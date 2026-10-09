@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase/client', () => ({ createClient: vi.fn() }))
 import {
+  shareWidth,
   announceLayout,
   applyOrder,
   clampWidth,
@@ -231,5 +232,19 @@ describe('effectiveLayout', () => {
   })
   it("is the code's arrangement when neither has one", () => {
     expect(effectiveLayout(NO_LAYOUT, NO_LAYOUT)).toEqual({ order: [], widths: {}, hidden: [] })
+  })
+})
+
+// 2026-10-09 — the Finance revamp resizes a column against its right-hand
+// neighbour, so the table's edge stays where it is.
+describe('shareWidth', () => {
+  it('moves width from one column to the next and back, the pair’s sum unchanged', () => {
+    expect(shareWidth(200, 140, 30)).toEqual([230, 110])
+    expect(shareWidth(200, 140, -50)).toEqual([150, 190])
+  })
+
+  it('stops at the minimum width of either column', () => {
+    expect(shareWidth(200, 140, 500)).toEqual([280, 60])
+    expect(shareWidth(200, 140, -500)).toEqual([60, 280])
   })
 })

@@ -60,6 +60,25 @@ in English. The user compared a Harbour-blue accent for
 Finance's sheet with the orange and kept the orange ("我发现橘色比较好看"): the
 sheet has one accent for every department.
 
+**The Finance view (2026-10-09).** The user's Claude Design handoff
+(`.design/finance-revamp`) redesigns every Finance page in this same language
+and adds global rules that apply to **Finance's pages only** — the routes in
+`lib/finance-view.ts` as Finance or the Principal sees them; HR's and a
+department manager's pages keep the sheet as described above. PortalFrame
+puts `.fin-view` on the sheet frame and `FinViewProvider` around the shell;
+everything the view changes hangs off those (globals.css › "THE FINANCE
+VIEW"). On it: a card's figure is in the number face and coloured by meaning
+(ledger green for money in, danger red for money out, the new blue `wait`
+for anything waiting on someone, walnut for the page's one figure), its label
+sentence-case; chips in the body face, pending in blue; tables wear a navy
+band (#E2E7EF / #1D2B4A) with white rows, no zebra, and offer a Range mode on
+amount and date columns (`range`), a 620px scroll box with a sticky header
+(`scrollBox`) and neighbour resizing (`resizeMode`); the row menu reads Open /
+Open in new tab; a list keeps its scroll on Back; on a phone the top bar is
+cream with the H tile and the page's name, the lit tab sits on a peach pill,
+and a detail page goes back on an edge swipe. Numbers never come from the
+prototype.
+
 **What it is.** PortalFrame draws, for those routes, the content column inset
 10px around ONE white sheet (`.sheet-frame` › `.sheet`, 16px radius, hairline
 border, 24px padding) that stays put while one of these pages replaces another;

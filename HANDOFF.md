@@ -1,5 +1,66 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-09 a (SHIPPED) — Finance revamp · Phase 1, the Finance view
+
+The user handed over a Claude Design project, **Finance Revamp** (zip →
+`.design/finance-revamp/design_handoff_finance_revamp/`: `Finance
+Revamp.dc.html` + `support.js` + README + 16 screenshots; served for the
+browser pane by `$TEMP/claude-patch/serve-proto.js` on :4797). It redesigns
+EVERY Finance page in the sheet language we had been building (cards, section
+heads, counted tabs, orange), plus global rules (README "Global rules") and
+some new features. Decided with the user (AskUserQuestion):
+- the global rules apply to **Finance's pages only** — Finance's routes as
+  Finance or the Principal sees them (`lib/finance-view.ts`); HR's and a
+  department manager's pages keep the sheet as it was;
+- the handoff's **new features are in scope** (built with the page they
+  belong to, numbers from the database — never the prototype's samples);
+- **four phases**: 1 foundation (this) → 2 re-align the five pages already
+  converted → 3 Daily Bank, Fund IN/OUT + details, Invoice Financing,
+  Repayment Schedule (calendar), Overdue → 4 Overview, Dept Pool, Venture
+  Pool, General Ledger, Reports, Reconciliation/Journal, Settings. Each phase
+  deploys for the user to check. Invoice Pool stays skipped.
+
+Phase 1 (this checkpoint):
+- `lib/finance-view.ts` (tested): `FINANCE_VIEW_PREFIXES`, `isFinanceView
+  (pathname, role)`, `isFinanceDetailRoute` (a row's page under a list, for
+  Back and the edge swipe), `financePageTitle` (the phone top bar's word).
+- `FinViewProvider` / `useFinView` (`components/layout/fin-view.tsx`);
+  PortalFrame provides it, adds `.fin-view` to the sheet frame, passes `fin`
+  to TopBar and BottomTabBar, mounts `FinScrollMemory` (useEntryScroll over
+  `.st-box` panes — a list keeps its place on Back) and, on a detail route,
+  `FinSwipeBack` (28px edge, 8px axis lock, 0.9×dx follow, >80px commits,
+  180ms slide, then router.back()).
+- CSS (`globals.css` › "THE FINANCE VIEW"): tabular-nums body, accent-hover
+  #C9741F, Inter eyebrow/count at 0.05em, cards (12.5px sentence-case label,
+  mono figure grey by default, ledger bar+icon, new `wait` tone — blue —
+  defined for every sheet), Inter chips + `.chip.wait`, navy table band
+  #E2E7EF/#1D2B4A with rule #C8D0DD, no zebra, hover #FFF5E9, `.num` at 400
+  unless a weight class says otherwise, `.st-box` (620px, sticky thead),
+  `.st-modes` / `.st-range-*` / `.st-presets`, `[data-fin]` dressing for the
+  portaled popover, Columns panel and row menu, `.fin-topbar` (56px cream, H
+  tile, role kicker, page name) and `.fin-tabbar` (cream, `.fin-pill`
+  46×28 peach behind the lit icon, 10.5px labels).
+- `SortableTable`: column `range: 'number' | 'date'` → the popover's Pick
+  values | Range switch (one mode at a time), Min/Max or From/To, presets
+  (`lib/table-range.ts`: amountPresets, datePresets, inRange, rangeNumber),
+  "N rows in range", filter icon `data-active`; props `scrollBox` and
+  `resizeMode: 'neighbour'` (shareWidth in table-layout: the pair's sum is
+  constant, no handle on the last column); the words object (`WORDS.en` on
+  the Finance view: Double-click to open · right-click for more, Open →,
+  Search…, Clear filter, Reset columns, Set as default…).
+- `useRowLinks` / `RowMenu`: Open (or double-click) / Open in new tab on
+  the Finance view; `data-fin` on the menu.
+- Sidebar: "Bank BA" → "Invoice Financing" (the page itself in Phase 3).
+- Tests: finance-view 7, table-range 7, table-layout +2, SortableTable +7,
+  row-links 2, FinSwipeBack 2, TopBar 2, BottomTabBar 2, PortalFrame.fin 3.
+
+Next: Phase 2 — Payments/Receipts (status as chips, pending → wait tone, the
+detail side panel's When & where / Booking headings, Receipt # / Payer
+labels, a Payroll batches tab), Invoice (one-row toolbar with ▾ menus, Credit
+notes / Marketing projects / Non-billable below, an invoice detail page with
+Billable / Contra), Allocator (prototype's Records columns, a record's
+detail), Statements; then Phases 3–4.
+
 ## CHECKPOINT 2026-10-07 g (SHIPPED) — Billing Allocator on the sheet (batch 1, page 5)
 
 The sample (`docs/samples/2026-10-07-allocator-sheet-sample.html`, September

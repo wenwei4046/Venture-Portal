@@ -84,6 +84,17 @@ export function moveColumn(order: string[], moving: string, target: string, side
 }
 
 /** A width somebody DRAGGED: never narrower than a column can be read at. */
+/**
+ * A drag between two columns (2026-10-09, the Finance revamp): the width one
+ * gains the other loses, so the table's edge stays where it is. Either column
+ * stops at the minimum.
+ */
+export function shareWidth(left: number, right: number, dx: number): [number, number] {
+  const total = left + right
+  const next = Math.min(Math.max(left + dx, MIN_COLUMN_WIDTH), total - MIN_COLUMN_WIDTH)
+  return [next, total - next]
+}
+
 export function clampWidth(px: number): number {
   return Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, Math.round(px)))
 }

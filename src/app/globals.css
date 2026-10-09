@@ -4854,3 +4854,202 @@ table.ledger-table.audit-saves td { vertical-align: top; }
   .audit-fields { grid-template-columns: minmax(0, 1fr); }
   .audit-field { margin-top: 4px; font-size: 11px; }
 }
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE FINANCE VIEW (2026-10-09) — the user's Claude Design handoff
+   (.design/finance-revamp, README "Global rules"). Finance's pages as
+   Finance or the Principal sees them (lib/finance-view.ts); PortalFrame sets
+   `.fin-view` on the sheet frame and everything below hangs off it, so HR's
+   and a department manager's pages keep the sheet exactly as it was.
+   ═══════════════════════════════════════════════════════════════════════ */
+.fin-view { font-variant-numeric: tabular-nums lining-nums; }
+.fin-view .sheet-theme { --accent-hover: 201 116 31; }
+
+/* Page head: the eyebrow in the body face at the 0.05em cap; the title stays
+   Georgia, the sheet's display face. */
+.fin-view .page-eyebrow {
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: rgb(90 78 68);
+}
+.fin-view .sect-head .count {
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: rgb(var(--ink));
+}
+
+/* Summary cards: the label in sentence case, the figure in the number face
+   and grey unless its tone says otherwise — money in green (ledger), money
+   out red (danger), waiting on someone blue (wait), the page's one figure
+   walnut (primary). */
+.fin-view .stat-card-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(90 78 68);
+}
+.fin-view .stat-card-value {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  color: rgb(84 90 102);
+}
+.fin-view .stat-card-foot {
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 11px;
+}
+.fin-view .stat-card[data-tone='ledger']::before { background: rgb(120 170 145); }
+.fin-view .stat-card[data-tone='ledger'] .stat-card-icon { background: rgb(232 243 237); color: rgb(var(--ledger)); }
+/* The wait tone — pending, awaiting the Principal, maturing — is new, so it
+   is defined for every sheet; only the Finance pages ask for it. */
+.stat-card[data-tone='wait']::before { background: rgb(140 170 205); }
+.stat-card[data-tone='wait'] .stat-card-value { color: rgb(46 92 138); }
+.stat-card[data-tone='wait'] .stat-card-icon { background: rgb(232 239 247); color: rgb(46 92 138); }
+
+/* Chips in the body face; a blue chip for what is waiting. */
+.fin-view .chip {
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-weight: 400;
+}
+.chip.wait { background: rgb(230 238 247); color: rgb(46 92 138); border-color: rgb(46 92 138 / 0.4); }
+
+/* Tables: a navy header band, white rows without zebra, peach hover, the
+   figures at the regular weight (totals keep their own). */
+.fin-view table.ledger-table:where(:not(.payroll-grid)) thead th {
+  background: rgb(226 231 239);
+  color: rgb(29 43 74);
+  border-bottom-color: rgb(200 208 221);
+}
+.fin-view table.ledger-table:where(:not(.payroll-grid)) thead tr { background: rgb(226 231 239); }
+.fin-view table.ledger-table:where(:not(.payroll-grid)) thead th .text-accent { color: rgb(29 43 74); }
+.fin-view table.ledger-table:where(:not(.payroll-grid)) tbody tr:nth-child(even) { background: transparent; }
+.fin-view table.ledger-table:where(:not(.payroll-grid)) tbody tr:hover { background: rgb(255 245 233); }
+:where(.fin-view) .num:where(:not(.font-semibold, .font-bold, .font-medium)) { font-weight: 400; }
+.fin-view .st-resize::after { background: rgb(190 199 214); }
+
+/* A long list in a box that scrolls under a sticky header (SortableTable
+   `scrollBox`). The box carries the frame; the table inside drops its own. */
+.st-box {
+  max-height: 620px;
+  overflow: auto;
+  border: 1px solid rgb(var(--sheet-table-border, var(--hairline)));
+  border-radius: 10px;
+  background: rgb(var(--surface));
+}
+.st-box table.ledger-table { border: 0; border-radius: 0; overflow: visible; }
+.st-box thead th { position: sticky; top: 0; z-index: 2; }
+
+/* The filter's Pick values | Range switch and the range editor. */
+.st-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 8px;
+  padding: 3px;
+  border-radius: 8px;
+  background: rgb(238 236 232);
+}
+.st-modes button {
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  color: inherit;
+  cursor: pointer;
+}
+.st-modes button[aria-pressed='true'] { background: #fff; box-shadow: 0 1px 2px rgb(43 31 23 / 0.12); font-weight: 600; }
+.st-range-field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgb(117 100 86);
+}
+.st-range-field input { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; text-align: right; }
+.st-presets { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.st-presets button {
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 99px;
+  background: #fff;
+  font-size: 11px;
+  color: inherit;
+  cursor: pointer;
+}
+.st-presets button:hover { border-color: rgb(var(--accent)); }
+.st-range-count { margin-top: 8px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; color: rgb(117 100 86); }
+
+/* The popover, the row menu and the Columns panel are portaled to <body>,
+   outside the sheet: on the Finance view they carry data-fin and dress here. */
+[role='dialog'][data-fin='true'] {
+  background: #fff;
+  border-color: rgb(229 228 223);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgb(43 31 23 / 0.16);
+  color: #000;
+}
+[role='dialog'][data-fin='true'] input[type='checkbox'] { accent-color: rgb(233 154 83); }
+[role='menu'][data-fin='true'] {
+  background: rgb(242 239 234);
+  border-color: rgb(211 203 192);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgb(43 31 23 / 0.18);
+  color: rgb(43 31 23);
+}
+[role='menu'][data-fin='true'] [role='menuitem']:hover,
+[role='menu'][data-fin='true'] [role='menuitem']:focus { background: rgb(222 231 240); }
+
+/* The phone's chrome: a cream top bar with the H tile and the page's name;
+   the tab bar cream with a peach pill behind the lit tab's icon. */
+.fin-topbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  padding: 0 16px;
+  background: rgb(252 250 247);
+  box-shadow: 0 1px 0 rgb(232 225 216);
+}
+.fin-topbar-tile {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: rgb(90 62 43);
+  color: #fff;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 13px;
+}
+.fin-topbar-text { display: flex; min-width: 0; flex-direction: column; line-height: 1.15; }
+.fin-topbar-kicker { font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: rgb(138 119 101); }
+.fin-topbar-page { overflow: hidden; font-size: 14px; font-weight: 600; color: rgb(43 31 23); white-space: nowrap; text-overflow: ellipsis; }
+.fin-tabbar {
+  background: rgb(252 250 247);
+  border-top-color: rgb(232 225 216);
+  box-shadow: 0 -6px 18px rgb(43 31 23 / 0.06);
+}
+.fin-tabbar .fin-tab { color: rgb(138 128 118); }
+.fin-tabbar .fin-tab-lit { color: rgb(43 31 23); }
+.fin-tabbar .fin-tab > span:last-child,
+.fin-tabbar .fin-tab-lit > span:last-child { font-size: 10.5px; }
+.fin-tabbar .fin-tab-lit > span:last-child { font-weight: 600; }
+.fin-tabbar .fin-pill {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  border-radius: 99px;
+  background: rgb(255 234 210);
+}
+.fin-tabbar .fin-pill + svg { position: relative; }
+.fin-tabbar .fin-tab-lit svg { stroke-width: 1.8; }

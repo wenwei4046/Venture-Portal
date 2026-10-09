@@ -12,7 +12,9 @@ import { SheetIcon, type SheetIconName } from './SheetIcon'
 // commission. `danger` / `alert` carry a problem that still needs somebody;
 // the word says what it is, the colour only says it needs looking at.
 
-export type StatTone = 'default' | 'primary' | 'danger' | 'alert' | 'ledger'
+// `wait` (2026-10-09, the Finance revamp): something waiting on someone —
+// pending, awaiting the Principal, maturing — in blue.
+export type StatTone = 'default' | 'primary' | 'danger' | 'alert' | 'ledger' | 'wait'
 
 /** How many cards sit side by side: all of them up to six, then two even
  *  rows (eight → 4 + 4) rather than a seventh squeezed in or one left over. */

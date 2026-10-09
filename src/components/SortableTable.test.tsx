@@ -40,6 +40,7 @@ vi.mock('@/lib/supabase/client', () => ({
 }))
 
 import SortableTable, { type SortableColumn } from './SortableTable'
+import { FinViewProvider } from './layout/fin-view'
 
 interface Row {
   id: string
@@ -648,5 +649,87 @@ describe('a queue table', () => {
     fireEvent.click(screen.getAllByRole('button', { name: '展开明细' })[0])
     expect(screen.getByText('Open the voucher →')).toBeInTheDocument()
     expect(screen.queryByText('打开 →')).toBeNull()
+  })
+})
+
+// 2026-10-09 — the Finance revamp (the user's Claude Design handoff): an
+// amount or date column's filter has a Range mode beside Pick values, a long
+// list sits in a box that scrolls under a sticky header, a column is resized
+// against its neighbour so the table's edge stays put, and the table speaks
+// English on the Finance view.
+describe('the Finance revamp', () => {
+  const rangeColumns: SortableColumn<Row>[] = columns.map((c) => (c.key === 'amount' ? { ...c, filterable: true, range: 'number' } : c))
+  const fin = (extra: Partial<TableProps> = {}) => render(<FinViewProvider value={true}>{tableElement(extra)}</FinViewProvider>)
+  const popover = () => screen.getByRole('dialog', { name: /Filter/ })
+
+  it('narrows an amount column to a range instead of picking values', () => {
+    table({ columns: rangeColumns })
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Amount' }))
+    fireEvent.click(within(popover()).getByRole('button', { name: 'Range' }))
+    fireEvent.change(within(popover()).getByLabelText('Min'), { target: { value: '150' } })
+    expect(bodyRows().map((r) => r.textContent)).toEqual([expect.stringContaining('INV-2')])
+    expect(popover()).toHaveTextContent('1 row in range')
+    expect(screen.getByRole('button', { name: 'Filter Amount' })).toHaveAttribute('data-active', 'true')
+    fireEvent.click(within(popover()).getByRole('button', { name: '> 100k' }))
+    expect(bodyRows()[0]).toHaveTextContent('No rows')
+    fireEvent.click(within(popover()).getByRole('button', { name: /clear filter/i }))
+    expect(bodyRows()).toHaveLength(2)
+  })
+
+  it('a date column takes From and To, with presets from today', () => {
+    const today = new Date()
+    const dated = [
+      { ...rows[0], date: new Date(today.getFullYear(), today.getMonth(), 1, 9) },
+      { ...rows[1], date: new Date(2020, 0, 15) },
+    ] as Array<Row & { date: Date }>
+    const cols: SortableColumn<Row & { date: Date }>[] = [
+      { key: 'no', label: 'Invoice #', render: (r) => r.no },
+      { key: 'date', label: 'Date', filterable: true, range: 'date', render: (r) => r.date.toISOString().slice(0, 10), sortValue: (r) => r.date },
+    ]
+    render(<SortableTable rows={dated} columns={cols} defaultSort={{ key: 'no', dir: 'asc' }} getRowKey={(r) => r.id} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Date' }))
+    fireEvent.click(within(popover()).getByRole('button', { name: 'Range' }))
+    expect(within(popover()).getByLabelText('From')).toBeInTheDocument()
+    fireEvent.click(within(popover()).getByRole('button', { name: 'This month' }))
+    expect(bodyRows().map((r) => r.textContent)).toEqual([expect.stringContaining('INV-1')])
+  })
+
+  it('picking values and a range are one or the other', () => {
+    table({ columns: rangeColumns })
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Amount' }))
+    fireEvent.click(within(popover()).getByRole('button', { name: 'Range' }))
+    fireEvent.change(within(popover()).getByLabelText('Min'), { target: { value: '150' } })
+    expect(bodyRows()).toHaveLength(1)
+    fireEvent.click(within(popover()).getByRole('button', { name: 'Pick values' }))
+    expect(bodyRows()).toHaveLength(2)
+    expect(within(popover()).getByLabelText('250')).toBeInTheDocument()
+  })
+
+  it('puts a long list in a box that scrolls', () => {
+    table({ scrollBox: true })
+    expect(document.querySelector('.st-box table')).not.toBeNull()
+  })
+
+  it('resizing against a neighbour leaves the last column without a handle', async () => {
+    table({ resizeMode: 'neighbour' })
+    await settle()
+    expect(th('amount').querySelector('.st-resize')).not.toBeNull()
+    expect(th('action').querySelector('.st-resize')).toBeNull()
+  })
+
+  it('speaks English on the Finance view', () => {
+    fin({ onRowOpen: vi.fn(), onRowContextMenu: vi.fn(), columns: rangeColumns })
+    expect(screen.getByText('Double-click to open · right-click for more')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Amount' }))
+    expect(within(popover()).getByPlaceholderText('Search…')).toBeInTheDocument()
+    expect(within(popover()).getByRole('button', { name: 'Clear filter' })).toBeInTheDocument()
+    expect(popover()).toHaveAttribute('data-fin', 'true')
+  })
+
+  it('…and opens a row on the phone with Open →', () => {
+    desktop(false)
+    fin({ onRowOpen: vi.fn(), layoutId: undefined })
+    fireEvent.click(screen.getAllByRole('button', { name: '展开明细' })[0])
+    expect(screen.getByText('Open →')).toBeInTheDocument()
   })
 })

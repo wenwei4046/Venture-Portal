@@ -1,6 +1,7 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { financePageTitle } from '@/lib/finance-view'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@/types'
 import { getRoleLabel } from '@/lib/roles'
@@ -10,10 +11,14 @@ import ThemeToggle from './ThemeToggle'
 
 interface TopBarProps {
   user: User
+  /** The Finance view (2026-10-09): on a phone the bar is the handoff's — an
+   *  H tile, the role, the page's name. The desktop bar is unchanged. */
+  fin?: boolean
 }
 
-export default function TopBar({ user }: TopBarProps) {
+export default function TopBar({ user, fin = false }: TopBarProps) {
   const router = useRouter()
+  const pathname = usePathname()
   // Ultimate full access (`view_switch`, 2026-10-08) — the Principal role
   // used to be the test, which Full access now shares without the switcher.
   const canSwitchView = user.canSwitchView === true
@@ -46,7 +51,21 @@ export default function TopBar({ user }: TopBarProps) {
   // is 22px on md so text lands on the same 32px gutter as the page content
   // below (10px margin + 22px padding).
   return (
-    <div className="h-[60px] bg-chrome px-4 md:px-[22px] md:mt-2.5 md:mx-2.5 md:rounded-panel md:border md:border-hairline flex items-center justify-between shrink-0 gap-3">
+    <>
+    {fin ? (
+      <div data-testid="fin-topbar" className="fin-topbar md:hidden">
+        <span className="fin-topbar-tile" aria-hidden>H</span>
+        <span className="fin-topbar-text">
+          <span className="fin-topbar-kicker">{getRoleLabel(user.role)}</span>
+          <span className="fin-topbar-page">{financePageTitle(pathname) || 'Overview'}</span>
+        </span>
+        <span className="ml-auto flex items-center gap-3">
+          {canSwitchView ? <PortalViewSwitcher value={user.role} /> : null}
+          <ThemeToggle />
+        </span>
+      </div>
+    ) : null}
+    <div className={`h-[60px] bg-chrome px-4 md:px-[22px] md:mt-2.5 md:mx-2.5 md:rounded-panel md:border md:border-hairline ${fin ? 'hidden md:flex' : 'flex'} items-center justify-between shrink-0 gap-3`}>
       <div className="flex items-center gap-3 min-w-0">
         {/* The hamburger used to live here. Removed 2026-08-31 when mobile nav
             became a bottom tab bar — the greeting now gets the full width it
@@ -96,5 +115,6 @@ export default function TopBar({ user }: TopBarProps) {
         </button>
       </div>
     </div>
+    </>
   )
 }
