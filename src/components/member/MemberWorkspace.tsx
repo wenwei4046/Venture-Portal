@@ -20,6 +20,7 @@ import MemberQuoteBuilder from "./MemberQuoteBuilder";
 import MemberSearch, { type MemberSearchItem } from "./MemberSearch";
 import PortalViewSwitcher from "@/components/layout/PortalViewSwitcher";
 import PrincipalRevenuePanels, { RevenueManagementButton } from "./PrincipalRevenuePanels";
+import CrmApp from "./crm/CrmApp";
 import principalStyles from "./PrincipalRevenuePanels.module.css";
 import { categoryLabel } from "@/lib/member/catalog";
 import {
@@ -92,6 +93,7 @@ const labels: Record<MemberPage, string> = {
   team: "My team",
   requests: "Requests",
   memos: "Memos & notifications",
+  crm: "CRM",
   account: "Profile",
 };
 const statusLabels: Record<string, string> = {
@@ -309,6 +311,8 @@ export default function MemberWorkspace({
     [mapBusy, setMapBusy] = useState(false),
     [mapError, setMapError] = useState<string | null>(null);
   const [viewedStaffId, setViewedStaffId] = useState("");
+  // The member the Principal picked in Today, for the CRM (null: none picked — the CRM shows everyone).
+  const [crmViewing, setCrmViewing] = useState<string | null>(null);
   const [insightEntry, setInsightEntry] = useState<{ screen: "overview" | "orders"; brand?: string }>({ screen: "overview" });
   const insightSequence = useRef(0);
   const mapSequence = useRef(0);
@@ -437,6 +441,8 @@ export default function MemberWorkspace({
       setInsightEntry({ screen: url.searchParams.get("screen") === "orders" ? "orders" : "overview", brand: url.searchParams.get("brand") ?? undefined });
       setDepartment(selected?.id ?? "");
       setViewedStaffId(initialData.principalView ? selected?.people.find(person => person.id === url.searchParams.get("staff"))?.id ?? selected?.people[0]?.id ?? "" : "");
+      // The CRM opens on a member only when the Principal picked one (the URL names them), not on the first by default.
+      setCrmViewing(initialData.principalView ? selected?.people.find(person => person.id === url.searchParams.get("staff"))?.id ?? null : null);
       if (p && p !== next) {
         url.searchParams.set("page", next);
         history.replaceState(history.state, "", url);
@@ -674,6 +680,7 @@ export default function MemberWorkspace({
     setOrgMap(null);
     setLiveKpi(null);
     setViewedStaffId(value);
+    setCrmViewing(value);
     setInsightEntry({ screen: "overview" });
     closeDialog();
     const url = new URL(window.location.href);
@@ -2081,6 +2088,7 @@ export default function MemberWorkspace({
                     : ([["insight", "chart", "Insight · sales, ranking & downline"]] as const)),
                   ["requests", "receipt", "Requests"],
                   ["memos", "bell", "Memos & notifications"],
+                  ["crm", "chat", "CRM"],
                   ["team", "team", "Team & capacity"],
                 ] as const
               ).map(([p, i, l]) => (
@@ -2222,6 +2230,13 @@ export default function MemberWorkspace({
   }
   const activeMemo = data.memos.find((m) => m.id === selectedMemo),
     activeRequest = data.requests.find((r) => r.id === selectedRequest);
+  // CRM is an app of its own: its own top bar and Inbox / Calendar / Profile
+  // bar replace the workspace chrome. Back returns to Profile.
+  if (page === "crm" && member) {
+    return <div className={`${s.workspace} ${liveDesign ? liveStyles.workspace : ""}`} lang="en-MY">
+      <CrmApp salesperson={data.profile.name} onExit={() => navigate("account")} live={!data.demo} />
+    </div>;
+  }
   return (
     <div className={`${s.workspace} ${design ? motion.shell : ""} ${liveDesign ? liveStyles.workspace : ""}`} lang="en-MY" data-arena-design={design} data-revenue-design={design} data-revenue-preview={isDesignPreview ? design : undefined}>
       <div id="member-shell">

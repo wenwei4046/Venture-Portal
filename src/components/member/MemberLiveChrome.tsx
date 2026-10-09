@@ -31,7 +31,7 @@ export function MemberLiveNav({ active, canQuote, principalView = false, desktop
     ] : []),
     { page: "account", icon: "user", label: "Profile" },
   ];
-  const selected = desktop ? active : ["team", "requests", "memos"].includes(active) ? "account" : active === "income" ? "insight" : active;
+  const selected = desktop ? active : ["team", "requests", "memos", "crm"].includes(active) ? "account" : active === "income" ? "insight" : active;
   const content = entries.map(entry => <button key={entry.page} aria-current={selected === entry.page ? "page" : undefined} onClick={() => onSelect(entry.page)}>
     <span className={s.navIcon}><Icon name={entry.icon} size={desktop ? 23 : 25} /></span><span>{entry.label}</span>
   </button>);

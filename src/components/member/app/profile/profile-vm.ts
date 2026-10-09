@@ -10,7 +10,7 @@ import type { ClaimRates } from "@/lib/member/claim-rules";
 export type Tone = "good" | "neutral" | "warn" | "bad" | "none";
 
 // ── Profile ──
-export type WorkKey = "income" | "honours" | "team" | "requests" | "memos";
+export type WorkKey = "income" | "honours" | "team" | "requests" | "crm" | "memos";
 export interface ProfileMainVM {
   name: string;
   ini: string;

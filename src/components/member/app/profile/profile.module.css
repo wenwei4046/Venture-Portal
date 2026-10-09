@@ -145,6 +145,7 @@
 .toneTeam { background: var(--rv-orange-bg); color: var(--rv-accent); }
 .toneRequests { background: var(--rv-sand); color: var(--rv-brown); }
 .toneMemos { background: var(--rv-red-bg); color: var(--rv-red); }
+.toneLeads { background: var(--rv-orange-bg); color: var(--rv-accent); }
 .workText { min-width: 0; }
 .workLabel { display: flex; align-items: center; gap: 8px; font-size: calc(16px * var(--rv-type)); font-weight: 650; }
 .workBadge { font-size: calc(11.5px * var(--rv-type)); font-weight: 650; color: var(--rv-amber); background: var(--rv-amber-bg); border-radius: 10px; padding: 1px 7px; }
