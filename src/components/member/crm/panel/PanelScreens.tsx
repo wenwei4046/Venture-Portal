@@ -64,9 +64,10 @@ export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
     <PanelRooms v={roomsVM(ctx)} />
     <PanelOverlays v={overlaysVM(ctx)} />
     <PanelNav v={navVM(ctx)} />
-    {/* What happened (the design's dark toast), above the bar. */}
-    {!!ui.toast && !ui.lead && (
-      <div style={{ position: "absolute", left: "20px", right: "20px", bottom: "78px", zIndex: 30, padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: "14px", fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{ui.toast}</div>
+    {/* What happened (the design's dark toast), above the bar — or, in a chat, above the composer
+        (a booking the customer was not told of must say so where it was made). */}
+    {!!ui.toast && (
+      <div style={{ position: "absolute", left: "20px", right: "20px", bottom: ui.lead ? "92px" : "78px", zIndex: 30, padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: "14px", fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{ui.toast}</div>
     )}
   </>);
 }
