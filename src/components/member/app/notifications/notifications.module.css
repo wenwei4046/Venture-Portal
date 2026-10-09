@@ -8,6 +8,8 @@
   top: var(--status-h, 54px);
   z-index: 24;
   border-left: 1px solid transparent;
+  /* The list ends above the phone's own bar (`--sheet-safe`, shell.module.css .screen). */
+  border-bottom: var(--sheet-safe, 0px) solid transparent;
   background: var(--rv-white);
   display: flex;
   flex-direction: column;

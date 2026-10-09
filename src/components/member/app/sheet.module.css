@@ -22,6 +22,10 @@
   top: auto;
   box-shadow: none;
   border-left: 0;
+  /* The phone's own bar (2026-10-10): the sheet's white runs on under it — a
+     transparent border shows the panel's own background — and its contents
+     stay above it. How much: `--sheet-safe`, shell.module.css .screen. */
+  border-bottom: var(--sheet-safe, 0px) solid transparent;
   height: var(--sheet-h, auto);
   max-height: var(--sheet-max, none);
   background: var(--rv-white);

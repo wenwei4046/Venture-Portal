@@ -42,7 +42,18 @@
   position: relative;
   padding-left: 0;
   box-sizing: border-box;
+  /* What a sheet, or a page sliding over the screen, adds under its own bottom
+     padding to clear the phone's own bar (2026-10-10; `--safe-bottom`,
+     globals.css). The prototype padded each one 24–34px for an iPhone's home
+     indicator, which is translucent: there only what the inset exceeds 30px by
+     is added (34 → 4px), so an iPhone looks as drawn. */
+  --sheet-safe: max(0px, calc(var(--safe-bottom, 0px) - 30px));
 }
+/* Android's three buttons are opaque (48px): a sheet's last row sat behind them.
+   Its sheets were drawn tighter (18–34px; Start a quote, the cart, Add to quote
+   and the customer quote 18–20 over the prototype's 18px gesture bar), so each
+   clears the buttons by at least 12px (48 → 42px added). */
+.screen[data-platform="android"] { --sheet-safe: max(0px, calc(var(--safe-bottom, 0px) - 6px)); }
 .screenFramed { height: 100%; }
 .frameIos .screen { border-radius: 52px; }
 .frameAndroid .screen { border-radius: 36px; }

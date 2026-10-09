@@ -945,6 +945,8 @@
   top: var(--status-h, 54px);
   z-index: 28;
   background: var(--rv-white);
+  /* The list ends above the phone's own bar (`--sheet-safe`, shell.module.css .screen). */
+  border-bottom: var(--sheet-safe, 0px) solid transparent;
   display: flex;
   flex-direction: column;
   transform: translateX(104%);

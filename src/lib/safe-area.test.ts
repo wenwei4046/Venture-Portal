@@ -127,4 +127,30 @@ describe('bottom bars stand on --safe-bottom', () => {
     expect(readFileSync(resolve(ROOT, 'src/components/member/app/shell.module.css'), 'utf8')).toMatch(/\.navLive \{ padding-bottom: var\(--safe-bottom/)
     expect(readFileSync(resolve(ROOT, 'src/components/layout/BottomTabBar.tsx'), 'utf8')).toContain('pb-[var(--safe-bottom)]')
   })
+
+  // Everything the Revenue app slides over the whole screen reaches its bottom
+  // edge: on a phone with three buttons the last ~48px sat behind them, a
+  // reload or not (Start a quote's last brand, Add to quote's foot). Each keeps
+  // its white running on under the bar and its contents above it.
+  it.each([
+    ['src/components/member/app/sheet.module.css', 'panel'],
+    ['src/components/member/app/quote/quote.module.css', 'psPanel'],
+    ['src/components/member/app/quote/quote.module.css', 'pickPanel'],
+    ['src/components/member/app/notifications/notifications.module.css', 'page'],
+    ['src/components/member/app/profile/profile.module.css', 'va'],
+  ])('%s .%s stands above the phone’s bar', (file, cls) => {
+    const css = uncommented(readFileSync(resolve(ROOT, file), 'utf8'))
+    const rule = css.match(new RegExp(`(?:^|\\n)\\.${cls}\\s*\\{([^}]*)\\}`))
+    expect(rule?.[1]).toMatch(/border-bottom:\s*var\(--sheet-safe, 0px\) solid transparent/)
+  })
+
+  // Only what the sheets' own ~30px does not already cover, so an iPhone keeps
+  // its look — its home indicator is translucent (2026-10-10, a review note the
+  // user passed on: the whole inset made every iPhone sheet's foot ~64px);
+  // Android's three opaque buttons are cleared with air to spare.
+  it('adds to a sheet only what its own padding does not cover', () => {
+    const css = uncommented(readFileSync(resolve(ROOT, 'src/components/member/app/shell.module.css'), 'utf8'))
+    expect(css).toMatch(/\n\.screen \{[^}]*--sheet-safe: max\(0px, calc\(var\(--safe-bottom, 0px\) - 30px\)\);/)
+    expect(css).toMatch(/\n\.screen\[data-platform="android"\] \{ --sheet-safe: max\(0px, calc\(var\(--safe-bottom, 0px\) - 6px\)\); \}/)
+  })
 })
