@@ -44,6 +44,13 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
       out.push({ id: i.id, kind: "status", from, ini: ini(from), lead: i.customerName, text: `You ${i.state} ${from}'s ${i.kind === "share" ? "invitation" : "move request"}`, at: atLabel(t, now), time: t, ok: i.state === "accepted", pending: false });
     }
   }
+  // Customers given to them (user 2026-10-09): a new enquiry the CRM dealt, or one someone assigned.
+  for (const c of data.customers) {
+    if (c.assignedTo !== me || !c.assignedAt) continue;
+    const t = new Date(c.assignedAt).getTime(), by = c.assignedBy && c.assignedBy !== me ? nameOf(c.assignedBy) : "";
+    out.push({ id: "a" + c.id + t, kind: "status", from: by || c.name, ini: ini(by || c.name), lead: c.name, at: atLabel(t, now), time: t, ok: true, pending: false,
+      text: by ? `${firstName(by)} assigned a customer to you` : c.adId ? `New enquiry for you · ${c.ad}` : "New enquiry for you" });
+  }
   // About the people below them, only theirs.
   const below = new Set(downlineOf(me, data.people).filter(id => id !== me));
   if (below.size) {

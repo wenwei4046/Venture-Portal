@@ -124,6 +124,18 @@ const bens = (await q(`select id from crm_contacts where assigned_to = $1 limit 
 check((await as('boss', `select public.crm_can_reply($1) as ok`, [bens]))[0].ok, true, 'the Principal may answer Ben’s customer')
 check((await as('hod', `select public.crm_can_reply($1) as ok`, [bens]))[0].ok, true, 'the Director may too')
 check((await as('ann', `select public.crm_can_reply($1) as ok`, [bens]))[0].ok, false, 'Ann may not')
+// Assigned (user 2026-10-09): when and by whom, behind the salesperson's "new enquiry for you".
+{
+  await db.exec(`set test.uid = ''`) // the ingest: no session
+  const dealt = (await q(`insert into crm_contacts (channel, account_id, external_id, name, assigned_to) values ('whatsapp', 'PN1', 'dealt-1', 'Dealt', $1)
+    returning assigned_at is not null as stamped, assigned_by`, [S('ann')]))[0]
+  check(dealt, { stamped: true, assigned_by: null }, 'a customer the CRM dealt is stamped with the time and no one')
+  const c = (await q(`select id from crm_contacts where external_id = 'dealt-1'`))[0].id
+  await as('boss', `select public.crm_send_to($1, $2)`, [c, S('ben')])
+  check((await q(`select assigned_to, assigned_by from crm_contacts where id = $1`, [c]))[0], { assigned_to: S('ben'), assigned_by: S('boss') }, 'sent by the Principal: stamped with the Principal')
+  await q(`update crm_contacts set unread = 1 where id = $1`, [c])
+  check((await q(`select assigned_by from crm_contacts where id = $1`, [c]))[0].assigned_by, S('boss'), 'another change leaves the stamp')
+}
 // Unread (user 2026-10-09, choice B): a manager looking in leaves it; a reply from anyone clears it.
 await q(`update crm_contacts set unread = 5 where id = $1`, [bens])
 await as('boss', `select public.crm_mark_read($1)`, [bens])

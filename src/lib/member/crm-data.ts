@@ -54,6 +54,9 @@ export interface CrmCustomer {
   previous?: "won" | "lost";
   wonAmount: number | null;
   assignedTo: string | null;
+  /** When the customer was given to them, and by whom (null: the CRM dealt it) — the bell's "new enquiry for you". */
+  assignedAt?: string | null;
+  assignedBy?: string | null;
   teamId: string | null;
   lastCustomerAt: string | null;
   createdAt: string;
@@ -181,6 +184,8 @@ export interface CrmContactRowX extends CrmContactRow {
   budget?: string | null;
   won_amount?: number | string | null;
   details_at?: string | null;
+  assigned_at?: string | null;
+  assigned_by?: string | null;
 }
 export interface CrmMessageRowX extends CrmMessageRow {
   reply_to?: string | null;
@@ -269,6 +274,8 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
     ...(row.previous_status ? { previous: row.previous_status } : {}),
     wonAmount: row.won_amount == null ? null : Number(row.won_amount),
     assignedTo: row.assigned_to,
+    assignedAt: row.assigned_at ?? null,
+    assignedBy: row.assigned_by ?? null,
     teamId: row.team_id,
     lastCustomerAt: row.last_customer_at ?? null,
     createdAt: row.created_at,
