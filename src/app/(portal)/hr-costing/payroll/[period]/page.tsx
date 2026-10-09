@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
+import { sees } from '@/lib/sensitive'
 import { formatMoney, formatIntlDate } from '@/lib/utils'
 import { OFFICE_TZ } from '@/lib/office-clock'
 import { revenuePath, subDeptSlug } from '@/lib/revenue'
@@ -428,12 +429,21 @@ export default async function PayrollGridPage({ params }: PageProps) {
                 }
               : undefined
           }
+          // The files need the real numbers (2026-10-09, PR4, choice A): the
+          // bank file the account numbers, the statutory files the NRICs — so
+          // each is offered only where that tick is the viewer's.
           actions={[
-            { label: 'Bank CSV (Alliance Bank)', href: `/hr-costing/payroll/${period}/bank-transfer?format=alliance`, title: 'Bulk payment file for the Alliance Bank portal' },
-            { label: 'KWSP file', href: `/hr-costing/payroll/${period}/statutory?file=kwsp` },
-            { label: 'SOCSO file', href: `/hr-costing/payroll/${period}/statutory?file=socso` },
-            { label: 'EIS file', href: `/hr-costing/payroll/${period}/statutory?file=eis` },
-            { label: 'LHDN CP39 file', href: `/hr-costing/payroll/${period}/statutory?file=pcb` },
+            ...(sees(user, 'bank')
+              ? [{ label: 'Bank CSV (Alliance Bank)', href: `/hr-costing/payroll/${period}/bank-transfer?format=alliance`, title: 'Bulk payment file for the Alliance Bank portal' }]
+              : []),
+            ...(sees(user, 'nric')
+              ? [
+                  { label: 'KWSP file', href: `/hr-costing/payroll/${period}/statutory?file=kwsp` },
+                  { label: 'SOCSO file', href: `/hr-costing/payroll/${period}/statutory?file=socso` },
+                  { label: 'EIS file', href: `/hr-costing/payroll/${period}/statutory?file=eis` },
+                  { label: 'LHDN CP39 file', href: `/hr-costing/payroll/${period}/statutory?file=pcb` },
+                ]
+              : []),
           ]}
         />
       </div>

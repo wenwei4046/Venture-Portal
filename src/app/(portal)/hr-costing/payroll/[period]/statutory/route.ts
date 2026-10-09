@@ -6,6 +6,8 @@ import { generatePerkesoSocso } from '@/lib/statutory/perkeso-socso'
 import { generatePerkesoEis } from '@/lib/statutory/perkeso-eis'
 import { generateLhdnCp39 } from '@/lib/statutory/lhdn-cp39'
 import type { StatutoryContributor } from '@/lib/statutory/types'
+import { readDirectorNric, readStaffPrivate } from '@/lib/private-fields'
+import { needsTick, sees } from '@/lib/sensitive'
 
 type FileKind = 'kwsp' | 'socso' | 'eis' | 'pcb'
 
@@ -22,7 +24,12 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ period: string }> },
 ) {
-  await requireAction('hr_costing', 'export')
+  const user = await requireAction('hr_costing', 'export')
+  // EPF, SOCSO, EIS and LHDN file every person under their NRIC (2026-10-09,
+  // PR4, the user's choice A): without NRIC / IC ticked there is no file.
+  if (!sees(user, 'nric')) {
+    return NextResponse.json({ error: needsTick('nric', 'A statutory file') }, { status: 403 })
+  }
   const { period } = await context.params
   if (!/^\d{4}-\d{2}-01$/.test(period)) {
     return NextResponse.json({ error: 'invalid period format' }, { status: 400 })
@@ -48,7 +55,7 @@ export async function GET(
       .select(`
         statutory_allowance, basic_salary, gross, epf_er, epf_ee,
         socso_er, socso_ee, eis_er, eis_ee, pcb,
-        hr_staff_costs (employee_name, employee_code, nric)
+        hr_staff_costs (id, employee_name, employee_code)
       `)
       .eq('period_month', period),
     supabase
@@ -56,7 +63,7 @@ export async function GET(
       .select(`
         employee_name, basic_salary, statutory_allowance, gross,
         epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb,
-        directors (name, code, nric)
+        directors (id, name, code)
       `)
       .eq('period_month', period),
   ])
@@ -68,6 +75,17 @@ export async function GET(
     )
   }
 
+  // The NRICs, through the readers — the tables no longer hand them out
+  // (2026-10-09, PR4); the caller holds the tick, so they come back whole.
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const staffIds = (staffRows ?? []).map(r => (r as any).hr_staff_costs?.id).filter(Boolean) as string[]
+  const directorIds = (directorRows ?? []).map(r => (r as any).directors?.id).filter(Boolean) as string[]
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+  const [staffPrivate, directorNric] = await Promise.all([
+    readStaffPrivate(supabase, user, staffIds),
+    readDirectorNric(supabase, user, directorIds),
+  ])
+
   const contributors: StatutoryContributor[] = []
 
   for (const r of staffRows ?? []) {
@@ -78,7 +96,7 @@ export async function GET(
     contributors.push({
       code: staff.employee_code ?? null,
       fullName: staff.employee_name,
-      nric: staff.nric ?? null,
+      nric: staffPrivate.get(staff.id)?.nric ?? null,
       statutoryWages: statWages,
       taxableIncome: Number(r.gross) - Number(r.epf_ee),
       epfEr: Number(r.epf_er),
@@ -100,7 +118,7 @@ export async function GET(
     contributors.push({
       code: dir?.code ?? null,
       fullName: dir?.name ?? r.employee_name,
-      nric: dir?.nric ?? null,
+      nric: dir?.id ? (directorNric.get(dir.id) ?? null) : null,
       statutoryWages: statWages,
       taxableIncome: Number(r.gross ?? 0) - Number(r.epf_ee ?? 0),
       epfEr: Number(r.epf_er ?? 0),

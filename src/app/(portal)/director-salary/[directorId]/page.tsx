@@ -8,6 +8,7 @@ import PCBInput from './_components/PCBInput'
 import EditableDeduction from './_components/EditableDeduction'
 import ResetStatutoryButton from './_components/ResetStatutoryButton'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import { DIRECTOR_ROW_COLUMNS } from '@/lib/private-columns'
 
 interface Props {
   params: Promise<{ directorId: string }>
@@ -27,7 +28,7 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
     { data: director },
     { data: payout },
   ] = await Promise.all([
-    supabase.from('directors').select('*').eq('id', directorId).single(),
+    supabase.from('directors').select(DIRECTOR_ROW_COLUMNS).eq('id', directorId).single(),
     supabase.from('director_payouts').select('*').eq('director_id', directorId).eq('period_month', period).maybeSingle(),
   ])
 

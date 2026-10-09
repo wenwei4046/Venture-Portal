@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/auth'
 import { formatMoney, formatMoneyBare, getPeriodMonth } from '@/lib/utils'
 import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
+import { DIRECTOR_ROW_COLUMNS } from '@/lib/private-columns'
 
 interface Props {
   params: Promise<{ directorId: string }>
@@ -19,7 +20,7 @@ export default async function PrintPayoutPage({ params, searchParams }: Props) {
   const period = dayjs(rawPeriod ?? getPeriodMonth()).startOf('month').format('YYYY-MM-DD')
 
   const [{ data: director }, { data: payout }] = await Promise.all([
-    supabase.from('directors').select('*').eq('id', directorId).single(),
+    supabase.from('directors').select(DIRECTOR_ROW_COLUMNS).eq('id', directorId).single(),
     supabase.from('director_payouts').select('*').eq('director_id', directorId).eq('period_month', period).maybeSingle(),
   ])
 

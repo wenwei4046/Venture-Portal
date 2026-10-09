@@ -2,12 +2,13 @@ import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requireAction } from '@/lib/auth'
+import { sees } from '@/lib/sensitive'
 import type { ManagerOption, SubDepartmentOption, TitleOption } from '@/lib/staff-form'
 import { listSubDepartments } from '../../../revenue/_lib/sub-departments'
 import AddStaffForm, { type AddStaffDepartment } from '../_components/AddStaffForm'
 
 export default async function NewStaffPage() {
-  await requireAction('team', 'create')
+  const viewer = await requireAction('team', 'create')
   const supabase = await createClient()
 
   // is_internal=false excludes the hidden 'Venture Office' pseudo-department —
@@ -106,6 +107,7 @@ export default async function NewStaffPage() {
         subDepartments={subDepartmentOptions}
         managers={managers}
         nextCode={nextCode}
+        canSeeBank={sees(viewer, 'bank')}
       />
     </div>
   )
