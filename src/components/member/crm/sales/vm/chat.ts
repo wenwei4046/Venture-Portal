@@ -196,8 +196,8 @@ export function chatVM(ctx: SalesCtx) {
     people: assigning ? assignList.map(p => ({ name: p.id === c.assignedTo ? `${p.name} · now` : p.name, role: titleOf(p), ini: ini(p.name), ring: hm.sel === p.id ? RUST : "#D9C7BA", dot: hm.sel === p.id ? RUST : "transparent", pick: () => setHm({ sel: p.id }) }))
       : superior ? [{ name: superior.name, role: jobTitle(superior), ini: ini(superior.name), ring: hm.sel === superior.id ? RUST : "#D9C7BA", dot: hm.sel === superior.id ? RUST : "transparent", pick: () => setHm({ sel: superior.id }) }] : [],
     cLabel: assigning ? (assignSel ? `Assign to ${assignSel.name}` : "Choose a person") : superior && hm.sel ? `Send move request to ${superior.name}` : "Choose a person", cBg: (assigning ? !!assignSel : !!(superior && hm.sel)) ? RUST : "#D9C7BA",
-    confirm: assigning ? (assigner && assignSel && assignSel.id !== c.assignedTo ? async () => {
-      if (!(await assigner(c.id, assignSel.id))) return;
+    confirm: assigning ? (assignSel && assignSel.id !== c.assignedTo ? async () => {
+      if (!(await assigner?.(c.id, assignSel.id))) return;
       // The customer leaves this person's CRM: back to their Inbox, and say where it went.
       set(u => ({ ...u, hm: null, chat: null }));
       act.toast(`${c.name} assigned to ${assignSel.name}`);
