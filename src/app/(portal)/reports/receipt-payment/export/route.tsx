@@ -26,6 +26,7 @@ import { fetchDeptOutstanding } from '@/lib/dept-receipt-payment'
 import { deptNameToSegment } from '@/lib/billing'
 import { glStatementExportResponse } from '@/lib/export/gl-statement'
 import { segmentFilterFor } from '../../_components/report-segments'
+import { reportsCompanyWide } from '@/lib/surfaces'
 
 const YM = /^\d{4}-\d{2}$/
 const r2 = (n: number) => Math.round(n * 100) / 100
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
   const format = url.searchParams.get('format') === 'pdf' ? ('pdf' as const) : ('xlsx' as const)
   const period = url.searchParams.get('period') ?? officeMonth()
   const compare = url.searchParams.get('compare') ?? ''
-  const isDeptMgr = user.role === 'dept_manager'
+  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
   const segment = isDeptMgr ? '' : (url.searchParams.get('segment') ?? '')
   if (!YM.test(period) || (compare && !YM.test(compare))) {
     return Response.json({ error: 'invalid period/compare (YYYY-MM)' }, { status: 400 })

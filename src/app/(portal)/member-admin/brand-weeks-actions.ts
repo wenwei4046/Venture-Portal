@@ -20,7 +20,7 @@ const validPeriod = (period: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(period);
 
 async function backOffice() {
   const user = await requireAuth();
-  if (user.role !== "principal" && !user.permissions.includes("member_requests_manage")) {
+  if (!user.permissions.includes("member_requests_manage")) {
     throw new Error("Brand weeks need HR request management access.");
   }
   return (await createClient()) as unknown as SupabaseClient;

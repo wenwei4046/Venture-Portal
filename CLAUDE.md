@@ -2262,8 +2262,8 @@ reads no page of theirs makes — hr@ a department's NP / OPEX, carrie report-on
 mirror slices, Finance the per-director payout summary (Director Salary is not
 Finance's). `permission-table-writes.test.ts` refuses a later row policy that asks
 `current_user_role()`. Still by kind, on purpose: `approvals_decider_update`
-(owner kind may decide their own request), `table_layout_defaults`,
-`dashboard_summary` (which dashboard to draw). Domain READS (`has_scope`) are still
+(owner kind may decide their own request), `table_layout_defaults`
+(`dashboard_summary` asks Treasury · View since Q7, below). Domain READS (`has_scope`) are still
 by key: a View cell of one Treasury function reads its domain's tables through
 the API. Mig `20261009040000`, `tests/member-sql/validate-reach.mjs`.
 
@@ -2308,6 +2308,41 @@ functions; columns still readable) before the code, `20261009050100` (the
 revoke; refuses to run without the readers) once the code is live.
 `tests/member-sql/validate-sensitive-fields.mjs`,
 `src/lib/private-columns.test.ts`.
+
+**PAGES ASK THE CELLS, NOT THE KIND (2026-10-09, Q7).** The KIND
+(`users.role`) is a template's hidden base_role and a custom template's cells
+need not agree with it, yet thirty-odd pages and actions still branched on it:
+which Overview to draw, whether a department page shows only the viewer's own
+department, who decides a pool claim, who raises for somebody else's sign-off,
+which Settings tabs, whether Billing Allocation is read-only, a report's
+company-wide or department cut. Each asks the cells now, one rule per question
+in `lib/surfaces.ts`: `overviewFor` (Treasury · View → the treasury Overview,
+else HR Costing · View → HR's, else Dept Pool · View → the department's, else a
+well saying the title opens none), `decidesEverything` (Approvals · Approve:
+the sign-off queue), `raisesForSignOff` (Treasury · Create without Approvals ·
+Approve: Finance's own queues, Invoice Pool's *Request release*),
+`ownDepartmentOnly(fn)` (View held at Own / Dept, not All),
+`decidesPoolClaims` (Claims · Approve + Treasury · View — a pool claim's
+voucher is raised in the treasury; approve, reject and mark paid all ask it),
+`raisesDepartmentRequests` (My Billing · Create at Dept: a pool's request
+tabs), `seesAllSettings` (Settings · Manage, else Accounts + Departments),
+`reportsCompanyWide` (Reports · View, else the department's cut). Billing
+Allocation edits with HR Costing · Edit (its writes ask the same — the
+Principal may edit it now); Member services and the member preview go by their
+keys. The Overview's two summaries swapped their kind check for the cell
+(`dashboard_summary` Treasury · View, `hr_dashboard_summary` HR Costing ·
+View — production's bodies, one statement each; mig `20261009060000`). The
+five logins land exactly where their kind put them (`src/lib/surfaces.test.ts`,
+on production's own keys and actions); what moves is a template whose kind
+disagreed with its cells — the Director title (kind staff, Treasury · View)
+opens the treasury Overview instead of "Principal and Finance only"; nobody
+wears it on 2026-10-09 (carrie is the one templated login). Still by kind, on
+purpose, each with its why in `src/lib/kind-checks.test.ts` — which fails on a
+new `user.role` anywhere else: which app the account belongs to (Revenue app
+or portal), the shared table layouts (`table_layout_defaults`), reopening a
+Total-Closed payroll month (the Principal's), the owner kind's self-approval
+(`approver_may`; `isOwnerKind`, claims too), view-as, labels and the phone's
+tab bar. `tests/member-sql/validate-overview-actions.mjs`.
 
 View as (2026-09-27): the Principal's `vp-view-as` cookie is shared by every
 tab. *Revenue View* (`revenue_member`) is honoured by the member app ONLY

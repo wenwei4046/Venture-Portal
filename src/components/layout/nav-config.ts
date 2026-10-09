@@ -308,7 +308,7 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     // Permissions is People Management's second tab (permission templates),
     // Roles is Hierarchy's fourth. Their old addresses redirect there.
     { href: '/team/people', label: 'People Management', section: 'People', visible: isHRorPrincipal },
-    { href: '/member-admin', label: 'Member Services', section: 'People', visible: v => v.role === 'principal' || can(v, 'member_requests_manage') || can(v, 'member_memos_manage') },
+    { href: '/member-admin', label: 'Member Services', section: 'People', visible: v => can(v, 'member_requests_manage') || can(v, 'member_memos_manage') },
     { href: '/team/hierarchy', label: 'Hierarchy', section: 'People', visible: isHRorPrincipal },
 
     // ── Reports & Admin ──

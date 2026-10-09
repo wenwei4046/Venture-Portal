@@ -9,6 +9,7 @@ import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import DeptPoolTabs from '../_components/DeptPoolTabs'
 import HistoryTable from '../_components/HistoryTable'
 import DeptPnlView from '../_components/DeptPnlView'
+import { ownDepartmentOnly, raisesDepartmentRequests } from '@/lib/surfaces'
 
 // Slug → dept name. Director (the special director payout pool) is intentionally
 // excluded — it has its own /director-pool view and is not a regular dept pool.
@@ -43,7 +44,7 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
   if (!dept) notFound()
 
   // Dept Manager restriction: must be their own dept
-  if (user.role === 'dept_manager' && user.department_id !== dept.id) {
+  if (ownDepartmentOnly(user, 'dept_pool') && user.department_id !== dept.id) {
     notFound()
   }
 
@@ -101,7 +102,7 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
 
       <DeptPoolTabs
         basePath={`/dept-pool/${slug}`}
-        role={user.role}
+        raisesRequests={raisesDepartmentRequests(user)}
         isOwnDept={isOwnDept}
         extraTabs={[{ key: 'pnl', label: 'P&L' }]}
       />

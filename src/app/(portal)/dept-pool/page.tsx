@@ -12,6 +12,7 @@ import { extraDeptNameToSegment, primedRegistryRows } from '@/lib/dept-registry'
 import { startRead } from '@/lib/start-read'
 import type { User } from '@/types'
 import { BalanceProvider, BalanceToggle, BalanceValue } from './_components/RevealAmount'
+import { ownDepartmentOnly } from '@/lib/surfaces'
 
 // dept_manager only owns their own dept pool. Skip the multi-dept list and
 // land them straight on their own detail page — same content as clicking View.
@@ -31,10 +32,11 @@ interface HRCostSubmissionRow {
   dept_summaries: Record<string, { total_ctc?: number; department_id?: string }> | null
 }
 
-// Dept Manager sees only their own dept
+// Somebody whose Dept Pool reaches only their own department sees only it
+// (2026-10-09, Q7: by their cell, not the dept_manager kind).
 function visibleDepartments<D extends { id: string }>(user: User, departments: D[] | null): D[] {
   const all = departments ?? []
-  return user.role === 'dept_manager' ? all.filter((d) => d.id === user.department_id) : all
+  return ownDepartmentOnly(user, 'dept_pool') ? all.filter((d) => d.id === user.department_id) : all
 }
 
 export default async function DeptPoolPage({
@@ -48,9 +50,9 @@ export default async function DeptPoolPage({
   const { basis: basisParam } = await searchParams
   const basis = basisParam === 'accrual' ? 'accrual' : 'cash'
 
-  // Fast-path: dept_manager → their own dept detail page. No reason to show
-  // a 1-row list and make them click View.
-  if (user.role === 'dept_manager' && user.department_id) {
+  // Fast-path: their own department only → its detail page. No reason to
+  // show a 1-row list and make them click View.
+  if (ownDepartmentOnly(user, 'dept_pool') && user.department_id) {
     const { data: ownDept } = await supabase
       .from('departments')
       .select('name')
@@ -102,7 +104,7 @@ export default async function DeptPoolPage({
     // Venture (= Office / corporate) shown as its own row for principal/finance.
     // Its P&L lives in the income statement's venture_pool bucket.
     const ventureAccrual =
-      user.role !== 'dept_manager'
+      !ownDepartmentOnly(user, 'dept_pool')
         ? splitPoolAccrual(poolByKey.get('venture_pool') ?? null)
         : null
 
@@ -266,7 +268,7 @@ export default async function DeptPoolPage({
   // were two reads of the same rows), and each journal_lines read starts the
   // moment they are in. null = no active bank has a GL code: nothing to read.
   const bankRowsRead =
-    user.role !== 'dept_manager'
+    !ownDepartmentOnly(user, 'dept_pool')
       ? startRead(
           supabase
             .from('bank_accounts')
@@ -390,7 +392,7 @@ export default async function DeptPoolPage({
   // the "Per-bank breakdown" Venture (Office) total therefore include the
   // pseudo-dept overlay.
   let ventureCash: { balance: number; in_amt: number; out_amt: number } | null = null
-  if (user.role !== 'dept_manager') {
+  if (!ownDepartmentOnly(user, 'dept_pool')) {
     // The GL corporate/treasury lines on every active bank's code (item 2),
     // read above beside everything else; null = no bank code, nothing read.
     let vIn = 0
@@ -421,7 +423,7 @@ export default async function DeptPoolPage({
   type BankInfo = { code: string; name: string; balance: number }
   type PerBankRow = { segment: string; label: string; perBank: Record<string, number>; total: number }
   let perBankBreakdown: { banks: BankInfo[]; rows: PerBankRow[]; totals: { perBank: Record<string, number>; grand: number } } | null = null
-  if (user.role !== 'dept_manager') {
+  if (!ownDepartmentOnly(user, 'dept_pool')) {
     const bankRows = await bankRowsRead
     const banks: BankInfo[] = (bankRows ?? [])
       .filter((b) => b.gl_account_code)

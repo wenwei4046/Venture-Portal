@@ -17,6 +17,7 @@ import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segment
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import ExportLinks from '../_components/ExportLinks'
 import ReportViewToggle from '../_components/ReportViewToggle'
+import { reportsCompanyWide } from '@/lib/surfaces'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +36,7 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
   // Dept managers see ONLY their own segment (RLS-enforced on journal_lines);
   // force the filter empty + hide the segment picker so the report is theirs
   // and a hand-typed ?segment= can't select another dept (it just returns empty).
-  const isDeptMgr = user.role === 'dept_manager'
+  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
   const segment = isDeptMgr ? '' : (params.segment ?? '')
 
   // Consolidated = the true all-segments view (finance/principal, no segment

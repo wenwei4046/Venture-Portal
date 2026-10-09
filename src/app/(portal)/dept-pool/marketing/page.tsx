@@ -13,6 +13,7 @@ import RequestPaymentForm from '../_components/RequestPaymentForm'
 import RequestCreditForm from '../_components/RequestCreditForm'
 import StageBadge from '../_components/StageBadge'
 import LedgerRow from '@/components/LedgerRow'
+import { ownDepartmentOnly, raisesDepartmentRequests } from '@/lib/surfaces'
 
 interface Props {
   searchParams: Promise<{ tab?: string; filter?: string }>
@@ -46,7 +47,7 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
   if (!marketing) notFound()
 
   // Dept Manager restriction: must be Marketing's manager
-  if (user.role === 'dept_manager' && user.department_id !== marketing.id) {
+  if (ownDepartmentOnly(user, 'dept_pool') && user.department_id !== marketing.id) {
     notFound()
   }
 
@@ -83,7 +84,7 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
     .maybeSingle()
 
   const balance = Number(balanceRow?.balance ?? 0)
-  const canSubmitExpense = user.role === 'dept_manager' && user.department_id === marketing.id
+  const canSubmitExpense = raisesDepartmentRequests(user) && user.department_id === marketing.id
 
   return (
     <div>
@@ -106,7 +107,7 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
 
       <DeptPoolTabs
         basePath="/dept-pool/marketing"
-        role={user.role}
+        raisesRequests={raisesDepartmentRequests(user)}
         isOwnDept={isOwnDept}
         extraTabs={[{ key: 'pnl', label: 'P&L' }]}
       />

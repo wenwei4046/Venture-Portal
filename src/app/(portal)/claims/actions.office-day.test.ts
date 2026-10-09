@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { inTimeZoneAsync } from '@/test/time-zone'
+import { withActions } from '@/test/with-actions'
 import { recordingSupabase, type RecordedCall } from '@/test/recording-supabase'
 
 // 2026-10-08: approving a claim drafts its payout voucher, numbered by month.
@@ -17,7 +18,8 @@ import { approveClaim } from './actions'
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requirePermission.mockResolvedValue({ id: 'finance-user', role: 'finance', permissions: ['claims_approve'] })
+  // Pool claims are decided with Claims · Approve and Treasury · View (lib/surfaces.ts).
+  mocks.requirePermission.mockResolvedValue(withActions({ id: 'finance-user', role: 'finance', permissions: ['claims', 'claims_approve', 'treasury'] }))
   vi.useFakeTimers({ now: new Date('2026-10-31T16:30:00Z'), toFake: ['Date'] }) // 00:30 on 1 Nov in the office
 })
 afterEach(() => vi.useRealTimers())

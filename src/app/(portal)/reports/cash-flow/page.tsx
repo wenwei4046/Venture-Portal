@@ -30,6 +30,7 @@ import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segment
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import ExportLinks from '../_components/ExportLinks'
 import ReportViewToggle from '../_components/ReportViewToggle'
+import { reportsCompanyWide } from '@/lib/surfaces'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,7 +48,7 @@ export default async function CashFlowPage({ searchParams }: Props) {
   const compare = params.compare ?? ''
   // Dept managers see ONLY their own segment (RLS on journal_lines) — force the
   // filter empty + hide the picker (a hand-typed ?segment= returns empty).
-  const isDeptMgr = user.role === 'dept_manager'
+  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
   const segment = isDeptMgr ? '' : (params.segment ?? '')
   // The bridge lines are a pure INTERNAL reallocation (one dept −X, another +X)
   // that exists so a single segment's cash ties to its Dept Pool. Consolidated

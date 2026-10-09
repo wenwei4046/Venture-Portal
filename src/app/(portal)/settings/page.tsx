@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { requirePermission } from '@/lib/auth'
+import { seesAllSettings } from '@/lib/surfaces'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/paginate'
 import type { TreasuryConfig, OverdueConfig, Company } from '@/types'
@@ -43,7 +44,8 @@ export default async function SettingsPage({ searchParams }: Props) {
   // (user 2026-08-31) and they were the only reason HR was ever here. They now
   // live under /revenue — the Revenue Department's own group (2026-09-01).
   const user = await requirePermission('categories')
-  const isPrincipal = user.role === 'principal'
+  // Every tab with Settings · Manage, else the chart-of-accounts tabs (Q7).
+  const isPrincipal = seesAllSettings(user)
 
   const { tab: rawTab } = await searchParams
   const defaultTab: SettingsTab = isPrincipal ? 'treasury' : 'accounts'
@@ -132,7 +134,7 @@ export default async function SettingsPage({ searchParams }: Props) {
       </div>
 
       <Suspense fallback={null}>
-        <SettingsTabs active={activeTabResolved} role={user.role} />
+        <SettingsTabs active={activeTabResolved} allTabs={isPrincipal} />
       </Suspense>
 
       {activeTabResolved === 'treasury' && (

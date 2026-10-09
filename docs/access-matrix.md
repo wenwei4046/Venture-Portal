@@ -4,6 +4,18 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-09 — Pages ask the cells, not the account's kind (Q7)
+Which Overview opens, whether a department page shows only your own department, who
+decides a pool claim (Claims · Approve with Treasury · View), who raises for somebody
+else's sign-off, which Settings tabs, Billing Allocation's editing (HR Costing · Edit)
+and a report's company-wide or department cut now follow the title's cells, not the
+role the account was created with. The two Overview summaries ask the same cells.
+Every account that signs in lands where it did before; a title whose cells differ
+from its kind (Director: Treasury · View on a staff account) now gets what its cells
+say. Still by kind on purpose: which app opens, shared table layouts, reopening a
+Total-Closed payroll month, the Principal deciding their own request, view-as.
+Mig `20261009060000`.
+---
 ⚡ AMENDMENT 2026-10-09 — Salary, NRIC and bank accounts show only where ticked (PR4)
 A template's Sensitive fields now hold in the database too. Salary amounts already
 did (every pay page's key needs the tick); NRIC and account numbers did not — any

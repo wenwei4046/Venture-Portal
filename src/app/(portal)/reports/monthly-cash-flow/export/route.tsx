@@ -15,6 +15,7 @@ import { segmentFilterFor } from '../../_components/report-segments'
 import { exportPdfResponse, exportXlsxResponse } from '@/lib/export/response'
 import { buildMatrixXlsx } from '@/lib/export/monthly-matrix-export'
 import { MatrixPdf } from '@/lib/export/matrix-pdf'
+import { reportsCompanyWide } from '@/lib/surfaces'
 
 export async function GET(req: Request) {
   // dept_manager may export their own segment (RLS scopes journal_lines).
@@ -32,7 +33,7 @@ export async function GET(req: Request) {
   // (dept managers have no segment param but ARE one segment via RLS); there
   // the bridge is not read at all, and elsewhere it starts beside the journal
   // read with the bank codes still pending (2026-10-08).
-  const consolidated = user.role !== 'dept_manager' && !segment
+  const consolidated = reportsCompanyWide(user) && !segment
   const bankCodesRead = Promise.resolve(
     supabase.rpc('bank_gl_codes' as never), // codes only; dept_managers can't read bank_accounts
   ).then(({ data: banks }) => new Set((banks ?? []) as unknown as string[]))

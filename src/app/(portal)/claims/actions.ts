@@ -5,6 +5,11 @@ import { createClient } from '@/lib/supabase/server'
 import { requireAction } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { officeDate } from '@/lib/office-clock'
+import { isOwnerKind } from '@/lib/approval-domains'
+import { decidesPoolClaims } from '@/lib/surfaces'
+
+/** Pool claims are decided with Claims · Approve and the treasury their voucher is raised in (Q7). */
+const NOT_A_DECIDER = 'Pool claims are decided with Claims · Approve and Treasury · View'
 
 /**
  * A member's BENEFIT claim is decided in People › Member services since
@@ -55,13 +60,14 @@ export async function approveClaim(claimId: string) {
   // Security: prevent self-approval (defense in depth — RLS enforces too).
   // Principal is exempt (mig 20260806000000): they are the top of the chain, so
   // blocking them just leaves the claim unapprovable by anyone.
-  if (user.role !== 'principal' && claim.created_by === user.id) {
+  if (!isOwnerKind(user) && claim.created_by === user.id) {
     throw new Error('Cannot approve your own claim')
   }
 
-  // Finance approves pool claims.
-  if (user.role !== 'finance' && user.role !== 'principal') {
-    throw new Error('Only Finance or Principal can approve pool claims')
+  // Whoever decides pool claims (lib/surfaces.ts — it was the Finance /
+  // Principal kind until 2026-10-09).
+  if (!decidesPoolClaims(user)) {
+    throw new Error(NOT_A_DECIDER)
   }
 
   await assertPeriodOpen(supabase, new Date())
@@ -164,6 +170,7 @@ export async function approveClaim(claimId: string) {
 
 export async function rejectClaim(claimId: string) {
   const user = await requireAction('claims', 'approve')
+  if (!decidesPoolClaims(user)) throw new Error(NOT_A_DECIDER)
   const supabase = await createClient()
 
   // Pool claims only, and only while pending — a benefit claim is decided in
@@ -194,9 +201,9 @@ export async function markClaimPaid(claimId: string) {
   if (claim.claim_type !== 'project') throw new Error(BENEFIT_ELSEWHERE)
   if (claim.status !== 'approved') throw new Error('Only approved claims can be marked as paid')
 
-  // Finance marks pool claims paid.
-  if (user.role !== 'finance' && user.role !== 'principal') {
-    throw new Error('Only Finance or Principal can mark pool claims as paid')
+  // Whoever decides pool claims marks them paid.
+  if (!decidesPoolClaims(user)) {
+    throw new Error(NOT_A_DECIDER)
   }
 
   const { error } = await supabase
