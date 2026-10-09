@@ -14,7 +14,7 @@ holder of its tick and •••• to anybody else, over the rows the table's o
 allow. The payroll bank file needs Bank accounts and the statutory files NRIC / IC
 (the user's choice A: no tick, no file); raising salary PVs needs Bank; the PV print
 shows ••••; editing a person needs Salary amounts. Every account that signs in sees
-what it saw before. Mig `20261009050000`.
+what it saw before. Migs `20261009050000` (readers) / `20261009050100` (the columns leave SELECT).
 ---
 ⚡ AMENDMENT 2026-10-09 — Own and Dept reach the rows (PR3c)
 A cell's reach now holds in the database too. Own = their own records (a claim they

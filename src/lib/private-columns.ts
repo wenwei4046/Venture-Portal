@@ -1,6 +1,6 @@
 /**
  * The columns no session reads straight off its table since mig
- * 20261009050000 (2026-10-09, PR4 — salary, NRIC and bank accounts show only
+ * 20261009050100 (2026-10-09, PR4 — salary, NRIC and bank accounts show only
  * where ticked). Their SELECT is revoked from `authenticated`, and with it any
  * `select('*')` on these tables; the readers in lib/private-fields.ts are the
  * only way to them, and they hand the value to a holder of the tick and ••••

@@ -7,7 +7,7 @@ import type { SensitiveField } from '@/lib/permission-matrix'
  * (the design: "Hidden as •••• unless ticked, on every page this template can
  * open").
  *
- * The database decides first: since mig 20261009050000 no session reads an
+ * The database decides first: since mig 20261009050100 no session reads an
  * NRIC or an account number straight off a table; the readers
  * (`staff_private_fields`, `director_private_fields`, `payroll_line_accounts`,
  * lib/private-fields.ts) hand the value to a holder of the tick and •••• to

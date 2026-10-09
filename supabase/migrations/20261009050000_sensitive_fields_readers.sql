@@ -1,7 +1,7 @@
 -- ============================================================================
--- 20261009050000_sensitive_fields_need_their_tick.sql
+-- 20261009050000_sensitive_fields_readers.sql
 -- Salary amounts, NRIC / IC and bank account numbers show only where ticked
--- (PR4 of the People Management revamp, 2026-10-09).
+-- (PR4 of the People Management revamp, 2026-10-09) — step one of two.
 -- ============================================================================
 --
 -- A permission template ticks which of the three its holders may see (the
@@ -15,7 +15,12 @@
 -- director or a salary-PV line read them raw, the Director template (Salary
 -- ticked, NRIC and Bank not) included, page or API.
 --
--- 1. Those columns leave `authenticated`'s SELECT: hr_staff_costs.nric /
+-- TWO STEPS, so the deploy has no window: THIS file (the readers and the
+-- function changes below; the columns stay readable, so the code still live
+-- keeps working) goes first, then PR4's code (which reads through the
+-- readers), then 20261009050100 — (1) below — once that code is live.
+--
+-- 1. (20261009050100) Those columns leave `authenticated`'s SELECT: hr_staff_costs.nric /
 --    bank_account_no / bank_account_no_2, directors.nric,
 --    payroll_voucher_lines.bank_account_no — and the per-person copies a
 --    payroll submission keeps (hr_cost_submissions.staff_snapshot /
@@ -123,32 +128,6 @@ $$;
 
 REVOKE ALL ON FUNCTION public.mask_private_json(jsonb, boolean, boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.mask_private_json(jsonb, boolean, boolean) TO authenticated, service_role;
-
--- ── 1. The columns leave the session's SELECT ───────────────────────────────
-
-DO $$
-DECLARE
-  t record;
-  v_cols text;
-BEGIN
-  FOR t IN
-    SELECT * FROM (VALUES
-      ('hr_staff_costs', ARRAY['nric', 'bank_account_no', 'bank_account_no_2']),
-      ('directors', ARRAY['nric']),
-      ('payroll_voucher_lines', ARRAY['bank_account_no']),
-      ('hr_cost_submissions', ARRAY['staff_snapshot', 'staff_allocation_snapshot'])
-    ) AS x(tbl, private)
-  LOOP
-    SELECT string_agg(quote_ident(column_name), ', ' ORDER BY ordinal_position) INTO v_cols
-      FROM information_schema.columns
-     WHERE table_schema = 'public' AND table_name = t.tbl AND column_name <> ALL (t.private);
-    EXECUTE format('REVOKE SELECT ON public.%I FROM PUBLIC, anon, authenticated', t.tbl);
-    EXECUTE format('REVOKE SELECT (%s) ON public.%I FROM PUBLIC, anon, authenticated',
-                   (SELECT string_agg(quote_ident(c), ', ') FROM unnest(t.private) c), t.tbl);
-    EXECUTE format('GRANT SELECT (%s) ON public.%I TO authenticated', v_cols, t.tbl);
-  END LOOP;
-END
-$$;
 
 -- ── 2. The readers ──────────────────────────────────────────────────────────
 
@@ -309,29 +288,7 @@ SELECT pg_temp.swap_check(
 -- ── Guards ──────────────────────────────────────────────────────────────────
 
 DO $$
-DECLARE
-  t record;
-  c record;
 BEGIN
-  FOR t IN
-    SELECT * FROM (VALUES
-      ('hr_staff_costs', ARRAY['nric', 'bank_account_no', 'bank_account_no_2']),
-      ('directors', ARRAY['nric']),
-      ('payroll_voucher_lines', ARRAY['bank_account_no']),
-      ('hr_cost_submissions', ARRAY['staff_snapshot', 'staff_allocation_snapshot'])
-    ) AS x(tbl, private)
-  LOOP
-    FOR c IN SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = t.tbl LOOP
-      IF has_column_privilege('authenticated', format('public.%I', t.tbl), c.column_name, 'SELECT')
-         IS DISTINCT FROM (NOT (c.column_name = ANY (t.private))) THEN
-        RAISE EXCEPTION '%.%: authenticated SELECT is not as planned', t.tbl, c.column_name;
-      END IF;
-      IF has_column_privilege('anon', format('public.%I', t.tbl), c.column_name, 'SELECT') THEN
-        RAISE EXCEPTION '%.%: anon may still read it', t.tbl, c.column_name;
-      END IF;
-    END LOOP;
-  END LOOP;
-
   IF has_function_privilege('authenticated', 'public.payment_cycle_unmasked(date)', 'EXECUTE') THEN
     RAISE EXCEPTION 'payment_cycle_unmasked is callable by a session';
   END IF;

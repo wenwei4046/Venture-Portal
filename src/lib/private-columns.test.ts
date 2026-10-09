@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { DIRECTOR_ROW_COLUMNS, PRIVATE_COLUMNS, STAFF_ROW_COLUMNS, type PrivateTable } from './private-columns'
 
-// The guard for PR4 (2026-10-09, mig 20261009050000): NRIC, account numbers
+// The guard for PR4 (2026-10-09, mig 20261009050100): NRIC, account numbers
 // and a submission's per-person copies are not `authenticated`'s to SELECT.
 // A query that names one — or asks for `*` on one of these tables — would be
 // refused by the database at run time; this refuses it at test time, before a
@@ -81,7 +81,7 @@ describe('nobody reads a private column straight off its table', () => {
 })
 
 describe('a later migration keeps those tables readable the PR4 way', () => {
-  const later = fs.readdirSync(MIGRATIONS).filter(f => f.endsWith('.sql') && f > '20261009050000_sensitive_fields_need_their_tick.sql')
+  const later = fs.readdirSync(MIGRATIONS).filter(f => f.endsWith('.sql') && f > '20261009050100_sensitive_columns_leave_select.sql')
 
   it('a column added to one of those tables is granted to authenticated in the same migration (or listed as private)', () => {
     const missing: string[] = []

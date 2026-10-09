@@ -1,6 +1,8 @@
-// Local PostgreSQL regression for 20261009050000 (PR4 of the People
-// Management revamp, 2026-10-09): salary amounts, NRIC / IC and bank account
-// numbers show only where ticked. Production's four tables with their own
+// Local PostgreSQL regression for 20261009050000 + 20261009050100 (PR4 of
+// the People Management revamp, 2026-10-09): salary amounts, NRIC / IC and
+// bank account numbers show only where ticked — in two steps, and the state
+// between them (readers in place, columns still readable) keeps the code that
+// was live working. Production's four tables with their own
 // SELECT policies (byte for byte — the migration's guard reads them),
 // production's payment_cycle (its md5 is guarded), stand-ins carrying the
 // exact statements the migration swaps, and five people: HR (all three ticks),
@@ -227,7 +229,7 @@ try {
     const db = await boot({ policies: moved })
     let refused = null
     try {
-      await db.exec(await migrationText('20261009050000_sensitive_fields_need_their_tick'))
+      await db.exec(await migrationText('20261009050000_sensitive_fields_readers'))
     } catch (error) {
       refused = error.message
     }
@@ -242,7 +244,26 @@ try {
   check((await read(DIRECTOR, 'SELECT nric FROM public.hr_staff_costs ORDER BY employee_name')).map(r => r.nric),
     ['850101141234', '900202081111', null, ''], 'before: a Director reads every NRIC raw')
 
-  await db.exec(await migrationText('20261009050000_sensitive_fields_need_their_tick'))
+  // Step two refuses to run before step one.
+  {
+    let refused = null
+    try {
+      await db.exec(await migrationText('20261009050100_sensitive_columns_leave_select'))
+    } catch (error) {
+      refused = error.message
+    }
+    check(/The readers are not there/.test(refused ?? ''), true, 'step two needs step one')
+  }
+
+  await db.exec(await migrationText('20261009050000_sensitive_fields_readers'))
+
+  // ── Between the steps: the code that was live still reads, the new code's readers answer ─
+  check((await read(HR, 'SELECT nric FROM public.hr_staff_costs ORDER BY employee_name')).length, 4,
+    'between: the old direct read still works')
+  check((await read(DIRECTOR, 'SELECT nric FROM public.staff_private_fields(NULL) WHERE nric IS NOT NULL AND nric <> \'\' ')).map(r => r.nric),
+    ['••••', '••••'], 'between: the readers already mask')
+
+  await db.exec(await migrationText('20261009050100_sensitive_columns_leave_select'))
 
   // ── 1. Nobody's session reads a number straight off the table ─────────────
   for (const [who, sql] of [
@@ -352,7 +373,7 @@ try {
 
   // ── Running it twice changes nothing ──────────────────────────────────────
   const before = (await q("SELECT md5(string_agg(proname || prosrc, '' ORDER BY proname)) AS m FROM pg_proc WHERE proname IN ('create_payroll_disbursement_vouchers', 'build_hr_cost_submission_payload', 'employee_chart_lifecycle')"))[0].m
-  const swapOnly = (await migrationText('20261009050000_sensitive_fields_need_their_tick')).match(/CREATE OR REPLACE FUNCTION pg_temp\.swap_check[\s\S]*?\$fn\$;\n\nSELECT[\s\S]*?(?=\n-- ── Guards)/)
+  const swapOnly = (await migrationText('20261009050000_sensitive_fields_readers')).match(/CREATE OR REPLACE FUNCTION pg_temp\.swap_check[\s\S]*?\$fn\$;\n\nSELECT[\s\S]*?(?=\n-- ── Guards)/)
   assert(swapOnly, 'the swap section')
   await db.exec(swapOnly[0])
   check((await q("SELECT md5(string_agg(proname || prosrc, '' ORDER BY proname)) AS m FROM pg_proc WHERE proname IN ('create_payroll_disbursement_vouchers', 'build_hr_cost_submission_payload', 'employee_chart_lifecycle')"))[0].m,
