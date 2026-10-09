@@ -12,6 +12,7 @@ import EditStaffForm from './EditStaffForm'
 import Promotion from './Promotion'
 import Employment from './Employment'
 import { isFullyCommissionBased, isVariablePay } from '@/lib/staff-form'
+import { MASKED } from '@/lib/sensitive'
 import { getPersonCard, type PersonCardData } from '../card-actions'
 
 dayjs.extend(relativeTime)
@@ -167,7 +168,9 @@ export default function PersonCard({ personId, startEditing, onClose, onInvite }
               ) : null}
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              {person && !editing ? (
+              {/* The edit form is built around pay, so it is offered only to a
+                  viewer whose title ticks Salary amounts (2026-10-09, PR4). */}
+              {person && !editing && person.canSee.salary ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -232,6 +235,7 @@ export default function PersonCard({ personId, startEditing, onClose, onInvite }
               <EditStaffForm
                 staff={person.staff}
                 titles={person.titles}
+                canSee={person.canSee}
                 embedded
                 onSaved={() => {
                   setEditing(false)
@@ -434,8 +438,8 @@ function Details({ person }: { person: PersonCardData }) {
           </>
         ) : (
           <>
-            <Field label="Basic" value={s.basic_salary.toFixed(2)} mono />
-            <Field label="Allowance" value={s.allowances.toFixed(2)} mono />
+            <Field label="Basic" value={person.canSee.salary ? s.basic_salary.toFixed(2) : MASKED} mono />
+            <Field label="Allowance" value={person.canSee.salary ? s.allowances.toFixed(2) : MASKED} mono />
             <Field
               label="EPF"
               value={s.is_epf_exempt ? 'Exempt' : `Part ${s.epf_category}`}

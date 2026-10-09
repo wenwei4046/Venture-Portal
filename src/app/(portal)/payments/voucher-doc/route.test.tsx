@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('server-only', () => ({}))
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), exportPdfResponse: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
@@ -33,13 +34,15 @@ function mockDatabase(vouchers: ReturnType<typeof voucher>[], coverageError: obj
     }
     return query
   })
-  mocks.createClient.mockResolvedValue({ from })
+  mocks.createClient.mockResolvedValue({ from, rpc: vi.fn((fn: string, args?: { p_line_ids?: string[] }) => Promise.resolve(fn === 'payroll_line_accounts'
+      ? { data: ((salaryError ? [] : salary) as typeof salary).filter(l => (args?.p_line_ids ?? []).includes(String(l.id))).map(l => ({ id: l.id, bank_account_no: l.bank_account_no ?? null })), error: null }
+      : { data: [], error: null })) })
   return { from, calls }
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requirePermission.mockResolvedValue({ role: 'principal', permissions: ['treasury', 'payroll_payouts'] })
+  mocks.requirePermission.mockResolvedValue({ role: 'principal', permissions: ['treasury', 'payroll_payouts'], sensitive: ['bank', 'nric', 'salary'] })
   mocks.exportPdfResponse.mockResolvedValue(new Response('pdf'))
 })
 
@@ -84,6 +87,15 @@ describe('voucher PDF statutory coverage', () => {
     ])
     expect(from).not.toHaveBeenCalledWith('hr_staff_costs')
     expect(from).not.toHaveBeenCalledWith('hr_monthly_payroll')
+  })
+
+  it('prints •••• for the account numbers to a viewer whose title does not tick Bank accounts (PR4)', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'staff', permissions: ['treasury', 'payroll_payouts'], sensitive: ['salary'] })
+    mockDatabase([voucher('salary', 'payroll_disbursement')])
+    await GET(new Request('http://localhost/payments/voucher-doc?id=salary'))
+    const lines = mocks.exportPdfResponse.mock.calls[0][0].element.props.vouchers[0].salary_payments
+    expect(lines.map((line: { bank_account_no: string | null }) => line.bank_account_no)).toEqual(['••••', '••••'])
+    expect(lines.map((line: { bank_name: string | null }) => line.bank_name)).toEqual(['Recorded Maybank', 'Recorded CIMB'])
   })
 
   it('refuses an incomplete salary PDF if stored receiving account details cannot be read', async () => {

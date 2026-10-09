@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { can } from '@/lib/permissions'
+import { readStaffPrivate } from '@/lib/private-fields'
+import { onFile } from '@/lib/sensitive'
 import { loadPermissionsData } from '../_lib/permission-templates'
 import type { PersonRow, AccountRow } from './_components/PeopleDirectory'
 import type { InviteCandidate } from './_components/InviteDrawer'
@@ -56,14 +58,14 @@ export default async function PeopleManagementPage({
   const supabase = await createClient()
   const params = await searchParams
 
-  const [{ data: staff }, { data: accounts }, { data: levels }, positions, permissions] = await Promise.all([
+  const [{ data: staff }, { data: accounts }, { data: levels }, positions, permissions, privateFields] = await Promise.all([
     supabase
       .from('hr_staff_costs')
       // Every status, not just 'active'. Deactivating somebody used to remove
       // them from the only page that lists people, which left no way back
       // except the database — the roster filters by status instead.
       .select(
-        'id, employee_name, employee_code, designation, user_id, status, resignation_date, nric, bank_account_no, hire_date, title_id, reports_to, titles(name, level_id, template_id), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
+        'id, employee_name, employee_code, designation, user_id, status, resignation_date, hire_date, title_id, reports_to, titles(name, level_id, template_id), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
       )
       .order('employee_name'),
     supabase.from('users').select('id, name, email, role, is_active').order('name'),
@@ -88,6 +90,10 @@ export default async function PeopleManagementPage({
       ),
     // The Permissions tab and the invite drawer read the same templates.
     loadPermissionsData(supabase as unknown as SupabaseClient),
+    // NRIC and the account number, only to say whether they are on file —
+    // the table no longer hands them out (2026-10-09, PR4); the reader says
+    // •••• to a viewer without the tick, which still counts as on file.
+    readStaffPrivate(supabase, user, null),
   ])
 
   const rungs = new Map(
@@ -126,6 +132,7 @@ export default async function PeopleManagementPage({
     /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
     const r = s as any
     const active = r.status !== 'inactive'
+    const priv = privateFields.get(r.id)
     const rung = r.titles?.level_id ? (rungs.get(r.titles.level_id) ?? null) : null
     const rank = rankByStaff.get(r.id) ?? null
     return {
@@ -152,8 +159,8 @@ export default async function PeopleManagementPage({
       // a chore anybody has to do.
       missing: active
         ? [
-            !r.nric && 'NRIC',
-            !r.bank_account_no && 'bank account',
+            !onFile(priv?.nric) && 'NRIC',
+            !onFile(priv?.bank_account_no) && 'bank account',
             !r.hire_date && 'hire date',
           ].filter((x): x is string => typeof x === 'string')
         : [],

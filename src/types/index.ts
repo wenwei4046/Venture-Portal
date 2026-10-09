@@ -32,6 +32,11 @@ export interface User {
   // `canDo` / `requireAction` (lib/permission-actions.ts). Absent on a value
   // built before it existed: read as "no actions".
   actions?: Record<string, 'own' | 'dept' | 'all'>
+  // Which of salary amounts, NRIC / IC and bank account numbers they may see
+  // (2026-10-09, PR4): their template's Sensitive fields, or what their
+  // account's kind always saw — `current_sensitive_fields()`. Everything else
+  // shows as •••• (lib/sensitive.ts). Absent means nothing ticked.
+  sensitive?: Array<'salary' | 'nric' | 'bank'>
 }
 
 export interface Company {

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAction, requireAnyAction } from '@/lib/auth'
+import { needsTick, sees } from '@/lib/sensitive'
 import type { SalaryComponentSelection } from '@/lib/payment-cycle'
 
 export interface DisbursementResult {
@@ -70,7 +71,11 @@ export async function createPayrollDisbursement(
   payrollRowIds: string[] | null = null,
   componentSelections: SalaryComponentSelection[] | null = null,
 ): Promise<DisbursementResult> {
-  await requireAction('hr_costing', 'create')
+  const user = await requireAction('hr_costing', 'create')
+  // A salary PV carries each person's account number, and the preview it is
+  // checked against showed them (2026-10-09, PR4): Bank accounts ticked. The
+  // database refuses it too (create_payroll_disbursement_vouchers).
+  if (!sees(user, 'bank')) throw new Error(needsTick('bank', 'Raising salary PVs'))
   const supabase = await createClient()
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) {

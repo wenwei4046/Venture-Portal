@@ -19,11 +19,14 @@ interface Props {
   onGenerate: (group: DeptGroup, gran: Granularity) => void
   onOpen: (key: string) => void
   payoutBank: { name: string; last4: string } | null
+  /** Bank accounts ticked for the viewer (2026-10-09, PR4): the bank file and
+   *  salary PVs both carry the numbers. */
+  seesBank?: boolean
 }
 
 /** Salary statement, with a fixed generation method chosen at the row. */
 export default function DeptRows({
-  period, groups, prevMonthName, today, dates, fundedFor, busy, onGenerate, onOpen, payoutBank,
+  period, groups, prevMonthName, today, dates, fundedFor, busy, onGenerate, onOpen, payoutBank, seesBank = true,
 }: Props) {
   const [filter, setFilter] = useState<Filter>('all')
   const remainingOf = (g: DeptGroup) => g.headcount - g.generated
@@ -60,9 +63,11 @@ export default function DeptRows({
             </button>
           ))}
         </div>
-        <Link href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance`} className="pay-btn sec" title={`Export all generated staff salary PVs, including paid PVs, for ${payoutBank?.name ?? 'Alliance Bank'}. Open PV records to download a specific payment.`}>
-          All staff generated PVs · includes paid
-        </Link>
+        {seesBank ? (
+          <Link href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance`} className="pay-btn sec" title={`Export all generated staff salary PVs, including paid PVs, for ${payoutBank?.name ?? 'Alliance Bank'}. Open PV records to download a specific payment.`}>
+            All staff generated PVs · includes paid
+          </Link>
+        ) : null}
       </div>
       <div className="table-frame">
         <div className="table-frame-scroll">
@@ -85,8 +90,9 @@ export default function DeptRows({
                 const timeline = deptTimeline(g, funded, date, today)
                 const difference = delta(g.net, g.prev_net)
                 const remaining = remainingOf(g)
-                const canGenerate = funded && remaining > 0 && (g.scope === 'directors' || !!g.dept_id)
-                const reason = !funded ? 'Funding is not complete yet' : !g.dept_id && g.scope === 'staff' ? 'Assign a department on the People page first' : undefined
+                const canGenerate = seesBank && funded && remaining > 0 && (g.scope === 'directors' || !!g.dept_id)
+                const reason = !seesBank ? 'Salary PVs carry the account numbers — needs Bank accounts ticked for your title'
+                  : !funded ? 'Funding is not complete yet' : !g.dept_id && g.scope === 'staff' ? 'Assign a department on the People page first' : undefined
                 const paidDates = Array.from(new Set(g.vouchers.map((v) => v.payment_date)))
                 const status = g.headcount === 0 ? 'No salary due'
                   : g.stage === 'paid' ? `Paid${paidDates.length === 1 && paidDates[0] ? ` · ${shortDate(paidDates[0])}` : ''}`

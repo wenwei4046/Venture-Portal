@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireAction } from '@/lib/auth'
 import { validateStaffForm, designationForTitle, payFieldsForUpdate } from '@/lib/staff-form'
 import { validateSecondaryStaffBankAccount } from '@/lib/staff-bank-accounts'
+import { isMasked, sees } from '@/lib/sensitive'
 
 function trimOrNull(v: FormDataEntryValue | null): string | null {
   if (typeof v !== 'string') return null
@@ -90,10 +91,16 @@ export async function addStaff(formData: FormData) {
     basic_salary: form.basicSalary,
     allowances: form.allowances,
     non_statutory_allowance: form.nonStatutoryAllowance,
-    bank_name: form.bankName,
-    bank_account_no: form.bankAccountNo,
-    bank_name_2: form.bankName2,
-    bank_account_no_2: form.bankAccountNo2,
+    // Only by somebody whose title ticks Bank accounts (2026-10-09, PR4) —
+    // the form does not ask anybody else.
+    ...(sees(user, 'bank')
+      ? {
+          bank_name: form.bankName,
+          bank_account_no: form.bankAccountNo,
+          bank_name_2: form.bankName2,
+          bank_account_no_2: form.bankAccountNo2,
+        }
+      : {}),
     contact_number: form.contactNumber,
     email: form.email,
     address: form.address,
@@ -119,8 +126,27 @@ export async function addStaff(formData: FormData) {
 }
 
 export async function updateStaff(id: string, formData: FormData) {
-  await requireAction('team', 'edit')
+  const editor = await requireAction('team', 'edit')
   const supabase = await createClient()
+
+  // The form writes pay, so it is an editor whose title ticks Salary amounts
+  // (2026-10-09, PR4) — anybody else was never shown the figures it saves.
+  if (!sees(editor, 'salary')) {
+    throw new Error('Editing a person needs Salary amounts ticked for your title — the form saves their pay.')
+  }
+
+  // NRIC and the bank accounts are written only by an editor whose title
+  // ticks them, and only when the form carried them (2026-10-09, PR4). An
+  // editor without the tick was shown •••• and sent nothing; the save must
+  // leave them exactly as they were — before, a form without the field wrote
+  // NULL over it.
+  const writesNric = sees(editor, 'nric') && formData.has('nric')
+  const writesBank = sees(editor, 'bank') && (formData.has('bank_name') || formData.has('bank_account_no'))
+  for (const key of ['nric', 'bank_account_no', 'bank_account_no_2']) {
+    if (isMasked(((formData.get(key) as string | null) ?? '').trim())) {
+      throw new Error('That number is hidden from you, so it cannot be saved — leave it as it is.')
+    }
+  }
 
   const hireDate = (formData.get('hire_date') as string) || null
   const resignDate = (formData.get('resignation_date') as string) || null
@@ -134,7 +160,7 @@ export async function updateStaff(id: string, formData: FormData) {
   const bankName = ((formData.get('bank_name') as string) || '').trim() || null
   const bankAccountNo = ((formData.get('bank_account_no') as string) || '').trim() || null
   // Older clients and imports that only carry Account 1 must not clear Account 2.
-  const secondBank = formData.has('bank_name_2') || formData.has('bank_account_no_2')
+  const secondBank = writesBank && (formData.has('bank_name_2') || formData.has('bank_account_no_2'))
     ? validateSecondaryStaffBankAccount({
         bankName, bankAccountNo,
         bankName2: str(formData, 'bank_name_2'),
@@ -200,10 +226,9 @@ export async function updateStaff(id: string, formData: FormData) {
       ...infotech,
       hire_date: hireDate,
       resignation_date: resignDate,
-      bank_name: bankName,
-      bank_account_no: bankAccountNo,
+      ...(writesBank ? { bank_name: bankName, bank_account_no: bankAccountNo } : {}),
       ...(secondBank ? { bank_name_2: secondBank.bankName2, bank_account_no_2: secondBank.bankAccountNo2 } : {}),
-      nric: nric,
+      ...(writesNric ? { nric } : {}),
       contact_number: trimOrNull(formData.get('contact_number')),
       email: trimOrNull(formData.get('email')),
       address: trimOrNull(formData.get('address')),

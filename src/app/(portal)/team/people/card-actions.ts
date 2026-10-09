@@ -8,6 +8,9 @@ import { navLabelByPath } from '@/components/layout/nav-config'
 import { describeActivity, type ActivityRow } from '@/lib/activity'
 import { ladderAllows, nextRung, type LadderTitle, type Rung } from '@/lib/ladder'
 import { offersVariablePay, type TitleRow } from '@/lib/staff-form'
+import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
+import { readStaffPrivate } from '@/lib/private-fields'
+import { onFile, sees } from '@/lib/sensitive'
 import { listSubDepartments } from '../../revenue/_lib/sub-departments'
 import { loadPersonAccess, type PersonAccessData } from '../_lib/person-permissions'
 import type { StaffRow } from './_components/EditStaffForm'
@@ -49,6 +52,10 @@ export interface PersonCardData {
   /** null when the reader may not read access_log — an empty list would read
    *  as "they did nothing", which is a different and wrong statement. */
   activity: CardActivityLine[] | null
+  /** Which of the three the viewer's title ticks (2026-10-09, PR4). The
+   *  `staff` above already carries •••• where it does not; the edit form uses
+   *  this to show those fields without sending them. */
+  canSee: { salary: boolean; nric: boolean; bank: boolean }
 }
 
 /**
@@ -71,19 +78,23 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
 
   // One read of the title table serves both the edit form's dropdown (every
   // title, active or not) and the ladder (active ones, with their rung).
-  const [{ data: staff }, { data: titleRows }, { data: levels }] = await Promise.all([
+  const [{ data: staff }, { data: titleRows }, { data: levels }, privateFields] = await Promise.all([
     supabase
       .from('hr_staff_costs')
       .select(
-        '*, departments(name, payroll_source, segment_key), titles(id, name, level_id, template_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)',
+        `${STAFF_ROW_COLUMNS}, departments(name, payroll_source, segment_key), titles(id, name, level_id, template_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)` as const,
       )
       .eq('id', id)
       .maybeSingle(),
     supabase.from('titles').select('id, name, department_id, level_id, is_active').order('name'),
     supabase.from('title_levels').select('id, rank, name'),
+    // NRIC and the account numbers, through the reader (2026-10-09, PR4).
+    readStaffPrivate(supabase, viewer, [id]),
   ])
 
   if (!staff) throw new Error('That person is no longer on the roster.')
+  const priv = privateFields.get(id) ?? { nric: null, bank_account_no: null, bank_account_no_2: null }
+  const seesSalary = sees(viewer, 'salary')
 
   /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
   const row = staff as any
@@ -178,9 +189,12 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
       commission_dept: row.departments?.payroll_source === 'commission',
       director_dept: offersVariablePay(row.departments),
       title_id: row.title_id ?? null,
-      basic_salary: Number(row.basic_salary ?? 0),
-      allowances: Number(row.allowances ?? 0),
-      non_statutory_allowance: Number(row.non_statutory_allowance ?? 0),
+      // Not sent at all to a viewer whose title does not tick Salary amounts
+      // — the card shows •••• (canSee below), and the figure never reaches
+      // their browser.
+      basic_salary: seesSalary ? Number(row.basic_salary ?? 0) : 0,
+      allowances: seesSalary ? Number(row.allowances ?? 0) : 0,
+      non_statutory_allowance: seesSalary ? Number(row.non_statutory_allowance ?? 0) : 0,
       employee_code: row.employee_code ?? null,
       infotech_code: row.infotech_code ?? null,
       hire_date: row.hire_date ?? null,
@@ -192,10 +206,10 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
       children_count: row.children_count ?? 0,
       employment_type: row.employment_type,
       bank_name: row.bank_name ?? null,
-      bank_account_no: row.bank_account_no ?? null,
+      bank_account_no: priv.bank_account_no,
       bank_name_2: row.bank_name_2 ?? null,
-      bank_account_no_2: row.bank_account_no_2 ?? null,
-      nric: row.nric ?? null,
+      bank_account_no_2: priv.bank_account_no_2,
+      nric: priv.nric,
       contact_number: row.contact_number ?? null,
       email: row.email ?? null,
       address: row.address ?? null,
@@ -228,8 +242,8 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     missing:
       row.status !== 'inactive'
         ? [
-            !row.nric && 'NRIC',
-            !row.bank_account_no && 'bank account',
+            !onFile(priv.nric) && 'NRIC',
+            !onFile(priv.bank_account_no) && 'bank account',
             !row.hire_date && 'hire date',
           ].filter((x): x is string => typeof x === 'string')
         : [],
@@ -245,5 +259,6 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     access,
     canManagePermissions: canManagePermissions(viewer),
     activity,
+    canSee: { salary: seesSalary, nric: sees(viewer, 'nric'), bank: sees(viewer, 'bank') },
   }
 }

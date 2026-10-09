@@ -42,6 +42,9 @@ interface Props {
   onSaveDates: () => void
   payoutBank: { name: string; last4: string } | null
   onClose: () => void
+  /** Bank accounts ticked for the viewer (2026-10-09, PR4): the bank file and
+   *  salary PVs both carry the numbers. Absent: ticked, as before. */
+  seesBank?: boolean
 }
 
 const BANK_ISSUE_LABEL = {
@@ -88,6 +91,7 @@ export default function DeptWindow({
   onSaveDates,
   payoutBank,
   onClose,
+  seesBank = true,
 }: Props) {
   const d = delta(g.net, g.prev_net)
   const remaining = g.headcount - g.generated
@@ -98,7 +102,7 @@ export default function DeptWindow({
   const hasSplit = selection.lines.some(line => line.component !== 'net')
   const showGeneration = !readOnly && remaining > 0
   const showSelection = showGeneration && gran === 'employee'
-  const canGenerate = showGeneration && funded && selection.count > 0 && selection.missingAccounts.length === 0 && selection.negativeComponents.length === 0 && (g.scope === 'directors' || !!g.dept_id) && validPaymentDate(date)
+  const canGenerate = seesBank && showGeneration && funded && selection.count > 0 && selection.missingAccounts.length === 0 && selection.negativeComponents.length === 0 && (g.scope === 'directors' || !!g.dept_id) && validPaymentDate(date)
   const locked = busy != null || confirming
   const pendingVouchers = g.vouchers.filter((v) => v.status === 'pending_approval' || v.status === 'draft')
   const dateChanged = pendingVouchers.some((v) => v.payment_date !== date)
@@ -123,7 +127,7 @@ export default function DeptWindow({
                   ? `${selection.count} selected · RM ${formatMoneyBare(selection.total)} · ${selection.voucherCount} PV${selection.voucherCount === 1 ? '' : 's'}`
                 : `${g.vouchers.length} existing PV${g.vouchers.length === 1 ? '' : 's'}${remaining > 0 ? ` · ${remaining} people still to generate` : ' · no people left to generate'}`}
           </span>
-          {g.scope === 'staff' && g.dept_id ? (
+          {seesBank && g.scope === 'staff' && g.dept_id ? (
             <Link
               href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance&department=${g.dept_id}`}
               className="pay-btn sec"
@@ -186,7 +190,7 @@ export default function DeptWindow({
               className="pay-btn pri"
               onClick={onAskGenerate}
               disabled={!canGenerate || busy != null || confirming}
-              title={!funded ? 'Funding is not complete yet' : selection.count === 0 ? 'Select at least one payment' : selection.missingAccounts.length ? 'Complete the selected receiving bank accounts first' : undefined}
+              title={!seesBank ? 'Salary PVs carry the account numbers — needs Bank accounts ticked for your title' : !funded ? 'Funding is not complete yet' : selection.count === 0 ? 'Select at least one payment' : selection.missingAccounts.length ? 'Complete the selected receiving bank accounts first' : undefined}
             >
               Review PVs
             </button>
@@ -340,7 +344,7 @@ export default function DeptWindow({
                     ) : (
                       <span className="pv none">net 0</span>
                     )}
-                    {v && p.scope === 'staff' ? <Link
+                    {seesBank && v && p.scope === 'staff' ? <Link
                       href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance&vouchers=${v.id}`}
                       className="block text-xs text-accent hover:underline"
                       aria-label={`Bank file for ${v.no ?? v.id}`}

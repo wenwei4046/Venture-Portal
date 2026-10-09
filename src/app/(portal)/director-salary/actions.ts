@@ -14,6 +14,7 @@ import {
 } from '@/lib/salary'
 import { notifyDirectorSalaryCalculated } from '@/lib/slack'
 import dayjs from 'dayjs'
+import { DIRECTOR_ROW_COLUMNS } from '@/lib/private-columns'
 
 // ─── Save CTC ──────────────────────────────────────────────────────
 
@@ -221,7 +222,7 @@ export async function calculateDirectorSalary(
   // 2. Fetch directors
   const { data: directors, error: dirErr } = await supabase
     .from('directors')
-    .select('*')
+    .select(DIRECTOR_ROW_COLUMNS)
     .eq('status', 'active')
     .order('code')
 

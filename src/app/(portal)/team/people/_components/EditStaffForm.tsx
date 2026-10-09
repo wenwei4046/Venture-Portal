@@ -63,6 +63,21 @@ interface Props {
   /** Shown beside Save when the form is embedded — leaving edit mode has to
    *  be reachable without scrolling back to the card header. */
   onCancel?: () => void
+  /** Whether the editor's title ticks NRIC / IC and Bank accounts (2026-10-09,
+   *  PR4). An unticked one is shown — as •••• when on file — and not sent, so
+   *  a save leaves it exactly as it was. Absent: both, as before. */
+  canSee?: { nric: boolean; bank: boolean }
+}
+
+/** A value this editor may not change: shown as the reader gave it (•••• when
+ *  on file), with why. No input, so the save leaves it as it was. */
+function LockedValue({ value, why }: { value: string | null | undefined; why: string }) {
+  return (
+    <div className="w-full px-3 py-2 bg-surface-2 border border-hairline rounded-control text-sm" title={why}>
+      <span className="font-mono">{value ? value : '—'}</span>
+      <span className="block text-[11px] mt-0.5">{why}</span>
+    </div>
+  )
 }
 
 /** A tick that changes what the form asks: peach and edged in orange while on
@@ -72,7 +87,7 @@ const tickTile = (on: boolean) =>
     on ? 'bg-accent-bg border-accent' : 'bg-surface border-hairline'
   }`
 
-export default function EditStaffForm({ staff, titles, embedded, onSaved, onCancel }: Props) {
+export default function EditStaffForm({ staff, titles, embedded, onSaved, onCancel, canSee = { nric: true, bank: true } }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -213,13 +228,17 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
           {/* The dash in the pattern has to be escaped: unescaped between `9`
               and `\s` the browser reads it as a range, throws under the `v`
               flag, and silently drops the constraint altogether. */}
-          <input
-            name="nric"
-            defaultValue={staff.nric ?? ''}
-            placeholder="850101141234"
-            pattern="[0-9\-\s]*"
-            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono focus:outline-none focus:border-accent-border"
-          />
+          {canSee.nric ? (
+            <input
+              name="nric"
+              defaultValue={staff.nric ?? ''}
+              placeholder="850101141234"
+              pattern="[0-9\-\s]*"
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono focus:outline-none focus:border-accent-border"
+            />
+          ) : (
+            <LockedValue value={staff.nric} why="NRIC / IC is not ticked for your title" />
+          )}
         </div>
         {staff.commission_dept || staff.director_dept ? null : (
           <div>
@@ -435,6 +454,18 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
       )}
 
       {/* Section 4 — Bank account (Spec 5) */}
+      {canSee.bank ? null : (
+        // Bank accounts not ticked (2026-10-09, PR4): both accounts shown as
+        // the reader gave them and not sent — a save leaves them as they were.
+        <>
+          <h3 className="sheet-heading mb-4">Bank accounts</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <LockedValue value={[staff.bank_name, staff.bank_account_no].filter(Boolean).join(' · ') || null} why="Account 1 · Bank accounts is not ticked for your title" />
+            <LockedValue value={[staff.bank_name_2, staff.bank_account_no_2].filter(Boolean).join(' · ') || null} why="Account 2 · Bank accounts is not ticked for your title" />
+          </div>
+        </>
+      )}
+      {canSee.bank ? (<>
       <h3 className="sheet-heading mb-4">Account 1 <span className="text-xs ml-1 font-normal">Default receiving bank account</span></h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
@@ -490,6 +521,7 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
           />
         </div>
       </div>
+      </>) : null}
 
       {/* Section 5 — Contact */}
       <h3 className="sheet-heading mb-4">Contact</h3>

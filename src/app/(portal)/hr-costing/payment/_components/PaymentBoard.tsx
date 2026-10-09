@@ -38,6 +38,10 @@ export interface BoardProps {
   staffFunded: boolean
   directorsFunded: boolean
   payoutBank: { name: string; last4: string } | null
+  /** The viewer's title ticks Bank accounts (2026-10-09, PR4). Without it
+   *  the account numbers read ••••, and neither salary PVs nor the bank file
+   *  can be made — both carry the numbers. Absent: ticked, as before. */
+  seesBank?: boolean
   today: string
   defaultDate: string
   fundingSlot: ReactNode
@@ -46,7 +50,7 @@ export interface BoardProps {
 type WindowState = { kind: 'dept'; key: string; mode: Granularity | 'view' } | { kind: 'body'; key: BodyKey } | null
 type SalaryReview = { key: string; rowIds: string[]; selectionKeys: string[]; components: SalaryComponentSelection[]; accounts: Record<string, BankAccountSelection>; group: DeptGroup; granularity: Granularity; date: string }
 
-export default function PaymentBoard({ period, periodLabel, periodRange, prevMonthName, groups, rows, statutoryCoverage = [], totals, band, headline, milestones, variances, facts, phase, staffFunded, directorsFunded, payoutBank, today, defaultDate, fundingSlot }: BoardProps) {
+export default function PaymentBoard({ period, periodLabel, periodRange, prevMonthName, groups, rows, statutoryCoverage = [], totals, band, headline, milestones, variances, facts, phase, staffFunded, directorsFunded, payoutBank, today, defaultDate, fundingSlot, seesBank = true }: BoardProps) {
   const router = useRouter()
   const [tab, setTab] = useState<'salary' | 'statutory'>('salary')
   const tabs = useRef<Array<HTMLButtonElement | null>>([])
@@ -164,7 +168,7 @@ export default function PaymentBoard({ period, periodLabel, periodRange, prevMon
         <section className="payment-section" aria-label="Salary PVs">
           <div className="sect-head"><h2>Salary PVs</h2><span className="rule" aria-hidden /><span className="count">By department · MYR</span></div>
           <DeptRows period={period} groups={groups} prevMonthName={prevMonthName} today={today}
-            dates={dates} fundedFor={fundedFor} busy={busy} payoutBank={payoutBank}
+            dates={dates} fundedFor={fundedFor} busy={busy} payoutBank={payoutBank} seesBank={seesBank}
             onGenerate={openSalary} onOpen={key => { const g = groups.find(group => group.key === key); if (g) openSalary(g, 'view') }} />
         </section>
         <SalaryChanges groups={groups} variances={variances} prevMonthName={prevMonthName}
@@ -181,7 +185,7 @@ export default function PaymentBoard({ period, periodLabel, periodRange, prevMon
         mode={generator.mode} groups={groups} rows={rows} coverage={statutoryCoverage}
         fundedFor={statutoryFundedFor} onClose={() => setGenerator(null)} /> : null}
     </> : null}
-    {openGroup ? <DeptWindow key={`${openGroup.key}:${openMode}`} group={openReview?.group ?? openGroup} period={period} periodLabel={periodLabel}
+    {openGroup ? <DeptWindow key={`${openGroup.key}:${openMode}`} group={openReview?.group ?? openGroup} period={period} periodLabel={periodLabel} seesBank={seesBank}
       prevMonthName={prevMonthName} gran={openReview?.granularity ?? (openMode === 'department' ? 'department' : 'employee')}
       readOnly={openMode === 'view'} selectedIds={openReview?.selectionKeys ?? (openMode === 'department' ? null : selections[openGroup.key] ?? [])}
       onSelection={ids => setSelections(current => ({ ...current, [openGroup.key]: ids ?? payrollComponentSelection(openGroup.people, null, 'employee').selectionKeys }))}

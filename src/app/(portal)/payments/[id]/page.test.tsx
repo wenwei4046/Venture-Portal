@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { withActions } from '@/test/with-actions'
 import { render, screen, within } from '@testing-library/react'
+vi.mock('server-only', () => ({}))
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), notFound: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
@@ -30,7 +31,9 @@ function database(referenceType = 'payroll_statutory', salaryLines: Record<strin
     }
     return query
   })
-  mocks.createClient.mockResolvedValue({ from, rpc: vi.fn().mockResolvedValue({ data: [], error: null }) })
+  mocks.createClient.mockResolvedValue({ from, rpc: vi.fn((fn: string, args?: { p_line_ids?: string[] }) => Promise.resolve(fn === 'payroll_line_accounts'
+      ? { data: salaryLines.filter(l => (args?.p_line_ids ?? []).includes(String(l.id))).map(l => ({ id: l.id, bank_account_no: l.bank_account_no ?? null })), error: null }
+      : { data: [], error: null })) })
   return { from, filters, voucher }
 }
 
@@ -104,6 +107,19 @@ describe('HR payroll voucher detail access', () => {
     expect(screen.getByText('1 PERSON · 2 PAYMENTS')).toBeVisible()
     expect(within(table).getByRole('row', { name: /Total/ })).toHaveTextContent('8,556.15')
     expect(from).not.toHaveBeenCalledWith('hr_staff_costs')
+  })
+
+  it('shows •••• for the account numbers to a viewer whose title does not tick Bank accounts (PR4)', async () => {
+    mocks.requirePermission.mockResolvedValue({ ...withActions({ role: 'hr', permissions: ['hr_costing'] }), sensitive: ['salary'] })
+    const person = { scope: 'staff', payroll_row_id: 'salary-row', employee_name: 'Salary Employee', employee_code: 'SAL001', department_name: 'Original Revenue' }
+    database('payroll_disbursement', [
+      { ...person, id: 'basic', salary_component: 'basic', recipient_account: 'account_1', bank_name: 'Recorded Maybank', bank_account_no: '0012345678', net: 4302.70 },
+    ])
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'salary' }) }))
+    const table = screen.getByRole('table', { name: 'Salary payments on this voucher' })
+    expect(table).toHaveTextContent('Recorded Maybank')
+    expect(table).toHaveTextContent('••••')
+    expect(table).not.toHaveTextContent('0012345678')
   })
 
   it('labels an old net line without inventing a receiving account', async () => {

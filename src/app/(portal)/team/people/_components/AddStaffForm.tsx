@@ -39,6 +39,10 @@ interface Props {
    * read, in which case the field says as much.
    */
   nextCode: string | null
+  /** The adder's title ticks Bank accounts (2026-10-09, PR4). Without it the
+   *  accounts are not asked here — somebody who has it adds them later.
+   *  Absent: asked, as before. */
+  canSeeBank?: boolean
 }
 
 const ZERO = '0.00'
@@ -86,7 +90,7 @@ const tickTile = (on: boolean) =>
  * number plus one. The form shows which that will be and nothing more — a
  * disabled input is not submitted, which is the point.
  */
-export default function AddStaffForm({ departments, titles, subDepartments, managers, nextCode }: Props) {
+export default function AddStaffForm({ departments, titles, subDepartments, managers, nextCode, canSeeBank = true }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -463,6 +467,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
 
       <div className="border-t border-hairline my-6" />
 
+      {canSeeBank ? (<>
       <h3 className="sheet-heading mb-1">
         Account 1{' '}
         <span className={hintBase}>default receiving bank account</span>
@@ -517,6 +522,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
       </div>
 
       <div className="border-t border-hairline my-6" />
+      </>) : null}
 
       <h3 className="sheet-heading mb-1">
         Contact <span className={hintBase}>optional, editable later</span>
