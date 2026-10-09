@@ -10,22 +10,36 @@ import type { ReportSegmentOption } from './report-segments'
  * Design handoff): Period From – To, Find account, Segment and Detail level
  * on one row over the matrix. Navigates on change. Find and the level come
  * through ReportSearchProvider, which the matrix reads.
+ *
+ * 2026-10-10: a single month's statement picks its month "vs" a month to
+ * compare (`mode="single"`); a balance reads "As at" one month (`"asat"`).
  */
 export default function ReportToolbar({
-  from,
-  to,
-  fromOptions,
-  toOptions,
+  mode = 'range',
+  from = '',
+  to = '',
+  fromOptions = [],
+  toOptions = [],
+  period = '',
+  compare = '',
+  monthOptions = [],
   segment,
   segments,
 }: {
-  from: string
-  to: string
-  fromOptions: string[]
-  toOptions: string[]
+  mode?: 'range' | 'single' | 'asat'
+  from?: string
+  to?: string
+  fromOptions?: string[]
+  toOptions?: string[]
+  /** single / asat: the month shown ('YYYY-MM'). */
+  period?: string
+  /** single: the month compared with, or ''. */
+  compare?: string
+  /** single / asat: the months to choose from, latest first. */
+  monthOptions?: string[]
   segment: string
   /** Empty = no segment choice. */
-  segments: ReportSegmentOption[]
+  segments: Array<Pick<ReportSegmentOption, 'value' | 'label'>>
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -33,6 +47,7 @@ export default function ReportToolbar({
   const find = useReportSearch()
 
   const go = (next: { from?: string; to?: string; segment?: string }) => {
+    if (mode !== 'range') return goMonth({ segment: next.segment })
     const qs = new URLSearchParams(sp.toString())
     const t = next.to ?? to
     const jan = `${t.slice(0, 4)}-01`
@@ -47,36 +62,81 @@ export default function ReportToolbar({
     }
     router.push(`${pathname}?${qs.toString()}`)
   }
+  // A single month or an As at: the month, the compare, the segment.
+  const goMonth = (next: { period?: string; compare?: string; segment?: string }) => {
+    const qs = new URLSearchParams(sp.toString())
+    qs.set('period', next.period ?? period)
+    const cmp = mode === 'single' ? (next.compare ?? compare) : ''
+    if (cmp) qs.set('compare', cmp)
+    else qs.delete('compare')
+    if (next.segment !== undefined) {
+      if (next.segment) qs.set('segment', next.segment)
+      else qs.delete('segment')
+    }
+    router.push(`${pathname}?${qs.toString()}`)
+  }
   const month = (ym: string) => dayjs(`${ym}-01`).format('MMM YYYY')
   // A To older than the list still shows as itself (an old link, a typed URL).
   const tos = toOptions.includes(to) ? toOptions : [...toOptions, to]
+  const months = monthOptions.includes(period) ? monthOptions : [period, ...monthOptions]
+  const compares = !compare || monthOptions.includes(compare) ? monthOptions : [...monthOptions, compare]
 
   return (
     <div className="rpt-toolbar" role="group" aria-label="Report controls">
-      <div className="rpt-field">
-        <span>Period</span>
-        <div className="rpt-range">
-          <select aria-label="From" value={from} onChange={(e) => go({ from: e.target.value })}>
-            {fromOptions.map((ym) => (
-              <option key={ym} value={ym}>
-                {month(ym)}
-              </option>
-            ))}
-          </select>
-          <span aria-hidden>–</span>
-          <select aria-label="To" value={to} onChange={(e) => go({ to: e.target.value })}>
-            {tos.map((ym) => (
-              <option key={ym} value={ym}>
-                {month(ym)}
-              </option>
-            ))}
-          </select>
+      {mode === 'range' ? (
+        <div className="rpt-field">
+          <span>Period</span>
+          <div className="rpt-range">
+            <select aria-label="From" value={from} onChange={(e) => go({ from: e.target.value })}>
+              {fromOptions.map((ym) => (
+                <option key={ym} value={ym}>
+                  {month(ym)}
+                </option>
+              ))}
+            </select>
+            <span className="rpt-range-word">to</span>
+            <select aria-label="To" value={to} onChange={(e) => go({ to: e.target.value })}>
+              {tos.map((ym) => (
+                <option key={ym} value={ym}>
+                  {month(ym)}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="rpt-field">
+          <span>{mode === 'asat' ? 'As at' : 'Period'}</span>
+          <div className="rpt-range">
+            <select aria-label={mode === 'asat' ? 'As at' : 'Period'} value={period} onChange={(e) => goMonth({ period: e.target.value })}>
+              {months.map((ym) => (
+                <option key={ym} value={ym}>
+                  {month(ym)}
+                </option>
+              ))}
+            </select>
+            {mode === 'single' ? (
+              <>
+                <span className="rpt-range-word">vs</span>
+                <select aria-label="Compare" value={compare} onChange={(e) => goMonth({ compare: e.target.value })}>
+                  <option value="">No compare</option>
+                  {compares.map((ym) => (
+                    <option key={ym} value={ym}>
+                      {month(ym)}
+                    </option>
+                  ))}
+                </select>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {find ? (
         <div className="rpt-field rpt-find">
-          <span>Find account</span>
+          <span>
+            Find account <span className="rpt-find-hint">· highlights only</span>
+          </span>
           <div className="rpt-find-box">
             <input
               type="search"

@@ -4,7 +4,8 @@ import { r2, sliceMatrixMonths } from '@/lib/monthly-matrix'
 import type { loadMonthlyPnl } from '@/lib/monthly-statements'
 import { fromChoices, rangeLabel, toChoices, type ReportRange } from '@/lib/report-range'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
-import MonthlyMatrix from './MonthlyMatrix'
+import { sheetColumns, sheetFromMatrix } from '@/lib/report-sheet'
+import SheetReport from './SheetReport'
 import { ReportSearchProvider } from './ReportSearchProvider'
 import ReportToolbar from './ReportToolbar'
 import type { ReportSegmentOption } from './report-segments'
@@ -15,6 +16,7 @@ import type { ReportSegmentOption } from './report-segments'
  * Detail level on one row over the matrix, cut to From with its months
  * separated. Reports' P&L draws it, and so does a department's page under Dept
  * Pool (2026-10-09) — there with no Segment, the page being the segment.
+ * The table is the handoff's own since 2026-10-10 (SheetReport).
  */
 export default function MonthlyPnlBody({
   pnl: { data, rows },
@@ -75,9 +77,9 @@ export default function MonthlyPnlBody({
             segments={segments}
           />
           {consolidated ? (
-            <p className="fin-notice mb-3">Consolidated view eliminates inter-billing between segments — pick a segment to see its own charges.</p>
+            <p className="rpt-cons">Consolidated view eliminates inter-billing between segments — pick a segment to see its own charges.</p>
           ) : null}
-          <MonthlyMatrix columns={cut.columns} rows={cut.rows} pctBaseByColumn={cut.base} nowKey={nowYM} separated />
+          <SheetReport columns={sheetColumns(cut.columns, nowYM)} rows={sheetFromMatrix(cut.rows)} pctBase={cut.base} />
         </section>
       </ReportSearchProvider>
     </>

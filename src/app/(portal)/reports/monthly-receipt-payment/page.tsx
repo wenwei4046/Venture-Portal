@@ -23,6 +23,8 @@ import { buildRnpMatrixRows, fetchRnpInvoiceEvents } from '@/lib/monthly-rnp'
 import { segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
+import SheetReport from '../_components/SheetReport'
+import { sheetColumns, sheetFromMatrix } from '@/lib/report-sheet'
 import MonthlyReportControls from '../_components/MonthlyReportControls'
 import { ReportSearchProvider } from '../_components/ReportSearchProvider'
 import ReportViewToggle from '../_components/ReportViewToggle'
@@ -117,7 +119,8 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
       if (!range.wholeYear) qs.set('from', range.from)
       return `/reports/monthly-receipt-payment/export?${qs.toString()}`
     }
-    const startLevel = rows.some((r) => r.kind === 'category') ? 1 : 3
+    // Each line as a % of the month's receipts (2026-10-10, the handoff).
+    const receipts = sliceMatrixMonths(data.columns, [{ key: 'flow', values: data.inflowTotalByCol }], range.from).rows[0].values
     return (
       <div>
         <div className="page-head">
@@ -153,7 +156,7 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
           />
         </StatCards>
 
-        <ReportSearchProvider level={startLevel}>
+        <ReportSearchProvider level={3}>
           <section className="mb-6">
             <div className="sect-head">
               <h2>Monthly receipt &amp; payment</h2>
@@ -170,7 +173,7 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
               segment={segment}
               segments={segments}
             />
-            <MonthlyMatrix columns={cut.columns} rows={cut.rows} nowKey={nowYM} separated />
+            <SheetReport columns={sheetColumns(cut.columns, nowYM)} rows={sheetFromMatrix(cut.rows)} pctBase={receipts} />
           </section>
         </ReportSearchProvider>
       </div>

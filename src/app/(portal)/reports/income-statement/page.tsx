@@ -112,10 +112,8 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
               {segName.toUpperCase()} · {periodLabel.toUpperCase()}
             </span>
           </div>
-          {consolidated ? (
-            <p className="fin-notice mb-3">Consolidated view eliminates inter-billing between segments — pick a segment to see its own charges.</p>
-          ) : null}
           <GlReportView
+            notice={consolidated ? 'Consolidated view eliminates inter-billing between segments — pick a segment to see its own charges.' : undefined}
             basePath="/reports/income-statement"
             period={period}
             compare={compare}

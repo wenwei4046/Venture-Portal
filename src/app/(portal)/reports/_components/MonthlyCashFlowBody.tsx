@@ -3,7 +3,8 @@ import { sliceMatrixMonths } from '@/lib/monthly-matrix'
 import type { loadMonthlyCashFlow } from '@/lib/monthly-statements'
 import { fromChoices, rangeLabel, toChoices, type ReportRange } from '@/lib/report-range'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
-import MonthlyMatrix from './MonthlyMatrix'
+import { sheetColumns, sheetFromMatrix } from '@/lib/report-sheet'
+import SheetReport from './SheetReport'
 import { ReportSearchProvider } from './ReportSearchProvider'
 import ReportToolbar from './ReportToolbar'
 import type { ReportSegmentOption } from './report-segments'
@@ -13,6 +14,7 @@ import type { ReportSegmentOption } from './report-segments'
  * Design handoff): five cards, then one control row over the matrix, cut to
  * From. Reports' Cash Flow draws it, and so does a department's page under
  * Dept Pool (2026-10-09) — there with no Segment, the page being the segment.
+ * The table is the handoff's own since 2026-10-10 (SheetReport), opened at L3.
  */
 export default function MonthlyCashFlowBody({
   cashFlow: { data, rows },
@@ -35,7 +37,6 @@ export default function MonthlyCashFlowBody({
   // A card reads the Accumulated of its line as cut to From: a flow adds up, an
   // opening reads its first month, a closing or a balance its last.
   const pick = (values: number[], key = 'flow') => sliceMatrixMonths(data.columns, [{ key, values }], range.from).rows[0].values[0]
-  const startLevel = rows.some((r) => r.kind === 'category') ? 1 : 3
 
   return (
     <>
@@ -47,7 +48,7 @@ export default function MonthlyCashFlowBody({
         <StatCard label="Closing cash" value={formatMoney(pick(data.closingByCol, 'CLOSING_CASH'))} icon="bank" tone="primary" note="End of period" />
       </StatCards>
 
-      <ReportSearchProvider level={startLevel}>
+      <ReportSearchProvider level={3}>
         <section className="mb-6">
           <div className="sect-head">
             <h2>Monthly cash flow</h2>
@@ -64,7 +65,7 @@ export default function MonthlyCashFlowBody({
             segment={segment}
             segments={segments}
           />
-          <MonthlyMatrix columns={cut.columns} rows={cut.rows} nowKey={nowYM} separated />
+          <SheetReport columns={sheetColumns(cut.columns, nowYM)} rows={sheetFromMatrix(cut.rows)} />
         </section>
       </ReportSearchProvider>
     </>

@@ -12,7 +12,13 @@ import { formatMoneyBare } from '@/lib/utils'
 import type { AccountNode, ReportSection } from '@/lib/gl-reports'
 import { deltaPct, pctOf, type ReportBlock } from '@/lib/gl-report-blocks'
 import { matchesAccount } from '@/lib/report-search'
+import { sheetFromBlocks } from '@/lib/report-sheet'
+import { toChoices } from '@/lib/report-range'
+import { officeMonth } from '@/lib/office-time'
 import Highlight from './Highlight'
+import { ReportSearchProvider } from './ReportSearchProvider'
+import ReportToolbar from './ReportToolbar'
+import SheetReport from './SheetReport'
 
 export type { ReportBlock }
 
@@ -39,6 +45,8 @@ export interface GlReportViewProps {
   controls?: 'rail' | 'row'
   /** The period control's name — "As at" on the Balance Sheet. */
   periodLabel?: string
+  /** A line under the control row ('row' controls), e.g. the consolidated note. */
+  notice?: string
 }
 
 /** Collapse key for a headed section that is NOT a merged root (its own row
@@ -104,6 +112,7 @@ export default function GlReportView({
   skin = 'cf',
   controls = 'rail',
   periodLabel = 'Period',
+  notice,
 }: GlReportViewProps) {
   const router = useRouter()
   // A statement with layout (headed) sections opens folded to its category
@@ -122,12 +131,9 @@ export default function GlReportView({
     return { allGroupCodes: k.groups, allTxnCodes: k.txns }
   }, [blocks])
 
-  // Which level was last asked for — the control row shows it pressed.
-  const [level, setLevelShown] = useState<1 | 2 | 3>(() =>
-    blocks.some((b) => b.kind === 'section' && b.section.headed) ? 1 : 2,
-  )
+  // The rail's L1 / L2 / L3 (Finance's control row holds its own level since
+  // 2026-10-10, in SheetReport's provider).
   const setLevel = (level: 1 | 2 | 3) => {
-    setLevelShown(level)
     setCollapsed(level === 1 ? new Set(allGroupCodes) : new Set())
     setOpenTxns(level === 3 ? new Set(allTxnCodes) : new Set())
   }
@@ -291,100 +297,33 @@ export default function GlReportView({
   )
 
   if (controls === 'row') {
-    const compareChoices = Array.from({ length: 12 }, (_, i) => stepMonth(period, -(i + 1)))
-    const monthName = (ym: string) => dayjs(`${ym}-01`).format('MMM YYYY')
+    // Finance's view (2026-10-10, the handoff's rptSection): the control row —
+    // the month "vs" a month to compare, or As at for a balance — over the
+    // reports' table, opened at L3. A balance neither compares nor drills; a
+    // month's items open onto their journal lines.
+    const asAt = periodLabel === 'As at'
+    const cmp = !asAt && compare !== ''
     return (
-      <div>
-        <div className="rpt-toolbar" role="group" aria-label="Report controls">
-          <div className="rpt-field">
-            <span>{periodLabel}</span>
-            <div className="rpt-range">
-              <button type="button" className="rpt-step" onClick={() => navigate(stepMonth(period, -1), compare, segment)} aria-label="Previous month">
-                ‹
-              </button>
-              <input type="month" aria-label={periodLabel} value={period} onChange={(e) => e.target.value && navigate(e.target.value, compare, segment)} />
-              <button type="button" className="rpt-step" onClick={() => navigate(stepMonth(period, 1), compare, segment)} aria-label="Next month">
-                ›
-              </button>
-            </div>
-          </div>
-          <div className="rpt-field">
-            <span>Compare</span>
-            <select aria-label="Compare" value={compare} onChange={(e) => navigate(period, e.target.value, segment)}>
-              <option value="">No compare</option>
-              {compare && !compareChoices.includes(compare) ? <option value={compare}>{monthName(compare)}</option> : null}
-              {compareChoices.map((ym) => (
-                <option key={ym} value={ym}>
-                  {monthName(ym)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="rpt-field rpt-find">
-            <span>Find account</span>
-            <div className="rpt-find-box">
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    stepHit(e.shiftKey ? -1 : 1)
-                  } else if (e.key === 'Escape') {
-                    setSearch('')
-                  }
-                }}
-                placeholder="Code or name…"
-                aria-label="Find account by code or name"
-                className="search-plain"
-              />
-              {search.trim() ? (
-                <>
-                  <small>{hitCodes.length === 0 ? 'No match' : `${activeHit + 1} / ${hitCodes.length}`}</small>
-                  {hitCodes.length > 0 ? (
-                    <>
-                      <button type="button" className="rpt-step" onClick={() => stepHit(-1)} aria-label="Previous match">
-                        ‹
-                      </button>
-                      <button type="button" className="rpt-step" onClick={() => stepHit(1)} aria-label="Next match">
-                        ›
-                      </button>
-                    </>
-                  ) : null}
-                </>
-              ) : null}
-            </div>
-          </div>
-          {segments.length > 0 ? (
-            <div className="rpt-field">
-              <span>Segment</span>
-              <select aria-label="Segment" value={segment} onChange={(e) => navigate(period, compare, e.target.value)}>
-                {segments.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-          <div className="rpt-field">
-            <span>Detail level</span>
-            <div className="rpt-levels">
-              {([
-                [1, 'Top accounts only'],
-                [2, 'All account levels'],
-                [3, 'Everything incl. transactions'],
-              ] as const).map(([l, title]) => (
-                <button key={l} type="button" aria-pressed={level === l} onClick={() => setLevel(l)} title={title}>
-                  L{l}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="min-w-0 overflow-x-auto">{table}</div>
-      </div>
+      <ReportSearchProvider level={3}>
+        <ReportToolbar
+          mode={asAt ? 'asat' : 'single'}
+          period={period}
+          compare={cmp ? compare : ''}
+          monthOptions={toChoices(officeMonth())}
+          segment={segment}
+          segments={segments}
+        />
+        {notice ? <p className="rpt-cons">{notice}</p> : null}
+        <SheetReport
+          columns={[
+            { key: 'cur', label: currentLabel, tone: 'now' },
+            ...(cmp ? [{ key: 'cmp', label: `${compareLabel} · compare` }] : []),
+          ]}
+          rows={sheetFromBlocks(blocks, cmp)}
+          pctBase={pctBase ? (cmp ? [pctBase.current, pctBase.previous] : [pctBase.current]) : undefined}
+          drill={!asAt}
+        />
+      </ReportSearchProvider>
     )
   }
 

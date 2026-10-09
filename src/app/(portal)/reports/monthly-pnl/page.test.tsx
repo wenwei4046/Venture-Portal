@@ -90,7 +90,25 @@ describe('the Monthly P&L, company-wide', () => {
     expect(within(row).getByRole('searchbox', { name: 'Find account by code or name' })).toBeInTheDocument()
     expect(within(row).getByRole('button', { name: 'L3' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('Consolidated view eliminates inter-billing between segments — pick a segment to see its own charges.')).toBeInTheDocument()
-    expect(document.querySelector('.mx-sep')).not.toBeNull()
+  })
+
+  // 2026-10-10 — the handoff's table: Accumulated a shade darker, the current
+  // month peach, RM and % under each; the category titled in blue over its
+  // accounts and closed on "Total …".
+  it('draws the handoff’s table', async () => {
+    render(await page())
+    const heads = Array.from(document.querySelectorAll('.sheet-rpt thead tr:first-child th')).slice(1)
+    expect(heads.map((th) => th.textContent)).toEqual(['Accumulated', 'Oct 2026', 'Sep 2026', 'Aug 2026', 'Jul 2026'])
+    expect(heads[0]).toHaveClass('is-acc')
+    expect(heads[1]).toHaveClass('is-now')
+    expect(Array.from(document.querySelectorAll('.sheet-rpt thead tr:nth-child(2) th')).map((th) => th.textContent).slice(0, 4)).toEqual(['RM', '%', 'RM', '%'])
+    const kinds = Array.from(document.querySelectorAll('.sheet-rpt tbody tr')).map((tr) => [(tr as HTMLElement).dataset.kind, tr.querySelector('td')?.textContent])
+    expect(kinds).toEqual([
+      ['title', 'Revenue'],
+      ['group', '4000 Service fees'],
+      ['total', 'Total Revenue'],
+      ['total', 'Net Income / (Loss)'],
+    ])
   })
 
   it('cuts the matrix to From, Accumulated over the months kept', async () => {

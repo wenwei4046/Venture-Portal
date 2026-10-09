@@ -8,6 +8,9 @@ import { withActions } from '@/test/with-actions'
 // with Excel and PDF, the cards, and the statement's controls — period,
 // compare, find, segment, detail level — on one row over it. A department
 // manager keeps the page as it was (the rail).
+// 2026-10-10 — the handoff's table: the month (peach) over its RM and %, the
+// month "vs" a month to compare, opened at L3; Cash Flow opens at L3 too, and
+// Receipt & Payment reads each line as a % of the receipts.
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), buildPnl: vi.fn(), buildCashFlow: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
@@ -83,7 +86,21 @@ describe('the single-month P&L, company-wide', () => {
     expect(within(row).getByLabelText('Period')).toHaveValue('2026-10')
     expect(within(row).getByRole('combobox', { name: 'Compare' })).toHaveValue('')
     expect(within(row).getByRole('combobox', { name: 'Segment' })).toBeInTheDocument()
-    expect(within(row).getByRole('button', { name: 'L2' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(row).getByRole('button', { name: 'L3' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('draws the month over its RM and %', async () => {
+    render(await IncomeStatementPage({ searchParams: Promise.resolve({}) }))
+    const month = Array.from(document.querySelectorAll('.sheet-rpt thead tr:first-child th')).slice(1)
+    expect(month.map((th) => th.textContent)).toEqual(['Oct 2026'])
+    expect(month[0]).toHaveClass('is-now')
+    expect(Array.from(document.querySelectorAll('.sheet-rpt thead tr:nth-child(2) th')).map((th) => th.textContent)).toEqual(['RM', '%'])
+  })
+
+  it('adds the month compared, with its own %', async () => {
+    render(await IncomeStatementPage({ searchParams: Promise.resolve({ compare: '2026-09' }) }))
+    expect(Array.from(document.querySelectorAll('.sheet-rpt thead tr:first-child th')).slice(1).map((th) => th.textContent)).toEqual(['Oct 2026', 'Sep 2026 · compare'])
+    expect(Array.from(document.querySelectorAll('.sheet-rpt thead tr:nth-child(2) th')).map((th) => th.textContent)).toEqual(['RM', '%', 'RM', '%'])
   })
 
   it('keeps the rail for a department manager', async () => {
@@ -104,6 +121,9 @@ describe('the single-month Cash Flow and Receipt & Payment, company-wide', () =>
     expect(card('Money out')).toHaveTextContent('RM (20,000.00)')
     expect(card('Net change')).toHaveTextContent('RM 10,000.00')
     expect(card('Closing cash')).toHaveAttribute('data-tone', 'primary')
+    const row = screen.getByRole('group', { name: 'Report controls' })
+    expect(within(row).getByRole('button', { name: 'L3' })).toHaveAttribute('aria-pressed', 'true')
+    expect(Array.from(document.querySelectorAll('.sheet-rpt thead tr:nth-child(2) th')).map((th) => th.textContent)).toEqual(['RM'])
   })
 
   it('shows receipts, payments and the net', async () => {
@@ -113,5 +133,6 @@ describe('the single-month Cash Flow and Receipt & Payment, company-wide', () =>
     expect(card('Payments')).toHaveTextContent('RM (20,000.00)')
     expect(card('Net')).toHaveTextContent('RM 10,000.00')
     expect(screen.getByRole('group', { name: 'Report controls' })).toBeInTheDocument()
+    expect(Array.from(document.querySelectorAll('.sheet-rpt thead tr:nth-child(2) th')).map((th) => th.textContent)).toEqual(['RM', '%'])
   })
 })

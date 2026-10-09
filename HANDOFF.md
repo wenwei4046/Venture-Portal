@@ -1,5 +1,109 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-10 m (SHIPPED) — audit fixes, part 1a: the reports' table
+
+The user asked for the whole audit list (l) to be done ("做"), Reports first.
+Done here (items 1, 2, part of 3 and 4 of list l):
+
+- **`reports/_components/SheetReport.tsx`** — the handoff's rptSection table: two-row
+  head (each column's name over RM [+ %]), current / chosen month peach + orange bar,
+  Accumulated rgb(210,218,230); blue block title, group (depth 1) and item rows, an
+  OPEN group blanks its figures and gets a "Subtotal" row after its items, tinted
+  total rows (every total alike — the handoff's TOT; `strong` only darkens, unused
+  so far, meant for aging's "All"); negatives red brackets, nil "—" muted, now-column
+  wash; L1 totals / L2 + groups (folded, no arrows) / L3 everything (fold by hand);
+  Find highlights (`is-hit`) and forces ancestors open; `drill` = a single month's
+  leaf opens onto its journal lines ("HV-JV-… · 05 Oct" + description · party).
+  Level + Find come from ReportSearchProvider. CSS `.sheet-rpt` (globals.css end).
+- **`lib/report-sheet.ts`** — `sheetFromMatrix` (monthly MatrixRow[] → titles /
+  accounts / totals: P&L "cat:" subtotals close a block → title + "Total <name>";
+  cash-flow categories become depth-1 groups under a side title read from the side
+  total via `sideTitle` ("流入合计 · Total money in" → "Money in"); a subtotal heading
+  its own rows (AR outstanding) = title + rows + total, but NOT when a later "cat:" /
+  side total closes those rows (Gross Profit)); `sheetFromBlocks` (single-month
+  ReportBlock[]: section → title + nodes; a run of headed sections → one side title +
+  each section a group; summaries → totals; txns kept); `sheetColumns`.
+- Wired for Finance only: MonthlyPnlBody / MonthlyCashFlowBody (so Dept Pool's
+  per-department pages too), monthly R&P (+ % of receipts), GlReportView `controls="row"`
+  (P&L, CF, R&P + % of receipts, BS as-at: no compare, no drill). All open at L3.
+  Department managers keep MonthlyMatrix / the rail (unchanged).
+- **ReportToolbar** `mode`: 'range' (From "to" To) | 'single' (month "vs" Compare,
+  "No compare") | 'asat' ("As at"); Find label "· highlights only"; segments typed
+  loosely. Consolidated note = `.rpt-cons` amber italic under the control row
+  (GlReportView `notice` prop). `.fin-view .neg` red; `.rpt-field` 0.05em.
+- Still open from list l: TB Segment (gl_net_by_account has no segment — compute from
+  fetchAllJournalLines when picked), Debtor / Loan aging (As at needs payment dates —
+  payment_vouchers per invoice has no as-of filter yet; cards / copy / cells), Company
+  Statement duplicate tiles + styling, then items 5–10.
+- A visual harness lives in `src/__harness__/reports.harness.test.tsx` (untracked,
+  HARNESS_OUT=1) + `$TEMP/claude-patch/build-page-harness.js`; delete when done.
+
+## AUDIT 2026-10-09 l (OPEN) — what of the Finance handoff is still not built
+
+The user: "report 那边的 P&L, cash flow 有些没换到我要的 design" then "全部检查有什么
+design 没有换成我要的". Six read-only audits compared every prototype builder
+(`.design/finance-revamp/…/Finance Revamp.dc.html`, rptSection 2854 / pageReports 2929
+etc.) with the code. Nothing changed yet — the user decides what to fix. Agreed
+deviations (invoice-date debtor aging, Mark executed, Delete for Reverse, no Request
+credit, Invoice Pool skipped, Dept Pool per-department sidebar, orange) are excluded.
+
+1. **Reports — single month** (`reports/_components/GlReportView.tsx`, used by P&L,
+   CF, R&P, BS): two-row head with RM + % under EVERY month incl. "· compare" (now one
+   row, % for the current month only, 219-225); block title blue bold on white, totals /
+   net tinted rgb(238,243,248) navy text blue top rule (now gold caps band 744-751, serif
+   italic totals, navy+gold "strong" rows 246-286, CSS 1215-1243); an open group blanks
+   its figures and ends on a **Subtotal** row (none, 663/699); selected month peach wash;
+   month select + "vs" compare select (now ‹ › stepper + 12-month Compare 299-358); drill
+   lines show "HV-JV-… · 05 Oct"; L1 = totals + net only; Find hint "· highlights only".
+2. **Reports — month by month** (`MonthlyMatrix.tsx` 191-287, CSS 1253-1272): head
+   #E2E7EF, Accumulated rgb(210,218,230), current month peach + orange bar (now navy head,
+   gold current cells); blue block titles, tinted "Total …" rows, Subtotal rows (now
+   navy/gold bands, no subtotals); "to" not "–" in the range; CF/R&P "RM" sub-head.
+   Fixing this also changes Dept Pool's per-department pages (same body).
+3. Negatives: `span.neg` has no colour (only `.num.neg`, CSS 1036) → black brackets in
+   MonthlyMatrix 159, GlReportView 273, StatementsPeriodTable 92/104, dashboard 1082.
+4. Report details: CF 4 cards (Opening / Operating / Net change / Closing) not 5, opens
+   at L3 not L1, "Find line"; R&P has no % of receipts; BS: no compare / drill; TB: no
+   Segment; Debtor: As at control, section "Debtor aging · AS AT …", oldest-company card
+   notes; Loan: 4 cards not 6, subtitle still "bucket by months late", As at + Find;
+   Company Statement: old three summary tiles still render under the cards (279-310),
+   no "Counterparties · N SHOWN", tinted collect/repay heads, navy total row.
+5. **Table behaviours missing** (SortableTable `filterable`/`range`/`resizeMode`/
+   `layoutId`/`canSetDefault`/box): plain tables on Overview (5), Invoice sub-lists
+   (Credit notes / Marketing projects / Non-billable), Overdue, Repayment lists, Dept Pool,
+   General Ledger, Journal list (no dbl-click / right-click either), Reconciliation,
+   Settings Departments / Base rate. Partial: Fund IN (From, Outstanding, Rate, Lock-in,
+   Maturity), Fund OUT (Company, Outstanding, Rate), BA (Ref, Face, Period, Charge, Owe
+   HC), Statements (all, + 620 box), Allocator By company / Staff, Venture Pool (`range`
+   without `filterable` → unreachable, no layoutId); Invoice row menu lacks "Open in new
+   tab"; Payments/Receipts lose the box while ?q= is set; resize "grow" on Statements /
+   Staff.
+6. **Chinese where the design is English**: payment / receipt detail
+   (`payments/[id]/page.tsx`, VoucherActions), Allocator Staff + Setup tabs, Invoice list
+   bits (对数补差, 跨月…, 作废所选, settle / void dialogs), Receipt "收到 loan 还款",
+   Payments card note "还款", Repayment "最低还息单…" / "Short 还差", GL filter "搜索值…".
+7. Pages: Repayment Schedule = ONE "Due to collect / Due to pay" table (Type chip,
+   Received/Paid, Short "clear", Record on short rows, "N ITEMS") + Export (now four
+   tables, no export); BA "Record financing" form still the old Record BA (no day chips,
+   big RM input, live "= RM x", three result tiles, title / button copy) + per-card Edit
+   limit; Payments/Receipts: one search box, filtering via ▽ (old filter form remains),
+   Total foot, eyebrow month, Receipt title "Receipt", Total received ledger tone,
+   receipt detail "← Back to Receipt"; Overview: Alerts as a table, titled fold tables,
+   plain KPI cards; Fund IN/OUT: Total foot rows, Terms over time styling, Print schedule
+   signature row; Statements: All companies foot, print shows direction; Overdue: Net off
+   on Fund OUT, every month foot, cards above tabs; GL: signed red balance (now x Dr / x
+   Cr), "code · name" on lines, IT / Revenue Department show raw keys
+   (LedgerSections 34-47, hard-coded); Dept Pool "awaiting Principal" should be blue
+   (wait), not alert; Allocator "To bill" wait tone, Generate invoices in head.
+8. Extras the design lacks (keep unless the user says): Payments Export / Claim
+   Requests, Fund IN/OUT head BA Calculator + Repayment Schedule, Record repayment +
+   recorded fold, BA Edit/Delete, CF/R&P Edit layout, Settings Accounts|Departments
+   strip, base-rate chart, Dept Pool notes + hidden balance toggle.
+9. Needs a DB change first: Allocator record "Source voucher" (alloc_txns has no voucher).
+10. Type / tokens: secondary text is black (`--graphite`/`--muted`, CSS 3539) vs
+    #5A4E44/#75645A/#8A7765; micro-label spacing >0.05em in several places; 9–9.5px text;
+    print letterhead font var undefined (CSS 5437); body figures at weight 500.
+
 ## CHECKPOINT 2026-10-09 k (SHIPPED) — Dept Pool: each department's own P&L and Cash Flow
 
 The user: "我要把每个 department 的 cash flow, P&L 放过来 … Venture, Marketing,

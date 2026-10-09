@@ -212,6 +212,8 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
             segment={segment}
             segments={segChoices}
             blocks={[...blocks, ...arBlocks]}
+            // Each line as a % of the month's receipts (2026-10-10, the handoff).
+            pctBase={{ current: cf.inflow.current, previous: cf.inflow.previous }}
             currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}
             compareLabel={compare ? dayjs(`${compare}-01`).format('MMM YYYY') : ''}
             controls="row"

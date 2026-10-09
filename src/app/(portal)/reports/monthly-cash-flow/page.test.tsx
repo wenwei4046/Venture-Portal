@@ -82,7 +82,11 @@ describe('the month-by-month Cash Flow, company-wide', () => {
     expect(card('Net change')).toHaveAttribute('data-tone', 'ledger')
     expect(card('Closing cash')).toHaveAttribute('data-tone', 'primary')
     expect(card('Closing cash')).toHaveTextContent('RM 115,000.00')
-    expect(within(screen.getByRole('group', { name: 'Report controls' })).getByRole('button', { name: 'L1' })).toHaveAttribute('aria-pressed', 'true')
+    // The handoff opens every report at L3 (2026-10-10).
+    expect(within(screen.getByRole('group', { name: 'Report controls' })).getByRole('button', { name: 'L3' })).toHaveAttribute('aria-pressed', 'true')
+    const titles = Array.from(document.querySelectorAll('.sheet-rpt tbody tr[data-kind="title"]')).map((tr) => tr.textContent)
+    expect(titles).toEqual(['Money in', 'Money out'])
+    expect(Array.from(document.querySelectorAll('.sheet-rpt thead tr:nth-child(2) th')).map((th) => th.textContent)).toEqual(['RM', 'RM', 'RM', 'RM'])
   })
 
   it('opens From on its own opening cash', async () => {
@@ -109,5 +113,7 @@ describe('the month-by-month Receipt & Payment, company-wide', () => {
     expect(card('Net')).toHaveAttribute('data-tone', 'primary')
     expect(card('Net')).toHaveTextContent('RM 15,000.00')
     expect(card('Outstanding at month end')).toHaveTextContent('RM 900.00')
+    // Each line as a % of the month's receipts (2026-10-10, the handoff).
+    expect(Array.from(document.querySelectorAll('.sheet-rpt thead tr:nth-child(2) th')).map((th) => th.textContent).slice(0, 2)).toEqual(['RM', '%'])
   })
 })
