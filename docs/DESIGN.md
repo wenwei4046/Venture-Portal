@@ -81,7 +81,11 @@ prototype.
 Its page-head menus (`ActMenu`: "From payroll ▾", "Export ▾", "+ Create
 Invoice ▾") hold the controls a captioned band used to lay out; a page's
 facts sit in `DetailGroups` (banded group cards of label / value rows) and
-its actions in a `.fin-actions` panel with a line on what they do.
+its actions in a `.fin-actions` panel with a line on what they do. Where the
+handoff and an earlier per-page pick disagreed (the allocator's split: the
+prototype's one text column against the 每家一栏 matrix of two days before),
+the user chose the handoff — a row's breakdown is one line of "label pct%"
+and a page of its own (`/billing-allocator/[id]`), not a column per company.
 
 **What it is.** PortalFrame draws, for those routes, the content column inset
 10px around ONE white sheet (`.sheet-frame` › `.sheet`, 16px radius, hairline

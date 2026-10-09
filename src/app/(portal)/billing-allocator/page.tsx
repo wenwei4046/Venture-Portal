@@ -19,7 +19,8 @@ import type {
 // through the same path as manual multi-line invoices.
 
 interface Props {
-  searchParams: Promise<{ period?: string }>
+  /** `edit` — a record's own page sent it back to be corrected (2026-10-09). */
+  searchParams: Promise<{ period?: string; edit?: string }>
 }
 
 export default async function BillingAllocatorPage({ searchParams }: Props) {
@@ -70,7 +71,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     supabase.from('alloc_template_splits').select('template_id, company_id, pct'),
     supabase
       .from('alloc_txns')
-      .select('id, txn_no, description, amount, method, category_id, hc_period, billed_ref, alloc_txn_details(company_id, department_id, method_detail, amount, is_own_share)')
+      .select('id, txn_no, description, amount, method, category_id, hc_period, billed_ref, created_at, alloc_txn_details(company_id, department_id, method_detail, amount, is_own_share)')
       .eq('period_month', pd)
       .order('txn_no'),
     // ALL batches of the month: ALC-YYYYMM, ALC-YYYYMM-2, …
@@ -186,6 +187,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     categoryId: (t.category_id as string | null) ?? null,
     categoryName: catName.get((t.category_id as string | null) ?? '') ?? '',
     hcPeriod: t.hc_period ? dayjs(t.hc_period as string).format('YYYY-MM') : null,
+    createdAt: (t.created_at as string | null) ?? '',
     details: ((t.alloc_txn_details ?? []) as Array<{
       company_id: string | null; department_id: string | null
       method_detail: string; amount: number | string; is_own_share: boolean
@@ -308,7 +310,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
         <StatCard label="HV own share" value={formatMoney(summary.ownShare)} icon="building" note="kept by HV · not billed" />
       </StatCards>
 
-      <AllocatorTabs data={data} />
+      <AllocatorTabs data={data} initialEditId={sp.edit} />
     </div>
   )
 }

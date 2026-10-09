@@ -55,6 +55,8 @@ export interface TxnRow {
   categoryId: string | null
   categoryName: string
   hcPeriod: string | null
+  /** ISO timestamp — when the allocation was recorded. */
+  createdAt: string
   details: TxnDetailRow[]
 }
 

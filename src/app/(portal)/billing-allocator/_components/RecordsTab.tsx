@@ -4,22 +4,24 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
-import { allocatorSummary, batchLabel, byCompanyRows, matrixColumns, type ByCompanyRow } from '@/lib/allocator-sheet'
+import { officeTime } from '@/lib/office-time'
+import { allocatorSummary, batchLabel, byCompanyRows, splitSummary, type ByCompanyRow } from '@/lib/allocator-sheet'
 import SortableTable, { type SortableColumn } from '@/components/SortableTable'
+import { useRowLinks } from '@/components/row-links'
 import { deleteAllocTxn, generateAllocatorInvoices, type GenerateResult } from '../actions'
 import type { AllocatorData, TxnRow } from './types'
 import { unwrap } from './unwrap'
 
-// The month's records on the sheet (2026-10-07; the user approved the
-// allocator sample and picked 每家一栏): a strip above the table for what still
-// has to be billed, the records with the split as one column per company (HV's
-// own share the last column, kept and never billed) and the batch as a chip,
-// then a By company table — each target's share, what is billed, what is to
-// bill, and its invoices. On a phone a record is Description + Amount with the
-// number and method as small print; the arrow opens the category, the split
-// and the batch, and Edit / Delete.
+// The month's records on the sheet (2026-10-07, the allocator sample; 2026-10-09,
+// the user's Claude Design handoff — 照设计档): a strip above the table for
+// what still has to be billed, the records with the split as ONE column of
+// text ("2990 3.9% · CAR 19.4%", HV's own share left out), the batch and the
+// status as chips, a record opening its own page on a double-click, then a By
+// company table — each target's share, what is billed, what is to bill, and
+// its invoices. On a phone a record is Description + Amount with the number
+// and method as small print; the arrow opens the split, the category and the
+// batch, and Edit / Delete.
 
-const fmt = (n: number) => n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const METHOD: Record<string, string> = { headcount: 'Headcount', percentage: 'Percentage', equal: 'Equal', custom: 'Custom' }
 const methodLabel = (m: string) => METHOD[m] ?? m
 
@@ -29,6 +31,16 @@ function BatchChip({ t }: { t: TxnRow }) {
     <span className={`chip ${label === 'not billed' ? 'alert' : 'ledger'}`}>
       <i className="dot" />
       {label}
+    </span>
+  )
+}
+
+/** Billed, or still to bill — the handoff's Status column. */
+function StatusChip({ t }: { t: TxnRow }) {
+  return (
+    <span className={`chip ${t.locked ? 'ledger' : 'alert'}`}>
+      <i className="dot" />
+      {t.locked ? 'billed' : 'to bill'}
     </span>
   )
 }
@@ -60,12 +72,7 @@ export default function RecordsTab({
 
   const monthLabel = dayjs(`${data.period}-01`).format('MMMM YYYY')
   const summary = allocatorSummary(data.txns, data.invoices)
-  const targets = matrixColumns(data.txns, data.companies)
   const byCompany = byCompanyRows(data.txns, data.invoices)
-  const amountFor = (t: TxnRow, targetId: string | null): number | null => {
-    const d = t.details.find((x) => (targetId === null ? x.isOwnShare || x.companyId === null : x.companyId === targetId && !x.isOwnShare))
-    return d ? d.amount : null
-  }
 
   const run = (fn: () => Promise<void>) => {
     setError(null)
@@ -78,6 +85,18 @@ export default function RecordsTab({
       }
     })
   }
+  const remove = (t: TxnRow) => run(async () => { unwrap(await deleteAllocTxn(t.id)) })
+
+  // A record's own page (2026-10-09): a double-click opens it, a right-click
+  // offers that, a new tab, and what the row's buttons do.
+  const links = useRowLinks<TxnRow>({
+    href: (t) => `/billing-allocator/${t.id}`,
+    title: (t) => t.txnNo,
+    more: (t) => [
+      { key: 'edit', label: 'Edit in Calculate', disabled: isPending || t.locked, onSelect: () => onEdit(t) },
+      { key: 'delete', label: 'Delete', danger: true, disabled: isPending || t.locked, onSelect: () => remove(t) },
+    ],
+  })
 
   if (data.txns.length === 0) {
     return (
@@ -89,6 +108,8 @@ export default function RecordsTab({
     )
   }
 
+  const lockedTitle = (t: TxnRow) => `Billed under ${t.billedRef} — delete that batch's drafts first`
+
   const columns: SortableColumn<TxnRow>[] = [
     {
       key: 'txn_no',
@@ -96,7 +117,7 @@ export default function RecordsTab({
       label: 'Txn',
       mobile: 'drop',
       render: (t) => t.txnNo,
-      cellClassName: 'font-mono text-[12px] text-graphite whitespace-nowrap',
+      cellClassName: 'font-sans text-[12px] text-ink font-medium whitespace-nowrap',
     },
     {
       key: 'description',
@@ -106,10 +127,10 @@ export default function RecordsTab({
       render: (t) => (
         <>
           <span className="q-desc" title={t.description}>{t.description}</span>
-          {/* The desktop's second line: how it was split and what it is. */}
+          {/* The desktop's second line: when it was recorded and how it was split. */}
           <span className="q-meta">
+            {t.createdAt ? `${officeTime(t.createdAt).format('D MMM YYYY')} · ` : ''}
             {methodLabel(t.method)}
-            {t.categoryName ? ` · ${t.categoryName}` : ''}
             {t.hcPeriod ? ` · HC ${dayjs(`${t.hcPeriod}-01`).format('MMM YYYY')}` : ''}
           </span>
           {/* The phone's small print: the number and the method, then the batch and how many shares. */}
@@ -130,51 +151,28 @@ export default function RecordsTab({
       label: 'Amount',
       align: 'right',
       mobile: 'keep',
+      filterable: true,
+      range: 'number',
       render: (t) => <span className="font-semibold">{formatMoney(t.amount)}</span>,
       sortValue: (t) => t.amount,
       cellClassName: 'whitespace-nowrap',
     },
-    ...targets.map<SortableColumn<TxnRow>>((c) => ({
-      key: `t:${c.id ?? 'own'}`,
-      group: '分摊',
-      label: c.label,
-      align: 'right',
-      mobile: 'drop',
-      cellClassName: c.own ? 'own whitespace-nowrap' : 'whitespace-nowrap',
-      headerClassName: c.own ? 'own' : undefined,
-      render: (t) => {
-        const amount = amountFor(t, c.id)
-        return amount === null ? <span className="text-muted">—</span> : fmt(amount)
-      },
-      sortValue: (t) => amountFor(t, c.id) ?? 0,
-    })),
     {
       key: 'split',
       group: '分摊',
       label: 'Split',
-      mobile: 'detail-only',
-      render: (t) => (
-        <span className="flex flex-wrap gap-1.5">
-          {t.details.map((d, i) => (
-            <span
-              key={i}
-              title={d.detail}
-              className={`px-2 py-0.5 rounded-md border text-xs font-mono tabular ${
-                d.isOwnShare ? 'bg-surface text-muted border-hairline' : 'bg-accent-bg text-ink border-accent-border'
-              }`}
-            >
-              {d.isOwnShare ? 'HV own' : d.companyLabel.replace(/ \(dept\)$/, '')} {fmt(d.amount)}
-            </span>
-          ))}
-        </span>
-      ),
+      mobile: 'detail',
+      render: (t) => <span className="font-sans text-[12px] text-graphite">{splitSummary(t)}</span>,
+      sortValue: (t) => splitSummary(t),
     },
     {
       key: 'category',
       group: '基本',
       label: 'Category',
-      mobile: 'detail-only',
-      render: (t) => t.categoryName || '—',
+      mobile: 'detail',
+      filterable: true,
+      render: (t) => t.categoryName || <span className="text-muted">—</span>,
+      sortValue: (t) => t.categoryName,
     },
     {
       key: 'batch',
@@ -184,6 +182,16 @@ export default function RecordsTab({
       filterable: true,
       render: (t) => <BatchChip t={t} />,
       sortValue: (t) => batchLabel(t),
+      cellClassName: 'whitespace-nowrap',
+    },
+    {
+      key: 'status',
+      group: '基本',
+      label: 'Status',
+      mobile: 'detail',
+      filterable: true,
+      render: (t) => <StatusChip t={t} />,
+      sortValue: (t) => (t.locked ? 'billed' : 'to bill'),
       cellClassName: 'whitespace-nowrap',
     },
     {
@@ -199,17 +207,17 @@ export default function RecordsTab({
             type="button"
             onClick={() => onEdit(t)}
             disabled={isPending || t.locked}
-            title={t.locked ? `Billed under ${t.billedRef} — delete that batch's drafts first` : 'Load it into Calculate; saving there overwrites this record'}
+            title={t.locked ? lockedTitle(t) : 'Load it into Calculate; saving there overwrites this record'}
             className="font-mono text-[11px] text-accent disabled:opacity-40"
           >
             Edit
           </button>
           <button
             type="button"
-            onClick={() => run(async () => { unwrap(await deleteAllocTxn(t.id)) })}
+            onClick={() => remove(t)}
             disabled={isPending || t.locked}
             aria-label="Delete"
-            title={t.locked ? `Billed under ${t.billedRef} — delete that batch's drafts first` : 'Delete this allocation'}
+            title={t.locked ? lockedTitle(t) : 'Delete this allocation'}
             className="font-mono text-sm text-muted hover:text-danger disabled:opacity-40"
           >
             ×
@@ -252,7 +260,8 @@ export default function RecordsTab({
       label: 'Billed',
       align: 'right',
       mobile: 'detail',
-      render: (r) => (r.own ? <span className="text-muted">—</span> : formatMoney(r.billed)),
+      // What is billed reads green — the handoff's By company table.
+      render: (r) => (r.own || r.billed <= 0 ? <span className="text-muted">—</span> : <span className="text-ledger">{formatMoney(r.billed)}</span>),
       sortValue: (r) => r.billed,
       cellClassName: 'whitespace-nowrap',
     },
@@ -261,7 +270,7 @@ export default function RecordsTab({
       label: 'To bill',
       align: 'right',
       mobile: 'detail',
-      render: (r) => (r.own || r.toBill <= 0 ? <span className="text-muted">—</span> : formatMoney(r.toBill)),
+      render: (r) => (r.own || r.toBill <= 0 ? <span className="text-muted">—</span> : <span className="text-alert">{formatMoney(r.toBill)}</span>),
       sortValue: (r) => r.toBill,
       cellClassName: 'whitespace-nowrap',
     },
@@ -343,11 +352,17 @@ export default function RecordsTab({
             layoutId="billing-allocator.records"
             layoutTitle="Allocations"
             canSetDefault
+            scrollBox
+            resizeMode="neighbour"
             rows={data.txns}
             columns={columns}
             getRowKey={(t) => t.id}
             defaultSort={{ key: 'txn_no', dir: 'asc' }}
-            rowOpens={() => false}
+            searchKeys={['txn_no', 'description', 'split', 'category']}
+            searchPlaceholder="Search txn / description…"
+            onRowOpen={links.onRowOpen}
+            onRowContextMenu={links.onRowContextMenu}
+            openLabel="Open →"
             footer={(visible) => (
               <tr>
                 <td colSpan={1000} className="q-foot">
@@ -360,6 +375,7 @@ export default function RecordsTab({
               </tr>
             )}
           />
+          {links.menu}
         </div>
       </section>
 
@@ -378,6 +394,7 @@ export default function RecordsTab({
             layoutId="billing-allocator.by-company"
             layoutTitle="By company"
             canSetDefault
+            resizeMode="neighbour"
             rows={byCompany}
             columns={companyRows}
             getRowKey={(r) => r.id ?? 'own'}

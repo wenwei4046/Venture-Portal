@@ -10,9 +10,12 @@ const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.f
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('./_components/AllocatorTabs', () => ({
-  default: (p: { data: { period: string; txns: unknown[]; invoices: unknown[]; companies: Array<{ label: string }> } }) => (
+  default: (p: { data: { period: string; txns: Array<{ createdAt: string }>; invoices: unknown[]; companies: Array<{ label: string }> }; initialEditId?: string }) => (
     <pre data-testid="tabs">
-      {JSON.stringify({ period: p.data.period, txns: p.data.txns.length, invoices: p.data.invoices.length, companies: p.data.companies.map((c) => c.label) })}
+      {JSON.stringify({
+        period: p.data.period, txns: p.data.txns.length, invoices: p.data.invoices.length, companies: p.data.companies.map((c) => c.label),
+        ...(p.initialEditId ? { edit: p.initialEditId, recorded: p.data.txns.map((t) => t.createdAt) } : {}),
+      })}
     </pre>
   ),
 }))
@@ -79,7 +82,7 @@ function database(txns = TXNS, invoices = INVOICES) {
 }
 
 const card = (name: string) => screen.getByRole('group', { name })
-const page = (period = '2026-09') => BillingAllocatorPage({ searchParams: Promise.resolve({ period }) })
+const page = (period = '2026-09', edit?: string) => BillingAllocatorPage({ searchParams: Promise.resolve({ period, edit }) })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -117,5 +120,16 @@ describe('the Billing Allocator on the sheet', () => {
     expect(card('Allocated · October')).toHaveTextContent('RM 0.00')
     expect(card('Allocated · October')).toHaveTextContent('nothing allocated yet')
     expect(card('Billed')).toHaveTextContent('no invoices')
+  })
+
+  // 2026-10-09 — a record's own page sends "Correct this record" back as
+  // ?edit=<id>, and each record now carries when it was recorded.
+  it('hands the tabs the record to correct and when each record was made', async () => {
+    database(TXNS.map((t, i) => ({ ...t, created_at: `2026-09-0${i + 1}T02:00:00Z` })))
+    render(await page('2026-09', 't6'))
+    expect(JSON.parse(screen.getByTestId('tabs').textContent ?? '{}')).toMatchObject({
+      edit: 't6',
+      recorded: ['2026-09-01T02:00:00Z', '2026-09-02T02:00:00Z', '2026-09-03T02:00:00Z'],
+    })
   })
 })

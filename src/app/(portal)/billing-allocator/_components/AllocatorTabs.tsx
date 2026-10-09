@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { SlidingTabs } from '@/components/motion/SlidingTabs'
 import type { AllocatorData, TxnRow } from './types'
 import CalculateTab from './CalculateTab'
@@ -17,15 +17,26 @@ type TabKey = 'calc' | 'records' | 'staff' | 'setup'
 // month. Keyed on the month the server rendered, the workspace starts fresh
 // for it (a draft typed for one month is dropped rather than filed under
 // another).
-export default function AllocatorTabs({ data }: { data: AllocatorData }) {
-  return <AllocatorTabsBody key={data.period} data={data} />
+export default function AllocatorTabs({ data, initialEditId }: { data: AllocatorData; initialEditId?: string }) {
+  return <AllocatorTabsBody key={data.period} data={data} initialEditId={initialEditId} />
 }
 
-function AllocatorTabsBody({ data }: { data: AllocatorData }) {
-  const [tab, setTab] = useState<TabKey>(data.txns.length > 0 ? 'records' : 'calc')
+function AllocatorTabsBody({ data, initialEditId }: { data: AllocatorData; initialEditId?: string }) {
+  // A record arriving from its own page (2026-10-09, "Correct this record" →
+  // ?edit=<id>): Calculate opens with it loaded — unless the month does not
+  // hold it, or it is billed and so locked.
+  const initialEdit = initialEditId ? data.txns.find((t) => t.id === initialEditId && !t.locked) ?? null : null
+  const [tab, setTab] = useState<TabKey>(initialEdit ? 'calc' : data.txns.length > 0 ? 'records' : 'calc')
   // A record being corrected: Records' Edit loads it into Calculate; saving
   // there overwrites the original (same ALC number).
-  const [editTxn, setEditTxn] = useState<TxnRow | null>(null)
+  const [editTxn, setEditTxn] = useState<TxnRow | null>(initialEdit)
+
+  // The address drops ?edit= once the record is loaded, so a reload or Back
+  // does not open the correction a second time.
+  useEffect(() => {
+    if (!initialEditId || typeof window === 'undefined') return
+    window.history.replaceState(window.history.state, '', `/billing-allocator?period=${data.period}`)
+  }, [initialEditId, data.period])
 
   // The sheet's counted rail (2026-10-07): Records by the month's records,
   // Staff by the people on the list, Setup by the templates.

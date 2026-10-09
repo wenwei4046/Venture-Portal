@@ -39,6 +39,7 @@ const txn: TxnRow = {
   categoryId: null,
   categoryName: '',
   hcPeriod: null,
+  createdAt: '2026-08-03T02:00:00Z',
   details: [],
 }
 
@@ -106,5 +107,26 @@ describe('the allocator’s tabs on the sheet', () => {
     fireEvent.click(tab(/^Staff/))
     expect(screen.getByText('Staff list')).toBeVisible()
     expect(tab(/^Staff/)).toHaveAttribute('data-active')
+  })
+})
+
+// 2026-10-09 — a record's own page offers "Correct this record", which comes
+// back here as ?edit=<id>: Calculate opens with that record loaded. An id the
+// month does not hold, or a billed record, is ignored.
+describe('a record arriving from its own page', () => {
+  it('opens Calculate with the record loaded, and drops ?edit= from the address', () => {
+    window.history.replaceState(null, '', '/billing-allocator?period=2026-08&edit=t2')
+    render(<AllocatorTabs data={data('2026-08', [txn, { ...txn, id: 't2', txnNo: 'ALC-2026-08-002' }])} initialEditId="t2" />)
+    expect(screen.getByText('Calculate — correcting ALC-2026-08-002')).toBeVisible()
+    expect(screen.getByRole('button', { name: /^Calculate/ })).toHaveAttribute('data-active')
+    expect(window.location.search).toBe('?period=2026-08')
+  })
+
+  it('ignores an id the month does not hold, and a billed record', () => {
+    const { unmount } = render(<AllocatorTabs data={data('2026-08', [txn])} initialEditId="nope" />)
+    expect(screen.getByRole('button', { name: /^Records/ })).toHaveAttribute('data-active')
+    unmount()
+    render(<AllocatorTabs data={data('2026-08', [{ ...txn, locked: true, billedRef: 'ALC-202608' }])} initialEditId="t1" />)
+    expect(screen.getByRole('button', { name: /^Records/ })).toHaveAttribute('data-active')
   })
 })

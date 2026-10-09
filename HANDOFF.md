@@ -1,5 +1,48 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-09 c (SHIPPED) — Finance revamp · the Billing Allocator per the handoff
+
+The user answered the Phase 2 question with **照设计档**: the Records table
+follows the prototype, not the 每家一栏 matrix picked on 2026-10-07.
+- `lib/allocator-sheet.ts`: `matrixColumns` is gone; `splitSummary(txn)` is
+  the Split column's text — each non-own share as "label pct%" joined by
+  " · " (pct = share ÷ amount, one decimal), "—" when nothing is billed to
+  anyone.
+- **Records** (`RecordsTab`): Txn (body face) / Description (second line:
+  recorded date · method · HC month) / Amount (Range) / Split (text) /
+  Category / Batch chip / **Status chip** (billed ledger · to bill alert) /
+  Edit · ×. Search "Search txn / description…", `scrollBox`, neighbour
+  resize. A row **opens its own page** on a double-click (`useRowLinks`; the
+  right-click menu adds Edit in Calculate / Delete, disabled when locked).
+  By company: Billed reads green, To bill in the alert colour; invoice chips
+  kept (clickable, unlike the prototype's text). The gen-strip is unchanged.
+- **Record page** `/billing-allocator/[id]` (new; `isFinanceDetailRoute`
+  knows it): ReturnLink "← Back to Billing Allocator" (`?period=`), eyebrow
+  "BILLING · ALLOCATOR · <batch | NOT BILLED>", the number as the title with
+  its chip, "description · recorded date"; cards Amount (primary) / Billable
+  (= the non-own shares) / HV own share / Billed (ledger, "n invoices ·
+  batch") or To bill (alert, "Not invoiced yet"); `DetailGroups` Expense
+  (Description, Category, Date) + Split (Method, Headcount list, Batch,
+  Companies, Invoice(s)); "Split by company" `ledger-table` (Bill to with
+  subsidiary / dept pool / kept by HV, Basis = method_detail, Share %, Amount,
+  Status chip; HV own last) with a Billable total foot; Actions (Billing ·
+  Edit only; `[id]/_components/RecordActions.tsx`): billed → "View <invoice> ·
+  <bill-to>" links to invoice-doc; unbilled → **Generate invoices** (the
+  month's `generateAllocatorInvoices`, same as the strip), **Correct this
+  record** (→ `/billing-allocator?period=…&edit=<id>`), **Delete** (confirm →
+  `deleteAllocTxn` → back to the list). Billed = billed_ref set AND the batch
+  still has live invoices (the list's lock rule).
+- `?edit=<id>`: the list page passes `initialEditId` to `AllocatorTabs`, which
+  opens Calculate with the record loaded (ignored if the month lacks it or it
+  is locked) and `history.replaceState`s the param away. `TxnRow.createdAt`
+  added (`created_at` selected).
+- Tests: allocator-sheet (splitSummary 2), finance-view (+2 paths), RecordsTab
+  rewritten (7), AllocatorTabs +2, list page +1, record page 4.
+
+Next: the invoice detail page (Billable / Contra apart); then Phase 3 (Daily
+Bank, Fund IN/OUT + details, Invoice Financing, Repayment Schedule calendar,
+Overdue), then Phase 4.
+
 ## CHECKPOINT 2026-10-09 b (SHIPPED) — Finance revamp · Phase 2, the converted pages re-aligned
 
 Phase 1 (the Finance view) is live. Phase 2 brings the five pages converted
@@ -33,7 +76,8 @@ before the handoff onto the handoff's rules:
   the handoff's "dl" block; `.dl-*` CSS) and Actions in a `.fin-actions` panel.
 - **Billing Allocator**: NOT touched — the prototype's Records table has ONE
   "Split" column (text "HC 30% · HM 20%") and a record detail page, while the
-  user picked 每家一栏 (the matrix) two days earlier; asked the user which.
+  user picked 每家一栏 (the matrix) two days earlier; asked the user which
+  (answered 照设计档 — see checkpoint c).
 - Tests: VouchersTable +5, VoucherLedger +2 (and two adjusted), PaymentTabs 2,
   voucher page +1, BillingView (one rewritten), InvoicesList +2, statement
   page 2, statements list adjusted.

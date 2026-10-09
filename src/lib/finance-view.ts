@@ -55,6 +55,7 @@ const DETAIL_ROOTS: Record<string, readonly string[]> = {
   '/fund-out': ['new'],
   '/statements': ['monthly', 'export'],
   '/approvals': [],
+  '/billing-allocator': [],
   '/dept-pool': ['submissions'],
   '/reconciliation': ['journal', 'journal-entries'],
 }

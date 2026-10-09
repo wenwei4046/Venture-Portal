@@ -34,13 +34,13 @@ describe('isFinanceView', () => {
 
 describe('isFinanceDetailRoute', () => {
   it('is a row’s own page under a Finance list — what Back and an edge swipe return from', () => {
-    for (const path of ['/payments/v1', '/receipts/v2', '/fund-in/f1', '/fund-out/l1', '/fund-out/l1/edit', '/statements/s1', '/statements/s1/print', '/approvals/a1', '/reconciliation/sess1', '/reconciliation/journal-entries/j1/edit', '/dept-pool/marketing']) {
+    for (const path of ['/payments/v1', '/receipts/v2', '/fund-in/f1', '/fund-out/l1', '/fund-out/l1/edit', '/statements/s1', '/statements/s1/print', '/approvals/a1', '/reconciliation/sess1', '/reconciliation/journal-entries/j1/edit', '/dept-pool/marketing', '/billing-allocator/t1']) {
       expect(isFinanceDetailRoute(path), path).toBe(true)
     }
   })
 
   it('is not a list, a form or a sub-page of its own', () => {
-    for (const path of ['/payments', '/payments/new', '/payments/export', '/payments/voucher-doc', '/payments/payroll-requests', '/fund-in/new', '/statements/monthly', '/statements/export', '/reconciliation', '/reconciliation/journal', '/reconciliation/journal-entries', '/reconciliation/journal-entries/new', '/dept-pool', '/dept-pool/submissions', '/dept-pool/marketing/contracts', '/billing/invoice-doc', '/reports/ledger', '/daily-bank']) {
+    for (const path of ['/payments', '/payments/new', '/payments/export', '/payments/voucher-doc', '/payments/payroll-requests', '/fund-in/new', '/statements/monthly', '/statements/export', '/reconciliation', '/reconciliation/journal', '/reconciliation/journal-entries', '/reconciliation/journal-entries/new', '/dept-pool', '/dept-pool/submissions', '/dept-pool/marketing/contracts', '/billing/invoice-doc', '/reports/ledger', '/daily-bank', '/billing-allocator']) {
       expect(isFinanceDetailRoute(path), path).toBe(false)
     }
   })
