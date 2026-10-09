@@ -224,7 +224,7 @@ export default function BottomTabBar({ role, viewer, moreOpen, onMoreClick, fin 
 
   return (
     <nav
-      className={`md:hidden print:hidden fixed bottom-0 inset-x-0 z-40 border-t border-hairline pb-[env(safe-area-inset-bottom)] ${fin ? 'fin-tabbar' : 'bg-chrome'}`}
+      className={`md:hidden print:hidden fixed bottom-0 inset-x-0 z-40 border-t border-hairline pb-[var(--safe-bottom)] ${fin ? 'fin-tabbar' : 'bg-chrome'}`}
       aria-label="Primary"
     >
       <ul className="flex items-stretch">

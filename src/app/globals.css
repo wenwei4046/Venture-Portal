@@ -759,6 +759,26 @@ h3.font-serif { font-size: 15px; font-weight: 500; font-style: normal; }
   }
 }
 
+/* The phone's own navigation bar (2026-10-10): lib/safe-area.ts,
+   components/pwa/SafeAreaMemory.tsx. Every bottom bar stands on --safe-bottom,
+   never on the bare env(): after a reload the installed app can still be drawn
+   under the phone's buttons while the inset comes back as 0, and then the
+   inset the tab remembers (--safe-bottom-floor, on <html>) holds the bar up
+   until the browser speaks again. The probe is what SafeAreaMemory reads the
+   browser's own inset off. */
+:root {
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-bottom-floor, 0px));
+}
+.safe-bottom-probe {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: env(safe-area-inset-bottom, 0px);
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* While a navigation has not committed yet (html[data-nav-pending], set by
    NavProgress) the page being left dims — after a beat, so a navigation that
    commits at once never shows it. */
@@ -3521,7 +3541,7 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   min-height: 100%;
   padding: 10px;
   /* Clears the phone's 54px tab bar and the home-indicator inset. */
-  padding-bottom: calc(54px + 10px + env(safe-area-inset-bottom));
+  padding-bottom: calc(54px + 10px + var(--safe-bottom));
 }
 @media (min-width: 768px) {
   .sheet-frame { padding-bottom: 10px; }
@@ -4107,7 +4127,7 @@ details.fin-fold .fin-fold-inner { padding: 4px 0 18px; }
   .fin-queue table.ledger-table td.lt-toggle > button { width: 34px; height: auto; min-height: 44px; margin: 0; }
   /* The bar sits on the tab bar, not under it. */
   .fin-queue .bulk-bar {
-    bottom: calc(54px + 8px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(54px + 8px + var(--safe-bottom));
     padding: 10px 12px;
     gap: 8px 10px;
   }

@@ -113,7 +113,7 @@
   .previewBadge { margin-bottom: 24px !important; }
   .intro { font-size: 13px; margin-bottom: 30px !important; }
   .form { gap: 20px; }
-  .footer { padding: 20px 26px calc(24px + env(safe-area-inset-bottom)); flex-wrap: wrap; gap: 6px; }
+  .footer { padding: 20px 26px calc(24px + var(--safe-bottom)); flex-wrap: wrap; gap: 6px; }
   .footer span:last-child { display: none; }
 }
 @media (max-width: 360px) {

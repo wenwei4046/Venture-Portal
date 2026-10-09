@@ -102,7 +102,7 @@ export default function PortalFrame({
             ref={surfaceRef}
             className={sheet
               ? `route-surface sheet-frame page-enter print:p-0${fin ? ' fin-view' : ''}`
-              : `route-surface ${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto px-4 md:px-8 py-6 md:py-10 pb-[calc(54px+24px+env(safe-area-inset-bottom))] md:pb-10 page-enter print:max-w-none print:p-0 print:pb-0`}
+              : `route-surface ${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto px-4 md:px-8 py-6 md:py-10 pb-[calc(54px+24px+var(--safe-bottom))] md:pb-10 page-enter print:max-w-none print:p-0 print:pb-0`}
           >
             {sheet ? <div className="sheet-theme sheet">{children}</div> : children}
           </div>

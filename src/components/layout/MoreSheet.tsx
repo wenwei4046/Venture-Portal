@@ -184,7 +184,7 @@ export default function MoreSheet({ user, navData, open, onClose }: Props) {
         </div>
 
         {/* Nav list */}
-        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 pb-[calc(16px+env(safe-area-inset-bottom))]">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 pb-[calc(16px+var(--safe-bottom))]">
           {sections.map((section) => {
             const roman = section.label ? ROMAN[romanIdx++] : null
             return (

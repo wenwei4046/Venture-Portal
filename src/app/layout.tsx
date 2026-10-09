@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Noto_Sans_SC, Chivo_Mono } from 'next/font/google'
 import NavProgress from '@/components/layout/NavProgress'
 import PwaRegister from '@/components/pwa/PwaRegister'
+import SafeAreaMemory from '@/components/pwa/SafeAreaMemory'
 import UpdatePrompt from '@/components/pwa/UpdatePrompt'
+import { SAFE_BOTTOM_BOOT } from '@/lib/safe-area'
 import './globals.css'
 
 // Typography — loaded via next/font for zero-CLS self-hosting.
@@ -95,9 +97,13 @@ export default function RootLayout({
             __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light'){document.documentElement.setAttribute('data-theme',t)}else if(window.matchMedia('(prefers-color-scheme:dark)').matches){document.documentElement.setAttribute('data-theme','dark')}}catch(e){}})()`,
           }}
         />
+        {/* The bottom bars' floor before the first paint — a reload can lose
+            the phone's navigation-bar inset (lib/safe-area.ts). */}
+        <script dangerouslySetInnerHTML={{ __html: SAFE_BOTTOM_BOOT }} />
       </head>
       <body suppressHydrationWarning>
         <PwaRegister />
+        <SafeAreaMemory />
         {children}
         {/* The progress line along the top edge, for every surface. It
             replaced nextjs-toploader (2026-09-26), which watched link clicks

@@ -411,7 +411,9 @@
 
 /* ── the bottom bar ── */
 .nav { flex: 0 0 auto; background: var(--rv-white); border-top: 1px solid var(--rv-line); position: relative; z-index: 2; }
-.navLive { padding-bottom: env(safe-area-inset-bottom, 0px); }
+/* The phone's own navigation bar, by `--safe-bottom` (globals.css): a reload
+   can lose the browser's inset, and the bar sat under the buttons (2026-10-10). */
+.navLive { padding-bottom: var(--safe-bottom, env(safe-area-inset-bottom, 0px)); }
 .navGrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; height: 62px; padding: 0 4px; }
 .navItem { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0 8px; border: 0; background: transparent; color: var(--rv-sub); }
 .navItemOn { color: var(--rv-accent); }
