@@ -41,11 +41,13 @@ export const GUARDS: Readonly<Record<string, Gate>> = {
  */
 export const BRANCHES: Readonly<Record<string, Readonly<Record<Want, readonly string[]>>>> = {
   'src/app/(portal)/dashboard/page.tsx#DashboardPage': {
-    // overviewFor → 'treasury': the summary, the bank accounts, the queues and their live amounts.
+    // overviewFor → 'treasury': the summary, the bank accounts, the queues and their live amounts,
+    // and (2026-10-09) every live deal's repayment plan — its terms over time — for the
+    // Overdue instalments and Coming up sections (lib/repayment-book).
     'treasury.view': [
       'approval_requests', 'bank_accounts', 'base_rate_history', 'dept_pools', 'fund_source_repayments', 'fund_sources',
       'invoice_payout_pool', 'invoices', 'journal_entries', 'journal_lines', 'loans', 'overdue_records', 'payment_vouchers',
-      'repayments', 'venture_pool',
+      'repayments', 'treasury_terms_history', 'venture_pool',
     ],
     // overviewFor → 'department': its pool, its requests, its invoices.
     'dept_pool.view:dept': ['approval_requests', 'dept_pools', 'invoices'],
