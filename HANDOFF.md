@@ -1,5 +1,32 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-10 n (SHIPPED) — audit fixes, part 1b: TB segment, agings, Company Statement
+
+- **Trial Balance · Segment** (list l item 4): `fetchTrialBalance({ segment })` — with a
+  segment it sums `fetchAllJournalLines` itself (`netByAccountFromLines`, dated ≤ as-at,
+  segment ∈ filter; an entry has one segment so it balances) because the
+  `gl_net_by_account` RPC knows no segment; without one, the RPC as before. Page:
+  Segment select on the GET form (REPORT_SEGMENTS + registry extras, Venture =
+  corporate+treasury via `segmentFilterFor`), count "<SEG> · AS AT …", export
+  carries `&segment=`, export route applies it. Find label "· highlights only".
+- **Debtor Aging** (Finance): section "Debtor aging · AS AT d MMM yyyy"; AgingByCustomer
+  `sheet` (bare figures, white customer rows) and Find company on a `.rpt-toolbar`
+  control row; cards 31–60 "Follow up", Over 60 = the company owing most over 60 days.
+- **Loan Aging**: the handoff's 4 cards (Loans outstanding · n borrowers / Not due · On
+  schedule / 1–30 days / 31–90 days, each naming the top borrower); the repay-side
+  cards went (its tables stay — the user's July "Loan Monitor" structure is kept);
+  subtitle says days late; Find company (`_components/LoanFind.tsx`: provider renders
+  the control row, `FindRow` client `<tr>` around server-rendered cells); bare figures.
+- **Company Statement**: the three old summary tiles removed (they repeated the
+  cards); StatementView renders its own section "Counterparties · n [/ all] SHOWN";
+  header groups `cs-collect` (green) / `cs-repay` (the user's ORANGE for repay,
+  2026-08-06 "要收绿底, 要还橙底" — the handoff draws red; kept orange, mention if
+  asked) + tinted sub-heads; total row `cs-total` navy tint; names sans 600.
+- NOT done (needs data work, ask the user): As at a past date for Debtor / Loan
+  aging — debtor reads only status='issued' invoices and all receipts to date
+  (payment_vouchers.payment_date exists; invoices.invoice_date; credit_notes only
+  approved_at), so a past as-at needs paid-later invoices + dated receipts/CNs.
+
 ## CHECKPOINT 2026-10-10 m (SHIPPED) — audit fixes, part 1a: the reports' table
 
 The user asked for the whole audit list (l) to be done ("做"), Reports first.

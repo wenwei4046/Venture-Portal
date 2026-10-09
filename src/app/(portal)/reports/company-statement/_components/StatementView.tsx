@@ -246,11 +246,26 @@ export default function StatementView({
   // Ticked counterparties → export only those (user 2026-08-06).
   const [sel, setSel] = useState<Set<string>>(new Set())
 
+  // The handoff's section head (2026-10-10): the counterparties, how many shown.
+  const head = (shownCount: number, filtered: boolean) => (
+    <div className="sect-head">
+      <h2>Counterparties</h2>
+      <span className="rule" aria-hidden />
+      <span className="count">
+        {shownCount}
+        {filtered ? ` / ${rows.length}` : ''} SHOWN
+      </span>
+    </div>
+  )
+
   if (rows.length === 0) {
     return (
-      <div className="border border-hairline rounded-md bg-surface p-8 text-center">
-        <p className="font-serif italic text-ledger text-base">All square — nothing outstanding.</p>
-      </div>
+      <section className="mb-6">
+        {head(0, false)}
+        <div className="border border-hairline rounded-md bg-surface p-8 text-center">
+          <p className="font-serif italic text-ledger text-base">All square — nothing outstanding.</p>
+        </div>
+      </section>
     )
   }
 
@@ -275,40 +290,8 @@ export default function StatementView({
   const allOpen = shown.length > 0 && shown.every(g => open[g.counterparty])
 
   return (
-    <div>
-      {/* ── Summary tiles ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-        <div className="border border-hairline rounded-md bg-surface p-5">
-          <div className="font-serif italic text-ledger text-sm mb-1">To Collect</div>
-          <div className="statement-amount text-num-ink">
-            RM {formatMoneyBare(totals.collectPrincipal + totals.collectInterest)}
-          </div>
-          <div className="font-mono text-[11px] text-graphite mt-1.5">
-            Principal {formatMoneyBare(totals.collectPrincipal)} · Interest {formatMoneyBare(totals.collectInterest)}
-          </div>
-        </div>
-        <div className="border border-hairline rounded-md bg-surface p-5">
-          <div className="font-serif italic text-alert text-sm mb-1">To Repay</div>
-          <div className="statement-amount text-num-ink">
-            RM {formatMoneyBare(totals.repayPrincipal + totals.repayInterest)}
-          </div>
-          <div className="font-mono text-[11px] text-graphite mt-1.5">
-            Principal {formatMoneyBare(totals.repayPrincipal)} · Interest {formatMoneyBare(totals.repayInterest)}
-          </div>
-        </div>
-        <div className="border border-hairline rounded-md bg-surface p-5">
-          <div className="font-serif italic text-graphite text-sm mb-1">Net</div>
-          <div
-            className={`statement-amount ${totals.net >= 0 ? 'text-ledger' : 'text-danger'}`}
-          >
-            {totals.net >= 0 ? 'Collect ' : 'Repay '}RM {formatMoneyBare(Math.abs(totals.net))}
-          </div>
-          <div className="font-mono text-[11px] text-graphite mt-1.5">
-            {rows.length} counterparties
-          </div>
-        </div>
-      </div>
-
+    <section className="mb-6">
+      {head(shown.length, !!needle)}
       {/* ── Search + expand-all ── */}
       <div className="flex items-center gap-3 mb-3 flex-wrap">
         <input
@@ -368,18 +351,18 @@ export default function StatementView({
               Counterparty
             </th>
             <th
-              className="py-1 px-3 font-medium border-b border-hairline m-hide"
+              className="cs-collect py-1 px-3 font-medium border-b border-hairline m-hide"
               style={{ textAlign: 'center' }}
               colSpan={2}
             >
-              To Collect
+              To collect
             </th>
             <th
-              className="py-1 px-3 font-medium border-b border-hairline m-hide"
+              className="cs-repay py-1 px-3 font-medium border-b border-hairline m-hide"
               style={{ textAlign: 'center' }}
               colSpan={2}
             >
-              To Repay
+              To repay
             </th>
             <th className="right py-2 px-3 font-medium" rowSpan={2}>
               Net
@@ -390,10 +373,10 @@ export default function StatementView({
               already expands rows on tap for detail; it does not get a second
               chevron. */}
           <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline m-hide">
-            <th className="right py-1 px-3 font-medium">Principal</th>
-            <th className="right py-1 px-3 font-medium">Interest</th>
-            <th className="right py-1 px-3 font-medium">Principal</th>
-            <th className="right py-1 px-3 font-medium">Interest</th>
+            <th className="right cs-collect-sub py-1 px-3 font-medium">Principal</th>
+            <th className="right cs-collect-sub py-1 px-3 font-medium">Interest</th>
+            <th className="right cs-repay-sub py-1 px-3 font-medium">Principal</th>
+            <th className="right cs-repay-sub py-1 px-3 font-medium">Interest</th>
           </tr>
         </thead>
         <tbody>
@@ -432,7 +415,7 @@ export default function StatementView({
                     <span className="font-mono text-[10px] text-muted mr-2">
                       {isOpen ? '▾' : '▸'}
                     </span>
-                    <span className="font-serif text-ink">{g.counterparty}</span>
+                    <span className="font-semibold text-ink">{g.counterparty}</span>
                     <span className="font-mono text-[10px] text-muted ml-2">
                       {g.items.length} positions
                     </span>
@@ -458,8 +441,8 @@ export default function StatementView({
               </Fragment>
             )
           })}
-          <tr className="bg-surface/40">
-            <td className="py-2.5 px-3 font-serif italic text-accent">
+          <tr className="cs-total">
+            <td className="py-2.5 px-3">
               Total{needle ? ' (filtered)' : ''}
             </td>
             <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink m-hide">
@@ -484,6 +467,6 @@ export default function StatementView({
         </tbody>
       </table>
       </div>
-    </div>
+    </section>
   )
 }

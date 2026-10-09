@@ -24,6 +24,7 @@ import dayjs from 'dayjs'
 import { officeDay, officeTime } from './office-time'
 import { poolLabel, comparePools } from './pools'
 import { fetchAllRows, fetchAllRowsParallel, fetchByKeys } from './paginate'
+import { fetchAllJournalLines } from './gl-reports'
 import { lineAttributions, segmentToPoolKey } from './invoice-settlement'
 import { primedModeToPool, primedSegmentToPool } from './dept-registry'
 import type { AccountType, CashFlowCategory } from './coa'
@@ -1671,18 +1672,40 @@ export function buildTrialBalance(args: {
   return { asOf, rows, totals, reconciles, showZeroBalance }
 }
 
+/** One segment's balances (2026-10-10, the Trial Balance's Segment): each
+ *  account's Dr − Cr over that segment's lines dated on or before `asOf`. A
+ *  journal entry carries one segment, so the segment balances on its own. */
+export function netByAccountFromLines(
+  lines: ReadonlyArray<{ account_code: string; debit: number; credit: number; date: string; segment: string }>,
+  asOf: string,
+  segments: readonly string[],
+): Map<string, number> {
+  const keep = new Set(segments)
+  const net = new Map<string, number>()
+  for (const l of lines) {
+    if (l.date > asOf || !keep.has(l.segment)) continue
+    net.set(l.account_code, (net.get(l.account_code) ?? 0) + Number(l.debit) - Number(l.credit))
+  }
+  for (const [code, v] of net) net.set(code, r2(v))
+  return net
+}
+
 export async function fetchTrialBalance(
   supabase: SupabaseClient,
-  args: { asOf: string; showZeroBalance: boolean },
+  args: { asOf: string; showZeroBalance: boolean; segment?: string[] },
 ): Promise<TrialBalance> {
-  const { asOf, showZeroBalance } = args
+  const { asOf, showZeroBalance, segment } = args
   if (!isCalendarDay(asOf)) throw new Error(`fetchTrialBalance: ${asOf} is not a date`)
 
   // The balances need nothing from the chart of accounts, so both start at
   // once (2026-10-08 — it was the COA, then five pages of every journal line
   // one after another). The COA's failure is still the one reported first.
+  // One segment (2026-10-10) sums its own lines — the database's per-account
+  // sum knows no segment.
   const netRead = startedEarly(
-    fetchNetByAccount(supabase, dayjs(asOf).add(1, 'day').format('YYYY-MM-DD'), null, 'fetchTrialBalance lines'),
+    segment && segment.length > 0
+      ? fetchAllJournalLines(supabase).then((lines) => netByAccountFromLines(lines, asOf, segment))
+      : fetchNetByAccount(supabase, dayjs(asOf).add(1, 'day').format('YYYY-MM-DD'), null, 'fetchTrialBalance lines'),
   )
 
   // ── 1: Resolve the set of leaf accounts. A leaf is an account that is NOT

@@ -120,4 +120,22 @@ describe('the Trial Balance on the sheet', () => {
     expect(row('Current assets')).toHaveTextContent('2,095,750.00')
     expect(within(table).queryByRole('link', { name: '1010 · Cash — Hong Leong' })).toBeNull()
   })
+
+  // 2026-10-10 — the handoff puts Segment on the control row.
+  it('reads one segment, and exports it', async () => {
+    render(await TrialBalancePage({ searchParams: Promise.resolve({ segment: 'corporate' }) }))
+    expect(mocks.fetchTrialBalance).toHaveBeenCalledWith(expect.anything(), { asOf: '2026-10-09', showZeroBalance: false, segment: ['corporate', 'treasury'] })
+    const table = screen.getByRole('heading', { level: 2, name: 'Trial balance' }).closest('section') as HTMLElement
+    const controls = within(table).getByRole('group', { name: 'Report controls' })
+    expect(within(controls).getByRole('combobox', { name: 'Segment' })).toHaveValue('corporate')
+    expect(table.querySelector('.sect-head .count')).toHaveTextContent('VENTURE (OFFICE) · AS AT 9 OCTOBER 2026')
+    expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/reports/trial-balance/export?format=xlsx&as_of=2026-10-09&segment=corporate')
+  })
+
+  it('reads every segment by default', async () => {
+    render(await TrialBalancePage({ searchParams: Promise.resolve({}) }))
+    expect(mocks.fetchTrialBalance).toHaveBeenCalledWith(expect.anything(), { asOf: '2026-10-09', showZeroBalance: false, segment: undefined })
+    const controls = screen.getByRole('group', { name: 'Report controls' })
+    expect(within(controls).getByRole('combobox', { name: 'Segment' })).toHaveValue('')
+  })
 })

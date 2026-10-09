@@ -25,11 +25,16 @@ function AccountLink({ item }: { item: TbItem }) {
 export default function TrialBalanceView({
   asOf,
   showZero,
+  segment = '',
+  segments = [],
   blocks,
   totals,
 }: {
   asOf: string
   showZero: boolean
+  /** The segment read ('' = all) and the choices (2026-10-10, the handoff). */
+  segment?: string
+  segments?: Array<{ value: string; label: string }>
   blocks: TbBlock[]
   totals: { debit: number; credit: number }
 }) {
@@ -64,8 +69,22 @@ export default function TrialBalanceView({
             Zero-balance accounts
           </span>
         </label>
+        {segments.length > 0 ? (
+          <label className="rpt-field">
+            <span>Segment</span>
+            <select name="segment" aria-label="Segment" defaultValue={segment} onChange={(e) => e.currentTarget.form?.requestSubmit()}>
+              {segments.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <div className="rpt-field rpt-find">
-          <span>Find account</span>
+          <span>
+            Find account <span className="rpt-find-hint">· highlights only</span>
+          </span>
           <div className="rpt-find-box">
             <input
               type="search"

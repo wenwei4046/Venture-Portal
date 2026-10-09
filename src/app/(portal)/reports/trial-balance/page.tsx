@@ -8,26 +8,32 @@ import Link from 'next/link'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { groupTrialBalance } from '@/lib/trial-balance-groups'
 import TrialBalanceView from './_components/TrialBalanceView'
+import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
+import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 
 interface Props {
-  searchParams: Promise<{ as_of?: string; show_zero?: string }>
+  searchParams: Promise<{ as_of?: string; show_zero?: string; segment?: string }>
 }
 
 export default async function TrialBalancePage({ searchParams }: Props) {
   await requirePermission('reports')
   const supabase = await createClient()
 
-  const { as_of: rawAsOf, show_zero: rawShowZero } = await searchParams
+  const { as_of: rawAsOf, show_zero: rawShowZero, segment: rawSegment } = await searchParams
   // A hand-typed day that is not one (2026-02-31) opens today, not an error —
   // the office's today: on the server's clock (UTC) it was yesterday until 08:00.
   const asOf = isCalendarDay(rawAsOf) ? rawAsOf : officeToday()
   const showZeroBalance = rawShowZero === '1'
+  // One segment (2026-10-10, the handoff's Segment on the control row).
+  const segments = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
+  const segment = segments.some((s) => s.value === rawSegment) ? (rawSegment as string) : ''
+  const segName = (segments.find((s) => s.value === segment) ?? segments[0]).label
 
   // The accounts' parents arrange the rows into groups (2026-10-09, the
   // handoff). Only the arrangement rides on this read: should it fail, every
   // account stands on its own and the figures are the same.
   const coaRead = (async () => supabase.from('chart_of_accounts').select('code, name, parent_code'))().catch(() => ({ data: null }))
-  const [tb, { data: coaRows }] = await Promise.all([fetchTrialBalance(supabase, { asOf, showZeroBalance }), coaRead])
+  const [tb, { data: coaRows }] = await Promise.all([fetchTrialBalance(supabase, { asOf, showZeroBalance, segment: segmentFilterFor(segment) }), coaRead])
   const blocks = groupTrialBalance(tb.rows, (coaRows ?? []) as Array<{ code: string; name: string; parent_code: string | null }>)
   const dateLabel = dayjs(asOf).format('D MMMM YYYY')
 
@@ -35,7 +41,7 @@ export default async function TrialBalancePage({ searchParams }: Props) {
   // the eyebrow, Excel / PDF, three cards, the as-at control on a row, the
   // accounts closing on their totals.
   const difference = Math.round((tb.totals.debit - tb.totals.credit) * 100) / 100
-  const exportQs = `as_of=${asOf}${showZeroBalance ? '&show_zero=1' : ''}`
+  const exportQs = `as_of=${asOf}${showZeroBalance ? '&show_zero=1' : ''}${segment ? `&segment=${segment}` : ''}`
 
   return (
     <div>
@@ -72,7 +78,9 @@ export default async function TrialBalancePage({ searchParams }: Props) {
       <div className="sect-head">
         <h2>Trial balance</h2>
         <span className="rule" aria-hidden />
-        <span className="count">AS AT {dateLabel.toUpperCase()}</span>
+        <span className="count">
+          {segment ? `${segName.toUpperCase()} · ` : ''}AS AT {dateLabel.toUpperCase()}
+        </span>
       </div>
       <p className="text-xs text-graphite mb-3 max-w-3xl">
         Every postable GL account as at {dateLabel}. Header accounts (1000, 9050) roll up through their children. Σ Dr must equal Σ Cr.
@@ -84,7 +92,14 @@ export default async function TrialBalancePage({ searchParams }: Props) {
         </div>
       ) : null}
 
-      <TrialBalanceView asOf={asOf} showZero={showZeroBalance} blocks={blocks} totals={tb.totals} />
+      <TrialBalanceView
+        asOf={asOf}
+        showZero={showZeroBalance}
+        segment={segment}
+        segments={segments.map((s) => ({ value: s.value, label: s.label }))}
+        blocks={blocks}
+        totals={tb.totals}
+      />
       </section>
 
       {tb.rows.length === 0 ? (

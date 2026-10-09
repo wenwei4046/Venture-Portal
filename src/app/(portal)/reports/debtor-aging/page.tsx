@@ -74,6 +74,11 @@ export default async function DebtorAgingPage() {
     const fresh = b.d0_30 ?? 0
     const d31 = b.d31_60 ?? 0
     const over60 = Math.round(((b.d61_90 ?? 0) + (b.d90_plus ?? 0)) * 100) / 100
+    // The company owing most for longest names the card (the handoff).
+    const oldest = days.byPayer
+      .map((p) => ({ payer: p.payer, v: (p.buckets.d61_90 ?? 0) + (p.buckets.d90_plus ?? 0) }))
+      .filter((p) => p.v > 0.005)
+      .sort((x, y) => y.v - x.v)[0]
     const exportHref = (format: 'xlsx' | 'pdf', view: 'detail' | 'summary') => `/reports/debtor-aging/export?format=${format}&view=${view}`
     return (
       <div>
@@ -110,24 +115,22 @@ export default async function DebtorAgingPage() {
             note={`${aging.byPayer.length} ${aging.byPayer.length === 1 ? 'company' : 'companies'} · ${aging.totals.count} ${aging.totals.count === 1 ? 'invoice' : 'invoices'}`}
           />
           <StatCard label="0–30 days" value={formatMoney(fresh)} icon="check" note="Since the invoice date" />
-          <StatCard label="31–60 days" value={formatMoney(d31)} icon="clock" tone={d31 > 0 ? 'danger' : 'default'} note="Since the invoice date" />
-          <StatCard label="Over 60 days" value={formatMoney(over60)} icon="alert" tone={over60 > 0 ? 'danger' : 'default'} note="Since the invoice date" />
+          <StatCard label="31–60 days" value={formatMoney(d31)} icon="clock" tone={d31 > 0 ? 'danger' : 'default'} note="Follow up" />
+          <StatCard label="Over 60 days" value={formatMoney(over60)} icon="alert" tone={over60 > 0 ? 'danger' : 'default'} note={oldest ? oldest.payer : 'Nothing over 60 days'} />
         </StatCards>
 
         <section className="mb-6">
           <div className="sect-head">
-            <h2>By customer</h2>
+            <h2>Debtor aging</h2>
             <span className="rule" aria-hidden />
-            <span className="count">
-              {aging.byPayer.length} {aging.byPayer.length === 1 ? 'COMPANY' : 'COMPANIES'} · {aging.totals.count} {aging.totals.count === 1 ? 'INVOICE' : 'INVOICES'}
-            </span>
+            <span className="count">AS AT {dayjs(today).format('D MMM YYYY').toUpperCase()}</span>
           </div>
           {aging.totals.count === 0 ? (
             <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
               <p className="text-sm">Nothing outstanding — every issued invoice has been collected.</p>
             </div>
           ) : (
-            <AgingByCustomer byPayer={days.byPayer} invoices={days.invoices} totals={days.totals} columns={days.columns} allRow search />
+            <AgingByCustomer byPayer={days.byPayer} invoices={days.invoices} totals={days.totals} columns={days.columns} allRow search sheet />
           )}
         </section>
       </div>

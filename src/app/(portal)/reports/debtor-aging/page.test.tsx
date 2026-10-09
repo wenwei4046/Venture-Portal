@@ -6,6 +6,11 @@ import { withActions } from '@/test/with-actions'
 // user's Claude Design handoff (Phase 4 of the Finance revamp): the date in
 // the eyebrow, Excel / PDF in the head, cards, and the aging tables closing
 // on a navy "All" row. A department manager's Debtor Aging stays as it was.
+// 2026-10-10 — the rest of the handoff: the section "Debtor aging · AS AT …",
+// Find company on a control row ("· highlights only"), bare figures on white
+// rows, the cards' notes (Follow up, the oldest company); Loan Aging's four
+// cards and its days-late wording; the Company Statement's counterparties
+// under their own head, no tiles repeating the cards, a navy-tinted total.
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), fetchLoanMonitorData: vi.fn(), fetchCounterpartyStatement: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
@@ -78,12 +83,32 @@ describe('Debtor Aging on the sheet', () => {
     expect(all).toHaveTextContent('70,000.00')
   })
 
+  it('heads the table "Debtor aging" as at the day, with bare figures on white rows', async () => {
+    render(await DebtorAgingPage())
+    const section = screen.getByRole('heading', { level: 2, name: 'Debtor aging' }).closest('section') as HTMLElement
+    expect(section.querySelector('.sect-head .count')).toHaveTextContent('AS AT 9 OCT 2026')
+    const century = within(section).getByText('HOUZS Century').closest('tr') as HTMLElement
+    expect(century).toHaveTextContent('64,000.00')
+    expect(century).not.toHaveTextContent('RM')
+    expect(century).not.toHaveClass('bg-surface-2')
+  })
+
+  it('notes what to follow up and the company owing longest', async () => {
+    render(await DebtorAgingPage())
+    expect(card('31–60 days')).toHaveTextContent('Follow up')
+    expect(card('Over 60 days')).toHaveTextContent('HOUZS Design')
+  })
+
   it('finds a company by name, nothing hidden', async () => {
     render(await DebtorAgingPage())
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Find company' }), { target: { value: 'design' } })
+    const controls = screen.getByRole('group', { name: 'Report controls' })
+    expect(within(controls).getByText('· highlights only')).toBeInTheDocument()
+    fireEvent.change(within(controls).getByRole('searchbox', { name: 'Find company' }), { target: { value: 'design' } })
     expect(screen.getByText('1 match')).toBeInTheDocument()
-    expect(screen.getByText('HOUZS Design').closest('tr')).toHaveClass('search-row-hit')
-    expect(screen.getByText('HOUZS Century').closest('tr')).not.toHaveClass('search-row-hit')
+    // The table's rows (the Over 60 card names the company too).
+    const table = screen.getByRole('heading', { level: 2, name: 'Debtor aging' }).closest('section') as HTMLElement
+    expect(within(table).getByText('HOUZS Design').closest('tr')).toHaveClass('search-row-hit')
+    expect(within(table).getByText('HOUZS Century').closest('tr')).not.toHaveClass('search-row-hit')
   })
 
   it('stays as it was for a department manager', async () => {
@@ -98,19 +123,34 @@ describe('Loan Aging on the sheet', () => {
   it('shows both sides in cards and closes each aging on a navy All row', async () => {
     render(await LoanAgingPage())
     expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · LOAN AGING · OCTOBER 2026')
-    expect(card('To collect · outstanding')).toHaveAttribute('data-tone', 'primary')
-    expect(card('To collect · outstanding')).toHaveTextContent('RM 250,000.00')
+    // The handoff's four cards (2026-10-10).
+    expect(card('Loans outstanding')).toHaveAttribute('data-tone', 'primary')
+    expect(card('Loans outstanding')).toHaveTextContent('RM 250,000.00')
     expect(card('Not due')).toHaveTextContent('RM 4,000.00')
-    expect(card('1–30 days late')).toHaveAttribute('data-tone', 'danger')
-    expect(card('1–30 days late')).toHaveTextContent('RM 2,000.00')
-    expect(card('Over 30 days late')).toHaveTextContent('RM 0.00')
-    expect(card('To repay · outstanding')).toHaveTextContent('RM 120,000.00')
+    expect(card('Not due')).toHaveTextContent('On schedule')
+    expect(card('1–30 days')).toHaveAttribute('data-tone', 'danger')
+    expect(card('1–30 days')).toHaveTextContent('RM 2,000.00')
+    expect(card('1–30 days')).toHaveTextContent('HOUZS Kitchen')
+    expect(card('31–90 days')).toHaveTextContent('RM 0.00')
+    expect(screen.queryByRole('group', { name: 'To repay · outstanding' })).toBeNull()
+    expect(document.querySelector('.page-sub')).toHaveTextContent('days late')
+    expect(document.querySelector('.page-sub')).not.toHaveTextContent('months late')
     const collect = screen.getByRole('heading', { level: 2, name: 'To Collect · aging — Fund OUT' }).closest('section') as HTMLElement
     expect(Array.from(collect.querySelectorAll('thead th')).map((th) => th.textContent)).toEqual(['Counterparty', 'Not due', '1–30 days', '31–90 days', '90+ days', 'Total due'])
     const alls = Array.from(document.querySelectorAll('tr.rpt-all')).map((r) => r.textContent)
     expect(alls[0]).toContain('All borrowers')
     expect(alls[1]).toContain('All lenders')
     expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/reports/loan-aging/export?format=xlsx&view=aging')
+  })
+
+  it('finds a company on its control row, nothing hidden', async () => {
+    render(await LoanAgingPage())
+    const controls = screen.getByRole('group', { name: 'Report controls' })
+    fireEvent.change(within(controls).getByRole('searchbox', { name: 'Find company' }), { target: { value: 'kitchen' } })
+    // The tables' rows (the 1–30 card names the borrower too).
+    const rows = screen.getAllByText('HOUZS Kitchen').map((el) => el.closest('tr')).filter((r): r is HTMLTableRowElement => !!r)
+    expect(rows.length).toBeGreaterThan(0)
+    for (const r of rows) expect(r).toHaveClass('search-row-hit')
   })
 })
 
@@ -123,5 +163,26 @@ describe('the Company Statement on the sheet', () => {
     expect(card('Net')).toHaveAttribute('data-tone', 'primary')
     expect(card('Net')).toHaveTextContent('Collect RM 104,000.00')
     expect(within(document.querySelector('.page-head') as HTMLElement).getByRole('link', { name: 'Export Excel' })).toHaveAttribute('href', '/reports/company-statement/export?format=xlsx')
+  })
+
+  it('lists the counterparties under their own head, without tiles repeating the cards', async () => {
+    render(await CompanyStatementPage())
+    const section = screen.getByRole('heading', { level: 2, name: 'Counterparties' }).closest('section') as HTMLElement
+    expect(section.querySelector('.sect-head .count')).toHaveTextContent('0 SHOWN')
+    expect(document.querySelectorAll('.statement-amount')).toHaveLength(0)
+  })
+
+  it('tints To collect and To repay over their columns and closes on a navy-tinted total', async () => {
+    mocks.fetchCounterpartyStatement.mockResolvedValue({
+      rows: [{ counterparty: 'HOUZS Century', collectPrincipal: 300000, collectInterest: 12000, repayPrincipal: 200000, repayInterest: 8000, net: 104000, items: [] }],
+      totals: { collectPrincipal: 300000, collectInterest: 12000, repayPrincipal: 200000, repayInterest: 8000, net: 104000 },
+    })
+    render(await CompanyStatementPage())
+    const section = screen.getByRole('heading', { level: 2, name: 'Counterparties' }).closest('section') as HTMLElement
+    expect(section.querySelector('.sect-head .count')).toHaveTextContent('1 SHOWN')
+    expect(section.querySelector('th.cs-collect')).toHaveTextContent('To collect')
+    expect(section.querySelector('th.cs-repay')).toHaveTextContent('To repay')
+    expect(section.querySelector('tr.cs-total')).toHaveTextContent('Total')
+    expect(within(section).getByText('HOUZS Century')).not.toHaveClass('font-serif')
   })
 })

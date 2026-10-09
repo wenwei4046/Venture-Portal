@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from 'react'
 import dayjs from 'dayjs'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { AGING_BUCKETS, type AgingColumn } from '@/lib/debtor-aging'
 
 // Master-detail aging matrix: one collapsible row per customer with per-bucket
@@ -36,13 +36,16 @@ interface Props {
   search?: boolean
   /** Close on the handoff's navy "All companies" row (2026-10-09, Finance's view). */
   allRow?: boolean
+  /** The handoff's sheet (2026-10-10, Finance's view): bare figures, white rows. */
+  sheet?: boolean
 }
 
-function money(v: number) {
-  return v ? <span className="num">{formatMoney(v)}</span> : <span className="num text-muted">—</span>
+function money(v: number, bare = false) {
+  return v ? <span className="num">{bare ? formatMoneyBare(v) : formatMoney(v)}</span> : <span className="num text-muted">—</span>
 }
 
-export default function AgingByCustomer({ byPayer, invoices, totals, allRow = false, columns = AGING_BUCKETS, search = false }: Props) {
+export default function AgingByCustomer({ byPayer, invoices, totals, allRow = false, columns = AGING_BUCKETS, search = false, sheet = false }: Props) {
+  const amount = (v: number) => (sheet ? formatMoneyBare(v) : formatMoney(v))
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [find, setFind] = useState('')
   const needle = find.trim().toLowerCase()
@@ -70,16 +73,27 @@ export default function AgingByCustomer({ byPayer, invoices, totals, allRow = fa
   return (
     <div>
       {search ? (
-        <div className="gl-toolbar">
-          <input
-            type="search"
-            value={find}
-            onChange={(e) => setFind(e.target.value)}
-            placeholder="Find company…"
-            aria-label="Find company"
-            className="search-plain flex-1 min-w-[200px] px-3 py-2 bg-white border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
-          />
-          {needle ? <span className="text-xs text-graphite">{hits.size === 0 ? 'No match' : `${hits.size} ${hits.size === 1 ? 'match' : 'matches'}`}</span> : null}
+        // The handoff's control row (2026-10-10): Find company highlights only.
+        <div className="rpt-toolbar" role="group" aria-label="Report controls">
+          <div className="rpt-field rpt-find">
+            <span>
+              Find company <span className="rpt-find-hint">· highlights only</span>
+            </span>
+            <div className="rpt-find-box">
+              <input
+                type="search"
+                value={find}
+                onChange={(e) => setFind(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setFind('')
+                }}
+                placeholder="Company…"
+                aria-label="Find company"
+                className="search-plain"
+              />
+              {needle ? <small>{hits.size === 0 ? 'No match' : `${hits.size} ${hits.size === 1 ? 'match' : 'matches'}`}</small> : null}
+            </div>
+          </div>
         </div>
       ) : null}
       <div className="mb-2 flex gap-3">
@@ -114,7 +128,7 @@ export default function AgingByCustomer({ byPayer, invoices, totals, allRow = fa
               return (
                 <Fragment key={p.payer}>
                   <tr
-                    className={`cursor-pointer bg-surface-2 hover:bg-surface${hits.has(p.payer) ? ' search-row-hit' : ''}`}
+                    className={`cursor-pointer ${sheet ? 'hover:bg-surface-2' : 'bg-surface-2 hover:bg-surface'}${hits.has(p.payer) ? ' search-row-hit' : ''}`}
                     onClick={() => toggle(p.payer)}
                   >
                     <td className="font-sans font-medium text-ink whitespace-nowrap">
@@ -122,9 +136,9 @@ export default function AgingByCustomer({ byPayer, invoices, totals, allRow = fa
                       {p.payer} <span className="text-muted text-xs font-normal">· {p.count}</span>
                     </td>
                     {columns.map((b) => (
-                      <td key={b.key} className="num">{money(p.buckets[b.key] ?? 0)}</td>
+                      <td key={b.key} className="num">{money(p.buckets[b.key] ?? 0, sheet)}</td>
                     ))}
-                    <td className="num font-semibold">{formatMoney(p.total)}</td>
+                    <td className="num font-semibold">{amount(p.total)}</td>
                   </tr>
                   {isOpen &&
                     rows.map((inv) => (
@@ -150,13 +164,13 @@ export default function AgingByCustomer({ byPayer, invoices, totals, allRow = fa
                         {columns.map((b) => (
                           <td key={b.key} className="num">
                             {inv.bucket === b.key ? (
-                              formatMoney(inv.amount)
+                              amount(inv.amount)
                             ) : (
                               <span className="text-muted">·</span>
                             )}
                           </td>
                         ))}
-                        <td className="num">{formatMoney(inv.amount)}</td>
+                        <td className="num">{amount(inv.amount)}</td>
                       </tr>
                     ))}
                 </Fragment>
@@ -167,9 +181,9 @@ export default function AgingByCustomer({ byPayer, invoices, totals, allRow = fa
                 {allRow ? 'All companies' : 'Total'} <span className={allRow ? 'text-xs font-normal' : 'text-muted text-xs'}>· {totals.count}</span>
               </td>
               {columns.map((b) => (
-                <td key={b.key} className="num">{money(totals.buckets[b.key] ?? 0)}</td>
+                <td key={b.key} className="num">{money(totals.buckets[b.key] ?? 0, sheet)}</td>
               ))}
-              <td className="num text-num-ink">{formatMoney(totals.total)}</td>
+              <td className="num text-num-ink">{amount(totals.total)}</td>
             </tr>
           </tbody>
         </table>

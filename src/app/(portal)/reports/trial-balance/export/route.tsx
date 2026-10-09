@@ -5,6 +5,7 @@ import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildTrialBalanceXlsx } from './_format/xlsx'
 import { TrialBalancePdf } from './_format/pdf'
 import { officeToday } from '@/lib/office-time'
+import { segmentFilterFor } from '../../_components/report-segments'
 
 export async function GET(req: Request) {
   await requireAction('reports', 'export')
@@ -18,7 +19,8 @@ export async function GET(req: Request) {
   }
 
   const supabase = await createClient()
-  const tb = await fetchTrialBalance(supabase, { asOf, showZeroBalance: showZero })
+  // One segment, as the page read it (2026-10-10).
+  const tb = await fetchTrialBalance(supabase, { asOf, showZeroBalance: showZero, segment: segmentFilterFor(url.searchParams.get('segment') ?? '') })
 
   const filename = `trial-balance-${asOf.replace(/-/g, '')}`
   if (format === 'xlsx') {
