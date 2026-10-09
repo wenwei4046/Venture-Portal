@@ -151,7 +151,8 @@ export function chatVM(ctx: SalesCtx) {
   const already = new Set([...data.shares.filter(s => s.customerId === c.id).map(s => s.staffId), ...(c.assignedTo ? [c.assignedTo] : [])]);
   const ss = hm.ssel ?? [];
   // The Principal / Director in someone's chat: Assign to anyone, beside Share and Move (user 2026-10-09: 3个功能都要有). Their Move goes to the owner's superior (crm_invite).
-  const assigner = (ctx.me.role === "boss" || ctx.me.role === "hod") && ctx.embedded?.assignTo ? ctx.embedded.assignTo : null;
+  // Offered only with CRM · Manage (CrmApp hands it over then).
+  const assigner = ctx.embedded?.assignTo ?? null;
   const assignList = assigner ? (ctx.embedded?.switchList ?? []).filter(p => p.role !== "boss") : [];
   const assigning = !!(assigner && hm.assign);
   const assignSel = assigning ? assignList.find(p => p.id === hm.sel) : undefined;

@@ -121,20 +121,23 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
     ? "Your job title has no role in the CRM. The CRM is for the Revenue team; if you should be in it, ask your administrator to check your title in People."
     : "Your login is not linked to your employee record in People yet. Once your administrator links them, your customers appear here."}</p>);
 
-  // The Principal and the Director see everyone: the Control panel, and anyone's own CRM from it.
-  const full = me.role === "boss" || me.role === "hod";
+  // Whoever holds CRM · View at All sees everyone: the Control panel, and anyone's own CRM from it
+  // (2026-10-10: the permission matrix decides — the Principal and the Revenue Director by their templates).
+  const full = data.can.viewAll;
+  // Everybody in the CRM sells but the Boss: somebody with the Control panel who sells has My CRM beside it.
+  const sells = me.role !== "boss";
   const nameOf = (id: string | null | undefined) => personOf(id, data.people)?.name ?? "—";
   const openCrmOf = (staffId: string, customerId?: string) => {
-    if (staffId === me.id && me.role === "hod") { setViewing(null); setHodMode("crm"); } else setViewing(staffId);
+    if (staffId === me.id && sells) { setViewing(null); setHodMode("crm"); } else setViewing(staffId);
     setUi(u => ({ ...initialSalesUi(), toast: u.toast, chat: customerId ?? null }));
   };
-  if (full && !viewing && (me.role === "boss" || hodMode === "panel")) {
+  if (full && !viewing && (!sells || hodMode === "panel")) {
     const teams = teamsOf(data);
     const pctx: PanelCtx = {
       data, me, now, live, ui: panelUi, set: setPanelUi, patch: p => setPanelUi(u => ({ ...u, ...p })), act: panelAct, nameOf, teams,
       directors: data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)),
       teamOfStaff: id => { const tl = id ? teams.find(t => t.id === id || t.people.some(p => p.id === id)) : undefined; return tl; },
-      openCrmOf, toMyCrm: me.role === "hod" ? () => openCrmOf(me.id) : undefined, exitApp: onExit, slotCounts,
+      openCrmOf, toMyCrm: sells ? () => openCrmOf(me.id) : undefined, exitApp: onExit, slotCounts,
     };
     return shell(<>
       {problem && <p className={H.problem}>{problem}</p>}
@@ -155,10 +158,11 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
     nameOf,
     embedded: {
       // The Director's own CRM carries Control panel | My CRM.
-      rdMode: me.role === "hod",
+      rdMode: full && sells,
       toPanel: () => { setHodMode("panel"); setViewing(null); },
       switchList: byTeam(below.map(id => personOf(id, data.people)!).filter(Boolean), data.people),
-      assignTo: full ? (customerId, staffId) => panelAct.sendTo(customerId, staffId) : undefined,
+      // Assign to somebody: assignment is CRM · Manage's.
+      assignTo: data.can.manage ? (customerId, staffId) => panelAct.sendTo(customerId, staffId) : undefined,
       onSwitch: id => { setViewing(id); setUi(u => ({ ...u, tab: "inbox", chat: null, filter: null, profSub: null })); },
       // Leaving someone's CRM goes back where it was opened: the Control panel, or one's own Profile.
       exitAs: () => { setViewing(null); setUi(u => ({ ...u, tab: full ? "inbox" : "profile", chat: null, filter: null })); },

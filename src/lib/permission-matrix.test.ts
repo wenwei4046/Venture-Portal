@@ -47,6 +47,8 @@ const FUNCTIONS: PermFunction[] = [
   F('accounts', 'Logins & invites', 'People', 'view create manage', 'all'),
   F('member', 'Member Services', 'People', 'view manage', 'all'),
   F('revenue_app', 'Revenue app', 'People', 'view create', 'own'),
+  // 20261010020000: the CRM joins the matrix.
+  F('crm', 'CRM', 'People', 'view edit manage', 'own all'),
   F('dept_pool', 'Dept Pool', 'Departments', 'view export', 'dept all'),
   F('venture_pool', 'Venture Pool', 'Departments', 'view create edit export', 'all'),
   F('opex', 'OPEX', 'Departments', 'view export', 'dept all'),
@@ -102,6 +104,8 @@ const CELL_KEYS: CellKey[] = [
   K('revenue_app', 'view', 'member_insight', 'own'),
   K('revenue_app', 'create', 'member_quote', 'own'),
   K('revenue_app', 'create', 'member_requests', 'own'),
+  K('crm', 'view', 'member_crm', 'own'),
+  K('crm', 'manage', 'crm_manage', 'all'),
   K('view_switch', 'view', 'view_switch', 'all', 'principal'),
 ]
 
@@ -135,18 +139,21 @@ const T: Record<string, { grants: Grants; sensitive: SensitiveField[]; baseRole:
   hr: { sensitive: ['salary', 'nric', 'bank'], baseRole: 'hr', grants: parse({ dashboard: 'view:all', hr_costing: 'view:all create:all edit:all export:all', revenue: 'view:all edit:all', director_salary: 'view:all edit:all', director_pool: 'view:all', team: 'view:all create:all edit:all', accounts: 'view:all', claims: 'view:own create:own', member: 'view:all manage:all' }) },
   dept_head: { sensitive: [], baseRole: 'dept_manager', grants: parse({ dashboard: 'view:all', dept_pool: 'view:dept export:dept', opex: 'view:dept', my_billing: 'view:dept create:dept', claims: 'view:dept create:own approve:dept', dept_reports: 'view:dept export:dept', team: 'view:dept' }) },
   staff: { sensitive: [], baseRole: 'staff', grants: parse({ dashboard: 'view:all', claims: 'view:own create:own edit:own' }) },
-  revenue_team: { sensitive: [], baseRole: 'revenue_member', grants: parse({ revenue_app: 'view:own create:own' }) },
+  revenue_team: { sensitive: [], baseRole: 'revenue_member', grants: parse({ revenue_app: 'view:own create:own', crm: 'view:own edit:own' }) },
+  revenue_director: { sensitive: [], baseRole: 'revenue_member', grants: parse({ revenue_app: 'view:own create:own', crm: 'view:all edit:all manage:all' }) },
 }
 
 // Production's role defaults (2026-10-08).
 const PRINCIPAL = ['approvals', 'audit_log', 'billing', 'categories', 'claims', 'claims_approve', 'dashboard', 'department_mode',
   'dept_pool', 'dept_reports', 'director_pool', 'director_salary', 'hr_costing', 'member_memos_manage', 'member_requests_manage',
   'opex', 'override', 'payroll_payouts', 'permissions_manage', 'product_list', 'reconciliation', 'reports', 'revenue',
-  'salary_individual', 'settings', 'team', 'team_invite', 'treasury', 'venture_pool']
+  'salary_individual', 'settings', 'team', 'team_invite', 'treasury', 'venture_pool', 'crm_manage']
 const FINANCE = ['billing', 'categories', 'claims', 'claims_approve', 'dashboard', 'dept_pool', 'dept_reports', 'reconciliation',
   'reports', 'treasury', 'venture_pool']
 const DEPT_MANAGER = ['claims', 'dashboard', 'dept_pool', 'dept_reports', 'my_billing', 'opex']
 const REVENUE_MEMBER = ['member_insight', 'member_memos', 'member_portal', 'member_quote', 'member_requests']
+/** What a Revenue Team title opens since 20261010020000: the member app's keys and its own CRM. */
+const REVENUE_TEAM = [...REVENUE_MEMBER, 'member_crm'].sort()
 
 describe('cycling a cell', () => {
   it('runs · → each reach the function allows, narrowest first → ·', () => {
@@ -285,8 +292,8 @@ describe('what a template opens today — the database rule, in TypeScript', () 
   const opens = (key: keyof typeof T) => openedKeys(T[key].grants, T[key].sensitive, T[key].baseRole, CELL_KEYS)
 
   it('Ultimate and Full are the Principal role (and My Billing, the queue and the directory); only Ultimate switches views', () => {
-    expect(opens('ultimate')).toEqual([...PRINCIPAL, 'approvals_queue', 'my_billing', 'team_directory', 'view_switch'].sort())
-    expect(opens('full')).toEqual([...PRINCIPAL, 'approvals_queue', 'my_billing', 'team_directory'].sort())
+    expect(opens('ultimate')).toEqual([...PRINCIPAL, 'approvals_queue', 'member_crm', 'my_billing', 'team_directory', 'view_switch'].sort())
+    expect(opens('full')).toEqual([...PRINCIPAL, 'approvals_queue', 'member_crm', 'my_billing', 'team_directory'].sort())
   })
 
   it('the checker and the Revenue team are their old roles exactly; the department head also reads People', () => {
@@ -294,7 +301,19 @@ describe('what a template opens today — the database rule, in TypeScript', () 
     // PR4b (2026-10-10): Team · View at Dept opens the directory — its own
     // department's roster and the company chart, never the staff table.
     expect(opens('dept_head')).toEqual([...DEPT_MANAGER, 'team_directory'].sort())
-    expect(opens('revenue_team')).toEqual(REVENUE_MEMBER)
+    expect(opens('revenue_team')).toEqual(REVENUE_TEAM)
+  })
+
+  // 20261010020000 (2026-10-10): the CRM in the matrix — a Revenue app account
+  // may hold its keys, so the Revenue Director's Control panel is in force.
+  it('opens the CRM: the Revenue team its own, the Revenue Director the Control panel', () => {
+    expect(opens('revenue_director')).toEqual([...REVENUE_MEMBER, 'crm_manage', 'member_crm'].sort())
+    const held = (key: keyof typeof T) => heldCells(T[key].grants, T[key].sensitive, T[key].baseRole, CELL_KEYS, FUNCTIONS)
+    expect(held('revenue_team')).toEqual([])
+    expect(held('revenue_director')).toEqual([])
+    // Manage opens only at All; nothing short of it is the Control panel.
+    const ownManager = setCell(T.revenue_team.grants, fn('crm'), 'manage', 'own')
+    expect(openedKeys(ownManager, [], 'revenue_member', CELL_KEYS)).not.toContain('crm_manage')
   })
 
   it('holds back what a module key would open wider than the cell', () => {
@@ -337,7 +356,7 @@ describe('what a template opens today — the database rule, in TypeScript', () 
     expect(keys).not.toContain('audit_log')
     expect(keys).not.toContain('reports')
     const revenue = effectiveGrants(T.revenue_team.grants, { 'dashboard.view': 'all' })
-    expect(openedKeys(revenue, [], 'revenue_member', CELL_KEYS)).toEqual(REVENUE_MEMBER)
+    expect(openedKeys(revenue, [], 'revenue_member', CELL_KEYS)).toEqual(REVENUE_TEAM)
   })
 
   it('labels every cell value', () => {

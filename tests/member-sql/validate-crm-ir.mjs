@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict'
 import { readFile, readdir } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
+import { CRM_PERMISSION_STANDIN } from './crm-permission-standin.mjs'
 
 const db = new PGlite()
 const q = async (sql, params = []) => (await db.query(sql, params)).rows
@@ -54,9 +55,11 @@ const FAIR = id('sd', 'fair'), IR = id('sd', 'ir')
 await q(`insert into comm_sub_departments values ($1, 'Fair', true), ($2, 'IR', true)`, [FAIR, IR])
 await q(`insert into comm_schemes values ($1, $2, true), ($3, $4, true), ($5, $4, false)`, [id('sc', 'fair'), FAIR, id('sc', 'ir'), IR, id('sc', 'ir-old')])
 
+// The CRM asks the permission matrix (20261010030000): each person holds their role's seeded cells.
+await db.exec(CRM_PERMISSION_STANDIN)
 const dir = new URL('../../supabase/migrations/', import.meta.url)
 for (const file of (await readdir(dir)).filter(f => /^20261(00[2-9]|01\d)\d+_crm_.*\.sql$/.test(f)).sort()) {
-  await db.exec(await readFile(new URL(file, dir), 'utf8'))
+  await db.exec((await readFile(new URL(file, dir), 'utf8')).replace(/\r\n/g, '\n'))
 }
 
 // Titles and the CRM roles they map to (as production: a Senior RS is an RS).

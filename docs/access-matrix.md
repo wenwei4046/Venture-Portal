@@ -4,6 +4,17 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-10 — The CRM in the matrix
+The Revenue team's CRM (WhatsApp / Messenger customers, showroom visits) decided who
+may do what from job titles alone. It is now a row of the matrix — CRM: View · Edit ·
+Manage, reach Own or All — and the CRM's database checks ask it. Own = their customers
+and their team's below them; All = everybody's (the Control panel). Edit = reply, book,
+share and move; Manage = assignment (organic leads, ads to teams), full time and
+showrooms. Revenue Team: View and Edit at Own. A new Revenue Director template (the
+Revenue Director title): the Revenue app and every CRM cell at All. Ultimate / Full
+access (the CEO): every CRM cell. The Principal's shared login keeps the Control panel.
+Nothing else changes for anybody signing in today. Migs `20261010020000` / `030000`.
+---
 ⚡ AMENDMENT 2026-10-10 — Team · View without the Salary tick opens People (PR4b)
 The Executive office (Team · View at All) and the Department head (Team · View at
 Dept) templates hold Team · View without Salary amounts, so People stayed shut for

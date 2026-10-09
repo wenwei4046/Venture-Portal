@@ -2,7 +2,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { headers } from "next/headers";
-import { getMemberUser } from "@/lib/auth";
+import { getAccountUser, getMemberUser } from "@/lib/auth";
+import { canDo } from "@/lib/permission-actions";
 import { createClient } from "@/lib/supabase/server";
 import { crmFromRows, messageFromRow, type CrmLiveData, type CrmMessageRow, type CrmPeopleRow, type CrmRows } from "@/lib/member/crm-live";
 import type { CrmMessage } from "@/lib/member/crm";
@@ -22,6 +23,7 @@ export async function fetchCrm(): Promise<{ ok: true; data: CrmLiveData } | { ok
   try {
     const user = await getMemberUser();
     if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    await requireCrm("view");
     // The crm_* tables postdate database.types.ts — untyped-client convention (as the WhatsApp webhook).
     const db = (await createClient()) as unknown as SupabaseClient;
     const read = async <T,>(query: PromiseLike<{ data: T | null; error: { message: string } | null }>): Promise<T> => {
@@ -61,6 +63,7 @@ export async function sendCrmReply(contactId: string, text: string): Promise<{ o
   try {
     const user = await getMemberUser();
     if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    await requireCrm("edit");
     if (!/^[0-9a-f-]{36}$/i.test(contactId)) throw new Error("Choose a customer first.");
     const clean = cleanText(text);
     if (!clean.ok) throw new Error(clean.error);
@@ -133,6 +136,7 @@ export async function crmWrite(name: CrmWrite, args: Record<string, unknown>): P
     if (!CRM_WRITES.includes(name)) throw new Error("Unknown action.");
     const user = await getMemberUser();
     if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    await requireCrm(MANAGE_WRITES.has(name) ? "manage" : EDIT_WRITES.has(name) ? "edit" : "view");
     const db = (await createClient()) as unknown as SupabaseClient;
     const { data, error } = await db.rpc(name, args);
     if (error) throw new Error(error.message);
@@ -160,6 +164,34 @@ const session = async (): Promise<Db> => {
   if (!user?.is_active) throw new Error("Sign in with an active work account.");
   return (await createClient()) as unknown as Db;
 };
+
+/**
+ * The CRM's cells (2026-10-10, the permission matrix): asked of the ACCOUNT —
+ * the CRM is the signed-in account's own whatever view the portal was left in,
+ * and the database answers for the account too (crm_me / crm_can). The
+ * database refuses whatever these let through that it would not.
+ */
+const NOT_IN_CRM = "The CRM is not part of your title's permissions. Ask your administrator.";
+async function crmAllows(need: "view" | "edit" | "manage"): Promise<boolean> {
+  const account = await getAccountUser();
+  if (!account?.is_active) return false;
+  if (need === "manage") return canDo(account, "crm", "manage");
+  if (need === "edit") return canDo(account, "crm", "edit", "own");
+  return canDo(account, "crm", "view", "own");
+}
+const requireCrm = async (need: "view" | "edit" | "manage") => {
+  if (!(await crmAllows(need))) throw new Error(need === "view" ? NOT_IN_CRM : "You may not do that.");
+};
+
+/** Which cell each of the CRM's writes needs (the database asks the same). */
+const MANAGE_WRITES: ReadonlySet<string> = new Set([
+  "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ad_rule", "crm_save_fulltime",
+  "crm_save_team_shares", "crm_set_full_time", "crm_save_showroom", "crm_save_showroom_full",
+]);
+const EDIT_WRITES: ReadonlySet<string> = new Set([
+  "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
+  "crm_visit_outcome", "crm_save_details", "crm_invite", "crm_answer_invite", "crm_mark_reminded",
+]);
 const friendly = (error: unknown, fallback: string) => {
   const message = error instanceof Error ? error.message : fallback;
   return /permission denied|42501/i.test(message) ? "You may not do that." : message.slice(0, 250);
@@ -172,13 +204,16 @@ const friendly = (error: unknown, fallback: string) => {
 export async function fetchCrmData(): Promise<{ ok: true; data: CrmData } | { ok: false; error: string }> {
   try {
     const db = await session();
+    await requireCrm("view");
     const read = async <T,>(query: PromiseLike<{ data: T | null; error: { message: string } | null }>): Promise<T> => {
       const { data, error } = await query;
       if (error) throw new Error(error.message);
       return (data ?? []) as T;
     };
-    const [people, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs, adRules, ftRules] = await Promise.all([
+    const [people, can, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs, adRules, ftRules] = await Promise.all([
       read<CrmDataRows["people"]>(db.rpc("crm_people")),
+      // What they may do (mig 20261010030000) — the screens follow it; a database without it yet answers by role.
+      Promise.resolve(db.rpc("crm_my_can")).then(r => (r.error ? null : r.data), () => null),
       fetchAllRowsParallel<CrmDataRows["contacts"][number]>((from, to, withCount) => db.from("crm_contacts")
         .select("id, channel, account_id, external_id, name, phone, ad_source_id, ad_headline, status, lost_reason, lost_note, previous_status, assigned_to, team_id, last_customer_at, unread, created_at, property_type, unit_size, unit_location, requirement, budget, won_amount, details_at, assigned_at, assigned_by", withCount ? { count: "exact" } : undefined)
         .order("created_at").order("id").range(from, to), "crm contacts"),
@@ -200,7 +235,7 @@ export async function fetchCrmData(): Promise<{ ok: true; data: CrmData } | { ok
       read<CrmDataRows["adRules"]>(db.from("crm_ad_assign").select("ad_source_id, ad_label, mode, team_split, people_mode, people, started_at")),
       read<CrmDataRows["ftRules"]>(db.from("crm_fulltime_rules").select("tl_id, mode, days, vals")),
     ]);
-    return { ok: true, data: crmDataFromRows({ people, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs, adRules, ftRules }) };
+    return { ok: true, data: crmDataFromRows({ people, can, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs, adRules, ftRules }) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The CRM could not be loaded. Please try again.";
     return { ok: false, error: /schema cache|does not exist|could not find|permission denied for/i.test(message)
@@ -247,6 +282,7 @@ export async function sendCrmMessage(contactId: string, text: string, opts: { re
     const clean = cleanText(text);
     if (!clean.ok) throw new Error(clean.error);
     const db = await session();
+    await requireCrm("edit");
     const { contact, token, window } = await reachable(db, contactId, true);
     let quote: string | null = null;
     if (opts.replyTo) {
@@ -284,6 +320,7 @@ export async function sendCrmMessage(contactId: string, text: string, opts: { re
 export async function reactToMessage(messageId: string, emoji: string): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const db = await session();
+    await requireCrm("edit");
     const { data: m, error } = await db.from("crm_messages").select("id, contact_id, external_id, direction").eq("id", messageId).maybeSingle();
     if (error) throw new Error(error.message);
     if (!m) throw new Error("That message is not in your CRM.");
@@ -304,6 +341,7 @@ export async function reactToMessage(messageId: string, emoji: string): Promise<
 export async function fetchCrmTemplates(): Promise<{ ok: true; templates: WaTemplate[] } | { ok: false; error: string }> {
   try {
     await session();
+    await requireCrm("edit");
     const token = process.env.META_SYSTEM_USER_TOKEN?.trim(), wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim();
     if (!token || !wabaId) throw new Error("WhatsApp is not connected on this server yet. Ask your administrator.");
     return await fetchWhatsAppTemplates({ wabaId, token });
@@ -316,6 +354,7 @@ export async function fetchCrmTemplates(): Promise<{ ok: true; templates: WaTemp
 export async function sendCrmTemplate(contactId: string, template: { name: string; language: string; text: string }, params: string[]): Promise<{ ok: true; message: CrmChatMessage } | { ok: false; error: string }> {
   try {
     const db = await session();
+    await requireCrm("edit");
     const { contact, token } = await reachable(db, contactId, false);
     if (contact.channel !== "whatsapp") throw new Error("Messenger has no templates. Call the customer instead.");
     const sent = await sendWhatsApp({ phoneNumberId: contact.account_id, token, message: templateMessage(contact.external_id, template.name, template.language, params) });
@@ -339,6 +378,7 @@ export async function sendCrmMedia(form: FormData): Promise<{ ok: true; message:
     // Vercel takes ~4.5 MB in one request (next.config.ts bodySizeLimit 4 MB): a larger file never reaches here.
     if (file.size > CRM_MEDIA_BYTES) throw new Error("A photo or file can be up to 4 MB.");
     const db = await session();
+    await requireCrm("edit");
     const { contact, token, window } = await reachable(db, contactId, true);
     let externalId: string;
     if (contact.channel === "messenger") {

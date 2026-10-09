@@ -4,7 +4,7 @@
  * (CrmData). The person looking is "a1".
  */
 import { crmDemo, crmTeamDemo, demoShowrooms } from "./crm-demo";
-import { DEFAULT_AUTO_REPLY_SET, type CrmData } from "./crm-data";
+import { DEFAULT_AUTO_REPLY_SET, canFromRole, type CrmData } from "./crm-data";
 
 /** `viewer`: whose eyes — "a1" (a salesperson), or "boss" / "hod" for the Control panel (/member/preview?page=crm&crmAs=boss). */
 export function crmDemoData(you = "You", viewer = "a1"): CrmData {
@@ -22,8 +22,9 @@ export function crmDemoData(you = "You", viewer = "a1"): CrmData {
       messages: msgs.map(m => ({ id: `${l.id}-${m.id}`, from: m.from as "lead" | "me", kind: "text", text: m.text, at: m.at, ...(m.from === "me" ? { status: "read" as const } : {}), ...(m.auto ? { auto: true } : {}) })),
     };
   });
+  const viewerId = people.some(p => p.id === viewer) ? viewer : "a1";
   return {
-    viewerId: people.some(p => p.id === viewer) ? viewer : "a1", setup: null, people, customers,
+    viewerId, can: canFromRole(people.find(p => p.id === viewerId)?.role ?? null), setup: null, people, customers,
     visits: demo.appointments.map(a => ({ id: a.id, customerId: a.leadId, showroomId: a.showroomId, start: a.start, minutes: a.minutes, state: a.state === "attended" ? "attended" : a.state === "cancelled" ? "cancelled" : "booked", outcome: null, remindedAt: null })),
     rooms: demoShowrooms.map((r, i) => ({ id: r.id, name: r.name, active: true, address: i === 0 ? "Jalan Ampang, Kuala Lumpur" : "", slots: ["11:00", "13:00", "15:00", "17:00", "19:00"], cap: 2, weekly: [], blocks: [] })),
     prefs: {}, hiddenMessages: [], labels: [], customerLabels: {}, quickReplies: [], autoReplies: DEFAULT_AUTO_REPLY_SET,

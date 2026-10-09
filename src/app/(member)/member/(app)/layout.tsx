@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import type { Viewport } from "next";
-import { getMemberUser } from "@/lib/auth";
+import { getAccountUser, getMemberUser } from "@/lib/auth";
+import { canDo } from "@/lib/permission-actions";
 import { loadMemberData } from "@/lib/member/server";
 import { productListAccess } from "@/lib/member/product-access";
 import RevenueApp from "@/components/member/app/RevenueApp";
@@ -22,6 +23,9 @@ export default async function MemberAppLayout({ children }: { children: ReactNod
   const user = await getMemberUser();
   if (!user) redirect("/login");
   // The first screen's snapshot: no Quote catalogue (2026-10-08) — the app reads that when the Quote opens.
-  const [data, products] = await Promise.all([loadMemberData({ lite: true }), productListAccess(user)]);
-  return <RevenueApp initialData={data} productList={products}>{children}</RevenueApp>;
+  // The CRM's row under Profile: the ACCOUNT's CRM · View (2026-10-10, the permission matrix) — the CRM
+  // is the signed-in account's own whatever view the portal was left in, as crm-actions.ts asks.
+  const [data, products, account] = await Promise.all([loadMemberData({ lite: true }), productListAccess(user), getAccountUser()]);
+  const crm = canDo(account, "crm", "view", "own");
+  return <RevenueApp initialData={data} productList={products} crm={crm}>{children}</RevenueApp>;
 }
