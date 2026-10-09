@@ -1,5 +1,77 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-09 e (SHIPPED) — Finance revamp · Phase 3 begins: Daily Bank
+
+Daily Bank per the handoff (it answers the open choices of the 7 Oct sample:
+no dark banner — a sheet section with the navy table band; money in green,
+pending brown, overdrawn red).
+- `DailyBankView` now owns the page head (the server page only fetches):
+  eyebrow, title, the **day nav** pill "← Today · 9 Oct 2026 →" (`.db-daynav`;
+  the label hides a date input "Pick a day"; → is disabled on today), the
+  subtitle (`.page-sub`), Today (when not today) / PNG / PDF / **Get image**
+  (`.btn-pri-sheet`). Five `StatCard`s: Balance B/F (Σ bf), Received today
+  (ledger when > 0; "n receipts"), Pending payment (wait; "n awaiting
+  Principal"), Total available (primary, `totals.grand`), Banks ("n
+  departments" = columns). `SlidingTabs` Bank × Department / By bank (count).
+- The board (`.dbank`, what Get image / PNG capture, white background now):
+  Matrix = sect-head + `ledger-table.db-matrix` — `tr.db-band` per bank's B/F
+  (inset walnut edge), `db-indent` rows (Received today `.db-in`, each pending
+  PV with a Pending chip and "PV · description" `.db-sub`, figures `.db-pend`
+  in parentheses), `tr.db-avail` Available balance, tfoot Total available;
+  zero = dash, negative = `.db-neg`. **Phone**: `.db-phone` card per bank
+  (available, the "B/F · +in · −pending" walk, a line per department that
+  moved, the pending list) + Total available; the table is `hidden md:block`.
+  By bank = one section per bank (count "BANK BALANCE RM x" = current), Pay to
+  / PV No. / Description / Received / Pending, tfoot Available (after pending).
+- Capture logic unchanged (scroll containers flattened); PDF export unchanged.
+- Tests: `DailyBankView.test.tsx` (6).
+
+## CHECKPOINT 2026-10-09 d (SHIPPED) — Finance revamp · an invoice's own page
+
+User: "继续做完他" — finish the revamp. First the invoice detail page the
+handoff wants (README: "Invoice items (Billable) and Contra items (Non-bill)
+are clearly separated"). Invoices carry no non-billable lines, so the contra
+items are the invoice's **credit notes**.
+- New route **`/invoices/[id]`** (registered in `lib/finance-view.ts` —
+  prefix, detail root, title "Invoice"; `lib/sheet-routes.ts`; the sidebar's
+  Invoice item lights on it via `alsoPaths`; `loading.tsx` at `/invoices` and
+  `/invoices/[id]`). `requirePermission('billing')`.
+- Page: ReturnLink "← Back to Service Billing" (`/statements?period=`),
+  eyebrow "INVOICE · <MODE>", the number (or Draft) with its chip, "<party> ·
+  <kind>"; head PDF (billing·export) + Copy (billing·create,
+  `_components/CopyInvoiceLink`); cards Total amount (primary) / Received
+  (ledger when > 0; a paid invoice counts total − approved credit, its
+  consolidated receipt's slice) / Remaining (wait while issued and owing) /
+  Due ("n days left", "Paid", "Draft"); `DetailGroups` Billing (Billed to,
+  Billing mode, GL category, Reference no) + Dates + Contact (free-text
+  party); Description in `.fin-notice`; **Invoice items** (lines, or the
+  invoice itself when it has none; "n LINES · BILLABLE"); **Contra items**
+  (credit notes: CN # / Status chip / Reason / (amount), foot = approved);
+  **Receipts** (direct ones + the consolidated receipt it points at, shown as
+  this invoice's slice with "consolidated receipt · RM x in all").
+- Actions (`_components/InvoicePageActions.tsx`, the list's own actions by
+  status): draft → Approve & issue / Edit / Delete; issued → **Settle in
+  place** (inline Bank / Payment date / Amount received → the list's
+  `settleInvoicesConsolidated` with `partialAmount`; a dept-pool invoice links
+  to `/payments/new?invoice_id=…&return_to=/invoices/<id>` instead) / Edit /
+  + Credit note / Change account / Void (untouched only; inline reason); paid
+  → Edit / Refund (treasury·create, voucher page) / + Credit note / Change
+  account. Edit, credit note and change-account are the list's dialogs
+  (`autoOpen hideTrigger`). Inline forms: `.fin-inline-form` / `.fin-field`.
+- `lib/invoice-labels.ts` (tested): `billingModeLabel` ("HR attribution",
+  a provisioned dept by its own label) and `invoiceParty` (subsidiary "Name
+  (CODE)", Dept pool, Director, Free text).
+- **Service Billing list**: the popup is gone — the number is a Link to the
+  page, a double-click / 打开 / the phone's "Open the invoice →" push it; the
+  row menu reads in English on the Finance view (Open, Change account, Void…;
+  Chinese elsewhere). `InvoiceDetailButton.tsx` is no longer used by the list
+  (kept: the user's " - Copy" backups import it). BillingView still hands the
+  list `receiptsByInvoice` / `cnDetailByInvoice` (an upstream pagination test
+  guards those reads) — unused now; a candidate cleanup.
+
+Next: Phase 3 — Daily Bank, Fund IN/OUT + details, Invoice Financing,
+Repayment Schedule calendar, Overdue.
+
 ## CHECKPOINT 2026-10-09 c (SHIPPED) — Finance revamp · the Billing Allocator per the handoff
 
 The user answered the Phase 2 question with **照设计档**: the Records table
