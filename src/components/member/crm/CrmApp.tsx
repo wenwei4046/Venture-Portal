@@ -20,7 +20,7 @@ import { initialSalesUi, type SalesRefs, type SalesUi } from "./sales/ui";
 import { type SalesCtx } from "./sales/vm/common";
 import { lastAt } from "./sales/vm/inbox";
 import SalesScreens from "./sales/SalesScreens";
-import { downlineOf } from "./shared/people";
+import { byTeam, downlineOf } from "./shared/people";
 import PanelScreens from "./panel/PanelScreens";
 import { makePanelActions } from "./panel/actions";
 import { initialPanelUi, type PanelUi } from "./panel/ui";
@@ -135,7 +135,7 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
       // The Director's own CRM carries Control panel | My CRM.
       rdMode: me.role === "hod",
       toPanel: () => { setHodMode("panel"); setViewing(null); },
-      switchList: below.map(id => personOf(id, data.people)!).filter(Boolean),
+      switchList: byTeam(below.map(id => personOf(id, data.people)!).filter(Boolean), data.people),
       onSwitch: id => { setViewing(id); setUi(u => ({ ...u, tab: "inbox", chat: null, filter: null, profSub: null })); },
       // Leaving someone's CRM goes back where it was opened: the Control panel, or one's own Profile.
       exitAs: () => { setViewing(null); setUi(u => ({ ...u, tab: full ? "inbox" : "profile", chat: null, filter: null })); },

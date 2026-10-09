@@ -36,7 +36,7 @@ export default function SalesShellBanners({ v }: { v: ShellVM }) {
     </>)}
     {!!(v.swOpenX) && (<>
       <div onClick={v.closeSwX} style={{ position: "absolute", inset: "0", zIndex: "20", background: "rgba(63,43,34,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeIn 200ms ease-out" }}>
-        <div onClick={v.stopTeam} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 26px", display: "flex", flexDirection: "column", gap: "4px" }}>
+        <div onClick={v.stopTeam} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 26px", display: "flex", flexDirection: "column", gap: "4px", maxHeight: "88%", overflowY: "auto", scrollbarWidth: "none", boxSizing: "border-box" }}>
           <span style={{ alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2" }}>
           </span>
           <h2 style={{ margin: "6px 0 8px", fontSize: "20px", fontWeight: "700", letterSpacing: "-.02em" }}>Switch to</h2>

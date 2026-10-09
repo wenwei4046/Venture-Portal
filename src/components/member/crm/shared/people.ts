@@ -48,3 +48,15 @@ export const jobTitle = (p: CrmPerson) => p.title?.trim() || ROLE_TITLE[p.role];
 export const titleOf = (p: CrmPerson) => jobTitle(p) + (p.role === "rs" ? ` · ${p.fullTime ? "Full time" : "Part time"}` : "");
 /** The short form a crowded row shows: "Senior Revenue Specialist" → "SRS", "Team Leader" → "TL". */
 export const titleShort = (p: CrmPerson) => { const w = jobTitle(p).split(/\s+/).filter(Boolean); return w.length > 1 ? w.map(x => x[0]!.toUpperCase()).join("") : jobTitle(p); };
+
+/**
+ * People in team order (user 2026-10-09): the Director(s), then each team — its TL, TAs, then RS,
+ * full time before part time — teams by their TL's name, then anyone in no team.
+ */
+export function byTeam(list: CrmPerson[], people: CrmPerson[]): CrmPerson[] {
+  const tlName = (p: CrmPerson) => teamOf(p.id, people)?.name ?? "\uffff";
+  const rank = (p: CrmPerson) => (p.role === "boss" ? 0 : p.role === "hod" ? 1 : teamOf(p.id, people) ? 2 : 3);
+  return [...list].sort((a, b) =>
+    rank(a) - rank(b) || tlName(a).localeCompare(tlName(b)) || ROLE_ORDER[a.role] - ROLE_ORDER[b.role]
+    || Number(b.fullTime) - Number(a.fullTime) || a.name.localeCompare(b.name));
+}

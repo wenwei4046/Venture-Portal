@@ -27,6 +27,9 @@ const parts = [
 const PATCHES = {
   SalesProfile: [[">Full time</strong>", ">{v.meRankX}</strong>"]],
   SalesChat: [[/(<span onClick=\{v\.simReply\}[^>]*>Demo: customer replies<\/span>)/, "{!!v.simReplyShow && ($1)}"]],
+  // Switch to: a whole department's list scrolls inside the sheet instead of running off the screen (user 2026-10-09).
+  SalesShellBanners: [['<div onClick={v.stopTeam} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 26px", display: "flex", flexDirection: "column", gap: "4px" }}>',
+    '<div onClick={v.stopTeam} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 26px", display: "flex", flexDirection: "column", gap: "4px", maxHeight: "88%", overflowY: "auto", scrollbarWidth: "none", boxSizing: "border-box" }}>']],
 };
 for (const [name, vm, frag, doc] of parts) {
   let body = convert(frag);
