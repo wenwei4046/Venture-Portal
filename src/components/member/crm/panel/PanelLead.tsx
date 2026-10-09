@@ -100,7 +100,7 @@ export default function PanelLead({ v }: { v: LeadVM }) {
           {!!(v.ld.movedTo) && (<>
             <div style={{ flex: "none", padding: "8px 12px", borderRadius: "12px", background: "#E4F1E8", color: "#2E6B4C", fontSize: "13px", fontWeight: "600" }}>{v.ld.movedTo}</div>
           </>)}
-          <div style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "10px", padding: "4px 0" }}>
+          <div data-chat-list="1" style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "10px", padding: "4px 0" }}>
             {(v.ld.msgs).map((m, m_i) => (<Fragment key={m_i}>
               {!!(m.sep) && (<>
                 <span style={{ alignSelf: "center", margin: "4px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "#F5EBE3", color: "#4E2F20", fontSize: "12px", fontWeight: "600" }}>{m.sep}</span>
@@ -153,7 +153,7 @@ export default function PanelLead({ v }: { v: LeadVM }) {
           </div>
         </>)}
         {!!(v.lx.viewOnly) && (<>
-          <div style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
+          <div data-chat-list="1" style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
             {(v.ld.msgs).map((m, m_i) => (<Fragment key={m_i}>
               <div style={{ alignSelf: m.align, maxWidth: "80%", padding: "10px 13px", boxSizing: "border-box", borderRadius: m.radius, background: m.bg, border: `1px solid ${m.bd}`, fontSize: "14px", lineHeight: "1.45" }}>{m.text}<span style={{ display: "block", marginTop: "4px", fontSize: "11px", color: "#806B60", textAlign: "right" }}>{!!(m.hasBy) && (<>
                     <em style={{ fontStyle: "italic" }}>{m.by} · </em>

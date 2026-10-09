@@ -51,7 +51,7 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
     return () => { current = false; };
   }, [live]);
   // Live: new messages arrive without a reload (user 2026-10-09: 我發送 receive 但是 crm inbox 收不到 —
-  // it was saved; the screen had read once). Read again every 10 s while on screen and at once on coming
+  // it was saved; the screen had read once). Read again every 5 s while on screen and at once on coming
   // back; never two reads at a time, and a read begun before one of our own changes is dropped, so it
   // cannot put back what that change just replaced.
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
         if (!stopped && r.ok && started >= (refs.localAt ?? 0)) setData(r.data);
       } finally { busy = false; }
     };
-    const t = setInterval(() => void pull(), 10_000);
+    const t = setInterval(() => void pull(), 5_000);
     const back = () => void pull();
     document.addEventListener("visibilitychange", back);
     window.addEventListener("focus", back);

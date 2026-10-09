@@ -20,13 +20,21 @@ export function messengerWindow(lastCustomerAt: string | null | undefined, now: 
 
 const graph = (path: string) => `https://graph.facebook.com/${GRAPH_VERSION}/${path}`;
 
+/** A Page token asked once is kept on this server for 15 minutes: each reply asked Meta for it again, a second round trip before the send. */
+const pageTokens = new Map<string, { token: string; until: number }>();
+const PAGE_TOKEN_MS = 15 * 60_000;
+
 /** The Page's own access token, asked with the System User token (assigned to both Pages). */
 export async function pageToken(pageId: string, systemToken: string, fetchImpl: typeof fetch = fetch): Promise<string | null> {
   if (!/^\d{5,32}$/.test(pageId)) return null;
+  const key = `${pageId}:${systemToken.slice(-12)}`, kept = pageTokens.get(key);
+  if (kept && kept.until > Date.now()) return kept.token;
   try {
     const r = await fetchImpl(graph(`${pageId}?fields=access_token`), { headers: { Authorization: `Bearer ${systemToken}` }, cache: "no-store" });
     const j = (await r.json().catch(() => null)) as { access_token?: string } | null;
-    return r.ok && j?.access_token ? j.access_token : null;
+    if (!r.ok || !j?.access_token) return null;
+    pageTokens.set(key, { token: j.access_token, until: Date.now() + PAGE_TOKEN_MS });
+    return j.access_token;
   } catch {
     return null;
   }

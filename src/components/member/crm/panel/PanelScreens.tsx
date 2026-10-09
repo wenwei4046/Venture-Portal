@@ -32,6 +32,7 @@ import { roomsVM } from "./vm/rooms";
 import { overlaysVM } from "./vm/overlays";
 import { navVM } from "./vm/nav";
 import type { PanelCtx } from "./vm/common";
+import { useFollowNewest } from "../shared/stick";
 
 export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
   const { ui, set } = ctx;
@@ -43,6 +44,7 @@ export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
     return () => clearInterval(t);
   }, [undoOn, set]);
   const tab = ui.tab;
+  useFollowNewest(ui.lead, ctx.data.customers.find(c => c.id === ui.lead)?.messages.length ?? 0);
   return (<>
     <PanelBell v={bellVM(ctx)} />
     <PanelHead v={headVM(ctx)} />

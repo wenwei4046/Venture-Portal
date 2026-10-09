@@ -22,10 +22,12 @@ import { insightVM } from "./vm/insight";
 import { profileVM } from "./vm/profile";
 import { chatVM } from "./vm/chat";
 import type { SalesCtx } from "./vm/common";
+import { useFollowNewest } from "../shared/stick";
 
 export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: () => void }) {
   const { ui } = ctx;
   const chat = chatVM(ctx);
+  useFollowNewest(ui.chat, ctx.data.customers.find(c => c.id === ui.chat)?.messages.length ?? 0);
   return (<>
     <SalesShellBanners v={shellVM(ctx)} />
     {!chat && (<>

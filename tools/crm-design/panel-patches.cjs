@@ -10,6 +10,11 @@ module.exports = {
      '<span onClick={w.open} style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px", cursor: "pointer" }}>\n                    <strong style={{ fontSize: "15px", fontWeight: "650" }}>{w.name}</strong>'],
   ],
   PanelLead: [
+    // The message lists follow the newest message (shared/stick.ts finds them by data-chat-list).
+    [`<div style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "10px", padding: "4px 0" }}>`,
+     `<div data-chat-list="1" style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "10px", padding: "4px 0" }}>`],
+    [`<div style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "10px" }}>`,
+     `<div data-chat-list="1" style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "10px" }}>`],
     ["{v.ld.ownerName}'s customer · reply window open 20h 15m", "{v.ld.ownerName}'s customer{v.ld.windowNote}"],
     // The Principal / Director do reply — from Inbox, in the owner's CRM (crm_can_reply). This page only reads.
     ["View only · {v.ld.ownerFirst}'s customer. The Principal reads chats but doesn't reply.", "View only · {v.ld.ownerFirst}'s customer. To reply, open this chat from Inbox."],
