@@ -124,6 +124,12 @@ const bens = (await q(`select id from crm_contacts where assigned_to = $1 limit 
 check((await as('boss', `select public.crm_can_reply($1) as ok`, [bens]))[0].ok, true, 'the Principal may answer Ben’s customer')
 check((await as('hod', `select public.crm_can_reply($1) as ok`, [bens]))[0].ok, true, 'the Director may too')
 check((await as('ann', `select public.crm_can_reply($1) as ok`, [bens]))[0].ok, false, 'Ann may not')
+// Unread (user 2026-10-09, choice B): a manager looking in leaves it; a reply from anyone clears it.
+await q(`update crm_contacts set unread = 5 where id = $1`, [bens])
+await as('boss', `select public.crm_mark_read($1)`, [bens])
+check((await q(`select unread from crm_contacts where id = $1`, [bens]))[0].unread, 5, 'the Principal opening Ben’s chat leaves Ben’s unread')
+await as('boss', `select public.crm_record_out($1, 'wamid.boss-1', 'text', 'On my way')`, [bens])
+check((await q(`select unread from crm_contacts where id = $1`, [bens]))[0].unread, 0, 'the Principal answering it clears it')
 
 // 9. Notifications read one by one, and all at once.
 await as('boss', `select public.crm_read_notifs('{e1,e2}')`)

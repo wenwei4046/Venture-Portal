@@ -77,7 +77,8 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
   };
   const patchCustomer = (id: string, f: (c: CrmData["customers"][number]) => CrmData["customers"][number]) =>
     setData(d => ({ ...d, customers: d.customers.map(c => (c.id === id ? f(c) : c)) }));
-  const addMessage = (customerId: string, m: CrmChatMessage) => patchCustomer(customerId, c => ({ ...c, messages: [...c.messages, m], status: c.status === "new" ? "follow_up" : c.status }));
+  // A reply from anyone clears the chat's unread (crm_record_out, user 2026-10-09: 谁回复都清零).
+  const addMessage = (customerId: string, m: CrmChatMessage) => patchCustomer(customerId, c => ({ ...c, messages: [...c.messages, m], status: c.status === "new" ? "follow_up" : c.status, unread: m.from === "me" ? 0 : c.unread }));
   const room = (id: string) => data().rooms.find(r => r.id === id);
   const visit = (id: string) => data().visits.find(v => v.id === id);
   const setVisit = (id: string, f: (v: CrmVisit) => CrmVisit) => setData(d => ({ ...d, visits: d.visits.map(v => (v.id === id ? f(v) : v)) }));
