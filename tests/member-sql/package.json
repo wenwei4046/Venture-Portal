@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node validate-member.mjs && node validate-director-reporting.mjs && node validate-ir-specialist-downlines.mjs && node validate-employee-chart-lifecycle.mjs && node validate-fair-calendar.mjs && node validate-catalogue.mjs && node validate-upsales.mjs && node validate-closed-month.mjs && node validate-pays-from.mjs && node validate-open-bill-months.mjs && node validate-kpi-add-ons.mjs && node validate-member-claims.mjs && node validate-permission-templates.mjs && node validate-app-audit.mjs && node validate-permission-actions.mjs && node validate-definer-login.mjs && node validate-crm-whatsapp.mjs && node validate-crm-team.mjs && node validate-crm-assign.mjs && node validate-crm-writes.mjs && node validate-crm-messenger.mjs && node validate-crm-redesign.mjs && node validate-crm-control.mjs && node validate-table-writes.mjs && node validate-function-actions.mjs && node validate-reach.mjs",
+    "test": "node validate-member.mjs && node validate-director-reporting.mjs && node validate-ir-specialist-downlines.mjs && node validate-employee-chart-lifecycle.mjs && node validate-fair-calendar.mjs && node validate-catalogue.mjs && node validate-upsales.mjs && node validate-closed-month.mjs && node validate-pays-from.mjs && node validate-open-bill-months.mjs && node validate-kpi-add-ons.mjs && node validate-member-claims.mjs && node validate-permission-templates.mjs && node validate-app-audit.mjs && node validate-permission-actions.mjs && node validate-definer-login.mjs && node validate-crm-whatsapp.mjs && node validate-crm-team.mjs && node validate-crm-assign.mjs && node validate-crm-writes.mjs && node validate-crm-messenger.mjs && node validate-crm-redesign.mjs && node validate-crm-control.mjs && node validate-crm-ir.mjs && node validate-table-writes.mjs && node validate-function-actions.mjs && node validate-reach.mjs",
     "test:director-reporting": "node validate-director-reporting.mjs",
     "test:ir-specialist-downlines": "node validate-ir-specialist-downlines.mjs",
     "test:employee-chart-lifecycle": "node validate-employee-chart-lifecycle.mjs",
@@ -27,6 +27,7 @@
     "test:crm-messenger": "node validate-crm-messenger.mjs",
     "test:crm-redesign": "node validate-crm-redesign.mjs",
     "test:crm-control": "node validate-crm-control.mjs",
+    "test:crm-ir": "node validate-crm-ir.mjs",
     "test:table-writes": "node validate-table-writes.mjs",
     "test:function-actions": "node validate-function-actions.mjs",
     "test:reach": "node validate-reach.mjs"
