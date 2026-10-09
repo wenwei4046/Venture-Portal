@@ -203,7 +203,9 @@ describe('Rules › KPI items', () => {
     click('Remove HB Straight')
     click('Save 1 change')
     expect(await screen.findByRole('alert')).toHaveTextContent('A KPI item changed since the page was opened. Reload and try again.')
-    expect(screen.getByRole('button', { name: 'Save 1 change' })).toBeEnabled()
+    // The refusal lands inside the save's transition; the button leaves *Saving…*
+    // when the transition ends, a render after the alert — wait for it, don't race it.
+    expect(await screen.findByRole('button', { name: 'Save 1 change' })).toBeEnabled()
     expect(refresh).not.toHaveBeenCalled()
   })
 

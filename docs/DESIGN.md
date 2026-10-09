@@ -1104,6 +1104,10 @@ When a release lands while the portal or the member app is open, an **ink pill**
 
 When it shows (`components/pwa/UpdatePrompt.tsx`, `lib/app-update.ts`): the app asks the server which build is live on load, on every return to the screen, when the network comes back and every five minutes while in view — a HEAD to `/sw.js`, whose `X-App-Version` is the build's own name. It **never reloads by itself while somebody is looking**. In the **Revenue app only**, back after 30 minutes or more away, it loads the new build at once — unless the focus was still in a field or something was typed in the ten minutes before leaving, when it only offers. Its screens are read from the server and the quote is kept in the tab's session storage, so a reload loses nothing there. **The portal is only ever offered the new build**: a page like HR › Payroll holds edits until *Save all*, and an edit made long before the tab was left is invisible to any check — the person presses Update when their work is saved. A page that guards unsaved changes (`beforeunload`) still asks before any reload.
 
+### The phone's own navigation bar (2026-10-10 — every bottom bar)
+
+Every bar that stands at the bottom of the screen — the Revenue app's Today · Insight · Quote · Arena · Profile, the portal's tab bar, and whatever pads itself clear of them (`PortalFrame`'s scroll area, `MoreSheet`, `.sheet-frame`, Finance's `.bulk-bar`, the login footer) — pads by **`var(--safe-bottom)`**, never by the bare `env(safe-area-inset-bottom)`. The installed app draws under the phone's own navigation bar (`viewport-fit=cover`), and after a reload (Update, a pull that met a new release, Try again) Chrome on a phone with three-button navigation can hand the new page an inset of 0 while still drawing it under those buttons: the Revenue app's bar sat behind them with only its top edge and the Quote circle showing. `--safe-bottom` (globals.css) is the larger of the browser's inset and the one the tab remembers from earlier in the session in the very same window (`lib/safe-area.ts`, `components/pwa/SafeAreaMemory.tsx`, set before the first paint by the root layout's head script); the moment the browser gives the page a non-zero inset it is believed again, a later 0 included (a keyboard is real). Nothing changes on a phone the browser reads right, on a desktop, or in a fresh launch. `src/lib/safe-area.test.ts` fails on a new bare inset outside the previews.
+
 ### `.page-head` example (mandatory shape)
 
 ```tsx
@@ -2446,9 +2450,10 @@ sheet cannot drift apart. Principal gets 总览 · 审批 · 付款 · 收款; F
 swaps 审批 for 发票; HR gets 薪资 · 员工 · 董事; a dept manager gets
 账单 · OPEX · 报表. The Approvals tab carries a pending-count badge.
 
-The bar is 54px plus `env(safe-area-inset-bottom)`; the root layout sets
-`viewportFit: 'cover'` so that inset resolves on notched phones, and
-`PortalFrame` pads the main scroll area by the same amount.
+The bar is 54px plus `var(--safe-bottom)` — the phone's navigation-bar inset,
+held up when a reload loses it ("The phone's own navigation bar"); the root
+layout sets `viewportFit: 'cover'` so that inset resolves on notched phones,
+and `PortalFrame` pads the main scroll area by the same amount.
 
 ### Tables — the fold
 
@@ -2695,6 +2700,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-10 (Bottom bars · after a reload)** — the Revenue app's bottom bar no longer slides under the phone's own buttons after Update, a pull that met a new release, or Try again (user's screenshot: only its top edge and the Quote circle showed). Every bottom bar and what clears it pads by `--safe-bottom`, the browser's navigation-bar inset or, when a reload comes back with 0 in the same window, the one the tab remembers. Nothing moves where the browser reads right. See "The phone's own navigation bar".
 - **2026-10-09 v3.18 (Salary, NRIC and bank accounts show only where ticked)** — a value whose Sensitive field the viewer's title does not tick reads `••••` on every page it appears (People, a person's card and page, the PV page and its print, HR › Payment); blank stays `—`. An edit form shows an unticked field as a read-only box and never sends it; editing a person is offered only with Salary amounts ticked (the form saves pay). The payroll bank CSV is offered only with Bank accounts, the statutory files only with NRIC / IC, salary-PV generation only with Bank. See "Permission matrix › A hidden value".
 - **2026-10-09 v3.17 (Approvals by domain)** — the queue opens for whoever may see it (Approvals · View, its own key) or decide anything in it (a domain's Approve: Treasury, HR Costing, Director Salary). A row the reader may not decide — outside their Approve, or one they raised (the Principal excepted) — has a muted `—` instead of a tick, with why on hover; a request's page says *Awaiting sign-off* instead of its buttons; a voucher's *Approve* follows the same rule. See "Multi-select — ticks outlive a drill-down".
 - **2026-10-08 v3.16 (Every action takes effect)** — a button is drawn only for somebody who holds the cell its Server Action asks for: *Create payment*, *Record new loan*, *+ New Entry*, *+ Add person*, *Import InfoTech* (Create); *Edit*, *Mark paid*, *Issue* (Edit); *Void*, *Withdraw*, *Request cancellation*, a repayment's reversal (Void); *Amend terms* (Treasury · Approve); a voucher's *Approve* (Approvals · Approve); the loans CSV (Export). A Finance · Maker sees *Submit* and *Edit* on a draft voucher and no *Void*; a Checker sees *Approve* alone. Nothing moves for the four shared accounts — their keys still allow every action they did. The matrix's *held for now* now reads the same rule. See "Permission matrix".
