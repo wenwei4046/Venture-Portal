@@ -1,5 +1,7 @@
 import { requirePermission } from '@/lib/auth'
 import { canManagePermissions } from '@/lib/roles'
+import { canDo } from '@/lib/permission-actions'
+import { readOrgChart, readsStaffTable } from '@/lib/team-directory'
 import { createClient } from '@/lib/supabase/server'
 import { pickHomeSubDepartments, revenuePath, subDeptSlug } from '@/lib/revenue'
 import { ladderBreaks, type Rung } from '@/lib/ladder'
@@ -22,19 +24,31 @@ import type { TitleRow } from './_components/TitlesSection'
  * Pay rates stay on Revenue, where the relevant period is in scope.
  */
 export default async function TeamHierarchyPage() {
-  const user = await requirePermission('team')
+  // The roster's own key — or Team · View without the Salary tick, which draws
+  // the whole company's chart from team_org_chart(): names and titles, read
+  // only (2026-10-10, PR4b; the user's 2b).
+  const user = await requirePermission('team', 'team_directory')
   const supabase = await createClient()
   const untyped = supabase as unknown as import('@supabase/supabase-js').SupabaseClient
+  const direct = readsStaffTable(user)
+  // A directory reader's chart comes in one read; the commission positions,
+  // the title rules and the schemes are Revenue's and not theirs to read.
+  const chart = direct ? null : readOrgChart(supabase)
+  const fromChart = <T,>(pick: (c: Awaited<NonNullable<typeof chart>>) => T) =>
+    chart!.then(c => ({ data: pick(c), error: null }))
+  const none = Promise.resolve({ data: [] as never[], error: null })
 
   const [staffResult, levelsResult, titlesResult, ranksResult, subsResult, schemesResult, directorsResult, memberships, deptResult, templatesResult] =
     await Promise.all([
-      supabase
-        .from('hr_staff_costs')
-        .select(
-          'id, employee_name, employee_code, reports_to, designation, title_id, department_id, titles(name, level_id, is_department_head), departments(name, payroll_source)',
-        )
-        .eq('status', 'active')
-        .order('employee_name'),
+      direct
+        ? supabase
+            .from('hr_staff_costs')
+            .select(
+              'id, employee_name, employee_code, reports_to, designation, title_id, department_id, titles(name, level_id, is_department_head), departments(name, payroll_source)',
+            )
+            .eq('status', 'active')
+            .order('employee_name')
+        : fromChart(c => c.people),
       supabase.from('title_levels').select('id, rank, name').order('rank'),
       // Every title, inactive ones too: the board shows those dimmed rather
       // than dropping them off the ladder while somebody still holds one.
@@ -46,17 +60,19 @@ export default async function TeamHierarchyPage() {
       // recruit rule, asked the way the database asks it: on the department's
       // HOME sub-department's ladder (its oldest). The comm_* tables postdate
       // database.types.ts, hence the cast.
-      untyped
+      direct ? untyped
         .from('comm_ranks')
-        .select('scheme_id, title_id, can_recruit'),
+        .select('scheme_id, title_id, can_recruit') : none,
       // Checked here because a failed sub-department or scheme query must
       // not silently turn a person with several roles into a single card.
-      untyped.from('comm_sub_departments').select('id, name, department_id, created_at')
-        .eq('is_active', true).order('name'),
-      untyped.from('comm_schemes').select('id, sub_department_id')
-        .eq('is_active', true).is('effective_to', null),
-      untyped.from('comm_sub_department_directors').select('staff_id, sub_department_id'),
-      loadOpenMemberships(untyped),
+      direct
+        ? untyped.from('comm_sub_departments').select('id, name, department_id, created_at')
+            .eq('is_active', true).order('name')
+        : fromChart(c => c.subDepartments),
+      direct ? untyped.from('comm_schemes').select('id, sub_department_id')
+        .eq('is_active', true).is('effective_to', null) : none,
+      direct ? untyped.from('comm_sub_department_directors').select('staff_id, sub_department_id') : fromChart(c => c.directors),
+      direct ? loadOpenMemberships(untyped) : Promise.resolve([] as CompanyChartMembership[]),
       // The Roles tab: the department picker, and each title's template by name.
       supabase.from('departments').select('id, name').order('name'),
       untyped.from('permission_templates').select('id, name'),
@@ -227,6 +243,8 @@ export default async function TeamHierarchyPage() {
       roleTitles={roleTitles}
       departments={(deptResult.data ?? []).map(d => ({ id: d.id, name: d.name }))}
       canDeleteTitles={canManagePermissions(user)}
+      canEdit={canDo(user, 'team', 'edit')}
+      chartOnly={!direct}
     />
   )
 }

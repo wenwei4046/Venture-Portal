@@ -9,6 +9,7 @@ import { isFullyCommissionBased, isVariablePay } from '@/lib/staff-form'
 import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
 import { readStaffPrivate } from '@/lib/private-fields'
 import { MASKED, sees } from '@/lib/sensitive'
+import { readDirectory, readsStaffTable } from '@/lib/team-directory'
 import ActivityLog from '../../_components/ActivityLog'
 import PersonAccess from '../../_components/PersonAccess'
 import { loadPersonAccess } from '../../_lib/person-permissions'
@@ -31,25 +32,36 @@ const PCB_LABELS: Record<string, string> = {
 }
 
 export default async function StaffDetailPage({ params }: PageProps) {
-  const viewer = await requirePermission('team')
+  // The roster's own key — or Team · View without the Salary tick, which reads
+  // this person through the directory, and only inside its reach (2026-10-10,
+  // PR4b: a Department head opens their own department's people).
+  const viewer = await requirePermission('team', 'team_directory')
   const { id } = await params
   const supabase = await createClient()
+  const direct = readsStaffTable(viewer)
 
   // The row without its NRIC and account numbers, which come through the
   // reader beside it — the table no longer hands them out (2026-10-09, PR4).
-  const [{ data: staff }, privateFields] = await Promise.all([
-    supabase
-      .from('hr_staff_costs')
-      .select(
-        `${STAFF_ROW_COLUMNS}, departments(name, payroll_source), titles(name, template_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active)` as const,
-      )
-      .eq('id', id)
-      .maybeSingle(),
-    readStaffPrivate(supabase, viewer, [id]),
-  ])
+  const [{ data: tableRow }, privateFields] = direct
+    ? await Promise.all([
+        supabase
+          .from('hr_staff_costs')
+          .select(
+            `${STAFF_ROW_COLUMNS}, departments(name, payroll_source), titles(name, template_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active)` as const,
+          )
+          .eq('id', id)
+          .maybeSingle(),
+        readStaffPrivate(supabase, viewer, [id]),
+      ])
+    : [{ data: null }, new Map<string, { nric: string | null; bank_account_no: string | null; bank_account_no_2: string | null }>()]
+  // The directory's row carries its own NRIC / accounts, masked as the ticks say.
+  const directoryRow = direct ? null : ((await readDirectory(supabase, viewer, [id]))[0] ?? null)
+  const staff = (tableRow ?? directoryRow) as NonNullable<typeof tableRow> | null
 
   if (!staff) notFound()
-  const priv = privateFields.get(id) ?? { nric: null, bank_account_no: null, bank_account_no_2: null }
+  const priv = directoryRow
+    ? { nric: directoryRow.nric, bank_account_no: directoryRow.bank_account_no, bank_account_no_2: directoryRow.bank_account_no_2 }
+    : (privateFields.get(id) ?? { nric: null, bank_account_no: null, bank_account_no_2: null })
   // A pay figure as this viewer may see it (Salary amounts, the template's tick).
   const pay = (amount: number) => (sees(viewer, 'salary') ? formatMoney(amount) : MASKED)
 
@@ -76,7 +88,9 @@ export default async function StaffDetailPage({ params }: PageProps) {
   // What this person's account actually resolves to. Shared with the floating
   // person card since 2026-09-01 — two copies of this would drift, and it is
   // the answer an audit reads.
-  const access = account
+  // What their login may do is read beside the roster's own key only — the
+  // directory opens a person, not their permissions.
+  const access = account && direct
     ? await loadPersonAccess(
         supabase,
         { id: account.id, role: account.role },

@@ -24,6 +24,10 @@ export const PERMISSIONS = [
   'director_salary',
   'director_pool',
   'team',
+  // People without the staff table (2026-10-10, PR4b): Team · View at any reach
+  // with no Salary tick — the roster through team_directory(), the chart
+  // through team_org_chart(). Opens reading only (lib/team-directory.ts).
+  'team_directory',
   'team_invite',
   'salary_individual',
   'dept_pool',

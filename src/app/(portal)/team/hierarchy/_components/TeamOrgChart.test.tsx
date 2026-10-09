@@ -105,13 +105,13 @@ function rankedPeople(): ChartPerson[] {
   ]
 }
 
-function Chart({ roster = people(), initialDepartment = ALL_DEPARTMENTS, initialFocused = null }: {
-  roster?: ChartPerson[]; initialDepartment?: string; initialFocused?: string | null
+function Chart({ roster = people(), initialDepartment = ALL_DEPARTMENTS, initialFocused = null, canEdit = true }: {
+  roster?: ChartPerson[]; initialDepartment?: string; initialFocused?: string | null; canEdit?: boolean
 }) {
   const [focused, setFocused] = useState<string | null>(initialFocused)
   const [department, setDepartment] = useState(initialDepartment)
   return <TeamOrgChart people={roster} commissionHref="/revenue/fair/hierarchy"
-    focused={focused} onFocus={setFocused} focusDept={department} onFocusDept={setDepartment} />
+    focused={focused} onFocus={setFocused} focusDept={department} onFocusDept={setDepartment} canEdit={canEdit} />
 }
 
 function renderChart({ overview = false, ...props }: ComponentProps<typeof Chart> & { overview?: boolean } = {}) {
@@ -599,6 +599,18 @@ describe('company hierarchy overview and independent roles', () => {
     act(() => flow().onNodeDragStop?.(new MouseEvent('mouseup'), node(mover), [node(mover)]))
     expect(node(mover).position).toEqual(origin)
     expect(adapters.setReportsTo).not.toHaveBeenCalled()
+  })
+
+  // PR4b (2026-10-10): Team · View without the Salary tick reads the chart
+  // through the directory, and without Team · Edit nothing on it moves.
+  it('is read only without Team · Edit — no drag, no line drawn, no Detach', () => {
+    renderChart({ roster: multipleRoles(), canEdit: false })
+    expect(flow().nodesDraggable).toBe(false)
+    expect(flow().nodesConnectable).toBe(false)
+    fireEvent.click(screen.getByTestId('node:chea'))
+    expect(screen.queryByRole('button', { name: /Detach/ })).toBeNull()
+    expect(screen.getByText('Click a card to select it.')).toBeTruthy()
+    expect(document.body.textContent).not.toMatch(/can be changed by dragging/)
   })
 
   it('offers the exact Revenue edit link instead of Detach for an additional role', () => {

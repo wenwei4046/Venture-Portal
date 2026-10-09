@@ -167,6 +167,8 @@ export default function TeamOrgChart(props: {
    *  is how the two halves of a view drift apart. */
   focusDept: string
   onFocusDept: (department: string) => void
+  /** Team · Edit (2026-10-10, PR4b): without it the chart is read only — no drag, no line drawn, no detach. */
+  canEdit: boolean
 }) {
   return (
     <ReactFlowProvider>
@@ -182,6 +184,7 @@ function Chart({
   onFocus,
   focusDept,
   onFocusDept,
+  canEdit,
 }: {
   people: ChartPerson[]
   commissionHref: string | null
@@ -189,6 +192,7 @@ function Chart({
   onFocus: (staffId: string | null) => void
   focusDept: string
   onFocusDept: (department: string) => void
+  canEdit: boolean
 }) {
   const router = useRouter()
   const { getIntersectingNodes, setCenter, setViewport, fitBounds, zoomIn, zoomOut } = useReactFlow()
@@ -918,8 +922,8 @@ function Chart({
           maxZoom={1.7}
           panOnDrag={spaces.moving ? false : [0, 1]}
           proOptions={{ hideAttribution: false }}
-          nodesConnectable={!pending}
-          nodesDraggable={!pending && !spaces.moving}
+          nodesConnectable={canEdit && !pending}
+          nodesDraggable={canEdit && !pending && !spaces.moving}
           elementsSelectable
         >
           <Background gap={24} color="rgb(var(--cv-grid))" />
@@ -933,6 +937,8 @@ function Chart({
           <Link href={selectedPerson.membershipHref} className={`text-xs ${SHEET_LINK}`}>
             Edit {selectedPerson.name}&rsquo;s {selectedPerson.subDepartment} role on Revenue →
           </Link>
+        ) : !canEdit ? (
+          <span className="text-xs">Click a card to select it.</span>
         ) : selected && visibleIds.has(selected) ? (
           <button
             type="button"
@@ -997,8 +1003,9 @@ function Chart({
         Cards with the same L level share a row, even when one reports to another. Arrows show the reporting direction.
         Each card represents one role. A person with appointments in multiple sub-departments
         appears in each, with that role&rsquo;s title and reporting line. Select a card to
-        switch between their roles. Primary reporting lines can be changed by dragging to a
-        manager; additional Revenue roles are edited in their own sub-department.
+        switch between their roles.{canEdit
+          ? ' Primary reporting lines can be changed by dragging to a manager; additional Revenue roles are edited in their own sub-department.'
+          : ''}
       </p>
     </div>
   )
