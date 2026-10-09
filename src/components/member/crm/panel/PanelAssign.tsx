@@ -36,7 +36,7 @@ export default function PanelAssign({ v }: { v: AssignVM }) {
             <div style={{ display: "flex", flexDirection: "column", borderRadius: "14px", background: "#fff", border: "1px solid #F3D9C4", padding: "0 12px" }}>
               {(v.waitList).map((w, w_i) => (<Fragment key={w_i}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: w.rule }}>
-                  <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
+                  <span onClick={w.open} style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px", cursor: "pointer" }}>
                     <strong style={{ fontSize: "15px", fontWeight: "650" }}>{w.name}</strong>
                     <small style={{ fontSize: "12px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.ad} · {w.when}</small>
                   </span>

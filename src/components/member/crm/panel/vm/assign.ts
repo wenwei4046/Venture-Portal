@@ -106,7 +106,9 @@ export function assignVM(ctx: PanelCtx) {
   // Organic Leads: no rule placed them, so somebody has to.
   const organic = data.customers.filter(c => !c.assignedTo && !c.teamId)
     .map(c => ({ c, at: [...c.messages].reverse().find(m => m.from === "lead")?.at ?? c.createdAt })).sort((a, b) => b.at.localeCompare(a.at));
-  const waitList = organic.map(({ c, at }, k) => ({ name: c.name, ad: `${c.ad} · ${c.channel === "messenger" ? "Messenger" : "WhatsApp"}`, when: ago(at, now), rule: k ? "1px solid #F3E9E1" : "0", openSend: () => patch({ sendFor: c.id, sdSel: null }) }));
+  const waitList = organic.map(({ c, at }, k) => ({ name: c.name, ad: `${c.ad} · ${c.channel === "messenger" ? "Messenger" : "WhatsApp"}`, when: ago(at, now), rule: k ? "1px solid #F3E9E1" : "0", openSend: () => patch({ sendFor: c.id, sdSel: null }),
+    // Tapping the name reads the chat first (and may answer it) before choosing who gets it.
+    open: () => patch({ lead: c.id, pick: "", toast: "" }) }));
 
   // The ads: every ad that brought someone, and every ad with a rule.
   const ruleOf = (id: string) => data.adRules.find(r => r.adId === id);
