@@ -136,6 +136,15 @@ check((await as('ann', `select public.crm_can_reply($1) as ok`, [bens]))[0].ok, 
   await q(`update crm_contacts set unread = 1 where id = $1`, [c])
   check((await q(`select assigned_by from crm_contacts where id = $1`, [c]))[0].assigned_by, S('boss'), 'another change leaves the stamp')
 }
+// The Principal in Ben's chat: Move hands it to Ben's superior (they have none of their own); Share to anyone.
+{
+  const mv = (await as('boss', `select public.crm_invite('move', $1, $2) as r`, [bens, S('tlb')]))[0].r
+  check([mv.from_staff, mv.to_staff, mv.state], [S('boss'), S('tlb'), 'pending'], 'the Principal moves Ben’s customer to Ben’s TL')
+  await refused('boss', `select public.crm_invite('move', $1, $2)`, [bens, S('tla')], /direct superior/, 'not to someone else’s TL')
+  const sh = (await as('boss', `select public.crm_invite('share', $1, $2) as r`, [bens, S('ann')]))[0].r
+  check(sh.to_staff, S('ann'), 'the Principal shares Ben’s chat with Ann (another team)')
+  await refused('tla', `select public.crm_invite('move', $1, $2)`, [bens, S('hod')], /may not|pass on/, 'a TL of another team may not move Ben’s customer')
+}
 // Unread (user 2026-10-09, choice B): a manager looking in leaves it; a reply from anyone clears it.
 await q(`update crm_contacts set unread = 5 where id = $1`, [bens])
 await as('boss', `select public.crm_mark_read($1)`, [bens])

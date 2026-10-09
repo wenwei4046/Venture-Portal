@@ -69,7 +69,7 @@ export interface SalesUi {
   qrPage: "list" | "new" | null;
   qrNew: { s: string; m: string };
   qrEditIdx: number | null;
-  hm: { menu?: boolean; share?: boolean; ssel?: string[]; move?: boolean; sel?: string | null; info?: boolean; appt?: boolean; toast?: string } | null;
+  hm: { menu?: boolean; share?: boolean; ssel?: string[]; move?: boolean; assign?: boolean; sel?: string | null; info?: boolean; appt?: boolean; toast?: string } | null;
   cform: CustomerForm | null;
   book: BookState | null;
   cancelAsk: string | null;

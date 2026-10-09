@@ -150,10 +150,11 @@ export function chatVM(ctx: SalesCtx) {
   const teamPeople = myTeam ? [myTeam, ...downlineOf(myTeam.id, data.people).map(id => personOf(id, data.people)!)].filter(p => p && p.id !== owner.id) : downlineOf(owner.id, data.people).map(id => personOf(id, data.people)!).filter(Boolean);
   const already = new Set([...data.shares.filter(s => s.customerId === c.id).map(s => s.staffId), ...(c.assignedTo ? [c.assignedTo] : [])]);
   const ss = hm.ssel ?? [];
-  // The Principal / Director in someone's chat: Assign to anyone, in place of the salesperson's own Share and Move (user 2026-10-09).
+  // The Principal / Director in someone's chat: Assign to anyone, beside Share and Move (user 2026-10-09: 3个功能都要有). Their Move goes to the owner's superior (crm_invite).
   const assigner = (ctx.me.role === "boss" || ctx.me.role === "hod") && ctx.embedded?.assignTo ? ctx.embedded.assignTo : null;
   const assignList = assigner ? (ctx.embedded?.switchList ?? []).filter(p => p.role !== "boss") : [];
-  const assignSel = assigner ? assignList.find(p => p.id === hm.sel) : undefined;
+  const assigning = !!(assigner && hm.assign);
+  const assignSel = assigning ? assignList.find(p => p.id === hm.sel) : undefined;
   const sNames = teamPeople.filter(p => ss.includes(p.id)).map(p => p.name);
   const goBook = () => {
     // A first booking asks for the customer's details first (step 1 of 2).
@@ -164,12 +165,12 @@ export function chatVM(ctx: SalesCtx) {
   const hmVM = {
     open: !!hm.menu, btnBg: hm.menu ? "#F5EBE3" : "#fff", toggle: () => setHm({ menu: !hm.menu }), close: () => patch({ hm: null }), toast: hm.toast ?? "",
     items: ([
-      ...(assigner ? [["Assign to", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, move: true, sel: null }), "Give this customer to anyone", "#E4EDF8", "#2F6FB5"]] : []),
+      ...(assigner ? [["Assign to", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, assign: true, sel: null }), "Give this customer to anyone", "#E4EDF8", "#2F6FB5"]] : []),
       ["Share", "M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v12m-8-4 4-4 4 4", () => setHm({ menu: false, share: true, ssel: [] }), "Invite a teammate", "#FFF0E4", "#BD4A19"],
       ["Move", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, move: true, sel: null }), superior ? `Hand over to ${firstName(superior.name)}` : "Hand over to your Team Lead", "#E4EDF8", "#2F6FB5"],
       ["Customer info", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => setHm({ menu: false, info: true }), "", "#E4F1E8", "#387557"],
       ["Appointment", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => setHm({ menu: false, appt: true }), nextVisit ? "View, change or cancel" : "", "#F3E8EF", "#8E4B6E"],
-    ] as [string, string, () => void, string, string, string][]).filter(([label]) => !assigner || (label !== "Share" && label !== "Move")).map(([label, icon, go, sub, bg, fg]) => ({ label, icon, go, sub, bg, fg })),
+    ] as [string, string, () => void, string, string, string][]).map(([label, icon, go, sub, bg, fg]) => ({ label, icon, go, sub, bg, fg })),
     apptOpen: !!hm.appt, apptHas: !!nextVisit, apptNone: !nextVisit,
     apptRoom: nextVisit ? (roomOf(nextVisit.showroomId)?.name ?? "").replace(/ showroom$/i, "") : "",
     apptWhen: nextVisit ? `${dayLabel(new Date(nextVisit.start))}, ${timeLabel(new Date(nextVisit.start))}` : "",
@@ -191,11 +192,11 @@ export function chatVM(ctx: SalesCtx) {
       if (sent) set(u => ({ ...u, hm: { toast: `Invite sent to ${sNames.length === 1 ? sNames[0] : sent + " people"}` } }));
       setTimeout(() => set(u => (u.hm?.toast ? { ...u, hm: null } : u)), 3000);
     } : undefined,
-    moveOpen: !!hm.move, moveTitle: `${assigner ? "Assign" : "Move"} ${c.name} to`,
-    people: assigner ? assignList.map(p => ({ name: p.id === c.assignedTo ? `${p.name} · now` : p.name, role: titleOf(p), ini: ini(p.name), ring: hm.sel === p.id ? RUST : "#D9C7BA", dot: hm.sel === p.id ? RUST : "transparent", pick: () => setHm({ sel: p.id }) }))
+    moveOpen: !!(hm.move || assigning), moveTitle: `${assigning ? "Assign" : "Move"} ${c.name} to`,
+    people: assigning ? assignList.map(p => ({ name: p.id === c.assignedTo ? `${p.name} · now` : p.name, role: titleOf(p), ini: ini(p.name), ring: hm.sel === p.id ? RUST : "#D9C7BA", dot: hm.sel === p.id ? RUST : "transparent", pick: () => setHm({ sel: p.id }) }))
       : superior ? [{ name: superior.name, role: jobTitle(superior), ini: ini(superior.name), ring: hm.sel === superior.id ? RUST : "#D9C7BA", dot: hm.sel === superior.id ? RUST : "transparent", pick: () => setHm({ sel: superior.id }) }] : [],
-    cLabel: assigner ? (assignSel ? `Assign to ${assignSel.name}` : "Choose a person") : superior && hm.sel ? `Send move request to ${superior.name}` : "Choose a person", cBg: (assigner ? !!assignSel : !!(superior && hm.sel)) ? RUST : "#D9C7BA",
-    confirm: assigner ? (assignSel && assignSel.id !== c.assignedTo ? async () => {
+    cLabel: assigning ? (assignSel ? `Assign to ${assignSel.name}` : "Choose a person") : superior && hm.sel ? `Send move request to ${superior.name}` : "Choose a person", cBg: (assigning ? !!assignSel : !!(superior && hm.sel)) ? RUST : "#D9C7BA",
+    confirm: assigning ? (assigner && assignSel && assignSel.id !== c.assignedTo ? async () => {
       if (!(await assigner(c.id, assignSel.id))) return;
       // The customer leaves this person's CRM: back to their Inbox, and say where it went.
       set(u => ({ ...u, hm: null, chat: null }));
