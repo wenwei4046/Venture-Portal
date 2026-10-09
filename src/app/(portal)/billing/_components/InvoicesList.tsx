@@ -10,7 +10,7 @@ import { formatMoney } from '@/lib/utils'
 import { ApproveInvoiceButton, BulkIssueInvoicesButton, EditInvoiceButton } from './InvoiceActions'
 import CreateCreditNoteButton from './CreateCreditNoteButton'
 import ReassignInvoiceGlButton from './ReassignInvoiceGlButton'
-import InvoiceDetailButton from './InvoiceDetailButton'
+import { useFinView } from '@/components/layout/fin-view'
 import SortableTable from '@/components/SortableTable'
 import { SlidingTabs } from '@/components/motion/SlidingTabs'
 import RowMenu, { type RowMenuAnchor, type RowMenuItem } from '@/components/RowMenu'
@@ -127,9 +127,11 @@ interface Props {
    *  until the 跨月 toggle is on, then they join the list so one receipt can
    *  cover a payer's invoices across months. Period totals ignore them. */
   extraOpenInvoices?: Invoice[]
-  /** invoice_id → receipts recorded against it (detail-modal 收款记录). */
+  /** invoice_id → receipts recorded against it. The list no longer shows them
+   *  (2026-10-09: an invoice opens its own page, /invoices/<id>, which reads
+   *  its own); BillingView still hands them over. */
   receiptsByInvoice?: Record<string, Array<{ voucherNo: string | null; date: string | null; amount: number; batch?: boolean }>>
-  /** invoice_id → credit notes raised against it (detail modal, any status). */
+  /** invoice_id → credit notes raised against it — likewise no longer shown here. */
   cnDetailByInvoice?: Record<string, Array<{ cnNo: string | null; amount: number; status: string; reason: string | null }>>
   /** Dynamically provisioned dept modes — forwarded to the CN modal. */
   extraModes?: Array<{ value: string; label: string }>
@@ -142,8 +144,12 @@ interface Props {
 
 // Invoices for the selected period. Populated by Step 5's generate_monthly_invoices
 // RPC. Until Step 5 ships, this section shows the empty state with an explanation.
-export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {}, paidByInvoice = {}, cnByInvoice = {}, extraOpenInvoices = [], extraModes = [], receiptsByInvoice = {}, cnDetailByInvoice = {}, categoryByInvoice = {}, canSetDefault = false }: Props) {
+export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {}, paidByInvoice = {}, cnByInvoice = {}, extraOpenInvoices = [], extraModes = [], categoryByInvoice = {}, canSetDefault = false }: Props) {
   const router = useRouter()
+  // On the Finance view the row menu reads in English (2026-10-09).
+  const fin = useFinView()
+  /** An invoice's own page (2026-10-09, the Finance revamp). */
+  const pageOf = (inv: Invoice) => `/invoices/${inv.id}`
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   // The selection belongs to the month on screen. A ?period= navigation keeps
@@ -176,38 +182,6 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   )
   const categoryOf = (inv: Invoice): string | null =>
     categoryByInvoice[inv.id] ?? (inv.category_code ? (catLabelByCode[inv.category_code] ?? inv.category_code) : null)
-  /** What the detail popup shows for an invoice. Its number in the Invoice #
-   *  cell and a double-click anywhere on its row open the same thing. */
-  const detailOf = (inv: Invoice) => {
-    const labels = resolvePartyLabel(inv, companyMap, departmentMap)
-    return {
-      invoice: {
-        id: inv.id,
-        invoice_no: inv.invoice_no,
-        period_month: inv.period_month,
-        billing_mode: inv.billing_mode,
-        total_amount: Number(inv.total_amount),
-        status: inv.status,
-        description: inv.description ?? null,
-        invoice_date: inv.invoice_date ?? null,
-        due_date: inv.due_date ?? null,
-        reference_no: inv.reference_no ?? null,
-        category_code: inv.category_code ?? null,
-        created_at: inv.created_at ?? null,
-        freetext_address: inv.billable_to_freetext_address ?? null,
-        freetext_phone: inv.billable_to_freetext_phone ?? null,
-        freetext_email: inv.billable_to_freetext_email ?? null,
-      },
-      partyPrimary: labels.primary,
-      partySub: labels.sub,
-      categoryLabel: inv.category_code ? categories.find((c) => c.code === inv.category_code)?.label : undefined,
-      billingModeLabel: formatBillingMode(inv.billing_mode),
-      lines: invoiceLines[inv.id] ?? [],
-      categoryLabels: catLabelByCode,
-      receipts: receiptsByInvoice[inv.id] ?? [],
-      creditNotes: cnDetailByInvoice[inv.id] ?? [],
-    }
-  }
   // 跨月: reveal other periods' unsettled invoices in the same list.
   const [showAllOpen, setShowAllOpen] = useState(false)
   const displayRows = showAllOpen ? [...invoices, ...extraOpenInvoices] : invoices
@@ -380,9 +354,9 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   const [menu, setMenu] = useState<{ invoice: Invoice; anchor: RowMenuAnchor } | null>(null)
   // The actions that are dialogs are mounted here, once, for the row that
   // asked — not in every row as before. `nonce` remounts the component so
-  // choosing the same action on the same invoice opens it again. `detail` is
-  // the read-only popup, which a double-click on the row opens too.
-  type DialogKind = 'detail' | 'edit' | 'credit_note' | 'reassign'
+  // choosing the same action on the same invoice opens it again. (The
+  // read-only popup went on 2026-10-09: an invoice has a page of its own.)
+  type DialogKind = 'edit' | 'credit_note' | 'reassign'
   const [dialog, setDialog] = useState<{ kind: DialogKind; invoice: Invoice; nonce: number } | null>(null)
   const [rowError, setRowError] = useState<string | null>(null)
   const openDialog = (kind: DialogKind, invoice: Invoice) => setDialog({ kind, invoice, nonce: Date.now() })
@@ -417,23 +391,23 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   /** Everything that can be done to this invoice in its present status. */
   function menuItems(inv: Invoice): RowMenuItem[] {
     const items: RowMenuItem[] = [
-      { key: 'open', label: '打开', hint: '看明细 · 双击也可以', onSelect: () => openDialog('detail', inv) },
+      { key: 'open', label: fin ? 'Open' : '打开', hint: fin ? 'or double-click' : '发票页 · 双击也可以', onSelect: () => router.push(pageOf(inv)) },
     ]
     if (inv.status === 'draft') {
       items.push({
         key: 'approve',
         label: 'Approve & issue',
-        hint: '开出去',
+        hint: fin ? 'issue it' : '开出去',
         // The row's own button does it, so its 'Issuing…' and any error show there.
         onSelect: () => document.querySelector<HTMLButtonElement>(`[data-approve="${inv.id}"] button`)?.click(),
       })
-      items.push({ key: 'edit', label: 'Edit', hint: '改内容', onSelect: () => openDialog('edit', inv) })
+      items.push({ key: 'edit', label: 'Edit', hint: fin ? 'change it' : '改内容', onSelect: () => openDialog('edit', inv) })
     }
     if (inv.status === 'issued') {
       items.push({
         key: 'settle',
         label: 'Settle',
-        hint: '收钱、开收据',
+        hint: fin ? 'collect, write the receipt' : '收钱、开收据',
         onSelect: () =>
           isBatchSettleable(inv) ? settleOne(inv) : router.push(`/payments/new?invoice_id=${inv.id}&return_to=/billing`),
       })
@@ -441,33 +415,33 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
     if (inv.status === 'issued' || inv.status === 'paid' || inv.status === 'paid_via_netting') {
       // 2026-10-07 (user: "invoice edit 我要全部都可以改"): an issued invoice is
       // edited with the same form as a draft; its entry is corrected in place.
-      items.push({ key: 'edit', label: 'Edit', hint: '整张改，JE 原地改', onSelect: () => openDialog('edit', inv) })
+      items.push({ key: 'edit', label: 'Edit', hint: fin ? 'whole invoice, entry corrected in place' : '整张改，JE 原地改', onSelect: () => openDialog('edit', inv) })
     }
     items.push({
       key: 'pdf',
       label: 'PDF',
-      hint: '看发票',
+      hint: fin ? 'the invoice document' : '看发票',
       onSelect: () => window.open(`/billing/invoice-doc?id=${inv.id}`, '_blank', 'noopener,noreferrer'),
     })
-    items.push({ key: 'copy', label: 'Copy', hint: '复制成本月新草稿', onSelect: () => copyOne(inv) })
+    items.push({ key: 'copy', label: 'Copy', hint: fin ? 'as a new draft this month' : '复制成本月新草稿', onSelect: () => copyOne(inv) })
     if (inv.status === 'paid') {
       items.push({
         key: 'refund',
         label: 'Refund',
-        hint: '退款',
+        hint: fin ? 'raise a refund' : '退款',
         onSelect: () => router.push(`/payments/new?mode=refund&invoice_id=${inv.id}&return_to=/billing`),
       })
     }
     if (inv.status !== 'draft' && inv.status !== 'voided') {
-      items.push({ key: 'credit_note', label: '+ Credit note', hint: '开 CN', onSelect: () => openDialog('credit_note', inv) })
-      items.push({ key: 'reassign', label: '改 account', hint: '换科目', onSelect: () => openDialog('reassign', inv) })
+      items.push({ key: 'credit_note', label: '+ Credit note', hint: fin ? 'raise a CN' : '开 CN', onSelect: () => openDialog('credit_note', inv) })
+      items.push({ key: 'reassign', label: fin ? 'Change account' : '改 account', hint: fin ? 'another GL account' : '换科目', onSelect: () => openDialog('reassign', inv) })
     }
     const last: RowMenuItem[] = []
     if (isVoidable(inv)) {
-      last.push({ key: 'void', label: '作废', hint: '整张作废', danger: true, onSelect: () => openVoidModal([inv.id]) })
+      last.push({ key: 'void', label: fin ? 'Void' : '作废', hint: fin ? 'the whole invoice' : '整张作废', danger: true, onSelect: () => openVoidModal([inv.id]) })
     }
     if (inv.status === 'draft') {
-      last.push({ key: 'delete', label: 'Delete', hint: '删掉这张 draft', danger: true, onSelect: () => deleteOne(inv) })
+      last.push({ key: 'delete', label: 'Delete', hint: fin ? 'this draft' : '删掉这张 draft', danger: true, onSelect: () => deleteOne(inv) })
     }
     return last.length > 0 ? [...items, 'sep', ...last] : items
   }
@@ -578,7 +552,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   </td>
                 </tr>
               )}
-              onRowOpen={(inv) => openDialog('detail', inv)}
+              onRowOpen={(inv) => router.push(pageOf(inv))}
               onRowContextMenu={(inv, e) => {
                 e.preventDefault()
                 setMenu({ invoice: inv, anchor: { x: e.clientX, y: e.clientY } })
@@ -649,7 +623,16 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   label: 'Invoice #',
                   // The phone's small print under Bill to carries the number.
                   mobile: 'drop',
-                  render: (inv) => <InvoiceDetailButton {...detailOf(inv)} />,
+                  // The number opens the invoice's page (2026-10-09) — a link, so
+                  // a middle-click or Ctrl-click opens it in a new tab.
+                  render: (inv) => (
+                    <Link
+                      href={pageOf(inv)}
+                      className="font-sans text-[12px] font-medium text-ink hover:text-accent transition-colors underline-offset-2 hover:underline"
+                    >
+                      {inv.invoice_no ?? inv.id.slice(0, 8)}
+                    </Link>
+                  ),
                   sortValue: (inv) => inv.invoice_no ?? inv.id,
                   cellClassName: 'whitespace-nowrap',
                 },
@@ -889,15 +872,6 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
       ) : null}
 
       {/* The dialogs the menu opens — one instance, for the row that asked. */}
-      {dialog?.kind === 'detail' ? (
-        <InvoiceDetailButton
-          key={`detail:${dialog.invoice.id}:${dialog.nonce}`}
-          autoOpen
-          hideTrigger
-          // The row as it is NOW: a settle or a credit note may have landed since.
-          {...detailOf(displayRows.find((i) => i.id === dialog.invoice.id) ?? dialog.invoice)}
-        />
-      ) : null}
       {dialog?.kind === 'edit' ? (
         <EditInvoiceButton
           key={`edit:${dialog.invoice.id}:${dialog.nonce}`}

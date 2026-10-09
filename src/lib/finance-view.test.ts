@@ -9,7 +9,7 @@ import { financePageTitle, isFinanceDetailRoute, isFinanceView } from './finance
 
 describe('isFinanceView', () => {
   it('is Finance’s pages, for Finance and the Principal', () => {
-    for (const path of ['/payments', '/receipts/abc', '/statements', '/statements/monthly', '/billing-allocator', '/daily-bank', '/fund-in/x1', '/ba', '/overdue', '/repayment-schedule', '/venture-pool', '/reconciliation/journal-entries/new', '/approvals']) {
+    for (const path of ['/payments', '/receipts/abc', '/statements', '/statements/monthly', '/invoices/i1', '/billing-allocator', '/daily-bank', '/fund-in/x1', '/ba', '/overdue', '/repayment-schedule', '/venture-pool', '/reconciliation/journal-entries/new', '/approvals']) {
       expect(isFinanceView(path, 'finance'), path).toBe(true)
       expect(isFinanceView(path, 'principal'), path).toBe(true)
     }
@@ -34,7 +34,7 @@ describe('isFinanceView', () => {
 
 describe('isFinanceDetailRoute', () => {
   it('is a row’s own page under a Finance list — what Back and an edge swipe return from', () => {
-    for (const path of ['/payments/v1', '/receipts/v2', '/fund-in/f1', '/fund-out/l1', '/fund-out/l1/edit', '/statements/s1', '/statements/s1/print', '/approvals/a1', '/reconciliation/sess1', '/reconciliation/journal-entries/j1/edit', '/dept-pool/marketing', '/billing-allocator/t1']) {
+    for (const path of ['/payments/v1', '/receipts/v2', '/fund-in/f1', '/fund-out/l1', '/fund-out/l1/edit', '/statements/s1', '/statements/s1/print', '/approvals/a1', '/reconciliation/sess1', '/reconciliation/journal-entries/j1/edit', '/dept-pool/marketing', '/billing-allocator/t1', '/invoices/i1']) {
       expect(isFinanceDetailRoute(path), path).toBe(true)
     }
   })
@@ -54,6 +54,7 @@ describe('financePageTitle', () => {
     expect(financePageTitle('/statements')).toBe('Invoice')
     expect(financePageTitle('/statements/monthly')).toBe('Statements')
     expect(financePageTitle('/statements/s1')).toBe('Statements')
+    expect(financePageTitle('/invoices/i1')).toBe('Invoice')
     expect(financePageTitle('/billing-allocator')).toBe('Billing Allocator')
     expect(financePageTitle('/ba')).toBe('Invoice Financing')
     expect(financePageTitle('/reports/ledger')).toBe('General Ledger')

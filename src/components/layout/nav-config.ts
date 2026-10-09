@@ -159,7 +159,8 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     { href: '/receipts', label: 'Receipt', section: 'Daily Operations', visible: canAccessTreasury },
     // /statements IS the invoices landing (Phase 7 Step 11 merge); the monthly
     // statements list lives at /statements/monthly (inside Fund In / Out below).
-    { href: '/statements', label: 'Invoice', section: 'Daily Operations', exact: true, visible: canAccessTreasury },
+    // An invoice's own page (/invoices/<id>, 2026-10-09) lights it too.
+    { href: '/statements', label: 'Invoice', section: 'Daily Operations', exact: true, alsoPaths: ['/invoices'], visible: canAccessTreasury },
     // Shared-expense allocator (port of the user's Apps Script, 2026-08-01):
     // HV-paid costs → headcount/percentage/equal/custom split → draft invoices.
     { href: '/billing-allocator', label: 'Billing Allocator', section: 'Daily Operations', visible: canAccessTreasury },

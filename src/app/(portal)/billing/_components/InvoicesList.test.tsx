@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import InvoicesList from './InvoicesList'
+import { FinViewProvider } from '@/components/layout/fin-view'
 
 /**
  * The batch selection belongs to the month on screen. Changing the month is a
@@ -45,16 +46,6 @@ vi.mock('./InvoiceActions', () => ({
 }))
 vi.mock('./CreateCreditNoteButton', () => ({ default: dialog('dialog-cn') }))
 vi.mock('./ReassignInvoiceGlButton', () => ({ default: dialog('dialog-gl') }))
-// The detail popup: nothing in the cell, and — when the row opens it — a
-// stand-in that says which invoice it is showing.
-vi.mock('./InvoiceDetailButton', () => ({
-  default: (p: { invoice: { invoice_no: string | null; status: string }; autoOpen?: boolean; hideTrigger?: boolean }) =>
-    p.autoOpen ? (
-      <div data-testid="dialog-detail" data-hide={String(!!p.hideTrigger)}>
-        {p.invoice.invoice_no} · {p.invoice.status}
-      </div>
-    ) : null,
-}))
 
 function invoice(id: string, invoice_no: string, period_month: string) {
   return {
@@ -237,44 +228,34 @@ describe('the row menu', () => {
   })
 })
 
-// 2026-10-02: every finance table opens a row on a double-click. An invoice has
-// no page of its own, so what opens is its detail popup — the one its number
-// has always opened.
+// 2026-10-02: every finance table opens a row on a double-click. Since the
+// Finance revamp (2026-10-09, the user's Claude Design handoff) an invoice has
+// a page of its own, /invoices/<id>: a double-click, 打开 in the row menu, the
+// number in the row and the phone's Open button all go there.
 describe('opening an invoice', () => {
   const issued = invoice('inv-1', 'INV-1', '2026-09-01')
   const other = invoice('inv-2', 'INV-2', '2026-09-01')
   const row = (no: string) => screen.getByLabelText(`Select ${no}`).closest('tr') as HTMLElement
 
-  it('a double-click on the row opens its detail, for that row, with no trigger of its own', () => {
+  it('a double-click on the row opens its page', () => {
     render(list('2026-09-01', [issued, other]))
-    expect(screen.queryByTestId('dialog-detail')).toBeNull()
     fireEvent.doubleClick(within(row('INV-2')).getByText('HOUZS Century'))
-    const detail = screen.getByTestId('dialog-detail')
-    expect(detail).toHaveTextContent('INV-2 · issued')
-    expect(detail.dataset.hide).toBe('true')
+    expect(push).toHaveBeenCalledWith('/invoices/inv-2')
   })
 
   it('…but not a double-click on its tick box or on its Settle button', () => {
     render(list('2026-09-01', [issued]))
     fireEvent.doubleClick(screen.getByLabelText('Select INV-1'))
     fireEvent.doubleClick(screen.getByRole('button', { name: 'Actions for INV-1' }))
-    expect(screen.queryByTestId('dialog-detail')).toBeNull()
+    expect(push).not.toHaveBeenCalled()
   })
 
-  it('打开 in the row menu opens the same thing', () => {
+  it('打开 in the row menu opens the same page, and the number is a link to it', () => {
     render(list('2026-09-01', [issued, other]))
+    expect(screen.getByRole('link', { name: 'INV-1' })).toHaveAttribute('href', '/invoices/inv-1')
     fireEvent.contextMenu(row('INV-1'))
     fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /^打开/ }))
-    expect(screen.getByTestId('dialog-detail')).toHaveTextContent('INV-1 · issued')
-  })
-
-  it('shows the invoice as it is now, not as it was when the popup opened', () => {
-    const { rerender } = render(list('2026-09-01', [issued]))
-    fireEvent.doubleClick(within(row('INV-1')).getByText('HOUZS Century'))
-    expect(screen.getByTestId('dialog-detail')).toHaveTextContent('INV-1 · issued')
-    // A settle lands and the page refreshes under the open popup.
-    rerender(list('2026-09-01', [{ ...issued, status: 'paid' }]))
-    expect(screen.getByTestId('dialog-detail')).toHaveTextContent('INV-1 · paid')
+    expect(push).toHaveBeenCalledWith('/invoices/inv-1')
   })
 })
 
@@ -328,7 +309,9 @@ describe('the invoices table on the sheet', () => {
       />,
     )
   const tab = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}`) })
-  const rowOf = (no: string) => screen.getByText(no).closest('tr') as HTMLElement
+  // The number is the row's link to its page, and the phone's small print
+  // repeats it: the row is the link's.
+  const rowOf = (no: string) => screen.getByRole('link', { name: no }).closest('tr') as HTMLElement
 
   it('heads the section with the month and the count, and tabs the statuses with their counts', () => {
     sheet()
@@ -336,10 +319,10 @@ describe('the invoices table on the sheet', () => {
     expect(document.querySelector('.sect-head .count')).toHaveTextContent('3 INVOICES · SEPTEMBER 2026')
     expect(['All', 'Issued', 'Paid', 'Draft', 'Voided'].map((t) => tab(t).querySelector('[data-tab-count]')?.textContent)).toEqual(['3', '1', '1', '0', '1'])
     fireEvent.click(tab('Paid'))
-    expect(screen.queryByText('INV-1')).toBeNull()
-    expect(screen.getByText('INV-P')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'INV-1' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'INV-P' })).toBeInTheDocument()
     fireEvent.click(tab('All'))
-    expect(screen.getByText('INV-1')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'INV-1' })).toBeInTheDocument()
   })
 
   it('shows the bill-to code over the name, the category from the lines, the status as a chip, and totals without the voided', () => {
@@ -383,7 +366,7 @@ describe('the invoices table on the sheet', () => {
     expect(panel).toHaveTextContent('Design Income')
     expect(within(panel).getByTitle('就地开收据,不用离开 Billing')).toHaveClass('inv-settle')
     fireEvent.click(within(panel).getByText('Open the invoice →'))
-    expect(screen.getByTestId('dialog-detail')).toHaveTextContent('INV-1 · issued')
+    expect(push).toHaveBeenCalledWith('/invoices/inv-1')
   })
 })
 
@@ -406,5 +389,13 @@ describe('the Finance revamp', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Filter Amount' }))
     fireEvent.click(screen.getByRole('button', { name: 'Filter Date' }))
     expect(within(screen.getByRole('dialog', { name: 'Filter Date' })).getByRole('button', { name: 'Range' })).toBeInTheDocument()
+  })
+
+  it('reads the row menu in English on the Finance view', () => {
+    render(<FinViewProvider value={true}>{list('2026-09-01', [invoice('a', 'INV-1', '2026-09-01')])}</FinViewProvider>)
+    fireEvent.contextMenu(screen.getByLabelText('Select INV-1').closest('tr') as HTMLElement)
+    expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((b) => b.firstChild?.textContent)).toEqual([
+      'Open', 'Settle', 'Edit', 'PDF', 'Copy', '+ Credit note', 'Change account', 'Void',
+    ])
   })
 })
