@@ -10,7 +10,8 @@ export const inLead = (ctx: PanelCtx) => !!ctx.ui.lead && ["overview", "calendar
 export function headVM(ctx: PanelCtx) {
   const { ui, patch } = ctx, lead = inLead(ctx);
   return {
-    showHead: lead || !(ui.tab === "overview" || ui.tab === "inbox"),
+    // A customer's chat has its own back arrow (the design's full mode); sub-pages show the link.
+    showHead: !lead && !(ui.tab === "overview" || ui.tab === "inbox"),
     backLabel: lead ? "Back" : ui.tab === "ads" ? "Profile" : "Back to Revenue app",
     back: lead ? () => patch({ lead: null, toast: "", pMenu: false, reSheet: false, pick: "" }) : ui.tab === "ads" ? () => patch({ tab: "profile" }) : ctx.exitApp,
   };
