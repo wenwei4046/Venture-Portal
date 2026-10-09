@@ -1,5 +1,52 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-09 h (SHIPPED) — Finance revamp · Phase 4a: Overview, Dept Pool, Venture Pool, General Ledger
+
+- **Overview** (treasury branch of `dashboard/page.tsx` only — HR's and a
+  department's Overviews untouched): eyebrow OVERVIEW · TREASURY · <MONTH>,
+  head buttons **Daily Bank** (quiet) and **Record payment** (`canDo treasury
+  create`, → /payments/new); Pending your hand / Awaiting Principal cards in
+  the `wait` tone; Pool breakdown in a `details.fin-fold`; Margin panel and
+  a separate **Interest this month** panel; new **Overdue instalments** (n
+  BEHIND, only when any) and **Coming up · next 14 days** (with the Net in
+  tfoot) from every live deal's plan — `lib/repayment-book.ts`
+  (`loadRepaymentBook` reads active loans + active/matured fund sources and
+  their repayments, `bookWindow(deals, today, 14)`). Rows link
+  `/fund-…/<id>?from=overview`.
+- **Back to Overview / Calendar**: `lib/deal-return.ts` (`dealReturn`,
+  `fromCalendar`); fund-in/[id] and fund-out/[id] read `?from=overview|
+  calendar&month=` and their ReturnLink says “← Back to Overview / Calendar”;
+  the calendar items carry `?from=calendar` (+ the calendar's own month).
+- **Dept Pool** (`_components/DeptPoolSheet.tsx`): for whoever reads every
+  department (`!ownDepartmentOnly`) — Cash: cards Total balance / In / Out /
+  Net (to date) / Below zero, **Balance by bank** above **By department**
+  (balance column still masked by `BalanceToggle`), "All departments" foot
+  rows; Accrual: Revenue (bill) / Cost / Expense / Inter-billing / Net margin
+  over By department. Same figures as before. An own-department reader keeps
+  the old page (test pins it). "Request credit" from the prototype was not
+  added — it is Marketing's own invoice-request form.
+- **Venture Pool**: Export (`/venture-pool/export`: whole ledger, oldest first,
+  In / Out / running balance, xlsx), four cards, **In vs Out** (CSS pie +
+  12-month bars, `_components/InOutCharts.tsx`, `.vp-*` CSS — In #3F7A64,
+  Out #E99A53), **Pool ledger** via SortableTable (search, chips, ranges).
+  `lib/venture-pool.ts` `ventureRefLabel` shared by page + export.
+- **General Ledger**: eyebrow period (`lib/ledger-view.ts`
+  `ledgerPeriodLabel`), `.page-sub`, head **Select accounts…** (LedgerPicker
+  is now a popover `.gl-picker`: accounts, From/To, Show zero, Apply) / **Excel**
+  / **PDF** for whatever is picked — the export route takes `?codes=` or none
+  (= every account with activity, `hasLedgerActivity`; `showZero=1` keeps all),
+  `buildLedgersXlsx` / `LedgersPdf`; `?code=` single path unchanged. Each
+  account is a section (heading code · name, n LINES), Opening balance row
+  (`tr.gl-open`), journal type chip, Dept named, Closing balance foot.
+  The page now awaits LedgerBody itself (same wait, testable).
+- Tests: Overview sheet 5, repayment-book 3, deal-return 4, Dept Pool 4,
+  Venture Pool 3 + export 2, ledger page 3 + export 4, ledger-view 3, deal
+  pages +4.
+
+Next: Reports (P&L monthly default, one control row, From–To; Cash Flow, R&P,
+BS, TB, aging navy All row, Company Statement — gate by reportsCompanyWide),
+Reconciliation / Journal Entries, Settings (Base Rate History tab).
+
 ## CHECKPOINT 2026-10-09 g (SHIPPED) — Finance revamp · Phase 3 done: Invoice Financing, Repayment Schedule, Overdue
 
 - **Invoice Financing** (`/ba`, was "Bank BA"): `BaView` now owns the head

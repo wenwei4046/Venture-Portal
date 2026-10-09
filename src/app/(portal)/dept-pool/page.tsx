@@ -13,6 +13,7 @@ import { startRead } from '@/lib/start-read'
 import type { User } from '@/types'
 import { BalanceProvider, BalanceToggle, BalanceValue } from './_components/RevealAmount'
 import { ownDepartmentOnly } from '@/lib/surfaces'
+import { DeptPoolAccrualSheet, DeptPoolCashSheet } from './_components/DeptPoolSheet'
 
 // dept_manager only owns their own dept pool. Skip the multi-dept list and
 // land them straight on their own detail page — same content as clicking View.
@@ -111,6 +112,28 @@ export default async function DeptPoolPage({
     // Total = the visible departments + Venture (whole-company net margin).
     const totalNetMargin =
       rows.reduce((s, r) => s + r.a.netMargin, 0) + (ventureAccrual?.netMargin ?? 0)
+
+    // Finance's view (2026-10-09, the user's Claude Design handoff): whoever
+    // reads every department gets the sheet's cards and tables, drawn from the
+    // same figures; somebody who reads only their own keeps the page below,
+    // as it was. The accrual view stays read-only (no New project contract).
+    if (!ownDepartmentOnly(user, 'dept_pool')) {
+      return (
+        <DeptPoolAccrualSheet
+          monthTitle={dayjs(period).format('MMMM YYYY').toUpperCase()}
+          asAt={dayjs(period).endOf('month').format('D MMM YYYY')}
+          canNewContract={false}
+          rows={rows.map(({ dept, a, href }) => ({
+            id: dept.id,
+            name: dept.name,
+            href,
+            pnlHref: dept.name === 'Marketing' && href ? `${href}?tab=pnl` : null,
+            a,
+          }))}
+          venture={ventureAccrual}
+        />
+      )
+    }
 
     return (
       <div>
@@ -534,6 +557,35 @@ export default async function DeptPoolPage({
   const totalDeployed =
     Array.from(balanceMap.values()).reduce((acc, b) => acc + b, 0) +
     (ventureCash?.balance ?? 0)
+
+  // Finance's view (2026-10-09, the handoff) — as the accrual branch above:
+  // the same figures as cards, Balance by bank, then By department.
+  if (!ownDepartmentOnly(user, 'dept_pool')) {
+    return (
+      <DeptPoolCashSheet
+        monthTitle={dayjs(period).format('MMMM YYYY').toUpperCase()}
+        canNewContract={canDo(user, 'my_billing', 'create', 'dept')}
+        rows={visible.map((dept) => {
+          const io = inOutByDept.get(dept.id) ?? { in_amt: 0, out_amt: 0 }
+          const slug = DEPT_NAME_TO_SLUG[dept.name]
+          const href = slug ? `/dept-pool/${slug}` : null
+          return {
+            id: dept.id,
+            name: dept.name,
+            href,
+            pnlHref: dept.name === 'Marketing' && href ? `${href}?tab=pnl` : null,
+            balance: balanceMap.get(dept.id) ?? 0,
+            inAmt: io.in_amt,
+            outAmt: io.out_amt,
+            costing: costingByDept.get(dept.id) ?? 0,
+          }
+        })}
+        venture={ventureCash}
+        perBank={perBankBreakdown}
+        total={totalDeployed}
+      />
+    )
+  }
 
   return (
     <div>

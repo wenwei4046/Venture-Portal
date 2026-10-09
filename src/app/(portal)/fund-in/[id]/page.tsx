@@ -24,6 +24,7 @@ import PrintSchedule from '@/components/treasury/PrintSchedule'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import DetailGroups from '@/components/sheet/DetailGroups'
 import ReturnLink from '@/components/layout/ReturnLink'
+import { dealReturn } from '@/lib/deal-return'
 import { allTermsChanges, buildTermsSegments, currentSegment, termsChanged } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isFundSourcePrincipal, paidByMonthByType, principalPaidByMonth, termsForFundSource } from '@/lib/treasury-terms-data'
 
@@ -47,7 +48,7 @@ const STATUS_TONE: Record<string, string> = { active: 'ledger', pending_approval
 interface Props {
   params: Promise<{ id: string }>
   /** print=1 — the list's Print schedule: the sheet opens straight away. */
-  searchParams?: Promise<{ print?: string }>
+  searchParams?: Promise<{ print?: string; from?: string; month?: string }>
 }
 
 export default async function FundSourceDetailPage({ params, searchParams }: Props) {
@@ -255,12 +256,14 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
   const tone = STATUS_TONE[source.status] ?? ''
   const monthsLeft = isActive && maturityDays !== null ? (maturityDays < 0 ? ` · past by ${Math.abs(maturityDays)}d` : ` · ${maturityDays}d remaining`) : ''
   const dateLong = (d: string) => dayjs(d).format('D MMM YYYY')
+  // Opened from the Overview or the repayment calendar, it says so and goes back there.
+  const back = dealReturn({ href: '/fund-in', label: 'Fund IN' }, sp)
 
   return (
     <div>
       <div className="mb-3">
-        <ReturnLink href="/fund-in" className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
-          ← Back to Fund IN
+        <ReturnLink href={back.href} className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
+          ← Back to {back.label}
         </ReturnLink>
       </div>
 

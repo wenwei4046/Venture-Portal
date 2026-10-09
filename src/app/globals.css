@@ -5556,3 +5556,72 @@ table.ledger-table.audit-saves td { vertical-align: top; }
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* The Venture Pool's In vs Out (2026-10-09, the Finance revamp handoff): the
+   month as a pie beside twelve months of paired bars, in plain CSS as the
+   prototype draws them. In #3F7A64, Out #E99A53. */
+.vp-charts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12px; }
+.vp-panel { min-width: 0; padding: 16px 18px; border: 1px solid rgb(232 225 216); border-radius: 12px; background: #fff; }
+.vp-panel h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.vp-sub { margin-bottom: 14px; font-size: 11px; color: rgb(117 100 86); }
+.vp-pie { width: 150px; height: 150px; margin: 6px auto 4px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04); }
+.vp-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.vp-key { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgb(90 78 68); }
+.vp-swatch { display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 2px; }
+.vp-fig { margin-top: 2px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 15.5px; font-weight: 500; }
+.vp-bars-wrap { display: flex; gap: 6px; }
+.vp-ticks { display: flex; flex-direction: column; justify-content: space-between; height: 150px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; color: rgb(117 100 86); text-align: right; white-space: nowrap; }
+.vp-plot { flex: 1; min-width: 0; }
+.vp-bars {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: end;
+  gap: 4px;
+  height: 150px;
+  border-bottom: 1px solid rgb(207 197 183);
+  border-left: 1px solid rgb(207 197 183);
+  background: repeating-linear-gradient(to top, transparent 0, transparent 37px, rgb(242 239 234) 37px, rgb(242 239 234) 38px);
+}
+.vp-month { display: flex; align-items: flex-end; justify-content: center; gap: 2px; height: 100%; }
+.vp-bar { width: 42%; border-radius: 2px 2px 0 0; }
+.vp-bar.in { background: #3F7A64; }
+.vp-bar.out { background: #E99A53; }
+.vp-months { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; margin-top: 4px; }
+.vp-months span { text-align: center; font-size: 10px; color: rgb(117 100 86); }
+.vp-keys { display: flex; justify-content: center; gap: 14px; margin-top: 10px; font-size: 11px; color: rgb(90 78 68); }
+.vp-keys > span { display: inline-flex; align-items: center; gap: 5px; }
+@media (max-width: 767px) {
+  .vp-charts { grid-template-columns: minmax(0, 1fr); }
+  .vp-bars { gap: 2px; }
+  .vp-months span { font-size: 9px; }
+}
+
+/* The Ledger's Select accounts… (2026-10-09, the Finance revamp handoff): a
+   panel under the head button with the accounts, the period and Show zero. */
+.gl-picker {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  gap: 12px;
+  width: min(92vw, 460px);
+  padding: 16px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 12px;
+  background: rgb(var(--surface));
+  box-shadow: 0 12px 32px rgba(43, 31, 23, 0.14);
+  text-align: left;
+}
+.gl-picker .fin-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.gl-picker .fin-field > span { font-size: 11.5px; font-weight: 500; color: rgb(var(--graphite)); }
+.gl-picker .fin-field input[type='date'] { width: 100%; padding: 7px 10px; border: 1px solid rgb(var(--hairline)); border-radius: 6px; background: rgb(var(--surface)); color: rgb(var(--ink)); font-size: 13px; }
+.gl-picker .fin-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.gl-picker .fin-toggle input { width: 16px; height: 16px; accent-color: rgb(var(--accent)); }
+.gl-picker .fin-hint { margin: 0; font-size: 11px; line-height: 1.5; color: rgb(138 119 101); }
+/* The Ledger's search and filters, in one band over the accounts. */
+.gl-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 20px; padding: 10px 12px; border: 1px solid rgb(var(--hairline)); border-radius: 12px; background: rgb(247 245 241); }
+.ledger-table tr.gl-open > td { font-weight: 600; background: rgb(250 249 246); }
+@media (max-width: 767px) {
+  .gl-picker { position: fixed; top: 96px; right: 16px; left: 16px; width: auto; }
+}

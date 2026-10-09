@@ -20,6 +20,7 @@ import PrintSchedule from '@/components/treasury/PrintSchedule'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import DetailGroups, { type DetailGroup } from '@/components/sheet/DetailGroups'
 import ReturnLink from '@/components/layout/ReturnLink'
+import { dealReturn } from '@/lib/deal-return'
 import { allTermsChanges, buildTermsSegments, currentSegment } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isLoanPrincipal, paidByMonthByType, principalPaidByMonth, termsForLoan } from '@/lib/treasury-terms-data'
 
@@ -34,7 +35,7 @@ import { fetchTermsHistory, isLoanPrincipal, paidByMonthByType, principalPaidByM
 interface Props {
   params: Promise<{ id: string }>
   /** print=1 — the list's Print schedule: the sheet opens straight away. */
-  searchParams?: Promise<{ print?: string }>
+  searchParams?: Promise<{ print?: string; from?: string; month?: string }>
 }
 
 /** "Auto-synced from voucher HV-OR-…" — the voucher a repayment came in on. */
@@ -199,12 +200,14 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
     },
   ]
   if (loan.repayment_terms) groups.push({ title: 'Repayment terms', items: [{ label: 'Terms', value: loan.repayment_terms, text: true }] })
+  // Opened from the Overview or the repayment calendar, it says so and goes back there.
+  const back = dealReturn({ href: '/fund-out', label: 'Fund OUT' }, sp)
 
   return (
     <div>
       <div className="mb-3">
-        <ReturnLink href="/fund-out" className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
-          ← Back to Fund OUT
+        <ReturnLink href={back.href} className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
+          ← Back to {back.label}
         </ReturnLink>
       </div>
 

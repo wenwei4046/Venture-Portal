@@ -67,7 +67,7 @@ describe('the Overview, on the office clock', () => {
   it("is 'as of' the office's today, and dates a request by the office's day", async () => {
     mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', role: 'finance', permissions: ['treasury'] }))
     render(await drawnByTheServer())
-    expect(screen.getByText(/TREASURY · OVERVIEW · 1 NOVEMBER 2026/)).toBeInTheDocument()
+    expect(screen.getByText(/OVERVIEW · TREASURY · NOVEMBER 2026/)).toBeInTheDocument()
     expect(screen.getByText(/As of 1 November 2026/)).toBeInTheDocument()
     const row = screen.getByText('New loan to 2990').closest('tr') as HTMLElement
     expect(within(row).getByText('1 Nov')).toBeInTheDocument()

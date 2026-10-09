@@ -143,3 +143,14 @@ describe('a fund source’s page', () => {
     expect(screen.getByRole('button', { name: 'Withdraw' })).toBeInTheDocument()
   })
 })
+
+describe('where a fund source page returns to (2026-10-09, the handoff)', () => {
+  it('goes back to the Overview it was opened from', async () => {
+    render(await FundSourcePage({ params: Promise.resolve({ id: 'fs-1' }), searchParams: Promise.resolve({ from: 'overview' }) }))
+    expect(screen.getByRole('link', { name: '← Back to Overview' })).toHaveAttribute('href', '/dashboard')
+  })
+  it('goes back to the calendar, on its month', async () => {
+    render(await FundSourcePage({ params: Promise.resolve({ id: 'fs-1' }), searchParams: Promise.resolve({ from: 'calendar', month: '2026-11' }) }))
+    expect(screen.getByRole('link', { name: '← Back to Calendar' })).toHaveAttribute('href', '/repayment-schedule?month=2026-11')
+  })
+})

@@ -3,8 +3,10 @@ import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { fetchAllRows } from '@/lib/paginate'
-import PnlCharts from '../dept-pool/_components/PnlCharts'
-import LedgerRow from '@/components/LedgerRow'
+import { ventureRefLabel } from '@/lib/venture-pool'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import InOutCharts, { type TrendMonth } from './_components/InOutCharts'
+import PoolLedgerTable, { type PoolLine } from './_components/PoolLedgerTable'
 
 // Post 2026-05-26 re-import: Venture Pool data is derived from journal_lines
 // where segment IN ('corporate', 'treasury') on HV bank accounts, NOT the
@@ -101,190 +103,86 @@ export default async function VenturePoolPage() {
     row.in += Number(l.debit ?? 0)
     row.out += Number(l.credit ?? 0)
   }
-  const trend = Array.from(trendMap.entries()).map(([m, v]) => ({
-    month: dayjs(m).format('MMM'),
-    revenue: Math.round(v.in),
-    cost: Math.round(v.out),
+  const trend: TrendMonth[] = Array.from(trendMap.entries()).map(([m, v]) => ({
+    label: dayjs(m).format('MMM'),
+    in: Math.round(v.in * 100) / 100,
+    out: Math.round(v.out * 100) / 100,
   }))
 
-  const composition = [
-    { name: 'In', value: Math.max(monthIn, 0) },
-    { name: 'Out', value: Math.max(monthOut, 0) },
-  ].filter((d) => d.value > 0)
-
-  // Friendly type label from journal_entries.reference_type.
-  function refLabel(refType: string | null): string {
-    if (!refType) return 'Journal'
-    switch (refType) {
-      case 'manual_jv': return 'Manual JV'
-      case 'invoice': return 'Invoice settled'
-      case 'voucher':
-      case 'payment_voucher': return 'Payment voucher'
-      case 'fund_source': return 'Fund source'
-      case 'fund_source_repayment': return 'Fund source repayment'
-      case 'loan': return 'Loan'
-      case 'repayment': return 'Loan repayment'
-      case 'invoice_paid_credit': return 'Invoice paid credit'
-      default: return refType.replace(/_/g, ' ')
+  // The pool ledger's latest lines, each signed and labelled.
+  const lines: PoolLine[] = ledgerLines.map((l) => {
+    const dr = Number(l.debit ?? 0)
+    const cr = Number(l.credit ?? 0)
+    return {
+      id: String(l.id),
+      date: l.journal_entries.transaction_date.slice(0, 10),
+      type: ventureRefLabel(l.journal_entries.reference_type),
+      dir: dr > 0 ? 'in' : 'out',
+      description: l.description ?? l.journal_entries.description ?? '—',
+      amount: dr > 0 ? dr : -cr,
     }
-  }
+  })
 
+  // On the sheet (2026-10-09, the user's Claude Design handoff): Export in
+  // the head, four cards, In vs Out (the month's pie, twelve months of
+  // bars), then the pool ledger.
   return (
     <div>
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> DEPARTMENTS · VENTURE POOL · {dayjs(period).format('MMM YYYY').toUpperCase()}
+            <em>I.</em> DEPARTMENTS · VENTURE POOL · {dayjs(period).format('MMMM YYYY').toUpperCase()}
           </div>
           <h1 className="page-title">Venture Pool</h1>
         </div>
-      </div>
-
-      {/* ───────── Hero: balance + this-month summary ───────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
-        <div className="lg:col-span-7 hero-walnut px-6 py-6 md:px-8 md:py-7">
-          <div className="font-serif italic text-graphite text-sm mb-1">Running balance</div>
-          <div
-            className={`statement-amount ${
-              balance < 0 ? 'text-danger' : 'text-num-ink'
-            }`}
-          >
-            {formatMoney(balance)}
-          </div>
-          <div className="font-mono text-xs text-muted mt-2">
-            Corporate-segment cash on HV bank accounts · all-time
-          </div>
-        </div>
-
-        <div className="lg:col-span-5 space-y-2">
-          <div className="font-serif italic text-graphite text-sm mb-2">This month</div>
-          <div className="flex items-baseline justify-between text-sm">
-            <em className="font-serif text-graphite text-md">In</em>
-            <span className="num text-ledger">{formatMoney(monthIn)}</span>
-          </div>
-          <div className="flex items-baseline justify-between text-sm">
-            <em className="font-serif text-graphite text-md">Out</em>
-            <span className="num">{formatMoney(-monthOut)}</span>
-          </div>
-          <div className="flex items-baseline justify-between text-sm border-t border-hairline pt-2 mt-2">
-            <em className="font-serif text-ink text-md">Net</em>
-            <span className={`num text-md ${netChange < 0 ? 'neg' : 'text-num-ink'}`}>
-              {formatMoney(netChange)}
-            </span>
-          </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {/* The whole ledger as a spreadsheet, oldest first with the running balance. */}
+          <a href="/venture-pool/export" className="btn-quiet-sheet" download>
+            Export
+          </a>
         </div>
       </div>
 
-      {/* ───────── KPI tiles ───────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 pb-6 border-b border-hairline mb-10">
-        <Kpi
-          label="In this month"
-          amount={monthIn}
-          subtitle="Cash in: debits on HL/Alliance (segment=corporate)"
+      <StatCards label="Venture Pool">
+        <StatCard label="In this month" value={formatMoney(monthIn)} icon="inbox" tone="ledger" note="Cash in: debits on HL/Alliance" />
+        <StatCard label="Out this month" value={formatMoney(-monthOut)} icon="send" tone="danger" note="Cash out: credits on HL/Alliance" />
+        <StatCard label="Net change" value={formatMoney(netChange)} icon="swap" tone={netChange >= 0 ? 'ledger' : 'danger'} note="This month" />
+        <StatCard
+          label="Running balance"
+          value={formatMoney(balance)}
+          icon="bank"
+          tone={balance < 0 ? 'danger' : 'primary'}
+          note="All-time, see ledger below"
         />
-        <Kpi label="Out this month" amount={-monthOut} subtitle="Cash out: credits on HL/Alliance" />
-        <Kpi label="Net change" amount={netChange} accent />
-        <Kpi label="Running balance" amount={balance} subtitle="All-time, see ledger below" />
-      </div>
+      </StatCards>
 
-      {/* ───────── 12-month In/Out chart ───────── */}
-      <div className="mb-10">
-        <PnlCharts
-          composition={composition}
-          trend={trend}
-          trendLabels={{ revenue: 'In', cost: 'Out' }}
-          compositionTitle="In vs Out"
-          trendTitle="12-month In/Out"
-          trendSubtitle="Venture Pool — money flowing in and out by month"
-        />
-      </div>
+      <section className="mb-10">
+        <div className="sect-head">
+          <h2>In vs Out</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">THIS MONTH · 12 MONTHS</span>
+        </div>
+        <InOutCharts monthIn={monthIn} monthOut={monthOut} trend={trend} />
+      </section>
 
-      {/* ───────── Ledger ───────── */}
-      <section className="mb-12">
-        <h2 className="font-serif text-xl text-ink mb-1">Pool ledger</h2>
-        <p className="font-serif italic text-graphite text-xs mb-4">
-          Latest 50 entries · derived from journal_lines (segment=corporate on HV banks)
-        </p>
-        {ledgerLines.length === 0 ? (
-          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
-            <p className="font-serif italic text-muted text-sm">No movements yet.</p>
+      <section className="mb-6">
+        <div className="sect-head">
+          <h2>Pool ledger</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{lines.length} ENTRIES · LATEST FIRST</span>
+        </div>
+        {lines.length === 0 ? (
+          <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+            <p className="text-sm">No movements yet.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th className="text-left m-hide">Date</th>
-                  <th className="text-left m-hide">Type</th>
-                  <th className="text-left m-hide">Direction</th>
-                  <th className="text-left">Description</th>
-                  <th className="text-right">Amount</th>
-                  <th className="lt-toggle" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {ledgerLines.map((l) => {
-                  const dr = Number(l.debit ?? 0)
-                  const cr = Number(l.credit ?? 0)
-                  const isIn = dr > 0
-                  const signed = isIn ? dr : -cr
-                  const desc = l.description ?? l.journal_entries.description ?? '—'
-                  return (
-                    <LedgerRow key={l.id}>
-                      <td className="font-mono text-xs text-muted m-hide" data-label="Date">
-                        {dayjs(l.journal_entries.transaction_date).format('D MMM YYYY')}
-                      </td>
-                      <td className="font-serif italic text-graphite text-sm m-hide" data-label="Type">
-                        {refLabel(l.journal_entries.reference_type)}
-                      </td>
-                      <td className="m-hide" data-label="Direction">
-                        <span
-                          className={
-                            isIn
-                              ? 'text-xs font-serif italic text-ledger'
-                              : 'text-xs font-serif italic text-graphite'
-                          }
-                        >
-                          {isIn ? 'In' : 'Out'}
-                        </span>
-                      </td>
-                      <td className="font-serif italic text-graphite">{desc}</td>
-                      <td className={`num ${isIn ? 'text-ledger' : ''}`}>
-                        {isIn ? formatMoney(signed) : <span className="neg">{formatMoney(signed)}</span>}
-                      </td>
-                    </LedgerRow>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <PoolLedgerTable lines={lines} />
         )}
+        <p className="text-xs text-graphite mt-3">
+          The latest 50 lines, from the journal lines (corporate and treasury segments on HV bank accounts, reversal pairs left out).
+          Export has every line with the running balance.
+        </p>
       </section>
-    </div>
-  )
-}
-
-function Kpi({
-  label,
-  amount,
-  subtitle,
-  accent,
-}: {
-  label: string
-  amount: number
-  subtitle?: string
-  accent?: boolean
-}) {
-  const colour = accent ? (amount < 0 ? 'text-danger' : 'text-accent') : 'text-ink'
-  return (
-    <div>
-      <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
-        {label}
-      </div>
-      <div className={`statement-amount mt-1 ${colour}`}>{formatMoney(amount)}</div>
-      {subtitle ? (
-        <p className="font-serif italic text-muted text-xs mt-1">{subtitle}</p>
-      ) : null}
     </div>
   )
 }

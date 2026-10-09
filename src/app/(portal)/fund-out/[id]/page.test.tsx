@@ -136,3 +136,14 @@ describe('a loan’s page', () => {
     expect(within(screen.getByRole('region', { name: 'Details' })).getByText('Awaiting Principal approval')).toBeInTheDocument()
   })
 })
+
+describe('where a loan page returns to (2026-10-09, the handoff)', () => {
+  it('goes back to the Overview it was opened from', async () => {
+    render(await LoanPage({ params: Promise.resolve({ id: 'loan-4' }), searchParams: Promise.resolve({ from: 'overview' }) }))
+    expect(screen.getByRole('link', { name: '← Back to Overview' })).toHaveAttribute('href', '/dashboard')
+  })
+  it('goes back to the calendar', async () => {
+    render(await LoanPage({ params: Promise.resolve({ id: 'loan-4' }), searchParams: Promise.resolve({ from: 'calendar' }) }))
+    expect(screen.getByRole('link', { name: '← Back to Calendar' })).toHaveAttribute('href', '/repayment-schedule')
+  })
+})

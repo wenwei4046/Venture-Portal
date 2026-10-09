@@ -17,7 +17,8 @@ const SEGMENT_SHORT: Record<string, string> = {
 }
 const segShort = (s: string) => (s ? SEGMENT_SHORT[s] ?? s : '')
 
-export function buildLedgerXlsx(led: Ledger): Buffer {
+/** One account's block: its band row, its lines, its total. */
+function ledgerRows(led: Ledger): (string | number | null)[][] {
   const rows: (string | number | null)[][] = []
   rows.push([
     `Acc. No.: ${led.code} · ${led.accountName}`, null, null, null, null, null,
@@ -44,6 +45,20 @@ export function buildLedgerXlsx(led: Ledger): Buffer {
     led.periodTotals.credit > 0 ? led.periodTotals.credit : null,
     fmtBalance(led.closingBalance),
   ])
+  return rows
+}
+
+export function buildLedgerXlsx(led: Ledger): Buffer {
+  return buildLedgersXlsx([led])
+}
+
+/** Several accounts (2026-10-09, the Finance revamp): each block in turn, a blank row between. */
+export function buildLedgersXlsx(ledgers: Ledger[]): Buffer {
+  const rows: (string | number | null)[][] = []
+  ledgers.forEach((led, i) => {
+    if (i > 0) rows.push([null])
+    rows.push(...ledgerRows(led))
+  })
 
   return buildXlsxBuffer({
     sheetName: 'Ledger',

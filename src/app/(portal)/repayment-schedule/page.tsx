@@ -10,6 +10,7 @@ import { buildTermsSegments, compoundRoll, currentSegment, principalPaidSince, s
 import { fetchTermsHistory, isFundSourcePrincipal, isLoanPrincipal, principalPaidByMonth, termsForFundSource, termsForLoan } from '@/lib/treasury-terms-data'
 import { buildRepaymentPlan } from '@/lib/repayment-plan'
 import { monthEvents, type CalendarEntry } from '@/lib/repayment-calendar'
+import { fromCalendar } from '@/lib/deal-return'
 import { formatMoney } from '@/lib/utils'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { fundingSourceFromTerms } from '@/lib/utils'
@@ -435,7 +436,7 @@ export default async function RepaymentSchedulePage({
       status: l.status as string,
     })
     events.push(
-      ...monthEvents(plan, { kind: 'collect', name: (co?.short_code ?? co?.name ?? '—') as string, href: `/fund-out/${l.id}`, rate: Number(l.effective_rate), principal: Number(l.principal) }, currentYM, today),
+      ...monthEvents(plan, { kind: 'collect', name: (co?.short_code ?? co?.name ?? '—') as string, href: fromCalendar(`/fund-out/${l.id}`, month), rate: Number(l.effective_rate), principal: Number(l.principal) }, currentYM, today),
     )
   }
   const fsDeptName = new Map(((fsDepts ?? []) as Array<{ id: string; name: string }>).map((d) => [d.id, d.name]))
@@ -465,7 +466,7 @@ export default async function RepaymentSchedulePage({
       dueDay: m.effective_date ? dayjs(m.effective_date as string).date() : 1,
       status: m.status as string,
     })
-    events.push(...monthEvents(plan, { kind: 'pay', name, href: `/fund-in/${id}`, rate: Number(m.cost_rate), principal: Number(m.amount) }, currentYM, today))
+    events.push(...monthEvents(plan, { kind: 'pay', name, href: fromCalendar(`/fund-in/${id}`, month), rate: Number(m.cost_rate), principal: Number(m.amount) }, currentYM, today))
   }
 
   // ── The cards: the month's scheduled cash, what is done, what is short.
