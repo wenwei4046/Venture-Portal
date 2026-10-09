@@ -59,6 +59,7 @@ const DETAIL_ROOTS: Record<string, readonly string[]> = {
   '/invoices': [],
   '/approvals': [],
   '/billing-allocator': [],
+  '/ba': [],
   '/dept-pool': ['submissions'],
   '/reconciliation': ['journal', 'journal-entries'],
 }

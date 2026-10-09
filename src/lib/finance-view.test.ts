@@ -34,7 +34,7 @@ describe('isFinanceView', () => {
 
 describe('isFinanceDetailRoute', () => {
   it('is a row’s own page under a Finance list — what Back and an edge swipe return from', () => {
-    for (const path of ['/payments/v1', '/receipts/v2', '/fund-in/f1', '/fund-out/l1', '/fund-out/l1/edit', '/statements/s1', '/statements/s1/print', '/approvals/a1', '/reconciliation/sess1', '/reconciliation/journal-entries/j1/edit', '/dept-pool/marketing', '/billing-allocator/t1', '/invoices/i1']) {
+    for (const path of ['/payments/v1', '/receipts/v2', '/fund-in/f1', '/fund-out/l1', '/fund-out/l1/edit', '/statements/s1', '/statements/s1/print', '/approvals/a1', '/reconciliation/sess1', '/reconciliation/journal-entries/j1/edit', '/dept-pool/marketing', '/billing-allocator/t1', '/invoices/i1', '/ba/b1']) {
       expect(isFinanceDetailRoute(path), path).toBe(true)
     }
   })

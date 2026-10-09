@@ -5,8 +5,11 @@ import { backdropDismiss } from '@/components/modal-dismiss'
 import dayjs from 'dayjs'
 import { officeToday } from '@/lib/office-time'
 import { calcBa, daysBetween } from '@/lib/ba'
-import { formatMoneyBare } from '@/lib/utils'
+import Link from 'next/link'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import SortableTable from '@/components/SortableTable'
+import { useRowLinks } from '@/components/row-links'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import {
   createBa,
   updateBa,
@@ -694,7 +697,8 @@ function LimitCards({ rows, limits }: { rows: BaRow[]; limits: LimitRow[] }) {
 }
 
 // ── Generate-PV modal (pick bank + date) ────────────────────────────────────
-function PvModal({
+// Also used by a financing's own page (/ba/[id], 2026-10-09).
+export function PvModal({
   row,
   banks,
   onClose,
@@ -780,7 +784,8 @@ function PvModal({
 }
 
 // ── Attachment chips (open via signed URL, add, remove) ─────────────────────
-function AttachmentChips({ row }: { row: BaRow }) {
+/** full: the names in full (a financing's own page has the room). */
+export function AttachmentChips({ row, full = false }: { row: BaRow; full?: boolean }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -819,7 +824,7 @@ function AttachmentChips({ row }: { row: BaRow }) {
             title={a.name}
             className="text-[11px] font-mono text-accent hover:text-accent-hover disabled:opacity-50"
           >
-            📎{a.name.length > 14 ? `${a.name.slice(0, 12)}…` : a.name}
+            📎{!full && a.name.length > 14 ? `${a.name.slice(0, 12)}…` : a.name}
           </button>
           <button
             type="button"
@@ -856,7 +861,7 @@ function AttachmentChips({ row }: { row: BaRow }) {
 }
 
 // ── Interest cell: invoice + PV status / generate buttons ───────────────────
-function InterestCell({
+export function InterestCell({
   row,
   onPv,
   onMsg,
@@ -910,6 +915,28 @@ function InterestCell({
   )
 }
 
+/** A financing's status as the sheet's chip (2026-10-09): active by its days
+ *  left — amber within 14, red past maturity — settled green. */
+export function BaStatusChip({ row, large = false }: { row: Pick<BaRow, 'status' | 'maturityDate'>; large?: boolean }) {
+  const daysLeft = dayjs(row.maturityDate).diff(officeToday(), 'day')
+  const [tone, label] =
+    row.status === 'active'
+      ? daysLeft < 0
+        ? ['danger', `overdue ${-daysLeft}d`]
+        : daysLeft <= 14
+          ? ['alert', `matures in ${daysLeft}d`]
+          : ['info', `matures in ${daysLeft}d`]
+      : row.status === 'settled'
+        ? ['ledger', 'settled']
+        : ['', 'cancelled']
+  return (
+    <span className={`chip${large ? ' lg' : ''}${tone ? ` ${tone}` : ''}`}>
+      <i className="dot" />
+      {label}
+    </span>
+  )
+}
+
 // ── Main view ───────────────────────────────────────────────────────────────
 export default function BaView({
   rows,
@@ -960,77 +987,68 @@ export default function BaView({
     { face: 0, charge: 0, owe: 0, margin: 0 },
   )
 
+  // A financing's own page (2026-10-09, the handoff): a double-click opens it.
+  const links = useRowLinks<BaRow>({ href: r => `/ba/${r.id}`, title: r => r.baNo ?? r.id.slice(0, 8) })
+  const toggleForm = () => {
+    if (showForm) {
+      setShowForm(false)
+      setEditing(null)
+    } else {
+      setEditing(null)
+      setShowForm(true)
+    }
+  }
+  const shownLimits = limits.filter(l => l.limit > 0 || l.used > 0)
+  const limitTotal = shownLimits.reduce((t, l) => t + l.limit, 0)
+  const usedTotal = shownLimits.reduce((t, l) => t + l.used, 0)
+
+  // Invoice Financing on the sheet (2026-10-09, the user's Claude Design
+  // handoff — was "Bank BA"): the head with Calculator and Record financing,
+  // four cards, the Financing register first and the Limits after it.
   return (
     <div>
-      {/* ── Summary + actions ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="border border-hairline rounded-md bg-surface p-4">
-          <div className="font-serif italic text-graphite text-sm mb-1">Active face</div>
-          <div className="font-serif text-xl text-num-ink tabular">RM {money(totals.face)}</div>
-          <div className="font-mono text-[11px] text-muted mt-1">{active.length} active</div>
+      <div className="mb-3">
+        <Link href="/fund-in" className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
+          ← Fund In
+        </Link>
+      </div>
+      <div className="page-head">
+        <div className="min-w-0">
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · INVOICE FINANCING
+          </div>
+          <h1 className="page-title">Invoice Financing</h1>
+          <p className="page-sub">
+            HC&apos;s facility with the bank — the principal never touches HV&apos;s account, but the interest is real: bill the
+            borrower (5028) and pay HC (6001) straight from each row. Bank interest is reference only (HC&apos;s cost).
+          </p>
         </div>
-        <div className="border border-hairline rounded-md bg-surface p-4">
-          <div className="font-serif italic text-ledger text-sm mb-1">To charge borrowers</div>
-          <div className="font-serif text-xl text-num-ink tabular">RM {money(totals.charge)}</div>
-        </div>
-        <div className="border border-hairline rounded-md bg-surface p-4">
-          <div className="font-serif italic text-alert text-sm mb-1">To pay HC</div>
-          <div className="font-serif text-xl text-num-ink tabular">RM {money(totals.owe)}</div>
-        </div>
-        <div className="border border-hairline rounded-md bg-surface p-4">
-          <div className="font-serif italic text-graphite text-sm mb-1">HV margin</div>
-          <div className="font-serif text-xl text-ledger tabular">RM {money(totals.margin)}</div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button type="button" className="btn-quiet-sheet" onClick={() => setShowCalc(true)}>
+            Calculator
+          </button>
+          <button type="button" className="btn-pri-sheet" onClick={toggleForm}>
+            {showForm ? 'Close form' : 'Record financing'}
+          </button>
         </div>
       </div>
 
-      <LimitCards rows={rows} limits={limits} />
-
-      <div className="flex items-center gap-3 mb-4">
-        <button
-          type="button"
-          onClick={() => {
-            if (showForm) {
-              setShowForm(false)
-              setEditing(null)
-            } else {
-              setEditing(null)
-              setShowForm(true)
-            }
-          }}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-        >
-          {showForm ? 'Close form' : 'Record BA'}
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowCalc(true)}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-        >
-          Calculator
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowLimits(v => !v)}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-        >
-          {showLimits ? 'Hide limits' : 'Limits'}
-        </button>
-      </div>
+      <StatCards label="Invoice Financing">
+        <StatCard tone="primary" label="Active face" value={formatMoney(totals.face)} icon="bank" note={`${active.length} active`} />
+        <StatCard tone="ledger" label="To charge borrowers" value={formatMoney(totals.charge)} icon="send" note="Bill the borrower · 5028" />
+        <StatCard tone="danger" label="To pay HC" value={formatMoney(totals.owe)} icon="wallet" note="Pay HC · 6001" />
+        <StatCard tone="ledger" label="HV margin" value={formatMoney(totals.margin)} icon="trend" note="Charge − owe HC" />
+      </StatCards>
 
       {banner ? (
         <div className="border border-hairline rounded-md bg-surface px-4 py-2 mb-4 flex items-center justify-between">
           <span className="font-sans text-sm text-graphite">{banner}</span>
-          <button
-            type="button"
-            onClick={() => setBanner(null)}
-            className="text-muted hover:text-ink text-xs font-sans ml-4"
-          >
+          <button type="button" onClick={() => setBanner(null)} className="text-muted hover:text-ink text-xs font-sans ml-4">
             ✕
           </button>
         </div>
       ) : null}
 
-      {showLimits ? <LimitsSection limits={limits} /> : null}
       {showForm ? (
         <RecordForm
           key={editing?.id ?? 'new'}
@@ -1045,16 +1063,27 @@ export default function BaView({
         />
       ) : null}
 
-      {/* ── List ── */}
+      <section className="mb-9 fin-queue">
+        <div className="sect-head">
+          <h2>Financing register</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">
+            {rows.length} {rows.length === 1 ? 'BA' : 'BAs'}
+          </span>
+        </div>
       {rows.length === 0 ? (
         <div className="border border-hairline rounded-md bg-surface p-8 text-center">
-          <p className="font-serif italic text-muted text-base">No BAs recorded yet.</p>
+          <p className="font-sans text-muted text-sm">No financing recorded yet.</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <SortableTable<BaRow>
             layoutId="ba.facilities"
-            layoutTitle="BA"
+            layoutTitle="Financing register"
+            scrollBox
+            resizeMode="neighbour"
+            onRowOpen={links.onRowOpen}
+            onRowContextMenu={links.onRowContextMenu}
             rows={rows}
             getRowKey={r => r.id}
             defaultSort={{ key: 'period', dir: 'desc' }}
@@ -1067,8 +1096,8 @@ export default function BaView({
                 label: 'Ref',
                 render: r => (
                   <div>
-                    <div className="font-mono text-[12px] text-ink">{r.baNo ?? '—'}</div>
-                    <div className="font-serif italic text-muted text-xs">{r.bankName ?? ''}</div>
+                    <div className="font-sans text-[12px] font-medium text-ink whitespace-nowrap">{r.baNo ?? '—'}</div>
+                    <div className="text-muted text-xs">{r.bankName ?? ''}</div>
                     <AttachmentChips row={r} />
                   </div>
                 ),
@@ -1081,7 +1110,7 @@ export default function BaView({
                 render: r => r.borrower,
                 sortValue: r => r.borrower,
                 filterable: true,
-                cellClassName: 'font-serif text-[15px] text-ink',
+                cellClassName: 'text-ink',
               },
               {
                 key: 'face',
@@ -1154,32 +1183,7 @@ export default function BaView({
                 key: 'status',
                 group: '基本',
                 label: 'Status',
-                render: r => {
-                  const daysLeft = dayjs(r.maturityDate).diff(officeToday(), 'day')
-                  return (
-                    <div>
-                      <em
-                        className={`font-serif text-sm ${
-                          r.status === 'active'
-                            ? daysLeft < 0
-                              ? 'text-danger'
-                              : daysLeft <= 14
-                                ? 'text-alert'
-                                : 'text-graphite'
-                            : r.status === 'settled'
-                              ? 'text-ledger'
-                              : 'text-muted'
-                        }`}
-                      >
-                        {r.status === 'active'
-                          ? daysLeft < 0
-                            ? `overdue ${-daysLeft}d`
-                            : `matures in ${daysLeft}d`
-                          : r.status}
-                      </em>
-                    </div>
-                  )
-                },
+                render: r => <BaStatusChip row={r} />,
                 sortValue: r => r.status,
                 filterable: true,
                 filterValue: r => r.status,
@@ -1257,6 +1261,25 @@ export default function BaView({
           />
         </div>
       )}
+
+        {links.menu}
+      </section>
+
+      <section className="mb-9">
+        <div className="sect-head">
+          <h2>Limits</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">
+            {shownLimits.length} {shownLimits.length === 1 ? 'COMPANY' : 'COMPANIES'}
+            {limitTotal > 0 ? ` · ${Math.round((usedTotal / limitTotal) * 100)}% USED` : ''}
+          </span>
+          <button type="button" className="btn-quiet-sheet" onClick={() => setShowLimits(v => !v)}>
+            {showLimits ? 'Done' : 'Edit limits'}
+          </button>
+        </div>
+        {showLimits ? <LimitsSection limits={limits} /> : null}
+        <LimitCards rows={rows} limits={limits} />
+      </section>
 
       <CalculatorModal open={showCalc} onClose={() => setShowCalc(false)} />
       {pvRow ? (

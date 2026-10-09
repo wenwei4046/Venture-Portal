@@ -5458,6 +5458,92 @@ table.ledger-table.audit-saves td { vertical-align: top; }
   body.printing-schedule .sched-print-sheet { max-width: none; padding: 0; box-shadow: none; }
 }
 
+/* The Repayment Schedule's calendar (2026-10-09): the month's installments on
+   their days — ↓ collect (green bar), ↑ pay (orange bar), tinted paid / due /
+   part paid / overdue; a card on hover; a phone reads the days as a list. */
+.repay-cal { margin-bottom: 28px; }
+.repay-cal .cal-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin: 0 0 10px; font-size: 11.5px; color: rgb(var(--graphite)); }
+.repay-cal .cal-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.repay-cal .cal-legend .bar { width: 3px; height: 12px; border-radius: 2px; }
+.repay-cal .cal-legend .swatch { width: 10px; height: 10px; border-radius: 3px; border: 1px solid rgb(var(--hairline)); }
+.repay-cal .bar.collect { background: rgb(21 110 78); }
+.repay-cal .bar.pay { background: rgb(233 154 83); }
+.repay-cal .swatch.paid { background: rgb(222 240 232); border-color: rgb(21 110 78 / 0.4); }
+.repay-cal .swatch.due { background: #fff; }
+.repay-cal .swatch.partial { background: rgb(249 238 214); border-color: rgb(150 100 12 / 0.4); }
+.repay-cal .swatch.overdue { background: rgb(250 228 224); border-color: rgb(176 40 34 / 0.4); }
+.repay-cal .cal-wrap { border: 1px solid rgb(var(--sheet-table-border, var(--hairline))); border-radius: 10px; overflow: hidden; background: rgb(var(--surface)); }
+.repay-cal .cal-head, .repay-cal .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.repay-cal .cal-head > div { padding: 8px 10px; background: rgb(226 231 239); color: rgb(29 43 74); font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.repay-cal .cal-day { min-height: 112px; padding: 6px 6px 8px; border-top: 1px solid rgb(var(--hairline)); border-left: 1px solid rgb(var(--hairline)); display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.repay-cal .cal-grid .cal-day:nth-child(7n + 1) { border-left: 0; }
+.repay-cal .cal-day.blank { background: rgb(250 249 247); }
+.repay-cal .cal-day.today { background: rgb(255 250 243); }
+.repay-cal .cal-top { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; margin-bottom: 2px; }
+.repay-cal .cal-num { font-size: 12px; font-weight: 500; color: rgb(var(--ink)); padding: 1px 6px; border-radius: 999px; }
+.repay-cal .cal-day.today .cal-num { background: rgb(var(--accent)); font-weight: 700; }
+.repay-cal .cal-net { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.repay-cal .cal-net.in { color: rgb(21 110 78); }
+.repay-cal .cal-net.out { color: rgb(150 100 12); }
+.repay-cal .cal-item { display: flex; align-items: center; gap: 4px; padding: 2px 5px; border-radius: 5px; border-left: 3px solid; font-size: 10.5px; text-decoration: none; min-width: 0; }
+.repay-cal .cal-item.collect { border-left-color: rgb(21 110 78); }
+.repay-cal .cal-item.pay { border-left-color: rgb(233 154 83); }
+.repay-cal .cal-item .who { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.repay-cal .cal-item .amt { flex: none; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+.repay-cal :is(.cal-item, .cal-agenda-item).paid { background: rgb(222 240 232); color: rgb(21 110 78); }
+.repay-cal :is(.cal-item, .cal-agenda-item).due { background: #fff; color: #000; box-shadow: inset 0 0 0 1px rgb(var(--hairline)); }
+.repay-cal :is(.cal-item, .cal-agenda-item).partial { background: rgb(249 238 214); color: rgb(150 100 12); }
+.repay-cal :is(.cal-item, .cal-agenda-item).overdue { background: rgb(250 228 224); color: rgb(176 40 34); }
+.repay-cal .cal-item:hover { filter: brightness(0.97); }
+.repay-cal .cal-more { align-self: flex-start; padding: 0 4px; border: 0; background: none; font-size: 10.5px; color: rgb(var(--accent-hover)); cursor: pointer; }
+.repay-cal .cal-dots { display: none; }
+.repay-cal .cal-agenda { display: none; }
+.cal-card {
+  position: fixed;
+  z-index: 70;
+  width: 280px;
+  padding: 12px 14px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 10px;
+  background: rgb(var(--surface));
+  box-shadow: 0 10px 28px rgb(43 31 23 / 0.16);
+  font-size: 12px;
+  pointer-events: none;
+}
+.cal-card-kind { font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; }
+.cal-card-kind.collect { color: rgb(21 110 78); }
+.cal-card-kind.pay { color: rgb(201 116 31); }
+.cal-card-name { margin-top: 3px; font-size: 14px; font-weight: 600; color: rgb(var(--ink)); }
+.cal-card-date { margin-bottom: 8px; color: rgb(var(--graphite)); }
+.cal-card dl { margin: 0 0 8px; }
+.cal-card dl > div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px solid rgb(236 234 229); }
+.cal-card dt { color: rgb(117 100 86); }
+.cal-card dd { margin: 0; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+.cal-card-status { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; }
+.cal-card-status.paid { background: rgb(222 240 232); color: rgb(21 110 78); }
+.cal-card-status.due { background: rgb(246 246 244); color: #000; }
+.cal-card-status.partial { background: rgb(249 238 214); color: rgb(150 100 12); }
+.cal-card-status.overdue { background: rgb(250 228 224); color: rgb(176 40 34); }
+@media (max-width: 767px) {
+  .repay-cal .cal-day { min-height: 54px; padding: 4px; }
+  .repay-cal :is(.cal-item, .cal-more, .cal-net) { display: none; }
+  .repay-cal .cal-dots { display: flex; flex-wrap: wrap; gap: 3px; }
+  .repay-cal .cal-dots i { width: 6px; height: 6px; border-radius: 999px; }
+  .repay-cal .cal-dots i.collect { background: rgb(120 170 145); }
+  .repay-cal .cal-dots i.pay { background: rgb(233 154 83); }
+  .repay-cal .cal-dots i.paid { background: rgb(21 110 78); }
+  .repay-cal .cal-dots i.overdue { background: rgb(176 40 34); }
+  .repay-cal .cal-dots i.partial { background: rgb(150 100 12); }
+  .repay-cal .cal-agenda { display: grid; gap: 10px; margin-top: 12px; }
+  .repay-cal .cal-agenda-day { border: 1px solid rgb(var(--hairline)); border-radius: 10px; padding: 8px 10px; background: rgb(var(--surface)); }
+  .repay-cal .cal-agenda-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 12px; font-weight: 600; }
+  .repay-cal .cal-agenda-head .in { color: rgb(21 110 78); font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+  .repay-cal .cal-agenda-head .out { color: rgb(150 100 12); font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+  .repay-cal .cal-agenda-item { display: flex; justify-content: space-between; gap: 8px; padding: 5px 8px; border-radius: 6px; margin-top: 4px; font-size: 12px; text-decoration: none; }
+  .repay-cal .cal-agenda-item small { color: inherit; opacity: 0.8; }
+  .repay-cal .cal-agenda-item .amt { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+}
+
 /* A page's free text — an invoice's description (the handoff's notice box). */
 .fin-notice {
   padding: 14px 16px;

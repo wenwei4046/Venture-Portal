@@ -1,5 +1,45 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-09 g (SHIPPED) — Finance revamp · Phase 3 done: Invoice Financing, Repayment Schedule, Overdue
+
+- **Invoice Financing** (`/ba`, was "Bank BA"): `BaView` now owns the head
+  (← Fund In, eyebrow TREASURY · INVOICE FINANCING, `.page-sub`, Calculator /
+  **Record financing** — the inline RecordForm with its live calc and limit
+  check, unchanged), four `StatCard`s (Active face primary, To charge
+  borrowers ledger, To pay HC danger, HV margin ledger), then **Financing
+  register** (scroll box, neighbour resize, Ref in the body face,
+  `BaStatusChip`: matures in Nd info / ≤14d alert / overdue red / settled
+  green) and **Limits** after it (count "n COMPANIES · x% USED", Edit limits
+  toggles the old LimitsSection, LimitCards). A double-click opens the new
+  **`/ba/[id]`** page (in `isFinanceDetailRoute`; `ba/loading.tsx`): title =
+  BA ref + chip, six cards (Face, Charge borrower, Owe HC, HV margin,
+  Matures, Interest billing), DetailGroups Terms / Dates / Billing /
+  Facility · borrower (+ Notes), Documents (`AttachmentChips full`), Actions
+  (`[id]/_components/BaDetailActions`: Bill borrower, Pay HC via the exported
+  `PvModal`, Mark settled / Reopen). `PvModal`, `AttachmentChips`,
+  `InterestCell`, `BaStatusChip` are exported from BaView.
+- **Repayment Schedule**: head with `MonthNav` as the handoff's pill (reuses
+  `.db-daynav`) beside the title; five cards (To collect / To pay / Net this
+  month / Done so far / Overdue · short); tabs **Calendar** (default) /
+  **We collect** / **We pay** (`ScheduleView`; the old sections and the Full
+  plan / Outstanding only toggle now live under each side, compounding and
+  no-term included). The calendar (`_components/RepayCalendar.tsx`, `.repay-
+  cal` CSS) is fed server-side: every loan and fund source's
+  `buildRepaymentPlan` → `lib/repayment-calendar.ts` `monthEvents` (status
+  paid / partial / overdue / due by the row's outstanding and day); hover
+  card (role tooltip), click → the deal, "+N more" past four, phone = dots +
+  an agenda list.
+- **Overdue & Netting**: tabs (`OverdueTabs`, `?tab=in`) **Fund OUT · they
+  owe us** (the `overdue_records` as before, by month, `StageChip`, the
+  netting & penalty log) and **Fund IN · we owe** (new: a fund source's
+  installments whose day passed unpaid — `overdueOf(plan, today)`), four
+  cards each (Overdue outstanding, Penalty accrued, Longest overdue, Netted
+  this month = loan repayments of type netting this month).
+- Tests: BaView 3, BA page 4, calendar 4, calendar helpers 4, Overdue 2.
+
+Next: Phase 4 — Overview, Dept Pool, Venture Pool, General Ledger, Reports,
+Reconciliation / Journal, Settings.
+
 ## CHECKPOINT 2026-10-09 f (SHIPPED) — Finance revamp · Phase 3: Fund IN / Fund OUT
 
 - **Lists** (`fund-in/page.tsx`, `fund-out/page.tsx`): `StatCards` per the

@@ -1,13 +1,17 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { officeMonth } from '@/lib/office-time'
+import { officeMonth, officeToday } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { loanMonthlyInstallment, isLoanUnscheduled, isBeforeFirstInstallment, compoundInterestState, minInterestStatus } from '@/lib/treasury-schedule'
 import { resolveFirstDueYM } from '@/lib/loan-monitor'
 import { buildTermsSegments, compoundRoll, currentSegment, principalPaidSince, segmentRemainingPeriods, termsChanged, type TermsSegment } from '@/lib/treasury-terms'
-import { fetchTermsHistory, isLoanPrincipal, principalPaidByMonth, termsForFundSource, termsForLoan } from '@/lib/treasury-terms-data'
+import { fetchTermsHistory, isFundSourcePrincipal, isLoanPrincipal, principalPaidByMonth, termsForFundSource, termsForLoan } from '@/lib/treasury-terms-data'
+import { buildRepaymentPlan } from '@/lib/repayment-plan'
+import { monthEvents, type CalendarEntry } from '@/lib/repayment-calendar'
+import { formatMoney } from '@/lib/utils'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { listPayableFundSources } from '../fund-in/actions'
 import ScheduleView, { type SchedRow, type NoTermRow, type CompoundRow, type MinInterestRow } from './_components/ScheduleView'
@@ -212,9 +216,9 @@ export default async function RepaymentSchedulePage({
   collectCompound.sort((a, b) => b.balance - a.balance)
 
   // ── 应付 (fund sources) + repayment history + compounding meta + pending PVs ──
-  const [payable, { data: fsMetaRows }, { data: fsReps }, { data: pendingPvs }] = await Promise.all([
+  const [payable, { data: fsMetaRows }, { data: fsReps }, { data: pendingPvs }, { data: fsDepts }] = await Promise.all([
     listPayableFundSources({ includeSettledInMonth: currentYM }),
-    supabase.from('fund_sources').select('id, compound_interest, effective_date, min_pay_interest, repayment_start_month, amount, cost_rate, lock_in_months, terms_effective_from'),
+    supabase.from('fund_sources').select('id, status, from_company_id, from_department_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, repayment_start_month, amount, cost_rate, lock_in_months, terms_effective_from'),
     fetchAllRows((lo, hi) => supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
     supabase
       .from('payment_vouchers')
@@ -222,6 +226,7 @@ export default async function RepaymentSchedulePage({
       .not('fund_source_id', 'is', null)
       .not('repayment_breakdown', 'is', null)
       .in('status', ['draft', 'pending_approval', 'approved']),
+    supabase.from('departments').select('id, name'),
   ])
   const fsMeta = new Map((fsMetaRows ?? []).map((m) => [m.id as string, m as { compound_interest?: boolean; effective_date?: string | null; min_pay_interest?: boolean; repayment_start_month?: string | null; amount?: number | string; cost_rate?: number | string; lock_in_months?: number | null; terms_effective_from?: string | null }]))
   const fsHist = await fetchTermsHistory(supabase, 'fund_source', (fsMetaRows ?? []).map((m) => m.id as string))
@@ -412,6 +417,70 @@ export default async function RepaymentSchedulePage({
   const repayNoTermOutstanding = r2(repayNoTerm.reduce((s, r) => s + r.outstanding, 0))
   const repayNoTermInterest = r2(repayNoTerm.reduce((s, r) => s + r.monthlyInterest, 0))
 
+  // ── The calendar (2026-10-09, the handoff): each deal's repayment plan —
+  // the same rows as its page's Repayment schedule — gives the month's
+  // installments on their days.
+  const today = officeToday()
+  const events: CalendarEntry[] = []
+  for (const l of loans ?? []) {
+    const co = l.company_id ? coById.get(l.company_id as string) : null
+    const plan = buildRepaymentPlan({
+      terms: termsForLoan(l, loanHist.get(l.id as string) ?? []),
+      payments: (loanReps ?? [])
+        .filter((rp) => rp.loan_id === l.id)
+        .map((rp) => ({ date: String(rp.payment_date).slice(0, 10), type: rp.payment_type as string, amount: Number(rp.amount), ref: null })),
+      isPrincipal: isLoanPrincipal,
+      today,
+      dueDay: l.disbursement_date ? dayjs(l.disbursement_date as string).date() : 1,
+      status: l.status as string,
+    })
+    events.push(
+      ...monthEvents(plan, { kind: 'collect', name: (co?.short_code ?? co?.name ?? '—') as string, href: `/fund-out/${l.id}`, rate: Number(l.effective_rate), principal: Number(l.principal) }, currentYM, today),
+    )
+  }
+  const fsDeptName = new Map(((fsDepts ?? []) as Array<{ id: string; name: string }>).map((d) => [d.id, d.name]))
+  for (const m of (fsMetaRows ?? []) as Array<Record<string, unknown>>) {
+    if (!['active', 'matured', 'repaid'].includes(m.status as string)) continue
+    const id = m.id as string
+    const co = m.from_company_id ? coById.get(m.from_company_id as string) : null
+    const name = (co?.short_code ?? co?.name ?? (m.from_freetext_name as string | null) ?? (m.from_department_id ? fsDeptName.get(m.from_department_id as string) : null) ?? 'Fund source') as string
+    const plan = buildRepaymentPlan({
+      terms: termsForFundSource(
+        {
+          amount: (m.amount as number) ?? 0,
+          cost_rate: (m.cost_rate as number) ?? 0,
+          lock_in_months: (m.lock_in_months as number | null) ?? null,
+          compound_interest: m.compound_interest as boolean | null,
+          effective_date: (m.effective_date as string | null) ?? null,
+          repayment_start_month: (m.repayment_start_month as string | null) ?? null,
+          terms_effective_from: (m.terms_effective_from as string | null) ?? null,
+        },
+        fsHist.get(id) ?? [],
+      ),
+      payments: (fsReps ?? [])
+        .filter((rp) => rp.fund_source_id === id)
+        .map((rp) => ({ date: String(rp.payment_date).slice(0, 10), type: rp.payment_type as string, amount: Number(rp.amount), ref: null })),
+      isPrincipal: isFundSourcePrincipal,
+      today,
+      dueDay: m.effective_date ? dayjs(m.effective_date as string).date() : 1,
+      status: m.status as string,
+    })
+    events.push(...monthEvents(plan, { kind: 'pay', name, href: `/fund-in/${id}`, rate: Number(m.cost_rate), principal: Number(m.amount) }, currentYM, today))
+  }
+
+  // ── The cards: the month's scheduled cash, what is done, what is short.
+  const sumDue = (rows: SchedRow[]) => r2(rows.reduce((t, r) => t + r.totalDue, 0))
+  const toCollect = sumDue(collectRows)
+  const toPay = sumDue(repayRows)
+  const collected = sumDue(collectRows.filter((r) => r.done))
+  const paid = sumDue(repayRows.filter((r) => r.done))
+  const shortOf = (kind: 'collect' | 'pay') =>
+    r2(events.filter((e) => e.kind === kind && e.date <= today && (e.status === 'overdue' || e.status === 'partial')).reduce((t, e) => t + e.outstanding, 0))
+  const shortCollect = shortOf('collect')
+  const shortPay = shortOf('pay')
+  const netMonth = r2(toCollect - toPay)
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
   return (
     <div>
       <div className="flex items-center gap-4 mb-2">
@@ -420,20 +489,39 @@ export default async function RepaymentSchedulePage({
       </div>
 
       <div className="page-head">
-        <div>
+        <div className="min-w-0">
           <div className="page-eyebrow"><em>I.</em> TREASURY · {isCurrentMonth ? 'DUE THIS MONTH' : 'SCHEDULE FOR'} · {dayjs(`${currentYM}-01`).format('MMMM YYYY').toUpperCase()}</div>
-          <h1 className="page-title">Repayment Schedule</h1>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="page-title">Repayment Schedule</h1>
+            <MonthNav month={currentYM} isCurrent={isCurrentMonth} />
+          </div>
+          <p className="page-sub">
+            Flat amortisation: principal = original ÷ tenure, interest = original × monthly rate. Repayment PVs awaiting approval carry a
+            &ldquo;Pending PV&rdquo; tag and only count as paid once approved.
+          </p>
         </div>
-        <MonthNav month={currentYM} isCurrent={isCurrentMonth} />
       </div>
 
-      <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
-        Flat amortisation: principal = original ÷ tenure, interest = original × monthly rate.
-        Repayment PVs awaiting approval carry a &ldquo;Pending PV&rdquo; tag and only count as paid once approved.
-      </p>
+      {/* The cards (2026-10-09, the handoff). */}
+      <StatCards label="Repayment Schedule">
+        <StatCard tone="ledger" label="To collect" value={formatMoney(toCollect)} icon="inbox" note={`${plural(collectRows.length, 'instalment', 'instalments')} · Fund OUT`} />
+        <StatCard tone="danger" label="To pay" value={formatMoney(toPay)} icon="send" note={`${plural(repayRows.length, 'instalment', 'instalments')} · Fund IN`} />
+        <StatCard tone="primary" label="Net this month" value={formatMoney(netMonth)} icon="swap" note={netMonth >= 0 ? 'Collect more than we pay' : 'Pay more than we collect'} />
+        <StatCard label="Done so far" value={formatMoney(r2(collected + paid))} icon="check" note={`Received ${formatMoney(collected)} · paid ${formatMoney(paid)}`} />
+        <StatCard
+          tone={shortCollect + shortPay > 0 ? 'danger' : 'default'}
+          label="Overdue / short"
+          value={formatMoney(r2(shortCollect + shortPay))}
+          icon="alert"
+          note={`Collect ${formatMoney(shortCollect)} · pay ${formatMoney(shortPay)}`}
+        />
+      </StatCards>
 
       <ScheduleView
         monthLabel={monthLabel}
+        month={currentYM}
+        today={today}
+        events={events}
         collectRows={collectRows}
         collectMin={collectMin}
         repayMin={repayMin}
