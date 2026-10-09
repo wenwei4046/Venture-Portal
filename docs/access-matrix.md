@@ -4,6 +4,16 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-09 — The database asks for the action on a read too (PR3d)
+A table used to be readable by anybody holding any key of its area (Treasury, HR or
+Admin), through the API even where no page of theirs reads it: Revenue alone opened
+every director's payout, Product List the payroll. Each table now also asks for one of
+the actions of the pages that read it (Director Salary · View for director payouts,
+Product list · View for the product mirror …), on top of the area rule. Three views
+that showed every signed-in person the whole company's figures (department payroll
+totals, department pool balances, fund sources) now show only what the reader's own
+rules allow. Every page reads what it read. Mig `20261009080000`.
+---
 ⚡ AMENDMENT 2026-10-09 — Pages ask the cells, not the account's kind (Q7)
 Which Overview opens, whether a department page shows only your own department, who
 decides a pool claim (Claims · Approve with Treasury · View), who raises for somebody

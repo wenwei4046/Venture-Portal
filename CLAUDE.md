@@ -2263,9 +2263,9 @@ mirror slices, Finance the per-director payout summary (Director Salary is not
 Finance's). `permission-table-writes.test.ts` refuses a later row policy that asks
 `current_user_role()`. Still by kind, on purpose: `approvals_decider_update`
 (owner kind may decide their own request), `table_layout_defaults`
-(`dashboard_summary` asks Treasury · View since Q7, below). Domain READS (`has_scope`) are still
-by key: a View cell of one Treasury function reads its domain's tables through
-the API. Mig `20261009040000`, `tests/member-sql/validate-reach.mjs`.
+(`dashboard_summary` asks Treasury · View since Q7, below). Domain READS asked
+only the key (`has_scope`) until PR3d (below) — every table now also asks for
+the action. Mig `20261009040000`, `tests/member-sql/validate-reach.mjs`.
 
 **SALARY, NRIC AND BANK ACCOUNTS SHOW ONLY WHERE TICKED (2026-10-09, PR4; user
 chose A for the files).** A template's three Sensitive fields are
@@ -2343,6 +2343,47 @@ or portal), the shared table layouts (`table_layout_defaults`), reopening a
 Total-Closed payroll month (the Principal's), the owner kind's self-approval
 (`approver_may`; `isOwnerKind`, claims too), view-as, labels and the phone's
 tab bar. `tests/member-sql/validate-overview-actions.mjs`.
+
+**READS ASK FOR THE ACTION TOO (2026-10-09, PR3d).** A table's SELECT policies
+opened it to whoever held ANY key of its domain (`has_scope`), and a domain is
+wide: the hr domain is Director Pool, Director Salary, HR Costing, Revenue,
+People and the Salary tick together, so a title given Revenue alone read every
+director's payout through the API, Product List (admin) read the payroll,
+Billing (treasury) read the bank reconciliations. Like the writes (PR3a): every
+table a domain policy opens has a RESTRICTIVE `needs_action_select` asking
+`may_read(table)` (plpgsql) — does the caller hold one of
+`permission_table_reads`' actions for it (133 tables; twin
+`TABLE_READS` in `lib/permission-table-reads.ts`). The row policies still say
+WHICH rows. Each list is every way somebody reads the table under their own
+session, derived in `src/test/read-paths.ts` (the read scan
+`src/test/scan-reads.ts` — JSX, default exports, cache(), embedded relations,
+the service role's client skipped — plus what it cannot see written down: a
+check made by hand (`GUARDS`), a page's cell branches (`BRANCHES`: the
+Overview, the approval page), tables named at run time (`DYNAMIC_TABLES`),
+reads for whoever may (`WHOEVER_MAY`: audit labels), dead code), the
+SECURITY INVOKER functions the app calls (`INVOKER_READS`, production's
+bodies; `DEFINER_RPCS` names the rest — a new `.rpc()` must go in one), the
+INVOKER triggers (they read as the writer), the policies' own subqueries,
+security_invoker views, and each table's own writers. A page key counts as its
+function's View at the least reach (`claims.view:own`). Not registered
+(`READS_WITHOUT_ACTION`): users, title_levels, title_permissions (every
+session), access_log, user_permissions, user_permission_cells, audit_tables,
+member_requests, hr_import_templates (own rows). Three OWNER-rights views were
+readable whole by every signed-in session past every policy —
+`hr_monthly_payroll_summary` (department payroll totals; the app never read
+it), `dept_pool_balances`, `fund_source_outstanding` — and now read under the
+caller's policies (`security_invoker`); the migration refuses to finish while
+any view a session can read is not invoker. Production (rolled-back dry run,
+every login, row by row per table and view): the Principal reads exactly
+what it read; the others lose only reads no page of theirs makes — carrie the
+bank reconciliations, Settings' splits and overdue rules, report layouts; hr@
+the Product List mirror and the Venture pool; the views their whole-company
+answers. **A read of a registered table behind a gate it does not list fails
+`src/lib/permission-table-reads.test.ts` in CI: add the gate's action to
+`TABLE_READS` AND, in a new migration, to `permission_table_reads` (then
+`permission_reads_guard('<table>')`); a new table opened to a domain gets its
+row the same way.** Mig `20261009080000`,
+`tests/member-sql/validate-table-reads.mjs`.
 
 View as (2026-09-27): the Principal's `vp-view-as` cookie is shared by every
 tab. *Revenue View* (`revenue_member`) is honoured by the member app ONLY
