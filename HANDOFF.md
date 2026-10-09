@@ -1,5 +1,48 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-09 f (SHIPPED) — Finance revamp · Phase 3: Fund IN / Fund OUT
+
+- **Lists** (`fund-in/page.tsx`, `fund-out/page.tsx`): `StatCards` per the
+  handoff — Fund IN: Total paid capital / Weighted average cost / Outstanding
+  / Maturing in 30 days (wait) / Pending approval; Fund OUT: Total
+  outstanding / Weighted effective rate (+ monthly interest income) / Net
+  spread (over Fund IN's weighted cost of the active sources, ledger) /
+  Maturing in 30 days (disbursement + tenure, scheduled loans only) /
+  Overdue (danger; a loan with a `pending` row in `overdue_records` — the
+  Overdue page's — the card links to `/overdue`). Tabs counted
+  (`FundSourceTabs` / `LoanTabs` take `counts`; Fund OUT gains `?status=
+  overdue`). Tables: chips (`SourceStatusChip`, `LoanStatusChip`), Range on
+  amount/date, `scrollBox` + neighbour resize, totals in the footer, phone
+  keeps From/Company + Outstanding with the rest as `.q-sub` small print
+  (wrapped in `.fin-queue`), right-click adds **Print schedule**
+  (`/fund-…/<id>?print=1`) and **Amend terms** (Treasury · Approve, active).
+  Head buttons are `btn-quiet-sheet` / `btn-pri-sheet`.
+- **Detail pages**: ReturnLink, eyebrow, title + status chip (loan: overdue
+  red), head **Print schedule** (`components/treasury/PrintSchedule.tsx`: an
+  overlay sheet with the letterhead, terms and every installment; printing
+  shows only it via `body.printing-schedule`) + Amend terms; cards per the
+  handoff; `DetailGroups` (IN: Terms / Dates / Routing; OUT: Terms / Dates /
+  Approval trail / Repayment terms); **Repayment settings** and **Notes** as
+  `.fin-form` panels (the editors rewritten as `.fin-field`s, English);
+  Terms over time; **Repayment schedule** (`RepaymentScheduleSection`)
+  replacing the history — the payments as recorded fold away under it
+  (`details.sched-recorded`; a loan's keep their Reverse button); Record
+  repayment; Actions in `.fin-actions`.
+- **`lib/repayment-plan.ts`** (11 tests, live-book cases): per-installment
+  plan from `buildTermsSegments` (a changed segment re-bases), money set
+  against rows oldest first per pool (principal vs interest; penalty pays
+  neither), 1% slack per row for stored-rate rounding, RM 1 for "repaid";
+  remarks Paid · voucher / Part paid / Overdue n days / Settled early / Rate
+  change; open (no fixed term) month by month to date; compounding rolls
+  unpaid interest into the balance; a repaid deal stops at its payoff month.
+  Due day = the record's own day (effective / disbursement date). Voucher
+  refs: fund sources via `payment_voucher_id`, loans parsed from "Auto-synced
+  from voucher …" notes.
+- Tests: lists 2+2, tables updated, details 4+4, schedule section 5, plan 11.
+
+Next: Invoice Financing (rename, register first then Limits, a BA's own
+page), the Repayment Schedule calendar, Overdue — then Phase 4.
+
 ## CHECKPOINT 2026-10-09 e (SHIPPED) — Finance revamp · Phase 3 begins: Daily Bank
 
 Daily Bank per the handoff (it answers the open choices of the 7 Oct sample:

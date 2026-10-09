@@ -5,6 +5,7 @@ import { setFundSourceMinPayInterest } from '../../actions'
 
 // 最低还息单 (user 2026-09-04): flagged = "本金可以慢慢还，但每月利息一定要付".
 // Finance self-service, editable anytime (旧单也能补设). Saves on toggle.
+// 2026-10-09: a field of the page's Repayment settings panel (the handoff).
 export default function MinPayInterestToggle({
   sourceId,
   current,
@@ -18,11 +19,9 @@ export default function MinPayInterestToggle({
   const [saved, setSaved] = useState(false)
 
   return (
-    <div className="mt-4">
-      <div className="text-xs uppercase tracking-wide text-muted font-sans mb-1">
-        最低还息 · Minimum pay interest
-      </div>
-      <label className="flex items-center gap-2">
+    <div className="fin-field span-2">
+      <span className="fin-label">Minimum pay interest</span>
+      <label className="fin-toggle">
         <input
           type="checkbox"
           checked={value}
@@ -42,18 +41,16 @@ export default function MinPayInterestToggle({
               }
             })
           }}
-          className="h-4 w-4 accent-[var(--accent)]"
         />
-        <span className="text-sm font-sans text-graphite">
-          这笔资金每月最低要付利息（本金可以慢慢还）
-        </span>
-        {isPending ? <span className="text-xs font-sans text-muted">保存中…</span> : null}
-        {saved && !isPending ? <span className="text-xs font-sans text-ledger">已保存 ✓</span> : null}
+        <span>Interest must be paid in full every month (principal can be repaid gradually)</span>
+        {isPending ? <span className="fin-saved text-muted">Saving…</span> : null}
+        {saved && !isPending ? <span className="fin-saved">Saved ✓</span> : null}
       </label>
-      <p className="font-serif italic text-muted text-xs mt-1.5">
-        勾了之后，Repayment schedule 会追踪当月利息付齐了没有，statement 上也会注明每月最低应还利息。
+      <p className="fin-hint">
+        When on, the Repayment schedule tracks whether each month&apos;s interest is paid in full, and the statement shows the
+        monthly minimum interest.
       </p>
-      {error ? <p className="text-xs font-sans text-danger mt-1.5">{error}</p> : null}
+      {error ? <p className="fin-error">{error}</p> : null}
     </div>
   )
 }

@@ -39,11 +39,24 @@ describe('FundSourcesTable', () => {
     expect(push).toHaveBeenCalledWith('/fund-in/fs-1')
   })
 
-  it('a right-click offers opening it, here or in a new tab', () => {
+  it('a right-click offers opening it, here or in a new tab, and its schedule to print', () => {
     render(<FundSourcesTable rows={[source]} />)
     fireEvent.contextMenu(screen.getByText('Liang').closest('tr')!)
     const menu = screen.getByRole('menu', { name: 'Actions for Liang · Loan' })
-    expect(within(menu).getAllByRole('menuitem').map((b) => b.firstChild?.textContent)).toEqual(['打开', '在新分页打开'])
+    expect(within(menu).getAllByRole('menuitem').map((b) => b.firstChild?.textContent)).toEqual(['打开', '在新分页打开', 'Print schedule'])
+  })
+
+  // 2026-10-09 — the handoff: Amend terms on an active source's menu, for an
+  // account that may amend.
+  it('offers Amend terms on an active source, to an account that may amend', () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    render(<FundSourcesTable rows={[{ ...source, status: 'active' }]} canAmend />)
+    fireEvent.contextMenu(screen.getByText('Liang').closest('tr')!)
+    const menu = screen.getByRole('menu', { name: 'Actions for Liang · Loan' })
+    expect(within(menu).getAllByRole('menuitem').map((b) => b.firstChild?.textContent)).toEqual(['打开', '在新分页打开', 'Print schedule', 'Amend terms'])
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /Print schedule/ }))
+    expect(open).toHaveBeenCalledWith('/fund-in/fs-1?print=1', '_blank', 'noopener,noreferrer')
+    open.mockRestore()
   })
 
   it('the two dates read from the left; the figures stay on the right, under their headings', () => {
@@ -55,13 +68,36 @@ describe('FundSourcesTable', () => {
     expect(header('rate').classList.contains('right')).toBe(true)
   })
 
-  // The phone grid kept Type and Date only because Date was right-aligned
-  // (first column + first right-aligned one). It still keeps those two.
-  it('a phone keeps the same two columns it did', () => {
+  // 2026-10-09 — the handoff: a phone keeps who and how much is still owed;
+  // the type, the date and the status are its small print.
+  it('a phone keeps From and Outstanding, the rest as small print', () => {
     render(<FundSourcesTable rows={[source]} />)
     const kept = Array.from(document.querySelectorAll('thead th[data-col]'))
       .filter((h) => !h.classList.contains('m-hide'))
       .map((h) => (h as HTMLElement).dataset.col)
-    expect(kept).toEqual(['typeLabel', 'effectiveDate'])
+    expect(kept).toEqual(['fromLabel', 'outstanding'])
+    expect(screen.getByText('Liang').closest('td')!.querySelector('.q-sub')).toHaveTextContent('Loan · 15 Jan 2026')
+  })
+
+  it('chips the status, ranges the amount and the date, and totals what is shown', () => {
+    render(
+      <FundSourcesTable
+        rows={[
+          source,
+          { ...source, id: 'fs-2', fromLabel: 'Carres', status: 'active', outstanding: 40000, maturityDate: '2099-01-01' },
+          { ...source, id: 'fs-3', fromLabel: 'HC', status: 'pending_approval', outstanding: null },
+        ]}
+      />,
+    )
+    // The status cell's chip, not the phone's small print.
+    const chip = (from: string) => Array.from(screen.getByText(from).closest('tr')!.querySelectorAll('.chip')).find((c) => !c.closest('.q-sub')) as HTMLElement
+    expect(chip('Liang')).toHaveClass('info')
+    expect(chip('Carres')).toHaveClass('ledger')
+    expect(chip('HC')).toHaveClass('wait')
+    expect(chip('HC')).toHaveTextContent('pending approval')
+    expect(document.querySelector('tfoot')).toHaveTextContent('3 sources · amount RM 180,000.00')
+    expect(document.querySelector('tfoot')).toHaveTextContent('Outstanding RM 100,000.00')
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Amount' }))
+    expect(within(screen.getByRole('dialog', { name: 'Filter Amount' })).getByRole('button', { name: 'Range' })).toBeInTheDocument()
   })
 })
