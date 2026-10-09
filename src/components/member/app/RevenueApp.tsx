@@ -70,6 +70,7 @@ import { claimWeeks, memoVM, profileMainVM, replaceable, requestCode, requestDet
 import type { ClaimRates } from "@/lib/member/claim-rules";
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
+import CrmApp from "../crm/CrmApp";
 
 export type Device = "live" | "ios" | "android" | "desktop";
 
@@ -1026,7 +1027,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   } else if (route.screen === "account") {
     const back = () => goScreen("account");
     const pf = route.pf;
-    const pick = principal && !viewed && !fxp && pf !== "memos" && pf !== "team" && pf !== null;
+    const pick = principal && !viewed && !fxp && pf !== "memos" && pf !== "team" && pf !== "crm" && pf !== null;
     if (pick) {
       page = <PickSomebody title={pf === "income" || pf === "incOrders" ? "My income" : pf === "honours" ? "My honours" : pf === "brandWeeks" ? "My brand weeks" : "Requests"}
         onBack={back} onViewAs={() => setVaOpen(true)} />;
@@ -1044,6 +1045,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else if (pf === "requests") {
       page = <RequestsPage rows={reqRows} filter={reqFilter} onFilter={setReqFilter} onBack={back}
         onNew={k => { setRevising(null); setReqForm(k); }} onOpen={openRequest} />;
+    } else if (pf === "crm") {
+      // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
+      page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} onExit={back} />;
     } else if (pf === "memos") {
       page = <MemosPage memos={memoVMs} tab={memoTab} onTab={setMemoTab} onBack={back} onOpen={openMemo} />;
     } else if (pf === "brandWeeks") {

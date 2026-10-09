@@ -10,6 +10,8 @@ const ROWS: { key: WorkKey; label: string; sub: string; d: string; tone: string 
   { key: "honours", label: "My honours", sub: "Medals and Fair records", d: ICON.trophy, tone: s.toneHonours },
   { key: "team", label: "Team & capacity", sub: "Department map and your reporting tree", d: ICON.team, tone: s.toneTeam },
   { key: "requests", label: "Requests", sub: "Claims, team changes and waiting lists", d: ICON.receipt, tone: s.toneRequests },
+  // The CRM (2026-10-09, prototype 2a: Profile › My leads & appointments).
+  { key: "crm", label: "My leads & appointments", sub: "Manage your leads and appointments", d: ICON.chat, tone: s.toneLeads },
   { key: "memos", label: "Memos & notifications", sub: "Read published team updates", d: ICON.bell, tone: s.toneMemos },
 ];
 
