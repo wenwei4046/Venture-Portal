@@ -561,6 +561,15 @@ export default async function DeptPoolPage({
   // Finance's view (2026-10-09, the handoff) — as the accrual branch above:
   // the same figures as cards, Balance by bank, then By department.
   if (!ownDepartmentOnly(user, 'dept_pool')) {
+    // Each department's latest HR costing submission (the handoff's status
+    // chip in the HR Costing Submission column).
+    const latestHr = new Map<string, { id: string; state: string; period: string }>()
+    for (const sub of [...submissions].sort((a, b) => b.period_month.localeCompare(a.period_month))) {
+      for (const info of Object.values(sub.dept_summaries ?? {})) {
+        const deptId = info?.department_id
+        if (deptId && !latestHr.has(deptId)) latestHr.set(deptId, { id: sub.id, state: sub.execution_state, period: sub.period_month })
+      }
+    }
     return (
       <DeptPoolCashSheet
         monthTitle={dayjs(period).format('MMMM YYYY').toUpperCase()}
@@ -578,8 +587,10 @@ export default async function DeptPoolPage({
             inAmt: io.in_amt,
             outAmt: io.out_amt,
             costing: costingByDept.get(dept.id) ?? 0,
+            hr: latestHr.get(dept.id) ?? null,
           }
         })}
+        canExecuteHr={canDo(user, 'treasury', 'edit')}
         venture={ventureCash}
         perBank={perBankBreakdown}
         total={totalDeployed}

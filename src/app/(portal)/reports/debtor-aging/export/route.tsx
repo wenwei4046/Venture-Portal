@@ -7,13 +7,14 @@ import { formatMoneyBare } from '@/lib/utils'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildXlsxBuffer } from '@/lib/export/excel'
 import { PdfDocument, PdfTable, type PdfRowKind } from '@/lib/export/pdf'
-import { buildDebtorAging, AGING_BUCKETS, type RawInvoice, type AgingBucket } from '@/lib/debtor-aging'
+import { debtorAgingView, type RawInvoice } from '@/lib/debtor-aging'
+import { reportsCompanyWide } from '@/lib/surfaces'
 import { fetchPaidByInvoice } from '@/lib/debtor-aging-data'
 
 // Always generate fresh from live invoice data; never statically cache.
 export const dynamic = 'force-dynamic'
 
-async function loadAging() {
+async function loadAging(scheme: 'months' | 'days') {
   const supabase = await createClient()
   const [invoices, companies, departments] = await Promise.all([
     fetchAllRows((lo, hi) =>
@@ -52,14 +53,16 @@ async function loadAging() {
       }
     })
     .filter((i) => i.amount > 0.005)
-  return buildDebtorAging(raw, officeToday())
+  // Finance's view ages by days since the invoice (2026-10-09); a department
+  // manager's by months, as before.
+  return debtorAgingView(raw, officeToday(), scheme)
 }
 
 const m = (v: number) => (v ? formatMoneyBare(v) : '—')
 
 export async function GET(req: Request) {
   // dept_manager may export their own segment's aging (RLS scopes invoices).
-  await requireAction('dept_reports', 'export', 'dept')
+  const user = await requireAction('dept_reports', 'export', 'dept')
   const params = new URL(req.url).searchParams
   const format = params.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   // view: 'detail' (one row per invoice) or 'summary' (aging matrix by customer).
@@ -67,14 +70,15 @@ export async function GET(req: Request) {
   const viewParam = params.get('view')
   const view = viewParam === 'summary' ? 'summary' : viewParam === 'detail' ? 'detail' : format === 'pdf' ? 'summary' : 'detail'
 
-  const aging = await loadAging()
+  const aging = await loadAging(reportsCompanyWide(user) ? 'days' : 'months')
+  const AGING_BUCKETS = aging.columns
   const asOf = dayjs(aging.asOf).format('D MMM YYYY')
   const filename = `debtor-aging-${view}-${dayjs(aging.asOf).format('YYYYMMDD')}`
 
   // ── Detail: master-detail matrix — per customer, a subtotal row then its
   //    invoices, each invoice's amount dropped into its aging column ──────────
   if (view === 'detail') {
-    const bucketKeys = AGING_BUCKETS.map((b) => b.key as AgingBucket)
+    const bucketKeys = AGING_BUCKETS.map((b) => b.key)
     const invByPayer = new Map<string, typeof aging.invoices>()
     for (const inv of aging.invoices) {
       const arr = invByPayer.get(inv.payer) ?? []
@@ -144,10 +148,10 @@ export async function GET(req: Request) {
   if (format === 'xlsx') {
     const rows = aging.byPayer.map((p) => [
       p.payer,
-      ...AGING_BUCKETS.map((b) => p.buckets[b.key as AgingBucket]),
+      ...AGING_BUCKETS.map((b) => p.buckets[b.key]),
       p.total,
     ])
-    rows.push(['TOTAL', ...AGING_BUCKETS.map((b) => aging.totals.buckets[b.key as AgingBucket]), aging.totals.total])
+    rows.push(['TOTAL', ...AGING_BUCKETS.map((b) => aging.totals.buckets[b.key]), aging.totals.total])
     const buffer = buildXlsxBuffer({
       sheetName: 'Debtor Aging (summary)',
       headerRow: summaryHeader,
@@ -163,12 +167,12 @@ export async function GET(req: Request) {
   ]
   const rows: (string | number | null)[][] = aging.byPayer.map((p) => [
     p.payer,
-    ...AGING_BUCKETS.map((b) => m(p.buckets[b.key as AgingBucket])),
+    ...AGING_BUCKETS.map((b) => m(p.buckets[b.key])),
     formatMoneyBare(p.total),
   ])
   rows.push([
     'TOTAL',
-    ...AGING_BUCKETS.map((b) => m(aging.totals.buckets[b.key as AgingBucket])),
+    ...AGING_BUCKETS.map((b) => m(aging.totals.buckets[b.key])),
     formatMoneyBare(aging.totals.total),
   ])
   return exportPdfResponse({

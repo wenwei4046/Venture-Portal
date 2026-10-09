@@ -47,7 +47,8 @@ export async function GET(req: Request) {
   const filename = `loan-monitor-${view}-${data.currentYM}`
 
   if (view === 'aging') {
-    const header = ['Counterparty', 'SC', 'Due this month', '1 month late', '2 months late', '3+ months late', 'Total unpaid (RM)']
+    // Days late (2026-10-09), as the page shows them.
+    const header = ['Counterparty', 'SC', 'Not due', '1–30 days', '31–90 days', '90+ days', 'Total unpaid (RM)']
     const sideBlock = (title: string, s: MonitorSide) => {
       const rows: (string | number | null)[][] = []
       const kinds: PdfRowKind[] = []
@@ -57,16 +58,16 @@ export async function GET(req: Request) {
         rows.push([
           `   ${dueLabel(d)}`,
           sc(d.source),
-          m(d.buckets.current), m(d.buckets.m1), m(d.buckets.m2), m(d.buckets.m3),
-          formatMoneyBare(d.buckets.total),
+          m(d.days.notDue), m(d.days.d30), m(d.days.d90), m(d.days.d90plus),
+          formatMoneyBare(d.days.total),
         ])
         kinds.push('detail')
       }
       rows.push([
         `${title} — TOTAL`,
         '',
-        m(s.dueTotal.current), m(s.dueTotal.m1), m(s.dueTotal.m2), m(s.dueTotal.m3),
-        formatMoneyBare(s.dueTotal.total),
+        m(s.dueDaysTotal.notDue), m(s.dueDaysTotal.d30), m(s.dueDaysTotal.d90), m(s.dueDaysTotal.d90plus),
+        formatMoneyBare(s.dueDaysTotal.total),
       ])
       kinds.push('total')
       return { rows, kinds }
@@ -100,10 +101,10 @@ export async function GET(req: Request) {
             columns={[
               { label: 'Counterparty', width: 272, align: 'left' as const },
               { label: 'SC', width: 58, align: 'left' as const },
-              { label: 'Due this month', width: 62, align: 'right' as const },
-              { label: '1 month late', width: 62, align: 'right' as const },
-              { label: '2 months late', width: 62, align: 'right' as const },
-              { label: '3+ months late', width: 62, align: 'right' as const },
+              { label: 'Not due', width: 62, align: 'right' as const },
+              { label: '1–30 days', width: 62, align: 'right' as const },
+              { label: '31–90 days', width: 62, align: 'right' as const },
+              { label: '90+ days', width: 62, align: 'right' as const },
               { label: 'Total unpaid', width: 72, align: 'right' as const },
             ]}
             rows={rows}

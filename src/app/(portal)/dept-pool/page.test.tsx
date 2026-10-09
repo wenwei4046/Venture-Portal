@@ -16,6 +16,7 @@ vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/cfo-reports', () => ({ fetchIncomeStatement: mocks.fetchIncomeStatement }))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
+vi.mock('@/app/(portal)/hr-costing/actions', () => ({ executeHrCosting: vi.fn() }))
 
 import DeptPoolPage from './page'
 
@@ -88,6 +89,8 @@ function database() {
   const rpc = async () => ({
     data: [
       { id: 's1', period_month: '2026-09-01', submitted_at: '2026-09-28T02:00:00Z', submitted_by_name: 'HR', execution_state: 'executed', dept_summaries: { mk: { department_id: 'd-mk', total_ctc: 32960 } } },
+      { id: 's2', period_month: '2026-10-01', submitted_at: '2026-10-08T02:00:00Z', submitted_by_name: 'HR', execution_state: 'approved_for_execution', dept_summaries: { hr: { department_id: 'd-hr', total_ctc: 20000 } } },
+      { id: 's0', period_month: '2026-08-01', submitted_at: '2026-08-28T02:00:00Z', submitted_by_name: 'HR', execution_state: 'pending', dept_summaries: { it: { department_id: 'd-it', total_ctc: 5000 } } },
     ],
     error: null,
   })
@@ -154,6 +157,20 @@ describe('Department Pools · cash, for Finance', () => {
     expect(foot).toHaveTextContent('All departments')
     expect(foot).toHaveTextContent('725,000.00')
     expect(foot).toHaveTextContent('281,656.72')
+  })
+})
+
+describe('Department Pools · the HR costing submission, for Finance', () => {
+  it('reads each department’s latest submission as a chip, the ready one with Mark executed', async () => {
+    render(await DeptPoolPage({ searchParams: Promise.resolve({}) }))
+    const depts = section('By department')
+    const row = (name: string) => within(depts).getByText(name).closest('tr') as HTMLElement
+    expect(within(row('Marketing')).getByText('executed').closest('.chip')).toHaveClass('ledger')
+    expect(within(row('HR')).getByText('ready to execute').closest('.chip')).toHaveClass('accent')
+    expect(within(row('HR')).getByRole('button', { name: 'Mark executed' })).toBeInTheDocument()
+    expect(within(row('IT')).getByText('awaiting Principal').closest('.chip')).toHaveClass('alert')
+    expect(row('Finance')).toHaveTextContent('—')
+    expect(within(row('Marketing')).queryByRole('button', { name: 'Mark executed' })).toBeNull()
   })
 })
 

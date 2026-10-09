@@ -5651,3 +5651,50 @@ table.ledger-table.audit-saves td { vertical-align: top; }
   .rpt-range :is(select, input) { flex: 1 1 0; min-width: 0; }
 }
 .rpt-field input[type='checkbox'] { width: 16px; height: 16px; padding: 0; accent-color: rgb(var(--accent)); }
+
+/* The Trial Balance in groups (2026-10-09, the Finance revamp handoff). */
+.ledger-table tr.tb-block > td { padding-top: 14px; font-weight: 700; color: rgb(46 92 138); background: #fff; }
+.ledger-table tr.tb-group > td { font-weight: 600; }
+.ledger-table td.tb-indent { padding-left: 34px; }
+.ledger-table tr.tb-sub > td { font-weight: 600; background: rgb(248 246 242); box-shadow: inset 0 1px 0 rgb(207 197 183); }
+.ledger-table tr.tb-total > td { font-weight: 700; color: rgb(30 62 98); background: rgb(238 243 248); box-shadow: inset 0 1.5px 0 rgb(46 92 138); }
+.tb-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.tb-toggle > span:first-child { font-size: 9px; color: rgb(117 100 86); }
+
+/* The journal voucher form (2026-10-09, the Finance revamp handoff). */
+.jv-form { max-width: 980px; padding: 20px; border: 1px solid rgb(229 228 223); border-radius: 12px; background: #fff; }
+.jv-head { display: grid; grid-template-columns: 160px minmax(0, 1fr) 270px; gap: 14px 16px; }
+.jv-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.jv-field > span { font-size: 12px; font-weight: 500; color: rgb(90 78 68); }
+.jv-form .jv-input, .jv-form .jv-row input[type="text"] { width: 100%; height: 40px; padding: 0 12px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: rgb(246 246 244); color: rgb(var(--ink)); font-size: 13px; }
+.jv-hint { margin: 8px 0 18px; font-size: 11px; line-height: 1.5; color: rgb(138 119 101); }
+.jv-lines { border: 1px solid rgb(229 228 223); border-radius: 10px; overflow: hidden; }
+.jv-row { display: grid; grid-template-columns: minmax(0, 1.4fr) 120px 120px minmax(0, 1fr) 28px; gap: 8px; align-items: center; padding: 8px 12px; border-top: 1px solid rgb(236 234 229); }
+.jv-row .r { text-align: right; }
+.jv-form .jv-row :is(.jv-input, input[type="text"]) { height: 36px; padding: 0 10px; font-size: 12.5px; }
+.jv-form .jv-num { text-align: right; font-family: var(--font-mono), "Chivo Mono", Menlo, monospace; }
+.jv-form .jv-num:disabled { opacity: 0.45; cursor: not-allowed; }
+.jv-row-head { padding: 9px 12px; border-top: 0; background: rgb(226 231 239); color: rgb(29 43 74); font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.jv-row-foot { padding: 10px 12px; border-top: 1px solid rgb(200 208 221); background: rgb(238 243 248); font-weight: 500; }
+.jv-del { width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: rgb(117 100 86); font-size: 16px; cursor: pointer; }
+.jv-del:hover:not(:disabled) { background: rgb(246 246 244); }
+.jv-del:disabled { opacity: 0.3; cursor: not-allowed; }
+.jv-add { justify-self: start; display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: #C9741F; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.jv-add kbd { padding: 1px 6px; border: 1px solid rgb(200 208 221); border-radius: 4px; background: #fff; color: rgb(72 84 106); font-family: var(--font-mono), "Chivo Mono", Menlo, monospace; font-size: 10px; font-weight: 500; }
+.jv-bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.jv-bal { display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 99px; font-size: 11.5px; font-weight: 500; background: rgb(246 246 244); color: rgb(117 100 86); }
+.jv-bal .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.jv-bal.ok { background: #DEF0E8; color: #156E4E; }
+.jv-bal.bad { background: #FAE4E0; color: #B02822; }
+@media (max-width: 767px) {
+  .jv-form { padding: 14px; }
+  .jv-head { grid-template-columns: minmax(0, 1fr); }
+  .jv-row { grid-template-columns: minmax(0, 1fr) 84px 84px 28px; }
+  .jv-row .jv-note { display: none; }
+}
+
+/* Settings · Chart of Accounts (2026-10-09, the Finance revamp handoff). */
+.coa-table .coa-name { display: inline-flex; align-items: center; gap: 6px; }
+.coa-table .coa-chev { display: inline-block; width: 10px; font-size: 9px; color: rgb(var(--accent)); }
+.coa-table .coa-sub { display: block; margin-top: 2px; margin-left: 16px; font-size: 11px; color: rgb(117 100 86); }
+.coa-table .coa-range { margin-left: 6px; font-family: var(--font-mono), "Chivo Mono", Menlo, monospace; font-size: 10.5px; font-weight: 400; color: rgb(117 100 86); }

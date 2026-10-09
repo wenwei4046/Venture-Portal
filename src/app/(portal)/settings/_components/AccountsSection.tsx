@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { Fragment, useState, useTransition, useMemo } from 'react'
 import { backdropDismiss } from '@/components/modal-dismiss'
 import {
   ACCOUNT_TYPES,
@@ -48,6 +48,10 @@ export default function AccountsSection({ accounts }: Props) {
   // set = everything expanded, which is the first-load default so newcomers
   // see the structure.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  // Search code or name (2026-10-09, the handoff): the matches and their
+  // parents, so the tree still reads; the collapse is set aside meanwhile.
+  const [query, setQuery] = useState('')
+  const needle = query.trim().toLowerCase()
 
   function toggleCollapsed(code: string) {
     setCollapsed((prev) => {
@@ -150,37 +154,75 @@ export default function AccountsSection({ accounts }: Props) {
     return out
   }
 
+  const searchKeep = (() => {
+    if (!needle) return null
+    const byCode = new Map(accounts.map((a) => [a.code, a]))
+    const keep = new Set<string>()
+    for (const a of visible) {
+      if (!a.code.toLowerCase().includes(needle) && !a.name.toLowerCase().includes(needle)) continue
+      let cur: Account | undefined = a
+      let guard = 0
+      while (cur && guard < 50) {
+        keep.add(cur.code)
+        cur = cur.parent_code ? byCode.get(cur.parent_code) : undefined
+        guard++
+      }
+    }
+    return keep
+  })()
+
+  // Each type's rows as they will show: the collapse applied, or the search.
+  const draggingType = dragging ? accounts.find((a) => a.code === dragging)?.type ?? null : null
+  const sections = ACCOUNT_TYPES.map((t) => ({
+    t,
+    rows: sortForRender(grouped.get(t) ?? []).filter(({ acc, ancestors }) =>
+      searchKeep ? searchKeep.has(acc.code) : !ancestors.some((p) => collapsed.has(p)),
+    ),
+  })).filter((s) => s.rows.length > 0 || draggingType === s.t)
+  const shown = sections.reduce((n, s) => n + s.rows.length, 0)
+
+  // The Chart of Accounts per the user's Claude Design handoff (2026-10-09):
+  // Search, Show inactive and + New account in one band; one table with a
+  // band per account type; a parent's count of sub-accounts under its name;
+  // the status as a chip. Drag a row onto another to move it (as before).
   return (
     <section>
-      <div className="sticky top-0 z-20 bg-paper pt-2 pb-3 flex items-baseline justify-between mb-1 border-b border-hairline">
-        <h2 className="font-serif text-2xl text-ink">Chart of Accounts</h2>
+      <div className="gl-toolbar">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search code or name…"
+          aria-label="Search code or name"
+          className="search-plain flex-1 min-w-[200px] px-3 py-2 bg-white border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+        />
+        <button type="button" className="btn-quiet-sheet" onClick={() => setShowInactive((v) => !v)}>
+          {showInactive ? 'Hide inactive' : 'Show inactive'}
+        </button>
+        {childCounts.size > 0 ? (
+          <>
+            <button type="button" className="btn-quiet-sheet" onClick={() => setCollapsed(new Set(childCounts.keys()))}>
+              Collapse all
+            </button>
+            <button type="button" className="btn-quiet-sheet" onClick={() => setCollapsed(new Set())}>
+              Expand all
+            </button>
+          </>
+        ) : null}
         <button
           type="button"
+          className="btn-pri-sheet"
           onClick={() => {
             setShowCreate(true)
             setError(null)
           }}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
         >
           + New account
         </button>
       </div>
-      <p className="font-serif italic text-muted text-sm mb-6">
-        Every payment line, journal entry, and report flows through these
-        accounts. Codes are auto-allocated by type; cash flow category drives
-        Operating / Investing / Financing on the Cash Flow Statement.
-      </p>
 
-      {error ? (
-        <div className="mb-4 p-3 border border-danger bg-danger-bg rounded-md text-sm text-danger font-serif">
-          {error}
-        </div>
-      ) : null}
-      {notice ? (
-        <div className="mb-4 p-3 border border-ledger bg-ledger-bg rounded-md text-sm text-ledger font-serif">
-          {notice}
-        </div>
-      ) : null}
+      {error ? <div className="sheet-danger mb-4">{error}</div> : null}
+      {notice ? <p className="fin-notice mb-4">{notice}</p> : null}
 
       {showCreate ? (
         <div
@@ -189,14 +231,14 @@ export default function AccountsSection({ accounts }: Props) {
         >
           <div
             className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-2xl my-4"
+            role="dialog"
+            aria-label="New account"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline">
               <div>
-                <h2 className="font-serif text-2xl text-ink">New account</h2>
-                <p className="font-serif italic text-graphite text-xs mt-1">
-                  Code is auto-allocated within the type&apos;s range.
-                </p>
+                <h2 className="text-lg font-semibold text-ink">New account</h2>
+                <p className="text-xs text-graphite mt-1">Code is auto-allocated within the type&apos;s range.</p>
               </div>
               <button
                 onClick={() => !isPending && setShowCreate(false)}
@@ -233,80 +275,42 @@ export default function AccountsSection({ accounts }: Props) {
         </div>
       ) : null}
 
-      <div className="flex items-baseline gap-3 mb-3 mt-6">
-        <span className="font-mono text-xs uppercase tracking-wide text-ledger font-semibold">
-          {visible.length} {visible.length === 1 ? 'account' : 'accounts'}
-        </span>
-        <button
-          type="button"
-          onClick={() => setShowInactive((v) => !v)}
-          className="text-xs text-graphite hover:text-ink font-serif italic"
-        >
-          {showInactive ? 'Hide inactive' : 'Show inactive'}
-        </button>
-        {childCounts.size > 0 ? (
-          <>
-            <button
-              type="button"
-              onClick={() => setCollapsed(new Set(childCounts.keys()))}
-              className="text-xs text-graphite hover:text-ink font-serif italic"
-            >
-              Collapse all
-            </button>
-            <button
-              type="button"
-              onClick={() => setCollapsed(new Set())}
-              className="text-xs text-graphite hover:text-ink font-serif italic"
-            >
-              Expand all
-            </button>
-          </>
-        ) : null}
+      <div className="sect-head">
+        <h2>Accounts</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">{shown} SHOWN</span>
       </div>
 
       {visible.length === 0 ? (
-        <div className="border border-hairline rounded-md bg-surface p-8 text-center">
-          <p className="font-serif italic text-muted text-sm">
-            No accounts yet — click <strong>+ New account</strong> above to start.
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-sm">
+            No accounts yet — <strong>+ New account</strong> starts the chart.
           </p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {ACCOUNT_TYPES.map((t) => {
-            const rows = grouped.get(t) ?? []
-            if (rows.length === 0) return null
-            const [start, end] = rangeFor(t)
-            const sortedRows = sortForRender(rows)
-            return (
-              <div key={t}>
-                <div className="sect-head">
-                  <h3>
-                    {typeLabel(t)}{' '}
-                    <span className="text-graphite font-mono text-xs ml-1">
-                      ({start}-{end})
-                    </span>
-                  </h3>
-                  <span className="font-mono text-xs uppercase text-graphite">
-                    {String(rows.length).padStart(2, '0')}
-                  </span>
-                </div>
-                <div className="overflow-x-auto">
-                  {/* table-fixed + explicit widths on the non-name columns so
-                      the Code column lands at the SAME x-position in every
-                      type section — each section is its own <table>, and
-                      auto layout let name length shift the columns around. */}
-                  <table className="ledger-table table-fixed w-full">
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th className="w-24">Code</th>
-                        <th className="w-28 m-hide">Cash Flow</th>
-                        <th className="w-24 m-hide">Status</th>
-                        <th className="w-16"></th>
+        <div className="table-frame">
+          <div className="table-frame-scroll">
+            <table className="ledger-table coa-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th className="w-24">Code</th>
+                  <th className="w-28 m-hide">Cash flow</th>
+                  <th className="w-28 m-hide">Status</th>
+                  <th className="w-20" aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {sections.map(({ t, rows }) => {
+                  const [start, end] = rangeFor(t)
+                  return (
+                    <Fragment key={t}>
+                      <tr className="tb-block">
+                        <td colSpan={5}>
+                          {typeLabel(t)} accounts <span className="coa-range">{start}–{end}</span>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {dragging && accounts.find((a) => a.code === dragging)?.type === t ? (
+                      {draggingType === t ? (
                         <tr
                           onDragOver={(e) => {
                             e.preventDefault()
@@ -317,39 +321,25 @@ export default function AccountsSection({ accounts }: Props) {
                             e.preventDefault()
                             handleDrop(null)
                           }}
-                          className={
-                            dropTarget === '__top__' + t
-                              ? 'bg-accent-bg'
-                              : 'bg-surface'
-                          }
+                          className={dropTarget === '__top__' + t ? 'bg-accent-bg' : undefined}
                         >
-                          <td colSpan={5} className="text-center font-serif italic text-xs text-graphite py-2 border border-dashed border-accent-border">
+                          <td colSpan={5} className="text-center text-xs text-graphite py-2 border border-dashed border-accent-border">
                             Drop here to make it a top-level account
                           </td>
                         </tr>
                       ) : null}
-                      {sortedRows.map(({ acc, depth, ancestors }) => {
+                      {rows.map(({ acc, depth }) => {
                         const isEditing = editing === acc.code
                         const isHeader = (childCounts.get(acc.code) ?? 0) > 0
-                        // Hide rows with ANY collapsed ancestor (not just the
-                        // direct parent — collapsing 4000 must also hide 4101).
-                        if (ancestors.some((p) => collapsed.has(p))) {
-                          return null
-                        }
-                        const isCollapsed = isHeader && collapsed.has(acc.code)
+                        const isCollapsed = isHeader && !searchKeep && collapsed.has(acc.code)
                         const isDragSource = dragging === acc.code
-                        // Valid drop target: same type, not the dragged row,
-                        // not its current parent. Headers and leaves both
-                        // qualify (dropping on a leaf makes it a header).
-                        const isDropOk =
-                          dragging !== null &&
-                          !isDragSource &&
-                          accounts.find((a) => a.code === dragging)?.type === acc.type
+                        // Valid drop target: same type, not the dragged row.
+                        const isDropOk = dragging !== null && !isDragSource && draggingType === acc.type
                         return (
                           <tr key={acc.code}>
                             {isEditing ? (
                               <td colSpan={5} className="p-0">
-                                <div className="p-4 bg-surface">
+                                <div className="p-4">
                                   <AccountForm
                                     mode="edit"
                                     isPending={isPending}
@@ -367,11 +357,7 @@ export default function AccountsSection({ accounts }: Props) {
                                           setError(null)
                                           setNotice(result?.message ?? null)
                                         } catch (e) {
-                                          setError(
-                                            e instanceof Error
-                                              ? e.message
-                                              : 'Failed to update',
-                                          )
+                                          setError(e instanceof Error ? e.message : 'Failed to update')
                                         }
                                       })
                                     }
@@ -404,61 +390,43 @@ export default function AccountsSection({ accounts }: Props) {
                                     e.preventDefault()
                                     handleDrop(acc.code)
                                   }}
-                                  onClick={
-                                    isHeader ? () => toggleCollapsed(acc.code) : undefined
-                                  }
+                                  onClick={isHeader ? () => toggleCollapsed(acc.code) : undefined}
                                   className={[
-                                    'text-ink select-none',
+                                    'select-none',
                                     isHeader ? 'cursor-pointer' : 'cursor-grab',
                                     isDragSource ? 'opacity-40' : '',
                                     dropTarget === acc.code ? 'bg-accent-bg' : '',
                                   ].join(' ')}
-                                  title={
-                                    isHeader
-                                      ? 'Click to expand/collapse · drag a row onto me to adopt it'
-                                      : 'Drag onto another account to move it there'
-                                  }
+                                  title={isHeader ? 'Click to expand or collapse · drag a row onto me to adopt it' : 'Drag onto another account to move it there'}
                                 >
-                                  {isHeader ? (
-                                    <span className="mr-1.5 inline-block w-3 text-accent">
-                                      {isCollapsed ? '▶' : '▼'}
+                                  <span className="coa-name" style={{ paddingLeft: depth * 18 }}>
+                                    <span className="coa-chev" aria-hidden>
+                                      {isHeader ? (isCollapsed ? '▶' : '▼') : ''}
                                     </span>
-                                  ) : (
-                                    <span className="mr-1.5 inline-block w-3" aria-hidden />
-                                  )}
-                                  {depth > 0 ? (
-                                    <span
-                                      className="text-muted"
-                                      style={{ paddingLeft: depth * 16 }}
-                                    >
-                                      └{' '}
-                                    </span>
-                                  ) : null}
-                                  {acc.name}
-                                  {isHeader ? (
-                                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-graphite border border-hairline rounded px-1.5 py-0.5">
-                                      {childCounts.get(acc.code)} sub
-                                    </span>
-                                  ) : null}
-                                </td>
-                                <td className="font-mono text-xs text-graphite">
-                                  {acc.code}
-                                </td>
-                                <td className="m-hide">
-                                  <span className="font-mono text-[10px] uppercase tracking-wider text-info">
-                                    {CFC_LABELS[acc.cash_flow_category]}
+                                    {depth > 0 ? (
+                                      <span className="text-graphite" aria-hidden>
+                                        └
+                                      </span>
+                                    ) : null}
+                                    <span className={isHeader ? 'font-medium' : undefined}>{acc.name}</span>
                                   </span>
+                                  {isHeader ? (
+                                    <span className="coa-sub" style={{ paddingLeft: depth * 18 }}>
+                                      {childCounts.get(acc.code)} sub-accounts
+                                    </span>
+                                  ) : null}
                                 </td>
-                                <td className="m-hide">
-                                  <span
-                                    className={`font-serif italic text-xs ${
-                                      acc.is_active ? 'text-ledger' : 'text-muted'
-                                    }`}
-                                  >
+                                <td className="font-mono text-xs">{acc.code}</td>
+                                <td className="m-hide" data-label="Cash flow">
+                                  {CFC_LABELS[acc.cash_flow_category]}
+                                </td>
+                                <td className="m-hide" data-label="Status">
+                                  <span className={`chip ${acc.is_active ? 'ledger' : ''}`}>
+                                    <span className="dot" />
                                     {acc.is_active ? 'active' : 'inactive'}
                                   </span>
                                 </td>
-                                <td className="text-right">
+                                <td className="right">
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -467,7 +435,7 @@ export default function AccountsSection({ accounts }: Props) {
                                       setError(null)
                                       setNotice(null)
                                     }}
-                                    className="text-xs text-accent hover:text-accent-hover font-serif italic"
+                                    className="btn-quiet-sheet"
                                   >
                                     Edit
                                   </button>
@@ -477,14 +445,18 @@ export default function AccountsSection({ accounts }: Props) {
                           </tr>
                         )
                       })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )
-          })}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
+      <p className="text-xs text-graphite mt-3 max-w-3xl">
+        Drag a row onto another account to make it a sub-account. Same type only; accounts with postings can&apos;t become parents.
+        Codes are allocated by type, and the cash flow category decides Operating / Investing / Financing on the Cash Flow Statement.
+      </p>
     </section>
   )
 }
@@ -756,19 +728,11 @@ function AccountForm({
       ) : null}
 
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={isPending}
-          className="px-4 py-2 bg-accent text-white text-sm font-serif italic rounded-md hover:bg-accent-hover disabled:opacity-50"
-        >
+        <button type="submit" disabled={isPending} className="btn-pri-sheet">
           {isPending ? 'Saving…' : mode === 'create' ? 'Create' : 'Save'}
         </button>
         {onCancel ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 border border-hairline text-graphite text-sm font-serif italic rounded-md hover:bg-stone"
-          >
+          <button type="button" onClick={onCancel} className="btn-quiet-sheet">
             Cancel
           </button>
         ) : null}

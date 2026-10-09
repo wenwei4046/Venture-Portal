@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
 
 // 2026-10-09 — Debtor Aging, Loan Aging and the Company Statement per the
@@ -39,9 +39,12 @@ import CompanyStatementPage from '../company-statement/page'
 
 const card = (name: string) => screen.getByRole('group', { name })
 const buckets = (current: number, m1: number, m2: number, m3: number) => ({ current, m1, m2, m3, total: current + m1 + m2 + m3 })
+// Days late (2026-10-09): not due yet, 1–30, 31–90, over 90.
+const days = (notDue: number, d30: number, d90: number, d90plus: number) => ({ notDue, d30, d90, d90plus, total: notDue + d30 + d90 + d90plus })
 const side = (due: number[], grand: number) => ({
-  due: [{ key: 'd1', counterparty: 'HOUZS Kitchen', detail: '', buckets: buckets(due[0], due[1], due[2], due[3]) }],
+  due: [{ key: 'd1', counterparty: 'HOUZS Kitchen', detail: '', buckets: buckets(due[0], due[1], due[2], due[3]), days: days(due[0], due[1], due[2], due[3]) }],
   dueTotal: buckets(due[0], due[1], due[2], due[3]),
+  dueDaysTotal: days(due[0], due[1], due[2], due[3]),
   scheduled: [], scheduledTotal: grand, noTerm: [], noTermTotal: 0, grandTotal: grand,
 })
 
@@ -63,11 +66,24 @@ describe('Debtor Aging on the sheet', () => {
     expect(card('Total receivable')).toHaveAttribute('data-tone', 'primary')
     expect(card('Total receivable')).toHaveTextContent('RM 70,000.00')
     expect(card('Total receivable')).toHaveTextContent('2 companies')
-    expect(card('Current')).toHaveTextContent('RM 64,000.00')
-    expect(card('Over 1 month')).toHaveTextContent('RM 6,000.00')
+    // Days since the invoice (the July rule: invoice date, not due date).
+    expect(card('0–30 days')).toHaveTextContent('RM 64,000.00')
+    expect(card('31–60 days')).toHaveTextContent('RM 0.00')
+    expect(card('Over 60 days')).toHaveAttribute('data-tone', 'danger')
+    expect(card('Over 60 days')).toHaveTextContent('RM 6,000.00')
+    const heads = Array.from(document.querySelectorAll('thead th')).map((th) => th.textContent)
+    expect(heads).toEqual(['Customer', '0–30 days', '31–60 days', '61–90 days', '90+ days', 'Total'])
     const all = document.querySelector('tr.rpt-all') as HTMLElement
     expect(all).toHaveTextContent('All companies')
     expect(all).toHaveTextContent('70,000.00')
+  })
+
+  it('finds a company by name, nothing hidden', async () => {
+    render(await DebtorAgingPage())
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Find company' }), { target: { value: 'design' } })
+    expect(screen.getByText('1 match')).toBeInTheDocument()
+    expect(screen.getByText('HOUZS Design').closest('tr')).toHaveClass('search-row-hit')
+    expect(screen.getByText('HOUZS Century').closest('tr')).not.toHaveClass('search-row-hit')
   })
 
   it('stays as it was for a department manager', async () => {
@@ -84,9 +100,13 @@ describe('Loan Aging on the sheet', () => {
     expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · LOAN AGING · OCTOBER 2026')
     expect(card('To collect · outstanding')).toHaveAttribute('data-tone', 'primary')
     expect(card('To collect · outstanding')).toHaveTextContent('RM 250,000.00')
-    expect(card('Due this month')).toHaveTextContent('RM 4,000.00')
-    expect(card('Late · to collect')).toHaveTextContent('RM 2,000.00')
+    expect(card('Not due')).toHaveTextContent('RM 4,000.00')
+    expect(card('1–30 days late')).toHaveAttribute('data-tone', 'danger')
+    expect(card('1–30 days late')).toHaveTextContent('RM 2,000.00')
+    expect(card('Over 30 days late')).toHaveTextContent('RM 0.00')
     expect(card('To repay · outstanding')).toHaveTextContent('RM 120,000.00')
+    const collect = screen.getByRole('heading', { level: 2, name: 'To Collect · aging — Fund OUT' }).closest('section') as HTMLElement
+    expect(Array.from(collect.querySelectorAll('thead th')).map((th) => th.textContent)).toEqual(['Counterparty', 'Not due', '1–30 days', '31–90 days', '90+ days', 'Total due'])
     const alls = Array.from(document.querySelectorAll('tr.rpt-all')).map((r) => r.textContent)
     expect(alls[0]).toContain('All borrowers')
     expect(alls[1]).toContain('All lenders')

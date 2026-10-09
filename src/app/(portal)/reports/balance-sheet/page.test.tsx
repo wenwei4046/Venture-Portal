@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 
 // 2026-10-09 — the Balance Sheet and the Trial Balance per the user's Claude
 // Design handoff (Phase 4 of the Finance revamp): the date in the eyebrow,
@@ -10,7 +10,22 @@ import { render, screen, within } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({ buildBalanceSheet: vi.fn(), fetchTrialBalance: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePermission: async () => ({ role: 'finance', permissions: ['reports'] }) }))
-vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({}) }))
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: async () => ({
+    from: () => {
+      const rows = [
+        { code: '1000', name: 'Current assets', parent_code: null },
+        { code: '1010', name: 'Cash — Hong Leong', parent_code: '1000' },
+        { code: '1020', name: 'Cash — Alliance', parent_code: '1000' },
+        { code: '2100', name: 'Fund sources', parent_code: null },
+      ]
+      const q: Record<string, unknown> = {}
+      for (const m of ['select', 'eq', 'order']) q[m] = () => q
+      q.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: rows, error: null }).then(res)
+      return q
+    },
+  }),
+}))
 vi.mock('@/lib/gl-reports', () => ({
   applyGlRefs: (l: unknown) => l,
   buildBalanceSheet: mocks.buildBalanceSheet,
@@ -39,8 +54,9 @@ beforeEach(() => {
   })
   mocks.fetchTrialBalance.mockResolvedValue({
     rows: [
-      { code: '1010', name: 'Cash — Hong Leong', debit: 2095750, credit: 0 },
-      { code: '2100', name: 'Fund sources', debit: 0, credit: 2095750 },
+      { code: '1010', name: 'Cash — Hong Leong', type: 'asset', debit: 1500000, credit: 0 },
+      { code: '1020', name: 'Cash — Alliance', type: 'asset', debit: 595750, credit: 0 },
+      { code: '2100', name: 'Fund sources', type: 'liability', debit: 0, credit: 2095750 },
     ],
     totals: { debit: 2095750, credit: 2095750 },
     reconciles: true,
@@ -67,12 +83,41 @@ describe('the Trial Balance on the sheet', () => {
     expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · TRIAL BALANCE · AS AT 9 OCTOBER 2026')
     expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/reports/trial-balance/export?format=xlsx&as_of=2026-10-09')
     expect(card('Total debit')).toHaveTextContent('RM 2,095,750.00')
-    expect(card('Total debit')).toHaveTextContent('2 accounts')
+    expect(card('Total debit')).toHaveTextContent('3 accounts')
     expect(card('Total credit')).toHaveTextContent('RM 2,095,750.00')
     expect(card('Difference')).toHaveAttribute('data-tone', 'primary')
     expect(card('Difference')).toHaveTextContent('RM 0.00')
     const table = screen.getByRole('heading', { level: 2, name: 'Trial balance' }).closest('section') as HTMLElement
     expect(within(table).getByRole('link', { name: '1010 · Cash — Hong Leong' })).toHaveAttribute('href', '/reports/ledger?code=1010')
     expect(table.querySelector('tfoot')).toHaveTextContent('Total')
+  })
+
+  it('groups the accounts by type under their parents, with levels and Find', async () => {
+    render(await TrialBalancePage({ searchParams: Promise.resolve({}) }))
+    const table = screen.getByRole('heading', { level: 2, name: 'Trial balance' }).closest('section') as HTMLElement
+    const row = (text: string) => within(table).getByText(text).closest('tr') as HTMLElement
+    expect(row('Assets')).toHaveClass('tb-block')
+    expect(row('Total assets')).toHaveTextContent('2,095,750.00')
+    expect(row('Total liabilities')).toHaveTextContent('2,095,750.00')
+    expect(row('Current assets')).toBeInTheDocument()
+    expect(row('Subtotal')).toHaveTextContent('2,095,750.00')
+
+    const controls = within(table).getByRole('group', { name: 'Report controls' })
+    expect(within(controls).getByLabelText('As at')).toHaveValue('2026-10-09')
+    expect(within(controls).getByRole('button', { name: 'L3' })).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.change(within(controls).getByRole('searchbox', { name: 'Find account' }), { target: { value: 'alliance' } })
+    expect(within(controls).getByText('1 match')).toBeInTheDocument()
+    expect(within(table).getByRole('link', { name: '1020 · Cash — Alliance' }).closest('tr')).toHaveClass('search-row-hit')
+
+    fireEvent.change(within(controls).getByRole('searchbox', { name: 'Find account' }), { target: { value: '' } })
+    fireEvent.click(within(controls).getByRole('button', { name: 'L1' }))
+    expect(within(table).queryByRole('link', { name: '1010 · Cash — Hong Leong' })).toBeNull()
+    expect(within(table).queryByText('Current assets')).toBeNull()
+    expect(row('Total assets')).toBeInTheDocument()
+
+    fireEvent.click(within(controls).getByRole('button', { name: 'L2' }))
+    expect(row('Current assets')).toHaveTextContent('2,095,750.00')
+    expect(within(table).queryByRole('link', { name: '1010 · Cash — Hong Leong' })).toBeNull()
   })
 })

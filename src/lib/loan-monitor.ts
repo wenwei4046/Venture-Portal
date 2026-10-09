@@ -6,14 +6,24 @@
 //        定好要还却还没收到的" must age, "收了就不会出现").
 //   区2 Outstanding 总览 — every open balance, split 定好日期 vs 还没定好.
 
-import { officeMonth } from '@/lib/office-time'
+import { officeMonth, officeToday } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
 import { isLoanUnscheduled, loanMonthlyInstallment } from '@/lib/treasury-schedule'
-import { buildSegmentedAging, buildTermsSegments, currentSegment, principalPaidSince, resolveFirstDueYM, segmentRemainingPeriods, termsChanged } from '@/lib/treasury-terms'
+import { buildTermsSegments, currentSegment, principalPaidSince, resolveFirstDueYM, segmentedUnpaid, segmentRemainingPeriods, termsChanged } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isFundSourcePrincipal, isLoanPrincipal, principalPaidByMonth, termsForFundSource, termsForLoan } from '@/lib/treasury-terms-data'
 import { fundingSourceFromTerms } from '@/lib/utils'
-import { buildInstallmentAging, sumBuckets, type AgingBuckets, EMPTY_BUCKETS } from './loan-aging'
+import {
+  agingByDays,
+  agingByMonths,
+  sumBuckets,
+  sumDayBuckets,
+  unpaidInstallments,
+  type AgingBuckets,
+  type DayAgingBuckets,
+  EMPTY_BUCKETS,
+  EMPTY_DAY_BUCKETS,
+} from './loan-aging'
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
@@ -35,6 +45,8 @@ export interface DueRow {
   detail: string
   source?: string | null
   buckets: AgingBuckets
+  /** The same unpaid installments by days late (2026-10-09, Finance's view). */
+  days: DayAgingBuckets
 }
 
 export interface OutstandingRow {
@@ -49,6 +61,7 @@ export interface OutstandingRow {
 export interface MonitorSide {
   due: DueRow[]
   dueTotal: AgingBuckets
+  dueDaysTotal: DayAgingBuckets
   scheduled: OutstandingRow[]
   scheduledTotal: number
   noTerm: OutstandingRow[]
@@ -67,6 +80,10 @@ const money = (n: number) =>
 
 export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<LoanMonitorData> {
   const currentYM = officeMonth()
+  const today = officeToday()
+  // An installment falls due on the deal's own day of the month (its
+  // disbursement / effective date's), as on its Repayment schedule.
+  const dayOf = (d: unknown) => (d ? Number(String(d).slice(8, 10)) || 1 : 1)
 
   const [
     { data: loans },
@@ -194,9 +211,9 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
           tenureMonths: tenure,
           principalPaid: Number(out?.total_principal_paid ?? 0),
         }).remainingPeriods
-    const buckets = changed
-      ? buildSegmentedAging({ segments, asOfYM: currentYM, totalPaid: paidByLoan.get(l.id as string) ?? 0 })
-      : buildInstallmentAging({
+    const unpaid = changed
+      ? segmentedUnpaid({ segments, asOfYM: currentYM, totalPaid: paidByLoan.get(l.id as string) ?? 0 })
+      : unpaidInstallments({
           principal,
           monthlyRate: rate,
           tenureMonths: tenure,
@@ -204,6 +221,7 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
           asOfYM: currentYM,
           totalPaid: paidByLoan.get(l.id as string) ?? 0,
         })
+    const buckets = agingByMonths(unpaid, currentYM)
     if (buckets.total <= 0.005) continue // fully caught up → disappears
     collectDue.push({
       key: l.id as string,
@@ -211,6 +229,7 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
       detail: `RM ${money(principal)} @ ${(rate * 100).toFixed(3)}%/mo · ${tenure}mo · ${remainingLeft} left${termsTag}`,
       source,
       buckets,
+      days: agingByDays(unpaid, dayOf(l.disbursement_date), today),
     })
   }
 
@@ -265,9 +284,9 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
     const remaining = seg
       ? segmentRemainingPeriods(seg, principalPaidSince(fsPrincipalByMonth.get(s.id as string) ?? {}, seg.fromYM))
       : remainingPeriods(amount, lockIn, principalPaid)
-    const buckets = changed
-      ? buildSegmentedAging({ segments, asOfYM: currentYM, totalPaid: paidByFs.get(s.id as string) ?? 0 })
-      : buildInstallmentAging({
+    const unpaid = changed
+      ? segmentedUnpaid({ segments, asOfYM: currentYM, totalPaid: paidByFs.get(s.id as string) ?? 0 })
+      : unpaidInstallments({
           principal: amount,
           monthlyRate: rate,
           tenureMonths: lockIn,
@@ -275,12 +294,14 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
           asOfYM: currentYM,
           totalPaid: paidByFs.get(s.id as string) ?? 0,
         })
+    const buckets = agingByMonths(unpaid, currentYM)
     if (buckets.total <= 0.005) continue
     repayDue.push({
       key: s.id as string,
       counterparty: from as string,
       detail: `RM ${money(amount)} @ ${(rate * 100).toFixed(3)}%/mo · ${lockIn}mo · ${remaining} left${termsTag}`,
       buckets,
+      days: agingByDays(unpaid, dayOf(s.effective_date), today),
     })
   }
 
@@ -293,6 +314,7 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
     return {
       due,
       dueTotal: due.length ? sumBuckets(due.map((d) => d.buckets)) : { ...EMPTY_BUCKETS },
+      dueDaysTotal: due.length ? sumDayBuckets(due.map((d) => d.days)) : { ...EMPTY_DAY_BUCKETS },
       scheduled: sched,
       scheduledTotal,
       noTerm,

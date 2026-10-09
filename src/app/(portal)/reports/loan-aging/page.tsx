@@ -30,11 +30,13 @@ function SourceBadge({ source }: { source?: string | null }) {
   )
 }
 
+// Days late (2026-10-09, the Finance revamp handoff): each unpaid installment
+// from its own due day — not due yet, 1–30, 31–90 or over 90 days.
 const BUCKETS = [
-  { key: 'current', label: 'Due this month' },
-  { key: 'm1', label: '1 mo late' },
-  { key: 'm2', label: '2 mo late' },
-  { key: 'm3', label: '3+ mo late' },
+  { key: 'notDue', label: 'Not due' },
+  { key: 'd30', label: '1–30 days' },
+  { key: 'd90', label: '31–90 days' },
+  { key: 'd90plus', label: '90+ days' },
 ] as const
 
 function DueTable({ side, verb, allLabel }: { side: MonitorSide; verb: 'collected' | 'paid'; allLabel: string }) {
@@ -66,18 +68,18 @@ function DueTable({ side, verb, allLabel }: { side: MonitorSide; verb: 'collecte
                 <span className="font-mono text-[11px] text-graphite ml-2">{d.detail}</span>
               </td>
               {BUCKETS.map((b) => (
-                <td key={b.key} className="num">{money(d.buckets[b.key])}</td>
+                <td key={b.key} className="num">{money(d.days[b.key])}</td>
               ))}
-              <td className="num font-semibold">{formatMoney(d.buckets.total)}</td>
+              <td className="num font-semibold">{formatMoney(d.days.total)}</td>
             </tr>
           ))}
           {/* The handoff's navy "All" row (2026-10-09). */}
           <tr className="rpt-all">
             <td>{allLabel}</td>
             {BUCKETS.map((b) => (
-              <td key={b.key} className="num">{money(side.dueTotal[b.key])}</td>
+              <td key={b.key} className="num">{money(side.dueDaysTotal[b.key])}</td>
             ))}
-            <td className="num">{formatMoney(side.dueTotal.total)}</td>
+            <td className="num">{formatMoney(side.dueDaysTotal.total)}</td>
           </tr>
         </tbody>
       </table>
@@ -173,8 +175,8 @@ export default async function LoanMonitorPage() {
   // On the sheet (2026-10-09, the user's Claude Design handoff): cards for
   // both sides, the exports as the sheet's buttons, each aging closing on a
   // navy "All" row.
-  const late = (s: MonitorSide) => Math.round((s.dueTotal.m1 + s.dueTotal.m2 + s.dueTotal.m3) * 100) / 100
-  const lateCollect = late(data.collect)
+  const late = (s: MonitorSide) => Math.round((s.dueDaysTotal.d30 + s.dueDaysTotal.d90 + s.dueDaysTotal.d90plus) * 100) / 100
+  const over30 = Math.round((data.collect.dueDaysTotal.d90 + data.collect.dueDaysTotal.d90plus) * 100) / 100
   const lateRepay = late(data.repay)
 
   return (
@@ -210,10 +212,17 @@ export default async function LoanMonitorPage() {
 
       <StatCards label="Loan aging">
         <StatCard label="To collect · outstanding" value={formatMoney(data.collect.grandTotal)} icon="send" tone="primary" note="Fund OUT" />
-        <StatCard label="Due this month" value={formatMoney(data.collect.dueTotal.current)} icon="calendar" note="To collect, unsettled" />
-        <StatCard label="Late · to collect" value={formatMoney(lateCollect)} icon="clock" tone={lateCollect > 0 ? 'danger' : 'default'} note="A month or more" />
+        <StatCard label="Not due" value={formatMoney(data.collect.dueDaysTotal.notDue)} icon="calendar" note="This month, not yet late" />
+        <StatCard
+          label="1–30 days late"
+          value={formatMoney(data.collect.dueDaysTotal.d30)}
+          icon="clock"
+          tone={data.collect.dueDaysTotal.d30 > 0 ? 'danger' : 'default'}
+          note="To collect"
+        />
+        <StatCard label="Over 30 days late" value={formatMoney(over30)} icon="alert" tone={over30 > 0 ? 'danger' : 'default'} note="To collect" />
         <StatCard label="To repay · outstanding" value={formatMoney(data.repay.grandTotal)} icon="inbox" note="Fund IN" />
-        <StatCard label="Late · to repay" value={formatMoney(lateRepay)} icon="alert" tone={lateRepay > 0 ? 'danger' : 'default'} note="A month or more" />
+        <StatCard label="Late · to repay" value={formatMoney(lateRepay)} icon="alert" tone={lateRepay > 0 ? 'danger' : 'default'} note="Past its due day" />
       </StatCards>
 
       <section className="mb-12">

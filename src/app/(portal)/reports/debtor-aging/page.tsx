@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney } from '@/lib/utils'
-import { buildDebtorAging, type RawInvoice } from '@/lib/debtor-aging'
+import { buildDebtorAging, debtorAgingView, type RawInvoice } from '@/lib/debtor-aging'
 import { fetchPaidByInvoice } from '@/lib/debtor-aging-data'
 import AgingByCustomer from './_components/AgingByCustomer'
 import { reportsCompanyWide } from '@/lib/surfaces'
@@ -68,10 +68,12 @@ export default async function DebtorAgingPage() {
   // table closing on a navy "All companies" row. A department manager keeps
   // the page below, as it was.
   if (reportsCompanyWide(user)) {
-    const b = aging.totals.buckets
-    const current = b.this_month
-    const overOne = Math.round((aging.totals.total - current) * 100) / 100
-    const overThree = Math.round((b.m3 + b.m4 + b.m5_plus) * 100) / 100
+    // By days since the invoice (the handoff's columns, the July rule's basis).
+    const days = debtorAgingView(raw, today, 'days')
+    const b = days.totals.buckets
+    const fresh = b.d0_30 ?? 0
+    const d31 = b.d31_60 ?? 0
+    const over60 = Math.round(((b.d61_90 ?? 0) + (b.d90_plus ?? 0)) * 100) / 100
     const exportHref = (format: 'xlsx' | 'pdf', view: 'detail' | 'summary') => `/reports/debtor-aging/export?format=${format}&view=${view}`
     return (
       <div>
@@ -81,7 +83,7 @@ export default async function DebtorAgingPage() {
               <em>I.</em> REPORTS · DEBTOR AGING · AS AT {dayjs(today).format('D MMM YYYY').toUpperCase()}
             </div>
             <h1 className="page-title">Debtor Aging</h1>
-            <p className="page-sub">Invoices billed out and not yet collected, by how many months they have been open.</p>
+            <p className="page-sub">Invoices billed out and not yet collected, by days since the invoice date.</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <a href={exportHref('xlsx', 'detail')} className="btn-quiet-sheet">
@@ -107,9 +109,9 @@ export default async function DebtorAgingPage() {
             tone="primary"
             note={`${aging.byPayer.length} ${aging.byPayer.length === 1 ? 'company' : 'companies'} · ${aging.totals.count} ${aging.totals.count === 1 ? 'invoice' : 'invoices'}`}
           />
-          <StatCard label="Current" value={formatMoney(current)} icon="check" note="Billed this month" />
-          <StatCard label="Over 1 month" value={formatMoney(overOne)} icon="clock" tone={overOne > 0 ? 'danger' : 'default'} note="Open a month or more" />
-          <StatCard label="Over 3 months" value={formatMoney(overThree)} icon="alert" tone={overThree > 0 ? 'danger' : 'default'} note="Open three months or more" />
+          <StatCard label="0–30 days" value={formatMoney(fresh)} icon="check" note="Since the invoice date" />
+          <StatCard label="31–60 days" value={formatMoney(d31)} icon="clock" tone={d31 > 0 ? 'danger' : 'default'} note="Since the invoice date" />
+          <StatCard label="Over 60 days" value={formatMoney(over60)} icon="alert" tone={over60 > 0 ? 'danger' : 'default'} note="Since the invoice date" />
         </StatCards>
 
         <section className="mb-6">
@@ -125,7 +127,7 @@ export default async function DebtorAgingPage() {
               <p className="text-sm">Nothing outstanding — every issued invoice has been collected.</p>
             </div>
           ) : (
-            <AgingByCustomer byPayer={aging.byPayer} invoices={aging.invoices} totals={aging.totals} allRow />
+            <AgingByCustomer byPayer={days.byPayer} invoices={days.invoices} totals={days.totals} columns={days.columns} allRow search />
           )}
         </section>
       </div>

@@ -1,5 +1,46 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-09 j (SHIPPED) — Finance revamp · the five gaps closed
+
+The user asked what was left ("还有什么没做？") and then "继续做完这五处".
+
+- **Dept Pool · HR Costing Submission** (Finance's cash view): each department's
+  latest `hr_cost_submissions` row as a chip — executed (ledger), ready to execute
+  (= `approved_for_execution`, accent), awaiting Principal (= `pending`, alert),
+  "—" if none; the month and the approved-to-date total on hover. A ready one
+  has **Mark executed** (the submissions page's `executeHrCosting` form, Treasury ·
+  Edit; it moves no money — the prototype's "Execute transfers" wording was not
+  used). `executeHrCosting` now also revalidates /dept-pool and its submissions.
+- **Debtor Aging by days** (company-wide readers + their export): `lib/debtor-aging`
+  `DAY_BUCKETS` / `debtorAgingView(raw, asOf, 'months' | 'days')`. Still aged by
+  **invoice date** (the user's July 2026 rule), so the design's "Current + 1–30"
+  became one "0–30 days" column: 0–30 / 31–60 / 61–90 / 90+. Cards 0–30 /
+  31–60 / Over 60. `AgingByCustomer` takes `columns` and `search` (Find company,
+  highlights only). A department manager keeps months.
+- **Loan Aging by days late** (page + export): `lib/loan-aging`
+  `unpaidInstallments` / `agingByMonths` / `agingByDays` / `dueDateIn`,
+  `treasury-terms` `segmentedUnpaid`; the same FIFO allocation as before (totals
+  unchanged), each unpaid installment aged from the deal's day of the month
+  (disbursement / effective date, clamped): Not due / 1–30 / 31–90 / 90+.
+  `loan-monitor` rows carry `days`, sides `dueDaysTotal`.
+- **Trial Balance in groups**: `lib/trial-balance-groups.ts` (types in the
+  statement's order, each account under its top-level parent),
+  `trial-balance/_components/TrialBalanceView` (As at, Show zero, Find account,
+  L1 type totals / L2 + parents / L3 every account, parents fold, navy Total).
+  As at / Show zero submit a plain GET form (no router; the default-period test
+  renders it bare); the page's chart-of-accounts read fails soft (ungrouped).
+- **Voucher form** (new / copy / edit): Date · Description · Segment row, the lines
+  under a navy band, + Add line [Ins], totals at the foot, balance chip (Balanced /
+  Out of balance · x / waiting), Post entry (was "Post voucher") only when the
+  existing `canSubmit` holds. CSS `.jv-*`.
+- **Settings tables**: Chart of Accounts = one table with a band per type, "n
+  sub-accounts", Cash flow, status chip, Search (matches + their parents), Show
+  inactive / Collapse / Expand / + New account in one band (drag-to-reparent,
+  inline edit, the create dialog unchanged). Departments = + New department, the
+  three notes in a "How departments work" fold, Pool GL "code · name"
+  (`poolNames` from the page), billing mode in words (`billingModeLabel`), Mode
+  chip (the switch stays for whoever `canSwitch`), Provision.
+
 ## CHECKPOINT 2026-10-09 i (SHIPPED) — Finance revamp · Phase 4b: Reports, Reconciliation / Journal, Settings — the revamp is complete
 
 - **Reports, company-wide readers only** (`reportsCompanyWide(user)` — a department

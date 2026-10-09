@@ -5,8 +5,9 @@ import { fetchTrialBalance, isCalendarDay } from '@/lib/cfo-reports'
 import dayjs from 'dayjs'
 import { officeToday } from '@/lib/office-time'
 import Link from 'next/link'
-import { formatMoneyBare } from '@/lib/utils'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import { groupTrialBalance } from '@/lib/trial-balance-groups'
+import TrialBalanceView from './_components/TrialBalanceView'
 
 interface Props {
   searchParams: Promise<{ as_of?: string; show_zero?: string }>
@@ -22,7 +23,12 @@ export default async function TrialBalancePage({ searchParams }: Props) {
   const asOf = isCalendarDay(rawAsOf) ? rawAsOf : officeToday()
   const showZeroBalance = rawShowZero === '1'
 
-  const tb = await fetchTrialBalance(supabase, { asOf, showZeroBalance })
+  // The accounts' parents arrange the rows into groups (2026-10-09, the
+  // handoff). Only the arrangement rides on this read: should it fail, every
+  // account stands on its own and the figures are the same.
+  const coaRead = (async () => supabase.from('chart_of_accounts').select('code, name, parent_code'))().catch(() => ({ data: null }))
+  const [tb, { data: coaRows }] = await Promise.all([fetchTrialBalance(supabase, { asOf, showZeroBalance }), coaRead])
+  const blocks = groupTrialBalance(tb.rows, (coaRows ?? []) as Array<{ code: string; name: string; parent_code: string | null }>)
   const dateLabel = dayjs(asOf).format('D MMMM YYYY')
 
   // On the sheet (2026-10-09, the user's Claude Design handoff): the date in
@@ -68,22 +74,6 @@ export default async function TrialBalancePage({ searchParams }: Props) {
         <span className="rule" aria-hidden />
         <span className="count">AS AT {dateLabel.toUpperCase()}</span>
       </div>
-      <form className="rpt-toolbar" aria-label="Trial balance date">
-        <label className="rpt-field">
-          <span>As at</span>
-          <input type="date" name="as_of" defaultValue={asOf} />
-        </label>
-        <label className="rpt-field">
-          <span>Show</span>
-          <span className="flex items-center gap-2 h-8 normal-case tracking-normal text-[13px] font-normal text-ink">
-            <input type="checkbox" name="show_zero" value="1" defaultChecked={showZeroBalance} />
-            Zero-balance accounts
-          </span>
-        </label>
-        <button type="submit" className="btn-pri-sheet">
-          Apply
-        </button>
-      </form>
       <p className="text-xs text-graphite mb-3 max-w-3xl">
         Every postable GL account as at {dateLabel}. Header accounts (1000, 9050) roll up through their children. Σ Dr must equal Σ Cr.
       </p>
@@ -94,39 +84,7 @@ export default async function TrialBalancePage({ searchParams }: Props) {
         </div>
       ) : null}
 
-      <div className="table-frame max-w-4xl">
-        <div className="table-frame-scroll">
-          <table className="ledger-table">
-            <thead>
-              <tr>
-                <th>Account</th>
-                <th className="right">Debit</th>
-                <th className="right">Credit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tb.rows.map((r) => (
-                <tr key={r.code}>
-                  <td>
-                    <Link href={`/reports/ledger?code=${encodeURIComponent(r.code)}`} className="text-ink hover:text-accent">
-                      {r.code} · {r.name}
-                    </Link>
-                  </td>
-                  <td className="num">{r.debit > 0 ? formatMoneyBare(r.debit) : '—'}</td>
-                  <td className="num">{r.credit > 0 ? formatMoneyBare(r.credit) : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="rpt-all">
-                <td>Total</td>
-                <td className="num">{formatMoneyBare(tb.totals.debit)}</td>
-                <td className="num">{formatMoneyBare(tb.totals.credit)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
+      <TrialBalanceView asOf={asOf} showZero={showZeroBalance} blocks={blocks} totals={tb.totals} />
       </section>
 
       {tb.rows.length === 0 ? (

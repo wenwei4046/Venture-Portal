@@ -278,12 +278,11 @@ export interface AgingBucketsLike {
   total: number
 }
 
-export function buildSegmentedAging(args: {
-  segments: TermsSegment[]
-  asOfYM: string
-  totalPaid: number
-}): AgingBucketsLike {
-  const out: AgingBucketsLike = { current: 0, m1: 0, m2: 0, m3: 0, total: 0 }
+/** The installments due up to asOfYM by the segments in force, not fully
+ *  paid, payments FIFO — what both agings bucket (2026-10-09: split out so
+ *  the days aging reads the very same ones). */
+export function segmentedUnpaid(args: { segments: TermsSegment[]; asOfYM: string; totalPaid: number }): Array<{ ym: string; unpaid: number }> {
+  const out: Array<{ ym: string; unpaid: number }> = []
   const first = args.segments[0]
   if (!first || first.fromYM === '0000-00') return out
   let paidLeft = args.totalPaid
@@ -297,16 +296,26 @@ export function buildSegmentedAging(args: {
       const applied = Math.min(paidLeft, installment)
       paidLeft = r2(paidLeft - applied)
       const unpaid = r2(installment - applied)
-      const age = monthsBetweenYM(ym, args.asOfYM)
-      if (unpaid > 0) {
-        if (age === 0) out.current = r2(out.current + unpaid)
-        else if (age === 1) out.m1 = r2(out.m1 + unpaid)
-        else if (age === 2) out.m2 = r2(out.m2 + unpaid)
-        else out.m3 = r2(out.m3 + unpaid)
-      }
+      if (unpaid > 0) out.push({ ym, unpaid })
     }
     ym = addMonthsYM(ym, 1)
     guard++
+  }
+  return out
+}
+
+export function buildSegmentedAging(args: {
+  segments: TermsSegment[]
+  asOfYM: string
+  totalPaid: number
+}): AgingBucketsLike {
+  const out: AgingBucketsLike = { current: 0, m1: 0, m2: 0, m3: 0, total: 0 }
+  for (const { ym, unpaid } of segmentedUnpaid(args)) {
+    const age = monthsBetweenYM(ym, args.asOfYM)
+    if (age === 0) out.current = r2(out.current + unpaid)
+    else if (age === 1) out.m1 = r2(out.m1 + unpaid)
+    else if (age === 2) out.m2 = r2(out.m2 + unpaid)
+    else out.m3 = r2(out.m3 + unpaid)
   }
   out.total = r2(out.current + out.m1 + out.m2 + out.m3)
   return out

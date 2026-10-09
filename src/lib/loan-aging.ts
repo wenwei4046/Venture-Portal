@@ -37,7 +37,7 @@ export function addMonths(ym: string, n: number): string {
   return `${ny}-${String(nm).padStart(2, '0')}`
 }
 
-export function buildInstallmentAging(args: {
+export interface InstallmentArgs {
   principal: number
   monthlyRate: number
   tenureMonths: number
@@ -46,27 +46,98 @@ export function buildInstallmentAging(args: {
   asOfYM: string
   /** Total repaid to date (all payment types pooled). */
   totalPaid: number
-}): AgingBuckets {
+}
+
+/** An installment due by asOfYM with something still unpaid on it. */
+export interface UnpaidInstallment {
+  ym: string
+  unpaid: number
+}
+
+/** The installments due up to asOfYM that are not fully paid, the payments
+ *  allocated FIFO — the rows both agings bucket (2026-10-09: split out of
+ *  buildInstallmentAging so the days aging reads the very same ones). */
+export function unpaidInstallments(args: InstallmentArgs): UnpaidInstallment[] {
   const { principal, monthlyRate, tenureMonths, firstDueYM, asOfYM, totalPaid } = args
-  const out = { ...EMPTY_BUCKETS }
+  const out: UnpaidInstallment[] = []
   if (tenureMonths <= 0 || principal <= 0) return out
 
   const installment = r2(principal / tenureMonths + principal * monthlyRate)
   let paidLeft = totalPaid
   for (let k = 0; k < tenureMonths; k++) {
     const dueYM = addMonths(firstDueYM, k)
-    const age = monthsBetween(dueYM, asOfYM)
-    if (age < 0) break // future installments — not due yet, not aged
+    if (monthsBetween(dueYM, asOfYM) < 0) break // future installments — not due yet, not aged
     const applied = Math.min(paidLeft, installment)
     paidLeft = r2(paidLeft - applied)
     const unpaid = r2(installment - applied)
-    if (unpaid <= 0) continue
-    if (age === 0) out.current = r2(out.current + unpaid)
-    else if (age === 1) out.m1 = r2(out.m1 + unpaid)
-    else if (age === 2) out.m2 = r2(out.m2 + unpaid)
-    else out.m3 = r2(out.m3 + unpaid)
+    if (unpaid > 0) out.push({ ym: dueYM, unpaid })
+  }
+  return out
+}
+
+/** Unpaid installments bucketed by how many months past due they are as of asOfYM. */
+export function agingByMonths(unpaid: UnpaidInstallment[], asOfYM: string): AgingBuckets {
+  const out = { ...EMPTY_BUCKETS }
+  for (const u of unpaid) {
+    const age = monthsBetween(u.ym, asOfYM)
+    if (age <= 0) out.current = r2(out.current + u.unpaid)
+    else if (age === 1) out.m1 = r2(out.m1 + u.unpaid)
+    else if (age === 2) out.m2 = r2(out.m2 + u.unpaid)
+    else out.m3 = r2(out.m3 + u.unpaid)
   }
   out.total = r2(out.current + out.m1 + out.m2 + out.m3)
+  return out
+}
+
+export function buildInstallmentAging(args: InstallmentArgs): AgingBuckets {
+  return agingByMonths(unpaidInstallments(args), args.asOfYM)
+}
+
+// ─── By days late (2026-10-09, the Finance revamp handoff) ──────────────────
+// The same unpaid installments, each aged from its own due day: the deal's
+// day of the month (the disbursement / effective date's), or the month's last
+// day when the month is shorter. Not due yet · 1–30 · 31–90 · over 90 days.
+
+export interface DayAgingBuckets {
+  notDue: number
+  d30: number
+  d90: number
+  d90plus: number
+  total: number
+}
+
+export const EMPTY_DAY_BUCKETS: DayAgingBuckets = { notDue: 0, d30: 0, d90: 0, d90plus: 0, total: 0 }
+
+/** YYYY-MM-DD of an installment month's due day. */
+export function dueDateIn(ym: string, dueDay: number): string {
+  const [y, m] = ym.split('-').map(Number)
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate()
+  return `${ym}-${String(Math.min(Math.max(1, dueDay), last)).padStart(2, '0')}`
+}
+
+export function agingByDays(unpaid: UnpaidInstallment[], dueDay: number, today: string): DayAgingBuckets {
+  const out = { ...EMPTY_DAY_BUCKETS }
+  const t = Date.parse(`${today}T00:00:00Z`)
+  for (const u of unpaid) {
+    const late = Math.round((t - Date.parse(`${dueDateIn(u.ym, dueDay)}T00:00:00Z`)) / 86_400_000)
+    if (late <= 0) out.notDue = r2(out.notDue + u.unpaid)
+    else if (late <= 30) out.d30 = r2(out.d30 + u.unpaid)
+    else if (late <= 90) out.d90 = r2(out.d90 + u.unpaid)
+    else out.d90plus = r2(out.d90plus + u.unpaid)
+  }
+  out.total = r2(out.notDue + out.d30 + out.d90 + out.d90plus)
+  return out
+}
+
+export function sumDayBuckets(rows: DayAgingBuckets[]): DayAgingBuckets {
+  const out = { ...EMPTY_DAY_BUCKETS }
+  for (const b of rows) {
+    out.notDue = r2(out.notDue + b.notDue)
+    out.d30 = r2(out.d30 + b.d30)
+    out.d90 = r2(out.d90 + b.d90)
+    out.d90plus = r2(out.d90plus + b.d90plus)
+    out.total = r2(out.total + b.total)
+  }
   return out
 }
 

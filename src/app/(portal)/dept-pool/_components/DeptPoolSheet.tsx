@@ -4,6 +4,8 @@ import type { DeptPoolAccrual } from '@/lib/dept-pool-accrual'
 import LedgerRow from '@/components/LedgerRow'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { BalanceProvider, BalanceToggle, BalanceValue } from './RevealAmount'
+import { executeHrCosting } from '@/app/(portal)/hr-costing/actions'
+import dayjs from 'dayjs'
 
 // Department Pools on the sheet (2026-10-09, the user's Claude Design handoff
 // — Phase 4 of the Finance revamp), for whoever reads every department
@@ -79,6 +81,42 @@ export interface CashDeptRow {
   outAmt: number
   /** Lifetime approved HR costing submissions for the department. */
   costing: number
+  /** Its latest HR costing submission, if any (the status chip). */
+  hr?: { id: string; state: string; period: string } | null
+}
+
+/** A submission's state as the handoff names it. */
+const HR_STATE: Record<string, { label: string; tone: string }> = {
+  executed: { label: 'executed', tone: 'ledger' },
+  approved_for_execution: { label: 'ready to execute', tone: 'accent' },
+  pending: { label: 'awaiting Principal', tone: 'alert' },
+}
+
+/** The HR Costing Submission cell: the latest submission's state as a chip
+ *  (its month and the approved total on hover), and Mark executed for a ready
+ *  one — the same action as the submissions page; it moves no money. */
+function HrCell({ row, canExecute }: { row: CashDeptRow; canExecute: boolean }) {
+  if (!row.hr) return <span className="text-graphite">—</span>
+  const s = HR_STATE[row.hr.state] ?? { label: row.hr.state, tone: '' }
+  return (
+    <span className="inline-flex flex-wrap items-center justify-end gap-2">
+      <span
+        className={`chip ${s.tone}`}
+        title={`${dayjs(row.hr.period).format('MMM YYYY')} · approved to date ${formatMoney(row.costing)}`}
+      >
+        <span className="dot" />
+        {s.label}
+      </span>
+      {canExecute && row.hr.state === 'approved_for_execution' ? (
+        <form action={executeHrCosting}>
+          <input type="hidden" name="id" value={row.hr.id} />
+          <button type="submit" className="btn-quiet-sheet">
+            Mark executed
+          </button>
+        </form>
+      ) : null}
+    </span>
+  )
 }
 
 export interface PerBankBreakdown {
@@ -94,10 +132,13 @@ export function DeptPoolCashSheet({
   venture,
   perBank,
   total,
+  canExecuteHr = false,
 }: {
   monthTitle: string
   canNewContract: boolean
   rows: CashDeptRow[]
+  /** Treasury · Edit — Mark executed on a ready HR costing submission. */
+  canExecuteHr?: boolean
   venture: { balance: number; in_amt: number; out_amt: number } | null
   perBank: PerBankBreakdown | null
   /** Every department's balance plus Venture's — the physical bank balance. */
@@ -105,7 +146,6 @@ export function DeptPoolCashSheet({
 }) {
   const inAll = r2(rows.reduce((s, r) => s + r.inAmt, 0) + (venture?.in_amt ?? 0))
   const outAll = r2(rows.reduce((s, r) => s + r.outAmt, 0) + (venture?.out_amt ?? 0))
-  const costingAll = r2(rows.reduce((s, r) => s + r.costing, 0))
   const below = [...rows.filter((r) => r.balance < -0.005).map((r) => r.name), ...(venture && venture.balance < -0.005 ? ['Venture (Office)'] : [])]
   const deptCount = `${rows.length} department${rows.length === 1 ? '' : 's'}${venture ? ' + Venture' : ''}`
 
@@ -236,8 +276,8 @@ export function DeptPoolCashSheet({
                         <td className="num m-hide" data-label="Net (to date)">
                           <Fig v={r2(r.inAmt - r.outAmt)} />
                         </td>
-                        <td className="num m-hide" data-label="HR Costing Submission">
-                          {formatMoneyBare(r.costing)}
+                        <td className="right m-hide" data-label="HR Costing Submission">
+                          <HrCell row={r} canExecute={canExecuteHr} />
                         </td>
                       </LedgerRow>
                     ))}
@@ -256,8 +296,8 @@ export function DeptPoolCashSheet({
                         <td className="num m-hide" data-label="Net (to date)">
                           <Fig v={r2(venture.in_amt - venture.out_amt)} />
                         </td>
-                        <td className="num m-hide" data-label="HR Costing Submission">
-                          {formatMoneyBare(0)}
+                        <td className="right m-hide" data-label="HR Costing Submission">
+                          <span className="text-graphite">—</span>
                         </td>
                       </LedgerRow>
                     ) : null}
@@ -273,7 +313,7 @@ export function DeptPoolCashSheet({
                       <td className="num m-hide">
                         <Fig v={r2(inAll - outAll)} />
                       </td>
-                      <td className="num m-hide">{formatMoneyBare(costingAll)}</td>
+                      <td className="m-hide" />
                       <td className="lt-toggle" aria-hidden />
                     </tr>
                   </tfoot>

@@ -105,4 +105,7 @@ export async function executeHrCosting(formData: FormData) {
   void user
   revalidatePath('/hr-costing')
   revalidatePath('/dashboard')
+  // Department Pools shows each department's latest submission (2026-10-09).
+  revalidatePath('/dept-pool')
+  revalidatePath('/dept-pool/submissions')
 }

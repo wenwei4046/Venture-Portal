@@ -261,6 +261,7 @@ export default async function SettingsPage({ searchParams }: Props) {
             own_share_billback: Boolean((d as { own_share_billback?: boolean }).own_share_billback),
           }))}
           modes={departmentModes}
+          poolNames={Object.fromEntries((accountRows ?? []).map((a) => [a.code as string, a.name as string]))}
         />
       )}
 
