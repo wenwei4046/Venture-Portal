@@ -9,6 +9,9 @@
 import type { UserRole } from '@/types'
 import { can, type PermissionHolder } from '@/lib/permissions'
 import { REVENUE_DEPARTMENT_PATH, revenuePath } from '@/lib/revenue'
+import { canDo } from '@/lib/permission-actions'
+import { reportsCompanyWide } from '@/lib/surfaces'
+import { statementDepts, statementPath, type StatementDept } from '@/lib/dept-statements'
 import {
   canAccessAuditLog,
   canAccessCategories,
@@ -126,6 +129,12 @@ export function groupActive(
 }
 
 const isHR = (v: NavViewer) => v.role === 'hr'
+
+/** Reads every department's pool and the reports company-wide (Finance, the
+ *  Principal): Dept Pool lists each department's own P&L and Cash Flow
+ *  (2026-10-09, user: 我要把每个 department 的 cash flow, P&L 放过来). */
+export const readsDeptStatements = (v: NavViewer) => canDo(v, 'dept_pool', 'view') && reportsCompanyWide(v)
+const keepsPoolBases = (v: NavViewer) => canAccessDeptPool(v) && !readsDeptStatements(v)
 const isHRorPrincipal = (v: NavViewer) => canAccessTeam(v)
 
 /**
@@ -138,6 +147,9 @@ const isHRorPrincipal = (v: NavViewer) => canAccessTeam(v)
  */
 export interface NavData {
   revenueSubDepts: Array<{ slug: string; name: string }>
+  /** Dept Pool's departments (2026-10-09): the five, then the registry's
+   *  added ones — IT, Revenue Department. Left out = the five alone. */
+  deptPoolDepts?: StatementDept[]
 }
 
 export const emptyNavData: NavData = { revenueSubDepts: [] }
@@ -203,8 +215,27 @@ export function buildNavEntries(data: NavData): NavEntry[] {
       section: 'Departments',
       visible: canAccessDeptPool,
       children: [
-        { href: '/dept-pool', label: 'Cash', notBasis: ['accrual'], visible: canAccessDeptPool },
-        { href: '/dept-pool?basis=accrual', label: 'Accrual P&L', basis: 'accrual', visible: canAccessDeptPool },
+        // A department manager (and whoever reads one department, or no
+        // reports) keeps the two bases. Listed first so the activity log keeps
+        // naming /dept-pool "Dept Pool · Cash".
+        { href: '/dept-pool', label: 'Cash', notBasis: ['accrual'], visible: keepsPoolBases },
+        { href: '/dept-pool?basis=accrual', label: 'Accrual P&L', basis: 'accrual', visible: keepsPoolBases },
+        // Whoever reads them all (2026-10-09): the overview — Cash | Accrual
+        // P&L switched in its head — then each department's own P&L and Cash
+        // Flow. A department still lights on the pool page it already had.
+        {
+          href: '/dept-pool',
+          label: 'Overview',
+          exact: true,
+          alsoPaths: ['/dept-pool/submissions', '/dept-pool/contracts'],
+          visible: readsDeptStatements,
+        },
+        ...(data.deptPoolDepts ?? statementDepts([])).map((d) => ({
+          href: statementPath(d.slug),
+          label: d.label,
+          ...(d.poolPath ? { alsoPaths: [d.poolPath] } : {}),
+          visible: readsDeptStatements,
+        })),
       ],
     },
     // Venture Pool = HV holding-company cash ledger (5 txn types). Sits next to

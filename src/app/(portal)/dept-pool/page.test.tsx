@@ -134,6 +134,15 @@ describe('Department Pools · cash, for Finance', () => {
     expect(card('Below zero')).toHaveTextContent('IT')
   })
 
+  // The sidebar lists each department since 2026-10-09, so the two bases
+  // are switched in the head (the user's sample: Cash | Accrual P&L).
+  it('switches to Accrual P&L in its head', async () => {
+    render(await DeptPoolPage({ searchParams: Promise.resolve({}) }))
+    const basis = screen.getByRole('group', { name: 'Basis' })
+    expect(within(basis).getByRole('link', { name: 'Cash' })).toHaveAttribute('aria-current', 'page')
+    expect(within(basis).getByRole('link', { name: 'Accrual P&L' })).toHaveAttribute('href', '/dept-pool?basis=accrual')
+  })
+
   it('puts Balance by bank above By department, each closing on All departments', async () => {
     render(await DeptPoolPage({ searchParams: Promise.resolve({}) }))
     expect(Array.from(document.querySelectorAll('.sect-head h2')).map((h) => h.textContent)).toEqual(['Balance by bank', 'By department'])
@@ -178,6 +187,9 @@ describe('Department Pools · accrual, for Finance', () => {
   it('shows five cards over By department with its total', async () => {
     render(await DeptPoolPage({ searchParams: Promise.resolve({ basis: 'accrual' }) }))
     expect(document.querySelector('.page-eyebrow')).toHaveTextContent('DEPARTMENTS · ACCRUAL P&L · OCTOBER 2026')
+    const basis = screen.getByRole('group', { name: 'Basis' })
+    expect(within(basis).getByRole('link', { name: 'Accrual P&L' })).toHaveAttribute('aria-current', 'page')
+    expect(within(basis).getByRole('link', { name: 'Cash' })).toHaveAttribute('href', '/dept-pool')
     expect(card('Revenue (bill)')).toHaveTextContent('RM 642,500.00')
     expect(card('Cost')).toHaveTextContent('RM 382,400.00')
     expect(card('Expense')).toHaveTextContent('RM 112,400.00')

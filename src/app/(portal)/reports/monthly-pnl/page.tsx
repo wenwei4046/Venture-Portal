@@ -2,10 +2,7 @@ import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
-import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/consolidation'
-import { buildPnlAccounts, buildCustomPnlRows, defaultPnlLayout } from '@/lib/pnl-custom'
-import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
+import { loadMonthlyPnl } from '@/lib/monthly-statements'
 import { segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
@@ -13,14 +10,10 @@ import MonthlyReportControls from '../_components/MonthlyReportControls'
 import { ReportSearchProvider } from '../_components/ReportSearchProvider'
 import ReportViewToggle from '../_components/ReportViewToggle'
 import { reportsCompanyWide } from '@/lib/surfaces'
-import { formatMoney } from '@/lib/utils'
-import { r2, sliceMatrixMonths } from '@/lib/monthly-matrix'
-import { fromChoices, rangeLabel, reportRange, toChoices } from '@/lib/report-range'
-import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import { rangeLabel, reportRange } from '@/lib/report-range'
 import { REPORT_SEGMENTS } from '../_components/report-segments'
-import ReportToolbar from '../_components/ReportToolbar'
 import ReportModeSwitch from '../_components/ReportModeSwitch'
-import dayjs from 'dayjs'
+import MonthlyPnlBody from '../_components/MonthlyPnlBody'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,20 +36,9 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
   // Consolidated = all-segments view for finance/principal; dept managers'
   // empty segment is their OWN view via RLS — never eliminate for them.
   const consolidated = !isDeptMgr && !segment
-  const [rawLines, accounts, savedRaw, elim] = await Promise.all([
-    fetchAllJournalLines(supabase),
-    fetchCoaAccounts(supabase),
-    readReportLayout(supabase, 'pnl'),
-    consolidated ? fetchInterBillingElimination(supabase) : Promise.resolve(null),
-  ])
-  const lines = elim ? eliminateInterBilling(rawLines, elim) : rawLines
-
-  const data = buildPnlAccounts(lines, accounts, { year, throughMonth, segment: segmentFilterFor(segment) })
-  const saved = (savedRaw ?? null) as ReportLayout | null
-  const layout = saved && Array.isArray(saved.categories) && saved.categories.length > 0
-    ? saved
-    : defaultPnlLayout(data.accounts)
-  const rows = buildCustomPnlRows(data, layout)
+  // The read a department's own page under Dept Pool makes for its segment
+  // too (2026-10-09, lib/monthly-statements): one P&L, two places.
+  const { data, rows } = await loadMonthlyPnl(supabase, { year, throughMonth, segment: segmentFilterFor(segment), consolidated })
 
   // Whoever reads the reports company-wide (2026-10-09, the user's Claude
   // Design handoff): the period From – To, the two views and the exports in
@@ -65,17 +47,6 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
   if (!isDeptMgr) {
     const nowYM = officeMonth()
     const range = reportRange({ from: params.from, period }, nowYM)
-    const cost = data.accounts.filter((a) => a.defaultCategory === 'cost' || a.defaultCategory === 'expense')
-    const expenses = data.columns.map((_, i) => r2(-cost.reduce((s, a) => s + (a.values[i] ?? 0), 0)))
-    const net = rows.find((r) => r.key === 'NET_INCOME')?.values ?? data.columns.map(() => 0)
-    const cut = sliceMatrixMonths(data.columns, rows, range.from, { base: data.salesByColumn })
-    const sums = sliceMatrixMonths(data.columns, [
-      { key: 'rev', values: data.salesByColumn },
-      { key: 'exp', values: expenses },
-      { key: 'net', values: net },
-    ], range.from).rows
-    const [rev, exp, netCut] = sums.map((s) => s.values)
-    const toName = dayjs(`${range.to}-01`).format('MMM') + (range.to === nowYM ? ' (to date)' : '')
     const segments = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
     const segName = (segments.find((s) => s.value === segment) ?? segments[0]).label
     const exportHref = (format: 'xlsx' | 'pdf') => {
@@ -84,7 +55,6 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
       if (!range.wholeYear) qs.set('from', range.from)
       return `/reports/monthly-pnl/export?${qs.toString()}`
     }
-    const margin = Math.abs(rev[0]) < 0.005 ? '—' : `${((netCut[0] / rev[0]) * 100).toFixed(1)}%`
     return (
       <div>
         <div className="page-head">
@@ -108,36 +78,15 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
           </div>
         </div>
 
-        <StatCards label="P&L">
-          <StatCard label={`Revenue · ${toName}`} value={formatMoney(rev[1] ?? 0)} icon="receipt" tone="ledger" note={`Accumulated ${formatMoney(rev[0])}`} />
-          <StatCard label={`Expenses · ${toName}`} value={formatMoney(exp[1] ?? 0)} icon="wallet" tone="danger" note={`Accumulated ${formatMoney(exp[0])}`} />
-          <StatCard label="Net profit · accumulated" value={formatMoney(netCut[0])} icon="chart" tone={netCut[0] < 0 ? 'danger' : 'primary'} note="Selected period" />
-          <StatCard label="Net margin · accumulated" value={margin} icon="percent" note="Against accumulated sales" />
-        </StatCards>
-
-        <ReportSearchProvider level={3}>
-          <section className="mb-6">
-            <div className="sect-head">
-              <h2>Monthly P&amp;L</h2>
-              <span className="rule" aria-hidden />
-              <span className="count">
-                {segName.toUpperCase()} · {rangeLabel(range.from, range.to).toUpperCase()}
-              </span>
-            </div>
-            <ReportToolbar
-              from={range.from}
-              to={range.to}
-              fromOptions={fromChoices(range.to)}
-              toOptions={toChoices(nowYM)}
-              segment={segment}
-              segments={segments}
-            />
-            {consolidated ? (
-              <p className="fin-notice mb-3">Consolidated view eliminates inter-billing between segments — pick a segment to see its own charges.</p>
-            ) : null}
-            <MonthlyMatrix columns={cut.columns} rows={cut.rows} pctBaseByColumn={cut.base} nowKey={nowYM} separated />
-          </section>
-        </ReportSearchProvider>
+        <MonthlyPnlBody
+          pnl={{ data, rows }}
+          range={range}
+          nowYM={nowYM}
+          segmentLabel={segName}
+          segment={segment}
+          segments={segments}
+          consolidated={consolidated}
+        />
       </div>
     )
   }

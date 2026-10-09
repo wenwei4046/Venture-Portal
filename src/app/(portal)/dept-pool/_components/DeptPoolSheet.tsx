@@ -11,7 +11,8 @@ import dayjs from 'dayjs'
 // — Phase 4 of the Finance revamp), for whoever reads every department
 // (Finance, the Principal). The page computes the figures exactly as before;
 // this draws them: cards, then the tables, each closing on "All departments".
-// Cash or Accrual is the sidebar's choice (?basis=).
+// Cash or Accrual (?basis=) is switched in the head since 2026-10-09, when the
+// sidebar began listing each department's own P&L and Cash Flow instead.
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
@@ -31,6 +32,16 @@ function Head({ basis, monthTitle, canNewContract }: { basis: 'CASH' | 'ACCRUAL 
         <h1 className="page-title">Department Pools</h1>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="rpt-modes" role="group" aria-label="Basis">
+          {([
+            ['CASH', '/dept-pool', 'Cash'],
+            ['ACCRUAL P&L', '/dept-pool?basis=accrual', 'Accrual P&L'],
+          ] as const).map(([b, href, label]) => (
+            <Link key={b} href={href} aria-current={basis === b ? 'page' : undefined} className={basis === b ? 'btn-pri-sheet' : 'btn-quiet-sheet'}>
+              {label}
+            </Link>
+          ))}
+        </div>
         <Link href="/dept-pool/submissions" className="btn-quiet-sheet">
           Submissions
         </Link>

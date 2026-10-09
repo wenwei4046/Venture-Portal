@@ -1,7 +1,9 @@
 import { requireAuth } from '@/lib/auth'
 import PortalFrame from '@/components/layout/PortalFrame'
-import { emptyNavData, type NavData } from '@/components/layout/nav-config'
+import { emptyNavData, readsDeptStatements, type NavData } from '@/components/layout/nav-config'
 import { canAccessRevenue } from '@/lib/roles'
+import { primedRegistryRows } from '@/lib/dept-registry'
+import { statementDepts } from '@/lib/dept-statements'
 import { listSubDepartments } from './revenue/_lib/sub-departments'
 import { redirect } from 'next/navigation'
 
@@ -19,7 +21,14 @@ export default async function PortalLayout({
   // roles that can see the group; nobody else pays for the query.
   let navData: NavData = emptyNavData
   if (canAccessRevenue(user)) {
-    navData = { revenueSubDepts: await listSubDepartments() }
+    navData = { ...navData, revenueSubDepts: await listSubDepartments() }
+  }
+  // Dept Pool lists each department for whoever reads them all (2026-10-09);
+  // the ones added since — IT, Revenue Department — come from the registry
+  // this request has already primed (signing in builds the server client),
+  // so no read is made for them here.
+  if (readsDeptStatements(user)) {
+    navData = { ...navData, deptPoolDepts: statementDepts(primedRegistryRows()) }
   }
 
   return (

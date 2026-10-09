@@ -2,15 +2,7 @@ import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
-import { buildMonthlyCashFlowSides, buildSideMatrixRows } from '@/lib/cash-flow-custom'
-import {
-  fetchInterBillingCashFlow,
-  interBillTransferAccount,
-  payrollCustodyAccount,
-} from '@/lib/inter-billing-cash-flow'
-import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
-import type { MatrixRow } from '@/lib/monthly-matrix'
+import { loadMonthlyCashFlow } from '@/lib/monthly-statements'
 import { segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
@@ -18,13 +10,10 @@ import MonthlyReportControls from '../_components/MonthlyReportControls'
 import { ReportSearchProvider } from '../_components/ReportSearchProvider'
 import ReportViewToggle from '../_components/ReportViewToggle'
 import { reportsCompanyWide } from '@/lib/surfaces'
-import { formatMoney } from '@/lib/utils'
-import { sliceMatrixMonths } from '@/lib/monthly-matrix'
-import { fromChoices, rangeLabel, reportRange, toChoices } from '@/lib/report-range'
-import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import { rangeLabel, reportRange } from '@/lib/report-range'
 import { REPORT_SEGMENTS } from '../_components/report-segments'
-import ReportToolbar from '../_components/ReportToolbar'
 import ReportModeSwitch from '../_components/ReportModeSwitch'
+import MonthlyCashFlowBody from '../_components/MonthlyCashFlowBody'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,40 +37,9 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
   // so the consolidated view must not carry it (same rule as the statement),
   // and there it is not read at all (2026-10-08).
   const consolidated = !isDeptMgr && !segment
-
-  // bank GL codes via RPC (dept_managers are RLS-blocked from bank_accounts,
-  // which zeroed their Cash Flow) — codes only, no balances. Shared with the
-  // bridge, which starts beside the journal read instead of after it.
-  const bankCodesRead = Promise.resolve(supabase.rpc('bank_gl_codes' as never)).then(
-    ({ data: banks }) => new Set((banks ?? []) as unknown as string[]),
-  )
-  // Same two layouts the Cash Flow STATEMENT uses — the statement is the
-  // reference, this view just adds month columns (user 2026-07-30: "monthly
-  // cash flow 和 cash flow 显示的是一样,以 cash flow 为准").
-  const [lines, accounts, bankCodes, ib, inSaved, outSaved] = await Promise.all([
-    fetchAllJournalLines(supabase),
-    fetchCoaAccounts(supabase),
-    bankCodesRead,
-    consolidated ? null : fetchInterBillingCashFlow(supabase, bankCodesRead),
-    readReportLayout(supabase, 'cash_flow_in'),
-    readReportLayout(supabase, 'cash_flow_out'),
-  ])
-  const ibLines = ib ? ib.lines : []
-
-  const data = buildMonthlyCashFlowSides([...lines, ...ibLines], [...accounts, interBillTransferAccount, payrollCustodyAccount], bankCodes, {
-    year,
-    throughMonth,
-    segment: segmentFilterFor(segment),
-  })
-
-  const nCols = data.columns.length
-  const rows: MatrixRow[] = [
-    ...buildSideMatrixRows(data.inflow, inSaved as ReportLayout | null, nCols, 'in', '流入合计 · Total money in', data.inflowTotalByCol),
-    ...buildSideMatrixRows(data.outflow, outSaved as ReportLayout | null, nCols, 'out', '流出合计 · Total money out', data.outflowTotalByCol),
-    { key: 'NET_CHANGE', label: 'Net change in cash', depth: 0, kind: 'subtotal', tone: 'auto', emphasis: 'strong', values: data.netChangeByCol },
-    { key: 'OPENING_CASH', label: 'Opening cash', depth: 0, kind: 'subtotal', tone: 'ledger', values: data.openingByCol },
-    { key: 'CLOSING_CASH', label: 'Closing cash', depth: 0, kind: 'subtotal', tone: 'ledger', emphasis: 'strong', values: data.closingByCol },
-  ]
+  // The read a department's own page under Dept Pool makes for its segment
+  // too (2026-10-09, lib/monthly-statements): one Cash Flow, two places.
+  const { data, rows } = await loadMonthlyCashFlow(supabase, { year, throughMonth, segment: segmentFilterFor(segment), consolidated })
 
   // Whoever reads the reports company-wide (2026-10-09, the user's Claude
   // Design handoff): the period From – To, the two views and the exports in
@@ -90,10 +48,6 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
   if (!isDeptMgr) {
     const nowYM = officeMonth()
     const range = reportRange({ from: params.from, period }, nowYM)
-    const cut = sliceMatrixMonths(data.columns, rows, range.from)
-    // A card reads the Accumulated of its line as cut to From: a flow adds up, an
-    // opening reads its first month, a closing or a balance its last.
-    const pick = (values: number[], key = 'flow') => sliceMatrixMonths(data.columns, [{ key, values }], range.from).rows[0].values[0]
     const segments = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
     const segName = (segments.find((s) => s.value === segment) ?? segments[0]).label
     const exportHref = (format: 'xlsx' | 'pdf') => {
@@ -102,7 +56,6 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
       if (!range.wholeYear) qs.set('from', range.from)
       return `/reports/monthly-cash-flow/export?${qs.toString()}`
     }
-    const startLevel = rows.some((r) => r.kind === 'category') ? 1 : 3
     return (
       <div>
         <div className="page-head">
@@ -126,34 +79,14 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
           </div>
         </div>
 
-        <StatCards label="Cash flow">
-          <StatCard label="Opening cash" value={formatMoney(pick(data.openingByCol, 'OPENING_CASH'))} icon="wallet" note="Start of period" />
-          <StatCard label="Money in" value={formatMoney(pick(data.inflowTotalByCol))} icon="inbox" tone="ledger" note="Selected period" />
-          <StatCard label="Money out" value={formatMoney(pick(data.outflowTotalByCol))} icon="send" tone="danger" note="Selected period" />
-          <StatCard label="Net change" value={formatMoney(pick(data.netChangeByCol))} icon="swap" tone={pick(data.netChangeByCol) < 0 ? 'danger' : 'ledger'} note="All movements" />
-          <StatCard label="Closing cash" value={formatMoney(pick(data.closingByCol, 'CLOSING_CASH'))} icon="bank" tone="primary" note="End of period" />
-        </StatCards>
-
-        <ReportSearchProvider level={startLevel}>
-          <section className="mb-6">
-            <div className="sect-head">
-              <h2>Monthly cash flow</h2>
-              <span className="rule" aria-hidden />
-              <span className="count">
-                {segName.toUpperCase()} · {rangeLabel(range.from, range.to).toUpperCase()}
-              </span>
-            </div>
-            <ReportToolbar
-              from={range.from}
-              to={range.to}
-              fromOptions={fromChoices(range.to)}
-              toOptions={toChoices(nowYM)}
-              segment={segment}
-              segments={segments}
-            />
-            <MonthlyMatrix columns={cut.columns} rows={cut.rows} nowKey={nowYM} separated />
-          </section>
-        </ReportSearchProvider>
+        <MonthlyCashFlowBody
+          cashFlow={{ data, rows }}
+          range={range}
+          nowYM={nowYM}
+          segmentLabel={segName}
+          segment={segment}
+          segments={segments}
+        />
       </div>
     )
   }

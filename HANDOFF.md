@@ -1,5 +1,42 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-09 k (SHIPPED) — Dept Pool: each department's own P&L and Cash Flow
+
+The user: "我要把每个 department 的 cash flow, P&L 放过来 … Venture, Marketing,
+Finance, HR, Director Office, IT, Revenue Department — 每个 segment 就有 cash
+flow 和 P&L". A sample (sidebar + page, toggles) went out first; the user took
+the recommended options ("照这个做"): one sidebar row per department with a
+P&L | Cash Flow switch in the page, the overview kept as the first row, the
+Director NOT listed. Asked "如果要看多月的呢？" — answered: the page is month by
+month, From – To within one year, Accumulated = the range.
+
+- **Sidebar** (`nav-config.ts`): for `readsDeptStatements` (= dept_pool.view at All
+  AND `reportsCompanyWide` — Finance, the Principal) Dept Pool lists Overview
+  (/dept-pool, exact; also lights /dept-pool/submissions and /contracts) then
+  each department → /dept-pool/statements/<slug>; a core department also lights
+  on its old pool page (alsoPaths /dept-pool/hr …). Everyone else keeps Cash /
+  Accrual P&L (`keepsPoolBases`), listed first so the activity log still names
+  /dept-pool "Dept Pool · Cash". `NavData.deptPoolDepts?` (falls back to the five);
+  `(portal)/layout.tsx` fills it from `primedRegistryRows()` (no read).
+- **The list** (`lib/dept-statements.ts`): Venture (= segment corporate,
+  treasury folded in by `segmentFilterFor`), Marketing, Finance, HR, Director
+  Office, then `extraFullDepts` in created_at order (IT = it, Revenue Department
+  = revenue_department → slug revenue-department). `statementPath(slug, view,
+  {period, from})`.
+- **The page** (`dept-pool/statements/[seg]/page.tsx` + `statements/loading.tsx`):
+  gate `requireAction('reports','view')` then notFound unless dept_pool.view All;
+  unknown slug (incl. director) → notFound. Head: eyebrow DEPARTMENTS · <DEPT> ·
+  range, P&L | Cash Flow switch (`?view=cash-flow`, keeps period/from), Excel /
+  PDF = the Reports exports with `segment=`. Body = Reports' own.
+- **Shared with Reports** (no change to Reports' output): `lib/monthly-statements.ts`
+  `loadMonthlyPnl` / `loadMonthlyCashFlow` (lifted from the two monthly pages;
+  one segment is never consolidated → no elimination, the cash bridge IS read),
+  `reports/_components/MonthlyPnlBody` / `MonthlyCashFlowBody` (cards + toolbar +
+  matrix; `segments=[]` hides the Segment picker).
+- **Overview** (`DeptPoolSheet` head): Cash | Accrual P&L switch (group "Basis").
+- Tests: lib/dept-statements, statements/[seg]/page, nav-config.dept-pool,
+  (portal)/layout, dept-pool/page (switch). Reports' monthly tests unchanged, green.
+
 ## CHECKPOINT 2026-10-09 j (SHIPPED) — Finance revamp · the five gaps closed
 
 The user asked what was left ("还有什么没做？") and then "继续做完这五处".
