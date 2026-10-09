@@ -1,7 +1,7 @@
 /** Top bar (back to the Revenue app, the bell), the bottom bar, and the View-my-team banner. */
 import { firstName, ini, RUST, SUB, stop, type SalesCtx } from "./common";
 import { salesNotifs, unreadNotifs } from "./notifs";
-import { titleOf } from "../../shared/people";
+import { teamName, teamOf, titleOf } from "../../shared/people";
 import type { SalesTab } from "../ui";
 
 export function headerVM(ctx: SalesCtx, onExit: () => void) {
@@ -43,15 +43,18 @@ export type NavVM = ReturnType<typeof navVM>;
 export function shellVM(ctx: SalesCtx) {
   const { ui, set, embedded, owner, viewingOther } = ctx;
   const list = embedded?.switchList ?? [];
+  const groupOf = (p: (typeof list)[number]) => (p.role === "boss" ? "Principal" : p.role === "hod" ? "Director" : teamName(teamOf(p.id, ctx.data.people)) || "Others");
   return {
     rdX: !!embedded?.rdMode && !viewingOther, toPanelX: () => embedded?.toPanel?.(),
     asOnX: viewingOther, asNameX: firstName(owner.name),
     canSwitchX: viewingOther && list.length > 1,
     swOpenX: ui.swOpen, openSwX: () => set(u => ({ ...u, swOpen: true })), closeSwX: () => set(u => ({ ...u, swOpen: false })),
     stopTeam: stop,
-    swList: list.map(p => {
-      const cur = p.id === owner.id;
+    // Grouped as the list comes (team order): a heading over each group — Director, each team, Others (user 2026-10-09).
+    swList: list.map((p, k) => {
+      const cur = p.id === owner.id, group = groupOf(p), first = !k || groupOf(list[k - 1]) !== group;
       return { name: p.name, title: titleOf(p), ini: ini(p.name), act: cur ? "Viewing" : "View", fg: cur ? "#387557" : "#BD4A19",
+        head: first ? `${group} · ${list.filter(x => groupOf(x) === group).length}` : "", hasHead: first, rule: first ? "0" : "1px solid #F5EEE9",
         go: cur ? () => set(u => ({ ...u, swOpen: false })) : () => { set(u => ({ ...u, swOpen: false, chat: null, filter: null })); embedded?.onSwitch?.(p.id); } };
     }),
     exitAsX: () => { set(u => ({ ...u, chat: null, tab: "inbox", filter: null })); embedded?.exitAs?.(); },

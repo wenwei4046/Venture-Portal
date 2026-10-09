@@ -41,7 +41,8 @@ export default function SalesShellBanners({ v }: { v: ShellVM }) {
           </span>
           <h2 style={{ margin: "6px 0 8px", fontSize: "20px", fontWeight: "700", letterSpacing: "-.02em" }}>Switch to</h2>
           {(v.swList).map((p, p_i) => (<Fragment key={p_i}>
-            <div onClick={p.go} style={{ display: "flex", alignItems: "center", gap: "12px", minHeight: "58px", borderTop: "1px solid #F5EEE9", cursor: "pointer" }}>
+            {!!p.hasHead && (<span style={{ padding: "8px 0 4px", fontSize: "12px", fontWeight: "700", letterSpacing: ".08em", textTransform: "uppercase", color: "#806B60" }}>{p.head}</span>)}
+            <div onClick={p.go} style={{ display: "flex", alignItems: "center", gap: "12px", minHeight: "58px", borderTop: p.rule, cursor: "pointer" }}>
               <span style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: "#F5EBE3", color: "#4E2F20", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "700" }}>{p.ini}</span>
               <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
                 <strong style={{ fontSize: "15px", fontWeight: "650" }}>{p.name}</strong>
