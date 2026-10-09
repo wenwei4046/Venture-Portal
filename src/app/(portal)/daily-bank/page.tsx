@@ -4,6 +4,10 @@
 // columns. Two views: BANK × DEPARTMENT matrix and a simpler by-bank list.
 // Any date is viewable; balances are GL-exact, historical pending is
 // reconstructed from submit/approve timestamps (≈).
+//
+// 2026-10-09 (the Finance revamp): the head — the day between its arrows,
+// PNG / PDF / Get image — belongs to DailyBankView, which holds the board the
+// image is taken of.
 
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -33,22 +37,5 @@ export default async function DailyBankPage({
 
   const data = await fetchDailyBank(supabase, date, { seesPayroll: canSeePayrollPayouts(user) })
 
-  return (
-    <div>
-      <div className="page-head">
-        <div>
-          <div className="page-eyebrow">
-            <em>I.</em> TREASURY · DAILY BANK
-          </div>
-          <h1 className="page-title">Daily Bank</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
-            Where the cash stands today: balance b/f, money in, pending payments awaiting the
-            Principal, and what is truly free — per bank, split by department.
-          </p>
-        </div>
-      </div>
-
-      <DailyBankView data={data} today={today} />
-    </div>
-  )
+  return <DailyBankView data={data} today={today} />
 }

@@ -77,7 +77,7 @@ export default async function VoucherLedger({
   const vouchersRead = startRead(
     fetchAllRows((lo, hi) => supabase
       .from('payment_vouchers')
-      .select('id, voucher_no, direction, amount, payee_name, status, voucher_type, reference_type, description, payment_date, created_at, target_pool, source_pool, fund_source_id, loan_id')
+      .select('id, voucher_no, direction, amount, payee_name, status, voucher_type, reference_type, description, payment_date, created_at, target_pool, source_pool, fund_source_id, loan_id, bank_account_id')
       .eq('direction', direction)
       .order('created_at', { ascending: false })
       .order('id', { ascending: true })
@@ -126,6 +126,9 @@ export default async function VoucherLedger({
     ),
   )
 
+  // The receipt side names each receipt's bank (2026-10-09, the Finance revamp).
+  const banksRead = isReceipts ? startRead(supabase.from('bank_accounts').select('id, bank_name')) : null
+
   // Money that moved outside the voucher flow (extraRows below).
   const extraRowsRead = startRead(isReceipts ? fetchReceiptExtras(supabase) : fetchPaymentExtras(supabase))
 
@@ -169,6 +172,11 @@ export default async function VoucherLedger({
   // fund-source repayments (no PV) + Loan OUT disbursements (user 2026-08-06:
   // "不能像reciept 这样显示全部吗？"). Shared with /payments/export.
   const extraRows: VoucherRow[] = await extraRowsRead
+  const bankById = new Map<string, string>()
+  if (banksRead) {
+    const { data: banks } = await banksRead
+    for (const b of (banks ?? []) as Array<{ id: string; bank_name: string }>) bankById.set(b.id, b.bank_name)
+  }
 
   const all = vouchers ?? []
   const tab = statusFilter ?? 'all'
@@ -194,8 +202,13 @@ export default async function VoucherLedger({
   const isLoanRepay = (v: { fund_source_id?: string | null; loan_id?: string | null; voucher_type?: string | null }) =>
     v.fund_source_id != null || v.loan_id != null || v.voucher_type === 'loan_repayment'
 
+  // The Payroll batches tab (2026-10-09): the payroll disbursements, which
+  // VouchersTable folds under their batch, and nothing else.
+  const payrollTab = tab === 'payroll'
   const filtered = open.filter((v) => {
-    if (tab !== 'all' && v.status !== tab) return false
+    if (payrollTab) {
+      if (v.reference_type !== 'payroll_disbursement') return false
+    } else if (tab !== 'all' && v.status !== tab) return false
     if (typeFilter === 'loan_repayment') {
       if (!isLoanRepay(v)) return false
     } else if (typeFilter && v.voucher_type !== typeFilter) return false
@@ -221,6 +234,13 @@ export default async function VoucherLedger({
     return true
   })
 
+  // Payroll disbursements are one PV per person (26 a month); the description's
+  // leading phrase ("Payroll disbursement Aug 2026" / "Director salary Aug
+  // 2026") names the batch they collapse under in VouchersTable.
+  const batchKeyOf = (v: { reference_type: string | null; description: string | null }) =>
+    v.reference_type === 'payroll_disbursement' ? (v.description ?? 'Payroll disbursement').split(' — ')[0].trim() : undefined
+  const batchCount =
+    new Set(open.map(batchKeyOf).filter((k): k is string => !!k)).size + lockedBatches.length
   const counts = {
     all: all.length,
     draft: all.filter((v) => v.status === 'draft').length,
@@ -228,6 +248,8 @@ export default async function VoucherLedger({
     approved: all.filter((v) => v.status === 'approved').length,
     paid: all.filter((v) => v.status === 'paid').length,
     voided: all.filter((v) => v.status === 'voided').length,
+    // A tab of their own on the payment side (2026-10-09).
+    ...(isReceipts ? {} : { payroll: batchCount }),
   }
 
   // Settled money = executed vouchers + the outside-the-flow rows.
@@ -257,7 +279,7 @@ export default async function VoucherLedger({
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> TREASURY · {isReceipts ? 'OFFICIAL RECEIPTS' : 'PAYMENT VOUCHERS'}
+            <em>I.</em> DAILY OPERATIONS · {isReceipts ? 'OFFICIAL RECEIPTS' : 'PAYMENT VOUCHERS'}
           </div>
           <h1 className="page-title">{isReceipts ? 'Receipts' : 'Payments'}</h1>
         </div>
@@ -367,7 +389,7 @@ export default async function VoucherLedger({
           }
         />
         <StatCard
-          tone={counts.draft + counts.pending_approval > 0 ? 'alert' : 'default'}
+          tone={counts.draft + counts.pending_approval > 0 ? 'wait' : 'default'}
           label="Pending approval"
           value={formatMoney(pendingAmount)}
           icon="clock"
@@ -416,7 +438,7 @@ export default async function VoucherLedger({
             <span className="count">
               {filtered.length + lockedCount + extraFiltered.length} of {all.length + extraRows.length} {noun}
               {all.length + extraRows.length === 1 ? '' : 's'}
-              {tab !== 'all' ? ` · ${tab.replace('_', ' ')}` : ''}
+              {tab !== 'all' ? ` · ${payrollTab ? 'payroll batches' : tab.replace('_', ' ')}` : ''}
             </span>
           </div>
 
@@ -432,6 +454,7 @@ export default async function VoucherLedger({
                 layoutId={isReceipts ? 'receipts.vouchers' : 'payments.vouchers'}
                 layoutTitle={isReceipts ? 'Receipts' : 'Payments'}
                 canSetDefault={user.role === 'finance' || user.role === 'principal'}
+                side={isReceipts ? 'receipts' : 'payments'}
                 rows={[...filtered.map<VoucherRow>((v) => {
                   const cats = categoriesByVoucher.get(v.id) ?? []
                   // 还款 · prefix keeps repayment PVs recognizable (and
@@ -456,10 +479,7 @@ export default async function VoucherLedger({
                   // the description's leading phrase ("Payroll disbursement
                   // Aug 2026" / "Director salary Aug 2026") names the batch
                   // they collapse under in VouchersTable.
-                  const batchKey =
-                    v.reference_type === 'payroll_disbursement'
-                      ? ((v.description as string | null) ?? 'Payroll disbursement').split(' — ')[0].trim()
-                      : undefined
+                  const batchKey = batchKeyOf(v)
                   return {
                     id: v.id,
                     voucher_no: v.voucher_no,
@@ -471,6 +491,7 @@ export default async function VoucherLedger({
                     poolLabel,
                     description: (v.description as string | null) ?? null,
                     paymentOrCreatedDate: (v.payment_date ?? v.created_at) as string,
+                    bankLabel: isReceipts && v.bank_account_id ? bankById.get(v.bank_account_id as string) : undefined,
                     batchKey,
                     // A paid voucher's date is corrected in place (改日期) — a
                     // draft or pending one with Edit, and payroll's from HR Payment.

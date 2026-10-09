@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-const mocks = vi.hoisted(() => ({ rpc: vi.fn(), requirePermission: vi.fn(), revalidatePath: vi.fn() }))
+// HR: Bank accounts ticked (2026-10-09, PR4) — a salary PV carries the account numbers.
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), requirePermission: vi.fn().mockResolvedValue({ id: 'hr', sensitive: ['bank', 'nric', 'salary'] }), revalidatePath: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ rpc: mocks.rpc }) }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
@@ -51,5 +52,10 @@ describe('salary component generation', () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: 'Salary amount or bank details changed after preview' } })
     await expect(createPayrollDisbursement('2026-09-01', 'staff', '2026-09-30', 'employee', department, [row], [selection])).rejects.toThrow('changed after preview')
     expect(mocks.revalidatePath).not.toHaveBeenCalled()
+  })
+  it('refuses a salary PV to somebody whose title does not tick Bank accounts (PR4)', async () => {
+    mocks.requirePermission.mockResolvedValueOnce({ id: 'custom', sensitive: ['salary'] })
+    await expect(createPayrollDisbursement('2026-09-01', 'staff', '2026-09-30', 'employee', department, [row], null)).rejects.toThrow(/Bank accounts/)
+    expect(mocks.rpc).not.toHaveBeenCalled()
   })
 })

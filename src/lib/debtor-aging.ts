@@ -99,3 +99,69 @@ export function buildDebtorAging(raw: RawInvoice[], asOfISO: string): DebtorAgin
 
   return { asOf: asOfISO, invoices, byPayer, totals }
 }
+
+// ─── By days (2026-10-09, the Finance revamp handoff) ───────────────────────
+// Finance's view ages in days, still from the INVOICE date (the July rule):
+// 0–30, 31–60, 61–90 and 90+ days since the invoice. A department manager's
+// view keeps the months above.
+
+export type DayBucket = 'd0_30' | 'd31_60' | 'd61_90' | 'd90_plus'
+
+export const DAY_BUCKETS: { key: DayBucket; label: string }[] = [
+  { key: 'd0_30', label: '0–30 days' },
+  { key: 'd31_60', label: '31–60 days' },
+  { key: 'd61_90', label: '61–90 days' },
+  { key: 'd90_plus', label: '90+ days' },
+]
+
+export function bucketForDaysOld(days: number): DayBucket {
+  if (days <= 30) return 'd0_30'
+  if (days <= 60) return 'd31_60'
+  if (days <= 90) return 'd61_90'
+  return 'd90_plus'
+}
+
+export interface AgingColumn {
+  key: string
+  label: string
+}
+
+/** An aging in either scheme, its columns named — what the page and the exports draw. */
+export interface AgingView {
+  asOf: string
+  columns: readonly AgingColumn[]
+  /** Oldest first; the age in months or days by the scheme. */
+  invoices: Array<RawInvoice & { age: number; bucket: string }>
+  byPayer: Array<{ payer: string; buckets: Record<string, number>; total: number; count: number }>
+  totals: { buckets: Record<string, number>; total: number; count: number }
+}
+
+export function debtorAgingView(raw: RawInvoice[], asOfISO: string, scheme: 'months' | 'days'): AgingView {
+  if (scheme === 'months') {
+    const a = buildDebtorAging(raw, asOfISO)
+    return { asOf: a.asOf, columns: AGING_BUCKETS, invoices: a.invoices.map((i) => ({ ...i, age: i.monthsOld })), byPayer: a.byPayer, totals: a.totals }
+  }
+  const asOf = dayjs(asOfISO).startOf('day')
+  const empty = (): Record<string, number> => Object.fromEntries(DAY_BUCKETS.map((b) => [b.key, 0]))
+  const invoices = raw.map((r) => {
+    const age = r.invoiceDate ? Math.max(0, asOf.diff(dayjs(r.invoiceDate).startOf('day'), 'day')) : 0
+    return { ...r, age, bucket: bucketForDaysOld(age) as string }
+  })
+  const map = new Map<string, { payer: string; buckets: Record<string, number>; total: number; count: number }>()
+  const totals = { buckets: empty(), total: 0, count: 0 }
+  for (const inv of invoices) {
+    let row = map.get(inv.payer)
+    if (!row) {
+      row = { payer: inv.payer, buckets: empty(), total: 0, count: 0 }
+      map.set(inv.payer, row)
+    }
+    row.buckets[inv.bucket] = r2(row.buckets[inv.bucket] + inv.amount)
+    row.total = r2(row.total + inv.amount)
+    row.count++
+    totals.buckets[inv.bucket] = r2(totals.buckets[inv.bucket] + inv.amount)
+    totals.total = r2(totals.total + inv.amount)
+    totals.count++
+  }
+  invoices.sort((a, b) => b.age - a.age)
+  return { asOf: asOfISO, columns: DAY_BUCKETS, invoices, byPayer: [...map.values()].sort((a, b) => b.total - a.total), totals }
+}

@@ -10,14 +10,14 @@ const PRIMARY = 'bg-accent hover:bg-accent-hover text-xs font-medium px-3 py-1.5
 interface Props {
   claimId: string
   claimStatus: string
-  userRole: string
+  /** Decides pool claims (lib/surfaces.ts decidesPoolClaims — Q7, 2026-10-09). */
+  canDecide: boolean
 }
 
 /** A pool claim's decision: Finance (or the Principal) approves and pays it. */
-export default function ClaimActions({ claimId, claimStatus, userRole }: Props) {
+export default function ClaimActions({ claimId, claimStatus, canDecide }: Props) {
   const [isPending, startTransition] = useTransition()
 
-  const canDecide = userRole === 'principal' || userRole === 'finance'
 
   if (claimStatus === 'approved' && canDecide) {
     return (

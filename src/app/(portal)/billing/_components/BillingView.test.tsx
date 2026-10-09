@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { withActions } from '@/test/with-actions'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 
 // 2026-10-07 — Service Billing on the sheet (the user approved the Invoice /
 // Statements sample, v6): the month beside the title, every control in a
@@ -152,7 +152,7 @@ describe('Service Billing on the sheet', () => {
     expect(card('Invoiced · September')).toHaveAttribute('data-tone', 'primary')
     expect(card('Invoiced · September')).toHaveTextContent('RM 21,133.76')
     expect(card('Invoiced · September')).toHaveTextContent('3 invoices · 1 voided left out')
-    expect(card('Outstanding')).toHaveAttribute('data-tone', 'alert')
+    expect(card('Outstanding')).toHaveAttribute('data-tone', 'wait')
     expect(card('Outstanding')).toHaveTextContent('RM 9,642.13')
     expect(card('Outstanding')).toHaveTextContent('1 issued')
     expect(card('Received')).toHaveTextContent('RM 11,491.63')
@@ -163,21 +163,31 @@ describe('Service Billing on the sheet', () => {
     expect(screen.queryByText('HR OPEX')).toBeNull()
   })
 
-  it('keeps every control, in three captioned groups, with the month beside the title', async () => {
+  // 2026-10-09 (the Finance revamp): the controls in ONE row beside the title —
+  // the month, then From payroll ▾, Export ▾ and + Create Invoice ▾, each a
+  // menu that holds the buttons the captioned band used to show.
+  it('keeps every control in one row: the month, then three menus', async () => {
     database()
     await page()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Service Billing')
     expect(screen.getByTestId('period')).toHaveTextContent(PERIOD)
-    const band = document.querySelector('.act-band') as HTMLElement
-    expect(within(band).getByText('From payroll')).toBeInTheDocument()
-    expect(within(band).getByText('Create')).toBeInTheDocument()
-    expect(within(band).getByText('Export')).toBeInTheDocument()
-    for (const label of ['Generate payroll invoices', '对数补差', 'Own-share → Venture (Office)', '+ Create Invoice', '+ Multi-line Invoice']) {
-      expect(within(band).getByRole('button', { name: label })).toBeInTheDocument()
+    expect(document.querySelector('.act-band')).toBeNull()
+    const head = document.querySelector('.page-head') as HTMLElement
+    const menu = (name: string) => {
+      fireEvent.click(within(head).getByRole('button', { name }))
+      return screen.getByRole('menu', { name })
     }
-    expect(within(band).getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/statements/export?format=xlsx&period=2026-09')
-    expect(within(band).getByRole('link', { name: 'PDF · list' })).toHaveAttribute('href', '/statements/export?format=pdf&period=2026-09')
-    expect(within(band).getByRole('link', { name: 'PDF · per invoice' })).toHaveAttribute('href', '/billing/invoice-doc?period=2026-09')
+    const payroll = menu('From payroll')
+    for (const label of ['Generate payroll invoices', '对数补差', 'Own-share → Venture (Office)']) {
+      expect(within(payroll).getByRole('button', { name: label })).toBeInTheDocument()
+    }
+    const exp = menu('Export')
+    expect(within(exp).getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/statements/export?format=xlsx&period=2026-09')
+    expect(within(exp).getByRole('link', { name: 'PDF · list' })).toHaveAttribute('href', '/statements/export?format=pdf&period=2026-09')
+    expect(within(exp).getByRole('link', { name: 'PDF · per invoice' })).toHaveAttribute('href', '/billing/invoice-doc?period=2026-09')
+    const create = menu('+ Create Invoice')
+    expect(within(create).getByRole('button', { name: '+ Create Invoice' })).toBeInTheDocument()
+    expect(within(create).getByRole('button', { name: '+ Multi-line Invoice' })).toBeInTheDocument()
   })
 
   it('folds the payroll basis above the invoices, its figures on the fold, counting the consolidated lines by department', async () => {

@@ -13,6 +13,7 @@ import { exportPdfResponse } from '@/lib/export/response'
 import { formatPoolLabel } from '@/lib/voucher-detail'
 import { VoucherDocPdf, type SalaryPaymentData, type StatutoryCoverageData, type VoucherDocData } from '../_format/voucher-doc-pdf'
 import { officeTime } from '@/lib/office-time'
+import { readPayrollLineAccounts, withLineAccounts } from '@/lib/private-fields'
 
 export async function GET(req: Request) {
   const user = await requireAnyAction(['treasury', 'export'], ['hr_costing', 'export'])
@@ -77,7 +78,7 @@ export async function GET(req: Request) {
     salaryIds.length > 0
       ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any).from('payroll_voucher_lines')
-          .select('id, voucher_id, scope, payroll_row_id, employee_name, employee_code, department_name, period_month, net, salary_component, recipient_account, bank_name, bank_account_no')
+          .select('id, voucher_id, scope, payroll_row_id, employee_name, employee_code, department_name, period_month, net, salary_component, recipient_account, bank_name')
           .in('voucher_id', salaryIds)
           .order('department_name').order('employee_name').order('salary_component')
       : Promise.resolve({ data: [], error: null }),
@@ -88,9 +89,13 @@ export async function GET(req: Request) {
   if (salaryResult.error) {
     return Response.json({ error: 'Unable to load recorded salary payment details. Please try again.' }, { status: 500 })
   }
+  // The account each line pays into, through the reader: the print shows ••••
+  // unless the viewer's title ticks Bank accounts (2026-10-09, PR4).
+  const salaryLines = (salaryResult.data ?? []) as Array<{ id: string }>
+  const lineAccounts = await readPayrollLineAccounts(supabase, user, salaryLines.map((l) => l.id))
 
   const salaryByVoucher = new Map<string, SalaryPaymentData[]>()
-  for (const line of (salaryResult.data ?? []) as Array<Omit<SalaryPaymentData, 'net'> & { voucher_id: string; net: string | number }>) {
+  for (const line of withLineAccounts(salaryLines, lineAccounts) as unknown as Array<Omit<SalaryPaymentData, 'net'> & { voucher_id: string; net: string | number }>) {
     const payments = salaryByVoucher.get(line.voucher_id) ?? []
     payments.push({ ...line, net: Number(line.net) })
     salaryByVoucher.set(line.voucher_id, payments)

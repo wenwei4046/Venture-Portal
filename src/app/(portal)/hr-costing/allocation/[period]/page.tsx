@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { formatMoney } from '@/lib/utils'
 import { comparePayrollOrder } from '@/lib/payroll-grid'
 import { isTopupKind, type RowStatus } from '@/lib/payroll-lifecycle'
@@ -105,7 +106,9 @@ export default async function AllocationPage({ params }: PageProps) {
   const staffWithAlloc = staff.filter((s) => s.rows.length > 0).length
   const lockedCount = staff.filter((s) => s.lock.locked).length
   const openCount = staff.filter((s) => !s.lock.locked && !s.centralized).length
-  const readOnly = user.role !== 'hr' // RLS: writes are HR-only
+  // Editable by whoever edits payroll (HR Costing · Edit — the writes ask the
+  // same; it was the HR kind until 2026-10-09, Q7).
+  const readOnly = !canDo(user, 'hr_costing', 'edit')
   // "Marketing (12) and Revenue Department (32)"
   const notListedLine = notListed.map((d) => `${d.dept} (${d.people})`).join(', ').replace(/, ([^,]*)$/, ' and $1')
 

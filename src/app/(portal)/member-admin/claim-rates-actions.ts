@@ -19,7 +19,7 @@ import { readClaimRatesAdmin, validClaimRatesToSave, type ClaimRatesAdmin, type 
  */
 async function backOffice() {
   const user = await requireAuth();
-  if (user.role !== "principal" && !user.permissions.includes("member_requests_manage")) {
+  if (!user.permissions.includes("member_requests_manage")) {
     throw new Error("Claim rates need HR request management access.");
   }
   return (await createClient()) as unknown as SupabaseClient;

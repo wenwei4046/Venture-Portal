@@ -38,16 +38,35 @@ describe('LoansTable', () => {
     expect(push).toHaveBeenCalledWith('/fund-out/loan-9')
   })
 
-  it('a right-click offers opening it, here or in a new tab', () => {
+  it('a right-click offers opening it, here or in a new tab, and its schedule to print', () => {
     render(<LoansTable rows={[loan]} />)
     fireEvent.contextMenu(screen.getByText('The Cont').closest('tr')!)
     const menu = screen.getByRole('menu', { name: 'Actions for The Cont · CONTS' })
-    expect(within(menu).getAllByRole('menuitem').map((b) => b.firstChild?.textContent)).toEqual(['打开', '在新分页打开'])
+    expect(within(menu).getAllByRole('menuitem').map((b) => b.firstChild?.textContent)).toEqual(['打开', '在新分页打开', 'Print schedule'])
+  })
+
+  // 2026-10-09 — the handoff: Amend terms on an active loan's menu; the status
+  // as a chip, an overdue loan red; the totals of what is shown.
+  it('offers Amend terms to an account that may amend, chips the status and totals the list', () => {
+    render(<LoansTable rows={[loan, { ...loan, id: 'loan-2', companyName: 'Carres', overdue: true }, { ...loan, id: 'loan-3', companyName: 'HK', status: 'fully_repaid' }]} canAmend />)
+    fireEvent.contextMenu(screen.getByText('The Cont').closest('tr')!)
+    const menu = screen.getByRole('menu', { name: 'Actions for The Cont · CONTS' })
+    expect(within(menu).getAllByRole('menuitem').map((b) => b.firstChild?.textContent)).toEqual(['打开', '在新分页打开', 'Print schedule', 'Amend terms'])
+    // The status cell's chip, not the phone's small print.
+    const chip = (name: string) => Array.from(screen.getByText(name).closest('tr')!.querySelectorAll('.chip')).find((c) => !c.closest('.q-sub')) as HTMLElement
+    expect(chip('The Cont')).toHaveClass('ledger')
+    expect(chip('Carres')).toHaveClass('danger')
+    expect(chip('Carres')).toHaveTextContent('overdue')
+    expect(chip('HK')).toHaveTextContent('fully repaid')
+    expect(document.querySelector('tfoot')).toHaveTextContent('3 loans · principal RM 180,000.00')
+    expect(document.querySelector('tfoot')).toHaveTextContent('Outstanding RM 90,000.00')
   })
 
   it('the disbursement date reads from the left; the figures stay on the right', () => {
     render(<LoansTable rows={[loan]} />)
-    expect(screen.getByText('5 Jan 2026').closest('td')!.classList.contains('text-right')).toBe(false)
+    // The Disbursed cell, not the phone's small print under the company.
+    const cell = screen.getAllByText('5 Jan 2026').find((el) => !el.closest('.q-sub'))!
+    expect(cell.closest('td')!.classList.contains('text-right')).toBe(false)
     expect(header('disbursedAt').classList.contains('right')).toBe(false)
     expect(header('principal').classList.contains('right')).toBe(true)
   })

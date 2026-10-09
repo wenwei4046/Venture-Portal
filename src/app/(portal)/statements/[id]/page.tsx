@@ -6,7 +6,17 @@ import { requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import DetailGroups from '@/components/sheet/DetailGroups'
+import ReturnLink from '@/components/layout/ReturnLink'
 import { issueStatement, markStatementPaid } from '../actions'
+
+// A statement's page on the Finance view (2026-10-09, the user's Claude Design
+// handoff): the company as the title with its status chip, three cards — the
+// net as the primary, the two subtotals — the invoice items and the contra
+// items as two tables, the net summary in groups, and the one action its
+// status allows. "← Back to Statements" is Back when the list is where the
+// reader came from, so the list keeps its place.
 
 interface Props {
   params: Promise<{ id: string }>
@@ -42,183 +52,104 @@ export default async function StatementDetailPage({ params }: Props) {
   const lineList = lines ?? []
   const invoiceLines = lineList.filter((l) => l.line_type === 'invoice')
   const contraLines = lineList.filter((l) => l.line_type === 'contra')
+  const totalInvoice = Number(statement.total_invoice)
+  const totalContra = Number(statement.total_contra)
+  const net = Number(statement.net_amount)
+  const companyName = company?.name ?? '—'
+  const period = dayjs(statement.period_month).format('MMMM YYYY')
+  const direction = net >= 0 ? `${companyName} pays HV` : `HV owes ${companyName}`
 
   // Issue and Mark paid move the statement along: Treasury · Edit (2026-10-08, PR2).
   const canFinanceAct = canDo(user, 'treasury', 'edit')
   const isDraft = statement.status === 'draft'
   const isIssued = statement.status === 'issued'
+  const items = (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`
 
   return (
     <div>
-      <Link
-        href="/statements/monthly"
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
-      >
-        ← Back to Statements
-      </Link>
+      <div className="mb-3">
+        <ReturnLink href="/statements/monthly" className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
+          ← Back to Statements
+        </ReturnLink>
+      </div>
 
       {/* ───────── Header ───────── */}
       <div className="page-head">
-        <div>
+        <div className="min-w-0">
           <div className="page-eyebrow">
-            <em>I.</em> TREASURY · STATEMENT · {dayjs(statement.period_month).format('MMM YYYY').toUpperCase()}
+            <em>I.</em> TREASURY · STATEMENT · {period.toUpperCase()}
           </div>
-          <h1 className="page-title">{company?.name ?? '—'}</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            {company?.short_code} · Created <em>{officeTime(statement.created_at).format('D MMMM YYYY')}</em>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="page-title">{companyName}</h1>
+            <StatementStatus status={statement.status} />
+          </div>
+          <p className="font-sans text-xs text-graphite mt-2">
+            {company?.short_code ? `${company.short_code} · ` : ''}Created {officeTime(statement.created_at).format('D MMMM YYYY')}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/statements/${id}/print`}
-            target="_blank"
-            className="btn-secondary"
-          >
+        <div className="flex items-center gap-2">
+          <Link href={`/statements/${id}/print`} target="_blank" className="btn-quiet-sheet">
             Print Statement
           </Link>
-          <StatementStatus status={statement.status} />
         </div>
       </div>
 
-      {/* ───────── Hero net amount ───────── */}
-      <div className="mb-12 pb-12 border-b border-hairline">
-        <div className="font-serif italic text-accent text-base mb-1">
-          Net amount
-        </div>
-        <div className={`statement-amount ${Number(statement.net_amount) < 0 ? 'text-danger' : 'text-num-ink'}`}>
-          {formatMoney(Number(statement.net_amount))}
-        </div>
-        <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
-          {Number(statement.net_amount) >= 0 ? (
-            <>
-              {(company?.name ?? '—').toUpperCase()} <em className="font-serif italic normal-case text-graphite">pays HV</em>
-            </>
-          ) : (
-            <>
-              HV <em className="font-serif italic normal-case text-graphite">owes</em> {(company?.name ?? '—').toUpperCase()}
-            </>
-          )}
-        </div>
-      </div>
+      {/* ───────── Cards ───────── */}
+      <StatCards label="Statement">
+        <StatCard tone="primary" label="Net amount" value={formatMoney(net)} icon="receipt" note={direction} />
+        <StatCard label="Subtotal invoice" value={formatMoney(totalInvoice)} icon="coin" note={items(invoiceLines.length)} />
+        <StatCard label="Subtotal contra" value={formatMoney(-totalContra)} icon="swap" note={contraLines.length > 0 ? items(contraLines.length) : 'None'} />
+      </StatCards>
 
       {/* ───────── Invoice items ───────── */}
-      <section className="mb-10">
-        <div className="sect-head">
-          <h2>Invoice items</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">{invoiceLines.length} ITEM{invoiceLines.length === 1 ? '' : 'S'} · <span className="num">{formatMoney(Number(statement.total_invoice))}</span></span>
-        </div>
-        {invoiceLines.length === 0 ? (
-          <div className="border border-hairline rounded-md bg-surface p-5 text-center">
-            <p className="font-serif italic text-muted text-sm">
-              No invoice items for this period. Finance generates invoices via <em>/billing</em>
-              before regenerating statements to pick them up.
-            </p>
-          </div>
-        ) : (
-          <div className="border-t border-hairline">
-            {invoiceLines.map((line) => (
-              <div
-                key={line.id}
-                className="py-3 border-b border-hairline last:border-0 flex items-baseline justify-between"
-              >
-                <div>
-                  <div className="font-serif text-md text-ink">
-                    {formatCategory(line.category_code)}
-                  </div>
-                  {line.description ? (
-                    <div className="font-serif italic text-muted text-xs">
-                      {line.description}
-                    </div>
-                  ) : null}
-                </div>
-                <span className="num">
-                  {formatMoney(Number(line.amount))}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      <LineSection
+        title="Invoice items"
+        count={`${items(invoiceLines.length).toUpperCase()} · ${formatMoney(totalInvoice)}`}
+        lines={invoiceLines.map((l) => ({ id: l.id, category: formatCategory(l.category_code), description: l.description, amount: Number(l.amount) }))}
+        footLabel="Subtotal invoice"
+        footAmount={totalInvoice}
+        empty="No invoice items for this period. Finance generates invoices on Service Billing before regenerating statements to pick them up."
+      />
 
       {/* ───────── Contra items ───────── */}
-      <section className="mb-10">
-        <div className="sect-head">
-          <h2>Contra items</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">{contraLines.length} ITEM{contraLines.length === 1 ? '' : 'S'} · <span className="num neg">{formatMoney(-Number(statement.total_contra))}</span></span>
-        </div>
-        {contraLines.length === 0 ? (
-          <div className="border border-hairline rounded-md bg-surface p-5 text-center">
-            <p className="font-serif italic text-muted text-sm">
-              No contra items. Savings interest and loan repayments (via netting) would
-              appear here.
-            </p>
-          </div>
-        ) : (
-          <div className="border-t border-hairline">
-            {contraLines.map((line) => (
-              <div
-                key={line.id}
-                className="py-3 border-b border-hairline last:border-0 flex items-baseline justify-between"
-              >
-                <div>
-                  <div className="font-serif text-md text-ink">
-                    {formatCategory(line.category_code)}
-                  </div>
-                  {line.description ? (
-                    <div className="font-serif italic text-muted text-xs">
-                      {line.description}
-                    </div>
-                  ) : null}
-                </div>
-                <span className="num neg">
-                  {formatMoney(-Number(line.amount))}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      <LineSection
+        title="Contra items"
+        count={`${items(contraLines.length).toUpperCase()} · ${formatMoney(-totalContra)}`}
+        lines={contraLines.map((l) => ({ id: l.id, category: formatCategory(l.category_code), description: l.description, amount: -Number(l.amount) }))}
+        footLabel="Subtotal contra"
+        footAmount={-totalContra}
+        empty="No contra items. Savings interest and loan repayments (via netting) would appear here."
+      />
 
-      {/* ───────── Final net summary ───────── */}
-      <div className="bg-surface border border-hairline rounded-md p-5 mb-10 max-w-md ml-auto">
-        <div className="flex justify-between font-mono text-sm text-graphite mb-1">
-          <span>Subtotal invoice</span>
-          <span className="num">
-            {formatMoney(Number(statement.total_invoice))}
-          </span>
-        </div>
-        <div className="flex justify-between font-mono text-sm text-graphite mb-2 pb-2 border-b border-hairline">
-          <span>Subtotal contra</span>
-          <span className="num neg">
-            {formatMoney(-Number(statement.total_contra))}
-          </span>
-        </div>
-        <div className="flex items-baseline justify-between">
-          <span className="font-serif italic text-md text-accent">Net payable</span>
-          <span className={`statement-amount ${Number(statement.net_amount) < 0 ? 'text-danger' : 'text-num-ink'}`}>
-            {formatMoney(Number(statement.net_amount))}
-          </span>
-        </div>
-      </div>
+      {/* ───────── Net summary ───────── */}
+      <DetailGroups
+        title="Net summary"
+        count={direction.toUpperCase()}
+        groups={[
+          {
+            title: 'Summary',
+            items: [
+              { label: 'Subtotal invoice', value: formatMoney(totalInvoice) },
+              { label: 'Subtotal contra', value: formatMoney(-totalContra) },
+              { label: 'Net payable', value: <span className={net < 0 ? 'text-danger' : undefined}>{formatMoney(net)}</span> },
+            ],
+          },
+        ]}
+      />
 
       {/* ───────── Actions ───────── */}
       {canFinanceAct && (isDraft || isIssued) ? (
-        <section className="border-t border-hairline pt-8">
+        <section className="mb-6">
           <div className="sect-head">
             <h2>Actions</h2>
             <span className="rule" aria-hidden />
             <span className="count">FINANCE ONLY · ISSUED STATEMENTS LOCK</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="fin-actions">
             {isDraft ? (
               <form action={issueStatement}>
                 <input type="hidden" name="id" value={statement.id} />
-                <button
-                  type="submit"
-                  className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-                >
+                <button type="submit" className="btn-pri">
                   Issue to subsidiary
                 </button>
               </form>
@@ -226,34 +157,92 @@ export default async function StatementDetailPage({ params }: Props) {
             {isIssued ? (
               <form action={markStatementPaid}>
                 <input type="hidden" name="id" value={statement.id} />
-                <button
-                  type="submit"
-                  className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-                >
+                <button type="submit" className="btn-pri">
                   Mark as paid
                 </button>
               </form>
             ) : null}
+            <span className="note">
+              {isDraft
+                ? 'Once issued the statement locks.'
+                : statement.issued_at
+                  ? `Issued ${officeTime(statement.issued_at).format('D MMM YYYY HH:mm')}`
+                  : 'Issued.'}
+            </span>
           </div>
-          {statement.issued_at ? (
-            <p className="font-mono text-xs text-muted mt-3">
-              Issued {officeTime(statement.issued_at).format('D MMM YYYY HH:mm')}
-            </p>
-          ) : null}
         </section>
       ) : null}
     </div>
   )
 }
 
+function LineSection({
+  title,
+  count,
+  lines,
+  footLabel,
+  footAmount,
+  empty,
+}: {
+  title: string
+  count: string
+  lines: Array<{ id: string; category: string; description: string | null; amount: number }>
+  footLabel: string
+  footAmount: number
+  empty: string
+}) {
+  return (
+    <section className="mb-9">
+      <div className="sect-head">
+        <h2>{title}</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">{count}</span>
+      </div>
+      {lines.length === 0 ? (
+        <div className="border border-hairline rounded-md bg-surface p-5 text-center">
+          <p className="font-sans text-sm text-graphite">{empty}</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="ledger-table w-full">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th className="m-hide">Description</th>
+                <th className="text-right right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line) => (
+                <tr key={line.id}>
+                  <td>{line.category}</td>
+                  <td className="m-hide text-graphite">{line.description ?? <span className="text-muted">—</span>}</td>
+                  <td className={`num${line.amount < 0 ? ' neg' : ''}`}>{formatMoney(line.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={2}>{footLabel}</td>
+                <td className={`num${footAmount < 0 ? ' neg' : ''}`}>{formatMoney(footAmount)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
+/** The statement's status as the sheet's chip: issued waits, paid is done. */
 function StatementStatus({ status }: { status: string }) {
-  if (status === 'draft')
-    return <span className="status-morph font-serif italic text-graphite text-md">draft</span>
-  if (status === 'issued')
-    return <span className="status-morph font-serif italic text-alert text-md">issued</span>
-  if (status === 'paid')
-    return <span className="status-morph font-serif italic text-ledger text-md">paid</span>
-  return <span className="status-morph font-serif italic text-muted text-md">{status}</span>
+  const tone = status === 'issued' ? ' alert' : status === 'paid' ? ' ledger' : ''
+  return (
+    <span className={`chip lg${tone}`}>
+      <i className="dot" />
+      {status}
+    </span>
+  )
 }
 
 function formatCategory(code: string): string {

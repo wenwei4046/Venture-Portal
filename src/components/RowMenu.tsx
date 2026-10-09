@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useFinView } from '@/components/layout/fin-view'
 
 // A row's actions, on a right-click or its ⋯ button (2026-10-02).
 //
@@ -41,6 +42,7 @@ interface Props {
 }
 
 export default function RowMenu({ title, anchor, items, onClose }: Props) {
+  const fin = useFinView()
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number }>({ left: anchor.x, top: anchor.y })
 
@@ -90,6 +92,7 @@ export default function RowMenu({ title, anchor, items, onClose }: Props) {
       ref={ref}
       role="menu"
       aria-label={`Actions for ${title}`}
+      data-fin={fin ? 'true' : undefined}
       className="fixed z-[60] min-w-[220px] rounded-panel border border-hairline bg-paper p-1 shadow-xl font-sans normal-case text-left"
       style={{ left: pos.left, top: pos.top }}
       onContextMenu={(e) => e.preventDefault()}

@@ -1,5 +1,472 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-09 k (SHIPPED) — Dept Pool: each department's own P&L and Cash Flow
+
+The user: "我要把每个 department 的 cash flow, P&L 放过来 … Venture, Marketing,
+Finance, HR, Director Office, IT, Revenue Department — 每个 segment 就有 cash
+flow 和 P&L". A sample (sidebar + page, toggles) went out first; the user took
+the recommended options ("照这个做"): one sidebar row per department with a
+P&L | Cash Flow switch in the page, the overview kept as the first row, the
+Director NOT listed. Asked "如果要看多月的呢？" — answered: the page is month by
+month, From – To within one year, Accumulated = the range.
+
+- **Sidebar** (`nav-config.ts`): for `readsDeptStatements` (= dept_pool.view at All
+  AND `reportsCompanyWide` — Finance, the Principal) Dept Pool lists Overview
+  (/dept-pool, exact; also lights /dept-pool/submissions and /contracts) then
+  each department → /dept-pool/statements/<slug>; a core department also lights
+  on its old pool page (alsoPaths /dept-pool/hr …). Everyone else keeps Cash /
+  Accrual P&L (`keepsPoolBases`), listed first so the activity log still names
+  /dept-pool "Dept Pool · Cash". `NavData.deptPoolDepts?` (falls back to the five);
+  `(portal)/layout.tsx` fills it from `primedRegistryRows()` (no read).
+- **The list** (`lib/dept-statements.ts`): Venture (= segment corporate,
+  treasury folded in by `segmentFilterFor`), Marketing, Finance, HR, Director
+  Office, then `extraFullDepts` in created_at order (IT = it, Revenue Department
+  = revenue_department → slug revenue-department). `statementPath(slug, view,
+  {period, from})`.
+- **The page** (`dept-pool/statements/[seg]/page.tsx` + `statements/loading.tsx`):
+  gate `requireAction('reports','view')` then notFound unless dept_pool.view All;
+  unknown slug (incl. director) → notFound. Head: eyebrow DEPARTMENTS · <DEPT> ·
+  range, P&L | Cash Flow switch (`?view=cash-flow`, keeps period/from), Excel /
+  PDF = the Reports exports with `segment=`. Body = Reports' own.
+- **Shared with Reports** (no change to Reports' output): `lib/monthly-statements.ts`
+  `loadMonthlyPnl` / `loadMonthlyCashFlow` (lifted from the two monthly pages;
+  one segment is never consolidated → no elimination, the cash bridge IS read),
+  `reports/_components/MonthlyPnlBody` / `MonthlyCashFlowBody` (cards + toolbar +
+  matrix; `segments=[]` hides the Segment picker).
+- **Overview** (`DeptPoolSheet` head): Cash | Accrual P&L switch (group "Basis").
+- Tests: lib/dept-statements, statements/[seg]/page, nav-config.dept-pool,
+  (portal)/layout, dept-pool/page (switch). Reports' monthly tests unchanged, green.
+
+## CHECKPOINT 2026-10-09 j (SHIPPED) — Finance revamp · the five gaps closed
+
+The user asked what was left ("还有什么没做？") and then "继续做完这五处".
+
+- **Dept Pool · HR Costing Submission** (Finance's cash view): each department's
+  latest `hr_cost_submissions` row as a chip — executed (ledger), ready to execute
+  (= `approved_for_execution`, accent), awaiting Principal (= `pending`, alert),
+  "—" if none; the month and the approved-to-date total on hover. A ready one
+  has **Mark executed** (the submissions page's `executeHrCosting` form, Treasury ·
+  Edit; it moves no money — the prototype's "Execute transfers" wording was not
+  used). `executeHrCosting` now also revalidates /dept-pool and its submissions.
+- **Debtor Aging by days** (company-wide readers + their export): `lib/debtor-aging`
+  `DAY_BUCKETS` / `debtorAgingView(raw, asOf, 'months' | 'days')`. Still aged by
+  **invoice date** (the user's July 2026 rule), so the design's "Current + 1–30"
+  became one "0–30 days" column: 0–30 / 31–60 / 61–90 / 90+. Cards 0–30 /
+  31–60 / Over 60. `AgingByCustomer` takes `columns` and `search` (Find company,
+  highlights only). A department manager keeps months.
+- **Loan Aging by days late** (page + export): `lib/loan-aging`
+  `unpaidInstallments` / `agingByMonths` / `agingByDays` / `dueDateIn`,
+  `treasury-terms` `segmentedUnpaid`; the same FIFO allocation as before (totals
+  unchanged), each unpaid installment aged from the deal's day of the month
+  (disbursement / effective date, clamped): Not due / 1–30 / 31–90 / 90+.
+  `loan-monitor` rows carry `days`, sides `dueDaysTotal`.
+- **Trial Balance in groups**: `lib/trial-balance-groups.ts` (types in the
+  statement's order, each account under its top-level parent),
+  `trial-balance/_components/TrialBalanceView` (As at, Show zero, Find account,
+  L1 type totals / L2 + parents / L3 every account, parents fold, navy Total).
+  As at / Show zero submit a plain GET form (no router; the default-period test
+  renders it bare); the page's chart-of-accounts read fails soft (ungrouped).
+- **Voucher form** (new / copy / edit): Date · Description · Segment row, the lines
+  under a navy band, + Add line [Ins], totals at the foot, balance chip (Balanced /
+  Out of balance · x / waiting), Post entry (was "Post voucher") only when the
+  existing `canSubmit` holds. CSS `.jv-*`.
+- **Settings tables**: Chart of Accounts = one table with a band per type, "n
+  sub-accounts", Cash flow, status chip, Search (matches + their parents), Show
+  inactive / Collapse / Expand / + New account in one band (drag-to-reparent,
+  inline edit, the create dialog unchanged). Departments = + New department, the
+  three notes in a "How departments work" fold, Pool GL "code · name"
+  (`poolNames` from the page), billing mode in words (`billingModeLabel`), Mode
+  chip (the switch stays for whoever `canSwitch`), Provision.
+
+## CHECKPOINT 2026-10-09 i (SHIPPED) — Finance revamp · Phase 4b: Reports, Reconciliation / Journal, Settings — the revamp is complete
+
+- **Reports, company-wide readers only** (`reportsCompanyWide(user)` — a department
+  manager keeps every report page as it was; tests pin it). Shared pieces:
+  `lib/report-range.ts` (From – To within one year, `period` = To, `from` new;
+  `rangeLabel`, `toChoices`, `fromChoices`), `lib/monthly-matrix.ts`
+  `sliceMatrixMonths` (cut a matrix built through To down to From:
+  Accumulated = sum of kept months, except OPENING_CASH = first kept month,
+  CLOSING_CASH / AR_* = last kept month), `_components/ReportToolbar` (Period
+  From – To, Find account, Segment dropdown, Detail level L1–L3 on one row; level
+  now lives in `ReportSearchProvider` when a page passes `level`, and
+  `MonthlyMatrix` hides its own pills then; `separated` adds `.mx-sep` rules
+  before each column), `_components/ReportModeSwitch` (Single month · P&L /
+  Monthly P&L in the head; CF / R&P: Single month / Month by month),
+  `GlReportView controls="row"` (+ `periodLabel`, "As at" on the BS), `ExportLinks
+  variant="sheet"`, CSS `.rpt-*`, `tr.rpt-all` (the navy All row).
+- Pages: Monthly P&L / Cash Flow / R&P (cards; exports take `from` too),
+  single P&L / CF / R&P (cards, consolidated note on P&L), Balance Sheet (cards,
+  Check = Balanced), Trial Balance (cards, as-at row, navy Total), Debtor Aging
+  (cards, `AgingByCustomer allRow` → navy "All companies"), Loan Aging (five
+  cards, navy All borrowers / All lenders), Company Statement (To collect / To
+  repay / Net). Sidebar: P&L → /reports/monthly-pnl for `canAccessReports`,
+  /reports/income-statement for dept-only readers.
+- **Reconciliation**: `?upload=1` opens the upload form (head button), one card
+  per bank ("✓ Ties to GL" / the difference, Cache · GL), sessions with chips and
+  Continue / Open / Report. **Journal Entries**: list → **`/reconciliation/
+  journal-entries/[id]`** (new page: chip posted / auto · payroll, Date /
+  Segment / Amount cards, Lines with totals, Delete (`JvDeleteButton`) / Copy /
+  Edit, or Fix mistakes for an auto accrual); AUTO as a chip, total foot; the
+  voucher form adds a line on **Ins** (focus to its account); new / edit heads
+  say "Press Ins to add a line".
+- **Settings**: accounts tab = "Chart of Accounts" (Active / Inactive cards),
+  departments tab = "Departments" (count + cost centers, Bill back salary); the
+  Principal's own tabs keep "Settings". **Base Rate History**: four cards
+  (current, weighted cost, op margin, change vs last quarter), History section.
+- `src/test/read-paths.ts`: the dashboard's treasury branch also reads
+  `treasury_terms_history` (upstream PR3d test).
+- Not done on purpose: "Request credit" on Dept Pool (Marketing's own form);
+  Reverse on a voucher stays "Delete" (the existing reversing delete).
+
+## CHECKPOINT 2026-10-09 h (SHIPPED) — Finance revamp · Phase 4a: Overview, Dept Pool, Venture Pool, General Ledger
+
+- **Overview** (treasury branch of `dashboard/page.tsx` only — HR's and a
+  department's Overviews untouched): eyebrow OVERVIEW · TREASURY · <MONTH>,
+  head buttons **Daily Bank** (quiet) and **Record payment** (`canDo treasury
+  create`, → /payments/new); Pending your hand / Awaiting Principal cards in
+  the `wait` tone; Pool breakdown in a `details.fin-fold`; Margin panel and
+  a separate **Interest this month** panel; new **Overdue instalments** (n
+  BEHIND, only when any) and **Coming up · next 14 days** (with the Net in
+  tfoot) from every live deal's plan — `lib/repayment-book.ts`
+  (`loadRepaymentBook` reads active loans + active/matured fund sources and
+  their repayments, `bookWindow(deals, today, 14)`). Rows link
+  `/fund-…/<id>?from=overview`.
+- **Back to Overview / Calendar**: `lib/deal-return.ts` (`dealReturn`,
+  `fromCalendar`); fund-in/[id] and fund-out/[id] read `?from=overview|
+  calendar&month=` and their ReturnLink says “← Back to Overview / Calendar”;
+  the calendar items carry `?from=calendar` (+ the calendar's own month).
+- **Dept Pool** (`_components/DeptPoolSheet.tsx`): for whoever reads every
+  department (`!ownDepartmentOnly`) — Cash: cards Total balance / In / Out /
+  Net (to date) / Below zero, **Balance by bank** above **By department**
+  (balance column still masked by `BalanceToggle`), "All departments" foot
+  rows; Accrual: Revenue (bill) / Cost / Expense / Inter-billing / Net margin
+  over By department. Same figures as before. An own-department reader keeps
+  the old page (test pins it). "Request credit" from the prototype was not
+  added — it is Marketing's own invoice-request form.
+- **Venture Pool**: Export (`/venture-pool/export`: whole ledger, oldest first,
+  In / Out / running balance, xlsx), four cards, **In vs Out** (CSS pie +
+  12-month bars, `_components/InOutCharts.tsx`, `.vp-*` CSS — In #3F7A64,
+  Out #E99A53), **Pool ledger** via SortableTable (search, chips, ranges).
+  `lib/venture-pool.ts` `ventureRefLabel` shared by page + export.
+- **General Ledger**: eyebrow period (`lib/ledger-view.ts`
+  `ledgerPeriodLabel`), `.page-sub`, head **Select accounts…** (LedgerPicker
+  is now a popover `.gl-picker`: accounts, From/To, Show zero, Apply) / **Excel**
+  / **PDF** for whatever is picked — the export route takes `?codes=` or none
+  (= every account with activity, `hasLedgerActivity`; `showZero=1` keeps all),
+  `buildLedgersXlsx` / `LedgersPdf`; `?code=` single path unchanged. Each
+  account is a section (heading code · name, n LINES), Opening balance row
+  (`tr.gl-open`), journal type chip, Dept named, Closing balance foot.
+  The page now awaits LedgerBody itself (same wait, testable).
+- Tests: Overview sheet 5, repayment-book 3, deal-return 4, Dept Pool 4,
+  Venture Pool 3 + export 2, ledger page 3 + export 4, ledger-view 3, deal
+  pages +4.
+
+Next: Reports (P&L monthly default, one control row, From–To; Cash Flow, R&P,
+BS, TB, aging navy All row, Company Statement — gate by reportsCompanyWide),
+Reconciliation / Journal Entries, Settings (Base Rate History tab).
+
+## CHECKPOINT 2026-10-09 g (SHIPPED) — Finance revamp · Phase 3 done: Invoice Financing, Repayment Schedule, Overdue
+
+- **Invoice Financing** (`/ba`, was "Bank BA"): `BaView` now owns the head
+  (← Fund In, eyebrow TREASURY · INVOICE FINANCING, `.page-sub`, Calculator /
+  **Record financing** — the inline RecordForm with its live calc and limit
+  check, unchanged), four `StatCard`s (Active face primary, To charge
+  borrowers ledger, To pay HC danger, HV margin ledger), then **Financing
+  register** (scroll box, neighbour resize, Ref in the body face,
+  `BaStatusChip`: matures in Nd info / ≤14d alert / overdue red / settled
+  green) and **Limits** after it (count "n COMPANIES · x% USED", Edit limits
+  toggles the old LimitsSection, LimitCards). A double-click opens the new
+  **`/ba/[id]`** page (in `isFinanceDetailRoute`; `ba/loading.tsx`): title =
+  BA ref + chip, six cards (Face, Charge borrower, Owe HC, HV margin,
+  Matures, Interest billing), DetailGroups Terms / Dates / Billing /
+  Facility · borrower (+ Notes), Documents (`AttachmentChips full`), Actions
+  (`[id]/_components/BaDetailActions`: Bill borrower, Pay HC via the exported
+  `PvModal`, Mark settled / Reopen). `PvModal`, `AttachmentChips`,
+  `InterestCell`, `BaStatusChip` are exported from BaView.
+- **Repayment Schedule**: head with `MonthNav` as the handoff's pill (reuses
+  `.db-daynav`) beside the title; five cards (To collect / To pay / Net this
+  month / Done so far / Overdue · short); tabs **Calendar** (default) /
+  **We collect** / **We pay** (`ScheduleView`; the old sections and the Full
+  plan / Outstanding only toggle now live under each side, compounding and
+  no-term included). The calendar (`_components/RepayCalendar.tsx`, `.repay-
+  cal` CSS) is fed server-side: every loan and fund source's
+  `buildRepaymentPlan` → `lib/repayment-calendar.ts` `monthEvents` (status
+  paid / partial / overdue / due by the row's outstanding and day); hover
+  card (role tooltip), click → the deal, "+N more" past four, phone = dots +
+  an agenda list.
+- **Overdue & Netting**: tabs (`OverdueTabs`, `?tab=in`) **Fund OUT · they
+  owe us** (the `overdue_records` as before, by month, `StageChip`, the
+  netting & penalty log) and **Fund IN · we owe** (new: a fund source's
+  installments whose day passed unpaid — `overdueOf(plan, today)`), four
+  cards each (Overdue outstanding, Penalty accrued, Longest overdue, Netted
+  this month = loan repayments of type netting this month).
+- Tests: BaView 3, BA page 4, calendar 4, calendar helpers 4, Overdue 2.
+
+Next: Phase 4 — Overview, Dept Pool, Venture Pool, General Ledger, Reports,
+Reconciliation / Journal, Settings.
+
+## CHECKPOINT 2026-10-09 f (SHIPPED) — Finance revamp · Phase 3: Fund IN / Fund OUT
+
+- **Lists** (`fund-in/page.tsx`, `fund-out/page.tsx`): `StatCards` per the
+  handoff — Fund IN: Total paid capital / Weighted average cost / Outstanding
+  / Maturing in 30 days (wait) / Pending approval; Fund OUT: Total
+  outstanding / Weighted effective rate (+ monthly interest income) / Net
+  spread (over Fund IN's weighted cost of the active sources, ledger) /
+  Maturing in 30 days (disbursement + tenure, scheduled loans only) /
+  Overdue (danger; a loan with a `pending` row in `overdue_records` — the
+  Overdue page's — the card links to `/overdue`). Tabs counted
+  (`FundSourceTabs` / `LoanTabs` take `counts`; Fund OUT gains `?status=
+  overdue`). Tables: chips (`SourceStatusChip`, `LoanStatusChip`), Range on
+  amount/date, `scrollBox` + neighbour resize, totals in the footer, phone
+  keeps From/Company + Outstanding with the rest as `.q-sub` small print
+  (wrapped in `.fin-queue`), right-click adds **Print schedule**
+  (`/fund-…/<id>?print=1`) and **Amend terms** (Treasury · Approve, active).
+  Head buttons are `btn-quiet-sheet` / `btn-pri-sheet`.
+- **Detail pages**: ReturnLink, eyebrow, title + status chip (loan: overdue
+  red), head **Print schedule** (`components/treasury/PrintSchedule.tsx`: an
+  overlay sheet with the letterhead, terms and every installment; printing
+  shows only it via `body.printing-schedule`) + Amend terms; cards per the
+  handoff; `DetailGroups` (IN: Terms / Dates / Routing; OUT: Terms / Dates /
+  Approval trail / Repayment terms); **Repayment settings** and **Notes** as
+  `.fin-form` panels (the editors rewritten as `.fin-field`s, English);
+  Terms over time; **Repayment schedule** (`RepaymentScheduleSection`)
+  replacing the history — the payments as recorded fold away under it
+  (`details.sched-recorded`; a loan's keep their Reverse button); Record
+  repayment; Actions in `.fin-actions`.
+- **`lib/repayment-plan.ts`** (11 tests, live-book cases): per-installment
+  plan from `buildTermsSegments` (a changed segment re-bases), money set
+  against rows oldest first per pool (principal vs interest; penalty pays
+  neither), 1% slack per row for stored-rate rounding, RM 1 for "repaid";
+  remarks Paid · voucher / Part paid / Overdue n days / Settled early / Rate
+  change; open (no fixed term) month by month to date; compounding rolls
+  unpaid interest into the balance; a repaid deal stops at its payoff month.
+  Due day = the record's own day (effective / disbursement date). Voucher
+  refs: fund sources via `payment_voucher_id`, loans parsed from "Auto-synced
+  from voucher …" notes.
+- Tests: lists 2+2, tables updated, details 4+4, schedule section 5, plan 11.
+
+Next: Invoice Financing (rename, register first then Limits, a BA's own
+page), the Repayment Schedule calendar, Overdue — then Phase 4.
+
+## CHECKPOINT 2026-10-09 e (SHIPPED) — Finance revamp · Phase 3 begins: Daily Bank
+
+Daily Bank per the handoff (it answers the open choices of the 7 Oct sample:
+no dark banner — a sheet section with the navy table band; money in green,
+pending brown, overdrawn red).
+- `DailyBankView` now owns the page head (the server page only fetches):
+  eyebrow, title, the **day nav** pill "← Today · 9 Oct 2026 →" (`.db-daynav`;
+  the label hides a date input "Pick a day"; → is disabled on today), the
+  subtitle (`.page-sub`), Today (when not today) / PNG / PDF / **Get image**
+  (`.btn-pri-sheet`). Five `StatCard`s: Balance B/F (Σ bf), Received today
+  (ledger when > 0; "n receipts"), Pending payment (wait; "n awaiting
+  Principal"), Total available (primary, `totals.grand`), Banks ("n
+  departments" = columns). `SlidingTabs` Bank × Department / By bank (count).
+- The board (`.dbank`, what Get image / PNG capture, white background now):
+  Matrix = sect-head + `ledger-table.db-matrix` — `tr.db-band` per bank's B/F
+  (inset walnut edge), `db-indent` rows (Received today `.db-in`, each pending
+  PV with a Pending chip and "PV · description" `.db-sub`, figures `.db-pend`
+  in parentheses), `tr.db-avail` Available balance, tfoot Total available;
+  zero = dash, negative = `.db-neg`. **Phone**: `.db-phone` card per bank
+  (available, the "B/F · +in · −pending" walk, a line per department that
+  moved, the pending list) + Total available; the table is `hidden md:block`.
+  By bank = one section per bank (count "BANK BALANCE RM x" = current), Pay to
+  / PV No. / Description / Received / Pending, tfoot Available (after pending).
+- Capture logic unchanged (scroll containers flattened); PDF export unchanged.
+- Tests: `DailyBankView.test.tsx` (6).
+
+## CHECKPOINT 2026-10-09 d (SHIPPED) — Finance revamp · an invoice's own page
+
+User: "继续做完他" — finish the revamp. First the invoice detail page the
+handoff wants (README: "Invoice items (Billable) and Contra items (Non-bill)
+are clearly separated"). Invoices carry no non-billable lines, so the contra
+items are the invoice's **credit notes**.
+- New route **`/invoices/[id]`** (registered in `lib/finance-view.ts` —
+  prefix, detail root, title "Invoice"; `lib/sheet-routes.ts`; the sidebar's
+  Invoice item lights on it via `alsoPaths`; `loading.tsx` at `/invoices` and
+  `/invoices/[id]`). `requirePermission('billing')`.
+- Page: ReturnLink "← Back to Service Billing" (`/statements?period=`),
+  eyebrow "INVOICE · <MODE>", the number (or Draft) with its chip, "<party> ·
+  <kind>"; head PDF (billing·export) + Copy (billing·create,
+  `_components/CopyInvoiceLink`); cards Total amount (primary) / Received
+  (ledger when > 0; a paid invoice counts total − approved credit, its
+  consolidated receipt's slice) / Remaining (wait while issued and owing) /
+  Due ("n days left", "Paid", "Draft"); `DetailGroups` Billing (Billed to,
+  Billing mode, GL category, Reference no) + Dates + Contact (free-text
+  party); Description in `.fin-notice`; **Invoice items** (lines, or the
+  invoice itself when it has none; "n LINES · BILLABLE"); **Contra items**
+  (credit notes: CN # / Status chip / Reason / (amount), foot = approved);
+  **Receipts** (direct ones + the consolidated receipt it points at, shown as
+  this invoice's slice with "consolidated receipt · RM x in all").
+- Actions (`_components/InvoicePageActions.tsx`, the list's own actions by
+  status): draft → Approve & issue / Edit / Delete; issued → **Settle in
+  place** (inline Bank / Payment date / Amount received → the list's
+  `settleInvoicesConsolidated` with `partialAmount`; a dept-pool invoice links
+  to `/payments/new?invoice_id=…&return_to=/invoices/<id>` instead) / Edit /
+  + Credit note / Change account / Void (untouched only; inline reason); paid
+  → Edit / Refund (treasury·create, voucher page) / + Credit note / Change
+  account. Edit, credit note and change-account are the list's dialogs
+  (`autoOpen hideTrigger`). Inline forms: `.fin-inline-form` / `.fin-field`.
+- `lib/invoice-labels.ts` (tested): `billingModeLabel` ("HR attribution",
+  a provisioned dept by its own label) and `invoiceParty` (subsidiary "Name
+  (CODE)", Dept pool, Director, Free text).
+- **Service Billing list**: the popup is gone — the number is a Link to the
+  page, a double-click / 打开 / the phone's "Open the invoice →" push it; the
+  row menu reads in English on the Finance view (Open, Change account, Void…;
+  Chinese elsewhere). `InvoiceDetailButton.tsx` is no longer used by the list
+  (kept: the user's " - Copy" backups import it). BillingView still hands the
+  list `receiptsByInvoice` / `cnDetailByInvoice` (an upstream pagination test
+  guards those reads) — unused now; a candidate cleanup.
+
+Next: Phase 3 — Daily Bank, Fund IN/OUT + details, Invoice Financing,
+Repayment Schedule calendar, Overdue.
+
+## CHECKPOINT 2026-10-09 c (SHIPPED) — Finance revamp · the Billing Allocator per the handoff
+
+The user answered the Phase 2 question with **照设计档**: the Records table
+follows the prototype, not the 每家一栏 matrix picked on 2026-10-07.
+- `lib/allocator-sheet.ts`: `matrixColumns` is gone; `splitSummary(txn)` is
+  the Split column's text — each non-own share as "label pct%" joined by
+  " · " (pct = share ÷ amount, one decimal), "—" when nothing is billed to
+  anyone.
+- **Records** (`RecordsTab`): Txn (body face) / Description (second line:
+  recorded date · method · HC month) / Amount (Range) / Split (text) /
+  Category / Batch chip / **Status chip** (billed ledger · to bill alert) /
+  Edit · ×. Search "Search txn / description…", `scrollBox`, neighbour
+  resize. A row **opens its own page** on a double-click (`useRowLinks`; the
+  right-click menu adds Edit in Calculate / Delete, disabled when locked).
+  By company: Billed reads green, To bill in the alert colour; invoice chips
+  kept (clickable, unlike the prototype's text). The gen-strip is unchanged.
+- **Record page** `/billing-allocator/[id]` (new; `isFinanceDetailRoute`
+  knows it): ReturnLink "← Back to Billing Allocator" (`?period=`), eyebrow
+  "BILLING · ALLOCATOR · <batch | NOT BILLED>", the number as the title with
+  its chip, "description · recorded date"; cards Amount (primary) / Billable
+  (= the non-own shares) / HV own share / Billed (ledger, "n invoices ·
+  batch") or To bill (alert, "Not invoiced yet"); `DetailGroups` Expense
+  (Description, Category, Date) + Split (Method, Headcount list, Batch,
+  Companies, Invoice(s)); "Split by company" `ledger-table` (Bill to with
+  subsidiary / dept pool / kept by HV, Basis = method_detail, Share %, Amount,
+  Status chip; HV own last) with a Billable total foot; Actions (Billing ·
+  Edit only; `[id]/_components/RecordActions.tsx`): billed → "View <invoice> ·
+  <bill-to>" links to invoice-doc; unbilled → **Generate invoices** (the
+  month's `generateAllocatorInvoices`, same as the strip), **Correct this
+  record** (→ `/billing-allocator?period=…&edit=<id>`), **Delete** (confirm →
+  `deleteAllocTxn` → back to the list). Billed = billed_ref set AND the batch
+  still has live invoices (the list's lock rule).
+- `?edit=<id>`: the list page passes `initialEditId` to `AllocatorTabs`, which
+  opens Calculate with the record loaded (ignored if the month lacks it or it
+  is locked) and `history.replaceState`s the param away. `TxnRow.createdAt`
+  added (`created_at` selected).
+- Tests: allocator-sheet (splitSummary 2), finance-view (+2 paths), RecordsTab
+  rewritten (7), AllocatorTabs +2, list page +1, record page 4.
+
+Next: the invoice detail page (Billable / Contra apart); then Phase 3 (Daily
+Bank, Fund IN/OUT + details, Invoice Financing, Repayment Schedule calendar,
+Overdue), then Phase 4.
+
+## CHECKPOINT 2026-10-09 b (SHIPPED) — Finance revamp · Phase 2, the converted pages re-aligned
+
+Phase 1 (the Finance view) is live. Phase 2 brings the five pages converted
+before the handoff onto the handoff's rules:
+- **Payments / Receipts** (`VoucherLedger`, `VouchersTable`, `PaymentTabs`):
+  Pending approval card → `wait`; the status as a chip (pending wait, approved
+  accent, paid ledger, voided info); the voucher number in the body face;
+  Range on Amount and Date; `scrollBox` + `resizeMode="neighbour"`; a
+  **Payroll batches** tab on the payment side (`?status=payroll` — the payroll
+  disbursements only, `counts.payroll` = batches + locked batches); the
+  receipt side says Receipt # / Payer and has a **Bank** column
+  (`bank_account_id` + a `bank_accounts` read → `bankLabel`); the row menu
+  and the batch rows in English on the Finance view (Change date / Change
+  amount / n vouchers / Expand). Eyebrow "DAILY OPERATIONS · …".
+- **Voucher page** (`payments/[id]`): the panel's rows under "When & where"
+  and "Booking" (`.deal-side-sec`); a pending voucher's chip is `wait`. The
+  panel's labels stay Chinese (the page's tests and the trail are).
+- **Service Billing** (`BillingView`, `InvoicesList`): the `.act-band` is
+  gone — ONE row beside the title: the month, then `ActMenu`s "From payroll
+  ▾" / "Export ▾" / "+ Create Invoice ▾" (`components/sheet/ActMenu.tsx`: the
+  very same buttons and links, stacked in a popover; `.act-menu*` CSS);
+  Outstanding → `wait`; voided chip red; Range on Amount and Date; scroll
+  box + neighbour resize; the number in the body face. The invoice DETAIL PAGE
+  the handoff wants (Billable / Contra apart) is NOT built yet — the row still
+  opens the detail popup; it is the next item.
+- **Statements**: the list's Draft card rests in the default tone (the
+  prototype's); the detail page is rebuilt — `ReturnLink` back, the company
+  with its chip, three cards (Net primary / Subtotal invoice / Subtotal
+  contra), Invoice items and Contra items as `ledger-table`s with subtotal
+  feet, the Net summary as `DetailGroups` (`components/sheet/DetailGroups.tsx`,
+  the handoff's "dl" block; `.dl-*` CSS) and Actions in a `.fin-actions` panel.
+- **Billing Allocator**: NOT touched — the prototype's Records table has ONE
+  "Split" column (text "HC 30% · HM 20%") and a record detail page, while the
+  user picked 每家一栏 (the matrix) two days earlier; asked the user which
+  (answered 照设计档 — see checkpoint c).
+- Tests: VouchersTable +5, VoucherLedger +2 (and two adjusted), PaymentTabs 2,
+  voucher page +1, BillingView (one rewritten), InvoicesList +2, statement
+  page 2, statements list adjusted.
+
+Next: the user's answer on the allocator; the invoice detail page; then
+Phase 3 (Daily Bank, Fund IN/OUT + details, Invoice Financing, Repayment
+Schedule calendar, Overdue).
+
+## CHECKPOINT 2026-10-09 a (SHIPPED) — Finance revamp · Phase 1, the Finance view
+
+The user handed over a Claude Design project, **Finance Revamp** (zip →
+`.design/finance-revamp/design_handoff_finance_revamp/`: `Finance
+Revamp.dc.html` + `support.js` + README + 16 screenshots; served for the
+browser pane by `$TEMP/claude-patch/serve-proto.js` on :4797). It redesigns
+EVERY Finance page in the sheet language we had been building (cards, section
+heads, counted tabs, orange), plus global rules (README "Global rules") and
+some new features. Decided with the user (AskUserQuestion):
+- the global rules apply to **Finance's pages only** — Finance's routes as
+  Finance or the Principal sees them (`lib/finance-view.ts`); HR's and a
+  department manager's pages keep the sheet as it was;
+- the handoff's **new features are in scope** (built with the page they
+  belong to, numbers from the database — never the prototype's samples);
+- **four phases**: 1 foundation (this) → 2 re-align the five pages already
+  converted → 3 Daily Bank, Fund IN/OUT + details, Invoice Financing,
+  Repayment Schedule (calendar), Overdue → 4 Overview, Dept Pool, Venture
+  Pool, General Ledger, Reports, Reconciliation/Journal, Settings. Each phase
+  deploys for the user to check. Invoice Pool stays skipped.
+
+Phase 1 (this checkpoint):
+- `lib/finance-view.ts` (tested): `FINANCE_VIEW_PREFIXES`, `isFinanceView
+  (pathname, role)`, `isFinanceDetailRoute` (a row's page under a list, for
+  Back and the edge swipe), `financePageTitle` (the phone top bar's word).
+- `FinViewProvider` / `useFinView` (`components/layout/fin-view.tsx`);
+  PortalFrame provides it, adds `.fin-view` to the sheet frame, passes `fin`
+  to TopBar and BottomTabBar, mounts `FinScrollMemory` (useEntryScroll over
+  `.st-box` panes — a list keeps its place on Back) and, on a detail route,
+  `FinSwipeBack` (28px edge, 8px axis lock, 0.9×dx follow, >80px commits,
+  180ms slide, then router.back()).
+- CSS (`globals.css` › "THE FINANCE VIEW"): tabular-nums body, accent-hover
+  #C9741F, Inter eyebrow/count at 0.05em, cards (12.5px sentence-case label,
+  mono figure grey by default, ledger bar+icon, new `wait` tone — blue —
+  defined for every sheet), Inter chips + `.chip.wait`, navy table band
+  #E2E7EF/#1D2B4A with rule #C8D0DD, no zebra, hover #FFF5E9, `.num` at 400
+  unless a weight class says otherwise, `.st-box` (620px, sticky thead),
+  `.st-modes` / `.st-range-*` / `.st-presets`, `[data-fin]` dressing for the
+  portaled popover, Columns panel and row menu, `.fin-topbar` (56px cream, H
+  tile, role kicker, page name) and `.fin-tabbar` (cream, `.fin-pill`
+  46×28 peach behind the lit icon, 10.5px labels).
+- `SortableTable`: column `range: 'number' | 'date'` → the popover's Pick
+  values | Range switch (one mode at a time), Min/Max or From/To, presets
+  (`lib/table-range.ts`: amountPresets, datePresets, inRange, rangeNumber),
+  "N rows in range", filter icon `data-active`; props `scrollBox` and
+  `resizeMode: 'neighbour'` (shareWidth in table-layout: the pair's sum is
+  constant, no handle on the last column); the words object (`WORDS.en` on
+  the Finance view: Double-click to open · right-click for more, Open →,
+  Search…, Clear filter, Reset columns, Set as default…).
+- `useRowLinks` / `RowMenu`: Open (or double-click) / Open in new tab on
+  the Finance view; `data-fin` on the menu.
+- Sidebar: "Bank BA" → "Invoice Financing" (the page itself in Phase 3).
+- Tests: finance-view 7, table-range 7, table-layout +2, SortableTable +7,
+  row-links 2, FinSwipeBack 2, TopBar 2, BottomTabBar 2, PortalFrame.fin 3.
+
+Next: Phase 2 — Payments/Receipts (status as chips, pending → wait tone, the
+detail side panel's When & where / Booking headings, Receipt # / Payer
+labels, a Payroll batches tab), Invoice (one-row toolbar with ▾ menus, Credit
+notes / Marketing projects / Non-billable below, an invoice detail page with
+Billable / Contra), Allocator (prototype's Records columns, a record's
+detail), Statements; then Phases 3–4.
+
 ## CHECKPOINT 2026-10-07 g (SHIPPED) — Billing Allocator on the sheet (batch 1, page 5)
 
 The sample (`docs/samples/2026-10-07-allocator-sheet-sample.html`, September

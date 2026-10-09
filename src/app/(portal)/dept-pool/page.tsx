@@ -12,6 +12,8 @@ import { extraDeptNameToSegment, primedRegistryRows } from '@/lib/dept-registry'
 import { startRead } from '@/lib/start-read'
 import type { User } from '@/types'
 import { BalanceProvider, BalanceToggle, BalanceValue } from './_components/RevealAmount'
+import { ownDepartmentOnly } from '@/lib/surfaces'
+import { DeptPoolAccrualSheet, DeptPoolCashSheet } from './_components/DeptPoolSheet'
 
 // dept_manager only owns their own dept pool. Skip the multi-dept list and
 // land them straight on their own detail page — same content as clicking View.
@@ -31,10 +33,11 @@ interface HRCostSubmissionRow {
   dept_summaries: Record<string, { total_ctc?: number; department_id?: string }> | null
 }
 
-// Dept Manager sees only their own dept
+// Somebody whose Dept Pool reaches only their own department sees only it
+// (2026-10-09, Q7: by their cell, not the dept_manager kind).
 function visibleDepartments<D extends { id: string }>(user: User, departments: D[] | null): D[] {
   const all = departments ?? []
-  return user.role === 'dept_manager' ? all.filter((d) => d.id === user.department_id) : all
+  return ownDepartmentOnly(user, 'dept_pool') ? all.filter((d) => d.id === user.department_id) : all
 }
 
 export default async function DeptPoolPage({
@@ -48,9 +51,9 @@ export default async function DeptPoolPage({
   const { basis: basisParam } = await searchParams
   const basis = basisParam === 'accrual' ? 'accrual' : 'cash'
 
-  // Fast-path: dept_manager → their own dept detail page. No reason to show
-  // a 1-row list and make them click View.
-  if (user.role === 'dept_manager' && user.department_id) {
+  // Fast-path: their own department only → its detail page. No reason to
+  // show a 1-row list and make them click View.
+  if (ownDepartmentOnly(user, 'dept_pool') && user.department_id) {
     const { data: ownDept } = await supabase
       .from('departments')
       .select('name')
@@ -102,13 +105,35 @@ export default async function DeptPoolPage({
     // Venture (= Office / corporate) shown as its own row for principal/finance.
     // Its P&L lives in the income statement's venture_pool bucket.
     const ventureAccrual =
-      user.role !== 'dept_manager'
+      !ownDepartmentOnly(user, 'dept_pool')
         ? splitPoolAccrual(poolByKey.get('venture_pool') ?? null)
         : null
 
     // Total = the visible departments + Venture (whole-company net margin).
     const totalNetMargin =
       rows.reduce((s, r) => s + r.a.netMargin, 0) + (ventureAccrual?.netMargin ?? 0)
+
+    // Finance's view (2026-10-09, the user's Claude Design handoff): whoever
+    // reads every department gets the sheet's cards and tables, drawn from the
+    // same figures; somebody who reads only their own keeps the page below,
+    // as it was. The accrual view stays read-only (no New project contract).
+    if (!ownDepartmentOnly(user, 'dept_pool')) {
+      return (
+        <DeptPoolAccrualSheet
+          monthTitle={dayjs(period).format('MMMM YYYY').toUpperCase()}
+          asAt={dayjs(period).endOf('month').format('D MMM YYYY')}
+          canNewContract={false}
+          rows={rows.map(({ dept, a, href }) => ({
+            id: dept.id,
+            name: dept.name,
+            href,
+            pnlHref: dept.name === 'Marketing' && href ? `${href}?tab=pnl` : null,
+            a,
+          }))}
+          venture={ventureAccrual}
+        />
+      )
+    }
 
     return (
       <div>
@@ -266,7 +291,7 @@ export default async function DeptPoolPage({
   // were two reads of the same rows), and each journal_lines read starts the
   // moment they are in. null = no active bank has a GL code: nothing to read.
   const bankRowsRead =
-    user.role !== 'dept_manager'
+    !ownDepartmentOnly(user, 'dept_pool')
       ? startRead(
           supabase
             .from('bank_accounts')
@@ -390,7 +415,7 @@ export default async function DeptPoolPage({
   // the "Per-bank breakdown" Venture (Office) total therefore include the
   // pseudo-dept overlay.
   let ventureCash: { balance: number; in_amt: number; out_amt: number } | null = null
-  if (user.role !== 'dept_manager') {
+  if (!ownDepartmentOnly(user, 'dept_pool')) {
     // The GL corporate/treasury lines on every active bank's code (item 2),
     // read above beside everything else; null = no bank code, nothing read.
     let vIn = 0
@@ -421,7 +446,7 @@ export default async function DeptPoolPage({
   type BankInfo = { code: string; name: string; balance: number }
   type PerBankRow = { segment: string; label: string; perBank: Record<string, number>; total: number }
   let perBankBreakdown: { banks: BankInfo[]; rows: PerBankRow[]; totals: { perBank: Record<string, number>; grand: number } } | null = null
-  if (user.role !== 'dept_manager') {
+  if (!ownDepartmentOnly(user, 'dept_pool')) {
     const bankRows = await bankRowsRead
     const banks: BankInfo[] = (bankRows ?? [])
       .filter((b) => b.gl_account_code)
@@ -532,6 +557,46 @@ export default async function DeptPoolPage({
   const totalDeployed =
     Array.from(balanceMap.values()).reduce((acc, b) => acc + b, 0) +
     (ventureCash?.balance ?? 0)
+
+  // Finance's view (2026-10-09, the handoff) — as the accrual branch above:
+  // the same figures as cards, Balance by bank, then By department.
+  if (!ownDepartmentOnly(user, 'dept_pool')) {
+    // Each department's latest HR costing submission (the handoff's status
+    // chip in the HR Costing Submission column).
+    const latestHr = new Map<string, { id: string; state: string; period: string }>()
+    for (const sub of [...submissions].sort((a, b) => b.period_month.localeCompare(a.period_month))) {
+      for (const info of Object.values(sub.dept_summaries ?? {})) {
+        const deptId = info?.department_id
+        if (deptId && !latestHr.has(deptId)) latestHr.set(deptId, { id: sub.id, state: sub.execution_state, period: sub.period_month })
+      }
+    }
+    return (
+      <DeptPoolCashSheet
+        monthTitle={dayjs(period).format('MMMM YYYY').toUpperCase()}
+        canNewContract={canDo(user, 'my_billing', 'create', 'dept')}
+        rows={visible.map((dept) => {
+          const io = inOutByDept.get(dept.id) ?? { in_amt: 0, out_amt: 0 }
+          const slug = DEPT_NAME_TO_SLUG[dept.name]
+          const href = slug ? `/dept-pool/${slug}` : null
+          return {
+            id: dept.id,
+            name: dept.name,
+            href,
+            pnlHref: dept.name === 'Marketing' && href ? `${href}?tab=pnl` : null,
+            balance: balanceMap.get(dept.id) ?? 0,
+            inAmt: io.in_amt,
+            outAmt: io.out_amt,
+            costing: costingByDept.get(dept.id) ?? 0,
+            hr: latestHr.get(dept.id) ?? null,
+          }
+        })}
+        canExecuteHr={canDo(user, 'treasury', 'edit')}
+        venture={ventureCash}
+        perBank={perBankBreakdown}
+        total={totalDeployed}
+      />
+    )
+  }
 
   return (
     <div>

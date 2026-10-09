@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition, useEffect } from 'react'
 import Link from 'next/link'
-import { formatMoney } from '@/lib/utils'
+import { formatMoneyBare } from '@/lib/utils'
 import { officeToday } from '@/lib/office-time'
 import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
 import {
@@ -130,9 +130,19 @@ export default function JournalVoucherForm({ accounts, entry, prefill }: Props) 
     updateLine(key, value ? { credit: value, debit: '' } : { credit: value })
   }
 
+  // A line added from the keyboard (Ins) or the button takes the cursor to
+  // its account (2026-10-09, the handoff: "Ins adds a line").
+  const focusNewLine = useRef(false)
   function addLine() {
     setLines((prev) => [...prev, emptyLine()])
+    focusNewLine.current = true
   }
+  useEffect(() => {
+    if (!focusNewLine.current) return
+    focusNewLine.current = false
+    const rows = formRef.current?.querySelectorAll<HTMLElement>('[data-jv-line]')
+    rows?.[rows.length - 1]?.querySelector<HTMLInputElement>('input')?.focus()
+  }, [lines.length])
 
   function removeLine(key: string) {
     setLines((prev) => (prev.length > 2 ? prev.filter((l) => l.key !== key) : prev))
@@ -212,21 +222,34 @@ export default function JournalVoucherForm({ accounts, entry, prefill }: Props) 
     })
   }
 
+  // Whether the entry balances, as the handoff's chip says it (2026-10-09).
+  const balanceTone = isBalanced && hasAmount ? 'ok' : totals.debit > 0 || totals.credit > 0 ? 'bad' : 'idle'
+  const balanceText =
+    balanceTone === 'ok'
+      ? 'Balanced'
+      : balanceTone === 'bad'
+        ? `Out of balance · ${formatMoneyBare(Math.abs(totals.diff))}`
+        : 'Debits must equal credits before posting'
+
+  // The voucher per the user's Claude Design handoff (2026-10-09): Date,
+  // Description and Segment on one row; the lines under a navy band with
+  // + Add line (Ins) and the totals at their foot; the balance chip; Post
+  // entry only once the entry balances. Ins anywhere in the form adds a line.
   return (
     <form
       ref={formRef}
+      onKeyDown={(e) => {
+        if (e.key === 'Insert') {
+          e.preventDefault()
+          addLine()
+        }
+      }}
       onSubmit={handleSubmit}
-      className="bg-surface border border-hairline rounded-md p-4 sm:p-8 max-w-4xl"
+      className="jv-form"
     >
-      {/* ───────── Header fields ───────── */}
-      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label
-            htmlFor="transaction_date"
-            className="block text-sm font-sans font-medium text-graphite mb-1.5"
-          >
-            Transaction date <span className="text-danger">*</span>
-          </label>
+      <div className="jv-head">
+        <label className="jv-field">
+          <span>Date</span>
           <input
             id="transaction_date"
             name="transaction_date"
@@ -234,16 +257,11 @@ export default function JournalVoucherForm({ accounts, entry, prefill }: Props) 
             required
             value={transactionDate}
             onChange={(e) => setTransactionDate(e.target.value)}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+            className="jv-input font-mono"
           />
-        </div>
-        <div>
-          <label
-            htmlFor="description"
-            className="block text-sm font-sans font-medium text-graphite mb-1.5"
-          >
-            Description <span className="text-danger">*</span>
-          </label>
+        </label>
+        <label className="jv-field">
+          <span>Description</span>
           <input
             id="description"
             name="description"
@@ -251,188 +269,114 @@ export default function JournalVoucherForm({ accounts, entry, prefill }: Props) 
             required
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="e.g., Reclassify prepaid insurance to expense"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+            placeholder="e.g. Reclassify prepaid insurance to expense"
+            className="jv-input"
           />
-        </div>
-        <div>
-          <label
-            htmlFor="segment"
-            className="block text-sm font-sans font-medium text-graphite mb-1.5"
-          >
-            Segment <span className="text-danger">*</span>
-          </label>
-          <select
-            id="segment"
-            name="segment"
-            value={segment}
-            onChange={(e) => setSegment(e.target.value)}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
+        </label>
+        <label className="jv-field">
+          <span>Segment</span>
+          <select id="segment" name="segment" value={segment} onChange={(e) => setSegment(e.target.value)} className="jv-input">
             {SEGMENT_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
             ))}
           </select>
-          <p className="font-serif italic text-muted text-xs mt-1.5">
-            Drives which department P&amp;L this voucher appears in. If the voucher
-            also moves a bank account, the department&apos;s pool moves by the same
-            amount. Unallocated stays out of every department view.
-          </p>
-        </div>
+        </label>
       </div>
+      <p className="jv-hint">
+        The segment decides which department&apos;s P&amp;L the voucher appears in; if it also moves a bank account, that
+        department&apos;s pool moves by the same amount. Unallocated stays out of every department view. At least two lines.
+      </p>
 
-      {/* ───────── Lines ───────── */}
-      <div className="mb-4">
-        <div className="flex items-baseline justify-between mb-2">
-          <span className="text-sm font-sans font-medium text-graphite">
-            Lines <span className="text-muted font-normal">(minimum 2)</span>
-          </span>
+      <div className="jv-lines">
+        <div className="jv-row jv-row-head">
+          <span>Account</span>
+          <span className="r">Debit</span>
+          <span className="r">Credit</span>
+          <span className="jv-note">Line note</span>
+          <span />
         </div>
-
-        <div className="border border-hairline rounded-md overflow-hidden">
-          {/* Column header */}
-          <div className="hidden sm:grid grid-cols-[2fr_1.2fr_1.2fr_1.8fr_auto] gap-2 px-3 py-2 bg-surface-2 text-xs uppercase tracking-wide font-sans text-muted">
-            <div>Account</div>
-            <div className="text-right">Debit</div>
-            <div className="text-right">Credit</div>
-            <div>Line description</div>
-            <div className="w-7" aria-hidden />
+        {lines.map((line) => (
+          <div key={line.key} data-jv-line className="jv-row">
+            {/* Type-ahead account search (user 2026-06-12) — same picker as
+                the PV/invoice forms; headers hidden. */}
+            <AccountPicker
+              accounts={accounts}
+              value={line.account_code}
+              onChange={(code) => updateLine(line.key, { account_code: code })}
+              name={`jv_line_acct_${line.key}`}
+              placeholder="Type code or name…"
+            />
+            <input
+              aria-label="Debit"
+              type="number"
+              step="0.01"
+              min="0"
+              inputMode="decimal"
+              value={line.debit}
+              onChange={(e) => setDebit(line.key, e.target.value)}
+              disabled={!!line.credit}
+              placeholder="0.00"
+              className="jv-input jv-num"
+            />
+            <input
+              aria-label="Credit"
+              type="number"
+              step="0.01"
+              min="0"
+              inputMode="decimal"
+              value={line.credit}
+              onChange={(e) => setCredit(line.key, e.target.value)}
+              disabled={!!line.debit}
+              placeholder="0.00"
+              className="jv-input jv-num"
+            />
+            <input
+              aria-label="Line description"
+              type="text"
+              value={line.description}
+              onChange={(e) => updateLine(line.key, { description: e.target.value })}
+              placeholder="Optional"
+              className="jv-input jv-note"
+            />
+            <button type="button" onClick={() => removeLine(line.key)} disabled={lines.length <= 2} aria-label="Remove line" className="jv-del">
+              ×
+            </button>
           </div>
-
-          {lines.map((line) => (
-            <div
-              key={line.key}
-              className="grid grid-cols-1 sm:grid-cols-[2fr_1.2fr_1.2fr_1.8fr_auto] gap-2 px-3 py-2 border-t border-hairline first:border-t-0 sm:border-t items-center"
-            >
-              {/* Type-ahead account search (user 2026-06-12) — same picker as
-                  the PV/invoice forms; headers hidden, type any part of the
-                  code or name to narrow. */}
-              <AccountPicker
-                accounts={accounts}
-                value={line.account_code}
-                onChange={(code) => updateLine(line.key, { account_code: code })}
-                name={`jv_line_acct_${line.key}`}
-                placeholder="Type code or name…"
-              />
-
-              <input
-                aria-label="Debit"
-                type="number"
-                step="0.01"
-                min="0"
-                inputMode="decimal"
-                value={line.debit}
-                onChange={(e) => setDebit(line.key, e.target.value)}
-                disabled={!!line.credit}
-                placeholder="0.00"
-                className="w-full px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-num-ink text-right focus:outline-none focus:border-accent-border disabled:opacity-40 disabled:cursor-not-allowed"
-              />
-
-              <input
-                aria-label="Credit"
-                type="number"
-                step="0.01"
-                min="0"
-                inputMode="decimal"
-                value={line.credit}
-                onChange={(e) => setCredit(line.key, e.target.value)}
-                disabled={!!line.debit}
-                placeholder="0.00"
-                className="w-full px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-num-ink text-right focus:outline-none focus:border-accent-border disabled:opacity-40 disabled:cursor-not-allowed"
-              />
-
-              <input
-                aria-label="Line description"
-                type="text"
-                value={line.description}
-                onChange={(e) => updateLine(line.key, { description: e.target.value })}
-                placeholder="Optional"
-                className="w-full px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
-              />
-
-              <button
-                type="button"
-                onClick={() => removeLine(line.key)}
-                disabled={lines.length <= 2}
-                aria-label="Remove line"
-                className="justify-self-end text-muted hover:text-danger text-lg leading-none px-2 py-1 rounded-md disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-
-        <button
-          type="button"
-          onClick={addLine}
-          className="mt-3 text-sm text-accent hover:text-accent-hover font-sans transition-colors"
-        >
-          + Add line
-        </button>
-      </div>
-
-      {/* ───────── Totals footer ───────── */}
-      <div className="mb-6 grid grid-cols-1 sm:grid-cols-[2fr_1.2fr_1.2fr_1.8fr_auto] gap-2 px-3 py-3 border-t-2 border-ink">
-        <div className="font-serif italic text-ink text-sm self-center">Totals</div>
-        <div className="num text-right">{formatMoney(totals.debit)}</div>
-        <div className="num text-right">{formatMoney(totals.credit)}</div>
-        <div className="self-center sm:col-span-2">
-          <span className="font-sans text-xs uppercase tracking-wide text-muted mr-2">
-            Difference
-          </span>
-          <span
-            className={
-              isBalanced
-                ? 'font-mono tabular font-medium text-ledger text-sm'
-                : 'font-mono tabular font-medium text-danger text-sm'
-            }
-          >
-            {isBalanced ? 'Balanced' : formatMoney(totals.diff)}
-          </span>
-        </div>
-      </div>
-
-      {/* ───────── Error ───────── */}
-      {error ? (
-        <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 mb-6 text-sm font-sans">
-          {error}
-        </div>
-      ) : null}
-
-      {/* ───────── Actions ───────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 pt-4 border-t border-hairline">
-        <button
-          type="submit"
-          disabled={isPending || isDeleting || !canSubmit}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isPending
-            ? 'Saving…'
-            : isEdit
-              ? 'Save changes'
-              : 'Post voucher'}
-        </button>
-        <Link
-          href="/reconciliation/journal-entries"
-          className="text-sm text-graphite hover:text-ink font-sans transition-colors text-center sm:text-left"
-        >
-          Cancel
-        </Link>
-        {isEdit ? (
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={isPending || isDeleting}
-            className="text-sm text-danger hover:underline font-sans transition-colors sm:ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isDeleting ? 'Deleting…' : 'Delete voucher'}
+        ))}
+        <div className="jv-row jv-row-foot">
+          <button type="button" onClick={addLine} className="jv-add">
+            + Add line
+            <kbd>Ins</kbd>
           </button>
-        ) : (
-          <span className="text-xs text-muted italic font-serif sm:ml-auto">
-            Debits must equal credits before posting
-          </span>
-        )}
+          <span className="r num">{formatMoneyBare(totals.debit)}</span>
+          <span className="r num">{formatMoneyBare(totals.credit)}</span>
+          <span className="jv-note" />
+          <span />
+        </div>
+      </div>
+
+      {error ? <div className="sheet-danger mt-4">{error}</div> : null}
+
+      <div className="jv-bottom">
+        <span className={`jv-bal ${balanceTone}`} role="status">
+          <span className="dot" />
+          {balanceText}
+        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {isEdit ? (
+            <button type="button" onClick={handleDelete} disabled={isPending || isDeleting} className="btn-quiet-sheet text-danger">
+              {isDeleting ? 'Deleting…' : 'Delete voucher'}
+            </button>
+          ) : null}
+          <Link href="/reconciliation/journal-entries" className="btn-quiet-sheet">
+            Cancel
+          </Link>
+          <button type="submit" disabled={isPending || isDeleting || !canSubmit} className="btn-pri-sheet">
+            {isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Post entry'}
+          </button>
+        </div>
       </div>
     </form>
   )

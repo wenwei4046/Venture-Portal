@@ -43,6 +43,8 @@ export const SHEET_ROUTE_PREFIXES = [
   '/payments',
   '/receipts',
   '/statements',
+  // An invoice's own page (2026-10-09, the Finance revamp).
+  '/invoices',
   '/billing',
   '/billing-allocator',
   '/invoice-pool',

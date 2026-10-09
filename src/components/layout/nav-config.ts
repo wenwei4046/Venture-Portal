@@ -9,6 +9,9 @@
 import type { UserRole } from '@/types'
 import { can, type PermissionHolder } from '@/lib/permissions'
 import { REVENUE_DEPARTMENT_PATH, revenuePath } from '@/lib/revenue'
+import { canDo } from '@/lib/permission-actions'
+import { reportsCompanyWide } from '@/lib/surfaces'
+import { statementDepts, statementPath, type StatementDept } from '@/lib/dept-statements'
 import {
   canAccessAuditLog,
   canAccessCategories,
@@ -126,6 +129,12 @@ export function groupActive(
 }
 
 const isHR = (v: NavViewer) => v.role === 'hr'
+
+/** Reads every department's pool and the reports company-wide (Finance, the
+ *  Principal): Dept Pool lists each department's own P&L and Cash Flow
+ *  (2026-10-09, user: 我要把每个 department 的 cash flow, P&L 放过来). */
+export const readsDeptStatements = (v: NavViewer) => canDo(v, 'dept_pool', 'view') && reportsCompanyWide(v)
+const keepsPoolBases = (v: NavViewer) => canAccessDeptPool(v) && !readsDeptStatements(v)
 const isHRorPrincipal = (v: NavViewer) => canAccessTeam(v)
 
 /**
@@ -138,6 +147,9 @@ const isHRorPrincipal = (v: NavViewer) => canAccessTeam(v)
  */
 export interface NavData {
   revenueSubDepts: Array<{ slug: string; name: string }>
+  /** Dept Pool's departments (2026-10-09): the five, then the registry's
+   *  added ones — IT, Revenue Department. Left out = the five alone. */
+  deptPoolDepts?: StatementDept[]
 }
 
 export const emptyNavData: NavData = { revenueSubDepts: [] }
@@ -159,7 +171,8 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     { href: '/receipts', label: 'Receipt', section: 'Daily Operations', visible: canAccessTreasury },
     // /statements IS the invoices landing (Phase 7 Step 11 merge); the monthly
     // statements list lives at /statements/monthly (inside Fund In / Out below).
-    { href: '/statements', label: 'Invoice', section: 'Daily Operations', exact: true, visible: canAccessTreasury },
+    // An invoice's own page (/invoices/<id>, 2026-10-09) lights it too.
+    { href: '/statements', label: 'Invoice', section: 'Daily Operations', exact: true, alsoPaths: ['/invoices'], visible: canAccessTreasury },
     // Shared-expense allocator (port of the user's Apps Script, 2026-08-01):
     // HV-paid costs → headcount/percentage/equal/custom split → draft invoices.
     { href: '/billing-allocator', label: 'Billing Allocator', section: 'Daily Operations', visible: canAccessTreasury },
@@ -190,7 +203,8 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     { href: '/daily-bank', label: 'Daily Bank', section: 'Fund In / Out', visible: canAccessTreasury },
     { href: '/fund-in', label: 'Fund IN', section: 'Fund In / Out', visible: canAccessTreasury },
     { href: '/fund-out', label: 'Fund OUT', section: 'Fund In / Out', visible: canAccessTreasury },
-    { href: '/ba', label: 'Bank BA', section: 'Fund In / Out', visible: canAccessTreasury },
+    // "Invoice Financing" since the Finance revamp (2026-10-09): what the BA is.
+    { href: '/ba', label: 'Invoice Financing', section: 'Fund In / Out', visible: canAccessTreasury },
     { href: '/overdue', label: 'Overdue', section: 'Fund In / Out', visible: canAccessTreasury },
     { href: '/repayment-schedule', label: 'Repayment Schedule', section: 'Fund In / Out', visible: canAccessTreasury },
     { href: '/statements/monthly', label: 'Statements', section: 'Fund In / Out', visible: canAccessTreasury },
@@ -201,8 +215,27 @@ export function buildNavEntries(data: NavData): NavEntry[] {
       section: 'Departments',
       visible: canAccessDeptPool,
       children: [
-        { href: '/dept-pool', label: 'Cash', notBasis: ['accrual'], visible: canAccessDeptPool },
-        { href: '/dept-pool?basis=accrual', label: 'Accrual P&L', basis: 'accrual', visible: canAccessDeptPool },
+        // A department manager (and whoever reads one department, or no
+        // reports) keeps the two bases. Listed first so the activity log keeps
+        // naming /dept-pool "Dept Pool · Cash".
+        { href: '/dept-pool', label: 'Cash', notBasis: ['accrual'], visible: keepsPoolBases },
+        { href: '/dept-pool?basis=accrual', label: 'Accrual P&L', basis: 'accrual', visible: keepsPoolBases },
+        // Whoever reads them all (2026-10-09): the overview — Cash | Accrual
+        // P&L switched in its head — then each department's own P&L and Cash
+        // Flow. A department still lights on the pool page it already had.
+        {
+          href: '/dept-pool',
+          label: 'Overview',
+          exact: true,
+          alsoPaths: ['/dept-pool/submissions', '/dept-pool/contracts'],
+          visible: readsDeptStatements,
+        },
+        ...(data.deptPoolDepts ?? statementDepts([])).map((d) => ({
+          href: statementPath(d.slug),
+          label: d.label,
+          ...(d.poolPath ? { alsoPaths: [d.poolPath] } : {}),
+          visible: readsDeptStatements,
+        })),
       ],
     },
     // Venture Pool = HV holding-company cash ledger (5 txn types). Sits next to
@@ -307,7 +340,7 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     // Permissions is People Management's second tab (permission templates),
     // Roles is Hierarchy's fourth. Their old addresses redirect there.
     { href: '/team/people', label: 'People Management', section: 'People', visible: isHRorPrincipal },
-    { href: '/member-admin', label: 'Member Services', section: 'People', visible: v => v.role === 'principal' || can(v, 'member_requests_manage') || can(v, 'member_memos_manage') },
+    { href: '/member-admin', label: 'Member Services', section: 'People', visible: v => can(v, 'member_requests_manage') || can(v, 'member_memos_manage') },
     { href: '/team/hierarchy', label: 'Hierarchy', section: 'People', visible: isHRorPrincipal },
 
     // ── Reports & Admin ──
@@ -322,7 +355,11 @@ export function buildNavEntries(data: NavData): NavEntry[] {
         // Each statement page carries a 单月 ｜ 逐月 toggle to its monthly
         // matrix twin (ReportViewToggle, 2026-09-15), so the Monthly * entries
         // no longer need their own sidebar rows.
-        { href: '/reports/income-statement', label: 'P&L', alsoPaths: ['/reports/monthly-pnl'], visible: canAccessDeptReports },
+        // P&L opens month by month for whoever reads the reports company-wide
+        // (2026-10-09, the Finance revamp handoff: "P&L defaults to Monthly
+        // P&L"); a department manager's still opens their single month.
+        { href: '/reports/monthly-pnl', label: 'P&L', alsoPaths: ['/reports/income-statement'], visible: canAccessReports },
+        { href: '/reports/income-statement', label: 'P&L', alsoPaths: ['/reports/monthly-pnl'], visible: (v) => canAccessDeptReports(v) && !canAccessReports(v) },
         { href: '/reports/cash-flow', label: 'Cash Flow', alsoPaths: ['/reports/monthly-cash-flow'], visible: canAccessDeptReports },
         { href: '/reports/receipt-payment', label: 'Receipt & Payment', alsoPaths: ['/reports/monthly-receipt-payment'], visible: canAccessDeptReports },
         { href: '/reports/balance-sheet', label: 'Balance Sheet', visible: canAccessReports },

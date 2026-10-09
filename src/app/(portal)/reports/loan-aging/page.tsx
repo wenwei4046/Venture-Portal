@@ -6,11 +6,11 @@
 // unset = defaults to the month after disbursement/receipt.
 
 import dayjs from 'dayjs'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { fetchLoanMonitorData, type MonitorSide } from '@/lib/loan-monitor'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,14 +30,16 @@ function SourceBadge({ source }: { source?: string | null }) {
   )
 }
 
+// Days late (2026-10-09, the Finance revamp handoff): each unpaid installment
+// from its own due day — not due yet, 1–30, 31–90 or over 90 days.
 const BUCKETS = [
-  { key: 'current', label: 'Due this month' },
-  { key: 'm1', label: '1 mo late' },
-  { key: 'm2', label: '2 mo late' },
-  { key: 'm3', label: '3+ mo late' },
+  { key: 'notDue', label: 'Not due' },
+  { key: 'd30', label: '1–30 days' },
+  { key: 'd90', label: '31–90 days' },
+  { key: 'd90plus', label: '90+ days' },
 ] as const
 
-function DueTable({ side, verb }: { side: MonitorSide; verb: 'collected' | 'paid' }) {
+function DueTable({ side, verb, allLabel }: { side: MonitorSide; verb: 'collected' | 'paid'; allLabel: string }) {
   if (side.due.length === 0) {
     return (
       <div className="border border-hairline rounded-md bg-surface p-6 text-center mb-6">
@@ -66,17 +68,18 @@ function DueTable({ side, verb }: { side: MonitorSide; verb: 'collected' | 'paid
                 <span className="font-mono text-[11px] text-graphite ml-2">{d.detail}</span>
               </td>
               {BUCKETS.map((b) => (
-                <td key={b.key} className="num">{money(d.buckets[b.key])}</td>
+                <td key={b.key} className="num">{money(d.days[b.key])}</td>
               ))}
-              <td className="num font-semibold">{formatMoney(d.buckets.total)}</td>
+              <td className="num font-semibold">{formatMoney(d.days.total)}</td>
             </tr>
           ))}
-          <tr className="bg-surface-2">
-            <td className="font-sans font-medium text-ink">Total</td>
+          {/* The handoff's navy "All" row (2026-10-09). */}
+          <tr className="rpt-all">
+            <td>{allLabel}</td>
             {BUCKETS.map((b) => (
-              <td key={b.key} className="num font-semibold">{money(side.dueTotal[b.key])}</td>
+              <td key={b.key} className="num">{money(side.dueDaysTotal[b.key])}</td>
             ))}
-            <td className="num font-semibold">{formatMoney(side.dueTotal.total)}</td>
+            <td className="num">{formatMoney(side.dueDaysTotal.total)}</td>
           </tr>
         </tbody>
       </table>
@@ -169,47 +172,58 @@ export default async function LoanMonitorPage() {
   const data = await fetchLoanMonitorData(supabase)
   const monthLabel = dayjs(`${data.currentYM}-01`).format('MMMM YYYY')
 
+  // On the sheet (2026-10-09, the user's Claude Design handoff): cards for
+  // both sides, the exports as the sheet's buttons, each aging closing on a
+  // navy "All" row.
+  const late = (s: MonitorSide) => Math.round((s.dueDaysTotal.d30 + s.dueDaysTotal.d90 + s.dueDaysTotal.d90plus) * 100) / 100
+  const over30 = Math.round((data.collect.dueDaysTotal.d90 + data.collect.dueDaysTotal.d90plus) * 100) / 100
+  const lateRepay = late(data.repay)
+
   return (
     <div>
-      <Link href="/reports" className="text-sm text-muted hover:text-accent font-sans transition-colors">
-        ← Back to Reports
-      </Link>
-
       <div className="page-head">
-        <div>
+        <div className="min-w-0">
           <div className="page-eyebrow">
-            <em>III.</em> REPORTS · LOAN AGING · {monthLabel.toUpperCase()}
+            <em>I.</em> REPORTS · LOAN AGING · {monthLabel.toUpperCase()}
           </div>
           <h1 className="page-title">Loan Aging</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
+          <p className="page-sub">
             Scheduled by the agreed start month: unpaid installments bucket by
             months late (settled months drop off) · Outstanding overview below ·
             set the start month on each position&apos;s detail page; unset
             defaults to the month after disbursement/receipt
           </p>
         </div>
-        <div className="flex flex-col gap-1.5 shrink-0 text-right">
-          {(['aging', 'outstanding'] as const).map((view) => (
-            <div key={view} className="flex gap-2 items-center justify-end">
-              <span className="text-[11px] font-mono uppercase tracking-wide text-muted w-24 text-right">
-                {view}
-              </span>
-              <a
-                href={`/reports/loan-aging/export?format=xlsx&view=${view}`}
-                className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-              >
-                Excel
-              </a>
-              <a
-                href={`/reports/loan-aging/export?format=pdf&view=${view}`}
-                className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-              >
-                PDF
-              </a>
-            </div>
-          ))}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <a href="/reports/loan-aging/export?format=xlsx&view=aging" className="btn-quiet-sheet">
+            Excel
+          </a>
+          <a href="/reports/loan-aging/export?format=pdf&view=aging" className="btn-quiet-sheet">
+            PDF
+          </a>
+          <a href="/reports/loan-aging/export?format=xlsx&view=outstanding" className="btn-quiet-sheet">
+            Outstanding Excel
+          </a>
+          <a href="/reports/loan-aging/export?format=pdf&view=outstanding" className="btn-quiet-sheet">
+            Outstanding PDF
+          </a>
         </div>
       </div>
+
+      <StatCards label="Loan aging">
+        <StatCard label="To collect · outstanding" value={formatMoney(data.collect.grandTotal)} icon="send" tone="primary" note="Fund OUT" />
+        <StatCard label="Not due" value={formatMoney(data.collect.dueDaysTotal.notDue)} icon="calendar" note="This month, not yet late" />
+        <StatCard
+          label="1–30 days late"
+          value={formatMoney(data.collect.dueDaysTotal.d30)}
+          icon="clock"
+          tone={data.collect.dueDaysTotal.d30 > 0 ? 'danger' : 'default'}
+          note="To collect"
+        />
+        <StatCard label="Over 30 days late" value={formatMoney(over30)} icon="alert" tone={over30 > 0 ? 'danger' : 'default'} note="To collect" />
+        <StatCard label="To repay · outstanding" value={formatMoney(data.repay.grandTotal)} icon="inbox" note="Fund IN" />
+        <StatCard label="Late · to repay" value={formatMoney(lateRepay)} icon="alert" tone={lateRepay > 0 ? 'danger' : 'default'} note="Past its due day" />
+      </StatCards>
 
       <section className="mb-12">
         <div className="sect-head">
@@ -217,7 +231,7 @@ export default async function LoanMonitorPage() {
           <span className="rule" aria-hidden />
           <span className="count">{data.collect.due.length} UNSETTLED</span>
         </div>
-        <DueTable side={data.collect} verb="collected" />
+        <DueTable side={data.collect} verb="collected" allLabel="All borrowers" />
       </section>
 
       <section className="mb-12">
@@ -226,7 +240,7 @@ export default async function LoanMonitorPage() {
           <span className="rule" aria-hidden />
           <span className="count">{data.repay.due.length} UNSETTLED</span>
         </div>
-        <DueTable side={data.repay} verb="paid" />
+        <DueTable side={data.repay} verb="paid" allLabel="All lenders" />
       </section>
 
       <section className="mb-12">

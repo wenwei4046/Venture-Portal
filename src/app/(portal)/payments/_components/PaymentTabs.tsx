@@ -11,6 +11,9 @@ const TABS = [
   { key: 'paid', label: 'Paid' },
   { key: 'voided', label: 'Voided' },
 ]
+// Payroll batches have a tab of their own (2026-10-09, the Finance revamp) —
+// on the ledger that counts them, which is the payment side.
+const PAYROLL_TAB = { key: 'payroll', label: 'Payroll batches' }
 
 /** `counts` — how many vouchers sit under each tab, shown beside its label
  *  (2026-10-07, the sheet's tabs). */
@@ -22,7 +25,7 @@ export default function PaymentTabs({ counts }: { counts?: Partial<Record<string
 
   return (
     <SlidingTabs
-      items={TABS.map((t) => ({ ...t, count: counts?.[t.key] }))}
+      items={[...TABS, ...(counts?.payroll !== undefined ? [PAYROLL_TAB] : [])].map((t) => ({ ...t, count: counts?.[t.key] }))}
       active={current}
       onTabChange={(key) => {
         const params = new URLSearchParams(searchParams.toString())

@@ -64,18 +64,18 @@ export default async function NewJournalVoucherPage({
 
   return (
     <div>
-      <Link
-        href="/reconciliation/journal-entries"
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
-      >
-        ← Back to Journal Entries
-      </Link>
+      <div className="mb-3">
+        <Link href="/reconciliation/journal-entries" className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
+          ← Journal Entries
+        </Link>
+      </div>
       <div className="page-head">
-        <div>
+        <div className="min-w-0">
           <div className="page-eyebrow">
-            <em>I.</em> TREASURY · {prefill ? 'COPY VOUCHER' : 'NEW VOUCHER'}
+            <em>I.</em> TREASURY · MANUAL VOUCHERS · {prefill ? 'COPY' : 'NEW'}
           </div>
-          <h1 className="page-title">{prefill ? 'Copy journal entry' : 'New journal entry'}</h1>
+          <h1 className="page-title">{prefill ? 'Copy Journal Voucher' : 'New Journal Voucher'}</h1>
+          <p className="page-sub">Debits must equal credits. Press Ins to add a line.</p>
         </div>
       </div>
 

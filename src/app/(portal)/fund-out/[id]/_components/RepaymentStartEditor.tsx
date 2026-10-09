@@ -5,6 +5,7 @@ import { setLoanRepaymentStart } from '../../actions'
 
 // Finance self-service: the agreed first-installment month (还款起始月) that
 // drives the Loan Monitor's 本月应收. Unset = defaults to disbursement +1.
+// 2026-10-09: a field of the page's Repayment settings panel (the handoff).
 export default function RepaymentStartEditor({
   loanId,
   current,
@@ -20,19 +21,13 @@ export default function RepaymentStartEditor({
   const [value, setValue] = useState(current ?? '')
 
   return (
-    <div className="mt-4">
-      <div className="text-xs uppercase tracking-wide text-muted font-sans mb-1">
-        还款起始月 · Repayment starts
-      </div>
-      <div className="flex items-center gap-2">
-        <input
-          type="month"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          className="px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-        />
+    <div className="fin-field">
+      <label htmlFor="repayment-start">Repayment starts</label>
+      <div className="fin-field-row">
+        <input id="repayment-start" type="month" value={value} onChange={(e) => setValue(e.target.value)} />
         <button
           type="button"
+          className="btn-sec"
           disabled={isPending || !value}
           onClick={() =>
             startTransition(async () => {
@@ -43,17 +38,16 @@ export default function RepaymentStartEditor({
               else setSaved(true)
             })
           }
-          className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-md text-xs font-sans transition-colors disabled:opacity-50"
         >
-          {isPending ? '保存中…' : '保存'}
+          {isPending ? 'Saving…' : 'Save'}
         </button>
-        {saved && !isPending ? <span className="text-xs font-sans text-ledger">已保存 ✓</span> : null}
+        {saved && !isPending ? <span className="fin-saved">Saved ✓</span> : null}
       </div>
-      <p className="font-serif italic text-muted text-xs mt-1.5">
-        第一期落在哪个月(比如谈好 5 月起还就选 5 月)。没设的话默认 {defaultHint} 起。
-        Loan Aging 的「本月应收」按这个算。
+      <p className="fin-hint">
+        Which month the first installment falls in (agreed to start repaying in May — pick May). Unset defaults to {defaultHint}. The
+        Loan Monitor&apos;s due-this-month follows this.
       </p>
-      {error ? <p className="text-xs font-sans text-danger mt-1.5">{error}</p> : null}
+      {error ? <p className="fin-error">{error}</p> : null}
     </div>
   )
 }

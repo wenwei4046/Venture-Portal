@@ -2,14 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import type { AllocatorData, TxnRow } from './types'
 
-// 2026-10-07 — the allocator's Records on the sheet (the user approved the
-// allocator sample and picked 每家一栏): a strip for what still has to be
-// billed, the month's records with the split as one column per company and
-// the batch as a chip, then a By company table with each target's share,
-// what is billed, what is still to bill and its invoices.
+// 2026-10-07 — the allocator's Records on the sheet; 2026-10-09 — the user's
+// Claude Design handoff (照设计档): a strip for what still has to be billed,
+// the month's records with the split as ONE column of text, the batch and
+// the status as chips, a record opening its own page on a double-click, then
+// a By company table with each target's share, what is billed, what is still
+// to bill and its invoices.
 
-const mocks = vi.hoisted(() => ({ refresh: vi.fn(), deleteAllocTxn: vi.fn(), generateAllocatorInvoices: vi.fn() }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh, push: vi.fn() }) }))
+const mocks = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn(), deleteAllocTxn: vi.fn(), generateAllocatorInvoices: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh, push: mocks.push }) }))
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }),
@@ -33,17 +34,17 @@ const d = (companyId: string | null, companyLabel: string, amount: number, detai
 const TXNS: TxnRow[] = [
   {
     id: 't1', txnNo: 'ALC-202609-001', description: 'Office Rental', amount: 18980, method: 'headcount',
-    categoryId: 'cat-rent', categoryName: 'Rental', hcPeriod: '2026-09', billedRef: 'ALC-202609', locked: true,
+    categoryId: 'cat-rent', categoryName: 'Rental', hcPeriod: '2026-09', billedRef: 'ALC-202609', locked: true, createdAt: '2026-09-03T02:00:00Z',
     details: [d(null, 'HOUZS Venture (own)', 366.59), d('co-2990', '2990', 742.32), d('co-car', 'CAR', 3681.57), d('dept:mkt', 'Marketing (dept)', 4745)],
   },
   {
     id: 't5', txnNo: 'ALC-202609-005', description: 'AI TOOLS - JUL26', amount: 1863.18, method: 'percentage',
-    categoryId: 'cat-web', categoryName: 'Website & Software', hcPeriod: null, billedRef: 'ALC-202609-3', locked: true,
+    categoryId: 'cat-web', categoryName: 'Website & Software', hcPeriod: null, billedRef: 'ALC-202609-3', locked: true, createdAt: '2026-09-10T02:00:00Z',
     details: [d(null, 'HOUZS Venture (own)', 745.27, '40% (own)'), d('co-2990', '2990', 372.64, '20%'), d('co-car', 'CAR', 745.27, '40%')],
   },
   {
     id: 't6', txnNo: 'ALC-202609-006', description: "AI TOOLS-SEP'2026", amount: 2149.2, method: 'percentage',
-    categoryId: 'cat-web', categoryName: 'Website & Software', hcPeriod: null, billedRef: 'ALC-202609-4', locked: false,
+    categoryId: 'cat-web', categoryName: 'Website & Software', hcPeriod: null, billedRef: 'ALC-202609-4', locked: false, createdAt: '2026-09-12T02:00:00Z',
     details: [d(null, 'HOUZS Venture (own)', 859.68, '40% (own)'), d('co-2990', '2990', 429.84, '20%'), d('co-car', 'CAR', 859.68, '40%')],
   },
 ]
@@ -95,28 +96,28 @@ describe('the allocator’s Records on the sheet', () => {
     expect(within(strip).getByRole('button', { name: 'Generate draft invoices →' })).toBeEnabled()
   })
 
-  it('lays the split out as one column per company, HV own last, a dash where a record gives a company nothing', () => {
+  it('shows the split as one column of text, the batch and the status as chips', () => {
     render(<RecordsTab data={data()} onEdit={vi.fn()} />)
-    expect(headers(tableOf('Allocations'))).toEqual(['Txn', 'Description', 'Amount', '2990', 'CAR', 'Marketing', 'HV own', 'Batch', ''])
+    expect(headers(tableOf('Allocations'))).toEqual(['Txn', 'Description', 'Amount', 'Split', 'Category', 'Batch', 'Status', ''])
     const rental = row('Office Rental')
     expect(rental).toHaveTextContent('ALC-202609-001')
     expect(rental).toHaveTextContent('RM 18,980.00')
-    expect(within(rental).getByText('3,681.57')).toBeInTheDocument()
-    expect(within(rental).getByText('4,745.00')).toBeInTheDocument()
-    expect(within(rental).getByText('366.59').closest('td')).toHaveClass('own')
-    const tools = row('AI TOOLS - JUL26')
-    expect(within(tools).getAllByText('—')).toHaveLength(1) // nothing for Marketing
-    expect(within(tools).getByText('372.64')).toBeInTheDocument()
+    expect(rental).toHaveTextContent('2990 3.9% · CAR 19.4% · Marketing 25.0%')
+    expect(rental).toHaveTextContent('Rental')
+    expect(within(rental).getAllByText('ALC-202609')[0].closest('.chip')).toHaveClass('ledger')
+    expect(within(rental).getAllByText('billed')[0].closest('.chip')).toHaveClass('ledger')
+    const open = row("AI TOOLS-SEP'2026")
+    expect(within(open).getAllByText('not billed')[0].closest('.chip')).toHaveClass('alert')
+    expect(within(open).getAllByText('to bill')[0].closest('.chip')).toHaveClass('alert')
+    expect(document.querySelector('.st-box table')).not.toBeNull()
   })
 
-  it('tags each record with its batch, or that it is not billed', () => {
+  it('opens a record’s own page on a double-click, and offers it in the menu', () => {
     render(<RecordsTab data={data()} onEdit={vi.fn()} />)
-    // The chip is in the Batch column and again in the phone's small print.
-    const chips = (r: HTMLElement, text: string) => within(r).getAllByText(text).map((e) => e.closest('.chip'))
-    expect(chips(row('Office Rental'), 'ALC-202609')).toHaveLength(2)
-    for (const chip of chips(row('Office Rental'), 'ALC-202609')) expect(chip).toHaveClass('ledger')
-    expect(chips(row('AI TOOLS - JUL26'), 'ALC-202609-3')[0]).toHaveClass('ledger')
-    for (const chip of chips(row("AI TOOLS-SEP'2026"), 'not billed')) expect(chip).toHaveClass('alert')
+    fireEvent.doubleClick(row('Office Rental'))
+    expect(mocks.push).toHaveBeenCalledWith('/billing-allocator/t1')
+    fireEvent.contextMenu(row("AI TOOLS-SEP'2026"))
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['打开双击也可以', '在新分页打开', 'Edit in Calculate', 'Delete'])
   })
 
   it('lets the unbilled be corrected or deleted; a billed record is locked', () => {

@@ -4,6 +4,40 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-09 — The database asks for the action on a read too (PR3d)
+A table used to be readable by anybody holding any key of its area (Treasury, HR or
+Admin), through the API even where no page of theirs reads it: Revenue alone opened
+every director's payout, Product List the payroll. Each table now also asks for one of
+the actions of the pages that read it (Director Salary · View for director payouts,
+Product list · View for the product mirror …), on top of the area rule. Three views
+that showed every signed-in person the whole company's figures (department payroll
+totals, department pool balances, fund sources) now show only what the reader's own
+rules allow. Every page reads what it read. Mig `20261009080000`.
+---
+⚡ AMENDMENT 2026-10-09 — Pages ask the cells, not the account's kind (Q7)
+Which Overview opens, whether a department page shows only your own department, who
+decides a pool claim (Claims · Approve with Treasury · View), who raises for somebody
+else's sign-off, which Settings tabs, Billing Allocation's editing (HR Costing · Edit)
+and a report's company-wide or department cut now follow the title's cells, not the
+role the account was created with. The two Overview summaries ask the same cells.
+Every account that signs in lands where it did before; a title whose cells differ
+from its kind (Director: Treasury · View on a staff account) now gets what its cells
+say. Still by kind on purpose: which app opens, shared table layouts, reopening a
+Total-Closed payroll month, the Principal deciding their own request, view-as.
+Mig `20261009060000`.
+---
+⚡ AMENDMENT 2026-10-09 — Salary, NRIC and bank accounts show only where ticked (PR4)
+A template's Sensitive fields now hold in the database too. Salary amounts already
+did (every pay page's key needs the tick); NRIC and account numbers did not — any
+session that read a staff row, a director or a salary-PV line read them raw, a
+Director (Salary only) included. Those columns, and a payroll submission's
+per-person copies, are no session's to SELECT; three readers hand a number to a
+holder of its tick and •••• to anybody else, over the rows the table's own policies
+allow. The payroll bank file needs Bank accounts and the statutory files NRIC / IC
+(the user's choice A: no tick, no file); raising salary PVs needs Bank; the PV print
+shows ••••; editing a person needs Salary amounts. Every account that signs in sees
+what it saw before. Migs `20261009050000` (readers) / `20261009050100` (the columns leave SELECT).
+---
 ⚡ AMENDMENT 2026-10-09 — Own and Dept reach the rows (PR3c)
 A cell's reach now holds in the database too. Own = their own records (a claim they
 raised), Dept = their department's (its pool, expense and payment requests, contracts,

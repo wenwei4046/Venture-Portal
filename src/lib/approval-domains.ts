@@ -61,8 +61,8 @@ export function approvableTypes(user: ActionHolder | null | undefined): Approval
   })
 }
 
-/** Is this account the owner kind — the Principal, who may decide their own requests? */
-function isOwnerKind(user: Approver): boolean {
+/** Is this account the owner kind — the Principal, who may decide their own requests? (Claims ask the same.) */
+export function isOwnerKind(user: Approver): boolean {
   return user.role === 'principal' && (user.actualRole === undefined || user.actualRole === 'principal')
 }
 

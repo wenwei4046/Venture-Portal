@@ -1,30 +1,50 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
-import { officeMonth, officeTime } from '@/lib/office-time'
+import { officeMonth, officeTime, officeToday } from '@/lib/office-time'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
 import { requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
+import { buildRepaymentPlan } from '@/lib/repayment-plan'
 import { cancelLoan } from '../actions'
 import RepaymentForm from '../_components/RepaymentForm'
 import FundingSourceEditor from './_components/FundingSourceEditor'
 import RepaymentStartEditor from './_components/RepaymentStartEditor'
 import MinPayInterestToggle from './_components/MinPayInterestToggle'
 import VoidRepaymentButton from './_components/VoidRepaymentButton'
-import LedgerRow from '@/components/LedgerRow'
 import TermsTimeline from '@/components/treasury/TermsTimeline'
-import { allTermsChanges, buildTermsSegments, currentSegment, termsChanged } from '@/lib/treasury-terms'
+import RepaymentScheduleSection from '@/components/treasury/RepaymentScheduleSection'
+import PrintSchedule from '@/components/treasury/PrintSchedule'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import DetailGroups, { type DetailGroup } from '@/components/sheet/DetailGroups'
+import ReturnLink from '@/components/layout/ReturnLink'
+import { dealReturn } from '@/lib/deal-return'
+import { allTermsChanges, buildTermsSegments, currentSegment } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isLoanPrincipal, paidByMonthByType, principalPaidByMonth, termsForLoan } from '@/lib/treasury-terms-data'
+
+// A loan's page (2026-10-09, the user's Claude Design handoff — Phase 3 of the
+// Finance revamp): the borrower as the title with its status chip (an open
+// record on the Overdue page reads it overdue), Print schedule and Amend
+// terms at the head, the cards, the terms, dates and approval trail in
+// groups, then Repayment settings, Terms over time, the Repayment schedule
+// (it replaces the repayment history; the payments as recorded fold away
+// under it, each still reversible), Record repayment and the Actions.
 
 interface Props {
   params: Promise<{ id: string }>
+  /** print=1 — the list's Print schedule: the sheet opens straight away. */
+  searchParams?: Promise<{ print?: string; from?: string; month?: string }>
 }
 
-export default async function LoanDetailPage({ params }: Props) {
+/** "Auto-synced from voucher HV-OR-…" — the voucher a repayment came in on. */
+const voucherOf = (notes: string | null) => notes?.match(/voucher\s+(\S+)/i)?.[1] ?? null
+
+export default async function LoanDetailPage({ params, searchParams }: Props) {
   const user = await requirePermission('treasury')
   const { id } = await params
+  const sp = (await searchParams) ?? {}
   const supabase = await createClient()
 
   const { data: loan, error } = await supabase
@@ -41,6 +61,7 @@ export default async function LoanDetailPage({ params }: Props) {
     { data: repayments },
     { data: approver },
     { data: creator },
+    { data: overdueRows },
   ] = await Promise.all([
     supabase
       .from('companies')
@@ -61,12 +82,15 @@ export default async function LoanDetailPage({ params }: Props) {
       ? supabase.from('users').select('name').eq('id', loan.approved_by).single()
       : Promise.resolve({ data: null }),
     supabase.from('users').select('name').eq('id', loan.created_by).single(),
+    // Overdue = an open record on the Overdue page (Detect overdue writes them).
+    supabase.from('overdue_records').select('id').eq('loan_id', loan.id).eq('status', 'pending').limit(1),
   ])
 
   // Terms over time (2026-09-21): segments + each 从某月起 change with its 差价.
   const termsHistory = await fetchTermsHistory(supabase, 'loan', [loan.id])
   const repRows = (repayments ?? []).map((r) => ({ id: loan.id, amount: Number(r.amount), payment_date: r.payment_date as string, payment_type: r.payment_type as string }))
-  const termsSegments = buildTermsSegments(termsForLoan(loan, termsHistory.get(loan.id) ?? []), principalPaidByMonth(repRows, isLoanPrincipal).get(loan.id) ?? {})
+  const terms = termsForLoan(loan, termsHistory.get(loan.id) ?? [])
+  const termsSegments = buildTermsSegments(terms, principalPaidByMonth(repRows, isLoanPrincipal).get(loan.id) ?? {})
   const termsChanges = allTermsChanges(termsSegments, { currentYM: officeMonth(), paidByMonth: paidByMonthByType(repRows, isLoanPrincipal).get(loan.id) ?? {} })
 
   // A filed-but-not-yet-approved cancellation. Finance can't see /approvals
@@ -83,13 +107,7 @@ export default async function LoanDetailPage({ params }: Props) {
     .maybeSingle()
 
   const outstandingAmount = Number(outstanding?.outstanding ?? loan.principal)
-  // Once the terms changed mid-life, the current segment's figure (rate ×
-  // principal still owed when it began) is the monthly interest.
-  const monthlyInterest = termsChanged(termsSegments)
-    ? currentSegment(termsSegments, officeMonth()).interestPerMonth
-    : outstandingAmount * Number(loan.effective_rate)
   const totalPrincipalPaid = Number(outstanding?.total_principal_paid ?? 0)
-  const totalInterestPaid = Number(outstanding?.total_interest_paid ?? 0)
   const repaymentList = repayments ?? []
   const tenureMonths = Number(loan.tenure_months ?? 0)
   // No-fixed-term loans store tenure_months=1 as a placeholder (the schedule
@@ -111,314 +129,255 @@ export default async function LoanDetailPage({ params }: Props) {
   // already exist (RPC guards this too).
   const isPendingApproval = loan.status === 'pending_approval'
   const isActive = loan.status === 'active'
+  const isRepaid = loan.status === 'fully_repaid'
+  const overdue = isActive && (overdueRows ?? []).length > 0
   const noRepayments = repaymentList.length === 0
-  const canCancelLoan =
-    canVoid &&
-    (isPendingApproval || (isActive && noRepayments))
+  const canCancelLoan = canVoid && (isPendingApproval || (isActive && noRepayments))
+
+  // The Repayment schedule (2026-10-09): the plan by the terms, the money in
+  // set against it oldest first.
+  const today = officeToday()
+  const plan = buildRepaymentPlan({
+    terms,
+    payments: repaymentList.map((r) => ({
+      date: String(r.payment_date).slice(0, 10),
+      type: r.payment_type as string,
+      amount: Number(r.amount),
+      ref: voucherOf(r.notes as string | null),
+    })),
+    isPrincipal: isLoanPrincipal,
+    today,
+    dueDay: loan.disbursement_date ? dayjs(loan.disbursement_date).date() : 1,
+    status: loan.status,
+  })
+  // This month's row (or the last one) gives the monthly figures.
+  const thisRow = plan.rows.find((r) => r.ym === officeMonth()) ?? plan.rows[plan.rows.length - 1] ?? null
+  const monthlyInterest = thisRow?.interest ?? currentSegment(termsSegments, officeMonth()).interestPerMonth
+
+  const companyName = company?.name ?? '—'
+  const borrower = company?.short_code ? `${companyName} (${company.short_code})` : companyName
+  const pct = (n: number) => `${(n * 100).toFixed(3)}%`
+  const dateLong = (d: string) => dayjs(d).format('D MMM YYYY')
+  const stamp = (at: string) => officeTime(at).format('D MMM YYYY HH:mm')
+  const [chipTone, chipLabel] = overdue
+    ? ['danger', 'overdue']
+    : isActive
+      ? ['ledger', 'active']
+      : isPendingApproval
+        ? ['wait', 'pending approval']
+        : isRepaid
+          ? ['ledger', 'fully repaid']
+          : ['', 'cancelled']
+
+  const groups: DetailGroup[] = [
+    {
+      title: 'Terms',
+      items: [
+        { label: 'Borrower', value: borrower, text: true },
+        { label: 'Effective rate', value: `${pct(Number(loan.effective_rate))} /mo` },
+        { label: 'Base + custom', value: `${pct(Number(loan.base_rate))} + ${pct(Number(loan.risk_premium))}` },
+        { label: 'Tenure', value: noFixedTerm ? 'No fixed term' : `${tenureMonths} ${tenureMonths === 1 ? 'month' : 'months'}`, text: true },
+      ],
+    },
+    {
+      title: 'Dates',
+      items: [
+        { label: 'Created', value: officeTime(loan.created_at).format('D MMM YYYY') },
+        { label: 'Disbursed', value: loan.disbursement_date ? dateLong(loan.disbursement_date) : '—' },
+        { label: 'Maturity date', value: maturityDate ? maturityDate.format('D MMM YYYY') : '—' },
+      ],
+    },
+    {
+      title: 'Approval trail',
+      items: [
+        { label: 'Submitted by', value: `${creator?.name ?? '—'} · ${stamp(loan.created_at)}`, text: true },
+        {
+          label: 'Approved by',
+          value: loan.approved_at ? `${approver?.name ?? '—'} · ${stamp(loan.approved_at)}` : 'Awaiting Principal approval',
+          text: true,
+        },
+      ],
+    },
+  ]
+  if (loan.repayment_terms) groups.push({ title: 'Repayment terms', items: [{ label: 'Terms', value: loan.repayment_terms, text: true }] })
+  // Opened from the Overview or the repayment calendar, it says so and goes back there.
+  const back = dealReturn({ href: '/fund-out', label: 'Fund OUT' }, sp)
 
   return (
     <div>
-      <Link
-        href="/fund-out"
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
-      >
-        ← Back to Fund OUT
-      </Link>
+      <div className="mb-3">
+        <ReturnLink href={back.href} className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
+          ← Back to {back.label}
+        </ReturnLink>
+      </div>
 
       {/* ───────── Header ───────── */}
       <div className="page-head">
-        <div>
+        <div className="min-w-0">
           <div className="page-eyebrow">
             <em>I.</em> TREASURY · LOAN OUT
           </div>
-          <h1 className="page-title">{company?.name ?? '—'}</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            {company?.short_code} · Created <em>{officeTime(loan.created_at).format('D MMMM YYYY')}</em>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="page-title">{companyName}</h1>
+            <span className={`chip lg${chipTone ? ` ${chipTone}` : ''}`}>
+              <i className="dot" />
+              {chipLabel}
+            </span>
+          </div>
+          <p className="font-sans text-xs text-graphite mt-2">
+            {company?.short_code ? `${company.short_code} · ` : ''}Created {officeTime(loan.created_at).format('D MMMM YYYY')}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {canAmend && loan.status === 'active' ? (
-            <Link
-              href={`/fund-out/${loan.id}/edit`}
-              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-            >
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {loan.status !== 'cancelled' ? (
+            <PrintSchedule
+              autoOpen={sp.print === '1'}
+              kicker="FUND OUT · LOAN"
+              name={companyName}
+              plan={plan}
+              printed={`Printed ${dateLong(today)} · ${(user as { name?: string | null }).name ?? 'Finance'}`}
+              meta={[
+                { label: 'Borrower', value: borrower },
+                { label: 'Principal', value: formatMoney(Number(loan.principal)) },
+                { label: 'Rate', value: `${pct(Number(loan.effective_rate))} /mo` },
+                { label: 'Installments', value: plan.months ? String(plan.months) : 'No fixed term' },
+                { label: 'First installment', value: plan.firstDue ? dateLong(plan.firstDue) : '—' },
+                { label: 'Installment', value: formatMoney(plan.firstInstallment) },
+                { label: 'Total interest', value: `${formatMoney(plan.totalInterest)}${plan.kind === 'open' ? ' (to date)' : ''}` },
+                { label: 'Paid', value: formatMoney(plan.principalPaid + plan.interestPaid) },
+                { label: 'Outstanding', value: formatMoney(plan.kind === 'open' ? plan.principalOwed : plan.outstandingDue) },
+                { label: 'Principal owed', value: formatMoney(plan.principalOwed) },
+              ]}
+            />
+          ) : null}
+          {canAmend && isActive ? (
+            <Link href={`/fund-out/${loan.id}/edit`} className="btn-quiet-sheet">
               Amend terms
             </Link>
           ) : null}
-          <LoanStatus status={loan.status} />
         </div>
       </div>
 
-      {/* ───────── Hero outstanding ───────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
-        <div className="lg:col-span-7">
-          <div className="font-serif italic text-accent text-base mb-1">
-            {loan.status === 'active' ? 'Outstanding' : 'Principal'}
-          </div>
-          <div className="statement-amount text-num-ink">
-            {formatMoney(
-              loan.status === 'active' ? outstandingAmount : Number(loan.principal)
-            )}
-          </div>
-          {loan.status === 'active' && totalPrincipalPaid > 0 ? (
-            <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
-              REPAID <span className="text-ledger">{formatMoney(totalPrincipalPaid)}</span> OF {formatMoney(Number(loan.principal))}
-            </div>
-          ) : (
-            <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
-              PRINCIPAL <span className="text-num-ink">{formatMoney(Number(loan.principal))}</span>
-            </div>
-          )}
-        </div>
-
-        <div className="lg:col-span-5 space-y-6">
-          <div>
-            <div className="font-serif italic text-accent text-base mb-1">
-              Effective rate
-            </div>
-            <div className="font-serif text-3xl text-num-ink tabular">
-              {(Number(loan.effective_rate) * 100).toFixed(3)}
-              <span className="text-graphite text-xl">% /mo</span>
-            </div>
-            <div className="font-mono text-[11.5px] text-graphite mt-2 tracking-[0.02em] font-medium">
-              {(Number(loan.base_rate) * 100).toFixed(3)}% BASE +{' '}
-              {(Number(loan.risk_premium) * 100).toFixed(3)}% CUSTOM
-            </div>
-          </div>
-
-          {loan.status === 'active' ? (
-            <div>
-              <div className="font-serif italic text-accent text-base mb-1">
-                Monthly interest
-              </div>
-              <div className="statement-amount compact text-num-ink">
-                {formatMoney(monthlyInterest)}
-              </div>
-            </div>
-          ) : null}
-
-          <div>
-            <div className="font-serif italic text-accent text-base mb-1">
-              Tenure
-            </div>
-            <div className="font-serif text-xl text-num-ink tabular">
-              {noFixedTerm ? 'No fixed term' : `${tenureMonths} ${tenureMonths === 1 ? 'month' : 'months'}`}
-            </div>
-            {noFixedTerm ? (
-              <div className="font-serif italic text-graphite text-xs mt-2">
-                Interest accrues monthly from disbursement — no maturity date
-              </div>
-            ) : maturityDate ? (
-              <div className="font-mono text-[11.5px] text-graphite mt-2 tracking-[0.02em] font-medium">
-                MATURES {maturityDate.format('D MMM YYYY').toUpperCase()}
-              </div>
-            ) : (
-              <div className="font-serif italic text-graphite text-xs mt-2">
-                Maturity set once disbursed
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ───────── Approval info ───────── */}
-      <section className="mb-12">
-        <div className="sect-head">
-          <h2>Approval trail</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">CREATION → APPROVAL → DISBURSEMENT</span>
-        </div>
-        <div className="font-sans text-sm text-graphite space-y-1">
-          <div>
-            Submitted by{' '}
-            <span className="text-ink font-serif italic">{creator?.name ?? '—'}</span>{' '}
-            on{' '}
-            <span className="font-mono text-muted">
-              {officeTime(loan.created_at).format('D MMM YYYY HH:mm')}
-            </span>
-          </div>
-          {loan.approved_at ? (
-            <div>
-              Approved by{' '}
-              <span className="text-ink font-serif italic">
-                {approver?.name ?? '—'}
-              </span>{' '}
-              on{' '}
-              <span className="font-mono text-muted">
-                {officeTime(loan.approved_at).format('D MMM YYYY HH:mm')}
-              </span>
-              {loan.disbursement_date ? (
-                <>
-                  {' '}· Disbursed{' '}
-                  <span className="font-mono text-muted">
-                    {dayjs(loan.disbursement_date).format('D MMM YYYY')}
-                  </span>
-                </>
-              ) : null}
-            </div>
-          ) : (
-            <div className="italic font-serif">
-              <em className="text-alert">Awaiting Principal approval</em>
-            </div>
-          )}
-        </div>
-
-        {pendingCancel ? (
-          // A cancellation request is already filed. Show it (Finance can't
-          // open /approvals, so this is their only window into the status).
-          <div className="mt-5 border border-alert/30 bg-alert/5 rounded-md px-4 py-3">
-            <div className="text-sm text-alert font-sans font-medium">
-              ⏳ Cancellation pending Principal approval
-            </div>
-            <p className="text-xs text-muted mt-1 italic font-serif">
-              Requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} on{' '}
-              {officeTime(pendingCancel.created_at).format('D MMM YYYY HH:mm')}. Principal approves it in
-              Approvals; the loan reverses (bank, Venture Pool, GL) and is marked cancelled.
-            </p>
-          </div>
-        ) : canCancelLoan ? (
-          <form action={cancelLoan} className="mt-5">
-            <input type="hidden" name="id" value={loan.id} />
-            {isActive ? (
-              <>
-                <label htmlFor="reason" className="block text-xs uppercase tracking-wide text-muted font-sans mb-1">
-                  Reason for cancellation
-                </label>
-                <input
-                  id="reason"
-                  name="reason"
-                  type="text"
-                  maxLength={200}
-                  required
-                  placeholder="e.g., wrong borrower, agreement voided"
-                  className="w-full sm:max-w-md px-3 py-2 mb-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-                />
-              </>
-            ) : null}
-            <button
-              type="submit"
-              className="text-sm text-alert border border-alert/30 px-4 py-2 rounded-md hover:bg-alert/5 font-sans transition-colors"
-            >
-              {isActive ? 'Request cancellation (needs Principal)' : 'Cancel this loan'}
-            </button>
-            <p className="text-xs text-muted mt-1.5 italic font-serif">
-              {isActive
-                ? 'Active loan: files an approval request. Once Principal approves, bank balance, Venture Pool, and GL entries are reversed and the loan is marked cancelled.'
-                : 'Finance can cancel before Principal approves. The loan and its approval request are both marked rejected in one transaction.'}
-            </p>
-          </form>
-        ) : null}
-        {isActive && !noRepayments && canVoid ? (
-          <p className="text-xs text-muted mt-3 italic font-serif">
-            Cannot cancel — {repaymentList.length} repayment
-            {repaymentList.length === 1 ? '' : 's'} recorded. Reverse those first.
-          </p>
-        ) : null}
-
-        {loan.repayment_terms ? (
-          <div className="mt-4">
-            <div className="text-xs uppercase tracking-wide text-muted font-sans mb-1">
-              Repayment terms
-            </div>
-            <p className="font-serif italic text-graphite text-sm whitespace-pre-wrap">
-              {loan.repayment_terms}
-            </p>
-          </div>
-        ) : null}
-
-        <FundingSourceEditor
-          loanId={loan.id}
-          repaymentTerms={(loan.repayment_terms as string | null) ?? null}
+      {/* ───────── Cards ───────── */}
+      <StatCards label="Loan">
+        {isActive ? (
+          <StatCard
+            tone="primary"
+            label="Outstanding"
+            value={formatMoney(outstandingAmount)}
+            icon="wallet"
+            note={totalPrincipalPaid > 0 ? `Repaid ${formatMoney(totalPrincipalPaid)} of ${formatMoney(Number(loan.principal))}` : `Principal ${formatMoney(Number(loan.principal))}`}
+          />
+        ) : (
+          <StatCard tone="primary" label="Principal" value={formatMoney(Number(loan.principal))} icon="coin" note={`Principal ${formatMoney(Number(loan.principal))}`} />
+        )}
+        <StatCard
+          label="Effective rate"
+          value={`${pct(Number(loan.effective_rate))} /mo`}
+          icon="percent"
+          note={`${pct(Number(loan.base_rate))} base + ${pct(Number(loan.risk_premium))} custom`}
         />
-
-        <RepaymentStartEditor
-          loanId={loan.id}
-          current={((loan as { repayment_start_month?: string | null }).repayment_start_month ?? null)?.slice(0, 7) ?? null}
-          defaultHint={
-            loan.disbursement_date
-              ? dayjs(`${(loan.disbursement_date as string).slice(0, 7)}-01`).add(1, 'month').format('YYYY-MM')
-              : 'the month after disbursement'
+        {isActive ? (
+          <StatCard
+            tone={overdue ? 'danger' : 'default'}
+            label="Monthly interest"
+            value={formatMoney(monthlyInterest)}
+            icon="calendar"
+            note={plan.kind === 'fixed' && thisRow ? `On original principal · installment ${formatMoney(thisRow.installment)}` : 'On the principal lent · no fixed term'}
+          />
+        ) : null}
+        <StatCard
+          label="Tenure"
+          value={noFixedTerm ? 'No fixed term' : `${tenureMonths} ${tenureMonths === 1 ? 'month' : 'months'}`}
+          icon="clock"
+          note={
+            noFixedTerm
+              ? 'Interest accrues monthly from disbursement — no maturity date'
+              : maturityDate
+                ? `Matures ${maturityDate.format('D MMM YYYY')}`
+                : 'Maturity set once disbursed'
           }
         />
+      </StatCards>
 
-        <MinPayInterestToggle
-          loanId={loan.id}
-          current={(loan as { min_pay_interest?: boolean }).min_pay_interest === true}
-        />
+      {/* ───────── Details ───────── */}
+      <DetailGroups title="Details" count="TERMS · DATES · APPROVAL TRAIL" groups={groups} />
+
+      {/* ───────── Repayment settings ───────── */}
+      <section className="mb-9">
+        <div className="sect-head">
+          <h2>Repayment settings</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">FINANCE · EDITABLE ANYTIME</span>
+        </div>
+        <div className="fin-form">
+          <FundingSourceEditor loanId={loan.id} repaymentTerms={(loan.repayment_terms as string | null) ?? null} />
+          <RepaymentStartEditor
+            loanId={loan.id}
+            current={((loan as { repayment_start_month?: string | null }).repayment_start_month ?? null)?.slice(0, 7) ?? null}
+            defaultHint={
+              loan.disbursement_date
+                ? dayjs(`${(loan.disbursement_date as string).slice(0, 7)}-01`).add(1, 'month').format('YYYY-MM')
+                : 'the month after disbursement'
+            }
+          />
+          <MinPayInterestToggle loanId={loan.id} current={(loan as { min_pay_interest?: boolean }).min_pay_interest === true} />
+        </div>
       </section>
 
+      {/* ───────── Terms over time ───────── */}
       <TermsTimeline kind="loan" recordId={loan.id} segments={termsSegments} changes={termsChanges} canRevert={canAmend && loan.status === 'active'} />
 
-      {/* ───────── Repayment history ───────── */}
-      <section className="mb-12">
-        <div className="sect-head">
-          <h2>Repayment history</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">{repaymentList.length} ENTR{repaymentList.length === 1 ? 'Y' : 'IES'} · INTEREST · PRINCIPAL · PENALTY · NETTING</span>
-        </div>
-
-        {repaymentList.length === 0 ? (
-          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
-            <p className="font-serif italic text-muted text-sm">
-              No repayments recorded yet.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th className="m-hide">Type</th>
-                  <th className="right">Amount</th>
-                  <th className="m-hide">Notes</th>
-                  {canVoid ? <th className="right m-hide">Action</th> : null}
-                  <th className="lt-toggle" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {repaymentList.map((r) => (
-                  <LedgerRow key={r.id}>
-                    <td className="font-mono tabular text-ink">
-                      {dayjs(r.payment_date).format('D MMM YYYY')}
-                    </td>
-                    <td className="font-serif italic text-graphite m-hide" data-label="Type">
-                      {r.payment_type}
-                    </td>
-                    <td className="num">
-                      {formatMoney(Number(r.amount))}
-                    </td>
-                    <td className="text-sm text-muted italic font-serif m-hide" data-label="Notes">
-                      {r.notes ?? '—'}
-                    </td>
-                    {canVoid ? (
-                      <td className="text-right m-hide">
-                        <VoidRepaymentButton
-                          repaymentId={r.id as string}
-                          loanId={loan.id as string}
-                          label={`${r.payment_type} RM ${formatMoney(Number(r.amount))} · ${dayjs(r.payment_date).format('D MMM YYYY')}`}
-                        />
-                      </td>
-                    ) : null}
-                  </LedgerRow>
-                ))}
-              </tbody>
-            </table>
-            <div className="mt-4 pt-4 border-t border-hairline text-xs font-mono text-muted flex flex-wrap gap-6">
-              <span>
-                Principal paid: <span className="num">{formatMoney(totalPrincipalPaid)}</span>
-              </span>
-              <span>
-                Interest paid: <span className="num">{formatMoney(totalInterestPaid)}</span>
-              </span>
-            </div>
-          </div>
-        )}
-      </section>
+      {/* ───────── Repayment schedule (the payments fold under it) ───────── */}
+      <RepaymentScheduleSection
+        plan={plan}
+        cancelled={loan.status === 'cancelled'}
+        recorded={
+          repaymentList.length > 0
+            ? {
+                count: repaymentList.length,
+                content: (
+                  <div className="overflow-x-auto">
+                    <table className="ledger-table w-full">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Type</th>
+                          <th className="text-right right">Amount</th>
+                          <th className="m-hide">Notes</th>
+                          {canVoid ? <th className="text-right right m-hide">Action</th> : null}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {repaymentList.map((r) => (
+                          <tr key={r.id}>
+                            <td className="whitespace-nowrap">{dateLong(r.payment_date)}</td>
+                            <td className="text-graphite">{r.payment_type}</td>
+                            <td className="num">{formatMoney(Number(r.amount))}</td>
+                            <td className="m-hide text-muted">{r.notes ?? '—'}</td>
+                            {canVoid ? (
+                              <td className="text-right m-hide">
+                                <VoidRepaymentButton
+                                  repaymentId={r.id as string}
+                                  loanId={loan.id as string}
+                                  label={`${r.payment_type} RM ${formatMoney(Number(r.amount))} · ${dateLong(r.payment_date)}`}
+                                />
+                              </td>
+                            ) : null}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ),
+              }
+            : undefined
+        }
+      />
 
       {/* ───────── Record repayment form (Finance, active loans only) ───────── */}
       {canRecordRepayment ? (
-        <section className="border-t border-hairline pt-8">
+        <section className="mb-9">
           <div className="sect-head">
             <h2>Record repayment</h2>
             <span className="rule" aria-hidden />
@@ -427,19 +386,63 @@ export default async function LoanDetailPage({ params }: Props) {
           <RepaymentForm loanId={loan.id} outstanding={outstandingAmount} />
         </section>
       ) : null}
+
+      {/* ───────── Actions ───────── */}
+      {pendingCancel || canCancelLoan || (isActive && !noRepayments && canVoid) ? (
+        <section className="mb-6">
+          <div className="sect-head">
+            <h2>Actions</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">{isPendingApproval ? 'BEFORE PRINCIPAL APPROVES' : 'CANCELLATION NEEDS PRINCIPAL APPROVAL'}</span>
+          </div>
+          {pendingCancel ? (
+            // A cancellation request is already filed. Show it (Finance can't
+            // open /approvals, so this is their only window into the status).
+            <div className="fin-actions">
+              <span className="note">
+                ⏳ Cancellation pending Principal approval — requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} on{' '}
+                {stamp(pendingCancel.created_at)}. The Principal approves it in Approvals; the loan reverses (bank, Venture Pool, GL)
+                and is marked cancelled.
+              </span>
+            </div>
+          ) : canCancelLoan ? (
+            <form action={cancelLoan} className="fin-actions">
+              <input type="hidden" name="id" value={loan.id} />
+              {isActive ? (
+                <div className="fin-field" style={{ flex: '1 1 320px' }}>
+                  <label htmlFor="reason" className="text-[11.5px] text-graphite">
+                    Reason for cancellation
+                  </label>
+                  <input
+                    id="reason"
+                    name="reason"
+                    type="text"
+                    maxLength={200}
+                    required
+                    placeholder="e.g., wrong borrower, agreement voided"
+                    className="w-full px-3 py-2 bg-surface border border-hairline rounded-md text-sm text-ink"
+                  />
+                </div>
+              ) : null}
+              <button type="submit" className="btn-danger">
+                {isActive ? 'Request cancellation (needs Principal)' : 'Cancel this loan'}
+              </button>
+              <span className="note">
+                {isActive
+                  ? 'Active loan: files an approval request. Once the Principal approves, bank balance, Venture Pool, and GL entries are reversed and the loan is marked cancelled.'
+                  : 'Finance can cancel before the Principal approves. The loan and its approval request are both marked rejected in one transaction.'}
+              </span>
+            </form>
+          ) : (
+            <div className="fin-actions">
+              <span className="note">
+                Cannot cancel — {repaymentList.length} repayment{repaymentList.length === 1 ? '' : 's'} recorded. Reverse those first
+                (under the schedule, Repayments recorded).
+              </span>
+            </div>
+          )}
+        </section>
+      ) : null}
     </div>
   )
-}
-
-function LoanStatus({ status }: { status: string }) {
-  if (status === 'active') {
-    return <span className="status-morph font-serif italic text-graphite text-md">active</span>
-  }
-  if (status === 'pending_approval') {
-    return <span className="status-morph font-serif italic text-alert text-md">pending approval</span>
-  }
-  if (status === 'fully_repaid') {
-    return <span className="status-morph font-serif italic text-ledger text-md">fully repaid</span>
-  }
-  return <span className="status-morph font-serif italic text-muted text-md">cancelled</span>
 }

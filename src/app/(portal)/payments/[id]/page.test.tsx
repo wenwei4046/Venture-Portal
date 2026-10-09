@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { withActions } from '@/test/with-actions'
 import { render, screen, within } from '@testing-library/react'
+vi.mock('server-only', () => ({}))
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), notFound: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
@@ -30,7 +31,9 @@ function database(referenceType = 'payroll_statutory', salaryLines: Record<strin
     }
     return query
   })
-  mocks.createClient.mockResolvedValue({ from, rpc: vi.fn().mockResolvedValue({ data: [], error: null }) })
+  mocks.createClient.mockResolvedValue({ from, rpc: vi.fn((fn: string, args?: { p_line_ids?: string[] }) => Promise.resolve(fn === 'payroll_line_accounts'
+      ? { data: salaryLines.filter(l => (args?.p_line_ids ?? []).includes(String(l.id))).map(l => ({ id: l.id, bank_account_no: l.bank_account_no ?? null })), error: null }
+      : { data: [], error: null })) })
   return { from, filters, voucher }
 }
 
@@ -106,6 +109,19 @@ describe('HR payroll voucher detail access', () => {
     expect(from).not.toHaveBeenCalledWith('hr_staff_costs')
   })
 
+  it('shows •••• for the account numbers to a viewer whose title does not tick Bank accounts (PR4)', async () => {
+    mocks.requirePermission.mockResolvedValue({ ...withActions({ role: 'hr', permissions: ['hr_costing'] }), sensitive: ['salary'] })
+    const person = { scope: 'staff', payroll_row_id: 'salary-row', employee_name: 'Salary Employee', employee_code: 'SAL001', department_name: 'Original Revenue' }
+    database('payroll_disbursement', [
+      { ...person, id: 'basic', salary_component: 'basic', recipient_account: 'account_1', bank_name: 'Recorded Maybank', bank_account_no: '0012345678', net: 4302.70 },
+    ])
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'salary' }) }))
+    const table = screen.getByRole('table', { name: 'Salary payments on this voucher' })
+    expect(table).toHaveTextContent('Recorded Maybank')
+    expect(table).toHaveTextContent('••••')
+    expect(table).not.toHaveTextContent('0012345678')
+  })
+
   it('labels an old net line without inventing a receiving account', async () => {
     mocks.requirePermission.mockResolvedValue(withActions({ role: 'hr', permissions: ['hr_costing'] }))
     database('payroll_disbursement', [{ id: 'legacy', scope: 'staff', payroll_row_id: 'legacy-row', employee_name: 'Legacy Employee', department_name: 'Revenue', net: 1000, salary_component: 'net', recipient_account: null, bank_name: null, bank_account_no: null }])
@@ -157,6 +173,20 @@ describe('the voucher page, laid out like the deal forms', () => {
     expect(side).toHaveTextContent('付款日期12 Sep 2026')
     expect(side).toHaveTextContent('方式bank transfer')
     expect(within(side).getByTestId('voucher-actions')).toBeInTheDocument()
+  })
+
+  // 2026-10-09 (the Finance revamp): the panel's rows sit under When & where
+  // and Booking, and a pending voucher's chip is the blue wait.
+  it('groups the panel under When & where and Booking, and waits in blue', async () => {
+    asFinance()
+    const { voucher } = database('ordinary_payment')
+    voucher.payment_date = '2026-09-12'
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    const side = panel()
+    const heads = Array.from(side.querySelectorAll('.deal-side-sec')).map((h) => h.textContent)
+    expect(heads).toEqual(['When & where', 'Booking'])
+    const number = screen.getByRole('heading', { level: 1, name: 'TEST-STAT-PV' })
+    expect(number.parentElement?.querySelector('.chip')).toHaveClass('wait')
   })
 
   it('says so when no payment date was set', async () => {

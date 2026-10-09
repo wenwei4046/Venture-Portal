@@ -54,7 +54,7 @@ describe('the monthly Statements on the sheet', () => {
     expect(card('Latest period')).toHaveTextContent('2 statements · all draft')
     expect(card('Net · September')).toHaveTextContent('RM 17,507.90')
     expect(card('Net · September')).toHaveTextContent('invoice 22,507.90 − contra 5,000.00')
-    expect(card('Draft')).toHaveAttribute('data-tone', 'alert')
+    expect(card('Draft')).not.toHaveAttribute('data-tone')
     expect(card('Draft')).toHaveTextContent('2')
     expect(card('All statements')).toHaveTextContent('4')
     expect(card('All statements')).toHaveTextContent('1 issued · 1 paid')

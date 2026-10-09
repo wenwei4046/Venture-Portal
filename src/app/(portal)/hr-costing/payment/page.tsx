@@ -2,6 +2,7 @@ import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { sees } from '@/lib/sensitive'
 import { getPeriodMonth } from '@/lib/utils'
 import { officeToday } from '@/lib/office-time'
 import {
@@ -44,7 +45,7 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
     supabase.from('payroll_runs').select('id, period_month, status').gte('period_month', railFrom).lte('period_month', railTo),
   ])
   firstReads.catch(() => {})
-  await requirePermission('hr_costing')
+  const viewer = await requirePermission('hr_costing')
   const [cycleRes, runsRes] = await firstReads
   if (cycleRes.error) throw new Error(cycleRes.error.message)
   const runs = (runsRes.data ?? []).map((r) => ({ id: String(r.id), period_month: String(r.period_month), status: String(r.status) }))
@@ -169,6 +170,7 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
 
       <PaymentBoard
         key={period}
+        seesBank={sees(viewer, 'bank')}
         period={period}
         periodLabel={periodLabel}
         periodRange={periodRange}

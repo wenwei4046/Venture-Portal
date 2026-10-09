@@ -31,6 +31,7 @@ import {
   sameLayout,
   saveDefaultLayout,
   saveLayout,
+  shareWidth,
   storedWidth,
   toggleHidden,
   visibleColumns,
@@ -39,6 +40,8 @@ import {
   type TableLayout,
 } from '@/lib/table-layout'
 import { backdropDismiss } from '@/components/modal-dismiss'
+import { useFinView } from '@/components/layout/fin-view'
+import { amountPresets, datePresets, hasRange, inRange, rangeNumber, type RangeBounds, type RangeKind } from '@/lib/table-range'
 
 export type SortDir = 'asc' | 'desc'
 
@@ -75,6 +78,10 @@ export interface SortableColumn<T> {
   filterable?: boolean
   /** Optional override for the value used in the column filter facet list. */
   filterValue?: (row: T) => string
+  /** An amount or a date column also filters by a RANGE — Min / Max, From /
+   *  To, with presets — beside picking values (2026-10-09, the Finance
+   *  revamp). The bounds compare against `sortValue`. */
+  range?: RangeKind
   /** Right-align (typical for amount columns). */
   align?: 'left' | 'right'
   /** Optional extra className applied to <td> cells in this column. */
@@ -179,6 +186,40 @@ interface Props<T> {
   openLabel?: string
   /** A class for a data row — the queue highlights the rows that are ticked. */
   rowClassName?: (row: T) => string | undefined
+  /** The list in a box that scrolls under a sticky header (2026-10-09, the
+   *  Finance revamp: a long list keeps the page's length). */
+  scrollBox?: boolean
+  /** How a drag on a column's edge resizes it: `grow` widens the table (as
+   *  it always has); `neighbour` takes the width from the next column, so
+   *  the table's edge stays where it is (2026-10-09, the Finance revamp). */
+  resizeMode?: 'grow' | 'neighbour'
+}
+
+// What the table says, in the portal's Chinese or, on the Finance view, in
+// English (2026-10-09).
+const WORDS = {
+  zh: {
+    open: '打开 →',
+    hint: (menu: boolean) => `双击一行打开${menu ? ' · 右键更多' : ''}`,
+    search: '搜索值…',
+    clear: 'Clear Filter',
+    close: 'Close',
+    columnsTitle: '选要显示哪些栏位',
+    reset: '还原栏位',
+    resetTitle: '栏位的宽度、顺序和显示回到预设 · Reset columns to default',
+    resize: '左右拉调整宽度',
+  },
+  en: {
+    open: 'Open →',
+    hint: (menu: boolean) => `Double-click to open${menu ? ' · right-click for more' : ''}`,
+    search: 'Search…',
+    clear: 'Clear filter',
+    close: 'Close',
+    columnsTitle: 'Choose the columns to show',
+    reset: 'Reset columns',
+    resetTitle: 'Widths, order and the columns shown back to the default',
+    resize: 'Drag to resize',
+  },
 }
 
 const ROW_CONTROLS = 'a, button, input, select, textarea, label'
@@ -226,9 +267,14 @@ export default function SortableTable<T>({
   onRowContextMenu: onAnyRowContextMenu,
   onRowOpen: onAnyRowOpen,
   rowOpens,
-  openLabel = '打开 →',
+  openLabel,
   rowClassName,
+  scrollBox = false,
+  resizeMode = 'grow',
 }: Props<T>) {
+  const fin = useFinView()
+  const words = fin ? WORDS.en : WORDS.zh
+  const openText = openLabel ?? words.open
   const [sortKey, setSortKey] = useState(defaultSort.key)
   const [sortDir, setSortDir] = useState<SortDir>(defaultSort.dir)
   const [search, setSearch] = useState('')
@@ -240,7 +286,26 @@ export default function SortableTable<T>({
   const [openFilterKey, setOpenFilterKey] = useState<string | null>(null)
   const [filterAnchor, setFilterAnchor] = useState<{ top: number; left: number } | null>(null)
   const [filterSearch, setFilterSearch] = useState('')
+  // The filter's Range mode (2026-10-09): column key → the bounds typed, and
+  // whether the open popover shows the range or the value list.
+  const [ranges, setRanges] = useState<Record<string, RangeBounds>>({})
+  const [rangeMode, setRangeMode] = useState(false)
   const BLANK = '\0blank'
+
+  function rangeValue(row: T, col: SortableColumn<T>): number | null {
+    const v = col.sortValue ? col.sortValue(row) : col.render(row)
+    return rangeNumber(v, col.range ?? 'number')
+  }
+  function setRange(key: string, patch: Partial<RangeBounds>) {
+    setRanges((prev) => ({ ...prev, [key]: { ...(prev[key] ?? { min: '', max: '' }), ...patch } }))
+  }
+  function clearRange(key: string) {
+    setRanges((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
 
   function facetValue(row: T, col: SortableColumn<T>): string {
     if (col.filterValue) return col.filterValue(row)
@@ -365,6 +430,12 @@ export default function SortableTable<T>({
     const others = Object.entries(base).reduce((sum, [k, w]) => (k === key ? sum : sum + w), 0)
     const order = effective.order
     let width = startW
+    // Neighbour mode: the next column gives what this one takes.
+    const at = shownColumns.findIndex((c) => c.key === key)
+    const nextKey = resizeMode === 'neighbour' ? shownColumns[at + 1]?.key : undefined
+    const startNext = nextKey ? base[nextKey] ?? widthOf(nextKey) : 0
+    let nextWidth = startNext
+    const colOf = (k: string) => Array.from(table.querySelectorAll<HTMLElement>('col[data-col]')).find((c) => c.dataset.col === k)
     resizing.current = true
     // From the arrangement on show — the table's default when this account has
     // none of its own — so the first drag keeps everything else where it was.
@@ -373,8 +444,16 @@ export default function SortableTable<T>({
     // While dragging, the <col> and the table are sized directly: a state
     // update per pointer move would re-render every row of a long ledger.
     const move = (ev: PointerEvent) => {
+      if (nextKey) {
+        ;[width, nextWidth] = shareWidth(startW, startNext, ev.clientX - startX)
+        const col = colOf(key)
+        if (col) col.style.width = `${width}px`
+        const next = colOf(nextKey)
+        if (next) next.style.width = `${nextWidth}px`
+        return
+      }
       width = clampWidth(startW + ev.clientX - startX)
-      const col = Array.from(table.querySelectorAll<HTMLElement>('col[data-col]')).find((c) => c.dataset.col === key)
+      const col = colOf(key)
       if (col) col.style.width = `${width}px`
       table.style.width = `${others + width}px`
     }
@@ -383,7 +462,7 @@ export default function SortableTable<T>({
       document.removeEventListener('pointerup', up)
       document.removeEventListener('pointercancel', up)
       resizing.current = false
-      commitLayout({ ...effective, order, widths: { ...effective.widths, ...base, [key]: width } })
+      commitLayout({ ...effective, order, widths: { ...effective.widths, ...base, [key]: width, ...(nextKey ? { [nextKey]: nextWidth } : {}) } })
     }
     document.addEventListener('pointermove', move)
     document.addEventListener('pointerup', up)
@@ -483,19 +562,26 @@ export default function SortableTable<T>({
     return String(cell)
   }
 
-  // Apply per-column value filters (Excel-style facets) before search/sort.
+  // Apply per-column value filters (Excel-style facets) and ranges before search/sort.
   const columnFiltered = useMemo(() => {
     const active = Object.entries(filters)
-    if (active.length === 0) return rows
-    return rows.filter((row) =>
-      active.every(([key, set]) => {
-        const col = columnByKey.get(key)
-        if (!col) return true
-        return set.has(facetToken(row, col))
-      }),
+    const bounded = Object.entries(ranges).filter(([, b]) => hasRange(b))
+    if (active.length === 0 && bounded.length === 0) return rows
+    return rows.filter(
+      (row) =>
+        active.every(([key, set]) => {
+          const col = columnByKey.get(key)
+          if (!col) return true
+          return set.has(facetToken(row, col))
+        }) &&
+        bounded.every(([key, b]) => {
+          const col = columnByKey.get(key)
+          if (!col) return true
+          return inRange(rangeValue(row, col), b.min, b.max, col.range ?? 'number')
+        }),
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, filters, columnByKey])
+  }, [rows, filters, ranges, columnByKey])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -539,6 +625,7 @@ export default function SortableTable<T>({
 
   // Distinct facet tokens for the currently-open filter popover (from all rows
   // so the value list is stable regardless of other active filters/search).
+  const openColumn = openFilterKey ? columnByKey.get(openFilterKey) : undefined
   const openDistinct = useMemo(() => {
     if (!openFilterKey) return [] as string[]
     const col = columnByKey.get(openFilterKey)
@@ -578,12 +665,16 @@ export default function SortableTable<T>({
       return next
     })
   }
-  function clearColumnFilter(key: string) {
+  function clearValues(key: string) {
     setFilters((prev) => {
       const next = { ...prev }
       delete next[key]
       return next
     })
+  }
+  function clearColumnFilter(key: string) {
+    clearValues(key)
+    clearRange(key)
   }
   function openFilter(key: string, e: MouseEvent) {
     e.stopPropagation()
@@ -591,6 +682,7 @@ export default function SortableTable<T>({
     const left = Math.min(r.left, (typeof window !== 'undefined' ? window.innerWidth : 9999) - 280)
     setFilterAnchor({ top: r.bottom + 4, left: Math.max(8, left) })
     setFilterSearch('')
+    setRangeMode(hasRange(ranges[key]))
     setOpenFilterKey((k) => (k === key ? null : key))
   }
 
@@ -615,9 +707,7 @@ export default function SortableTable<T>({
             </>
           ) : null}
           {onAnyRowOpen ? (
-            <span className="hidden md:inline font-serif italic text-xs text-muted">
-              双击一行打开{onAnyRowContextMenu ? ' · 右键更多' : ''}
-            </span>
+            <span className="hidden md:inline font-serif italic text-xs text-muted">{words.hint(!!onAnyRowContextMenu)}</span>
           ) : null}
           {toolbarRight ? <div className="ml-auto flex items-center gap-3 flex-wrap">{toolbarRight}</div> : null}
           {layoutOn ? (
@@ -627,7 +717,7 @@ export default function SortableTable<T>({
                 onClick={() => setColumnsOpen(true)}
                 aria-haspopup="dialog"
                 className="inline-flex items-center gap-2 rounded-md border border-hairline bg-surface px-3 py-1.5 font-sans text-sm font-medium text-ink hover:border-accent-border"
-                title="选要显示哪些栏位"
+                title={words.columnsTitle}
               >
                 <span aria-hidden>▥</span>
                 Columns
@@ -638,9 +728,9 @@ export default function SortableTable<T>({
                   type="button"
                   onClick={() => commitLayout(EMPTY_LAYOUT)}
                   className="text-xs text-muted hover:text-accent font-serif italic"
-                  title="栏位的宽度、顺序和显示回到预设 · Reset columns to default"
+                  title={words.resetTitle}
                 >
-                  还原栏位
+                  {words.reset}
                 </button>
               ) : null}
             </span>
@@ -648,7 +738,7 @@ export default function SortableTable<T>({
         </div>
       ) : null}
 
-      <div className={widthsOn ? 'overflow-x-auto' : undefined}>
+      <div className={scrollBox ? 'st-box' : widthsOn ? 'overflow-x-auto' : undefined}>
       <table
         ref={tableRef}
         className={`${tableClassName}${widthsOn ? ' st-fixed' : ''}`}
@@ -666,7 +756,7 @@ export default function SortableTable<T>({
             {shownColumns.map((c) => {
               const isActive = c.key === sortKey
               const sortable = c.sortable !== false
-              const filterActive = !!filters[c.key]
+              const filterActive = !!filters[c.key] || hasRange(ranges[c.key])
               const movable = layoutOn && !c.pinned
               const hint = dropHint && dropHint.key === c.key ? dropHint.side : null
               return (
@@ -742,6 +832,7 @@ export default function SortableTable<T>({
                         className={`align-middle ${filterActive ? 'text-accent' : 'text-muted hover:text-ink'}`}
                         aria-label={`Filter ${c.label}`}
                         title={`Filter ${c.label}`}
+                        data-active={filterActive ? 'true' : undefined}
                       >
                         <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
                           <path d="M2 3.5h12L9.2 9v4l-2.4 1.2V9L2 3.5z" />
@@ -749,13 +840,13 @@ export default function SortableTable<T>({
                       </button>
                     ) : null}
                   </span>
-                  {layoutOn && c.resizable !== false ? (
+                  {layoutOn && c.resizable !== false && !(resizeMode === 'neighbour' && c.key === shownColumns[shownColumns.length - 1]?.key) ? (
                     <span
                       className="st-resize"
                       role="separator"
                       aria-orientation="vertical"
                       aria-label={`Resize ${c.label || 'column'}`}
-                      title="左右拉调整宽度"
+                      title={words.resize}
                       draggable={false}
                       onPointerDown={(e) => startResize(c.key, e)}
                       onMouseDown={(e) => e.preventDefault()}
@@ -858,7 +949,7 @@ export default function SortableTable<T>({
                                   onClick={() => onRowOpen(row)}
                                   className="text-sm text-accent hover:text-accent-hover font-serif italic"
                                 >
-                                  {openLabel}
+                                  {openText}
                                 </button>
                               ) : null}
                               {onRowContextMenu && !hasPinnedEnd ? (
@@ -887,6 +978,7 @@ export default function SortableTable<T>({
 
       {columnsOpen && layoutOn ? (
         <ColumnsPanel
+          fin={fin}
           title={layoutTitle}
           columns={hideableColumns.map((c) => ({ key: c.key, label: c.label, group: c.group }))}
           hidden={effective.hidden}
@@ -912,16 +1004,52 @@ export default function SortableTable<T>({
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpenFilterKey(null)} aria-hidden />
           <div
+            role="dialog"
+            aria-label={`Filter ${openColumn?.label ?? ''}`}
+            data-fin={fin ? 'true' : undefined}
             className="fixed z-50 w-64 bg-paper border border-hairline rounded-panel shadow-xl p-2 text-left font-sans normal-case"
             style={{ top: filterAnchor.top, left: filterAnchor.left }}
             onClick={(e) => e.stopPropagation()}
           >
+            {openColumn?.range ? (
+              <div className="st-modes" role="group" aria-label="Filter mode">
+                <button
+                  type="button"
+                  aria-pressed={!rangeMode}
+                  onClick={() => {
+                    clearRange(openFilterKey)
+                    setRangeMode(false)
+                  }}
+                >
+                  Pick values
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={rangeMode}
+                  onClick={() => {
+                    clearValues(openFilterKey)
+                    setRangeMode(true)
+                  }}
+                >
+                  Range
+                </button>
+              </div>
+            ) : null}
+            {openColumn?.range && rangeMode ? (
+              <RangeEditor
+                kind={openColumn.range}
+                bounds={ranges[openFilterKey] ?? { min: '', max: '' }}
+                count={rows.filter((row) => inRange(rangeValue(row, openColumn), (ranges[openFilterKey] ?? { min: '' }).min, (ranges[openFilterKey] ?? { max: '' }).max, openColumn.range)).length}
+                onChange={(patch) => setRange(openFilterKey, patch)}
+              />
+            ) : (
+            <>
             <input
               type="text"
               autoFocus
               value={filterSearch}
               onChange={(e) => setFilterSearch(e.target.value)}
-              placeholder="搜索值…"
+              placeholder={words.search}
               className="w-full mb-2 px-2 py-1 text-sm bg-paper border border-hairline rounded text-ink focus:outline-none focus:border-accent-border"
             />
             <div className="max-h-56 overflow-y-auto pr-1">
@@ -958,20 +1086,22 @@ export default function SortableTable<T>({
                 <div className="text-xs text-muted italic py-1">No values</div>
               ) : null}
             </div>
+            </>
+            )}
             <div className="flex items-center justify-between mt-2 pt-2 border-t border-hairline">
               <button
                 type="button"
                 onClick={() => clearColumnFilter(openFilterKey)}
                 className="text-xs text-muted hover:text-ink"
               >
-                Clear Filter
+                {words.clear}
               </button>
               <button
                 type="button"
                 onClick={() => setOpenFilterKey(null)}
                 className="text-xs text-accent hover:text-accent-hover"
               >
-                Close
+                {words.close}
               </button>
             </div>
           </div>
@@ -1003,7 +1133,10 @@ function ColumnsPanel({
   onSetDefault,
   defaultNote,
   onClose,
+  fin = false,
 }: {
+  /** On the Finance view: English, and the revamp's styling (data-fin). */
+  fin?: boolean
   title?: string
   columns: Array<{ key: string; label: string; group?: string }>
   hidden: string[]
@@ -1035,13 +1168,14 @@ function ColumnsPanel({
         role="dialog"
         aria-modal="true"
         aria-label="Columns"
+        data-fin={fin ? 'true' : undefined}
         className="absolute right-0 top-0 flex h-full w-[340px] max-w-[92vw] flex-col border-l border-hairline bg-paper shadow-xl font-sans normal-case text-left"
       >
         <div className="flex items-start justify-between gap-3 border-b border-hairline px-4 pt-4 pb-3">
           <div>
             {title ? <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent">{title}</div> : null}
             <h2 className="font-serif text-xl text-ink">Columns</h2>
-            <p className="text-xs text-muted">勾选要显示的栏位</p>
+            <p className="text-xs text-muted">{fin ? 'Tick the columns to show' : '勾选要显示的栏位'}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="text-xl leading-none text-muted hover:text-ink">
             ×
@@ -1063,14 +1197,14 @@ function ColumnsPanel({
             type="button"
             onClick={onReset}
             className="whitespace-nowrap text-xs font-semibold text-ink hover:text-accent"
-            title="显示、宽度和顺序全部回到预设"
+            title={fin ? 'Shown columns, widths and order back to the default' : '显示、宽度和顺序全部回到预设'}
           >
             Reset
           </button>
         </div>
         <div className="flex-1 overflow-y-auto pb-2">
           {matches.length === 0 ? (
-            <p className="px-4 py-4 font-serif italic text-sm text-muted">没有叫这个名字的栏位。</p>
+            <p className="px-4 py-4 font-serif italic text-sm text-muted">{fin ? 'No column by that name.' : '没有叫这个名字的栏位。'}</p>
           ) : (
             matches.map((g) => (
               <div key={g.name || '_'} role="group" aria-label={g.name || 'Columns'}>
@@ -1114,9 +1248,9 @@ function ColumnsPanel({
                 type="button"
                 onClick={onSetDefault}
                 className="text-xs font-semibold text-ink hover:text-accent"
-                title="把现在的显示、宽度和顺序定为这张表所有人的预设 · Set as default for everyone"
+                title={fin ? 'Make this arrangement the default for everyone' : '把现在的显示、宽度和顺序定为这张表所有人的预设 · Set as default for everyone'}
               >
-                设为预设
+                {fin ? 'Set as default' : '设为预设'}
               </button>
             ) : null}
             <button
@@ -1131,5 +1265,56 @@ function ColumnsPanel({
       </aside>
     </div>,
     document.body,
+  )
+}
+
+/**
+ * The filter's Range mode (2026-10-09, the Finance revamp): Min / Max for an
+ * amount, From / To for a date, a few presets, and how many rows fall inside.
+ */
+function RangeEditor({
+  kind,
+  bounds,
+  count,
+  onChange,
+}: {
+  kind: RangeKind
+  bounds: RangeBounds
+  count: number
+  onChange: (patch: Partial<RangeBounds>) => void
+}) {
+  const date = kind === 'date'
+  const presets = date ? datePresets() : amountPresets()
+  const field = (side: 'min' | 'max') => (
+    <label className="st-range-field">
+      <span>{date ? (side === 'min' ? 'From' : 'To') : side === 'min' ? 'Min' : 'Max'}</span>
+      <input
+        type={date ? 'date' : 'text'}
+        inputMode={date ? undefined : 'decimal'}
+        aria-label={date ? (side === 'min' ? 'From' : 'To') : side === 'min' ? 'Min' : 'Max'}
+        value={bounds[side]}
+        onChange={(e) => onChange({ [side]: e.target.value })}
+        placeholder={date ? undefined : side === 'min' ? '0.00' : 'No limit'}
+        className="w-full px-2 py-1 text-sm bg-paper border border-hairline rounded text-ink focus:outline-none focus:border-accent-border"
+      />
+    </label>
+  )
+  return (
+    <div className="st-range">
+      <div className="flex gap-2">
+        {field('min')}
+        {field('max')}
+      </div>
+      <div className="st-presets">
+        {presets.map((p) => (
+          <button key={p.label} type="button" onClick={() => onChange({ min: p.min, max: p.max })}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <div className="st-range-count">
+        {count} {count === 1 ? 'row' : 'rows'} in range
+      </div>
+    </div>
   )
 }

@@ -3914,6 +3914,115 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   white-space: nowrap;
 }
 .btn-quiet-sheet:hover { color: rgb(var(--ink)); background: rgb(var(--surface-2)); }
+.btn-quiet-sheet:disabled { opacity: 0.5; cursor: not-allowed; }
+/* The head's one primary action (Daily Bank's Get image, 2026-10-09). */
+.btn-pri-sheet {
+  display: inline-block;
+  padding: 7px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(var(--accent));
+  color: #000;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btn-pri-sheet:hover { background: rgb(var(--accent-hover)); }
+.btn-pri-sheet:disabled { opacity: 0.5; cursor: not-allowed; }
+/* A page's one-line subtitle under the title (the handoff's "sub"). */
+.page-sub { margin-top: 8px; max-width: 640px; font-size: 13px; line-height: 1.5; color: rgb(var(--graphite)); }
+
+/* ── Daily Bank (2026-10-09, the Finance revamp) ── */
+/* The day between its arrows; the label opens a calendar. */
+.db-daynav {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 8px;
+  background: rgb(var(--surface));
+  overflow: hidden;
+}
+.db-daynav button {
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1;
+  color: rgb(var(--ink));
+  cursor: pointer;
+}
+.db-daynav button:hover:not(:disabled) { background: rgb(var(--surface-2)); }
+.db-daynav button:disabled { color: rgb(var(--muted)); cursor: default; }
+.db-daynav-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-left: 1px solid rgb(var(--hairline));
+  border-right: 1px solid rgb(var(--hairline));
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: rgb(var(--ink));
+}
+.db-daynav-label input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.db-daynav-label input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+/* The board: a band per bank's B/F, money in green, pending brown in
+   parentheses, the available row on green, overdrawn red. */
+.dbank { background: rgb(var(--surface)); }
+.dbank .db-section { margin-bottom: 22px; }
+.dbank .db-box { overflow-x: auto; border: 1px solid rgb(var(--sheet-table-border, var(--hairline))); border-radius: 10px; }
+.dbank table.ledger-table { width: 100%; border: 0; border-radius: 0; font-size: 12.5px; }
+.dbank table.ledger-table :is(th, td).num { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; text-align: right; white-space: nowrap; }
+.dbank .db-label-col { width: 34%; }
+.dbank tr.db-band > td { background: rgb(235 231 224); font-weight: 600; color: rgb(var(--ink)); }
+.dbank tr.db-band > td:first-child { box-shadow: inset 3px 0 0 rgb(90 62 43); }
+.dbank tr.db-indent > td:first-child { padding-left: 22px; color: rgb(var(--graphite)); }
+.dbank tr.db-avail > td { background: rgb(222 240 232); font-weight: 600; color: rgb(var(--ink)); }
+.dbank tr.db-avail > td:first-child { color: rgb(21 110 78); }
+.dbank tfoot td { font-weight: 600; color: rgb(var(--ink)); }
+.dbank .db-in { color: rgb(21 110 78); }
+.dbank .db-pend, .dbank .db-pend-name { color: rgb(150 100 12); }
+.dbank .db-neg { color: rgb(176 40 34); }
+.dbank .db-dash { color: rgb(var(--muted)); }
+.dbank .db-payee { color: rgb(var(--ink)); }
+.dbank .db-tag { margin-left: 4px; padding: 1px 6px; font-size: 10px; vertical-align: 1px; }
+.dbank .db-sub { display: block; margin-top: 2px; font-size: 11px; color: rgb(var(--muted)); }
+.dbank .db-vno { font-size: 11.5px; color: rgb(var(--graphite)); white-space: nowrap; }
+.dbank .db-desc { color: rgb(var(--graphite)); }
+.dbank .db-note { margin: 0; padding: 4px 2px 0; font-size: 11px; line-height: 1.6; color: rgb(138 119 101); }
+.dbank .db-phone { display: grid; gap: 12px; }
+@media (min-width: 768px) { .dbank .db-phone { display: none; } }
+.dbank .db-card { border: 1px solid rgb(216 210 200); border-radius: 12px; overflow: hidden; background: rgb(var(--surface)); }
+.dbank .db-card-head { padding: 12px 14px; background: rgb(235 231 224); }
+.dbank .db-card-line { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.dbank .db-card-name { font-size: 15px; font-weight: 600; color: rgb(var(--ink)); }
+.dbank .db-card-avail { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 16px; font-weight: 500; color: rgb(21 110 78); }
+.dbank .db-card-small { margin-top: 2px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; color: rgb(117 100 86); }
+.dbank .db-card-line.db-card-small { font-family: inherit; color: rgb(90 78 68); }
+.dbank .db-card-dept { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 9px 14px; border-top: 1px solid rgb(236 234 229); }
+.dbank .db-card-dept-name { font-size: 13px; font-weight: 500; color: rgb(var(--ink)); }
+.dbank .db-card-figure { flex: none; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 13px; font-weight: 500; }
+.dbank .db-card-pend { padding: 8px 14px 10px; border-top: 1px dashed rgb(207 197 183); background: rgb(255 250 243); }
+.dbank .db-card-pend-head { margin-bottom: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: rgb(150 100 12); }
+.dbank .db-card-pend-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-size: 12px; }
+.dbank .db-card-pend-row > :last-child { flex: none; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+.dbank .db-card-pend-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dbank .db-card-pend-who .db-card-small { font-family: inherit; }
+.dbank .db-card-total { display: flex; justify-content: space-between; padding: 12px 14px; border-radius: 12px; background: rgb(222 240 232); font-size: 13px; font-weight: 600; }
+.dbank .db-card-total > :last-child { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; color: rgb(21 110 78); }
+@media (max-width: 767px) {
+  .dbank .db-label-col { width: auto; min-width: 180px; }
+  .dbank table.ledger-table { font-size: 12px; }
+}
 /* A folded block of reference tables (the billing page's payroll basis). */
 details.fin-fold {
   margin: 0 0 26px;
@@ -4854,3 +4963,738 @@ table.ledger-table.audit-saves td { vertical-align: top; }
   .audit-fields { grid-template-columns: minmax(0, 1fr); }
   .audit-field { margin-top: 4px; font-size: 11px; }
 }
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE FINANCE VIEW (2026-10-09) — the user's Claude Design handoff
+   (.design/finance-revamp, README "Global rules"). Finance's pages as
+   Finance or the Principal sees them (lib/finance-view.ts); PortalFrame sets
+   `.fin-view` on the sheet frame and everything below hangs off it, so HR's
+   and a department manager's pages keep the sheet exactly as it was.
+   ═══════════════════════════════════════════════════════════════════════ */
+.fin-view { font-variant-numeric: tabular-nums lining-nums; }
+.fin-view .sheet-theme { --accent-hover: 201 116 31; }
+
+/* Page head: the eyebrow in the body face at the 0.05em cap; the title stays
+   Georgia, the sheet's display face. */
+.fin-view .page-eyebrow {
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: rgb(90 78 68);
+}
+.fin-view .sect-head .count {
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: rgb(var(--ink));
+}
+
+/* Summary cards: the label in sentence case, the figure in the number face
+   and grey unless its tone says otherwise — money in green (ledger), money
+   out red (danger), waiting on someone blue (wait), the page's one figure
+   walnut (primary). */
+.fin-view .stat-card-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(90 78 68);
+}
+.fin-view .stat-card-value {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  color: rgb(84 90 102);
+}
+.fin-view .stat-card-foot {
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 11px;
+}
+.fin-view .stat-card[data-tone='ledger']::before { background: rgb(120 170 145); }
+.fin-view .stat-card[data-tone='ledger'] .stat-card-icon { background: rgb(232 243 237); color: rgb(var(--ledger)); }
+/* The wait tone — pending, awaiting the Principal, maturing — is new, so it
+   is defined for every sheet; only the Finance pages ask for it. */
+.stat-card[data-tone='wait']::before { background: rgb(140 170 205); }
+.stat-card[data-tone='wait'] .stat-card-value { color: rgb(46 92 138); }
+.stat-card[data-tone='wait'] .stat-card-icon { background: rgb(232 239 247); color: rgb(46 92 138); }
+
+/* Chips in the body face; a blue chip for what is waiting. */
+.fin-view .chip {
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-weight: 400;
+}
+.chip.wait { background: rgb(230 238 247); color: rgb(46 92 138); border-color: rgb(46 92 138 / 0.4); }
+
+/* Tables: a navy header band, white rows without zebra, peach hover, the
+   figures at the regular weight (totals keep their own). */
+.fin-view table.ledger-table:where(:not(.payroll-grid)) thead th {
+  background: rgb(226 231 239);
+  color: rgb(29 43 74);
+  border-bottom-color: rgb(200 208 221);
+}
+.fin-view table.ledger-table:where(:not(.payroll-grid)) thead tr { background: rgb(226 231 239); }
+.fin-view table.ledger-table:where(:not(.payroll-grid)) thead th .text-accent { color: rgb(29 43 74); }
+.fin-view table.ledger-table:where(:not(.payroll-grid)) tbody tr:nth-child(even) { background: transparent; }
+.fin-view table.ledger-table:where(:not(.payroll-grid)) tbody tr:hover { background: rgb(255 245 233); }
+:where(.fin-view) .num:where(:not(.font-semibold, .font-bold, .font-medium)) { font-weight: 400; }
+.fin-view .st-resize::after { background: rgb(190 199 214); }
+
+/* A long list in a box that scrolls under a sticky header (SortableTable
+   `scrollBox`). The box carries the frame; the table inside drops its own. */
+.st-box {
+  max-height: 620px;
+  overflow: auto;
+  border: 1px solid rgb(var(--sheet-table-border, var(--hairline)));
+  border-radius: 10px;
+  background: rgb(var(--surface));
+}
+.st-box table.ledger-table { border: 0; border-radius: 0; overflow: visible; }
+.st-box thead th { position: sticky; top: 0; z-index: 2; }
+
+/* The filter's Pick values | Range switch and the range editor. */
+.st-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 8px;
+  padding: 3px;
+  border-radius: 8px;
+  background: rgb(238 236 232);
+}
+.st-modes button {
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  color: inherit;
+  cursor: pointer;
+}
+.st-modes button[aria-pressed='true'] { background: #fff; box-shadow: 0 1px 2px rgb(43 31 23 / 0.12); font-weight: 600; }
+.st-range-field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgb(117 100 86);
+}
+.st-range-field input { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; text-align: right; }
+.st-presets { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.st-presets button {
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 99px;
+  background: #fff;
+  font-size: 11px;
+  color: inherit;
+  cursor: pointer;
+}
+.st-presets button:hover { border-color: rgb(var(--accent)); }
+.st-range-count { margin-top: 8px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; color: rgb(117 100 86); }
+
+/* The popover, the row menu and the Columns panel are portaled to <body>,
+   outside the sheet: on the Finance view they carry data-fin and dress here. */
+[role='dialog'][data-fin='true'] {
+  background: #fff;
+  border-color: rgb(229 228 223);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgb(43 31 23 / 0.16);
+  color: #000;
+}
+[role='dialog'][data-fin='true'] input[type='checkbox'] { accent-color: rgb(233 154 83); }
+[role='menu'][data-fin='true'] {
+  background: rgb(242 239 234);
+  border-color: rgb(211 203 192);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgb(43 31 23 / 0.18);
+  color: rgb(43 31 23);
+}
+[role='menu'][data-fin='true'] [role='menuitem']:hover,
+[role='menu'][data-fin='true'] [role='menuitem']:focus { background: rgb(222 231 240); }
+
+/* The phone's chrome: a cream top bar with the H tile and the page's name;
+   the tab bar cream with a peach pill behind the lit tab's icon. */
+.fin-topbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  padding: 0 16px;
+  background: rgb(252 250 247);
+  box-shadow: 0 1px 0 rgb(232 225 216);
+}
+.fin-topbar-tile {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: rgb(90 62 43);
+  color: #fff;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 13px;
+}
+.fin-topbar-text { display: flex; min-width: 0; flex-direction: column; line-height: 1.15; }
+.fin-topbar-kicker { font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: rgb(138 119 101); }
+.fin-topbar-page { overflow: hidden; font-size: 14px; font-weight: 600; color: rgb(43 31 23); white-space: nowrap; text-overflow: ellipsis; }
+.fin-tabbar {
+  background: rgb(252 250 247);
+  border-top-color: rgb(232 225 216);
+  box-shadow: 0 -6px 18px rgb(43 31 23 / 0.06);
+}
+.fin-tabbar .fin-tab { color: rgb(138 128 118); }
+.fin-tabbar .fin-tab-lit { color: rgb(43 31 23); }
+.fin-tabbar .fin-tab > span:last-child,
+.fin-tabbar .fin-tab-lit > span:last-child { font-size: 10.5px; }
+.fin-tabbar .fin-tab-lit > span:last-child { font-weight: 600; }
+.fin-tabbar .fin-pill {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  border-radius: 99px;
+  background: rgb(255 234 210);
+}
+.fin-tabbar .fin-pill + svg { position: relative; }
+.fin-tabbar .fin-tab-lit svg { stroke-width: 1.8; }
+
+/* The voucher panel's group headings (2026-10-09, the Finance revamp):
+   "When & where" over the date and bank, "Booking" over the pool and account. */
+.deal-side-sec {
+  margin-top: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgb(62 78 112);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgb(130 143 170);
+}
+
+/* A page-head menu (2026-10-09, the Finance revamp — ActMenu): the button,
+   and the list of the controls it holds. */
+.act-menu { position: relative; display: inline-block; }
+.act-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  background: rgb(var(--surface));
+  font-size: 12.5px;
+  font-weight: 500;
+  color: rgb(var(--ink));
+  white-space: nowrap;
+  cursor: pointer;
+}
+.act-menu-btn:hover { background: rgb(var(--surface-2)); }
+.act-menu-btn.primary { border-color: rgb(var(--accent)); background: rgb(var(--accent)); color: #000; font-weight: 600; }
+.act-menu-btn.primary:hover { background: rgb(var(--accent-hover)); }
+.act-menu-chev { font-size: 10px; opacity: 0.7; }
+.act-menu-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  min-width: 240px;
+  padding: 6px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 10px;
+  background: rgb(var(--surface));
+  box-shadow: 0 10px 30px rgb(43 31 23 / 0.14);
+}
+/* Each control the menu holds reads as a row of it, whatever it wore outside. */
+.act-menu-pop > * { display: block; }
+.act-menu-pop > :is(a, button),
+.act-menu-pop > * > :is(a, button) {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 400;
+  text-align: left;
+  color: rgb(var(--ink));
+  text-decoration: none;
+}
+.act-menu-pop > :is(a, button):hover,
+.act-menu-pop > * > :is(a, button):hover { background: rgb(var(--accent-bg)); }
+.act-menu-pop :is(a, button):disabled { opacity: 0.5; }
+@media (max-width: 767px) {
+  .act-menu-pop { right: auto; left: 0; }
+}
+
+/* Facts in groups (2026-10-09, the Finance revamp — DetailGroups): cards side
+   by side, each with a banded title and label / value rows. */
+.dl-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 9px; }
+.dl-group {
+  overflow: hidden;
+  border: 1px solid rgb(var(--card-border, var(--hairline)));
+  border-radius: 12px;
+  background: rgb(var(--surface));
+  box-shadow: 0 3px 12px rgb(var(--walnut) / 5.5%);
+}
+.dl-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border-bottom: 1px solid rgb(var(--card-border, var(--hairline)));
+  background: rgb(246 242 236);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgb(var(--walnut));
+}
+.dl-group-bar { width: 16px; height: 3px; border-radius: 3px; background: rgb(205 184 162); }
+.dl-group-list { margin: 0; }
+.dl-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 16px;
+  border-bottom: 1px solid rgb(236 234 229);
+}
+.dl-item:last-child { border-bottom: 0; }
+.dl-item dt { font-size: 11px; color: rgb(117 100 86); }
+.dl-item dd {
+  margin: 0;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.dl-item dd.text { font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-weight: 500; }
+@media (max-width: 767px) { .dl-groups { grid-template-columns: minmax(0, 1fr); } }
+
+/* A page's Actions (the handoff's form section): a quiet panel with the
+   buttons and a line on what they do. */
+.fin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 14px;
+  padding: 18px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 12px;
+  background: rgb(246 246 244);
+}
+.fin-actions .note { flex: 1 1 260px; font-size: 11px; line-height: 1.5; color: rgb(138 119 101); }
+.fin-actions .btn-pri {
+  display: inline-block;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(var(--accent));
+  color: #000;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.fin-actions .btn-pri:hover { background: rgb(var(--accent-hover)); }
+.fin-actions .btn-pri:disabled { opacity: 0.5; cursor: not-allowed; }
+.fin-actions .btn-sec {
+  display: inline-block;
+  padding: 8px 16px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  background: rgb(var(--surface));
+  color: rgb(var(--ink));
+  font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.fin-actions .btn-sec:hover { background: rgb(var(--surface-2)); }
+.fin-actions .btn-danger {
+  display: inline-block;
+  padding: 8px 16px;
+  border: 1px solid rgb(var(--danger) / 0.4);
+  border-radius: 6px;
+  background: rgb(var(--surface));
+  color: rgb(var(--danger));
+  font-size: 13px;
+  cursor: pointer;
+}
+.fin-actions .btn-danger:hover { background: rgb(var(--danger-bg)); }
+.fin-actions .btn-pri { text-decoration: none; }
+/* An inline form under the panel's buttons — Settle's receipt, Void's reason
+   (2026-10-09, an invoice's own page): labels over fields, one row on a desk. */
+.fin-actions .fin-inline-form {
+  flex: 1 1 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgb(var(--hairline));
+}
+.fin-actions .fin-inline-form.one { grid-template-columns: minmax(0, 1fr); }
+.fin-actions .fin-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fin-actions .fin-field label { font-size: 11.5px; color: rgb(var(--graphite)); }
+.fin-actions .fin-field :is(select, input, textarea) {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  background: rgb(var(--surface));
+  color: rgb(var(--ink));
+  font-size: 13px;
+}
+.fin-actions .fin-field input.num { text-align: right; font-variant-numeric: tabular-nums; }
+.fin-actions .fin-inline-buttons { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; }
+@media (max-width: 767px) {
+  .fin-actions .fin-inline-form { grid-template-columns: minmax(0, 1fr); }
+}
+/* A form section on a page (the handoff's form block, 2026-10-09): a white
+   panel, fields in a grid with the label over the field and a hint under it. */
+.fin-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px 24px;
+  padding: 18px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 12px;
+  background: rgb(var(--surface));
+}
+.fin-form .span-2 { grid-column: span 2; }
+.fin-form .span-3 { grid-column: 1 / -1; }
+.fin-form .fin-field,
+.fin-actions .fin-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.fin-form .fin-field > label,
+.fin-form .fin-field > .fin-label { font-size: 11.5px; font-weight: 500; color: rgb(var(--graphite)); }
+.fin-form .fin-field :is(select, input:not([type='checkbox']), textarea) {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  background: rgb(var(--surface));
+  color: rgb(var(--ink));
+  font-size: 13px;
+}
+.fin-form .fin-field-row { display: flex; align-items: center; gap: 8px; }
+.fin-form .fin-field-row :is(input, select) { flex: 1 1 auto; min-width: 0; }
+.fin-form .fin-toggle { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: rgb(var(--ink)); cursor: pointer; }
+.fin-form .fin-toggle input { margin-top: 2px; width: 16px; height: 16px; accent-color: rgb(var(--accent)); }
+.fin-form .fin-hint { margin: 0; font-size: 11px; line-height: 1.5; color: rgb(138 119 101); }
+.fin-form .fin-saved { font-size: 12px; color: rgb(var(--ledger)); white-space: nowrap; }
+.fin-form .fin-error { margin: 0; font-size: 12px; color: rgb(var(--danger)); }
+.fin-form .btn-sec {
+  flex: none;
+  padding: 7px 14px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  background: rgb(var(--surface));
+  color: rgb(var(--ink));
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.fin-form .btn-sec:hover:not(:disabled) { background: rgb(var(--surface-2)); }
+.fin-form .btn-sec:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (max-width: 767px) {
+  .fin-form { grid-template-columns: minmax(0, 1fr); }
+  .fin-form :is(.span-2, .span-3) { grid-column: auto; }
+}
+.fin-notice.ledger { border-color: rgb(21 110 78 / 0.4); background: rgb(222 240 232); }
+
+/* A fund source's and a loan's Repayment schedule (2026-10-09). */
+.sched .sched-table :is(th, td) { white-space: nowrap; }
+.sched .sched-table td:last-child { min-width: 220px; white-space: normal; font-size: 12px; }
+.sched .sched-table td.sched-clear { color: rgb(21 110 78); }
+.sched-ledger { color: rgb(21 110 78); }
+.sched-alert { color: rgb(150 100 12); }
+.sched-danger { color: rgb(176 40 34); }
+.sched-info { color: rgb(108 104 98); }
+.sched .sched-note { margin: 8px 2px 0; font-size: 11px; line-height: 1.6; color: rgb(138 119 101); }
+.sched .sched-recorded {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 10px;
+  background: rgb(var(--surface));
+}
+.sched .sched-recorded summary { cursor: pointer; font-size: 12.5px; font-weight: 500; color: rgb(var(--graphite)); }
+
+/* Print schedule: the plan on a sheet of its own over the page; printing
+   shows the sheet alone. */
+.sched-print { position: fixed; inset: 0; z-index: 80; overflow: auto; padding: 20px 12px 40px; background: rgb(214 208 199); }
+.sched-print-bar { display: flex; justify-content: flex-end; gap: 10px; max-width: 1000px; margin: 0 auto 12px; }
+.sched-print-sheet { max-width: 1000px; margin: 0 auto; padding: 36px 40px; background: #fff; color: #000; box-shadow: 0 10px 30px rgb(43 31 23 / 0.15); }
+.sched-print-letterhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 14px; border-bottom: 2px solid rgb(90 62 43); }
+.sched-print-house { font-family: var(--font-serif), Georgia, 'Times New Roman', serif; font-size: 20px; letter-spacing: -0.01em; color: rgb(51 36 27); }
+.sched-print-kicker { margin-top: 4px; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: rgb(90 78 68); }
+.sched-print-what { margin: 22px 0 4px; }
+.sched-print-printed { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; text-align: right; color: rgb(90 78 68); }
+.sched-print-title { margin: 0 0 18px; font-family: var(--font-serif), Georgia, 'Times New Roman', serif; font-size: 28px; font-weight: 400; letter-spacing: -0.02em; }
+.sched-print-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 32px; margin: 0 0 22px; }
+.sched-print-meta > div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid rgb(229 228 223); font-size: 12px; }
+.sched-print-meta dt { color: rgb(117 100 86); }
+.sched-print-meta dd { margin: 0; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; text-align: right; }
+.sched-print-table { width: 100%; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+.sched-print-table th { padding: 8px; border: 1px solid rgb(207 197 183); background: rgb(235 231 224); font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; text-align: right; white-space: nowrap; }
+.sched-print-table td { padding: 6px 8px; border: 1px solid rgb(229 228 223); font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; text-align: right; white-space: nowrap; }
+.sched-print-table :is(th, td).left { text-align: left; }
+.sched-print-table td.left { font-family: var(--font-sans), 'Inter', sans-serif; white-space: normal; }
+.sched-print-table tbody tr:nth-child(even) td { background: rgb(247 247 245); }
+.sched-print-table td.clear { color: rgb(21 110 78); }
+.sched-print-table tfoot td { font-weight: 600; background: rgb(251 251 250); }
+@media print {
+  body.printing-schedule > :not(.sched-print) { display: none !important; }
+  body.printing-schedule .sched-print { position: static; overflow: visible; padding: 0; background: #fff; }
+  body.printing-schedule .sched-print-bar { display: none !important; }
+  body.printing-schedule .sched-print-sheet { max-width: none; padding: 0; box-shadow: none; }
+}
+
+/* The Repayment Schedule's calendar (2026-10-09): the month's installments on
+   their days — ↓ collect (green bar), ↑ pay (orange bar), tinted paid / due /
+   part paid / overdue; a card on hover; a phone reads the days as a list. */
+.repay-cal { margin-bottom: 28px; }
+.repay-cal .cal-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin: 0 0 10px; font-size: 11.5px; color: rgb(var(--graphite)); }
+.repay-cal .cal-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.repay-cal .cal-legend .bar { width: 3px; height: 12px; border-radius: 2px; }
+.repay-cal .cal-legend .swatch { width: 10px; height: 10px; border-radius: 3px; border: 1px solid rgb(var(--hairline)); }
+.repay-cal .bar.collect { background: rgb(21 110 78); }
+.repay-cal .bar.pay { background: rgb(233 154 83); }
+.repay-cal .swatch.paid { background: rgb(222 240 232); border-color: rgb(21 110 78 / 0.4); }
+.repay-cal .swatch.due { background: #fff; }
+.repay-cal .swatch.partial { background: rgb(249 238 214); border-color: rgb(150 100 12 / 0.4); }
+.repay-cal .swatch.overdue { background: rgb(250 228 224); border-color: rgb(176 40 34 / 0.4); }
+.repay-cal .cal-wrap { border: 1px solid rgb(var(--sheet-table-border, var(--hairline))); border-radius: 10px; overflow: hidden; background: rgb(var(--surface)); }
+.repay-cal .cal-head, .repay-cal .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.repay-cal .cal-head > div { padding: 8px 10px; background: rgb(226 231 239); color: rgb(29 43 74); font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.repay-cal .cal-day { min-height: 112px; padding: 6px 6px 8px; border-top: 1px solid rgb(var(--hairline)); border-left: 1px solid rgb(var(--hairline)); display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.repay-cal .cal-grid .cal-day:nth-child(7n + 1) { border-left: 0; }
+.repay-cal .cal-day.blank { background: rgb(250 249 247); }
+.repay-cal .cal-day.today { background: rgb(255 250 243); }
+.repay-cal .cal-top { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; margin-bottom: 2px; }
+.repay-cal .cal-num { font-size: 12px; font-weight: 500; color: rgb(var(--ink)); padding: 1px 6px; border-radius: 999px; }
+.repay-cal .cal-day.today .cal-num { background: rgb(var(--accent)); font-weight: 700; }
+.repay-cal .cal-net { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.repay-cal .cal-net.in { color: rgb(21 110 78); }
+.repay-cal .cal-net.out { color: rgb(150 100 12); }
+.repay-cal .cal-item { display: flex; align-items: center; gap: 4px; padding: 2px 5px; border-radius: 5px; border-left: 3px solid; font-size: 10.5px; text-decoration: none; min-width: 0; }
+.repay-cal .cal-item.collect { border-left-color: rgb(21 110 78); }
+.repay-cal .cal-item.pay { border-left-color: rgb(233 154 83); }
+.repay-cal .cal-item .who { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.repay-cal .cal-item .amt { flex: none; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+.repay-cal :is(.cal-item, .cal-agenda-item).paid { background: rgb(222 240 232); color: rgb(21 110 78); }
+.repay-cal :is(.cal-item, .cal-agenda-item).due { background: #fff; color: #000; box-shadow: inset 0 0 0 1px rgb(var(--hairline)); }
+.repay-cal :is(.cal-item, .cal-agenda-item).partial { background: rgb(249 238 214); color: rgb(150 100 12); }
+.repay-cal :is(.cal-item, .cal-agenda-item).overdue { background: rgb(250 228 224); color: rgb(176 40 34); }
+.repay-cal .cal-item:hover { filter: brightness(0.97); }
+.repay-cal .cal-more { align-self: flex-start; padding: 0 4px; border: 0; background: none; font-size: 10.5px; color: rgb(var(--accent-hover)); cursor: pointer; }
+.repay-cal .cal-dots { display: none; }
+.repay-cal .cal-agenda { display: none; }
+.cal-card {
+  position: fixed;
+  z-index: 70;
+  width: 280px;
+  padding: 12px 14px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 10px;
+  background: rgb(var(--surface));
+  box-shadow: 0 10px 28px rgb(43 31 23 / 0.16);
+  font-size: 12px;
+  pointer-events: none;
+}
+.cal-card-kind { font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; }
+.cal-card-kind.collect { color: rgb(21 110 78); }
+.cal-card-kind.pay { color: rgb(201 116 31); }
+.cal-card-name { margin-top: 3px; font-size: 14px; font-weight: 600; color: rgb(var(--ink)); }
+.cal-card-date { margin-bottom: 8px; color: rgb(var(--graphite)); }
+.cal-card dl { margin: 0 0 8px; }
+.cal-card dl > div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px solid rgb(236 234 229); }
+.cal-card dt { color: rgb(117 100 86); }
+.cal-card dd { margin: 0; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+.cal-card-status { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; }
+.cal-card-status.paid { background: rgb(222 240 232); color: rgb(21 110 78); }
+.cal-card-status.due { background: rgb(246 246 244); color: #000; }
+.cal-card-status.partial { background: rgb(249 238 214); color: rgb(150 100 12); }
+.cal-card-status.overdue { background: rgb(250 228 224); color: rgb(176 40 34); }
+@media (max-width: 767px) {
+  .repay-cal .cal-day { min-height: 54px; padding: 4px; }
+  .repay-cal :is(.cal-item, .cal-more, .cal-net) { display: none; }
+  .repay-cal .cal-dots { display: flex; flex-wrap: wrap; gap: 3px; }
+  .repay-cal .cal-dots i { width: 6px; height: 6px; border-radius: 999px; }
+  .repay-cal .cal-dots i.collect { background: rgb(120 170 145); }
+  .repay-cal .cal-dots i.pay { background: rgb(233 154 83); }
+  .repay-cal .cal-dots i.paid { background: rgb(21 110 78); }
+  .repay-cal .cal-dots i.overdue { background: rgb(176 40 34); }
+  .repay-cal .cal-dots i.partial { background: rgb(150 100 12); }
+  .repay-cal .cal-agenda { display: grid; gap: 10px; margin-top: 12px; }
+  .repay-cal .cal-agenda-day { border: 1px solid rgb(var(--hairline)); border-radius: 10px; padding: 8px 10px; background: rgb(var(--surface)); }
+  .repay-cal .cal-agenda-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 12px; font-weight: 600; }
+  .repay-cal .cal-agenda-head .in { color: rgb(21 110 78); font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+  .repay-cal .cal-agenda-head .out { color: rgb(150 100 12); font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+  .repay-cal .cal-agenda-item { display: flex; justify-content: space-between; gap: 8px; padding: 5px 8px; border-radius: 6px; margin-top: 4px; font-size: 12px; text-decoration: none; }
+  .repay-cal .cal-agenda-item small { color: inherit; opacity: 0.8; }
+  .repay-cal .cal-agenda-item .amt { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+}
+
+/* A page's free text — an invoice's description (the handoff's notice box). */
+.fin-notice {
+  padding: 14px 16px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 10px;
+  background: rgb(247 247 245);
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgb(var(--ink));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The Venture Pool's In vs Out (2026-10-09, the Finance revamp handoff): the
+   month as a pie beside twelve months of paired bars, in plain CSS as the
+   prototype draws them. In #3F7A64, Out #E99A53. */
+.vp-charts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12px; }
+.vp-panel { min-width: 0; padding: 16px 18px; border: 1px solid rgb(232 225 216); border-radius: 12px; background: #fff; }
+.vp-panel h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.vp-sub { margin-bottom: 14px; font-size: 11px; color: rgb(117 100 86); }
+.vp-pie { width: 150px; height: 150px; margin: 6px auto 4px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04); }
+.vp-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.vp-key { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgb(90 78 68); }
+.vp-swatch { display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 2px; }
+.vp-fig { margin-top: 2px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 15.5px; font-weight: 500; }
+.vp-bars-wrap { display: flex; gap: 6px; }
+.vp-ticks { display: flex; flex-direction: column; justify-content: space-between; height: 150px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; color: rgb(117 100 86); text-align: right; white-space: nowrap; }
+.vp-plot { flex: 1; min-width: 0; }
+.vp-bars {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: end;
+  gap: 4px;
+  height: 150px;
+  border-bottom: 1px solid rgb(207 197 183);
+  border-left: 1px solid rgb(207 197 183);
+  background: repeating-linear-gradient(to top, transparent 0, transparent 37px, rgb(242 239 234) 37px, rgb(242 239 234) 38px);
+}
+.vp-month { display: flex; align-items: flex-end; justify-content: center; gap: 2px; height: 100%; }
+.vp-bar { width: 42%; border-radius: 2px 2px 0 0; }
+.vp-bar.in { background: #3F7A64; }
+.vp-bar.out { background: #E99A53; }
+.vp-months { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; margin-top: 4px; }
+.vp-months span { text-align: center; font-size: 10px; color: rgb(117 100 86); }
+.vp-keys { display: flex; justify-content: center; gap: 14px; margin-top: 10px; font-size: 11px; color: rgb(90 78 68); }
+.vp-keys > span { display: inline-flex; align-items: center; gap: 5px; }
+@media (max-width: 767px) {
+  .vp-charts { grid-template-columns: minmax(0, 1fr); }
+  .vp-bars { gap: 2px; }
+  .vp-months span { font-size: 9px; }
+}
+
+/* The Ledger's Select accounts… (2026-10-09, the Finance revamp handoff): a
+   panel under the head button with the accounts, the period and Show zero. */
+.gl-picker {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  gap: 12px;
+  width: min(92vw, 460px);
+  padding: 16px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 12px;
+  background: rgb(var(--surface));
+  box-shadow: 0 12px 32px rgba(43, 31, 23, 0.14);
+  text-align: left;
+}
+.gl-picker .fin-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.gl-picker .fin-field > span { font-size: 11.5px; font-weight: 500; color: rgb(var(--graphite)); }
+.gl-picker .fin-field input[type='date'] { width: 100%; padding: 7px 10px; border: 1px solid rgb(var(--hairline)); border-radius: 6px; background: rgb(var(--surface)); color: rgb(var(--ink)); font-size: 13px; }
+.gl-picker .fin-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.gl-picker .fin-toggle input { width: 16px; height: 16px; accent-color: rgb(var(--accent)); }
+.gl-picker .fin-hint { margin: 0; font-size: 11px; line-height: 1.5; color: rgb(138 119 101); }
+/* The Ledger's search and filters, in one band over the accounts. */
+.gl-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 20px; padding: 10px 12px; border: 1px solid rgb(var(--hairline)); border-radius: 12px; background: rgb(247 245 241); }
+.ledger-table tr.gl-open > td { font-weight: 600; background: rgb(250 249 246); }
+@media (max-width: 767px) {
+  .gl-picker { position: fixed; top: 96px; right: 16px; left: 16px; width: auto; }
+}
+
+/* The reports' control row (2026-10-09, the Finance revamp handoff): the
+   period, find, segment and detail level on one row over the statement. */
+.rpt-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 18px; margin-bottom: 14px; padding: 12px 14px; border: 1px solid rgb(var(--hairline)); border-radius: 12px; background: rgb(247 245 241); }
+.rpt-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(117 100 86); }
+.rpt-field :is(select, input) { height: 32px; padding: 0 10px; border: 1px solid rgb(var(--hairline)); border-radius: 6px; background: #fff; color: rgb(var(--ink)); font-size: 13px; font-weight: 400; letter-spacing: normal; text-transform: none; }
+.rpt-range { display: flex; align-items: center; gap: 6px; color: rgb(var(--ink)); }
+.rpt-find { flex: 1 1 220px; }
+.rpt-find-box { display: flex; align-items: center; gap: 6px; }
+.rpt-find-box input { flex: 1 1 auto; min-width: 140px; }
+.rpt-find-box small { font-size: 11px; font-weight: 400; letter-spacing: normal; text-transform: none; white-space: nowrap; }
+.rpt-step { flex: none; width: 28px; height: 32px; border: 1px solid rgb(var(--hairline)); border-radius: 6px; background: #fff; color: rgb(var(--ink)); font-size: 14px; }
+.rpt-levels { display: inline-flex; gap: 4px; }
+.rpt-levels button { min-width: 34px; height: 32px; padding: 0 8px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: #fff; color: #000; font-size: 12.5px; font-weight: 500; letter-spacing: normal; text-transform: none; }
+.rpt-levels button[aria-pressed='true'] { background: #E99A53; border-color: #E99A53; }
+.rpt-modes { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+/* Month columns separated: a rule before each column’s figures. */
+.mx-sep .mx-col-start { border-left: 1px solid rgb(207 197 183); }
+/* The aging reports’ closing row: the handoff’s navy "All". */
+.ledger-table tr.rpt-all > td { background: rgb(221 229 240); color: rgb(29 43 74); font-weight: 700; box-shadow: inset 0 2px 0 rgb(29 43 74); }
+@media (max-width: 767px) {
+  .rpt-toolbar { gap: 10px 12px; padding: 10px; }
+  .rpt-field { flex: 1 1 100%; }
+  .rpt-range :is(select, input) { flex: 1 1 0; min-width: 0; }
+}
+.rpt-field input[type='checkbox'] { width: 16px; height: 16px; padding: 0; accent-color: rgb(var(--accent)); }
+
+/* The Trial Balance in groups (2026-10-09, the Finance revamp handoff). */
+.ledger-table tr.tb-block > td { padding-top: 14px; font-weight: 700; color: rgb(46 92 138); background: #fff; }
+.ledger-table tr.tb-group > td { font-weight: 600; }
+.ledger-table td.tb-indent { padding-left: 34px; }
+.ledger-table tr.tb-sub > td { font-weight: 600; background: rgb(248 246 242); box-shadow: inset 0 1px 0 rgb(207 197 183); }
+.ledger-table tr.tb-total > td { font-weight: 700; color: rgb(30 62 98); background: rgb(238 243 248); box-shadow: inset 0 1.5px 0 rgb(46 92 138); }
+.tb-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.tb-toggle > span:first-child { font-size: 9px; color: rgb(117 100 86); }
+
+/* The journal voucher form (2026-10-09, the Finance revamp handoff). */
+.jv-form { max-width: 980px; padding: 20px; border: 1px solid rgb(229 228 223); border-radius: 12px; background: #fff; }
+.jv-head { display: grid; grid-template-columns: 160px minmax(0, 1fr) 270px; gap: 14px 16px; }
+.jv-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.jv-field > span { font-size: 12px; font-weight: 500; color: rgb(90 78 68); }
+.jv-form .jv-input, .jv-form .jv-row input[type="text"] { width: 100%; height: 40px; padding: 0 12px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: rgb(246 246 244); color: rgb(var(--ink)); font-size: 13px; }
+.jv-hint { margin: 8px 0 18px; font-size: 11px; line-height: 1.5; color: rgb(138 119 101); }
+.jv-lines { border: 1px solid rgb(229 228 223); border-radius: 10px; overflow: hidden; }
+.jv-row { display: grid; grid-template-columns: minmax(0, 1.4fr) 120px 120px minmax(0, 1fr) 28px; gap: 8px; align-items: center; padding: 8px 12px; border-top: 1px solid rgb(236 234 229); }
+.jv-row .r { text-align: right; }
+.jv-form .jv-row :is(.jv-input, input[type="text"]) { height: 36px; padding: 0 10px; font-size: 12.5px; }
+.jv-form .jv-num { text-align: right; font-family: var(--font-mono), "Chivo Mono", Menlo, monospace; }
+.jv-form .jv-num:disabled { opacity: 0.45; cursor: not-allowed; }
+.jv-row-head { padding: 9px 12px; border-top: 0; background: rgb(226 231 239); color: rgb(29 43 74); font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.jv-row-foot { padding: 10px 12px; border-top: 1px solid rgb(200 208 221); background: rgb(238 243 248); font-weight: 500; }
+.jv-del { width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: rgb(117 100 86); font-size: 16px; cursor: pointer; }
+.jv-del:hover:not(:disabled) { background: rgb(246 246 244); }
+.jv-del:disabled { opacity: 0.3; cursor: not-allowed; }
+.jv-add { justify-self: start; display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: #C9741F; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.jv-add kbd { padding: 1px 6px; border: 1px solid rgb(200 208 221); border-radius: 4px; background: #fff; color: rgb(72 84 106); font-family: var(--font-mono), "Chivo Mono", Menlo, monospace; font-size: 10px; font-weight: 500; }
+.jv-bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.jv-bal { display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 99px; font-size: 11.5px; font-weight: 500; background: rgb(246 246 244); color: rgb(117 100 86); }
+.jv-bal .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.jv-bal.ok { background: #DEF0E8; color: #156E4E; }
+.jv-bal.bad { background: #FAE4E0; color: #B02822; }
+@media (max-width: 767px) {
+  .jv-form { padding: 14px; }
+  .jv-head { grid-template-columns: minmax(0, 1fr); }
+  .jv-row { grid-template-columns: minmax(0, 1fr) 84px 84px 28px; }
+  .jv-row .jv-note { display: none; }
+}
+
+/* Settings · Chart of Accounts (2026-10-09, the Finance revamp handoff). */
+.coa-table .coa-name { display: inline-flex; align-items: center; gap: 6px; }
+.coa-table .coa-chev { display: inline-block; width: 10px; font-size: 9px; color: rgb(var(--accent)); }
+.coa-table .coa-sub { display: block; margin-top: 2px; margin-left: 16px; font-size: 11px; color: rgb(117 100 86); }
+.coa-table .coa-range { margin-left: 6px; font-family: var(--font-mono), "Chivo Mono", Menlo, monospace; font-size: 10.5px; font-weight: 400; color: rgb(117 100 86); }

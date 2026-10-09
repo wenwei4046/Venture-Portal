@@ -17,6 +17,10 @@ import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segment
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import ExportLinks from '../_components/ExportLinks'
 import ReportViewToggle from '../_components/ReportViewToggle'
+import { reportsCompanyWide } from '@/lib/surfaces'
+import { formatMoney } from '@/lib/utils'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import ReportModeSwitch from '../_components/ReportModeSwitch'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +39,7 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
   // Dept managers see ONLY their own segment (RLS-enforced on journal_lines);
   // force the filter empty + hide the segment picker so the report is theirs
   // and a hand-typed ?segment= can't select another dept (it just returns empty).
-  const isDeptMgr = user.role === 'dept_manager'
+  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
   const segment = isDeptMgr ? '' : (params.segment ?? '')
 
   // Consolidated = the true all-segments view (finance/principal, no segment
@@ -59,6 +63,74 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
 
   const blocks = pnlBlocks(pnl)
   const periodLabel = dayjs(`${period}-01`).format('MMMM YYYY')
+
+  // Whoever reads the reports company-wide (2026-10-09, the user's Claude
+  // Design handoff): the two views and the exports in the head, the cards,
+  // the controls on one row over the statement. A department manager keeps
+  // the page below, as it was.
+  if (!isDeptMgr) {
+    const segChoices = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
+    const segName = (segChoices.find((s) => s.value === segment) ?? segChoices[0]).label
+    const isNow = period === officeMonth()
+    const mon = dayjs(`${period}-01`).format('MMM')
+    const revenue = pnl.revenue.current
+    const expenses = Math.round((pnl.cost.current + pnl.expense.current) * 100) / 100
+    const net = pnl.netIncome.current
+    const note = `${periodLabel}${isNow ? ' · to date' : ''}`
+    return (
+      <div>
+        <div className="page-head">
+          <div className="min-w-0">
+            <div className="page-eyebrow">
+              <em>I.</em> REPORTS · P&amp;L · {periodLabel.toUpperCase()}
+            </div>
+            <h1 className="page-title">P&amp;L</h1>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <ReportModeSwitch pair="pnl" active="single" period={period} segment={segment || undefined} />
+            <ExportLinks variant="sheet" basePath="/reports/income-statement/export" period={period} compare={compare} segment={segment} />
+          </div>
+        </div>
+
+        <StatCards label="P&L">
+          <StatCard label={`Revenue · ${mon}${isNow ? ' (to date)' : ''}`} value={formatMoney(revenue)} icon="receipt" tone="ledger" note={note} />
+          <StatCard label={`Expenses · ${mon}${isNow ? ' (to date)' : ''}`} value={formatMoney(expenses)} icon="wallet" tone="danger" note={note} />
+          <StatCard label={`Net profit · ${mon}`} value={formatMoney(net)} icon="chart" tone={net < 0 ? 'danger' : 'primary'} note="Revenue − expenses" />
+          <StatCard
+            label={`Net margin · ${mon}`}
+            value={Math.abs(revenue) < 0.005 ? '—' : `${((net / revenue) * 100).toFixed(1)}%`}
+            icon="percent"
+            note={isNow ? 'This month' : periodLabel}
+          />
+        </StatCards>
+
+        <section className="mb-6">
+          <div className="sect-head">
+            <h2>Income statement</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">
+              {segName.toUpperCase()} · {periodLabel.toUpperCase()}
+            </span>
+          </div>
+          {consolidated ? (
+            <p className="fin-notice mb-3">Consolidated view eliminates inter-billing between segments — pick a segment to see its own charges.</p>
+          ) : null}
+          <GlReportView
+            basePath="/reports/income-statement"
+            period={period}
+            compare={compare}
+            segment={segment}
+            segments={segChoices}
+            blocks={blocks}
+            pctBase={{ current: pnl.revenue.current, previous: pnl.revenue.previous }}
+            currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}
+            compareLabel={compare ? dayjs(`${compare}-01`).format('MMM YYYY') : ''}
+            controls="row"
+          />
+        </section>
+      </div>
+    )
+  }
 
   return (
     <div>

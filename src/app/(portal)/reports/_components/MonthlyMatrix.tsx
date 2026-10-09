@@ -17,6 +17,7 @@ export default function MonthlyMatrix({
   pctBaseByColumn,
   variant = 'cf',
   nowKey,
+  separated = false,
 }: {
   columns: MonthlyMatrixData['columns']
   rows: MonthlyMatrixData['rows']
@@ -30,12 +31,15 @@ export default function MonthlyMatrix({
   variant?: 'default' | 'cf'
   /** Column key to wash as "this month" (cf skin). */
   nowKey?: string
+  /** A rule before each column's figures (2026-10-09, the Finance revamp
+   *  handoff: "month columns are visually separated"). */
+  separated?: boolean
 }) {
   const cf = variant === 'cf'
   // L1 = subtotals / categories only · L2 = + top accounts & parent roll-ups ·
   // L3 = every level. A matrix with layout category rows (Cash Flow) opens
   // folded to them, as in the approved mock-up; the others open fully.
-  const [level, setLevel] = useState<1 | 2 | 3>(() => (rows.some((r) => r.kind === 'category') ? 1 : 3))
+  const [ownLevel, setOwnLevel] = useState<1 | 2 | 3>(() => (rows.some((r) => r.kind === 'category') ? 1 : 3))
   // Explicit user overrides of the level default, both directions: `collapsed`
   // closes something the level would show, `expanded` opens something the level
   // would hide. Without the second set, clicking ▶ at L2 did nothing — the
@@ -55,6 +59,11 @@ export default function MonthlyMatrix({
   // statements, and the rail is a sibling — so query + cursor come through
   // ReportSearchProvider and we publish the match count back up.
   const ctx = useReportSearch()
+  // The page's control row may hold the detail level (2026-10-09); else the
+  // matrix keeps its own, with its L1 / L2 / L3 above the table.
+  const levelInRow = ctx?.level != null
+  const level: 1 | 2 | 3 = ctx?.level ?? ownLevel
+  const setLevel = levelInRow && ctx ? ctx.setLevel : setOwnLevel
   const search = ctx?.search ?? ''
   const activeHit = ctx?.activeHit ?? 0
   const setHitCount = ctx?.setHitCount
@@ -154,7 +163,8 @@ export default function MonthlyMatrix({
 
   return (
     // `cf-report` on the wrapper puts the skin tokens in scope for the pills too.
-    <div className={cf ? 'cf-report' : undefined}>
+    <div className={[cf ? 'cf-report' : '', separated ? 'mx-sep' : ''].filter(Boolean).join(' ') || undefined}>
+      {levelInRow ? null : (
       <div className="flex items-center gap-2 mb-3">
         <span className="text-xs uppercase tracking-wide text-muted font-sans">Detail level</span>
         {([1, 2, 3] as const).map((lv) => (
@@ -175,6 +185,7 @@ export default function MonthlyMatrix({
           </button>
         ))}
       </div>
+      )}
 
       <div className={`overflow-x-auto table-scroll border rounded-md mx-matrix ${cf ? 'cf-matrix' : 'border-hairline'}`}>
         <table className="w-full text-sm border-collapse">
@@ -189,7 +200,7 @@ export default function MonthlyMatrix({
                   colSpan={showPct ? 2 : 1}
                   className={
                     cf
-                      ? `cf-th text-right font-sans text-xs uppercase tracking-wide px-4 py-3 ${c.key === 'acc' ? 'font-semibold' : ''} ${c.key === nowKey ? 'cf-th-now' : ''}`
+                      ? `cf-th mx-col-start text-right font-sans text-xs uppercase tracking-wide px-4 py-3 ${c.key === 'acc' ? 'font-semibold' : ''} ${c.key === nowKey ? 'cf-th-now' : ''}`
                       : `text-center font-sans text-xs uppercase tracking-wide px-4 py-3 border-l border-hairline ${c.key === 'acc' ? 'text-ink font-semibold' : 'text-muted'}`
                   }
                 >
@@ -206,7 +217,7 @@ export default function MonthlyMatrix({
                 {columns.map((c) => (
                   <Fragment key={c.key}>
                     <th
-                      className={`text-right font-mono text-[10px] uppercase px-4 py-1.5 ${
+                      className={`mx-col-start text-right font-mono text-[10px] uppercase px-4 py-1.5 ${
                         cf ? `cf-th cf-th-sub ${c.key === nowKey ? 'cf-th-now' : ''}` : 'text-muted border-l border-hairline'
                       }`}
                     >
@@ -315,7 +326,7 @@ export default function MonthlyMatrix({
                     return (
                       <Fragment key={`${row.key}-${c.key}`}>
                         <td
-                          className={`text-right font-mono tabular px-4 ${cf ? '' : 'border-l border-hairline'} ${cellBg}${now} ${valueTone} ${
+                          className={`mx-col-start text-right font-mono tabular px-4 ${cf ? '' : 'border-l border-hairline'} ${cellBg}${now} ${valueTone} ${
                             isStrong ? 'py-4 text-[15px]' : 'py-2.5'
                           } ${c.key === 'acc' ? 'font-semibold' : ''}`}
                         >

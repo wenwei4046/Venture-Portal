@@ -1,56 +1,79 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
-import { formatMoneyBare } from '@/lib/utils'
-import {
-  DB_COLUMNS,
-  DB_COLUMN_LABELS,
-  type BankDay,
-  type SegAmounts,
-} from '@/lib/daily-bank'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
+import { DB_COLUMNS, DB_COLUMN_LABELS, type BankDay, type SegAmounts } from '@/lib/daily-bank'
 import type { DailyBankData } from '@/lib/daily-bank-data'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import { SlidingTabs } from '@/components/motion/SlidingTabs'
+
+// Daily Bank on the sheet (2026-10-09, the user's Claude Design handoff —
+// Phase 3 of the Finance revamp). The head carries the day between ← and →
+// (the label opens a calendar), and PNG / PDF / Get image. Five cards sum the
+// day: Balance B/F, Received today, Pending payment, Total available, Banks.
+// The board — what an image or the PNG captures — is a sheet section:
+//   Bank × Department: per bank a band with its Balance B/F, money received
+//   today in green, each payment awaiting the Principal in brown parentheses
+//   with its PV and description, then the Available balance row on green; a
+//   foot sums what every bank has free.
+//   By bank: one table per bank — who paid in and who is waiting to be paid.
+// Negatives are red parentheses, a zero is a dash (the user's other system).
 
 // Dynamic departments (2026-08-24): the column set travels in the payload
 // (six cores + one per provisioned full dept). Set by the top component each
 // render; the nested row components read it synchronously.
-let COLS: Array<{ key: string; label: string }> = DB_COLUMNS.map(k => ({
-  key: k as string,
-  label: DB_COLUMN_LABELS[k],
-}))
+let COLS: Array<{ key: string; label: string }> = DB_COLUMNS.map((k) => ({ key: k as string, label: DB_COLUMN_LABELS[k] }))
 
 // Row totals MUST sum over the payload columns, not lib sumAmounts: that
 // helper reads the server module's dynamic-column state, which is EMPTY in
 // the browser — with IT provisioned, the HLB Available row footed 4,841.53
 // high (user report 2026-09-04) while the cells themselves were right.
-const sumCols = (a: SegAmounts): number =>
-  Math.round(COLS.reduce((s, c) => s + (a[c.key] ?? 0), 0) * 100) / 100
+const sumCols = (a: SegAmounts): number => Math.round(COLS.reduce((s, c) => s + (a[c.key] ?? 0), 0) * 100) / 100
+const r2 = (n: number) => Math.round(n * 100) / 100
 
-const money = (n: number) => formatMoneyBare(Math.abs(n))
-
-// House rendering for the board: negatives in red parentheses (matches the
-// user's other system), zeros as an em dash in matrix cells.
-function Cell({ n, zeroDash = true, tone }: { n: number; zeroDash?: boolean; tone?: string }) {
-  if (n === 0 && zeroDash) return <span className="text-muted">—</span>
-  if (n < 0) return <span className="text-danger">({money(n)})</span>
-  return <span className={tone}>{money(n)}</span>
+/** A board figure: a dash for zero, red parentheses below zero, else in the
+ *  tone it is given (money in green, pending brown). */
+function Fig({ n, kind, dash = true }: { n: number; kind?: 'in' | 'pend'; dash?: boolean }) {
+  if (n === 0 && dash) return <span className="db-dash">—</span>
+  if (kind === 'pend') return <span className="db-pend">({formatMoneyBare(Math.abs(n))})</span>
+  if (n < 0) return <span className="db-neg">({formatMoneyBare(Math.abs(n))})</span>
+  return <span className={kind === 'in' ? 'db-in' : undefined}>{formatMoneyBare(n)}</span>
 }
 
-const v = (token: string) => `rgb(var(${token}))`
+const NOTE = (
+  <>
+    Each department column reads top→bottom: <b>Balance B/F</b> (balance up to the day before) → <b>Received today</b> (green) →
+    <b> Pending</b> unpaid items (brown · payee + PV, submitted and awaiting the Principal, deducted from the department set on the PV) →
+    <b> Available balance</b> (green) = current balance − pending. <b>Paid items are already deducted</b> from the balance (not listed
+    separately). <b>Venture</b> covers corporate + treasury (fund in/out) + anything untagged. Today&apos;s columns tie to the Dept Pool
+    page&apos;s per-bank breakdown — the inter-billing gap is folded into the primary bank. The bottom <b>Total available</b> adds up
+    every bank&apos;s available across departments — the cash truly free. Past dates are GL-only (no inter-billing fold-in) with the
+    pending list rebuilt from submit/approve timestamps — both approximate.
+  </>
+)
 
 export default function DailyBankView({ data, today }: { data: DailyBankData; today: string }) {
-  if (data.columns?.length) {
-    COLS = data.columns
-  }
+  if (data.columns?.length) COLS = data.columns
   const router = useRouter()
   const [view, setView] = useState<'matrix' | 'banks'>('matrix')
   const [busy, setBusy] = useState(false)
   const captureRef = useRef<HTMLDivElement>(null)
 
-  const go = (d: string) => router.push(`/daily-bank?date=${d}`)
   const date = data.date
-  const dayLabel = dayjs(date).format('ddd · DD/MM/YYYY')
+  const isToday = date === today
+  const go = (d: string) => router.push(`/daily-bank?date=${d}`)
+  const dayLabel = `${isToday ? 'Today · ' : ''}${dayjs(date).format('D MMM YYYY')}`
+
+  // The day in five figures.
+  const sumOver = (pick: (b: BankDay) => SegAmounts) => r2(data.banks.reduce((s, b) => s + sumCols(pick(b)), 0))
+  const bf = sumOver((b) => b.bf)
+  const received = sumOver((b) => b.inToday)
+  const pending = sumOver((b) => b.pendingTotal)
+  const receiptCount = data.banks.reduce((s, b) => s + b.receipts.length, 0)
+  const pendingCount = data.banks.reduce((s, b) => s + b.pending.length, 0)
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
   const captureBlob = async (): Promise<Blob | null> => {
     const node = captureRef.current
@@ -91,14 +114,10 @@ export default function DailyBankView({ data, today }: { data: DailyBankData; to
     const w = Math.ceil(Math.max(node.scrollWidth, node.offsetWidth))
     const h = Math.ceil(Math.max(node.scrollHeight, node.offsetHeight))
     try {
-      return await toBlob(node, {
-        pixelRatio: 2,
-        width: w,
-        height: h,
-        backgroundColor: getComputedStyle(document.body).backgroundColor || '#faf5ea',
-      })
+      // The board sits on the white sheet; the image keeps it white.
+      return await toBlob(node, { pixelRatio: 2, width: w, height: h, backgroundColor: '#ffffff' })
     } finally {
-      restore.forEach(f => f())
+      restore.forEach((f) => f())
     }
   }
 
@@ -134,313 +153,362 @@ export default function DailyBankView({ data, today }: { data: DailyBankData; to
 
   return (
     <div>
-      {/* ── Controls ── */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <button
-          type="button"
-          onClick={() => go(dayjs(date).subtract(1, 'day').format('YYYY-MM-DD'))}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-1.5 rounded-md"
-        >
-          ‹
-        </button>
-        <input
-          type="date"
-          value={date}
-          onChange={e => e.target.value && go(e.target.value)}
-          className="px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
-        />
-        <button
-          type="button"
-          onClick={() => go(dayjs(date).add(1, 'day').format('YYYY-MM-DD'))}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-1.5 rounded-md"
-        >
-          ›
-        </button>
-        <button
-          type="button"
-          onClick={() => go(today)}
-          disabled={date === today}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-1.5 rounded-md disabled:opacity-50"
-        >
-          Today
-        </button>
-
-        <span className="flex-1" />
-
-        <div className="inline-flex rounded-md border border-hairline overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setView('matrix')}
-            className={`text-sm font-serif italic px-3 py-1.5 ${view === 'matrix' ? 'bg-accent text-white' : 'bg-surface text-ink hover:bg-surface-2'}`}
-          >
-            Bank × Department
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('banks')}
-            className={`text-sm font-serif italic px-3 py-1.5 ${view === 'banks' ? 'bg-accent text-white' : 'bg-surface text-ink hover:bg-surface-2'}`}
-          >
-            By bank
-          </button>
-        </div>
-
-        <button
-          type="button"
-          disabled={busy}
-          onClick={copyImage}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-3 py-1.5 rounded-md disabled:opacity-50"
-          title="Copy the board as an image — paste into chat apps"
-        >
-          {busy ? '…' : 'Get image'}
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={downloadPng}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-1.5 rounded-md disabled:opacity-50"
-        >
-          PNG
-        </button>
-        <a
-          href={`/daily-bank/export?date=${date}`}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-1.5 rounded-md"
-        >
-          PDF
-        </a>
-      </div>
-
-      {/* ── Capture area ── */}
-      <div ref={captureRef} className="bg-paper">
-        <div
-          className="rounded-t-md px-5 py-3 flex items-baseline justify-between"
-          style={{ backgroundColor: v('--ink'), color: v('--paper') }}
-        >
-          <span className="font-sans text-sm font-semibold tracking-[0.2em]">
-            {view === 'matrix' ? 'BANK × DEPARTMENT' : 'BANK BALANCE AVAILABLE'}
-          </span>
-          <span className="font-mono text-xs">{dayLabel}</span>
-        </div>
-
-        {view === 'matrix' ? <MatrixView data={data} /> : <BanksView data={data} />}
-
-        <p className="font-sans text-[11px] text-muted leading-relaxed px-5 py-3 border border-t-0 border-hairline rounded-b-md">
-          Each department column reads top→bottom: <b>Balance B/F</b> (balance up to the day
-          before) → <b>Received today</b> (green) → <b>Pending</b> unpaid items (orange · payee +
-          PV, submitted and awaiting the Principal, deducted from the department set on the PV) →
-          <b>Available balance</b> (green) = current balance − pending. <b>Paid items are already
-          deducted</b> from the balance (not listed separately). <b>Venture</b> covers corporate +
-          treasury (fund in/out) + anything untagged. Today&apos;s columns tie to the Dept Pool
-          page&apos;s per-bank breakdown — the inter-billing gap is folded into the primary bank.
-          The bottom <b>Total available</b> adds up every bank&apos;s available across departments
-          — the cash truly free. Past dates are GL-only (no inter-billing fold-in) with the
-          pending list rebuilt from submit/approve timestamps — both approximate.
-        </p>
-      </div>
-    </div>
-  )
-}
-
-// ── Matrix: BANK × DEPARTMENT ───────────────────────────────────────────────
-function MatrixView({ data }: { data: DailyBankData }) {
-  return (
-    <div className="overflow-x-auto border border-t-0 border-hairline">
-      <table className="w-full text-[13px] font-mono tabular">
-        <thead>
-          <tr className="border-b border-hairline">
-            <th className="text-left font-sans text-[11px] tracking-wider text-muted px-4 py-2">
-              BANK \ DEPT
-            </th>
-            {COLS.map(col => (
-              <th
-                key={col.key}
-                className="text-right font-sans text-[11px] tracking-wider text-muted px-3 py-2"
+      <div className="page-head">
+        <div className="min-w-0">
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · DAILY BANK
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="page-title">Daily Bank</h1>
+            <div className="db-daynav">
+              <button type="button" aria-label="Previous day" title="Previous day" onClick={() => go(dayjs(date).subtract(1, 'day').format('YYYY-MM-DD'))}>
+                ←
+              </button>
+              <span className="db-daynav-label">
+                {dayLabel}
+                <input
+                  type="date"
+                  aria-label="Pick a day"
+                  value={date}
+                  max={today}
+                  onChange={(e) => e.target.value && go(e.target.value)}
+                />
+              </span>
+              <button
+                type="button"
+                aria-label="Next day"
+                title="Next day"
+                disabled={date >= today}
+                onClick={() => go(dayjs(date).add(1, 'day').format('YYYY-MM-DD'))}
               >
-                {col.label.toUpperCase()}
-              </th>
-            ))}
-            <th className="text-right font-sans text-[11px] tracking-wider text-ink px-4 py-2">
-              TOTAL
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.banks.map(b => (
-            <BankMatrixRows key={b.bankId} b={b} />
-          ))}
-          <tr style={{ backgroundColor: v('--ledger-bg') }}>
-            <td className="px-4 py-2 font-sans font-semibold text-ledger">Total available</td>
-            {COLS.map(col => (
-              <td key={col.key} className="text-right px-3 py-2 font-semibold">
-                <Cell n={data.totals.available[col.key] ?? 0} zeroDash={false} tone="text-ink" />
-              </td>
-            ))}
-            <td className="text-right px-4 py-2 font-semibold text-ledger">
-              <Cell n={data.totals.grand} zeroDash={false} tone="text-ledger" />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                →
+              </button>
+            </div>
+          </div>
+          <p className="page-sub">
+            Where the cash stands today: balance b/f, money in, pending payments awaiting the Principal, and what is truly free — per
+            bank, split by department.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {!isToday ? (
+            <button type="button" className="btn-quiet-sheet" onClick={() => go(today)}>
+              Today
+            </button>
+          ) : null}
+          <button type="button" className="btn-quiet-sheet" disabled={busy} onClick={downloadPng}>
+            PNG
+          </button>
+          <a className="btn-quiet-sheet" href={`/daily-bank/export?date=${date}`}>
+            PDF
+          </a>
+          <button type="button" className="btn-pri-sheet" disabled={busy} onClick={copyImage} title="Copy the board as an image — paste into chat apps">
+            {busy ? '…' : 'Get image'}
+          </button>
+        </div>
+      </div>
+
+      <StatCards label="Daily Bank">
+        <StatCard label="Balance B/F" value={formatMoney(bf)} icon="wallet" note="GL-exact, start of day" />
+        <StatCard
+          tone={received > 0 ? 'ledger' : 'default'}
+          label="Received today"
+          value={formatMoney(received)}
+          icon="inbox"
+          note={receiptCount > 0 ? plural(receiptCount, 'receipt', 'receipts') : received > 0 ? 'by JV / transfer' : 'nothing in yet'}
+        />
+        <StatCard
+          tone={pending > 0 ? 'wait' : 'default'}
+          label="Pending payment"
+          value={formatMoney(pending)}
+          icon="clock"
+          note={pendingCount > 0 ? `${pendingCount} awaiting Principal` : 'nothing waiting'}
+        />
+        <StatCard tone="primary" label="Total available" value={formatMoney(data.totals.grand ?? 0)} icon="bank" note="Cash truly free" />
+        <StatCard label="Banks" value={String(data.banks.length)} icon="building" note={plural(COLS.length, 'department', 'departments')} />
+      </StatCards>
+
+      <SlidingTabs
+        items={[
+          { key: 'matrix', label: 'Bank × Department' },
+          { key: 'banks', label: 'By bank', count: data.banks.length },
+        ]}
+        active={view}
+        onTabChange={(key) => setView(key as 'matrix' | 'banks')}
+        variant="control"
+      />
+
+      {/* The board — what Get image and PNG capture. */}
+      <div ref={captureRef} className="dbank">
+        {view === 'matrix' ? <MatrixView data={data} label={dayLabel} /> : <BanksView data={data} />}
+        <p className="db-note">{NOTE}</p>
+      </div>
     </div>
   )
 }
 
-function AmountRow({
-  label,
-  amounts,
-  strong = false,
-  tone,
-  bg,
-}: {
-  label: React.ReactNode
-  amounts: SegAmounts
-  strong?: boolean
-  tone?: string
-  bg?: string
-}) {
+function SectHead({ title, count }: { title: string; count: ReactNode }) {
   return (
-    <tr className="border-b border-hairline" style={bg ? { backgroundColor: v(bg) } : undefined}>
-      <td className={`px-4 py-2 font-sans ${strong ? 'font-semibold text-ink' : 'text-graphite'}`}>
-        {label}
-      </td>
-      {COLS.map(col => (
-        <td key={col.key} className={`text-right px-3 py-2 ${strong ? 'font-semibold' : ''}`}>
-          <Cell n={amounts[col.key] ?? 0} tone={tone} />
-        </td>
-      ))}
-      <td className={`text-right px-4 py-2 ${strong ? 'font-semibold' : ''}`}>
-        <Cell n={sumCols(amounts)} zeroDash={false} tone={tone} />
-      </td>
-    </tr>
+    <div className="sect-head">
+      <h2>{title}</h2>
+      <span className="rule" aria-hidden />
+      <span className="count">{count}</span>
+    </div>
   )
 }
 
-function BankMatrixRows({ b }: { b: BankDay }) {
+// ── Bank × Department ──────────────────────────────────────────────────────
+// On a phone the wide table becomes a card per bank (the handoff's phone
+// board): what the bank has free, the B/F → in → pending walk under it, a
+// line per department that moved, and what waits on the Principal.
+const walk = (bf: number, inToday: number, pend: number) =>
+  `B/F ${formatMoneyBare(bf)}${inToday ? ` · +${formatMoneyBare(inToday)}` : ''}${pend ? ` · −${formatMoneyBare(pend)}` : ''}`
+
+function PhoneBoard({ data }: { data: DailyBankData }) {
+  return (
+    <div className="db-phone md:hidden">
+      {data.banks.map((b) => {
+        const depts = COLS.filter((c) => (b.bf[c.key] ?? 0) !== 0 || (b.inToday[c.key] ?? 0) !== 0 || (b.pendingTotal[c.key] ?? 0) !== 0)
+        return (
+          <div key={b.bankId} className="db-card">
+            <div className="db-card-head">
+              <div className="db-card-line">
+                <span className="db-card-name">{b.bankName}</span>
+                <span className="db-card-avail">
+                  <Fig n={sumCols(b.available)} dash={false} />
+                </span>
+              </div>
+              <div className="db-card-line db-card-small">
+                <span>{walk(sumCols(b.bf), sumCols(b.inToday), sumCols(b.pendingTotal))}</span>
+                <span>Available</span>
+              </div>
+            </div>
+            {depts.map((c) => (
+              <div key={c.key} className="db-card-dept">
+                <div className="min-w-0">
+                  <div className="db-card-dept-name">{c.label}</div>
+                  <div className="db-card-small">{walk(b.bf[c.key] ?? 0, b.inToday[c.key] ?? 0, b.pendingTotal[c.key] ?? 0)}</div>
+                </div>
+                <span className="db-card-figure">
+                  <Fig n={b.available[c.key] ?? 0} dash={false} />
+                </span>
+              </div>
+            ))}
+            {b.pending.length > 0 ? (
+              <div className="db-card-pend">
+                <div className="db-card-pend-head">Pending · awaiting Principal</div>
+                {b.pending.map((p, i) => (
+                  <div key={i} className="db-card-pend-row">
+                    <span className="db-card-pend-who">
+                      {p.payee}{' '}
+                      <span className="db-card-small">
+                        · {COLS.filter((c) => (p.amounts[c.key] ?? 0) !== 0).map((c) => c.label).join(', ')}
+                      </span>
+                    </span>
+                    <Fig n={p.total} kind="pend" dash={false} />
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        )
+      })}
+      <div className="db-card-total">
+        <span>Total available</span>
+        <Fig n={data.totals.grand ?? 0} dash={false} />
+      </div>
+    </div>
+  )
+}
+
+function MatrixView({ data, label }: { data: DailyBankData; label: string }) {
+  return (
+    <section className="db-section">
+      <SectHead title="Bank × Department" count={label.toUpperCase()} />
+      <PhoneBoard data={data} />
+      <div className="db-box hidden md:block">
+        <table className="ledger-table db-matrix">
+          <thead>
+            <tr>
+              <th className="db-label-col">Bank \ Dept</th>
+              {COLS.map((col) => (
+                <th key={col.key} className="num">
+                  {col.label}
+                </th>
+              ))}
+              <th className="num">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.banks.map((b) => (
+              <BankRows key={b.bankId} b={b} />
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>Total available</td>
+              {COLS.map((col) => (
+                <td key={col.key} className="num">
+                  <Fig n={data.totals.available[col.key] ?? 0} dash={false} />
+                </td>
+              ))}
+              <td className="num">
+                <Fig n={data.totals.grand ?? 0} dash={false} />
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function BankRows({ b }: { b: BankDay }) {
   return (
     <>
-      <AmountRow label={<b>{b.bankName} · Balance B/F</b>} amounts={b.bf} strong />
-      {sumCols(b.inToday) !== 0 ? (
-        <AmountRow label="· Received today" amounts={b.inToday} tone="text-ledger" />
-      ) : null}
-      {b.pending.map((p, i) => (
-        <tr key={i} className="border-b border-hairline">
-          <td className="px-4 py-2 font-sans text-graphite">
-            <span className="text-ink">· {p.payee}</span>{' '}
-            <span className="font-mono text-[11px] text-muted">{p.voucherNo}</span>{' '}
-            <span className="font-serif italic text-muted">
-              {p.description.length > 42 ? `${p.description.slice(0, 40)}…` : p.description}
-            </span>{' '}
-            <span
-              className="font-sans text-[10px] px-1.5 py-0.5 rounded"
-              style={{ backgroundColor: v('--alert-bg'), color: v('--alert') }}
-            >
-              Pending
-            </span>
+      <tr className="db-band">
+        <td>{b.bankName} · Balance B/F</td>
+        {COLS.map((col) => (
+          <td key={col.key} className="num">
+            <Fig n={b.bf[col.key] ?? 0} />
           </td>
-          {COLS.map(col => (
-            <td key={col.key} className="text-right px-3 py-2">
-              {(p.amounts[col.key] ?? 0) !== 0 ? (
-                <span className="text-alert">({money(p.amounts[col.key])})</span>
-              ) : (
-                <span className="text-muted">—</span>
-              )}
+        ))}
+        <td className="num">
+          <Fig n={sumCols(b.bf)} dash={false} />
+        </td>
+      </tr>
+      {sumCols(b.inToday) !== 0 ? (
+        <tr className="db-indent">
+          <td>· Received today</td>
+          {COLS.map((col) => (
+            <td key={col.key} className="num">
+              <Fig n={b.inToday[col.key] ?? 0} kind="in" />
             </td>
           ))}
-          <td className="text-right px-4 py-2">
-            <span className="text-alert">({money(p.total)})</span>
+          <td className="num">
+            <Fig n={sumCols(b.inToday)} kind="in" dash={false} />
+          </td>
+        </tr>
+      ) : null}
+      {b.pending.map((p, i) => (
+        <tr key={i} className="db-indent">
+          <td>
+            <span className="db-payee">· {p.payee}</span> <span className="chip alert db-tag">Pending</span>
+            <span className="db-sub">
+              {p.voucherNo}
+              {p.description ? ` · ${p.description}` : ''}
+            </span>
+          </td>
+          {COLS.map((col) => (
+            <td key={col.key} className="num">
+              <Fig n={p.amounts[col.key] ?? 0} kind="pend" />
+            </td>
+          ))}
+          <td className="num">
+            <Fig n={p.total} kind="pend" dash={false} />
           </td>
         </tr>
       ))}
-      <AmountRow
-        label={<span className="text-ledger">⌊ Available balance</span>}
-        amounts={b.available}
-        tone="text-ink"
-        bg="--ledger-bg"
-      />
+      <tr className="db-avail">
+        <td>⌊ Available balance</td>
+        {COLS.map((col) => (
+          <td key={col.key} className="num">
+            <Fig n={b.available[col.key] ?? 0} />
+          </td>
+        ))}
+        <td className="num">
+          <Fig n={sumCols(b.available)} dash={false} />
+        </td>
+      </tr>
     </>
   )
 }
 
-// ── Simple: one section per bank ────────────────────────────────────────────
+// ── By bank ────────────────────────────────────────────────────────────────
 function BanksView({ data }: { data: DailyBankData }) {
   return (
-    <div className="border border-t-0 border-hairline">
-      {data.banks.map(b => (
-        <div key={b.bankId} className="border-b border-hairline last:border-b-0">
-          <div
-            className="px-5 py-2 flex items-baseline justify-between"
-            style={{ backgroundColor: v('--surface-2') }}
-          >
-            <span className="font-serif text-base text-ink">{b.bankName}</span>
-            <span className="font-mono text-sm text-ink">
-              Bank Balance&nbsp;&nbsp;<b>{formatMoneyBare(sumCols(b.current))}</b>
-            </span>
-          </div>
-          <table className="w-full text-[13px] font-mono tabular">
-            <thead>
-              <tr className="border-b border-hairline">
-                <th className="text-left font-sans text-[11px] tracking-wider text-muted px-5 py-1.5">PAY TO</th>
-                <th className="text-left font-sans text-[11px] tracking-wider text-muted px-3 py-1.5">PV NO.</th>
-                <th className="text-left font-sans text-[11px] tracking-wider text-muted px-3 py-1.5">DESCRIPTION</th>
-                <th className="text-right font-sans text-[11px] tracking-wider text-muted px-3 py-1.5">RECEIVED (RM)</th>
-                <th className="text-right font-sans text-[11px] tracking-wider text-muted px-5 py-1.5">PENDING PAYMENT (RM)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-hairline">
-                <td className="px-5 py-1.5 font-sans text-ink">Balance B/F</td>
-                <td /><td /><td />
-                <td className="text-right px-5 py-1.5">
-                  <Cell n={sumCols(b.bf)} zeroDash={false} />
-                </td>
-              </tr>
-              {sumCols(b.inToday) !== 0 ? (
-                <tr className="border-b border-hairline">
-                  <td className="px-5 py-1.5 font-sans text-ledger">Received today</td>
-                  <td /><td />
-                  <td className="text-right px-3 py-1.5 text-ledger">
-                    {formatMoneyBare(sumCols(b.inToday))}
+    <>
+      {data.banks.map((b) => (
+        <section key={b.bankId} className="db-section">
+          <SectHead title={b.bankName} count={`BANK BALANCE ${formatMoney(sumCols(b.current))}`} />
+          <div className="db-box">
+            <table className="ledger-table db-bybank">
+              <thead>
+                <tr>
+                  <th className="db-label-col">Pay to</th>
+                  <th>PV No.</th>
+                  <th>Description</th>
+                  <th className="num">Received (RM)</th>
+                  <th className="num">Pending payment (RM)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="db-band">
+                  <td>Balance B/F</td>
+                  <td />
+                  <td />
+                  <td />
+                  <td className="num">
+                    <Fig n={sumCols(b.bf)} dash={false} />
                   </td>
-                  <td />
                 </tr>
-              ) : null}
-              {b.receipts.map((r, i) => (
-                <tr key={`r${i}`} className="border-b border-hairline">
-                  <td className="px-5 py-1.5 font-sans text-graphite">&nbsp;&nbsp;· {r.payer}</td>
-                  <td className="px-3 py-1.5 text-[11px] text-muted">{r.voucherNo}</td>
-                  <td className="px-3 py-1.5 font-serif italic text-muted">{r.description}</td>
-                  <td className="text-right px-3 py-1.5 text-ledger">{formatMoneyBare(r.amount)}</td>
-                  <td />
+                {sumCols(b.inToday) !== 0 ? (
+                  <tr>
+                    <td className="db-in">Received today</td>
+                    <td />
+                    <td />
+                    <td className="num">
+                      <Fig n={sumCols(b.inToday)} kind="in" />
+                    </td>
+                    <td />
+                  </tr>
+                ) : null}
+                {b.receipts.map((r, i) => (
+                  <tr key={`r${i}`} className="db-indent">
+                    <td>· {r.payer}</td>
+                    <td className="db-vno">{r.voucherNo}</td>
+                    <td className="db-desc">{r.description}</td>
+                    <td className="num">
+                      <Fig n={r.amount} kind="in" />
+                    </td>
+                    <td />
+                  </tr>
+                ))}
+                {b.otherInToday !== 0 ? (
+                  <tr className="db-indent">
+                    <td>· Other (JV / transfer)</td>
+                    <td />
+                    <td />
+                    <td className="num">
+                      <Fig n={b.otherInToday} kind="in" />
+                    </td>
+                    <td />
+                  </tr>
+                ) : null}
+                {b.pending.map((p, i) => (
+                  <tr key={`p${i}`} className="db-indent">
+                    <td className="db-pend-name">· {p.payee}</td>
+                    <td className="db-vno">{p.voucherNo}</td>
+                    <td className="db-desc">{p.description}</td>
+                    <td />
+                    <td className="num">
+                      <Fig n={p.total} kind="pend" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={4}>Available (after pending)</td>
+                  <td className="num">
+                    <Fig n={sumCols(b.available)} dash={false} />
+                  </td>
                 </tr>
-              ))}
-              {b.otherInToday !== 0 ? (
-                <tr className="border-b border-hairline">
-                  <td className="px-5 py-1.5 font-sans text-graphite">&nbsp;&nbsp;· Other (JV / transfer)</td>
-                  <td /><td />
-                  <td className="text-right px-3 py-1.5 text-ledger">{formatMoneyBare(b.otherInToday)}</td>
-                  <td />
-                </tr>
-              ) : null}
-              {b.pending.map((p, i) => (
-                <tr key={`p${i}`} className="border-b border-hairline">
-                  <td className="px-5 py-1.5 font-sans text-alert">· {p.payee}</td>
-                  <td className="px-3 py-1.5 text-[11px] text-muted">{p.voucherNo}</td>
-                  <td className="px-3 py-1.5 font-serif italic text-graphite">{p.description}</td>
-                  <td />
-                  <td className="text-right px-5 py-1.5 text-alert">{formatMoneyBare(p.total)}</td>
-                </tr>
-              ))}
-              <tr style={{ backgroundColor: v('--ledger-bg') }}>
-                <td className="px-5 py-2 font-sans font-semibold text-ledger" colSpan={4}>
-                  Available (after pending)
-                </td>
-                <td className="text-right px-5 py-2 font-semibold">
-                  <Cell n={sumCols(b.available)} zeroDash={false} tone="text-ledger" />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+              </tfoot>
+            </table>
+          </div>
+        </section>
       ))}
-    </div>
+    </>
   )
 }

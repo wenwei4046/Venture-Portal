@@ -47,7 +47,7 @@ const VOUCHERS = [
 
 function database(claimQueue: Array<{ voucher_id: string | null }> = []) {
   const from = vi.fn((table: string) => {
-    const result = table === 'payroll_payment_requests' ? { count: 2, data: null, error: null } : { data: [], error: null }
+    const result = table === 'payroll_payment_requests' ? { count: 2, data: null, error: null } : table === 'bank_accounts' ? { data: [{ id: 'bank-hl', bank_name: 'Hong Leong' }], error: null } : { data: [], error: null }
     const q = {
       select: () => q, eq: () => q, order: () => q, range: () => q,
       then: (resolve: (value: typeof result) => unknown) => Promise.resolve(resolve(result)),
@@ -201,7 +201,7 @@ describe('the ledger on the sheet', () => {
     expect(card('Total paid')).toHaveTextContent('RM 9,514.75')
     expect(card('Total paid')).toHaveAttribute('data-tone', 'primary')
     expect(card('Pending approval')).toHaveTextContent('RM 4,225.00')
-    expect(card('Pending approval')).toHaveAttribute('data-tone', 'alert')
+    expect(card('Pending approval')).toHaveAttribute('data-tone', 'wait')
     expect(card('Pending approval')).toHaveTextContent('0 draft · 1 pending')
     expect(card('Approved · to pay')).toHaveTextContent('RM 0.00')
     expect(card('All vouchers')).toHaveTextContent('5')
@@ -212,10 +212,18 @@ describe('the ledger on the sheet', () => {
   it('counts every tab, and heads the table with what is on show', async () => {
     database()
     render(await VoucherLedger({ direction: 'debit', params: {} }))
-    expect(JSON.parse(screen.getByTestId('tabs').textContent ?? 'null')).toEqual({ all: 5, draft: 0, pending_approval: 1, approved: 0, paid: 4, voided: 0 })
+    expect(JSON.parse(screen.getByTestId('tabs').textContent ?? 'null')).toEqual({ all: 5, draft: 0, pending_approval: 1, approved: 0, paid: 4, voided: 0, payroll: 1 })
     const head = document.querySelector('.sect-head')
     expect(head).toHaveTextContent('Payment vouchers')
     expect(head).toHaveTextContent('5 of 5 vouchers')
+  })
+
+  // 2026-10-09 (the Finance revamp): payroll batches have a tab of their own.
+  it('the Payroll batches tab lists the batches’ vouchers only', async () => {
+    database()
+    render(await VoucherLedger({ direction: 'debit', params: { status: 'payroll' } }))
+    expect(sent().map((r) => r.id)).toEqual(['v-aina', 'v-bala'])
+    expect(document.querySelector('.sect-head')).toHaveTextContent('2 of 5 vouchers')
   })
 
   it('says Total received and Approved · to receive on the receipt side', async () => {
@@ -225,6 +233,17 @@ describe('the ledger on the sheet', () => {
     expect(card('Total received')).toHaveAttribute('data-tone', 'primary')
     expect(card('Approved · to receive')).toBeInTheDocument()
     expect(document.querySelector('.sect-head')).toHaveTextContent('Official receipts')
+    // No payroll on the receipt side, so no tab for it.
+    expect(JSON.parse(screen.getByTestId('tabs').textContent ?? 'null')).not.toHaveProperty('payroll')
+  })
+
+  it('names each receipt’s bank (2026-10-09)', async () => {
+    database()
+    mocks.fetchAllRows.mockResolvedValue(VOUCHERS.map((v) => ({ ...v, direction: 'credit', bank_account_id: v.id === 'v-tnb' ? 'bank-hl' : null })))
+    render(await VoucherLedger({ direction: 'credit', params: {} }))
+    const rows = sent() as Array<{ id: string; bankLabel?: string }>
+    expect(rows.find((r) => r.id === 'v-tnb')?.bankLabel).toBe('Hong Leong')
+    expect(rows.find((r) => r.id === 'v-kwsp')?.bankLabel).toBeUndefined()
   })
 })
 

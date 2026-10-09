@@ -55,6 +55,8 @@ export interface AllocatorSummary {
 const r2 = (n: number) => Math.round(n * 100) / 100
 const DEPT_SUFFIX = / \(dept\)$/
 const isDept = (id: string | null) => !!id && id.startsWith('dept:')
+// (The matrix of one column per company went with the user's 2026-10-09 pick
+// of the handoff's single Split column.)
 const targetLabel = (label: string) => label.replace(DEPT_SUFFIX, '')
 
 export function allocatorSummary(txns: SheetTxn[], invoices: SheetInvoice[]): AllocatorSummary {
@@ -100,41 +102,13 @@ export function allocatorSummary(txns: SheetTxn[], invoices: SheetInvoice[]): Al
   }
 }
 
-export interface MatrixColumn {
-  /** null = HV's own share. */
-  id: string | null
-  label: string
-  own: boolean
-}
-
-/** One column per target the month allocates to — the companies in the order
- *  given (the pickers' order), the departments after them, HV own last — and
- *  no column for a company the month never touched. */
-export function matrixColumns(txns: SheetTxn[], companies: Array<{ id: string; label: string }>): MatrixColumn[] {
-  const seen = new Map<string, string>()
-  let own = false
-  for (const t of txns) {
-    for (const d of t.details) {
-      if (d.isOwnShare || d.companyId === null) {
-        own = true
-        continue
-      }
-      if (!seen.has(d.companyId)) seen.set(d.companyId, targetLabel(d.companyLabel))
-    }
-  }
-  const out: MatrixColumn[] = []
-  for (const c of companies) {
-    if (seen.has(c.id)) {
-      out.push({ id: c.id, label: c.label, own: false })
-      seen.delete(c.id)
-    }
-  }
-  // Departments and anything else the companies list does not carry (a
-  // switched-off company in an old month), in first-seen order.
-  const rest = [...seen.entries()].sort((a, b) => Number(isDept(b[0])) - Number(isDept(a[0])) || 0)
-  for (const [id, label] of rest) out.push({ id, label, own: false })
-  if (own) out.push({ id: null, label: 'HV own', own: true })
-  return out
+/** The Split column (2026-10-09, the handoff): each company's share of the
+ *  amount as a percentage — "2990 3.9% · CAR 19.4%" — HV's own share left out. */
+export function splitSummary(t: Pick<SheetTxn, 'amount' | 'details'>): string {
+  const parts = t.details
+    .filter((d) => !d.isOwnShare && d.companyId !== null)
+    .map((d) => `${targetLabel(d.companyLabel)} ${t.amount > 0 ? ((d.amount / t.amount) * 100).toFixed(1) : '0.0'}%`)
+  return parts.length > 0 ? parts.join(' · ') : '—'
 }
 
 export interface ByCompanyRow {

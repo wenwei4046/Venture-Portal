@@ -3,6 +3,7 @@
 import { useState, type MouseEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import RowMenu, { type RowMenuAnchor, type RowMenuItem } from '@/components/RowMenu'
+import { useFinView } from '@/components/layout/fin-view'
 
 // A table whose rows each have a page of their own (2026-10-02).
 //
@@ -36,6 +37,8 @@ export function useRowLinks<T>({ href, title, more }: Options<T>): {
   menu: ReactNode
 } {
   const router = useRouter()
+  // On the Finance view the menu reads in English (2026-10-09).
+  const fin = useFinView()
   const [at, setAt] = useState<{ row: T; anchor: RowMenuAnchor } | null>(null)
   const onRowOpen = (row: T) => router.push(href(row))
 
@@ -43,10 +46,10 @@ export function useRowLinks<T>({ href, title, more }: Options<T>): {
   if (at) {
     const extra = more?.(at.row) ?? []
     const items: RowMenuItem[] = [
-      { key: 'open', label: '打开', hint: '双击也可以', onSelect: () => onRowOpen(at.row) },
+      { key: 'open', label: fin ? 'Open' : '打开', hint: fin ? 'or double-click' : '双击也可以', onSelect: () => onRowOpen(at.row) },
       {
         key: 'new-tab',
-        label: '在新分页打开',
+        label: fin ? 'Open in new tab' : '在新分页打开',
         onSelect: () => window.open(href(at.row), '_blank', 'noopener,noreferrer'),
       },
     ]

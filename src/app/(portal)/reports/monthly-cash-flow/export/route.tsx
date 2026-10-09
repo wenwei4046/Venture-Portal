@@ -10,11 +10,13 @@ import {
   payrollCustodyAccount,
 } from '@/lib/inter-billing-cash-flow'
 import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
-import type { MatrixRow } from '@/lib/monthly-matrix'
+import { sliceMatrixMonths, type MatrixRow } from '@/lib/monthly-matrix'
+import { rangeLabel, reportRange } from '@/lib/report-range'
 import { segmentFilterFor } from '../../_components/report-segments'
 import { exportPdfResponse, exportXlsxResponse } from '@/lib/export/response'
 import { buildMatrixXlsx } from '@/lib/export/monthly-matrix-export'
 import { MatrixPdf } from '@/lib/export/matrix-pdf'
+import { reportsCompanyWide } from '@/lib/surfaces'
 
 export async function GET(req: Request) {
   // dept_manager may export their own segment (RLS scopes journal_lines).
@@ -23,6 +25,8 @@ export async function GET(req: Request) {
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const periodRaw = url.searchParams.get('period') ?? ''
   const period = /^\d{4}-\d{2}$/.test(periodRaw) ? periodRaw : officeMonth()
+  // From – To (2026-10-09, the Finance revamp): the months cut as the page cuts them.
+  const range = reportRange({ from: url.searchParams.get('from') ?? undefined, period }, officeMonth())
   const segment = url.searchParams.get('segment') ?? ''
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
@@ -32,7 +36,7 @@ export async function GET(req: Request) {
   // (dept managers have no segment param but ARE one segment via RLS); there
   // the bridge is not read at all, and elsewhere it starts beside the journal
   // read with the bank codes still pending (2026-10-08).
-  const consolidated = user.role !== 'dept_manager' && !segment
+  const consolidated = reportsCompanyWide(user) && !segment
   const bankCodesRead = Promise.resolve(
     supabase.rpc('bank_gl_codes' as never), // codes only; dept_managers can't read bank_accounts
   ).then(({ data: banks }) => new Set((banks ?? []) as unknown as string[]))
@@ -55,9 +59,10 @@ export async function GET(req: Request) {
     { key: 'OPENING_CASH', label: 'Opening cash', depth: 0, kind: 'subtotal', tone: 'ledger', values: data.openingByCol },
     { key: 'CLOSING_CASH', label: 'Closing cash', depth: 0, kind: 'subtotal', tone: 'ledger', emphasis: 'strong', values: data.closingByCol },
   ]
-  const matrix = { columns: data.columns, rows }
+  const cut = sliceMatrixMonths(data.columns, rows, range.from)
+  const matrix = { columns: cut.columns, rows: cut.rows }
 
-  const filename = `monthly-cash-flow-${period}${segment ? `-${segment}` : ''}`
+  const filename = `monthly-cash-flow-${range.wholeYear ? period : `${range.from}-${period}`}${segment ? `-${segment}` : ''}`
   if (format === 'pdf') {
     return exportPdfResponse({
       filename,
@@ -65,7 +70,7 @@ export async function GET(req: Request) {
         <MatrixPdf
           title="Monthly Cash Flow"
           subtitle={`FY ${year} · all amounts RM · direct method`}
-          periodLabel={`Up to ${dayjs(`${period}-01`).format('MMMM YYYY')}`}
+          periodLabel={range.wholeYear ? `Up to ${dayjs(`${period}-01`).format('MMMM YYYY')}` : rangeLabel(range.from, range.to)}
           data={matrix}
         />
       ),

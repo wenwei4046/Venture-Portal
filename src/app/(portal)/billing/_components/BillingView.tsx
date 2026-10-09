@@ -12,6 +12,7 @@ import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { directorBillingTarget } from '@/lib/billing'
 import { invoiceSummary, payrollBasisSummary, payrollBillingLines } from '@/lib/billing-sheet'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import ActMenu from '@/components/sheet/ActMenu'
 import type { AccountType } from '@/lib/coa'
 import PeriodSelector from './PeriodSelector'
 import GenerateInvoicesButton from './GenerateInvoicesButton'
@@ -539,68 +540,45 @@ export default async function BillingView({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Service Billing</h1>
         </div>
-        {/* Six controls do not fit beside the title on the sheet (user
-            2026-10-07: "超过格子了"): they wrap onto a second line rather than
-            run past the sheet's edge. */}
-        <div className="flex items-center gap-3">
+        {/* One row (2026-10-09, the Finance revamp): the month, then From
+            payroll ▾, Export ▾ and + Create Invoice ▾ — each a menu holding the
+            buttons the captioned band used to lay side by side. */}
+        <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
           <PeriodSelector currentPeriod={period} />
-        </div>
-      </div>
-
-      {/* Every control on show, in three captioned groups (2026-10-07; the
-          user: all of them visible, but the month, the creating and the
-          exporting no longer in one line). */}
-      <div className="act-band">
-        {canFinanceCreate ? (
-          <>
-            <div className="act-group">
-              <div className="cap">From payroll</div>
-              <div className="btns">
-                <GenerateConsolidatedInvoicesButton currentPeriod={period} categories={categoryList} />
-                <ReconcilePayrollBillingButton currentPeriod={period} />
-                <GenerateOwnShareInvoiceButton currentPeriod={period} categories={categoryList} />
-              </div>
-            </div>
-            <div className="act-group">
-              <div className="cap">Create</div>
-              <div className="btns">
-                <CreateInvoiceButton
-                  companies={companyList}
-                  currentPeriod={period}
-                  departments={departments ?? []}
-                  categories={categoryList}
-                  extraModes={extraModes}
-                />
-                <CreateMultiLineInvoiceButton
-                  companies={companyList}
-                  currentPeriod={period}
-                  departments={departments ?? []}
-                  categories={categoryList}
-                  extraModes={extraModes}
-                />
-              </div>
-            </div>
-          </>
-        ) : null}
-        <div className="act-group">
-          <div className="cap">Export</div>
-          <div className="btns">
-            <Link href={`/statements/export?format=xlsx&period=${periodMonth}`} className="btn-quiet-sheet">
-              Excel
-            </Link>
-            <Link href={`/statements/export?format=pdf&period=${periodMonth}`} className="btn-quiet-sheet" title="Export the invoice list as a single-page table">
+          {canFinanceCreate ? (
+            <ActMenu label="From payroll">
+              <GenerateConsolidatedInvoicesButton currentPeriod={period} categories={categoryList} />
+              <ReconcilePayrollBillingButton currentPeriod={period} />
+              <GenerateOwnShareInvoiceButton currentPeriod={period} categories={categoryList} />
+            </ActMenu>
+          ) : null}
+          <ActMenu label="Export">
+            <Link href={`/statements/export?format=xlsx&period=${periodMonth}`}>Excel</Link>
+            <Link href={`/statements/export?format=pdf&period=${periodMonth}`} title="Export the invoice list as a single-page table">
               PDF · list
             </Link>
-            <Link
-              href={`/billing/invoice-doc?period=${periodMonth}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-quiet-sheet"
-              title="Export each invoice as its own document page (batch PDF)"
-            >
+            <Link href={`/billing/invoice-doc?period=${periodMonth}`} target="_blank" rel="noopener noreferrer" title="Export each invoice as its own document page (batch PDF)">
               PDF · per invoice
             </Link>
-          </div>
+          </ActMenu>
+          {canFinanceCreate ? (
+            <ActMenu label="+ Create Invoice" primary>
+              <CreateInvoiceButton
+                companies={companyList}
+                currentPeriod={period}
+                departments={departments ?? []}
+                categories={categoryList}
+                extraModes={extraModes}
+              />
+              <CreateMultiLineInvoiceButton
+                companies={companyList}
+                currentPeriod={period}
+                departments={departments ?? []}
+                categories={categoryList}
+                extraModes={extraModes}
+              />
+            </ActMenu>
+          ) : null}
         </div>
       </div>
 
@@ -618,7 +596,7 @@ export default async function BillingView({ searchParams }: Props) {
           }`}
         />
         <StatCard
-          tone={summary.outstanding > 0.005 ? 'alert' : 'default'}
+          tone={summary.outstanding > 0.005 ? 'wait' : 'default'}
           label="Outstanding"
           value={formatMoney(summary.outstanding)}
           icon="clock"

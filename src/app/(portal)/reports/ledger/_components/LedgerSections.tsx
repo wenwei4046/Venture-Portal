@@ -3,7 +3,7 @@
 import { useMemo, useState, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import dayjs from 'dayjs'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import type { Ledger, LedgerLine } from '@/lib/cfo-reports'
 import LedgerRow from '@/components/LedgerRow'
 
@@ -13,7 +13,7 @@ const BLANK = ' blank'
 function formatSignedBalance(signed: number): string {
   const abs = Math.abs(signed)
   if (abs < 0.005) return '—'
-  return `${formatMoney(abs)} ${signed >= 0 ? 'Dr' : 'Cr'}`
+  return `${formatMoneyBare(abs)} ${signed >= 0 ? 'Dr' : 'Cr'}`
 }
 
 const SEGMENT_SHORT: Record<string, string> = {
@@ -140,14 +140,14 @@ export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
   return (
     <div className="mt-2">
       {/* Toolbar — search + sort + facet filters */}
-      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-4">
-        <div className="relative flex-1 min-w-[12rem] max-w-md">
+      <div className="gl-toolbar">
+        <div className="relative flex-1 min-w-[12rem]">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search ref, description, dept, date…"
-            className="w-full pl-9 pr-9 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+            className="w-full pl-9 pr-9 py-2 bg-white border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
           />
           <svg
             className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none"
@@ -187,7 +187,7 @@ export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
         <button
           type="button"
           onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-          className="px-3 py-2 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors flex items-center gap-2"
+          className="btn-quiet-sheet flex items-center gap-2"
           title={sortDir === 'asc' ? 'Oldest first (click for newest first)' : 'Newest first (click for oldest first)'}
         >
           <span>Date</span>
@@ -197,14 +197,14 @@ export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
       </div>
 
       {narrowed ? (
-        <p className="font-serif italic text-muted text-xs mb-4">
+        <p className="text-xs text-graphite mb-4">
           {totalMatches} matching {totalMatches === 1 ? 'line' : 'lines'} across {prepared.length} {prepared.length === 1 ? 'account' : 'accounts'}
           {hiddenSections > 0 ? ` · ${hiddenSections} ${hiddenSections === 1 ? 'account' : 'accounts'} hidden` : ''}
         </p>
       ) : null}
 
       {prepared.length === 0 ? (
-        <p className="font-serif italic text-muted text-sm">
+        <p className="text-sm text-graphite">
           {q ? (
             <>No lines match <strong>&ldquo;{query}&rdquo;</strong>. Try a different keyword or clear the filters.</>
           ) : (
@@ -212,7 +212,7 @@ export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
           )}
         </p>
       ) : (
-        <div className="space-y-8">
+        <div>
           {prepared.map(({ led, lines }) => (
             <LedgerSection key={led.code} led={led} lines={lines} />
           ))}
@@ -274,11 +274,7 @@ function FacetFilter({
       <button
         type="button"
         onClick={openPanel}
-        className={`px-3 py-2 border rounded-md text-xs font-mono transition-colors flex items-center gap-2 ${
-          active
-            ? 'bg-surface-2 border-accent-border text-ink'
-            : 'bg-surface hover:bg-surface-2 border-hairline text-graphite hover:text-ink'
-        }`}
+        className={`btn-quiet-sheet flex items-center gap-2 ${active ? 'border-accent-border' : ''}`}
         title={`Filter by ${label}`}
       >
         <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
@@ -352,77 +348,108 @@ function FacetFilter({
   )
 }
 
+/**
+ * One account (2026-10-09, the user's Claude Design handoff): its code and
+ * name as the section's heading with the count of its lines, then the table —
+ * an Opening balance row (the balance brought forward), the lines with the
+ * journal type a chip and the department named, and a Closing balance row
+ * with the period's debits and credits.
+ */
 function LedgerSection({ led, lines }: { led: Ledger; lines: LedgerLine[] }) {
+  const count = lines.filter((l) => !isBfLine(l)).length
   return (
     <section className="mb-10">
-      <table className="ledger-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th className="m-hide">Acc. Desc.</th>
-            <th className="m-hide">Journal Type</th>
-            <th className="m-hide">Ref. 1</th>
-            <th className="m-hide">Dept</th>
-            <th className="m-hide">Desc.</th>
-            <th className="num m-hide">Home DR</th>
-            <th className="num m-hide">Home CR</th>
-            <th className="num">Home Balance</th>
-            <th className="lt-toggle" aria-hidden />
-          </tr>
-        </thead>
-        <tbody>
-          <tr className="bg-surface border-t-2 border-hairline">
-            <td colSpan={6} className="font-mono text-xs text-ink font-semibold">
-              Acc. No.: {led.code} · {led.accountName}
-            </td>
-            <td className="num font-semibold m-hide">
-              {led.periodTotals.debit > 0 ? formatMoney(led.periodTotals.debit) : '—'}
-            </td>
-            <td className="num font-semibold m-hide">
-              {led.periodTotals.credit > 0 ? formatMoney(led.periodTotals.credit) : '—'}
-            </td>
-            <td className="num font-semibold">{formatSignedBalance(led.closingBalance)}</td>
-            <td className="lt-toggle" />
-          </tr>
-          {lines.map((l, i) => {
-            const isBf = isBfLine(l)
-            return (
-              <LedgerRow key={i} className={isBf ? 'text-graphite italic' : ''}>
-                <td className="font-mono text-xs">
-                  {l.entryDate ? dayjs(l.entryDate).format('D MMM YYYY') : '—'}
-                </td>
-                <td className="font-mono text-xs m-hide" data-label="Acc. Desc.">{l.accountDesc}</td>
-                <td className="font-mono text-xs uppercase tracking-wide text-accent m-hide" data-label="Journal Type">
-                  {l.journalType}
-                </td>
-                <td className="font-mono text-sm text-ink m-hide" data-label="Ref. 1">{l.ref}</td>
-                <td className="font-mono text-xs text-graphite m-hide" data-label="Dept">{segmentShort(l.segment)}</td>
-                <td className="text-sm m-hide" data-label="Desc.">{l.description}</td>
-                <td className="num m-hide" data-label="Home DR">{l.debit > 0 ? formatMoney(l.debit) : '—'}</td>
-                <td className="num m-hide" data-label="Home CR">{l.credit > 0 ? formatMoney(l.credit) : '—'}</td>
-                <td className="num">{formatSignedBalance(l.runningBalance)}</td>
-              </LedgerRow>
-            )
-          })}
-        </tbody>
-        <tfoot>
-          <tr className="border-t border-hairline">
-            <td colSpan={6} className="font-mono text-xs text-ink font-semibold">
-              {led.code} {led.accountName} — total
-            </td>
-            <td className="num font-semibold m-hide">
-              {led.periodTotals.debit > 0 ? formatMoney(led.periodTotals.debit) : '—'}
-            </td>
-            <td className="num font-semibold m-hide">
-              {led.periodTotals.credit > 0 ? formatMoney(led.periodTotals.credit) : '—'}
-            </td>
-            <td className="num font-semibold text-num-ink">
-              {formatSignedBalance(led.closingBalance)}
-            </td>
-            <td className="lt-toggle" />
-          </tr>
-        </tfoot>
-      </table>
+      <div className="sect-head">
+        <h2>
+          {led.code} · {led.accountName}
+        </h2>
+        <span className="rule" aria-hidden />
+        <span className="count">
+          {count} {count === 1 ? 'LINE' : 'LINES'}
+        </span>
+      </div>
+      <div className="table-frame">
+        <div className="table-frame-scroll">
+          <table className="ledger-table [&_td.num]:whitespace-nowrap">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th className="m-hide">Acc. Desc.</th>
+                <th className="m-hide">Journal Type</th>
+                <th className="m-hide">Ref. 1</th>
+                <th className="m-hide">Dept</th>
+                <th className="m-hide">Desc.</th>
+                <th className="right m-hide">Home DR</th>
+                <th className="right m-hide">Home CR</th>
+                <th className="right">Home Balance</th>
+                <th className="lt-toggle" aria-hidden />
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l, i) =>
+                isBfLine(l) ? (
+                  <LedgerRow key={i} className="gl-open">
+                    <td className="font-mono text-xs whitespace-nowrap">{dayjs(led.from).format('D MMM YYYY')}</td>
+                    <td className="m-hide" data-label="Acc. Desc.">
+                      {led.code} · {led.accountName}
+                    </td>
+                    <td className="m-hide" data-label="Journal Type">—</td>
+                    <td className="m-hide" data-label="Ref. 1">—</td>
+                    <td className="m-hide" data-label="Dept">—</td>
+                    <td className="m-hide" data-label="Desc.">Opening balance</td>
+                    <td className="num m-hide" data-label="Home DR">—</td>
+                    <td className="num m-hide" data-label="Home CR">—</td>
+                    <td className="num">{formatSignedBalance(led.openingBalance)}</td>
+                  </LedgerRow>
+                ) : (
+                  <LedgerRow key={i}>
+                    <td className="font-mono text-xs whitespace-nowrap">{l.entryDate ? dayjs(l.entryDate).format('D MMM YYYY') : '—'}</td>
+                    <td className="text-xs m-hide" data-label="Acc. Desc.">
+                      {l.accountDesc}
+                    </td>
+                    <td className="m-hide" data-label="Journal Type">
+                      {l.journalType ? (
+                        <span className="chip">
+                          <span className="dot" />
+                          {l.journalType}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="font-mono text-xs m-hide" data-label="Ref. 1">
+                      {l.ref}
+                    </td>
+                    <td className="m-hide" data-label="Dept">
+                      {l.segment ? segmentLabel(l.segment) : '—'}
+                    </td>
+                    <td className="m-hide" data-label="Desc.">
+                      {l.description}
+                    </td>
+                    <td className="num m-hide" data-label="Home DR">
+                      {l.debit > 0 ? formatMoneyBare(l.debit) : '—'}
+                    </td>
+                    <td className="num m-hide" data-label="Home CR">
+                      {l.credit > 0 ? formatMoneyBare(l.credit) : '—'}
+                    </td>
+                    <td className="num">{formatSignedBalance(l.runningBalance)}</td>
+                  </LedgerRow>
+                ),
+              )}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>Closing balance</td>
+                <td className="m-hide" colSpan={5} />
+                <td className="num m-hide">{led.periodTotals.debit > 0 ? formatMoneyBare(led.periodTotals.debit) : '—'}</td>
+                <td className="num m-hide">{led.periodTotals.credit > 0 ? formatMoneyBare(led.periodTotals.credit) : '—'}</td>
+                <td className="num">{formatSignedBalance(led.closingBalance)}</td>
+                <td className="lt-toggle" aria-hidden />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
     </section>
   )
 }

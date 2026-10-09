@@ -2,26 +2,23 @@ import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
-import { buildMonthlyCashFlowSides, buildSideMatrixRows } from '@/lib/cash-flow-custom'
-import {
-  fetchInterBillingCashFlow,
-  interBillTransferAccount,
-  payrollCustodyAccount,
-} from '@/lib/inter-billing-cash-flow'
-import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
-import type { MatrixRow } from '@/lib/monthly-matrix'
+import { loadMonthlyCashFlow } from '@/lib/monthly-statements'
 import { segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
 import MonthlyReportControls from '../_components/MonthlyReportControls'
 import { ReportSearchProvider } from '../_components/ReportSearchProvider'
 import ReportViewToggle from '../_components/ReportViewToggle'
+import { reportsCompanyWide } from '@/lib/surfaces'
+import { rangeLabel, reportRange } from '@/lib/report-range'
+import { REPORT_SEGMENTS } from '../_components/report-segments'
+import ReportModeSwitch from '../_components/ReportModeSwitch'
+import MonthlyCashFlowBody from '../_components/MonthlyCashFlowBody'
 
 export const dynamic = 'force-dynamic'
 
 interface Props {
-  searchParams: Promise<{ period?: string; segment?: string }>
+  searchParams: Promise<{ period?: string; segment?: string; from?: string }>
 }
 
 export default async function MonthlyCashFlowPage({ searchParams }: Props) {
@@ -31,7 +28,7 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
   const params = await searchParams
   const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : officeMonth()
   // Dept managers see ONLY their own segment (RLS) — force empty + hide picker.
-  const isDeptMgr = user.role === 'dept_manager'
+  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
   const segment = isDeptMgr ? '' : (params.segment ?? '')
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
@@ -40,40 +37,59 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
   // so the consolidated view must not carry it (same rule as the statement),
   // and there it is not read at all (2026-10-08).
   const consolidated = !isDeptMgr && !segment
+  // The read a department's own page under Dept Pool makes for its segment
+  // too (2026-10-09, lib/monthly-statements): one Cash Flow, two places.
+  const { data, rows } = await loadMonthlyCashFlow(supabase, { year, throughMonth, segment: segmentFilterFor(segment), consolidated })
 
-  // bank GL codes via RPC (dept_managers are RLS-blocked from bank_accounts,
-  // which zeroed their Cash Flow) — codes only, no balances. Shared with the
-  // bridge, which starts beside the journal read instead of after it.
-  const bankCodesRead = Promise.resolve(supabase.rpc('bank_gl_codes' as never)).then(
-    ({ data: banks }) => new Set((banks ?? []) as unknown as string[]),
-  )
-  // Same two layouts the Cash Flow STATEMENT uses — the statement is the
-  // reference, this view just adds month columns (user 2026-07-30: "monthly
-  // cash flow 和 cash flow 显示的是一样,以 cash flow 为准").
-  const [lines, accounts, bankCodes, ib, inSaved, outSaved] = await Promise.all([
-    fetchAllJournalLines(supabase),
-    fetchCoaAccounts(supabase),
-    bankCodesRead,
-    consolidated ? null : fetchInterBillingCashFlow(supabase, bankCodesRead),
-    readReportLayout(supabase, 'cash_flow_in'),
-    readReportLayout(supabase, 'cash_flow_out'),
-  ])
-  const ibLines = ib ? ib.lines : []
+  // Whoever reads the reports company-wide (2026-10-09, the user's Claude
+  // Design handoff): the period From – To, the two views and the exports in
+  // the head, the cards, one control row, the months separated. A department
+  // manager keeps the page below, as it was.
+  if (!isDeptMgr) {
+    const nowYM = officeMonth()
+    const range = reportRange({ from: params.from, period }, nowYM)
+    const segments = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
+    const segName = (segments.find((s) => s.value === segment) ?? segments[0]).label
+    const exportHref = (format: 'xlsx' | 'pdf') => {
+      const qs = new URLSearchParams({ format, period: range.to })
+      if (segment) qs.set('segment', segment)
+      if (!range.wholeYear) qs.set('from', range.from)
+      return `/reports/monthly-cash-flow/export?${qs.toString()}`
+    }
+    return (
+      <div>
+        <div className="page-head">
+          <div className="min-w-0">
+            <div className="page-eyebrow">
+              <em>I.</em> REPORTS · CASH FLOW · {rangeLabel(range.from, range.to).toUpperCase()}
+            </div>
+            <h1 className="page-title">Cash Flow</h1>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <ReportModeSwitch pair="cash-flow" active="monthly" period={range.to} segment={segment || undefined} />
+            <Link href="/reports/cash-flow/layout" className="btn-quiet-sheet">
+              Edit layout
+            </Link>
+            <a href={exportHref('xlsx')} className="btn-quiet-sheet">
+              Excel
+            </a>
+            <a href={exportHref('pdf')} className="btn-quiet-sheet">
+              PDF
+            </a>
+          </div>
+        </div>
 
-  const data = buildMonthlyCashFlowSides([...lines, ...ibLines], [...accounts, interBillTransferAccount, payrollCustodyAccount], bankCodes, {
-    year,
-    throughMonth,
-    segment: segmentFilterFor(segment),
-  })
-
-  const nCols = data.columns.length
-  const rows: MatrixRow[] = [
-    ...buildSideMatrixRows(data.inflow, inSaved as ReportLayout | null, nCols, 'in', '流入合计 · Total money in', data.inflowTotalByCol),
-    ...buildSideMatrixRows(data.outflow, outSaved as ReportLayout | null, nCols, 'out', '流出合计 · Total money out', data.outflowTotalByCol),
-    { key: 'NET_CHANGE', label: 'Net change in cash', depth: 0, kind: 'subtotal', tone: 'auto', emphasis: 'strong', values: data.netChangeByCol },
-    { key: 'OPENING_CASH', label: 'Opening cash', depth: 0, kind: 'subtotal', tone: 'ledger', values: data.openingByCol },
-    { key: 'CLOSING_CASH', label: 'Closing cash', depth: 0, kind: 'subtotal', tone: 'ledger', emphasis: 'strong', values: data.closingByCol },
-  ]
+        <MonthlyCashFlowBody
+          cashFlow={{ data, rows }}
+          range={range}
+          nowYM={nowYM}
+          segmentLabel={segName}
+          segment={segment}
+          segments={segments}
+        />
+      </div>
+    )
+  }
 
   return (
     <div>

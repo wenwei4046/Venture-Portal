@@ -30,6 +30,7 @@ import {
   type ShouldBillRow,
   type BilledRow,
 } from '@/lib/payroll-billing-delta'
+import { canDo } from '@/lib/permission-actions'
 
 // Payer-side inter-billing splits BY NATURE (user 2026-07-24): the paying
 // dept's expense JE debits what the charge actually was — rent share → 9094,
@@ -655,7 +656,7 @@ export async function createContract(formData: FormData) {
 
   // Dept Manager: must be Marketing's manager. Mig 207 RLS also enforces this,
   // but fail fast here with a clean error instead of a generic RLS failure.
-  if (user.role === 'dept_manager' && user.department_id !== mktDept.id) {
+  if (!canDo(user, 'billing', 'create') && user.department_id !== mktDept.id) {
     throw new Error('Only Marketing department manager can create Marketing contracts')
   }
 

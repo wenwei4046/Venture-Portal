@@ -126,9 +126,18 @@ function TabIcon({ name }: { name: TabDef['icon'] | 'more' }) {
 /** A tab's face, inside its <Link> so it can read that link's pending state:
  *  a tapped tab takes the accent and its marker at once, before the page it
  *  opens has committed (2026-09-26). */
-function TabFace({ active, children }: { active: boolean; children: React.ReactNode }) {
+function TabFace({ active, fin, children }: { active: boolean; fin?: boolean; children: React.ReactNode }) {
   const { pending } = useLinkStatus()
   const lit = active || pending
+  // The Finance view (2026-10-09): a peach pill behind the lit tab's icon,
+  // ink lettering — the handoff's tab bar; elsewhere the accent bar.
+  if (fin) {
+    return (
+      <span className={`relative flex flex-col items-center justify-center gap-1 h-[54px] px-1 ${lit ? 'fin-tab-lit' : 'fin-tab'}`}>
+        {children}
+      </span>
+    )
+  }
   return (
     <span
       className={`relative flex flex-col items-center justify-center gap-1 h-[54px] px-1 ${
@@ -148,6 +157,16 @@ function TabFace({ active, children }: { active: boolean; children: React.ReactN
   )
 }
 
+/** The icon in its pill on the Finance view: the pill shows only when lit. */
+function TabGlyph({ name, lit, fin }: { name: TabDef['icon'] | 'more'; lit: boolean; fin?: boolean }) {
+  return (
+    <span className="relative inline-flex items-center justify-center">
+      {fin && lit ? <span className="fin-pill" aria-hidden /> : null}
+      <TabIcon name={name} />
+    </span>
+  )
+}
+
 function tabActive(tab: TabDef, pathname: string): boolean {
   const path = tab.href.split('?')[0]
   const match = tab.exact ? pathname === path : pathname === path || pathname.startsWith(path + '/')
@@ -161,9 +180,11 @@ interface Props {
   viewer: NavViewer
   moreOpen: boolean
   onMoreClick: () => void
+  /** The Finance view (2026-10-09): the handoff's cream bar and peach pill. */
+  fin?: boolean
 }
 
-export default function BottomTabBar({ role, viewer, moreOpen, onMoreClick }: Props) {
+export default function BottomTabBar({ role, viewer, moreOpen, onMoreClick, fin = false }: Props) {
   const pathname = usePathname() ?? ''
   const router = useRouter()
   const tabs = tabsForRole(role)
@@ -203,7 +224,7 @@ export default function BottomTabBar({ role, viewer, moreOpen, onMoreClick }: Pr
 
   return (
     <nav
-      className="md:hidden print:hidden fixed bottom-0 inset-x-0 z-40 bg-chrome border-t border-hairline pb-[env(safe-area-inset-bottom)]"
+      className={`md:hidden print:hidden fixed bottom-0 inset-x-0 z-40 border-t border-hairline pb-[env(safe-area-inset-bottom)] ${fin ? 'fin-tabbar' : 'bg-chrome'}`}
       aria-label="Primary"
     >
       <ul className="flex items-stretch">
@@ -213,9 +234,9 @@ export default function BottomTabBar({ role, viewer, moreOpen, onMoreClick }: Pr
           return (
             <li key={tab.href} className="flex-1 min-w-0">
               <Link href={tab.href} aria-current={active ? 'page' : undefined} className="block">
-                <TabFace active={active}>
+                <TabFace active={active} fin={fin}>
                   <span className="relative">
-                    <TabIcon name={tab.icon} />
+                    <TabGlyph name={tab.icon} lit={active} fin={fin} />
                     {showBadge ? (
                       <span
                         className="absolute -top-1.5 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-danger text-paper font-mono text-[9.5px] leading-[15px] text-center"
@@ -242,16 +263,18 @@ export default function BottomTabBar({ role, viewer, moreOpen, onMoreClick }: Pr
             aria-expanded={moreOpen}
             aria-haspopup="dialog"
             className={`relative w-full flex flex-col items-center justify-center gap-1 h-[54px] px-1 ${
-              moreOpen ? 'text-accent' : 'text-graphite'
+              fin ? (moreOpen ? 'fin-tab-lit' : 'fin-tab') : moreOpen ? 'text-accent' : 'text-graphite'
             }`}
           >
-            <span
-              aria-hidden
-              className={`absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-7 rounded-b-sm transition-opacity ${
-                moreOpen ? 'bg-accent opacity-100' : 'opacity-0'
-              }`}
-            />
-            <TabIcon name="more" />
+            {fin ? null : (
+              <span
+                aria-hidden
+                className={`absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-7 rounded-b-sm transition-opacity ${
+                  moreOpen ? 'bg-accent opacity-100' : 'opacity-0'
+                }`}
+              />
+            )}
+            <TabGlyph name="more" lit={moreOpen} fin={fin} />
             <span className="text-[10px] leading-none tracking-wide">{moreTabLabel(role)}</span>
           </button>
         </li>

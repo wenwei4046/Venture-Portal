@@ -6,8 +6,16 @@ import { requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import FundSourceTabs from './_components/FundSourceTabs'
 import FundSourcesTable from './_components/FundSourcesTable'
+
+// Fund IN on the sheet (2026-10-09, the user's Claude Design handoff — Phase 3
+// of the Finance revamp): five cards — the paid capital, its weighted cost,
+// what is still owed, what matures within 30 days, what awaits the
+// Principal — the status tabs counted, and the sources in a scroll box with
+// their status as chips. A double-click opens a source; a right-click also
+// prints its schedule or amends its terms.
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   subsidiary: 'Subsidiary',
@@ -39,8 +47,10 @@ interface Props {
 
 export default async function FundInPage({ searchParams }: Props) {
   const user = await requirePermission('treasury')
-  // Recording a fund source raises one: Treasury · Create (2026-10-08, PR2).
+  // Recording a fund source raises one: Treasury · Create (2026-10-08, PR2);
+  // amending a booked one is Treasury · Approve.
   const canRaise = canDo(user, 'treasury', 'create')
+  const canAmend = canDo(user, 'treasury', 'approve')
   const supabase = await createClient()
   const { status: statusFilter } = await searchParams
 
@@ -78,17 +88,19 @@ export default async function FundInPage({ searchParams }: Props) {
     )
   )
 
-  // Active sources for hero metrics (always based on active, regardless of tab)
+  // The cards are always about the active sources, whichever tab is open.
   const active = sources.filter((s) => s.status === 'active')
   const totalPaid = active.reduce((sum, s) => sum + Number(s.amount), 0)
   const weightedCost =
     totalPaid > 0
       ? active.reduce((sum, s) => sum + Number(s.amount) * Number(s.cost_rate), 0) / totalPaid
       : 0
+  const outstandingActive = active.reduce((sum, s) => sum + (outstandingMap.get(s.id) ?? Number(s.amount)), 0)
 
+  const today = officeToday()
   const maturingIn30d = active.filter((s) => {
     if (!s.maturity_date) return false
-    const days = dayjs(s.maturity_date).diff(officeToday(), 'day')
+    const days = dayjs(s.maturity_date).diff(today, 'day')
     return days >= 0 && days <= 30
   })
 
@@ -96,8 +108,8 @@ export default async function FundInPage({ searchParams }: Props) {
   const tab = statusFilter ?? 'active'
   const filtered = tab === 'all' ? sources : sources.filter((s) => s.status === tab)
 
-  // Status counts for tab badges
-  const counts = {
+  // Status counts for the tabs
+  const counts: Record<string, number> = {
     pending_approval: sources.filter((s) => s.status === 'pending_approval').length,
     active: sources.filter((s) => s.status === 'active').length,
     matured: sources.filter((s) => s.status === 'matured').length,
@@ -127,6 +139,8 @@ export default async function FundInPage({ searchParams }: Props) {
     return '—'
   }
 
+  const tabWord: Record<string, string> = { pending_approval: 'PENDING', all: 'TOTAL' }
+
   return (
     <div>
       {/* ───────── Header ───────── */}
@@ -137,102 +151,74 @@ export default async function FundInPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Fund IN</h1>
         </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/ba?calc=1"
-            className="bg-surface hover:bg-surface-2 border border-hairline text-graphite hover:text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-          >
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Link href="/ba?calc=1" className="btn-quiet-sheet">
             BA Calculator
           </Link>
-          <Link
-            href="/repayment-schedule"
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-          >
+          <Link href="/repayment-schedule" className="btn-quiet-sheet">
             Repayment Schedule
           </Link>
           {canRaise ? (
-            <Link
-              href="/fund-in/new"
-              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-            >
+            <Link href="/fund-in/new" className="btn-pri-sheet">
               Record new fund source
             </Link>
           ) : null}
         </div>
       </div>
 
-      {/* ───────── Summary hero ───────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
-        <div className="lg:col-span-7 hero-walnut px-6 py-6 md:px-8 md:py-7">
-          <div className="font-serif italic text-accent text-base mb-1">
-            Total paid capital
-          </div>
-          <div className="statement-amount text-num-ink">
-            {totalPaid > 0 ? (
-              <>
-                RM {formatMoney(totalPaid).replace('RM ', '').replace(/\.\d{2}$/, '')}
-                <span className="text-graphite">
-                  {formatMoney(totalPaid).slice(-3)}
-                </span>
-              </>
-            ) : (
-              <>
-                RM <span className="text-muted">—</span>
-              </>
-            )}
-          </div>
-          <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
-            {counts.active} ACTIVE · {counts.matured} MATURED · {counts.repaid} REPAID · {counts.cancelled} CANCELLED
-          </div>
-        </div>
+      {/* ───────── Cards ───────── */}
+      <StatCards label="Fund IN">
+        <StatCard
+          tone="primary"
+          label="Total paid capital"
+          value={formatMoney(totalPaid)}
+          icon="coin"
+          note={`${counts.active} active · ${counts.matured} matured · ${counts.repaid} repaid · ${counts.cancelled} cancelled`}
+        />
+        <StatCard
+          label="Weighted average cost"
+          value={totalPaid > 0 ? `${(weightedCost * 100).toFixed(3)}% /mo` : '—'}
+          icon="percent"
+          note="Active sources"
+        />
+        <StatCard label="Outstanding" value={formatMoney(outstandingActive)} icon="wallet" note="After repayments" />
+        <StatCard
+          tone={maturingIn30d.length > 0 ? 'wait' : 'default'}
+          label="Maturing in 30 days"
+          value={String(maturingIn30d.length)}
+          icon="calendar"
+          note={maturingIn30d.length > 0 ? formatMoney(maturingIn30d.reduce((s, x) => s + Number(x.amount), 0)) : 'None due'}
+        />
+        <StatCard label="Pending approval" value={String(counts.pending_approval)} icon="clock" note="Awaiting Principal" />
+      </StatCards>
 
-        <div className="lg:col-span-5">
-          <div className="font-serif italic text-accent text-base mb-1">
-            Weighted average cost
-          </div>
-          <div className="font-serif text-3xl text-num-ink tabular">
-            {totalPaid > 0 ? (
-              <>
-                {(weightedCost * 100).toFixed(3)}
-                <span className="text-graphite text-xl">% /mo</span>
-              </>
-            ) : (
-              <span className="text-muted">—</span>
-            )}
-          </div>
-          {maturingIn30d.length > 0 ? (
-            <p className="font-serif italic text-alert text-sm mt-4">
-              {maturingIn30d.length} source
-              {maturingIn30d.length === 1 ? '' : 's'} maturing in next 30 days
-            </p>
-          ) : null}
-        </div>
-      </div>
-
-      {/* ───────── Status tabs ───────── */}
+      {/* ───────── Status tabs + the list ───────── */}
       {sources.length === 0 ? (
         <EmptyState canRaise={canRaise} />
       ) : (
         <section>
+          <Suspense fallback={null}>
+            <FundSourceTabs counts={counts} />
+          </Suspense>
+
           <div className="sect-head">
             <h2>Fund sources</h2>
             <span className="rule" aria-hidden />
-            <span className="count">{filtered.length} {tab === 'all' ? 'TOTAL' : tab.toUpperCase()}</span>
+            <span className="count">
+              {filtered.length} {tabWord[tab] ?? tab.toUpperCase()}
+            </span>
           </div>
-
-          <Suspense fallback={null}>
-            <FundSourceTabs />
-          </Suspense>
 
           {filtered.length === 0 ? (
             <div className="border border-hairline rounded-md bg-surface p-8 text-center">
-              <p className="font-serif italic text-muted text-sm">
-                No {tab} fund sources.
-              </p>
+              <p className="font-sans text-muted text-sm">No {tab.replace('_', ' ')} fund sources.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            // The queue's small print and footer (2026-10-09).
+            <div className="fin-queue">
               <FundSourcesTable
+                canSetDefault={canRaise}
+                canAmend={canAmend}
                 rows={filtered.map((source) => ({
                   id: source.id,
                   typeLabel: SOURCE_TYPE_LABELS[source.source_type] ?? source.source_type,
@@ -261,17 +247,12 @@ export default async function FundInPage({ searchParams }: Props) {
 function EmptyState({ canRaise }: { canRaise: boolean }) {
   return (
     <div className="py-16 text-center border border-hairline rounded-md bg-surface">
-      <p className="font-serif italic text-graphite text-lg mb-4">
-        No fund sources yet.
-      </p>
-      <p className="font-serif italic text-muted text-sm mb-6">
+      <p className="font-sans text-graphite text-lg mb-4">No fund sources yet.</p>
+      <p className="font-sans text-muted text-sm mb-6">
         Finance can record the first fund source — subsidiary loan, director loan, or internal pool transfer.
       </p>
       {canRaise ? (
-        <Link
-          href="/fund-in/new"
-          className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-        >
+        <Link href="/fund-in/new" className="btn-pri-sheet">
           Record first fund source
         </Link>
       ) : null}

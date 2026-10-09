@@ -1,5 +1,5 @@
 // Local PostgreSQL regression for the Control panel's dealing rules (2026-10-09,
-// mig 20261009090000). Every CRM migration runs VERBATIM; under test: Organic
+// mig 20261009180000). Every CRM migration runs VERBATIM; under test: Organic
 // Leads, Evenly, By team %, By people (maximum / %), full-time days, the
 // Principal / Director sending and undoing, and who may answer. No live I/O.
 import assert from 'node:assert/strict'
@@ -158,7 +158,7 @@ check(await as('boss', `select notif_read from crm_staff_prefs`), [{ notif_read:
 await as('boss', `select public.crm_read_notifs('{}', true)`)
 check(await as('boss', `select notif_read, notifs_seen_at is not null as seen from crm_staff_prefs`), [{ notif_read: [], seen: true }], 'Mark all read')
 
-// 10. crm_people() hands over each person's title from People (mig 20261009100000).
+// 10. crm_people() hands over each person's title from People (mig 20261009190000).
 const crmPpl = (await as('boss', `select public.crm_people() as p`))[0].p.people
 check(crmPpl.every(p => typeof p.title === 'string' && p.title.length > 0), true, 'every person comes with their People title')
 check(crmPpl.find(p => p.id === S('ann')).title, (await q(`select t.name from titles t join hr_staff_costs s on s.title_id = t.id where s.id = $1`, [S('ann')]))[0].name, 'the title is the one People holds')

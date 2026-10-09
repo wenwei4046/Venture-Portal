@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePayrollPayoutsAction } from '@/lib/auth'
 import { generateAllianceBankCsv } from '@/lib/bank-transfer/alliance-bank'
 import { salaryBankPayees, type SalaryBankLine } from '@/lib/bank-transfer/payroll-voucher-payees'
+import { readPayrollLineAccounts, withLineAccounts } from '@/lib/private-fields'
+import { needsTick, sees } from '@/lib/sensitive'
 
 /** Download the selected generated salary PVs using their recipient snapshots.
  * Approval is the existing system's paid event, so paid PVs remain exportable.
@@ -13,8 +15,13 @@ export async function GET(
   context: { params: Promise<{ period: string }> },
 ) {
   // Every employee's net pay and bank account: HR Costing, or Treasury WITH
-  // Payroll payouts (2026-10-02).
-  await requirePayrollPayoutsAction(['hr_costing', 'export'], ['treasury', 'export'])
+  // Payroll payouts (2026-10-02) — and since 2026-10-09 (PR4, the user's
+  // choice A) a title that ticks Bank accounts: the bank cannot pay ••••, so
+  // without the tick there is no file rather than a masked one.
+  const user = await requirePayrollPayoutsAction(['hr_costing', 'export'], ['treasury', 'export'])
+  if (!sees(user, 'bank')) {
+    return NextResponse.json({ error: needsTick('bank', 'The payroll bank file') }, { status: 403 })
+  }
   const { period } = await context.params
 
   if (!/^\d{4}-\d{2}-01$/.test(period)) {
@@ -48,7 +55,7 @@ export async function GET(
   }
   const supabase = await createClient()
   let query = supabase.from('payroll_voucher_lines').select(`
-    payroll_row_id, employee_name, employee_code, net, salary_component, bank_name, bank_account_no,
+    id, payroll_row_id, employee_name, employee_code, net, salary_component, bank_name,
     payment_vouchers!inner(id, voucher_no, status, payment_date)
   `).eq('period_month', period).eq('scope', 'staff')
     .in('payment_vouchers.status', ['pending_approval', 'approved', 'paid'])
@@ -56,7 +63,11 @@ export async function GET(
   if (voucherIds) query = query.in('voucher_id', voucherIds)
   const { data: rows, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  const lines = (rows ?? []) as unknown as SalaryBankLine[]
+  // The account numbers, through the reader (the line's own column is not
+  // readable since PR4); the caller holds the tick, so they come back whole.
+  const found = (rows ?? []) as unknown as Array<{ id: string }>
+  const accounts = await readPayrollLineAccounts(supabase, user, found.map(line => line.id))
+  const lines = withLineAccounts(found, accounts) as unknown as SalaryBankLine[]
   if (voucherIds && new Set(lines.map(line => line.payment_vouchers.id)).size !== voucherIds.length) {
     return NextResponse.json({ error: 'Selected salary PVs changed or are outside this payroll group' }, { status: 409 })
   }

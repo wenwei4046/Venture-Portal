@@ -4,7 +4,6 @@
 // but the interest is real: Generate invoice bills the borrower (5028) and
 // Generate PV pays HOUZS Century (6001), both through the normal flows.
 
-import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
@@ -147,28 +146,10 @@ export default async function BaPage({
     account_number: string | null
   }>).map(b => ({ id: b.id, label: `${b.bank_name}${b.account_number ? ` — ${b.account_number}` : ''}` }))
 
+  // The head — Invoice Financing, Calculator, Record financing — belongs to
+  // BaView, which holds the form and the calculator (2026-10-09, the handoff).
   return (
     <div>
-      <Link
-        href="/fund-in"
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
-      >
-        ← Fund In
-      </Link>
-      <div className="page-head">
-        <div>
-          <div className="page-eyebrow">
-            <em>I.</em> TREASURY · BANKER&apos;S ACCEPTANCE
-          </div>
-          <h1 className="page-title">Bank BA</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
-            HC&apos;s facility with the bank — the principal never touches HV&apos;s account, but
-            the interest is real: bill the borrower (5028) and pay HC (6001) straight from each
-            row. Bank interest is reference only (HC&apos;s cost).
-          </p>
-        </div>
-      </div>
-
       <BaView
         rows={rows}
         companies={companyOptions}

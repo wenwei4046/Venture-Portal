@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { formatMoney } from '@/lib/utils'
+import { SlidingTabs } from '@/components/motion/SlidingTabs'
+import RepayCalendar, { type CalendarEvent } from './RepayCalendar'
 
 export interface SchedRow {
   key: string
@@ -65,10 +67,12 @@ export interface MinInterestRow {
 }
 
 type Mode = 'all' | 'outstanding'
-// 'scheduled' = the cash actually due this month (feeds the hero totals);
-// 'reference' = compounding 挂账 + no-fixed-term items, which are excluded
-// from the totals — split into their own tab so the main view stays short.
-type Tab = 'scheduled' | 'reference'
+// 2026-10-09 (the Finance revamp, the user's Claude Design handoff): the
+// month as a calendar, then one tab per side — what we collect (Fund OUT) and
+// what we pay (Fund IN) — each with its scheduled installments, its minimum
+// interest, and its compounding and no-fixed-term deals (kept out of the
+// cash totals, as before). The cards sit on the page.
+type Tab = 'cal' | 'collect' | 'pay'
 
 function r2(n: number): number {
   return Math.round(n * 100) / 100
@@ -76,6 +80,9 @@ function r2(n: number): number {
 
 export default function ScheduleView({
   monthLabel,
+  month,
+  today,
+  events,
   collectRows,
   collectMin,
   repayMin,
@@ -92,6 +99,12 @@ export default function ScheduleView({
   repayCompoundTotals,
 }: {
   monthLabel: string
+  /** YYYY-MM — the month on screen. */
+  month: string
+  /** The office's today, YYYY-MM-DD. */
+  today: string
+  /** The month's installments, from each deal's repayment plan. */
+  events: CalendarEvent[]
   collectRows: SchedRow[]
   collectMin: MinInterestRow[]
   repayMin: MinInterestRow[]
@@ -108,166 +121,85 @@ export default function ScheduleView({
   repayCompoundTotals: CompoundTotals
 }) {
   const [mode, setMode] = useState<Mode>('all')
-  const [tab, setTab] = useState<Tab>('scheduled')
+  const [tab, setTab] = useState<Tab>('cal')
 
   const visible = (rows: SchedRow[]) => (mode === 'all' ? rows : rows.filter((r) => !r.done))
-  const sum = (rows: SchedRow[]) => rows.reduce((s, r) => r2(s + r.totalDue), 0)
-
-  const collectVisible = visible(collectRows)
-  const repayVisible = visible(repayRows)
-  const collectTot = sum(collectVisible)
-  const repayTot = sum(repayVisible)
-  const net = r2(collectTot - repayTot)
-
-  const referenceCount =
-    collectCompound.length + collectNoTerm.length + repayCompound.length + repayNoTerm.length
+  const collectCount = collectRows.length + collectMin.length + collectCompound.length + collectNoTerm.length
+  const payCount = repayRows.length + repayMin.length + repayCompound.length + repayNoTerm.length
 
   return (
     <div>
-      {/* Hero totals (reflect the active view). Full-width grid like the
-          /payments hero — a max-w-3xl cap squeezed each column below the
-          rendered width of "RM (277,423.46)" at text-3xl, so the unbreakable
-          number token overflowed and overlapped the neighbouring column.
-          lg breakpoint (not sm): below ~1024px the figures stack instead. */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div>
-          <div className="font-serif italic text-accent text-sm mb-1">To collect · {monthLabel}</div>
-          <div className="statement-amount text-num-ink text-ledger">{formatMoney(collectTot)}</div>
-        </div>
-        <div>
-          <div className="font-serif italic text-accent text-sm mb-1">To repay · {monthLabel}</div>
-          <div className="statement-amount text-num-ink"><span className="neg">{formatMoney(-repayTot)}</span></div>
-        </div>
-        <div>
-          <div className="font-serif italic text-accent text-sm mb-1">Net</div>
-          <div className={`statement-amount ${net >= 0 ? 'text-ledger' : 'text-danger'}`}>
-            {net < 0 ? <span className="neg">{formatMoney(net)}</span> : formatMoney(net)}
-          </div>
-        </div>
-      </div>
+      <SlidingTabs
+        items={[
+          { key: 'cal', label: 'Calendar' },
+          { key: 'collect', label: 'We collect', count: collectCount },
+          { key: 'pay', label: 'We pay', count: payCount },
+        ]}
+        active={tab}
+        onTabChange={(key) => setTab(key as Tab)}
+        variant="control"
+      />
 
-      {/* Tabs — scheduled cash (in the totals) vs reference items (excluded) */}
-      <div className="border-b border-hairline mb-6">
-        <nav className="flex gap-6" aria-label="Schedule tabs">
-          <TabButton
-            label={`Due · ${monthLabel}`}
-            isActive={tab === 'scheduled'}
-            onClick={() => setTab('scheduled')}
-          />
-          <TabButton
-            label={`Compounding & no fixed term (${referenceCount})`}
-            isActive={tab === 'reference'}
-            onClick={() => setTab('reference')}
-          />
-        </nav>
-      </div>
-
-      {tab === 'scheduled' ? (
+      {tab === 'cal' ? (
+        <RepayCalendar month={month} today={today} events={events} />
+      ) : (
         <>
           {/* Toggle — only affects the scheduled tables */}
-          <div className="flex items-center gap-2 mb-8">
-            <span className="font-mono text-xs text-muted mr-1">View:</span>
-            <button
-              type="button"
-              onClick={() => setMode('all')}
-              className={`text-sm px-3 py-1.5 rounded-md border transition-colors ${mode === 'all' ? 'bg-accent text-white border-accent' : 'bg-surface text-graphite border-hairline hover:text-ink'}`}
-            >
-              Full plan (incl. collected &amp; paid)
+          <div className="flex flex-wrap items-center gap-2 mb-6" role="group" aria-label="View">
+            <button type="button" aria-pressed={mode === 'all'} onClick={() => setMode('all')} className={mode === 'all' ? 'btn-pri-sheet' : 'btn-quiet-sheet'}>
+              Full plan (incl. {tab === 'collect' ? 'collected' : 'paid'})
             </button>
-            <button
-              type="button"
-              onClick={() => setMode('outstanding')}
-              className={`text-sm px-3 py-1.5 rounded-md border transition-colors ${mode === 'outstanding' ? 'bg-accent text-white border-accent' : 'bg-surface text-graphite border-hairline hover:text-ink'}`}
-            >
-              Outstanding only (approved drop off)
+            <button type="button" aria-pressed={mode === 'outstanding'} onClick={() => setMode('outstanding')} className={mode === 'outstanding' ? 'btn-pri-sheet' : 'btn-quiet-sheet'}>
+              Outstanding only
             </button>
           </div>
 
-          {/* 最低还息单 — minimum-interest tracking (2026-09-04) */}
-          {collectMin.length > 0 || repayMin.length > 0 ? (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-10">
-              <MinInterestSection
-                title="Minimum interest — to collect"
-                rows={collectMin}
-                paidLabel="Received"
-                monthLabel={monthLabel}
+          {tab === 'collect' ? (
+            <>
+              {collectMin.length > 0 ? (
+                <MinInterestSection title="Minimum interest — to collect" rows={collectMin} paidLabel="Received" monthLabel={monthLabel} />
+              ) : null}
+              <ScheduleSection title="To collect — scheduled loans" rows={visible(collectRows)} tone="credit" monthLabel={monthLabel} />
+              <CompoundSection
+                title="To collect — compounding"
+                note="Principal on these loans is not being collected yet — each month's interest rolls into the balance and compounds. Not counted in the cash to collect. Rolled interest = total interest capitalised so far."
+                rows={collectCompound}
+                totals={collectCompoundTotals}
+                tone="credit"
               />
-              <MinInterestSection
-                title="Minimum interest — to repay"
-                rows={repayMin}
-                paidLabel="Paid"
-                monthLabel={monthLabel}
+              <NoTermSection
+                title="To collect — no fixed term"
+                note="Loans with no agreed rate / tenure / method — excluded from this month's collections. Outstanding principal and monthly interest listed for reference."
+                rows={collectNoTerm}
+                outstanding={collectNoTermOutstanding}
+                interest={collectNoTermInterest}
               />
-            </div>
-          ) : null}
-
-          {/* Side-by-side on wide screens: collect left, repay right */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-10">
-            <ScheduleSection title="To collect — scheduled loans" rows={collectVisible} tone="credit" monthLabel={monthLabel} />
-            <ScheduleSection title="To repay — scheduled fund sources" rows={repayVisible} tone="debit" monthLabel={monthLabel} />
-          </div>
+            </>
+          ) : (
+            <>
+              {repayMin.length > 0 ? (
+                <MinInterestSection title="Minimum interest — to repay" rows={repayMin} paidLabel="Paid" monthLabel={monthLabel} />
+              ) : null}
+              <ScheduleSection title="To repay — scheduled fund sources" rows={visible(repayRows)} tone="debit" monthLabel={monthLabel} />
+              <CompoundSection
+                title="To repay — compounding"
+                note="Principal on these fund sources is not being repaid yet — monthly interest rolls into the balance. Not counted in the cash to repay."
+                rows={repayCompound}
+                totals={repayCompoundTotals}
+                tone="debit"
+              />
+              <NoTermSection
+                title="To repay — no fixed term"
+                note="Fund sources with no agreed tenure and no pending repayment PV — excluded from this month's repayments. To schedule one, edit it in Fund In and set the tenure."
+                rows={repayNoTerm}
+                outstanding={repayNoTermOutstanding}
+                interest={repayNoTermInterest}
+              />
+            </>
+          )}
         </>
-      ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-10">
-          <div>
-            <CompoundSection
-              title="To collect — compounding"
-              note="Principal on these loans is not being collected yet — each month's interest rolls into the balance and compounds. Not counted in the cash to collect on the other tab. Rolled interest = total interest capitalised so far."
-              rows={collectCompound}
-              totals={collectCompoundTotals}
-              tone="credit"
-            />
-            <NoTermSection
-              title="To collect — no fixed term"
-              note="Loans with no agreed rate / tenure / method — excluded from this month's collections. Outstanding principal and monthly interest listed for reference."
-              rows={collectNoTerm}
-              outstanding={collectNoTermOutstanding}
-              interest={collectNoTermInterest}
-            />
-          </div>
-          <div>
-            <CompoundSection
-              title="To repay — compounding"
-              note="Principal on these fund sources is not being repaid yet — monthly interest rolls into the balance. Not counted in the cash to repay on the other tab."
-              rows={repayCompound}
-              totals={repayCompoundTotals}
-              tone="debit"
-            />
-            <NoTermSection
-              title="To repay — no fixed term"
-              note="Fund sources with no agreed tenure and no pending repayment PV — excluded from this month's repayments. To schedule one, edit it in Fund In and set the tenure."
-              rows={repayNoTerm}
-              outstanding={repayNoTermOutstanding}
-              interest={repayNoTermInterest}
-            />
-          </div>
-        </div>
       )}
     </div>
-  )
-}
-
-function TabButton({
-  label,
-  isActive,
-  onClick,
-}: {
-  label: string
-  isActive: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        isActive
-          ? 'pb-3 border-b-2 border-accent font-serif text-accent text-lg font-medium'
-          : 'pb-3 border-b-2 border-transparent font-serif italic text-graphite text-lg hover:text-ink transition-colors'
-      }
-    >
-      {label}
-    </button>
   )
 }
 

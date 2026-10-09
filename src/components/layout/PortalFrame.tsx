@@ -6,6 +6,10 @@ import type { User } from '@/types'
 import { dropSelectionsForPath } from '@/lib/selection-store'
 import { logPageView } from '@/lib/page-view'
 import { isSheetRoute } from '@/lib/sheet-routes'
+import { isFinanceDetailRoute, isFinanceView } from '@/lib/finance-view'
+import { FinViewProvider } from './fin-view'
+import FinSwipeBack from './FinSwipeBack'
+import FinScrollMemory from './FinScrollMemory'
 import { useViewAsSync } from './useViewAsSync'
 import { navRootPaths, type NavData } from './nav-config'
 import Sidebar from './Sidebar'
@@ -45,6 +49,12 @@ export default function PortalFrame({
   // here rather than by each page, so it stays put while one of these pages
   // replaces another and the loading skeleton lands on it too.
   const sheet = isSheetRoute(pathname)
+  // The Finance view (2026-10-09, the user's Claude Design handoff): Finance's
+  // pages as Finance or the Principal sees them take the revamp — the shared
+  // components read it through FinViewProvider, the CSS through `.fin-view`.
+  const fin = isFinanceView(pathname, user.role)
+  const mainRef = useRef<HTMLElement>(null)
+  const surfaceRef = useRef<HTMLDivElement>(null)
 
   // A list's checkbox selection outlives the drill-down into a row's detail
   // page (it lives in lib/selection-store.ts, not in the unmounted list), so
@@ -72,6 +82,7 @@ export default function PortalFrame({
   useViewAsSync(user.role, user.canSwitchView === true)
 
   return (
+    <FinViewProvider value={fin}>
     <div className="flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible">
       <div className="print:hidden contents">
         <Sidebar viewer={user} navData={navData} />
@@ -79,21 +90,24 @@ export default function PortalFrame({
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden print:overflow-visible">
         <div className="print:hidden contents">
-          <TopBar user={user} />
+          <TopBar user={user} fin={fin} />
         </div>
-        <main className="flex-1 overflow-y-auto print:overflow-visible">
+        <main ref={mainRef} className="flex-1 overflow-y-auto print:overflow-visible">
           {/* pb on mobile clears the 54px tab bar + the home-indicator inset,
               so the last row of a ledger is never parked under the chrome.
               `route-surface`: every page (or the skeleton standing in for it)
               inserted here settles in — see "Navigation feedback" in
               docs/DESIGN.md. */}
           <div
+            ref={surfaceRef}
             className={sheet
-              ? 'route-surface sheet-frame page-enter print:p-0'
+              ? `route-surface sheet-frame page-enter print:p-0${fin ? ' fin-view' : ''}`
               : `route-surface ${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto px-4 md:px-8 py-6 md:py-10 pb-[calc(54px+24px+env(safe-area-inset-bottom))] md:pb-10 page-enter print:max-w-none print:p-0 print:pb-0`}
           >
             {sheet ? <div className="sheet-theme sheet">{children}</div> : children}
           </div>
+          {fin ? <FinScrollMemory root={surfaceRef} view={pathname ?? ''} /> : null}
+          {fin && isFinanceDetailRoute(pathname) ? <FinSwipeBack main={mainRef} sheet={surfaceRef} /> : null}
         </main>
       </div>
 
@@ -102,6 +116,7 @@ export default function PortalFrame({
         viewer={user}
         moreOpen={moreOpen}
         onMoreClick={() => setMoreOpen((o) => !o)}
+        fin={fin}
       />
       <MoreSheet
         user={user}
@@ -116,5 +131,6 @@ export default function PortalFrame({
         <RouteFreshener />
       </Suspense>
     </div>
+    </FinViewProvider>
   )
 }

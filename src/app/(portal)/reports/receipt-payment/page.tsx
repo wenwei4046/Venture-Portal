@@ -37,6 +37,10 @@ import ExportLinks from '../_components/ExportLinks'
 import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import ReportViewToggle from '../_components/ReportViewToggle'
+import { reportsCompanyWide } from '@/lib/surfaces'
+import { formatMoney } from '@/lib/utils'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import ReportModeSwitch from '../_components/ReportModeSwitch'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,7 +57,7 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
   const params = await searchParams
   const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : officeMonth()
   const compare = params.compare ?? ''
-  const isDeptMgr = user.role === 'dept_manager'
+  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
   const segment = isDeptMgr ? '' : (params.segment ?? '')
   const consolidated = !isDeptMgr && !segment
   // ── 未收 To collect — the block Cash Flow doesn't have ────────────────────
@@ -162,6 +166,60 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
   }
 
   const periodLabel = dayjs(`${period}-01`).format('MMMM YYYY')
+
+  // Whoever reads the reports company-wide (2026-10-09, the user's Claude
+  // Design handoff): the two views and the exports in the head, the cards,
+  // the controls on one row over the statement. A department manager keeps
+  // the page below, as it was.
+  if (!isDeptMgr) {
+    const segChoices = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
+    const segName = (segChoices.find((s) => s.value === segment) ?? segChoices[0]).label
+    const mon = dayjs(`${period}-01`).format('MMM')
+    return (
+      <div>
+        <div className="page-head">
+          <div className="min-w-0">
+            <div className="page-eyebrow">
+              <em>I.</em> REPORTS · RECEIPT &amp; PAYMENT · {periodLabel.toUpperCase()}
+            </div>
+            <h1 className="page-title">Receipt &amp; Payment</h1>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <ReportModeSwitch pair="receipt-payment" active="single" period={period} segment={segment || undefined} />
+            <ExportLinks variant="sheet" basePath="/reports/receipt-payment/export" period={period} compare={compare} segment={segment} />
+          </div>
+        </div>
+
+        <StatCards label="Receipt and payment">
+          <StatCard label="Receipts" value={formatMoney(cf.inflow.current)} icon="inbox" tone="ledger" note={periodLabel} />
+          <StatCard label="Payments" value={formatMoney(cf.outflow.current)} icon="send" tone="danger" note={periodLabel} />
+          <StatCard label="Net" value={formatMoney(cf.netChange.current)} icon="swap" tone="primary" note="Receipts − payments" />
+        </StatCards>
+
+        <section className="mb-6">
+          <div className="sect-head">
+            <h2>Receipt &amp; payment</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">
+              {segName.toUpperCase()} · {mon.toUpperCase()} {period.slice(0, 4)}
+            </span>
+          </div>
+          {!showAr ? <p className="fin-notice mb-3">Pick a segment to see its invoices still to collect under the statement.</p> : null}
+          <GlReportView
+            basePath="/reports/receipt-payment"
+            period={period}
+            compare={compare}
+            segment={segment}
+            segments={segChoices}
+            blocks={[...blocks, ...arBlocks]}
+            currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}
+            compareLabel={compare ? dayjs(`${compare}-01`).format('MMM YYYY') : ''}
+            controls="row"
+          />
+        </section>
+      </div>
+    )
+  }
 
   return (
     <div>

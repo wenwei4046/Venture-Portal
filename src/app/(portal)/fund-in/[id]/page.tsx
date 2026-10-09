@@ -5,8 +5,9 @@ import { officeMonth, officeTime, officeToday } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney, formatMoneyBare, formatDate } from '@/lib/utils'
+import { formatMoney, formatDate } from '@/lib/utils'
 import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
+import { buildRepaymentPlan } from '@/lib/repayment-plan'
 import { cancelFundSource } from '../actions'
 import { ConfirmButton } from './_components/ConfirmButton'
 import WithdrawButton from './_components/WithdrawButton'
@@ -18,8 +19,21 @@ import { fetchDeptRegistry } from '@/lib/dept-registry'
 import { paymentPoolOptions, registryPoolOptions } from '@/lib/payment-pools'
 import { INTEREST_EXPENSE_ACCOUNT, PENALTY_EXPENSE_ACCOUNT } from '@/lib/repayment-source-rows'
 import TermsTimeline from '@/components/treasury/TermsTimeline'
+import RepaymentScheduleSection from '@/components/treasury/RepaymentScheduleSection'
+import PrintSchedule from '@/components/treasury/PrintSchedule'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import DetailGroups from '@/components/sheet/DetailGroups'
+import ReturnLink from '@/components/layout/ReturnLink'
+import { dealReturn } from '@/lib/deal-return'
 import { allTermsChanges, buildTermsSegments, currentSegment, termsChanged } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isFundSourcePrincipal, paidByMonthByType, principalPaidByMonth, termsForFundSource } from '@/lib/treasury-terms-data'
+
+// A fund source's page (2026-10-09, the user's Claude Design handoff — Phase
+// 3 of the Finance revamp): the lender as the title with its status chip,
+// Print schedule and Amend terms at the head, the cards, the terms in groups,
+// then in the handoff's order — Repayment settings, Notes, Terms over time,
+// the Repayment schedule (it replaces the repayment history; the payments as
+// recorded fold away under it), Record repayment, and the Actions.
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   subsidiary: 'Subsidiary',
@@ -29,13 +43,18 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   outsource: 'Outsource',
 }
 
+const STATUS_TONE: Record<string, string> = { active: 'ledger', pending_approval: 'wait', matured: 'accent', repaid: 'info', cancelled: '' }
+
 interface Props {
   params: Promise<{ id: string }>
+  /** print=1 — the list's Print schedule: the sheet opens straight away. */
+  searchParams?: Promise<{ print?: string; from?: string; month?: string }>
 }
 
-export default async function FundSourceDetailPage({ params }: Props) {
+export default async function FundSourceDetailPage({ params, searchParams }: Props) {
   const user = await requirePermission('treasury')
   const { id } = await params
+  const sp = (await searchParams) ?? {}
 
   const supabase = await createClient()
 
@@ -58,7 +77,8 @@ export default async function FundSourceDetailPage({ params }: Props) {
   // Terms over time (2026-09-21): segments + each 从某月起 change with its 差价.
   const termsHistory = await fetchTermsHistory(supabase, 'fund_source', [source.id])
   const repRows = (repayments ?? []).map((r) => ({ id: source.id, amount: Number(r.amount), payment_date: r.payment_date as string, payment_type: r.payment_type as string }))
-  const termsSegments = buildTermsSegments(termsForFundSource(source, termsHistory.get(source.id) ?? []), principalPaidByMonth(repRows, isFundSourcePrincipal).get(source.id) ?? {})
+  const terms = termsForFundSource(source, termsHistory.get(source.id) ?? [])
+  const termsSegments = buildTermsSegments(terms, principalPaidByMonth(repRows, isFundSourcePrincipal).get(source.id) ?? {})
   const termsChanges = allTermsChanges(termsSegments, { currentYM: officeMonth(), paidByMonth: paidByMonthByType(repRows, isFundSourcePrincipal).get(source.id) ?? {} })
 
   // A filed-but-not-yet-approved cancellation (cancelFundSource files a
@@ -148,6 +168,13 @@ export default async function FundSourceDetailPage({ params }: Props) {
     accountLabel = a ? `${a.code} — ${a.name}` : source.account_code
   }
 
+  // The voucher each repayment came in on — the schedule's "Paid … · PV".
+  const voucherIds = Array.from(new Set((repayments ?? []).map((r) => r.payment_voucher_id).filter((v): v is string => !!v)))
+  const { data: voucherRows } = voucherIds.length
+    ? await supabase.from('payment_vouchers').select('id, voucher_no').in('id', voucherIds)
+    : { data: [] as Array<{ id: string; voucher_no: string | null }> }
+  const voucherNo = new Map(((voucherRows ?? []) as Array<{ id: string; voucher_no: string | null }>).map((v) => [v.id, v.voucher_no]))
+
   const isActive = source.status === 'active'
   const isMatured = source.status === 'matured'
   const isRepaid = source.status === 'repaid'
@@ -160,14 +187,14 @@ export default async function FundSourceDetailPage({ params }: Props) {
   const canVoid = canDo(user, 'treasury', 'void')
   const canAmend = canDo(user, 'treasury', 'approve')
 
+  const today = officeToday()
   const maturityDays = source.maturity_date
-    ? dayjs(source.maturity_date).diff(officeToday(), 'day')
+    ? dayjs(source.maturity_date).diff(today, 'day')
     : null
 
   // Outstanding balance from view (falls back to original amount if no repayments)
   const outstanding = Number(outstandingRow?.outstanding ?? source.amount)
   const totalPrincipalPaid = Number(outstandingRow?.total_principal_paid ?? 0)
-  const totalInterestPaid = Number(outstandingRow?.total_interest_paid ?? 0)
   const totalInterestDue = Number(outstandingRow?.total_interest_due ?? 0)
   const monthlyPayment = Number(outstandingRow?.monthly_payment ?? 0)
 
@@ -179,6 +206,22 @@ export default async function FundSourceDetailPage({ params }: Props) {
     : Number(source.amount) * Number(source.cost_rate)
 
   const repaymentsList = repayments ?? []
+
+  // The Repayment schedule (2026-10-09): the plan by the terms, the money in
+  // set against it oldest first.
+  const plan = buildRepaymentPlan({
+    terms,
+    payments: repaymentsList.map((r) => ({
+      date: String(r.payment_date).slice(0, 10),
+      type: r.payment_type as string,
+      amount: Number(r.amount),
+      ref: r.payment_voucher_id ? voucherNo.get(r.payment_voucher_id) ?? null : null,
+    })),
+    isPrincipal: isFundSourcePrincipal,
+    today,
+    dueDay: source.effective_date ? dayjs(source.effective_date).date() : 1,
+    status: source.status,
+  })
 
   // Record repayment (2026-10-02): the form below files the same voucher
   // Create payment does in loan-repayment mode, so it needs the banks, the
@@ -207,247 +250,221 @@ export default async function FundSourceDetailPage({ params }: Props) {
     ? Math.max(0, Math.min(outstanding, Math.round((monthlyPayment - monthlyInterest) * 100) / 100))
     : 0
 
+  const typeLabel = SOURCE_TYPE_LABELS[source.source_type] ?? source.source_type
+  const rate = `${(Number(source.cost_rate) * 100).toFixed(3)}% /mo`
+  const fromWithCode = source.from_company_id && fromSubLabel ? `${fromLabel} (${fromSubLabel})` : fromLabel
+  const tone = STATUS_TONE[source.status] ?? ''
+  const monthsLeft = isActive && maturityDays !== null ? (maturityDays < 0 ? ` · past by ${Math.abs(maturityDays)}d` : ` · ${maturityDays}d remaining`) : ''
+  const dateLong = (d: string) => dayjs(d).format('D MMM YYYY')
+  // Opened from the Overview or the repayment calendar, it says so and goes back there.
+  const back = dealReturn({ href: '/fund-in', label: 'Fund IN' }, sp)
+
   return (
     <div>
-      {/* ───────── Back link ───────── */}
-      <Link
-        href="/fund-in"
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
-      >
-        ← Back to Fund IN
-      </Link>
+      <div className="mb-3">
+        <ReturnLink href={back.href} className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
+          ← Back to {back.label}
+        </ReturnLink>
+      </div>
 
       {/* ───────── Header ───────── */}
       <div className="page-head">
-        <div>
+        <div className="min-w-0">
           <div className="page-eyebrow">
-            <em>I.</em> TREASURY · {(SOURCE_TYPE_LABELS[source.source_type] ?? source.source_type).toUpperCase()}
+            <em>I.</em> TREASURY · {typeLabel.toUpperCase()}
           </div>
-          <h1 className="page-title">{fromLabel}</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            {fromSubLabel}{fromSubLabel ? ' · ' : ''}Recorded <em>{officeTime(source.created_at).format('D MMMM YYYY')}</em>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="page-title">{fromLabel}</h1>
+            <span className={`chip lg${tone ? ` ${tone}` : ''}`}>
+              <i className="dot" />
+              {String(source.status).replace('_', ' ')}
+            </span>
+          </div>
+          <p className="font-sans text-xs text-graphite mt-2">
+            {fromSubLabel}
+            {fromSubLabel ? ' · ' : ''}Recorded {officeTime(source.created_at).format('D MMMM YYYY')}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {source.status !== 'cancelled' ? (
+            <PrintSchedule
+              autoOpen={sp.print === '1'}
+              kicker={`FUND IN · ${typeLabel.toUpperCase()}`}
+              name={fromLabel}
+              plan={plan}
+              printed={`Printed ${dateLong(today)} · ${(user as { name?: string | null }).name ?? 'Finance'}`}
+              meta={[
+                { label: 'Source', value: fromWithCode },
+                { label: 'Principal', value: formatMoney(Number(source.amount)) },
+                { label: 'Rate', value: rate },
+                { label: 'Installments', value: plan.months ? String(plan.months) : 'No fixed term' },
+                { label: 'First installment', value: plan.firstDue ? dateLong(plan.firstDue) : '—' },
+                { label: 'Installment', value: formatMoney(plan.firstInstallment) },
+                { label: 'Total interest', value: `${formatMoney(plan.totalInterest)}${plan.kind === 'open' ? ' (to date)' : ''}` },
+                { label: 'Paid', value: formatMoney(plan.principalPaid + plan.interestPaid) },
+                { label: 'Outstanding', value: formatMoney(plan.kind === 'open' ? plan.principalOwed : plan.outstandingDue) },
+                { label: 'Principal owed', value: formatMoney(plan.principalOwed) },
+              ]}
+            />
+          ) : null}
           {canAmend && isActive ? (
-            <Link
-              href={`/fund-in/${source.id}/edit`}
-              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-            >
+            <Link href={`/fund-in/${source.id}/edit`} className="btn-quiet-sheet">
               Amend terms
             </Link>
           ) : null}
-          <StatusBadge status={source.status} />
         </div>
       </div>
 
-      {/* ───────── Hero: principal + outstanding ───────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
-        <div className="lg:col-span-4">
-          <div className="font-serif italic text-accent text-base mb-1">
-            Principal
-          </div>
-          <div className="statement-amount text-num-ink">
-            {formatMoney(Number(source.amount))}
-          </div>
-          <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
-            EFFECTIVE {dayjs(source.effective_date).format('D MMMM YYYY').toUpperCase()}
-          </div>
-        </div>
-
-        <div className="lg:col-span-4">
-          <div className="font-serif italic text-accent text-base mb-1">
-            Outstanding
-          </div>
-          <div className="statement-amount text-num-ink">
-            {formatMoney(outstanding)}
-          </div>
-          {totalPrincipalPaid > 0 ? (
-            <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
-              REPAID <span className="text-ledger">{formatMoney(totalPrincipalPaid)}</span> OF {formatMoney(Number(source.amount))}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="lg:col-span-4 space-y-4">
-          <div>
-            <div className="font-serif italic text-accent text-base mb-1">
-              Interest rate
-            </div>
-            <div className="font-serif text-xl text-num-ink tabular">
-              {(Number(source.cost_rate) * 100).toFixed(3)}
-              <span className="text-graphite text-base">% /mo</span>
-            </div>
-            <div className="font-mono text-[11.5px] text-graphite mt-2 tracking-[0.02em] font-medium">
-              MONTHLY INTEREST{' '}
-              <span className="text-num-ink">{formatMoney(monthlyInterest)}</span>
-              {' · '}TOTAL{' '}
-              <span className="text-num-ink">{formatMoney(totalInterestDue)}</span>
-            </div>
-          </div>
-
-          {source.lock_in_months ? (
-            <div>
-              <div className="font-serif italic text-accent text-base mb-1">
-                Monthly payment
-              </div>
-              <div className="statement-amount compact text-num-ink">
-                {formatMoney(monthlyPayment)}
-              </div>
-              <div className="font-mono text-[11.5px] text-graphite mt-2 tracking-[0.02em] font-medium">
-                {source.lock_in_months}M ·{' '}
-                {source.maturity_date
-                  ? `MATURES ${dayjs(source.maturity_date).format('D MMM YYYY').toUpperCase()}`
-                  : 'NO MATURITY'}
-                {isActive && maturityDays !== null ? (
-                  maturityDays < 0
-                    ? ` · PAST BY ${Math.abs(maturityDays)}D`
-                    : ` · ${maturityDays}D REMAINING`
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
-          {source.repayment_date ? (
-            <div>
-              <div className="font-serif italic text-accent text-base mb-1">
-                Expected repayment date (first installment)
-              </div>
-              <div className="font-serif text-xl text-num-ink tabular">
-                {formatDate(source.repayment_date)}
-              </div>
-              {source.lock_in_months ? (
-                <div className="font-mono text-[11.5px] text-graphite mt-2 tracking-[0.02em] font-medium">
-                  EXPECTED FULL REPAYMENT:{' '}
-                  <span className="text-num-ink">
-                    {formatDate(expectedFullRepaymentDate(source.repayment_date, source.lock_in_months))}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      </div>
+      {/* ───────── Cards ───────── */}
+      <StatCards label="Fund source">
+        <StatCard tone="primary" label="Principal" value={formatMoney(Number(source.amount))} icon="coin" note={`Effective ${dateLong(source.effective_date)}`} />
+        <StatCard
+          tone={isRepaid ? 'ledger' : 'default'}
+          label="Outstanding"
+          value={formatMoney(outstanding)}
+          icon="wallet"
+          note={totalPrincipalPaid > 0 ? `Repaid ${formatMoney(totalPrincipalPaid)} of ${formatMoney(Number(source.amount))}` : 'No principal repaid yet'}
+        />
+        <StatCard label="Interest rate" value={rate} icon="percent" note={`Monthly ${formatMoney(monthlyInterest)} · total ${formatMoney(totalInterestDue)}`} />
+        {source.lock_in_months ? (
+          <StatCard
+            tone={isActive && maturityDays !== null && maturityDays <= 30 ? 'alert' : 'default'}
+            label="Monthly payment"
+            value={formatMoney(monthlyPayment)}
+            icon="calendar"
+            note={`${source.lock_in_months}M · ${source.maturity_date ? `matures ${dateLong(source.maturity_date)}` : 'no maturity'}${monthsLeft}`}
+          />
+        ) : null}
+        {source.repayment_date ? (
+          <StatCard
+            label="Expected repayment (first installment)"
+            value={dateLong(source.repayment_date)}
+            icon="clock"
+            note={source.lock_in_months ? `Full repayment: ${formatDate(expectedFullRepaymentDate(source.repayment_date, source.lock_in_months))}` : 'No fixed term'}
+          />
+        ) : null}
+      </StatCards>
 
       {/* ───────── Details ───────── */}
-      <section className="mb-12">
-        <div className="sect-head">
-          <h2>Details</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">TERMS &amp; ROUTING</span>
-        </div>
-        <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5 max-w-4xl">
-          <Detail
-            label="Source type"
-            value={SOURCE_TYPE_LABELS[source.source_type] ?? source.source_type}
-          />
-          <Detail label="From" value={fromLabel} sub={fromSubLabel} />
-          <Detail
-            label="Receive into bank"
-            value={bankLabel ?? 'Primary bank (not specified)'}
-          />
-          <Detail
-            label="Amount due to (BS account)"
-            value={accountLabel ?? '4000 — Fund Sources Payable (default)'}
-          />
-          <Detail
-            label="Interest rate"
-            value={`${(Number(source.cost_rate) * 100).toFixed(3)}% /mo · ${source.compound_interest ? 'compound' : 'simple'}`}
-          />
-          <Detail
-            label="Repayment period"
-            value={source.lock_in_months ? `${source.lock_in_months} months` : 'No fixed term'}
-          />
-          <Detail label="Effective date" value={formatDate(source.effective_date)} />
-          <Detail
-            label="Expected repayment"
-            value={source.repayment_date ? formatDate(source.repayment_date) : '—'}
-          />
-          <Detail
-            label="Maturity date"
-            value={source.maturity_date ? formatDate(source.maturity_date) : '—'}
-          />
-        </dl>
-      </section>
+      <DetailGroups
+        title="Details"
+        count="TERMS & ROUTING"
+        groups={[
+          {
+            title: 'Terms',
+            items: [
+              { label: 'Source type', value: typeLabel, text: true },
+              { label: 'From', value: fromWithCode, text: true },
+              { label: 'Interest rate', value: `${rate} · ${source.compound_interest ? 'compound' : 'simple'}` },
+              { label: 'Repayment period', value: source.lock_in_months ? `${source.lock_in_months} months` : 'No fixed term', text: true },
+            ],
+          },
+          {
+            title: 'Dates',
+            items: [
+              { label: 'Effective date', value: dateLong(source.effective_date) },
+              { label: 'Expected repayment', value: source.repayment_date ? dateLong(source.repayment_date) : '—' },
+              { label: 'Maturity date', value: source.maturity_date ? dateLong(source.maturity_date) : '—' },
+            ],
+          },
+          {
+            title: 'Routing',
+            items: [
+              { label: 'Receive into bank', value: bankLabel ?? 'Primary bank (not specified)', text: true },
+              { label: 'Amount due to (BS account)', value: accountLabel ?? '4000 — Fund Sources Payable (default)', text: true },
+            ],
+          },
+        ]}
+      />
 
-      {/* ───────── Notes ───────── */}
-      {source.notes ? (
-        <section className="mb-12">
-          <div className="sect-head">
-            <h2>Notes</h2>
-            <span className="rule" aria-hidden />
+      {/* ───────── Fully repaid ───────── */}
+      {isRepaid && source.repaid_at ? (
+        <section className="mb-9" aria-label="Fully repaid">
+          <div className="fin-notice ledger">
+            Repaid on {officeTime(source.repaid_at).format('D MMM YYYY')}
+            {repaidByName ? ` by ${repaidByName}` : ''}.
           </div>
-          <p className="font-serif italic text-graphite text-md max-w-3xl whitespace-pre-wrap">
-            {source.notes}
-          </p>
         </section>
       ) : null}
 
-      {/* ───────── Repayment history ───────── */}
-      <section className="mb-12">
+      {/* ───────── Repayment settings ───────── */}
+      <section className="mb-9">
         <div className="sect-head">
-          <h2>Repayment history</h2>
+          <h2>Repayment settings</h2>
           <span className="rule" aria-hidden />
-          <span className="count">{repaymentsList.length} ENTR{repaymentsList.length === 1 ? 'Y' : 'IES'} · PRINCIPAL + INTEREST</span>
+          <span className="count">FINANCE · EDITABLE ANYTIME</span>
         </div>
-
-        {repaymentsList.length === 0 ? (
-          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
-            <p className="font-serif italic text-muted text-sm">
-              No repayments recorded yet.
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto mb-4">
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Type</th>
-                    <th className="right">Amount</th>
-                    <th>Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {repaymentsList.map((r) => (
-                    <tr key={r.id}>
-                      <td className="font-mono text-xs text-ink">
-                        {dayjs(r.payment_date).format('D MMM YYYY')}
-                      </td>
-                      <td className="font-serif italic text-graphite text-sm">
-                        {r.payment_type}
-                      </td>
-                      <td className="num">
-                        {formatMoney(Number(r.amount))}
-                      </td>
-                      <td className="font-serif italic text-muted text-sm truncate max-w-[200px]">
-                        {r.notes ?? '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Totals */}
-            <div className="flex gap-8 text-sm font-mono">
-              <div>
-                <span className="text-muted">Principal paid: </span>
-                <span className="num">{formatMoney(totalPrincipalPaid)}</span>
-              </div>
-              <div>
-                <span className="text-muted">Interest paid: </span>
-                <span className="num">{formatMoney(totalInterestPaid)}</span>
-              </div>
-            </div>
-          </>
-        )}
+        <div className="fin-form">
+          <RepaymentStartEditor
+            sourceId={source.id}
+            current={((source as { repayment_start_month?: string | null }).repayment_start_month ?? null)?.slice(0, 7) ?? null}
+            defaultHint={
+              source.effective_date
+                ? dayjs(`${(source.effective_date as string).slice(0, 7)}-01`).add(1, 'month').format('YYYY-MM')
+                : 'the month after receipt'
+            }
+          />
+          <MinPayInterestToggle sourceId={source.id} current={(source as { min_pay_interest?: boolean }).min_pay_interest === true} />
+        </div>
       </section>
+
+      {/* ───────── Notes ───────── */}
+      <section className="mb-9">
+        <div className="sect-head">
+          <h2>Notes</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">FINANCE · SHOWS ON COMPANY STATEMENT</span>
+        </div>
+        <div className="fin-form">
+          <NotesEditor sourceId={source.id} current={(source.notes as string | null) ?? null} />
+        </div>
+      </section>
+
+      {/* ───────── Terms over time ───────── */}
+      <TermsTimeline kind="fund_source" recordId={source.id} segments={termsSegments} changes={termsChanges} canRevert={canAmend && source.status === 'active'} />
+
+      {/* ───────── Repayment schedule (the payments fold under it) ───────── */}
+      <RepaymentScheduleSection
+        plan={plan}
+        cancelled={source.status === 'cancelled'}
+        recorded={
+          repaymentsList.length > 0
+            ? {
+                count: repaymentsList.length,
+                content: (
+                  <div className="overflow-x-auto">
+                    <table className="ledger-table w-full">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Type</th>
+                          <th className="text-right right">Amount</th>
+                          <th className="m-hide">Voucher</th>
+                          <th className="m-hide">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {repaymentsList.map((r) => (
+                          <tr key={r.id}>
+                            <td className="whitespace-nowrap">{dateLong(r.payment_date)}</td>
+                            <td className="text-graphite">{r.payment_type}</td>
+                            <td className="num">{formatMoney(Number(r.amount))}</td>
+                            <td className="m-hide whitespace-nowrap">{(r.payment_voucher_id && voucherNo.get(r.payment_voucher_id)) || <span className="text-muted">—</span>}</td>
+                            <td className="m-hide text-muted">{r.notes ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ),
+              }
+            : undefined
+        }
+      />
 
       {/* ───────── Record repayment — the same entry a loan has on Fund out ───────── */}
       {canRecordRepayment ? (
-        <section className="mb-12 border-t border-hairline pt-8">
+        <section className="mb-9">
           <div className="sect-head">
             <h2>Record repayment</h2>
             <span className="rule" aria-hidden />
@@ -471,137 +488,65 @@ export default async function FundSourceDetailPage({ params }: Props) {
             activeAccounts={(repayAccounts ?? []).map((a) => a.code as string)}
           />
         </section>
-      ) : (isActive || isMatured) ? (
-        <section className="mb-12 bg-accent-bg border border-accent-border rounded-md p-4 max-w-3xl">
-          <p className="font-serif italic text-accent text-sm">
-            Repayments on this fund source are recorded by Finance and need Principal approval.
-          </p>
-        </section>
       ) : null}
-
-      {/* ───────── Fully repaid audit ───────── */}
-      {isRepaid && source.repaid_at ? (
-        <section className="mb-12 border-l-2 border-ledger pl-4 py-2 max-w-3xl">
-          <h2 className="font-serif italic text-xl text-ink mb-1">Fully repaid</h2>
-          <p className="font-serif text-md text-ink">
-            Repaid on{' '}
-            <em className="font-serif italic text-ledger">
-              {officeTime(source.repaid_at).format('D MMM YYYY')}
-            </em>
-            {repaidByName ? (
-              <> by <em className="font-serif italic text-ledger">{repaidByName}</em></>
-            ) : null}
-            .
-          </p>
-        </section>
-      ) : null}
-
-      <RepaymentStartEditor
-        sourceId={source.id}
-        current={((source as { repayment_start_month?: string | null }).repayment_start_month ?? null)?.slice(0, 7) ?? null}
-        defaultHint={
-          source.effective_date
-            ? dayjs(`${(source.effective_date as string).slice(0, 7)}-01`).add(1, 'month').format('YYYY-MM')
-            : 'the month after receipt'
-        }
-      />
-
-      <MinPayInterestToggle
-        sourceId={source.id}
-        current={(source as { min_pay_interest?: boolean }).min_pay_interest === true}
-      />
-
-      <div className="mt-8">
-        <TermsTimeline kind="fund_source" recordId={source.id} segments={termsSegments} changes={termsChanges} canRevert={canAmend && source.status === 'active'} />
-      </div>
-
-      <NotesEditor sourceId={source.id} current={(source.notes as string | null) ?? null} />
 
       {/* ───────── Actions (Finance only) ───────── */}
       {pendingCancel ? (
         // Cancellation already filed — show it (Finance can't open /approvals).
-        <section className="border-t border-hairline pt-8">
-          <div className="border border-alert/30 bg-alert/5 rounded-md px-4 py-3">
-            <div className="text-sm text-alert font-sans font-medium">
-              ⏳ Cancellation pending Principal approval
-            </div>
-            <p className="text-xs text-muted mt-1 italic font-serif">
-              Requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} on{' '}
-              {officeTime(pendingCancel.created_at).format('D MMM YYYY HH:mm')}. Principal approves it in
-              Approvals; the deposit reverses (bank, Venture Pool, GL) and is marked cancelled.
-            </p>
+        <section className="mb-6">
+          <div className="sect-head">
+            <h2>Actions</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">CANCELLATION PENDING</span>
+          </div>
+          <div className="fin-actions">
+            <span className="note">
+              ⏳ Cancellation pending Principal approval — requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} on{' '}
+              {officeTime(pendingCancel.created_at).format('D MMM YYYY HH:mm')}. The Principal approves it in Approvals; the deposit
+              reverses (bank, Venture Pool, GL) and is marked cancelled.
+            </span>
           </div>
         </section>
       ) : (canFinanceEdit || canVoid) && isPending ? (
-        <section className="border-t border-hairline pt-8">
+        <section className="mb-6">
           <div className="sect-head">
             <h2>Actions</h2>
             <span className="rule" aria-hidden />
             <span className="count">EDITABLE UNTIL PRINCIPAL APPROVES</span>
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="fin-actions">
             {canFinanceEdit ? (
-              <Link
-                href={`/fund-in/${source.id}/edit`}
-                className="text-sm text-accent hover:text-accent-hover font-serif italic border border-hairline px-4 py-2 rounded-md transition-colors inline-block"
-              >
+              <Link href={`/fund-in/${source.id}/edit`} className="btn-sec">
                 Edit fund source
               </Link>
             ) : null}
             {canVoid ? <WithdrawButton id={source.id} /> : null}
+            <span className="note">
+              Fix typos, wrong amount, wrong rate, or wrong dates while the request is still pending. Locks once the Principal approves.
+              Submitted the whole thing by mistake? Withdraw it directly — no Principal needed.
+            </span>
           </div>
-          <p className="text-xs text-muted mt-2 italic font-serif">
-            Fix typos, wrong amount, wrong rate, or wrong dates while the request is still pending. Locks once Principal approves.
-            Submitted the whole thing by mistake? Withdraw it directly — no Principal needed.
-          </p>
         </section>
       ) : canVoid && isActive ? (
-        <section className="border-t border-hairline pt-8">
+        <section className="mb-6">
           <div className="sect-head">
             <h2>Actions</h2>
             <span className="rule" aria-hidden />
             <span className="count">CANCELLATION NEEDS PRINCIPAL APPROVAL</span>
           </div>
-          <ConfirmButton
-            id={source.id}
-            action={cancelFundSource}
-            confirmMessage={`Cancel this fund source?\n\nThis will submit a cancellation request for Principal approval. The fund source remains active until approved.`}
-            className="text-sm text-muted hover:text-danger font-sans transition-colors border border-hairline px-4 py-2 rounded-md"
-          >
-            Request cancellation
-          </ConfirmButton>
+          <div className="fin-actions">
+            <ConfirmButton
+              id={source.id}
+              action={cancelFundSource}
+              confirmMessage={`Cancel this fund source?\n\nThis will submit a cancellation request for Principal approval. The fund source remains active until approved.`}
+              className="btn-danger"
+            >
+              Request cancellation
+            </ConfirmButton>
+            <span className="note">Submits a cancellation request for Principal approval. The fund source remains active until approved.</span>
+          </div>
         </section>
       ) : null}
     </div>
   )
-}
-
-function Detail({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div>
-      <dt className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted mb-1">
-        {label}
-      </dt>
-      <dd className="font-serif text-md text-ink">
-        {value}
-        {sub ? <span className="font-mono text-[11px] text-graphite ml-2">{sub}</span> : null}
-      </dd>
-    </div>
-  )
-}
-
-function StatusBadge({ status }: { status: string }) {
-  if (status === 'pending_approval') {
-    return <span className="status-morph font-serif italic text-alert text-md">pending approval</span>
-  }
-  if (status === 'active') {
-    return <span className="status-morph font-serif italic text-graphite text-md">active</span>
-  }
-  if (status === 'matured') {
-    return <span className="status-morph font-serif italic text-alert text-md">matured</span>
-  }
-  if (status === 'repaid') {
-    return <span className="status-morph font-serif italic text-ledger text-md">repaid</span>
-  }
-  return <span className="status-morph font-serif italic text-muted text-md">cancelled</span>
 }

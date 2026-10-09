@@ -8,7 +8,8 @@ import { can, type Permission } from '@/lib/permissions'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { actionsFromJson, actionsFromKeys, canDo, type FunctionKey } from '@/lib/permission-actions'
 import { approvableTypes, canSeeApprovals } from '@/lib/approval-domains'
-import type { Action, Scope } from '@/lib/permission-matrix'
+import { isSensitiveField, type Action, type Scope } from '@/lib/permission-matrix'
+import { sensitiveFromKeys } from '@/lib/sensitive'
 
 // Per-request dedup. Middleware, layout, and Server Actions all converge
 // on getUser(); wrapping with React.cache() collapses the Supabase calls
@@ -40,7 +41,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   // only in the member app (lib/view-as.ts, 2026-09-27).
   const viewAs = honouredViewAs((await cookies()).get(VIEW_AS_COOKIE)?.value, surface)
 
-  const [{ data }, { data: perms }, { data: acts }, masked] = await Promise.all([
+  const [{ data }, { data: perms }, { data: acts }, { data: fields }, masked] = await Promise.all([
     supabase.from('users').select('*').eq('id', authUserId).single(),
     // Resolved in the database because that is where the answer lives: an
     // explicit per-person row, then the holder's title, then their role's
@@ -51,6 +52,9 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
     // or their keys as actions — lib/permission-actions.ts. postdates
     // database.types.ts.
     (supabase as unknown as { rpc: (fn: string) => PromiseLike<{ data: unknown }> }).rpc('current_actions'),
+    // Which of salary amounts, NRIC / IC and bank accounts they may see
+    // (2026-10-09, PR4) — the same answer the database's readers give.
+    (supabase as unknown as { rpc: (fn: string) => PromiseLike<{ data: unknown }> }).rpc('current_sensitive_fields'),
     viewAs
       ? supabase.from('role_default_permissions').select('permission_key').eq('role', viewAs)
       : null,
@@ -59,7 +63,12 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   const row = data as (Omit<User, 'permissions'> | null)
   if (!row || !row.is_active) return null
 
-  const user: User = { ...row, permissions: (perms as string[] | null) ?? [], actions: actionsFromJson(acts) }
+  const user: User = {
+    ...row,
+    permissions: (perms as string[] | null) ?? [],
+    actions: actionsFromJson(acts),
+    sensitive: (Array.isArray(fields) ? fields : []).filter(isSensitiveField),
+  }
   // Switching views is its own permission since 2026-10-08: Ultimate full
   // access has it, Full access is everything else without it. Read off the
   // REAL account's keys — a masked session keeps it, so it can switch back.
@@ -74,6 +83,9 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
       canSwitchView,
       permissions: maskedKeys,
       actions: actionsFromKeys(maskedKeys, viewAs),
+      // The page masks as the viewed role would see it; the database still
+      // answers for the real account, so lib/private-fields.ts masks again.
+      sensitive: sensitiveFromKeys(maskedKeys, viewAs),
     }
   }
 

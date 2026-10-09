@@ -55,7 +55,7 @@ export default async function MemberPreview({
 }) {
   if (process.env.NODE_ENV !== "development") {
     const user = await getUser();
-    if (!user || !["principal", "hr"].includes(user.role)) notFound();
+    if (!user || !user.permissions.includes("member_requests_manage")) notFound();
   }
   const params = await searchParams;
   // The rebuilt app on the prototype's own content, drawn in the prototype's

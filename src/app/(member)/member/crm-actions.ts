@@ -119,11 +119,11 @@ export async function sendCrmReply(contactId: string, text: string): Promise<{ o
 const CRM_WRITES = [
   "crm_mark_read", "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state",
   "crm_assign_member", "crm_send_to_team", "crm_save_team_settings", "crm_save_team_shares", "crm_save_ad_rule", "crm_set_full_time", "crm_save_showroom", "crm_give_to_hod",
-  // The redesign (mig 20261009070000).
+  // The redesign (mig 20261009160000).
   "crm_visit_outcome", "crm_save_details", "crm_set_pref", "crm_hide_message", "crm_save_labels", "crm_set_label",
   "crm_save_quick_replies", "crm_save_auto_replies", "crm_seen_notifications", "crm_invite", "crm_answer_invite",
   "crm_save_showroom_full", "crm_slot_counts", "crm_mark_reminded",
-  // The Control panel (mig 20261009090000).
+  // The Control panel (mig 20261009180000).
   "crm_send_to", "crm_save_ad_assign", "crm_save_fulltime", "crm_read_notifs",
 ] as const;
 export type CrmWrite = (typeof CRM_WRITES)[number];

@@ -14,10 +14,12 @@ import { fetchAllRows } from '@/lib/paginate'
 import UploadStatementForm from './_components/UploadStatementForm'
 import SessionRowActions from './_components/SessionRowActions'
 import LedgerRow from '@/components/LedgerRow'
+import { formatMoneyBare } from '@/lib/utils'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ReconciliationPage() {
+export default async function ReconciliationPage({ searchParams }: { searchParams: Promise<{ upload?: string }> }) {
   await requirePermission('reconciliation')
   const supabase = (await createClient()) as unknown as SupabaseClient
 
@@ -72,150 +74,145 @@ export default async function ReconciliationPage() {
     countsBySession.set(l.session_id, c)
   }
 
+  // On the sheet (2026-10-09, the user's Claude Design handoff): Upload
+  // statement in the head opens the form under the cards; each bank against
+  // the GL is a card; the sessions read their status as chips.
+  const { upload } = await searchParams
+  const showUpload = upload === '1'
+  const sessionList = (sessions ?? []) as Array<{
+    id: string
+    bank_account_id: string
+    period_month: string
+    source_filename: string | null
+    status: string
+  }>
+
   return (
     <div>
       <div className="page-head">
-        <div>
+        <div className="min-w-0">
           <div className="page-eyebrow">
             <em>I.</em> TREASURY · BANK RECONCILIATION
           </div>
           <h1 className="page-title">Bank Reconciliation</h1>
         </div>
-        <Link
-          href="/reconciliation/journal"
-          className="text-sm text-accent hover:text-accent-hover font-serif italic"
-        >
-          General Ledger →
-        </Link>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Link href="/reconciliation/journal" className="btn-quiet-sheet">
+            General Ledger
+          </Link>
+          <Link href={showUpload ? '/reconciliation' : '/reconciliation?upload=1'} className={showUpload ? 'btn-quiet-sheet' : 'btn-pri-sheet'}>
+            {showUpload ? 'Close upload' : 'Upload statement'}
+          </Link>
+        </div>
       </div>
 
-      {/* ── Bank vs GL comparison ── */}
-      <section className="mb-12">
-        <h2 className="font-serif text-2xl text-ink mb-3">Bank vs GL Balance</h2>
-        <div className="overflow-x-auto">
-          <table className="ledger-table">
-            <thead>
-              <tr>
-                <th>Bank</th>
-                <th className="m-hide">Account</th>
-                <th className="num m-hide">Cache balance</th>
-                <th className="num m-hide">GL balance</th>
-                <th className="num">Difference</th>
-                <th className="lt-toggle" aria-hidden />
-              </tr>
-            </thead>
-            <tbody>
-              {banks.map(b => {
-                const gl = b.gl_account_code ? (glMap.get(b.gl_account_code) ?? 0) : 0
-                const diff = Math.round((Number(b.current_balance) - gl) * 100) / 100
-                return (
-                  <LedgerRow key={b.id}>
-                    <td className="font-serif text-[15px] text-ink">{b.bank_name}</td>
-                    <td className="font-mono text-[12px] text-graphite m-hide" data-label="Account">{b.account_number ?? '—'}</td>
-                    <td className="num m-hide" data-label="Cache balance">{formatMoney(Number(b.current_balance))}</td>
-                    <td className="num m-hide" data-label="GL balance">{formatMoney(gl)}</td>
-                    <td className={`num font-semibold ${diff === 0 ? 'text-ledger' : 'text-danger'}`}>
-                      {diff === 0 ? '✓ 0.00' : formatMoney(diff)}
-                    </td>
-                  </LedgerRow>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <StatCards label="Bank against the general ledger">
+        {banks.map((b) => {
+          const gl = b.gl_account_code ? (glMap.get(b.gl_account_code) ?? 0) : 0
+          const diff = Math.round((Number(b.current_balance) - gl) * 100) / 100
+          return (
+            <StatCard
+              key={b.id}
+              label={`${b.bank_name} · bank vs GL`}
+              value={diff === 0 ? '✓ Ties to GL' : formatMoney(diff)}
+              icon="bank"
+              tone={diff === 0 ? 'ledger' : 'danger'}
+              title={b.account_number ?? undefined}
+              note={`Cache ${formatMoneyBare(Number(b.current_balance))} · GL ${formatMoneyBare(gl)}`}
+            />
+          )
+        })}
+      </StatCards>
 
-      {/* ── Upload statement ── */}
-      <section className="mb-12">
-        <h2 className="font-serif text-2xl text-ink mb-1">Upload statement</h2>
-        <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
-          Excel / CSV from online banking works now; auto-matching pairs by amount first,
-          then payee/description, date last. Whatever can&apos;t be paired waits for you on the
-          review page. PDF needs your bank&apos;s layout — send a sample statement to Claude and
-          it will be added.
-        </p>
-        <UploadStatementForm
-          banks={banks.map(b => ({ id: b.id, label: `${b.bank_name}${b.account_number ? ` — ${b.account_number}` : ''}` }))}
-          defaultMonth={officeTime().subtract(1, 'month').format('YYYY-MM')}
-        />
-      </section>
+      {showUpload ? (
+        <section className="mb-10">
+          <div className="sect-head">
+            <h2>Upload statement</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">EXCEL / CSV</span>
+          </div>
+          <p className="text-xs text-graphite mb-3 max-w-3xl">
+            Excel / CSV from online banking. Auto-matching pairs by amount first, then payee / description, date last; whatever
+            cannot be paired waits on the review page. A PDF needs your bank&apos;s layout first.
+          </p>
+          <div>
+            <UploadStatementForm
+              banks={banks.map((b) => ({ id: b.id, label: `${b.bank_name}${b.account_number ? ` — ${b.account_number}` : ''}` }))}
+              defaultMonth={officeTime().subtract(1, 'month').format('YYYY-MM')}
+            />
+          </div>
+        </section>
+      ) : null}
 
       {/* ── Saved monthly reconciliations ── */}
-      <section className="mb-12">
-        <h2 className="font-serif text-2xl text-ink mb-3">Monthly reconciliations</h2>
-        {(sessions ?? []).length === 0 ? (
-          <div className="border border-hairline rounded-md bg-surface p-8 text-center">
-            <p className="font-serif italic text-muted text-base">
-              No reconciliations yet — upload a statement above.
-            </p>
+      <section className="mb-10">
+        <div className="sect-head">
+          <h2>Monthly reconciliations</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">
+            {sessionList.length} {sessionList.length === 1 ? 'SESSION' : 'SESSIONS'}
+          </span>
+        </div>
+        {sessionList.length === 0 ? (
+          <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+            <p className="text-sm">No reconciliations yet — upload a statement.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th>Bank</th>
-                  <th>Month</th>
-                  <th className="m-hide">File</th>
-                  <th className="num m-hide">Cleared</th>
-                  <th className="num">Open items</th>
-                  <th className="m-hide">Status</th>
-                  <th className="right m-hide">Actions</th>
-                  <th className="lt-toggle" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {((sessions ?? []) as Array<{
-                  id: string
-                  bank_account_id: string
-                  period_month: string
-                  source_filename: string | null
-                  status: string
-                }>).map(s => {
-                  const c = countsBySession.get(s.id) ?? { total: 0, cleared: 0 }
-                  const open = c.total - c.cleared
-                  return (
-                    <LedgerRow key={s.id}>
-                      <td className="font-serif text-[15px] text-ink">
-                        {bankById.get(s.bank_account_id)?.bank_name ?? '—'}
-                      </td>
-                      <td className="font-mono text-[12px] text-graphite">
-                        {dayjs(s.period_month).format('MMM YYYY')}
-                      </td>
-                      <td className="font-mono text-[11px] text-muted max-w-[200px] truncate m-hide" data-label="File">
-                        {s.source_filename ?? '—'}
-                      </td>
-                      <td className="num m-hide" data-label="Matched">
-                        {c.cleared} / {c.total}
-                      </td>
-                      <td className={`num font-semibold ${open === 0 ? 'text-ledger' : 'text-alert'}`}>
-                        {open === 0 ? '✓ 0' : open}
-                      </td>
-                      <td className="m-hide" data-label="Status">
-                        <em className={`font-serif text-sm ${s.status === 'done' ? 'text-ledger' : 'text-alert'}`}>
-                          {s.status}
-                        </em>
-                      </td>
-                      <td className="text-right m-hide">
-                        <Link
-                          href={`/reconciliation/${s.id}`}
-                          className="text-sm text-accent hover:text-accent-hover font-serif italic mr-3"
-                        >
-                          Open →
-                        </Link>
-                        <Link
-                          href={`/reconciliation/${s.id}/report`}
-                          className="text-sm text-accent hover:text-accent-hover font-serif italic mr-3"
-                        >
-                          Report
-                        </Link>
-                        <SessionRowActions sessionId={s.id} status={s.status as 'open' | 'done'} />
-                      </td>
-                    </LedgerRow>
-                  )
-                })}
-              </tbody>
-            </table>
+          <div className="table-frame">
+            <div className="table-frame-scroll">
+              <table className="ledger-table [&_td.num]:whitespace-nowrap">
+                <thead>
+                  <tr>
+                    <th>Bank</th>
+                    <th>Month</th>
+                    <th className="m-hide">File</th>
+                    <th className="right m-hide">Cleared</th>
+                    <th className="right">Open items</th>
+                    <th className="m-hide">Status</th>
+                    <th className="right m-hide">Actions</th>
+                    <th className="lt-toggle" aria-hidden />
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessionList.map((s) => {
+                    const c = countsBySession.get(s.id) ?? { total: 0, cleared: 0 }
+                    const open = c.total - c.cleared
+                    return (
+                      <LedgerRow key={s.id}>
+                        <td className="font-medium">{bankById.get(s.bank_account_id)?.bank_name ?? '—'}</td>
+                        <td className="whitespace-nowrap">{dayjs(s.period_month).format('MMM YYYY')}</td>
+                        <td className="font-mono text-[11.5px] max-w-[220px] truncate m-hide" data-label="File">
+                          {s.source_filename ?? '—'}
+                        </td>
+                        <td className="num m-hide" data-label="Cleared">
+                          {c.cleared} / {c.total}
+                        </td>
+                        <td className="num">
+                          <span className={open === 0 ? 'text-ledger' : 'text-alert'}>{open === 0 ? '✓ 0' : open}</span>
+                        </td>
+                        <td className="m-hide" data-label="Status">
+                          <span className={`chip ${s.status === 'done' ? 'ledger' : 'alert'}`}>
+                            <span className="dot" />
+                            {s.status}
+                          </span>
+                        </td>
+                        <td className="m-hide" data-label="Actions">
+                          <div className="flex items-center justify-end gap-2">
+                            <Link href={`/reconciliation/${s.id}`} className={s.status === 'open' ? 'btn-pri-sheet' : 'btn-quiet-sheet'}>
+                              {s.status === 'open' ? 'Continue' : 'Open'}
+                            </Link>
+                            <Link href={`/reconciliation/${s.id}/report`} className="btn-quiet-sheet">
+                              Report
+                            </Link>
+                            <SessionRowActions sessionId={s.id} status={s.status as 'open' | 'done'} />
+                          </div>
+                        </td>
+                      </LedgerRow>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </section>

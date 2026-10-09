@@ -4,6 +4,7 @@ import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
 import JvList, { type JvRow } from './_components/JvList'
+import ReturnLink from '@/components/layout/ReturnLink'
 
 export default async function JournalEntriesPage() {
   const user = await requirePermission('reconciliation')
@@ -69,28 +70,22 @@ export default async function JournalEntriesPage() {
 
   return (
     <div>
-      <Link
-        href="/reconciliation"
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
-      >
-        ← Back to Reconciliation
-      </Link>
+      <div className="mb-3">
+        <ReturnLink href="/reconciliation" className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
+          ← Back to Reconciliation
+        </ReturnLink>
+      </div>
       <div className="page-head">
-        <div>
+        <div className="min-w-0">
           <div className="page-eyebrow">
             <em>I.</em> TREASURY · MANUAL VOUCHERS
           </div>
           <h1 className="page-title">Journal Entries</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Manual journal vouchers. <em>Debits must equal credits.</em>
-          </p>
+          <p className="page-sub">Manual journal vouchers. Debits must equal credits.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {canCreate ? (
-            <Link
-              href="/reconciliation/journal-entries/new"
-              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-            >
+            <Link href="/reconciliation/journal-entries/new" className="btn-pri-sheet">
               + New Entry
             </Link>
           ) : null}
@@ -98,8 +93,8 @@ export default async function JournalEntriesPage() {
       </div>
 
       {entryList.length === 0 ? (
-        <div className="border border-hairline rounded-md bg-surface p-8 text-center">
-          <p className="font-serif italic text-graphite text-lg mb-1">
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-sm font-medium mb-1">
             No manual vouchers yet.
           </p>
           <p className="font-sans text-sm text-muted">

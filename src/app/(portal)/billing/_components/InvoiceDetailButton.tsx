@@ -107,7 +107,8 @@ export default function InvoiceDetailButton({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="font-mono text-xs text-graphite hover:text-accent transition-colors underline-offset-2 hover:underline cursor-pointer"
+          // The number in the body face (2026-10-09, the handoff).
+          className="font-sans text-[12px] font-medium text-ink hover:text-accent transition-colors underline-offset-2 hover:underline cursor-pointer"
         >
           {label}
         </button>

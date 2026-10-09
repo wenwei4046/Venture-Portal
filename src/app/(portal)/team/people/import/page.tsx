@@ -1,9 +1,13 @@
 import Link from 'next/link'
 import { requireAction } from '@/lib/auth'
+import { sees } from '@/lib/sensitive'
 import ImportStaffWizard from './_components/ImportStaffWizard'
 
 export default async function ImportStaffPage() {
-  await requireAction('team', 'create')
+  const viewer = await requireAction('team', 'create')
+  // The file carries NRICs, account numbers and pay, and the import writes
+  // them as they are (2026-10-09, PR4): all three ticks, or no import.
+  const allowed = sees(viewer, 'nric') && sees(viewer, 'bank') && sees(viewer, 'salary')
 
   return (
     <div>
@@ -23,7 +27,14 @@ export default async function ImportStaffPage() {
         </div>
       </div>
 
-      <ImportStaffWizard />
+      {allowed ? (
+        <ImportStaffWizard />
+      ) : (
+        <p className="sheet-warning mt-0">
+          The InfoTech file carries every person&rsquo;s NRIC, bank account and pay, and the import writes them as they
+          are — it needs Salary amounts, NRIC / IC and Bank accounts all ticked for your title.
+        </p>
+      )}
     </div>
   )
 }

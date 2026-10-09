@@ -6,6 +6,8 @@ import { requireAction, requirePermission } from '@/lib/auth'
 import type { InfotechStaffRow } from '@/lib/import/infotech-staff'
 import { buildStaffMatcher } from '@/lib/import/staff-match'
 import { bankNameFromCode } from '@/lib/banks'
+import { readStaffPrivate } from '@/lib/private-fields'
+import { sees } from '@/lib/sensitive'
 
 /**
  * InfoTech department code → portal department name.
@@ -71,21 +73,34 @@ export interface StaffPreviewResult {
 export async function previewInfotechStaffImport(
   rows: InfotechStaffRow[],
 ): Promise<StaffPreviewResult> {
-  await requirePermission('team')
+  const viewer = await requirePermission('team')
+  // The file's NRICs, account numbers and pay are compared and written as
+  // they are (2026-10-09, PR4): all three ticks, or no import — the import
+  // page says so before anybody gets here.
+  if (!sees(viewer, 'nric') || !sees(viewer, 'bank') || !sees(viewer, 'salary')) {
+    throw new Error('The InfoTech import needs Salary amounts, NRIC / IC and Bank accounts ticked for your title.')
+  }
   const supabase = await createClient()
 
-  const [{ data: existing }, { data: departments }] = await Promise.all([
+  const [{ data: rows0 }, { data: departments }, privateFields] = await Promise.all([
     // Everybody, whatever their status and whether or not they carry a
     // number yet: a name is the fallback key, and somebody who left may be
     // back on the list.
     supabase
       .from('hr_staff_costs')
-      .select('id, infotech_code, employee_name, department_id, designation, basic_salary, hire_date, nric, bank_name, bank_account_no'),
+      .select('id, infotech_code, employee_name, department_id, designation, basic_salary, hire_date, bank_name'),
     // is_internal=false — the 'Venture Office' pseudo-dept is not a staff dept.
     supabase.from('departments').select('id, name').eq('is_internal', false),
+    // Their NRIC and account number, through the reader — the table no longer
+    // hands them out.
+    readStaffPrivate(supabase, viewer, null),
   ])
+  const existing = (rows0 ?? []).map(r => {
+    const priv = privateFields.get(r.id)
+    return { ...r, nric: priv?.nric ?? null, bank_account_no: priv?.bank_account_no ?? null }
+  })
 
-  const match = buildStaffMatcher(existing ?? [])
+  const match = buildStaffMatcher(existing)
   const deptByName = new Map(
     (departments ?? []).map(d => [d.name.toLowerCase(), d.id]),
   )

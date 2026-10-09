@@ -1,11 +1,14 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { officeTime } from '@/lib/office-time'
+import { officeTime, officeToday } from '@/lib/office-time'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { resolveLiveApprovalAmounts, type ApprovalAmountRow } from '@/lib/approval-amounts'
 import { startRead } from '@/lib/start-read'
+import { decidesEverything, overviewFor, raisesForSignOff } from '@/lib/surfaces'
+import { canDo } from '@/lib/permission-actions'
+import { bookWindow, loadRepaymentBook, type BookDeal, type BookEntry } from '@/lib/repayment-book'
 import { fetchAllRows } from '@/lib/paginate'
 import { fetchDeptInvoiceSettlements } from '@/lib/dept-receipt-payment'
 import LedgerRow from '@/components/LedgerRow'
@@ -136,16 +139,20 @@ export default async function DashboardPage() {
   const user = await requireAuth()
   const supabase = await createClient()
 
-  // HR / Dept Manager dashboards branch on the APP-LAYER role (user.role) so
-  // the Principal's view-as mask is honoured — dashboard_summary()'s own gate
-  // keys off current_user_role(), the real DB role, so a masked Principal
-  // would otherwise always land on the treasury dashboard.
-  const roleDashboard = user.role === 'hr' || user.role === 'dept_manager'
+  // Which Overview, read off the viewer's own cells (2026-10-09, Q7 — it was
+  // the account's kind, so a Director's title holding Treasury · View drew
+  // the "Principal and Finance only" well): treasury for whoever reads the
+  // treasury, HR's for whoever reads payroll, a department's for whoever reads
+  // their own department's pool (lib/surfaces.ts). App-layer, so the
+  // Principal's view-as mask is honoured — the masked account's actions.
+  const overview = overviewFor(user)
+  const roleDashboard = overview !== 'treasury'
 
-  // App-layer role, not summary.role: a Principal masked as Finance must get
-  // the Finance dashboard (the RPC reports the real DB role).
-  const isPrincipal = user.role === 'principal'
-  const isFinance = user.role === 'finance'
+  // Inside the treasury Overview: the sign-off queue for whoever approves
+  // everything, Finance's own queues for whoever raises what somebody else
+  // signs off.
+  const isPrincipal = decidesEverything(user)
+  const isFinance = raisesForSignOff(user)
 
   // ── The treasury dashboard's reads, started together (2026-10-08) ──────
   // The bank accounts and Finance's two queues need nothing from
@@ -164,6 +171,12 @@ export default async function DashboardPage() {
           .eq('status', 'active')
           .order('is_primary', { ascending: false }),
       )
+  // Every live deal's repayment plan (2026-10-09, the handoff's "Overdue
+  // instalments" and "Coming up"), asked beside the summary. A read that fails
+  // leaves those two sections empty rather than the Overview down.
+  const bookRead = roleDashboard
+    ? null
+    : startRead(loadRepaymentBook(supabase, officeToday()).catch((): BookDeal[] => []))
   // An approval queue and the live amount of each of its rows — read through
   // to the target row (lib/approval-amounts.ts).
   const withLiveAmounts = <R extends ApprovalAmountRow>(queue: PromiseLike<{ data: R[] | null }>) =>
@@ -228,9 +241,7 @@ export default async function DashboardPage() {
   // The RPC also returns { error: 'Access denied' } for a real HR/dept_manager
   // session (not a Supabase error) — kept as a belt-and-braces fallback.
   if (roleDashboard || (raw && typeof raw === 'object' && 'error' in raw && (raw as Record<string, unknown>).error === 'Access denied')) {
-    const userRole = user.role
-
-    if (userRole === 'hr') {
+    if (overview === 'hr') {
       // HR Dashboard — data overview. Under the post-mig-278 flow HR's job is
       // three actions (Import Employment List · Import Payroll · Calculate
       // Director Salary), so the dashboard is three entry cards over the live
@@ -546,7 +557,7 @@ export default async function DashboardPage() {
       )
     }
 
-    if (userRole === 'dept_manager') {
+    if (overview === 'department') {
       // Dept Manager Dashboard — shows the manager's own department pool
       // state + their submitted expense requests awaiting Principal sign-off.
       if (!user.department_id) {
@@ -814,8 +825,8 @@ export default async function DashboardPage() {
       )
     }
 
-    // Any other non-treasury role (future-proofing — currently only hr/dept_manager hit
-    // the Access denied branch, so this is dead-ish code but keeps the type checker happy)
+    // Nobody's Overview of their own: no treasury, payroll or department pool
+    // among their cells (an Executive office, Staff · Basic).
     return (
       <div>
         <div className="page-head">
@@ -827,8 +838,8 @@ export default async function DashboardPage() {
           </div>
         </div>
         <div className={EMPTY_WELL}>
-          <p className="text-sm font-medium">Treasury data is available to Principal and Finance only.</p>
-          <p className="text-xs mt-1">Use the sidebar to navigate to your modules.</p>
+          <p className="text-sm font-medium">Your title opens no treasury, payroll or department figures to sum up here.</p>
+          <p className="text-xs mt-1">Use the sidebar to open your modules.</p>
         </div>
       </div>
     )
@@ -913,14 +924,33 @@ export default async function DashboardPage() {
   )
   const hvBalance = Number(summary.hv_fund_balance ?? 0)
 
+  // The head and the book around today (2026-10-09, the handoff): Daily Bank
+  // for whoever reads the treasury, Record payment for whoever raises a
+  // voucher (the Payments page's own test), and the installments behind and
+  // coming up from every live deal's plan.
+  const monthTitle = officeTime().format('MMMM YYYY')
+  const canRecordPayment = canDo(user, 'treasury', 'create')
+  const book = bookWindow(bookRead ? await bookRead : [], officeToday())
+  const upcomingNet = Math.round(book.upcoming.reduce((s, e) => s + (e.kind === 'collect' ? e.outstanding : -e.outstanding), 0) * 100) / 100
+
   return (
     <div>
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> TREASURY · OVERVIEW · {today.toUpperCase()}
+            <em>I.</em> OVERVIEW · TREASURY · {monthTitle.toUpperCase()}
           </div>
           <h1 className="page-title">Overview</h1>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Link href="/daily-bank" className="btn-quiet-sheet">
+            Daily Bank
+          </Link>
+          {canRecordPayment ? (
+            <Link href="/payments/new" className="btn-pri-sheet">
+              Record payment
+            </Link>
+          ) : null}
         </div>
       </div>
 
@@ -953,7 +983,7 @@ export default async function DashboardPage() {
             label="Pending your hand"
             value={String(pendingCount)}
             icon="inbox"
-            tone={pendingCount > 0 ? 'alert' : 'default'}
+            tone={pendingCount > 0 ? 'wait' : 'default'}
             href="/approvals"
             note={pendingCount === 0 ? 'All caught up' : `${pendingCount === 1 ? 'Approval' : 'Approvals'} waiting`}
           />
@@ -962,7 +992,7 @@ export default async function DashboardPage() {
             label="Awaiting Principal"
             value={String(financePendingList.length)}
             icon="clock"
-            tone={financePendingList.length > 0 ? 'alert' : 'default'}
+            tone={financePendingList.length > 0 ? 'wait' : 'default'}
             note={financePendingList.length === 0 ? 'Nothing waiting on Principal' : 'Your requests, not yet decided'}
           />
         )}
@@ -970,11 +1000,9 @@ export default async function DashboardPage() {
 
       {hasAnyData ? (
         summary.pool_breakdown ? (
-          <details className="mb-10">
-            <summary className="w-fit text-sm font-medium underline underline-offset-4 cursor-pointer select-none">
-              Pool breakdown
-            </summary>
-            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <details className="fin-fold">
+            <summary>Pool breakdown</summary>
+            <div className="fin-fold-inner grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* The three sources, side by side. They are not added up
                   here: the pool is the dept pools plus the Venture Pool, and
                   the fund sources are what fed them. */}
@@ -1283,6 +1311,14 @@ export default async function DashboardPage() {
               </div>
               <MarginPanel summary={summary} />
             </section>
+            <section className="mb-10">
+              <div className="sect-head">
+                <h2>Interest this month</h2>
+                <span className="rule" aria-hidden />
+                <span className="count">{monthTitle.toUpperCase()}</span>
+              </div>
+              <InterestPanel summary={summary} />
+            </section>
           </div>
         ) : null}
       </div>
@@ -1491,6 +1527,37 @@ export default async function DashboardPage() {
           />
         </StatCards>
       </section>
+
+      {/* ───────── The book around today (2026-10-09, the handoff) ─────────
+          Every live deal's installments from its repayment plan — the same
+          rows as its own page's Repayment schedule: what is behind, and what
+          falls due in the next 14 days with the net of it. */}
+      {book.overdue.length > 0 ? (
+        <section className="mb-10 mt-10">
+          <div className="sect-head">
+            <h2>Overdue instalments</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">{book.overdue.length} BEHIND</span>
+          </div>
+          <BookTable entries={book.overdue} late />
+        </section>
+      ) : null}
+      <section className={book.overdue.length > 0 ? 'mb-4' : 'mb-4 mt-10'}>
+        <div className="sect-head">
+          <h2>Coming up · next 14 days</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">
+            {book.upcoming.length} {book.upcoming.length === 1 ? 'INSTALMENT' : 'INSTALMENTS'}
+          </span>
+        </div>
+        {book.upcoming.length === 0 ? (
+          <div className={EMPTY_WELL}>
+            <p className="text-sm">Nothing due in the next 14 days.</p>
+          </div>
+        ) : (
+          <BookTable entries={book.upcoming} late={false} net={upcomingNet} />
+        )}
+      </section>
     </div>
   )
 }
@@ -1582,75 +1649,154 @@ function PositionLabel({ position }: { position: Subsidiary['position'] }) {
   )
 }
 
-// The month's margin as two small ledgers, each closing on its result line:
-// the spread (base rate over the weighted cost of capital) and the interest it
-// earned. Green while the result is positive, red once it is not.
+// The margin: the base rate over the weighted cost of capital, closing on
+// the spread — green while positive, red once it is not.
 function MarginPanel({ summary }: { summary: DashboardSummary }) {
-  const weightedCost = summary.weighted_cost_rate
-  const baseRate = summary.current_base_rate
   const netSpread = summary.net_spread
-  const netInterest = summary.net_interest_income
-
   const spreadNegative = netSpread != null && netSpread < 0
-  const interestNegative = netInterest < 0
   const pct = (rate: number | null) => (rate != null ? `${(rate * 100).toFixed(3)}%/mo` : '—')
 
   return (
-    <div className="space-y-3">
-      <table className="ledger-table">
-        <thead>
-          <tr>
-            <th>Spread</th>
-            <th className="right">Rate</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Weighted cost of capital</td>
-            <td className="num">{pct(weightedCost)}</td>
-          </tr>
-          <tr>
-            <td>Current base rate</td>
-            <td className="num">{pct(baseRate)}</td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr>
-            <td>Net spread</td>
-            {/* The colour rides on a span: a `.num` cell sets its own ink. */}
-            <td className="num">
-              <span className={spreadNegative ? 'text-danger' : 'text-ledger'}>{pct(netSpread)}</span>
-            </td>
-          </tr>
-        </tfoot>
-      </table>
+    <table className="ledger-table">
+      <thead>
+        <tr>
+          <th>Spread</th>
+          <th className="right">Rate</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Weighted cost of capital</td>
+          <td className="num">{pct(summary.weighted_cost_rate)}</td>
+        </tr>
+        <tr>
+          <td>Current base rate</td>
+          <td className="num">{pct(summary.current_base_rate)}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td>Net spread</td>
+          {/* The colour rides on a span: a `.num` cell sets its own ink. */}
+          <td className="num">
+            <span className={spreadNegative ? 'text-danger' : 'text-ledger'}>{pct(netSpread)}</span>
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  )
+}
 
-      <table className="ledger-table">
-        <thead>
-          <tr>
-            <th>Interest this month</th>
-            <th className="right">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Interest income</td>
-            <td className="num">{formatMoney(summary.monthly_interest_income)}</td>
-          </tr>
-          <tr>
-            <td>Interest expense</td>
-            <td className="num">{formatMoney(-Math.abs(summary.monthly_interest_expense))}</td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr>
-            <td>Net interest</td>
-            <td className="num">
-              <span className={interestNegative ? 'text-danger' : 'text-ledger'}>{formatMoney(netInterest)}</span>
-            </td>
-          </tr>
-        </tfoot>
-      </table>
+/** The month's interest — its own panel under the margin since 2026-10-09 (the handoff). */
+function InterestPanel({ summary }: { summary: DashboardSummary }) {
+  const netInterest = summary.net_interest_income
+  return (
+    <table className="ledger-table">
+      <thead>
+        <tr>
+          <th>Interest</th>
+          <th className="right">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Interest income</td>
+          <td className="num">{formatMoney(summary.monthly_interest_income)}</td>
+        </tr>
+        <tr>
+          <td>Interest expense</td>
+          <td className="num">
+            <span className="text-danger">{formatMoney(-Math.abs(summary.monthly_interest_expense))}</span>
+          </td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td>Net interest</td>
+          <td className="num">
+            <span className={netInterest < 0 ? 'text-danger' : 'text-ledger'}>{formatMoney(netInterest)}</span>
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  )
+}
+
+/**
+ * Installments from the deals' repayment plans (2026-10-09, the handoff):
+ * due day, the counterparty with the installment's place in the plan, which
+ * way the money goes, what is unpaid on it, and the deal's own page — which
+ * then says "← Back to Overview".
+ */
+function BookTable({ entries, late, net }: { entries: BookEntry[]; late: boolean; net?: number }) {
+  return (
+    <div className="table-frame">
+      <div className="table-frame-scroll">
+        <table className="ledger-table [&_td.num]:whitespace-nowrap">
+          <thead>
+            <tr>
+              <th>Due</th>
+              <th>Counterparty</th>
+              <th className="m-hide">Direction</th>
+              <th className="right">{late ? 'Outstanding' : 'Amount'}</th>
+              <th className="m-hide" aria-label="Open" />
+              <th className="lt-toggle" aria-hidden />
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((e) => {
+              const href = `${e.href}?from=overview`
+              return (
+                <LedgerRow key={`${e.kind}-${e.id}-${e.no}`}>
+                  <td className="font-mono text-xs whitespace-nowrap">{dayjs(e.due).format('D MMM YYYY')}</td>
+                  <td>
+                    <Link href={href} className="font-medium">
+                      {e.name}
+                    </Link>
+                    <div className="text-[11px] text-graphite mt-0.5">
+                      Instalment {e.no}
+                      {e.months ? ` of ${e.months}` : ''}
+                    </div>
+                  </td>
+                  <td className="m-hide" data-label="Direction">
+                    {e.kind === 'collect' ? (
+                      <span className="chip ledger whitespace-nowrap">
+                        <span className="dot" />↓ collect
+                      </span>
+                    ) : (
+                      <span className="chip accent whitespace-nowrap">
+                        <span className="dot" />↑ pay
+                      </span>
+                    )}
+                  </td>
+                  <td className="num">
+                    {late ? <span className="text-danger">{formatMoneyBare(e.outstanding)}</span> : formatMoneyBare(e.outstanding)}
+                  </td>
+                  <td className="m-hide right" data-label="Open">
+                    <Link href={href} className="btn-quiet-sheet">
+                      Open
+                    </Link>
+                  </td>
+                </LedgerRow>
+              )
+            })}
+          </tbody>
+          {net != null ? (
+            <tfoot>
+              <tr>
+                <td />
+                <td>Net</td>
+                <td className="m-hide" />
+                <td className="num">
+                  <span className={net < 0 ? 'text-danger' : 'text-ledger'}>{formatMoney(net)}</span>
+                </td>
+                <td className="m-hide" />
+                <td className="lt-toggle" aria-hidden />
+              </tr>
+            </tfoot>
+          ) : null}
+        </table>
+      </div>
     </div>
   )
 }

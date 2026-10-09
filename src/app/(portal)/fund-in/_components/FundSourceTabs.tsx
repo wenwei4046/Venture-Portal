@@ -12,15 +12,17 @@ const TABS = [
   { key: 'all', label: 'All' },
 ]
 
-export default function FundSourceTabs() {
+/** The status tabs, each with how many it holds (2026-10-09, the Finance revamp). */
+export default function FundSourceTabs({ counts }: { counts?: Record<string, number> }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const current = searchParams.get('status') ?? 'active'
 
   return (
     <SlidingTabs
-      items={TABS}
+      items={TABS.map((t) => (counts ? { ...t, count: counts[t.key] ?? 0 } : t))}
       active={current}
+      variant="control"
       onTabChange={(key) => {
         const params = new URLSearchParams(searchParams.toString())
         if (key === 'active') {

@@ -6,12 +6,13 @@
 // Schedule.
 
 import { officeTime } from '@/lib/office-time'
-import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { fetchCounterpartyStatement } from '@/lib/counterparty-statement-data'
 import StatementView from './_components/StatementView'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,38 +23,56 @@ export default async function CompanyStatementPage() {
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { rows, totals } = await fetchCounterpartyStatement(supabase)
 
+  // On the sheet (2026-10-09, the user's Claude Design handoff): three cards
+  // over the statement — to collect, to repay, and which way the net goes.
+  const toCollect = Math.round((totals.collectPrincipal + totals.collectInterest) * 100) / 100
+  const toRepay = Math.round((totals.repayPrincipal + totals.repayInterest) * 100) / 100
+  const net = Math.round((toCollect - toRepay) * 100) / 100
+
   return (
     <div>
-      <Link
-        href="/reports"
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
-      >
-        ← Back to Reports
-      </Link>
       <div className="page-head">
-        <div>
+        <div className="min-w-0">
           <div className="page-eyebrow">
             <em>I.</em> REPORTS · AS AT {officeTime().format('D MMM YYYY').toUpperCase()}
           </div>
           <h1 className="page-title">Company Statement</h1>
         </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/reports/company-statement/export?format=xlsx"
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <a href="/reports/company-statement/export?format=xlsx" className="btn-quiet-sheet">
             Export Excel
-          </Link>
-          <Link
-            href="/reports/company-statement/export?format=pdf"
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
+          </a>
+          <a href="/reports/company-statement/export?format=pdf" className="btn-quiet-sheet">
             Export PDF
-          </Link>
+          </a>
         </div>
       </div>
 
-      <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
+      <StatCards label="Company statement">
+        <StatCard
+          label="To collect"
+          value={formatMoney(toCollect)}
+          icon="inbox"
+          tone="ledger"
+          note={`Principal ${formatMoneyBare(totals.collectPrincipal)} · Interest ${formatMoneyBare(totals.collectInterest)}`}
+        />
+        <StatCard
+          label="To repay"
+          value={formatMoney(toRepay)}
+          icon="send"
+          tone="danger"
+          note={`Principal ${formatMoneyBare(totals.repayPrincipal)} · Interest ${formatMoneyBare(totals.repayInterest)}`}
+        />
+        <StatCard
+          label="Net"
+          value={`${net >= 0 ? 'Collect' : 'Repay'} ${formatMoney(Math.abs(net))}`}
+          icon="swap"
+          tone="primary"
+          note={`${rows.length} ${rows.length === 1 ? 'counterparty' : 'counterparties'}`}
+        />
+      </StatCards>
+
+      <p className="text-xs text-graphite mb-4 max-w-3xl">
         One row per counterparty: to collect (loans lent out) vs to repay (fund
         sources taken in). Interest — fixed-term deals count remaining
         installments to payoff (original × monthly rate × periods left);

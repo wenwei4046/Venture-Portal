@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -59,6 +59,33 @@ action (Settle) as an orange pill; Finance's and the Principal's tab bar reads
 in English. The user compared a Harbour-blue accent for
 Finance's sheet with the orange and kept the orange ("我发现橘色比较好看"): the
 sheet has one accent for every department.
+
+**The Finance view (2026-10-09).** The user's Claude Design handoff
+(`.design/finance-revamp`) redesigns every Finance page in this same language
+and adds global rules that apply to **Finance's pages only** — the routes in
+`lib/finance-view.ts` as Finance or the Principal sees them; HR's and a
+department manager's pages keep the sheet as described above. PortalFrame
+puts `.fin-view` on the sheet frame and `FinViewProvider` around the shell;
+everything the view changes hangs off those (globals.css › "THE FINANCE
+VIEW"). On it: a card's figure is in the number face and coloured by meaning
+(ledger green for money in, danger red for money out, the new blue `wait`
+for anything waiting on someone, walnut for the page's one figure), its label
+sentence-case; chips in the body face, pending in blue; tables wear a navy
+band (#E2E7EF / #1D2B4A) with white rows, no zebra, and offer a Range mode on
+amount and date columns (`range`), a 620px scroll box with a sticky header
+(`scrollBox`) and neighbour resizing (`resizeMode`); the row menu reads Open /
+Open in new tab; a list keeps its scroll on Back; on a phone the top bar is
+cream with the H tile and the page's name, the lit tab sits on a peach pill,
+and a detail page goes back on an edge swipe. Numbers never come from the
+prototype.
+Its page-head menus (`ActMenu`: "From payroll ▾", "Export ▾", "+ Create
+Invoice ▾") hold the controls a captioned band used to lay out; a page's
+facts sit in `DetailGroups` (banded group cards of label / value rows) and
+its actions in a `.fin-actions` panel with a line on what they do. Where the
+handoff and an earlier per-page pick disagreed (the allocator's split: the
+prototype's one text column against the 每家一栏 matrix of two days before),
+the user chose the handoff — a row's breakdown is one line of "label pct%"
+and a page of its own (`/billing-allocator/[id]`), not a column per company.
 
 **What it is.** PortalFrame draws, for those routes, the content column inset
 10px around ONE white sheet (`.sheet-frame` › `.sheet`, 16px radius, hairline
@@ -1192,6 +1219,16 @@ sheet's tokens:
   template* / *Back*.
 - **History** (not in the drawing): *Show history* reads every save — When
   (office time) · Who · What changed, a line per change, six then *Show all*.
+- **A hidden value (v3.18).** A salary figure, NRIC or account number whose
+  tick is not the viewer's reads `••••` — in the field's own style (mono where
+  the number would be mono), never a lock icon or a greyed row; blank stays `—`,
+  because whether something is on file is not a secret (a roster row still
+  says *missing NRIC*). In an edit form an unticked field is a read-only box
+  (`bg-surface-2`, hairline, the value or `••••`, an 11px line saying which
+  tick it needs) with no input behind it, so a save leaves it as it was. A
+  file that needs the real numbers (the payroll bank CSV, the statutory
+  files) is simply not offered without its tick; a print (the PV) shows
+  `••••`. The database decides first — `lib/private-fields.ts`.
 
 **Invite drawer** (`.drawer-scrim` walnut 28% + `.drawer-panel`, 640px,
 fixed 10px from the edges, radius 16, the modal shadow): the page eyebrow,
@@ -2658,6 +2695,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-09 v3.18 (Salary, NRIC and bank accounts show only where ticked)** — a value whose Sensitive field the viewer's title does not tick reads `••••` on every page it appears (People, a person's card and page, the PV page and its print, HR › Payment); blank stays `—`. An edit form shows an unticked field as a read-only box and never sends it; editing a person is offered only with Salary amounts ticked (the form saves pay). The payroll bank CSV is offered only with Bank accounts, the statutory files only with NRIC / IC, salary-PV generation only with Bank. See "Permission matrix › A hidden value".
 - **2026-10-09 v3.17 (Approvals by domain)** — the queue opens for whoever may see it (Approvals · View, its own key) or decide anything in it (a domain's Approve: Treasury, HR Costing, Director Salary). A row the reader may not decide — outside their Approve, or one they raised (the Principal excepted) — has a muted `—` instead of a tick, with why on hover; a request's page says *Awaiting sign-off* instead of its buttons; a voucher's *Approve* follows the same rule. See "Multi-select — ticks outlive a drill-down".
 - **2026-10-08 v3.16 (Every action takes effect)** — a button is drawn only for somebody who holds the cell its Server Action asks for: *Create payment*, *Record new loan*, *+ New Entry*, *+ Add person*, *Import InfoTech* (Create); *Edit*, *Mark paid*, *Issue* (Edit); *Void*, *Withdraw*, *Request cancellation*, a repayment's reversal (Void); *Amend terms* (Treasury · Approve); a voucher's *Approve* (Approvals · Approve); the loans CSV (Export). A Finance · Maker sees *Submit* and *Edit* on a draft voucher and no *Void*; a Checker sees *Approve* alone. Nothing moves for the four shared accounts — their keys still allow every action they did. The matrix's *held for now* now reads the same rule. See "Permission matrix".
 - **2026-10-08 v3.15 (Audit Log › Changes)** — every change people make through the portal is listed: one row per save, each record it touched with its fields before → after, filtered by area, record, person and dates, a record's own history a click away. The reader sees only the areas their permissions open, and salary / NRIC / bank values only where their title may. Audit Log becomes a sidebar group: Changes (`/audit-log`) and Access (`/audit-log/access`, the old page; old links redirect). See "Audit log — Changes".

@@ -2,21 +2,23 @@ import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
-import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/consolidation'
-import { buildPnlAccounts, buildCustomPnlRows, defaultPnlLayout } from '@/lib/pnl-custom'
-import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
+import { loadMonthlyPnl } from '@/lib/monthly-statements'
 import { segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
 import MonthlyReportControls from '../_components/MonthlyReportControls'
 import { ReportSearchProvider } from '../_components/ReportSearchProvider'
 import ReportViewToggle from '../_components/ReportViewToggle'
+import { reportsCompanyWide } from '@/lib/surfaces'
+import { rangeLabel, reportRange } from '@/lib/report-range'
+import { REPORT_SEGMENTS } from '../_components/report-segments'
+import ReportModeSwitch from '../_components/ReportModeSwitch'
+import MonthlyPnlBody from '../_components/MonthlyPnlBody'
 
 export const dynamic = 'force-dynamic'
 
 interface Props {
-  searchParams: Promise<{ period?: string; segment?: string }>
+  searchParams: Promise<{ period?: string; segment?: string; from?: string }>
 }
 
 export default async function MonthlyPnlPage({ searchParams }: Props) {
@@ -26,7 +28,7 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
   const params = await searchParams
   const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : officeMonth()
   // Dept managers see ONLY their own segment (RLS) — force empty + hide picker.
-  const isDeptMgr = user.role === 'dept_manager'
+  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
   const segment = isDeptMgr ? '' : (params.segment ?? '')
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
@@ -34,20 +36,60 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
   // Consolidated = all-segments view for finance/principal; dept managers'
   // empty segment is their OWN view via RLS — never eliminate for them.
   const consolidated = !isDeptMgr && !segment
-  const [rawLines, accounts, savedRaw, elim] = await Promise.all([
-    fetchAllJournalLines(supabase),
-    fetchCoaAccounts(supabase),
-    readReportLayout(supabase, 'pnl'),
-    consolidated ? fetchInterBillingElimination(supabase) : Promise.resolve(null),
-  ])
-  const lines = elim ? eliminateInterBilling(rawLines, elim) : rawLines
+  // The read a department's own page under Dept Pool makes for its segment
+  // too (2026-10-09, lib/monthly-statements): one P&L, two places.
+  const { data, rows } = await loadMonthlyPnl(supabase, { year, throughMonth, segment: segmentFilterFor(segment), consolidated })
 
-  const data = buildPnlAccounts(lines, accounts, { year, throughMonth, segment: segmentFilterFor(segment) })
-  const saved = (savedRaw ?? null) as ReportLayout | null
-  const layout = saved && Array.isArray(saved.categories) && saved.categories.length > 0
-    ? saved
-    : defaultPnlLayout(data.accounts)
-  const rows = buildCustomPnlRows(data, layout)
+  // Whoever reads the reports company-wide (2026-10-09, the user's Claude
+  // Design handoff): the period From – To, the two views and the exports in
+  // the head, four cards, one control row, the months separated. A
+  // department manager keeps the page below, as it was.
+  if (!isDeptMgr) {
+    const nowYM = officeMonth()
+    const range = reportRange({ from: params.from, period }, nowYM)
+    const segments = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
+    const segName = (segments.find((s) => s.value === segment) ?? segments[0]).label
+    const exportHref = (format: 'xlsx' | 'pdf') => {
+      const qs = new URLSearchParams({ format, period: range.to })
+      if (segment) qs.set('segment', segment)
+      if (!range.wholeYear) qs.set('from', range.from)
+      return `/reports/monthly-pnl/export?${qs.toString()}`
+    }
+    return (
+      <div>
+        <div className="page-head">
+          <div className="min-w-0">
+            <div className="page-eyebrow">
+              <em>I.</em> REPORTS · P&amp;L · {rangeLabel(range.from, range.to).toUpperCase()}
+            </div>
+            <h1 className="page-title">P&amp;L</h1>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <ReportModeSwitch pair="pnl" active="monthly" period={range.to} segment={segment || undefined} />
+            <Link href="/reports/monthly-pnl/layout" className="btn-quiet-sheet">
+              Edit layout
+            </Link>
+            <a href={exportHref('xlsx')} className="btn-quiet-sheet">
+              Excel
+            </a>
+            <a href={exportHref('pdf')} className="btn-quiet-sheet">
+              PDF
+            </a>
+          </div>
+        </div>
+
+        <MonthlyPnlBody
+          pnl={{ data, rows }}
+          range={range}
+          nowYM={nowYM}
+          segmentLabel={segName}
+          segment={segment}
+          segments={segments}
+          consolidated={consolidated}
+        />
+      </div>
+    )
+  }
 
   return (
     <div>

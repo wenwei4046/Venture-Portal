@@ -5,8 +5,9 @@ import MemberAdmin from "@/components/member/MemberAdmin";
 export const dynamic = "force-dynamic";
 export default async function MemberAdminPage() {
   const user = await requireAuth();
+  // Whoever manages member requests or memos — the Principal holds both
+  // keys, so asking the kind as well said nothing (Q7, 2026-10-09).
   if (
-    user.role !== "principal" &&
     !user.permissions.some((p) =>
       ["member_requests_manage", "member_memos_manage"].includes(p),
     )

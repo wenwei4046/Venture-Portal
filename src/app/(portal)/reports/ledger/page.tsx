@@ -6,7 +6,7 @@ import LedgerPicker from './_components/LedgerPicker'
 import LedgerSections from './_components/LedgerSections'
 import dayjs from 'dayjs'
 import { officeTime, officeToday } from '@/lib/office-time'
-import Link from 'next/link'
+import { hasLedgerActivity, ledgerExportHref, ledgerPeriodLabel } from '@/lib/ledger-view'
 
 interface Props {
   searchParams: Promise<{
@@ -66,43 +66,36 @@ export default async function LedgerPage({ searchParams }: Props) {
     is_active: r.is_active as boolean,
   }))
 
-  const periodLabel = `${dayjs(from).format('D MMM YYYY')} – ${dayjs(to).format('D MMM YYYY')}`
+  // The head per the handoff (2026-10-09): the period in the eyebrow, what the
+  // page is, and Select accounts… / Excel / PDF — the exports for whatever is
+  // picked, every account with activity when nothing is.
+  const exportArgs = { codes, from, to, showZero }
+  // The accounts, drawn here (it was a nested async component; the same wait,
+  // and a page a test can draw).
+  const body = await LedgerBody({ ledgersRead, codes, from, to, showZero })
 
   return (
     <div>
-      <Link href="/reports" className="text-sm text-muted hover:text-accent font-sans transition-colors">
-        ← Back to Reports
-      </Link>
-
       <div className="page-head">
-        <div>
+        <div className="min-w-0">
           <div className="page-eyebrow">
-            <em>I.</em> REPORTS · GENERAL LEDGER · {periodLabel.toUpperCase()}
+            <em>I.</em> REPORTS · GENERAL LEDGER · {ledgerPeriodLabel(from, to).toUpperCase()}
           </div>
           <h1 className="page-title">Ledger</h1>
+          <p className="page-sub">Per-account journal lines with running balance over a period. Pick accounts, or leave empty for all.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-start justify-end gap-2">
           <LedgerPicker accounts={accounts} selectedCodes={codes} from={from} to={to} showZero={showZero} />
-          {codes.length === 1 ? (
-            <>
-              <Link
-                href={`/reports/ledger/export?format=xlsx&code=${encodeURIComponent(codes[0])}&from=${from}&to=${to}`}
-                className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-              >
-                Export Excel
-              </Link>
-              <Link
-                href={`/reports/ledger/export?format=pdf&code=${encodeURIComponent(codes[0])}&from=${from}&to=${to}`}
-                className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-              >
-                Export PDF
-              </Link>
-            </>
-          ) : null}
+          <a href={ledgerExportHref('xlsx', exportArgs)} className="btn-quiet-sheet">
+            Excel
+          </a>
+          <a href={ledgerExportHref('pdf', exportArgs)} className="btn-quiet-sheet">
+            PDF
+          </a>
         </div>
       </div>
 
-      <LedgerBody ledgersRead={ledgersRead} codes={codes} from={from} to={to} showZero={showZero} />
+      {body}
     </div>
   )
 }
@@ -119,21 +112,15 @@ async function LedgerBody({
 }) {
   try {
     const ledgers = await ledgersRead
-    const visible = showZero
-      ? ledgers
-      : ledgers.filter(
-          (l) =>
-            // > 1: every ledger carries a synthetic BALANCE B/F line (see buildLedger), so >1 = real period movement
-            l.lines.length > 1 ||
-            Math.abs(l.openingBalance) >= 0.005 ||
-            Math.abs(l.closingBalance) >= 0.005,
-        )
+    // Every ledger carries a synthetic BALANCE B/F line (see buildLedger), so
+    // more than one line = real movement in the period (lib/ledger-view).
+    const visible = showZero ? ledgers : ledgers.filter(hasLedgerActivity)
 
     const periodLabel = `${dayjs(from).format('D MMMM YYYY')} – ${dayjs(to).format('D MMMM YYYY')}`
 
     if (visible.length === 0) {
       return (
-        <p className="font-serif italic text-muted text-sm max-w-3xl mt-6">
+        <p className="text-sm text-graphite max-w-3xl mt-6">
           {codes.length === 0 ? (
             <>No accounts have activity in <strong>{periodLabel}</strong>. Toggle <em>Show zero</em> to list every leaf account.</>
           ) : (
@@ -145,7 +132,7 @@ async function LedgerBody({
 
     return (
       <div className="mt-2">
-        <p className="font-serif italic text-muted text-sm mb-2 max-w-3xl">
+        <p className="text-xs text-graphite mb-3 max-w-3xl">
           {visible.length} {visible.length === 1 ? 'account' : 'accounts'} &middot; {periodLabel}
           {codes.length === 0 ? ' · all postable leaf accounts' : null}
           {!showZero && ledgers.length > visible.length
@@ -158,7 +145,7 @@ async function LedgerBody({
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     return (
-      <div className="mt-8 px-4 py-3 border border-danger rounded-md bg-surface text-danger text-sm font-serif italic">
+      <div className="sheet-danger mt-8">
         ⚠ {msg}
       </div>
     )

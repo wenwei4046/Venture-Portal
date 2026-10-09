@@ -59,18 +59,18 @@ export default async function EditJournalVoucherPage({
 
   return (
     <div>
-      <Link
-        href="/reconciliation/journal-entries"
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
-      >
-        ← Back to Journal Entries
-      </Link>
+      <div className="mb-3">
+        <Link href={`/reconciliation/journal-entries/${entry.id}`} className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
+          ← {entry.entry_no}
+        </Link>
+      </div>
       <div className="page-head">
-        <div>
+        <div className="min-w-0">
           <div className="page-eyebrow">
-            <em>I.</em> TREASURY · EDIT VOUCHER
+            <em>I.</em> TREASURY · MANUAL VOUCHERS · EDIT
           </div>
           <h1 className="page-title">{entry.entry_no}</h1>
+          <p className="page-sub">Debits must equal credits. Press Ins to add a line.</p>
         </div>
       </div>
 

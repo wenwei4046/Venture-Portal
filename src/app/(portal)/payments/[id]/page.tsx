@@ -22,6 +22,7 @@ import { AR_PARENT, accountFamily } from '@/lib/ar-accounts'
 import { bankShort } from '@/lib/deal-preview'
 import { DealMore } from '@/components/treasury/DealFormShell'
 import { officeStamp } from '@/lib/office-clock'
+import { readPayrollLineAccounts, withLineAccounts } from '@/lib/private-fields'
 import type { ReactNode } from 'react'
 
 const POOL_LABELS: Record<string, string> = {
@@ -168,13 +169,17 @@ export default async function PaymentDetailPage({ params }: Props) {
       ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabase as any)
           .from('payroll_voucher_lines')
-          .select('id, scope, payroll_row_id, employee_name, employee_code, department_name, net, salary_component, recipient_account, bank_name, bank_account_no')
+          .select('id, scope, payroll_row_id, employee_name, employee_code, department_name, net, salary_component, recipient_account, bank_name')
           .eq('voucher_id', id)
           .order('employee_name')
           .order('salary_component')
       : { data: null, error: null }
   if (payrollLinesError) throw new Error('Unable to load the recorded salary payment details. Please try again.')
-  const peopleOnVoucher = ((payrollLines ?? []) as unknown) as Array<{
+  // The account each line pays into comes through the reader: •••• unless the
+  // viewer's title ticks Bank accounts (2026-10-09, PR4).
+  const lineRows = ((payrollLines ?? []) as unknown) as Array<{ id: string }>
+  const lineAccounts = await readPayrollLineAccounts(supabase, user, lineRows.map(l => l.id))
+  const peopleOnVoucher = (withLineAccounts(lineRows, lineAccounts) as unknown) as Array<{
     id: string
     scope: string
     payroll_row_id: string
@@ -608,6 +613,8 @@ export default async function PaymentDetailPage({ params }: Props) {
             {isCredit ? '收自' : '付给'} {voucher.payee_name}
           </p>
           <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-[7px] text-[13px] m-0">
+            {/* The panel's two groups (2026-10-09, the Finance revamp): when and where, then the booking. */}
+            <div className="deal-side-sec col-span-2">When & where</div>
             <PanelRow
               label={isCredit ? '收款日期' : '付款日期'}
               value={
@@ -628,10 +635,9 @@ export default async function PaymentDetailPage({ params }: Props) {
               }
             />
             {bankLabel ? <PanelRow label={isCredit ? '进银行' : '从银行'} value={bankLabel} title={bankName ?? undefined} /> : null}
-            {poolLabel || categoryLabel ? <div role="separator" className="deal-side-sep col-span-2" /> : null}
+            {poolLabel || categoryLabel || settledInvoices.length > 0 || methodLabel ? <div className="deal-side-sec col-span-2">Booking</div> : null}
             {poolLabel ? <PanelRow label={isCredit ? '进哪个池' : '扣哪个池'} value={poolLabel} /> : null}
             {categoryLabel ? <PanelRow label="科目" value={categoryLabel} /> : null}
-            {settledInvoices.length > 0 || methodLabel ? <div role="separator" className="deal-side-sep col-span-2" /> : null}
             {settledInvoices.length > 0 ? (
               <PanelRow
                 label="结哪张发票"
@@ -668,7 +674,7 @@ export default async function PaymentDetailPage({ params }: Props) {
 /** The status beside the number (house chip) and in the panel (its own chip). */
 const STATUS_CHIP: Record<string, { tone: string; side: string; zh: string }> = {
   draft: { tone: '', side: '', zh: '草稿' },
-  pending_approval: { tone: 'alert', side: 'wait', zh: '等批准' },
+  pending_approval: { tone: 'wait', side: 'wait', zh: '等批准' },
   approved: { tone: 'accent', side: '', zh: '已批准' },
   paid: { tone: 'ledger', side: 'ok', zh: '已付' },
   voided: { tone: 'danger', side: 'bad', zh: '已作废' },

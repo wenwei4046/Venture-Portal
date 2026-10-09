@@ -3,32 +3,53 @@
 import { Fragment, useMemo, useState } from 'react'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
-import {
-  AGING_BUCKETS,
-  type AgingInvoice,
-  type AgingPayerRow,
-  type AgingBucket,
-} from '@/lib/debtor-aging'
+import { AGING_BUCKETS, type AgingColumn } from '@/lib/debtor-aging'
 
 // Master-detail aging matrix: one collapsible row per customer with per-bucket
 // totals; expand to see each unpaid invoice with its amount in the matching
 // aging column (matches the classic accounting-software creditor/debtor aging).
 
+/** One customer's row and one invoice, in whichever bucket scheme the page uses. */
+interface PayerRow {
+  payer: string
+  buckets: Record<string, number>
+  total: number
+  count: number
+}
+interface InvoiceRow {
+  id: string
+  invoiceNo: string
+  payer: string
+  invoiceDate: string | null
+  description?: string | null
+  amount: number
+  bucket: string
+}
+
 interface Props {
-  byPayer: AgingPayerRow[]
-  invoices: AgingInvoice[]
-  totals: { buckets: Record<AgingBucket, number>; total: number; count: number }
+  byPayer: PayerRow[]
+  invoices: InvoiceRow[]
+  totals: { buckets: Record<string, number>; total: number; count: number }
+  /** The aging columns — months (the default) or Finance's days (2026-10-09). */
+  columns?: readonly AgingColumn[]
+  /** A Find company box that highlights the matching customers, nothing hidden (2026-10-09). */
+  search?: boolean
+  /** Close on the handoff's navy "All companies" row (2026-10-09, Finance's view). */
+  allRow?: boolean
 }
 
 function money(v: number) {
   return v ? <span className="num">{formatMoney(v)}</span> : <span className="num text-muted">—</span>
 }
 
-export default function AgingByCustomer({ byPayer, invoices, totals }: Props) {
+export default function AgingByCustomer({ byPayer, invoices, totals, allRow = false, columns = AGING_BUCKETS, search = false }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [find, setFind] = useState('')
+  const needle = find.trim().toLowerCase()
+  const hits = needle ? new Set(byPayer.filter((p) => p.payer.toLowerCase().includes(needle)).map((p) => p.payer)) : new Set<string>()
 
   const invoicesByPayer = useMemo(() => {
-    const m = new Map<string, AgingInvoice[]>()
+    const m = new Map<string, InvoiceRow[]>()
     for (const inv of invoices) {
       const arr = m.get(inv.payer) ?? []
       arr.push(inv)
@@ -48,6 +69,19 @@ export default function AgingByCustomer({ byPayer, invoices, totals }: Props) {
 
   return (
     <div>
+      {search ? (
+        <div className="gl-toolbar">
+          <input
+            type="search"
+            value={find}
+            onChange={(e) => setFind(e.target.value)}
+            placeholder="Find company…"
+            aria-label="Find company"
+            className="search-plain flex-1 min-w-[200px] px-3 py-2 bg-white border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+          />
+          {needle ? <span className="text-xs text-graphite">{hits.size === 0 ? 'No match' : `${hits.size} ${hits.size === 1 ? 'match' : 'matches'}`}</span> : null}
+        </div>
+      ) : null}
       <div className="mb-2 flex gap-3">
         <button
           onClick={() => setExpanded(new Set(byPayer.map((p) => p.payer)))}
@@ -67,7 +101,7 @@ export default function AgingByCustomer({ byPayer, invoices, totals }: Props) {
           <thead>
             <tr>
               <th>Customer</th>
-              {AGING_BUCKETS.map((b) => (
+              {columns.map((b) => (
                 <th key={b.key} className="num">{b.label}</th>
               ))}
               <th className="num">Total</th>
@@ -80,15 +114,15 @@ export default function AgingByCustomer({ byPayer, invoices, totals }: Props) {
               return (
                 <Fragment key={p.payer}>
                   <tr
-                    className="cursor-pointer bg-surface-2 hover:bg-surface"
+                    className={`cursor-pointer bg-surface-2 hover:bg-surface${hits.has(p.payer) ? ' search-row-hit' : ''}`}
                     onClick={() => toggle(p.payer)}
                   >
                     <td className="font-sans font-medium text-ink whitespace-nowrap">
                       <span className="inline-block w-4 text-muted">{isOpen ? '▼' : '▶'}</span>
                       {p.payer} <span className="text-muted text-xs font-normal">· {p.count}</span>
                     </td>
-                    {AGING_BUCKETS.map((b) => (
-                      <td key={b.key} className="num">{money(p.buckets[b.key as AgingBucket])}</td>
+                    {columns.map((b) => (
+                      <td key={b.key} className="num">{money(p.buckets[b.key] ?? 0)}</td>
                     ))}
                     <td className="num font-semibold">{formatMoney(p.total)}</td>
                   </tr>
@@ -113,7 +147,7 @@ export default function AgingByCustomer({ byPayer, invoices, totals }: Props) {
                             <span className="text-graphite ml-2">{inv.description}</span>
                           ) : null}
                         </td>
-                        {AGING_BUCKETS.map((b) => (
+                        {columns.map((b) => (
                           <td key={b.key} className="num">
                             {inv.bucket === b.key ? (
                               formatMoney(inv.amount)
@@ -128,12 +162,12 @@ export default function AgingByCustomer({ byPayer, invoices, totals }: Props) {
                 </Fragment>
               )
             })}
-            <tr className="border-t-2 border-hairline bg-surface-2 font-semibold">
-              <td className="font-serif italic text-ink">
-                Total <span className="text-muted text-xs">· {totals.count}</span>
+            <tr className={allRow ? 'rpt-all' : 'border-t-2 border-hairline bg-surface-2 font-semibold'}>
+              <td className={allRow ? undefined : 'font-serif italic text-ink'}>
+                {allRow ? 'All companies' : 'Total'} <span className={allRow ? 'text-xs font-normal' : 'text-muted text-xs'}>· {totals.count}</span>
               </td>
-              {AGING_BUCKETS.map((b) => (
-                <td key={b.key} className="num">{money(totals.buckets[b.key as AgingBucket])}</td>
+              {columns.map((b) => (
+                <td key={b.key} className="num">{money(totals.buckets[b.key] ?? 0)}</td>
               ))}
               <td className="num text-num-ink">{formatMoney(totals.total)}</td>
             </tr>

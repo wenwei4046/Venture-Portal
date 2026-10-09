@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { allocatorSummary, batchLabel, byCompanyRows, matrixColumns, type SheetTxn } from './allocator-sheet'
+import { allocatorSummary, batchLabel, byCompanyRows, splitSummary, type SheetTxn } from './allocator-sheet'
 
-// 2026-10-07 — the Billing Allocator on the sheet (the user approved the
-// allocator sample and picked 每家一栏: the split as one column per company).
-// The figures behind the summary cards, the matrix's columns and the By
-// company table, worked out here so the Records tab only draws them.
+// 2026-10-07 — the Billing Allocator on the sheet; 2026-10-09 — the user's
+// Claude Design handoff (照设计档): the split is one column of text, and a
+// record has a page of its own. The figures behind the summary cards, the
+// Split column and the By company table, worked out here so the Records tab
+// only draws them.
 
 const d = (companyId: string | null, companyLabel: string, amount: number, isOwnShare = false) => ({
   companyId,
@@ -47,12 +48,6 @@ const INVOICES = [
   { id: 'i31', invoiceNo: 'HV-INV-202609-0031', companyId: 'co-car', companyLabel: 'CAR', status: 'paid', referenceNo: 'ALC-202609-3' },
 ]
 
-const COMPANIES = [
-  { id: 'co-2990', label: '2990' },
-  { id: 'co-car', label: 'CAR' },
-  { id: 'co-hk', label: 'HK' },
-]
-
 describe('allocatorSummary', () => {
   it('sums the month, what its unbilled allocations still have to bill, what is billed, and HV’s own share', () => {
     const s = allocatorSummary(TXNS, INVOICES)
@@ -75,19 +70,14 @@ describe('allocatorSummary', () => {
   })
 })
 
-describe('matrixColumns', () => {
-  it('is one column per target the month allocates to, in the companies’ order, departments after, HV own last', () => {
-    expect(matrixColumns(TXNS, COMPANIES)).toEqual([
-      { id: 'co-2990', label: '2990', own: false },
-      { id: 'co-car', label: 'CAR', own: false },
-      { id: 'dept:mkt', label: 'Marketing', own: false },
-      { id: null, label: 'HV own', own: true },
-    ])
+describe('splitSummary', () => {
+  it('reads the split as each company’s share of the amount, HV own left out', () => {
+    expect(splitSummary(TXNS[0])).toBe('2990 3.9% · CAR 19.4% · Marketing 25.0%')
+    expect(splitSummary(TXNS[1])).toBe('2990 20.0% · CAR 40.0%')
   })
 
-  it('leaves out a company the month never allocated to, and HV own when nothing was kept', () => {
-    const cols = matrixColumns([{ ...TXNS[1], details: [d('co-car', 'CAR', 1863.18)] }], COMPANIES)
-    expect(cols).toEqual([{ id: 'co-car', label: 'CAR', own: false }])
+  it('is a dash when nothing is billed to anyone', () => {
+    expect(splitSummary({ ...TXNS[0], details: [] })).toBe('—')
   })
 })
 

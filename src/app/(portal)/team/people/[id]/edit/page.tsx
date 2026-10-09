@@ -1,8 +1,11 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireAction } from '@/lib/auth'
 import { offersVariablePay, type TitleRow } from '@/lib/staff-form'
+import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
+import { readStaffPrivate } from '@/lib/private-fields'
+import { sees } from '@/lib/sensitive'
 import EditStaffForm from '../../_components/EditStaffForm'
 
 interface PageProps {
@@ -10,20 +13,27 @@ interface PageProps {
 }
 
 export default async function EditStaffPage({ params }: PageProps) {
-  await requireAction('team', 'edit')
+  const viewer = await requireAction('team', 'edit')
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data: staff }, { data: titles }] = await Promise.all([
+  const [{ data: staff }, { data: titles }, privateFields] = await Promise.all([
     supabase
       .from('hr_staff_costs')
-      .select('*, departments(name, payroll_source, segment_key)')
+      .select(`${STAFF_ROW_COLUMNS}, departments(name, payroll_source, segment_key)` as const)
       .eq('id', id)
       .maybeSingle(),
     supabase.from('titles').select('id, name, department_id, is_active').order('name'),
+    // NRIC and the account numbers: •••• to an editor without the tick, and
+    // the form then leaves them as they are (2026-10-09, PR4).
+    readStaffPrivate(supabase, viewer, [id]),
   ])
 
   if (!staff) notFound()
+  // The form saves pay: an editor whose title does not tick Salary amounts is
+  // sent back to the record rather than shown figures it may not see.
+  if (!sees(viewer, 'salary')) redirect(`/team/people/${id}`)
+  const priv = privateFields.get(id) ?? { nric: null, bank_account_no: null, bank_account_no_2: null }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const deptName = (staff as any).departments?.name ?? '—'
@@ -54,6 +64,7 @@ export default async function EditStaffPage({ params }: PageProps) {
       </div>
 
       <EditStaffForm
+        canSee={{ nric: sees(viewer, 'nric'), bank: sees(viewer, 'bank') }}
         titles={(titles ?? []) as TitleRow[]}
         staff={{
           id: staff.id,
@@ -78,10 +89,10 @@ export default async function EditStaffPage({ params }: PageProps) {
           children_count: Number(staff.children_count ?? 0),
           employment_type: staff.employment_type,
           bank_name: staff.bank_name ?? null,
-          bank_account_no: staff.bank_account_no ?? null,
+          bank_account_no: priv.bank_account_no,
           bank_name_2: staff.bank_name_2 ?? null,
-          bank_account_no_2: staff.bank_account_no_2 ?? null,
-          nric: staff.nric ?? null,
+          bank_account_no_2: priv.bank_account_no_2,
+          nric: priv.nric,
           contact_number: staff.contact_number ?? null,
           email: staff.email ?? null,
           address: staff.address ?? null,

@@ -6,6 +6,9 @@ import { canDo } from '@/lib/permission-actions'
 import { formatMoney } from '@/lib/utils'
 import { canAccessAuditLog, canInviteUsers, canManagePermissions } from '@/lib/roles'
 import { isFullyCommissionBased, isVariablePay } from '@/lib/staff-form'
+import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
+import { readStaffPrivate } from '@/lib/private-fields'
+import { MASKED, sees } from '@/lib/sensitive'
 import ActivityLog from '../../_components/ActivityLog'
 import PersonAccess from '../../_components/PersonAccess'
 import { loadPersonAccess } from '../../_lib/person-permissions'
@@ -32,15 +35,23 @@ export default async function StaffDetailPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: staff } = await supabase
-    .from('hr_staff_costs')
-    .select(
-      '*, departments(name, payroll_source), titles(name, template_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active)',
-    )
-    .eq('id', id)
-    .maybeSingle()
+  // The row without its NRIC and account numbers, which come through the
+  // reader beside it — the table no longer hands them out (2026-10-09, PR4).
+  const [{ data: staff }, privateFields] = await Promise.all([
+    supabase
+      .from('hr_staff_costs')
+      .select(
+        `${STAFF_ROW_COLUMNS}, departments(name, payroll_source), titles(name, template_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active)` as const,
+      )
+      .eq('id', id)
+      .maybeSingle(),
+    readStaffPrivate(supabase, viewer, [id]),
+  ])
 
   if (!staff) notFound()
+  const priv = privateFields.get(id) ?? { nric: null, bank_account_no: null, bank_account_no_2: null }
+  // A pay figure as this viewer may see it (Salary amounts, the template's tick).
+  const pay = (amount: number) => (sees(viewer, 'salary') ? formatMoney(amount) : MASKED)
 
   /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
   const row = staff as any
@@ -112,7 +123,7 @@ export default async function StaffDetailPage({ params }: PageProps) {
               Invite
             </Link>
           ) : null}
-          {canDo(viewer, 'team', 'edit') ? (
+          {canDo(viewer, 'team', 'edit') && sees(viewer, 'salary') ? (
             <Link
               href={`/team/people/${staff.id}/edit`}
               className="bg-accent hover:bg-accent-hover text-ink text-sm px-4 py-2 rounded-control transition-colors"
@@ -136,7 +147,7 @@ export default async function StaffDetailPage({ params }: PageProps) {
         </Section>
 
         <Section title="Identity">
-          <Field label="NRIC" value={staff.nric} mono />
+          <Field label="NRIC" value={priv.nric} mono />
           <Field label="Employee Code" value={staff.employee_code} mono />
           <Field label="InfoTech No" value={staff.infotech_code} mono />
           <Field
@@ -169,9 +180,9 @@ export default async function StaffDetailPage({ params }: PageProps) {
 
         <Section title="Bank Accounts">
           <Field label="Account 1 bank" value={staff.bank_name} />
-          <Field label="Account 1 number" value={staff.bank_account_no} mono />
+          <Field label="Account 1 number" value={priv.bank_account_no} mono />
           <Field label="Account 2 bank" value={staff.bank_name_2} />
-          <Field label="Account 2 number" value={staff.bank_account_no_2} mono />
+          <Field label="Account 2 number" value={priv.bank_account_no_2} mono />
         </Section>
 
         {fullCommission ? (
@@ -192,11 +203,11 @@ export default async function StaffDetailPage({ params }: PageProps) {
                 </>
               ) : (
                 <>
-                  <Field label="Basic" value={formatMoney(Number(staff.basic_salary))} mono />
-                  <Field label="Statutory Allowance" value={formatMoney(Number(staff.allowances))} mono />
+                  <Field label="Basic" value={pay(Number(staff.basic_salary))} mono />
+                  <Field label="Statutory Allowance" value={pay(Number(staff.allowances))} mono />
                   <Field
                     label="Non-Statutory Allowance"
-                    value={formatMoney(Number(staff.non_statutory_allowance ?? 0))}
+                    value={pay(Number(staff.non_statutory_allowance ?? 0))}
                     mono
                   />
                 </>
