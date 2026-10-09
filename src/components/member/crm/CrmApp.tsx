@@ -50,6 +50,28 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
     void fetchCrmData().then(r => { if (current) { if (r.ok) setData(r.data); else setProblem(r.error); } });
     return () => { current = false; };
   }, [live]);
+  // Live: new messages arrive without a reload (user 2026-10-09: 我發送 receive 但是 crm inbox 收不到 —
+  // it was saved; the screen had read once). Read again every 10 s while on screen and at once on coming
+  // back; never two reads at a time, and a read begun before one of our own changes is dropped, so it
+  // cannot put back what that change just replaced.
+  useEffect(() => {
+    if (!live) return;
+    let busy = false, stopped = false;
+    const pull = async () => {
+      if (busy || stopped || document.visibilityState !== "visible") return;
+      busy = true;
+      const started = Date.now();
+      try {
+        const r = await fetchCrmData();
+        if (!stopped && r.ok && started >= (refs.localAt ?? 0)) setData(r.data);
+      } finally { busy = false; }
+    };
+    const t = setInterval(() => void pull(), 10_000);
+    const back = () => void pull();
+    document.addEventListener("visibilitychange", back);
+    window.addEventListener("focus", back);
+    return () => { stopped = true; clearInterval(t); document.removeEventListener("visibilitychange", back); window.removeEventListener("focus", back); };
+  }, [live, refs]);
   // Demo only: whose eyes, after the first paint (the server cannot read the address's ?crmAs).
   useEffect(() => { const v = demoViewer(); if (!live && v) setData(crmDemoData(salesperson, v)); }, [live, salesperson]);
   // The clock behind the colours: every minute the waits grow.
@@ -60,7 +82,7 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
     clearTimeout(refs.toastT);
     refs.toastT = setTimeout(() => setUi(u => (u.toast === text ? { ...u, toast: "" } : u)), 4000);
   }, [refs]);
-  const setDataSafe = useCallback((f: SetStateAction<CrmData>) => setData(d => (d ? (typeof f === "function" ? f(d) : f) : d)), []);
+  const setDataSafe = useCallback((f: SetStateAction<CrmData>) => { refs.localAt = Date.now(); setData(d => (d ? (typeof f === "function" ? f(d) : f) : d)); }, [refs]);
   const act = useMemo(() => makeSalesActions({ live, me: data?.viewerId ?? "", data: () => dataRef.current!, setData: setDataSafe, toast }), [live, data?.viewerId, setDataSafe, toast]);
   const panelToast = useCallback((text: string) => {
     setPanelUi(u => ({ ...u, toast: text }));

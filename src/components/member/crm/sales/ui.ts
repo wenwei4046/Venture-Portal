@@ -122,5 +122,7 @@ export interface SalesRefs {
   celT?: ReturnType<typeof setTimeout>;
   toastT?: ReturnType<typeof setTimeout>;
   panelToastT?: ReturnType<typeof setTimeout>;
+  /** When this screen last changed the data itself (a background read older than that is dropped). */
+  localAt?: number;
   slotKey?: string;
 }
