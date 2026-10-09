@@ -7,6 +7,7 @@ import { crmFromRows, messageFromRow, type CrmLiveData, type CrmMessageRow, type
 import type { CrmMessage } from "@/lib/member/crm";
 import { cleanText, fetchWhatsAppTemplates, fillTemplate, mediaMessage, reactionMessage, sendWhatsApp, sendWhatsAppText, templateMessage, textMessage, uploadWhatsAppMedia, windowOpen, type WaTemplate } from "@/lib/whatsapp/send";
 import { messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from "@/lib/messenger/send";
+import { cardHasWay, messengerVisitMessage } from "@/lib/member/crm-maps";
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
@@ -250,7 +251,9 @@ export async function sendCrmMessage(contactId: string, text: string, opts: { re
     if (contact.channel === "messenger") {
       const pageAccess = await pageToken(contact.account_id, token);
       if (!pageAccess) throw new Error("This Facebook Page is not connected to the CRM. Ask your administrator.");
-      const sent = await sendMessengerText({ pageId: contact.account_id, psid: contact.external_id, body: clean.text, token: pageAccess, window: window as "open" | "human_agent" });
+      // A visit card with an address: the words and Google Maps · Waze as buttons.
+      const message = cardHasWay(opts.card) ? messengerVisitMessage(clean.text, opts.card) : undefined;
+      const sent = await sendMessengerText({ pageId: contact.account_id, psid: contact.external_id, body: clean.text, token: pageAccess, window: window as "open" | "human_agent", message });
       if (!sent.ok) throw new Error(sent.error);
       externalId = sent.mid;
     } else {

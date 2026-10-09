@@ -58,7 +58,7 @@ export async function profileName(pageId: string, psid: string, token: string, f
 }
 
 /** The Send API request: a normal response inside 24 hours, the HUMAN_AGENT tag after. */
-export function messengerRequest(pageId: string, psid: string, body: string, token: string, window: Exclude<MessengerWindow, "shut">) {
+export function messengerRequest(pageId: string, psid: string, body: string, token: string, window: Exclude<MessengerWindow, "shut">, message?: object) {
   return {
     url: graph(`${encodeURIComponent(pageId)}/messages`),
     init: {
@@ -67,7 +67,7 @@ export function messengerRequest(pageId: string, psid: string, body: string, tok
       body: JSON.stringify({
         recipient: { id: psid },
         ...(window === "open" ? { messaging_type: "RESPONSE" } : { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" }),
-        message: { text: body },
+        message: message ?? { text: body },
       }),
     },
   };
@@ -84,10 +84,10 @@ export function messengerError(status: number, payload: unknown): string {
 }
 
 export async function sendMessengerText(
-  opts: { pageId: string; psid: string; body: string; token: string; window: Exclude<MessengerWindow, "shut"> },
+  opts: { pageId: string; psid: string; body: string; token: string; window: Exclude<MessengerWindow, "shut">; message?: object },
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ ok: true; mid: string } | { ok: false; error: string }> {
-  const { url, init } = messengerRequest(opts.pageId, opts.psid, opts.body, opts.token, opts.window);
+  const { url, init } = messengerRequest(opts.pageId, opts.psid, opts.body, opts.token, opts.window, opts.message);
   let response: Response;
   try { response = await fetchImpl(url, init); } catch { return { ok: false, error: "Could not reach Messenger. Check the connection and send again." }; }
   const payload: unknown = await response.json().catch(() => null);

@@ -11,6 +11,7 @@ import {
 import type { CrmAutoReplySet, CrmCard, CrmChatMessage, CrmData, CrmLabel, CrmPrefs, CrmQuickReply, CrmVisit } from "@/lib/member/crm-data";
 import type { WaTemplate } from "@/lib/whatsapp/send";
 import { createClient } from "@/lib/supabase/client";
+import { withMapLinks } from "@/lib/member/crm-maps";
 import { dayLabel, timeLabel, windowShut } from "./vm/common";
 
 export interface SalesActions {
@@ -54,8 +55,11 @@ interface Deps {
 
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()).slice(2));
 
-/** The words a visit card sends the customer (the chat draws them as the card). */
+/** The words a visit card sends the customer (the chat draws them as the card), with the way there. */
 export function cardText(card: CrmCard): string {
+  return withMapLinks(cardWords(card), card);
+}
+function cardWords(card: CrmCard): string {
   const d = new Date(card.start), when = `${dayLabel(d)}, ${timeLabel(d)}`;
   const where = card.addr ? `${card.room}\n${card.addr}` : card.room;
   return card.kind === "Cancelled" ? `Your showroom visit on ${when} at ${card.room} is cancelled. Reply here to book another time.`
