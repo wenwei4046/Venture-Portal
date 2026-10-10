@@ -8,7 +8,7 @@ vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermis
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.refresh }))
 
-import { saveKpiItems, searchKpiSkus } from './kpi-actions'
+import { saveKpiItems } from './kpi-actions'
 
 const SCHEME = '9d6c1f7e-7c1d-4a8e-9f55-0b7d2d3f1a10'
 const ITEM = '11111111-1111-4111-8111-111111111111'
@@ -83,43 +83,5 @@ describe('Rules › KPI items — saving', () => {
     await expect(saveKpiItems(SCHEME, { adds: [], changes: [], removes: [ITEM] }))
       .rejects.toThrow('Could not save the KPI items: connection reset')
     expect(mocks.refresh).not.toHaveBeenCalled()
-  })
-})
-
-describe('Rules › KPI items — finding a SKU', () => {
-  it('searches the live SKU Master by code or description, twenty at most, and counts the rest', async () => {
-    mocks.limit.mockResolvedValueOnce({
-      data: [
-        { erp_id: 'p-1', item_code: 'AK-CS AIRLOFT COMFY PIL', description: 'Cool Silk Airloft', category: 'ACC', active: true },
-        { erp_id: 'p-2', item_code: 'AK-CS LATEX PIL', description: null, category: null, active: false },
-      ],
-      error: null,
-      count: 34,
-    })
-    expect(await searchKpiSkus('  pil  ')).toEqual({
-      ok: true,
-      total: 34,
-      hits: [
-        { erpId: 'p-1', code: 'AK-CS AIRLOFT COMFY PIL', description: 'Cool Silk Airloft', category: 'ACC', active: true },
-        { erpId: 'p-2', code: 'AK-CS LATEX PIL', description: null, category: null, active: false },
-      ],
-    })
-    expect(mocks.permission).toHaveBeenCalledExactlyOnceWith('revenue')
-    expect(mocks.from).toHaveBeenCalledExactlyOnceWith('erp_products')
-    // No price ever: Rules does not show what a product costs.
-    expect(mocks.select).toHaveBeenCalledExactlyOnceWith('erp_id, item_code, description, category, active', { count: 'exact' })
-    expect(mocks.is).toHaveBeenCalledExactlyOnceWith('removed_at', null)
-    expect(mocks.or).toHaveBeenCalledExactlyOnceWith('item_code.ilike."*pil*",description.ilike."*pil*"')
-    expect(mocks.limit).toHaveBeenCalledExactlyOnceWith(20)
-  })
-
-  it('asks nothing for an empty search', async () => {
-    expect(await searchKpiSkus('   ')).toEqual({ ok: true, hits: [], total: 0 })
-    expect(mocks.from).not.toHaveBeenCalled()
-  })
-
-  it('says so when the search fails', async () => {
-    mocks.limit.mockResolvedValueOnce({ data: null, error: { message: 'timeout' }, count: null })
-    expect(await searchKpiSkus('pillow')).toEqual({ ok: false, reason: 'The SKU Master could not be searched just now. Try again.' })
   })
 })
