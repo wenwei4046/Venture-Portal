@@ -160,6 +160,17 @@ await as('boss', `select public.crm_read_notifs('{e1,e2}')`)
 check(await as('boss', `select notif_read from crm_staff_prefs`), [{ notif_read: ['e1', 'e2'] }], 'two notifications read')
 await as('boss', `select public.crm_read_notifs('{}', true)`)
 check(await as('boss', `select notif_read, notifs_seen_at is not null as seen from crm_staff_prefs`), [{ notif_read: [], seen: true }], 'Mark all read')
+// The NEWEST 500 read keys are kept (rev 1010 §6): 600 read one after another keep k101…k600, oldest first;
+// one read again moves to the end.
+{
+  const keys = Array.from({ length: 600 }, (_, i) => `k${i + 1}`)
+  for (let i = 0; i < keys.length; i += 100) await as('boss', `select public.crm_read_notifs($1)`, [keys.slice(i, i + 100)])
+  const kept = (await as('boss', `select notif_read from crm_staff_prefs`))[0].notif_read
+  check([kept.length, kept[0], kept[499]], [500, 'k101', 'k600'], 'the newest 500 read keys are kept, oldest first')
+  await as('boss', `select public.crm_read_notifs('{k200}')`)
+  const again = (await as('boss', `select notif_read from crm_staff_prefs`))[0].notif_read
+  check([again.length, again[499], again.filter(k => k === 'k200').length], [500, 'k200', 1], 'a key read again moves to the end, once')
+}
 
 // 10. crm_people() hands over each person's title from People (mig 20261009190000).
 const crmPpl = (await as('boss', `select public.crm_people() as p`))[0].p.people

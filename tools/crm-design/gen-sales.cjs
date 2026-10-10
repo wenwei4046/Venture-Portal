@@ -19,6 +19,15 @@ function protoNode(name, marker) {
   while ((m = re.exec(s))) { depth += m[1] ? -1 : 1; if (!depth) return s.slice(at, s.indexOf(">", m.index) + 1); }
   throw new Error(name + ": unbalanced " + marker);
 }
+/** The whole element that starts with `start` (an opening tag's beginning), from the prototype or a fragment, balanced on `tag`. */
+function balanced(s, start, tag, what) {
+  const at = s.indexOf(start);
+  if (at < 0) throw new Error(what + ": no " + start.slice(0, 60));
+  const re = new RegExp("<(/?)" + tag + "(?=[\\s>])", "g"); re.lastIndex = at;
+  let depth = 0, m;
+  while ((m = re.exec(s))) { depth += m[1] ? -1 : 1; if (!depth) return s.slice(at, s.indexOf(">", m.index) + 1); }
+  throw new Error(what + ": unbalanced " + start.slice(0, 60));
+}
 const once = (text, from, to) => { if (text.split(from).length !== 2) throw new Error("not exactly once: " + from.slice(0, 60)); return text.replace(from, to); };
 // rev 1010 §5 Insight: Team | Me under the title, the three hero figures open lists, the list sheet and Customer info with ‹ back.
 const insightFrag = (() => {
@@ -31,6 +40,17 @@ const insightFrag = (() => {
   return [f, protoNode("RS Insight", "{{ lsOpen }}"), protoNode("RS Insight", "{{ ctOpen }}"), protoNode("RS Insight", "{{ cfOpen }}")].join("\n");
 })();
 
+// rev 1010 §6 Notifications: the title with Mark all as read, Unread | Read, the empty line; an update taps to read, bold with a dot while unread.
+const profileFrag = (() => {
+  const p = proto("RS Profile"), f0 = lines(304, 429);
+  const headStart = '<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;"><h1';
+  const head = p.slice(p.indexOf(headStart), p.indexOf('<sc-if value="{{ hasInv }}"', p.indexOf(headStart)));
+  let f = once(f0, '<h1 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -.03em; line-height: 1.2;">Notifications</h1>', head);
+  const upd = '<sc-for list="{{ notifUpd }}"';
+  f = once(f, balanced(f0, upd, "sc-for", "3b Profile"), balanced(p, upd, "sc-for", "RS Profile"));
+  return f;
+})();
+
 const line34 = src[33];
 const shellPart = line34.slice(line34.indexOf('<sc-if value="{{ rdX }}"'));
 
@@ -41,7 +61,7 @@ const parts = [
   ["SalesContacts", "ContactsVM", lines(121, 180), "Contacts: A–Z, swipe to edit or delete, customer details and info sheets."],
   // rev 1010 §3: a visit opens Contacts' Customer info sheet (lines 145–150) and its form (127–144) on the Calendar too.
   ["SalesCalendar", "CalendarVM", lines(183, 301) + "\n" + lines(145, 150) + "\n" + lines(127, 144), "Calendar: Month / Week / Day, Today with Show up / No show, upcoming, outcome and celebration; Customer info and its form."],
-  ["SalesProfile", "ProfileVM", lines(304, 429), "Profile: card, View my team, workspace, Notifications, Quick replies, Auto-reply."],
+  ["SalesProfile", "ProfileVM", profileFrag, "Profile: card, View my team, workspace, Notifications (Unread | Read), Quick replies, Auto-reply."],
   ["SalesInsight", "InsightVM", insightFrag, "Insight: Month / Week / Day / Range, the walnut hero and leads by status; Team | Me, the lists and Customer info."],
   ["SalesChat", "ChatVM", lines(496, 741), "A chat: header menu, messages, booking, quick replies, templates and every sheet."],
   // The customer form alone, for the Control panel's chat (Book visit asks for the details first, as here).

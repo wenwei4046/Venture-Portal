@@ -6,11 +6,12 @@ import type { SalesTab } from "../ui";
 
 export function headerVM(ctx: SalesCtx, onExit: () => void) {
   const { ui, set, data } = ctx;
-  const unread = unreadNotifs(salesNotifs(ctx), data.notifsSeenAt);
+  const unread = unreadNotifs(salesNotifs(ctx), data);
   return {
     backLabel: "Back to Revenue app", backVis: "visible" as const,
     crmBack: () => { if (ui.profSub) { set(u => ({ ...u, profSub: null })); return; } onExit(); },
-    openNotifTop: () => { set(u => ({ ...u, tab: "profile", profSub: "notif", hist: [...u.hist, u.tab].slice(-20) })); ctx.act.seenNotifs(); },
+    // Opening Notifications reads nothing by itself any more: each update is read when tapped (rev 1010 §6).
+    openNotifTop: () => { set(u => ({ ...u, tab: "profile", profSub: "notif", nTab: "unread", hist: [...u.hist, u.tab].slice(-20) })); },
     hasNotifBadge: unread > 0, notifBadge: unread ? String(unread) : "",
   };
 }
@@ -26,7 +27,7 @@ const NAV: [SalesTab, string, string][] = [
 
 export function navVM(ctx: SalesCtx) {
   const { ui, set, data, mine, now } = ctx;
-  const unread = unreadNotifs(salesNotifs(ctx), data.notifsSeenAt);
+  const unread = unreadNotifs(salesNotifs(ctx), data);
   const ids = new Set(mine.map(c => c.id));
   const upcoming = data.visits.filter(v => ids.has(v.customerId) && v.state === "booked" && new Date(v.start) > now).length;
   const badges: Record<SalesTab, number> = { inbox: mine.reduce((n, c) => n + (c.unread || 0), 0), contacts: 0, calendar: upcoming, insight: 0, profile: unread };
