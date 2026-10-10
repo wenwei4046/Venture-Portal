@@ -145,8 +145,8 @@ export interface HrAppData {
   talents: HrTalent[]
   docTypes: HrDocType[]
   letters: HrLetter[]
-  /** Department choices for a booking. */
-  bookDepts: string[]
+  /** Department choices for a booking: its id and name. */
+  bookDepts: Array<{ id: string; name: string }>
 }
 
 export const CHIP: Readonly<Record<ChipTone, [string, string]>> = {

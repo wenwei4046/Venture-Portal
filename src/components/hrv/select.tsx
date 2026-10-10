@@ -21,14 +21,9 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   round?: 10 | 12
   /** Leave out the kit's field box (padding, border, size) — the caller draws it. */
   bare?: boolean
-  /**
-   * `soft` (the portal): radius 10 and the handoff's chevron. `native`: the
-   * browser's own field, as the HR phone app draws it — only the popup is ours.
-   */
-  look?: 'soft' | 'native'
 }
 
-export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select({ className, round = 10, bare = false, look = 'soft', children, ...props }, outer) {
+export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select({ className, round = 10, bare = false, children, ...props }, outer) {
   const ref = useRef<HTMLSelectElement | null>(null)
   const [open, setOpen] = useState(false)
   const setRef = useCallback(
@@ -52,7 +47,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
     return () => el.removeEventListener('mousedown', onDown)
   }, [])
 
-  const cls = [bare ? '' : k.select, look === 'soft' ? s.field : '', look === 'soft' && round === 12 ? s.round12 : '', className ?? ''].filter(Boolean).join(' ')
+  const cls = [bare ? '' : k.select, s.field, round === 12 ? s.round12 : '', className ?? ''].filter(Boolean).join(' ')
   return (
     <>
       <select ref={setRef} {...props} className={cls} data-dd-open={open ? '1' : undefined}>

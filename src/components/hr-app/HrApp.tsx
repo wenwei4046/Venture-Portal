@@ -70,6 +70,9 @@ const TITLES: Record<string, [string, string]> = {
   more: ['HR', 'More'], insights: ['Hiring', 'Insights'], talents: ['Hiring', 'Talent Bank'], docs: ['Documentation', 'Data center'],
 }
 
+/** The book sheet opens on HR, as the prototype's does — or the first department there is. */
+const defaultDept = (d: HrAppData) => (d.bookDepts.find(x => x.name === 'HR') ?? d.bookDepts[0])?.id ?? ''
+
 const Chevron = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(128 107 96)" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
     <path d="M9 6l6 6-6 6" />
@@ -170,7 +173,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
             <div className={s.title} role="heading" aria-level={1}>{title}</div>
           </div>
           {view === 'rooms' ? (
-            <button type="button" className={s.headAction} onClick={() => openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: d.bookDepts[0] ?? '' })}>
+            <button type="button" className={s.headAction} onClick={() => openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: defaultDept(d) })}>
               + Book
             </button>
           ) : null}
@@ -279,7 +282,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
             <RoomsScreen
               d={d} day={day} today={today} setDate={setDate} roomView={roomView} setRoomView={setRoomView}
               openBooking={id => openSheet({ k: 'booking', id })}
-              bookAt={(roomId, from) => openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: d.bookDepts[0] ?? '', room: roomId, from: String(from), to: String(from + 60) })}
+              bookAt={(roomId, from) => openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: defaultDept(d), room: roomId, from: String(from), to: String(from + 60) })}
             />
           ) : null}
 
@@ -777,7 +780,7 @@ function SheetView(p: {
   )
   const SelectField = ({ k, label, options }: { k: string; label: string; options: Array<{ v: string; l: string }> }) => (
     <Field label={label}>
-      <Select bare look="native" className={s.selectBox} value={str(k)} onChange={e => set(k)(e.target.value)}>
+      <Select bare className={s.selectBox} value={str(k)} onChange={e => set(k)(e.target.value)}>
         <option value="">Choose…</option>
         {options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
       </Select>
@@ -870,7 +873,7 @@ function SheetView(p: {
     body = (
       <>
         <Field label="Meeting title"><input className={s.input} placeholder="e.g. Interview" value={str('title')} onChange={e => set('title')(e.target.value)} /></Field>
-        <SelectField k="dept" label="Department" options={d.bookDepts.map(x => ({ v: x, l: x }))} />
+        <SelectField k="dept" label="Department" options={d.bookDepts.map(x => ({ v: x.id, l: x.name }))} />
         <SelectField k="room" label="Room" options={d.rooms.map(r => ({ v: r.id, l: `${r.name} · ${r.seats} seats` }))} />
         <SelectField k="from" label="From" options={times} />
         <SelectField k="to" label="To" options={times} />
