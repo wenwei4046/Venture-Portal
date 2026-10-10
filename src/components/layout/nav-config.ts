@@ -399,6 +399,8 @@ function navEntries(data: NavData): NavEntry[] {
     { href: '/team/documentation', label: 'Documentation', section: 'People', visible: canAccessDocumentation },
     // Hiring (2026-10-11, HR revamp round 2): HR's requests, from submission to filled.
     { href: '/hiring/requests', label: 'Hiring Requests', section: 'Hiring', visible: canAccessHiring },
+    { href: '/hiring/insights', label: 'Hiring Insights', section: 'Hiring', visible: canAccessHiring },
+    { href: '/hiring/talent', label: 'Talent Bank', section: 'Hiring', visible: canAccessHiring },
 
     // ── Reports & Admin ──
     { href: '/reports/ledger', label: 'General Ledger', section: 'Reports & Admin', visible: canAccessReports },

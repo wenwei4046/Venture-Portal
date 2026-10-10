@@ -92,6 +92,9 @@ export const PAGE_TABS = {
   // Hiring (round 2, 2026-10-11): a request's own page opens from the same tab as the list.
   '/hiring/requests': ['hr.hiring_requests'],
   '/hiring/requests/[id]': ['hr.hiring_requests'],
+  '/hiring/insights': ['hr.hiring_insights'],
+  '/hiring/talent': ['hr.talent_bank'],
+  '/hiring/talent/[id]': ['hr.talent_bank'],
   // Changes: what it shows follows the reader's other boxes (each view's Audit Log).
   '/audit-log': ['hr.audit_log', 'fin.audit_log', 'pri.audit_log'],
   // Admin › Meeting Rooms (2026-10-11): every view books a room.

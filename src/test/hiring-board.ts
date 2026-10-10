@@ -62,13 +62,17 @@ const RAW: Raw[] = [
 ]
 const FILLED: Record<string, [string, number]> = { 'HR-202': ['Jobstreet', 450], 'HR-200': ['Social Media', 120], 'HR-199': ['Jobstreet', 380], 'HR-198': ['LinkedIn', 900], 'HR-197': ['Referral', 200] }
 
+/** The day a step first happened, as the database keeps it on the request. */
+const at = (r: Raw, what: string) => { const e = r.events.find(x => x[0] === what); return e ? iso(e[1]) : null }
+
 const requests: HiringRequest[] = RAW.map(r => {
   const filled = FILLED[r.id]
   const events = r.events.map(e => (e[0] === 'Filled' && filled ? ([e[0], e[1], e[2], `${e[3]} · via ${filled[0]} · cost RM ${filled[1]}`] as Ev) : e))
   return {
     id: r.id, status: r.status, source: 'portal', requestedBy: r.by, requesterName: nameOf(r.by), requesterDepartment: deptOf(r.by), requesterCompany: null, requesterPhone: null,
     fields: FIELDS, answers: r.a, ownerId: r.owner ?? null, assistedBy: null, hiredNames: r.hired ? [r.hired] : [], hiredThrough: filled?.[0] ?? null, hiringCost: filled?.[1] ?? null,
-    attachmentName: null, submittedAt: iso(r.when), acknowledgedAt: null, filledAt: null, closedAt: null,
+    attachmentName: null, submittedAt: iso(r.when), acknowledgedAt: at(r, 'Acknowledged'), filledAt: r.status === 'filled' ? at(r, 'Filled') : null,
+    closedAt: at(r, 'Filled') ?? at(r, 'Cancelled'),
     candidates: (r.cands ?? []).map(c => ({ id: c.id!, name: c.name!, phone: c.phone ?? '', source: c.source ?? 'Applied', stage: c.stage!, talentId: c.talent ?? null, answers: c.x ?? {}, note: c.note ?? '', resumeName: c.file ?? null })),
     events: evs(events),
   }

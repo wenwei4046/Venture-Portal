@@ -28,7 +28,7 @@ export default async function HiringRequestDetailPage({ params }: { params: Prom
       board={read.board}
       request={request}
       can={{ create: canDo(user, 'hiring', 'create'), edit: canDo(user, 'hiring', 'edit'), approve: canDo(user, 'hiring', 'approve') }}
-      talentPage={false}
+      talentPage
     />
   )
 }
