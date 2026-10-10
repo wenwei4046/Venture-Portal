@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import type { User, UserRole } from '@/types'
@@ -10,7 +10,7 @@ import { actionsFromJson, actionsFromKeys, canDo, type FunctionKey } from '@/lib
 import { approvableTypes, canSeeApprovals } from '@/lib/approval-domains'
 import { isSensitiveField, type Action, type Scope } from '@/lib/permission-matrix'
 import { sensitiveFromKeys } from '@/lib/sensitive'
-import { opensPage, storedTabsFrom, userTabs, type PageRoute } from '@/lib/page-tabs'
+import { actionsOnPage, opensPage, routeOf, storedTabsFrom, tabsAreExplicit, userTabs, type PageRoute } from '@/lib/page-tabs'
 
 // Per-request dedup. Middleware, layout, and Server Actions all converge
 // on getUser(); wrapping with React.cache() collapses the Supabase calls
@@ -87,6 +87,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
     sensitive: (Array.isArray(fields) ? fields : []).filter(isSensitiveField),
   }
   user.tabs = userTabs(storedTabsFrom(stored), user.actions, user.permissions)
+  user.tabsExplicit = tabsAreExplicit(storedTabsFrom(stored))
   // Switching views is its own permission since 2026-10-08: Ultimate full
   // access has it, Full access is everything else without it. Read off the
   // REAL account's keys — a masked session keeps it, so it can switch back.
@@ -113,6 +114,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
       actions,
       sensitive: (them.sensitive ?? []).filter(isSensitiveField),
       tabs: userTabs(storedTabsFrom(them.tabs), actions, permissions),
+      tabsExplicit: tabsAreExplicit(storedTabsFrom(them.tabs)),
       actualRole: user.role,
       canSwitchView,
       viewingAs: { id: them.id, name: them.name },
@@ -139,6 +141,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
       permissions: maskedKeys,
       actions: maskedActions,
       tabs: userTabs(null, maskedActions, maskedKeys),
+      tabsExplicit: false,
       // The page masks as the viewed role would see it; the database still
       // answers for the real account, so lib/private-fields.ts masks again.
       sensitive: sensitiveFromKeys(maskedKeys, viewAs),
@@ -207,7 +210,38 @@ export async function requirePage(route: PageRoute): Promise<User> {
   if (!opensPage(user.tabs, route)) {
     redirect('/dashboard')
   }
+  // Its writes follow this page's own tabs' boxes (2026-10-11, the user: "yes
+  // separate by tab"): the request's account is narrowed IN PLACE — getUser is
+  // cached per request, so every canDo after this on the page (each button,
+  // each form page's requireAction) asks the narrowed actions.
+  if (user.tabsExplicit && !NARROWED.has(user)) {
+    user.actions = actionsOnPage(user.actions ?? {}, user.tabs ?? [], route)
+    NARROWED.add(user)
+  }
   return user
+}
+
+/** Accounts already narrowed to the page this request draws (requirePage). */
+const NARROWED = new WeakSet<User>()
+
+/**
+ * The account a write on this request acts as: on a page, narrowed to its
+ * tabs' boxes (requirePage); in a Server Action, to the tabs of the page it
+ * was sent from — its Referer, the page the browser was on. With no page to go
+ * by, as held. Only an account whose tabs are explicit is ever narrowed.
+ */
+async function actingUser(): Promise<User> {
+  const user = await requireAuth()
+  if (!user.tabsExplicit || NARROWED.has(user)) return user
+  const h = await headers()
+  if (!h.get('next-action')) return user
+  let route: PageRoute | null = null
+  try {
+    route = routeOf(new URL(h.get('referer') ?? '').pathname)
+  } catch {
+    route = null
+  }
+  return route ? { ...user, actions: actionsOnPage(user.actions ?? {}, user.tabs ?? [], route) } : user
 }
 
 /**
@@ -221,7 +255,7 @@ export async function requirePage(route: PageRoute): Promise<User> {
  * a hand-made request, and the dashboard is the honest answer to either.
  */
 export async function requireAction(fn: FunctionKey, action: Action, scope: Scope = 'all'): Promise<User> {
-  const user = await requireAuth()
+  const user = await actingUser()
   if (!canDo(user, fn, action, scope)) {
     redirect('/dashboard')
   }
@@ -230,7 +264,7 @@ export async function requireAction(fn: FunctionKey, action: Action, scope: Scop
 
 /** requireAction for a write reachable as either of two actions. */
 export async function requireAnyAction(...wants: Array<[FunctionKey, Action] | [FunctionKey, Action, Scope]>): Promise<User> {
-  const user = await requireAuth()
+  const user = await actingUser()
   if (!wants.some(([fn, action, scope]) => canDo(user, fn, action, scope ?? 'all'))) {
     redirect('/dashboard')
   }
@@ -244,7 +278,7 @@ export async function requireAnyAction(...wants: Array<[FunctionKey, Action] | [
  * asked about on its own, as the database's approver_may() asks.
  */
 export async function requireApprover(): Promise<User> {
-  const user = await requireAuth()
+  const user = await actingUser()
   if (approvableTypes(user).length === 0) {
     redirect('/dashboard')
   }
