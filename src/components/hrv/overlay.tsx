@@ -89,6 +89,8 @@ export function Drawer({
   children,
   footer,
   bodyStyle,
+  bare = false,
+  label,
 }: {
   open: boolean
   onClose: () => void
@@ -105,11 +107,37 @@ export function Drawer({
   children: ReactNode
   footer?: ReactNode
   bodyStyle?: CSSProperties
+  /** The panel only — no head, body or foot of the kit's: the children draw their own (Documentation's preview). */
+  bare?: boolean
+  /** The dialog's name when `bare` (there is no title to name it). */
+  label?: string
 }) {
   const id = useId()
   useEscape(open, onClose)
   const panel = useFocusIn(open)
   if (!open) return null
+  if (bare) {
+    return (
+      <Portal>
+        {fixed => (
+          <>
+            <div className={`${s.scrim}${fixed ? ` ${s.scrimFixed}` : ''}`} onClick={onClose} aria-hidden="true" />
+            <div
+              ref={panel}
+              tabIndex={-1}
+              role="dialog"
+              aria-modal="true"
+              aria-label={label}
+              className={`${s.drawer}${fixed ? ` ${s.drawerFixed}` : ''}`}
+              style={{ width, outline: 'none' }}
+            >
+              {children}
+            </div>
+          </>
+        )}
+      </Portal>
+    )
+  }
   return (
     <Portal>
       {fixed => (
