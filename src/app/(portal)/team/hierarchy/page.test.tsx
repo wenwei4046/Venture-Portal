@@ -79,14 +79,15 @@ beforeEach(() => {
 })
 
 describe('company hierarchy role loading', () => {
-  it('passes separate role cards to the chart while keeping Table and Levels on the active roster', async () => {
+  it('passes separate role cards to the chart while keeping People & roles and Levels on the active roster', async () => {
     const view = await TeamHierarchyPage()
     expect(adapters.permission).toHaveBeenCalledWith('team', 'team_directory')
-    expect(view.props).toMatchObject({ canEdit: true, chartOnly: false })
+    expect(view.props).toMatchObject({ canEdit: true, canManage: true, chartOnly: false })
     expect(adapters.rpc).not.toHaveBeenCalled()
     expect(view.props.people).toHaveLength(3)
     expect(view.props.chartPeople).toHaveLength(5)
-    expect(view.props.titles[0].people).toBe(2)
+    expect(view.props.roleTitles[0]).toMatchObject({ id: 'leader', levelId: 'manager', isActive: true })
+    expect(view.props.rolePeople.filter((p: { titleId: string | null }) => p.titleId === 'leader')).toHaveLength(2)
     expect(view.props.people.find((person: { id: string }) => person.id === 'rachael')).toMatchObject({ title: 'Team Leader' })
     expect(view.props.chartPeople.find((person: { id: string }) => person.id === 'ir-scheme:rachael')).toMatchObject({
       staffId: 'rachael', title: 'Head of IR', levelRank: 6, secondaryRole: true, membershipHref: '/revenue/ir/hierarchy',
@@ -134,7 +135,7 @@ describe('company hierarchy role loading', () => {
         }, error: null }
       : { data: null, error: { message: `unexpected rpc ${fn}` } })
     const view = await TeamHierarchyPage()
-    expect(view.props).toMatchObject({ canEdit: false, chartOnly: true })
+    expect(view.props).toMatchObject({ canEdit: false, canManage: false, chartOnly: true })
     expect(view.props.chartPeople.map((p: { id: string }) => p.id).sort()).toEqual(['chea', 'peter', 'rachael'])
     // The top of the tree hangs from the sub-department's director, as on HR's chart.
     expect(view.props.chartPeople.find((p: { id: string }) => p.id === 'rachael')).toMatchObject({ leadIds: ['peter'] })

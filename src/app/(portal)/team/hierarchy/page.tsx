@@ -9,8 +9,7 @@ import { companyHierarchyRoles, type CompanyChartMembership, type CompanyChartSu
 import type { SupabaseClient } from '@supabase/supabase-js'
 import HierarchyView from './_components/HierarchyView'
 import type { ChartPerson } from './_components/TeamOrgChart'
-import type { BoardTitle } from './_components/LevelsBoard'
-import type { TitleRow } from './_components/TitlesSection'
+import type { RolePerson, RoleTitle } from '@/lib/hierarchy-roles'
 
 /**
  * The roster is authoritative for company titles, reporting lines, Table and
@@ -180,13 +179,10 @@ export default async function TeamHierarchyPage() {
     directors: directorRows.map(director => ({ staffId: director.staff_id, subDepartmentId: director.sub_department_id })),
   })
 
-  // The board: every title as a chip, with the headcount holding it.
-  const headcount = new Map<string, number>()
-  for (const s of staff) {
-    if (!s.title_id) continue
-    headcount.set(s.title_id, (headcount.get(s.title_id) ?? 0) + 1)
-  }
-  const boardTitles: BoardTitle[] = (titles ?? []).map(t => {
+  // Every title with its rung and template — People & roles' bands, Levels'
+  // chips (2026-10-10, the HR revamp) — and the roster by title.
+  const templateNames = new Map(((templatesResult.data ?? []) as Array<{ id: string; name: string }>).map(t => [t.id, t.name]))
+  const roleTitles: RoleTitle[] = (titles ?? []).map(t => {
     /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
     const r = t as any
     return {
@@ -195,29 +191,19 @@ export default async function TeamHierarchyPage() {
       departmentId: r.department_id ?? null,
       departmentName: r.departments?.name ?? null,
       levelId: r.level_id ?? null,
-      people: headcount.get(r.id) ?? 0,
-      isActive: r.is_active,
-    }
-  })
-
-  // The Roles tab (2026-10-08): every title with its rung and its template.
-  const templateNames = new Map(((templatesResult.data ?? []) as Array<{ id: string; name: string }>).map(t => [t.id, t.name]))
-  const roleTitles: TitleRow[] = (titles ?? []).map(t => {
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-    const r = t as any
-    return {
-      id: r.id,
-      name: r.name,
-      departmentId: r.department_id ?? null,
-      departmentName: r.departments?.name ?? null,
       isActive: r.is_active,
       isDepartmentHead: r.is_department_head === true,
-      people: headcount.get(r.id) ?? 0,
-      levelRank: r.level_id ? (rungById.get(r.level_id)?.rank ?? null) : null,
       templateId: r.template_id ?? null,
       templateName: r.template_id ? (templateNames.get(r.template_id) ?? null) : null,
     }
   })
+  const rolePeople: RolePerson[] = staff.map(s => ({
+    id: s.id,
+    name: s.employee_name,
+    titleId: s.title_id,
+    department: s.departments?.name ?? null,
+    reportsTo: s.reports_to,
+  }))
 
   // Lines the ladder, as it stands now, would refuse. The trigger only checks
   // a line when it is drawn, so a ladder edited after the fact can leave some;
@@ -238,12 +224,13 @@ export default async function TeamHierarchyPage() {
       chartPeople={chartPeople}
       commissionHref={commissionHref}
       rungs={rungs}
-      titles={boardTitles}
       breaks={breaks}
       roleTitles={roleTitles}
+      rolePeople={rolePeople}
       departments={(deptResult.data ?? []).map(d => ({ id: d.id, name: d.name }))}
       canDeleteTitles={canManagePermissions(user)}
       canEdit={canDo(user, 'team', 'edit')}
+      canManage={canDo(user, 'team', 'manage')}
       chartOnly={!direct}
     />
   )

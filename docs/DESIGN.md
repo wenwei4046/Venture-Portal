@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -316,6 +316,20 @@ disagree, the file wins; every value is the prototype's.**
   Full page. Invite user: 420px of content (22px padding, 14px radius, the
   1px rim), 17px title, Email, Password with Regenerate, the Role chip on
   `246 246 244`, Cancel · Send invite.
+- **Hierarchy** (v3.26, 2026-10-10; `team/hierarchy/_components/`): the kit
+  head, compact tabs Org chart · People & roles (boxed count) · Levels.
+  People & roles is a 10px-radius frame on a `216 210 200` rim — a `1.4fr
+  1.2fr 1fr 1fr` head on `235 231 224` (11px 14px), a band per title (9px
+  14px on `241 237 230`, a 3px walnut left rule, the name 12.5px / 700
+  uppercase at .05em, an 11px mono "L7 · 5 people", then 12px underlined
+  Edit and Template: X at the right), plain white rows at 9px 14px (the name
+  500, department and template in `90 78 68`). Levels: rows at most 820px
+  wide, 6px apart — a `70px 1fr` grid at 10px 14px, 10px radius, hairline;
+  white with titles, `250 249 246` without; the level a 14px / 500 mono
+  "L7"; chips 4px 10px, 999px, 12px "Team Leader · 5" in the title's tone;
+  "No title on this level" 12px `152 142 130`; the level's name 12px brown
+  at the row's right (click to rename); a dragged-over row peach with an
+  orange rim; + Add level outlined above the list.
 - **Cross-check** with a measuring script that finds each element by its text
   on both and diffs computed font / colour / size / padding / border / radius
   / background (`.design/revenue-app/tools/measure-pl.mjs` is the pattern).
