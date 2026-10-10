@@ -22,6 +22,7 @@ import { monthFinishes, type HonourBoard } from "./honours";
 import { formFromRow, type WaitingForm } from "@/lib/commission/waiting-form";
 import { waitingAnswersFrom, type WaitingAnswer } from "./waiting-answers";
 import { queuesFrom, type WaitingQueue } from "./waiting-queue";
+import { SEND_REFUSED, appClosed, requestPageOf } from "./app-pages";
 import type { MemberArenaSnapshot } from "./arena";
 import type { ArenaHistorySnapshot } from "./arena-history";
 import type {
@@ -789,6 +790,7 @@ export async function calculateMemberQuote(
     )
       throw new Error("Enter a valid amount with up to two decimal places.");
     const user = await getMemberUser();
+    if (appClosed(user?.closed).sends.includes("quote")) throw new Error(SEND_REFUSED.quote);
     const principalView = !!user && isPrincipalAccount(user);
     const build = quoteBuild(input.build);
     const client = await session("member_quote", principalView);
@@ -1047,6 +1049,7 @@ export async function submitMemberRequest(
     const kind = field(form, "kind");
     if (!["claim", "replacement", "waiting"].includes(kind))
       throw new Error("Select a request type.");
+    await mustSend(requestPageOf(kind));
     let subDepartmentId = field(form, "subDepartmentId");
     if (!subDepartmentId) {
       const data = await rpc<MemberData>(client, "member_data_snapshot");
@@ -1307,8 +1310,16 @@ export async function loadMemberRequestHistory(id: string): Promise<MemberOutcom
 export async function cancelMemberRequest(id: string): Promise<MemberOutcome<MemberRequest>> {
   return outcome(async () => {
     const client = await session("member_requests");
+    // Withdrawing is sending too: the request's own page's Create (RLS keeps the read to its owner).
+    const { data: sent } = await client.from("member_requests").select("kind").eq("id", uuid(id, "request")).maybeSingle();
+    if (sent) await mustSend(requestPageOf((sent as { kind: string }).kind));
     return requestLabels(await rpc<MemberRequest>(client, "member_cancel_request", { p_request: uuid(id, "request") }));
   });
+}
+
+/** Refuses a send whose page's Create box was unticked for the caller (lib/member/app-pages.ts). */
+async function mustSend(page: "requests" | "track"): Promise<void> {
+  if (appClosed((await getMemberUser())?.closed).sends.includes(page)) throw new Error(SEND_REFUSED[page]);
 }
 
 /**

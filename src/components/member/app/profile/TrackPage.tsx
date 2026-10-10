@@ -23,8 +23,8 @@ export default function TrackPage({ vm, segment, onSegment, onBack, onOpen, onNe
   onSegment: (segment: TrackSegment) => void;
   onBack: () => void;
   onOpen: (id: string) => void;
-  /** Submit a new request → the Requests page. */
-  onNew: () => void;
+  /** Submit a new request → the Requests page, or its form; absent when they may send neither kind (2026-10-11). */
+  onNew?: () => void;
 }) {
   const rows = segment === "waiting" ? vm.waiting : vm.replacements;
   return (
@@ -61,7 +61,7 @@ export default function TrackPage({ vm, segment, onSegment, onBack, onOpen, onNe
         ))}
         {!rows.length && <p className={p.empty}>{segment === "waiting" ? "You haven't submitted a waiting list." : "No replacements submitted."}</p>}
       </section>
-      <button className={s.newLink} onClick={onNew}>Submit a new request →</button>
+      {onNew && <button className={s.newLink} onClick={onNew}>Submit a new request →</button>}
     </div>
   );
 }

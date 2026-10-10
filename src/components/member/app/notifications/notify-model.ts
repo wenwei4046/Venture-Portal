@@ -1,4 +1,4 @@
-import type { MemberIncome, MemberMemo, MemberRequest } from "@/lib/member/types";
+import type { MemberIncome, MemberMemo, MemberRequest, RequestKind } from "@/lib/member/types";
 import { monthName, rm2, shortDay } from "../format";
 import { ICON } from "../icons";
 
@@ -7,7 +7,7 @@ export type NotifTab = "all" | "requests" | "memos" | "results";
 export type NotifKind = "memo" | "res" | "pay" | "req";
 export type NotifGo =
   | { to: "memo"; memoId: string }
-  | { to: "requests"; requestId?: string }
+  | { to: "requests"; requestId?: string; kind?: RequestKind }
   | { to: "income" }
   | { to: "arena" };
 
@@ -48,6 +48,8 @@ export interface NotifyInput {
   results?: SettledResults | null;
   readAll: boolean;
   requestCode: (request: MemberRequest) => string;
+  /** Where the app may take them (2026-10-11): news about a page their ticks close is not shown. */
+  opens?: (go: NotifGo) => boolean;
 }
 
 const STATUS: Record<string, { text: string; tone: NonNullable<NotifItem["done"]>["tone"] }> = {
@@ -94,7 +96,7 @@ export function notifications(input: NotifyInput): { items: NotifItem[]; count: 
       sub: action ? r.note || "HR needs more information." : `${input.requestCode(r)}${r.note ? ` · ${r.note}` : ""}`,
       open: action, unread: action, big: null, link: action ? "Open request" : null,
       done: action ? { text: "Returned · needs your update", tone: "red" } : status ? status : null,
-      go: { to: "requests", requestId: r.id },
+      go: { to: "requests", requestId: r.id, kind: r.kind },
     });
   }
   for (const m of input.memos) {
@@ -131,8 +133,8 @@ export function notifications(input: NotifyInput): { items: NotifItem[]; count: 
       open: false, unread: !input.readAll, big: null, link: "Open My income", done: null, go: { to: "income" },
     });
   }
-  const count = items.filter(n => n.open).length;
-  return { items, count };
+  const shown = input.opens ? items.filter(n => input.opens!(n.go)) : items;
+  return { items: shown, count: shown.filter(n => n.open).length };
 }
 
 export function notifGroups(items: NotifItem[], tab: NotifTab, settledMonth: string | null): NotifGroup[] {

@@ -273,4 +273,9 @@ describe('a page’s writes follow its own tabs’ boxes', () => {
     await requireAction('treasury', 'create')
     expect(redirect).not.toHaveBeenCalled()
   })
+
+  it('but a box of their own held back narrows them, over a template not saved on tabs too', async () => {
+    mocks.rpc.mockImplementation(answers({ ticks: null, boxes: [{ tab: 'fin.receipt', action: 'create', granted: false }], cells: true }))
+    expect((await requirePage('/receipts')).actions?.['treasury.create']).toBeUndefined()
+  })
 })

@@ -5,6 +5,7 @@ import { getAccountUser, getMemberUser } from "@/lib/auth";
 import { canDo } from "@/lib/permission-actions";
 import { loadMemberData } from "@/lib/member/server";
 import { productListAccess } from "@/lib/member/product-access";
+import { appClosed } from "@/lib/member/app-pages";
 import RevenueApp from "@/components/member/app/RevenueApp";
 
 export const dynamic = "force-dynamic";
@@ -27,5 +28,6 @@ export default async function MemberAppLayout({ children }: { children: ReactNod
   // is the signed-in account's own whatever view the portal was left in, as crm-actions.ts asks.
   const [data, products, account] = await Promise.all([loadMemberData({ lite: true }), productListAccess(user), getAccountUser()]);
   const crm = canDo(account, "crm", "view", "own");
-  return <RevenueApp initialData={data} productList={products} crm={crm}>{children}</RevenueApp>;
+  // The pages and sends their ticks close (2026-10-11): only what somebody unticked for them.
+  return <RevenueApp initialData={data} productList={products} crm={crm} closed={appClosed(user.closed)}>{children}</RevenueApp>;
 }

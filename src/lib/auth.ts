@@ -10,7 +10,7 @@ import { actionsFromJson, actionsFromKeys, canDo, type FunctionKey } from '@/lib
 import { approvableTypes, canSeeApprovals } from '@/lib/approval-domains'
 import { isSensitiveField, type Action, type Scope } from '@/lib/permission-matrix'
 import { sensitiveFromKeys } from '@/lib/sensitive'
-import { actionsOnPage, opensPage, routeOf, storedTabsFrom, tabsAreExplicit, userTabs, type PageRoute } from '@/lib/page-tabs'
+import { actionsOnPage, closedBoxes, opensPage, routeOf, storedTabsFrom, userTabs, type PageRoute } from '@/lib/page-tabs'
 
 // Per-request dedup. Middleware, layout, and Server Actions all converge
 // on getUser(); wrapping with React.cache() collapses the Supabase calls
@@ -87,7 +87,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
     sensitive: (Array.isArray(fields) ? fields : []).filter(isSensitiveField),
   }
   user.tabs = userTabs(storedTabsFrom(stored), user.actions, user.permissions)
-  user.tabsExplicit = tabsAreExplicit(storedTabsFrom(stored))
+  user.closed = closedBoxes(storedTabsFrom(stored))
   // Switching views is its own permission since 2026-10-08: Ultimate full
   // access has it, Full access is everything else without it. Read off the
   // REAL account's keys — a masked session keeps it, so it can switch back.
@@ -114,7 +114,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
       actions,
       sensitive: (them.sensitive ?? []).filter(isSensitiveField),
       tabs: userTabs(storedTabsFrom(them.tabs), actions, permissions),
-      tabsExplicit: tabsAreExplicit(storedTabsFrom(them.tabs)),
+      closed: closedBoxes(storedTabsFrom(them.tabs)),
       actualRole: user.role,
       canSwitchView,
       viewingAs: { id: them.id, name: them.name },
@@ -141,7 +141,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
       permissions: maskedKeys,
       actions: maskedActions,
       tabs: userTabs(null, maskedActions, maskedKeys),
-      tabsExplicit: false,
+      closed: [],
       // The page masks as the viewed role would see it; the database still
       // answers for the real account, so lib/private-fields.ts masks again.
       sensitive: sensitiveFromKeys(maskedKeys, viewAs),
@@ -214,8 +214,8 @@ export async function requirePage(route: PageRoute): Promise<User> {
   // separate by tab"): the request's account is narrowed IN PLACE — getUser is
   // cached per request, so every canDo after this on the page (each button,
   // each form page's requireAction) asks the narrowed actions.
-  if (user.tabsExplicit && !NARROWED.has(user)) {
-    user.actions = actionsOnPage(user.actions ?? {}, user.tabs ?? [], route)
+  if (user.closed?.length && !NARROWED.has(user)) {
+    user.actions = actionsOnPage(user.actions ?? {}, user.closed, route)
     NARROWED.add(user)
   }
   return user
@@ -228,11 +228,11 @@ const NARROWED = new WeakSet<User>()
  * The account a write on this request acts as: on a page, narrowed to its
  * tabs' boxes (requirePage); in a Server Action, to the tabs of the page it
  * was sent from — its Referer, the page the browser was on. With no page to go
- * by, as held. Only an account whose tabs are explicit is ever narrowed.
+ * by, as held. Only an account somebody unticked a box for is ever narrowed.
  */
 async function actingUser(): Promise<User> {
   const user = await requireAuth()
-  if (!user.tabsExplicit || NARROWED.has(user)) return user
+  if (!user.closed?.length || NARROWED.has(user)) return user
   const h = await headers()
   if (!h.get('next-action')) return user
   let route: PageRoute | null = null
@@ -241,7 +241,7 @@ async function actingUser(): Promise<User> {
   } catch {
     route = null
   }
-  return route ? { ...user, actions: actionsOnPage(user.actions ?? {}, user.tabs ?? [], route) } : user
+  return route ? { ...user, actions: actionsOnPage(user.actions ?? {}, user.closed, route) } : user
 }
 
 /**

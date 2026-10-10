@@ -14,7 +14,7 @@
  */
 
 import type { Scope } from '@/lib/permission-matrix'
-import { TAB_ACTIONS, TAB_BY_ID, personTicks, tabsFromCells, type PersonBox } from '@/lib/permission-tabs'
+import { PERMISSION_TABS, TAB_ACTIONS, TAB_BY_ID, grantOf, hasBox, personTicks, tabsFromCells, type PersonBox } from '@/lib/permission-tabs'
 
 const HR_COSTING = ['hr.hr_costing'] as const
 const PAYROLL = ['hr.payroll'] as const
@@ -255,16 +255,27 @@ export function userTabs(stored: StoredTabs | null, actions: Record<string, Scop
   return [...personTicks(base, stored.boxes)].sort()
 }
 
+/** Every box there is, `view.tab.action`: each tab's View and the actions it has. */
+const ALL_BOXES: readonly string[] = PERMISSION_TABS.flatMap(t => TAB_ACTIONS.filter(a => hasBox(t, a)).map(a => grantOf(t.id, a)))
+
 /**
- * Are their tabs the ones they were ticked — a template saved on tabs — rather
- * than worked out from their cells? Only then do a page's writes follow its own
- * tabs' boxes (`actionsOnPage`): worked-out ticks can leave a cell unticked that
- * the account still holds (Finance's Void, without Approve), and narrowing by
- * them would take it away. Person boxes over a template not yet saved on tabs
- * count from that save on.
+ * The boxes somebody unticked for them (2026-10-11) — what a page's writes
+ * (`actionsOnPage`) and the Revenue app's pages (`lib/member/app-pages.ts`)
+ * close by. A template saved on tabs closes every box its ticks, with their
+ * own boxes over them, leave out; over a template not saved on tabs yet, only
+ * the boxes their own were unticked (and the rest of a tab whose View was).
+ * Ticks worked out from cells close nothing: they can leave a box unticked
+ * whose cells the account still holds (Finance's Void, without Approve), and
+ * closing by them would take it away.
  */
-export function tabsAreExplicit(stored: StoredTabs | null): boolean {
-  return !!stored && stored.ticks !== null && !(stored.boxes.length === 0 && stored.cells)
+export function closedBoxes(stored: StoredTabs | null): string[] {
+  if (!stored || (stored.boxes.length === 0 && stored.cells)) return []
+  if (stored.ticks) {
+    const ticked: ReadonlySet<string> = personTicks(new Set(stored.ticks), stored.boxes)
+    return ALL_BOXES.filter(b => !ticked.has(b))
+  }
+  const heldBack = new Set<string>(stored.boxes.filter(b => !b.granted).map(b => grantOf(b.tab, b.action)))
+  return ALL_BOXES.filter(b => heldBack.has(b) || heldBack.has(`${b.slice(0, b.lastIndexOf('.'))}.view`))
 }
 
 /** The actions a write asks for — what a tab's Create, Edit and Approve stand for. View and Export never narrow. */
@@ -273,12 +284,12 @@ const WRITES = new Set(['create', 'edit', 'approve', 'void', 'manage'])
 /**
  * What they may DO on one page (2026-10-11, the user: writes "separate by
  * tab"): a write a tab of this page stands for counts only while one of those
- * tabs' boxes for it is ticked — Receipt's Create creates a receipt, Payments'
- * does not. A write none of the page's tabs stands for, and every View and
- * Export, stays as held. Only ever narrows.
+ * tabs' boxes for it is still open (`closedBoxes`) — Receipt's Create creates a
+ * receipt, Payments' does not. A write none of the page's tabs stands for, and
+ * every View and Export, stays as held. Only ever narrows.
  */
-export function actionsOnPage(actions: Readonly<Record<string, Scope>>, tabs: readonly string[], route: PageRoute): Record<string, Scope> {
-  const ticked = new Set(tabs)
+export function actionsOnPage(actions: Readonly<Record<string, Scope>>, closed: readonly string[], route: PageRoute): Record<string, Scope> {
+  const shut = new Set(closed)
   const out: Record<string, Scope> = {}
   for (const [cell, scope] of Object.entries(actions)) {
     const action = cell.slice(cell.indexOf('.') + 1)
@@ -287,7 +298,7 @@ export function actionsOnPage(actions: Readonly<Record<string, Scope>>, tabs: re
         const tab = TAB_BY_ID.get(id)
         return tab ? TAB_ACTIONS.filter(a => (tab.opens[a] ?? []).includes(cell as never)).map(a => `${id}.${a}`) : []
       })
-      if (boxes.length > 0 && !boxes.some(b => ticked.has(b))) continue
+      if (boxes.length > 0 && boxes.every(b => shut.has(b))) continue
     }
     out[cell] = scope
   }

@@ -17,31 +17,39 @@ const FILTERS: { id: RequestFilter; label: string }[] = [
   { id: "all", label: "All" }, { id: "claim", label: "Claim" }, { id: "replacement", label: "Replacement" }, { id: "waiting", label: "Waiting list" },
 ];
 
+const ALL_KINDS: readonly RequestKindVM[] = ["claim", "replacement", "waiting"];
+
 /**
  * Requests (lines 1081–1108): three ways to start one, then everything sent and where it is.
  * Each opens its form, in View as too — the form is where read-only shows (it sends nothing).
+ * `kinds`: the ones they may send (2026-10-11) — a claim is this page's Create, a waiting list
+ * or replacement Waiting list & replacements'.
  */
-export default function RequestsPage({ rows, filter, onFilter, onBack, onNew, onOpen }: {
+export default function RequestsPage({ rows, filter, kinds = ALL_KINDS, onFilter, onBack, onNew, onOpen }: {
   rows: RequestRowVM[];
   filter: RequestFilter;
+  kinds?: readonly RequestKindVM[];
   onFilter: (filter: RequestFilter) => void;
   onBack: () => void;
   onNew: (kind: RequestKindVM) => void;
   onOpen: (id: string) => void;
 }) {
   const shown = rows.filter(r => filter === "all" || r.kind === filter);
+  const starts = NEW.filter(n => kinds.includes(n.kind));
   return (
     <div className={s.page}>
       <PageHead back="Profile" title="Requests" onBack={onBack} />
-      <section className={s.newCard}>
-        {NEW.map(n => (
-          <button key={n.kind} className={s.newRow} onClick={() => onNew(n.kind)}>
-            <span className={`${s.newIcon} ${n.tone}`}><Svg d={n.d} size={20} sw={1.8} /></span>
-            <span className={s.sheetMinW}><span className={s.newTitle}>{n.title}</span><span className={s.newSub}>{n.sub}</span></span>
-            <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
-          </button>
-        ))}
-      </section>
+      {starts.length > 0 && (
+        <section className={s.newCard}>
+          {starts.map(n => (
+            <button key={n.kind} className={s.newRow} onClick={() => onNew(n.kind)}>
+              <span className={`${s.newIcon} ${n.tone}`}><Svg d={n.d} size={20} sw={1.8} /></span>
+              <span className={s.sheetMinW}><span className={s.newTitle}>{n.title}</span><span className={s.newSub}>{n.sub}</span></span>
+              <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
+            </button>
+          ))}
+        </section>
+      )}
       <section>
         <div className={s.sectHead}><h2 className={s.h2}>My requests</h2></div>
         <div className={s.filters}>
@@ -56,7 +64,7 @@ export default function RequestsPage({ rows, filter, onFilter, onBack, onNew, on
             <Svg d={ICON.chevronRight} size={14} sw={1.9} stroke="var(--rv-sub)" />
           </button>
         ))}
-        {!shown.length && <p className={s.empty}>{rows.length ? "No requests of this type." : "Nothing sent yet. Start a claim, a replacement or a waiting-list request above."}</p>}
+        {!shown.length && <p className={s.empty}>{rows.length ? "No requests of this type." : starts.length === NEW.length ? "Nothing sent yet. Start a claim, a replacement or a waiting-list request above." : starts.length ? "Nothing sent yet. Start one above." : "Nothing sent yet."}</p>}
       </section>
       <p className={s.note}>Each submission gets a request ID. HR approval, execution and payment are tracked separately.</p>
     </div>

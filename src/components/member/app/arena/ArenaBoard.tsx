@@ -15,7 +15,8 @@ export interface ArenaBoardActions {
   setBrand: (code: string) => void;
   openChamp: () => void;
   openFairs: () => void;
-  openFoot: () => void;
+  /** Insight's brand page — absent when their ticks close Insight (2026-10-11): the foot is not shown. */
+  openFoot?: () => void;
 }
 
 const medal = (n: number) => (n >= 1 && n <= 3 ? s[`m${n}`] : "");
@@ -60,7 +61,7 @@ export default function ArenaBoard({ vm, kind, dateLabel, actions }: { vm: Board
         )}
         {vm.rank && <RankBody rank={vm.rank} onChamp={actions.openChamp} />}
         {vm.fair && <FairBody fair={vm.fair} onFairs={actions.openFairs} />}
-        {vm.foot && (
+        {vm.foot && actions.openFoot && (
           <button className={s.foot} onClick={actions.openFoot}>
             <span className={s.footText}><span className={s.footTitle}>{vm.foot.title}</span><span className={s.footSub}>{vm.foot.sub}</span></span>
             <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />

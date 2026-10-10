@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MemberCatalogue, MemberCatalogueModel, MemberData, MemberMembership, MemberOrgMap, MemberProduct, MemberReadContext, QuoteInput } from "@/lib/member/types";
 import type { ProductListAccess } from "@/lib/member/product-access";
+import { NOTHING_CLOSED, requestPageOf, type AppClosed } from "@/lib/member/app-pages";
+import { allowedRoute, landing, requestPage, sends, shows } from "./app-access";
 import { setViewAs } from "@/components/layout/view-as-actions";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import { arenaRankings, type ArenaWeekBrand, type ArenaWeekPicks, type MemberArenaSnapshot } from "@/lib/member/arena";
@@ -91,6 +93,11 @@ export interface RevenueAppProps {
   productList?: ProductListAccess | null;
   /** Profile › My leads & appointments: the account holds CRM · View (2026-10-10). Previews keep it. */
   crm?: boolean;
+  /**
+   * The pages and sends their ticks close (2026-10-11, lib/member/app-pages.ts): a closed page is
+   * neither shown nor reachable, a closed send leaves its page sending nothing. Previews close none.
+   */
+  closed?: AppClosed;
   /** A preview draws the prototype's device around the app. */
   device?: Device;
   /** Fixtures: a fixed "today" and the source the preview reads. */
@@ -153,7 +160,7 @@ function useDesk(ref: RefObject<HTMLDivElement | null>): boolean {
   return desk;
 }
 
-export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
+export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
   // The live app keeps its answers on the phone, per account (2026-10-08, read-memory.ts): the next open shows them
   // at once and reads everything again behind them.
   const account = initialData.demo ? "" : initialData.profile.userId;
@@ -178,7 +185,18 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const pathname = usePathname();
   const router = useRouter();
   const onProducts = pathname === PRODUCTS_PATH;
-  const route = useMemo<Route>(() => (onProducts ? { ...baseRoute, screen: "products", staff: "" } : baseRoute), [onProducts, baseRoute]);
+  // A page their ticks close is never drawn: the app opens where it opens instead (2026-10-11), and the
+  // address follows below.
+  const route = useMemo<Route>(() => (onProducts ? { ...baseRoute, screen: "products", staff: "" } : allowedRoute(baseRoute, closed)),
+    [onProducts, baseRoute, closed]);
+  const home = landing(closed);
+  const hiddenScreens = useMemo<Screen[]>(() => (["today", "insight", "quote", "arena"] as const).filter(page => !shows(closed, page)), [closed]);
+  const closedRows = useMemo<WorkKey[]>(() => (["income", "requests", "track", "team"] as const).filter(page => !shows(closed, page)), [closed]);
+  const requestKinds = useMemo(() => (["claim", "replacement", "waiting"] as const).filter(kind => sends(closed, requestPageOf(kind))), [closed]);
+  const quoteSends = sends(closed, "quote");
+  useEffect(() => {
+    if (!onProducts && route !== baseRoute) go({ screen: route.screen, pf: null, ins: "main", arena: "hub" }, true);
+  }, [onProducts, route, baseRoute, go]);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [nfOpen, setNfOpen] = useState(false);
   const [nfTab, setNfTab] = useState<NotifTab>("all");
@@ -373,7 +391,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       sales: rank("sales"), margin: rank("margin"), champ: null };
   }, [settled, settledArena, membership?.name]);
   const nf = useMemo(() => notifications({ now: new Date(), memos: principal && !viewed ? [] : memos, requests: principal && !viewed ? [] : requests,
-    settled, salary: data.profile.salary, results, readAll, requestCode }), [memos, requests, settled, data.profile.salary, results, readAll, principal, viewed]);
+    settled, salary: data.profile.salary, results, readAll, requestCode,
+    // News about a page their ticks close is not shown (2026-10-11).
+    opens: go => go.to === "memo" || (go.to === "requests" ? requestPage(closed, go.kind ?? "claim") !== null : shows(closed, go.to)),
+  }), [memos, requests, settled, data.profile.salary, results, readAll, principal, viewed, closed]);
   const settledMonth = settled ? monthName(settled.period) : null;
 
   // ── the Quote's catalogue (2026-10-08): no longer in the snapshot every open waited for ──
@@ -425,7 +446,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     schemeId,
     bands: fixture?.quote?.bands ?? data.bands,
     storeKey: fixture || data.demo ? null : `${data.profile.userId}-${membershipId}`,
-    readOnly: principal && !!route.staff,
+    // View as reads it; an account whose ticks close the Quote's Create looks at its products only.
+    readOnly: (principal && !!route.staff) || !quoteSends,
     calc: quoteCalc,
     pricing: route.screen === "calc" || (desk && route.screen === "quote"),
     initial: fixture?.quote?.initial,
@@ -504,13 +526,13 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
 
   const todo = (t: TodayTodo) => {
     if (t.target === "memos") goScreen("account", { pf: "memos" });
-    else if (t.target === "requests") goScreen("account", { pf: "requests" });
+    else if (t.target === "requests") goScreen("account", { pf: requestPage(closed, t.requestKind ?? "claim") ?? "requests" });
     else goScreen("account", { pf: "brandWeeks" });
   };
   const openNotifItem = (n: NotifItem) => {
     setNfOpen(false);
     if (n.go.to === "memo") { goScreen("account", { pf: "memos" }); if (n.go.memoId) openMemo(n.go.memoId); }
-    else if (n.go.to === "requests") goScreen("account", { pf: "requests" });
+    else if (n.go.to === "requests") goScreen("account", { pf: requestPage(closed, n.go.kind ?? "claim") ?? "requests" });
     // A settled month's news opens on that month: the app itself opens on the current one.
     else if (n.go.to === "income") { setIncPeriod(settled?.period ?? null); goScreen("account", { pf: "income" }); }
     else openBoard("sales", settled?.period ?? null);
@@ -623,7 +645,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const arDateLabel = fixture?.arena?.dateLabel[arKind] ?? arPeriod.label;
   const arDateOptions = useMemo(() => fixture?.arena?.dateOptions[arKind] ?? periodOptions(arKind, period, monthState), [fixture, arKind, period, monthState]);
   const setArenaKind = (kind: PeriodKind) => { setArKind(kind); setArFrom(null); };
-  const todayVM = fixture?.today ?? model;
+  const todayVM = useMemo(() => {
+    const vm = fixture?.today ?? model;
+    const todo = vm.todo.filter(t => t.target !== "requests" || requestPage(closed, t.requestKind ?? "claim") !== null);
+    return todo.length === vm.todo.length ? vm : { ...vm, todo };
+  }, [fixture, model, closed]);
   const nfCount = fixture?.notifications.count ?? nf.count;
   const nfGroupsVM = fixture?.notifications.groups ?? notifGroups(nf.items, nfTab, settledMonth);
   const nfSummaryVM = fixture?.notifications.summary ?? notifSummary(nf.count, settledMonth);
@@ -683,8 +709,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         log: [...d.log.map(e => ({ ...e, dot: "past" as const })), { what: "Cancelled", who: "You", when: "Just now", note: "", dot: "bad" as const }] };
     }
     const r = myRequests.find(x => x.id === reqPick);
-    return r ? requestDetailVM(r, history[r.id]?.events ?? null, { nameOf, readOnly: readOnlyView, queues }) : null;
-  }, [reqPick, fxp, cancelled, myRequests, history, nameOf, readOnlyView, queues]);
+    // Sent under its own page's Create (2026-10-11): a claim Requests', a waiting list or replacement its own page's.
+    return r ? requestDetailVM(r, history[r.id]?.events ?? null, { nameOf, readOnly: readOnlyView || !sends(closed, requestPageOf(r.kind)), queues }) : null;
+  }, [reqPick, fxp, cancelled, myRequests, history, nameOf, readOnlyView, queues, closed]);
   // A waiting list or replacement opens the handoff's sheet (Edit request → Update); a claim keeps its own.
   const reqKind = fxp ? (reqPick ? fxp.requests.rows.find(r => r.id === reqPick)?.kind ?? null : null) : myRequests.find(r => r.id === reqPick)?.kind ?? null;
   const vaGroups = useMemo(() => (fxp
@@ -930,10 +957,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // a pull reads it again only on the Quote, never for a warm (it costs the database ~0.6 s).
   const catalogueWarmed = useRef(false);
   useEffect(() => {
-    if (booting || catalogueWarm || catalogueWarmed.current || !catalogueNeedsWarm(source, live, data.demo, !!fixture)) return;
+    if (booting || catalogueWarm || catalogueWarmed.current || !catalogueNeedsWarm(source, live, data.demo, !!fixture) || !shows(closed, "quote")) return;
     const timer = window.setTimeout(() => { catalogueWarmed.current = true; setCatalogueWarm(true); }, CATALOGUE_WARM_MS);
     return () => window.clearTimeout(timer);
-  }, [booting, catalogueWarm, source, live, data.demo, fixture]);
+  }, [booting, catalogueWarm, source, live, data.demo, fixture, closed]);
   useEffect(() => {
     if (catalogueWarm && (catalogueRead.value || catalogueRead.error)) setCatalogueWarm(false);
   }, [catalogueWarm, catalogueRead.value, catalogueRead.error]);
@@ -969,7 +996,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   reloadable.current = pullable && !bwBusy && !bwMonths?.some(m => m.dirty);
   // View as takes the page column's place too (the prototype's `vaPE` opens the rail). The Product List
   // keeps the whole column and makes room inside itself instead (`shift`).
-  const rail = desk && !onProducts && (nfOpen || anyPanel || route.screen === "quote" || vaOpen);
+  const rail = desk && !onProducts && (nfOpen || anyPanel || (route.screen === "quote" && quoteSends) || vaOpen);
   const productShell = useMemo<ProductShell>(() => ({
     shift: desk && (nfOpen || sheet !== null || vaOpen),
     closePanels: () => { setSheet(null); setNfOpen(false); setVaOpen(false); },
@@ -1010,13 +1037,15 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       setArKind("monthly"); setArFrom(period); setArSub("total");
       goScreen("arena", board ? { arena: "board", board } : {});
     };
+    // A page their ticks close is not opened from here: its figures stay, Your Arena goes (2026-10-11).
+    const insightOpen = shows(closed, "insight"), arenaOpen = shows(closed, "arena");
     page = <Today model={todayVM} hidden={hidden} actions={{
       toggleHide: () => setHidden(!hidden),
-      openMetric: key => insightThisMonth(key === "sales" ? "bills" : key === "margin" ? "brand" : "kpi"),
+      openMetric: insightOpen ? key => insightThisMonth(key === "sales" ? "bills" : key === "margin" ? "brand" : "kpi") : undefined,
       openTodo: todo,
-      openOrders: () => insightThisMonth("bills"),
-      openArena: () => arenaThisMonth(),
-      openBoard: board => arenaThisMonth(board),
+      openOrders: insightOpen ? () => insightThisMonth("bills") : undefined,
+      openArena: arenaOpen ? () => arenaThisMonth() : undefined,
+      openBoard: arenaOpen ? board => arenaThisMonth(board) : undefined,
     }} />;
   } else if (route.screen === "insight") {
     const back = () => toInsight("main");
@@ -1051,7 +1080,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         setBrand: setArBrand,
         openChamp: () => setChampOpen(true),
         openFairs: () => setFairsOpen(true),
-        openFoot: () => toInsight("brand"),
+        openFoot: shows(closed, "insight") ? () => toInsight("brand") : undefined,
       }} />;
     } else {
       page = <ArenaHub vm={hubVM} kind={arKind} onKind={setArenaKind}
@@ -1086,11 +1115,13 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else if (pf === "team") {
       page = <TeamPage vm={teamView} onBack={back} onPerson={setPersonPick} />;
     } else if (pf === "requests") {
-      page = <RequestsPage rows={reqRows} filter={reqFilter} onFilter={setReqFilter} onBack={back}
+      page = <RequestsPage rows={reqRows} filter={reqFilter} kinds={requestKinds} onFilter={setReqFilter} onBack={back}
         onNew={k => { setRevising(null); setReqForm(k); }} onOpen={openRequest} />;
     } else if (pf === "track") {
+      // A new one: on Requests, or — Requests closed to them — its form at once; neither when they may not send it.
       page = <TrackPage vm={trackView} segment={trackSeg} onSegment={setTrackSeg} onBack={back} onOpen={openRequest}
-        onNew={() => goScreen("account", { pf: "requests" })} />;
+        onNew={!sends(closed, "track") ? undefined : shows(closed, "requests") ? () => goScreen("account", { pf: "requests" })
+          : () => { setRevising(null); setReqForm(trackSeg); }} />;
     } else if (pf === "crm" && crm) {
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} onExit={back} />;
@@ -1100,7 +1131,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       page = <BrandWeeksPage months={bwMonths} backOffice={backOffice} busy={bwBusy} error={bwError} saved={bwSaved}
         onPick={pickBrandWeek} onSave={() => void saveBrandWeeks()} onBack={back} />;
     } else {
-      page = <ProfileMain vm={profileVM} hidden={hidden} crm={crm} actions={{
+      page = <ProfileMain vm={profileVM} hidden={hidden} crm={crm} closedRows={closedRows} actions={{
         open: (key: WorkKey) => goScreen("account", { pf: key }),
         scheme: () => setSchemeOpen(true),
         brandWeeks: () => goScreen("account", { pf: "brandWeeks" }),
@@ -1116,7 +1147,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const screen = (
     <div className={`${s.screen} ${live ? s.screenLive : s.screenFramed} ${rail ? s.rail : ""}`} style={screenVars} data-platform={android ? "android" : "ios"}>
       {!live && device !== "desktop" && <StatusBar android={android} />}
-      <DeskAside active={route.screen} count={nfCount} notifOpen={nfOpen} me={me} onGo={goScreen} onQuote={() => openSheet("brand")}
+      <DeskAside active={route.screen} count={nfCount} notifOpen={nfOpen} me={me} hidden={hiddenScreens} home={home} onGo={goScreen} onQuote={() => openSheet("brand")}
         onNotif={toggleNotif} onProfile={() => goScreen("account")}
         products={productList ? { group: productList.group, onOpen: openProducts } : null}
         modules={principal ? { current: "revenue", onPick: pickModule } : null} />
@@ -1126,18 +1157,18 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       {viewed && <ViewingAsBar me={me} onSwitch={() => setVaOpen(true)} onExit={() => goScreen("account", { staff: "" })} />}
       {showHeader && (
         <MobileHeader ruled={scrolled} back={route.screen === "calc"} subName={membership?.name ?? ""} count={nfCount} me={me}
-          onLogo={() => goScreen("today")} onBack={() => goScreen("quote")} onSubDept={() => openSheet("sd")} onBell={openNotif}
+          onLogo={() => goScreen(home)} onBack={() => goScreen("quote")} onSubDept={() => openSheet("sd")} onBell={openNotif}
           onProfile={() => goScreen("account")} />
       )}
       <PullRefresh target={mainRef} enabled={pullable} refreshing={refreshing || bootOverKept} failed={refreshFailed} onRefresh={pullRefresh} />
       <main ref={mainRef} className={`${s.main} ${onProducts ? s.mainProducts : ""}`} onScroll={e => { const t = e.currentTarget.scrollTop; const v = t > 4, c = t > 110; if (v !== scrolled) setScrolled(v); if (c !== compact) setCompact(c); }}>
         {page}
       </main>
-      {route.screen === "quote" && quote.catalog && (
+      {route.screen === "quote" && quote.catalog && quoteSends && (
         <ProductsDock items={quote.items} itemsText={itemsText(quote.cart, quote.catalog.name)} open={quote.cartOpen} onBag={quote.toggleCart} onSetPrice={toCalc} />
       )}
       {route.screen === "calc" && quote.catalog && <CalcDock ready={!!customer} onPreview={() => { if (customer) quote.setPreviewOpen(true); }} />}
-      <BottomNav active={route.screen} android={android} live={live} onGo={goScreen} onQuote={() => openSheet("brand")} />
+      <BottomNav active={route.screen} android={android} live={live} hidden={hiddenScreens} onGo={goScreen} onQuote={() => openSheet("brand")} />
       <SubDeptSheet open={sheet === "sd"} options={subOptions} current={membership?.id ?? ""} onClose={() => setSheet(null)}
         onPick={id => { setSheet(null); go({ department: id, staff: principal ? route.staff : "" }); }} />
       <Notifications open={nfOpen} summary={nfSummaryVM} tab={nfTab} groups={nfGroupsVM}
@@ -1146,12 +1177,13 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         onClose={() => setSheet(null)} onPick={code => { quote.setBrand(code); goScreen("quote"); }} />
       {onQuote && quote.catalog && (
         <>
-          <DeskCalc show={desk && route.screen === "quote" && !anyPanel && !nfOpen} {...calcProps} />
+          <DeskCalc show={desk && route.screen === "quote" && !anyPanel && !nfOpen && quoteSends} {...calcProps} />
           <AllModelsSheet open={quote.allOpen} catalog={quote.catalog} cart={quote.cart} query={quote.query} onQuery={quote.setQuery}
             onClose={() => quote.setAllOpen(false)} onModel={quote.openModel} />
           <CartSheet open={quote.cartOpen && quote.cart.length > 0} cart={quote.cart} brandName={quote.catalog.name} itemsText={itemsText(quote.cart, quote.catalog.name)}
             onClose={() => quote.setCartOpen(false)} onClear={quote.clearCart} onBump={quote.bump} onRemove={quote.remove} onSetPrice={toCalc} />
           <ProductSheet sheet={quote.sheet} catalog={quote.catalog} memory={quote.memory} cart={quote.cart} build={quote.build} readOnly={quote.readOnly}
+            readOnlyLabel={principal && route.staff ? undefined : "View only"}
             actions={{
               close: quote.closeSheet, patch: quote.patch, patchFrame: quote.patchFrame, openBf: quote.openBf, editBf: quote.editBf,
               removeBf: quote.removeBf, backToMattress: quote.backToMattress, applyFrame: quote.applyFrame, add: quote.addSheet,

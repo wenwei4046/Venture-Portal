@@ -53,7 +53,11 @@ export interface TodayInput {
 
 export type TodoTone = "memo" | "request" | "weeks";
 export type TodoTarget = "memos" | "requests" | "brandWeeks";
-export interface TodayTodo { key: string; tone: TodoTone; icon: string; title: string; sub: string; target: TodoTarget }
+export interface TodayTodo {
+  key: string; tone: TodoTone; icon: string; title: string; sub: string; target: TodoTarget;
+  /** A request's kind: where it is followed up depends on it (app-access.ts `requestPage`). */
+  requestKind?: MemberRequest["kind"];
+}
 export interface TodayMetric { key: "sales" | "margin" | "kpi"; label: string; value: string; tag: string; tagTone: "sub" | "good"; loading?: boolean }
 /**
  * `ranked` shows the place; `unranked` says so in words (nothing on that board yet); `loading` is a placeholder;
@@ -158,7 +162,7 @@ function todos(input: TodayInput): TodayTodo[] {
       title: `Acknowledge ${memos.length} memo${memos.length === 1 ? "" : "s"}`, sub: memos.map(m => m.title).join(" · ") });
   }
   for (const request of input.requests.filter(r => r.status === "needs_info")) {
-    out.push({ key: `rq-${request.id}`, tone: "request", icon: ICON.receipt, target: "requests",
+    out.push({ key: `rq-${request.id}`, tone: "request", icon: ICON.receipt, target: "requests", requestKind: request.kind,
       title: `${KIND[request.kind]} needs info`, sub: `${input.requestCode(request)} · HR returned it` });
   }
   const arena = input.arena;
