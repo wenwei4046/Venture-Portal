@@ -55,6 +55,8 @@ scripts/pcb-data.json
 !.claude/personas/
 !.claude/flows/
 !.claude/agent-shared/
+# The per-tab rules CLAUDE.md sends Claude to (2026-10-10) — shared, versioned.
+!.claude/rules/
 
 # E2E test screenshot artifacts (local only)
 /e2e-screenshots/

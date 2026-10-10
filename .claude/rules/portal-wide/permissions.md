@@ -1,0 +1,424 @@
+---
+paths:
+  - "src/lib/auth.ts"
+  - "src/lib/supabase/admin.ts"
+  - "src/lib/permission*.ts"
+  - "src/lib/surfaces.ts"
+  - "src/lib/sensitive.ts"
+  - "src/lib/private-*.ts"
+  - "src/lib/approval-domains.ts"
+  - "src/lib/team-directory.ts"
+  - "src/lib/view-as.ts"
+  - "src/lib/roles.ts"
+  - "src/lib/kind-checks.test.ts"
+  - "src/lib/audit/**"
+  - "src/test/**"
+  - "src/app/*/audit-log/**"
+  - "src/app/*/approvals/**"
+  - "docs/access-matrix.md"
+  - "supabase/migrations/**"
+  - "tests/member-sql/validate-*.mjs"
+---
+
+# Every tab — permissions, the database's guard rails, audit and View as
+
+CLAUDE.md › Permissions is the summary; this is the whole of it: permission templates, the action each gate asks, approvals by domain, the database asking for the action on every write and read, reach (own / dept / all), salary / NRIC / bank, the app-wide audit history, View as.
+
+Read this before changing a permission, a gate, a table, a policy or a database function — in any tab — and again in every full scan of such a change (CLAUDE.md › Rules by tab). New decisions are added here, dated, never to CLAUDE.md. Until 2026-10-10 this was CLAUDE.md's Permissions section, moved word for word.
+
+Permissions (2026-09-01 — replaced the four hard-coded roles)
+Every gate in the portal reads a PERMISSION, not a role. A permission is granted
+by a TITLE, with a per-person exception available on somebody's page. `permission_defs` is the catalog; `has_scope()` derives the
+table-level scopes RLS asks about, so a title cannot be granted a page whose
+queries then come back empty.
+  App:  `requirePermission('treasury')`, `can(user, 'reports')`, `canAccessX(user)`
+  DB:   `(SELECT has_scope(ARRAY['treasury']))`
+        The same wrapping is mandatory for `current_user_role()`,
+        `current_user_segment()` and `current_user_department_id()` inside a
+        policy: `(select current_user_role())`. Bare, Postgres re-runs the
+        `users` lookup for EVERY ROW the policy checks (mig 20260909150000
+        fixed 18 such policies; the `users` table had been scanned 32.6M
+        times). The migration ends with a guard that fails if one comes back.
+A title with NO permissions of its own falls back to the role its holder's
+account was created with — which is why the cutover changed nobody's access.
+`users.role` survives ONLY for that fallback (the dept_manager row-scoped
+policies it also served ask the cell's reach since PR3c, below). Do not add new
+gates that read it.
+
+**PERMISSION TEMPLATES (2026-10-08, the People Management revamp — PR1 of 4;
+user: 不要 role，到最后是跟着 title 的 permission 走).** A title points at a
+TEMPLATE (`titles.template_id`): cells = function × action (view create edit
+approve void export manage) × scope (own / dept / all) in
+`permission_template_grants`, plus sensitive fields (salary / nric / bank) in
+`permission_template_sensitive`. Rows = `permission_functions` (the design's
+22 + Member Services, Revenue app, Switch views). One person is raised or
+lowered on a cell in `user_permission_cells` (scope NULL = ✕). Ten templates
+seeded, 29 titles mapped; ACCOUNTS EXECUTIVE waits for the user; the four
+shared accounts (no staff row) keep their role defaults. **Ultimate full
+access** = everything + `view_switch` (the View-as switcher reads that key on
+the REAL account — `User.canSwitchView` — not the Principal role); **Full
+access** = the same without it. THE GATES STILL READ MODULE KEYS:
+`current_permissions()` opens each cell's key via `permission_cell_keys`
+FAIL CLOSED — hr/treasury/admin-domain keys need the cell at All, hr keys need
+Salary amounts ticked, treasury keys need Treasury · View, admin keys (the
+Principal's own powers) need a Principal template — and the UI lists what is
+"held for now" with the reason (`heldCells`, `lib/permission-matrix.ts`,
+the TS twin of the SQL). The account's hidden role = the template's
+`base_role` (`sync_user_role` triggers; new role `staff` = no defaults).
+Retitling somebody WITH a login onto another template, or linking a login,
+needs `permissions_manage` (trigger `hr_staff_costs_permission_guard`) —
+HR cannot promote anybody, themselves included, by retitling. Writers are RPCs
+(`permission_template_save` w/ version + per-person reset list,
+`permission_template_create`, `permission_title_set_template`,
+`permission_user_cells_set`, `permission_user_clear_legacy`); a save that
+changes a cell somebody has their own value on asks keep-or-reset per person.
+Every change is in `audit_events` (one txid per save; History on the
+Permissions tab, `permission_history()`, `lib/permission-history.ts`). Old
+per-key `user_permissions` still apply on top (carrie's 3 denies) until cleared
+on her card. PR2 (actions enforced) below; NEXT: approvals by domain, PR3
+own/dept into RLS, PR4 masking — then `permission_cell_keys` goes. Migs `20261008110000`–`130000`,
+`tests/member-sql/validate-permission-templates.mjs`.
+
+**THE APP-WIDE HISTORY (2026-10-08; user: 在 portal 里人手改的资料全部要有 audit
+history（谁、什么时候、改前/改后）… ERP 自动送进来的大量资料不用逐行记，但人手在上面做
+的改动要记; and 这个 audit log 基本上就是跟着自己的权限 … Finance 没有 HR 那边的
+permission，同样他就不会看到 HR 的 audit log).** Every table of the app has ONE
+line in `audit_tables` (187): `mode` all (every insert / update / delete) ·
+people (only a signed-in person's change — the ERP-fed `sales_orders`,
+`sales_order_lines`, `sales_import_batches`, Open Bill suggestions,
+`comm_upsales`, the ERP's fairs / venues / organisers; trigger `WHEN
+(auth.uid() IS NOT NULL)`, so the feed costs nothing) · none (with a `reason`:
+logs that are a record already, the ERP catalogue mirror, statutory
+schedules, run statements, screen layouts, the unmerged CRM's tables). The
+trigger `audit_row_change()` (no arguments — it reads the line) keeps who
+(`actor_id` = auth.uid(); `actor_source` portal / server / database; a server
+write names its person via `actor_column`, the member's invoice upload), the
+row's key, before / after (`omit_columns` never copied — the ERP's `raw`, run
+and close snapshots; `diff_only` UPDATEs keep only changed + key + label
+columns on the wide tables), `changed` (updated_at / updated_by / version
+never count) and `needs` (a payroll voucher, its sources / attachments /
+approval and the pool rows its payment wrote need Payroll payouts or HR
+Costing — the line `lib/payroll-vouchers.ts` draws). **A NEW TABLE = one
+`SELECT audit_register('t', 'Label', 'Area', '{read_keys}' …)` in its own
+migration** — `src/lib/audit/registry.test.ts` fails otherwise, and so does
+the next audit migration's coverage check. **Reading follows the reader's own
+permissions:** nobody selects `audit_events` (grant revoked, PR1's policy
+closed); `audit_changes()` returns only tables whose `read_keys` the caller
+holds (`audit_log` = all), drops what `needs` a key they lack, and blanks
+`salary_columns` / `nric_columns` / `bank_columns` their title may not see
+(`current_sensitive_fields()`: template's sensitive fields, else Principal / HR
+bank+NRIC, Finance bank; salary = `salary_individual`) — the column names come
+back in `masked`. A department head reads none yet (own / dept = PR3).
+`config_audit_log`'s 44 rows were copied in (one negative txid per old save),
+its 8 triggers DISABLED, `log_config_change()` left unused — nothing is
+dropped (the MCP refuses any `DROP` text; use CREATE OR REPLACE TRIGGER /
+DISABLE TRIGGER / ALTER POLICY). UI: Audit Log is a sidebar group — **Changes**
+(`/audit-log`, `canSeeAuditChanges` = any key in `lib/audit/read-keys.ts`) and
+**Access** (`/audit-log/access`, `audit_log`; old `?resource=` links
+redirect). `lib/audit/changes.ts` (saves, fields, values), `lib/audit/refs.ts`
+(ids → names under the reader's session), mig `20261008190000`,
+`tests/member-sql/validate-app-audit.mjs`.
+
+**EACH ACTION TAKES EFFECT (2026-10-08, PR2; user: 每个 action 各自生效).** A
+write asks for the ACTION it is, not the module key: `requireAction('treasury',
+'create')` / `requireAnyAction([…], […])` / `requirePayrollPayoutsAction` (lib/auth.ts)
+at every Server Action and form page, `canDo(user, fn, action, scope?)` for the
+button (lib/permission-actions.ts), `has_action()` in SQL. The answer is
+`current_actions()` (jsonb `fn.action` → own / dept / all; `User.actions`): a
+titled person's template cells with their own cells over them, else what the
+account's KEYS allowed — `permission_key_actions` (80 rows, TS twin
+`KEY_ACTIONS`, a department manager's department functions at Dept) — so the four
+shared accounts can do exactly what they could (verified on prod: every one of
+the 5 logins' actions = its keys'). A cell counts only while one of the keys that
+open its function's pages is held (`viewKeysOf` = the keys that allowed its View;
+`has_action` asks the same) — PR1's fail-closed key rules still decide pages.
+What each cell opens is in docs/access-matrix.md (amendment 2026-10-08 PR2):
+Approve is somebody else's submission (the queue, a claim, a reconciliation
+marked done, amending a BOOKED loan — the Treasury description), a module's own
+steps are Create / Edit (HR's Complete, Submit, Total Close; Revenue's closes;
+Director Salary's Complete), Void reverses, Export is a file. A key's actions
+must cover every gate it passed (`permission-actions.test.ts`), which is why a
+sign-off Finance always made is Edit OR Approve (send a payroll batch back =
+Void | Approve) and `team` gives `team.manage` (titles + ladder, as HR had).
+`GATED_ACTIONS` lists every action a gate asks and the least reach (Claims ·
+Create Own, My Billing · Create and Dept reports · Export Dept, the rest All);
+the test scans `src/` and fails when a gate is added without it, and the
+matrix's *held for now* reads it (`heldCells`). Unconverted on purpose: page
+reads (key), Reports' layout (key), the member app (its own keys), Department
+mode (`has_perm` in the DB), member back office (DB `member_is_manager`), and
+approvals (below). Test mocks of a user carry `actions` (`src/test/with-actions.ts`);
+a user without them may do nothing. Mig `20261008200000`,
+`tests/member-sql/validate-permission-actions.mjs`.
+
+**APPROVALS GO BY DOMAIN (2026-10-09, PR2b).** A request is decided by whoever
+holds its DOMAIN's Approve — Treasury: vouchers, loans, fund sources and their
+cancellations (`tier_change` on a fund source), department expenses / payment
+requests, advances, withdrawals, escalations, base rate; HR Costing: payroll
+runs, HR cost submissions; Director Salary: Invoice Pool releases; contracts
+only the queue's — or the queue's own Approvals · Approve (everything), and
+NEVER by whoever raised it unless their account is the Principal kind (user
+2026-08-06 kept the Principal's self-approval; a checker approving their own is
+no check). SQL `approval_domain()` / `approvable_types()` / `approver_may(user,
+types, submitters)` (+ `_request(id)` / `_group(id)`; no sign-in = the old rule:
+the account handed in must be a Principal); TS twin `lib/approval-domains.ts`
+(`approvableTypes`, `decision` → why not, `canSeeApprovals`), gates
+`requireApprover` / `requireApprovalQueue` (lib/auth.ts). The ten approval
+functions (approve_single_voucher, the two batches, payroll run approve /
+reject, execute_loan_cancel / _fund_source_cancel — now also only behind an
+APPROVED cancellation — dept expense approve / reject, dept_request_pv_rejected)
+keep production's bodies: one statement swapped in place by
+`pg_temp.swap_check` (pg_get_functiondef + replace, refused unless the old check
+is there exactly once). New key `approvals_queue` (no table scope) is opened by
+Approvals · View, so the Director and Executive office reach `/approvals`
+without the admin-scope `approvals` key. Policies: approval_requests read /
+flip for deciders (`IN (SELECT unnest(approvable_types()))` — `= ANY ((SELECT
+arr))` parses as a SUBQUERY and fails `text = text[]`), loans / bank_accounts
+update for Treasury approvers. The queue draws a non-decidable row with "—" and
+why (`undecidable` on PendingApprovals). hr_costing / director_salary / revenue
+keys' Approve rows moved to the `approvals` key (UPDATE, not DELETE — the MCP
+refuses DELETE): hr@ approves no payroll run, as before. Mig `20261009010000`.
+
+**THE DATABASE ASKS FOR THE ACTION TOO (2026-10-09, PR3a).** A table's row
+policies opened it to whoever held ANY key of its domain (`has_scope(ARRAY
+['treasury'])`), and a View cell opens a key — so through the API a template
+that only reads Treasury raised payment vouchers and a Director who sees the
+roster wrote payroll. Every table a domain policy lets somebody write now also
+has a RESTRICTIVE policy per command, `needs_action_insert / _update / _delete`
+→ `may_write(table, command)` → `has_any_action(actions)` over the row of
+`permission_table_writes` (TS twin `TABLE_WRITES`, lib/permission-table-writes.ts;
+`fn.action` or `fn.action:dept` / `:own`). Restrictive = only takes away. Each
+list is every way the APP writes that table under the caller's own session: the
+gate of each server action writing it straight, of each SECURITY INVOKER function
+it calls (the Revenue / catalogue / ladder RPCs — `INVOKER_WRITES` in the test),
+and of each INVOKER trigger writing on its behalf (a voucher marks its invoice
+paid, so every voucher writer is on invoices UPDATE). DEFINER functions meet no
+row policy (postgres owns tables and functions, BYPASSRLS) — they ask for their
+own action (PR3b, below). `permission-table-writes.test.ts` holds the twin, scans
+every `.from('t').insert/update/upsert/delete` and `.rpc(invoker)` in src/ with
+its gates (own function, else its callers across imports) and fails when a gate
+lets in an action the table does not ask for, or a new domain table is written
+unregistered; the migration's guard refuses a domain write policy left without
+its restrictive one. A NEW table a domain policy opens: rows in
+`permission_table_writes` + `SELECT permission_writes_guard('t')` in its
+migration. `WRITES_WITHOUT_ACTION`: table_layout_defaults only. Residual, said
+out loud: a table's UPDATE cannot tell edit from void from approve (an approver
+may update a voucher), and an action that writes a table as a side effect may
+write it straight (Claims · Approve raises the claim's voucher). Mig
+`20261009020000`, `tests/member-sql/validate-table-writes.mjs`.
+
+**THE FUNCTIONS ASK FOR THE ACTION TOO (2026-10-09, PR3b).** 70 write functions
+(DEFINER, plus `commit_sales_import_batch` and the commission trigger
+`guard_revenue_commission_adjustment`) asked who the caller WAS — `IF v_role NOT
+IN ('finance','principal')`, `EXISTS … role IN ('principal','hr')`,
+`has_perm('hr_costing')`, `has_scope(ARRAY['hr'])` — so a template's hidden kind
+decided (a Finance · Checker could book a loan through the API; a Director whose
+template HAS Treasury · Create was refused it) and a View cell, which opens the
+key, could submit payroll. Each now asks `has_any_action(…)` for the action its
+app gate asks, its one check statement swapped in place in PRODUCTION's body
+(`pg_temp.swap_check`: whitespace-blind, exactly once, nothing else moves); no
+sign-in answers as before. A function that also runs INSIDE another one — as
+the same signed-in person — asks for the outer path's actions too:
+`mark_journal_entry_reversed` (the loan / fund-source cancel executors run as the
+cancellation's approver: + Treasury · Approve, Approvals · Approve),
+`assert_commission_payroll_open` (Revenue · Edit or HR Costing · Edit — closes,
+pay lines, HR's adjustments, the payroll triggers), `payroll_send_back_batch`
+(Finance's send-back of a whole run). On production only four things moved, none
+a page of theirs did: carrie's manual JVs (her Reconciliation is held back by
+hand; the table refused them since PR3a) and hr@ closing a voided voucher's
+approvals (Treasury · Void's). `permission-table-writes.test.ts` › *the DEFINER
+functions that ask for an action* reads every swap out of the migration and fails
+when a caller's gate lets in somebody the function refuses (All covers Dept
+covers Own; a `requireApprover()` path names its domain in
+`DECIDED_IN_ONE_DOMAIN`). A NEW write function asks `has_any_action` for its app
+gate's action — never `current_user_role()`, never a key. Left on purpose: the
+approvals (PR2b, by domain), `permissions_manage`, `department_mode`, reopening a
+closed payroll month (the Principal's), the member app's own keys, the
+service-role-only `reopen_director_salary` / `reverse_staff_payroll_accruals`,
+the commission-run functions no page calls (`apply / save / reopen_commission_run`,
+INVOKER), and every READ function (reach = PR3c). Mig `20261009030000`,
+`tests/member-sql/validate-function-actions.mjs`.
+
+**OWN AND DEPT REACH THE ROWS (2026-10-09, PR3c).** A cell's reach (Own / Dept /
+All) was the app's alone: 18 row policies asked `current_user_role() =
+'dept_manager'` (or a list of kinds), so a template's Dept cells reached its
+department only on a dept_manager-kind template, and Own reached nobody (Staff ·
+Basic raised a claim it could not read). Each now asks
+`has_action(fn, action, 'own'|'dept'|'all')` — with the department / segment read
+off the person (`current_user_department_id()`, `current_user_segment()`) — and
+is `TO authenticated` (has_action is not the publishable key's to call): Claims
+own / dept / all, raised only as yourself with Claims · Create; Dept Pool its
+department's pool, expense and payment requests; My Billing its department's
+invoices, contracts, requests and its own draft invoices in its segment; Dept
+reports its segment's invoices and journals; an approval request raised as
+yourself by `may_write` (PR3a's list); a Revenue commission adjustment read by HR
+Costing / Revenue · View. 17 READ functions behind those pages swap the kind for
+the same cells (`calculate_dept_np`, `get_dept_opex_rows`,
+`dept_invoice_settlements`, `rnp_invoice_events`, `bridge_mirror_slices`: All =
+any department / segment, Dept = theirs; the HR-cost lump sums, billing
+allocations, payroll accrual / funding reads: Billing, HR Costing or Treasury ·
+View; `revenue_pay_preview` / `comm_effective_direct_line_limits`: Revenue ·
+View). Production, every active login: the same rows in all ten tables; moved only
+reads no page of theirs makes — hr@ a department's NP / OPEX, carrie report-only
+mirror slices, Finance the per-director payout summary (Director Salary is not
+Finance's). `permission-table-writes.test.ts` refuses a later row policy that asks
+`current_user_role()`. Still by kind, on purpose: `approvals_decider_update`
+(owner kind may decide their own request), `table_layout_defaults`
+(`dashboard_summary` asks Treasury · View since Q7, below). Domain READS asked
+only the key (`has_scope`) until PR3d (below) — every table now also asks for
+the action. Mig `20261009040000`, `tests/member-sql/validate-reach.mjs`.
+
+**SALARY, NRIC AND BANK ACCOUNTS SHOW ONLY WHERE TICKED (2026-10-09, PR4; user
+chose A for the files).** A template's three Sensitive fields are
+`current_sensitive_fields()` (untemplated: Principal / HR bank + NRIC, Finance
+bank; salary = `salary_individual`), on the app side `User.sensitive` and
+`lib/sensitive.ts` (`sees`, `shown` → the value or `••••`, blank stays blank;
+the view-as switch masks as the viewed role, `sensitiveFromKeys`). Salary was
+already held: every key that opens a pay page needs the Salary tick (PR1). NRIC
+and account numbers were not — any session that read a staff row, a director or
+a salary-PV line read them raw, the Director template (Salary only) included.
+Now `hr_staff_costs.nric / bank_account_no / bank_account_no_2`,
+`directors.nric`, `payroll_voucher_lines.bank_account_no` and a payroll
+submission's per-person copies (`hr_cost_submissions.staff_snapshot /
+staff_allocation_snapshot`, which the Treasury scope could read) are NOT
+`authenticated`'s to SELECT — every other column is granted, writes untouched —
+so a `select('*')` on those tables fails. The way to them is three DEFINER
+readers that repeat each table's own SELECT policies (the migration refuses if
+those moved) and hand the value to a holder of the tick, `••••` to anybody else:
+`staff_private_fields(ids|NULL)`, `director_private_fields`,
+`payroll_line_accounts` — in the app `lib/private-fields.ts` (`readStaffPrivate`
+…, which mask again for view-as); `lib/private-columns.ts` lists the columns and
+`STAFF_ROW_COLUMNS` / `DIRECTOR_ROW_COLUMNS` replace `*`. `payment_cycle` masks its
+account numbers (production's body renamed `payment_cycle_unmasked`, service
+role only, behind it). The two files need the real numbers, so (choice A) the
+payroll bank CSV needs Bank and the KWSP / SOCSO / EIS / CP39 files NRIC — 403
+and not offered otherwise; raising salary PVs needs Bank too (app and
+`create_payroll_disbursement_vouchers`); the PV page and its print show `••••`.
+People: the editor sees an unticked field read-only and never sends it
+(`updateStaff` used to write NULL over a field the form lacked), editing a
+person needs the Salary tick (the form saves pay), the InfoTech import all
+three. `build_hr_cost_submission_payload` copies no number;
+`employee_chart_lifecycle` reads the four fields it uses, not `*`. On
+production nobody's page changed — every login on a page that shows a number
+holds its tick (dry-run per login: same rows, same values through the readers,
+same `payment_cycle`); a Salary-only title read 29 NRICs and 29 accounts as
+`••••`, 0 digits. Team · View without the Salary tick opens People through the
+directory since PR4b (below). TWO migrations so the deploy has no window: `20261009050000` (readers +
+functions; columns still readable) before the code, `20261009050100` (the
+revoke; refuses to run without the readers) once the code is live.
+`tests/member-sql/validate-sensitive-fields.mjs`,
+`src/lib/private-columns.test.ts`.
+
+**PEOPLE WITHOUT THE SALARY TICK (2026-10-10, PR4b; the user chose 1b and
+2b).** The Executive office (Team · View at All) and the Department head (Team ·
+View at Dept) hold Team · View without Salary amounts, and the `team` key the
+People pages asked for opens `hr_staff_costs` itself — pay columns and all — so
+PR1's fail-closed rule kept People shut for both. They get a key of their own,
+`team_directory` (scope `none`: no domain, so no row policy ever opens for it;
+`permission_cell_keys` team.view → it at ANY reach, no gate; NOT a View key of
+Team — no `permission_key_actions` row — so Team · Create / Edit / Manage still
+need `team`), and read People through two DEFINER readers, never the table
+(`lib/team-directory.ts`; `readsStaffTable(user)` = the `team` key decides which
+path a page takes, `canOpenPeople` the sidebar): `team_directory(ids)` = the
+rows their Team · View reaches (All everybody, Dept their department, Own
+themselves; `current_actions()->>'team.view'`), every column named one by one
+(a column added later stays out) — 1b: everything but pay (NULL without Salary
+amounts) and NRIC / account numbers (•••• without their ticks, PR4's rule);
+`team_org_chart()` = every active person's name, code, title, department and
+line, plus the Revenue sub-departments and their directors (so a tree hangs from
+its director) — 2b: a Department head reads the whole company's chart, names
+and titles only. People Management (no unattached logins, no Rank column, no
+Permissions tab), the person page and its floating card (no Permissions /
+Activity, no Edit / Promote / Employment / Invite — `PersonCardData.can`) and
+Hierarchy (Org chart only, read only: `TeamOrgChart`'s `canEdit` = Team · Edit
+stops drag, line drawing and Detach) open for them. marketing@ (untemplated
+dept_manager) does NOT get it — no role default; a template is the way. Mig
+`20261010010000`, `tests/member-sql/validate-team-directory.mjs` (32).
+
+**PAGES ASK THE CELLS, NOT THE KIND (2026-10-09, Q7).** The KIND
+(`users.role`) is a template's hidden base_role and a custom template's cells
+need not agree with it, yet thirty-odd pages and actions still branched on it:
+which Overview to draw, whether a department page shows only the viewer's own
+department, who decides a pool claim, who raises for somebody else's sign-off,
+which Settings tabs, whether Billing Allocation is read-only, a report's
+company-wide or department cut. Each asks the cells now, one rule per question
+in `lib/surfaces.ts`: `overviewFor` (Treasury · View → the treasury Overview,
+else HR Costing · View → HR's, else Dept Pool · View → the department's, else a
+well saying the title opens none), `decidesEverything` (Approvals · Approve:
+the sign-off queue), `raisesForSignOff` (Treasury · Create without Approvals ·
+Approve: Finance's own queues, Invoice Pool's *Request release*),
+`ownDepartmentOnly(fn)` (View held at Own / Dept, not All),
+`decidesPoolClaims` (Claims · Approve + Treasury · View — a pool claim's
+voucher is raised in the treasury; approve, reject and mark paid all ask it),
+`raisesDepartmentRequests` (My Billing · Create at Dept: a pool's request
+tabs), `seesAllSettings` (Settings · Manage, else Accounts + Departments),
+`reportsCompanyWide` (Reports · View, else the department's cut). Billing
+Allocation edits with HR Costing · Edit (its writes ask the same — the
+Principal may edit it now); Member services and the member preview go by their
+keys. The Overview's two summaries swapped their kind check for the cell
+(`dashboard_summary` Treasury · View, `hr_dashboard_summary` HR Costing ·
+View — production's bodies, one statement each; mig `20261009060000`). The
+five logins land exactly where their kind put them (`src/lib/surfaces.test.ts`,
+on production's own keys and actions); what moves is a template whose kind
+disagreed with its cells — the Director title (kind staff, Treasury · View)
+opens the treasury Overview instead of "Principal and Finance only"; nobody
+wears it on 2026-10-09 (carrie is the one templated login). Still by kind, on
+purpose, each with its why in `src/lib/kind-checks.test.ts` — which fails on a
+new `user.role` anywhere else: which app the account belongs to (Revenue app
+or portal), the shared table layouts (`table_layout_defaults`), reopening a
+Total-Closed payroll month (the Principal's), the owner kind's self-approval
+(`approver_may`; `isOwnerKind`, claims too), view-as, labels and the phone's
+tab bar. `tests/member-sql/validate-overview-actions.mjs`.
+
+**READS ASK FOR THE ACTION TOO (2026-10-09, PR3d).** A table's SELECT policies
+opened it to whoever held ANY key of its domain (`has_scope`), and a domain is
+wide: the hr domain is Director Pool, Director Salary, HR Costing, Revenue,
+People and the Salary tick together, so a title given Revenue alone read every
+director's payout through the API, Product List (admin) read the payroll,
+Billing (treasury) read the bank reconciliations. Like the writes (PR3a): every
+table a domain policy opens has a RESTRICTIVE `needs_action_select` asking
+`may_read(table)` (plpgsql) — does the caller hold one of
+`permission_table_reads`' actions for it (133 tables; twin
+`TABLE_READS` in `lib/permission-table-reads.ts`). The row policies still say
+WHICH rows. Each list is every way somebody reads the table under their own
+session, derived in `src/test/read-paths.ts` (the read scan
+`src/test/scan-reads.ts` — JSX, default exports, cache(), embedded relations,
+the service role's client skipped — plus what it cannot see written down: a
+check made by hand (`GUARDS`), a page's cell branches (`BRANCHES`: the
+Overview, the approval page), tables named at run time (`DYNAMIC_TABLES`),
+reads for whoever may (`WHOEVER_MAY`: audit labels), dead code), the
+SECURITY INVOKER functions the app calls (`INVOKER_READS`, production's
+bodies; `DEFINER_RPCS` names the rest — a new `.rpc()` must go in one), the
+INVOKER triggers (they read as the writer), the policies' own subqueries,
+security_invoker views, and each table's own writers. A page key counts as its
+function's View at the least reach (`claims.view:own`). Not registered
+(`READS_WITHOUT_ACTION`): users, title_levels, title_permissions (every
+session), access_log, user_permissions, user_permission_cells, audit_tables,
+member_requests, hr_import_templates (own rows). Three OWNER-rights views were
+readable whole by every signed-in session past every policy —
+`hr_monthly_payroll_summary` (department payroll totals; the app never read
+it), `dept_pool_balances`, `fund_source_outstanding` — and now read under the
+caller's policies (`security_invoker`); the migration refuses to finish while
+any view a session can read is not invoker. Production (rolled-back dry run,
+every login, row by row per table and view): the Principal reads exactly
+what it read; the others lose only reads no page of theirs makes — carrie the
+bank reconciliations, Settings' splits and overdue rules, report layouts; hr@
+the Product List mirror and the Venture pool; the views their whole-company
+answers. **A read of a registered table behind a gate it does not list fails
+`src/lib/permission-table-reads.test.ts` in CI: add the gate's action to
+`TABLE_READS` AND, in a new migration, to `permission_table_reads` (then
+`permission_reads_guard('<table>')`); a new table opened to a domain gets its
+row the same way.** Mig `20261009080000`,
+`tests/member-sql/validate-table-reads.mjs`.
+
+View as (2026-09-27): the Principal's `vp-view-as` cookie is shared by every
+tab. *Revenue View* (`revenue_member`) is honoured by the member app ONLY
+(`getMemberUser`); the portal's `getUser` ignores it. Before, switching one tab
+to Revenue View sent every other tab's portal page to /dashboard — a Product
+List tab "jumping to Overview". `vp-view` is a readable mirror of the choice,
+so a tab left open re-renders its shell when another tab switches
+(`useViewAsSync`, `lib/view-as.ts`). `getAccountUser` (2026-10-08) reads the
+account with no mask at all; only the Product List asks it.
+
+## The service role's callers — the whole paragraph (CLAUDE.md › Coding Conventions › Supabase client keeps the list)
+
+Supabase client — server-side (`lib/supabase/server.ts`) uses the anon key with RLS via SSR cookies. `admin.ts` is the service-role client and BYPASSES RLS entirely. It is `'server-only'` guarded and has exactly EIGHT callers: `app/api/whatsapp/v1/webhook/route.ts` (Meta, 2026-10-02 — calling `crm_ingest_whatsapp`, and logging a refused delivery to `crm_channel_events`), `app/api/messenger/v1/webhook/route.ts` (Meta again, 2026-10-03 — the same, with `crm_ingest_messenger`), `app/api/erp/v1/sales-orders/route.ts` and `app/api/erp/v1/products/route.ts` (each uses it for one thing — calling its ingest RPC; the second, since 2026-09-24 the items-only catalogue mirror, is the SAME machine path as the first, a second endpoint of one feed rather than a new kind of caller), `app/api/member-queue/route.ts` (the cron-secret queue sweep, `member_process_all_queues`), `lib/member/server.ts` (a member quote's PRICES — `member_catalogue(…, p_priced)`, service-role-only, read only after `member_quote_context` authorised the session — and, the same way, its cost ratios (`member_quote_cost_rules`, 2026-10-05: the context a member's own login can call no longer carries them), and the invoice attestation insert; since 2026-10-05 also the member's month through Comm Cal's engine, `loadMemberIncome`, read only after `member_income_context` authorised the session because the engine reads costs no member session may, and My honours' kept finishes, `member_honours`, written there so no browser can put a place in them), `team/people/invite-actions.ts`, and `lib/erp-sync/feed-key.ts` (2026-09-13: the key the ERP generated and somebody pasted on Comm Cal lives in Supabase Vault behind `erp_link_put/get/drop_secret` + `erp_feed_secret`, executable by the service role ONLY — because whatever an HR user's server action can read with their session, their browser can read too, and that key opens the receiver). Reach for it only when a machine path has no session to act under or a secret must stay out of every session's reach, never to dodge an RLS policy that is merely inconvenient.
