@@ -23,7 +23,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers })
   }
   try {
-    const { data, error } = await (adminClient() as unknown as SupabaseClient).rpc('member_process_all_queues')
+    const db = adminClient() as unknown as SupabaseClient
+    const { data, error } = await db.rpc('member_process_all_queues')
+    // Replacements HR scheduled whose day has come (mig 20261010170000). Each
+    // refusal is written on its own request for HR to read; only the call
+    // itself failing is this sweep's failure.
+    const due = await db.rpc('member_run_due_replacements')
+    if (due.error) console.error('Member replacement sweep failed', due.error.code ?? 'unknown')
     if (error || !data || !['complete', 'partial', 'skipped'].includes(data.status)) {
       // Log codes only. Never echo SQL errors, credentials or private rows.
       console.error('Member queue worker failed', error?.code ?? 'invalid_result')
@@ -32,8 +38,9 @@ export async function GET(request: Request) {
     const result = {
       status: data.status, runId: data.runId ?? null,
       departmentsProcessed: data.departmentsProcessed, newReservations: data.newReservations, failures: data.failures,
+      replacements: due.error ? null : { ran: Number(due.data?.ran) || 0, failed: Number(due.data?.failed) || 0 },
     }
-    return NextResponse.json(result, { status: data.status === 'partial' ? 500 : 200, headers })
+    return NextResponse.json(result, { status: data.status === 'partial' || due.error ? 500 : 200, headers })
   } catch {
     console.error('Member queue worker service unavailable')
     return NextResponse.json({ error: 'Queue service unavailable' }, { status: 503, headers })

@@ -13,6 +13,13 @@ import { officeToday } from '@/lib/office-time'
 import {
   ACCEPT_NOTE,
   REQUEST_FILTERS,
+  approveLabel,
+  approvedText,
+  arrangementOf,
+  choosesReplacement,
+  defaultEffective,
+  defaultSeat,
+  effectiveWhen,
   filterRequests,
   isOpen,
   requestCaption,
@@ -22,12 +29,17 @@ import {
   requestStatus,
   requestStep,
   requestTitle,
+  runFailure,
+  scheduledNotice,
+  seatOptions,
   type RequestFacts,
   type RequestFilter,
 } from '@/lib/member/member-services'
+import { scheduleReplacement, unscheduleReplacement } from '../replacement-actions'
 import s from './member-services.module.css'
 
 type Act = { label: string; primary?: boolean; needsNote?: boolean; input: AdminMemberInput; done: string }
+type Outcome = { ok: true; done: string } | { ok: false; reason: string }
 
 /**
  * Member services › Request reviews (2026-10-10, the HR revamp): every request
@@ -35,8 +47,8 @@ type Act = { label: string; primary?: boolean; needsNote?: boolean; input: Admin
  * right — its facts, the step HR takes, the note, the buttons, and its audit
  * history. A waiting-list applicant is accepted here and then transferred or
  * failed on Sales Groups; a claim is decided here, once, into payroll or as a
- * payment request; a replacement keeps today's approve → link → confirm steps
- * until it gets its automatic run (PR4b).
+ * payment request; a replacement is approved with who takes the seat and the
+ * date, and the system makes the change on that date (HR revamp 4b).
  */
 export default function RequestReviews({
   data,
@@ -52,8 +64,9 @@ export default function RequestReviews({
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [candidate, setCandidate] = useState('')
-  const [checked, setChecked] = useState(false)
+  // A replacement's choice, kept per request while HR looks at others.
+  const [seats, setSeats] = useState<Record<string, string>>({})
+  const [dates, setDates] = useState<Record<string, string>>({})
 
   const shown = filterRequests(data.requests, filter)
   const selected = data.requests.find(r => r.id === picked) ?? shown[0] ?? null
@@ -62,37 +75,60 @@ export default function RequestReviews({
     setPicked(id)
     setNote('')
     setError('')
-    setCandidate('')
-    setChecked(false)
   }
 
-  async function run(act: Act) {
+  async function perform(work: () => Promise<Outcome | null>) {
     if (busy) return
-    if (act.needsNote && !note.trim()) {
-      setError('Write a review note first — it goes on the record.')
-      return
-    }
     setBusy(true)
     setError('')
     try {
-      const result = await adminMemberAction(act.input)
+      const result = await work()
+      if (!result) return
       if (!result.ok) {
-        setError(result.error)
-        return
-      }
-      if (act.input.action === 'invoice') {
-        const url = (result.data as { url?: string } | null)?.url
-        if (url) window.open(url, '_blank', 'noopener,noreferrer')
+        setError(result.reason)
         return
       }
       setNote('')
-      setChecked(false)
-      flash(act.done)
+      flash(result.done)
     } catch {
       setError('The action could not be completed. Please try again.')
     } finally {
       setBusy(false)
     }
+  }
+
+  function run(act: Act) {
+    if (busy) return
+    if (act.needsNote && !note.trim()) {
+      setError('Write a review note first — it goes on the record.')
+      return
+    }
+    void perform(async () => {
+      const result = await adminMemberAction(act.input)
+      if (!result.ok) return { ok: false, reason: result.error }
+      if (act.input.action === 'invoice') {
+        const url = (result.data as { url?: string } | null)?.url
+        if (url) window.open(url, '_blank', 'noopener,noreferrer')
+        return null
+      }
+      return { ok: true, done: act.done }
+    })
+  }
+
+  function approve(r: MemberRequest, seat: string, successor: string | null, date: string, sub: string | null) {
+    void perform(async () => {
+      const result = await scheduleReplacement({ requestId: r.id, successorId: seat || null, effective: date, note })
+      if (!result.ok) return result
+      return { ok: true, done: approvedText(r, facts?.[r.id], successor, sub, date, result.ran) }
+    })
+  }
+
+  function unschedule(r: MemberRequest) {
+    void perform(async () => {
+      const result = await unscheduleReplacement(r.id)
+      if (!result.ok) return result
+      return { ok: true, done: 'Taken off the schedule — back to Pending review' }
+    })
   }
 
   return (
@@ -138,11 +174,13 @@ export default function RequestReviews({
             }}
             error={error}
             busy={busy}
-            candidate={candidate}
-            setCandidate={setCandidate}
-            checked={checked}
-            setChecked={setChecked}
+            seat={seats[selected.id]}
+            setSeat={v => setSeats(m => ({ ...m, [selected.id]: v }))}
+            date={dates[selected.id]}
+            setDate={v => setDates(m => ({ ...m, [selected.id]: v }))}
             run={run}
+            approve={approve}
+            unschedule={unschedule}
           />
         ) : (
           <p className={s.empty} style={{ margin: 0 }}>Nothing to review yet.</p>
@@ -160,11 +198,13 @@ function Detail({
   setNote,
   error,
   busy,
-  candidate,
-  setCandidate,
-  checked,
-  setChecked,
+  seat: seatChosen,
+  setSeat,
+  date: dateChosen,
+  setDate,
   run,
+  approve,
+  unschedule,
 }: {
   r: MemberRequest
   data: AdminMemberData
@@ -173,20 +213,29 @@ function Detail({
   setNote: (v: string) => void
   error: string
   busy: boolean
-  candidate: string
-  setCandidate: (v: string) => void
-  checked: boolean
-  setChecked: (v: boolean) => void
+  seat: string | undefined
+  setSeat: (v: string) => void
+  date: string | undefined
+  setDate: (v: string) => void
   run: (act: Act) => void
+  approve: (r: MemberRequest, seat: string, successor: string | null, date: string, sub: string | null) => void
+  unschedule: (r: MemberRequest) => void
 }) {
   const st = requestStatus(r.status)
   const sub = data.departments.find(d => d.id === String(r.detail.subDepartmentId ?? ''))?.name ?? null
   const name = String(r.detail.newPerson ?? '').trim() || 'The applicant'
   const open = isOpen(r)
+  const choosing = choosesReplacement(r)
   const can = data.canManageRequests
   const base = { requestId: r.id }
   const moreInfo: Act = { label: 'Request more information', needsNote: true, input: { action: 'needs_info', ...base, note }, done: 'Sent back for more information' }
   const reject: Act = { label: 'Reject', needsNote: true, input: { action: 'reject', ...base, note }, done: 'Request rejected' }
+
+  const today = officeToday()
+  const options = choosing ? seatOptions(r, data) : []
+  const seat = seatChosen ?? defaultSeat(r, options)
+  const date = dateChosen ?? defaultEffective(r, today)
+  const successor = options.find(o => o.id !== '' && o.id === seat)?.label ?? null
 
   let acts: Act[] = []
   let notice: ReactNode = null
@@ -203,12 +252,7 @@ function Detail({
       { label: 'Approve · add to payroll', primary: true, input: { action: 'approve', route: 'payroll', ...base, note }, done: 'Claim approved — added to payroll' },
     ]
   } else if (open && r.kind === 'replacement') {
-    acts = [moreInfo, reject, {
-      label: 'Approve arrangement',
-      primary: true,
-      input: { action: 'approve', ...base, note: note.trim() || 'Arrangement approved.' },
-      done: 'Arrangement approved — complete it in People Management, then confirm it here',
-    }]
+    acts = [moreInfo, reject]
   }
 
   if (r.kind === 'waiting' && ['waiting', 'reserved', 'accepted'].includes(r.status)) {
@@ -222,19 +266,36 @@ function Detail({
     notice = `${name} has been transferred to an employee.`
   } else if (r.kind === 'waiting' && r.status === 'failed') {
     notice = `Taken off the waiting list${r.note ? ` — ${r.note}` : ''}.`
+  } else if (r.kind === 'replacement' && r.status === 'scheduled') {
+    notice = (
+      <>
+        {scheduledNotice(r, facts, sub)}
+        {can ? (
+          <button type="button" className={s.linkish} disabled={busy} onClick={() => unschedule(r)}>Take off the schedule →</button>
+        ) : null}
+      </>
+    )
+  } else if (r.kind === 'replacement' && r.status === 'executed') {
+    notice = arrangementOf(r) === 'resignation' ? (
+      <>
+        Replaced automatically. See People Management for the deactivated record.
+        <Link href="/team/people">Open People Management →</Link>
+      </>
+    ) : (
+      <>
+        Replaced automatically. See Sales Groups for the new chart.
+        {sub ? <Link href={revenuePath(subDeptSlug(sub), 'hierarchy')}>Open Sales Groups →</Link> : null}
+      </>
+    )
   } else if (r.kind === 'claim') {
     const where = claimPayoutLine(readClaimPayout(r.payout), r.status, 'hr')
     if (where) notice = where
   }
 
-  const caption = requestCaption(r, sub)
-  const history = requestHistory(facts)
+  const caption = requestCaption(r, sub, facts)
+  const history = requestHistory(facts, r.kind)
   const signature = typeof r.detail.signatureImage === 'string' && /^data:image\/png;base64,/.test(r.detail.signatureImage) ? r.detail.signatureImage : null
-  const linkedId = String(r.detail.allocatedStaffId ?? '')
-  const vacancy = r.detail.replacementSource === 'vacancy'
-  const effective = String(r.detail.effective ?? '')
-  const due = !effective || effective <= officeToday()
-  const matches = data.candidates.filter(c => c.name.trim().toLowerCase() === name.toLowerCase())
+  const failure = r.kind === 'replacement' && r.status === 'scheduled' ? runFailure(r.note) : null
 
   return (
     <>
@@ -262,40 +323,29 @@ function Detail({
         <div className={s.stepTitle}>{requestStep(r)}</div>
         {caption ? <p className={s.caption}>{caption}</p> : null}
 
-        {r.kind === 'replacement' && r.status === 'approved' ? (
-          <div className={s.arrange}>
-            {vacancy ? null : linkedId ? (
-              <div className={s.arrangeRow}>
-                <span className={s.arrangeLabel}>Replaced by</span>
-                <b style={{ fontWeight: 500 }}>{facts?.successor ?? data.candidates.find(c => c.id === linkedId)?.name ?? 'Linked'}</b>
+        {choosing ? (
+          <div className={s.repl}>
+            <div>
+              <div className={s.replLabel} id={`seat-${r.id}`}>Replaced by · from People Management</div>
+              <div className={s.seats} role="radiogroup" aria-labelledby={`seat-${r.id}`}>
+                {options.map(o => (
+                  <button key={o.id || 'release'} type="button" role="radio" aria-checked={seat === o.id} className={s.seat} onClick={() => setSeat(o.id)}>
+                    {o.label}
+                    {/* Always there, as in the handoff: an empty one still keeps its 6px. */}
+                    <span className={s.seatMeta}>{o.meta}</span>
+                  </button>
+                ))}
               </div>
-            ) : (
-              <div className={s.arrangeRow}>
-                <span className={s.arrangeLabel}>Replaced by · from People Management</span>
-                <select className={s.select} value={candidate} onChange={e => setCandidate(e.target.value)} aria-label="Replaced by">
-                  <option value="">{matches.length ? 'Choose their staff record' : `No staff record named ${name} yet`}</option>
-                  {matches.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className={s.action}
-                  disabled={busy || !can || !candidate}
-                  onClick={() => run({ label: 'Link', input: { action: 'bind_candidate', ...base, staffId: candidate, note }, done: 'Replacement linked' })}
-                >
-                  Link
-                </button>
-              </div>
-            )}
-            <label className={s.check}>
-              <input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} />
-              <span>I have checked the original member&apos;s arrangement, the replacement&apos;s place and the effective date in People Management and Revenue.</span>
-            </label>
+            </div>
+            <div className={s.when}>
+              <span className={s.replLabel}>Effective date</span>
+              <input type="date" className={s.date} value={date} onChange={e => setDate(e.target.value)} aria-label="Effective date" />
+              <span className={s.whenText}>{date ? effectiveWhen(date, today) : ''}</span>
+            </div>
           </div>
         ) : null}
 
-        {open || (r.kind === 'replacement' && r.status === 'approved') ? (
+        {open || choosing ? (
           <label className={s.noteField}>
             <span className={s.noteLabel}>Review notes / reason</span>
             <textarea
@@ -307,27 +357,31 @@ function Detail({
           </label>
         ) : null}
 
-        <div className={s.actions}>
-          {acts.map(a => (
-            <button key={a.label} type="button" className={s.action} data-primary={a.primary ? 'true' : undefined} disabled={busy || !can} onClick={() => run(a)}>
-              {a.label}
-            </button>
-          ))}
-          {r.kind === 'replacement' && r.status === 'approved' ? (
-            <button
-              type="button"
-              className={s.action}
-              data-primary="true"
-              disabled={busy || !can || !checked || !due || (!vacancy && !linkedId)}
-              title={!due ? `Not before ${effective}` : undefined}
-              onClick={() => run({ label: 'Confirm', input: { action: 'execute', ...base, note }, done: 'Marked completed' })}
-            >
-              Confirm change completed
-            </button>
-          ) : null}
-          {error ? <span className={s.error} role="alert">{error}</span> : null}
-        </div>
+        {acts.length > 0 || choosing ? (
+          <div className={s.actions}>
+            {acts.map(a => (
+              <button key={a.label} type="button" className={s.action} data-primary={a.primary ? 'true' : undefined} disabled={busy || !can} onClick={() => run(a)}>
+                {a.label}
+              </button>
+            ))}
+            {choosing ? (
+              <button
+                type="button"
+                className={s.action}
+                data-primary="true"
+                disabled={busy || !can || !date}
+                onClick={() => approve(r, seat, successor, date, sub)}
+              >
+                {approveLabel(date)}
+              </button>
+            ) : null}
+            {error ? <span className={s.error} role="alert">{error}</span> : null}
+          </div>
+        ) : null}
         {notice ? <div className={s.notice}>{notice}</div> : null}
+        {/* With no buttons (a scheduled replacement's link, an invoice), a refusal reads under the notice. */}
+        {acts.length === 0 && !choosing && error ? <p className={s.runFailure} role="alert">{error}</p> : null}
+        {failure ? <p className={s.runFailure} role="alert">{failure}</p> : null}
       </div>
 
       <div className={s.history}>

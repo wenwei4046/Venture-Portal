@@ -36,6 +36,8 @@ export interface RequestFacts {
   successor: string | null;
   target: string | null;
   acceptedAt: string | null;
+  /** A scheduled replacement: the day it runs (mig 20261010170000). */
+  effectiveOn?: string | null;
   events: RequestEvent[];
 }
 
@@ -52,6 +54,7 @@ export function requestFactsFromRow(raw: unknown): Record<string, RequestFacts> 
       successor: text(f.successor),
       target: text(f.target),
       acceptedAt: text(f.acceptedAt),
+      effectiveOn: text(f.effectiveOn),
       events: Array.isArray(f.events)
         ? (f.events as unknown[]).flatMap(e => {
             if (!e || typeof e !== "object") return [];
@@ -160,22 +163,27 @@ export function requestFacts(r: MemberRequest, facts: RequestFacts | undefined, 
 export function requestStep(r: MemberRequest): string {
   if (r.kind === "waiting") return isOpen(r) ? "Accept onto the waiting list" : "On the waiting list";
   if (r.kind === "replacement") {
-    if (isOpen(r)) return "Approve the arrangement";
-    if (r.status === "approved") return "Complete the arrangement";
+    if (choosesReplacement(r)) return "Approve and choose the replacement";
+    if (r.status === "scheduled") return "Scheduled";
     return r.status === "executed" ? "Completed" : "Decided";
   }
   return isOpen(r) ? "Decide the claim" : "Decided";
 }
 
 /** The line under the step. */
-export function requestCaption(r: MemberRequest, sub: string | null): string {
+export function requestCaption(r: MemberRequest, sub: string | null, facts?: RequestFacts): string {
   if (r.kind === "waiting" && isOpen(r)) {
     return `Accepting puts the applicant at the end of ${sub ?? "the sub-department"}'s waiting list. The department was chosen when the request was submitted.`;
   }
   if (r.kind === "claim" && isOpen(r)) return "Approving names where the money comes from.";
-  if (r.kind === "replacement" && isOpen(r)) return "Approving records the plan; the staff changes are made in People Management and confirmed here once done.";
-  if (r.kind === "replacement" && r.status === "approved") {
-    return "Make the change in People Management and Revenue — the original member's arrangement and the replacement's place — then confirm it here on or after the effective date.";
+  if (r.kind === "replacement" && choosesReplacement(r)) {
+    const original = facts?.original ?? "the original member";
+    const leaves = {
+      resignation: `${original} is deactivated`,
+      member_exit: `${original} leaves ${sub ?? "the sub-department"}`,
+      transfer: `${original} moves to ${facts?.target ?? "the receiving sub-department"}`,
+    }[arrangementOf(r)];
+    return `Pick who takes the seat from People Management (Revenue · ${sub ?? "—"}), and the date. On that date the system replaces them: ${leaves} and the new person is added.`;
   }
   return "";
 }
@@ -183,9 +191,148 @@ export function requestCaption(r: MemberRequest, sub: string | null): string {
 /** A waiting-list acceptance goes on the record even when HR adds nothing. */
 export const ACCEPT_NOTE = "Accepted onto the waiting list.";
 
-/** The audit history, oldest first, one step per move (the trigger's echo folded). */
-export function requestHistory(facts: RequestFacts | undefined) {
-  return historyOf(facts?.events ?? []);
+/**
+ * The audit history, oldest first, one step per move (the trigger's echo
+ * folded). A replacement's steps in the handoff's words: "Approved · replaced
+ * by Ryan Tan on 13 Oct 2026", "Replaced automatically" by the System,
+ * "Taken off the schedule".
+ */
+export function requestHistory(facts: RequestFacts | undefined, kind?: string) {
+  const steps = historyOf(facts?.events ?? []);
+  if (kind !== "replacement") return steps;
+  const current = steps.map(e => e.to).lastIndexOf("scheduled");
+  return steps.map((e, i) => {
+    const before = steps[i - 1]?.to;
+    if (e.to === "scheduled") {
+      const what =
+        i === current && facts?.effectiveOn
+          ? `Approved · ${facts.successor ? `replaced by ${facts.successor}` : "seat released"} on ${dayLabel(facts.effectiveOn)}`
+          : "Approved · scheduled";
+      return { ...e, what, note: e.note && /^Approved to run on /.test(e.note) ? null : e.note };
+    }
+    if (e.to === "executed") return { ...e, what: "Replaced automatically", by: e.by ?? "System" };
+    if (e.to === "submitted" && before === "scheduled") {
+      return { ...e, what: "Taken off the schedule", note: e.note === "Taken off the schedule." ? null : e.note };
+    }
+    return e;
+  });
+}
+
+// ── A replacement: who takes the seat, and when ─────────────────────────────
+
+export type Arrangement = "resignation" | "member_exit" | "transfer";
+
+/** What happens to the original member, the older words folded into the three the system runs. */
+export function arrangementOf(r: Pick<MemberRequest, "detail">): Arrangement {
+  const d = str(r.detail.destination);
+  if (d === "member_exit" || d === "department_exit") return "member_exit";
+  if (d === "transfer") return "transfer";
+  return "resignation";
+}
+
+/** Still to be approved with a successor and a date (`approved` is the old flow's half-way). */
+export function choosesReplacement(r: MemberRequest): boolean {
+  return r.kind === "replacement" && (isOpen(r) || r.status === "approved");
+}
+
+export interface SeatOption {
+  /** "" releases the seat. */
+  id: string;
+  label: string;
+  meta: string;
+}
+
+export const RELEASE_SEAT: SeatOption = { id: "", label: "No replacement · release the seat", meta: "" };
+
+/**
+ * Replaced by · from People Management: releasing the seat, then everybody
+ * active in the original member's department but them, each with their title
+ * — those who lead in this sub-department first (the handoff's list opens on
+ * its Team Leaders), then the rest, each by name.
+ */
+export function seatOptions(r: MemberRequest, data: Pick<AdminMemberData, "candidates" | "titles" | "uplines">): SeatOption[] {
+  const originalId = str(r.detail.originalStaffId);
+  const sub = str(r.detail.subDepartmentId);
+  const department = data.candidates.find(c => c.id === originalId)?.departmentId ?? null;
+  const titles = new Map(data.titles.map(t => [t.id, t.name]));
+  const leads = new Set(data.uplines.filter(u => u.subDepartmentId === sub).map(u => u.id));
+  const people = data.candidates
+    .filter(c => c.id !== originalId && (department === null || c.departmentId === department))
+    .sort((a, b) => Number(leads.has(b.id)) - Number(leads.has(a.id)) || a.name.localeCompare(b.name))
+    .map(c => ({ id: c.id, label: c.name, meta: (c.titleId && titles.get(c.titleId)) || "" }));
+  return [RELEASE_SEAT, ...people];
+}
+
+/** Who the choice starts on: the person the member named, if they are on the roster; else the seat released. */
+export function defaultSeat(r: MemberRequest, options: readonly SeatOption[]): string {
+  if (str(r.detail.replacementSource) === "vacancy") return "";
+  const named = str(r.detail.newPerson).toLowerCase();
+  return (named && options.find(o => o.id !== "" && o.label.trim().toLowerCase() === named)?.id) || "";
+}
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The date the choice starts on: the member's planned date, else today. */
+export function defaultEffective(r: MemberRequest, today: string): string {
+  const planned = str(r.detail.effective);
+  return ISO_DAY.test(planned) ? planned : today;
+}
+
+/** The line beside the date. */
+export function effectiveWhen(date: string, today: string): string {
+  return date <= today
+    ? "That date has come, so the change happens as soon as you approve."
+    : `Scheduled — the system replaces them on ${dayLabel(date)}.`;
+}
+
+export function approveLabel(date: string): string {
+  return `Approve · replace on ${dayLabel(date)}`;
+}
+
+/** What a successful approval says: replaced at once, or scheduled. */
+export function approvedText(
+  r: MemberRequest,
+  facts: RequestFacts | undefined,
+  successor: string | null,
+  sub: string | null,
+  date: string,
+  ran: boolean,
+): string {
+  if (!ran) return `Scheduled for ${dayLabel(date)} — the system replaces them then`;
+  const original = facts?.original ?? "the original member";
+  const leaves = {
+    resignation: `${original} deactivated`,
+    member_exit: `${original} left ${sub ?? "the sub-department"}`,
+    transfer: `${original} moved to ${facts?.target ?? "the receiving sub-department"}`,
+  }[arrangementOf(r)];
+  return `Replaced — ${leaves}${successor ? `, ${successor} added to ${sub ?? "the sub-department"}` : ""}`;
+}
+
+/** A scheduled replacement's notice: what the system does, and on which day. */
+export function scheduledNotice(r: MemberRequest, facts: RequestFacts | undefined, sub: string | null): string {
+  const original = facts?.original ?? "the original member";
+  const where = sub ?? "the sub-department";
+  const does = {
+    resignation: `deactivates ${original}`,
+    member_exit: `takes ${original} off ${where}`,
+    transfer: `moves ${original} to ${facts?.target ?? "the receiving sub-department"}`,
+  }[arrangementOf(r)];
+  const day = facts?.effectiveOn ? dayLabel(facts.effectiveOn) : "the effective date";
+  return `On ${day} the system ${does}${facts?.successor ? ` and adds ${facts.successor} to ${where}` : " and releases the seat"}.`;
+}
+
+/** The hourly run's refusal, as it wrote it on the request — or null. */
+export function runFailure(note: string | null | undefined): string | null {
+  return note && note.startsWith("Could not run on ") ? note : null;
+}
+
+/** Why the approval cannot be sent as it is — or null. */
+export function replacementRefusal(input: { requestId: string; successorId: string | null; effective: string }): string | null {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuid.test(input.requestId)) return "This request could not be found. Reload the page.";
+  if (input.successorId !== null && !uuid.test(input.successorId)) return "Choose who takes the seat again.";
+  if (!ISO_DAY.test(input.effective) || Number.isNaN(Date.parse(`${input.effective}T00:00:00Z`))) return "Choose the effective date.";
+  return null;
 }
 
 // ── Publish memo ────────────────────────────────────────────────────────────

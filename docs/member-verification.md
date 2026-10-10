@@ -64,7 +64,7 @@ Queue processing currently runs when:
 - a `comm_hierarchy` insert/update/delete commits, including a released position;
 - HR rejects/returns an open reservation and releases its seat;
 - HR selects **匹配空缺** in `/member-admin`, which calls `adminMemberAction({ action: 'process_queue', subDepartmentId })`.
-- An authenticated scheduler calls `GET /api/member-queue`, which invokes `member_process_all_queues()` with the server service-role client.
+- An authenticated scheduler calls `GET /api/member-queue`, which invokes `member_process_all_queues()` with the server service-role client — and, since 2026-10-10 (mig `20261010170000`), `member_run_due_replacements()`: every replacement HR scheduled whose effective date has come is carried out, each on its own (a refusal is written on its request for HR). The waiting list no longer reserves seats (mig `20261010140000`), so the queue half finds nothing to reserve.
 
 An ordinary vacancy mutation starts automatic matching immediately. The scheduled sweep covers calendar-only events: future-dated membership closures, newly eligible start dates and reservation expiry. `member_data_snapshot()` stays read-only. Without configuring and deploying a schedule, those calendar-only events still wait for a roster/HR action; code availability is not evidence of an active online job.
 

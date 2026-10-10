@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminMemberData } from '@/lib/member/server'
 import type { RequestFacts } from '@/lib/member/member-services'
+import type { MemberRequest } from '@/lib/member/types'
 
 // Member services › Request reviews (2026-10-10, the HR revamp): the list
 // beside the open request; Accept puts an applicant on the waiting list with
@@ -12,6 +13,8 @@ const action = vi.hoisted(() => vi.fn())
 vi.mock('@/app/(member)/member/actions', () => ({ adminMemberAction: action }))
 const flash = vi.fn()
 vi.mock('@/components/hrv/toast', () => ({ flash: (m: string) => flash(m) }))
+const replacement = vi.hoisted(() => ({ schedule: vi.fn(), unschedule: vi.fn() }))
+vi.mock('../replacement-actions', () => ({ scheduleReplacement: replacement.schedule, unscheduleReplacement: replacement.unschedule }))
 
 import RequestReviews from './RequestReviews'
 
@@ -43,6 +46,8 @@ const detail = () => screen.getByRole('region', { name: 'Request' })
 beforeEach(() => {
   action.mockReset().mockResolvedValue({ ok: true, data: {} })
   flash.mockReset()
+  replacement.schedule.mockReset().mockResolvedValue({ ok: true, ran: false })
+  replacement.unschedule.mockReset().mockResolvedValue({ ok: true })
 })
 afterEach(cleanup)
 
@@ -108,6 +113,110 @@ describe('RequestReviews', () => {
     show({}, 'amelia')
     expect(detail()).toHaveTextContent('On the waiting list')
     expect(within(detail()).getByRole('link', { name: 'Open the waiting list →' })).toHaveAttribute('href', '/revenue/fair/hierarchy?tab=waiting')
+  })
+
+  describe('a replacement (HR revamp 4b)', () => {
+    const KAR = '727f336a-e761-4cec-8ef0-390e7626348d'
+    const ADRIAN = '61b4c495-6b7d-442d-a391-31fe4cbe2d6a'
+    const ZACK = 'e35753f5-e58d-48e8-909a-19e26ab7ef2e'
+    const REV = 'dep-revenue'
+    const repl = (over: Record<string, unknown> = {}, status = 'submitted'): MemberRequest => ({
+      id: 'repl', kind: 'replacement', title: 'x', status, createdAt: '2026-10-09T00:00:00Z', requestNo: 'RQ-2610-022',
+      detail: { subDepartmentId: FAIR, department: 'Fair', originalStaffId: KAR, destination: 'resignation', replacementSource: 'new', newPerson: 'ADRIAN', effective: '2099-12-31', reason: 'Leaving', ...over },
+    })
+    const people = {
+      candidates: [
+        { id: KAR, name: 'KAR JUN', departmentId: REV, titleId: 't-ta' },
+        { id: ADRIAN, name: 'ADRIAN', departmentId: REV, titleId: 't-srs' },
+        { id: ZACK, name: 'ZACK', departmentId: REV, titleId: 't-rs' },
+      ],
+      titles: [
+        { id: 't-ta', name: 'Team Assistant', departmentId: REV, subDepartmentIds: [] },
+        { id: 't-srs', name: 'Senior Revenue Specialist', departmentId: REV, subDepartmentIds: [] },
+        { id: 't-rs', name: 'Revenue Specialist', departmentId: REV, subDepartmentIds: [] },
+      ],
+    }
+    const replFacts = (over: Partial<RequestFacts> = {}): Record<string, RequestFacts> => ({
+      ...facts, repl: { submittedBy: 'STANLEY', original: 'KAR JUN', successor: null, target: null, acceptedAt: null, events: [], ...over },
+    })
+    const showRepl = (request: MemberRequest, f = replFacts()) =>
+      render(<RequestReviews data={{ ...base, ...people, requests: [request] }} facts={f} initialRequestId="repl" />)
+    const seat = (name: string) => within(detail()).getByRole('radio', { name: new RegExp(`^${name}`) })
+
+    it('starts on the person the member named and their date, and schedules who takes the seat', async () => {
+      showRepl(repl())
+      expect(detail()).toHaveTextContent('Approve and choose the replacement')
+      expect(detail()).toHaveTextContent('KAR JUN is deactivated and the new person is added.')
+      expect(seat('ADRIAN')).toHaveAttribute('aria-checked', 'true')
+      expect(seat('ADRIAN')).toHaveTextContent('Senior Revenue Specialist')
+      expect(within(detail()).queryByRole('radio', { name: /^KAR JUN/ })).toBeNull()
+      expect(detail()).toHaveTextContent('Scheduled — the system replaces them on 31 Dec 2099.')
+      fireEvent.click(seat('ZACK'))
+      expect(seat('ZACK')).toHaveAttribute('aria-checked', 'true')
+      fireEvent.change(within(detail()).getByLabelText('Effective date'), { target: { value: '2099-11-30' } })
+      await act(async () => {
+        fireEvent.click(within(detail()).getByRole('button', { name: 'Approve · replace on 30 Nov 2099' }))
+      })
+      expect(replacement.schedule).toHaveBeenCalledWith({ requestId: 'repl', successorId: ZACK, effective: '2099-11-30', note: '' })
+      expect(flash).toHaveBeenCalledWith('Scheduled for 30 Nov 2099 — the system replaces them then')
+    })
+
+    it('releases the seat, and replaces at once when the date has come', async () => {
+      replacement.schedule.mockResolvedValue({ ok: true, ran: true })
+      showRepl(repl({ effective: '2020-01-02' }))
+      expect(detail()).toHaveTextContent('That date has come, so the change happens as soon as you approve.')
+      fireEvent.click(seat('No replacement · release the seat'))
+      await act(async () => {
+        fireEvent.click(within(detail()).getByRole('button', { name: 'Approve · replace on 2 Jan 2020' }))
+      })
+      expect(replacement.schedule).toHaveBeenCalledWith({ requestId: 'repl', successorId: null, effective: '2020-01-02', note: '' })
+      expect(flash).toHaveBeenCalledWith('Replaced — KAR JUN deactivated')
+    })
+
+    it('shows the database’s refusal in its own words', async () => {
+      replacement.schedule.mockResolvedValue({ ok: false, reason: 'Fair is full: 28 places, and this replacement would make 29.' })
+      showRepl(repl())
+      await act(async () => {
+        fireEvent.click(within(detail()).getByRole('button', { name: 'Approve · replace on 31 Dec 2099' }))
+      })
+      expect(within(detail()).getByRole('alert')).toHaveTextContent('Fair is full: 28 places, and this replacement would make 29.')
+      expect(flash).not.toHaveBeenCalled()
+    })
+
+    it('says what a scheduled one will do, shows the hourly run’s refusal, and takes it off the schedule', async () => {
+      showRepl(
+        { ...repl({}, 'scheduled'), note: 'Could not run on 11 Oct 2026: Fair is full: 28 places, and this replacement would make 29.' },
+        replFacts({ successor: 'ADRIAN', effectiveOn: '2099-12-31', events: [{ to: 'scheduled', at: '2026-10-10T05:00:00Z', note: null, by: 'HR' }] }),
+      )
+      expect(detail()).toHaveTextContent('On 31 Dec 2099 the system deactivates KAR JUN and adds ADRIAN to Fair.')
+      expect(within(detail()).getByRole('alert')).toHaveTextContent('Could not run on 11 Oct 2026: Fair is full')
+      expect(detail()).toHaveTextContent('Approved · replaced by ADRIAN on 31 Dec 2099')
+      expect(within(detail()).queryByRole('radio')).toBeNull()
+      await act(async () => {
+        fireEvent.click(within(detail()).getByRole('button', { name: 'Take off the schedule →' }))
+      })
+      expect(replacement.unschedule).toHaveBeenCalledWith('repl')
+      expect(flash).toHaveBeenCalledWith('Taken off the schedule — back to Pending review')
+    })
+
+    it('says why a scheduled one could not be taken off the schedule', async () => {
+      replacement.unschedule.mockResolvedValue({ ok: false, reason: 'Only a scheduled replacement can be taken off the schedule' })
+      showRepl(repl({}, 'scheduled'), replFacts({ successor: 'ADRIAN', effectiveOn: '2099-12-31' }))
+      await act(async () => {
+        fireEvent.click(within(detail()).getByRole('button', { name: 'Take off the schedule →' }))
+      })
+      expect(within(detail()).getByRole('alert')).toHaveTextContent('Only a scheduled replacement can be taken off the schedule')
+      expect(flash).not.toHaveBeenCalled()
+    })
+
+    it('sends a completed one to the record it changed', () => {
+      showRepl(repl({}, 'executed'))
+      expect(detail()).toHaveTextContent('Replaced automatically. See People Management for the deactivated record.')
+      expect(within(detail()).getByRole('link', { name: 'Open People Management →' })).toHaveAttribute('href', '/team/people')
+      cleanup()
+      showRepl(repl({ destination: 'member_exit' }, 'executed'))
+      expect(within(detail()).getByRole('link', { name: 'Open Sales Groups →' })).toHaveAttribute('href', '/revenue/fair/hierarchy')
+    })
   })
 
   it('shows the refusal and keeps the request open', async () => {

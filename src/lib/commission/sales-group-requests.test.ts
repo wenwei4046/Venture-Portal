@@ -121,4 +121,14 @@ describe('historyOf', () => {
     expect(steps).toHaveLength(1)
     expect(steps[0]).toMatchObject({ what: 'Accepted onto the waiting list', by: 'HR', note: 'ok' })
   })
+
+  it('reads two moves made at one instant in the order they happen', () => {
+    const at = '2026-10-10T08:00:00.123456+00:00'
+    const steps = historyOf([
+      { to: 'executed', at, note: null, by: null },
+      { to: 'scheduled', at, note: null, by: 'HR' },
+      { to: 'submitted', at: '2026-10-09T01:00:00Z', note: null, by: 'Stanley' },
+    ])
+    expect(steps.map(s => s.what)).toEqual(['Submitted', 'Scheduled', 'Completed'])
+  })
 })
