@@ -31,6 +31,7 @@ import {
   canAccessTeam,
   canAccessTreasury,
   canOpenPeople,
+  canAccessHiring,
   canAccessVenturePool,
   canApprove,
   canSeeAuditChanges,
@@ -396,6 +397,8 @@ function navEntries(data: NavData): NavEntry[] {
     { href: '/member-admin', label: 'Member Services', section: 'People', visible: v => can(v, 'member_requests_manage') || can(v, 'member_memos_manage') },
     { href: '/team/hierarchy', label: 'Hierarchy', section: 'People', visible: canOpenPeople },
     { href: '/team/documentation', label: 'Documentation', section: 'People', visible: canAccessDocumentation },
+    // Hiring (2026-10-11, HR revamp round 2): HR's requests, from submission to filled.
+    { href: '/hiring/requests', label: 'Hiring Requests', section: 'Hiring', visible: canAccessHiring },
 
     // ── Reports & Admin ──
     { href: '/reports/ledger', label: 'General Ledger', section: 'Reports & Admin', visible: canAccessReports },

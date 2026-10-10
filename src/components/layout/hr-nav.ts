@@ -22,6 +22,7 @@ import {
   canAccessDocumentation,
   canAccessRevenue,
   canAccessTeam,
+  canAccessHiring,
   canOpenPeople,
   canSeeAuditChanges,
   canAccessMeetingRooms,
@@ -116,6 +117,14 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
         { key: 'hier', label: 'Hierarchy', icon: 'org', href: '/team/hierarchy', match: p => under(p, '/team/hierarchy') || under(p, '/team/roles'), visible: canOpenPeople },
         { key: 'mem', label: 'Member Services', icon: 'approve', href: '/member-admin', match: p => under(p, '/member-admin'), visible: seesMemberServices },
         { key: 'docs', label: 'Documentation', icon: 'doc', href: '/team/documentation', match: p => under(p, '/team/documentation'), visible: canAccessDocumentation },
+      ],
+    },
+    // Round 2 (2026-10-11, README §3): V. HIRING, clay.
+    {
+      label: 'Hiring',
+      tone: 'clay',
+      items: [
+        { key: 'hire', label: 'Requests', icon: 'hire', href: '/hiring/requests', match: p => under(p, '/hiring/requests'), visible: canAccessHiring },
       ],
     },
     {

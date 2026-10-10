@@ -3839,6 +3839,21 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   --hv-oc-rule: 238 240 242;
   --hv-oc-hover: 247 249 251;
   --hv-rung-empty: 250 249 246;
+  /* Hiring (round 2, 2026-10-11): the clay of its highlighted tiles and tags,
+     the candidate cards' edge, the info pills, the listing's hover. */
+  --hv-clay: 163 78 37;
+  --hv-graphite: 74 64 58;
+  --hv-cand-edge: 236 233 228;
+  --hv-pill-wash: 246 244 241;
+  --hv-tick-edge: 190 180 168;
+  --hv-row-hover-soft: 250 248 245;
+  --hv-empty-text: 140 125 112;
+  --hv-dash: 160 150 140;
+  --hv-slate: 78 101 116;
+  --hv-mock-bar: 232 228 222;
+  --hv-ink-warm: 51 36 27;
+  --hv-olive: 88 98 68;
+  --hv-olive-bg: 238 240 226;
 }
 
 /* HR's view of the shell. The shell is drawn light, as the prototype draws

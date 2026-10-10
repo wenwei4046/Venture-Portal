@@ -166,6 +166,11 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'hr_costing.edit': 'all',
   'hr_costing.export': 'all',
   'hr_costing.view': 'all',
+  // Hiring (round 2, 2026-10-11).
+  'hiring.approve': 'all',
+  'hiring.create': 'all',
+  'hiring.edit': 'all',
+  'hiring.view': 'all',
   'my_billing.create': 'dept',
   'opex.view': 'all',
   'product_list.edit': 'all',
