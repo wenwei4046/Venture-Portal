@@ -15,9 +15,11 @@ describe('the Revenue app’s pages and their tabs', () => {
   })
 
   it('a template saved on tabs closes the pages it leaves unticked, and the sends whose Create it does', () => {
-    // A Revenue Specialist as the handoff's sample has it, without the Arena: every View, the Quote's and Requests' Create.
+    // A Revenue Specialist as the handoff's sample has it, without the Arena: every View, the Quote's and Requests' Create
+    // (and, round 2, booking a room).
     const ticks = ['rev.today.view', 'rev.insight.view', 'rev.quote.view', 'rev.quote.create', 'rev.income.view',
-      'rev.requests.view', 'rev.requests.create', 'rev.track.view', 'rev.team.view']
+      'rev.requests.view', 'rev.requests.create', 'rev.track.view', 'rev.team.view', 'rev.rooms.view', 'rev.rooms.create',
+      'rev.documentation.view']
     expect(appClosed(closedBoxes({ ticks, boxes: [], cells: false }))).toEqual({ pages: ['arena'], sends: ['track'] })
   })
 

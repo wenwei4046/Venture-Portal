@@ -16,6 +16,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => nav.router,
 }));
 vi.mock("@/app/(member)/member/actions", () => ({}));
+vi.mock("@/app/(member)/member/rooms-actions", () => ({}));
+vi.mock("@/app/(member)/member/docs-actions", () => ({}));
 vi.mock("@/app/(member)/member/arena-actions", () => ({}));
 vi.mock("@/app/(member)/member/kpi-summary-actions", () => ({}));
 

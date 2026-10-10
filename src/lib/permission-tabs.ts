@@ -186,6 +186,10 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('rev', 'requests', 'Profile · Requests', ['member_requests'], REVENUE_APP_SENDS),
   tab('rev', 'track', 'Profile · Waiting list & replacements', ['member_requests'], REVENUE_APP_SENDS),
   tab('rev', 'team', 'Profile · Team & capacity', ['member_portal'], REVENUE_APP),
+  // Round 2 (2026-10-11): the meeting rooms, booked from the app (the database lets a member book for themselves).
+  tab('rev', 'rooms', 'Profile · Book a room', ['member_portal'], REVENUE_APP_SENDS),
+  // …and the files HR shares with the member's department (People › Documentation).
+  tab('rev', 'documentation', 'Profile · Documentation', ['member_portal'], REVENUE_APP),
   tab('rev', 'leads', 'Profile · My leads & appointments', ['member_crm', 'crm_manage'], { view: ['crm.view'], edit: ['crm.edit'] }),
   // The Director and the CEO run the CRM for the whole team (PR #253).
   tab('rev', 'crm_team', 'CRM · Team', ['crm_manage'], { view: ['crm.view'], edit: ['crm.edit', 'crm.manage'] }, 'all'),

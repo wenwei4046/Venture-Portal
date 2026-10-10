@@ -42,6 +42,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'member_memo_reads', 'member_sub_department_requests', 'member_waiting_form', 'member_waiting_transfer', 'next_staff_code',
   // Documentation (mig 20261011070000): the page's read, a file's path, a member's documents.
   'hr_documentation', 'hr_documentation_file', 'member_documents',
+  // …and, the Revenue app's View as, one member's (mig 20261011110000).
+  'member_documents_of',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',
   'revenue_costing_gaps', 'revenue_fair_calendar', 'revenue_fair_calendar_moves', 'revenue_month_orders', 'revenue_payroll_adjustments',
   'revenue_possible_double_claims', 'revenue_uncosted_products', 'rnp_invoice_events', 'staff_private_fields', 'team_directory',

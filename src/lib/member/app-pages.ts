@@ -26,6 +26,9 @@ export const APP_PAGE_TABS = {
   requests: 'rev.requests',
   track: 'rev.track',
   team: 'rev.team',
+  // The HR revamp's second package (2026-10-11): Book a room and Documentation.
+  rooms: 'rev.rooms',
+  docs: 'rev.documentation',
 } as const
 
 export type AppPage = keyof typeof APP_PAGE_TABS
@@ -57,8 +60,9 @@ export function requestPageOf(kind: string): 'requests' | 'track' {
 }
 
 /** Why a send is refused, said to whoever tried (a stale page or a hand-made request — the button is not drawn). */
-export const SEND_REFUSED: Readonly<Record<'quote' | 'requests' | 'track', string>> = {
+export const SEND_REFUSED: Readonly<Record<'quote' | 'requests' | 'track' | 'rooms', string>> = {
   quote: 'Pricing a quote is not open to your account.',
   requests: 'Sending a claim is not open to your account.',
   track: 'Sending a waiting list or a replacement is not open to your account.',
+  rooms: 'Booking a room is not open to your account.',
 }

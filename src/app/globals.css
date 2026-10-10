@@ -321,6 +321,23 @@
   --rv-frame-ring: #3A3634;
   --rv-android-ink: #1D1B1A;
   --rv-android-cam: #111111;
+  /* Book a room (2026-10-11, HR revamp round 2): the phone's timeline, the
+     meeting tones (own orange, the rest of HQ slate, the guest link's
+     subsidiaries light orange), the cancel button and the sheet's scrim */
+  --rv-hour: #A08C80;
+  --rv-grid-head: #FFF8F2;
+  --rv-grid-hour: #EFE3D9;
+  --rv-grid-half: #F8F0EA;
+  --rv-slate: #4E6574;
+  --rv-slate-bg: #E6EDF1;
+  --rv-guest-bg: #FFF4E7;
+  --rv-err: #B02822;
+  --rv-err-line: #F0C4BE;
+  --rv-err-bg: #FBE4E0;
+  --rv-ink-12: rgba(63,43,34,.12);
+  --rv-dim-sheet: rgba(43,31,23,.4);
+  /* Documentation: the "Opening …" note */
+  --rv-open-line: #F3D9C4;
 }
 /* The Revenue app refreshes on its own pull (2026-10-06): the browser's pull-to-reload would load the whole page again. */
 html:has([data-revenue-app]) { overscroll-behavior-y: none; }
