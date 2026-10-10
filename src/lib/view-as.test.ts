@@ -4,6 +4,9 @@ import {
   isViewAsRole,
   isPrincipalAccount,
   isMasked,
+  lensNav,
+  lensOverview,
+  lensView,
   portalView,
   viewAsChanged,
   VIEW_AS_ROLES,
@@ -115,5 +118,29 @@ describe('isPrincipalAccount / isMasked', () => {
     expect(isPrincipalAccount({ role: 'revenue_member', actualRole: 'principal' })).toBe(true)
     expect(isMasked({ role: 'revenue_member', actualRole: 'principal' })).toBe(true)
     expect(isPrincipalAccount({ role: 'revenue_member' })).toBe(false)
+  })
+})
+
+describe('HR’s and Finance’s views are lenses (2026-10-11)', () => {
+  const tabs = ['hr.payroll.view', 'hr.payroll.edit', 'fin.payments.view', 'pri.settings.view', 'dept.opex.view']
+  const principal = { role: 'principal' as const, tabs }
+
+  it('knows the view a lens draws, and none in the account’s own', () => {
+    expect(lensView({ role: 'hr', actualRole: 'principal' })).toBe('hr')
+    expect(lensView({ role: 'finance', actualRole: 'principal' })).toBe('finance')
+    expect(lensView({ role: 'principal' })).toBeNull()
+    expect(lensView({ role: 'revenue_member', actualRole: 'principal' })).toBeNull()
+  })
+
+  it('lists only the view’s tabs in its menus', () => {
+    expect(lensNav({ ...principal, role: 'finance', actualRole: 'principal' }).tabs).toEqual(['fin.payments.view'])
+    expect(lensNav({ ...principal, role: 'hr', actualRole: 'principal' }).tabs).toEqual(['hr.payroll.view', 'hr.payroll.edit'])
+    expect(lensNav(principal).tabs).toBe(tabs)
+  })
+
+  it('opens the view’s Overview', () => {
+    expect(lensOverview({ role: 'hr', actualRole: 'principal' })).toBe('hr')
+    expect(lensOverview({ role: 'finance', actualRole: 'principal' })).toBe('treasury')
+    expect(lensOverview({ role: 'principal' })).toBeNull()
   })
 })

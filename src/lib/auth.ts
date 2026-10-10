@@ -32,7 +32,8 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
 
   // View-as mask (unified portal 2026-07-16): a Principal may flip the
   // app-layer role via the TopBar switcher. Every gate and role-driven UI
-  // follows the masked role. auth.uid() (RLS, audit authorship) stays the
+  // follows the masked role — since 2026-10-11 only the member app's Revenue
+  // View masks; HR's and Finance's views are lenses (below). auth.uid() (RLS, audit authorship) stays the
   // Principal — which is why the masked permissions have to be looked up here
   // rather than taken from current_permissions(), whose answer is about the
   // real account. The cookie is read first so that lookup shares the round
@@ -59,7 +60,9 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
     // Which tabs their template ticks, and their own boxes (2026-10-11, 8b) —
     // null without a template: then their cells and keys give their tabs.
     (supabase as unknown as { rpc: (fn: string) => PromiseLike<{ data: unknown }> }).rpc('current_tabs'),
-    viewAs
+    // Only the member app's Revenue View still borrows a role's keys; HR's and
+    // Finance's views are lenses over the account's own (below).
+    viewAs === 'revenue_member'
       ? supabase.from('role_default_permissions').select('permission_key').eq('role', viewAs)
       : null,
   ])
@@ -78,6 +81,15 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   // access has it, Full access is everything else without it. Read off the
   // REAL account's keys — a masked session keeps it, so it can switch back.
   const canSwitchView = user.permissions.includes('view_switch')
+
+  // HR's and Finance's views are LENSES (2026-10-11, the user: "switch view is
+  // still can be edit, full access means = ultimate access"): that view's
+  // shell, sidebar and Overview over the account's own keys, actions, tabs and
+  // sensitive fields — it edits as it does in its own view. To see the portal
+  // exactly as somebody else does is View as a person, read-only.
+  if (canSwitchView && (viewAs === 'hr' || viewAs === 'finance')) {
+    return { ...user, role: viewAs, actualRole: user.role, canSwitchView }
+  }
 
   if (canSwitchView && viewAs && masked) {
     const maskedKeys = (masked.data ?? []).map(r => (r as { permission_key: string }).permission_key)
