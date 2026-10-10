@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
@@ -36,6 +36,7 @@ function label(period: string): string {
  * Nothing on this page writes. Payroll is still written by syncing the run.
  */
 export default async function MonthPayPage({ params }: PageProps) {
+  await requirePage('/revenue/[sub]/[period]/pay')
   await requirePermission('revenue')
   const { sub, period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()

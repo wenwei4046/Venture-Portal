@@ -11,7 +11,7 @@ import dayjs from 'dayjs'
 import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { buildCashFlow, fetchAllJournalLines, fetchCoaAccounts, monthPeriod } from '@/lib/gl-reports'
 import { interBillTransferAccount, payrollCustodyAccount } from '@/lib/inter-billing-cash-flow'
 import { defaultSideLayout } from '@/lib/cash-flow-sections'
@@ -25,6 +25,7 @@ interface Props {
 }
 
 export default async function CashFlowStatementLayoutPage({ searchParams }: Props) {
+  await requirePage('/reports/cash-flow/layout')
   await requirePermission('reports')
   const supabase = await createClient()
 

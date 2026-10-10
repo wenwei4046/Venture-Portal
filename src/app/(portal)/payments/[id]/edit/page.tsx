@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { requireAction } from '@/lib/auth'
+import { requireAction, requirePage } from '@/lib/auth'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { createClient } from '@/lib/supabase/server'
@@ -24,6 +24,7 @@ interface SourceRow {
 }
 
 export default async function EditPaymentPage({ params }: Props) {
+  await requirePage('/payments/[id]/edit')
   const user = await requireAction('treasury', 'edit')
   const { id } = await params
   const supabase = await createClient()

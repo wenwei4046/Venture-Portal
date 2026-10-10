@@ -12,7 +12,7 @@ import { FinViewProvider } from '@/components/layout/fin-view'
 // profit), and on a phone the head keeps only Record payment.
 
 const mocks = vi.hoisted(() => ({ requireAuth: vi.fn(), createClient: vi.fn(), rpc: vi.fn(), push: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requireAuth: mocks.requireAuth }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireAuth: mocks.requireAuth }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push, refresh: vi.fn() }) }))
 // The tables' saved column layout comes from the browser client; here there is none.

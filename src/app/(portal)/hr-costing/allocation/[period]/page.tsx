@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { formatMoney } from '@/lib/utils'
 import { comparePayrollOrder } from '@/lib/payroll-grid'
@@ -35,6 +35,7 @@ function formatPeriodLabel(period: string): string {
 // listed (`allocationRoster`). A card locks with its payroll row: Completed,
 // with Finance or paid, the split stays as it left (`splitLock`).
 export default async function AllocationPage({ params }: PageProps) {
+  await requirePage('/hr-costing/allocation/[period]')
   const user = await requirePermission('hr_costing')
   const { period } = await params
 

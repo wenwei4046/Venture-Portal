@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { canDo } from '@/lib/permission-actions'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
@@ -20,6 +20,7 @@ export default async function RepaymentSchedulePage({
 }: {
   searchParams: Promise<{ month?: string }>
 }) {
+  await requirePage('/repayment-schedule')
   const user = await requirePermission('treasury')
   const supabase = await createClient()
 

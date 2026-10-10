@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import OpexTrendChart from './_components/OpexTrendChart'
@@ -25,6 +25,7 @@ interface Props {
 }
 
 export default async function OpexPage({ searchParams }: Props) {
+  await requirePage('/opex')
   const user = await requirePermission('opex')
   const supabase = await createClient()
 

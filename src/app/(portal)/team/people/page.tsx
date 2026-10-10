@@ -1,8 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { can } from '@/lib/permissions'
+import { hasTab } from '@/lib/page-tabs'
 import { readStaffPrivate } from '@/lib/private-fields'
 import { onFile } from '@/lib/sensitive'
 import { readDirectory, readsStaffTable } from '@/lib/team-directory'
@@ -75,6 +76,7 @@ export default async function PeopleManagementPage({
 }: {
   searchParams: Promise<{ template?: string; invite?: string }>
 }) {
+  await requirePage('/team/people')
   // The roster's own key — or Team · View without the Salary tick, which reads
   // it through the directory instead of the table (2026-10-10, PR4b).
   const user = await requirePermission('team', 'team_directory')
@@ -203,10 +205,12 @@ export default async function PeopleManagementPage({
       unattachedAccounts={unattached}
       canSeeActivity={can(user, 'audit_log')}
       permissions={permissions}
+      // Changing them and inviting are HR view › Permissions' Edit and Create too (8b), on top of the actions;
+      // reading the templates stays with the roster's readers, as before.
       showPermissions
-      canManagePermissions={canDo(user, 'accounts', 'manage')}
+      canManagePermissions={canDo(user, 'accounts', 'manage') && hasTab(user.tabs, 'hr.permissions', 'edit')}
       canSeeHistory={can(user, 'permissions_manage', 'audit_log')}
-      canInvite={canDo(user, 'accounts', 'create')}
+      canInvite={canDo(user, 'accounts', 'create') && hasTab(user.tabs, 'hr.permissions', 'create')}
       canAddPeople={canDo(user, 'team', 'create')}
       candidates={candidates}
       initialTemplateId={params.template && UUID.test(params.template) ? params.template : null}

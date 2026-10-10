@@ -11,7 +11,7 @@
 
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
 import { fetchDailyBank } from '@/lib/daily-bank-data'
@@ -25,6 +25,7 @@ export default async function DailyBankPage({
 }: {
   searchParams: Promise<{ date?: string }>
 }) {
+  await requirePage('/daily-bank')
   const user = await requirePermission('treasury')
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { date: rawDate } = await searchParams

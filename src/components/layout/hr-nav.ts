@@ -14,6 +14,7 @@
 // open the one last picked.
 
 import { can } from '@/lib/permissions'
+import { opensPath } from '@/lib/page-tabs'
 import { revenuePath } from '@/lib/revenue'
 import {
   canAccessDirectorPool,
@@ -127,7 +128,8 @@ export function visibleHrNav(sections: HrNavSection[], viewer: NavViewer): Array
   let n = 0
   const out: Array<HrNavSection & { roman: string | null }> = []
   for (const section of sections) {
-    const items = section.items.filter(item => item.visible(viewer))
+    // A link also asks its page's tabs (2026-10-11, 8b): it shows only where its page would open.
+    const items = section.items.filter(item => item.visible(viewer) && opensPath(viewer.tabs, item.href))
     if (items.length === 0) continue
     out.push({ ...section, items, roman: section.label ? ROMAN[n++] : null })
   }

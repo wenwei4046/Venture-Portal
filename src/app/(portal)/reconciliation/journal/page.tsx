@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { fetchAllRowsAsWritten } from '@/lib/paginate'
 
 export default async function JournalPage() {
+  await requirePage('/reconciliation/journal')
   await requirePermission('reconciliation')
   const supabase = await createClient()
 

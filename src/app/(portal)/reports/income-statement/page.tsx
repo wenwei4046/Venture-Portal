@@ -8,7 +8,7 @@ import dayjs from 'dayjs'
 import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { applyGlRefs, buildPnl, fetchAllJournalLines, fetchCoaAccounts, fetchGlRefs, monthPeriod } from '@/lib/gl-reports'
 import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/consolidation'
 import { pnlBlocks } from '@/lib/gl-report-blocks'
@@ -29,6 +29,7 @@ interface Props {
 }
 
 export default async function IncomeStatementPage({ searchParams }: Props) {
+  await requirePage('/reports/income-statement')
   const user = await requirePermission('dept_reports')
   const supabase = await createClient()
 

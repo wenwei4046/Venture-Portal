@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   fetchAllRows: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 // The vouchers' own read is answered by hand; every other pager is the real one.
 vi.mock('@/lib/paginate', async (original) => ({

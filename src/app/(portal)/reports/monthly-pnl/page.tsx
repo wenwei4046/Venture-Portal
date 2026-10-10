@@ -1,7 +1,7 @@
 import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { loadMonthlyPnl } from '@/lib/monthly-statements'
 import { segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
@@ -22,6 +22,7 @@ interface Props {
 }
 
 export default async function MonthlyPnlPage({ searchParams }: Props) {
+  await requirePage('/reports/monthly-pnl')
   const user = await requirePermission('dept_reports')
   const supabase = await createClient()
 

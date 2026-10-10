@@ -8,7 +8,7 @@ import { recordingSupabase, type RecordedCall } from '@/test/recording-supabase'
 // as October's; at approval its GL posted into October.
 
 const mocks = vi.hoisted(() => ({ requirePayrollPayouts: vi.fn(), createClient: vi.fn(), redirect: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePayrollPayouts: mocks.requirePayrollPayouts, requirePayrollPayoutsAction: mocks.requirePayrollPayouts }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePayrollPayouts: mocks.requirePayrollPayouts, requirePayrollPayoutsAction: mocks.requirePayrollPayouts }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))

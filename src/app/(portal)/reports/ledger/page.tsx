@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { fetchLedgers, type Ledger } from '@/lib/cfo-reports'
 import { type AccountType } from '@/lib/coa'
 import LedgerPicker from './_components/LedgerPicker'
@@ -30,6 +30,7 @@ function parseCodes(codes: string | undefined, code: string | undefined): string
 }
 
 export default async function LedgerPage({ searchParams }: Props) {
+  await requirePage('/reports/ledger')
   await requirePermission('reports')
   const supabase = await createClient()
 

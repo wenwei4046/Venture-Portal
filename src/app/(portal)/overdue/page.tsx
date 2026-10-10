@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import dayjs from 'dayjs'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -81,6 +81,7 @@ function StageChip({ stage, status }: { stage: OverdueRow['overdue_stage']; stat
 }
 
 export default async function OverduePage({ searchParams }: Props) {
+  await requirePage('/overdue')
   const user = await requirePermission('treasury')
   const { tab: rawTab } = (await searchParams) ?? {}
   const tab = rawTab === 'in' ? 'in' : 'out'

@@ -37,6 +37,12 @@ export interface User {
   // account's kind always saw — `current_sensitive_fields()`. Everything else
   // shows as •••• (lib/sensitive.ts). Absent means nothing ticked.
   sensitive?: Array<'salary' | 'nric' | 'bank'>
+  // The tabs they hold, `view.tab.action` (2026-10-11, HR revamp 8b): their
+  // template's ticks with their own boxes over them, else what their cells and
+  // keys give (lib/page-tabs.ts `userTabs`). Pages and the sidebars ask a tab's
+  // View on top of their own gates. Absent on a value built before it existed:
+  // read as "not asked".
+  tabs?: string[]
 }
 
 export interface Company {

@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   exportXlsxResponse: vi.fn(),
   buildXlsxBuffer: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requireAction: mocks.requireAction }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireAction: mocks.requireAction }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('../_lib/schedule-data', () => ({ loadRepaymentSchedule: mocks.load }))
 vi.mock('@/lib/export/response', () => ({ exportXlsxResponse: mocks.exportXlsxResponse }))

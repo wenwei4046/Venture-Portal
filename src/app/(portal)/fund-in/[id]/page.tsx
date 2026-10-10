@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import { officeMonth, officeTime, officeToday } from '@/lib/office-time'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatDate } from '@/lib/utils'
@@ -52,6 +52,7 @@ interface Props {
 }
 
 export default async function FundSourceDetailPage({ params, searchParams }: Props) {
+  await requirePage('/fund-in/[id]')
   const user = await requirePermission('treasury')
   const { id } = await params
   const sp = (await searchParams) ?? {}

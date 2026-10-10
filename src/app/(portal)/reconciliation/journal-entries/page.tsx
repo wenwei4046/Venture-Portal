@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
@@ -7,6 +7,7 @@ import JvList, { type JvRow } from './_components/JvList'
 import ReturnLink from '@/components/layout/ReturnLink'
 
 export default async function JournalEntriesPage() {
+  await requirePage('/reconciliation/journal-entries')
   const user = await requirePermission('reconciliation')
   // A new voucher (or a copy) is raised; Edit and Delete change one (2026-10-08, PR2).
   const canCreate = canDo(user, 'reconciliation', 'create')

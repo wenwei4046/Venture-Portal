@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -40,6 +40,7 @@ function executionLabel(state: string): { text: string; className: string } {
 }
 
 export default async function PastMonthSubmissionsPage() {
+  await requirePage('/dept-pool/submissions')
   const user = await requirePermission('dept_pool')
   const supabase = await createClient()
 

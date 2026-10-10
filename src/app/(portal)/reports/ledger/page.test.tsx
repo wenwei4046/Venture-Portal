@@ -9,7 +9,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 // a chip, the department named), and a Closing balance row.
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), fetchLedgers: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/cfo-reports', () => ({ fetchLedgers: mocks.fetchLedgers }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))

@@ -1,4 +1,4 @@
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { can } from '@/lib/permissions'
 import { canDo } from '@/lib/permission-actions'
 import { PageHead } from '@/components/hrv/kit'
@@ -27,6 +27,7 @@ interface PageProps {
  * while another's name is on screen.
  */
 export default async function RevenueRulesPage({ params }: PageProps) {
+  await requirePage('/revenue/[sub]/rules')
   const user = await requirePermission('revenue')
   const { sub } = await params
   const subDept = await requireSubDepartment(sub)

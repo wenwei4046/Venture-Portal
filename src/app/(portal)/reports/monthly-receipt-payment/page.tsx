@@ -9,7 +9,7 @@
 import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
 import { buildMonthlyCashFlowSides, buildSideMatrixRows } from '@/lib/cash-flow-custom'
 import {
@@ -44,6 +44,7 @@ interface Props {
 }
 
 export default async function MonthlyReceiptPaymentPage({ searchParams }: Props) {
+  await requirePage('/reports/monthly-receipt-payment')
   const user = await requirePermission('dept_reports')
   const supabase = await createClient()
 

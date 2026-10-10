@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { sees } from '@/lib/sensitive'
 import { getPeriodMonth } from '@/lib/utils'
 import { officeToday } from '@/lib/office-time'
@@ -28,6 +28,7 @@ import './payment-statement.css'
 
 /** HR Payment: a monthly statement above separate Salary and Statutory tabs. */
 export default async function HRPaymentPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+  await requirePage('/hr-costing/payment')
   // ?period=YYYY-MM-01 — a payroll cycle often finishes in the FOLLOWING
   // calendar month (August's payout ran on 5 September).
   const { period: periodParam } = await searchParams

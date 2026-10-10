@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import Link from 'next/link'
 import { officeTime } from '@/lib/office-time'
@@ -8,6 +8,7 @@ import BaseRateHistoryTable from './_components/BaseRateHistoryTable'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 export default async function BaseRateHistoryPage() {
+  await requirePage('/reports/base-rate')
   const user = await requirePermission('reports')
   const supabase = await createClient()
 

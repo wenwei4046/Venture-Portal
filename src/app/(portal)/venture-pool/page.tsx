@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { canDo } from '@/lib/permission-actions'
@@ -18,6 +18,7 @@ import { PoolSearchProvider } from './_components/PoolSearch'
 // captures generic HV expenses + historical OFFICE-tagged manual_jv.
 
 export default async function VenturePoolPage() {
+  await requirePage('/venture-pool')
   const user = await requirePermission('venture_pool')
   const supabase = await createClient()
 

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requireAuth } from '@/lib/auth'
+import { requireAuth, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { canSeeAuditChanges } from '@/lib/roles'
 import { officeTime } from '@/lib/office-time'
@@ -44,6 +44,7 @@ export default async function AuditChangesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
+  await requirePage('/audit-log')
   const user = await requireAuth()
   if (!canSeeAuditChanges(user)) redirect('/dashboard')
   const sp = await searchParams

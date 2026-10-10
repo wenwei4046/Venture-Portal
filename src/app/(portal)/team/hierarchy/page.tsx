@@ -1,4 +1,4 @@
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canManagePermissions } from '@/lib/roles'
 import { canDo } from '@/lib/permission-actions'
 import { readOrgChart, readsStaffTable } from '@/lib/team-directory'
@@ -23,6 +23,7 @@ import type { RolePerson, RoleTitle } from '@/lib/hierarchy-roles'
  * Pay rates stay on Revenue, where the relevant period is in scope.
  */
 export default async function TeamHierarchyPage() {
+  await requirePage('/team/hierarchy')
   // The roster's own key — or Team · View without the Salary tick, which draws
   // the whole company's chart from team_org_chart(): names and titles, read
   // only (2026-10-10, PR4b; the user's 2b).

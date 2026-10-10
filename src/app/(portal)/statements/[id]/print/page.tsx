@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import PrintButton from './PrintButton'
 import { HandoffSections, type PrintLine } from './PrintSections'
@@ -12,6 +12,7 @@ interface Props {
 }
 
 export default async function StatementPrintPage({ params }: Props) {
+  await requirePage('/statements/[id]/print')
   await requirePermission('treasury')
   const supabase = await createClient()
   const { id } = await params

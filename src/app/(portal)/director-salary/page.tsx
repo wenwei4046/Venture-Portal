@@ -7,7 +7,7 @@
 // table + the per-subsidiary CTC split for billing.
 
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import {
@@ -49,6 +49,7 @@ interface ByCompanyRow {
 }
 
 export default async function DirectorSalaryPage({ searchParams }: Props) {
+  await requirePage('/director-salary')
   const user = await requirePermission('director_salary')
   // Importing InfoTech's file changes the month: Director Salary · Edit (2026-10-08, PR2).
   const canEditMonth = canDo(user, 'director_salary', 'edit')

@@ -1,7 +1,7 @@
 import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { requireAction } from '@/lib/auth'
+import { requireAction, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import LoanAmendForm from '../_components/LoanAmendForm'
 
@@ -10,6 +10,7 @@ interface Props {
 }
 
 export default async function LoanEditPage({ params }: Props) {
+  await requirePage('/fund-out/[id]/edit')
   await requireAction('treasury', 'approve')
   const { id } = await params
   const supabase = await createClient()

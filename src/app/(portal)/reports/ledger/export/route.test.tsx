@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   exportPdfResponse: vi.fn(),
   buildXlsxBuffer: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requireAction: mocks.requireAction }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireAction: mocks.requireAction }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/cfo-reports', () => ({ fetchLedger: mocks.fetchLedger, fetchLedgers: mocks.fetchLedgers }))
 vi.mock('@/lib/export/response', () => ({ exportXlsxResponse: mocks.exportXlsxResponse, exportPdfResponse: mocks.exportPdfResponse }))

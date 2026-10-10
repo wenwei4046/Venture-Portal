@@ -13,7 +13,7 @@ import { withActions } from '@/test/with-actions'
 // under their own head, no tiles repeating the cards, a navy-tinted total.
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), fetchLoanMonitorData: vi.fn(), fetchCounterpartyStatement: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
     from: (table: string) => {

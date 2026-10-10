@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import { officeMonth, officeTime, officeToday } from '@/lib/office-time'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -42,6 +42,7 @@ interface Props {
 const voucherOf = (notes: string | null) => notes?.match(/voucher\s+(\S+)/i)?.[1] ?? null
 
 export default async function LoanDetailPage({ params, searchParams }: Props) {
+  await requirePage('/fund-out/[id]')
   const user = await requirePermission('treasury')
   const { id } = await params
   const sp = (await searchParams) ?? {}

@@ -308,6 +308,38 @@ revoke; refuses to run without the readers) once the code is live.
 `tests/member-sql/validate-sensitive-fields.mjs`,
 `src/lib/private-columns.test.ts`.
 
+**PAGES AND SIDEBARS FOLLOW THE TABS (2026-10-11, the HR revamp 8b — point 6:
+app gates per tab).** Every portal page asks `await requirePage('<its route>')`
+FIRST — its route as the folders spell it, `/fund-in/[id]/edit` — and
+`lib/page-tabs.ts` `PAGE_TABS` lists the tabs any one of whose View opens it (a
+page in several views, Approvals or the reports, opens from each; the Approvals
+queue also from the domains decided in it). It is asked ON TOP of the page's
+own gate, never instead: a tab can close a page, never open one. `OPEN_PAGES`
+are the few no tab closes — `/dashboard` (where every refused gate lands), a
+request's own approval pages, and the old addresses that only redirect. The
+sidebars ask the same (`opensPath`): the old nav through `buildNavEntries`
+(Settings' links name their tab — Chart of Account / Departments Finance's,
+the rest the Principal's), HR's nav, the phone's bottom bar. An account's tabs
+(`User.tabs`, worked out in `getUser`): its template's stored ticks with its
+own boxes over them; else what its cells and keys give (`tabsFromCells`) —
+every untemplated login, a template with no ticks stored yet (boxes still laid
+over, so a held-back tab whose cells another shares stays closed), somebody
+whose own cells predate tabs; a View-as mask, from the masked keys. Stored
+ticks and boxes come from `current_tabs()` (DEFINER, the caller only, mig
+`20261011030000`), in the same round trip as the keys. `page-tabs.test.ts`
+holds every page to the registry and to asking for itself first, and every
+login production has (principal@, finance@, hr@, marketing@, carrie — their
+real current_permissions / current_actions) and every template's holders to
+opening each page they open today. **A NEW PAGE goes into PAGE_TABS (or
+OPEN_PAGES) and asks requirePage first; a test that stubs `@/lib/auth` stubs
+requirePage too.** Not per tab yet: writes (Create / Edit / Approve still ask
+the function's action — a box unticked on one tab of a shared function does
+not stop a write the function allows), and the read-only Permissions views on
+People (hr@ holds no accounts.view; reading templates stays with the roster's
+readers), whose Edit and Invite now also ask HR view › Permissions' Edit and
+Create. NEXT (8c, the user's to decide): the view switcher, the Department
+view's own sidebar, the Principal's lens.
+
 **PERMISSIONS BY VIEW AND TAB (2026-10-11, the HR revamp 8a; the user chose B
 with my six points).** A template is ticked per VIEW › TAB › View / Create /
 Edit / Approve — five views (HR, Finance, Principal, Department, Revenue app;

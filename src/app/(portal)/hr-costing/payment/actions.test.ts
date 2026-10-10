@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 // HR: Bank accounts ticked (2026-10-09, PR4) — a salary PV carries the account numbers.
 const mocks = vi.hoisted(() => ({ rpc: vi.fn(), requirePermission: vi.fn().mockResolvedValue({ id: 'hr', sensitive: ['bank', 'nric', 'salary'] }), revalidatePath: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ rpc: mocks.rpc }) }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
 import { createPayrollDisbursement, generateStatutorySelection } from './actions'

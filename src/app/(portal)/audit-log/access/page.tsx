@@ -1,5 +1,5 @@
 import { officeTime } from '@/lib/office-time'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import LedgerRow from '@/components/LedgerRow'
 
@@ -13,6 +13,7 @@ const PAGE_SIZE = 50
 // /audit-log until 2026-10-08, when Changes (who changed what) took that
 // address; an old /audit-log?resource=… link is sent on here.
 export default async function AuditAccessPage({ searchParams }: Props) {
+  await requirePage('/audit-log/access')
   await requirePermission('audit_log')
   const supabase = await createClient()
 

@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   loadDepartmentMode: vi.fn(),
   departmentModeCard: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/debtor-aging-data', () => ({ fetchPaidByInvoice: mocks.fetchPaidByInvoice }))
 vi.mock('@/lib/department-mode-server', () => ({ loadDepartmentMode: mocks.loadDepartmentMode }))

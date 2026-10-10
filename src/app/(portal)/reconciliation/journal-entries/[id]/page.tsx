@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { notFound } from 'next/navigation'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
@@ -19,6 +19,7 @@ import JvDeleteButton from './_components/JvDeleteButton'
 const r2 = (n: number) => Math.round(n * 100) / 100
 
 export default async function JournalVoucherPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePage('/reconciliation/journal-entries/[id]')
   const user = await requirePermission('reconciliation')
   const canCreate = canDo(user, 'reconciliation', 'create')
   const canEdit = canDo(user, 'reconciliation', 'edit')

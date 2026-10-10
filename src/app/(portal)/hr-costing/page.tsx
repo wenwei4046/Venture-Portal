@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
@@ -31,6 +31,7 @@ interface LiveDeptRow {
 }
 
 export default async function HRCostingPage() {
+  await requirePage('/hr-costing')
   // Finance no longer accesses this page — they see aggregates on Dept Pool
   // and execute approved snapshots from /dept-pool/submissions.
   const user = await requirePermission('hr_costing')

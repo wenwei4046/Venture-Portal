@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { canDecide } from '@/lib/approval-domains'
 import { can } from '@/lib/permissions'
@@ -41,6 +41,7 @@ interface Props {
 }
 
 export default async function PaymentDetailPage({ params }: Props) {
+  await requirePage('/payments/[id]')
   const user = await requirePermission('treasury', 'hr_costing')
   const canReadTreasury = can(user, 'treasury')
   // 2026-10-10 — the handoff (audit 2026-10-09 l, item 8): the voucher page is

@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { canAccessAuditLog, canInviteUsers, canManagePermissions } from '@/lib/roles'
+import { hasTab } from '@/lib/page-tabs'
 import { canDo } from '@/lib/permission-actions'
 import { readDirectory, readOrgChart, readsStaffTable } from '@/lib/team-directory'
 import { navLabelByPath } from '@/components/layout/nav-config'
@@ -285,13 +286,14 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
         }
       : null,
     access,
-    canManagePermissions: canManagePermissions(viewer),
+    // HR view › Permissions · Edit too (2026-10-11, 8b): a tab can take it away, never give it.
+    canManagePermissions: canManagePermissions(viewer) && hasTab(viewer.tabs, 'hr.permissions', 'edit'),
     activity,
     canSee: { salary: seesSalary, nric: sees(viewer, 'nric'), bank: sees(viewer, 'bank') },
     can: {
       edit: direct && canDo(viewer, 'team', 'edit') && seesSalary,
       promote: direct && canDo(viewer, 'team', 'edit'),
-      invite: direct && canInviteUsers(viewer),
+      invite: direct && canInviteUsers(viewer) && hasTab(viewer.tabs, 'hr.permissions', 'create'),
     },
   }
 }

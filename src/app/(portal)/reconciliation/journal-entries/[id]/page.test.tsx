@@ -9,7 +9,7 @@ import { withActions } from '@/test/with-actions'
 // accrual offers Fix mistakes) — and the voucher form adds a line on Ins.
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), notFound: vi.fn(), entry: null as Record<string, unknown> | null }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('next/navigation', () => ({ notFound: mocks.notFound, useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }))
 vi.mock('@/components/layout/ReturnLink', () => ({ default: (p: { href: string; children: React.ReactNode }) => <a href={p.href}>{p.children}</a> }))
 vi.mock('../actions', () => ({ deleteJournalVoucher: vi.fn(), createJournalVoucher: vi.fn(), updateJournalVoucher: vi.fn() }))

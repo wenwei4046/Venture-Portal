@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
       return <div data-testid={name} data-auto={String(!!p.autoOpen)} data-hide={String(!!p.hideTrigger)} data-status={p.status ?? ''} data-settled={String(!!p.settled)}>{p.invoiceNo}</div>
     },
 }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/navigation', () => ({ notFound: mocks.notFound, useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }) }))
 vi.mock('@/lib/dept-registry', () => ({ extraBillingModeOptions: () => [], primedRegistryRows: () => [] }))

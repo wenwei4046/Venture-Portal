@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { redirect } from 'next/navigation'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { fetchAllRows } from '@/lib/paginate'
 import { createClient } from '@/lib/supabase/server'
@@ -45,6 +45,7 @@ export default async function DeptPoolPage({
 }: {
   searchParams: Promise<{ basis?: string }>
 }) {
+  await requirePage('/dept-pool')
   const user = await requirePermission('dept_pool')
   const supabase = await createClient()
 

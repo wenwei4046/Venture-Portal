@@ -1,3 +1,4 @@
+import { requirePage } from '@/lib/auth'
 import { requireAuth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { adminMemberAction, type AdminMemberData } from "@/lib/member/server";
@@ -18,6 +19,7 @@ export default async function MemberAdminPage({
 }: {
   searchParams: Promise<{ request?: string }>;
 }) {
+  await requirePage('/member-admin')
   const user = await requireAuth();
   // Sales Groups' Review opens one request here (2026-10-10).
   const { request: requestId } = await searchParams;

@@ -10,6 +10,7 @@ import type { UserRole } from '@/types'
 import { can, type PermissionHolder } from '@/lib/permissions'
 import { REVENUE_DEPARTMENT_PATH, revenuePath } from '@/lib/revenue'
 import { canDo } from '@/lib/permission-actions'
+import { opensPath } from '@/lib/page-tabs'
 import { reportsCompanyWide } from '@/lib/surfaces'
 import { statementDepts, statementPath, type StatementDept } from '@/lib/dept-statements'
 import {
@@ -42,7 +43,12 @@ import {
  * expresses.
  */
 /** The signed-in account, as the menus read it: its keys, its role, and (since PR2) what it may do. */
-export type NavViewer = PermissionHolder & { role: UserRole; actions?: Readonly<Record<string, 'own' | 'dept' | 'all'>> }
+export type NavViewer = PermissionHolder & {
+  role: UserRole
+  actions?: Readonly<Record<string, 'own' | 'dept' | 'all'>>
+  /** The tabs they hold (2026-10-11, 8b) — a link shows only where its page would open. */
+  tabs?: readonly string[]
+}
 
 export interface NavItem {
   href: string
@@ -68,6 +74,9 @@ export interface NavItem {
   // Also active on these path prefixes — pages reached from this entry's
   // in-page toggle (P&L ↔ Monthly P&L) rather than from the sidebar.
   alsoPaths?: string[]
+  // The permission tabs any one of which shows this link, where its page's own
+  // list (lib/page-tabs.ts) is not the answer — Settings' tabs share one page.
+  permissionTabs?: readonly string[]
   visible: (viewer: NavViewer) => boolean
 }
 
@@ -168,8 +177,37 @@ export function withPathRevenueSub(data: NavData, pathname: string): NavData {
   return { ...data, revenueSub: slug }
 }
 
-// Layout per user spec 2026-06-10 (re-grouped from the original phase layout).
+/**
+ * The nav as the menus draw it: every link also asks its page's tabs
+ * (2026-10-11, HR revamp 8b — lib/page-tabs `opensPath`), on top of the check
+ * it always had, so a link shows only where its page would open; a group shows
+ * while its own page or anything in it does.
+ */
 export function buildNavEntries(data: NavData): NavEntry[] {
+  return withTabGates(navEntries(data))
+}
+
+function withTabGates(entries: NavEntry[]): NavEntry[] {
+  return entries.map((entry) => {
+    const own = entry.visible
+    if (isGroup(entry)) {
+      const children = withTabGates(entry.children)
+      return {
+        ...entry,
+        children,
+        visible: (v: NavViewer) =>
+          own(v) &&
+          (children.length === 0 ||
+            (entry.href !== undefined && opensPath(v.tabs, entry.href)) ||
+            children.some((c) => c.visible(v))),
+      }
+    }
+    return { ...entry, visible: (v: NavViewer) => own(v) && opensPath(v.tabs, entry.href, entry.permissionTabs) }
+  })
+}
+
+// Layout per user spec 2026-06-10 (re-grouped from the original phase layout).
+function navEntries(data: NavData): NavEntry[] {
   return [
     { href: '/dashboard', label: 'Overview', visible: () => true },
 
@@ -405,18 +443,18 @@ export function buildNavEntries(data: NavData): NavEntry[] {
       section: 'Reports & Admin',
       visible: canAccessCategories,
       children: [
-        { href: '/settings?tab=accounts', label: 'Chart of Account', tab: 'accounts', visible: canAccessCategories },
+        { href: '/settings?tab=accounts', label: 'Chart of Account', tab: 'accounts', permissionTabs: ['fin.chart_of_account'], visible: canAccessCategories },
         // Departments management (2026-08-24): add + 转正 provision — Finance too.
-        { href: '/settings?tab=departments', label: 'Departments', tab: 'departments', visible: canAccessCategories },
+        { href: '/settings?tab=departments', label: 'Departments', tab: 'departments', permissionTabs: ['fin.chart_of_account'], visible: canAccessCategories },
         { href: '/reports/base-rate', label: 'Base Rate History', visible: canAccessReports },
-        { href: '/settings?tab=treasury', label: 'Treasury', tab: 'treasury', visible: canAccessSettings },
-        { href: '/settings?tab=overdue', label: 'Overdue Config', tab: 'overdue', visible: canAccessSettings },
-        { href: '/settings?tab=splits', label: 'Splits', tab: 'splits', visible: canAccessSettings },
-        { href: '/settings?tab=directors', label: 'Directors', tab: 'directors', visible: canAccessSettings },
-        { href: '/settings?tab=companies', label: 'Companies', tab: 'companies', visible: canAccessSettings },
-        { href: '/settings?tab=banks', label: 'Bank Accounts', tab: 'banks', visible: canAccessSettings },
-        { href: '/settings?tab=periods', label: 'Periods', tab: 'periods', visible: canAccessSettings },
-        { href: '/settings?tab=simulator', label: 'Simulator', tab: 'simulator', visible: canAccessSettings },
+        { href: '/settings?tab=treasury', label: 'Treasury', tab: 'treasury', permissionTabs: ['pri.settings'], visible: canAccessSettings },
+        { href: '/settings?tab=overdue', label: 'Overdue Config', tab: 'overdue', permissionTabs: ['pri.settings'], visible: canAccessSettings },
+        { href: '/settings?tab=splits', label: 'Splits', tab: 'splits', permissionTabs: ['pri.settings'], visible: canAccessSettings },
+        { href: '/settings?tab=directors', label: 'Directors', tab: 'directors', permissionTabs: ['pri.settings'], visible: canAccessSettings },
+        { href: '/settings?tab=companies', label: 'Companies', tab: 'companies', permissionTabs: ['pri.settings'], visible: canAccessSettings },
+        { href: '/settings?tab=banks', label: 'Bank Accounts', tab: 'banks', permissionTabs: ['pri.settings'], visible: canAccessSettings },
+        { href: '/settings?tab=periods', label: 'Periods', tab: 'periods', permissionTabs: ['pri.settings'], visible: canAccessSettings },
+        { href: '/settings?tab=simulator', label: 'Simulator', tab: 'simulator', permissionTabs: ['pri.settings'], visible: canAccessSettings },
       ],
     },
   ]

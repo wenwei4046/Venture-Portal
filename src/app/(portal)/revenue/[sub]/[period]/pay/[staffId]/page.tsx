@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
@@ -49,6 +49,7 @@ interface OpenBillLine {
  * payslip nobody can argue with is a payslip somebody can check.
  */
 export default async function StaffPayPage({ params }: PageProps) {
+  await requirePage('/revenue/[sub]/[period]/pay/[staffId]')
   await requirePermission('revenue')
   const { sub, period, staffId } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()

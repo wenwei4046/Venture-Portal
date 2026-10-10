@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import type { UserRole } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { canApprove } from '@/lib/roles'
+import { opensPath } from '@/lib/page-tabs'
 import { warmRoute } from '@/lib/nav-warm'
 import { moreTabLabel, tabsForRole, type NavViewer, type TabDef } from './nav-config'
 import { useNavOwner } from './nav-owner'
@@ -190,7 +191,8 @@ export default function BottomTabBar({ role, viewer, moreOpen, onMoreClick, fin 
   // The list a page belongs to when its path says another (a receipt, 2026-10-10).
   const navPath = useNavOwner(pathname)?.href ?? pathname
   const router = useRouter()
-  const tabs = tabsForRole(role)
+  // A slot shows only where its page would open for their tabs (2026-10-11, 8b).
+  const tabs = tabsForRole(role).filter((t) => opensPath(viewer.tabs, t.href))
 
   // Pending-approvals badge. Counted client-side with a head-only query so it
   // costs one tiny round-trip after paint rather than blocking every server

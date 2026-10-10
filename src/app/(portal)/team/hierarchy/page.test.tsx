@@ -11,7 +11,7 @@ const adapters = vi.hoisted(() => ({
   rpc: vi.fn(),
 }))
 
-vi.mock('@/lib/auth', () => ({ requirePermission: adapters.permission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: adapters.permission }))
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
     rpc: (fn: string, args?: unknown) => adapters.rpc(fn, args),

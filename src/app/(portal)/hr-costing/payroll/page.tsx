@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { getPeriodMonth } from '@/lib/utils'
 import { fetchAllRows } from '@/lib/paginate'
@@ -18,6 +18,7 @@ function formatPeriodLabel(period: string): string {
 }
 
 export default async function PayrollLandingPage() {
+  await requirePage('/hr-costing/payroll')
   const user = await requirePermission('hr_costing')
   const supabase = await createClient()
 

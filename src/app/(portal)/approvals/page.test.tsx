@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   resolveLiveApprovalAmounts: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireApprovalQueue: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission, requireApprovalQueue: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/approval-amounts', () => ({ resolveLiveApprovalAmounts: mocks.resolveLiveApprovalAmounts }))
 vi.mock('./_components/PendingApprovals', () => ({

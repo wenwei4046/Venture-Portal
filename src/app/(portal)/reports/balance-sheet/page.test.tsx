@@ -9,7 +9,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 // its totals.
 
 const mocks = vi.hoisted(() => ({ buildBalanceSheet: vi.fn(), fetchTrialBalance: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: async () => ({ role: 'finance', permissions: ['reports'] }) }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: async () => ({ role: 'finance', permissions: ['reports'] }) }))
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
     from: () => {
