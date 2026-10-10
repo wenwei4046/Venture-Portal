@@ -137,7 +137,7 @@ export function calendarVM(ctx: SalesCtx) {
 
   const cel = ui.celebrate;
   return {
-    stop,
+    // stop comes with the customer form below
     calTitle: first.toLocaleDateString("en-GB", ym[0] === now.getFullYear() ? { month: "long" } : { month: "long", year: "numeric" }),
     calToday: (e: MouseEvent<HTMLElement>) => {
       const main = e.currentTarget.closest("main");

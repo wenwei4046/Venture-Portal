@@ -150,8 +150,7 @@ export function insightVM(ctx: SalesCtx) {
   };
 
   return {
-    ...list, ...customerFormVM(ctx),
-    stop,
+    ...list, ...customerFormVM(ctx), // stop comes with the customer form
     pRange: per === "day" ? "Today · " + gb(now, { weekday: "short", day: "numeric", month: "short" })
       : per === "range" ? "Custom · " + (R0 === R1 ? f(new Date(R0)) : `${f(new Date(R0))} – ${f(new Date(R1))}`)
         : per === "week" ? `This week · ${f(new Date(wk0))} – ${f(new Date(wk0 + 6 * DAY))}`
