@@ -10,7 +10,47 @@ vi.mock('@/lib/hiring/board', () => ({ loadHiringBoard: vi.fn() }))
 import type { HiringRequest, HiringTalent } from '@/lib/hiring/types'
 import type { MemberRequest } from '@/lib/member/types'
 import type { Booking } from '@/lib/rooms/model'
-import { bookingOf, dataCenterOf, hireOf, memberRequestOf, talentOf } from './server'
+import type { User } from '@/types'
+import { appAccess, bookingOf, dataCenterOf, hireOf, memberRequestOf, talentOf } from './server'
+
+// HR's account: every Round-2 cell, the keys that open their pages.
+const HR_ACTIONS = {
+  'hiring.view': 'all', 'hiring.create': 'all', 'hiring.edit': 'all', 'hiring.approve': 'all',
+  'documentation.view': 'all', 'rooms.view': 'all', 'rooms.create': 'all', 'rooms.edit': 'all',
+  'member.view': 'all', 'member.manage': 'all',
+} as const
+const HR_KEYS = ['hiring', 'documentation', 'meeting_rooms_manage', 'member_requests_manage']
+const hrUser = (over: Partial<User>): User =>
+  ({ id: 'u', email: 'hr@example.invalid', name: 'HR', role: 'hr', is_active: true, permissions: HR_KEYS, actions: { ...HR_ACTIONS }, ...over }) as unknown as User
+
+describe('the app follows the account’s tabs, page by page (the review’s M2)', () => {
+  it('with nothing unticked, every part and every write their cells hold', () => {
+    expect(appAccess(hrUser({}))).toEqual({
+      parts: { requests: true, hiring: true, insights: true, talent: true, docs: true, rooms: true },
+      may: { decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true },
+    })
+  })
+
+  it('a closed page is left out — Requests closed while Insights stays — and a box unticked on one page closes its write there only', () => {
+    const tabs = ['hr.hiring_insights.view', 'hr.talent_bank.view', 'hr.talent_bank.create', 'hr.documentation.view',
+      'hr.member_services.view', 'hr.member_services.edit', 'hr.meeting_rooms.view', 'hr.meeting_rooms.create']
+    const closed = ['hr.hiring_requests.view', 'hr.hiring_requests.create', 'hr.hiring_requests.edit', 'hr.hiring_requests.approve', 'hr.talent_bank.edit']
+    const access = appAccess(hrUser({ tabs, closed }))
+    expect(access.parts).toEqual({ requests: true, hiring: false, insights: true, talent: true, docs: true, rooms: true })
+    expect(access.may).toEqual({ decide: true, hireApprove: false, hireEdit: false, hireCreate: false, talentEdit: false, book: true })
+  })
+
+  it('Member services’ Edit unticked: its requests still show, nothing is decided from the app', () => {
+    const tabs = ['hr.member_services.view', 'hr.meeting_rooms.view']
+    expect(appAccess(hrUser({ tabs, closed: ['hr.member_services.edit'] })).may.decide).toBe(false)
+  })
+
+  it('without the cell, the tab opens nothing', () => {
+    const access = appAccess(hrUser({ actions: { 'rooms.view': 'all' }, permissions: ['meeting_rooms'] }))
+    expect(access.parts).toEqual({ requests: false, hiring: false, insights: false, talent: false, docs: false, rooms: true })
+    expect(access.may.book).toBe(false)
+  })
+})
 
 // The HR phone app on the portal's own modules (2026-10-11): what each module answers, as the app draws it.
 

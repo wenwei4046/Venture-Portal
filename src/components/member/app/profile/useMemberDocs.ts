@@ -55,6 +55,8 @@ export function useMemberDocs({ active, onPage, source, staffId, fixture, readOn
     if (fixture || !source.openDocument) return;
     // Readied in the tap itself: a tab opened after the server answers is a pop-up to a phone.
     const tab = window.open("", "_blank");
+    // The file's page gets no handle back on the app.
+    if (tab) tab.opener = null;
     void settleRead(source.openDocument(id, staffId ? { staffId } : undefined)).then(res => {
       if (res.ok) {
         if (tab) tab.location.href = res.data.url;

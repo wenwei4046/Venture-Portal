@@ -38,7 +38,7 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'get_hr_cost_submissions_list', 'get_hr_cost_summary', 'get_payroll_accrual_totals', 'get_payroll_accrual_totals_for',
   'get_payroll_breakdown_by_pool', 'get_payroll_funding_paid', 'get_staff_billing_allocation', 'get_staff_own_share_allocation',
   'get_submitted_hr_summary', 'gl_net_by_account', 'hr_dashboard_summary', 'lookup_eis', 'lookup_epf', 'lookup_pcb', 'lookup_socso',
-  'member_admin_brand_weeks', 'member_admin_claim_settings', 'member_admin_request_facts', 'member_capacity_of', 'member_catalogue',
+  'member_admin_brand_weeks', 'member_admin_claim_settings', 'member_admin_request_facts', 'member_admin_snapshot', 'member_capacity_of', 'member_catalogue',
   'member_memo_reads', 'member_sub_department_requests', 'member_waiting_form', 'member_waiting_transfer', 'next_staff_code',
   // Documentation (mig 20261011070000): the page's read, a file's path, a member's documents.
   'hr_documentation', 'hr_documentation_file', 'member_documents',

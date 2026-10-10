@@ -153,6 +153,10 @@ export interface HrAppData {
   letters: HrLetter[]
   /** Department choices for a booking: its id and name. */
   bookDepts: Array<{ id: string; name: string }>
+  /** The parts their tabs open — each the portal page it stands for (`PART_PAGE`, server.ts). */
+  parts: { requests: boolean; hiring: boolean; insights: boolean; talent: boolean; docs: boolean; rooms: boolean }
+  /** The writes behind its buttons, by their page's boxes and the cells: a button they may not use is not drawn. */
+  may: { decide: boolean; hireApprove: boolean; hireEdit: boolean; hireCreate: boolean; talentEdit: boolean; book: boolean }
 }
 
 export const CHIP: Readonly<Record<ChipTone, [string, string]>> = {
