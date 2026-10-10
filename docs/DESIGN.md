@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -159,6 +159,60 @@ Every sheet override in `globals.css` is written `:where(.sheet-theme) <base
 selector>`, so it has exactly the specificity of the rule it replaces: a page's
 own utilities keep the power they had. Don't add a sheet rule with more weight
 than its base.
+
+### The HR revamp — HR's view and its kit (v3.19, 2026-10-10)
+
+The Claude Design handoff *Sidebar design revamp from HR* (`.design/hr-revamp/
+handoff`: README = spec, `design/Revenue App.dc.html` = source of truth, variant
+A) redraws HR's view and the pages it owns. **When the README and the file
+disagree, the file wins; every value is the prototype's.**
+
+- **HR's shell** (`lib/hr-view.ts` — the hr role, and the Principal viewing as
+  HR; every other view keeps its shell). `.hrv-shell` on a 243 ground: a square,
+  full-height, flush sidebar (`HrSidebar`, 248px ↔ 64px content-box on `248 245
+  240` with a `229 222 211` rule) of icon tiles in five toned sections —
+  Overview · I. HR & PAYROLL (clay) · II. DIRECTORS (gold) · III. REVENUE
+  (slate) · IV. PEOPLE (olive) · V. ADMIN (walnut) (`components/layout/
+  hr-nav.ts`). One peach pill with a 3px orange bar sits behind the rows and
+  slides to the row clicked (`top .34s cubic-bezier(.2,.8,.2,1)`, measured from
+  the row's offsetTop); the open row's tile swaps light/deep and grows to 1.06,
+  its label nudges 2px (.25s). The walnut **H** folds the rail (`width .28s`;
+  the words fade `.2s` where they stand; a cookie, `vp-hr-nav`, so it draws
+  folded). The greeting bar is white (`HrTopBar`: 60px, 16px radius, 10px in);
+  for an account that may switch views the "HR view" words ARE the switcher.
+  The sheet is the `<main>` and scrolls inside a 10px frame (`.hrv-frame`,
+  `data-hrv-overlay`) — so its rounded foot is always in view and drawers,
+  windows and the toast cover the sheet only.
+- **The kit** (`components/hrv/`: `kit.tsx` static pieces, `tabs.tsx`,
+  `overlay.tsx`, `toast.tsx`, `icons.tsx`, one `hrv.module.css`; colours are
+  the `--hv-*` tokens on `.sheet-theme`): the page head (10px/600/.18em eyebrow
+  behind a 2×10 orange bar — no roman numeral — Georgia 36/1.1, 13px subtitle,
+  the 64px orange segment; `bare` when tabs sit under it), tabs (8px tops,
+  peach + `inset 0 -2px 0` orange, 600; boxed counts), summary cards (the
+  prototype's own sizes per page), chips (mono 11px word + 5px dot on a wash),
+  grid tables (the prototype's tables are CSS grids: a `216 210 200` frame,
+  10px radius, a `235 231 224` band of 10.5px/600/.04em caps over `207 197
+  183`), right drawers (400–600px on `rgb(43 31 23 / .18)`), centred windows
+  (`.28` / `.22`), the toast (walnut, orange ●, bottom-centre, 2.2 s —
+  `flash()` after a save), the 28×16 toggle (`left .15s`), the peach save bar,
+  history dots, label/value facts. Esc closes the overlay on top.
+- **Tailwind moves the prototype's boxes, so the kit puts them back:** a
+  revamped page is `line-height: normal` (preflight's 1.5 makes every row
+  taller), and a box the prototype sizes with padding or a border is
+  `box-sizing: content-box` (the sidebar, menus, drawers, the small dialogs).
+- **Revenue's pages pick their sub-department on their own head**
+  (`SubDeptSwitcher`, top right: "SUB-DEPARTMENT" over the name, a chevron that
+  turns over; the menu lists each with ✓, then "+ New sub-department · Copy
+  Fair's rules, or start blank"). Fair | IR left every sidebar; Staff Hierarchy
+  is **Sales Groups**. **Comm Cal**: a status strip (ERP receiving · last
+  delivery · Pays from … · Change · **Data source ›**), five cards (the latest
+  month's commission is amber *Not computed* with its link, never a walnut
+  "—"), the months as a grid with each source a chip and its file below it;
+  Data source is a 440px drawer holding everything the ERP link and feed
+  panels did.
+- **Cross-check** with a measuring script that finds each element by its text
+  on both and diffs computed font / colour / size / padding / border / radius
+  / background (`.design/revenue-app/tools/measure-pl.mjs` is the pattern).
 
 ### Product List — a page of the Revenue app (v3.13, 2026-10-08)
 

@@ -1,0 +1,192 @@
+/* HR's sidebar (2026-10-10) — the prototype's aside, value for value:
+   square, full height, flush to the left edge; 248px open, 64px folded. */
+
+.aside {
+  /* The prototype's box is content-box: 248px plus its 1px border. */
+  box-sizing: content-box;
+  width: 248px;
+  flex: none;
+  border-right: 1px solid rgb(var(--hvs-nav-border));
+  background: rgb(var(--hvs-nav));
+  /* display: flex comes from `md:flex` — below md the phone's tab bar navigates. */
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  line-height: normal;
+  font-size: 13px;
+  color: rgb(var(--hvs-ink));
+}
+.aside[data-collapsed='true'] { width: 64px; }
+
+.brand {
+  padding: 16px 12px 14px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tile {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 0;
+  border-radius: 10px;
+  background: rgb(var(--hvs-walnut));
+  color: rgb(var(--hvs-cream));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: normal;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.tile:hover { transform: scale(1.06); }
+.tile:focus-visible { outline: 2px solid rgb(var(--hvs-nav-bar)); outline-offset: 2px; }
+.brandText {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  transition: opacity 0.2s;
+}
+.brandName { font-size: 14px; font-weight: 500; color: rgb(var(--hvs-ink)); line-height: 18px; }
+.brandSub { font-size: 11px; color: rgb(var(--hvs-muted)); line-height: 16px; }
+
+.nav {
+  position: relative;
+  flex: 1;
+  padding: 2px 10px 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--hvs-nav-border)) transparent;
+}
+.pill {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  height: 38px;
+  border-radius: 8px;
+  background: rgb(var(--hvs-nav-pill));
+  transition: top 0.34s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s;
+  pointer-events: none;
+}
+.pillBar {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: rgb(var(--hvs-nav-bar));
+}
+
+.section {
+  padding: 16px 10px 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgb(var(--hvs-muted));
+  white-space: nowrap;
+  transition: opacity 0.2s;
+}
+.roman { color: rgb(var(--hvs-roman)); letter-spacing: 0.02em; }
+
+.itemWrap { padding-bottom: 2px; }
+.item {
+  position: relative;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 5px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: transparent;
+  color: rgb(var(--hvs-graphite));
+  font-weight: 400;
+  font-size: 13.5px;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background-color 0.15s, color 0.2s;
+}
+.item:hover { background: rgb(var(--hvs-nav-hover)); }
+.item[data-on='true'] { color: rgb(var(--hvs-ink)); font-weight: 500; }
+.item[data-on='true']:hover { background: transparent; }
+.item:focus-visible { outline: 2px solid rgb(var(--hvs-nav-bar)); outline-offset: -2px; }
+.itemTile {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgb(var(--tile-light));
+  color: rgb(var(--tile-deep));
+  transform: scale(1);
+  transition: background-color 0.25s, color 0.25s, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.item[data-on='true'] .itemTile {
+  background: rgb(var(--tile-deep));
+  color: rgb(var(--tile-light));
+  transform: scale(1.06);
+}
+.itemLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform: translateX(0);
+  transition: opacity 0.2s, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.item[data-on='true'] .itemLabel { transform: translateX(2px); }
+
+.foot {
+  border-top: 1px solid rgb(var(--hvs-nav-border));
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+.avatar {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: rgb(var(--hvs-avatar));
+  color: rgb(var(--hvs-ink));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-left: 2px;
+}
+.footText { flex: 1; min-width: 0; transition: opacity 0.2s; }
+.footName { font-size: 13px; font-weight: 500; color: rgb(var(--hvs-ink)); line-height: 17px; overflow: hidden; text-overflow: ellipsis; }
+.footSub { font-size: 11px; color: rgb(var(--hvs-muted)); line-height: 15px; }
+.version { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; color: rgb(var(--hvs-muted)); }
+
+/* Folded: the words fade out where they stand, so nothing reflows. */
+.aside[data-collapsed='true'] .brandText,
+.aside[data-collapsed='true'] .section,
+.aside[data-collapsed='true'] .itemLabel,
+.aside[data-collapsed='true'] .footText { opacity: 0; }
+
+/* The tiles' tones (the open page's tile swaps light and deep). */
+.walnut { --tile-light: var(--tone-walnut); --tile-deep: var(--tone-walnut-deep); }
+.clay { --tile-light: var(--tone-clay); --tile-deep: var(--tone-clay-deep); }
+.gold { --tile-light: var(--tone-gold); --tile-deep: var(--tone-gold-deep); }
+.slate { --tile-light: var(--tone-slate); --tile-deep: var(--tone-slate-deep); }
+.olive { --tile-light: var(--tone-olive); --tile-deep: var(--tone-olive-deep); }
+
+@media (prefers-reduced-motion: reduce) {
+  .aside, .pill, .itemTile, .itemLabel, .tile, .brandText, .section, .footText { transition: none; }
+}

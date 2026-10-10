@@ -3726,6 +3726,179 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   background: rgb(var(--accent));
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   The HR revamp (v3.19, 2026-10-10 — the Claude Design handoff "Sidebar
+   design revamp from HR": `.design/hr-revamp/handoff`, README = spec,
+   `design/Revenue App.dc.html` = source of truth). docs/DESIGN.md › "The HR
+   revamp".
+
+   Two scopes, every value the prototype's own:
+   · `.hrv-shell` — HR's view of the portal: the square, full-height sidebar
+     with its icon tiles, the white greeting bar, the 243 ground. PortalFrame
+     puts it on the shell when the view is HR (`lib/hr-view.ts`).
+   · `--hv-*` on `.sheet-theme` — the kit the revamped pages are drawn with
+     (`components/hrv/`): Comm Cal, Sales Groups, Rules, People, Hierarchy,
+     Member services. Their tables, tabs, chips, drawers and cards read these
+     and nothing else, so the page and the prototype say the same colour.
+   ═══════════════════════════════════════════════════════════════════════ */
+.sheet-theme,
+.hrv-overlay {
+  --hv-ink: 0 0 0;
+  --hv-accent: 233 154 83;
+  --hv-accent-hover: 221 139 66;
+  --hv-peach: 255 244 231;
+  --hv-hairline: 229 228 223;
+  --hv-divider: 226 224 218;
+  --hv-head: 235 231 224;
+  --hv-head-rule: 207 197 183;
+  --hv-frame: 216 210 200;
+  --hv-panel: 246 246 244;
+  --hv-panel-2: 247 247 245;
+  --hv-panel-3: 240 238 234;
+  --hv-zebra: 250 250 249;
+  --hv-row-hover: 255 245 233;
+  --hv-brown: 117 100 86;
+  --hv-body-2: 90 78 68;
+  --hv-note: 138 119 101;
+  --hv-faint: 152 142 130;
+  --hv-quiet: 170 160 150;
+  --hv-disabled: 242 241 238;
+  --hv-walnut: 90 62 43;
+  --hv-dark: 43 31 23;
+  --hv-cream: 246 238 230;
+  --hv-orange-text: 160 90 30;
+  --hv-group: 241 237 230;
+  --hv-blue: 46 92 138;
+  --hv-blue-hover: 34 72 112;
+  --hv-from-border: 233 200 160;
+  --hv-from-bg: 255 250 243;
+  --hv-danger: 176 40 34;
+  --hv-danger-bg: 250 228 224;
+  --hv-danger-border: 236 190 184;
+  --hv-alert: 150 100 12;
+  --hv-alert-bg: 249 238 214;
+  --hv-alert-border: 232 206 150;
+  --hv-alert-bar: 222 178 104;
+  --hv-alert-icon-bg: 250 241 222;
+  --hv-ledger: 21 110 78;
+  --hv-ledger-bg: 222 240 232;
+  --hv-ledger-border: 180 215 198;
+  --hv-ledger-wash: 240 248 244;
+  --hv-info: 108 104 98;
+  --hv-info-bg: 238 235 231;
+  --hv-info-border: 222 218 212;
+  /* Summary cards. */
+  --hv-card-border: 232 225 216;
+  --hv-card-bar: 205 184 162;
+  --hv-card-icon: 154 128 103;
+  --hv-card-icon-bg: 246 242 236;
+  --hv-card-primary: 134 102 76;
+  --hv-card-danger-bar: 201 116 109;
+  --hv-card-danger-icon: 183 91 80;
+  --hv-card-danger-icon-bg: 251 239 237;
+  /* The title badges (Sales Groups' chart, Hierarchy). */
+  --hv-t-leader-bg: 240 232 250;
+  --hv-t-leader: 110 70 160;
+  --hv-t-assistant-bg: 253 232 233;
+  --hv-t-assistant: 170 60 70;
+  --hv-t-senior-bg: 255 236 214;
+  --hv-t-senior: 160 90 30;
+  --hv-t-specialist-bg: 246 240 230;
+  --hv-t-specialist: 120 95 70;
+  --hv-t-other-bg: 232 239 247;
+  --hv-t-other: 46 92 138;
+  /* Brands (Member services › Brand weeks). */
+  --hv-akemi: 189 74 25;
+  --hv-akemi-bg: 255 240 228;
+  --hv-dunlopillo: 78 101 116;
+  --hv-dunlopillo-bg: 230 237 241;
+  --hv-zanotti: 125 91 32;
+  --hv-zanotti-bg: 246 237 213;
+  --hv-ergotex: 56 117 87;
+  --hv-ergotex-bg: 232 243 237;
+  /* Canvases: Sales Groups' chart (cool) and Hierarchy's org chart. */
+  --hv-sg-canvas: 222 230 237;
+  --hv-sg-border: 200 212 222;
+  --hv-sg-rule: 186 200 212;
+  --hv-sg-text: 90 98 108;
+  --hv-sg-frame: 250 251 252;
+  --hv-sg-frame-border: 206 214 222;
+  --hv-sg-stem: 160 172 184;
+  --hv-sg-card-border: 222 226 230;
+  --hv-sg-code: 120 128 138;
+  --hv-sg-pill: 242 242 240;
+  --hv-oc-canvas: 232 238 243;
+  --hv-oc-zone: 176 192 206;
+  --hv-oc-slate: 78 101 116;
+  --hv-oc-rule: 238 240 242;
+  --hv-oc-hover: 247 249 251;
+  --hv-rung-empty: 250 249 246;
+}
+
+/* HR's view of the shell. The shell is drawn light, as the prototype draws
+   it, whatever the theme: the sheet is light in both, and a dark rail beside
+   a light sheet was the very wall #152 took out. */
+.hrv-shell {
+  color-scheme: light;
+  --hvs-ground: 243 243 241;
+  --hvs-nav: 248 245 240;
+  --hvs-nav-border: 229 222 211;
+  --hvs-nav-hover: 241 236 228;
+  --hvs-nav-pill: 255 244 231;
+  --hvs-nav-bar: 233 154 83;
+  --hvs-ink: 51 36 27;
+  --hvs-graphite: 74 64 58;
+  --hvs-muted: 117 100 86;
+  --hvs-roman: 221 139 66;
+  --hvs-avatar: 236 229 219;
+  --hvs-walnut: 90 62 43;
+  --hvs-cream: 246 238 230;
+  --hvs-top: 255 255 255;
+  --hvs-top-border: 229 228 223;
+  --hvs-top-ink: 43 31 23;
+  --hvs-top-name: 46 92 138;
+  --hvs-top-view: 90 78 68;
+  --hvs-top-dot: 150 100 12;
+  /* A section's tile: light at rest, the deep one for the page you are on. */
+  --tone-walnut: 239 228 217;
+  --tone-walnut-deep: 75 48 36;
+  --tone-clay: 249 231 216;
+  --tone-clay-deep: 163 78 37;
+  --tone-gold: 246 237 213;
+  --tone-gold-deep: 125 91 32;
+  --tone-slate: 230 237 241;
+  --tone-slate-deep: 78 101 116;
+  --tone-olive: 238 240 226;
+  --tone-olive-deep: 88 98 68;
+  background: rgb(var(--hvs-ground));
+}
+/* The content frame: 10px of ground around ONE sheet that scrolls inside
+   itself, so the sheet's rounded foot is always in view and a drawer covers
+   the sheet only (the prototype's `inset: 10px`). Drawers portal into it. */
+.hrv-frame {
+  flex: 1;
+  min-height: 0;
+  padding: 10px;
+  display: flex;
+  position: relative;
+}
+.hrv-sheet.sheet {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-y: auto;
+  position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(229 228 223) transparent;
+}
+@media (max-width: 767px) {
+  /* Clears the phone's 54px tab bar and the home-indicator inset. */
+  .hrv-frame { padding-bottom: calc(54px + 10px + var(--safe-bottom)); }
+}
+@media print {
+  .hrv-frame { display: block; padding: 0; }
+  .hrv-sheet.sheet { overflow: visible; }
+}
+
 /* ── Finance's queues (2026-10-07) ──
    The Approvals queue first, then the Invoices and the Statements: a table
    with one bar under it for what is ticked. Everything here hangs off

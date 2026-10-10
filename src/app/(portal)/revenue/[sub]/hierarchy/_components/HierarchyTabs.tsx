@@ -36,6 +36,7 @@ export default function HierarchyTabs({
   employeeDepartments = [],
   canManageEmployment = false,
   employmentToday = '',
+  head,
 }: {
   subDept: { name: string; slug: string; isHome: boolean }
   schemeId: string
@@ -45,14 +46,16 @@ export default function HierarchyTabs({
   employeeDepartments?: EmployeeDepartmentDestination[]
   canManageEmployment?: boolean
   employmentToday?: string
+  /** The page's head (2026-10-10: Sales Groups, with the sub-department switcher). */
+  head: React.ReactNode
 }) {
   const searchParams = useSearchParams()
   const tab: HierarchyTab = searchParams.get('tab') === 'team' ? 'team' : 'chart'
   const currentDestination = membershipDestinations.find(destination => destination.schemeId === schemeId)
 
   const tabs: TabItem[] = [
-    { key: 'chart', label: 'Hierarchy' },
-    { key: 'team', label: 'Team', count: team.people.length },
+    { key: 'chart', label: 'Chart' },
+    { key: 'team', label: 'Members', count: team.people.length },
   ]
 
   function goTo(key: string) {
@@ -65,45 +68,7 @@ export default function HierarchyTabs({
 
   return (
     <div>
-      <div className="page-head tabbed">
-        <div>
-          <div className="page-eyebrow">
-            <em>I.</em> REVENUE · {subDept.name.toUpperCase()}
-          </div>
-          <h1 className="page-title">Staff Hierarchy</h1>
-          {/* Nothing on the sheet is italic: a stressed word is bold. */}
-          <p className="text-sm mt-3 max-w-2xl">
-            {tab === 'team' ? (
-              subDept.isHome ? (
-                <>
-                  Who {subDept.name} reports to, then everyone on it: the title they hold, the
-                  rank they are paid from, and who they report to. Only the <strong>rank</strong> is set
-                  here — a title gives its rank on its own, and who somebody reports to is moved
-                  on the chart.
-                </>
-              ) : (
-                <>
-                  Who {subDept.name} reports to, then who is in it: the title each holds{' '}
-                  <strong>here</strong>, the rank they are paid from, and who they earn under. Titles,
-                  ranks and membership are set here; who earns under whom is moved on the chart.
-                  None of it touches People.
-                </>
-              )
-            ) : (
-              <>
-                Explore every sub-department on one canvas. Its Revenue Directors stand on a rail
-                above the frames, one line down to each sub-department they direct, and every team
-                leader and standalone member reports to them — a reporting line only, with no
-                override. Drag a team or department border or
-                heading to move it freely. Hold over a person until the transfer prompt appears
-                to change upline. Right-click a person to manage their memberships, titles,
-                or removal from the chart.
-                The Team tab edits {subDept.name}.
-              </>
-            )}
-          </p>
-        </div>
-      </div>
+      {head}
 
       <SlidingTabs items={tabs} active={tab} onTabChange={goTo} variant="control" />
 

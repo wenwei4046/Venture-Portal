@@ -6,6 +6,9 @@ import { revenuePath } from '@/lib/revenue'
 import { titleCanRecruit } from '@/lib/commission/titles'
 import { rankLabelOf, rankPayLabelOf } from '@/lib/commission/ranks'
 import HierarchyTabs from './_components/HierarchyTabs'
+import { PageHead } from '@/components/hrv/kit'
+import SubDeptSwitcher from '../../_components/SubDeptSwitcher'
+import { loadSwitcherData, type SwitcherData } from '../../_lib/switcher'
 import type { OrgDepartment, OrgPerson, OrgRank } from './_components/OrgChart'
 import type { OrgDirector } from './_components/org-chart-types'
 import { loadTeam } from '../../_components/config/load'
@@ -55,7 +58,9 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
 
   // Nothing can be charted against a sub-department with no scheme: a rank is
   // a scheme's row, and a position points at one.
-  if (!subDept.schemeId) return <NoScheme subDept={subDept} />
+  const switcher = await loadSwitcherData(user, subDept)
+  const head = <SalesGroupsHead name={subDept.name} switcher={switcher} />
+  if (!subDept.schemeId) return <NoScheme subDept={subDept} head={head} />
 
   const siblings = subDepartments.filter(
     (department): department is SubDepartment & { schemeId: string } =>
@@ -91,6 +96,20 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       employeeDepartments={employeeDepartments}
       canManageEmployment={canManageEmployment}
       employmentToday={employmentToday}
+      head={head}
+    />
+  )
+}
+
+/** Sales Groups' head (2026-10-10, was Staff Hierarchy): no rule — its tabs sit under it. */
+function SalesGroupsHead({ name, switcher }: { name: string; switcher: SwitcherData }) {
+  return (
+    <PageHead
+      bare
+      eyebrow={`Revenue · ${name}`}
+      title="Sales Groups"
+      subtitle={`Who sells under whom in ${name}, and the rank each person is paid from.`}
+      right={<SubDeptSwitcher data={switcher} view="sg" />}
     />
   )
 }
@@ -159,19 +178,12 @@ function chartData(team: TeamData): { people: OrgPerson[]; ranks: OrgRank[]; dir
   return { people, ranks, directors }
 }
 
-function NoScheme({ subDept }: { subDept: SubDepartment }) {
+function NoScheme({ subDept, head }: { subDept: SubDepartment; head: React.ReactNode }) {
   return (
     <div>
-      <div className="page-head">
-        <div>
-          <div className="page-eyebrow">
-            <em>I.</em> REVENUE · {subDept.name.toUpperCase()}
-          </div>
-          <h1 className="page-title">Staff Hierarchy</h1>
-        </div>
-      </div>
+      {head}
 
-      <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+      <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center mt-5">
         <p className="text-md font-bold mb-2">{subDept.name} has no scheme yet.</p>
         <p className="text-sm max-w-md mx-auto">
           A rank belongs to a scheme and a position points at a rank, so there is nothing to place

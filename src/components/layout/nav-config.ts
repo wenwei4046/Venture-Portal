@@ -148,12 +148,25 @@ const isHRorPrincipal = (v: NavViewer) => canAccessTeam(v)
  */
 export interface NavData {
   revenueSubDepts: Array<{ slug: string; name: string }>
+  /** The sub-department Revenue's Comm Cal / Sales Groups / Rules open
+   *  (2026-10-10): the one last picked on a Revenue page's switcher (a cookie),
+   *  else the first. Null while there is none. */
+  revenueSub?: string | null
   /** Dept Pool's departments (2026-10-09): the five, then the registry's
    *  added ones — IT, Revenue Department. Left out = the five alone. */
   deptPoolDepts?: StatementDept[]
 }
 
 export const emptyNavData: NavData = { revenueSubDepts: [] }
+
+/** On a Revenue page the links follow that page's own sub-department. */
+export function withPathRevenueSub(data: NavData, pathname: string): NavData {
+  const parts = pathname.split('/').filter(Boolean)
+  if (parts[0] !== 'revenue' || !parts[1]) return data
+  const slug = parts[1]
+  if (slug === data.revenueSub || !data.revenueSubDepts.some(s => s.slug === slug)) return data
+  return { ...data, revenueSub: slug }
+}
 
 // Layout per user spec 2026-06-10 (re-grouped from the original phase layout).
 export function buildNavEntries(data: NavData): NavEntry[] {
@@ -281,35 +294,31 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     // when it moved into the Revenue app (user: it is set for the Revenue
     // team's margins, so it belongs to their view — `/member/products`, under
     // PRINCIPAL in that app's sidebar, for whoever holds `product_list`).
+    // Since 2026-10-10 (the HR revamp handoff) the group no longer lists the
+    // sub-departments — Fair | IR moved to a switcher on each Revenue page's
+    // head — so its three views open the sub-department last picked there.
     {
       label: 'Revenue',
       section: 'Departments',
       visible: canAccessRevenue,
       children: [
-        ...data.revenueSubDepts.map((s) => ({
-          label: s.name,
-          href: revenuePath(s.slug),
-          visible: canAccessRevenue,
-          children: [
-            {
-              href: revenuePath(s.slug),
-              // "Comm Cal", not "Commission Calculation" (user 2026-09-01):
-              // three levels in, the full name is wider than the 220px rail and
-              // ellipsised to "Commission Calcu…", which reads worse than the
-              // short form. The page it opens still says Commission Calculation
-              // in full.
-              label: 'Comm Cal',
-              // A month opened from the calculation list — /revenue/fair/
-              // 2026-08-01 and the import, open-bill and statement pages under
-              // it — is still Calculation, so no `exact` here. Only the two
-              // siblings own a subtree of their own.
-              notPaths: [revenuePath(s.slug, 'hierarchy'), revenuePath(s.slug, 'rules')],
-              visible: canAccessRevenue,
-            },
-            { href: revenuePath(s.slug, 'hierarchy'), label: 'Staff Hierarchy', visible: canAccessRevenue },
-            { href: revenuePath(s.slug, 'rules'), label: 'Rules', visible: canAccessRevenue },
-          ],
-        })),
+        ...(data.revenueSub
+          ? [
+              {
+                href: revenuePath(data.revenueSub),
+                // "Comm Cal", not "Commission Calculation" (user 2026-09-01).
+                // A month opened from the calculation list — /revenue/fair/
+                // 2026-08-01 and the import, open-bill and statement pages
+                // under it — is still Calculation, so no `exact` here.
+                label: 'Comm Cal',
+                notPaths: [revenuePath(data.revenueSub, 'hierarchy'), revenuePath(data.revenueSub, 'rules')],
+                visible: canAccessRevenue,
+              },
+              // Was "Staff Hierarchy" (renamed 2026-10-10).
+              { href: revenuePath(data.revenueSub, 'hierarchy'), label: 'Sales Groups', visible: canAccessRevenue },
+              { href: revenuePath(data.revenueSub, 'rules'), label: 'Rules', visible: canAccessRevenue },
+            ]
+          : []),
         // Venues went on 2026-09-27: the ERP names every bill's fair — venue,
         // organiser and days — so nothing about a fair is typed here any more.
         // The department as a whole (2026-09-30): its mode, cost center or
@@ -423,7 +432,21 @@ export function buildNavEntries(data: NavData): NavEntry[] {
  *  a static list could not know its name. Pass `emptyNavData` where only the
  *  constant destinations matter. */
 export function navRootPaths(data: NavData): ReadonlySet<string> {
-  return new Set(navHrefs(buildNavEntries(data)).map((href) => href.split('?')[0]))
+  return new Set([
+    ...navHrefs(buildNavEntries(data)).map((href) => href.split('?')[0]),
+    // Every sub-department's three views are tabs, whichever one the nav
+    // happens to point at (2026-10-10: the sidebar lists only that one).
+    ...revenuePairs(data).map(([path]) => path),
+  ])
+}
+
+/** `[path, label]` for every sub-department's three views — "Revenue · Fair · Rules". */
+function revenuePairs(data: NavData): Array<readonly [string, string]> {
+  return data.revenueSubDepts.flatMap((s) => [
+    [revenuePath(s.slug), `Revenue · ${s.name}`] as const,
+    [revenuePath(s.slug, 'hierarchy'), `Revenue · ${s.name} · Sales Groups`] as const,
+    [revenuePath(s.slug, 'rules'), `Revenue · ${s.name} · Rules`] as const,
+  ])
 }
 
 /** Every href in the tree, at any depth — a group's own landing page included.
@@ -443,9 +466,9 @@ function navHrefs(entries: NavEntry[]): string[] {
 export function navLabelByPath(data: NavData): ReadonlyMap<string, string> {
   return new Map(
     // First writer wins: /settings appears once per tab and the group label is
-    // the same for all of them, and a sub-department shares its href with its
-    // own Comm Cal child — "Revenue · Fair" is the better of those two.
-    navLabelPairs(buildNavEntries(data), []).reverse(),
+    // the same for all of them. The sub-departments' own names go first so
+    // they win over the nav's "Revenue · Comm Cal" for the same path.
+    [...revenuePairs(data), ...navLabelPairs(buildNavEntries(data), [])].reverse(),
   )
 }
 

@@ -21,6 +21,8 @@ vi.mock('@/lib/selection-store', () => ({ dropSelectionsForPath: () => undefined
 vi.mock('./FinSwipeBack', () => ({ default: () => <span data-testid="swipe" /> }))
 vi.mock('./FinScrollMemory', () => ({ default: () => <span data-testid="scroll-memory" /> }))
 vi.mock('./RouteFreshener', () => ({ default: () => null }))
+vi.mock('./HrSidebar', () => ({ default: () => <aside>hr sidebar</aside> }))
+vi.mock('./HrTopBar', () => ({ default: () => <div data-testid="hr-topbar" /> }))
 
 import PortalFrame from './PortalFrame'
 
@@ -51,10 +53,14 @@ describe('PortalFrame and the Finance view', () => {
     expect(screen.getByTestId('swipe')).toBeInTheDocument()
   })
 
-  it('leaves HR’s view alone', () => {
+  it('leaves HR’s view alone — it has a shell of its own (2026-10-10)', () => {
     nav.pathname = '/hr-costing'
     render(<PortalFrame user={user('hr')} navData={navData}><Probe /></PortalFrame>)
-    expect(document.querySelector('.sheet-frame')).not.toHaveClass('fin-view')
+    expect(document.querySelector('.hrv-shell')).not.toBeNull()
+    expect(document.querySelector('main.hrv-sheet')).toHaveClass('sheet-theme')
+    expect(document.querySelector('[data-hrv-overlay]')).not.toBeNull()
+    expect(document.querySelector('.fin-view')).toBeNull()
+    expect(screen.getByTestId('hr-topbar')).toBeInTheDocument()
     expect(screen.getByTestId('probe')).toHaveTextContent('false')
     expect(screen.getByTestId('topbar')).toHaveAttribute('data-fin', 'false')
     expect(screen.queryByTestId('scroll-memory')).toBeNull()

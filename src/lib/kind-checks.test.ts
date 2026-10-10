@@ -20,9 +20,10 @@ const KIND_IS_THE_POINT: Record<string, string> = {
   'lib/approval-domains.ts': 'the owner kind — the Principal may decide what they raised themselves (approver_may)',
   'lib/view-as.ts': "the view-as switch — the Principal's mask is a kind",
   'lib/auth.ts': 'loading the account and its view-as mask; requireRole for the dept_manager row policies',
-  'components/layout/PortalFrame.tsx': "the phone's tab bar and the switcher's value — presentation by kind",
+  'components/layout/PortalFrame.tsx': "the phone's tab bar, the switcher's value and which shell — HR's view (lib/hr-view.ts) — presentation by kind",
   'components/layout/MoreSheet.tsx': 'labels and the tab bar it mirrors — presentation',
   'components/layout/TopBar.tsx': 'the role label and the view-as switcher — presentation',
+  'components/layout/HrTopBar.tsx': "HR's greeting bar: the role label and the view-as switcher — presentation",
   'test/with-actions.ts': 'test helper: a mocked untemplated account',
 }
 

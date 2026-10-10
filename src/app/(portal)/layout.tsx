@@ -1,9 +1,11 @@
+import { cookies } from 'next/headers'
 import { requireAuth } from '@/lib/auth'
 import PortalFrame from '@/components/layout/PortalFrame'
 import { emptyNavData, readsDeptStatements, type NavData } from '@/components/layout/nav-config'
 import { canAccessRevenue } from '@/lib/roles'
 import { primedRegistryRows } from '@/lib/dept-registry'
 import { statementDepts } from '@/lib/dept-statements'
+import { HR_NAV_COOKIE, REVENUE_SUB_COOKIE, isHrView } from '@/lib/hr-view'
 import { listSubDepartments } from './revenue/_lib/sub-departments'
 import { redirect } from 'next/navigation'
 
@@ -14,6 +16,7 @@ export default async function PortalLayout({
 }) {
   const user = await requireAuth()
   if (user.role === 'revenue_member') redirect('/member')
+  const jar = await cookies()
 
   // Almost all of the nav is a constant, but the Revenue group lists the
   // Revenue Department's sub-departments — Fair today, more when they are
@@ -21,7 +24,13 @@ export default async function PortalLayout({
   // roles that can see the group; nobody else pays for the query.
   let navData: NavData = emptyNavData
   if (canAccessRevenue(user)) {
-    navData = { ...navData, revenueSubDepts: await listSubDepartments() }
+    const subs = await listSubDepartments()
+    // Comm Cal / Sales Groups / Rules open the sub-department last picked on a
+    // Revenue page's switcher (2026-10-10) — else the home one, the oldest.
+    const picked = jar.get(REVENUE_SUB_COOKIE)?.value
+    const home = subs.find(s => s.isHome) ?? subs[0]
+    const revenueSub = subs.find(s => s.slug === picked)?.slug ?? home?.slug ?? null
+    navData = { ...navData, revenueSubDepts: subs, revenueSub }
   }
   // Dept Pool lists each department for whoever reads them all (2026-10-09);
   // the ones added since — IT, Revenue Department — come from the registry
@@ -32,7 +41,11 @@ export default async function PortalLayout({
   }
 
   return (
-    <PortalFrame user={user} navData={navData}>
+    <PortalFrame
+      user={user}
+      navData={navData}
+      hrNavCollapsed={isHrView(user.role) && jar.get(HR_NAV_COOKIE)?.value === 'collapsed'}
+    >
       {children}
     </PortalFrame>
   )

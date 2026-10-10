@@ -1,7 +1,10 @@
 import { requirePermission } from '@/lib/auth'
+import { PageHead } from '@/components/hrv/kit'
 import CommissionSection from '../../_components/config/CommissionSection'
 import { loadCommissionSettings } from '../../_components/config/load'
 import { requireSubDepartment } from '../../_lib/sub-departments'
+import { loadSwitcherData } from '../../_lib/switcher'
+import SubDeptSwitcher from '../../_components/SubDeptSwitcher'
 
 interface PageProps {
   params: Promise<{ sub: string }>
@@ -14,18 +17,30 @@ interface PageProps {
  * margin bands, plus the recorded promotion criteria, the directors' pay and,
  * last, KPI items with their threshold ladder (set here, not on the Product
  * List, since 2026-10-08): up to nine tabs on one URL (`?tab=`). The
- * salespeople themselves live on Staff Hierarchy's Team tab since 2026-09-05.
+ * salespeople themselves live on Sales Groups' Members tab.
  *
- * Scoped by the route rather than by an in-page picker (2026-09-01): the
- * sidebar already asks which sub-department you are working on, and a second
- * answer to the same question on the page is how Fair's ladder gets edited
- * while IR is the one on screen.
+ * Scoped by the route: the switcher on the head (2026-10-10, the HR revamp)
+ * opens the same page for another sub-department, so one sub-department's
+ * ladder is never edited while another's name is on screen.
  */
 export default async function RevenueRulesPage({ params }: PageProps) {
-  await requirePermission('revenue')
+  const user = await requirePermission('revenue')
   const { sub } = await params
   const subDept = await requireSubDepartment(sub)
-  const data = await loadCommissionSettings(subDept.schemeId)
+  const [data, switcher] = await Promise.all([loadCommissionSettings(subDept.schemeId), loadSwitcherData(user, subDept)])
 
-  return <CommissionSection data={data} subDept={subDept} />
+  return (
+    <CommissionSection
+      data={data}
+      subDept={subDept}
+      head={
+        <PageHead
+          eyebrow={`Revenue · ${subDept.name}`}
+          title="Rules"
+          subtitle={`What ${subDept.name} pays, and to whom. Every figure a run produces comes from here.`}
+          right={<SubDeptSwitcher data={switcher} view="rules" />}
+        />
+      }
+    />
+  )
 }
