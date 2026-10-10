@@ -810,6 +810,35 @@ textarea.input { resize: vertical; }
 .vwFrame { width: 100%; flex: 1; min-height: 640px; border: 0; background: rgb(255 255 255); }
 .vwImg { width: 100%; height: auto; background: rgb(255 255 255); box-shadow: 0 1px 3px rgba(43, 31, 23, 0.12); }
 .vwNone { margin: auto; text-align: center; color: rgb(var(--hv-body-2)); font-size: 13px; line-height: 1.6; }
+/* An Excel or CSV file (the handoff's `isSheet`): a white page, the column
+   letters on a grey band, each row's number down the side, the first row the
+   header; a column of figures right-aligned in figures' type. */
+.vwSheet { flex: none; background: rgb(255 255 255); box-shadow: 0 1px 3px rgba(43, 31, 23, 0.12); font-size: 12px; line-height: normal; overflow-x: auto; }
+.vwSheetHead {
+  display: grid;
+  background: rgb(242 240 236);
+  border-bottom: 1px solid rgb(216 210 200);
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10.5px;
+  color: rgb(117 100 86);
+}
+.vwSheetCorner,
+.vwSheetCol { padding: 6px 8px; border-right: 1px solid rgb(229 228 223); }
+.vwSheetRow { display: grid; border-bottom: 1px solid rgb(236 233 228); background: rgb(255 255 255); font-weight: 400; }
+.vwSheetFirst { background: rgb(250 248 245); font-weight: 600; }
+.vwSheetNum {
+  padding: 6px 8px;
+  border-right: 1px solid rgb(229 228 223);
+  background: rgb(242 240 236);
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10.5px;
+  color: rgb(117 100 86);
+}
+.vwSheetCell { padding: 6px 8px; border-right: 1px solid rgb(236 233 228); overflow-wrap: anywhere; }
+.vwSheetFigure { text-align: right; font-family: var(--font-mono), 'Chivo Mono', monospace; }
+.vwSheetCol.vwSheetEnd,
+.vwSheetCell.vwSheetEnd { border-right: 0; }
+.vwSheetMore { font-size: 12px; color: rgb(117 100 86); text-align: center; }
 .vwAudit { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 22px; }
 .vwFacts { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 8px 14px; font-size: 13px; margin-bottom: 22px; }
 .vwFactLabel { color: rgb(var(--hv-brown)); }

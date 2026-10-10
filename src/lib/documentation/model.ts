@@ -398,9 +398,11 @@ export function nameFromFile(fileName: string): string {
 }
 
 /** How the preview drawer shows a file: inline for a PDF or a picture, else "No preview". */
-export function previewKind(fileName: string, contentType: string | null): 'pdf' | 'image' | 'none' {
+export function previewKind(fileName: string, contentType: string | null): 'pdf' | 'image' | 'sheet' | 'none' {
   const type = contentTypeOf(fileName, contentType)
   if (type === 'application/pdf') return 'pdf'
   if (type && type.startsWith('image/') && type !== 'image/heic') return 'image'
+  // Excel and CSV are drawn as the handoff's sheet (2026-10-11, lib/documentation/sheet.ts); a Word file stays a download, as there.
+  if (type === TYPES.xlsx || type === TYPES.xls || type === TYPES.csv) return 'sheet'
   return 'none'
 }
