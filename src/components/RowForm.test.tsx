@@ -79,7 +79,9 @@ describe('RowForm', () => {
     fireEvent.submit(rowForm())
 
     expect(await screen.findByText('Rank SS already pays 11%')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add' })).toBeEnabled()
+    // The transition's pending flag clears in its own commit, after the error renders —
+    // under a loaded run the two can land in separate frames, so wait for the label.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add' })).toBeEnabled())
   })
 
   it('keeps the form outside the table and the row controls attached to it', () => {
