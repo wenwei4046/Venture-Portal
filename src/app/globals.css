@@ -1042,9 +1042,9 @@ html[data-nav-pending] .route-surface {
 }
 
 /* ───────── Motion: input focus glow ───────── */
-input:not([type="checkbox"]):not([type="radio"]):focus:not(:where([data-revenue-app] *)),
-textarea:focus:not(:where([data-revenue-app] *)),
-select:focus:not(:where([data-revenue-app] *)) {
+input:not([type="checkbox"]):not([type="radio"]):focus:not(:where([data-revenue-app] *, [data-hr-app] *)),
+textarea:focus:not(:where([data-revenue-app] *, [data-hr-app] *)),
+select:focus:not(:where([data-revenue-app] *, [data-hr-app] *)) {
   border-color: rgb(var(--accent));
   box-shadow: 0 0 0 3px rgb(var(--accent) / 0.12);
   outline: none;
@@ -1585,7 +1585,7 @@ tr:hover .icon-btn { opacity: 1; }
   text-transform: none;
   letter-spacing: 0.01em;
 }
-h1:not(.sr-only):not(:where([data-revenue-app] *)), .page-title {
+h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *)), .page-title {
   font-family: var(--font-display);
   font-weight: 400;
   font-style: normal;
@@ -1850,7 +1850,7 @@ table.ledger-table tr.lt-detail {
   .statement-amount, .num-hero { font-size: 23px; }
 }
 @media (max-width: 680px) {
-  h1:not(.sr-only):not(:where([data-revenue-app] *)), .page-title { font-size: 30px; }
+  h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *)), .page-title { font-size: 30px; }
   .statement-amount, .num-hero { font-size: 21px; }
 }
 
@@ -1881,20 +1881,20 @@ table.ledger-table tr.lt-detail {
   textarea {
     font-size: 16px !important;
   }
-  /* The Revenue app keeps the prototype's own control heights. */
-  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(:where([data-revenue-app] *)),
-  select:not(:where([data-revenue-app] *)),
-  textarea:not(:where([data-revenue-app] *)) {
+  /* The Revenue app and the HR phone app keep their prototypes' own control heights. */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(:where([data-revenue-app] *, [data-hr-app] *)),
+  select:not(:where([data-revenue-app] *, [data-hr-app] *)),
+  textarea:not(:where([data-revenue-app] *, [data-hr-app] *)) {
     min-height: 44px;
   }
   /* Checkboxes stay small but get a bigger hit area via padding on the label
      in the markup; bump the box itself to the platform minimum. */
-  input[type='checkbox']:not(:where([data-revenue-app] *)),
-  input[type='radio']:not(:where([data-revenue-app] *)) {
+  input[type='checkbox']:not(:where([data-revenue-app] *, [data-hr-app] *)),
+  input[type='radio']:not(:where([data-revenue-app] *, [data-hr-app] *)) {
     width: 18px;
     height: 18px;
   }
-  textarea:not(:where([data-revenue-app] *)) {
+  textarea:not(:where([data-revenue-app] *, [data-hr-app] *)) {
     min-height: 88px;
   }
   /* Money inputs inside a folded table panel are laid out by width utility
