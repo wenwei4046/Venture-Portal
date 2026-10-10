@@ -1,32 +1,149 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Facts, GridHead, GridRow, GridTable, HistoryEvent, SecLabel, btn, hv } from '@/components/hrv/kit'
 import { Drawer } from '@/components/hrv/overlay'
 import { Chevron } from '@/components/hrv/icons'
+import { flash } from '@/components/hrv/toast'
+import { revenuePath } from '@/lib/revenue'
 import { dayLabel, historyOf, shortDay, waitingList, type SubDeptRequest } from '@/lib/commission/sales-group-requests'
+import { TEMPLATE_ACCEPT, templateRefusal, type WaitingForm } from '@/lib/commission/waiting-form'
+import type { SubDepartmentCapacity } from '@/lib/commission/capacity'
+import { failWaitingApplicant, uploadWaitingFormTemplate } from '../../../waiting-actions'
+import WaitingFormSettings from './WaitingFormSettings'
 import s from './sales-groups.module.css'
+import w from './waiting.module.css'
 
 // Sales Groups › Waiting list (2026-10-10, the HR revamp): the applicants HR
-// accepted in Member services, numbered in the order they were accepted. A
-// row opens its drawer — the facts and the action history. Transfer (into
-// People Management's employee form) and Fail arrive with the waiting list's
-// own flow; until then the drawer opens the request in Member services.
+// accepted in Member services, numbered in the order they were accepted.
+// Above it, the form the Revenue team fills in (Upload form, Form settings);
+// a row opens its drawer — the facts, the action history, and what HR does
+// next: Transfer (People Management's employee form) or Fail (they didn't
+// come when called, and the next one moves up). No place is held for anybody
+// any more; the headcount limit is asked at Transfer.
 
 const COLS = '56px minmax(0,1.5fr) minmax(0,1fr) 140px 140px 28px'
 
-export default function WaitingList({ rows, subDeptName }: { rows: SubDeptRequest[]; subDeptName: string }) {
+export default function WaitingList({
+  rows,
+  subDeptName,
+  subSlug,
+  form: initialForm,
+  capacity,
+  canTransfer,
+  subOptions,
+}: {
+  rows: SubDeptRequest[]
+  subDeptName: string
+  subSlug: string
+  /** The form as saved, or why it could not be read. */
+  form: { ok: true; form: WaitingForm } | { ok: false; reason: string }
+  /** This sub-department's places, when they could be read. */
+  capacity: SubDepartmentCapacity | null
+  /** People › Create: Transfer files an employee. */
+  canTransfer: boolean
+  /** The department's sub-departments, for the built-in "Preferred sub-department". */
+  subOptions: string[]
+}) {
+  const router = useRouter()
   const list = waitingList(rows)
   const [openId, setOpenId] = useState<string | null>(null)
   const open = list.find(r => r.id === openId) ?? null
 
+  // The page's answer is the truth; a save here shows at once, until the
+  // page's next answer catches up.
+  const [seen, setSeen] = useState(initialForm)
+  const [form, setForm] = useState(initialForm.ok ? initialForm.form : null)
+  if (seen !== initialForm) {
+    setSeen(initialForm)
+    setForm(initialForm.ok ? initialForm.form : null)
+  }
+  const formMissing = initialForm.ok ? null : initialForm.reason
+
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const [confirmFail, setConfirmFail] = useState(false)
+  const [failing, setFailing] = useState(false)
+  const [failError, setFailError] = useState<string | null>(null)
+
+  const full = capacity !== null && capacity.free !== null && capacity.free <= 0
+  const fullWords = full && capacity ? `${subDeptName} is full — ${capacity.occupied + capacity.reserved} of ${capacity.capacity} places are taken.` : null
+  const rulesCapacity = `${revenuePath(subSlug, 'rules')}?tab=capacity`
+
+  function openRow(id: string | null) {
+    setOpenId(id)
+    setConfirmFail(false)
+    setFailError(null)
+  }
+
+  async function upload(file: File | undefined) {
+    if (!file || uploading) return
+    const refused = templateRefusal(file)
+    if (refused) {
+      flash(refused)
+      return
+    }
+    setUploading(true)
+    const data = new FormData()
+    data.set('file', file)
+    const done = await uploadWaitingFormTemplate(data)
+    setUploading(false)
+    if (fileRef.current) fileRef.current.value = ''
+    if (!done.ok) {
+      flash(done.reason)
+      return
+    }
+    setForm(done.form)
+    flash(`Form uploaded — the waiting-list application is now ${done.form.templateName}`)
+  }
+
+  async function fail() {
+    if (!open || failing) return
+    setFailing(true)
+    setFailError(null)
+    const done = await failWaitingApplicant(open.id)
+    setFailing(false)
+    if (!done.ok) {
+      setFailError(done.reason)
+      return
+    }
+    flash(`${open.newPerson ?? 'The applicant'} removed from the waiting list — the next in line moves up`)
+    openRow(null)
+  }
+
+  const uploaded = form?.templatePath ? form.templateName : null
+
   return (
     <section aria-label={`${subDeptName} waiting list`}>
+      <div className={w.toolbar}>
+        <label
+          className={w.upload}
+          data-uploaded={uploaded ? 'true' : undefined}
+          data-busy={uploading ? 'true' : undefined}
+          title={formMissing ?? (uploaded ? 'Click to replace — Revenue members download this file' : 'Upload the application form Revenue members download')}
+        >
+          {uploading ? 'Uploading…' : uploaded ? `Form: ${uploaded}` : 'Upload form'}
+          <input
+            ref={fileRef}
+            type="file"
+            accept={TEMPLATE_ACCEPT}
+            disabled={uploading || form === null}
+            onChange={e => void upload(e.target.files?.[0])}
+          />
+        </label>
+        <button type="button" className={w.settings} onClick={() => setSettingsOpen(true)} disabled={form === null} title={formMissing ?? undefined}>
+          Form settings
+        </button>
+      </div>
+
       <GridTable label={`${subDeptName} waiting list`}>
         <GridHead cols={COLS} cells={['#', 'Applicant', 'Submitted by', 'Joining date', 'Accepted', '']} />
         {list.map(r => (
-          <GridRow key={r.id} cols={COLS} onClick={() => setOpenId(r.id)} selected={openId === r.id} title={`Open ${r.newPerson ?? 'the applicant'}`}>
+          <GridRow key={r.id} cols={COLS} onClick={() => openRow(r.id)} selected={openId === r.id} title={`Open ${r.newPerson ?? 'the applicant'}`}>
             <span role="cell" className={s.position}>#{r.position}</span>
             <div role="cell" className={s.twoLine}>
               <div className={s.strong}>{r.newPerson ?? '—'}</div>
@@ -48,22 +165,55 @@ export default function WaitingList({ rows, subDeptName }: { rows: SubDeptReques
 
       <Drawer
         open={open !== null}
-        onClose={() => setOpenId(null)}
+        onClose={() => openRow(null)}
         width={400}
-        eyebrow={open ? `#${open.position} of ${list.length} on ${subDeptName}'s waiting list` : ''}
-        eyebrowStyle={{ color: 'rgb(var(--hv-orange-text))' }}
-        title={open?.newPerson ?? ''}
-        sub={open?.requestNo ? <span className={hv.mono} style={{ fontSize: 11, color: 'rgb(var(--hv-brown))' }}>{open.requestNo}</span> : undefined}
-        footer={
+        head={
           open ? (
             <>
-              <button type="button" className={btn('outline')} onClick={() => setOpenId(null)}>
-                Close
-              </button>
-              <Link href={`/member-admin?request=${open.id}`} className={btn('dark')}>
-                Open in Member services
-              </Link>
+              <div className={hv.drawerEyebrow} style={{ color: 'rgb(var(--hv-orange-text))' }}>
+                #{open.position} of {list.length} on {subDeptName}&apos;s waiting list
+              </div>
+              <div className={hv.drawerTitle}>{open.newPerson ?? '—'}</div>
+              {open.requestNo ? <div className={w.candNo}>{open.requestNo}</div> : null}
             </>
+          ) : null
+        }
+        footer={
+          open ? (
+            confirmFail ? (
+              <>
+                <span className={w.confirm}>Take {open.newPerson ?? 'them'} off the waiting list?</span>
+                <button type="button" className={btn('outline')} onClick={() => setConfirmFail(false)} disabled={failing}>
+                  Keep
+                </button>
+                <button type="button" className={btn('dangerSolid')} onClick={fail} disabled={failing}>
+                  {failing ? 'Failing…' : 'Fail'}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={`${btn('danger')} ${w.fail}`}
+                  title="They didn't come when called — removes them from the waiting list"
+                  onClick={() => setConfirmFail(true)}
+                >
+                  Fail
+                </button>
+                <button type="button" className={btn('outline')} onClick={() => openRow(null)}>
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className={`${btn('primary')} ${w.transfer}`}
+                  title={!canTransfer ? 'Transferring needs People › Create' : fullWords ?? 'Transfer to employee'}
+                  disabled={!canTransfer || full}
+                  onClick={() => router.push(`/team/people/new?waiting=${open.id}`)}
+                >
+                  Transfer
+                </button>
+              </>
+            )
           ) : null
         }
       >
@@ -85,9 +235,33 @@ export default function WaitingList({ rows, subDeptName }: { rows: SubDeptReques
                 <HistoryEvent key={i} what={e.what} when={shortDay(e.at)} who={e.by ?? undefined} note={e.note ?? undefined} />
               ))}
             </div>
+            <div className={w.transferNote}>
+              Transferring opens a new employee record in Revenue with the department and these details already filled. Only the
+              employee details — NRIC, bank account — are left.
+            </div>
+            {failError ? (
+              <p className={w.failError} role="alert">
+                {failError}
+              </p>
+            ) : null}
+            {fullWords ? (
+              <p className={w.full} role="note">
+                {fullWords} <Link href={rulesCapacity}>Raise the limit on Rules › Capacity</Link> to transfer anybody.
+              </p>
+            ) : null}
           </>
         ) : null}
       </Drawer>
+
+      {settingsOpen && form ? (
+        <WaitingFormSettings
+          form={form}
+          subName={subDeptName}
+          subOptions={subOptions}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={setForm}
+        />
+      ) : null}
     </section>
   )
 }

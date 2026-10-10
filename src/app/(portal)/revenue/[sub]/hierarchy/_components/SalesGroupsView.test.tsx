@@ -24,6 +24,7 @@ vi.mock('./OrgChart', () => ({
 }))
 vi.mock('../../../hierarchy-actions', () => ({}))
 vi.mock('../../../employee-actions', () => ({}))
+vi.mock('../../../waiting-actions', () => ({}))
 vi.mock('@/components/hrv/toast', () => ({ flash: vi.fn() }))
 
 import SalesGroupsView, { salesGroupsTab } from './SalesGroupsView'

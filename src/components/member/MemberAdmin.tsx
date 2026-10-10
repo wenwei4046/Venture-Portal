@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { productListPath } from "@/lib/revenue";
+import { productListPath, revenuePath, subDeptSlug } from "@/lib/revenue";
 import { claimPayoutLine, readClaimPayout } from "@/lib/member/claim-payout";
 import {
   adminMemberAction,
@@ -25,6 +25,9 @@ const names: Record<string, string> = {
   withdrawn: "Withdrawn",
   expired: "Expired",
   paid: "Paid",
+  // The HR revamp (2026-10-10): off the waiting list; a replacement set for a later date.
+  failed: "Failed · removed",
+  scheduled: "Scheduled",
 };
 // On the portal's white sheet a status is a word on a wash (DESIGN.md ›
 // "Sheet theme"): amber waits on somebody, green is approved, red was refused,
@@ -42,6 +45,8 @@ const statusChips: Record<string, string> = {
   paid: "chip info",
   withdrawn: "chip",
   expired: "chip",
+  failed: "chip danger",
+  scheduled: "chip alert",
 };
 const detailLabels: Record<string, string> = {
   category: "Claim category",
@@ -178,6 +183,7 @@ export default function MemberAdmin({
       data.departments.find((d) => d.name === request?.detail.department)?.id ??
       "",
   );
+  const waitingSubName = data.departments.find((d) => d.id === requestSub)?.name ?? null;
   const linkedId = String(request?.detail.allocatedStaffId ?? "");
   const linkedName = data.candidates.find((c) => c.id === linkedId)?.name;
   const canCreate =
@@ -859,11 +865,19 @@ export default function MemberAdmin({
                       </div>
                       {request.kind === "waiting" &&
                         request.status === "waiting" && (
+                          // No place is held for anybody any more (2026-10-10):
+                          // HR transfers or fails the applicant from the list.
                           <p className={s.notice}>
-                            The applicant is on the waiting list. A free
-                            position is reserved for them once the joining date
-                            is eligible. The headcount limit is set on Revenue ›
-                            Rules › Capacity.
+                            On {waitingSubName ?? "the sub-department"}&apos;s
+                            waiting list. Transfer to employee from Sales Groups ›
+                            Waiting list.{" "}
+                            {waitingSubName ? (
+                              <Link
+                                href={`${revenuePath(subDeptSlug(waitingSubName), "hierarchy")}?tab=waiting`}
+                              >
+                                Open the waiting list →
+                              </Link>
+                            ) : null}
                           </p>
                         )}
                       {request.kind === "waiting" &&

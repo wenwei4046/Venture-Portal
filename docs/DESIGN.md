@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -240,6 +240,30 @@ disagree, the file wins; every value is the prototype's.**
   top rule that sticks to the foot of the sheet. The lists: `56px …` and
   `1.6fr …` grids, the position in 15px mono `160 90 30`, chips for status, a
   400 / 420px drawer of facts (130px labels) and the history.
+- **Waiting list flow** (v3.22, 2026-10-10; `hierarchy/_components/WaitingList`,
+  `WaitingFormSettings`; `team/people/new/_components/WaitingTransferForm`):
+  above the list, right-aligned at 12.5px, an "Upload form" label-button (7px
+  12px, frame rim, white — a `180 215 198` rim on `240 248 244` once HR
+  uploaded, reading "Form: name") and a walnut "Form settings" (7px 14px,
+  cream type).
+  The applicant's 400px drawer ends on a grey 12px note box and the footer
+  *Fail* (danger outline, pushed left; asks "Take X off the waiting list?" ·
+  Keep · a solid red Fail) · Close · an orange *Transfer* (8px 18px), disabled
+  with an amber note and a Rules › Capacity link while the place is full. Form
+  settings is a 600px drawer: question cards (10px radius, 12px 14px) with
+  10px ▲▼, the built-in ones' label + "Kind · built in" and a dimmed
+  Required switch, HR's own a label input, Required / Optional, a 26px ×, the
+  kind chips (11.5px, walnut when picked) and option chips with a dashed 120px
+  "New option"; a dashed "+ Add question"; the Application form card (a 40×50
+  ruled-paper icon, Download, "Members must upload the signed form"); Cancel
+  · orange "Save as vN". The employee form: a `233 200 160` / `255 250 243`
+  banner with an orange dot, a 12px-radius Placement card (200px label column;
+  Department chip, Joining title and Direct manager as `.choice` chips, a
+  180px date, Pay basis), Identity / Contact / Bank cards (fields 8px 10px; the
+  ones carried over in the banner's colours with "from the waiting list" in
+  `160 90 30`; a missing required one red-rimmed with "Required"), and a
+  footer rule: the refusal in red, *Back to waiting list*, orange *Add to
+  company*.
 - **Cross-check** with a measuring script that finds each element by its text
   on both and diffs computed font / colour / size / padding / border / radius
   / background (`.design/revenue-app/tools/measure-pl.mjs` is the pattern).

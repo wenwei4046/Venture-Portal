@@ -12,6 +12,8 @@ import ReplacementList from './ReplacementList'
 import type { TeamData } from '../../../_components/config/types'
 import type { MembershipDestination } from '../../../_lib/membership-destinations'
 import type { EmployeeDepartmentDestination } from '../../../_lib/employee-destinations'
+import type { WaitingFormRead } from '../../../_lib/waiting-form'
+import type { SubDepartmentCapacity } from '@/lib/commission/capacity'
 import s from './sales-groups.module.css'
 
 export type SalesGroupsTab = 'chart' | 'members' | 'waiting' | 'replacement'
@@ -47,6 +49,9 @@ export default function SalesGroupsView({
   employmentToday = '',
   canEdit,
   requests,
+  waitingForm = null,
+  capacity = null,
+  canTransfer = false,
   head,
 }: {
   subDept: { name: string; slug: string; isHome: boolean }
@@ -61,6 +66,12 @@ export default function SalesGroupsView({
   canEdit: boolean
   /** The waiting-list and replacement requests; null = the viewer may not read them. */
   requests: { ok: true; rows: SubDeptRequest[] } | { ok: false; reason: string } | null
+  /** The waiting-list form (Form settings, Upload form) — read with the requests. */
+  waitingForm?: WaitingFormRead | null
+  /** This sub-department's places: Transfer waits while it is full. */
+  capacity?: SubDepartmentCapacity | null
+  /** People › Create: Transfer files an employee. */
+  canTransfer?: boolean
   head: ReactNode
 }) {
   const searchParams = useSearchParams()
@@ -123,7 +134,15 @@ export default function SalesGroupsView({
             {requests.reason}
           </p>
         ) : tab === 'waiting' ? (
-          <WaitingList rows={rows} subDeptName={subDept.name} />
+          <WaitingList
+            rows={rows}
+            subDeptName={subDept.name}
+            subSlug={subDept.slug}
+            form={waitingForm ?? { ok: false, reason: 'The waiting-list form could not be read.' }}
+            capacity={capacity}
+            canTransfer={canTransfer}
+            subOptions={departments.map(d => d.name)}
+          />
         ) : (
           <ReplacementList rows={rows} subDeptName={subDept.name} />
         )

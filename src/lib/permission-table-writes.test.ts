@@ -148,6 +148,7 @@ const INVOKER_WRITES: Readonly<Record<string, Readonly<Record<string, readonly W
   ladder_delete_level: { title_levels: ['UPDATE', 'DELETE'] },
   ladder_insert_level: { title_levels: ['INSERT', 'UPDATE'] },
   match_erp_salesperson: { comm_agent_aliases: ['INSERT', 'UPDATE'], sales_orders: ['UPDATE'], sales_order_open_bill_tags: ['INSERT', 'DELETE'] },
+  member_transfer_waiting: { hr_staff_costs: ['INSERT'] },
   recost_sales_order_lines: { sales_order_lines: ['UPDATE'] },
   revenue_apply_fair_calendar: { sales_import_batches: ['UPDATE'], sales_orders: ['UPDATE'] },
   revenue_dismiss_double_claim: { comm_double_claim_dismissals: ['INSERT', 'UPDATE'] },
