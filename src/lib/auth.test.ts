@@ -1,18 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@/types'
 import { redirect } from 'next/navigation'
-import { getMemberUser, getUser, requirePayrollPayouts } from './auth'
+import { getMemberUser, getUser, requireAction, requirePage, requirePayrollPayouts } from './auth'
 
 const mocks = vi.hoisted(() => ({
   subject: 'signed-in-id' as string | null,
   cookie: '',
   person: '',
+  header: {} as Record<string, string>,
   row: null as Omit<User, 'permissions'> | null,
   maskLookup: vi.fn(),
   rpc: vi.fn(),
 }))
 vi.mock('next/headers', () => ({
   cookies: async () => ({ get: (name: string) => ({ value: name === 'vp-view-as-person' ? mocks.person : mocks.cookie }) }),
+  headers: async () => ({ get: (name: string) => mocks.header[name] ?? null }),
 }))
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 vi.mock('@/lib/supabase/server', () => ({
@@ -30,6 +32,7 @@ beforeEach(() => {
   mocks.subject = 'signed-in-id'
   mocks.cookie = ''
   mocks.person = ''
+  mocks.header = {}
   mocks.row = {
     id: 'signed-in-id', name: 'Principal', email: 'principal@example.com',
     role: 'principal', is_active: true, created_at: '', updated_at: '',
@@ -220,5 +223,54 @@ describe('getUser while viewing as a person', () => {
     mocks.person = 'not-an-id'
     await getUser()
     expect(mocks.rpc).not.toHaveBeenCalledWith('view_as_person', expect.anything())
+  })
+})
+
+// Writes follow the tab boxes of the page (2026-10-11, the user: "yes separate by tab").
+describe('a page’s writes follow its own tabs’ boxes', () => {
+  // A template saved on tabs: Payments may create, Receipt is only viewed.
+  const savedOnTabs = { ticks: ['fin.overview.view', 'fin.payments.view', 'fin.payments.create', 'fin.receipt.view'], boxes: [], cells: false }
+  const answers = (tabs: unknown) => async (fn: string) => ({
+    data: fn === 'current_permissions' ? ['dashboard', 'treasury']
+      : fn === 'current_actions' ? { 'treasury.view': 'all', 'treasury.create': 'all' }
+      : fn === 'current_tabs' ? tabs
+      : null,
+    error: null,
+  })
+
+  beforeEach(() => {
+    mocks.row!.role = 'finance'
+    mocks.rpc.mockImplementation(answers(savedOnTabs))
+  })
+
+  it('a page narrows the account to its own tabs’ boxes', async () => {
+    expect((await requirePage('/receipts')).actions?.['treasury.create']).toBeUndefined()
+    expect((await requirePage('/payments')).actions?.['treasury.create']).toBe('all')
+  })
+
+  it('a Server Action follows the page it was sent from', async () => {
+    mocks.header = { 'next-action': 'a1', referer: 'https://portal.example/receipts' }
+    await requireAction('treasury', 'create')
+    expect(redirect).toHaveBeenCalledWith('/dashboard')
+    vi.mocked(redirect).mockClear()
+    mocks.header = { 'next-action': 'a1', referer: 'https://portal.example/payments?tab=draft' }
+    await requireAction('treasury', 'create')
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it('with no page to go by — no Referer, or not a Server Action — the account acts as held', async () => {
+    mocks.header = { 'next-action': 'a1' }
+    await requireAction('treasury', 'create')
+    mocks.header = { referer: 'https://portal.example/receipts' }
+    await requireAction('treasury', 'create')
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it('never narrows an account whose tabs are worked out from its cells', async () => {
+    mocks.rpc.mockImplementation(answers(null))
+    expect((await requirePage('/receipts')).actions?.['treasury.create']).toBe('all')
+    mocks.header = { 'next-action': 'a1', referer: 'https://portal.example/receipts' }
+    await requireAction('treasury', 'create')
+    expect(redirect).not.toHaveBeenCalled()
   })
 })

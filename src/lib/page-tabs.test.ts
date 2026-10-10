@@ -9,7 +9,7 @@ import { openedKeys, type Action, type Scope } from './permission-matrix'
 import { TAB_BY_ID } from './permission-tabs'
 import { CELL_KEYS, PROD, cellsOf, grantsOf } from './permission-tabs.fixtures'
 import { PROD_LOGINS } from './page-tabs.fixtures'
-import { OPEN_PAGES, PAGE_TABS, hasTab, opensPage, opensPath, routeOf, userTabs, type PageRoute } from './page-tabs'
+import { OPEN_PAGES, PAGE_TABS, actionsOnPage, hasTab, opensPage, opensPath, routeOf, tabsAreExplicit, userTabs, type PageRoute } from './page-tabs'
 
 const PORTAL = join(process.cwd(), 'src', 'app', '(portal)')
 
@@ -159,5 +159,46 @@ describe('nobody loses a page they open today', () => {
     const tabs = userTabs({ ticks: ['fin.payments.view', 'fin.overview.view'], boxes: [], cells: false }, {}, [])
     expect(opensPage(tabs, '/payments')).toBe(true)
     expect(opensPage(tabs, '/receipts')).toBe(false)
+  })
+})
+
+// ── Writes follow the tab boxes (2026-10-11, the user: "yes separate by tab") ──
+
+describe('a page’s writes follow its own tabs’ boxes', () => {
+  const actions = {
+    'treasury.view': 'all', 'treasury.export': 'all', 'treasury.create': 'all', 'treasury.edit': 'all',
+    'treasury.void': 'all', 'claims.create': 'own',
+  } as Record<string, Scope>
+  // Payments may create and edit; Receipt is viewed only.
+  const tabs = ['fin.payments.view', 'fin.payments.create', 'fin.payments.edit', 'fin.receipt.view']
+
+  it('Receipt’s own boxes decide on Receipt: Payments’ Create creates no receipt', () => {
+    const onReceipts = actionsOnPage(actions, tabs, '/receipts')
+    expect(onReceipts['treasury.create']).toBeUndefined()
+    expect(onReceipts['treasury.edit']).toBeUndefined()
+    expect(onReceipts['treasury.void']).toBeUndefined()
+    // Viewing and exporting are never narrowed; a write no tab of the page stands for stays.
+    expect(onReceipts).toMatchObject({ 'treasury.view': 'all', 'treasury.export': 'all', 'claims.create': 'own' })
+  })
+
+  it('and on Payments, its own Create and Edit hold', () => {
+    const onPayments = actionsOnPage(actions, tabs, '/payments')
+    expect(onPayments).toMatchObject({ 'treasury.create': 'all', 'treasury.edit': 'all' })
+    expect(onPayments['treasury.void']).toBeUndefined()
+  })
+
+  it('a page in several tabs keeps a write any of them ticks', () => {
+    const queue = actionsOnPage({ 'approvals.approve': 'all', 'treasury.approve': 'all' } as Record<string, Scope>,
+      ['fin.approvals.view', 'fin.approvals.approve'], '/approvals')
+    expect(queue).toEqual({ 'approvals.approve': 'all' })
+  })
+
+  it('narrows only accounts whose template is saved on tabs', () => {
+    expect(tabsAreExplicit({ ticks: ['fin.payments.view'], boxes: [], cells: false })).toBe(true)
+    expect(tabsAreExplicit({ ticks: ['fin.payments.view'], boxes: [{ tab: 'fin.receipt', action: 'view', granted: false }], cells: true })).toBe(true)
+    // Worked out from cells: Finance's Void without Approve would be lost.
+    expect(tabsAreExplicit(null)).toBe(false)
+    expect(tabsAreExplicit({ ticks: null, boxes: [{ tab: 'fin.receipt', action: 'view', granted: false }], cells: true })).toBe(false)
+    expect(tabsAreExplicit({ ticks: ['fin.payments.view'], boxes: [], cells: true })).toBe(false)
   })
 })

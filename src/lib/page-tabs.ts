@@ -14,7 +14,7 @@
  */
 
 import type { Scope } from '@/lib/permission-matrix'
-import { personTicks, tabsFromCells, type PersonBox } from '@/lib/permission-tabs'
+import { TAB_ACTIONS, TAB_BY_ID, personTicks, tabsFromCells, type PersonBox } from '@/lib/permission-tabs'
 
 const HR_COSTING = ['hr.hr_costing'] as const
 const PAYROLL = ['hr.payroll'] as const
@@ -253,6 +253,45 @@ export function userTabs(stored: StoredTabs | null, actions: Record<string, Scop
   if (!stored || (stored.boxes.length === 0 && stored.cells)) return [...derived()].sort()
   const base = stored.ticks ? new Set(stored.ticks) : derived()
   return [...personTicks(base, stored.boxes)].sort()
+}
+
+/**
+ * Are their tabs the ones they were ticked — a template saved on tabs — rather
+ * than worked out from their cells? Only then do a page's writes follow its own
+ * tabs' boxes (`actionsOnPage`): worked-out ticks can leave a cell unticked that
+ * the account still holds (Finance's Void, without Approve), and narrowing by
+ * them would take it away. Person boxes over a template not yet saved on tabs
+ * count from that save on.
+ */
+export function tabsAreExplicit(stored: StoredTabs | null): boolean {
+  return !!stored && stored.ticks !== null && !(stored.boxes.length === 0 && stored.cells)
+}
+
+/** The actions a write asks for — what a tab's Create, Edit and Approve stand for. View and Export never narrow. */
+const WRITES = new Set(['create', 'edit', 'approve', 'void', 'manage'])
+
+/**
+ * What they may DO on one page (2026-10-11, the user: writes "separate by
+ * tab"): a write a tab of this page stands for counts only while one of those
+ * tabs' boxes for it is ticked — Receipt's Create creates a receipt, Payments'
+ * does not. A write none of the page's tabs stands for, and every View and
+ * Export, stays as held. Only ever narrows.
+ */
+export function actionsOnPage(actions: Readonly<Record<string, Scope>>, tabs: readonly string[], route: PageRoute): Record<string, Scope> {
+  const ticked = new Set(tabs)
+  const out: Record<string, Scope> = {}
+  for (const [cell, scope] of Object.entries(actions)) {
+    const action = cell.slice(cell.indexOf('.') + 1)
+    if (WRITES.has(action)) {
+      const boxes = PAGE_TABS[route].flatMap(id => {
+        const tab = TAB_BY_ID.get(id)
+        return tab ? TAB_ACTIONS.filter(a => (tab.opens[a] ?? []).includes(cell as never)).map(a => `${id}.${a}`) : []
+      })
+      if (boxes.length > 0 && !boxes.some(b => ticked.has(b))) continue
+    }
+    out[cell] = scope
+  }
+  return out
 }
 
 /** `current_tabs()`'s answer, read defensively (it postdates database.types.ts). */
