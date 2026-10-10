@@ -2,6 +2,9 @@
 // current_actions() answer for each — read on production with auth.uid() set
 // to each account, inside a block that rolled back. page-tabs.test.ts holds
 // every page each opens today to staying open once pages also ask the tabs.
+// Round 2 (mig 20261011060000, read the same way after it was applied): the
+// Principal and HR gained Documentation, Hiring, both Meeting rooms keys and the
+// Guest link; Finance, carrie and Marketing the Meeting rooms key (book a room).
 
 import type { Scope } from './permission-matrix'
 
@@ -18,9 +21,9 @@ export const PROD_LOGINS: LoginFixture[] = [
   {
     email: 'carrieong1218@gmail.com',
     role: 'finance',
-    keys: ['billing', 'claims', 'dashboard', 'treasury', 'venture_pool'],
+    keys: ['billing', 'claims', 'dashboard', 'meeting_rooms', 'treasury', 'venture_pool'],
     actions: {
-      ...all('billing.edit billing.view billing.void billing.create billing.export dashboard.view treasury.edit treasury.view treasury.create treasury.export venture_pool.view venture_pool.create'),
+      ...all('billing.edit billing.view billing.void billing.create billing.export dashboard.view treasury.edit treasury.view treasury.create treasury.export venture_pool.view venture_pool.create rooms.view rooms.create'),
       'claims.view': 'own',
       'claims.create': 'own',
     },
@@ -28,39 +31,43 @@ export const PROD_LOGINS: LoginFixture[] = [
   {
     email: 'finance@venture.my',
     role: 'finance',
-    keys: ['billing', 'categories', 'claims', 'claims_approve', 'dashboard', 'dept_pool', 'dept_reports', 'payroll_payouts', 'reconciliation', 'reports', 'treasury', 'venture_pool'],
+    keys: ['billing', 'categories', 'claims', 'claims_approve', 'dashboard', 'dept_pool', 'dept_reports', 'meeting_rooms', 'payroll_payouts', 'reconciliation', 'reports', 'treasury', 'venture_pool'],
     actions: all(
       'claims.edit claims.view claims.void billing.edit billing.view billing.void reports.view claims.create treasury.edit treasury.view treasury.void ' +
       'billing.create billing.export claims.approve dashboard.view dept_pool.view reports.export categories.view treasury.create treasury.export ' +
       'dept_pool.export categories.manage dept_reports.view venture_pool.edit venture_pool.view dept_reports.export reconciliation.edit ' +
-      'reconciliation.view venture_pool.create venture_pool.export reconciliation.create reconciliation.approve',
+      'reconciliation.view venture_pool.create venture_pool.export reconciliation.create reconciliation.approve rooms.view rooms.create',
     ),
   },
   {
     email: 'hr@venture.my',
     role: 'hr',
-    keys: ['claims', 'claims_approve', 'dashboard', 'director_pool', 'director_salary', 'hr_costing', 'member_memos_manage', 'member_requests_manage', 'revenue', 'salary_individual', 'team'],
+    keys: ['claims', 'claims_approve', 'dashboard', 'director_pool', 'director_salary', 'documentation', 'guest_link', 'hiring', 'hr_costing', 'meeting_rooms',
+      'meeting_rooms_manage', 'member_memos_manage', 'member_requests_manage', 'revenue', 'salary_individual', 'team'],
     actions: all(
       'team.edit team.view claims.edit claims.view claims.void member.view team.create team.manage revenue.edit revenue.view claims.create ' +
       'member.manage claims.approve dashboard.view revenue.create revenue.export revenue.manage hr_costing.edit hr_costing.view hr_costing.create ' +
-      'hr_costing.export director_pool.edit director_pool.view director_salary.edit director_salary.view',
+      'hr_costing.export director_pool.edit director_pool.view director_salary.edit director_salary.view ' +
+      'documentation.view documentation.create documentation.edit hiring.view hiring.create hiring.edit hiring.approve rooms.view rooms.create rooms.edit ' +
+      'guest_link.view guest_link.edit',
     ),
   },
   {
     email: 'marketing@venture.my',
     role: 'dept_manager',
-    keys: ['claims', 'dashboard', 'dept_pool', 'dept_reports', 'my_billing', 'opex'],
+    keys: ['claims', 'dashboard', 'dept_pool', 'dept_reports', 'meeting_rooms', 'my_billing', 'opex'],
     actions: {
       'opex.view': 'dept', 'claims.edit': 'dept', 'claims.view': 'dept', 'claims.void': 'dept', 'opex.export': 'dept', 'claims.create': 'dept',
       'dashboard.view': 'all', 'dept_pool.view': 'dept', 'my_billing.view': 'dept', 'dept_pool.export': 'dept', 'dept_reports.view': 'dept',
-      'my_billing.create': 'dept', 'dept_reports.export': 'dept',
+      'my_billing.create': 'dept', 'dept_reports.export': 'dept', 'rooms.view': 'all', 'rooms.create': 'all',
     },
   },
   {
     email: 'principal@venture.my',
     role: 'principal',
     keys: ['approvals', 'audit_log', 'billing', 'categories', 'claims', 'claims_approve', 'crm_manage', 'dashboard', 'department_mode', 'dept_pool',
-      'dept_reports', 'director_pool', 'director_salary', 'hr_costing', 'member_memos_manage', 'member_requests_manage', 'opex', 'override',
+      'dept_reports', 'director_pool', 'director_salary', 'documentation', 'guest_link', 'hiring', 'hr_costing', 'meeting_rooms', 'meeting_rooms_manage',
+      'member_memos_manage', 'member_requests_manage', 'opex', 'override',
       'payroll_payouts', 'permissions_manage', 'product_list', 'reconciliation', 'reports', 'revenue', 'salary_individual', 'settings', 'team',
       'team_invite', 'treasury', 'venture_pool', 'view_switch'],
     actions: all(
@@ -72,7 +79,9 @@ export const PROD_LOGINS: LoginFixture[] = [
       'treasury.approve view_switch.view approvals.approve categories.manage dept_reports.view hr_costing.create hr_costing.export ' +
       'product_list.edit product_list.view venture_pool.edit venture_pool.view director_pool.edit director_pool.view hr_costing.approve ' +
       'dept_reports.export reconciliation.edit reconciliation.view venture_pool.create venture_pool.export director_salary.edit ' +
-      'director_salary.view reconciliation.create reconciliation.approve director_salary.approve',
+      'director_salary.view reconciliation.create reconciliation.approve director_salary.approve ' +
+      'documentation.view documentation.create documentation.edit hiring.view hiring.create hiring.edit hiring.approve rooms.view rooms.create rooms.edit ' +
+      'guest_link.view guest_link.edit',
     ),
   },
 ]

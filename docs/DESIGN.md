@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.30 (the HR revamp, round 2: the soft dropdown and the drawers' motion) / v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -392,6 +392,32 @@ disagree, the file wins; every value is the prototype's.**
 - **Cross-check** with a measuring script that finds each element by its text
   on both and diffs computed font / colour / size / padding / border / radius
   / background (`.design/revenue-app/tools/measure-pl.mjs` is the pattern).
+
+### The HR revamp, round 2 — the kit's additions (v3.30, 2026-10-11)
+
+The handoff's second package (`.design/hr-r2/handoff`, README sections 10–18;
+the file wins over the README) adds Documentation, Hiring, Meeting Rooms, the
+Guest link and an HR phone app. Two things every page of it shares:
+
+- **The soft dropdown** (`components/hrv/select.tsx` `Select`, its own
+  `select.module.css`; README 18.1, the handoff's `dropdown.js`). The real
+  `<select>` stays — value, onChange, keyboard — and is drawn radius 10 (12 on
+  the guest page), a 14px chevron (stroke 2.4, `#5a4e44`) 11px from the right,
+  34px kept clear for it, hover border `214 202 188`, focus the accent border
+  and a `0 0 0 3px rgb(233 154 83 / .18)` ring. A pointer press opens the menu
+  instead of the browser's: fixed to the window, white, radius 14, a `236 229
+  219` edge, `0 14px 36px rgba(43,31,23,.18), 0 2px 6px rgba(43,31,23,.06)`,
+  6px padding; rows 9px 12px, radius 9, 13.5px / 1.3, hover `247 244 239`, the
+  picked one peach with `163 78 37` 600 and a ✓, the blank option grey `150 138
+  126`; as wide as the field, wider only when an option would be cut; a search
+  box (34px, radius 9) over more than eight options; below the field, above it
+  when there is no room, 6px away; `hvddIn .16s` (fade + 4px drop). It closes
+  on a pick, a press outside, Esc (the menu only — a drawer under it stays), a
+  resize or a scroll. Arrow keys and Enter work inside it.
+- **Motion** (README 18.2): every right drawer slides in 40px and fades
+  (`hvDrawerIn .34s cubic-bezier(.2,.8,.2,1)`), its scrim fades in `.25s`, a
+  centred window fades in `.2s` — the kit's `Drawer` / `Window` do it, so
+  round 1's drawers move the same way. Reduced motion turns them off.
 
 ### Product List — a page of the Revenue app (v3.13, 2026-10-08)
 

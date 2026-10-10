@@ -23,6 +23,8 @@ export type FunctionKey =
   | 'director_salary' | 'director_pool' | 'team' | 'accounts' | 'member' | 'revenue_app' | 'dept_pool'
   | 'venture_pool' | 'opex' | 'my_billing' | 'claims' | 'reports' | 'dept_reports' | 'reconciliation'
   | 'audit_log' | 'settings' | 'view_switch' | 'crm'
+  // HR revamp round 2 (mig 20261011060000).
+  | 'documentation' | 'hiring' | 'rooms' | 'guest_link'
 
 /** Anybody gates can be asked about: their keys, and their actions when they were loaded. */
 export interface ActionHolder extends PermissionHolder {
@@ -100,6 +102,13 @@ export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.
   member_crm: ['crm.view', 'crm.edit'],
   crm_manage: ['crm.view', 'crm.edit', 'crm.manage'],
   view_switch: ['view_switch.view'],
+  // HR revamp round 2 (20261011060000): Documentation, Hiring, Meeting rooms
+  // (booking, and the rooms themselves), the Guest link.
+  documentation: ['documentation.view', 'documentation.create', 'documentation.edit'],
+  hiring: ['hiring.view', 'hiring.create', 'hiring.edit', 'hiring.approve'],
+  meeting_rooms: ['rooms.view', 'rooms.create'],
+  meeting_rooms_manage: ['rooms.view', 'rooms.create', 'rooms.edit'],
+  guest_link: ['guest_link.view', 'guest_link.edit'],
 }
 
 /**

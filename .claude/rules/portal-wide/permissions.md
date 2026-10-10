@@ -331,6 +331,26 @@ ticks worked out from cells can leave a cell unticked the account still holds
 (point 6): per-tab writes are the app's, as per-tab pages are. The Revenue app
 follows the same list (`revenue/revenue-app.md` › THE APP FOLLOWS THE TICKS).
 
+**ROUND 2'S FOUR MODULES (2026-10-11, the HR revamp's second package; mig
+`20261011060000`).** Functions `documentation` (view · create · edit),
+`hiring` (view · create · edit · approve), `rooms` (view · create · edit) and
+`guest_link` (view · edit), every reach all; keys (scope `none`)
+`documentation`, `hiring`, `meeting_rooms` (book) + `meeting_rooms_manage`
+(the rooms; rooms.edit), `guest_link`; `lib/roles.ts` `canAccessDocumentation`
+/ `canAccessHiring` / `canAccessMeetingRooms` / `canAccessGuestLink`. Role
+defaults: principal + hr all five; finance + dept_manager `meeting_rooms`.
+Templates: Ultimate / Full / HR every new cell; every other portal template
+Meeting rooms · View + Create (the user: Meeting Rooms in every view); the two
+Revenue app templates none (members book from the app). Tabs: HR view
+Documentation · Hiring requests · Hiring insights · Talent Bank · Meeting Rooms
+· Guest Link (after Member Services), and Meeting Rooms in the Finance,
+Principal and Department views (`shared('meeting_rooms')`, reach all). **The
+modules' tables have RLS on and NO policy** — every read and write is one of
+the module's SECURITY DEFINER functions asking `has_any_action` for its cell
+(the guest link's ask the link's code instead and are granted to anon by name,
+no service role). Nothing anybody had moved: the five logins gained exactly
+those keys (dry-run per login, then applied; `page-tabs.fixtures.ts`).
+
 **VIEW AS A PERSON, READ-ONLY (2026-10-11, the user: "can set a function is
 view as a user, same like in revenue app, i can view as a member").** Both view
 switchers end with *View as a person…*: a picker of everybody who signs in to

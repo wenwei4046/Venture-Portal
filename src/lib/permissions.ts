@@ -53,6 +53,13 @@ export const PERMISSIONS = [
   // The CRM (2026-10-10): CRM · View opens the first, CRM · Manage the second.
   'member_crm',
   'crm_manage',
+  // HR revamp round 2 (2026-10-11, mig 20261011060000): each module's View
+  // opens its key — Meeting rooms · Edit the second rooms key.
+  'documentation',
+  'hiring',
+  'meeting_rooms',
+  'meeting_rooms_manage',
+  'guest_link',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
