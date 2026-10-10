@@ -89,4 +89,16 @@ export function customerForm({ form: f, data, saveDetails, setForm, onSaved }: {
   };
 }
 export type CustomerFormVM = ReturnType<typeof customerForm>;
+
+/** The Customer info sheet (Contacts, and the Calendar since rev 1010 §3): the rows, Edit, and Open chat. */
+export function contactInfoVM(ctx: SalesCtx) {
+  const { ui, set, patch, data, act } = ctx;
+  const ci = ui.cInfo ? data.customers.find(c => c.id === ui.cInfo) : undefined;
+  return {
+    ctOpen: !!ci, ctClose: () => patch({ cInfo: null }), ctName: ci?.name ?? "", ctIni: ci ? ini(ci.name) : "",
+    ctRows: ci ? infoRows(ci) : [],
+    ctChat: () => { if (!ci) return; set(u => ({ ...u, tab: "inbox", chat: ci.id, cInfo: null, hist: [...u.hist, u.tab].slice(-20) })); act.openChat(ci.id); },
+    ctEdit: () => { if (!ci) return; set(u => ({ ...u, cform: { customerId: ci.id, edit: true }, cInfo: null })); },
+  };
+}
 interface Chip { label: string; pick: () => void; bg: string; fg: string; bd: string }

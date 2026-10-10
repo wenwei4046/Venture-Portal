@@ -5,7 +5,7 @@
  */
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from "react";
 import { STATUS_LABEL, ini, stop, type PEvent, type SalesCtx } from "./common";
-import { customerFormVM, infoRows, phoneLabel, telHref } from "./customer";
+import { contactInfoVM, customerFormVM, phoneLabel, telHref } from "./customer";
 
 const letterOf = (n: string) => { const c = n.trim().charAt(0).toUpperCase(); return c >= "A" && c <= "Z" ? c : "#"; };
 const AZ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".split("");
@@ -60,7 +60,6 @@ export function contactsVM(ctx: SalesCtx) {
     };
   });
   const have = new Set(contacts.map(p => letterOf(p.name)));
-  const ci = ui.cInfo ? data.customers.find(c => c.id === ui.cInfo) : undefined;
   return {
     cq: ui.cq, setCq: (e: ChangeEvent<HTMLInputElement>) => patch({ cq: e.target.value }),
     contacts, contactsEmpty: !contacts.length, // stop comes with the customer form below
@@ -74,10 +73,7 @@ export function contactsVM(ctx: SalesCtx) {
         if (el) list.scrollTop = el.offsetTop - list.offsetTop - 4;
       },
     })),
-    ctOpen: !!ci, ctClose: () => patch({ cInfo: null }), ctName: ci?.name ?? "", ctIni: ci ? ini(ci.name) : "",
-    ctRows: ci ? infoRows(ci) : [],
-    ctChat: () => { if (!ci) return; set(u => ({ ...u, tab: "inbox", chat: ci.id, cInfo: null, hist: [...u.hist, u.tab].slice(-20) })); act.openChat(ci.id); },
-    ctEdit: () => { if (!ci) return; set(u => ({ ...u, cform: { customerId: ci.id, edit: true }, cInfo: null })); },
+    ...contactInfoVM(ctx),
     ...customerFormVM(ctx),
   };
 }

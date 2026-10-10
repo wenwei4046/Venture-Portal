@@ -8,7 +8,7 @@ import { Fragment } from "react";
 import H from "../crm.module.css";
 import type { CalendarVM } from "./vm/calendar";
 
-/** Calendar: Month / Week / Day, Today with Show up / No show, upcoming, outcome and celebration. */
+/** Calendar: Month / Week / Day, Today with Show up / No show, upcoming, outcome and celebration; Customer info and its form. */
 export default function SalesCalendar({ v }: { v: CalendarVM }) {
   return (<>
             
@@ -38,7 +38,7 @@ export default function SalesCalendar({ v }: { v: CalendarVM }) {
             <div onClick={c.pick} style={{ minWidth: "0", height: "62px", boxSizing: "border-box", padding: "4px 2px", borderBottom: "1px solid #F3E9E1", borderLeft: c.edge, background: c.bg, display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", cursor: "pointer" }}>
               <span style={{ width: "24px", height: "24px", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: c.weight, background: c.dotBg, color: c.fg, fontVariantNumeric: "tabular-nums" }}>{c.n}</span>
               {(c.ev).map((e, e_i) => (<Fragment key={e_i}>
-                <span style={{ alignSelf: "stretch", height: "14px", padding: "0 3px", borderRadius: "3px", background: e.bg, color: "#fff", fontSize: "9px", fontWeight: "650", lineHeight: "14px", whiteSpace: "nowrap", overflow: "hidden" }}>{e.t}</span>
+                <span onClick={e.open} style={{ alignSelf: "stretch", height: "14px", padding: "0 3px", borderRadius: "3px", background: e.bg, color: "#fff", fontSize: "9px", fontWeight: "650", lineHeight: "14px", whiteSpace: "nowrap", overflow: "hidden" }}>{e.t}</span>
               </Fragment>))}
             </div>
           </Fragment>))}
@@ -66,7 +66,7 @@ export default function SalesCalendar({ v }: { v: CalendarVM }) {
               <span style={{ fontSize: "11px", fontWeight: "600", color: "#806B60" }}>{c.wk}</span>
               <span style={{ width: "26px", height: "26px", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: c.weight, background: c.dotBg, color: c.fg }}>{c.n}</span>
               {(c.ev).map((e, e_i) => (<Fragment key={e_i}>
-                <span style={{ alignSelf: "stretch", padding: "4px 3px", borderRadius: "4px", background: e.bg, color: "#fff", fontSize: "9px", fontWeight: "650", lineHeight: "1.25", overflow: "hidden", wordBreak: "break-word" }}>{e.time}<br />{e.name}</span>
+                <span onClick={e.open} style={{ alignSelf: "stretch", padding: "4px 3px", borderRadius: "4px", background: e.bg, color: "#fff", fontSize: "9px", fontWeight: "650", lineHeight: "1.25", overflow: "hidden", wordBreak: "break-word" }}>{e.time}<br />{e.name}</span>
               </Fragment>))}
             </div>
           </Fragment>))}
@@ -265,6 +265,100 @@ export default function SalesCalendar({ v }: { v: CalendarVM }) {
           <span style={{ fontSize: "28px", fontWeight: "800", color: "#387557", fontVariantNumeric: "tabular-nums" }}>{v.celAmount}</span>
           <span style={{ fontSize: "13px", color: "#806B60" }}>{v.celName}</span>
         </div></div>
+    </>)}
+    {!!(v.ctOpen) && (<>
+      <div onClick={v.ctClose} style={{ position: "absolute", inset: "0", zIndex: "8", background: "rgba(63,43,34,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeIn 200ms ease-out" }}>
+        <div onClick={v.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", maxHeight: "92%", overflowY: "auto", scrollbarWidth: "none", boxSizing: "border-box", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "14px" }}>
+          <span style={{ alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2" }}>
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", display: "grid", placeItems: "center", fontSize: "17px", fontWeight: "650" }}>{v.ctIni}</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: "0" }}>
+              <strong style={{ fontSize: "19px", fontWeight: "700" }}>{v.ctName}</strong>
+            </div>
+            <span onClick={v.ctEdit} style={{ flex: "none", marginLeft: "auto", height: "34px", padding: "0 14px", borderRadius: "17px", border: "1px solid #EBDDD2", display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4">
+                </path>
+              </svg>Edit</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", borderRadius: "14px", border: "1px solid #EBDDD2" }}>
+            {(v.ctRows).map((r, r_i) => (<Fragment key={r_i}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "12px 14px", borderTop: r.rule, fontSize: "14px" }}>
+                <span style={{ flex: "none", color: "#806B60" }}>{r.k}</span>
+                <strong style={{ fontWeight: "600", textAlign: "right", minWidth: "0", color: r.vFg }}>{r.v}</strong>
+              </div>
+            </Fragment>))}
+          </div>
+          <span onClick={v.ctChat} style={{ height: "50px", borderRadius: "25px", display: "grid", placeItems: "center", background: "#BD4A19", color: "#fff", fontSize: "16px", fontWeight: "650", cursor: "pointer" }}>Open chat</span>
+        </div>
+      </div>
+    </>)}
+    {!!(v.cfOpen) && (<>
+      <div onClick={v.cfClose} style={{ position: "absolute", inset: "0", zIndex: "8", background: "rgba(63,43,34,.32)", animation: "fadeIn 200ms ease-out", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+        <div onClick={v.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", maxHeight: "94%", overflowY: "auto", scrollbarWidth: "none", boxSizing: "border-box", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 22px", display: "flex", flexDirection: "column", gap: "12px" }}>
+          <span style={{ alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2" }}>
+          </span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
+            <h2 style={{ margin: "0", fontSize: "20px", fontWeight: "700", letterSpacing: "-.02em" }}>Customer details</h2>
+            <span style={{ fontSize: "12px", fontWeight: "600", color: "#806B60" }}>{v.cfStep}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", paddingTop: "6px" }}>
+            <span style={{ flex: "none", marginTop: "7px", width: "7px", height: "7px", borderRadius: "50%", background: "#BD4A19" }}>
+            </span>
+            <span style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+              <strong style={{ fontSize: "16px", fontWeight: "700" }}>Customer</strong>
+            </span>
+          </div>
+          <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: ".04em", color: "#806B60" }}>NAME <b style={{ color: "#A3371A" }}>*</b></span>
+            <input value={v.cfName} onChange={v.cfSetName} placeholder="e.g. Mr. Lim" style={{ height: "46px", boxSizing: "border-box", padding: "0 14px", borderRadius: "12px", border: "1px solid #EBDDD2", background: "#FBF7F3", font: "inherit", fontSize: "15px", color: "#3F2B22", outline: "none" }} />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: ".04em", color: "#806B60" }}>PHONE</span>
+            <input value={v.cfPhone} onChange={v.cfSetPhone} placeholder="e.g. 012-345 6789" inputMode="tel" style={{ height: "46px", boxSizing: "border-box", padding: "0 14px", borderRadius: "12px", border: "1px solid #EBDDD2", background: "#FBF7F3", font: "inherit", fontSize: "15px", color: "#3F2B22", outline: "none" }} />
+          </label>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", paddingTop: "6px" }}>
+            <span style={{ flex: "none", marginTop: "7px", width: "7px", height: "7px", borderRadius: "50%", background: "#BD4A19" }}>
+            </span>
+            <span style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+              <strong style={{ fontSize: "16px", fontWeight: "700" }}>Property</strong>
+            </span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: ".04em", color: "#806B60" }}>PROPERTY TYPE</span>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {(v.cfType).map((c, c_i) => (<Fragment key={c_i}>
+                <span onClick={c.pick} style={{ height: "38px", padding: "0 16px", boxSizing: "border-box", borderRadius: "19px", border: `1px solid ${c.bd}`, background: c.bg, color: c.fg, display: "grid", placeItems: "center", fontSize: "14px", fontWeight: "600", cursor: "pointer" }}>{c.label}</span>
+              </Fragment>))}
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: ".04em", color: "#806B60" }}>UNIT SIZE</span>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "8px" }}>
+              {(v.cfSize).map((c, c_i) => (<Fragment key={c_i}>
+                <span onClick={c.pick} style={{ height: "38px", padding: "0 16px", boxSizing: "border-box", borderRadius: "19px", border: `1px solid ${c.bd}`, background: c.bg, color: c.fg, display: "grid", placeItems: "center", fontSize: "14px", fontWeight: "600", cursor: "pointer" }}>{c.label}</span>
+              </Fragment>))}
+            </div>
+          </div>
+          <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: ".04em", color: "#806B60" }}>UNIT LOCATION</span>
+            <input value={v.cfLoc} onChange={v.cfSetLoc} placeholder="e.g. Mont Kiara / Cheras" style={{ height: "46px", boxSizing: "border-box", padding: "0 14px", borderRadius: "12px", border: "1px solid #EBDDD2", background: "#FBF7F3", font: "inherit", fontSize: "15px", color: "#3F2B22", outline: "none" }} />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: ".04em", color: "#806B60" }}>REQUIREMENT</span>
+            <textarea value={v.cfReq} onChange={v.cfSetReq} placeholder={v.cfReqPh} rows={2} style={{ boxSizing: "border-box", padding: "12px 14px", borderRadius: "12px", border: "1px solid #EBDDD2", background: "#FBF7F3", font: "inherit", fontSize: "15px", color: "#3F2B22", outline: "none", resize: "none" }}>
+            </textarea>
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: ".04em", color: "#806B60" }}>BUDGET</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "8px", boxSizing: "border-box", height: "48px", padding: "0 14px", borderRadius: "12px", border: "1px solid #EBDDD2", background: "#FBF7F3" }}>
+              <span style={{ fontSize: "15px", fontWeight: "600", color: "#806B60" }}>RM</span>
+              <input value={v.cfBudget} onChange={v.cfSetBudget} inputMode="numeric" placeholder="" style={{ flex: "1", minWidth: "0", border: "0", background: "transparent", font: "inherit", fontSize: "15px", color: "#3F2B22", outline: "none" }} />
+            </span>
+          </label>
+          <span onClick={v.cfSave} style={{ flex: "none", marginTop: "8px", height: "58px", borderRadius: "29px", display: "grid", placeItems: "center", background: v.cfSaveBg, color: "#fff", fontSize: "17px", fontWeight: "700", cursor: "pointer" }}>{v.cfSaveLabel}</span>
+        </div>
+      </div>
     </>)}
   </>);
 }

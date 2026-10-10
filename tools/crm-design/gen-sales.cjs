@@ -16,7 +16,8 @@ const parts = [
   ["SalesHeader", "HeaderVM", lines(36, 39), "Top bar: back to the Revenue app, and the bell."],
   ["SalesInbox", "InboxVM", lines(41, 118), "Inbox: search, filter chips, rows (swipe for More), the More / Label sheets and the ad filter."],
   ["SalesContacts", "ContactsVM", lines(121, 180), "Contacts: A–Z, swipe to edit or delete, customer details and info sheets."],
-  ["SalesCalendar", "CalendarVM", lines(183, 301), "Calendar: Month / Week / Day, Today with Show up / No show, upcoming, outcome and celebration."],
+  // rev 1010 §3: a visit opens Contacts' Customer info sheet (lines 145–150) and its form (127–144) on the Calendar too.
+  ["SalesCalendar", "CalendarVM", lines(183, 301) + "\n" + lines(145, 150) + "\n" + lines(127, 144), "Calendar: Month / Week / Day, Today with Show up / No show, upcoming, outcome and celebration; Customer info and its form."],
   ["SalesProfile", "ProfileVM", lines(304, 429), "Profile: card, View my team, workspace, Notifications, Quick replies, Auto-reply."],
   ["SalesInsight", "InsightVM", lines(432, 491), "Insight: Month / Week / Day / Range, the walnut hero and leads by status."],
   ["SalesChat", "ChatVM", lines(496, 741), "A chat: header menu, messages, booking, quick replies, templates and every sheet."],
@@ -27,6 +28,9 @@ const parts = [
 
 // Where the design shows a demo value, the live one (each must match exactly once).
 const PATCHES = {
+  // rev 1010 §3: Month / Week chips open the visit (their own tap; "+N" has none and keeps select-day).
+  SalesCalendar: [["<span style={{ alignSelf: \"stretch\", height: \"14px\",", "<span onClick={e.open} style={{ alignSelf: \"stretch\", height: \"14px\","],
+    ["<span style={{ alignSelf: \"stretch\", padding: \"4px 3px\",", "<span onClick={e.open} style={{ alignSelf: \"stretch\", padding: \"4px 3px\","]],
   SalesProfile: [[">Full time</strong>", ">{v.meRankX}</strong>"]],
   // No phone (a Messenger customer) — no call button (user 2026-10-09: 無法打電話，刪掉).
   SalesContacts: [[/(<a href=\{p\.tel\}[\s\S]*?<\/a>)/, "{!!p.hasTel && ($1)}"]],
