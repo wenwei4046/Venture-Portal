@@ -105,21 +105,20 @@ const loadLadderTitles = cache(async () => {
 /**
  * Rules › Ranks' "Held by" (2026-10-10, the HR revamp): who is paid from each
  * rank of the catalogue today — the open memberships' rungs, mapped to the
- * rank each rung points at, named from the commission roster.
+ * rank each rung points at, named from the commission roster. Reads the rungs
+ * itself, so the page runs it beside `loadCommissionSettings`, not after it.
  */
-export async function loadRankHolders(
-  schemeId: string | null,
-  ranks: ReadonlyArray<{ id: string; rank_def_id: string }>,
-): Promise<Record<string, string[]>> {
+export async function loadRankHolders(schemeId: string | null): Promise<Record<string, string[]>> {
   if (!schemeId) return {}
   const supabase = await untyped()
-  const [{ data: positions, error }, { data: roster }] = await Promise.all([
+  const [{ data: positions, error }, { data: rungs }, { data: roster }] = await Promise.all([
     supabase.from('comm_hierarchy').select('staff_id, rank_id').eq('scheme_id', schemeId).is('effective_to', null),
+    supabase.from('comm_ranks').select('id, rank_def_id').eq('scheme_id', schemeId),
     loadCommissionRoster(),
   ])
   if (error) return {}
   const nameOf = new Map(rows<{ id: string; employee_name: string }>(roster).map(s => [s.id, s.employee_name]))
-  const defOfRung = new Map(ranks.map(r => [r.id, r.rank_def_id]))
+  const defOfRung = new Map(rows<{ id: string; rank_def_id: string }>(rungs).map(r => [r.id, r.rank_def_id]))
   const out: Record<string, string[]> = {}
   for (const p of rows<{ staff_id: string; rank_id: string | null }>(positions)) {
     const def = p.rank_id ? defOfRung.get(p.rank_id) : undefined

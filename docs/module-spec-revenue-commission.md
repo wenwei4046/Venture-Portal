@@ -1811,6 +1811,19 @@ catalogue order holds, and a row moves only when Save lands — the page
 re-reads the scheme — never while a box is being ticked.
 `lib/commission/scheme-rule-order.ts`.
 
+**Since 2026-10-10 (the HR revamp handoff, user: "100% same with
+prototype")** Scheme rules is the prototype's: the eight components as
+switches in ONE fixed order (Product revenue · KPI item allowance · Open
+Bill bonus · Hierarchy override · Below-margin penalty · Monthly margin
+incentive · Group incentive package · Deposit gate), a dot on each switch
+changed since the last save, Save / Saved at the section's top, and what a
+component needs besides its switch opened under its row while it is on —
+Group incentive's three layer settings (2 · 2 · 3 when it is switched on),
+how Open Bill pays, whether the override base counts KPI revenue, the
+deposit gate's %. The Revenue Team cost basis and the default rate mode
+sit under *Defaults*. The on-first ordering and `scheme-rule-order.ts` went
+with the table (`_components/rules/SchemePanel.tsx`).
+
 **II. Title ladder** — `comm_ranks`. One rung per title. The **title is
 fixed** once the rung exists (2026-09-05 evening: "选好后 title 就是 fixed 的") —
 only the blank row at the bottom, the one that adds a rung, has the title

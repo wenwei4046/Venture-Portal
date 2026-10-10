@@ -119,6 +119,13 @@ export default function SchemePanel({ scheme, subName, canManage }: { scheme: Sc
         next.overrideDepth = next.overrideDepth || '2'
         next.directLimit = next.directLimit || '3'
       }
+      // Switched off again, its settings go back to what is saved: they are
+      // out of sight now, and override layers bind a percentage scheme too.
+      if (k === 'group' && !next.sw.group) {
+        next.groupDepth = saved.groupDepth
+        next.overrideDepth = saved.overrideDepth
+        next.directLimit = saved.directLimit
+      }
       return next
     })
     setError('')
@@ -230,6 +237,7 @@ export default function SchemePanel({ scheme, subName, canManage }: { scheme: Sc
                       disabled={!canManage}
                       role="switch"
                       aria-checked={f.overrideKpi}
+                      aria-label="Override base includes KPI revenue"
                       onClick={() => setF(p => ({ ...p, overrideKpi: !p.overrideKpi }))}
                     >
                       <Toggle on={f.overrideKpi} shadow />

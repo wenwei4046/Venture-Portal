@@ -2,10 +2,11 @@
 
 import { Fragment, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { compareRankPay, rankLetters, rankPayLabelOf, rankPayOf } from '@/lib/commission/ranks'
+import { rankPayLabelOf } from '@/lib/commission/ranks'
 import { GridHead, GridRow, GridTable, hv } from '@/components/hrv/kit'
 import { flash } from '@/components/hrv/toast'
 import { removeRankDef, saveRankDef } from '../../config-actions'
+import { catalogueLetters, catalogueTopDown } from '../config/RulesTables'
 import type { CommissionSettingsData, SchemeRow } from '../config/types'
 import { SectionTop } from './SectionTop'
 import s from './rules.module.css'
@@ -16,16 +17,6 @@ import s from './rules.module.css'
 // the top, never typed. Whoever may manage the rules edits a rank in place
 // (rate, package, subsidy cap) and adds one under the list; a rank no title
 // sits on can be removed.
-
-/** The catalogue from the top: group packages, then percentage rates. */
-export function catalogueTopDown(data: Pick<CommissionSettingsData, 'rankDefs'>) {
-  return [...data.rankDefs].sort((a, b) => compareRankPay(rankPayOf(b), rankPayOf(a)) || b.sort_order - a.sort_order || b.id.localeCompare(a.id))
-}
-
-/** The letter each rank of the catalogue wears — counted over the catalogue, not the rungs. */
-export function catalogueLetters(data: Pick<CommissionSettingsData, 'rankDefs'>) {
-  return rankLetters(data.rankDefs.map(d => ({ id: d.id, ...rankPayOf(d), sortOrder: d.sort_order })))
-}
 
 const pct = (n: number) => String(Math.round(Number(n) * 10000) / 100)
 
@@ -80,7 +71,10 @@ export default function RanksPanel({
   const editor = (key: string, d: { id?: string; product_rate?: number; group_incentive_amount?: number; group_subsidy_cap?: number } | null, label: string) => (
     <form
       className={s.rankEdit}
-      action={fd => save(fd, label)}
+      onSubmit={e => {
+        e.preventDefault()
+        save(new FormData(e.currentTarget), label)
+      }}
       aria-label={`Edit ${label}`}
     >
       {d?.id ? <input type="hidden" name="id" value={d.id} /> : null}

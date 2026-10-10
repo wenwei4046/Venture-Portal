@@ -16,6 +16,12 @@
   top: 0;
   align-self: start;
 }
+/* A group's label and its sections, on the list's own 2px rhythm. */
+.navGroupWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .navGroup {
   padding: 14px 10px 6px;
   font-size: 10px;
@@ -233,6 +239,7 @@ select.paramValue { font-family: inherit; font-size: 13px; cursor: pointer; }
 .capLabel { font-size: 10px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(var(--hv-brown)); }
 .capValue { font-size: 24px; font-weight: 600; margin-top: 8px; letter-spacing: -0.02em; }
 .limit {
+  box-sizing: content-box; /* the prototype's 640px is the content: 674 with padding and border */
   display: flex;
   align-items: center;
   gap: 14px;
@@ -259,12 +266,10 @@ select.paramValue { font-family: inherit; font-size: 13px; cursor: pointer; }
 .queue { margin-top: 14px; font-size: 12.5px; color: rgb(var(--hv-body-2)); }
 .queue a { text-decoration: underline; color: rgb(var(--hv-ink)); cursor: pointer; }
 
-/* The tables kept as they were ("same content as today") sit under the section's line. */
-.legacy :global(.sect-head) h2 { font-size: 15px; }
-
 @media (max-width: 767px) {
   .layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .nav { position: static; flex-direction: row; flex-wrap: wrap; }
+  .nav { position: static; }
+  .navGroupWrap { flex-direction: row; flex-wrap: wrap; }
   .navGroup { width: 100%; padding: 8px 4px 2px; }
   .navNote { display: none; }
   .swLine { grid-template-columns: 44px minmax(0, 1fr); }
