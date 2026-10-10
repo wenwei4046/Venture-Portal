@@ -2,12 +2,15 @@
 paths:
   - "src/app/*/admin/**"
   - "src/lib/rooms/**"
+  - "src/app/*/g/**"
+  - "src/lib/guest/**"
+  - "tests/member-sql/validate-guest-link.mjs"
   - "tests/member-sql/validate-meeting-rooms.mjs"
 ---
 
-# HR tab — Meeting Rooms
+# HR tab — Meeting Rooms and the Guest Link
 
-Admin › Meeting Rooms, `/admin/rooms` — `src/app/(portal)/admin/rooms/`, `src/lib/rooms/`. DESIGN.md › "Meeting Rooms" is the visual spec; how a page and its writes are gated is `../portal-wide/permissions.md`.
+Admin › Meeting Rooms, `/admin/rooms` — `src/app/(portal)/admin/rooms/`, `src/lib/rooms/`; Admin › Guest Link, `/admin/guest-link`, and the public `/g/<code>` — `src/app/(portal)/admin/guest-link/`, `src/app/(guest)/g/`, `src/lib/guest/`. DESIGN.md › "Meeting Rooms" and "Guest link" are the visual spec; how a page and its writes are gated is `../portal-wide/permissions.md`.
 
 Read this before changing anything it covers, and again in every full scan of such a change (a review, QA, an E2E audit) — CLAUDE.md › Rules by tab. New decisions are added here, dated, never to CLAUDE.md.
 
@@ -19,3 +22,12 @@ Read this before changing anything it covers, and again in every full scan of su
 - **Other callers** (the Revenue app, the HR app) use `lib/rooms/read.ts` (server-only readers, a date RANGE) and `lib/rooms/actions.ts` (`bookRoom` with its `source`, `cancelBooking`); parsing and wording are `lib/rooms/model.ts`.
 - **The day is the address's** (`?day=`), written with `history.replaceState(null, …)` — never `history.state`, which Next's router does not read: a Server Action posts to the address the router knows, so a booking's refresh rendered today and threw the booked day away (found in the E2E, 2026-10-11). A refreshed page is taken only when it is for the day the address asks for.
 - **Tests:** `lib/rooms/model.test.ts`, `admin/rooms/_components/book-form.test.ts`, PGlite `tests/member-sql/validate-meeting-rooms.mjs`. An E2E on prod names its rows "E2E …" and deletes them after, with their `audit_events`.
+
+**THE GUEST LINK (2026-10-11, README §15–16; mig `20261011091000`).** Admin › Guest Link `/admin/guest-link` (HR's view: `PAGE_TABS` `hr.guest_link`; Guest link · View reads, Edit changes) and the PUBLIC page `/g/<code>` — its own route group `(guest)`, no portal layout, no `requirePage`, no sign-in. The user: the link starts OFF; HQ's meetings are never a guest's to change ("can set hq de 不给 guest edit 就好"); a meeting booked through the link may be changed or cancelled by any guest, who gives their name for the trail.
+
+- **The code is the only key.** `guest_link` (one row: on, `hv-` + 8 of 32 letters and digits — about 10^12, not guessable; the prototype's 4 would be), the parts (`booking`, `hiring`), `days_ahead` 1–21. New link makes a new code and the old one reads closed at once; so does any wrong code — the page never says more than "This link is closed".
+- **The guest page reads and writes as a stranger** (`lib/guest/client.ts`: the publishable key, no session cookie — a signed-in portal user is the same stranger there), through four DEFINER functions granted to anon BY NAME: `guest_link_page(code)`, `guest_link_day(code, day)`, `guest_link_book(code, …, actor)`, `guest_link_cancel(code, id, actor)`. Each checks the code (`guest_link_open`: on, current, the part open); book and cancel touch only `source = 'guest'` bookings; a guest books only a room switched on under *Rooms guests can book*, inside the days ahead, within its seats, on a free slot. Never the service role.
+- **The subsidiaries are the link's own list** (`guest_link_subsidiaries`: code up to 3, name, departments), seeded ONCE from Finance's active `companies` (codes = their short codes cut to three: 2990 → 299, The Cont → CON — HR edits them); `companies` is never written. A company with no departments asks none. A booking keeps the company and department as picked; its code follows the subsidiary (a code change rewrites `guest_code`). The Meeting Rooms legend reads the codes (`guest_link_legend()`).
+- **Admin functions:** `guest_link_admin()` (the page; its upcoming guest bookings as `meeting_rooms_rows` reads them, so Open is the Meeting Rooms drawer — Meeting rooms · Edit cancels or changes them), `guest_link_set(on, booking, hiring, days)`, `guest_link_new_code()`, `guest_link_room(room, on)`, `guest_link_save_subsidiary(…)`, `guest_link_remove_subsidiary(id)` (soft). Writes in `lib/guest/admin-actions.ts` (`requireAction('guest_link', 'edit')`), the guest page's in `lib/guest/actions.ts` (no gate to ask: the database checks the code).
+- **Request manpower** — the link's third part — is NOT on the guest page yet: `guest_link_page` answers `hiring: false` until the Hiring module's guest door (`hiring_file_guest_request`, `hiring_guest_form`) is on main; the admin switch is kept already.
+- **Tests:** `lib/guest/model.test.ts`, `GuestPage.test.tsx` (HQ's meeting has no buttons; a cancel asks the name), PGlite `tests/member-sql/validate-guest-link.mjs` (both migrations verbatim, as anon). An E2E turns the link on only for the test and off after, names its rows "E2E …" and deletes them with their `audit_events`.

@@ -93,6 +93,8 @@ export const PAGE_TABS = {
   '/audit-log': ['hr.audit_log', 'fin.audit_log', 'pri.audit_log'],
   // Admin › Meeting Rooms (2026-10-11): every view books a room.
   '/admin/rooms': ['hr.meeting_rooms', 'fin.meeting_rooms', 'pri.meeting_rooms', 'dept.meeting_rooms'],
+  // Admin › Guest Link (2026-10-11): HR's.
+  '/admin/guest-link': ['hr.guest_link'],
   '/audit-log/access': ['pri.audit_log'],
 
   // ── Finance view ──

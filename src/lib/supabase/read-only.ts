@@ -48,6 +48,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'team_org_chart', 'venue_event_organiser_for_order', 'view_as_people',
   // Admin › Meeting Rooms (mig 20261011090000):
   'meeting_rooms_range', 'meeting_rooms_booking', 'meeting_rooms_rooms', 'meeting_rooms_people',
+  // Admin › Guest Link (mig 20261011091000):
+  'guest_link_admin', 'guest_link_legend',
   // VOLATILE, read to write nothing:
   'comm_effective_direct_line_limits', 'commission_payroll_closed', 'next_account_code', 'revenue_pay_lines_closed', 'revenue_pay_preview',
   // Who is being viewed — sets auth.uid() for its own four reads and puts it back:

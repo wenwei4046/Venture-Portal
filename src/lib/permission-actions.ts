@@ -160,6 +160,7 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'documentation.view': 'all',
   'director_salary.approve': 'all',
   'director_salary.edit': 'all',
+  'guest_link.edit': 'all',
   'hr_costing.approve': 'all',
   'hr_costing.create': 'all',
   'hr_costing.edit': 'all',

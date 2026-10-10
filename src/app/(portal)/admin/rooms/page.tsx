@@ -3,6 +3,7 @@ import { canDo } from '@/lib/permission-actions'
 import { officeToday } from '@/lib/office-time'
 import { isDay } from '@/lib/rooms/model'
 import { readRooms, readRoomsPeople, readRoomsRange } from '@/lib/rooms/read'
+import { readGuestLegend } from '@/lib/guest/read'
 import { HvPage, PageHead } from '@/components/hrv/kit'
 import MeetingRoomsView from './_components/MeetingRoomsView'
 
@@ -20,10 +21,11 @@ export default async function MeetingRoomsPage({ searchParams }: { searchParams:
   const { day: asked } = await searchParams
   const day = isDay(asked) ? asked : officeToday()
   const canManage = canDo(user, 'rooms', 'edit')
-  const [range, people, rooms] = await Promise.all([
+  const [range, people, rooms, legend] = await Promise.all([
     readRoomsRange(day, day),
     readRoomsPeople(),
     canManage ? readRooms() : Promise.resolve(null),
+    readGuestLegend(),
   ])
   if (!range.ok || !people.ok) {
     return (
@@ -40,6 +42,7 @@ export default async function MeetingRoomsPage({ searchParams }: { searchParams:
       rooms={rooms && rooms.ok ? rooms.data : null}
       canBook={canDo(user, 'rooms', 'create')}
       canManage={canManage}
+      legend={legend}
     />
   )
 }
