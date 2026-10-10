@@ -2,13 +2,13 @@ import type { MemberCatalogue, MemberData, MemberInsight, MemberOrgMap, MemberRe
 import type { RequestEvent } from "./profile/profile-model";
 import { readClaimRates, type ClaimRates } from "@/lib/member/claim-rules";
 import type { DepartmentIncome, MemberIncome } from "@/lib/member/income";
-import type { MemberHonours } from "@/lib/member/server";
+import type { MemberHonours, MemberWaitingForm } from "@/lib/member/server";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { ArenaWeekPicks, ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
 import {
-  acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, submitMemberRequest,
-  type fetchDepartmentIncome, type fetchMemberCatalogue, type fetchMemberClaimRates, type fetchMemberHonours, type fetchMemberIncome, type fetchMemberInsight,
+  acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberWaitingFormLink, submitMemberRequest,
+  type fetchDepartmentIncome, type fetchMemberCatalogue, type fetchMemberClaimRates, type fetchMemberWaitingForm, type fetchMemberHonours, type fetchMemberIncome, type fetchMemberInsight,
   type fetchMemberInsightRange, type fetchMemberOrderBook, type fetchMemberOrgMap, type fetchMemberRequestHistory, type fetchPrincipalMemoReceipts,
   type refreshMemberData,
 } from "@/app/(member)/member/actions";
@@ -57,6 +57,7 @@ export const ask = {
     ({ kind: "honours", subDepartmentId, from, until, context }),
   memoReceipts: (staffId: string): MemberRead => ({ kind: "memoReceipts", staffId }),
   claimRates: (): MemberRead => ({ kind: "claimRates" }),
+  waitingForm: (): MemberRead => ({ kind: "waitingForm" }),
   requestHistory: (id: string): MemberRead => ({ kind: "requestHistory", id }),
   catalogue: (): MemberRead => ({ kind: "catalogue" }),
 };
@@ -89,6 +90,10 @@ export interface RevenueSource {
   cancelRequest(id: string): Promise<Outcome<MemberRequest>>;
   /** HR's fair-claim rates and regions. */
   claimRates(): Promise<Outcome<ClaimRates>>;
+  /** The waiting-list form HR set (2026-10-10). */
+  waitingForm?(): Promise<Outcome<MemberWaitingForm>>;
+  /** Download form: a fresh link to HR's uploaded application form — null when the app builds it. Never kept. */
+  waitingFormLink?(): Promise<Outcome<{ url: string; name: string } | null>>;
   /** My income: one month as Comm Cal works it out (live until the close), and the months paid. */
   income(subDepartmentId: string, period: string, context?: MemberReadContext): Promise<Outcome<MemberIncome>>;
   /** Today for a Principal viewing nobody: the sub-department's commission this month, before salaries. */
@@ -169,6 +174,8 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
       return go(request, read<Answer<typeof fetchMemberClaimRates>>(request)
         .then((result): Outcome<ClaimRates> => (result.ok ? { ok: true, data: readClaimRates(result.data) } : result)));
     },
+    waitingForm: () => go<Answer<typeof fetchMemberWaitingForm>>(ask.waitingForm()),
+    waitingFormLink: () => fetchMemberWaitingFormLink(),
     memoReceipts: staffId => go<Answer<typeof fetchPrincipalMemoReceipts>>(ask.memoReceipts(staffId)),
     income: (subDepartmentId, period, context) => go<Answer<typeof fetchMemberIncome>>(ask.income(subDepartmentId, period, context)),
     departmentIncome: (subDepartmentId, period) => go<Answer<typeof fetchDepartmentIncome>>(ask.departmentIncome(subDepartmentId, period)),

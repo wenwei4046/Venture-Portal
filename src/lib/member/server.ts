@@ -19,6 +19,8 @@ import type { StatementDto } from "@/lib/commission/run-payload";
 import { fetchByKeys } from "@/lib/paginate";
 import { loadCommissionInput } from "@/app/(portal)/revenue/_lib/commission-input";
 import { monthFinishes, type HonourBoard } from "./honours";
+import { formFromRow, type WaitingForm } from "@/lib/commission/waiting-form";
+import { waitingAnswersFrom, type WaitingAnswer } from "./waiting-answers";
 import type { MemberArenaSnapshot } from "./arena";
 import type { ArenaHistorySnapshot } from "./arena-history";
 import type {
@@ -952,11 +954,19 @@ interface VerifiedInvoice {
   name: string;
 }
 async function invoice(form: FormData): Promise<VerifiedInvoice> {
-  const file = form.get("invoice");
+  return verifiedUpload(form, "invoice", "invoice");
+}
+/**
+ * A file the member attached, looked at byte by byte: a JPG, PNG or PDF of 3 MB
+ * or less, whatever its name says — a claim's invoice, a waiting list's signed
+ * application form (2026-10-10).
+ */
+async function verifiedUpload(form: FormData, fieldName: string, noun: string): Promise<VerifiedInvoice> {
+  const file = form.get(fieldName);
   if (!file || typeof file === "string" || file.size < 1)
-    throw new Error("Upload an invoice.");
+    throw new Error(noun === "invoice" ? "Upload an invoice." : `Upload the ${noun}.`);
   if (file.size > MAX_INVOICE)
-    throw new Error("The invoice must be 3 MB or smaller.");
+    throw new Error(`The ${noun} must be 3 MB or smaller.`);
   const bytes = new Uint8Array(await file.arrayBuffer());
   let mime = "",
     extension = "";
@@ -982,8 +992,49 @@ async function invoice(form: FormData): Promise<VerifiedInvoice> {
     extension = "pdf";
   }
   if (!mime || (file.type && file.type !== mime))
-    throw new Error("The invoice must be a valid JPG, PNG or PDF file.");
+    throw new Error(`The ${noun} must be a valid JPG, PNG or PDF file.`);
   return { bytes, mime, extension, name: file.name.slice(0, 200) };
+}
+
+/**
+ * A verified file kept on the member's draft request — a claim's invoice, a
+ * waiting list's signed form: uploaded under their own folder, then attested
+ * by the service role (members cannot spoof the MIME check by calling the
+ * submission RPC directly). Once per file: the same bytes are not kept twice.
+ */
+async function attachVerified(
+  client: SupabaseClient,
+  prepared: { id: string; userId: string },
+  file: VerifiedInvoice,
+  hash: string,
+): Promise<void> {
+  const existing = await client
+    .from("member_request_attachments")
+    .select("id")
+    .eq("request_id", prepared.id)
+    .eq("content_sha256", hash)
+    .limit(1);
+  if (existing.error) throw new Error(existing.error.message);
+  if (existing.data?.length) return;
+  const path = `${prepared.userId}/${prepared.id}/${randomUUID()}.${file.extension}`;
+  const upload = await client.storage
+    .from("member-invoices")
+    .upload(path, file.bytes, { contentType: file.mime, upsert: false });
+  if (upload.error) throw new Error(upload.error.message);
+  const attestation = await (adminClient() as unknown as SupabaseClient)
+    .from("member_request_attachments")
+    .insert({
+      request_id: prepared.id,
+      uploaded_by: prepared.userId,
+      object_path: path,
+      mime_type: file.mime,
+      size_bytes: file.bytes.length,
+      content_sha256: hash,
+    });
+  if (attestation.error) {
+    await client.storage.from("member-invoices").remove([path]);
+    throw new Error(attestation.error.message);
+  }
 }
 
 /** Draft + immutable verified attachment + atomic claim/request submission. */
@@ -1012,6 +1063,9 @@ export async function submitMemberRequest(
     uuid(subDepartmentId, "department");
     const detail: Record<string, string | number | boolean> = {};
     let verified: VerifiedInvoice | null = null;
+    // A waiting list: HR's own questions and its signed application form.
+    let answers: WaitingAnswer[] = [];
+    let signedForm: VerifiedInvoice | null = null;
     const claimType = kind === "claim" ? field(form, "claimType") : "";
     if (claimType) {
       // A fair claim (2026-10-05): its amount is the rate HR set, worked out by
@@ -1124,6 +1178,26 @@ export async function submitMemberRequest(
             );
           detail.signatureImage = signatureImage;
         }
+        // HR's own questions and the signed application form (2026-10-10,
+        // the form Sales Groups › Form settings versions).
+        answers = waitingAnswersFrom(field(form, "answers", 40000));
+        const version = Number(field(form, "formVersion"));
+        if (Number.isInteger(version) && version > 0) detail.formVersion = version;
+        const signedFile = form.get("signedForm");
+        if (signedFile && typeof signedFile !== "string" && signedFile.size > 0) {
+          signedForm = await verifiedUpload(form, "signedForm", "signed application form");
+          detail.signedFormName = signedForm.name;
+          detail.signedFormHash = createHash("sha256").update(signedForm.bytes).digest("hex");
+        } else if (field(form, "requestId")) {
+          // A revision keeps the form it was sent with (member_submit_request
+          // still finds it attached to this request, by its hash).
+          const name = field(form, "signedFormName", 200);
+          const hash = field(form, "signedFormHash", 64);
+          if (name && /^[0-9a-f]{64}$/.test(hash)) {
+            detail.signedFormName = name;
+            detail.signedFormHash = hash;
+          }
+        }
       } else {
         const destination = field(form, "destination");
         Object.assign(detail, {
@@ -1180,46 +1254,15 @@ export async function submitMemberRequest(
       {
         p_kind: kind,
         p_sub_department: subDepartmentId,
-        p_detail: detail,
+        p_detail: answers.length ? { ...detail, answers } : detail,
         p_idempotency: key,
         p_revision: revision,
       },
     );
-    if (kind === "claim" && prepared.status === "draft" && verified) {
-      const existing = await client
-        .from("member_request_attachments")
-        .select("id")
-        .eq("request_id", prepared.id)
-        .eq("content_sha256", detail.invoiceHash)
-        .limit(1);
-      if (existing.error) throw new Error(existing.error.message);
-      if (!existing.data?.length) {
-        const path = `${prepared.userId}/${prepared.id}/${randomUUID()}.${verified.extension}`;
-        const upload = await client.storage
-          .from("member-invoices")
-          .upload(path, verified.bytes, {
-            contentType: verified.mime,
-            upsert: false,
-          });
-        if (upload.error) throw new Error(upload.error.message);
-        // Only service-role can attest attachments; members cannot spoof the
-        // MIME validation by invoking the submission RPC directly.
-        const attestation = await (adminClient() as unknown as SupabaseClient)
-          .from("member_request_attachments")
-          .insert({
-            request_id: prepared.id,
-            uploaded_by: prepared.userId,
-            object_path: path,
-            mime_type: verified.mime,
-            size_bytes: verified.bytes.length,
-            content_sha256: detail.invoiceHash,
-          });
-        if (attestation.error) {
-          await client.storage.from("member-invoices").remove([path]);
-          throw new Error(attestation.error.message);
-        }
-      }
-    }
+    if (kind === "claim" && prepared.status === "draft" && verified)
+      await attachVerified(client, prepared, verified, String(detail.invoiceHash));
+    if (kind === "waiting" && prepared.status === "draft" && signedForm)
+      await attachVerified(client, prepared, signedForm, String(detail.signedFormHash));
     return requestLabels(
       await rpc<MemberRequest>(client, "member_submit_request", {
         p_request: prepared.id,
@@ -1281,6 +1324,46 @@ export async function loadMemberClaimRates(): Promise<MemberOutcome<unknown>> {
   });
 }
 
+/** The waiting-list form as HR set it (Sales Groups › Form settings). */
+export interface MemberWaitingForm {
+  form: WaitingForm;
+}
+
+/**
+ * The waiting-list form the Revenue app draws (2026-10-10, HR revamp 7a):
+ * `member_waiting_form()` lets the Revenue team in (`member_requests`). The
+ * phone keeps this answer, so it carries no link that could expire — HR's
+ * uploaded application form is asked for when Download is pressed
+ * (`loadMemberWaitingFormLink`).
+ */
+export async function loadMemberWaitingForm(): Promise<MemberOutcome<MemberWaitingForm>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    const client = await session("member_requests", !!user && isPrincipalAccount(user));
+    const form = formFromRow(await rpc<unknown>(client, "member_waiting_form"));
+    if (!form) throw new Error("The waiting-list form could not be read. Pull to refresh.");
+    return { form };
+  });
+}
+
+/**
+ * Download form: a ten-minute link to the application form HR uploaded (the
+ * `member-forms` bucket's templates/ read policy lets the Revenue team in),
+ * or null when HR uploaded none and the app builds the black-and-white one.
+ */
+export async function loadMemberWaitingFormLink(): Promise<MemberOutcome<{ url: string; name: string } | null>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    const client = await session("member_requests", !!user && isPrincipalAccount(user));
+    const form = formFromRow(await rpc<unknown>(client, "member_waiting_form"));
+    if (!form) throw new Error("The waiting-list form could not be read. Pull to refresh.");
+    if (!form.templatePath) return null;
+    const signed = await client.storage.from("member-forms").createSignedUrl(form.templatePath, 600, { download: form.templateName });
+    if (signed.error || !signed.data?.signedUrl) throw new Error("HR's application form could not be downloaded. Try again.");
+    return { url: signed.data.signedUrl, name: form.templateName };
+  });
+}
+
 /** View as: which memos the viewed person has read and acknowledged (their receipts, not the Principal's). */
 export async function loadPrincipalMemoReceipts(staffId: string): Promise<MemberOutcome<{ memoId: string; readAt: string | null; acknowledgedAt: string | null }[]>> {
   return outcome(async () => {
@@ -1332,26 +1415,29 @@ export async function adminMemberAction(
         requests: (data.requests ?? []).map(requestLabels),
       };
     }
-    if (command.action === "invoice") {
+    if (command.action === "invoice" || command.action === "signed_form") {
       // RLS authorizes either the submitter or the HR reviewer, never another member.
+      // A claim's invoice, or a waiting list's signed application form (2026-10-10).
+      const key = command.action === "invoice" ? "invoiceHash" : "signedFormHash";
+      const what = command.action === "invoice" ? "invoice" : "signed form";
       const requestId = uuid(command.requestId, "request");
       const request = await client
         .from("member_requests")
         .select("detail")
         .eq("id", requestId)
         .maybeSingle();
-      if (request.error || !request.data?.detail?.invoiceHash)
-        throw new Error("No accessible invoice was found.");
+      if (request.error || !request.data?.detail?.[key])
+        throw new Error(`No accessible ${what} was found.`);
       const result = await client
         .from("member_request_attachments")
         .select("object_path")
         .eq("request_id", requestId)
-        .eq("content_sha256", request.data.detail.invoiceHash)
+        .eq("content_sha256", request.data.detail[key])
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       if (result.error || !result.data)
-        throw new Error("No accessible invoice was found.");
+        throw new Error(`No accessible ${what} was found.`);
       const signed = await client.storage
         .from("member-invoices")
         .createSignedUrl(result.data.object_path, 120);

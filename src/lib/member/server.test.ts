@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@/types'
 import type { MemberBand, MemberData, QuoteInput } from './types'
-import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, submitMemberRequest } from './server'
+import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, loadMemberWaitingForm, loadMemberWaitingFormLink, submitMemberRequest } from './server'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), createClient: vi.fn(), adminClient: vi.fn(), rpc: vi.fn(), adminRpc: vi.fn(),
@@ -381,6 +381,99 @@ describe('a member sends a request', () => {
       p_kind: 'waiting', p_sub_department: ir,
       p_detail: { newPerson: 'Amelia Tan', contact: '012-345 6789', start: '2026-11-01', signature: 'Jia En', consent: true },
     }))
+  })
+
+  // HR revamp 7a (2026-10-10): the form Sales Groups › Form settings versions.
+  describe('a waiting list on HR’s form', () => {
+    const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37])
+    const waitingForm = (fields: Record<string, string> = {}) => form({
+      kind: 'waiting', subDepartmentId: fair, idempotencyKey: key, newPerson: 'Amelia Tan', contact: '012-345 6789',
+      targetDepartmentId: fair, start: '2026-11-01', consent: 'true', signature: 'Jia En', ...fields,
+    })
+    const upload = vi.fn(async () => ({ error: null }))
+    const insert = vi.fn(async () => ({ error: null }))
+    beforeEach(() => {
+      upload.mockClear()
+      insert.mockClear()
+      const tables = (name: string) => name === 'member_requests'
+        ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { idempotency_key: key }, error: null }) }) }) }
+        : { select: () => ({ eq: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }) }) }
+      mocks.createClient.mockResolvedValue({ rpc: mocks.rpc, from: tables, storage: { from: () => ({ upload, remove: vi.fn() }) } })
+      mocks.adminClient.mockReturnValue({ from: () => ({ insert }) })
+    })
+
+    it('sends HR’s answers with the form’s version, and attests the signed form before it is sent', async () => {
+      const data = waitingForm({ formVersion: '3', answers: JSON.stringify([{ id: 'ic', label: 'IC number', value: ' 900101 ' }, { id: 'bad id', label: 'x', value: 'y' }]) })
+      data.set('signedForm', new File([pdf], 'amelia-form.pdf', { type: 'application/pdf' }))
+      expect((await submitMemberRequest(data)).ok).toBe(true)
+      const prepared = mocks.rpc.mock.calls[0][1] as { p_detail: Record<string, unknown> }
+      expect(prepared.p_detail).toMatchObject({ formVersion: 3, signedFormName: 'amelia-form.pdf', answers: [{ id: 'ic', label: 'IC number', value: '900101' }] })
+      expect(prepared.p_detail.signedFormHash).toMatch(/^[0-9a-f]{64}$/)
+      expect(upload).toHaveBeenCalledTimes(1)
+      expect(insert).toHaveBeenCalledWith(expect.objectContaining({ request_id: requestId, mime_type: 'application/pdf', content_sha256: prepared.p_detail.signedFormHash }))
+      expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
+    })
+
+    it('refuses a signed form that is not a JPG, PNG or PDF', async () => {
+      const data = waitingForm()
+      data.set('signedForm', new File(['GIF89a'], 'form.gif', { type: 'image/gif' }))
+      expect(await submitMemberRequest(data)).toEqual({ ok: false, error: 'The signed application form must be a valid JPG, PNG or PDF file.' })
+      mocks.rpc.mockReset()
+    })
+
+    it('a new request cannot claim a signed form it did not upload', async () => {
+      expect((await submitMemberRequest(waitingForm({ signedFormName: 'old.pdf', signedFormHash: 'c'.repeat(64) }))).ok).toBe(true)
+      const prepared = mocks.rpc.mock.calls[0][1] as { p_detail: Record<string, unknown> }
+      expect(prepared.p_detail).not.toHaveProperty('signedFormName')
+      expect(prepared.p_detail).not.toHaveProperty('answers')
+    })
+
+    it('an update keeps the signed form it was sent with', async () => {
+      const hash = 'c'.repeat(64)
+      expect((await submitMemberRequest(waitingForm({ requestId, signedFormName: 'old.pdf', signedFormHash: hash }))).ok).toBe(true)
+      expect(mocks.rpc).toHaveBeenNthCalledWith(1, 'member_prepare_request', expect.objectContaining({
+        p_revision: requestId, p_detail: expect.objectContaining({ signedFormName: 'old.pdf', signedFormHash: hash }),
+      }))
+      expect(upload).not.toHaveBeenCalled()
+    })
+  })
+})
+
+describe('the waiting-list form the Revenue app draws', () => {
+  const row = { version: 2, requireUpload: true, templatePath: 'templates/abc/HR form.pdf', templateName: 'HR form.pdf', createdAt: null,
+    fields: [{ id: 'newPerson', label: 'New member name', type: 'text', required: true, builtin: true }] }
+  const createSignedUrl = vi.fn(async () => ({ data: { signedUrl: 'https://files.example/HR%20form.pdf?token=1' }, error: null }))
+  beforeEach(() => {
+    createSignedUrl.mockClear()
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal', 'member_requests'] }))
+    mocks.createClient.mockResolvedValue({ rpc: mocks.rpc, storage: { from: () => ({ createSignedUrl }) } })
+  })
+
+  it('is read with no link in it — the phone keeps it', async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: row, error: null })
+    const result = await loadMemberWaitingForm()
+    expect(result).toEqual({ ok: true, data: { form: expect.objectContaining({ version: 2, requireUpload: true, templateName: 'HR form.pdf' }) } })
+    expect(mocks.rpc).toHaveBeenCalledWith('member_waiting_form', undefined)
+    expect(createSignedUrl).not.toHaveBeenCalled()
+  })
+
+  it('Download form asks for a fresh ten-minute link to HR’s own form', async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: row, error: null })
+    expect(await loadMemberWaitingFormLink()).toEqual({ ok: true, data: { url: 'https://files.example/HR%20form.pdf?token=1', name: 'HR form.pdf' } })
+    expect(createSignedUrl).toHaveBeenCalledWith('templates/abc/HR form.pdf', 600, { download: 'HR form.pdf' })
+  })
+
+  it('and is told to build the form when HR uploaded none', async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: { ...row, templatePath: null }, error: null })
+    expect(await loadMemberWaitingFormLink()).toEqual({ ok: true, data: null })
+    expect(createSignedUrl).not.toHaveBeenCalled()
+  })
+
+  it('asks nothing for an account without the requests', async () => {
+    mocks.getUser.mockResolvedValue(user({ role: 'finance', permissions: ['treasury'] }))
+    expect((await loadMemberWaitingForm()).ok).toBe(false)
+    expect((await loadMemberWaitingFormLink()).ok).toBe(false)
+    expect(mocks.rpc).not.toHaveBeenCalled()
   })
 })
 

@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -330,6 +330,23 @@ disagree, the file wins; every value is the prototype's.**
   "No title on this level" 12px `152 142 130`; the level's name 12px brown
   at the row's right (click to rename); a dragged-over row peach with an
   orange rim; + Add level outlined above the list.
+- **Submit waiting list** (v3.27, 2026-10-10; the Revenue app's
+  `profile/RequestForm`): the questions in the form's order under the capacity
+  pill — each label row a flex row (13px × type / 650, " (optional)" when not
+  required; after a refused send a 500-weight `--rv-red` *Required* at the
+  right and the input's edge red); Dropdown and Yes / No as the app's 38px
+  pills (the handoff's 36 + its border). The **Application form** box: 14px
+  padding, 1px `--rv-line`, 14px radius, an 8px column — title 13px / 650,
+  note 12px / 1.5 `--rv-sub`, two equal 42px buttons (12px radius,
+  `--rv-handle` edge, 13.5px / 600, a 15px download / upload glyph 6px from
+  the word; Download on no ground, Upload white → `--rv-green-bg`, green edge,
+  `--rv-kpi-ink` once a file is chosen, a red edge while it is required and
+  missing), then "✓ name" 12.5px green. The signature pad is the handoff's
+  canvas: 1px dashed `--rv-handle`, 12px radius, no ground, 112px (Clear
+  kept); the sign tabs have no padding. The done screen adds "Signed form
+  attached · name". Measured against the prototype at 410 × 864
+  (`.design/hr-revamp/tools/states-pr7a.json`; the tool takes a viewport per
+  state now).
 - **Cross-check** with a measuring script that finds each element by its text
   on both and diffs computed font / colour / size / padding / border / radius
   / background (`.design/revenue-app/tools/measure-pl.mjs` is the pattern).

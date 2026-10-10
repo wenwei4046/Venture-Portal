@@ -21,6 +21,7 @@ import {
   defaultSeat,
   effectiveWhen,
   filterRequests,
+  hasSignedForm,
   isOpen,
   requestCaption,
   requestFacts,
@@ -106,7 +107,7 @@ export default function RequestReviews({
     void perform(async () => {
       const result = await adminMemberAction(act.input)
       if (!result.ok) return { ok: false, reason: result.error }
-      if (act.input.action === 'invoice') {
+      if (act.input.action === 'invoice' || act.input.action === 'signed_form') {
         const url = (result.data as { url?: string } | null)?.url
         if (url) window.open(url, '_blank', 'noopener,noreferrer')
         return null
@@ -293,7 +294,7 @@ function Detail({
   }
 
   const caption = requestCaption(r, sub, facts)
-  const history = requestHistory(facts, r.kind)
+  const history = requestHistory(facts, r.kind, r.detail)
   const signature = typeof r.detail.signatureImage === 'string' && /^data:image\/png;base64,/.test(r.detail.signatureImage) ? r.detail.signatureImage : null
   const failure = r.kind === 'replacement' && r.status === 'scheduled' ? runFailure(r.note) : null
 
@@ -308,7 +309,10 @@ function Detail({
       </div>
       <Facts
         rows={[
-          ...requestFacts(r, facts, data),
+          // The signed application form a waiting list was sent with opens from its row (2026-10-10).
+          ...requestFacts(r, facts, data).map(f => f.l === 'Signed form' && hasSignedForm(r)
+            ? { l: f.l, v: <>{f.v} <button type="button" className={s.linkish} disabled={busy} onClick={() => run({ label: 'View signed form', input: { action: 'signed_form', requestId: r.id }, done: '' })}>View ↗</button></> }
+            : f),
           ...(r.kind === 'claim' && r.claimId
             ? [{ l: 'Invoice', v: <button type="button" className={s.linkish} style={{ marginLeft: 0 }} disabled={busy} onClick={() => run({ label: 'View invoice', input: { action: 'invoice', requestId: r.id }, done: '' })}>View invoice ↗</button> }]
             : []),

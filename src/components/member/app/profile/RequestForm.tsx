@@ -6,6 +6,8 @@ import Sheet, { SheetHandle } from "../Sheet";
 import { initials, rm2 } from "../format";
 import type { ClaimWeek, FormOptions, RequestKindVM } from "./profile-vm";
 import { airbnbGroup, claimAmount, fairRegion, isOutstation, MAX_STAY_NIGHTS, nightsBetween, stayProblem } from "@/lib/member/claim-rules";
+import { applicationFormHtml, BUILT_FORM_NAME, BUILTIN_FIELDS, type WaitingField } from "@/lib/commission/waiting-form";
+import { answersFor, blankRequired, capacityLine, fillIn, priorAnswers } from "@/lib/member/waiting-answers";
 import s from "./profile.module.css";
 
 const CAT_OUT = "M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18";
@@ -13,9 +15,13 @@ const CAT_AIR = "M3 11 12 4l9 7v9h-6v-6H9v6H3v-9Z";
 const CAMERA = "M4 8h3l2-3h6l2 3h3v11H4V8Zm8 9a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z";
 const PLANE = "M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z";
 const CLOSE = "M6 6l12 12M18 6 6 18";
+const DOWNLOAD = "M12 4v11M7 10l5 5 5-5M4 19h16";
+const UPLOAD = "M12 15V4M7 9l5-5 5 5M4 19h16";
 
 export type { ClaimWeek, FormOptions };
 export type SubmitOutcome = { ok: true; code: string } | { ok: false; error: string };
+/** Download form: a fresh link to HR's uploaded application form, or null when the app builds it. */
+export type FormLink = () => Promise<{ ok: true; data: { url: string; name: string } | null } | { ok: false; error: string }>;
 
 const TEXT: Record<RequestKindVM, [string, string, string, string]> = {
   claim: ["Submit claim", "Outstation or Airbnb stay for a fair", "Review & submit claim", "HR will check your claim. Payment is tracked in Requests."],
@@ -35,7 +41,7 @@ const SOURCES = [
 ] as const;
 
 /** The request form (lines 1553–1679): claim, replacement or waiting list, then the request ID. */
-export default function RequestForm({ kind, options, revising, readOnly, onSubmit, onClose }: {
+export default function RequestForm({ kind, options, revising, readOnly, onSubmit, onClose, formLink }: {
   kind: RequestKindVM | null;
   options: FormOptions;
   /** HR returned this request: its details come back to be updated. */
@@ -44,6 +50,8 @@ export default function RequestForm({ kind, options, revising, readOnly, onSubmi
   readOnly: boolean;
   onSubmit: (form: FormData) => Promise<SubmitOutcome>;
   onClose: () => void;
+  /** The waiting list's Download form, when HR uploaded its own (the preview has none: it builds the form). */
+  formLink?: FormLink;
 }) {
   const open = kind !== null;
   // A fresh form every time it opens; the same key on a retry (idempotent submission).
@@ -51,18 +59,19 @@ export default function RequestForm({ kind, options, revising, readOnly, onSubmi
   useEffect(() => { if (open) setSession(n => n + 1); }, [open, kind]);
   return (
     <Sheet open={open} onClose={onClose} z={23} height="90%" className={s.rfPanel} label={kind ? TEXT[kind][0] : "Request"}>
-      {kind && <FormBody key={`${kind}-${session}`} kind={kind} options={options} revising={revising} readOnly={readOnly} onSubmit={onSubmit} onClose={onClose} />}
+      {kind && <FormBody key={`${kind}-${session}`} kind={kind} options={options} revising={revising} readOnly={readOnly} onSubmit={onSubmit} onClose={onClose} formLink={formLink} />}
     </Sheet>
   );
 }
 
-function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
+function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLink }: {
   kind: RequestKindVM;
   options: FormOptions;
   revising: { id: string; detail: Record<string, unknown> } | null;
   readOnly: boolean;
   onSubmit: (form: FormData) => Promise<SubmitOutcome>;
   onClose: () => void;
+  formLink?: FormLink;
 }) {
   const [title, sub, cta, doneText] = TEXT[kind];
   const prior = revising?.detail ?? {};
@@ -94,9 +103,20 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
   const [newPerson, setNewPerson] = useState(str("newPerson"));
   const [effective, setEffective] = useState(str("effective"));
   const [reason, setReason] = useState(str("reason"));
-  // ── waiting ──
-  const [phone, setPhone] = useState(str("contact"));
-  const [start, setStart] = useState(str("start"));
+  // ── waiting: the form HR set (Sales Groups › Form settings) — its four built-ins until it arrives ──
+  const wform = options.waitingForm?.form ?? null;
+  const questions: readonly WaitingField[] = wform?.fields.length ? wform.fields : BUILTIN_FIELDS;
+  const [vals, setVals] = useState<Record<string, string>>(() => ({
+    ...priorAnswers(prior), newPerson: str("newPerson"), contact: str("contact"), start: str("start"),
+  }));
+  const setVal = (id: string, value: string) => { setVals(prev => ({ ...prev, [id]: value })); setError(null); };
+  const [signed, setSigned] = useState<File | null>(null);
+  const signedRef = useRef<HTMLInputElement>(null);
+  // A revision keeps the signed form it was sent with until another is chosen.
+  const keptForm = str("signedFormHash") && str("signedFormName") ? str("signedFormName") : "";
+  const signedName = signed?.name ?? keptForm;
+  const [tried, setTried] = useState(false);
+  const [fetching, setFetching] = useState(false);
   const [sigMode, setSigMode] = useState<"typed" | "draw">("typed");
   const [signature, setSignature] = useState(str("signature"));
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -106,6 +126,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [doneFile, setDoneFile] = useState("");
 
   const weekRow = options.weeks.find(w => w.key === week) ?? null;
   // The region is the one HR set for the brand week's venue — never picked here (user 2026-10-06).
@@ -126,7 +147,37 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
   const amount = useMemo(() => claimAmount(options.rates, cat === "outstation"
     ? { type: "outstation", regionId: regionRow?.id ?? null, ticket: ticketValue }
     : { type: "airbnb", pax, nights: stayIssue ? 0 : nights ?? 0, invoice: stayValue }), [options.rates, cat, regionRow, ticketValue, pax, nights, stayIssue, stayValue]);
-  const department = options.departments.find(d => d.id === (kind === "waiting" ? target : options.departmentId));
+  const department = options.departments.find(d => d.id === (kind === "waiting" ? target || options.departmentId : options.departmentId));
+  // The waiting list's answers as one map: the built-in sub-department is always chosen.
+  const answered = { ...vals, target: target || options.departmentId };
+  const blank = tried ? new Set(blankRequired(questions, answered).map(f => f.id)) : new Set<string>();
+  const needsForm = !!wform?.requireUpload;
+
+  /** Download form: HR's own when it uploaded one, else the black-and-white form built from the questions. */
+  const downloadForm = async () => {
+    if (fetching) return;
+    const built = () => save(new Blob([applicationFormHtml(wform ?? { version: 1, fields: [...questions], templateName: BUILT_FORM_NAME },
+      department?.name ?? options.subName, options.departments.map(d => d.name))], { type: "text/html" }), wform?.templateName ?? BUILT_FORM_NAME);
+    if (!wform?.templatePath || !formLink) return built();
+    setFetching(true);
+    try {
+      const link = await formLink();
+      if (!link.ok) return setError(link.error);
+      if (!link.data) return built();
+      try {
+        const res = await fetch(link.data.url);
+        if (!res.ok) throw new Error(String(res.status));
+        save(await res.blob(), link.data.name);
+      } catch {
+        // The link itself downloads (it is signed as an attachment).
+        window.location.assign(link.data.url);
+      }
+    } catch {
+      setError("The form could not be downloaded. Check your connection and try again.");
+    } finally {
+      setFetching(false);
+    }
+  };
 
   const submit = async () => {
     if (busy || readOnly) return;
@@ -191,28 +242,43 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
       form.set("effective", effective);
       form.set("reason", reason.trim());
     } else {
-      if (!newPerson.trim()) return setError("Enter the new member's full name.");
-      if (!phone.trim()) return setError("Enter a phone number.");
-      if (!start) return setError("Enter the preferred start date.");
-      form.set("newPerson", newPerson.trim());
-      form.set("contact", phone.trim());
+      // The handoff's order: the questions, then the signed form, then the signature.
+      const missing = fillIn(blankRequired(questions, answered));
+      if (missing) { setTried(true); return setError(missing); }
+      if (needsForm && !signedName) { setTried(true); return setError("Upload the signed application form."); }
+      if (signed && signed.size > 3 * 1024 * 1024) return setError("The signed form must be 3 MB or smaller.");
+      if (sigMode === "draw" ? !drawn : !signature.trim()) {
+        setTried(true);
+        return setError(sigMode === "draw" ? "Sign in the box, or type your signature." : "Type your full name to sign.");
+      }
+      form.set("newPerson", vals.newPerson.trim());
+      form.set("contact", vals.contact.trim());
       form.set("targetDepartmentId", target || options.departmentId);
-      form.set("start", start);
+      form.set("start", vals.start);
       form.set("consent", "true");
+      if (wform) {
+        form.set("formVersion", String(wform.version));
+        form.set("answers", JSON.stringify(answersFor(wform, vals)));
+      }
+      if (signed) form.set("signedForm", signed);
+      else if (keptForm) {
+        form.set("signedFormName", keptForm);
+        form.set("signedFormHash", str("signedFormHash"));
+      }
       if (sigMode === "draw") {
-        if (!drawn) return setError("Sign in the box, or type your signature.");
-        form.set("signature", newPerson.trim());
+        form.set("signature", vals.newPerson.trim());
         form.set("signatureImage", canvasRef.current?.toDataURL("image/png") ?? "");
       } else {
-        if (!signature.trim()) return setError("Type your full name to sign.");
         form.set("signature", signature.trim());
       }
     }
     setBusy(true);
     try {
       const outcome = await onSubmit(form);
-      if (outcome.ok) setDone(outcome.code);
-      else setError(outcome.error);
+      if (outcome.ok) {
+        setDone(outcome.code);
+        if (kind === "waiting" && signedName) setDoneFile(`Signed form attached · ${signedName}`);
+      } else setError(outcome.error);
     } catch {
       setError("Could not send it. Check your connection and try again.");
     } finally {
@@ -240,6 +306,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
           <span className={s.doneTitle}>Request submitted</span>
           <span className={s.doneText}>{doneText}</span>
           <span className={s.doneId}>{done}</span>
+          {doneFile && <span className={s.doneFile}>{doneFile}</span>}
           <button className={s.doneBtn} onClick={onClose}>Done</button>
         </div>
       </>
@@ -446,17 +513,55 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
         )}
         {kind === "waiting" && (
           <>
-            <div className={s.capPill}><span className={s.capPillLabel}>{department?.name ?? options.subName} capacity</span><span className={s.capPillValue}>{capacityText(department)}</span></div>
-            <label className={s.field}><span className={s.fieldLabel}>New member name</span><input type="text" className={s.input} placeholder="Full name as per IC" autoComplete="name" value={newPerson} onChange={e => setNewPerson(e.target.value)} maxLength={150} /></label>
-            <label className={s.field}><span className={s.fieldLabel}>Phone number</span><input type="tel" className={s.input} placeholder="e.g. 012-345 6789" inputMode="tel" value={phone} onChange={e => setPhone(e.target.value)} maxLength={32} /></label>
-            <div className={s.field}><span className={s.fieldLabel}>Preferred sub-department</span>
-              <div className={s.pills}>
-                {options.departments.map(d => (
-                  <button key={d.id} className={`${s.pill} ${(target || options.departmentId) === d.id ? s.pillOn : ""}`} onClick={() => setTarget(d.id)} aria-pressed={(target || options.departmentId) === d.id}>{d.name}</button>
-                ))}
+            <div className={s.capPill}><span className={s.capPillLabel}>{department?.name ?? options.subName} capacity</span><span className={s.capPillValue}>{capacityLine(department)}</span></div>
+            {questions.map(f => {
+              const err = blank.has(f.id);
+              const head = (
+                <span className={`${s.fieldLabel} ${s.qHead}`}>
+                  <span>{f.label}{f.required ? "" : " (optional)"}</span>
+                  {err && <span className={s.qErr}>Required</span>}
+                </span>
+              );
+              if (f.type === "dropdown" || f.type === "yesno") {
+                // The built-in sub-department offers the department's sub-departments; HR's own, their options.
+                const choices: (readonly [string, string])[] = f.builtin && f.id === "target"
+                  ? options.departments.map(d => [d.id, d.name] as const)
+                  : (f.type === "yesno" ? ["Yes", "No"] : f.options ?? []).map(o => [o, o] as const);
+                const value = f.id === "target" ? target || options.departmentId : vals[f.id] ?? "";
+                return (
+                  <div key={f.id} className={s.field} role="group" aria-label={f.label}>
+                    {head}
+                    <div className={s.pills}>
+                      {choices.map(([id, label]) => (
+                        <button key={id} className={`${s.pill} ${value === id ? s.pillOn : ""}`} aria-pressed={value === id}
+                          onClick={() => (f.id === "target" ? setTarget(id) : setVal(f.id, id))}>{label}</button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <label key={f.id} className={s.field}>
+                  {head}
+                  <input type={f.type === "date" ? "date" : f.type === "phone" ? "tel" : "text"} inputMode={f.type === "phone" ? "tel" : undefined}
+                    className={`${s.input} ${err ? s.inputErr : ""}`} placeholder={f.placeholder ?? ""} value={vals[f.id] ?? ""}
+                    onChange={e => setVal(f.id, e.target.value)} maxLength={f.id === "contact" ? 32 : f.id === "newPerson" ? 150 : 500} />
+                </label>
+              );
+            })}
+            <div className={s.appForm}>
+              <span className={s.appFormTitle}>Application form{needsForm ? "" : " (optional)"}</span>
+              <span className={s.appFormNote}>Download the form, print it in black and white, have the applicant fill it in and sign, then upload a photo or scan.</span>
+              <div className={s.appFormBtns}>
+                <button className={`${s.appFormBtn} ${s.appFormBtnPlain}`} onClick={() => void downloadForm()} aria-busy={fetching}><Svg d={DOWNLOAD} size={15} sw={1.8} />Download form</button>
+                <button className={`${s.appFormBtn} ${signedName ? s.appFormBtnOn : tried && needsForm ? s.appFormBtnErr : ""}`} onClick={() => signedRef.current?.click()}>
+                  <Svg d={UPLOAD} size={15} sw={1.8} />{signedName ? "Replace file" : "Upload signed form"}
+                </button>
               </div>
+              <input ref={signedRef} type="file" accept="image/jpeg,image/png,application/pdf" hidden aria-label="Signed application form"
+                onChange={e => { const file = e.target.files?.[0]; if (file) { setSigned(file); setError(null); } }} />
+              {signedName && <span className={s.appFormFile}>✓ {signedName}</span>}
             </div>
-            <label className={s.field}><span className={s.fieldLabel}>Preferred start date</span><input type="date" className={s.input} value={start} onChange={e => setStart(e.target.value)} /></label>
             <div className={s.field}>
               <span className={s.fieldLabel}>Your signature</span>
               <div className={s.sigTabs}>
@@ -468,7 +573,6 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
                 <input type="text" className={s.input} placeholder="Type your full name" value={signature} onChange={e => setSignature(e.target.value)} maxLength={150} />
               ) : (
                 <div className={s.sigPad}>
-                  {!drawn && "Sign here with your finger"}
                   <canvas ref={canvasRef} className={s.sigCanvas} width={600} height={220} aria-label="Signature"
                     onPointerDown={e => {
                       drawing.current = true; setDrawn(true);
@@ -506,11 +610,16 @@ function money(typed: string): number | null {
   return /^\d{1,9}(\.\d{1,2})?$/.test(typed.trim()) ? Number(typed.trim()) : null;
 }
 
-function capacityText(d: { capacity: number | null; occupied: number } | undefined): string {
-  if (!d) return "—";
-  if (d.capacity === null) return `${d.occupied} · no limit`;
-  const open = Math.max(d.capacity - d.occupied, 0);
-  return `${d.occupied} / ${d.capacity} · ${open} open`;
+/** Hand the phone a file to keep — the application form, built or HR's. */
+function save(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 /** The invoice: an Airbnb stay's, or a plane ticket's. */

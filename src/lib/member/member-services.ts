@@ -136,7 +136,10 @@ export function requestFacts(r: MemberRequest, facts: RequestFacts | undefined, 
           ["Signed by", str(d.signature)],
           ["Request department", department],
           ["Submitted by", facts?.submittedBy ?? ""],
-          ["Signed form", typeof d.signatureImage === "string" && d.signatureImage ? "Signed in the Revenue app" : "Paper form on file"],
+          // HR's own questions, as the form asked them (Sales Groups › Form settings, 2026-10-10).
+          ...waitingAnswers(d).map(a => [a.label, a.value] as [string, string]),
+          ["Signed form", str(d.signedFormName) ? `${str(d.signedFormName)} · black & white record` : "Paper form on file"],
+          ["Form version", Number.isInteger(d.formVersion) && Number(d.formVersion) > 0 ? `v${d.formVersion}` : ""],
         ]
       : r.kind === "replacement"
         ? [
@@ -157,6 +160,20 @@ export function requestFacts(r: MemberRequest, facts: RequestFacts | undefined, 
             ["Submitted by", facts?.submittedBy ?? ""],
           ];
   return rows.filter(([, v]) => v !== "").map(([l, v]) => ({ l, v }));
+}
+
+/** A waiting list's answers to HR's own questions, as `detail.answers` keeps them. */
+function waitingAnswers(d: Record<string, unknown>): { label: string; value: string }[] {
+  if (!Array.isArray(d.answers)) return [];
+  return d.answers.flatMap(a => {
+    const x = a && typeof a === "object" ? (a as Record<string, unknown>) : null;
+    return x && str(x.label) && str(x.value) ? [{ label: str(x.label), value: str(x.value) }] : [];
+  });
+}
+
+/** A waiting list sent with its signed application form — Member services opens it (`signed_form`). */
+export function hasSignedForm(r: Pick<MemberRequest, "kind" | "detail">): boolean {
+  return r.kind === "waiting" && !!str(r.detail.signedFormName) && /^[0-9a-f]{64}$/.test(str(r.detail.signedFormHash));
 }
 
 /** What HR does next, as the section under the facts names it. */
@@ -197,8 +214,13 @@ export const ACCEPT_NOTE = "Accepted onto the waiting list.";
  * by Ryan Tan on 13 Oct 2026", "Replaced automatically" by the System,
  * "Taken off the schedule".
  */
-export function requestHistory(facts: RequestFacts | undefined, kind?: string) {
+export function requestHistory(facts: RequestFacts | undefined, kind?: string, detail?: Record<string, unknown>) {
   const steps = historyOf(facts?.events ?? []);
+  if (kind === "waiting" && detail && str(detail.signedFormName)) {
+    // The handoff's sending step says what came with it: "Signed form attached: …".
+    const sent = steps.map(e => e.to === "submitted" && !e.note).lastIndexOf(true);
+    if (sent >= 0) steps[sent] = { ...steps[sent], note: `Signed form attached: ${str(detail.signedFormName)}` };
+  }
   if (kind !== "replacement") return steps;
   const current = steps.map(e => e.to).lastIndexOf("scheduled");
   return steps.map((e, i) => {

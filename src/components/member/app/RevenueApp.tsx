@@ -29,6 +29,7 @@ import { arenaKey, boardModel, hubModel, recordModel, type ArenaSub } from "./ar
 import { useArenaData } from "./arena/useArenaData";
 import { useMonthArena } from "./arena/useMonthArena";
 import { ask, createLiveSource, demoSource, settleRead, type RevenueSource, type TrackRead } from "./source";
+import type { MemberWaitingForm } from "@/lib/member/server";
 import { useKeyedRead } from "./useKeyedRead";
 import { BottomNav, DeskAside, DeskHeader, MobileHeader, ViewingAsBar, type Me, type ModuleId } from "./shell/Chrome";
 import PullRefresh from "./shell/PullRefresh";
@@ -837,6 +838,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const ratesRead = useKeyedRead<ClaimRates>("rates", !fxp && route.screen === "account" && route.pf === "requests" && !(principal && !viewed) && memoryReady, gen,
     () => source.claimRates(), track, () => source.peek?.<ClaimRates>(ask.claimRates()));
   const claimRates = ratesRead.value;
+  // The waiting-list form HR set (2026-10-10): its own questions, the signed form it asks for.
+  const waitFormRead = useKeyedRead<MemberWaitingForm>("waitForm", !fxp && route.screen === "account" && route.pf === "requests" && !(principal && !viewed) && memoryReady, gen,
+    () => (source.waitingForm ? source.waitingForm() : Promise.resolve({ ok: false as const, error: "Preview data only." })), track,
+    () => source.peek?.<MemberWaitingForm>(ask.waitingForm()));
+  const waitingForm = waitFormRead.value;
   const formOptions: FormOptions = useMemo(() => {
     if (fxp) return fxp.form;
     return {
@@ -847,8 +853,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       departments: data.departments ?? [],
       departmentId: membership?.id ?? "",
       waitingList: waitingChoices(myRequests),
+      waitingForm: waitingForm ?? null,
     };
-  }, [fxp, membership, arena, arenaNow, today, claimRates, team, data.departments, myRequests]);
+  }, [fxp, membership, arena, arenaNow, today, claimRates, team, data.departments, myRequests, waitingForm]);
 
   // ── pull to refresh: the end of it ──
   // Every read above has started for this pull by now (effects run in order), so everybody's snapshot — the slowest
@@ -1152,7 +1159,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
             <>
               <RequestSheet open={reqPick !== null} vm={reqDetail} busy={reqBusy} error={reqError} onCancel={() => void cancelRequest()} onUpdate={updateRequest} onClose={() => setReqPick(null)} />
               <RequestForm kind={reqForm} options={formOptions} revising={revising} readOnly={readOnlyView} onSubmit={submitRequest}
-                onClose={() => { setReqForm(null); setRevising(null); }} />
+                formLink={fxp ? undefined : source.waitingFormLink} onClose={() => { setReqForm(null); setRevising(null); }} />
             </>
           )}
           {route.pf === "memos" && <MemoSheet open={memoPick !== null} memo={memoPickVM} busy={memoBusy} readOnly={readOnlyView} error={memoError} onAck={() => void ackMemo()} onClose={() => setMemoPick(null)} />}
