@@ -382,7 +382,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const settledPeriod = settled?.period ?? null;
   const settledArena = useMonthArena({ source, membershipId, context, readable, month: settledPeriod, mark: markViewed, gen, track }).snapshot;
 
-  const memos = useMemo(() => data.memos.filter(m => !m.departments.length || m.departments.includes(membership?.name ?? "")), [data.memos, membership?.name]);
+  // A memo to a sub-department shows on its page; one addressed to people (Documentation, 2026-10-11) is the member's own —
+  // the Principal sees it only while viewing one of its recipients.
+  const memos = useMemo(() => data.memos.filter(m => (m.departments.length ? m.departments.includes(membership?.name ?? "")
+    : !principal || (!!viewed && (m.recipients ?? []).includes(viewed.id)))), [data.memos, membership?.name, principal, viewed]);
   const requests = data.requests;
 
   // ── the bell ──
