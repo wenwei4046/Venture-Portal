@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  attachable, availabilityBars, bookedFacts, bookingPreview, busyAt, calBlocks, dayChip, freeLine, fullDay, guestDataFromRow, guestDays, guestUrl, isGuestCode,
+  attachable, availabilityBars, bookedFacts, bookingPreview, busyAt, calBlocks, dayChip, freeLine, fullDay, guestDataFromRow, guestDays, guestRefusal, guestUrl, isGuestCode, SLOT_TAKEN,
   hireAnswers, hireFormFromRows, hireGroups, hireMissing, hirePlaceholder, hirePreview, hireValue, isChips, spansRow,
   longDay, missingLine, paxNote, pickSlot, selectionLine, shortDay, shortRoomName, takenDepartment, takenFacts, takenFromRows,
   type GuestTaken,
@@ -195,5 +195,37 @@ describe('request manpower', () => {
     expect(attachable('JD.PDF', 1000)).toEqual({ ext: 'pdf' })
     expect(attachable('jd.exe', 1000)).toEqual({ reason: 'Attach a PDF, a Word file or a photo.' })
     expect(attachable('jd.pdf', 11 * 1024 * 1024)).toEqual({ reason: 'Attach a file under 10 MB.' })
+  })
+})
+
+// The security review's N3 (2026-10-11): a stranger reads only the refusals written for them.
+describe('what a guest reads of a failed call', () => {
+  const FALLBACK = 'The room could not be booked. Please try again.'
+
+  it('passes the guest functions’ own refusals on, word for word', () => {
+    expect(guestRefusal({ code: 'P0001', message: 'Pick a day in the next 14 days.' }, FALLBACK)).toBe('Pick a day in the next 14 days.')
+    expect(guestRefusal({ code: 'P0001', message: ' Too many requests from the guest link just now. Try again later. ' }, FALLBACK))
+      .toBe('Too many requests from the guest link just now. Try again later.')
+    expect(guestRefusal({ code: '42501', message: 'This link is closed.' }, FALLBACK)).toBe('This link is closed.')
+    expect(guestRefusal({ code: '22023', message: 'Say which company is asking' }, FALLBACK)).toBe('Say which company is asking')
+  })
+
+  it('says a clash as the page does', () => {
+    expect(guestRefusal({ code: '23P01', message: 'conflicting key value violates exclusion constraint "meeting_room_bookings_no_overlap"' }, FALLBACK))
+      .toBe(SLOT_TAKEN)
+  })
+
+  it('keeps everything else to the fallback sentence', () => {
+    for (const error of [
+      { code: '22P02', message: 'invalid input syntax for type uuid: "x"' },
+      { code: '23514', message: 'new row for relation "meeting_room_bookings" violates check constraint "meeting_room_bookings_half_hours"' },
+      { code: '42883', message: 'function public.guest_link_book(text) does not exist' },
+      { code: 'PGRST202', message: 'Could not find the function public.guest_link_book in the schema cache' },
+      { code: '42501', message: 'permission denied for function guest_link_book' },
+      { code: '', message: 'TypeError: fetch failed' },
+      { code: 'P0001', message: '   ' },
+      { message: 'no code at all' },
+    ]) expect(guestRefusal(error, FALLBACK)).toBe(FALLBACK)
+    expect(guestRefusal(null, FALLBACK)).toBe(FALLBACK)
   })
 })

@@ -9,6 +9,10 @@
 // booking made through the link, giving a name for the trail; HQ's meetings are
 // never theirs to touch; the subsidiaries are the link's own list, seeded from
 // Finance's companies; the admin reads and changes all of it with its cells.
+// Then Request manpower (20261011092000) and the hardening after the security
+// review (20261011120000): Request manpower starts off, an upload takes one
+// name only (guest/<code>/<uuid>.<ext>), and the link takes at most 40 files,
+// 20 requests, 40 bookings or changes and 40 cancellations an hour.
 // No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
@@ -76,21 +80,27 @@ try {
       RETURNS text LANGUAGE sql AS $$ SELECT p_table $$;
     -- Supabase Storage's objects, and its folder helper (all but the file's own name).
     CREATE SCHEMA storage;
-    CREATE TABLE storage.objects(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bucket_id text NOT NULL, name text NOT NULL);
+    CREATE TABLE storage.objects(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bucket_id text NOT NULL, name text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now());
     CREATE FUNCTION storage.foldername(name text) RETURNS text[] LANGUAGE sql IMMUTABLE AS
       $$ SELECT (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
     ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
     GRANT USAGE ON SCHEMA storage TO anon, authenticated;
     GRANT INSERT ON storage.objects TO anon, authenticated;
-    -- The Hiring module's guest door (mig 20261011080000), as it answers: the form, and a request filed.
+    -- The Hiring module's guest door (mig 20261011080000), as it answers: the form, and a request filed
+    -- (into hiring_requests, as source guest, which is what the hourly cap counts).
     CREATE TABLE hire_calls(company text, department text, name text, phone text, answers jsonb, path text, file text);
+    CREATE TABLE public.hiring_requests(id text PRIMARY KEY, source text NOT NULL, submitted_at timestamptz NOT NULL DEFAULT now());
     CREATE FUNCTION public.hiring_guest_form() RETURNS jsonb LANGUAGE sql STABLE AS
       $$ SELECT '[{"id":"position","label":"Position","type":"text","options":"","required":true,"core":true}]'::jsonb $$;
     CREATE FUNCTION public.hiring_file_guest_request(p_company text, p_department text, p_name text, p_phone text, p_answers jsonb,
       p_attachment_path text DEFAULT NULL, p_attachment_name text DEFAULT NULL) RETURNS text LANGUAGE plpgsql AS $$
+    DECLARE v_id text;
     BEGIN
       INSERT INTO hire_calls VALUES (p_company, p_department, p_name, p_phone, p_answers, p_attachment_path, p_attachment_name);
-      RETURN 'HR-' || (300 + (SELECT count(*) FROM hire_calls))::text;
+      v_id := 'HR-' || (300 + (SELECT count(*) FROM hire_calls))::text;
+      INSERT INTO public.hiring_requests(id, source) VALUES (v_id, 'guest');
+      RETURN v_id;
     END $$;
     REVOKE ALL ON FUNCTION public.hiring_guest_form() FROM PUBLIC, anon, authenticated;
     REVOKE ALL ON FUNCTION public.hiring_file_guest_request(text, text, text, text, jsonb, text, text) FROM PUBLIC, anon, authenticated;
@@ -241,6 +251,33 @@ try {
   const hirePage = (await q(`SELECT public.guest_link_page($1) AS r`, [fresh]))[0].r
   check([hirePage.hiring, hirePage.hireForm.map(f => f.id)], [true, ['position']], 'the part opens with Hiring › Form settings’ fields')
   const HIRE = `SELECT public.guest_link_hire($1, $2, $3, $4::jsonb, $5, $6) AS r`
+
+  // ── The hardening (mig 20261011120000): Request manpower starts off ──
+  await db.exec('RESET ROLE')
+  const HARDENING = (await readFile(new URL('20261011120000_guest_link_hardening.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(HARDENING)
+  check(await one(`SELECT hiring FROM guest_link`), false, 'the one row: Request manpower off')
+  check(await one(`SELECT column_default FROM information_schema.columns WHERE table_name = 'guest_link' AND column_name = 'hiring'`), 'false',
+    'and off by default — turning the link on opens room booking only')
+  const bodies = async () => q(`SELECT proname, md5(prosrc) AS h FROM pg_proc WHERE proname IN ('guest_link_may_upload', 'guest_link_hire', 'guest_link_book', 'guest_link_cancel') ORDER BY proname`)
+  const swapped = await bodies()
+  await db.exec(HARDENING)
+  check(await bodies(), swapped, 'run twice, each statement is swapped once')
+  check(await one(`SELECT roles::text FROM pg_policies WHERE schemaname = 'storage' AND policyname = 'guest_link_uploads'`), '{anon,authenticated}',
+    'the upload policy is still the publishable key’s (and a session’s)')
+  check(await Promise.all(['public.guest_link_page(text)', 'public.guest_link_day(text, date)',
+    'public.guest_link_book(text, uuid, uuid, date, integer, integer, text, uuid, text, text, integer, text)',
+    'public.guest_link_cancel(text, uuid, text)', 'public.guest_link_hire(text, uuid, text, jsonb, text, text)', 'public.guest_link_may_upload(text)'].map(anonMay)),
+    [true, true, true, true, true, true], 'the six guest doors keep their grants')
+  await asAnon()
+  check((await q(`SELECT public.guest_link_page($1) AS r`, [fresh]))[0].r.hiring, false, 'the page offers no request')
+  check(await one(`SELECT public.guest_link_may_upload($1)`, [fresh]), false, 'takes no file')
+  await reject(HIRE, [fresh, HK, 'Wong', '{}', null, null], /This link is closed/, 'and files nothing')
+  await as(ADMIN, ['guest_link.edit'])
+  check((await q(`SELECT public.guest_link_set(NULL, NULL, true, NULL) AS r`))[0].r.hiring, true, 'HR turns it on with its own switch')
+  await asAnon()
+  check((await q(`SELECT public.guest_link_page($1) AS r`, [fresh]))[0].r.hiring, true, 'and the part opens')
+
   await reject(HIRE, [fresh, null, ' ', '{}', null, null], /Fill in Company, Your name\./, 'who is asking, in the form’s words')
   const sent = (await q(HIRE, [fresh, HK, 'Wong Mei Yee', '{"position":"Driver","headcount":"2"}', null, null]))[0].r
   check(sent, { id: 'HR-301', position: 'Driver' }, 'filed through the Hiring module’s guest door')
@@ -259,6 +296,81 @@ try {
   await reject(HIRE, [fresh, HK, 'Wong', '{}', `guest/${fresh}/11111111-4c1d-4f3a-9a77-2f1d0c3b4e5a.pdf`, 'jd.pdf'], /Attach the file again/, 'that are there')
   const withFile = (await q(HIRE, [fresh, HK, 'Wong', '{}', FILE, 'JD Driver.pdf']))[0].r
   check(withFile, { id: 'HR-302', position: 'the role' }, 'a request with its file')
+
+  // One name only: guest/<the code>/<uuid>.<ext>, as lib/guest/upload.ts writes it (review M1).
+  const PUT = `INSERT INTO storage.objects(bucket_id, name) VALUES ('hiring-files', $1)`
+  for (const [name, what] of [
+    [`guest/${fresh}/jd.pdf`, 'a name of the guest’s own'],
+    [`guest/${fresh}/0b5f6a1e-4c1d-4f3a-9a77-2f1d0c3b4e5a.exe`, 'a kind the bucket does not keep'],
+    [`guest/${fresh}/0b5f6a1e-4c1d-4f3a-9a77-2f1d0c3b4e5a.pdf.exe`, 'a kind hidden behind one it keeps'],
+    [`guest/${fresh}/0B5F6A1E-4C1D-4F3A-9A77-2F1D0C3B4E5A.PDF`, 'capitals the browser never writes'],
+    [`guest/${fresh}/x/0b5f6a1e-4c1d-4f3a-9a77-2f1d0c3b4e5a.pdf`, 'a folder deeper'],
+    [`guest/hv-WRONGCOD/0b5f6a1e-4c1d-4f3a-9a77-2f1d0c3b4e5a.pdf`, 'a code that is not the link’s'],
+  ]) await reject(PUT, [name], /row-level security/, `refused: ${what}`)
+  await q(PUT, [`guest/${fresh}/7c9e6679-7425-40de-944b-e07fc1f90ae7.jpeg`])
+  await q(PUT, [`guest/${fresh}/7c9e6679-7425-40de-944b-e07fc1f90ae8.docx`])
+  checks++
+
+  // At most 40 files an hour, whoever sends them.
+  await db.exec('RESET ROLE')
+  const files = Number(await one(`SELECT count(*) FROM storage.objects WHERE name LIKE 'guest/%' AND created_at > now() - interval '1 hour'`))
+  check(files, 3, 'three files this hour so far')
+  await q(`INSERT INTO storage.objects(bucket_id, name) SELECT 'hiring-files', 'guest/' || $1 || '/' || gen_random_uuid() || '.pdf' FROM generate_series(1, $2)`,
+    [fresh, 40 - files])
+  await asAnon()
+  check(await one(`SELECT public.guest_link_may_upload($1)`, [fresh]), false, 'forty this hour: the upload question says no')
+  await reject(PUT, [`guest/${fresh}/33333333-4c1d-4f3a-9a77-2f1d0c3b4e5a.pdf`], /row-level security/, 'and the 41st file is refused')
+  await db.exec('RESET ROLE')
+  await q(`UPDATE storage.objects SET created_at = now() - interval '61 minutes' WHERE name LIKE 'guest/%'`)
+  await asAnon()
+  check(await one(`SELECT public.guest_link_may_upload($1)`, [fresh]), true, 'an hour later it says yes again')
+  await q(PUT, [`guest/${fresh}/33333333-4c1d-4f3a-9a77-2f1d0c3b4e5a.pdf`])
+  checks++
+
+  // At most 20 requests an hour.
+  await db.exec('RESET ROLE')
+  const filed = Number(await one(`SELECT count(*) FROM hiring_requests WHERE source = 'guest' AND submitted_at > now() - interval '1 hour'`))
+  check(filed, 2, 'two requests this hour so far')
+  await q(`INSERT INTO hiring_requests(id, source) SELECT 'HR-9' || lpad(n::text, 2, '0'), 'guest' FROM generate_series(1, $1) n`, [20 - filed])
+  await asAnon()
+  await reject(HIRE, [fresh, HK, 'Wong', '{"position":"Driver"}', null, null], /Too many requests from the guest link just now\. Try again later\./,
+    'twenty this hour: the 21st waits, in the page’s words')
+  await db.exec('RESET ROLE')
+  await q(`UPDATE hiring_requests SET submitted_at = now() - interval '61 minutes'`)
+  await asAnon()
+  check((await q(HIRE, [fresh, HK, 'Wong', '{"position":"Driver"}', null, null]))[0].r, { id: 'HR-303', position: 'Driver' }, 'an hour later it goes through')
+
+  // At most 40 bookings or changes, and 40 cancellations, an hour (booking was switched off above).
+  await as(ADMIN, ['guest_link.edit'])
+  await q(`SELECT public.guest_link_set(NULL, true, NULL, NULL)`)
+  await db.exec('RESET ROLE')
+  const wrote = Number(await one(`SELECT count(*) FROM meeting_room_booking_events
+                                   WHERE what IN ('Booked via guest link', 'Edited via guest link') AND at > now() - interval '1 hour'`))
+  check(wrote, 3, 'two bookings and a change this hour so far')
+  await q(`INSERT INTO meeting_room_booking_events(booking_id, what, actor_name) SELECT $1, 'Booked via guest link', 'Script' FROM generate_series(1, $2)`,
+    [g2.id, 40 - wrote])
+  await asAnon()
+  await reject(BOOK, [fresh, null, r1.id, D1, 900, 960, 'One more', HK, 'Warehouse', 'Wong', 2, null], /Too many requests from the guest link just now/,
+    'forty this hour: the 41st booking waits')
+  await reject(BOOK, [fresh, g2.id, r1.id, D13, 1140, 1200, 'Late call', CON, '', 'Ali', 2, 'Ali'], /Too many requests from the guest link just now/,
+    'and so does a change — it writes as much as a booking')
+  await reject(BOOK, [code, null, r1.id, D1, 900, 960, 'One more', HK, 'Warehouse', 'Wong', 2, null], /This link is closed/, 'a closed link still says closed first')
+  await db.exec('RESET ROLE')
+  await q(`UPDATE meeting_room_booking_events SET at = now() - interval '61 minutes'`)
+  await asAnon()
+  const later = await gbook(fresh, { room: r1.id, day: D1, from: 900, to: 960, title: 'One more', sub: HK, dept: 'Warehouse', name: 'Wong', pax: 2 })
+  check(/^BK-G\d+$/.test(later.ref), true, 'an hour later it books again')
+  await db.exec('RESET ROLE')
+  await q(`INSERT INTO meeting_room_booking_events(booking_id, what, actor_name) SELECT $1, 'Cancelled via guest link', 'Script' FROM generate_series(1, 40)`, [g2.id])
+  await asAnon()
+  await reject(`SELECT public.guest_link_cancel($1, $2, 'Siti')`, [fresh, later.id], /Too many requests from the guest link just now/,
+    'forty cancellations this hour: the 41st waits')
+  check((await q(`SELECT public.guest_link_day($1, $2::date) AS r`, [fresh, D1]))[0].r.some(b => b.id === later.id), true, 'and the meeting stays')
+  await db.exec('RESET ROLE')
+  await q(`UPDATE meeting_room_booking_events SET at = now() - interval '61 minutes' WHERE what = 'Cancelled via guest link'`)
+  await asAnon()
+  check((await q(`SELECT public.guest_link_cancel($1, $2, 'Siti') AS r`, [fresh, later.id]))[0].r.title, 'One more', 'an hour later it cancels again')
+
   await as(ADMIN, ['guest_link.edit'])
   await q(`SELECT public.guest_link_set(NULL, NULL, false, NULL)`)
   await asAnon()
