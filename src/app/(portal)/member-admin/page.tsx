@@ -1,8 +1,18 @@
 import { requireAuth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { adminMemberAction } from "@/lib/member/server";
-import MemberAdmin from "@/components/member/MemberAdmin";
+import { adminMemberAction, type AdminMemberData } from "@/lib/member/server";
+import { HvPage, PageHead } from "@/components/hrv/kit";
+import MemberServicesView from "./_components/MemberServicesView";
+import { loadClaimRates, loadMemoReads, loadRequestFacts } from "./_lib/member-services";
 export const dynamic = "force-dynamic";
+
+/**
+ * People › Member services (2026-10-10, the HR revamp): the member back
+ * office's snapshot plus, with it, what its tabs read — each request's names
+ * and history, each memo's readers, the claim rates. Each read asks its own
+ * gate; the products the snapshot carries for the Principal (Product options,
+ * gone) are not sent to the browser.
+ */
 export default async function MemberAdminPage({
   searchParams,
 }: {
@@ -13,28 +23,30 @@ export default async function MemberAdminPage({
   const { request: requestId } = await searchParams;
   // Whoever manages member requests or memos — the Principal holds both
   // keys, so asking the kind as well said nothing (Q7, 2026-10-09).
-  if (
-    !user.permissions.some((p) =>
-      ["member_requests_manage", "member_memos_manage"].includes(p),
-    )
-  )
-    redirect("/dashboard");
-  const result = await adminMemberAction({ action: "list" });
+  const requests = user.permissions.includes("member_requests_manage");
+  const memos = user.permissions.includes("member_memos_manage");
+  if (!requests && !memos) redirect("/dashboard");
+  const [result, facts, memoReads, claimRates] = await Promise.all([
+    adminMemberAction({ action: "list" }),
+    requests ? loadRequestFacts() : Promise.resolve(null),
+    memos ? loadMemoReads() : Promise.resolve(null),
+    requests ? loadClaimRates() : Promise.resolve(null),
+  ]);
   if (!result.ok)
     return (
-      <div>
-        <div className="page-head">
-          <div>
-            <div className="page-eyebrow">
-              <em>I.</em> PEOPLE · MEMBER SERVICES
-            </div>
-            <h1 className="page-title">Member services</h1>
-          </div>
-        </div>
+      <HvPage>
+        <PageHead eyebrow="People · Member services" title="Member services" />
         <div className="sheet-danger">{result.error}</div>
-      </div>
+      </HvPage>
     );
-  // `portal`: this page sits on the portal's white sheet (lib/sheet-routes.ts),
-  // so it wears the portal's page head and tabs rather than the member app's.
-  return <MemberAdmin initialData={result.data} portal initialRequestId={requestId ?? null} />;
+  const data = { ...(result.data as AdminMemberData), products: [] };
+  return (
+    <MemberServicesView
+      data={data}
+      facts={facts}
+      memoReads={memoReads}
+      claimRates={claimRates}
+      initialRequestId={requestId && data.requests.some((r) => r.id === requestId) ? requestId : null}
+    />
+  );
 }

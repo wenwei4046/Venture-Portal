@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -264,6 +264,26 @@ disagree, the file wins; every value is the prototype's.**
   `160 90 30`; a missing required one red-rimmed with "Required"), and a
   footer rule: the refusal in red, *Back to waiting list*, orange *Add to
   company*.
+- **Member services** (v3.23, 2026-10-10; `member-admin/_components/`): the
+  kit head, compact tabs pulled 4px up. Request reviews = a `360px 1fr` grid:
+  a 12px-radius list card (15px title, walnut-when-picked filter pills, rows
+  10px 12px on a 9px radius — peach with an orange rim when open — title 13px
+  / 500, "Kind · RQ-…" 11px, a 10.5px chip) and the request card (20px 22px;
+  18px title, an 11.5px mono reference, the chip 3px 10px; facts on a 200px
+  label column; a hairline above the step — 14px / 500, a 12.5px caption, the
+  82px note, 8px 14px buttons with a frame rim, the primary orange — and the
+  AUDIT HISTORY rail). Brand weeks: a 15px title with its line, a sub-department
+  chip and a ‹ Oct 2026 › stepper; the grid `1.4fr` + a column per Friday (a
+  "closed" mark), each week a 999px chip in the brand's colours (Akemi `189 74
+  25` on `255 240 228`, Dunlopillo `78 101 116` on `230 237 241`, Zanotti `125
+  91 32` on `246 237 213`, Ergotex `56 117 87` on `232 243 237`), dashed on
+  white while nobody picked it, peach with an orange rim when changed, and a
+  peach bar with Discard · Save. Claim rates: one 12px card — a 17px / 600
+  title with its Save (`242 241 238` "Saved" until something differs), the
+  `2fr 3fr` Outstation / Airbnb boxes, the regions grid `1.6fr 150px 140px
+  150px 100px` (zebra rows, a 14px box for Flown to) and the venues grid.
+  Publish memo: two cards — Title, Body, ☑ audience chips (peach when on),
+  orange Publish; Published rows with a mono date and "· read by N".
 - **Cross-check** with a measuring script that finds each element by its text
   on both and diffs computed font / colour / size / padding / border / radius
   / background (`.design/revenue-app/tools/measure-pl.mjs` is the pattern).
