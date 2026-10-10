@@ -32,7 +32,22 @@ const PATCHES = {
   SalesContacts: [[/(<a href=\{p\.tel\}[\s\S]*?<\/a>)/, "{!!p.hasTel && ($1)}"]],
   SalesChat: [[/(<span onClick=\{v\.simReply\}[^>]*>Demo: customer replies<\/span>)/, "{!!v.simReplyShow && ($1)}"],
     // The Principal / Director assign rather than move (vm/chat.ts assigner).
-    [">Move {v.cl.name} to</h2>", ">{v.hm.moveTitle}</h2>"]],
+    [">Move {v.cl.name} to</h2>", ">{v.hm.moveTitle}</h2>"],
+    // ── rev 1010 (docs/design/rev1010, §1 Chat) ──
+    // 1.5 ⋮ closes on a tap anywhere outside it: the toggle and the menu are marked for the document listener
+    // (shared/outside.ts), which replaces the fixed backdrop that sat under the chat list.
+    ["<span onClick={v.hm.toggle} title=\"More\"", "<span data-hm-toggle=\"1\" onClick={v.hm.toggle} title=\"More\""],
+    [/<div onClick=\{v\.hm\.close\} style=\{\{ position: "fixed", inset: "0", zIndex: "6" \}\}>\s*<\/div>\s*/, ""],
+    ["<div style={{ position: \"absolute\", top: \"52px\", right: \"0\", zIndex: \"7\", width: \"264px\"", "<div data-hm-menu=\"1\" style={{ position: \"absolute\", top: \"52px\", right: \"0\", zIndex: \"7\", width: \"264px\""],
+    // 1.4 No "· reply window open Xh Ym" under the name (the Cold-lead banner stays).
+    [/<p style=\{\{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "6px", margin: "0", fontSize: "12px", color: "rgb\(128 107 96\)" \}\}>\s*<span style=\{\{ color: "rgb\(56 117 87\)" \}\}>\{v\.cl\.window\}<\/span>\s*<\/p>\s*/, ""],
+    // 1.1 The chat's wallpaper (WhatsApp-like), bleeding to the edges; the day pill white with a shadow.
+    ["<div data-chat-list=\"1\" style={{ flex: \"1\", minHeight: \"0\", overflowY: \"auto\", scrollbarWidth: \"none\", display: \"flex\", flexDirection: \"column\", gap: \"10px\", padding: \"6px 0\" }}>",
+     "<div data-chat-list=\"1\" style={{ flex: \"1\", minHeight: \"0\", overflowY: \"auto\", scrollbarWidth: \"none\", display: \"flex\", flexDirection: \"column\", gap: \"10px\", margin: \"0 -20px\", padding: \"10px 20px\", backgroundColor: v.wallBg, backgroundImage: v.wallImg, backgroundSize: v.wallSize }}>"],
+    ["padding: \"5px 12px\", borderRadius: \"9px\", background: \"#F5EBE3\", color: \"#4E2F20\", fontSize: \"12px\", fontWeight: \"600\" }}>{m.sep}</span>",
+     "padding: \"5px 12px\", borderRadius: \"9px\", background: \"#FFFFFF\", boxShadow: \"0 1px 1px rgba(63,43,34,.10)\", color: \"#4E2F20\", fontSize: \"12px\", fontWeight: \"600\" }}>{m.sep}</span>"],
+    // 1.2 Every bubble lifts a little off the wallpaper.
+    ["boxSizing: \"border-box\", borderRadius: m.radius, background: m.bg,", "boxSizing: \"border-box\", borderRadius: m.radius, boxShadow: \"0 1px 1px rgba(63,43,34,.10)\", background: m.bg,"]],
   // Switch to: a whole department's list scrolls inside the sheet instead of running off the screen (user 2026-10-09).
   SalesShellBanners: [['<div onClick={v.stopTeam} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 26px", display: "flex", flexDirection: "column", gap: "4px" }}>',
     '<div onClick={v.stopTeam} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 26px", display: "flex", flexDirection: "column", gap: "4px", maxHeight: "88%", overflowY: "auto", scrollbarWidth: "none", boxSizing: "border-box" }}>'],

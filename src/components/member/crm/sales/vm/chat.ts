@@ -15,8 +15,11 @@ import { BORDER, gb, CHANNEL, day0, DAY, daySep, dayLabel, firstName, ini, msgTi
 import { customerFormVM, infoRows } from "./customer";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { oneAtATime } from "../../shared/once";
+import { CHAT_WALL } from "../wall";
 
 const RUST = "#BD4A19", INK = "#3F2B22", SUB = "rgb(128 107 96)", BD = "#EBDDD2";
+/** Own bubbles (rev 1010 §1.2; was #FFF0E4). */
+const MINE = "#FCD6B8";
 const parts = (text: string) => String(text).split(/(\*[^*\n]+\*)/).filter(Boolean).map(t => (/^\*[^*]+\*$/.test(t) ? { t: t.slice(1, -1), w: 650 } : { t, w: "inherit" as const }));
 const plain = (text: string) => text.replace(/\*([^*\n]+)\*/g, "$1");
 
@@ -96,7 +99,7 @@ export function chatVM(ctx: SalesCtx) {
     const at = it.kind === "msg" ? it.m.at : it.at, prevAt = k ? (arr[k - 1].kind === "msg" ? (arr[k - 1] as { m: CrmChatMessage }).m.at : (arr[k - 1] as { at: string }).at) : null;
     const sep = !prevAt || new Date(at).toDateString() !== new Date(prevAt).toDateString() ? daySep(at, now) : "";
     if (it.kind === "sys") return {
-      sep, plain: true, align: "center", max: "100%", rowDir: "row" as const, rxGap: "0", radius: "12px", bg: "transparent", borderStyle: "dashed", border: BORDER, textAlign: "center" as const, fg: SUB,
+      sep, plain: true, align: "center", max: "100%", rowDir: "row" as const, rxGap: "0", radius: "12px", bg: "rgba(255,255,255,.8)", borderStyle: "dashed", border: BORDER, textAlign: "center" as const, fg: SUB,
       quote: null, ev: null, pDisp: "block", size: "12px", textStyle: "normal", textColor: "inherit", parts: parts(it.text), timeJustify: "center", timeColor: SUB, by: "", at: msgTime(at),
       tick: false, tickColor: "#A8968B", tickLabel: "", showTools: false, openMenu: undefined, openReact: undefined, reaction: "", rxLeft: "auto", rxRight: "auto", rbLeft: "auto", rbRight: "auto",
       enter: undefined, leave: undefined,
@@ -110,7 +113,7 @@ export function chatVM(ctx: SalesCtx) {
     const by = mine && m.by && m.by !== c.assignedTo && !m.auto ? nameOf(m.by) : m.auto ? "Auto-reply" : "";
     return {
       sep, plain: true, align: mine ? "flex-end" : "flex-start", max: "80%", rowDir: mine ? ("row-reverse" as const) : ("row" as const), rxGap: m.myReaction ? "14px" : "0",
-      radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px", bg: mine ? "#FFF0E4" : "#fff", borderStyle: "solid", border: mine ? "#FFF0E4" : BORDER,
+      radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px", bg: mine ? MINE : "#fff", borderStyle: "solid", border: mine ? MINE : "#fff",
       textAlign: "left" as const, fg: INK, quote: q ? { who: q.from === "me" ? "You" : c.name, text: plain(q.text) } : null,
       ev: card && cd ? {
         kind: card.kind, title: "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()), mon: gb(cd, { month: "short" }),
@@ -120,7 +123,7 @@ export function chatVM(ctx: SalesCtx) {
         go: () => set(u => ({ ...u, chat: null, tab: "calendar", calView: "month", calSel: day0(cd), calYM: [cd.getFullYear(), cd.getMonth()], hist: [...u.hist, u.tab].slice(-20) })),
       } : null,
       pDisp: card ? "none" : "block", size: "14px", textStyle: "normal", textColor: "inherit", parts: parts(m.media && !m.text ? (m.media.kind === "image" ? "📷 Photo" : "📄 " + (m.media.name ?? "Document")) : m.text),
-      timeJustify: mine ? "flex-end" : "flex-start", timeColor: mine ? "#806B60" : SUB, by, at: msgTime(m.at),
+      timeJustify: "flex-end", timeColor: mine ? "#806B60" : SUB, by, at: msgTime(m.at),
       tick: mine, tickColor: read ? "#2F8FD8" : "#A8968B", tickLabel: read ? "Read" : m.status === "failed" ? "Not delivered" : "Delivered",
       showTools: ui.hover === key, enter: () => patch({ hover: key }), leave: () => set(u => (u.hover === key ? { ...u, hover: null } : u)),
       openMenu: () => patch({ menu: { msgId: key, full: true, from: m.from, text: m.text } }),
@@ -168,9 +171,10 @@ export function chatVM(ctx: SalesCtx) {
     items: ([
       ...(assigner ? [["Assign to", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, assign: true, sel: null }), "Give this customer to anyone", "#E4EDF8", "#2F6FB5"]] : []),
       ["Share", "M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v12m-8-4 4-4 4 4", () => setHm({ menu: false, share: true, ssel: [] }), "Invite a teammate", "#FFF0E4", "#BD4A19"],
-      ["Move", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, move: true, sel: null }), superior ? `Hand over to ${firstName(superior.name)}` : "Hand over to your Team Lead", "#E4EDF8", "#2F6FB5"],
+      // Move only when there is somebody to hand over to (rev 1010 §1.5): no upline → no Move. Never by title.
+      ...(superior ? [["Move", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, move: true, sel: null }), `Hand over to ${firstName(superior.name)}`, "#E4EDF8", "#2F6FB5"]] : []),
       ["Customer info", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => setHm({ menu: false, info: true }), "", "#E4F1E8", "#387557"],
-      ["Appointment", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => setHm({ menu: false, appt: true }), nextVisit ? "View, change or cancel" : "", "#F3E8EF", "#8E4B6E"],
+      ["Appointment", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => setHm({ menu: false, appt: true }), "", "#F3E8EF", "#8E4B6E"],
     ] as [string, string, () => void, string, string, string][]).map(([label, icon, go, sub, bg, fg]) => ({ label, icon, go, sub, bg, fg })),
     apptOpen: !!hm.appt, apptHas: !!nextVisit, apptNone: !nextVisit,
     apptRoom: nextVisit ? (roomOf(nextVisit.showroomId)?.name ?? "").replace(/ showroom$/i, "") : "",
@@ -350,7 +354,8 @@ export function chatVM(ctx: SalesCtx) {
   };
 
   return {
-    cl: { name: c.name, ad: c.ad, first, ini: ini(c.name), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, window: shut ? "" : windowLeft(c, now) },
+    cl: { name: c.name, ad: c.ad, first, ini: ini(c.name), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon },
+    wallBg: CHAT_WALL.bg, wallImg: CHAT_WALL.img, wallSize: CHAT_WALL.size,
     closeChat: () => set(u => ({ ...u, chat: null, menu: null, book: null, tpl: false, qr: false, att: false, hm: null, reply: null })),
     hm: hmVM, msgs3b, // stop comes with the customer form below
     pinText: pinned ? plain(pinned.text) : "", unpin: () => void act.setPref(c.id, { pinnedMessageId: null }),
@@ -401,7 +406,7 @@ export function chatVM(ctx: SalesCtx) {
       patch({ qrNew: { s: "", m: "" }, qrEditIdx: null, qrPage: "list" });
     } : undefined,
     menuOpen: !!mu, closeMenu: close, menuFull: !!mu?.full, menuAlign: mu?.from === "me" ? "flex-end" : "flex-start",
-    menuMsg: { text: mu ? plain(mu.text) : "", bg: mu?.from === "me" ? "#FFF0E4" : "#fff", border: mu?.from === "me" ? "#FFF0E4" : "#EBDDD2", radius: mu?.from === "me" ? "16px 16px 4px 16px" : "16px 16px 16px 4px" },
+    menuMsg: { text: mu ? plain(mu.text) : "", bg: mu?.from === "me" ? MINE : "#fff", border: mu?.from === "me" ? MINE : "#EBDDD2", radius: mu?.from === "me" ? "16px 16px 4px 16px" : "16px 16px 16px 4px" },
     reactBar: ["👍", "❤️", "😂", "😮", "😢", "🙏"].map(e => ({ e, bg: muMsg?.myReaction === e ? "#F5EBE3" : "transparent",
       pick: (ev: MouseEvent) => { ev.stopPropagation(); if (!mu) return; close(); void act.react(mu.msgId, muMsg?.myReaction === e ? "" : e); } })),
     menuItems,
