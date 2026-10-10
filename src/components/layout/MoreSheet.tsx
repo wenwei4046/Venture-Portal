@@ -14,6 +14,7 @@ import {
   type NavData,
   type NavEntry,
 } from './nav-config'
+import { useNavOwner } from './nav-owner'
 
 // The fifth tab. Everything the four promoted tabs don't cover — for a
 // Principal that is ~45 destinations — rendered as one scrolling sheet
@@ -35,6 +36,8 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII']
 
 export default function MoreSheet({ user, navData, open, onClose }: Props) {
   const pathname = usePathname() ?? ''
+  // The list a page belongs to when its path says another (a receipt, 2026-10-10).
+  const navPath = useNavOwner(pathname)?.href ?? pathname
   const searchParams = useSearchParams()
   const router = useRouter()
   const tabParam = searchParams.get('tab')
@@ -132,7 +135,7 @@ export default function MoreSheet({ user, navData, open, onClose }: Props) {
         key={entry.href}
         href={entry.href}
         label={entry.label}
-        active={itemActive(entry, pathname, tabParam, basisParam)}
+        active={itemActive(entry, navPath, tabParam, basisParam)}
         dimmed={promoted.has(entry.href)}
       />
     )

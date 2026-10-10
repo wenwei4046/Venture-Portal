@@ -5,7 +5,7 @@ import SortableTable, { type SortableColumn } from '@/components/SortableTable'
 import { useRowLinks } from '@/components/row-links'
 import { fromCalendar } from '@/lib/deal-return'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
-import { dueTotals, type DueRow, type DueType } from './due-rows'
+import { DUE_TYPE_LABEL, dueTotals, type DueRow, type DueType } from './due-rows'
 
 // "Due to collect" / "Due to pay" on the sheet (2026-10-10, the user's Claude
 // Design handoff): every deal due this month in one table — a Type chip, what
@@ -14,10 +14,10 @@ import { dueTotals, type DueRow, type DueType } from './due-rows'
 // double-click opens the deal.
 
 const TYPE: Record<DueType, { label: string; tone: string }> = {
-  scheduled: { label: 'principal + interest', tone: 'accent' },
-  min: { label: 'min interest', tone: 'info' },
-  rolled: { label: 'rolled interest', tone: 'alert' },
-  open: { label: 'open-ended', tone: '' },
+  scheduled: { label: DUE_TYPE_LABEL.scheduled, tone: 'accent' },
+  min: { label: DUE_TYPE_LABEL.min, tone: 'info' },
+  rolled: { label: DUE_TYPE_LABEL.rolled, tone: 'alert' },
+  open: { label: DUE_TYPE_LABEL.open, tone: '' },
 }
 
 const NOTE =

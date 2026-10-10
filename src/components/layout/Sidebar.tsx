@@ -5,6 +5,7 @@ import Link, { useLinkStatus } from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { cancelWarmIntent, railEntered, recordVisit, usualPages, warmOnIntent, warmWhenIdle } from '@/lib/nav-warm'
 import type { NavViewer } from './nav-config'
+import { useNavOwner } from './nav-owner'
 import {
   buildNavEntries,
   groupActive,
@@ -27,6 +28,8 @@ interface SidebarProps {
 // is no `mobileOpen` / `onClose` any more.
 export default function Sidebar({ viewer, navData }: SidebarProps) {
   const pathname = usePathname()
+  // The list a page belongs to when its path says another (a receipt, 2026-10-10).
+  const navPath = useNavOwner(pathname)?.href ?? pathname
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
@@ -58,7 +61,7 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
     for (const entry of entries) {
       if (!isGroup(entry)) continue
       const key = groupKey(entry.label, prefix)
-      if (groupActive(entry, pathname, tabParam, basisParam)) {
+      if (groupActive(entry, navPath, tabParam, basisParam)) {
         open[key] = true
         Object.assign(open, openOnPath(entry.children, key))
       }
@@ -154,7 +157,7 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
     const isOpen = !!groupOpen[key]
     // Collapsed, a group wears its active child's highlight — that is the only
     // sign left that the page being read is in there. Open, the child wears it.
-    const lit = groupActive(group, pathname, tabParam, basisParam) && !isOpen
+    const lit = groupActive(group, navPath, tabParam, basisParam) && !isOpen
 
     const chevron = (
       <span className={`text-[10px] transition-transform ${isOpen ? 'rotate-180' : ''}`}>▼</span>
@@ -229,7 +232,7 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
   }
 
   function renderItem(item: NavItem, depth: number) {
-    const active = itemActive(item, pathname, tabParam, basisParam)
+    const active = itemActive(item, navPath, tabParam, basisParam)
     return (
       <Link
         key={item.href}

@@ -24,6 +24,7 @@ import { DealMore } from '@/components/treasury/DealFormShell'
 import { officeStamp } from '@/lib/office-clock'
 import { readPayrollLineAccounts, withLineAccounts } from '@/lib/private-fields'
 import type { ReactNode } from 'react'
+import { NavOwner } from '@/components/layout/nav-owner'
 
 const POOL_LABELS: Record<string, string> = {
   venture_pool: 'Venture Pool',
@@ -359,6 +360,8 @@ export default async function PaymentDetailPage({ params }: Props) {
 
   return (
     <div className={`max-w-[1180px]${en ? ' pay-detail' : ''}`}>
+      {/* …and is Receipt's on the phone's top bar, the tab bar and the sidebar. */}
+      {canReadTreasury && isCredit ? <NavOwner href="/receipts" title="Receipt" /> : null}
       <Link href={backHref} className={`text-sm text-muted hover:text-accent font-sans transition-colors${en ? ' pay-back' : ''}`}>
         ← Back to {backLabel}
       </Link>

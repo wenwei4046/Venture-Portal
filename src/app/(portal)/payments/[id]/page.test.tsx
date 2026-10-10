@@ -12,6 +12,8 @@ vi.mock('./_components/CopyVoucherButton', () => ({ default: () => <div data-tes
 vi.mock('./_components/ReassignGlAccountButton', () => ({ default: () => <div data-testid="reassign-gl" /> }))
 vi.mock('./_components/AttachmentUploader', () => ({ default: (p: { canUpload: boolean; late?: boolean }) => <div data-testid="attachment-uploader" data-can-upload={String(p.canUpload)} data-late={String(!!p.late)} /> }))
 vi.mock('../_components/AmendDateButton', () => ({ default: (p: { id: string; currentDate: string }) => <div data-testid="amend-date">{p.id} {p.currentDate}</div> }))
+// The list a receipt belongs to (2026-10-10): the bars read it on the Finance view.
+vi.mock('@/components/layout/nav-owner', () => ({ NavOwner: (p: { href: string; title: string }) => <div data-testid="nav-owner" data-href={p.href} data-title={p.title} /> }))
 vi.mock('@/components/voucher/AttachmentList', () => ({ default: (p: { canDelete?: boolean; lateAfter?: string | null }) => <div data-testid="attachment-list" data-can-delete={String(!!p.canDelete)} data-late-after={p.lateAfter ?? ''} /> }))
 import PaymentDetailPage from './page'
 
@@ -277,6 +279,9 @@ describe('the voucher page in the handoff’s English', () => {
     expect(cardTitles()).toEqual(['Received from', 'Credited to', 'Attachments', 'Trail'])
     expect(container.textContent).not.toMatch(/[㐀-鿿]/)
     expect(screen.getByRole('link', { name: '← Back to Receipt' })).toHaveAttribute('href', '/receipts')
+    // …and is Receipt's on the phone's top bar, the tab bar and the sidebar.
+    expect(screen.getByTestId('nav-owner')).toHaveAttribute('data-href', '/receipts')
+    expect(screen.getByTestId('nav-owner')).toHaveAttribute('data-title', 'Receipt')
     const side = panel()
     expect(side.querySelector('.deal-side-muted')).toHaveTextContent(/^Receipt$/)
     expect(side).toHaveTextContent('Into bankHong Leong Bank2190-0033-12')
@@ -303,6 +308,7 @@ describe('the voucher page in the handoff’s English', () => {
     database('ordinary_payment')
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
     expect(screen.getByRole('link', { name: '← Back to Payments' })).toHaveAttribute('href', '/payments')
+    expect(screen.queryByTestId('nav-owner')).toBeNull()
   })
 
   it('the payroll cards are English too', async () => {

@@ -3,13 +3,15 @@
 import dayjs from 'dayjs'
 import SortableTable, { type SortableColumn } from '@/components/SortableTable'
 import { formatMoneyBare } from '@/lib/utils'
+import { usePoolSearch } from './PoolSearch'
 
 // The pool ledger (2026-10-09, the user's Claude Design handoff): sortable,
 // searched by description or type, each line's direction a chip — in green,
 // out in the info tone — and its amount signed. 2026-10-10: every column
 // filters (▽; the date and the amount by a range too), the columns resize
 // against their neighbour and reorder in a box that scrolls, and money in
-// reads black (out stays red, in brackets).
+// reads black (out stays red, in brackets). Later that day: every line, and
+// searched from the page's toolbar over the charts (PoolSearch).
 
 export interface PoolLine {
   id: string
@@ -63,6 +65,7 @@ const COLUMNS: SortableColumn<PoolLine>[] = [
 ]
 
 export default function PoolLedgerTable({ lines, canSetDefault = false }: { lines: PoolLine[]; canSetDefault?: boolean }) {
+  const query = usePoolSearch()
   return (
     <div className="fin-queue">
       <SortableTable
@@ -77,6 +80,7 @@ export default function PoolLedgerTable({ lines, canSetDefault = false }: { line
         getRowKey={(l) => l.id}
         searchKeys={['description', 'type']}
         searchPlaceholder="Search description, type…"
+        query={query}
       />
     </div>
   )

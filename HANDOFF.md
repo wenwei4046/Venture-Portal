@@ -1,5 +1,27 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-10 q (SHIPPED) — the leftovers of p done (user: 做完他)
+
+- **Venture Pool**: the ledger lists EVERY line (the latest-50 read is gone; it reuses the
+  all-time read — 353 lines on 2026-10-10), count "n ENTRIES"; the search is the handoff's
+  page toolbar under the cards, over In vs Out (`venture-pool/_components/PoolSearch.tsx`:
+  provider renders `.page-search` + Clear, PoolLedgerTable reads `usePoolSearch()`).
+  **SortableTable `query`** (opt-in): a search typed outside the table narrows the rows by
+  `searchKeys` and the table draws no box of its own; every other table unchanged.
+- **Repayment Schedule Export**: head button → `/repayment-schedule/export?month=YYYY-MM`
+  (xlsx: "Due to collect · <Month>" then "Due to pay", rows as the page's DueTables — short
+  in brackets, "clear", note for pending PV / source of capital — each side closed by Total).
+  The page's data moved verbatim into `repayment-schedule/_lib/schedule-data.ts`
+  `loadRepaymentSchedule(supabase, month)`; page and export both call it. `DUE_TYPE_LABEL`
+  in due-rows.ts is the Type text for the chip and the export.
+- **A receipt is Receipt's**: `components/layout/nav-owner.tsx` — `<NavOwner href title>` on
+  a row's page (useLayoutEffect, Finance view only, keyed by pathname, cleared on unmount);
+  `useNavOwner(pathname)` in TopBar (phone title), BottomTabBar, Sidebar, MoreSheet (active
+  item). payments/[id] renders it for `canReadTreasury && isCredit`. A hard reload still
+  paints the server's "Payments" for a moment before hydration.
+- Still known, not done: netting log "ALL TIME" (no netted date in the data); the three
+  aligned-foot helpers could become one SortableTable feature.
+
 ## CHECKPOINT 2026-10-10 p (SHIPPED) — the user's calls, As at, the leftovers — audit list l is DONE
 
 - **Payments / Receipt filter form removed** (user: 拿掉，照设计档) — VoucherLedger no longer

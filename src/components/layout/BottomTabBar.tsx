@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { canApprove } from '@/lib/roles'
 import { warmRoute } from '@/lib/nav-warm'
 import { moreTabLabel, tabsForRole, type NavViewer, type TabDef } from './nav-config'
+import { useNavOwner } from './nav-owner'
 
 // Mobile navigation (2026-08-31). Replaces the hamburger + off-canvas drawer:
 // the user asked for a bottom tab bar, the shape every phone app uses, so the
@@ -186,6 +187,8 @@ interface Props {
 
 export default function BottomTabBar({ role, viewer, moreOpen, onMoreClick, fin = false }: Props) {
   const pathname = usePathname() ?? ''
+  // The list a page belongs to when its path says another (a receipt, 2026-10-10).
+  const navPath = useNavOwner(pathname)?.href ?? pathname
   const router = useRouter()
   const tabs = tabsForRole(role)
 
@@ -229,7 +232,7 @@ export default function BottomTabBar({ role, viewer, moreOpen, onMoreClick, fin 
     >
       <ul className="flex items-stretch">
         {tabs.map((tab) => {
-          const active = !moreOpen && tabActive(tab, pathname)
+          const active = !moreOpen && tabActive(tab, navPath)
           const showBadge = tab.badge && pending !== null && pending > 0
           return (
             <li key={tab.href} className="flex-1 min-w-0">

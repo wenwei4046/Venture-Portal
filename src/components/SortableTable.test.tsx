@@ -734,3 +734,21 @@ describe('the Finance revamp', () => {
     expect(screen.getByText('Open →')).toBeInTheDocument()
   })
 })
+
+// 2026-10-10 — a search typed outside the table (the handoff's page toolbar on
+// the Venture Pool, over the charts): it narrows the rows by the search keys as
+// the table's own box would, and the table then draws no box of its own.
+describe('a search typed outside the table', () => {
+  it('narrows the rows by the search keys, and the table draws no box', () => {
+    table({ searchKeys: ['company'], searchPlaceholder: 'Search company…', query: 'cont' })
+    expect(screen.queryByPlaceholderText('Search company…')).toBeNull()
+    expect(bodyRows()).toHaveLength(1)
+    expect(bodyRows()[0]).toHaveTextContent('The Cont')
+  })
+
+  it('shows every row while the outside search is empty', () => {
+    table({ searchKeys: ['company'], searchPlaceholder: 'Search company…', query: '' })
+    expect(screen.queryByPlaceholderText('Search company…')).toBeNull()
+    expect(bodyRows()).toHaveLength(2)
+  })
+})

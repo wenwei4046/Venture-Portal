@@ -6987,3 +6987,12 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
 .adm-btn-pri { border: 0; background: #E99A53; font-weight: 600; }
 .adm-btn-pri:hover:not(:disabled) { background: #C9741F; }
 .adm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* The page's search toolbar (2026-10-10, the Finance revamp handoff): a grey
+   box under the cards whose words narrow the table below — the Venture Pool's,
+   over its charts. */
+.page-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; padding: 10px 12px; border: 1px solid rgb(229 228 223); border-radius: 12px; background: rgb(246 246 244); }
+.page-search input { flex: 1 1 200px; min-width: 0; height: 34px; padding: 0 11px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: #fff; color: rgb(var(--ink)); font-size: 12px; outline: none; }
+.page-search input:focus { border-color: #E99A53; }
+.page-search button { height: 34px; padding: 0 12px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: #fff; color: #000; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.page-search button:hover { background: rgb(247 247 245); }

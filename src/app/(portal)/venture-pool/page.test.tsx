@@ -33,10 +33,10 @@ const LINES: Row[] = [
 
 const pick = (row: Row, path: string): unknown => path.split('.').reduce<unknown>((v, k) => (v as Row | undefined)?.[k], row)
 
-function database() {
+function database(lines: Row[] = LINES) {
   mocks.createClient.mockResolvedValue({
     from: (table: string) => {
-      let rows: Row[] = table === 'journal_lines' ? [...LINES] : table === 'bank_accounts' ? [{ gl_account_code: '1010', status: 'active' }] : []
+      let rows: Row[] = table === 'journal_lines' ? [...lines] : table === 'bank_accounts' ? [{ gl_account_code: '1010', status: 'active' }] : []
       const q: Record<string, unknown> = {}
       q.select = () => q
       q.order = () => q
@@ -96,7 +96,7 @@ describe('the Venture Pool on the sheet', () => {
   it('lists the pool ledger, each direction a chip', async () => {
     render(await VenturePoolPage())
     const ledger = section('Pool ledger')
-    expect(within(ledger).getByText('5 ENTRIES · LATEST FIRST')).toBeInTheDocument()
+    expect(within(ledger).getByText('5 ENTRIES')).toBeInTheDocument()
     const topUp = within(ledger).getByText('Top-up to Dept Pool — IT').closest('tr') as HTMLElement
     expect(within(topUp).getByText('out').closest('.chip')).toHaveClass('info')
     expect(topUp).toHaveTextContent('Payment voucher')
@@ -134,5 +134,42 @@ describe('the Venture Pool, per the handoff', () => {
   it('stands the chart panels 1 : 1.6', async () => {
     render(await VenturePoolPage())
     expect(section('In vs Out').querySelector('.vp-charts')).toHaveClass('sch-vp-charts')
+  })
+})
+
+// 2026-10-10 — the rest of the handoff (user: 做完他): the ledger lists every
+// line, not the latest 50, and its search is the page's toolbar under the
+// cards — over the charts — narrowing the ledger below.
+describe('the Venture Pool ledger, whole and searched from the toolbar', () => {
+  it('lists every line, not only the latest 50', async () => {
+    const many = Array.from({ length: 60 }, (_, i) =>
+      line(`m${i}`, `2026-0${3 + Math.floor(i / 10)}-${String((i % 10) + 1).padStart(2, '0')}`, 100 + i, 0, `Line ${i + 1}`, 'repayment'),
+    )
+    database(many)
+    render(await VenturePoolPage())
+    const ledger = section('Pool ledger')
+    expect(within(ledger).getByText('60 ENTRIES')).toBeInTheDocument()
+    for (const n of [1, 30, 60]) expect(within(ledger).getByText(`Line ${n}`)).toBeInTheDocument()
+    expect(ledger).not.toHaveTextContent('latest 50')
+  })
+
+  it('searches the ledger from a toolbar over the charts', async () => {
+    render(await VenturePoolPage())
+    const search = screen.getByRole('searchbox', { name: 'Search the pool ledger' })
+    expect(search).toHaveAttribute('placeholder', 'Search description, type…')
+    // Under the cards, over In vs Out; the ledger draws no box of its own.
+    expect(search.compareDocumentPosition(section('In vs Out')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const ledger = section('Pool ledger')
+    expect(within(ledger).queryByPlaceholderText('Search description, type…')).toBeNull()
+
+    fireEvent.change(search, { target: { value: 'interest' } })
+    expect(within(ledger).queryByText('Top-up to Dept Pool — IT')).toBeNull()
+    for (const d of ['HC fund source — Sep interest', 'HB advance — Oct interest', 'HC term loan — Oct interest']) {
+      expect(within(ledger).getByText(d)).toBeInTheDocument()
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+    expect(search).toHaveValue('')
+    expect(within(ledger).getByText('Top-up to Dept Pool — IT')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull()
   })
 })

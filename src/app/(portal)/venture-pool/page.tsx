@@ -8,6 +8,7 @@ import { ventureRefLabel } from '@/lib/venture-pool'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import InOutCharts, { type TrendMonth } from './_components/InOutCharts'
 import PoolLedgerTable, { type PoolLine } from './_components/PoolLedgerTable'
+import { PoolSearchProvider } from './_components/PoolSearch'
 
 // Post 2026-05-26 re-import: Venture Pool data is derived from journal_lines
 // where segment IN ('corporate', 'treasury') on HV bank accounts, NOT the
@@ -42,7 +43,7 @@ export default async function VenturePoolPage() {
     description: string | null
     journal_entries: { transaction_date: string; description: string | null; reference_type: string | null }
   }
-  async function fetchCorpBankLines(opts: { since?: string; until?: string; limit?: number }) {
+  async function fetchCorpBankLines(opts: { since?: string; until?: string }) {
     if (cashCodes.length === 0) return [] as RawLine[]
     const base = () => {
       let q = supabase
@@ -59,23 +60,15 @@ export default async function VenturePoolPage() {
       if (opts.until) q = q.lt('journal_entries.transaction_date', opts.until)
       return q
     }
-    // Display reads pass a limit (most-recent first); the aggregation reads
-    // (no limit) MUST paginate or they truncate at PostgREST's 1000-row cap.
-    if (opts.limit) {
-      const { data } = await base()
-        .order('transaction_date', { foreignTable: 'journal_entries', ascending: false })
-        .limit(opts.limit)
-      return (data ?? []) as unknown as RawLine[]
-    }
+    // Every read MUST paginate or it truncates at PostgREST's 1000-row cap.
     const rows = await fetchAllRows((lo, hi) => base().order('id', { ascending: true }).range(lo, hi))
     return rows as unknown as RawLine[]
   }
 
-  const [allTimeLines, monthLines, trendLines, ledgerLines] = await Promise.all([
+  const [allTimeLines, monthLines, trendLines] = await Promise.all([
     fetchCorpBankLines({}),
     fetchCorpBankLines({ since: monthStart, until: nextMonth }),
     fetchCorpBankLines({ since: trendStart }),
-    fetchCorpBankLines({ limit: 50 }),
   ])
 
   // All-time balance.
@@ -110,8 +103,9 @@ export default async function VenturePoolPage() {
     out: Math.round(v.out * 100) / 100,
   }))
 
-  // The pool ledger's latest lines, each signed and labelled.
-  const lines: PoolLine[] = ledgerLines.map((l) => {
+  // The pool ledger, each line signed and labelled — every line (2026-10-10,
+  // the handoff; the table opens latest first and the toolbar searches it).
+  const lines: PoolLine[] = allTimeLines.map((l) => {
     const dr = Number(l.debit ?? 0)
     const cr = Number(l.credit ?? 0)
     return {
@@ -125,8 +119,8 @@ export default async function VenturePoolPage() {
   })
 
   // On the sheet (2026-10-09, the user's Claude Design handoff): Export in
-  // the head, four cards, In vs Out (the month's pie, twelve months of
-  // bars), then the pool ledger.
+  // the head, four cards, the search toolbar (2026-10-10), In vs Out (the
+  // month's pie, twelve months of bars), then the pool ledger it searches.
   return (
     <div>
       <div className="page-head">
@@ -157,33 +151,35 @@ export default async function VenturePoolPage() {
         />
       </StatCards>
 
-      <section className="mb-10">
-        <div className="sect-head">
-          <h2>In vs Out</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">THIS MONTH · 12 MONTHS</span>
-        </div>
-        <InOutCharts monthIn={monthIn} monthOut={monthOut} trend={trend} />
-      </section>
-
-      <section className="mb-6">
-        <div className="sect-head">
-          <h2>Pool ledger</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">{lines.length} ENTRIES · LATEST FIRST</span>
-        </div>
-        {lines.length === 0 ? (
-          <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
-            <p className="text-sm">No movements yet.</p>
+      <PoolSearchProvider>
+        <section className="mb-10">
+          <div className="sect-head">
+            <h2>In vs Out</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">THIS MONTH · 12 MONTHS</span>
           </div>
-        ) : (
-          <PoolLedgerTable lines={lines} canSetDefault={canDo(user, 'treasury', 'create')} />
-        )}
-        <p className="text-xs text-graphite mt-3">
-          The latest 50 lines, from the journal lines (corporate and treasury segments on HV bank accounts, reversal pairs left out).
-          Export has every line with the running balance.
-        </p>
-      </section>
+          <InOutCharts monthIn={monthIn} monthOut={monthOut} trend={trend} />
+        </section>
+
+        <section className="mb-6">
+          <div className="sect-head">
+            <h2>Pool ledger</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">{lines.length} ENTRIES</span>
+          </div>
+          {lines.length === 0 ? (
+            <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+              <p className="text-sm">No movements yet.</p>
+            </div>
+          ) : (
+            <PoolLedgerTable lines={lines} canSetDefault={canDo(user, 'treasury', 'create')} />
+          )}
+          <p className="text-xs text-graphite mt-3">
+            Every line, from the journal lines (corporate and treasury segments on HV bank accounts, reversal pairs left out). Export
+            adds the running balance.
+          </p>
+        </section>
+      </PoolSearchProvider>
     </div>
   )
 }

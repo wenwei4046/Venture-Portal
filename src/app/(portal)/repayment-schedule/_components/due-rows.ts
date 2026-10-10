@@ -11,6 +11,14 @@ import type { CompoundRow, MinInterestRow, NoTermRow, SchedRow } from './Schedul
 
 export type DueType = 'scheduled' | 'min' | 'rolled' | 'open'
 
+/** What the Type column says — the table's chip and the Export's cell. */
+export const DUE_TYPE_LABEL: Record<DueType, string> = {
+  scheduled: 'principal + interest',
+  min: 'min interest',
+  rolled: 'rolled interest',
+  open: 'open-ended',
+}
+
 export interface DueRow {
   key: string
   /** The loan (we collect) or the fund source (we pay). */

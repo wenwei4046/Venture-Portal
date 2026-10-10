@@ -214,3 +214,12 @@ describe('Due to pay', () => {
     expect(within(conts).queryByRole('link', { name: 'Record payment' })).toBeNull()
   })
 })
+
+// 2026-10-10 — the head's Export (the handoff; user: 做完他): the month's two
+// due tables as a spreadsheet, for the month on show.
+describe('the Repayment Schedule’s head', () => {
+  it('offers Export for the month on show', async () => {
+    await page()
+    expect(screen.getByRole('link', { name: 'Export' })).toHaveAttribute('href', '/repayment-schedule/export?month=2026-10')
+  })
+})

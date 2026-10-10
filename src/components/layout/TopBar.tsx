@@ -7,6 +7,7 @@ import type { User } from '@/types'
 import { getRoleLabel } from '@/lib/roles'
 import { officeClock } from '@/lib/office-clock'
 import PortalViewSwitcher from './PortalViewSwitcher'
+import { useNavOwner } from './nav-owner'
 import ThemeToggle from './ThemeToggle'
 
 interface TopBarProps {
@@ -19,6 +20,8 @@ interface TopBarProps {
 export default function TopBar({ user, fin = false }: TopBarProps) {
   const router = useRouter()
   const pathname = usePathname()
+  // A receipt is Receipt's though it opens under /payments (2026-10-10).
+  const owner = useNavOwner(pathname)
   // Ultimate full access (`view_switch`, 2026-10-08) — the Principal role
   // used to be the test, which Full access now shares without the switcher.
   const canSwitchView = user.canSwitchView === true
@@ -57,7 +60,7 @@ export default function TopBar({ user, fin = false }: TopBarProps) {
         <span className="fin-topbar-tile" aria-hidden>H</span>
         <span className="fin-topbar-text">
           <span className="fin-topbar-kicker">{getRoleLabel(user.role)}</span>
-          <span className="fin-topbar-page">{financePageTitle(pathname) || 'Overview'}</span>
+          <span className="fin-topbar-page">{owner?.title ?? (financePageTitle(pathname) || 'Overview')}</span>
         </span>
         <span className="ml-auto flex items-center gap-3">
           {canSwitchView ? <PortalViewSwitcher value={user.role} /> : null}

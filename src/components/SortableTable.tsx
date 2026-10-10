@@ -136,6 +136,11 @@ interface Props<T> {
    */
   searchKeys?: string[]
   searchPlaceholder?: string
+  /** A search typed outside the table — the page's own toolbar (2026-10-10,
+   *  the handoff's Venture Pool, where it sits over the charts): it narrows
+   *  the rows by `searchKeys` as the table's own box would, and the table
+   *  then draws no box of its own. */
+  query?: string
   /** Optional content rendered on the right side of the search/toolbar row. */
   toolbarRight?: ReactNode
   emptyState?: ReactNode
@@ -257,6 +262,7 @@ export default function SortableTable<T>({
   getRowKey,
   searchKeys,
   searchPlaceholder = 'Search…',
+  query,
   toolbarRight,
   emptyState,
   tableClassName = 'ledger-table',
@@ -583,8 +589,10 @@ export default function SortableTable<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, filters, ranges, columnByKey])
 
+  // The table's own box, unless the page searches for it (`query`).
+  const ownSearch = !!searchKeys && searchKeys.length > 0 && query === undefined
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
+    const q = (query ?? search).trim().toLowerCase()
     if (!q || !searchKeys || searchKeys.length === 0) return columnFiltered
     return columnFiltered.filter((row) => {
       for (const key of searchKeys) {
@@ -601,7 +609,7 @@ export default function SortableTable<T>({
       }
       return false
     })
-  }, [columnFiltered, search, searchKeys, columnByKey])
+  }, [columnFiltered, search, query, searchKeys, columnByKey])
 
   const sorted = useMemo(() => {
     const col = columnByKey.get(sortKey)
@@ -688,9 +696,9 @@ export default function SortableTable<T>({
 
   return (
     <div>
-      {(searchKeys && searchKeys.length > 0) || toolbarRight || layoutOn || onAnyRowOpen ? (
+      {ownSearch || toolbarRight || layoutOn || onAnyRowOpen ? (
         <div className="mb-3 flex items-center gap-3 flex-wrap">
-          {searchKeys && searchKeys.length > 0 ? (
+          {ownSearch ? (
             <>
               <input
                 type="text"
