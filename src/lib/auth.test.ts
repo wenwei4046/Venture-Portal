@@ -6,11 +6,14 @@ import { getMemberUser, getUser, requirePayrollPayouts } from './auth'
 const mocks = vi.hoisted(() => ({
   subject: 'signed-in-id' as string | null,
   cookie: '',
+  person: '',
   row: null as Omit<User, 'permissions'> | null,
   maskLookup: vi.fn(),
   rpc: vi.fn(),
 }))
-vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => ({ value: mocks.cookie }) }) }))
+vi.mock('next/headers', () => ({
+  cookies: async () => ({ get: (name: string) => ({ value: name === 'vp-view-as-person' ? mocks.person : mocks.cookie }) }),
+}))
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
@@ -26,6 +29,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.subject = 'signed-in-id'
   mocks.cookie = ''
+  mocks.person = ''
   mocks.row = {
     id: 'signed-in-id', name: 'Principal', email: 'principal@example.com',
     role: 'principal', is_active: true, created_at: '', updated_at: '',
@@ -156,5 +160,65 @@ describe('requirePayrollPayouts', () => {
     signedInAs('dept_manager', ['payroll_payouts'])
     await requirePayrollPayouts('treasury')
     expect(redirect).toHaveBeenCalledWith('/dashboard')
+  })
+})
+
+// View as a person (2026-10-11, the user: "can set a function is view as a user, same like
+// in revenue app, i can view as a member"): the portal drawn as one account, read-only.
+describe('getUser while viewing as a person', () => {
+  const CARRIE = '3bff3ae3-d0a8-418c-b2b1-a2aa5fdd5419'
+  const asCarrie = {
+    id: CARRIE, name: 'ONG MEI SHUANG', email: 'carrie@example.com', role: 'finance', department_id: 'fin-dept',
+    permissions: ['billing', 'claims', 'dashboard', 'treasury', 'venture_pool'],
+    actions: { 'treasury.view': 'all', 'treasury.create': 'all', 'claims.view': 'own' },
+    sensitive: ['bank'],
+    tabs: { ticks: null, boxes: [], cells: true },
+  }
+
+  beforeEach(() => {
+    mocks.rpc.mockImplementation(async (fn: string) =>
+      fn === 'view_as_person' ? { data: asCarrie, error: null } : { data: ['dashboard', 'revenue', 'view_switch'], error: null })
+  })
+
+  it('draws the portal as that person — their kind, keys, actions, tabs and sensitive fields', async () => {
+    mocks.person = CARRIE
+    const user = await getUser()
+    expect(user).toMatchObject({
+      id: CARRIE, name: 'ONG MEI SHUANG', role: 'finance', department_id: 'fin-dept',
+      permissions: asCarrie.permissions, actions: asCarrie.actions, sensitive: ['bank'],
+      actualRole: 'principal', canSwitchView: true, viewingAs: { id: CARRIE, name: 'ONG MEI SHUANG' },
+    })
+    expect(user?.tabs).toContain('fin.payments.view')
+    expect(mocks.rpc).toHaveBeenCalledWith('view_as_person', { p_user: CARRIE })
+  })
+
+  it('takes precedence over HR’s or Finance’s view', async () => {
+    mocks.person = CARRIE
+    mocks.cookie = 'hr'
+    expect((await getUser())?.viewingAs?.id).toBe(CARRIE)
+  })
+
+  it('is the portal’s only: the member app and the account itself are never viewed as somebody', async () => {
+    mocks.person = CARRIE
+    expect((await getMemberUser())?.viewingAs).toBeUndefined()
+    expect(mocks.rpc).not.toHaveBeenCalledWith('view_as_person', expect.anything())
+  })
+
+  it('is nothing for an account that may not switch views, or when the database refuses', async () => {
+    mocks.person = CARRIE
+    mocks.rpc.mockImplementation(async (fn: string) =>
+      fn === 'view_as_person' ? { data: asCarrie, error: null } : { data: ['dashboard', 'revenue'], error: null })
+    expect((await getUser())?.viewingAs).toBeUndefined()
+    mocks.rpc.mockImplementation(async (fn: string) =>
+      fn === 'view_as_person' ? { data: null, error: { message: 'Only whoever may switch views can view as somebody else' } } : { data: ['dashboard', 'view_switch'], error: null })
+    const user = await getUser()
+    expect(user?.viewingAs).toBeUndefined()
+    expect(user?.id).toBe('signed-in-id')
+  })
+
+  it('reads no cookie that is not an account id', async () => {
+    mocks.person = 'not-an-id'
+    await getUser()
+    expect(mocks.rpc).not.toHaveBeenCalledWith('view_as_person', expect.anything())
   })
 })

@@ -20,6 +20,7 @@ import BackToTop from '@/components/BackToTop'
 import RouteFreshener from './RouteFreshener'
 import HrSidebar from './HrSidebar'
 import HrTopBar from './HrTopBar'
+import ViewingAsBanner from './ViewingAsBanner'
 import { isHrView } from '@/lib/hr-view'
 import { lensNav } from '@/lib/view-as'
 import { ToastHost } from '@/components/hrv/toast'
@@ -92,7 +93,8 @@ export default function PortalFrame({
   }, [pathname])
 
   // View-as switched in another tab → this shell is drawn in the old view.
-  useViewAsSync(user.role, user.canSwitchView === true)
+  // Not while a person is viewed: their portal is drawn from its own cookie.
+  useViewAsSync(user.role, user.canSwitchView === true && !user.viewingAs)
   // The menus of HR's / Finance's view list that view's tabs (2026-10-11): the
   // view is a lens over the account's own power, which still opens every page.
   const navUser = useMemo(() => lensNav(user), [user])
@@ -109,6 +111,7 @@ export default function PortalFrame({
           </div>
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden print:overflow-visible">
             <div className="print:hidden contents">
+              {user.viewingAs ? <ViewingAsBanner name={user.viewingAs.name} /> : null}
               <HrTopBar user={user} />
               <div className="md:hidden">
                 <TopBar user={user} />
@@ -146,6 +149,7 @@ export default function PortalFrame({
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden print:overflow-visible">
         <div className="print:hidden contents">
+          {user.viewingAs ? <ViewingAsBanner name={user.viewingAs.name} /> : null}
           <TopBar user={user} fin={fin} />
         </div>
         <main ref={mainRef} className="flex-1 overflow-y-auto print:overflow-visible">

@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import type { User, UserRole } from '@/types'
-import { VIEW_AS_COOKIE, honouredViewAs, type ViewSurface } from '@/lib/view-as'
+import { VIEW_AS_COOKIE, VIEW_AS_PERSON_COOKIE, honouredViewAs, viewAsPersonId, type ViewSurface } from '@/lib/view-as'
 import { can, type Permission } from '@/lib/permissions'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { actionsFromJson, actionsFromKeys, canDo, type FunctionKey } from '@/lib/permission-actions'
@@ -41,9 +41,13 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   // honoured only for an account that holds `view_switch` (Ultimate full
   // access, 2026-10-08 — it was the Principal role) — and the Revenue View
   // only in the member app (lib/view-as.ts, 2026-09-27).
-  const viewAs = honouredViewAs((await cookies()).get(VIEW_AS_COOKIE)?.value, surface)
+  const jar = await cookies()
+  const viewAs = honouredViewAs(jar.get(VIEW_AS_COOKIE)?.value, surface)
+  // View as a person (2026-10-11): on the portal only. Asked beside the rest —
+  // the function refuses an account that may not switch views.
+  const person = surface === 'portal' ? viewAsPersonId(jar.get(VIEW_AS_PERSON_COOKIE)?.value) : null
 
-  const [{ data }, { data: perms }, { data: acts }, { data: fields }, { data: stored }, masked] = await Promise.all([
+  const [{ data }, { data: perms }, { data: acts }, { data: fields }, { data: stored }, masked, viewed] = await Promise.all([
     supabase.from('users').select('*').eq('id', authUserId).single(),
     // Resolved in the database because that is where the answer lives: an
     // explicit per-person row, then the holder's title, then their role's
@@ -65,6 +69,12 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
     viewAs === 'revenue_member'
       ? supabase.from('role_default_permissions').select('permission_key').eq('role', viewAs)
       : null,
+    // What the database answers AS that person: their keys, actions, sensitive
+    // fields and tabs (view_as_person, mig 20261011050000).
+    person
+      ? (supabase as unknown as { rpc: (fn: string, args: object) => PromiseLike<{ data: unknown; error: unknown }> })
+          .rpc('view_as_person', { p_user: person })
+      : null,
   ])
 
   const row = data as (Omit<User, 'permissions'> | null)
@@ -81,6 +91,33 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   // access has it, Full access is everything else without it. Read off the
   // REAL account's keys — a masked session keeps it, so it can switch back.
   const canSwitchView = user.permissions.includes('view_switch')
+
+  // Viewing as a person: the portal is theirs — their kind, department, keys,
+  // actions, tabs and sensitive fields — and read-only (the server client
+  // writes nothing while the cookie is set). The switcher stays, to stop.
+  if (canSwitchView && viewed && !viewed.error && viewed.data) {
+    const them = viewed.data as {
+      id: string; name: string; email: string; role: UserRole; department_id: string | null
+      permissions: string[] | null; actions: unknown; sensitive: string[] | null; tabs: unknown
+    }
+    const permissions = them.permissions ?? []
+    const actions = actionsFromJson(them.actions)
+    return {
+      ...user,
+      id: them.id,
+      name: them.name,
+      email: them.email,
+      role: them.role,
+      department_id: them.department_id ?? undefined,
+      permissions,
+      actions,
+      sensitive: (them.sensitive ?? []).filter(isSensitiveField),
+      tabs: userTabs(storedTabsFrom(them.tabs), actions, permissions),
+      actualRole: user.role,
+      canSwitchView,
+      viewingAs: { id: them.id, name: them.name },
+    }
+  }
 
   // HR's and Finance's views are LENSES (2026-10-11, the user: "switch view is
   // still can be edit, full access means = ultimate access"): that view's

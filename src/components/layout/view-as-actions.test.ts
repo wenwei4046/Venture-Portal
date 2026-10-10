@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setViewAs } from './view-as-actions'
-import { VIEW_AS_COOKIE, VIEW_AS_MIRROR_COOKIE } from '@/lib/view-as'
+import { VIEW_AS_COOKIE, VIEW_AS_PERSON_COOKIE, VIEW_AS_MIRROR_COOKIE } from '@/lib/view-as'
 
 const mocks = vi.hoisted(() => ({
   authUser: { id: 'principal-id' } as { id: string } | null,
@@ -40,7 +40,9 @@ describe('setViewAs', () => {
     expect(mocks.set).toHaveBeenCalledWith(VIEW_AS_COOKIE, 'revenue_member', {
       httpOnly: true, sameSite: 'lax', path: '/', secure: false,
     })
-    expect(mocks.delete).not.toHaveBeenCalled()
+    expect(mocks.delete).not.toHaveBeenCalledWith(VIEW_AS_COOKIE)
+    // Picking a view ends viewing as a person (2026-10-11).
+    expect(mocks.delete).toHaveBeenCalledWith(VIEW_AS_PERSON_COOKIE)
   })
 
   // The copy other tabs read to notice the switch (useViewAsSync). Readable on

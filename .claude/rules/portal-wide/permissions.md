@@ -308,6 +308,36 @@ revoke; refuses to run without the readers) once the code is live.
 `tests/member-sql/validate-sensitive-fields.mjs`,
 `src/lib/private-columns.test.ts`.
 
+**VIEW AS A PERSON, READ-ONLY (2026-10-11, the user: "can set a function is
+view as a user, same like in revenue app, i can view as a member").** Both view
+switchers end with *View as a person…*: a picker of everybody who signs in to
+the portal (`view_as_people()`, by department), and the portal is then drawn
+AS that account — their kind, department, keys, actions, tabs and sensitive
+fields, the database's own answers asked as them: `view_as_person(p_user)`
+(DEFINER, view_switch only, mig `20261011050000`) points `auth.uid()` at them
+(`request.jwt.claim.sub`, which auth.uid() reads first) for current_permissions
+/ actions / sensitive_fields / tabs and puts the caller back. `getUser` (portal
+surface only; the member app and `getAccountUser` never) returns that account
+with `viewingAs`, `actualRole` = the viewer's kind; it beats HR's / Finance's
+view; a lens is never drawn over it. A strip says "Viewing as X — read-only"
+with *Stop viewing*; picking any view also ends it. **Read-only for the whole
+browser while the cookie is set:** `createClient()` hands back
+`lib/supabase/read-only.ts` — tables read, `insert/update/upsert/delete`
+answer `{ error: 'Read-only while viewing as somebody — nothing is saved.' }`
+without running, an rpc runs only if it is on `READS_WHILE_VIEWING_AS` (the
+portal's STABLE functions, read off pg_proc — Postgres refuses a write in one —
+plus five VOLATILE ones read to write nothing, `view_as_person` and the access
+log), storage reads and signs but never uploads or removes. The BROWSER's
+client reads only too — a column layout, a table's shared default, an upload —
+by the readable mark `vp-viewing-as` set beside the httpOnly cookie
+(`lib/supabase/client.ts`; the mark only ever takes writes away). The two
+service-role writers go around the session and ask `refuseWhileViewingAs()`
+(Invite user, the ERP feed key). Signing in clears both cookies, so the next
+account on the shared office PC never inherits a read-only browser. Data rows are still read as the viewer (RLS
+answers auth.uid()), so a page that narrows rows only through RLS shows more
+than the person would. **A new function the portal reads goes on the list, or
+it fails while viewing as somebody.**
+
 **SWITCHING VIEW KEEPS YOUR POWER (2026-10-11, the user: "switch view is still
 can be edit, full access means = ultimate access").** HR's and Finance's views
 are LENSES, no longer masks: `getUser` keeps the account's own keys, actions,

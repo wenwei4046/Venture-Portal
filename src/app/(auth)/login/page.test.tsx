@@ -15,7 +15,7 @@ vi.mock('@/components/member/MemberLoginScreen', () => ({ default: () => null })
 
 import LoginPage from './page'
 import MemberLoginScreen from '@/components/member/MemberLoginScreen'
-import { VIEW_AS_COOKIE } from '@/lib/view-as'
+import { VIEW_AS_COOKIE, VIEW_AS_PERSON_COOKIE, VIEW_AS_PERSON_MARK } from '@/lib/view-as'
 
 async function submit() {
   const screen = await LoginPage({ searchParams: Promise.resolve({}) })
@@ -53,6 +53,9 @@ describe('canonical sign-in routing', () => {
     mocks.profile.mockResolvedValue({ data: { is_active: true, role } })
     await expect(submit()).rejects.toThrow('REDIRECT:/dashboard')
     expect(mocks.clearView).toHaveBeenCalledWith(VIEW_AS_COOKIE)
+    // The next account on a shared PC never inherits a read-only browser (2026-10-11).
+    expect(mocks.clearView).toHaveBeenCalledWith(VIEW_AS_PERSON_COOKIE)
+    expect(mocks.clearView).toHaveBeenCalledWith(VIEW_AS_PERSON_MARK)
     expect(mocks.clearView.mock.invocationCallOrder[0]).toBeLessThan(mocks.redirect.mock.invocationCallOrder[0])
   })
 
