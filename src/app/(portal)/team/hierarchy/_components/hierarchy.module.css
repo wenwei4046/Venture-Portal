@@ -1,0 +1,145 @@
+/* People › Hierarchy (2026-10-10, the HR revamp handoff, variant A) — the prototype's, value for value. */
+
+.note { margin-top: 10px; font-size: 12px; color: rgb(var(--hv-brown)); max-width: 672px; line-height: 1.5; }
+.error { margin: 0 0 12px; color: rgb(var(--hv-danger)); font-size: 12.5px; }
+.warn {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgb(var(--hv-alert-bg));
+  border: 1px solid rgb(var(--hv-alert-border));
+  color: rgb(var(--hv-alert));
+  font-size: 12.5px;
+  max-width: 820px;
+}
+
+/* ── People & roles ── */
+.roles { border: 1px solid rgb(var(--hv-frame)); border-radius: 10px; overflow: hidden; background: rgb(255 255 255); }
+.rolesHead,
+.rolesRow { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); }
+.rolesHead {
+  background: rgb(var(--hv-head));
+  border-bottom: 1px solid rgb(var(--hv-head-rule));
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.rolesHead > span { padding: 11px 14px; }
+.band {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 14px;
+  background: rgb(241 237 230);
+  border-left: 3px solid rgb(var(--hv-dark));
+  border-bottom: 1px solid rgb(var(--hv-hairline));
+}
+.band[data-inactive='true'] .bandName,
+.band[data-inactive='true'] .bandMeta { opacity: 0.55; }
+.bandName { font-size: 12.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.bandMeta { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; }
+.bandSpacer { flex: 1; }
+.bandLink {
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  line-height: normal;
+  white-space: nowrap;
+}
+.bandQuiet { font-size: 12px; color: rgb(var(--hv-brown)); white-space: nowrap; }
+.rolesRow { border-bottom: 1px solid rgb(var(--hv-hairline)); }
+.rolesRow > span { padding: 9px 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rolesName { font-weight: 500; }
+.rolesQuiet { color: rgb(var(--hv-body-2)); }
+.rolesEmpty { padding: 9px 14px; border-bottom: 1px solid rgb(var(--hv-hairline)); color: rgb(var(--hv-brown)); font-size: 12px; }
+
+/* ── Levels ── */
+.levelsBar { display: flex; align-items: center; justify-content: flex-end; gap: 10px; max-width: 820px; margin-bottom: 10px; }
+.levels { display: flex; flex-direction: column; gap: 6px; max-width: 820px; }
+.level {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 10px;
+  background: rgb(255 255 255);
+  transition: border-color 0.12s, background-color 0.12s;
+}
+.level[data-empty='true'] { background: rgb(250 249 246); }
+.level[data-over='true'] { border-color: rgb(var(--hv-accent)); background: rgb(var(--hv-peach)); }
+.levelL { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 14px; font-weight: 500; }
+.levelBody { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 0;
+  background: rgb(var(--tone-bg));
+  color: rgb(var(--tone-fg));
+  font: inherit;
+  font-size: 12px;
+  line-height: normal;
+  white-space: nowrap;
+}
+.chip[draggable='true'] { cursor: grab; }
+.chip[data-inactive='true'] { opacity: 0.55; }
+.chip[data-moving='true'] { opacity: 0.4; }
+.chip:focus-visible { outline: 2px solid rgb(var(--hv-ink)); outline-offset: 2px; }
+.levelEmpty { font-size: 12px; color: rgb(152 142 130); }
+.levelName {
+  flex: none;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: rgb(var(--hv-brown));
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  line-height: normal;
+  cursor: pointer;
+}
+.levelName:hover { color: rgb(var(--hv-ink)); text-decoration: underline; text-underline-offset: 2px; }
+.levelName[disabled] { cursor: default; text-decoration: none; color: rgb(var(--hv-brown)); }
+.levelInput {
+  box-sizing: border-box;
+  width: 160px;
+  padding: 4px 8px;
+  border: 1px solid rgb(var(--hv-accent));
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  line-height: normal;
+  outline: none;
+  color: rgb(var(--hv-ink));
+  background: rgb(255 255 255);
+}
+.levelRemove { font-size: 12px; color: rgb(var(--hv-danger)); background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.chipWrap { position: relative; }
+.moveMenu { top: calc(100% + 4px); left: 0; min-width: 220px; max-height: 280px; overflow-y: auto; }
+
+/* ── A title's window ── */
+.tw { display: flex; flex-direction: column; gap: 14px; }
+.twTitle { font-size: 17px; font-weight: 500; margin: 0; line-height: normal; }
+.twSub { font-size: 12.5px; color: rgb(var(--hv-body-2)); margin-top: 4px; line-height: 1.5; }
+.twField { display: flex; flex-direction: column; gap: 5px; }
+.twLabel { font-size: 12px; color: rgb(var(--hv-brown)); }
+.twCheck { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; line-height: 1.5; cursor: pointer; }
+.twCheck input { margin-top: 3px; accent-color: rgb(var(--hv-accent)); }
+.twHint { font-size: 11.5px; color: rgb(var(--hv-brown)); line-height: 1.5; }
+.twTemplate { font-size: 12.5px; }
+.twTemplate a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.twFoot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.twDelete { margin-right: auto; }
+.twRefusal { color: rgb(var(--hv-danger)); font-size: 12.5px; }

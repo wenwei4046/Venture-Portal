@@ -15,86 +15,94 @@ import { requireAction } from '@/lib/auth'
  * HR writes titles as well as the Principal: HR runs the roster and would
  * otherwise be unable to file a new hire under a title nobody had created yet.
  * Deleting one stays with the Principal — see `deleteTitle`.
+ *
+ * Refusals come back as `{ ok: false, reason }` (Hierarchy › People & roles'
+ * title window shows them): a thrown message reaches production's browser
+ * only as a digest.
  */
+
+export type TitleOutcome = { ok: true } | { ok: false; reason: string }
+
+export interface TitleInput {
+  /** Absent for a new title. */
+  id?: string
+  name: string
+  departmentId: string | null
+  /** The rung it stands on; null = not on the ladder. */
+  levelId: string | null
+  isActive: boolean
+  /**
+   * "Heads the department" (2026-09-11): the title stands above the commission
+   * ladder — no rung, no rank, no override — and is the one everybody in a
+   * commission department may report to. Revenue Director. The database
+   * refuses a rung or a membership on such a title (23DIR) and closes any
+   * membership its new holder had, so ticking it is the whole change.
+   */
+  isDepartmentHead: boolean
+}
 
 function refresh() {
   revalidatePath('/team', 'layout')
 }
 
-function readName(formData: FormData): string {
-  const name = ((formData.get('name') as string) ?? '').trim()
-  if (!name) throw new Error('A title needs a name')
-  if (name.length > 120) throw new Error('That name is too long')
-  return name
+/** Why a title cannot be saved as it is, or null. */
+function refusalOf(input: TitleInput): string | null {
+  const name = input.name.trim()
+  if (!name) return 'A title needs a name'
+  if (name.length > 120) return 'That name is too long'
+  return null
 }
 
-function readDepartmentId(formData: FormData): string | null {
-  const id = ((formData.get('department_id') as string) ?? '').trim()
-  return id === '' ? null : id
+function saveError(error: { code?: string; message: string }, verb: string): string {
+  // 23505 is the (name, department) unique index — the one mistake somebody
+  // will actually make, so it gets a sentence instead of a Postgres string.
+  if (error.code === '23505') return 'That department already has a title by that name'
+  // 23DIR: the title now heads the department while a rung still points at it
+  // — the trigger's sentence says which, and it is the whole answer.
+  if (error.code === '23DIR') return error.message
+  return `Could not ${verb} the title. Please try again.`
 }
 
-/**
- * "Heads the department" (2026-09-11): the title stands above the commission
- * ladder — no rung, no rank, no override — and is the one everybody in a
- * commission department may report to. Revenue Director. The database
- * refuses a rung or a membership on such a title (23DIR) and closes any
- * membership its new holder had, so ticking it is the whole change.
- */
-function readDepartmentHead(formData: FormData): boolean {
-  return formData.get('is_department_head') === 'on'
-}
-
-export async function createTitle(formData: FormData): Promise<void> {
+export async function createTitle(input: TitleInput): Promise<TitleOutcome> {
   const user = await requireAction('team', 'manage')
+  const refused = refusalOf(input)
+  if (refused) return { ok: false, reason: refused }
   const supabase = await createClient()
 
   const { error } = await supabase.from('titles').insert({
-    name: readName(formData),
-    department_id: readDepartmentId(formData),
-    is_department_head: readDepartmentHead(formData),
+    name: input.name.trim(),
+    department_id: input.departmentId,
+    level_id: input.levelId,
+    is_department_head: input.isDepartmentHead,
     created_by: user.id,
   })
-
-  if (error) {
-    // 23505 is the (name, department) unique index — the one mistake somebody
-    // will actually make, so it gets a sentence instead of a Postgres string.
-    if (error.code === '23505') {
-      throw new Error('That department already has a title by that name')
-    }
-    throw new Error(`Could not create the title: ${error.message}`)
-  }
+  if (error) return { ok: false, reason: saveError(error, 'create') }
 
   refresh()
+  return { ok: true }
 }
 
-export async function updateTitle(formData: FormData): Promise<void> {
+export async function updateTitle(input: TitleInput): Promise<TitleOutcome> {
   await requireAction('team', 'manage')
+  if (!input.id) return { ok: false, reason: 'Which title?' }
+  const refused = refusalOf(input)
+  if (refused) return { ok: false, reason: refused }
   const supabase = await createClient()
-
-  const id = ((formData.get('id') as string) ?? '').trim()
-  if (!id) throw new Error('Which title?')
 
   const { error } = await supabase
     .from('titles')
     .update({
-      name: readName(formData),
-      department_id: readDepartmentId(formData),
-      is_active: formData.get('is_active') === 'on',
-      is_department_head: readDepartmentHead(formData),
+      name: input.name.trim(),
+      department_id: input.departmentId,
+      level_id: input.levelId,
+      is_active: input.isActive,
+      is_department_head: input.isDepartmentHead,
     })
-    .eq('id', id)
-
-  if (error) {
-    if (error.code === '23505') {
-      throw new Error('That department already has a title by that name')
-    }
-    // 23DIR: the title now heads the department while a rung still points at
-    // it — the trigger's sentence says which, and it is the whole answer.
-    if (error.code === '23DIR') throw new Error(error.message)
-    throw new Error(`Could not save the title: ${error.message}`)
-  }
+    .eq('id', input.id)
+  if (error) return { ok: false, reason: saveError(error, 'save') }
 
   refresh()
+  return { ok: true }
 }
 
 /**
@@ -104,7 +112,7 @@ export async function updateTitle(formData: FormData): Promise<void> {
  * would quietly strip their titles instead of failing. Counting first turns
  * that into a refusal that says who is in the way.
  */
-export async function deleteTitle(id: string): Promise<void> {
+export async function deleteTitle(id: string): Promise<TitleOutcome> {
   await requireAction('accounts', 'manage')
   const supabase = await createClient()
 
@@ -114,13 +122,15 @@ export async function deleteTitle(id: string): Promise<void> {
     .eq('title_id', id)
 
   if ((count ?? 0) > 0) {
-    throw new Error(
-      `${count} ${count === 1 ? 'person holds' : 'people hold'} this title — move them first, or deactivate it instead`,
-    )
+    return {
+      ok: false,
+      reason: `${count} ${count === 1 ? 'person holds' : 'people hold'} this title — move them first, or deactivate it instead`,
+    }
   }
 
   const { error } = await supabase.from('titles').delete().eq('id', id)
-  if (error) throw new Error(`Could not delete the title: ${error.message}`)
+  if (error) return { ok: false, reason: 'Could not delete the title. Please try again.' }
 
   refresh()
+  return { ok: true }
 }

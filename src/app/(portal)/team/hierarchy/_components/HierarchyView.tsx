@@ -2,52 +2,37 @@
 
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { SlidingTabs, type TabItem } from '@/components/motion/SlidingTabs'
-import type { Rung } from '@/lib/ladder'
+import { HvPage, PageHead, btn } from '@/components/hrv/kit'
+import { Tabs } from '@/components/hrv/tabs'
+import type { RolePerson, RoleRung, RoleTitle } from '@/lib/hierarchy-roles'
 import TeamOrgChart, { ALL_DEPARTMENTS, type ChartPerson } from './TeamOrgChart'
-import LevelsBoard, { type BoardTitle } from './LevelsBoard'
-import StaffTable from './StaffTable'
-import TitlesSection, { type DepartmentOption, type TitleRow } from './TitlesSection'
+import PeopleRoles from './PeopleRoles'
+import LevelsList from './LevelsList'
+import TitleWindow, { type DepartmentOption } from './TitleWindow'
+import s from './hierarchy.module.css'
 
-export type HierarchyTab = 'chart' | 'table' | 'levels' | 'roles'
+export type HierarchyTab = 'chart' | 'roles' | 'levels'
 
-/** The view a `?tab=` value names. Anything else is the chart. */
+/**
+ * The view a `?tab=` value names. Anything else is the chart; the old Table
+ * (2026-09) and Roles (2026-10-08) tabs became People & roles.
+ */
 export function hierarchyTab(param: string | null | undefined): HierarchyTab {
-  return param === 'table' || param === 'levels' || param === 'roles' ? param : 'chart'
+  if (param === 'levels') return 'levels'
+  return param === 'roles' || param === 'table' ? 'roles' : 'chart'
 }
 
 /**
- * Hierarchy — the graph, and the two ways of looking at what governs it.
+ * People › Hierarchy as the HR revamp draws it (2026-10-10, the handoff's
+ * variant A): Org chart · People & roles · Levels.
  *
- * The chart used to be one of two tabs and shared its width with nothing.
- * Since 2026-09-07 it is the page. The user's phrasing was that the graph takes
- * priority, and priority here means width and position, not a louder heading.
- *
- * It now has the whole width, which is the second half of one decision. The
- * canvas used to share the row with the Revenue department's commission tree,
- * drawn read-only in a 340px rail. That rail is gone (user, 2026-09-08) — not
- * as clutter, but because the fact it drew was not reliably true: the rank a
- * position carries is not what a month pays, since somebody who misses their
- * monthly quota earns at a different rate. A card reading "Rank B · 8%" was
- * therefore right only in the months quota was hit, and there was no honest
- * caption to swap in, because the real figure belongs to a RUN and not to a
- * person. The tree is drawn and edited on `/revenue/[sub]/hierarchy`, where a
- * period is in scope.
- *
- * Finding somebody replaced it. Clicking a card used to centre that person on
- * the other chart, which is the only thing the pair of them made easy; the
- * canvas now carries a name search that does it directly — type "lucas", and
- * the chart scrolls to Lucas and lights him up, crossing the department filter
- * to get there if it has to.
- *
- * Four views:
- *
- *   Org chart  the canvas. Drag, or draw a line from a manager down.
- *   Table      the same facts as rows, which is the shape bulk work wants.
- *   Levels     the ladder board, still editable in full.
- *   Roles      the titles — what somebody is called, under which department,
- *              on which rung, following which permission template. Its own
- *              page until 2026-10-08 (the Claude Design handoff).
+ *   Org chart       the canvas, as it was (the user: the chart stays) —
+ *                   drag, or draw a line from a manager down; search a name.
+ *   People & roles  a band per title over the people holding it, with its
+ *                   level and permission template; + New title, and Edit on
+ *                   each band (what the Roles tab's rows did).
+ *   Levels          the ladder top down, its titles as chips — drag one to
+ *                   another level, rename a level, add one on top.
  *
  * The tab is `?tab=`, pushed with the browser's own history so Next syncs
  * `useSearchParams` without a round trip and Back returns to the last view.
@@ -57,54 +42,47 @@ export default function HierarchyView({
   chartPeople = people,
   commissionHref,
   rungs,
-  titles,
   breaks,
   roleTitles,
+  rolePeople,
   departments,
   canDeleteTitles,
   canEdit,
+  canManage,
   chartOnly = false,
 }: {
   people: ChartPerson[]
-  /** Includes extra scheme-specific roles; Table and Levels keep the roster. */
+  /** Includes extra scheme-specific roles. */
   chartPeople?: ChartPerson[]
   commissionHref: string | null
-  rungs: Rung[]
-  titles: BoardTitle[]
+  rungs: RoleRung[]
   /** Reporting lines the ladder, as it stands, would refuse. */
   breaks: Array<{ id: string; managerId: string }>
-  /** The Roles tab: every title, with its rung and template. */
-  roleTitles: TitleRow[]
+  /** Every title, with its rung and template. */
+  roleTitles: RoleTitle[]
+  /** The roster by title, for People & roles and the Levels counts. */
+  rolePeople: RolePerson[]
   departments: DepartmentOption[]
   canDeleteTitles: boolean
   /** Team · Edit: the chart's lines may be dragged and redrawn. */
   canEdit: boolean
+  /** Team · Manage: titles and the ladder may be written. */
+  canManage: boolean
   /**
    * Somebody who reads People through the directory (Team · View without the
    * Salary tick, 2026-10-10, PR4b): the whole company's chart, names and
-   * titles only — no Table, Levels or Roles.
+   * titles only — no People & roles or Levels.
    */
   chartOnly?: boolean
 }) {
   const searchParams = useSearchParams()
   const tab = chartOnly ? 'chart' : hierarchyTab(searchParams.get('tab'))
-  // Who is lit up. Held here rather than in the canvas because it survives a
-  // switch to the table and back, so somebody found by name is still found
-  // after a detour.
+  // Who is lit up, and the department chips — held here so they survive a
+  // switch to another tab and back.
   const [focused, setFocused] = useState<string | null>(null)
-  // The department chips. Owned here so the choice survives the same detour —
-  // and so the search can widen it when the person somebody typed is standing
-  // outside the department currently in focus.
   const [focusDept, setFocusDept] = useState<string>(ALL_DEPARTMENTS)
-
-  const tabs: TabItem[] = chartOnly
-    ? [{ key: 'chart', label: 'Org chart' }]
-    : [
-        { key: 'chart', label: 'Org chart' },
-        { key: 'table', label: 'Table', count: people.length },
-        { key: 'levels', label: 'Levels' },
-        { key: 'roles', label: 'Roles', count: roleTitles.length },
-      ]
+  // The title window: an id, 'new', or closed.
+  const [editing, setEditing] = useState<string | null>(null)
 
   function goTo(key: string) {
     const params = new URLSearchParams(searchParams.toString())
@@ -114,84 +92,83 @@ export default function HierarchyView({
     window.history.pushState(null, '', qs ? `?${qs}` : window.location.pathname)
   }
 
-  return (
-    <div>
-      <div className="page-head tabbed">
-        <div>
-          <div className="page-eyebrow">
-            <em>I.</em> PEOPLE · HIERARCHY
-          </div>
-          <h1 className="page-title">Hierarchy</h1>
-          {/* The sheet's intro line: plain and upright, like the Revenue
-              hierarchy's (DESIGN.md › "Sheet theme"). */}
-          <p className="text-[12px] leading-normal mt-3 max-w-[672px]">
-            {tab === 'roles' ? (
-              <>
-                A title says what somebody is called and which department that role belongs under. How
-                high it stands is the ladder, under Levels; what it may do is its permission template,
-                under People Management → Permissions.
-              </>
-            ) : tab === 'levels' ? (
-              <>
-                Which title stands on which level — one scale for the whole company. The chart
-                obeys it, and a promotion climbs it.
-              </>
-            ) : tab === 'table' ? (
-              <>
-                The chart as rows, in ladder order. Who somebody reports to is the one line —
-                inside Revenue it is also who earns the override on their sales.
-              </>
-            ) : (
-              <>
-                Roles align by L level across department zones, with higher levels above and equal levels on the same row.
-                Expand a department or team to explore its reporting lines,
-                and search a name to find every role they hold. People in several Revenue sub-departments appear
-                in each role; edit additional roles on their own sub-department hierarchy.
-              </>
-            )}
-          </p>
-        </div>
-      </div>
+  const editingTitle = editing && editing !== 'new' ? (roleTitles.find(t => t.id === editing) ?? null) : null
 
-      <SlidingTabs items={tabs} active={tab} onTabChange={goTo} variant="control" />
+  return (
+    <HvPage>
+      <PageHead
+        eyebrow="People · Hierarchy"
+        title="Hierarchy"
+        right={
+          tab === 'roles' && canManage ? (
+            <button type="button" className={btn('outline')} onClick={() => setEditing('new')}>
+              + New title
+            </button>
+          ) : undefined
+        }
+      />
+
+      {chartOnly ? null : (
+        <Tabs
+          items={[
+            { key: 'chart', label: 'Org chart' },
+            { key: 'roles', label: 'People & roles', count: roleTitles.length },
+            { key: 'levels', label: 'Levels' },
+          ]}
+          active={tab}
+          onSelect={goTo}
+          size="compact"
+          label="Hierarchy"
+          style={{ margin: '-4px 0 16px' }}
+        />
+      )}
 
       {tab === 'roles' ? (
-        <TitlesSection titles={roleTitles} departments={departments} canDelete={canDeleteTitles} />
+        <PeopleRoles titles={roleTitles} rungs={rungs} people={rolePeople} canManage={canManage} onEdit={setEditing} />
       ) : tab === 'levels' ? (
-        <LevelsBoard rungs={rungs} titles={titles} breaks={breaks.length} />
+        <LevelsList rungs={rungs} titles={roleTitles} people={rolePeople} breaks={breaks.length} canManage={canManage} />
       ) : people.length === 0 ? (
         <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
           <p className="text-md font-bold mb-2">Nobody to chart yet.</p>
-          <p className="text-sm max-w-md mx-auto">
-            Add people under People → People Management first.
-          </p>
+          <p className="text-sm max-w-md mx-auto">Add people under People → People Management first.</p>
         </div>
       ) : (
         /* min-w-0 or the canvas — which is as wide as the tree is — sets the
            width of the row it sits in and pushes past the page. */
         <div className="min-w-0">
-          {tab === 'table' ? (
-            <StaffTable people={people} />
-          ) : (
-            <>
-              <div className="sect-head">
-                <h2>Staff hierarchy</h2>
-                <span className="rule" aria-hidden />
-                <span className="count">{people.length} PEOPLE · REPORTS TO</span>
-              </div>
-              <TeamOrgChart
-                people={chartPeople}
-                commissionHref={commissionHref}
-                focused={focused}
-                onFocus={setFocused}
-                focusDept={focusDept}
-                onFocusDept={setFocusDept}
-                canEdit={canEdit}
-              />
-            </>
-          )}
+          <div className="sect-head">
+            <h2>Staff hierarchy</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">{people.length} PEOPLE · REPORTS TO</span>
+          </div>
+          <TeamOrgChart
+            people={chartPeople}
+            commissionHref={commissionHref}
+            focused={focused}
+            onFocus={setFocused}
+            focusDept={focusDept}
+            onFocusDept={setFocusDept}
+            canEdit={canEdit}
+          />
+          <p className={s.note}>
+            Roles align by L level across department zones, with higher levels above and equal levels on the same row. Expand a
+            department or team to explore its reporting lines, and search a name to find every role they hold. People in several
+            Revenue sub-departments appear in each role; edit additional roles on their own sub-department hierarchy.
+          </p>
         </div>
       )}
-    </div>
+
+      {editing ? (
+        <TitleWindow
+          key={editing}
+          title={editingTitle}
+          people={editingTitle ? rolePeople.filter(p => p.titleId === editingTitle.id).length : 0}
+          rungs={rungs}
+          departments={departments}
+          canDelete={canDeleteTitles}
+          onClose={() => setEditing(null)}
+        />
+      ) : null}
+    </HvPage>
   )
 }
