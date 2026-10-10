@@ -13,6 +13,8 @@ import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildXlsxBuffer } from '@/lib/export/excel'
 import { PdfDocument, PdfTable, type PdfRowKind } from '@/lib/export/pdf'
 import { fetchLoanMonitorData, type MonitorSide, type DueRow, type OutstandingRow } from '@/lib/loan-monitor'
+import { resolveAgingAsAt } from '@/lib/debtor-aging'
+import { officeToday } from '@/lib/office-time'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +44,8 @@ export async function GET(req: Request) {
   const view = params.get('view') === 'outstanding' ? 'outstanding' : 'aging'
 
   const supabase = await createClient()
-  const data = await fetchLoanMonitorData(supabase)
+  // As at a month, as the page reads it (2026-10-10).
+  const data = await fetchLoanMonitorData(supabase, { asOf: resolveAgingAsAt(params.get('as_at'), officeToday()) })
   const monthLabel = dayjs(`${data.currentYM}-01`).format('MMMM YYYY')
   const filename = `loan-monitor-${view}-${data.currentYM}`
 

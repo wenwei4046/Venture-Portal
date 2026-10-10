@@ -8,13 +8,38 @@ import { createContext, useContext, useState } from 'react'
 
 const Find = createContext('')
 
-export function LoanFindProvider({ names, children }: { names: string[]; children: React.ReactNode }) {
+export function LoanFindProvider({
+  names,
+  asAt,
+  note,
+  children,
+}: {
+  names: string[]
+  /** As at a month (2026-10-10): picking one reloads the page with ?as_at=. */
+  asAt?: { value: string; options: Array<{ value: string; label: string }> }
+  /** A line under the control row (what an As at reads). */
+  note?: string
+  children: React.ReactNode
+}) {
   const [q, setQ] = useState('')
   const needle = q.trim().toLowerCase()
   const hits = needle ? names.filter((n) => n.toLowerCase().includes(needle)).length : 0
   return (
     <Find.Provider value={needle}>
       <div className="rpt-toolbar" role="group" aria-label="Report controls">
+        {asAt ? (
+          // A plain GET form: picking a month reloads the page as at it.
+          <form method="get" className="rpt-field">
+            <span>As at</span>
+            <select name="as_at" aria-label="As at" defaultValue={asAt.value} onChange={(e) => e.currentTarget.form?.requestSubmit()}>
+              {asAt.options.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </form>
+        ) : null}
         <div className="rpt-field rpt-find">
           <span>
             Find company <span className="rpt-find-hint">· highlights only</span>
@@ -35,6 +60,7 @@ export function LoanFindProvider({ names, children }: { names: string[]; childre
           </div>
         </div>
       </div>
+      {note ? <p className="rpt-cons">{note}</p> : null}
       {children}
     </Find.Provider>
   )

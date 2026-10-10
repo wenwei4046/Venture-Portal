@@ -12,6 +12,9 @@ import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { fetchLoanMonitorData, type MonitorSide } from '@/lib/loan-monitor'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { FindRow, LoanFindProvider } from './_components/LoanFind'
+import { officeMonth, officeToday } from '@/lib/office-time'
+import { resolveAgingAsAt } from '@/lib/debtor-aging'
+import { toChoices } from '@/lib/report-range'
 
 export const dynamic = 'force-dynamic'
 
@@ -167,12 +170,19 @@ function OutstandingTables({ side }: { side: MonitorSide }) {
   )
 }
 
-export default async function LoanMonitorPage() {
+export default async function LoanMonitorPage({ searchParams }: { searchParams: Promise<{ as_at?: string }> }) {
   await requirePermission('reports')
   const supabase = await createClient()
 
-  const data = await fetchLoanMonitorData(supabase)
-  const monthLabel = dayjs(`${data.currentYM}-01`).format('MMMM YYYY')
+  // As at a month (2026-10-10, the handoff; the user: 要做): a past month reads
+  // its last day exactly — every repayment is dated (lib/loan-monitor).
+  const today = officeToday()
+  const asAt = resolveAgingAsAt((await searchParams)?.as_at, today)
+  const past = asAt !== today
+  const data = await fetchLoanMonitorData(supabase, { asOf: asAt })
+  const asAtLabel = dayjs(asAt).format('D MMM YYYY')
+  const exportHref = (format: 'xlsx' | 'pdf', view: 'aging' | 'outstanding') =>
+    `/reports/loan-aging/export?format=${format}&view=${view}${past ? `&as_at=${asAt.slice(0, 7)}` : ''}`
 
   // On the sheet (2026-10-09, the user's Claude Design handoff): cards for
   // both sides, the exports as the sheet's buttons, each aging closing on a
@@ -195,7 +205,7 @@ export default async function LoanMonitorPage() {
       <div className="page-head">
         <div className="min-w-0">
           <div className="page-eyebrow">
-            <em>I.</em> REPORTS · LOAN AGING · {monthLabel.toUpperCase()}
+            <em>I.</em> REPORTS · LOAN AGING · AS AT {asAtLabel.toUpperCase()}
           </div>
           <h1 className="page-title">Loan Aging</h1>
           <p className="page-sub">
@@ -206,16 +216,16 @@ export default async function LoanMonitorPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <a href="/reports/loan-aging/export?format=xlsx&view=aging" className="btn-quiet-sheet">
+          <a href={exportHref('xlsx', 'aging')} className="btn-quiet-sheet">
             Excel
           </a>
-          <a href="/reports/loan-aging/export?format=pdf&view=aging" className="btn-quiet-sheet">
+          <a href={exportHref('pdf', 'aging')} className="btn-quiet-sheet">
             PDF
           </a>
-          <a href="/reports/loan-aging/export?format=xlsx&view=outstanding" className="btn-quiet-sheet">
+          <a href={exportHref('xlsx', 'outstanding')} className="btn-quiet-sheet">
             Outstanding Excel
           </a>
-          <a href="/reports/loan-aging/export?format=pdf&view=outstanding" className="btn-quiet-sheet">
+          <a href={exportHref('pdf', 'outstanding')} className="btn-quiet-sheet">
             Outstanding PDF
           </a>
         </div>
@@ -246,7 +256,14 @@ export default async function LoanMonitorPage() {
         />
       </StatCards>
 
-      <LoanFindProvider names={allNames}>
+      <LoanFindProvider
+        names={allNames}
+        asAt={{
+          value: asAt.slice(0, 7),
+          options: toChoices(officeMonth()).map((ym) => ({ value: ym, label: dayjs(`${ym}-01`).format('MMM YYYY') })),
+        }}
+        note={past ? `As at ${asAtLabel}: the deals live then, at what had been repaid by then.` : undefined}
+      >
       <section className="mb-12">
         <div className="sect-head">
           <h2>To Collect · aging — Fund OUT</h2>

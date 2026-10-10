@@ -165,3 +165,21 @@ export function debtorAgingView(raw: RawInvoice[], asOfISO: string, scheme: 'mon
   invoices.sort((a, b) => b.age - a.age)
   return { asOf: asOfISO, columns: DAY_BUCKETS, invoices, byPayer: [...map.values()].sort((a, b) => b.total - a.total), totals }
 }
+
+// ── As at a month (2026-10-10, the user's Claude Design handoff) ────────────
+// The user's rule: by the invoice date — the invoices dated on or before the
+// day, at what is still unpaid on them today, aged to that day. When each one
+// was settled is not recorded for about half the paid invoices (netting,
+// inter-billing), so the past is not re-read.
+
+/** The day a month reads as at: a past month's last day; this month, a
+ *  future one or nothing asked → today. */
+export function resolveAgingAsAt(month: string | undefined | null, today: string): string {
+  if (!month || !/^\d{4}-\d{2}$/.test(month) || month >= today.slice(0, 7)) return today
+  return dayjs(`${month}-01`).endOf('month').format('YYYY-MM-DD')
+}
+
+/** The invoices dated on or before the day (an undated one stays — it cannot be told apart). */
+export function invoicesAsAt<T extends { invoiceDate: string | null }>(raw: T[], asAt: string): T[] {
+  return raw.filter((i) => !i.invoiceDate || i.invoiceDate <= asAt)
+}

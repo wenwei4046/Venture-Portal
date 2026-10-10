@@ -7,14 +7,14 @@ import { formatMoneyBare } from '@/lib/utils'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildXlsxBuffer } from '@/lib/export/excel'
 import { PdfDocument, PdfTable, type PdfRowKind } from '@/lib/export/pdf'
-import { debtorAgingView, type RawInvoice } from '@/lib/debtor-aging'
+import { debtorAgingView, invoicesAsAt, resolveAgingAsAt, type RawInvoice } from '@/lib/debtor-aging'
 import { reportsCompanyWide } from '@/lib/surfaces'
 import { fetchPaidByInvoice } from '@/lib/debtor-aging-data'
 
 // Always generate fresh from live invoice data; never statically cache.
 export const dynamic = 'force-dynamic'
 
-async function loadAging(scheme: 'months' | 'days') {
+async function loadAging(scheme: 'months' | 'days', asAtMonth: string | null) {
   const supabase = await createClient()
   const [invoices, companies, departments] = await Promise.all([
     fetchAllRows((lo, hi) =>
@@ -54,7 +54,12 @@ async function loadAging(scheme: 'months' | 'days') {
     })
     .filter((i) => i.amount > 0.005)
   // Finance's view ages by days since the invoice (2026-10-09); a department
-  // manager's by months, as before.
+  // manager's by months, as before. Finance's As at a month (2026-10-10), as
+  // the page reads it: the invoices dated by then, aged to that day.
+  if (scheme === 'days') {
+    const asAt = resolveAgingAsAt(asAtMonth, officeToday())
+    return debtorAgingView(invoicesAsAt(raw, asAt), asAt, scheme)
+  }
   return debtorAgingView(raw, officeToday(), scheme)
 }
 
@@ -70,7 +75,7 @@ export async function GET(req: Request) {
   const viewParam = params.get('view')
   const view = viewParam === 'summary' ? 'summary' : viewParam === 'detail' ? 'detail' : format === 'pdf' ? 'summary' : 'detail'
 
-  const aging = await loadAging(reportsCompanyWide(user) ? 'days' : 'months')
+  const aging = await loadAging(reportsCompanyWide(user) ? 'days' : 'months', params.get('as_at'))
   const AGING_BUCKETS = aging.columns
   const asOf = dayjs(aging.asOf).format('D MMM YYYY')
   const filename = `debtor-aging-${view}-${dayjs(aging.asOf).format('YYYYMMDD')}`

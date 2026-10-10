@@ -65,7 +65,7 @@ beforeEach(() => {
 
 describe('Debtor Aging on the sheet', () => {
   it('shows the receivable in cards and closes on a navy All row', async () => {
-    render(await DebtorAgingPage())
+    render(await DebtorAgingPage({ searchParams: Promise.resolve({}) }))
     expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · DEBTOR AGING · AS AT 9 OCT 2026')
     expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/reports/debtor-aging/export?format=xlsx&view=detail')
     expect(card('Total receivable')).toHaveAttribute('data-tone', 'primary')
@@ -84,7 +84,7 @@ describe('Debtor Aging on the sheet', () => {
   })
 
   it('heads the table "Debtor aging" as at the day, with bare figures on white rows', async () => {
-    render(await DebtorAgingPage())
+    render(await DebtorAgingPage({ searchParams: Promise.resolve({}) }))
     const section = screen.getByRole('heading', { level: 2, name: 'Debtor aging' }).closest('section') as HTMLElement
     expect(section.querySelector('.sect-head .count')).toHaveTextContent('AS AT 9 OCT 2026')
     const century = within(section).getByText('HOUZS Century').closest('tr') as HTMLElement
@@ -93,14 +93,36 @@ describe('Debtor Aging on the sheet', () => {
     expect(century).not.toHaveClass('bg-surface-2')
   })
 
+  // 2026-10-10 — As at a month (the handoff), by the user's rule: the
+  // invoices dated by then, at what is unpaid on them today, aged to that day.
+  it('reads as at a past month: the invoices dated by then, aged to its last day', async () => {
+    render(await DebtorAgingPage({ searchParams: Promise.resolve({ as_at: '2026-09' }) }))
+    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · DEBTOR AGING · AS AT 30 SEP 2026')
+    // HV-INV-1 is dated 2 Oct: not yet issued on 30 Sep.
+    expect(card('Total receivable')).toHaveTextContent('RM 6,000.00')
+    // HV-INV-2, 2 Aug → 30 Sep: 59 days.
+    expect(card('31–60 days')).toHaveTextContent('RM 6,000.00')
+    const controls = screen.getByRole('group', { name: 'Report controls' })
+    expect(within(controls).getByRole('combobox', { name: 'As at' })).toHaveValue('2026-09')
+    expect(screen.getByText(/dated on or before 30 Sep 2026/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/reports/debtor-aging/export?format=xlsx&view=detail&as_at=2026-09')
+  })
+
+  it('reads as at today unless a past month is picked', async () => {
+    render(await DebtorAgingPage({ searchParams: Promise.resolve({}) }))
+    const controls = screen.getByRole('group', { name: 'Report controls' })
+    expect(within(controls).getByRole('combobox', { name: 'As at' })).toHaveValue('2026-10')
+    expect(screen.queryByText(/dated on or before/)).toBeNull()
+  })
+
   it('notes what to follow up and the company owing longest', async () => {
-    render(await DebtorAgingPage())
+    render(await DebtorAgingPage({ searchParams: Promise.resolve({}) }))
     expect(card('31–60 days')).toHaveTextContent('Follow up')
     expect(card('Over 60 days')).toHaveTextContent('HOUZS Design')
   })
 
   it('finds a company by name, nothing hidden', async () => {
-    render(await DebtorAgingPage())
+    render(await DebtorAgingPage({ searchParams: Promise.resolve({}) }))
     const controls = screen.getByRole('group', { name: 'Report controls' })
     expect(within(controls).getByText('· highlights only')).toBeInTheDocument()
     fireEvent.change(within(controls).getByRole('searchbox', { name: 'Find company' }), { target: { value: 'design' } })
@@ -113,7 +135,7 @@ describe('Debtor Aging on the sheet', () => {
 
   it('stays as it was for a department manager', async () => {
     mocks.requirePermission.mockResolvedValue(withActions({ id: 'm', role: 'dept_manager', permissions: ['dept_reports'] }))
-    render(await DebtorAgingPage())
+    render(await DebtorAgingPage({ searchParams: Promise.resolve({}) }))
     expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · DEBTOR AGING')
     expect(document.querySelector('tr.rpt-all')).toBeNull()
   })
@@ -121,8 +143,8 @@ describe('Debtor Aging on the sheet', () => {
 
 describe('Loan Aging on the sheet', () => {
   it('shows both sides in cards and closes each aging on a navy All row', async () => {
-    render(await LoanAgingPage())
-    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · LOAN AGING · OCTOBER 2026')
+    render(await LoanAgingPage({ searchParams: Promise.resolve({}) }))
+    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · LOAN AGING · AS AT 9 OCT 2026')
     // The handoff's four cards (2026-10-10).
     expect(card('Loans outstanding')).toHaveAttribute('data-tone', 'primary')
     expect(card('Loans outstanding')).toHaveTextContent('RM 250,000.00')
@@ -143,8 +165,25 @@ describe('Loan Aging on the sheet', () => {
     expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/reports/loan-aging/export?format=xlsx&view=aging')
   })
 
+  // 2026-10-10 — As at a month (the handoff; the user: 要做): every repayment
+  // is dated, so the past is read exactly (lib/loan-monitor).
+  it('reads as at a past month', async () => {
+    render(await LoanAgingPage({ searchParams: Promise.resolve({ as_at: '2026-09' }) }))
+    expect(mocks.fetchLoanMonitorData).toHaveBeenCalledWith(expect.anything(), { asOf: '2026-09-30' })
+    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · LOAN AGING · AS AT 30 SEP 2026')
+    const controls = screen.getByRole('group', { name: 'Report controls' })
+    expect(within(controls).getByRole('combobox', { name: 'As at' })).toHaveValue('2026-09')
+    expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/reports/loan-aging/export?format=xlsx&view=aging&as_at=2026-09')
+  })
+
+  it('reads today unless a past month is picked', async () => {
+    render(await LoanAgingPage({ searchParams: Promise.resolve({}) }))
+    expect(mocks.fetchLoanMonitorData).toHaveBeenCalledWith(expect.anything(), { asOf: '2026-10-09' })
+    expect(within(screen.getByRole('group', { name: 'Report controls' })).getByRole('combobox', { name: 'As at' })).toHaveValue('2026-10')
+  })
+
   it('finds a company on its control row, nothing hidden', async () => {
-    render(await LoanAgingPage())
+    render(await LoanAgingPage({ searchParams: Promise.resolve({}) }))
     const controls = screen.getByRole('group', { name: 'Report controls' })
     fireEvent.change(within(controls).getByRole('searchbox', { name: 'Find company' }), { target: { value: 'kitchen' } })
     // The tables' rows (the 1–30 card names the borrower too).

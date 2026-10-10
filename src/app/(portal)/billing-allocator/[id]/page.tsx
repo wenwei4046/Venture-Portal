@@ -104,7 +104,7 @@ export default async function AllocationRecordPage({ params }: Props) {
   return (
     <div>
       <div className="mb-3">
-        <ReturnLink href={`/billing-allocator?period=${period}`} className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
+        <ReturnLink href={`/billing-allocator?period=${period}`} alsoFrom={['/billing-allocator']} className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
           ← Back to Billing Allocator
         </ReturnLink>
       </div>

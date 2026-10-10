@@ -38,13 +38,20 @@ interface Props {
   allRow?: boolean
   /** The handoff's sheet (2026-10-10, Finance's view): bare figures, white rows. */
   sheet?: boolean
+  /** As at a month on the control row (2026-10-10): the month shown and the
+   *  choices; picking one reloads the page with ?as_at=. */
+  asAt?: { value: string; options: Array<{ value: string; label: string }> }
+  /** A line under the control row (what an As at reads). */
+  note?: string
+  /** Shown instead of the table when nothing is outstanding. */
+  empty?: string
 }
 
 function money(v: number, bare = false) {
   return v ? <span className="num">{bare ? formatMoneyBare(v) : formatMoney(v)}</span> : <span className="num text-muted">—</span>
 }
 
-export default function AgingByCustomer({ byPayer, invoices, totals, allRow = false, columns = AGING_BUCKETS, search = false, sheet = false }: Props) {
+export default function AgingByCustomer({ byPayer, invoices, totals, allRow = false, columns = AGING_BUCKETS, search = false, sheet = false, asAt, note, empty }: Props) {
   const amount = (v: number) => (sheet ? formatMoneyBare(v) : formatMoney(v))
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [find, setFind] = useState('')
@@ -75,6 +82,19 @@ export default function AgingByCustomer({ byPayer, invoices, totals, allRow = fa
       {search ? (
         // The handoff's control row (2026-10-10): Find company highlights only.
         <div className="rpt-toolbar" role="group" aria-label="Report controls">
+          {asAt ? (
+            // A plain GET form: picking a month reloads the page as at it.
+            <form method="get" className="rpt-field">
+              <span>As at</span>
+              <select name="as_at" aria-label="As at" defaultValue={asAt.value} onChange={(e) => e.currentTarget.form?.requestSubmit()}>
+                {asAt.options.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </form>
+          ) : null}
           <div className="rpt-field rpt-find">
             <span>
               Find company <span className="rpt-find-hint">· highlights only</span>
@@ -96,6 +116,13 @@ export default function AgingByCustomer({ byPayer, invoices, totals, allRow = fa
           </div>
         </div>
       ) : null}
+      {note ? <p className="rpt-cons">{note}</p> : null}
+      {empty ? (
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-sm">{empty}</p>
+        </div>
+      ) : (
+      <>
       <div className="mb-2 flex gap-3">
         <button
           onClick={() => setExpanded(new Set(byPayer.map((p) => p.payer)))}
@@ -188,6 +215,8 @@ export default function AgingByCustomer({ byPayer, invoices, totals, allRow = fa
           </tbody>
         </table>
       </div>
+      </>
+      )}
     </div>
   )
 }

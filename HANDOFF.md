@@ -1,5 +1,38 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-10 p (SHIPPED) — the user's calls, As at, the leftovers — audit list l is DONE
+
+- **Payments / Receipt filter form removed** (user: 拿掉，照设计档) — VoucherLedger no longer
+  renders PaymentFilters (file kept, unused); the ledger loads every voucher of the side and
+  the columns' ▽ / Range + the search box cover it; old ?q= / ?type= links still filter.
+- **Company Statement to-repay = red** (user: 照设计档改红色, overriding 2026-08-06 orange):
+  `cs-repay` rgb(246 222 219)/#B02822, sub rgb(250 235 233), DetailSection danger classes.
+- **GL balance stays "x Dr / x Cr"** (user: 保留).
+- **Debtor Aging As at** (user's rule: 根据发票日期): `lib/debtor-aging` `resolveAgingAsAt`
+  (past month → its last day; this / future / none → today) + `invoicesAsAt` (invoice_date ≤
+  day, undated kept); Finance's page + export take `?as_at=YYYY-MM`; the rows are TODAY's
+  unpaid amounts aged to that day — ~105 of 196 paid invoices have no dated settlement
+  (netting / inter-billing), so the past is NOT re-read; the page says so in a `.rpt-cons` note.
+  AgingByCustomer `asAt` (GET-form select), `note`, `empty`.
+- **Loan Aging As at** (exact): `fetchLoanMonitorData(supabase, { asOf })` — a past day keeps
+  deals live then (loans active|fully_repaid disbursed ≤ day; fund sources active|matured|
+  repaid effective ≤ day), repayments ≤ day, outstanding = principal − principal repaid by then
+  (fund sources principal+netting, as the views), aged to that day; no / today → unchanged path.
+  Page + export `?as_at=`; LoanFindProvider `asAt` + `note`. Pages take a required
+  `searchParams` (Next's PageProps rejects an optional one).
+- Leftovers: Payments Total skips voided; Due to collect/pay lists a min-interest deal with its
+  instalment once (`due-rows.ts`); SheetIcon `in` (↓) on Received today / Total received;
+  SortableTable phone "Show details" / "More ⋯" and AttachmentList in English on the Finance
+  view; wait tone on Fund IN Pending approval and the maturing card; Dept Pool Net (to date)
+  green/red; ReturnLink `alsoFrom` so Invoice / Allocator record "← Back" steps back from the
+  bare list. Temporary `src/__harness__` and `.design/_harness-*` removed.
+- Known, not done (tell the user if asked): receipt page's phone top-bar title says Payments
+  (finance-view path title can't tell a receipt); Repayment Schedule Export (needs new reads);
+  Venture Pool page-level search (SortableTable has no external query) and latest-50 cap;
+  netting log "ALL TIME" (no netted date); three aligned-foot helpers (AlignedFoot / TotalFoot /
+  ColumnFoot) could become one SortableTable feature; Allocator Staff now lists everyone
+  (inactive greyed) per the design.
+
 ## CHECKPOINT 2026-10-10 o (SHIPPED) — audit fixes, parts 2–4: every page group
 
 Six agents, each confined to its own folders (shared files were mine), closed list l

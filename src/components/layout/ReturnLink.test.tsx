@@ -34,6 +34,15 @@ describe('ReturnLink', () => {
     expect(back).not.toHaveBeenCalled()
   })
 
+  // 2026-10-10 — a list the sidebar opened has no ?period=, while the link
+  // names its month: that list counts as where the reader came from too.
+  it('steps back to any of the other addresses the page counts as where it came from', () => {
+    previousEntryIs.mockImplementation((href: string) => href === '/statements')
+    render(<ReturnLink href="/statements?period=2026-10-01" alsoFrom={['/statements']}>← Back to Service Billing</ReturnLink>)
+    expect(fireEvent.click(screen.getByRole('link', { name: '← Back to Service Billing' }))).toBe(false)
+    expect(back).toHaveBeenCalledOnce()
+  })
+
   it('leaves a new-tab or modified click to the browser', () => {
     previousEntryIs.mockReturnValue(true)
     render(<ReturnLink href={LEDGER}>← ANTHONY</ReturnLink>)

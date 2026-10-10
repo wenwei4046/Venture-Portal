@@ -200,7 +200,7 @@ export default async function InvoicePage({ params }: Props) {
   return (
     <div>
       <div className="mb-3">
-        <ReturnLink href={listHref} className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
+        <ReturnLink href={listHref} alsoFrom={['/statements']} className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
           ← Back to Service Billing
         </ReturnLink>
       </div>

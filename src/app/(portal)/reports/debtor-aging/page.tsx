@@ -1,11 +1,12 @@
 import dayjs from 'dayjs'
-import { officeToday } from '@/lib/office-time'
+import { officeMonth, officeToday } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney } from '@/lib/utils'
-import { buildDebtorAging, debtorAgingView, type RawInvoice } from '@/lib/debtor-aging'
+import { buildDebtorAging, debtorAgingView, invoicesAsAt, resolveAgingAsAt, type RawInvoice } from '@/lib/debtor-aging'
+import { toChoices } from '@/lib/report-range'
 import { fetchPaidByInvoice } from '@/lib/debtor-aging-data'
 import AgingByCustomer from './_components/AgingByCustomer'
 import { reportsCompanyWide } from '@/lib/surfaces'
@@ -13,7 +14,7 @@ import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 export const dynamic = 'force-dynamic'
 
-export default async function DebtorAgingPage() {
+export default async function DebtorAgingPage({ searchParams }: { searchParams: Promise<{ as_at?: string }> }) {
   // dept_manager sees only their own segment's invoices (RLS on invoices).
   const user = await requirePermission('dept_reports')
   const supabase = await createClient()
@@ -68,8 +69,16 @@ export default async function DebtorAgingPage() {
   // table closing on a navy "All companies" row. A department manager keeps
   // the page below, as it was.
   if (reportsCompanyWide(user)) {
+    // As at a month (2026-10-10, the handoff) by the user's rule: the invoices
+    // dated by then, at what is unpaid on them today, aged to that day.
+    const nowYM = officeMonth()
+    const asAtMonth = (await searchParams)?.as_at
+    const asAt = resolveAgingAsAt(asAtMonth, today)
+    const past = asAt !== today
+    const rawAt = invoicesAsAt(raw, asAt)
+    const agingAt = buildDebtorAging(rawAt, asAt)
     // By days since the invoice (the handoff's columns, the July rule's basis).
-    const days = debtorAgingView(raw, today, 'days')
+    const days = debtorAgingView(rawAt, asAt, 'days')
     const b = days.totals.buckets
     const fresh = b.d0_30 ?? 0
     const d31 = b.d31_60 ?? 0
@@ -79,13 +88,15 @@ export default async function DebtorAgingPage() {
       .map((p) => ({ payer: p.payer, v: (p.buckets.d61_90 ?? 0) + (p.buckets.d90_plus ?? 0) }))
       .filter((p) => p.v > 0.005)
       .sort((x, y) => y.v - x.v)[0]
-    const exportHref = (format: 'xlsx' | 'pdf', view: 'detail' | 'summary') => `/reports/debtor-aging/export?format=${format}&view=${view}`
+    const exportHref = (format: 'xlsx' | 'pdf', view: 'detail' | 'summary') =>
+      `/reports/debtor-aging/export?format=${format}&view=${view}${past ? `&as_at=${asAt.slice(0, 7)}` : ''}`
+    const asAtLabel = dayjs(asAt).format('D MMM YYYY')
     return (
       <div>
         <div className="page-head">
           <div className="min-w-0">
             <div className="page-eyebrow">
-              <em>I.</em> REPORTS · DEBTOR AGING · AS AT {dayjs(today).format('D MMM YYYY').toUpperCase()}
+              <em>I.</em> REPORTS · DEBTOR AGING · AS AT {asAtLabel.toUpperCase()}
             </div>
             <h1 className="page-title">Debtor Aging</h1>
             <p className="page-sub">Invoices billed out and not yet collected, by days since the invoice date.</p>
@@ -109,10 +120,10 @@ export default async function DebtorAgingPage() {
         <StatCards label="Debtor aging">
           <StatCard
             label="Total receivable"
-            value={formatMoney(aging.totals.total)}
+            value={formatMoney(agingAt.totals.total)}
             icon="receipt"
             tone="primary"
-            note={`${aging.byPayer.length} ${aging.byPayer.length === 1 ? 'company' : 'companies'} · ${aging.totals.count} ${aging.totals.count === 1 ? 'invoice' : 'invoices'}`}
+            note={`${agingAt.byPayer.length} ${agingAt.byPayer.length === 1 ? 'company' : 'companies'} · ${agingAt.totals.count} ${agingAt.totals.count === 1 ? 'invoice' : 'invoices'}`}
           />
           <StatCard label="0–30 days" value={formatMoney(fresh)} icon="check" note="Since the invoice date" />
           <StatCard label="31–60 days" value={formatMoney(d31)} icon="clock" tone={d31 > 0 ? 'danger' : 'default'} note="Follow up" />
@@ -123,15 +134,23 @@ export default async function DebtorAgingPage() {
           <div className="sect-head">
             <h2>Debtor aging</h2>
             <span className="rule" aria-hidden />
-            <span className="count">AS AT {dayjs(today).format('D MMM YYYY').toUpperCase()}</span>
+            <span className="count">AS AT {asAtLabel.toUpperCase()}</span>
           </div>
-          {aging.totals.count === 0 ? (
-            <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
-              <p className="text-sm">Nothing outstanding — every issued invoice has been collected.</p>
-            </div>
-          ) : (
-            <AgingByCustomer byPayer={days.byPayer} invoices={days.invoices} totals={days.totals} columns={days.columns} allRow search sheet />
-          )}
+          <AgingByCustomer
+            byPayer={days.byPayer}
+            invoices={days.invoices}
+            totals={days.totals}
+            columns={days.columns}
+            allRow
+            search
+            sheet
+            asAt={{
+              value: asAt.slice(0, 7),
+              options: toChoices(nowYM).map((ym) => ({ value: ym, label: dayjs(`${ym}-01`).format('MMM YYYY') })),
+            }}
+            note={past ? `Invoices dated on or before ${asAtLabel} that are still unpaid today, aged to ${asAtLabel}.` : undefined}
+            empty={agingAt.totals.count === 0 ? (past ? `Nothing dated on or before ${asAtLabel} is still unpaid.` : 'Nothing outstanding — every issued invoice has been collected.') : undefined}
+          />
         </section>
       </div>
     )

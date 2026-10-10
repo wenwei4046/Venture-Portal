@@ -5,7 +5,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { previousEntryIs } from '@/lib/history-entry'
 
-type ReturnLinkProps = Omit<ComponentProps<typeof Link>, 'href'> & { href: string }
+type ReturnLinkProps = Omit<ComponentProps<typeof Link>, 'href'> & {
+  href: string
+  /** Other addresses that count as where the reader came from — a list the
+   *  sidebar opened without the ?period= the link names (2026-10-10). */
+  alsoFrom?: string[]
+}
 
 /**
  * A "← back to …" link that IS Back when the page it names is the one the
@@ -15,7 +20,7 @@ type ReturnLinkProps = Omit<ComponentProps<typeof Link>, 'href'> & { href: strin
  * any other way (a new tab, a shared link, a reload) it is an ordinary link
  * to the same place, and a middle- or modified click always is.
  */
-export default function ReturnLink({ href, onClick, children, ...rest }: ReturnLinkProps) {
+export default function ReturnLink({ href, alsoFrom, onClick, children, ...rest }: ReturnLinkProps) {
   const router = useRouter()
   return (
     <Link
@@ -25,7 +30,7 @@ export default function ReturnLink({ href, onClick, children, ...rest }: ReturnL
         onClick?.(event)
         if (event.defaultPrevented || event.button !== 0) return
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-        if (!previousEntryIs(href)) return
+        if (!previousEntryIs(href) && !(alsoFrom ?? []).some((h) => previousEntryIs(h))) return
         event.preventDefault()
         router.back()
       }}

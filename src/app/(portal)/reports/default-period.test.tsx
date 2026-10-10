@@ -105,7 +105,7 @@ describe("reports open on the office's month", () => {
   })
 
   it("Debtor Aging: as of the office's today", async () => {
-    render(await asTheServer(() => DebtorAgingPage()))
+    render(await asTheServer(() => DebtorAgingPage({ searchParams: Promise.resolve({}) })))
     expect(screen.getByText(/as of 1 Nov 2026/)).toBeInTheDocument()
   })
 

@@ -78,28 +78,35 @@ export interface LoanMonitorData {
 const money = (n: number) =>
   n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<LoanMonitorData> {
-  const currentYM = officeMonth()
-  const today = officeToday()
+export async function fetchLoanMonitorData(supabase: SupabaseClient, opts: { asOf?: string } = {}): Promise<LoanMonitorData> {
+  // As at a past day (2026-10-10, the user's Claude Design handoff; the user:
+  // 要做). Every repayment is dated, so that day reads exactly: the deals live
+  // then (one repaid since included), their outstanding and their unpaid
+  // instalments from the repayments made by that day, aged to it. No day, or
+  // today, reads as it always has.
+  const realToday = officeToday()
+  const past = !!opts.asOf && /^\d{4}-\d{2}-\d{2}$/.test(opts.asOf) && opts.asOf < realToday
+  const today = past ? (opts.asOf as string) : realToday
+  const currentYM = past ? today.slice(0, 7) : officeMonth()
   // An installment falls due on the deal's own day of the month (its
   // disbursement / effective date's), as on its Repayment schedule.
   const dayOf = (d: unknown) => (d ? Number(String(d).slice(8, 10)) || 1 : 1)
 
   const [
-    { data: loans },
-    { data: loanOut },
+    { data: loansRead },
+    { data: loanOutRead },
     { data: companies },
-    loanReps,
-    { data: fsrcs },
-    { data: fsOut },
-    fsReps,
+    loanRepsRead,
+    { data: fsrcsRead },
+    { data: fsOutRead },
+    fsRepsRead,
     { data: directors },
     { data: departments },
   ] = await Promise.all([
     supabase
       .from('loans')
       .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, terms_effective_from')
-      .eq('status', 'active'),
+      .in('status', past ? ['active', 'fully_repaid'] : ['active']),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     supabase.from('companies').select('id, name, short_code'),
     fetchAllRows((lo, hi) =>
@@ -108,7 +115,7 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
     supabase
       .from('fund_sources')
       .select('id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, terms_effective_from')
-      .in('status', ['active', 'matured']),
+      .in('status', past ? ['active', 'matured', 'repaid'] : ['active', 'matured']),
     supabase.from('fund_source_outstanding').select('fund_source_id, outstanding, total_principal_paid'),
     fetchAllRows((lo, hi) =>
       supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi),
@@ -116,6 +123,29 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
     supabase.from('directors').select('id, name, code'),
     supabase.from('departments').select('id, name'),
   ])
+
+  // A past day keeps the deals made by then and the repayments made by then;
+  // a deal's outstanding is its principal less the principal repaid by then —
+  // the loan_outstanding / fund_source_outstanding views' own sums, dated.
+  const onOrBefore = (d: unknown) => !d || String(d).slice(0, 10) <= today
+  const loans = past ? (loansRead ?? []).filter((l) => onOrBefore(l.disbursement_date)) : loansRead
+  const fsrcs = past ? (fsrcsRead ?? []).filter((s) => onOrBefore(s.effective_date)) : fsrcsRead
+  const loanReps = past ? (loanRepsRead ?? []).filter((rp) => onOrBefore(rp.payment_date)) : loanRepsRead
+  const fsReps = past ? (fsRepsRead ?? []).filter((rp) => onOrBefore(rp.payment_date)) : fsRepsRead
+  const principalPaid = (reps: Array<{ amount: unknown; payment_type?: unknown }> | null | undefined, counts: (t: string) => boolean) =>
+    r2((reps ?? []).filter((rp) => counts(String(rp.payment_type ?? 'principal'))).reduce((s, rp) => s + Number(rp.amount), 0))
+  const loanOut = past
+    ? (loans ?? []).map((l) => {
+        const paid = principalPaid((loanReps ?? []).filter((rp) => rp.loan_id === l.id), (t) => t === 'principal')
+        return { loan_id: l.id, total_principal_paid: paid, outstanding: r2(Number(l.principal) - paid) }
+      })
+    : loanOutRead
+  const fsOut = past
+    ? (fsrcs ?? []).map((s) => {
+        const paid = principalPaid((fsReps ?? []).filter((rp) => rp.fund_source_id === s.id), (t) => t === 'principal' || t === 'netting')
+        return { fund_source_id: s.id, total_principal_paid: paid, outstanding: r2(Number(s.amount) - paid) }
+      })
+    : fsOutRead
 
   const coById = new Map((companies ?? []).map((c) => [c.id as string, c]))
   const dirById = new Map((directors ?? []).map((d) => [d.id as string, d]))
