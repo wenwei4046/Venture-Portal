@@ -409,6 +409,32 @@ export function isGuestCode(v: unknown): v is string {
   return typeof v === 'string' && /^hv-[A-HJ-NP-Z2-9]{8}$/.test(v)
 }
 
+/** The database's last word on a clash (the bookings' exclusion constraint), in the page's words. */
+export const SLOT_TAKEN = 'Someone just took that slot. Pick another time.'
+
+/**
+ * The SQLSTATEs the guest functions refuse with, in words written for the
+ * guest: RAISE EXCEPTION's own (P0001), the closed link and somebody else's
+ * booking (42501), and the Hiring module's refusals (22023).
+ */
+const GUEST_REFUSALS: ReadonlySet<string> = new Set(['P0001', '42501', '22023'])
+
+/**
+ * What a stranger on /g/<code> may read of a failed call (2026-10-11, the
+ * security review's N3): the guest functions' own refusals, word for word, and
+ * a clash (23P01) as the page says it. Anything else — a constraint's name,
+ * "invalid input syntax for type uuid", Postgres's own "permission denied for
+ * function …", a network failure — is the action's fallback sentence: the
+ * database's own text never reaches somebody with no account.
+ */
+export function guestRefusal(error: { code?: string | null; message?: string | null } | null | undefined, fallback: string): string {
+  if (!error) return fallback
+  if (error.code === '23P01') return SLOT_TAKEN
+  const message = typeof error.message === 'string' ? error.message.trim() : ''
+  if (!message || typeof error.code !== 'string' || !GUEST_REFUSALS.has(error.code)) return fallback
+  return /^permission denied\b/i.test(message) ? fallback : message
+}
+
 // ── Request manpower (the step-by-step form) ──────────────────────────────
 
 /** One of Hiring › Form settings' fields, as the guest page asks it. */

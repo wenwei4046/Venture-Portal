@@ -59,6 +59,18 @@ const nextConfig: NextConfig = {
         source: '/manifest.webmanifest',
         headers: [{ key: 'Content-Type', value: 'application/manifest+json; charset=utf-8' }],
       },
+      // The guest link's page (2026-10-11, the security review's N4). Its
+      // address carries the link's code — the only key a guest needs — so the
+      // page sends no Referer (a font or a file it loads would otherwise learn
+      // the code), no other site may frame it, and nothing keeps a copy.
+      {
+        source: '/g/:path*',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+          { key: 'Cache-Control', value: 'no-store' },
+        ],
+      },
     ]
   },
 
