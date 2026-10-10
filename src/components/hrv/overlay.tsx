@@ -91,6 +91,7 @@ export function Drawer({
   bodyStyle,
   bare = false,
   label,
+  headGrow = false,
 }: {
   open: boolean
   onClose: () => void
@@ -111,6 +112,8 @@ export function Drawer({
   bare?: boolean
   /** The dialog's name when `bare` (there is no title to name it). */
   label?: string
+  /** A custom head that spans the row (its own buttons before the ×). */
+  headGrow?: boolean
 }) {
   const id = useId()
   useEscape(open, onClose)
@@ -153,7 +156,7 @@ export function Drawer({
             style={{ width, outline: 'none' }}
           >
             <div className={s.drawerHead} style={headStyle}>
-              <div id={`${id}-title`}>
+              <div id={`${id}-title`} style={headGrow ? { flex: 1, minWidth: 0 } : undefined}>
                 {head ?? (
                   <>
                     {eyebrow ? <div className={s.drawerEyebrow} style={eyebrowStyle}>{eyebrow}</div> : null}
