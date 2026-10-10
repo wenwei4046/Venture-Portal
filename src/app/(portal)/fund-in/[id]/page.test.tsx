@@ -98,7 +98,8 @@ describe('a fund source’s page', () => {
     expect(card('Interest rate')).toHaveTextContent('Monthly RM 300.00 · total RM 900.00')
     expect(card('Monthly payment')).toHaveTextContent('RM 10,300.00')
     expect(card('Monthly payment')).toHaveTextContent('3M · matures 15 Oct 2026 · 6d remaining')
-    expect(card('Monthly payment')).toHaveAttribute('data-tone', 'alert')
+    // Maturing within 30 days is waiting, the blue wait tone (2026-10-10, the handoff's rule).
+    expect(card('Monthly payment')).toHaveAttribute('data-tone', 'wait')
     expect(card('Expected repayment (first installment)')).toHaveTextContent('15 Aug 2026')
 
     const details = screen.getByRole('region', { name: 'Details' })

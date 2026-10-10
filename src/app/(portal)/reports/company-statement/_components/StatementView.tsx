@@ -83,11 +83,12 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
     { principal: 0, totalInterest: 0, outstanding: 0, interest: 0, oweTotal: 0 },
   )
   return (
-    // 用格子围起来 + 底色分色 (user 2026-08-06): 要收绿底, 要还橙底 — 一眼分清.
+    // 用格子围起来 + 底色分色 (user 2026-08-06): 要收绿底 — and 要还 red since
+    // 2026-10-10 (the user took the handoff's red over the August orange).
     <div
       className={
         'rounded-md border p-3 ' +
-        (side === 'collect' ? 'border-ledger/40 bg-ledger/[0.06]' : 'border-alert/40 bg-alert/[0.06]')
+        (side === 'collect' ? 'border-ledger/40 bg-ledger/[0.06]' : 'border-danger/30 bg-danger/[0.045]')
       }
     >
       <div
@@ -95,7 +96,7 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
           'font-mono text-sm font-semibold uppercase tracking-wider inline-block rounded px-2.5 py-1 mb-2 border ' +
           (side === 'collect'
             ? 'text-ledger border-ledger/40 bg-ledger/10'
-            : 'text-alert border-alert/40 bg-alert/10')
+            : 'text-danger border-danger/30 bg-danger/[0.08]')
         }
       >
         {side === 'collect' ? 'TO COLLECT' : 'TO REPAY'} · {items.length}

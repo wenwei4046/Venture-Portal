@@ -5770,12 +5770,12 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .rpt-range-word { font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: rgb(117 100 86); }
 .rpt-cons { margin: 0 0 10px; font-size: 11.5px; font-style: italic; color: rgb(150 100 12); }
 /* The Company Statement's column groups (2026-10-10, the handoff): to collect
-   green, to repay in the user's orange (2026-08-06: 要收绿底, 要还橙底);
-   the total tinted navy. */
+   green, to repay red (the user took the handoff's red over the August
+   orange, 2026-10-10); the total tinted navy. */
 .fin-view .ledger-table thead th.cs-collect { background: rgb(216 236 225); color: #156E4E; }
-.fin-view .ledger-table thead th.cs-repay { background: rgb(252 236 214); color: #C9741F; }
+.fin-view .ledger-table thead th.cs-repay { background: rgb(246 222 219); color: #B02822; }
 .fin-view .ledger-table thead th.cs-collect-sub { background: rgb(232 243 237); }
-.fin-view .ledger-table thead th.cs-repay-sub { background: rgb(254 244 231); }
+.fin-view .ledger-table thead th.cs-repay-sub { background: rgb(250 235 233); }
 .fin-view .ledger-table tr.cs-total td { background: rgb(221 229 240); box-shadow: inset 0 1.5px 0 rgb(46 92 138); color: rgb(29 43 74); }
 .fin-view .ledger-table tr.cs-total td:first-child { font-weight: 600; }
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
 
 const mocks = vi.hoisted(() => ({
@@ -22,7 +22,7 @@ vi.mock('@/lib/payment-extras', () => ({ fetchPaymentExtras: vi.fn(async () => [
 vi.mock('./PaymentTabs', () => ({
   default: (props: { counts?: Record<string, number> }) => <pre data-testid="tabs">{JSON.stringify(props.counts ?? null)}</pre>,
 }))
-vi.mock('./PaymentFilters', () => ({ default: () => null }))
+vi.mock('./PaymentFilters', () => ({ default: () => <div data-testid="payment-filters" /> }))
 vi.mock('./BackToTop', () => ({ default: () => null }))
 // The table is a client component: its props are exactly what the server sends
 // to the browser, so they are printed and read here as the browser would get them.
@@ -268,6 +268,18 @@ describe('the ledger on the sheet', () => {
 // 2026-10-10 — the handoff (audit 2026-10-09 l): the head is Dept Requests ·
 // Payroll Requests · Create payment, the eyebrow names the month, the cards
 // speak English, and Receipts is "Receipt" with its green Total received.
+describe('the filter form', () => {
+  // 2026-10-10 — the user: drop the old filter row (照设计档); the columns' ▽
+  // filter category, pool, amount and date, and the search box finds the rest.
+  it('is gone from both sides', async () => {
+    render(await VoucherLedger({ direction: 'debit', params: {} }))
+    expect(screen.queryByTestId('payment-filters')).toBeNull()
+    cleanup()
+    render(await VoucherLedger({ direction: 'credit', params: {} }))
+    expect(screen.queryByTestId('payment-filters')).toBeNull()
+  })
+})
+
 describe('the handoff’s head and cards', () => {
   const head = () => document.querySelector('.page-head') as HTMLElement
   const actions = () => within(head()).getAllByRole('link')

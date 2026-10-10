@@ -57,7 +57,12 @@ export function dueRows(parts: { rows: SchedRow[]; min: MinInterestRow[]; compou
       source: r.source,
     })
   }
+  // A minimum-interest deal with its instalment this month IS that instalment
+  // (the interest is in it): listed once, so the Total counts it once
+  // (2026-10-10). Its minimum-interest check stays in the Full plans fold.
+  const scheduled = new Set(parts.rows.map((r) => r.key))
   for (const r of parts.min) {
+    if (scheduled.has(r.key)) continue
     push({
       key: `min:${r.key}`,
       id: r.key,

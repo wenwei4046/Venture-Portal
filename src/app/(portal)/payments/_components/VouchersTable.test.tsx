@@ -353,6 +353,14 @@ describe('the handoff’s list on the Finance view', () => {
     expect(footCell('amount')).toHaveTextContent('300.00')
   })
 
+  // 2026-10-10 — a voided voucher moved no money: it stays on the list but
+  // out of the Total, as on the Invoice list.
+  it('leaves voided vouchers out of the Total', () => {
+    fin(<VouchersTable rows={[voucher, pending, { ...pending, id: 'v-void', voucher_no: 'HV-PV-202609-0439', status: 'voided' }]} />)
+    expect(screen.getByText('HV-PV-202609-0439')).toBeInTheDocument()
+    expect(footCell('amount')).toHaveTextContent('1,500.00')
+  })
+
   it('on a phone, a row carries its status and its details under the number, and the figure says what it is', () => {
     fin(<VouchersTable rows={[voucher]} />)
     const row = rowOf('HV-PV-202609-0437')

@@ -218,7 +218,7 @@ export default function DailyBankView({ data, today }: { data: DailyBankData; to
           tone={received > 0 ? 'ledger' : 'default'}
           label="Received today"
           value={formatMoney(received)}
-          icon="inbox"
+          icon="in"
           note={receiptCount > 0 ? plural(receiptCount, 'receipt', 'receipts') : received > 0 ? 'by JV / transfer' : 'nothing in yet'}
         />
         <StatCard

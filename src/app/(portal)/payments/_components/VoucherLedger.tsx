@@ -12,7 +12,6 @@ import { formatMoney } from '@/lib/utils'
 import { filterLockedBatches, isPayrollReference, lockPayrollBatches } from '@/lib/payroll-vouchers'
 import PaymentTabs from './PaymentTabs'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
-import PaymentFilters from './PaymentFilters'
 import BackToTop from './BackToTop'
 import VouchersTable, { type VoucherRow } from './VouchersTable'
 import dayjs from 'dayjs'
@@ -374,7 +373,7 @@ export default async function VoucherLedger({
           tone={isReceipts ? 'ledger' : 'primary'}
           label={isReceipts ? 'Total received' : 'Total paid'}
           value={formatMoney(totalPaid)}
-          icon={isReceipts ? 'receipt' : 'bank'}
+          icon={isReceipts ? 'in' : 'bank'}
           note={
             extraRows.length > 0
               ? isReceipts
@@ -423,10 +422,10 @@ export default async function VoucherLedger({
             <PaymentTabs counts={counts} />
           </Suspense>
 
-          <Suspense fallback={null}>
-            <PaymentFilters side={isReceipts ? 'receipts' : 'payments'} />
-          </Suspense>
-
+          {/* The old filter row is gone (2026-10-10, the user: 照设计档) —
+              the columns' ▽ filter category, pool, amount and date, and the
+              table's search box finds the rest. An old ?q= / ?type= link
+              still filters, below. */}
           <div className="sect-head">
             <h2>{payrollTab ? 'Payroll batches' : isReceipts ? 'Official receipts' : 'Payment vouchers'}</h2>
             <span className="rule" aria-hidden />

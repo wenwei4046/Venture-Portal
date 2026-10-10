@@ -189,7 +189,8 @@ export default async function FundInPage({ searchParams }: Props) {
           icon="calendar"
           note={maturingIn30d.length > 0 ? formatMoney(maturingIn30d.reduce((s, x) => s + Number(x.amount), 0)) : 'None due'}
         />
-        <StatCard label="Pending approval" value={String(counts.pending_approval)} icon="clock" note="Awaiting Principal" />
+        {/* Waiting on someone = the blue wait tone (2026-10-10, the handoff's rule). */}
+        <StatCard tone={counts.pending_approval > 0 ? 'wait' : 'default'} label="Pending approval" value={String(counts.pending_approval)} icon="clock" note="Awaiting Principal" />
       </StatCards>
 
       {/* ───────── Status tabs + the list ───────── */}

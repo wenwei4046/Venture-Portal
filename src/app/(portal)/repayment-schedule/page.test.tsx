@@ -136,7 +136,8 @@ describe('Due to collect', () => {
     await page()
     fireEvent.click(tab(/^We collect/))
     const due = section('Due to collect')
-    expect(within(due).getByText('6 ITEMS · OCTOBER 2026')).toBeInTheDocument()
+    // HD's minimum interest is inside its instalment: one row, not two (2026-10-10).
+    expect(within(due).getByText('5 ITEMS · OCTOBER 2026')).toBeInTheDocument()
     expect(Array.from(due.querySelectorAll('thead th[data-col]')).map((th) => th.textContent?.replace(/[↕▲▼]/g, '').trim())).toEqual([
       'Counterparty', 'Type', 'Principal', 'Interest', 'Total due', 'Received · Oct', 'Short', '',
     ])
@@ -163,14 +164,15 @@ describe('Due to collect', () => {
     expect(within(hc).getByText('clear').closest('.chip')).toHaveClass('ledger')
     expect(within(hc).queryByRole('link', { name: 'Record receipt' })).toBeNull()
 
-    // HD paid only 5,000 of its interest: short on its instalment and on its minimum interest.
-    const [hdScheduled, hdMin] = rowsOf(due, 'HD')
+    // HD paid only 5,000 of its interest: short on its instalment — listed once,
+    // its minimum interest being part of it (the check stays in Full plans).
+    const hdRows = rowsOf(due, 'HD')
+    expect(hdRows).toHaveLength(1)
+    const [hdScheduled] = hdRows
     expect(hdScheduled).toHaveTextContent('5,000.00')
     expect(hdScheduled).toHaveTextContent('(26,000.00)')
-    expect(within(hdMin).getByText('min interest').closest('.chip')).toHaveClass('info')
-    expect(hdMin).toHaveTextContent('6,000.00')
-    expect(hdMin).toHaveTextContent('(1,000.00)')
-    expect(within(hdMin).getByRole('link', { name: 'Record receipt' })).toBeInTheDocument()
+    expect(within(hdScheduled).queryByText('min interest')).toBeNull()
+    expect(within(hdScheduled).getByRole('link', { name: 'Record receipt' })).toBeInTheDocument()
 
     // Rolled interest and open-ended deals are not in the month's cash: nothing short.
     const [hm] = rowsOf(due, 'HM')

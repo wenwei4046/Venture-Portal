@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { officeTime } from '@/lib/office-time'
+import { useFinView } from '@/components/layout/fin-view'
 import {
   getAttachmentSignedUrl,
   getAttachmentPreviewUrls,
@@ -42,6 +43,8 @@ export default function AttachmentList({ attachments, emptyMessage, canDelete = 
   const decidedAt = lateAfter ? new Date(lateAfter).getTime() : null
   const isLate = (uploadedAt: string) => decidedAt !== null && new Date(uploadedAt).getTime() > decidedAt
   const router = useRouter()
+  // English on the Finance view (2026-10-10, the handoff).
+  const fin = useFinView()
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [, startTransition] = useTransition()
@@ -66,7 +69,7 @@ export default function AttachmentList({ attachments, emptyMessage, canDelete = 
         await deleteVoucherAttachment(id)
         router.refresh()
       } catch (e) {
-        setError(e instanceof Error ? e.message : '删除失败')
+        setError(e instanceof Error ? e.message : fin ? 'Delete failed' : '删除失败')
       } finally {
         setPendingId(null)
       }
@@ -162,7 +165,9 @@ export default function AttachmentList({ attachments, emptyMessage, canDelete = 
                     {officeTime(a.uploaded_at).format('D MMM HH:mm')}
                   </span>
                   {isLate(a.uploaded_at) ? (
-                    <span className="font-serif italic text-xs text-alert" title="凭单批准之后才加的">事后补上</span>
+                    <span className="font-serif italic text-xs text-alert" title={fin ? 'Added after the voucher was approved' : '凭单批准之后才加的'}>
+                      {fin ? 'Added late' : '事后补上'}
+                    </span>
                   ) : null}
                   {kind && previewUrl ? (
                     <button
@@ -188,14 +193,16 @@ export default function AttachmentList({ attachments, emptyMessage, canDelete = 
                       type="button"
                       onClick={() => handleDelete(a.id)}
                       disabled={pendingId === a.id}
-                      title="删除这个附件（只在 PV 还没批准时可以）"
+                      title={fin ? 'Delete this attachment (only before the PV is approved)' : '删除这个附件（只在 PV 还没批准时可以）'}
                       className={`text-xs font-serif italic disabled:opacity-50 ${
                         armedId === a.id
                           ? 'text-white bg-danger rounded px-2 py-0.5'
                           : 'text-muted hover:text-danger'
                       }`}
                     >
-                      {pendingId === a.id ? '删除中…' : armedId === a.id ? '确定删除？' : '删除'}
+                      {fin
+                        ? pendingId === a.id ? 'Deleting…' : armedId === a.id ? 'Delete?' : 'Delete'
+                        : pendingId === a.id ? '删除中…' : armedId === a.id ? '确定删除？' : '删除'}
                     </button>
                   ) : null}
                 </div>

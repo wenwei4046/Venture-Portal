@@ -185,4 +185,19 @@ describe('the Company Statement on the sheet', () => {
     expect(section.querySelector('tr.cs-total')).toHaveTextContent('Total')
     expect(within(section).getByText('HOUZS Century')).not.toHaveClass('font-serif')
   })
+
+  // 2026-10-10 — the user took the handoff's red for what is to repay (it was
+  // the August orange).
+  it('boxes what is to repay in red when a counterparty opens', async () => {
+    const pos = { side: 'repay', counterparty: 'HOUZS Mattress', kind: 'flat', principal: 600000, monthlyRate: 0.01, tenureMonths: 12, principalPaid: 0, principalOutstanding: 600000, interestOutstanding: 14400, monthlyInterest: 6000, remainingPeriods: 12, finishYM: '2027-09', startYM: '2026-10', minPayInterest: false }
+    mocks.fetchCounterpartyStatement.mockResolvedValue({
+      rows: [{ counterparty: 'HOUZS Mattress', collectPrincipal: 0, collectInterest: 0, repayPrincipal: 600000, repayInterest: 14400, net: -614400, items: [{ id: 'fs1', ...pos }] }],
+      totals: { collectPrincipal: 0, collectInterest: 0, repayPrincipal: 600000, repayInterest: 14400, net: -614400 },
+    })
+    render(await CompanyStatementPage())
+    fireEvent.click(screen.getByText('HOUZS Mattress'))
+    const tag = screen.getByText(/TO REPAY · 1/)
+    expect(tag).toHaveClass('text-danger')
+    expect(tag.parentElement).toHaveClass('border-danger/30')
+  })
 })

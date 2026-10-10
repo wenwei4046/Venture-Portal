@@ -484,14 +484,15 @@ export default function VouchersTable({
                 : 'Search voucher #, payee, description…'
               : 'Search voucher # / payee / category / description…'
           }
-          // The handoff's Total row (2026-10-10): the rows on show, summed under Amount.
+          // The handoff's Total row (2026-10-10): the rows on show, summed under
+          // Amount — a voided voucher moved no money, so it stays out.
           footer={
             fin
               ? (visible) =>
                   visible.length > 0 ? (
                     <TotalFoot
                       label="Total"
-                      values={{ amount: money(Math.round(visible.reduce((s, v) => s + v.amount, 0) * 100) / 100) }}
+                      values={{ amount: money(Math.round(visible.reduce((s, v) => (v.status === 'voided' ? s : s + v.amount), 0) * 100) / 100) }}
                       columns={columns.map((c) => ({ key: c.key, phone: c.mobile === 'keep' }))}
                     />
                   ) : null

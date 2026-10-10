@@ -24,6 +24,8 @@ const PATHS = {
   chart: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
   swap: <path d="M7 4v16M3 8l4-4 4 4M17 20V4M21 16l-4 4-4-4" />,
   send: <><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></>,
+  // Money in (2026-10-10, the handoff's down arrow).
+  in: <><path d="M12 4v16" /><path d="M17.5 14.5 12 20l-5.5-5.5" /></>,
   user: <><circle cx="12" cy="8" r="4" /><path d="M5 21a7 7 0 0 1 14 0" /></>,
   briefcase: <><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18" /></>,
   trend: <><path d="m3 17 6-6 4 4 8-8" /><path d="M15 7h6v6" /></>,

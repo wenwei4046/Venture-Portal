@@ -906,7 +906,7 @@ export default function SortableTable<T>({
                           type="button"
                           onClick={() => toggleExpanded(rowKey)}
                           aria-expanded={isOpen}
-                          aria-label={isOpen ? '收起明细' : '展开明细'}
+                          aria-label={fin ? (isOpen ? 'Hide details' : 'Show details') : isOpen ? '收起明细' : '展开明细'}
                           className="flex items-center justify-center w-9 h-9 -my-2 -mr-2 text-graphite"
                         >
                           <svg
@@ -958,7 +958,7 @@ export default function SortableTable<T>({
                                   onClick={(e) => onRowContextMenu(row, e)}
                                   className="text-sm text-graphite hover:text-ink font-serif italic"
                                 >
-                                  更多 ⋯
+                                  {fin ? 'More ⋯' : '更多 ⋯'}
                                 </button>
                               ) : null}
                             </div>

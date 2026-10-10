@@ -339,7 +339,8 @@ export function DeptPoolCashSheet({
         <StatCard label="Total balance" value={formatMoney(total)} icon="layers" tone="primary" note={deptCount} />
         <StatCard label="In (to date)" value={formatMoney(inAll)} icon="inbox" tone="ledger" note="Credits since opening" />
         <StatCard label="Out (to date)" value={formatMoney(outAll)} icon="send" tone="danger" note="Debits since opening" />
-        <StatCard label="Net (to date)" value={formatMoney(r2(inAll - outAll))} icon="chart" note="In − out" />
+        {/* A net figure reads green up, red down (2026-10-10, the handoff's rule). */}
+        <StatCard label="Net (to date)" value={formatMoney(r2(inAll - outAll))} icon="chart" tone={r2(inAll - outAll) < 0 ? 'danger' : r2(inAll - outAll) > 0 ? 'ledger' : 'default'} note="In − out" />
         <StatCard
           label="Below zero"
           value={String(below.length)}

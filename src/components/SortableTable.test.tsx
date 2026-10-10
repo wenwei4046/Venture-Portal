@@ -729,7 +729,8 @@ describe('the Finance revamp', () => {
   it('…and opens a row on the phone with Open →', () => {
     desktop(false)
     fin({ onRowOpen: vi.fn(), layoutId: undefined })
-    fireEvent.click(screen.getAllByRole('button', { name: '展开明细' })[0])
+    // The phone's row toggle reads in English on the Finance view (2026-10-10).
+    fireEvent.click(screen.getAllByRole('button', { name: 'Show details' })[0])
     expect(screen.getByText('Open →')).toBeInTheDocument()
   })
 })

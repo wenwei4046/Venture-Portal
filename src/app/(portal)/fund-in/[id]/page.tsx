@@ -328,7 +328,8 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
         <StatCard label="Interest rate" value={rate} icon="percent" note={`Monthly ${formatMoney(monthlyInterest)} · total ${formatMoney(totalInterestDue)}`} />
         {source.lock_in_months ? (
           <StatCard
-            tone={isActive && maturityDays !== null && maturityDays <= 30 ? 'alert' : 'default'}
+            // Maturing soon is waiting, not late: the blue wait tone (2026-10-10).
+            tone={isActive && maturityDays !== null && maturityDays <= 30 ? 'wait' : 'default'}
             label="Monthly payment"
             value={formatMoney(monthlyPayment)}
             icon="calendar"
