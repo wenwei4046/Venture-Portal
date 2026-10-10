@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -227,6 +227,19 @@ disagree, the file wins; every value is the prototype's.**
   / 600), the *Headcount limit* box (640px content-box, an 80px mono input,
   orange Save) and how many wait for a seat. The other sections keep their
   tables under the new title — the prototype's "same content as today".
+- **Sales Groups** (v3.21, 2026-10-10; `hierarchy/_components/`): kit tabs
+  *Chart · Members N · Waiting list N · Replacement list N*. The chart's toolbar
+  is one row — 12px figures; then a 28×16 toggle "Show IR alongside" (12.5px),
+  a 180px Find, Tidy, `−` 40px mono zoom `+` — over a 520px `222 230 237` well
+  with a `200 212 222` rim and a white-.92 hint in its corner. Members: a
+  REPORTS TO caps label, director chips (999px, 5px 6px 5px 12px, a 20px round
+  ×), a dashed "+ Add director" chip, an orange "+ Add member"; the grid
+  `1.3fr 1.5fr 150px 170px 1.2fr 100px`, cells 9px 14px, the Rank (120px) /
+  Rate mode (140px) / Withholding (52px) selects drawn as 6px boxes with a ▾,
+  a changed one peach with an orange rim, and a peach save bar with an orange
+  top rule that sticks to the foot of the sheet. The lists: `56px …` and
+  `1.6fr …` grids, the position in 15px mono `160 90 30`, chips for status, a
+  400 / 420px drawer of facts (130px labels) and the history.
 - **Cross-check** with a measuring script that finds each element by its text
   on both and diffs computed font / colour / size / padding / border / radius
   / background (`.design/revenue-app/tools/measure-pl.mjs` is the pattern).

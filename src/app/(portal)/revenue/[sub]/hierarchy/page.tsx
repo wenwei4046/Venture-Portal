@@ -5,7 +5,9 @@ import { can } from '@/lib/permissions'
 import { revenuePath } from '@/lib/revenue'
 import { titleCanRecruit } from '@/lib/commission/titles'
 import { rankLabelOf, rankPayLabelOf } from '@/lib/commission/ranks'
-import HierarchyTabs from './_components/HierarchyTabs'
+import SalesGroupsView from './_components/SalesGroupsView'
+import { canDo } from '@/lib/permission-actions'
+import { loadSubDepartmentRequests } from '../../_lib/sub-department-requests'
 import { PageHead } from '@/components/hrv/kit'
 import SubDeptSwitcher from '../../_components/SubDeptSwitcher'
 import { loadSwitcherData, type SwitcherData } from '../../_lib/switcher'
@@ -67,7 +69,10 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       department.departmentId === subDept.departmentId && department.schemeId !== null,
   )
   const currentTeam = loadTeam(subDept.schemeId, { subDepartmentId: subDept.id })
-  const [team, departments, membershipDestinations, employeeDepartments] = await Promise.all([
+  // The waiting list and replacements are the member back office's to read:
+  // only for whoever manages member requests, and then with the page.
+  const seesRequests = can(user, 'member_requests_manage')
+  const [team, departments, membershipDestinations, employeeDepartments, requests] = await Promise.all([
     currentTeam,
     Promise.all(siblings.map(async (department): Promise<OrgDepartment> => {
       const membership = department.id === subDept.id
@@ -84,10 +89,11 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
     })),
     loadMembershipDestinations(subDepartments),
     canManageEmployment ? loadEmployeeDepartmentDestinations() : Promise.resolve([]),
+    seesRequests ? loadSubDepartmentRequests(subDept.id) : Promise.resolve(null),
   ])
 
   return (
-    <HierarchyTabs
+    <SalesGroupsView
       subDept={{ name: subDept.name, slug: subDept.slug, isHome: subDept.isHome }}
       schemeId={subDept.schemeId}
       departments={departments}
@@ -96,6 +102,8 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       employeeDepartments={employeeDepartments}
       canManageEmployment={canManageEmployment}
       employmentToday={employmentToday}
+      canEdit={canDo(user, 'revenue', 'edit')}
+      requests={requests}
       head={head}
     />
   )

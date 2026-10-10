@@ -135,9 +135,12 @@ export default function MemberAdmin({
   initialData,
   demo = false,
   portal = false,
+  initialRequestId = null,
 }: {
   initialData: AdminMemberData;
   demo?: boolean;
+  /** Open on this request (`?request=`, from Sales Groups' Review — 2026-10-10). */
+  initialRequestId?: string | null;
   /**
    * Rendered inside the portal (People › Member services, /member-admin),
    * where PortalFrame puts it on the white sheet: the portal's page head
@@ -155,7 +158,9 @@ export default function MemberAdmin({
           ? "memos"
           : "products",
     ),
-    [selected, setSelected] = useState<string | null>(null),
+    [selected, setSelected] = useState<string | null>(
+      initialRequestId && initialData.requests.some((r) => r.id === initialRequestId) ? initialRequestId : null,
+    ),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
     [note, setNote] = useState(""),

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type KeyboardEvent, type PointerEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import {
   Background, BackgroundVariant, ReactFlow, ReactFlowProvider, ViewportPortal,
   applyNodeChanges, useReactFlow, useViewport,
@@ -35,6 +35,8 @@ interface Props {
   employeeDepartments?: EmployeeDepartmentDestination[]
   canManageEmployment?: boolean
   employmentToday?: string
+  /** Sales Groups' "Show IR alongside" (2026-10-10, the HR revamp), drawn in the toolbar. */
+  toolbarToggle?: ReactNode
 }
 type ReportingEdge = Edge<{ fresh?: boolean }, 'line'>
 type DropTarget = { id: string; reason: string | null; armed: boolean; unchanged: boolean }
@@ -46,8 +48,6 @@ const edgeTypes = { line: ReportingLine }
 // `.space-tidy` / `.space-memberships` rules, which give a hovered or picked
 // button orange lettering — and orange is never lettering on the sheet. The
 // canvas itself keeps its own palette.
-/** A department pill: the sheet's filter chip, white, the picked one peach. */
-const JUMP_PILL = 'inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1.5 text-xs transition-colors hover:border-accent aria-pressed:border-accent aria-pressed:bg-accent-bg aria-pressed:font-bold max-[700px]:min-h-[44px]'
 /** A small outline button. */
 const TOOL_BUTTON = 'inline-flex items-center gap-2 rounded-control border border-hairline bg-surface px-3 py-[7px] text-xs transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 max-[700px]:min-h-[44px]'
 /** A refusal: `.sheet-notice`'s geometry on the danger wash. */
@@ -66,7 +66,7 @@ export default function HierarchySpaces(props: Props) {
   return <ReactFlowProvider><SpaceChart {...props} /></ReactFlowProvider>
 }
 
-function SpaceChart({ departments: serverDepartments, initialDepartmentId, membershipDestinations = [], employeeDepartments = [], canManageEmployment = false, employmentToday = '' }: Props) {
+function SpaceChart({ departments: serverDepartments, initialDepartmentId, membershipDestinations = [], employeeDepartments = [], canManageEmployment = false, employmentToday = '', toolbarToggle }: Props) {
   const { fitBounds, setCenter, getZoom, zoomIn, zoomOut, screenToFlowPosition } = useReactFlow()
   const camera = useHierarchyCamera()
   const { interrupt: interruptCamera, makeRoom, followTransfer } = camera
@@ -695,36 +695,32 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
     }}>
       {error ? <div role="alert" className={DANGER_NOTE}>{error}</div> : null}
       {note ? <p role="status" className="sheet-notice">{note}</p> : null}
-      {/* The sheet's toolbar panel (`.sheet-toolbar`'s look, spelled out so the
-          search keeps its own 16px face on a phone). */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-hairline bg-surface-2 p-3.5">
-        <div className="flex flex-wrap items-center gap-[7px]" aria-label="Jump to a sub-department">
-          <button type="button" className={JUMP_PILL} aria-pressed={activeDepartment === null} onClick={() => focusDepartment(null)}>All departments</button>
-          {departments.map((department, index) => <button
-            type="button" key={department.id} className={JUMP_PILL} aria-pressed={activeDepartment === department.id}
-            onClick={() => focusDepartment(department.id)} title={`Jump to ${department.name}${index < 9 ? ` · ${index + 1}` : ''}`}
-          >{department.name}<span className="space-shortcut">{index < 9 ? index + 1 : ''}</span></button>)}
+      {/* The prototype's toolbar (2026-10-10, the HR revamp): the chart's
+          figures, then "Show … alongside", Find, Tidy and the zoom. The
+          department pills went — the toggle says which sub-departments are on
+          the canvas, and 0–9 still jump between them. */}
+      <div className="space-toolbar">
+        <span className="space-stats">
+          {distinctPeople} people{records.length !== distinctPeople ? ` · ${records.length} memberships` : ''} · {teams.length} teams{directorCount ? ` · ${directorCount} director${directorCount === 1 ? '' : 's'}` : ''}
+        </span>
+        {menuPending || movePending ? <span className="space-saving">{menuPending ? 'Saving employee…' : 'Saving upline…'}</span> : null}
+        <span className="space-toolbar-gap" />
+        {toolbarToggle}
+        <div className="space-search">
+          <input type="search" value={find} onChange={event => setFind(event.target.value)}
+            onKeyDown={event => { if (event.key === 'Enter' && matches[0]) reveal(matches[0].id); if (event.key === 'Escape') setFind('') }}
+            placeholder="Find a person..." aria-label="Find a person on the chart" />
+          {find.trim() ? <div className="space-search-results">
+            {matches.length ? matches.map(record => <button type="button" key={record.id} onClick={() => reveal(record.id)}>
+              <strong>{record.person.name}</strong><span>{record.department.name} · {record.person.titleName ?? 'no title'}</span>
+            </button>) : <p>No matching person.</p>}
+          </div> : null}
         </div>
-        <div className="space-actions">
-          <div className="space-search">
-            <input type="search" value={find} onChange={event => setFind(event.target.value)}
-              onKeyDown={event => { if (event.key === 'Enter' && matches[0]) reveal(matches[0].id); if (event.key === 'Escape') setFind('') }}
-              placeholder="Find a person…" aria-label="Find a person across departments" />
-            {find.trim() ? <div className="space-search-results">
-              {matches.length ? matches.map(record => <button type="button" key={record.id} onClick={() => reveal(record.id)}>
-                <strong>{record.person.name}</strong><span>{record.department.name} · {record.person.titleName ?? 'no title'}</span>
-              </button>) : <p>No matching person.</p>}
-            </div> : null}
-          </div>
-          <button type="button" className={`${TOOL_BUTTON} font-medium`} disabled={pending} onClick={() => { if (menuPendingRef.current) return; interruptCamera(); arrange(undefined, { keepVisible: true, alignMembers: true }) }} title="Align members and separate overlapping teams; keep team locations">Tidy</button>
-          <div className="org-zoom">
-            <button type="button" onClick={() => { interruptCamera(); void zoomOut({ duration: duration(250) }) }} aria-label="Zoom out">−</button>
-            <button type="button" className="lv" onClick={() => focusDepartment(null)} aria-label="Fit all departments"><ZoomReadout /></button>
-            <button type="button" onClick={() => { interruptCamera(); void zoomIn({ duration: duration(250) }) }} aria-label="Zoom in">+</button>
-          </div>
-        </div>
+        <button type="button" className="space-tool" disabled={pending} onClick={() => { if (menuPendingRef.current) return; interruptCamera(); arrange(undefined, { keepVisible: true, alignMembers: true }) }} title="Align members and separate overlapping teams; keep team locations">Tidy</button>
+        <button type="button" className="space-tool" onClick={() => { interruptCamera(); void zoomOut({ duration: duration(250) }) }} aria-label="Zoom out">−</button>
+        <button type="button" className="space-zoom" onClick={() => focusDepartment(null)} aria-label="Fit the chart" title="Fit the chart"><ZoomReadout /></button>
+        <button type="button" className="space-tool" onClick={() => { interruptCamera(); void zoomIn({ duration: duration(250) }) }} aria-label="Zoom in">+</button>
       </div>
-      <div className="space-overview"><span>{distinctPeople} people · {records.length} memberships · {teams.length} teams{directorCount ? ` · ${directorCount} director${directorCount === 1 ? '' : 's'}` : ''}</span><span>{menuPending ? 'Saving employee…' : movePending ? 'Saving upline…' : 'Magnetic layout · Free canvas'}</span></div>
       <PersonMenuContext.Provider value={openPersonMenu}>
       <UplineContext.Provider value={openUpline}>
         <div ref={camera.canvas} onPointerDownCapture={interruptCamera} onWheelCapture={interruptCamera}
@@ -819,6 +815,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
                   style={{ left: department.bounds.x + SPACE_DEPARTMENT_PADDING, top: department.bounds.y + SPACE_DEPARTMENT_HEADER + SPACE_DEPARTMENT_PADDING + 18 }}>No members yet</div>)}
             </ViewportPortal>
           </ReactFlow>
+          <div className="space-hint" aria-hidden="true">Click a person to see them · drag to move · hold over somebody to change upline</div>
           {dropTarget && dropPerson ? <div className={`space-drop-notice${dropTarget.reason ? ' refused' : ''}`} role="status">
             {/* The notice paints its words orange; on the sheet they are ink,
                 with the orange left to its frame. A refusal keeps its danger. */}

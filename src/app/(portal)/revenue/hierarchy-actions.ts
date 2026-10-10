@@ -445,3 +445,18 @@ export async function updateStaffTax(formData: FormData): Promise<void> {
   if (error) throw new Error(`Could not save the tax setting: ${error.message}`)
   refresh()
 }
+
+/**
+ * Sales Groups › Members' Withholding cell (2026-10-10, the HR revamp): the
+ * same write as `updateStaffTax`, answered — the grid saves many rows in one
+ * go and says which one was refused, and production hides a thrown message.
+ */
+export async function saveStaffTax(formData: FormData): Promise<RankOutcome> {
+  try {
+    await updateStaffTax(formData)
+    return { ok: true, note: null }
+  } catch (e) {
+    if (isControlFlow(e)) throw e
+    return { ok: false, note: e instanceof Error ? e.message : 'Could not save the tax setting' }
+  }
+}

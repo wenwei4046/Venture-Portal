@@ -191,6 +191,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'hr_dashboard_summary', 'log_data_access', 'lookup_pcb', 'mark_journal_entry_reversed', 'member_admin_brand_weeks',
   'member_admin_claim_settings', 'member_admin_save_brand_weeks', 'member_admin_save_claim_settings',
   'member_arena_save_brand_week_picks', 'member_capacity_of', 'member_principal_save_brand_week_picks', 'member_process_all_queues',
+  'member_sub_department_requests',
   'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_cancel_topup',
   'payroll_close_month', 'payroll_complete_rows', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status',
   'payroll_open_topup', 'payroll_reopen_month', 'payroll_send_back_batch', 'payroll_submit_batch', 'payroll_uncomplete_rows',

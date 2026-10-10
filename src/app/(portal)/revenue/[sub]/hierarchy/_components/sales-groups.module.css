@@ -1,0 +1,253 @@
+/* Sales Groups (2026-10-10, the HR revamp handoff, variant A) — the prototype's, value for value. */
+
+/* ── Members: who it reports to ── */
+.reportsTo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.reportsLabel {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--hv-brown));
+}
+.nobody { font-size: 12.5px; color: rgb(var(--hv-brown)); }
+.directorChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 12px;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 999px;
+  font-size: 12.5px;
+  line-height: normal;
+}
+.directorChip b { font-weight: 500; }
+.directorTitle { color: rgb(var(--hv-brown)); }
+.directorRemove {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(var(--hv-brown));
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  line-height: normal;
+}
+.directorRemove:hover:not(:disabled) { background: rgb(var(--hv-panel-2)); color: rgb(var(--hv-ink)); }
+.pickWrap { position: relative; }
+.addDirector {
+  padding: 5px 12px;
+  border: 1px dashed rgb(var(--hv-frame));
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: normal;
+  color: rgb(var(--hv-brown));
+  background: transparent;
+  cursor: pointer;
+}
+.addDirector:hover:not(:disabled) { border-color: rgb(var(--hv-accent)); color: rgb(var(--hv-ink)); }
+.pickMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  min-width: 240px;
+  padding: 6px;
+  background: rgb(255 255 255);
+  border: 1px solid rgb(var(--hv-frame));
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgb(43 31 23 / 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pickItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  text-align: left;
+  cursor: pointer;
+  color: rgb(var(--hv-ink));
+}
+.pickItem:hover, .pickItem:focus-visible { background: rgb(var(--hv-peach)); outline: none; }
+.pickItem b { font-weight: 500; }
+.pickItem span { color: rgb(var(--hv-brown)); font-size: 12px; }
+.pickEmpty { margin: 0; padding: 8px 10px; font-size: 12.5px; color: rgb(var(--hv-brown)); }
+
+/* ── Members: the grid ── */
+.membersScroll { min-width: 0; }
+/* clip, not hidden: the save bar below sticks to the sheet, not to this box. */
+.membersFrame { overflow: clip; }
+/* While the save bar shows, it is the frame's foot. */
+.membersFrame[data-bar='true'] { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.nameCell, .textCell { padding: 9px 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nameCell b { font-weight: 500; }
+.code { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; color: rgb(var(--hv-brown)); }
+.cellPad { padding: 9px 14px; }
+.cellWrap { position: relative; display: inline-flex; vertical-align: middle; }
+.cellSelect {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 6px;
+  background: rgb(255 255 255);
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  color: rgb(var(--hv-ink));
+  cursor: pointer;
+}
+.cellSelect[data-caret='true'] { padding-right: 24px; }
+.cellSelect[data-caret='false'] { padding: 5px 8px; }
+.cellSelect[data-dirty='true'] { border-color: rgb(var(--hv-accent)); background: rgb(var(--hv-peach)); }
+.cellSelect:disabled { cursor: default; opacity: 1; }
+.cellSelect:focus-visible { outline: 2px solid rgb(var(--hv-ink)); outline-offset: 1px; }
+.cellCaret {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 10px;
+  color: rgb(var(--hv-brown));
+}
+
+/* The one bar that saves every change — sticky at the foot of the sheet. */
+.saveBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgb(var(--hv-peach));
+  border: 1px solid rgb(var(--hv-frame));
+  border-top: 1px solid rgb(var(--hv-accent));
+  border-radius: 0 0 10px 10px;
+  margin-top: -1px;
+}
+.saveBarText { font-size: 12.5px; }
+.saveBarText b { font-weight: 500; }
+.saveBarActions { display: flex; gap: 8px; }
+.discard {
+  padding: 7px 12px;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 6px;
+  background: rgb(255 255 255);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: normal;
+  cursor: pointer;
+  color: rgb(var(--hv-ink));
+}
+.saveChanges {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(var(--hv-accent));
+  font: inherit;
+  font-size: 12.5px;
+  line-height: normal;
+  cursor: pointer;
+  color: rgb(var(--hv-ink));
+}
+.saveChanges:hover:not(:disabled) { background: rgb(var(--hv-accent-hover)); }
+.discard:disabled, .saveChanges:disabled { opacity: 0.5; cursor: not-allowed; }
+.hint { margin-top: 10px; font-size: 12px; color: rgb(var(--hv-brown)); }
+.notes { margin: 0 0 14px; padding: 10px 14px; border: 1px solid rgb(var(--hv-from-border)); background: rgb(var(--hv-from-bg)); border-radius: 10px; font-size: 12.5px; }
+.notes p { margin: 0; }
+.notes p + p { margin-top: 4px; }
+.notes p[data-ok='false'] { color: rgb(var(--hv-danger)); }
+.empty { border: 1px solid rgb(var(--hv-hairline)); border-radius: 12px; background: rgb(var(--hv-panel-2)); padding: 28px; text-align: center; font-size: 13px; }
+.emptyTitle { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+.empty p { margin: 0; }
+
+/* ── + Add member ── */
+.addHead { padding: 20px 22px 14px; border-bottom: 1px solid rgb(var(--hv-hairline)); }
+.addTitle { font-size: 18px; font-weight: 500; }
+.addSub { font-size: 12.5px; color: rgb(var(--hv-body-2)); margin-top: 4px; }
+.addBody { padding: 16px 22px; display: flex; flex-direction: column; gap: 14px; }
+.addField { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: rgb(var(--hv-brown)); }
+.addField select { width: 100%; }
+.addNote { margin: 0; font-size: 12px; color: rgb(var(--hv-brown)); }
+.addError { margin: 0; font-size: 12.5px; color: rgb(var(--hv-danger)); }
+.addFoot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 22px 18px; }
+
+@media (max-width: 900px) {
+  .membersScroll { overflow-x: auto; }
+  .membersFrame { min-width: 860px; }
+}
+
+/* ── Waiting list / Replacement list ── */
+.position {
+  padding: 12px 14px;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 15px;
+  font-weight: 500;
+  color: rgb(var(--hv-orange-text));
+}
+.twoLine { padding: 10px 14px; min-width: 0; }
+.strong { font-weight: 500; }
+.sub { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; color: rgb(var(--hv-brown)); margin-top: 2px; }
+.cell10 { padding: 10px 14px; min-width: 0; }
+.listEmpty { padding: 28px; text-align: center; color: rgb(var(--hv-brown)); }
+.drawerTitle { font-size: 19px; font-weight: 500; }
+.drawerMeta { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.trailTop { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.trailWho { font-size: 12px; color: rgb(var(--hv-brown)); }
+.trailNote { font-size: 12px; margin-top: 2px; }
+
+/* ── Chart toolbar: "Show IR alongside" ── */
+.alongside {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: normal;
+  color: rgb(var(--hv-ink));
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  background: none;
+  white-space: nowrap;
+}
+.alongside:focus-visible { outline: 2px solid rgb(var(--hv-ink)); outline-offset: 3px; border-radius: 4px; }
+.alongsideLink {
+  margin-top: 12px;
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  color: rgb(var(--hv-ink));
+}
+.listError { margin: 0; padding: 12px 14px; border-radius: 10px; background: rgb(var(--hv-danger-bg)); color: rgb(var(--hv-danger)); font-size: 12.5px; }
+/* A row's small print: IR's direct lines, a rank its title lifts. */
+.subLine { display: block; margin-top: 2px; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; color: rgb(var(--hv-brown)); white-space: nowrap; }
