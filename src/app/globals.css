@@ -2684,6 +2684,20 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .space-footer strong, .space-footer > div > span { display: block; font-size: 12px; }
 .space-footer strong { color: rgb(var(--ink)); font-weight: 500; }
 .space-footer > div > span { color: rgb(var(--graphite)); margin-top: 3px; }
+/* Sales Groups' toolbar (2026-10-10, the HR revamp): the prototype's one row —
+   the chart's figures on the left; "Show … alongside", Find, Tidy and the zoom
+   on the right. */
+.space-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; line-height: normal; }
+.space-stats { font-size: 12px; }
+.space-saving { font-size: 12px; color: rgb(var(--graphite)); }
+.space-toolbar-gap { flex: 1; }
+.space-toolbar .space-search { width: 180px; }
+.space-toolbar .space-search input { padding: 8px 12px; border-radius: 6px; font-size: 13px; line-height: normal; }
+.space-tool { padding: 8px 10px; border: 1px solid rgb(var(--hairline)); border-radius: 6px; background: rgb(var(--surface)); color: rgb(var(--ink)); font: inherit; font-size: 12px; line-height: normal; cursor: pointer; }
+.space-tool:hover:not(:disabled) { background: rgb(var(--surface-2)); }
+.space-tool:disabled { opacity: .5; cursor: not-allowed; }
+.space-zoom { width: 40px; padding: 0; border: 0; background: none; color: rgb(var(--ink)); font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 12px; text-align: center; cursor: pointer; }
+.space-hint { position: absolute; right: 12px; bottom: 12px; z-index: 6; padding: 6px 10px; border-radius: 6px; background: rgb(255 255 255 / .92); color: rgb(var(--hv-sg-text, 90 98 108)); font-size: 11px; line-height: normal; pointer-events: none; }
 .space-memberships { display: flex; flex-wrap: wrap; gap: 6px; }
 .space-memberships button { font-weight: 400; font-size: 11px; }
 .company-canvas .space-team-heading { background: transparent; border: 0; border-radius: 0; }
@@ -4746,6 +4760,13 @@ a.stat-card:hover { border-color: rgb(var(--accent)); box-shadow: 0 4px 14px rgb
   --space-blue: 76 125 157;
   --space-violet: 134 109 164;
   --space-warm: 158 123 79;
+}
+/* Sales Groups' well (2026-10-10, the HR revamp): the prototype's 520px
+   blue-grey canvas with its own rim. */
+.sheet-theme .space-canvas.space-canvas.space-canvas.space-canvas {
+  --cv-ground: var(--hv-sg-canvas);
+  --cv-grid: var(--hv-sg-border);
+  height: 520px;
 }
 .sheet-theme .space-person.space-person.space-person {
   --title-leader: 109 62 157;
