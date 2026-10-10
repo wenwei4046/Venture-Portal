@@ -17,8 +17,8 @@ import LoginPage from './page'
 import MemberLoginScreen from '@/components/member/MemberLoginScreen'
 import { VIEW_AS_COOKIE, VIEW_AS_PERSON_COOKIE, VIEW_AS_PERSON_MARK } from '@/lib/view-as'
 
-async function submit() {
-  const screen = await LoginPage({ searchParams: Promise.resolve({}) })
+async function submit(params: { next?: string } = {}) {
+  const screen = await LoginPage({ searchParams: Promise.resolve(params) })
   const form = new FormData()
   form.set('email', '  staff@example.invalid  ')
   form.set('password', ' password with spaces ')
@@ -57,6 +57,15 @@ describe('canonical sign-in routing', () => {
     expect(mocks.clearView).toHaveBeenCalledWith(VIEW_AS_PERSON_COOKIE)
     expect(mocks.clearView).toHaveBeenCalledWith(VIEW_AS_PERSON_MARK)
     expect(mocks.clearView.mock.invocationCallOrder[0]).toBeLessThan(mocks.redirect.mock.invocationCallOrder[0])
+  })
+
+  it('returns to the installed HR app it was sent from, and nowhere else', async () => {
+    mocks.profile.mockResolvedValue({ data: { is_active: true, role: 'hr' } })
+    await expect(submit({ next: '/hr-app' })).rejects.toThrow('REDIRECT:/hr-app')
+    for (const next of ['https://evil.example', '//evil.example', '/hr-app/../payments', '/payments']) {
+      mocks.redirect.mockClear()
+      await expect(submit({ next })).rejects.toThrow('REDIRECT:/dashboard')
+    }
   })
 
   it.each([null, { is_active: false, role: 'revenue_member' }])('signs out a missing or inactive profile', async data => {

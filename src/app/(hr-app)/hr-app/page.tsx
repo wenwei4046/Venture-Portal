@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { requireAuth } from '@/lib/auth'
+import { getUser } from '@/lib/auth'
 import { loadHrAppData, opensHrApp } from '@/lib/hr-app/server'
 import HrAppLive from '@/components/hr-app/HrAppLive'
 
@@ -13,7 +13,9 @@ export const dynamic = 'force-dynamic'
  * everybody's. Anybody else goes back to the portal.
  */
 export default async function HrAppPage() {
-  const user = await requireAuth()
+  // Signed out: sign in and come straight back (the installed app opens here).
+  const user = await getUser()
+  if (!user) redirect('/login?next=/hr-app')
   if (!opensHrApp(user)) redirect('/dashboard')
   const data = await loadHrAppData(user)
   return <HrAppLive data={data} />
