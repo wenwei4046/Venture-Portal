@@ -465,6 +465,8 @@
   font-size: 13px;
 }
 .drawerFixed { position: fixed; top: 10px; right: 10px; bottom: 10px; max-width: calc(100vw - 20px); }
+/* Inside the frame too a drawer never runs past its left edge (a 640px preview on a phone). */
+.drawer:not(.drawerFixed) { max-width: calc(100% - 20px); }
 .drawerHead {
   display: flex;
   align-items: flex-start;

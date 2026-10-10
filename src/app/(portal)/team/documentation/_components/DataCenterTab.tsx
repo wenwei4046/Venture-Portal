@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { flash } from '@/components/hrv/toast'
 import { fileLetter } from '@/lib/documentation/actions'
 import { DOC_ACCEPT, dataCenterPeople, deptLabel, fileExt, missingFor, plural, type Documentation } from '@/lib/documentation/model'
@@ -47,6 +47,7 @@ export default function DataCenterTab({
 }) {
   const [find, setFind] = useState('')
   const [upload, setUpload] = useState(false)
+  const recordRef = useRef<HTMLElement>(null)
   const people = useMemo(() => dataCenterPeople(data), [data])
   const q = find.trim().toLowerCase()
   const shown = q ? people.filter(p => p.name.toLowerCase().includes(q)) : people
@@ -63,6 +64,14 @@ export default function DataCenterTab({
     flash(res.ok ? `${typeName} filed to ${me.name}'s record` : res.reason)
   }
 
+  // On a phone the record sits under the list: bring it into view.
+  function pick(id: string) {
+    onPerson(id)
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      requestAnimationFrame(() => recordRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    }
+  }
+
   async function download(id: string, fileName: string) {
     const refused = await downloadFile('letter', id)
     flash(refused ?? `Downloads ${fileName}`)
@@ -73,7 +82,7 @@ export default function DataCenterTab({
       <section className={s.people} aria-label="People">
         <input className={s.find} value={find} placeholder="Find a person" onChange={e => setFind(e.target.value)} aria-label="Find a person" />
         {shown.map(p => (
-          <button key={p.id} type="button" className={s.person} aria-current={me?.id === p.id ? 'true' : undefined} onClick={() => onPerson(p.id)}>
+          <button key={p.id} type="button" className={s.person} aria-current={me?.id === p.id ? 'true' : undefined} onClick={() => pick(p.id)}>
             <div style={{ minWidth: 0 }}>
               <div className={s.personName}>{p.name}</div>
               <div className={s.personLine}>{p.line}</div>
@@ -89,7 +98,7 @@ export default function DataCenterTab({
       </section>
 
       {me ? (
-        <section className={s.record} aria-labelledby="dc-name">
+        <section ref={recordRef} className={s.record} aria-labelledby="dc-name">
           <div className={s.recordHead}>
             <div className={s.recordWho}>
               <div id="dc-name" className={s.recordName}>{me.name}</div>
