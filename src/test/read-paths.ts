@@ -196,6 +196,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_sub_department_requests',
   // Sales Groups › Waiting list's flow (mig 20261010140000): each asks member_is_manager (the form also lets in member_requests).
   'member_waiting_form', 'member_save_waiting_form', 'member_fail_waiting', 'member_waiting_transfer',
+  // Member services' readers (mig 20261010160000): member_requests_manage / member_memos_manage.
+  'member_admin_request_facts', 'member_memo_reads',
   'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_cancel_topup',
   'payroll_close_month', 'payroll_complete_rows', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status',
   'payroll_open_topup', 'payroll_reopen_month', 'payroll_send_back_batch', 'payroll_submit_batch', 'payroll_uncomplete_rows',
