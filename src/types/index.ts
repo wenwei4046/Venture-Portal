@@ -43,6 +43,10 @@ export interface User {
   // View on top of their own gates. Absent on a value built before it existed:
   // read as "not asked".
   tabs?: string[]
+  // Set while an account that may switch views sees the portal AS this person
+  // (2026-10-11): everything above is theirs, `actualRole` the viewer's kind,
+  // and the session reads only (lib/supabase/read-only.ts).
+  viewingAs?: { id: string; name: string }
 }
 
 export interface Company {

@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { adminClient } from '@/lib/supabase/admin'
+import { refuseWhileViewingAs } from '@/lib/view-as-person'
 
 /**
  * The ERP's feed key — in and out of Vault, and nowhere else.
@@ -31,11 +32,14 @@ export async function getFeedSecret(): Promise<string | null> {
 }
 
 export async function putFeedKey(subDepartmentId: string, key: string): Promise<void> {
+  // The service role goes around the read-only session: refuse while viewing as somebody (2026-10-11).
+  await refuseWhileViewingAs()
   const { error } = await vault().rpc('erp_link_put_secret', { p_sub: subDepartmentId, p_secret: key })
   if (error) throw new Error(`Could not store the ERP feed key: ${error.message}`)
 }
 
 export async function dropFeedKey(subDepartmentId: string): Promise<void> {
+  await refuseWhileViewingAs()
   const { error } = await vault().rpc('erp_link_drop_secret', { p_sub: subDepartmentId })
   if (error) throw new Error(`Could not forget the ERP feed key: ${error.message}`)
 }

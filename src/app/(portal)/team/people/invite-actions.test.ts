@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
+  viewingAs: false,
   requirePermission: vi.fn(),
   createClient: vi.fn(),
   createUser: vi.fn(),
@@ -13,6 +14,8 @@ vi.mock('@/lib/supabase/admin', () => ({
   adminClient: () => ({ auth: { admin: { createUser: mocks.createUser, deleteUser: mocks.deleteUser } } }),
 }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
+// Viewing as somebody writes nothing (2026-10-11); here nobody is.
+vi.mock('@/lib/view-as-person', () => ({ viewingAsSomebody: async () => mocks.viewingAs }))
 
 import { inviteUser } from './invite-actions'
 
@@ -122,6 +125,13 @@ describe('inviting somebody on the roster', () => {
     expect(mocks.revalidatePath).not.toHaveBeenCalled()
   })
 
+  // A login is minted with the service role, around the read-only session (2026-10-11).
+  it('mints nothing while viewing the portal as somebody', async () => {
+    mocks.viewingAs = true
+    expect(await invite()).toEqual({ ok: false, reason: 'Read-only while viewing as somebody — nothing is saved.' })
+    expect(mocks.createUser).not.toHaveBeenCalled()
+    mocks.viewingAs = false
+  })
   it('requires the invite permission before reading anything', async () => {
     mocks.requirePermission.mockRejectedValueOnce(new Error('NEXT_REDIRECT'))
     await expect(invite()).rejects.toThrow('NEXT_REDIRECT')

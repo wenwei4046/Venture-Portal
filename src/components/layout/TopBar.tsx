@@ -63,7 +63,7 @@ export default function TopBar({ user, fin = false }: TopBarProps) {
           <span className="fin-topbar-page">{owner?.title ?? (financePageTitle(pathname) || 'Overview')}</span>
         </span>
         <span className="ml-auto flex items-center gap-3">
-          {canSwitchView ? <PortalViewSwitcher value={user.role} /> : null}
+          {canSwitchView ? <PortalViewSwitcher value={user.role} viewingAs={user.viewingAs?.name} /> : null}
           <ThemeToggle />
         </span>
       </div>
@@ -94,7 +94,7 @@ export default function TopBar({ user, fin = false }: TopBarProps) {
             app-layer experience (sidebar, gates, buttons) to the chosen
             role; auth identity stays the Principal. Always visible (also on
             mobile) so a masked session can switch back anywhere. */}
-        {canSwitchView ? <PortalViewSwitcher value={user.role} /> : null}
+        {canSwitchView ? <PortalViewSwitcher value={user.role} viewingAs={user.viewingAs?.name} /> : null}
         <div className="hidden sm:flex items-baseline gap-3 font-mono text-[11px] text-muted tracking-[0.02em]">
           {!canSwitchView ? (
             <span className="inline-flex items-baseline gap-1.5 font-sans font-normal text-[13.5px] text-graphite">

@@ -205,6 +205,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_waiting_queue',
   // People › Permissions by view and tab (migs 20261011010000, 20261011020000): each asks has_perm('permissions_manage').
   'permission_template_tabs_save', 'permission_user_tabs_set', 'permission_template_delete', 'permission_title_move',
+  // View as a person (mig 20261011050000): each asks has_perm(view_switch).
+  'view_as_person', 'view_as_people',
   'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_cancel_topup',
   'payroll_close_month', 'payroll_complete_rows', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status',
   'payroll_open_topup', 'payroll_reopen_month', 'payroll_send_back_batch', 'payroll_submit_batch', 'payroll_uncomplete_rows',

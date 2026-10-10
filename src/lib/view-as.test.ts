@@ -130,6 +130,8 @@ describe('HR’s and Finance’s views are lenses (2026-10-11)', () => {
     expect(lensView({ role: 'finance', actualRole: 'principal' })).toBe('finance')
     expect(lensView({ role: 'principal' })).toBeNull()
     expect(lensView({ role: 'revenue_member', actualRole: 'principal' })).toBeNull()
+    // Viewing as a person draws THEIR portal, not a lens over one (2026-10-11).
+    expect(lensView({ role: 'finance', actualRole: 'principal', viewingAs: { id: 'c', name: 'Carrie' } })).toBeNull()
   })
 
   it('lists only the view’s tabs in its menus', () => {

@@ -6,6 +6,23 @@ import type { UserRole } from '@/types'
 // module — safe to import from client, server, and tests alike.
 export const VIEW_AS_COOKIE = 'vp-view-as'
 
+/**
+ * View as a PERSON (2026-10-11): the account id somebody who may switch views
+ * is seeing the portal as — read-only for the whole browser while it is set
+ * (lib/supabase/read-only.ts). httpOnly; a session cookie.
+ */
+export const VIEW_AS_PERSON_COOKIE = 'vp-view-as-person'
+
+/** Its readable mark, so the BROWSER client reads only too (lib/supabase/client.ts). Trusted for nothing else. */
+export const VIEW_AS_PERSON_MARK = 'vp-viewing-as'
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** The person a cookie names, or null. */
+export function viewAsPersonId(value: string | null | undefined): string | null {
+  return value && UUID.test(value) ? value : null
+}
+
 // dept_manager is excluded: their pages key off user.department_id, which a
 // Principal account doesn't have.
 export const VIEW_AS_ROLES = ['hr', 'finance', 'revenue_member'] as const
@@ -68,7 +85,7 @@ export function viewAsChanged(mirror: string | null | undefined, rendered: UserR
   return portalView(mirror) !== rendered
 }
 
-export type MaskableUser = { role: UserRole; actualRole?: UserRole }
+export type MaskableUser = { role: UserRole; actualRole?: UserRole; viewingAs?: { id: string; name: string } }
 
 // The switcher shows for the Principal account whether or not it is currently
 // masked (a masked session must always be able to switch back).
@@ -91,6 +108,8 @@ export type LensView = 'hr' | 'finance'
 
 /** The view a lens draws, when the account switched to HR's or Finance's — null in its own. */
 export function lensView(user: MaskableUser): LensView | null {
+  // Viewing as a person draws THEIR portal, not a lens over one.
+  if (user.viewingAs) return null
   return isMasked(user) && (user.role === 'hr' || user.role === 'finance') ? user.role : null
 }
 

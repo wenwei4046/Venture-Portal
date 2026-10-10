@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { VIEW_AS_COOKIE, VIEW_AS_MIRROR_COOKIE } from "@/lib/view-as";
+import { VIEW_AS_COOKIE, VIEW_AS_MIRROR_COOKIE, VIEW_AS_PERSON_COOKIE, VIEW_AS_PERSON_MARK } from "@/lib/view-as";
 import MemberLoginScreen from "@/components/member/MemberLoginScreen";
 
 export const metadata = { title: "Sign In · HOUZS Venture" };
@@ -38,6 +38,10 @@ export default async function LoginPage({
     // A fresh sign-in starts in the account's own view, not a previous mask.
     (await cookies()).delete(VIEW_AS_COOKIE);
     (await cookies()).delete(VIEW_AS_MIRROR_COOKIE);
+    // Viewing as somebody ends with the session that started it (2026-10-11): on
+    // the shared office PC the next account must not inherit a read-only browser.
+    (await cookies()).delete(VIEW_AS_PERSON_COOKIE);
+    (await cookies()).delete(VIEW_AS_PERSON_MARK);
     redirect(profile.role === "revenue_member" ? "/member" : "/dashboard");
   }
 
