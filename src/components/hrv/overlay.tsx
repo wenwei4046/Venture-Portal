@@ -85,6 +85,7 @@ export function Drawer({
   titleStyle,
   sub,
   head,
+  headStyle,
   children,
   footer,
   bodyStyle,
@@ -99,6 +100,8 @@ export function Drawer({
   sub?: ReactNode
   /** Replaces eyebrow / title / sub with a head of its own (the × stays). */
   head?: ReactNode
+  /** The head's box (round 2's drawers pad it 18px 22px). */
+  headStyle?: CSSProperties
   children: ReactNode
   footer?: ReactNode
   bodyStyle?: CSSProperties
@@ -121,7 +124,7 @@ export function Drawer({
             className={`${s.drawer}${fixed ? ` ${s.drawerFixed}` : ''}`}
             style={{ width, outline: 'none' }}
           >
-            <div className={s.drawerHead}>
+            <div className={s.drawerHead} style={headStyle}>
               <div id={`${id}-title`}>
                 {head ?? (
                   <>

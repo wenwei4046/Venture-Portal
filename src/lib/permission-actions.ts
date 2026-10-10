@@ -173,6 +173,8 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'revenue.create': 'all',
   'revenue.edit': 'all',
   'revenue.manage': 'all',
+  'rooms.create': 'all',
+  'rooms.edit': 'all',
   'settings.manage': 'all',
   'team.create': 'all',
   'team.edit': 'all',

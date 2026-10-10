@@ -89,6 +89,8 @@ export const PAGE_TABS = {
   '/member-admin': ['hr.member_services'],
   // Changes: what it shows follows the reader's other boxes (each view's Audit Log).
   '/audit-log': ['hr.audit_log', 'fin.audit_log', 'pri.audit_log'],
+  // Admin › Meeting Rooms (2026-10-11): every view books a room.
+  '/admin/rooms': ['hr.meeting_rooms', 'fin.meeting_rooms', 'pri.meeting_rooms', 'dept.meeting_rooms'],
   '/audit-log/access': ['pri.audit_log'],
 
   // ── Finance view ──

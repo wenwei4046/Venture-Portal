@@ -33,6 +33,7 @@ import {
   canAccessVenturePool,
   canApprove,
   canSeeAuditChanges,
+  canAccessMeetingRooms,
 } from '@/lib/roles'
 
 /**
@@ -423,6 +424,9 @@ function navEntries(data: NavData): NavEntry[] {
     },
     { href: '/reconciliation', label: 'Reconciliation', section: 'Reports & Admin', notPaths: ['/reconciliation/journal-entries'], visible: canAccessTreasury },
     { href: '/reconciliation/journal-entries', label: 'Journal Entries', section: 'Reports & Admin', visible: canAccessTreasury },
+    // Meeting Rooms (2026-10-11, the HR revamp's second package): every view
+    // books a room — the user: "can add on at every view, hr principal, finance".
+    { href: '/admin/rooms', label: 'Meeting Rooms', section: 'Reports & Admin', visible: canAccessMeetingRooms },
     // The app-wide history (2026-10-08): Changes for whoever's permissions
     // open some area of it — each reader sees only those areas — and Access
     // (who read what) for the Principal, as before.

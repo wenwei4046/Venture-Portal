@@ -29,4 +29,6 @@ export const AUDIT_READ_KEYS = [
   'product_list',
   'member_requests_manage',
   'member_memos_manage',
+  // Meeting rooms and their bookings (2026-10-11): whoever manages the rooms.
+  'meeting_rooms_manage',
 ] as const satisfies readonly Permission[]

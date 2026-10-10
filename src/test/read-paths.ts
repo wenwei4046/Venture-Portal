@@ -207,6 +207,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'permission_template_tabs_save', 'permission_user_tabs_set', 'permission_template_delete', 'permission_title_move',
   // View as a person (mig 20261011050000): each asks has_perm(view_switch).
   'view_as_person', 'view_as_people',
+  // Admin › Meeting Rooms (mig 20261011090000): each asks has_any_action(rooms.*), a member's revenue_app.view:own.
+  'meeting_rooms_range', 'meeting_rooms_booking', 'meeting_rooms_rooms', 'meeting_rooms_people', 'meeting_rooms_book',
+  'meeting_rooms_cancel', 'meeting_rooms_save_room', 'meeting_rooms_delete_room',
   'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_cancel_topup',
   'payroll_close_month', 'payroll_complete_rows', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status',
   'payroll_open_topup', 'payroll_reopen_month', 'payroll_send_back_batch', 'payroll_submit_batch', 'payroll_uncomplete_rows',
