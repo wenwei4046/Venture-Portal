@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import type { MemberRequest } from '@/lib/member/types'
 import {
+  RELEASE_SEAT,
+  approveLabel,
+  approvedText,
+  arrangementOf,
+  choosesReplacement,
+  defaultEffective,
+  defaultSeat,
+  effectiveWhen,
   filterRequests,
   isOpen,
   memoLine,
   memoReadsFromRow,
   memoRefusal,
   nextWeekBrand,
+  replacementRefusal,
   requestCaption,
   requestFacts,
   requestFactsFromRow,
@@ -15,6 +24,9 @@ import {
   requestStatus,
   requestStep,
   requestTitle,
+  runFailure,
+  scheduledNotice,
+  seatOptions,
   weekBrand,
   weeksChangedText,
 } from './member-services'
@@ -71,7 +83,10 @@ describe('Request reviews · words and facts', () => {
     expect(requestStep(req({}))).toBe('Accept onto the waiting list')
     expect(requestStep(req({ status: 'waiting' }))).toBe('On the waiting list')
     expect(requestStep(req({ kind: 'claim' }))).toBe('Decide the claim')
-    expect(requestStep(req({ kind: 'replacement', status: 'approved' }))).toBe('Complete the arrangement')
+    expect(requestStep(req({ kind: 'replacement' }))).toBe('Approve and choose the replacement')
+    expect(requestStep(req({ kind: 'replacement', status: 'approved' }))).toBe('Approve and choose the replacement')
+    expect(requestStep(req({ kind: 'replacement', status: 'scheduled' }))).toBe('Scheduled')
+    expect(requestStep(req({ kind: 'replacement', status: 'executed' }))).toBe('Completed')
     expect(requestCaption(req({}), 'Fair')).toBe("Accepting puts the applicant at the end of Fair's waiting list. The department was chosen when the request was submitted.")
     expect(requestStatus('paid')).toEqual({ name: 'Paid', tone: 'info' })
     expect(requestStatus('failed').name).toBe('Failed · removed')
@@ -81,6 +96,131 @@ describe('Request reviews · words and facts', () => {
     const all = [req({ id: 'a' }), req({ id: 'b', kind: 'claim' }), req({ id: 'c', kind: 'replacement' })]
     expect(filterRequests(all, 'all').map(r => r.id)).toEqual(['a', 'b', 'c'])
     expect(filterRequests(all, 'claim').map(r => r.id)).toEqual(['b'])
+  })
+})
+
+describe('A replacement: who takes the seat, and when (HR revamp 4b)', () => {
+  const REV = 'dep-revenue'
+  const KAR = '727f336a-e761-4cec-8ef0-390e7626348d'
+  const ADRIAN = '61b4c495-6b7d-442d-a391-31fe4cbe2d6a'
+  const data = {
+    candidates: [
+      { id: 'z', name: 'ZACK', departmentId: REV, titleId: 't-rs' },
+      { id: KAR, name: 'KAR JUN', departmentId: REV, titleId: 't-ta' },
+      { id: ADRIAN, name: 'ADRIAN', departmentId: REV, titleId: 't-srs' },
+      { id: 'm', name: 'MARKETING ONE', departmentId: 'dep-marketing', titleId: null },
+      { id: 'y', name: 'YUNY', departmentId: REV, titleId: 't-tl' },
+      { id: 'b', name: 'BOBBY', departmentId: REV, titleId: 't-tl' },
+    ],
+    titles: [
+      { id: 't-rs', name: 'Revenue Specialist', departmentId: REV, subDepartmentIds: [] },
+      { id: 't-ta', name: 'Team Assistant', departmentId: REV, subDepartmentIds: [] },
+      { id: 't-srs', name: 'Senior Revenue Specialist', departmentId: REV, subDepartmentIds: [] },
+      { id: 't-tl', name: 'Team Leader', departmentId: REV, subDepartmentIds: [] },
+    ],
+    // Who leads where: YUNY in Fair (first), BOBBY only in IR (with the rest).
+    uplines: [
+      { id: 'y', name: 'YUNY', subDepartmentId: FAIR, titleId: 't-tl' },
+      { id: 'b', name: 'BOBBY', subDepartmentId: 'ir', titleId: 't-tl' },
+    ],
+  }
+  const repl = (detail: Record<string, unknown>, status = 'submitted') =>
+    req({ kind: 'replacement', status, detail: { subDepartmentId: FAIR, originalStaffId: KAR, destination: 'resignation', replacementSource: 'new', ...detail } })
+  const facts = (over: Record<string, unknown> = {}) => ({ submittedBy: 'STANLEY', original: 'KAR JUN', successor: null, target: null, acceptedAt: null, events: [], ...over })
+
+  it('offers releasing the seat, then everybody in the original member’s department but them — this sub-department’s leaders first — with their title', () => {
+    const options = seatOptions(repl({}), data)
+    expect(options.map(o => [o.label, o.meta])).toEqual([
+      ['No replacement · release the seat', ''],
+      ['YUNY', 'Team Leader'],
+      ['ADRIAN', 'Senior Revenue Specialist'],
+      ['BOBBY', 'Team Leader'],
+      ['ZACK', 'Revenue Specialist'],
+    ])
+    expect(options[0]).toBe(RELEASE_SEAT)
+  })
+
+  it('starts on the person the member named, else the seat released', () => {
+    const options = seatOptions(repl({}), data)
+    expect(defaultSeat(repl({ newPerson: ' adrian ' }), options)).toBe(ADRIAN)
+    expect(defaultSeat(repl({ newPerson: 'Somebody New' }), options)).toBe('')
+    expect(defaultSeat(repl({ newPerson: 'ADRIAN', replacementSource: 'vacancy' }), options)).toBe('')
+  })
+
+  it('starts on the planned date, and says when the change happens', () => {
+    expect(defaultEffective(repl({ effective: '2026-10-31' }), '2026-10-10')).toBe('2026-10-31')
+    expect(defaultEffective(repl({ effective: '' }), '2026-10-10')).toBe('2026-10-10')
+    expect(effectiveWhen('2026-10-10', '2026-10-10')).toBe('That date has come, so the change happens as soon as you approve.')
+    expect(effectiveWhen('2026-10-31', '2026-10-10')).toBe('Scheduled — the system replaces them on 31 Oct 2026.')
+    expect(approveLabel('2026-10-31')).toBe('Approve · replace on 31 Oct 2026')
+  })
+
+  it('folds the older arrangement words into the three the system runs', () => {
+    expect(arrangementOf(repl({ destination: 'resignation' }))).toBe('resignation')
+    expect(arrangementOf(repl({ destination: 'company_exit' }))).toBe('resignation')
+    expect(arrangementOf(repl({ destination: 'department_exit' }))).toBe('member_exit')
+    expect(arrangementOf(repl({ destination: 'transfer' }))).toBe('transfer')
+    expect(choosesReplacement(repl({}))).toBe(true)
+    expect(choosesReplacement(repl({}, 'approved'))).toBe(true)
+    expect(choosesReplacement(repl({}, 'scheduled'))).toBe(false)
+  })
+
+  it('says what the system will do, in each arrangement', () => {
+    expect(requestCaption(repl({}), 'Fair', facts())).toBe(
+      'Pick who takes the seat from People Management (Revenue · Fair), and the date. On that date the system replaces them: KAR JUN is deactivated and the new person is added.')
+    expect(requestCaption(repl({ destination: 'member_exit' }), 'Fair', facts())).toContain('KAR JUN leaves Fair and the new person is added.')
+    expect(requestCaption(repl({ destination: 'transfer' }), 'Fair', facts({ target: 'IR' }))).toContain('KAR JUN moves to IR and the new person is added.')
+    expect(scheduledNotice(repl({}, 'scheduled'), facts({ successor: 'ADRIAN', effectiveOn: '2026-10-31' }), 'Fair'))
+      .toBe('On 31 Oct 2026 the system deactivates KAR JUN and adds ADRIAN to Fair.')
+    expect(scheduledNotice(repl({ destination: 'member_exit' }, 'scheduled'), facts({ effectiveOn: '2026-10-31' }), 'Fair'))
+      .toBe('On 31 Oct 2026 the system takes KAR JUN off Fair and releases the seat.')
+    expect(scheduledNotice(repl({ destination: 'transfer' }, 'scheduled'), facts({ target: 'IR', successor: 'ZACK', effectiveOn: '2026-11-01' }), 'Fair'))
+      .toBe('On 1 Nov 2026 the system moves KAR JUN to IR and adds ZACK to Fair.')
+  })
+
+  it('says what an approval did', () => {
+    expect(approvedText(repl({}), facts(), 'ADRIAN', 'Fair', '2026-10-10', true)).toBe('Replaced — KAR JUN deactivated, ADRIAN added to Fair')
+    expect(approvedText(repl({}), facts(), null, 'Fair', '2026-10-10', true)).toBe('Replaced — KAR JUN deactivated')
+    expect(approvedText(repl({ destination: 'member_exit' }), facts(), 'ZACK', 'Fair', '2026-10-10', true)).toBe('Replaced — KAR JUN left Fair, ZACK added to Fair')
+    expect(approvedText(repl({}), facts(), 'ADRIAN', 'Fair', '2026-10-31', false)).toBe('Scheduled for 31 Oct 2026 — the system replaces them then')
+  })
+
+  it('shows the hourly run’s refusal, and nothing else, as a failure', () => {
+    expect(runFailure('Could not run on 11 Oct 2026: Fair is full: 28 places, and this replacement would make 29.')).toMatch(/^Could not run on 11 Oct 2026: Fair is full/)
+    expect(runFailure('Approved to run on 31 Oct 2026.')).toBeNull()
+    expect(runFailure(undefined)).toBeNull()
+  })
+
+  it('refuses to send a bad request, successor or date', () => {
+    const ok = { requestId: KAR, successorId: ADRIAN, effective: '2026-10-31' }
+    expect(replacementRefusal(ok)).toBeNull()
+    expect(replacementRefusal({ ...ok, successorId: null })).toBeNull()
+    expect(replacementRefusal({ ...ok, requestId: 'nope' })).toBe('This request could not be found. Reload the page.')
+    expect(replacementRefusal({ ...ok, successorId: 'nope' })).toBe('Choose who takes the seat again.')
+    expect(replacementRefusal({ ...ok, effective: '' })).toBe('Choose the effective date.')
+    expect(replacementRefusal({ ...ok, effective: '31/10/2026' })).toBe('Choose the effective date.')
+  })
+
+  it('tells a replacement’s history in the handoff’s words, the same-instant moves in order', () => {
+    const at = '2026-10-10T08:00:00.000000+00:00'
+    const steps = requestHistory(facts({
+      successor: 'ADRIAN', effectiveOn: '2026-10-10',
+      events: [
+        { to: 'submitted', at: '2026-10-09T01:00:00Z', note: null, by: 'STANLEY' },
+        { to: 'scheduled', at: '2026-10-09T05:00:00Z', note: 'Approved to run on 31 Oct 2026.', by: 'HR' },
+        { to: 'submitted', at: '2026-10-09T06:00:00Z', note: 'Taken off the schedule.', by: 'HR' },
+        // Approved for a date that has come: both moves at one instant, read back in either order.
+        { to: 'executed', at, note: 'Replaced on 10 Oct 2026: KAR JUN left the company, ADRIAN took the seat.', by: null },
+        { to: 'scheduled', at, note: 'Seat agreed with Stanley.', by: 'HR' },
+      ],
+    }), 'replacement')
+    expect(steps.map(e => [e.what, e.by, e.note])).toEqual([
+      ['Submitted', 'STANLEY', null],
+      ['Approved · scheduled', 'HR', null],
+      ['Taken off the schedule', 'HR', null],
+      ['Approved · replaced by ADRIAN on 10 Oct 2026', 'HR', 'Seat agreed with Stanley.'],
+      ['Replaced automatically', 'System', 'Replaced on 10 Oct 2026: KAR JUN left the company, ADRIAN took the seat.'],
+    ])
   })
 })
 

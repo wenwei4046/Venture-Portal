@@ -90,13 +90,23 @@ const EVENT_WORDS: Record<string, string> = {
 }
 
 /**
+ * Where a status falls in a request's life — the order two moves made in one
+ * transaction (one timestamp) are read in: a replacement approved for a date
+ * that has come is Scheduled, then Completed, at the same instant.
+ */
+const STEP_ORDER: Record<string, number> = {
+  draft: 0, submitted: 1, needs_info: 2, approved: 3, waiting: 3, reserved: 4, accepted: 5, scheduled: 6, allocated: 7,
+}
+
+/**
  * The history a person reads: one step per status it moved to. The database
  * writes a status change once from the app and, on some paths, once more from
  * its own trigger; the same move a second later is the same step.
  */
 export function historyOf(events: readonly RequestEvent[]): Array<RequestEvent & { what: string }> {
   const out: Array<RequestEvent & { what: string }> = []
-  for (const e of [...events].sort((a, b) => a.at.localeCompare(b.at))) {
+  const order = (e: RequestEvent) => STEP_ORDER[e.to] ?? 9
+  for (const e of [...events].sort((a, b) => a.at.localeCompare(b.at) || order(a) - order(b))) {
     const last = out[out.length - 1]
     if (last && last.to === e.to) {
       if (!last.by && e.by) last.by = e.by

@@ -88,25 +88,42 @@
   line-height: 1.5;
 }
 .notice a, .linkish { text-decoration: underline; text-underline-offset: 3px; margin-left: 4px; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; font: inherit; }
-.arrange { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 14px; }
-.arrangeRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; }
-.arrangeLabel { font-size: 12px; color: rgb(var(--hv-brown)); }
-.select {
-  box-sizing: border-box;
-  min-width: 240px;
+.linkish:disabled { cursor: progress; opacity: 0.6; }
+/* A replacement: Replaced by · from People Management, and the effective date. */
+.repl { display: flex; flex-direction: column; gap: 12px; margin: 6px 0 14px; }
+.replLabel { font-size: 12px; color: rgb(var(--hv-brown)); }
+.seats { display: flex; gap: 6px; flex-wrap: wrap; max-height: 120px; overflow-y: auto; margin-top: 6px; }
+.seat {
+  padding: 6px 11px;
+  border-radius: 7px;
+  border: 1px solid rgb(var(--hv-hairline));
+  background: rgb(255 255 255);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: normal;
+  color: rgb(var(--hv-ink));
+  cursor: pointer;
+  white-space: nowrap;
+}
+.seat[aria-checked='true'] { border-color: rgb(var(--hv-accent)); background: rgb(var(--hv-peach)); font-weight: 500; }
+.seat:focus-visible { outline: 2px solid rgb(var(--hv-ink)); outline-offset: 2px; }
+.seatMeta { font-weight: 400; color: rgb(var(--hv-brown)); margin-left: 6px; font-size: 11px; }
+.when { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.date {
+  box-sizing: content-box;
   padding: 7px 10px;
   border: 1px solid rgb(var(--hv-hairline));
   border-radius: 6px;
   font: inherit;
   font-size: 13px;
   line-height: normal;
-  background: rgb(255 255 255);
   color: rgb(var(--hv-ink));
+  background: rgb(255 255 255);
 }
-.check { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; line-height: 1.5; cursor: pointer; }
-.check input { margin-top: 3px; accent-color: rgb(var(--hv-accent)); }
+.whenText { font-size: 12px; color: rgb(var(--hv-body-2)); }
+.runFailure { margin: 8px 0 0; color: rgb(var(--hv-danger)); font-size: 12.5px; line-height: 1.5; }
 .history { margin-top: 22px; }
-.pick { padding: 0 14px 18px; color: rgb(var(--hv-brown)); }
 
 /* ── Brand weeks ── */
 .bwHead { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }

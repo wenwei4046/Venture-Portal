@@ -198,6 +198,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_waiting_form', 'member_save_waiting_form', 'member_fail_waiting', 'member_waiting_transfer',
   // Member services' readers (mig 20261010160000): member_requests_manage / member_memos_manage.
   'member_admin_request_facts', 'member_memo_reads',
+  // A replacement runs itself on its date (mig 20261010170000): HR's two ask member_is_manager; the
+  // hourly sweep is the service role's (api/member-queue).
+  'member_schedule_replacement', 'member_unschedule_replacement', 'member_run_due_replacements',
   'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_cancel_topup',
   'payroll_close_month', 'payroll_complete_rows', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status',
   'payroll_open_topup', 'payroll_reopen_month', 'payroll_send_back_batch', 'payroll_submit_batch', 'payroll_uncomplete_rows',
