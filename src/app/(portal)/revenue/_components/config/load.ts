@@ -102,6 +102,35 @@ const loadLadderTitles = cache(async () => {
     .order('name')
 })
 
+/**
+ * Rules › Ranks' "Held by" (2026-10-10, the HR revamp): who is paid from each
+ * rank of the catalogue today — the open memberships' rungs, mapped to the
+ * rank each rung points at, named from the commission roster.
+ */
+export async function loadRankHolders(
+  schemeId: string | null,
+  ranks: ReadonlyArray<{ id: string; rank_def_id: string }>,
+): Promise<Record<string, string[]>> {
+  if (!schemeId) return {}
+  const supabase = await untyped()
+  const [{ data: positions, error }, { data: roster }] = await Promise.all([
+    supabase.from('comm_hierarchy').select('staff_id, rank_id').eq('scheme_id', schemeId).is('effective_to', null),
+    loadCommissionRoster(),
+  ])
+  if (error) return {}
+  const nameOf = new Map(rows<{ id: string; employee_name: string }>(roster).map(s => [s.id, s.employee_name]))
+  const defOfRung = new Map(ranks.map(r => [r.id, r.rank_def_id]))
+  const out: Record<string, string[]> = {}
+  for (const p of rows<{ staff_id: string; rank_id: string | null }>(positions)) {
+    const def = p.rank_id ? defOfRung.get(p.rank_id) : undefined
+    const name = nameOf.get(p.staff_id)
+    if (!def || !name) continue
+    ;(out[def] ??= []).push(name)
+  }
+  for (const k of Object.keys(out)) out[k].sort((a, b) => a.localeCompare(b))
+  return out
+}
+
 export async function loadCommissionSettings(
   schemeId: string | null,
 ): Promise<CommissionSettingsData> {

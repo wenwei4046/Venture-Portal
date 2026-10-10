@@ -140,6 +140,33 @@ export async function createSubDepartment(formData: FormData) {
 }
 
 export type NewSubDepartmentResult = { ok: true; slug: string } | { ok: false; reason: string }
+export type RulesSaveResult = { ok: true } | { ok: false; reason: string }
+
+/** A write's refusal as a value — production masks a thrown message — while a gate's redirect still goes through. */
+async function answered(run: () => Promise<unknown>, fallback: string): Promise<RulesSaveResult> {
+  try {
+    await run()
+    return { ok: true }
+  } catch (err) {
+    if (err && typeof err === 'object' && 'digest' in err && String((err as { digest?: unknown }).digest).startsWith('NEXT_REDIRECT')) throw err
+    return { ok: false, reason: err instanceof Error ? err.message : fallback }
+  }
+}
+
+/** Rules › Scheme rules' Save (2026-10-10, the HR revamp): `updateScheme`, answered. */
+export async function saveSchemeRules(formData: FormData): Promise<RulesSaveResult> {
+  return answered(() => updateScheme(formData), 'Could not save the scheme rules')
+}
+
+/** Rules › Ranks' Save (2026-10-10): `upsertRankDef`, answered. */
+export async function saveRankDef(formData: FormData): Promise<RulesSaveResult> {
+  return answered(() => upsertRankDef(formData), 'Could not save the rank')
+}
+
+/** Rules › Ranks' Remove (2026-10-10): `deleteRankDef`, answered. */
+export async function removeRankDef(id: string): Promise<RulesSaveResult> {
+  return answered(() => deleteRankDef(id), 'Could not remove the rank')
+}
 
 /**
  * The sub-department switcher's "+ New sub-department" (2026-10-10): the same

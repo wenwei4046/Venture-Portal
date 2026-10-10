@@ -48,29 +48,55 @@ export type RulesTab =
   | 'ranks'
   | 'directors'
   | 'kpi'
+  | 'capacity'
+
+/** The side list's groups (2026-10-10, the HR revamp), in the prototype's order. */
+export type RulesGroup = 'Pay structure' | 'Item rules' | 'Headcount' | 'Policy'
+export const RULES_GROUPS: readonly RulesGroup[] = ['Pay structure', 'Item rules', 'Headcount', 'Policy']
 
 export interface RulesTabItem {
   key: RulesTab
   label: string
+  group: RulesGroup
 }
 
 /**
- * Every tab, in section order — Ranks is section IX, Directors X, and KPI
- * items XI: it was IV (the items, read-only) and V (the threshold ladder)
- * until 2026-10-08, when the two became one tab and the user put it at the end
- * of the rail, so it took the next numeral, as Directors did.
+ * Every tab, in the side list's order (2026-10-10, the HR revamp: a grouped
+ * side list replaced the rail — Pay structure · Item rules · Headcount ·
+ * Policy). Capacity is new here: the headcount limit moved from Member
+ * services, because it is the sub-department's own rule.
  */
 export const RULES_TABS: readonly RulesTabItem[] = [
-  { key: 'scheme', label: 'Scheme rules' },
-  { key: 'ladder', label: 'Title ladder' },
-  { key: 'groups', label: 'Item groups' },
-  { key: 'open-bill', label: 'Open Bill rates' },
-  { key: 'brands', label: 'Brands & margin bands' },
-  { key: 'promotion', label: 'Promotion criteria' },
-  { key: 'ranks', label: 'Ranks' },
-  { key: 'directors', label: 'Directors' },
-  { key: 'kpi', label: 'KPI items' },
+  { key: 'scheme', label: 'Scheme rules', group: 'Pay structure' },
+  { key: 'ladder', label: 'Title ladder', group: 'Pay structure' },
+  { key: 'ranks', label: 'Ranks', group: 'Pay structure' },
+  { key: 'directors', label: 'Directors', group: 'Pay structure' },
+  { key: 'groups', label: 'Item groups', group: 'Item rules' },
+  { key: 'kpi', label: 'KPI items', group: 'Item rules' },
+  { key: 'open-bill', label: 'Open Bill rates', group: 'Item rules' },
+  { key: 'brands', label: 'Brands & margin bands', group: 'Item rules' },
+  { key: 'capacity', label: 'Capacity', group: 'Headcount' },
+  { key: 'promotion', label: 'Promotion criteria', group: 'Policy' },
 ]
+
+/** The one line under each section's title (the prototype's). `{sub}` = the sub-department. */
+export const RULES_DESC: Record<RulesTab, string> = {
+  scheme: 'Which components {sub} pays. A switched-off component is skipped by the engine, and the item-rule tabs it reads come and go with it.',
+  ladder: 'Titles from the most senior down, and the rank each one gives.',
+  ranks: 'The rates a title pays from, lettered from the top of the catalogue.',
+  directors: 'What the Revenue Directors this sub-department reports to are paid.',
+  groups: 'Which product groups count as commissionable.',
+  kpi: 'Flat RM per unit, and the threshold ladder.',
+  'open-bill': 'The uplift paid on an Open Bill.',
+  brands: 'Each brand’s penalty and incentive rungs.',
+  capacity: 'How many people {sub} can hold. Capacity counts active members and reserved positions; waiting-list matching only reserves a seat while one is free.',
+  promotion: 'The recorded promotion policy.',
+}
+
+/** The visible tabs under their groups; a group with none drops out. */
+export function groupedRulesTabs(visible: readonly RulesTabItem[]): Array<{ label: RulesGroup; items: RulesTabItem[] }> {
+  return RULES_GROUPS.map(label => ({ label, items: visible.filter(t => t.group === label) })).filter(g => g.items.length > 0)
+}
 
 /** The switches of `comm_schemes` that decide a tab. */
 export interface RulesSwitches {
@@ -101,6 +127,7 @@ function tabIsShown(key: RulesTab, scheme: RulesSwitches, recorded: RulesRecorde
     case 'scheme':
     case 'ladder':
     case 'ranks':
+    case 'capacity':
       return true
     case 'groups':
       return scheme.enable_kpi || recorded.itemGroups > 0
