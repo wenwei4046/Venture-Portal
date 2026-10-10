@@ -164,6 +164,8 @@ export const TABLE_READS: Readonly<Record<string, readonly Want[]>> = {
   service_contracts: ['billing.create', 'billing.edit', 'billing.view', 'my_billing.create:dept', 'my_billing.view:dept'],
   treasury_config: ['approvals.approve', 'categories.view', 'director_salary.approve', 'director_salary.edit', 'hr_costing.approve', 'settings.manage', 'treasury.approve', 'treasury.view'],
   treasury_terms_history: ['reports.export', 'reports.view', 'treasury.create', 'treasury.view'],
+  // A person's boxes (mig 20261011010100): People › Permissions and the person window.
+  user_permission_tabs: ['accounts.manage', 'accounts.view', 'team.view:own'],
   utility_splits: ['categories.view', 'settings.manage'],
   venture_pool: ['approvals.approve', 'billing.create', 'billing.view', 'treasury.approve', 'treasury.create', 'treasury.edit', 'treasury.view', 'treasury.void', 'venture_pool.create', 'venture_pool.edit'],
 }

@@ -38,6 +38,7 @@ export default function PersonWindow({
   const [data, setData] = useState<PersonCardData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<WindowTab>('details')
+  const [footSlot, setFootSlot] = useState<HTMLElement | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -122,7 +123,7 @@ export default function PersonWindow({
           </div>
         ) : tab === 'permissions' ? (
           person.access && person.account ? (
-            <PersonAccess access={person.access} canEdit={person.canManagePermissions} onSaved={() => void load()} />
+            <PersonAccess access={person.access} canEdit={person.canManagePermissions} onSaved={() => void load()} personName={name} footSlot={footSlot} />
           ) : (
             <div className={s.pwEmpty}>
               {name} has no login yet, so there is nothing to set. Inviting them creates the account, and their title&apos;s
@@ -162,6 +163,8 @@ export default function PersonWindow({
 
       <div className={s.pwFoot}>
         <span className={s.pwHint}>Esc closes.</span>
+        {/* Reset to title and Save, while Permissions is open (the handoff's footer). */}
+        <span ref={setFootSlot} className={s.pwFootSlot} hidden={tab !== 'permissions'} />
         {person ? (
           <Link href={`/team/people/${person.staff.id}`} className={`${btn('outline')} ${s.pwFull}`}>
             Full page

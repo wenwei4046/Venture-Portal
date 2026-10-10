@@ -5,11 +5,26 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requireAction, requireAuth } from '@/lib/auth'
 import { can } from '@/lib/permissions'
-import { isAction, isScope, isSensitiveField } from '@/lib/permission-matrix'
+import { cellKeysFromRows, grantsFromRows, isSensitiveField, personCellsFromRows, type CellKey, type PersonCells, type Scope } from '@/lib/permission-matrix'
+import {
+  boxesOf,
+  cellMap,
+  cellRows,
+  cellsFromTabs,
+  parseGrant,
+  personCellRows,
+  personTicks,
+  reapplied,
+  templateTicks,
+  ticksOfPerson,
+  type PersonBox,
+  type TabAction,
+} from '@/lib/permission-tabs'
 import { describeHistory, type AuditRow, type HistoryEntry } from '@/lib/permission-history'
 
 /**
- * Writing permission templates (2026-10-08, the People Management revamp).
+ * Writing permission templates (2026-10-08, the People Management revamp;
+ * by view and tab since 2026-10-11).
  *
  * Every write is one RPC, and the RPC is the authority: it checks the caller
  * holds accounts.manage (`permissions_manage`), refuses a cell the function
@@ -25,7 +40,6 @@ import { describeHistory, type AuditRow, type HistoryEntry } from '@/lib/permiss
 export type Result<T extends object = object> = ({ ok: true } & T) | { ok: false; reason: string }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const FUNCTION_KEY = /^[a-z_]{2,40}$/
 
 function refresh() {
   revalidatePath('/team', 'layout')
@@ -33,110 +47,6 @@ function refresh() {
 
 async function db(): Promise<SupabaseClient> {
   return (await createClient()) as unknown as SupabaseClient
-}
-
-interface CellInput {
-  function_key: string
-  action: string
-  scope: string | null
-}
-
-function cellsAreShaped(cells: unknown, allowNone: boolean): cells is CellInput[] {
-  return (
-    Array.isArray(cells) &&
-    cells.length <= 400 &&
-    cells.every(
-      c =>
-        c !== null &&
-        typeof c === 'object' &&
-        typeof (c as CellInput).function_key === 'string' &&
-        FUNCTION_KEY.test((c as CellInput).function_key) &&
-        isAction((c as CellInput).action) &&
-        (isScope((c as CellInput).scope) || (allowNone && (c as CellInput).scope === null)),
-    )
-  )
-}
-
-export async function saveTemplate(input: {
-  templateId: string
-  version: number
-  grants: CellInput[]
-  sensitive: string[]
-  /** People whose own cells on the changed cells the Principal chose to put back on the template. */
-  reset: Array<{ userId: string; functionKey: string; action: string }>
-}): Promise<Result<{ version: number; titles: number }>> {
-  await requireAction('accounts', 'manage')
-  if (
-    !input ||
-    !UUID.test(input.templateId) ||
-    !Number.isInteger(input.version) ||
-    !cellsAreShaped(input.grants, false) ||
-    !Array.isArray(input.sensitive) ||
-    !input.sensitive.every(isSensitiveField) ||
-    !Array.isArray(input.reset) ||
-    !input.reset.every(r => UUID.test(r.userId) && FUNCTION_KEY.test(r.functionKey) && isAction(r.action))
-  ) {
-    return { ok: false, reason: 'Reload the page and try again.' }
-  }
-
-  const supabase = await db()
-  const { data, error } = await supabase.rpc('permission_template_save', {
-    p_template: input.templateId,
-    p_version: input.version,
-    p_grants: input.grants,
-    p_sensitive: input.sensitive,
-    p_reset: input.reset.map(r => ({ user_id: r.userId, function_key: r.functionKey, action: r.action })),
-  })
-  if (error) return { ok: false, reason: error.message }
-  refresh()
-  const saved = data as { version: number; titles: number }
-  return { ok: true, version: saved.version, titles: saved.titles }
-}
-
-export async function createTemplate(input: {
-  name: string
-  description: string
-  copyFrom: string | null
-}): Promise<Result<{ id: string }>> {
-  await requireAction('accounts', 'manage')
-  const name = (input?.name ?? '').trim()
-  if (!name || name.length > 80) return { ok: false, reason: 'Give the template a name, up to 80 characters.' }
-  if ((input.description ?? '').length > 400) return { ok: false, reason: 'Keep the description under 400 characters.' }
-  if (input.copyFrom !== null && !UUID.test(input.copyFrom)) return { ok: false, reason: 'Reload the page and try again.' }
-
-  const supabase = await db()
-  const { data, error } = await supabase.rpc('permission_template_create', {
-    p_name: name,
-    p_description: input.description?.trim() || null,
-    p_copy_from: input.copyFrom,
-  })
-  if (error) return { ok: false, reason: error.message }
-  refresh()
-  return { ok: true, id: data as string }
-}
-
-/** A title onto another template — at once, the design's select. */
-export async function setTitleTemplate(titleId: string, templateId: string | null): Promise<Result> {
-  await requireAction('accounts', 'manage')
-  if (!UUID.test(titleId) || (templateId !== null && !UUID.test(templateId))) {
-    return { ok: false, reason: 'Reload the page and try again.' }
-  }
-  const supabase = await db()
-  const { error } = await supabase.rpc('permission_title_set_template', { p_title: titleId, p_template: templateId })
-  if (error) return { ok: false, reason: error.message }
-  refresh()
-  return { ok: true }
-}
-
-/** One person's own cells, the whole set (✕ = null). */
-export async function setPersonCells(userId: string, cells: CellInput[]): Promise<Result> {
-  await requireAction('accounts', 'manage')
-  if (!UUID.test(userId) || !cellsAreShaped(cells, true)) return { ok: false, reason: 'Reload the page and try again.' }
-  const supabase = await db()
-  const { error } = await supabase.rpc('permission_user_cells_set', { p_user: userId, p_cells: cells })
-  if (error) return { ok: false, reason: error.message }
-  refresh()
-  return { ok: true }
 }
 
 /** A person's old per-key exceptions, cleared so their template and their cells decide. */
@@ -204,4 +114,211 @@ export async function setUserPermission(userId: string, key: string, granted: bo
     if (error) throw new Error(`Could not save the exception: ${error.message}`)
   }
   refresh()
+}
+
+// ── By view › tab (2026-10-11, the HR revamp's Permissions — the user's choice B) ──
+//
+// A template is ticked per tab; the cells the database asks for are worked out
+// HERE from the ticks (`cellRows`), never taken from the browser, and saved
+// with them in one transaction (`permission_template_tabs_save` →
+// `permission_template_save`, its checks unchanged). A person's own boxes are
+// laid over their title's ticks; the cells written for them are the ones their
+// ticks give at another reach than their template stores (`personCellRows`) —
+// so whenever what lies under their boxes changes (the template's ticks, or the
+// template their title points at), their cells are worked out again in the
+// same transaction (`reapplied`).
+
+/** A template's ticks as stored, else as its cells give them — read on the server. */
+async function ticksOf(supabase: SupabaseClient, templateId: string) {
+  const [tpl, grants, sens, tabs, keys] = await Promise.all([
+    supabase.from('permission_templates').select('id, base_role').eq('id', templateId).maybeSingle(),
+    supabase.from('permission_template_grants').select('function_key, action, scope').eq('template_id', templateId),
+    supabase.from('permission_template_sensitive').select('field').eq('template_id', templateId),
+    supabase.from('permission_template_tabs').select('tab_id, action').eq('template_id', templateId),
+    supabase.from('permission_cell_keys').select('function_key, action, legacy_key, min_scope, gate'),
+  ])
+  for (const res of [tpl, grants, sens, tabs, keys]) if (res.error) throw new Error(res.error.message)
+  if (!tpl.data) return null
+  const grantRows = (grants.data ?? []) as Array<{ function_key: string; action: string; scope: string }>
+  const stored = (tabs.data ?? []) as Array<{ tab_id: string; action: string }>
+  const record = {
+    grants: grantsFromRows(grantRows),
+    sensitive: ((sens.data ?? []) as Array<{ field: string }>).map(s => s.field).filter(isSensitiveField),
+    baseRole: (tpl.data as { base_role: string }).base_role,
+    tabs: stored.length ? stored.map(t => `${t.tab_id}.${t.action}`) : null,
+  }
+  const cellKeys = cellKeysFromRows((keys.data ?? []) as Array<{ function_key: string; action: string; legacy_key: string; min_scope: string; gate: string | null }>)
+  return { record, cellKeys, ticks: templateTicks(record, cellKeys), cells: cellMap(record.grants) }
+}
+
+type Ticked = NonNullable<Awaited<ReturnType<typeof ticksOf>>>
+
+/**
+ * The people on these titles who have boxes or cells of their own — the only
+ * ones a change under them can put out of step. Both tables hold exceptions
+ * only, so they are read whole.
+ */
+async function ownersOn(supabase: SupabaseClient, titleIds: string[]): Promise<Array<{ userId: string; boxes: PersonBox[]; cells: PersonCells }>> {
+  if (titleIds.length === 0) return []
+  const [staff, cells, boxes] = await Promise.all([
+    supabase.from('hr_staff_costs').select('user_id, title_id').in('title_id', titleIds).not('user_id', 'is', null),
+    supabase.from('user_permission_cells').select('user_id, function_key, action, scope'),
+    supabase.from('user_permission_tabs').select('user_id, tab_id, action, granted'),
+  ])
+  for (const res of [staff, cells, boxes]) if (res.error) throw new Error(res.error.message)
+  const cellRowsOf = (cells.data ?? []) as Array<{ user_id: string; function_key: string; action: string; scope: string | null }>
+  const boxRowsOf = (boxes.data ?? []) as Array<{ user_id: string; tab_id: string; action: string; granted: boolean }>
+  const users = [...new Set(((staff.data ?? []) as Array<{ user_id: string }>).map(s => s.user_id))]
+  return users
+    .map(userId => ({
+      userId,
+      boxes: boxRowsOf.filter(b => b.user_id === userId).map(b => ({ tab: b.tab_id, action: b.action as TabAction, granted: b.granted })),
+      cells: personCellsFromRows(cellRowsOf.filter(c => c.user_id === userId)),
+    }))
+    .filter(p => p.boxes.length > 0 || Object.keys(p.cells).length > 0)
+}
+
+/** Their boxes and cells again, over what now lies under them. */
+function peopleOver(
+  owners: Array<{ userId: string; boxes: PersonBox[]; cells: PersonCells }>,
+  before: Ticked,
+  after: { ticks: ReadonlySet<string>; cells: ReadonlyMap<string, Scope> },
+  cellKeys: readonly CellKey[],
+) {
+  return owners.map(p => ({ user_id: p.userId, ...reapplied(before.ticks, ticksOfPerson(before.record, p, cellKeys), after) }))
+}
+
+const ticksAreShaped = (tabs: unknown): tabs is string[] =>
+  Array.isArray(tabs) && tabs.length <= 400 && tabs.every(t => typeof t === 'string' && parseGrant(t) !== null)
+
+/** Save a template's ticks (and the cells they stand for), its sensitive fields, and its holders' own cells over them. */
+export async function saveTemplateTabs(input: {
+  templateId: string
+  version: number
+  tabs: string[]
+  sensitive: string[]
+}): Promise<Result<{ version: number; titles: number }>> {
+  await requireAction('accounts', 'manage')
+  if (
+    !input ||
+    !UUID.test(input.templateId) ||
+    !Number.isInteger(input.version) ||
+    !ticksAreShaped(input.tabs) ||
+    !Array.isArray(input.sensitive) ||
+    !input.sensitive.every(isSensitiveField)
+  ) {
+    return { ok: false, reason: 'Reload the page and try again.' }
+  }
+  const supabase = await db()
+  const tabs = [...new Set(input.tabs)]
+  const before = await ticksOf(supabase, input.templateId)
+  if (!before) return { ok: false, reason: 'That template is gone. Reload the page.' }
+  const titles = await supabase.from('titles').select('id').eq('template_id', input.templateId)
+  if (titles.error) return { ok: false, reason: titles.error.message }
+  const owners = await ownersOn(supabase, ((titles.data ?? []) as Array<{ id: string }>).map(t => t.id))
+  const { data, error } = await supabase.rpc('permission_template_tabs_save', {
+    p_template: input.templateId,
+    p_version: input.version,
+    p_tabs: tabs,
+    p_grants: cellRows(tabs),
+    p_sensitive: input.sensitive,
+    p_people: peopleOver(owners, before, { ticks: new Set(tabs), cells: cellsFromTabs(tabs) }, before.cellKeys),
+  })
+  if (error) return { ok: false, reason: error.message }
+  refresh()
+  const saved = data as { version: number; titles: number }
+  return { ok: true, version: saved.version, titles: saved.titles }
+}
+
+/**
+ * A title onto another template — at once, the design's select. Whoever on it
+ * has boxes of their own keeps them, over the new template's ticks.
+ */
+export async function setTitleTemplate(titleId: string, templateId: string | null): Promise<Result> {
+  await requireAction('accounts', 'manage')
+  if (!UUID.test(titleId) || (templateId !== null && !UUID.test(templateId))) {
+    return { ok: false, reason: 'Reload the page and try again.' }
+  }
+  const supabase = await db()
+  const title = await supabase.from('titles').select('template_id').eq('id', titleId).maybeSingle()
+  if (title.error) return { ok: false, reason: title.error.message }
+  if (!title.data) return { ok: false, reason: 'That title is gone. Reload the page.' }
+  const from = (title.data as { template_id: string | null }).template_id
+  let people: ReturnType<typeof peopleOver> = []
+  if (from && templateId && from !== templateId) {
+    const [before, after] = await Promise.all([ticksOf(supabase, from), ticksOf(supabase, templateId)])
+    if (!after) return { ok: false, reason: 'That template is gone. Reload the page.' }
+    if (before) people = peopleOver(await ownersOn(supabase, [titleId]), before, after, before.cellKeys)
+  }
+  const { error } = await supabase.rpc('permission_title_move', { p_title: titleId, p_template: templateId, p_people: people })
+  if (error) return { ok: false, reason: error.message }
+  refresh()
+  return { ok: true }
+}
+
+/** One person's boxes over their title's template — the whole set ([] = back to the title). */
+export async function setPersonTabs(input: { userId: string; templateId: string; boxes: PersonBox[] }): Promise<Result> {
+  await requireAction('accounts', 'manage')
+  if (
+    !input ||
+    !UUID.test(input.userId) ||
+    !UUID.test(input.templateId) ||
+    !Array.isArray(input.boxes) ||
+    input.boxes.length > 400 ||
+    !input.boxes.every(b => b && typeof b.granted === 'boolean' && parseGrant(`${b.tab}.${b.action}`) !== null)
+  ) {
+    return { ok: false, reason: 'Reload the page and try again.' }
+  }
+  const supabase = await db()
+  const base = await ticksOf(supabase, input.templateId)
+  if (!base) return { ok: false, reason: 'Their template is gone. Reload the page and try again.' }
+  const ticks = personTicks(base.ticks, input.boxes)
+  const { error } = await supabase.rpc('permission_user_tabs_set', {
+    p_user: input.userId,
+    p_tabs: boxesOf(base.ticks, ticks),
+    p_cells: personCellRows(base.cells, ticks),
+  })
+  if (error) return { ok: false, reason: error.message }
+  refresh()
+  return { ok: true }
+}
+
+/** The handoff's Delete: a template no title points at. */
+export async function deleteTemplate(input: { templateId: string; version: number }): Promise<Result> {
+  await requireAction('accounts', 'manage')
+  if (!input || !UUID.test(input.templateId) || !Number.isInteger(input.version)) {
+    return { ok: false, reason: 'Reload the page and try again.' }
+  }
+  const supabase = await db()
+  const { error } = await supabase.rpc('permission_template_delete', { p_template: input.templateId, p_version: input.version })
+  if (error) return { ok: false, reason: error.message }
+  refresh()
+  return { ok: true }
+}
+
+/** "+ New template": a copy of the one open — its cells, fields and, once it has them, its ticks. */
+export async function copyTemplate(input: { name: string; from: string }): Promise<Result<{ id: string }>> {
+  await requireAction('accounts', 'manage')
+  const name = (input?.name ?? '').trim()
+  if (!name || name.length > 80) return { ok: false, reason: 'Give the template a name, up to 80 characters.' }
+  if (!UUID.test(input.from)) return { ok: false, reason: 'Reload the page and try again.' }
+  const supabase = await db()
+  const { data, error } = await supabase.rpc('permission_template_create', { p_name: name, p_description: null, p_copy_from: input.from })
+  if (error) return { ok: false, reason: error.message }
+  const id = data as string
+  const source = await ticksOf(supabase, input.from)
+  if (source?.record.tabs) {
+    // A new template: no title points at it yet, so nobody's own boxes lie over it.
+    const saved = await supabase.rpc('permission_template_tabs_save', {
+      p_template: id,
+      p_version: 1,
+      p_tabs: source.record.tabs,
+      p_grants: cellRows(source.record.tabs),
+      p_sensitive: source.record.sensitive,
+      p_people: [],
+    })
+    if (saved.error) return { ok: false, reason: saved.error.message }
+  }
+  refresh()
+  return { ok: true, id }
 }

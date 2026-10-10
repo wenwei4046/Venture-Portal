@@ -259,7 +259,7 @@ export default async function StaffDetailPage({ params }: PageProps) {
         />
       ) : null}
 
-      {access ? <PersonAccess access={access} canEdit={canManagePermissions(viewer)} /> : null}
+      {access ? <PersonAccess access={access} canEdit={canManagePermissions(viewer)} personName={staff.employee_name} /> : null}
 
       {canSeeActivity ? <ActivityLog userId={account!.id} /> : null}
     </div>

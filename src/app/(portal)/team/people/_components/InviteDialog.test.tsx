@@ -17,7 +17,7 @@ const candidates: InviteCandidate[] = [
 ]
 const templates = [{
   id: 'maker', key: 'fin_maker', name: 'Finance · Maker', description: null, baseRole: 'finance', version: 1, sensitive: [],
-  grants: {},
+  grants: {}, tabs: null,
 }]
 
 const open = (initialStaffId: string | null) => {
