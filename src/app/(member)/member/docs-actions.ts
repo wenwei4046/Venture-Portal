@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isPrincipalAccount } from "@/lib/view-as";
 import { appClosed } from "@/lib/member/app-pages";
 import { loadMemberDocuments, memberDocumentsFromRow, openMemberDocument, type MemberDocument } from "@/lib/documentation/member";
-import { documentationFileLink } from "@/lib/documentation/server";
+import { openDocumentationFile } from "@/lib/documentation/actions";
 import type { User } from "@/types";
 
 /**
@@ -58,7 +58,8 @@ export async function openMemberDoc(id: string, staffId?: string): Promise<Outco
     const user = await member();
     if (!isId(id)) return { ok: false, error: "That document is not there." };
     const viewing = staffId !== undefined && isPrincipalAccount(user);
-    const link = viewing ? await documentationFileLink("document", id, "view") : await openMemberDocument(id, "view");
+    // The Principal's open is People › Documentation's own — a "Viewed" line on the trail, nothing marked seen for the member.
+    const link = viewing ? await openDocumentationFile("document", id, "view") : await openMemberDocument(id, "view");
     return link.ok ? { ok: true, data: { url: link.url, fileName: link.fileName } } : { ok: false, error: link.reason };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "The document could not be opened." };

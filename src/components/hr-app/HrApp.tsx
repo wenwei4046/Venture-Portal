@@ -97,7 +97,9 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
   const [busy, startBusy] = useTransition()
   const [error, setError] = useState('')
 
-  const d = data
+  // A part their tabs close is left out of every list (2026-10-11): Hiring › Requests closed, no request is
+  // listed or reviewed — Insights alone still reads them (parts.insights).
+  const d = useMemo(() => (data.parts.hiring ? data : { ...data, hires: [] }), [data])
   const top = stack[stack.length - 1]
   const view: string = top ? top.k : tab
   const today = d.today
@@ -173,7 +175,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
             {/* A div, as the prototype's: the portal's global h1 rule would set it in Georgia. */}
             <div className={s.title} role="heading" aria-level={1}>{title}</div>
           </div>
-          {view === 'rooms' ? (
+          {view === 'rooms' && d.may.book ? (
             <button type="button" className={s.headAction} onClick={() => openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: defaultDept(d) })}>
               + Book
             </button>
@@ -248,7 +250,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
             </>
           ) : null}
 
-          {view === 'hire' && hr ? <HireScreen hr={hr} openSheet={openSheet} /> : null}
+          {view === 'hire' && hr ? <HireScreen hr={hr} openSheet={openSheet} may={d.may} /> : null}
 
           {view === 'req' && rr ? (
             <>
@@ -269,7 +271,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
                 ))}
               </section>
               <textarea className={s.note} rows={3} placeholder="Note (optional)" value={note} onChange={e => setNote(e.target.value)} />
-              {isPendingRequest(rr) && rr.kind !== 'replacement' ? (
+              {isPendingRequest(rr) && rr.kind !== 'replacement' && d.may.decide ? (
                 <div className={s.btnRow}>
                   <button type="button" className={s.rejectBtn} disabled={busy} onClick={() => run(() => actions.requestDecide(rr.id, 'reject', note), pop, false)}>Reject</button>
                   <button type="button" className={s.approveBtn} disabled={busy} onClick={() => run(() => actions.requestDecide(rr.id, rr.kind === 'waiting' ? 'accept' : 'approve', note), pop, false)}>
@@ -285,17 +287,17 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
             <RoomsScreen
               d={d} day={day} today={today} setDate={setDate} roomView={roomView} setRoomView={setRoomView}
               openBooking={id => openSheet({ k: 'booking', id })}
-              bookAt={(roomId, from) => openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: defaultDept(d), room: roomId, from: String(from), to: String(from + 60) })}
+              bookAt={d.may.book ? (roomId, from) => openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: defaultDept(d), room: roomId, from: String(from), to: String(from + 60) }) : undefined}
             />
           ) : null}
 
           {view === 'more' ? (
             <section className={s.more}>
               {([
-                ['insights', 'Insights', 'Hiring time, cost and sources', '◔', 'rgb(230 237 241)', SLATE],
-                ['talents', 'Talent Bank', `${d.talents.length} people kept on file`, '★', 'rgb(255 244 231)', 'rgb(163 78 37)'],
-                ['docs', 'Data center', 'Letters on each person’s record', '▤', 'rgb(238 240 226)', 'rgb(88 98 68)'],
-              ] as const).map(([k, t, sub, icon, bg, fg]) => (
+                ['insights', 'Insights', 'Hiring time, cost and sources', '◔', 'rgb(230 237 241)', SLATE, d.parts.insights],
+                ['talents', 'Talent Bank', `${d.talents.length} people kept on file`, '★', 'rgb(255 244 231)', 'rgb(163 78 37)', d.parts.talent],
+                ['docs', 'Data center', 'Letters on each person’s record', '▤', 'rgb(238 240 226)', 'rgb(88 98 68)', d.parts.docs],
+              ] as const).filter(row => row[6]).map(([k, t, sub, icon, bg, fg]) => (
                 <button key={k} type="button" className={s.moreRow} onClick={() => push({ k } as Page)}>
                   <span className={s.moreIcon} style={{ background: bg, color: fg }}>{icon}</span>
                   <span className={s.grow}><span className={s.moreTitle}>{t}</span><span className={s.moreSub}>{sub}</span></span>
@@ -305,7 +307,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
             </section>
           ) : null}
 
-          {view === 'insights' ? <InsightsScreen d={d} /> : null}
+          {view === 'insights' ? <InsightsScreen d={data} /> : null}
 
           {view === 'talents' ? (
             <>
@@ -336,25 +338,28 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
                 <textarea
                   className={s.notesBox}
                   rows={5}
+                  readOnly={!d.may.talentEdit}
                   value={talentNotes?.id === tt.id ? talentNotes.text : tt.notes}
                   onChange={e => setTalentNotes({ id: tt.id, text: e.target.value })}
                   onBlur={() => {
-                    if (talentNotes?.id === tt.id && talentNotes.text !== tt.notes) run(() => actions.talentNotes(tt.id, talentNotes.text), undefined, false)
+                    if (d.may.talentEdit && talentNotes?.id === tt.id && talentNotes.text !== tt.notes) run(() => actions.talentNotes(tt.id, talentNotes.text), undefined, false)
                   }}
                 />
               </section>
-              <button
-                type="button"
-                className={s.removeBtn}
-                style={{ background: arm ? 'rgb(250 228 224)' : 'rgb(255 255 255)' }}
-                disabled={busy}
-                onClick={() => {
-                  if (!arm) return setArm(true)
-                  run(() => actions.talentRemove(tt.id), () => { pop(); setArm(false) }, false)
-                }}
-              >
-                {arm ? 'Tap again to remove' : 'Remove from Talent Bank'}
-              </button>
+              {d.may.talentEdit ? (
+                <button
+                  type="button"
+                  className={s.removeBtn}
+                  style={{ background: arm ? 'rgb(250 228 224)' : 'rgb(255 255 255)' }}
+                  disabled={busy}
+                  onClick={() => {
+                    if (!arm) return setArm(true)
+                    run(() => actions.talentRemove(tt.id), () => { pop(); setArm(false) }, false)
+                  }}
+                >
+                  {arm ? 'Tap again to remove' : 'Remove from Talent Bank'}
+                </button>
+              ) : null}
             </>
           ) : null}
 
@@ -387,6 +392,8 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
                     onClick={() => {
                       // A link made at the press (never kept): opened in a tab of its own.
                       const tab = window.open('', '_blank')
+                      // The file's page gets no handle back on the app.
+                      if (tab) tab.opener = null
                       void actions.letterLink(l.id).then(res => {
                         if (res.ok && tab) tab.location.href = res.url
                         else {
@@ -406,7 +413,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
         </div>
       </div>
 
-      {view === 'hire' && hr ? <HireBar hr={hr} busy={busy} openSheet={openSheet} cancel={() => run(() => actions.hireCancel(hr.id), undefined, false)} meId={d.meId} /> : null}
+      {view === 'hire' && hr && d.may.hireApprove ? <HireBar hr={hr} busy={busy} openSheet={openSheet} cancel={() => run(() => actions.hireCancel(hr.id), undefined, false)} meId={d.meId} /> : null}
 
       <nav className={s.tabs} aria-label="HR app">
         {TABS.map(([k, label]) => {
@@ -511,7 +518,7 @@ function greeting(): string {
   return h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening'
 }
 
-function HireScreen({ hr, openSheet }: { hr: HrHire; openSheet: (sh: Sheet, f?: Form) => void }) {
+function HireScreen({ hr, openSheet, may }: { hr: HrHire; openSheet: (sh: Sheet, f?: Form) => void; may: HrAppData['may'] }) {
   const ch = hireChip(hr.status)
   const facts = ([
     ['Department', hr.dept], ['Requested by', hr.requester], ['Employment', hr.employment], ['Reason', hr.reason], ['Age', hr.age], ['Gender', hr.gender],
@@ -539,7 +546,7 @@ function HireScreen({ hr, openSheet }: { hr: HrHire; openSheet: (sh: Sheet, f?: 
       <section className={s.cands}>
         <div className={s.candsHead}>
           <span className={s.candsTitle}>Candidates · {hr.candidates.length}</span>
-          <button type="button" className={s.plus} aria-label="Add a candidate" onClick={() => openSheet({ k: 'cand' })}>+</button>
+          {may.hireCreate ? <button type="button" className={s.plus} aria-label="Add a candidate" onClick={() => openSheet({ k: 'cand' })}>+</button> : null}
         </div>
         {hr.candidates.map(c => {
           const cc = candChip(c.stage)
@@ -550,9 +557,13 @@ function HireScreen({ hr, openSheet }: { hr: HrHire; openSheet: (sh: Sheet, f?: 
                 <span className={s.candName}>{c.name}</span>
                 <span className={s.candMeta}>{[c.source, c.phone, c.note].filter(Boolean).join(' · ')}</span>
               </span>
-              <button type="button" className={s.stageBtn} style={{ background: cc.bg, color: cc.fg }} onClick={() => openSheet({ k: 'stage', cid: c.id, name: c.name, cur: c.stage })}>
-                {cc.label} ▾
-              </button>
+              {may.hireEdit ? (
+                <button type="button" className={s.stageBtn} style={{ background: cc.bg, color: cc.fg }} onClick={() => openSheet({ k: 'stage', cid: c.id, name: c.name, cur: c.stage })}>
+                  {cc.label} ▾
+                </button>
+              ) : (
+                <span className={s.stageBtn} style={{ background: cc.bg, color: cc.fg }}>{cc.label}</span>
+              )}
             </div>
           )
         })}
@@ -611,7 +622,8 @@ function RoomsScreen({ d, day, today, setDate, roomView, setRoomView, openBookin
   roomView: 'cards' | 'timeline'
   setRoomView: (v: 'cards' | 'timeline') => void
   openBooking: (id: string) => void
-  bookAt: (roomId: string, from: number) => void
+  /** Absent when they may not book (Meeting rooms · Create closed): the slots take no tap. */
+  bookAt?: (roomId: string, from: number) => void
 }) {
   const days = Array.from({ length: 7 }, (_, i) => shiftDay(today, i))
   const cols = `40px repeat(${Math.max(1, d.rooms.length)}, minmax(0,1fr))`
@@ -649,10 +661,10 @@ function RoomsScreen({ d, day, today, setDate, roomView, setRoomView, openBookin
                 <div
                   key={r.id}
                   className={s.tlCol}
-                  onClick={e => {
+                  onClick={bookAt ? e => {
                     const rc = e.currentTarget.getBoundingClientRect()
                     bookAt(r.id, slotAt(e.clientY - rc.top, rc.height))
-                  }}
+                  } : undefined}
                 >
                   {d.bookings.filter(b => b.roomId === r.id && b.date === day).map(b => {
                     const dur = b.to - b.from
@@ -672,7 +684,7 @@ function RoomsScreen({ d, day, today, setDate, roomView, setRoomView, openBookin
               ))}
             </div>
           </div>
-          <div className={s.tlHint}>Tap an empty slot to book it.</div>
+          {bookAt ? <div className={s.tlHint}>Tap an empty slot to book it.</div> : null}
         </>
       ) : (
         d.rooms.map(r => {

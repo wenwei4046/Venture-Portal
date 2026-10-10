@@ -13,6 +13,7 @@ import type { HiringBoard, HiringRequest, HiringTalent } from '@/lib/hiring/type
 import type { Booking } from '@/lib/rooms/model'
 import { officeToday } from '@/lib/office-time'
 import { canDo } from '@/lib/permission-actions'
+import { actionsOnPage, opensPage, type PageRoute } from '@/lib/page-tabs'
 import { can } from '@/lib/permissions'
 import type { User } from '@/types'
 import { shiftDay, type HrAppData, type HrBooking, type HrHire, type HrMemberRequest, type HrTalent, type MemberKind } from './model'
@@ -137,18 +138,62 @@ export function dataCenterOf(doc: Pick<Documentation, 'people' | 'departments' |
   }
 }
 
+/**
+ * Each part of the app is a page of the portal (2026-10-11, the review's M2):
+ * shown only while that page's tab is open to them, and a write counts only
+ * while one of that page's boxes for it is (`actionsOnPage`) — the HR app is
+ * the same account on a second surface, never a way round its ticks.
+ */
+export const PART_PAGE = {
+  requests: '/member-admin',
+  hiring: '/hiring/requests',
+  insights: '/hiring/insights',
+  talent: '/hiring/talent',
+  docs: '/team/documentation',
+  rooms: '/admin/rooms',
+} as const satisfies Record<keyof HrAppData['parts'], PageRoute>
+
+/** The account as one page of the portal sees it: its writes narrowed to that page's open boxes. */
+export function onPage(user: User, route: PageRoute): User {
+  return user.closed?.length ? { ...user, actions: actionsOnPage(user.actions ?? {}, user.closed, route) } : user
+}
+
+/** What their cells and their tabs open in the app: its parts, and the writes behind its buttons. */
+export function appAccess(user: User): Pick<HrAppData, 'parts' | 'may'> {
+  const open = (route: PageRoute) => opensPage(user.tabs, route)
+  const parts = {
+    requests: can(user, 'member_requests_manage') && open(PART_PAGE.requests),
+    hiring: canDo(user, 'hiring', 'view') && open(PART_PAGE.hiring),
+    insights: canDo(user, 'hiring', 'view') && open(PART_PAGE.insights),
+    talent: canDo(user, 'hiring', 'view') && open(PART_PAGE.talent),
+    docs: canDo(user, 'documentation', 'view') && open(PART_PAGE.docs),
+    rooms: canDo(user, 'rooms', 'view') && open(PART_PAGE.rooms),
+  }
+  // Member services decides by its key (member_is_manager); a box unticked on its page still closes it.
+  const decide = parts.requests && (!user.closed?.length || canDo(onPage(user, PART_PAGE.requests), 'member', 'manage'))
+  return {
+    parts,
+    may: {
+      decide,
+      hireApprove: parts.hiring && canDo(onPage(user, PART_PAGE.hiring), 'hiring', 'approve'),
+      hireEdit: parts.hiring && canDo(onPage(user, PART_PAGE.hiring), 'hiring', 'edit'),
+      hireCreate: parts.hiring && canDo(onPage(user, PART_PAGE.hiring), 'hiring', 'create'),
+      talentEdit: parts.talent && canDo(onPage(user, PART_PAGE.talent), 'hiring', 'edit'),
+      book: parts.rooms && canDo(onPage(user, PART_PAGE.rooms), 'rooms', 'create'),
+    },
+  }
+}
+
 export async function loadHrAppData(user: User): Promise<HrAppData> {
   const today = officeToday()
-  const readsRequests = can(user, 'member_requests_manage')
-  const readsRooms = canDo(user, 'rooms', 'view')
-  const readsDocs = canDo(user, 'documentation', 'view')
-  const readsHiring = canDo(user, 'hiring', 'view')
+  const { parts, may } = appAccess(user)
+  const readsHiring = parts.hiring || parts.insights || parts.talent
   const [members, factsRead, range, people, docs, hiring] = await Promise.all([
-    readsRequests ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
-    readsRequests ? (async () => (await client()).rpc('member_admin_request_facts'))() : Promise.resolve(null),
-    readsRooms ? readRoomsRange(today, shiftDay(today, 6)) : Promise.resolve(null),
-    readsRooms ? readRoomsPeople() : Promise.resolve(null),
-    readsDocs ? loadDocumentation() : Promise.resolve(null),
+    parts.requests ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
+    parts.requests ? (async () => (await client()).rpc('member_admin_request_facts'))() : Promise.resolve(null),
+    parts.rooms ? readRoomsRange(today, shiftDay(today, 6)) : Promise.resolve(null),
+    parts.rooms ? readRoomsPeople() : Promise.resolve(null),
+    parts.docs ? loadDocumentation() : Promise.resolve(null),
     readsHiring ? loadHiringBoard() : Promise.resolve(null),
   ])
   const board = hiring?.ok ? hiring.board : null
@@ -174,14 +219,17 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     staff,
     // Who may own a request: HR's own people, as the portal's Acknowledge offers them.
     owners: board ? hrOwners(board).map(p => ({ id: p.id, name: p.name, title: p.title, dept: p.department })) : staff.filter(p => p.dept === 'HR'),
-    hires: board ? board.requests.map(r => hireOf(r, board)) : [],
+    // Insights reads the requests too; the Hiring tab and the Review list them only while Requests is open (parts.hiring).
+    hires: board && (parts.hiring || parts.insights) ? board.requests.map(r => hireOf(r, board)) : [],
     requests,
     rooms,
     bookings,
     sources: board ? board.sources.filter(x => x.active).map(x => x.name) : [],
-    talents: board ? board.talents.map(talentOf) : [],
+    talents: board && parts.talent ? board.talents.map(talentOf) : [],
     docTypes: center?.docTypes ?? [],
     letters: center?.letters ?? [],
     bookDepts: (who?.departments ?? []).map(d => ({ id: d.id, name: d.name })),
+    parts,
+    may,
   }
 }
