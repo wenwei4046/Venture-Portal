@@ -6,9 +6,14 @@ import { sees } from '@/lib/sensitive'
 import type { ManagerOption, SubDepartmentOption, TitleOption } from '@/lib/staff-form'
 import { listSubDepartments } from '../../../revenue/_lib/sub-departments'
 import AddStaffForm, { type AddStaffDepartment } from '../_components/AddStaffForm'
+import WaitingTransfer from './_components/WaitingTransfer'
 
-export default async function NewStaffPage() {
+export default async function NewStaffPage({ searchParams }: { searchParams: Promise<{ waiting?: string }> }) {
   const viewer = await requireAction('team', 'create')
+  // Sales Groups › Waiting list › Transfer (2026-10-10): the same form's job,
+  // started from an applicant — its own page, the HR revamp's.
+  const { waiting } = await searchParams
+  if (waiting) return <WaitingTransfer requestId={waiting} viewer={viewer} />
   const supabase = await createClient()
 
   // is_internal=false excludes the hidden 'Venture Office' pseudo-department —

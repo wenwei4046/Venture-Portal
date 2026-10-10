@@ -64,6 +64,9 @@ const STATUS: Record<string, [string, Tone]> = {
   paid: ["Paid", "good"],
   withdrawn: ["Cancelled", "none"],
   expired: ["Expired", "bad"],
+  // The HR revamp (2026-10-10): taken off the waiting list; a replacement set for a later date.
+  failed: ["Not placed", "bad"],
+  scheduled: ["Scheduled", "warn"],
 };
 export const requestStatus = (status: string): [string, Tone] => STATUS[status] ?? [status, "neutral"];
 
@@ -127,6 +130,7 @@ const WHAT: Record<string, string> = {
   submitted: "Submitted", needs_info: "Returned · needs info", approved: "Approved", rejected: "Rejected",
   waiting: "On the waiting list", reserved: "Place reserved", accepted: "Applicant accepted", executed: "Done",
   paid: "Paid", withdrawn: "Cancelled", expired: "Reservation expired",
+  failed: "Removed from the waiting list", scheduled: "Scheduled",
 };
 
 export function requestDetailVM(r: MemberRequest, events: readonly RequestEvent[] | null, options: {
@@ -143,7 +147,7 @@ export function requestDetailVM(r: MemberRequest, events: readonly RequestEvent[
     const what = e.status === "allocated" ? `Allocated to ${str(d.department) || "the team"}` : (e.from === "needs_info" && e.status === "submitted" ? "Updated and sent again" : WHAT[e.status] ?? e.status);
     const who = e.actor === "you" ? "You" : e.actor === "hr" ? (e.actorName ? `${e.actorName} (HR)` : "HR") : e.actor === "finance" ? "Finance"
       : e.actor === "principal" ? (e.actorName ?? "Principal") : "Revenue system";
-    const bad = ["needs_info", "rejected", "withdrawn", "expired"].includes(e.status);
+    const bad = ["needs_info", "rejected", "withdrawn", "expired", "failed"].includes(e.status);
     return {
       what, who, when: klDayTime(e.at),
       note: e.note ?? (i === 0 && e.status === "submitted" ? requestSummary(r, options.nameOf) : ""),
@@ -400,7 +404,7 @@ export function replaceable(membership: MemberMembership | undefined): { id: str
 
 /** The member's waiting-list requests, and which an approved one a replacement may use. */
 export function waitingChoices(requests: readonly MemberRequest[]): { id: string; name: string; sub: string; status: string; ok: boolean }[] {
-  return requests.filter(r => r.kind === "waiting" && !["draft", "withdrawn", "rejected", "expired"].includes(r.status)).map(r => {
+  return requests.filter(r => r.kind === "waiting" && !["draft", "withdrawn", "rejected", "expired", "failed"].includes(r.status)).map(r => {
     const start = typeof r.detail.start === "string" ? r.detail.start : "";
     const ok = ["waiting", "reserved", "accepted", "allocated"].includes(r.status);
     return {

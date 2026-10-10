@@ -146,6 +146,8 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   lookup_epf: ['epf_third_schedule'],
   lookup_socso: ['socso_act4_schedule'],
   match_erp_salesperson: ['comm_agent_aliases', 'comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_lines', 'sales_order_open_bill_tags', 'sales_orders'],
+  // Transfer from the waiting list (mig 20261010150000): the roster row as the caller; the request through two DEFINER functions.
+  member_transfer_waiting: ['hr_staff_costs', 'titles'],
   next_account_code: ['chart_of_accounts'],
   recost_sales_order_lines: ['catalogue_combo_prices', 'catalogue_live_combos', 'catalogue_option_prices', 'catalogue_skus', 'comm_order_releases', 'comm_runs', 'erp_fabrics', 'erp_products', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   revenue_apply_fair_calendar: ['comm_order_releases', 'comm_organisers', 'comm_runs', 'comm_venue_events', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
@@ -192,6 +194,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_admin_claim_settings', 'member_admin_save_brand_weeks', 'member_admin_save_claim_settings',
   'member_arena_save_brand_week_picks', 'member_capacity_of', 'member_principal_save_brand_week_picks', 'member_process_all_queues',
   'member_sub_department_requests',
+  // Sales Groups › Waiting list's flow (mig 20261010140000): each asks member_is_manager (the form also lets in member_requests).
+  'member_waiting_form', 'member_save_waiting_form', 'member_fail_waiting', 'member_waiting_transfer',
   'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_cancel_topup',
   'payroll_close_month', 'payroll_complete_rows', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status',
   'payroll_open_topup', 'payroll_reopen_month', 'payroll_send_back_batch', 'payroll_submit_batch', 'payroll_uncomplete_rows',

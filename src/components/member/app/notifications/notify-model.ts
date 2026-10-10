@@ -62,6 +62,8 @@ const STATUS: Record<string, { text: string; tone: NonNullable<NotifItem["done"]
   paid: { text: "Paid", tone: "green" },
   withdrawn: { text: "Cancelled", tone: "sub" },
   expired: { text: "Expired", tone: "sub" },
+  failed: { text: "Removed from the waiting list", tone: "red" },
+  scheduled: { text: "Scheduled", tone: "amber" },
 };
 
 /** `10 min`, `3 h`, then `2 Oct`. */
