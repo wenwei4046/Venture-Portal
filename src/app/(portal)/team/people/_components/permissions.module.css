@@ -1,0 +1,80 @@
+/* People › Permissions as the HR revamp's handoff draws it (Revenue App.dc.html,
+   2026-10-11): the template picked at the top, Delete and "+ New template",
+   the line saying who it applies to, the matrix (TabMatrix), Save at the foot. */
+
+.wrap { display: flex; flex-direction: column; margin-bottom: 48px; line-height: normal; }
+
+.top { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.topLabel { font-size: 12px; color: rgb(var(--hv-brown)); }
+.select {
+  min-width: 260px;
+  padding: 8px 10px;
+  border: 1px solid rgb(var(--hv-frame));
+  border-radius: 6px;
+  background: rgb(255 255 255);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.spacer { flex: 1; }
+.inline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.newName {
+  width: 230px;
+  padding: 7px 10px;
+  border: 1px solid rgb(var(--hv-frame));
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+.copies { font-size: 11.5px; color: rgb(var(--hv-brown)); }
+.confirm { font-size: 12.5px; color: rgb(var(--hv-danger)); }
+
+.ghost, .ghostWide, .deleteBtn, .primary, .danger {
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ghost { padding: 7px 10px; border: 1px solid rgb(var(--hv-hairline)); background: rgb(255 255 255); color: rgb(var(--hv-ink)); }
+.ghostWide { padding: 7px 14px; border: 1px solid rgb(var(--hv-frame)); background: transparent; color: rgb(var(--hv-ink)); }
+.ghostWide:hover { border-color: rgb(var(--hv-accent)); }
+.deleteBtn { padding: 7px 12px; margin-right: 6px; border: 1px solid rgb(var(--hv-danger-border)); background: transparent; color: rgb(var(--hv-danger)); }
+.deleteBtn:hover:not(:disabled) { background: rgb(var(--hv-danger-bg)); }
+.deleteBtn:disabled { opacity: .45; cursor: default; }
+.primary { padding: 7px 16px; border: 0; background: rgb(var(--hv-accent)); color: rgb(var(--hv-ink)); }
+.primary:hover:not(:disabled) { background: rgb(var(--hv-accent-hover)); }
+.primary:disabled { opacity: .5; cursor: default; }
+.danger { padding: 7px 12px; border: 0; background: rgb(var(--hv-danger)); color: rgb(255 255 255); }
+
+.lede { margin-bottom: 12px; font-size: 12.5px; color: rgb(var(--hv-body-2)); }
+.lede b { font-weight: 500; }
+
+.foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.footNote { font-size: 12px; color: rgb(var(--hv-brown)); }
+.footActions { display: flex; gap: 8px; }
+
+.error { margin: 0 0 12px; padding: 10px 12px; border: 1px solid rgb(var(--hv-danger-border)); border-radius: 8px; background: rgb(var(--hv-danger-bg)); color: rgb(var(--hv-danger)); font-size: 12.5px; }
+.warn { margin-top: 14px; padding: 10px 12px; border: 1px solid rgb(var(--hv-alert-border)); border-radius: 8px; background: rgb(var(--hv-alert-bg)); color: rgb(var(--hv-alert)); font-size: 12.5px; }
+.warn b { font-weight: 600; }
+
+/* Below the handoff's drawing: sensitive fields, the titles, the history. */
+.section { margin-top: 28px; }
+.sectHead { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.sectNote { margin: 0 0 10px; font-size: 12px; color: rgb(var(--hv-brown)); }
+.sectHead .sectNote { margin: 0; }
+.sectCount { margin-left: auto; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10px; letter-spacing: .08em; color: rgb(var(--hv-brown)); }
+.sensitive { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.sensItem { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border: 1px solid rgb(var(--hv-hairline)); border-radius: 8px; cursor: pointer; }
+.sensLabel { display: block; font-size: 12.5px; font-weight: 500; }
+.sensNote { display: block; margin-top: 2px; font-size: 11px; line-height: 1.45; color: rgb(var(--hv-brown)); }
+.titleSelect { width: 100%; padding: 5px 8px; border: 1px solid rgb(var(--hv-frame)); border-radius: 6px; background: rgb(255 255 255); font: inherit; font-size: 12px; }
+.link { margin-top: 4px; padding: 0; border: 0; background: none; font: inherit; font-size: 11px; text-decoration: underline; cursor: pointer; }
+
+@media (max-width: 760px) {
+  .select { min-width: 0; flex: 1; }
+  .sensitive { grid-template-columns: minmax(0, 1fr); }
+}

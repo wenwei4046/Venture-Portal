@@ -15,6 +15,7 @@ import {
   personCellsFromRows,
 } from '@/lib/permission-matrix'
 import type { PersonPermissionRow } from '../_components/PersonPermissions'
+import type { PersonBox, TabAction } from '@/lib/permission-tabs'
 
 /**
  * What one account's permissions actually resolve to, and why.
@@ -87,8 +88,10 @@ export type PersonAccessData =
       kind: 'template'
       userId: string
       titleName: string
-      template: { id: string; name: string; baseRole: string; grants: Grants; sensitive: SensitiveField[] }
+      template: { id: string; name: string; baseRole: string; grants: Grants; sensitive: SensitiveField[]; tabs: string[] | null }
       cells: PersonCells
+      /** Their own boxes over the template's ticks (2026-10-11); none stored yet = their cells give them. */
+      boxes: PersonBox[]
       /** Old per-key exceptions, still applied on top until cleared. */
       legacy: Array<{ key: string; label: string; granted: boolean }>
       functions: PermFunction[]
@@ -107,7 +110,7 @@ export async function loadPersonAccess(
   }
   // The permission tables postdate database.types.ts.
   const db = supabase as unknown as SupabaseClient
-  const [tpl, grants, sens, fns, keys, cells, legacy, defs] = await Promise.all([
+  const [tpl, grants, sens, fns, keys, cells, legacy, defs, tabs, boxes] = await Promise.all([
     db.from('permission_templates').select('id, name, base_role').eq('id', title.templateId).maybeSingle(),
     db.from('permission_template_grants').select('function_key, action, scope').eq('template_id', title.templateId),
     db.from('permission_template_sensitive').select('field').eq('template_id', title.templateId),
@@ -116,8 +119,10 @@ export async function loadPersonAccess(
     db.from('user_permission_cells').select('function_key, action, scope').eq('user_id', account.id),
     db.from('user_permissions').select('permission_key, granted').eq('user_id', account.id),
     db.from('permission_defs').select('key, label'),
+    db.from('permission_template_tabs').select('tab_id, action').eq('template_id', title.templateId),
+    db.from('user_permission_tabs').select('tab_id, action, granted').eq('user_id', account.id),
   ])
-  for (const [label, res] of [['their template', tpl], ['its cells', grants], ['the permission catalog', fns], ['their own cells', cells]] as const) {
+  for (const [label, res] of [['their template', tpl], ['its cells', grants], ['the permission catalog', fns], ['their own cells', cells], ['its boxes', tabs], ['their own boxes', boxes]] as const) {
     if (res.error) throw new Error(`Could not load ${label}: ${res.error.message}`)
   }
   const template = tpl.data as { id: string; name: string; base_role: string } | null
@@ -136,7 +141,9 @@ export async function loadPersonAccess(
       baseRole: template.base_role,
       grants: grantsFromRows((grants.data ?? []) as Array<{ function_key: string; action: string; scope: string }>),
       sensitive: ((sens.data ?? []) as Array<{ field: string }>).map(s => s.field).filter(isSensitiveField),
+      tabs: (tabs.data ?? []).length ? ((tabs.data ?? []) as Array<{ tab_id: string; action: string }>).map(t => `${t.tab_id}.${t.action}`) : null,
     },
+    boxes: ((boxes.data ?? []) as Array<{ tab_id: string; action: string; granted: boolean }>).map(b => ({ tab: b.tab_id, action: b.action as TabAction, granted: b.granted })),
     cells: personCellsFromRows((cells.data ?? []) as Array<{ function_key: string; action: string; scope: string | null }>),
     legacy: ((legacy.data ?? []) as Array<{ permission_key: string; granted: boolean }>).map(l => ({
       key: l.permission_key,

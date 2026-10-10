@@ -209,6 +209,9 @@
 }
 .pwHint { font-size: 12px; color: rgb(var(--hv-body-2)); }
 .pwFull { padding: 7px 14px; }
+/* Reset to title · Save, from the Permissions tab (createPortal). */
+.pwFootSlot { margin-left: auto; display: flex; }
+.pwFootSlot[hidden] { display: none; }
 
 /* ── Invite user ── */
 .inv { display: flex; flex-direction: column; gap: 14px; }

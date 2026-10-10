@@ -308,6 +308,63 @@ revoke; refuses to run without the readers) once the code is live.
 `tests/member-sql/validate-sensitive-fields.mjs`,
 `src/lib/private-columns.test.ts`.
 
+**PERMISSIONS BY VIEW AND TAB (2026-10-11, the HR revamp 8a; the user chose B
+with my six points).** A template is ticked per VIEW › TAB › View / Create /
+Edit / Approve — five views (HR, Finance, Principal, Department, Revenue app;
+the catalog is `src/lib/permission-tabs.ts`, each tab with the page keys it
+opens today and the function cells each box stands for). Four actions only: a
+function's Export rides with View, Void with Approve, Manage with the Edit of
+the tab where it is done (Rules = revenue.manage, Hierarchy = team.manage,
+Permissions = accounts.manage, Member Services = member.manage, Chart of
+Account = categories.manage, Settings = settings.manage, CRM · Team =
+crm.manage). No reach to pick: Department view = the holder's department,
+Revenue app = their own, the others = the company — save tabs that need
+another (My claims = own, CRM · Team and Product List = all, every Overview =
+all). **The database still asks for FUNCTION cells** (point 6): each save
+writes the ticks AND the cells they stand for in one transaction —
+`permission_template_tabs_save` calls `permission_template_save`, and a
+person's `permission_user_tabs_set` calls `permission_user_cells_set` — the
+cells worked out on the SERVER from the ticks (`cellRows`, `personCellRows`
+— a person's cells are what their ticks give at another reach than their
+template STORES, null = held back). `current_actions()` and every guard since
+PR3 are unchanged, and so is everybody's access: nothing was moved by the
+migration — a template with no ticks stored shows the ticks its cells give
+(`tabsFromCells`: a box only where its own cell is held at the tab's reach and
+its page opens for the template's keys today; a narrower tab only for what the
+company-wide ones do not already give, so Finance and the Principal are never
+put in the Department view; a page listed in several views — Approvals, Dept
+Pool, Venture Pool, Reports, Audit Log — only in the views the template lives
+in), and `permission-tabs.test.ts` holds the eleven production templates to
+LOSING NOTHING. A template's first save on tabs applies the user's merges, and
+only those (dept_head claims.void + opex.export; director dept_reports.export,
+treasury.void, venture_pool.export; fin_checker claims.void, dept_pool.export,
+treasury.void; fin_maker billing / treasury / venture_pool export; hr
+revenue.export + team.manage), and drops a cell that opened no page (the
+Executive office's reports.view, held back by the Treasury gate). Logins and
+permissions are their own HR-view tab (Permissions: accounts.view / .create /
+.manage) — never implied by People Management. Delete
+(`permission_template_delete`) refuses a template a title points at.
+Tables `permission_template_tabs` (read by every session, as the cells) and
+`user_permission_tabs` (as a person's cells, and registered:
+`permission_table_reads` accounts.manage / accounts.view / team.view:own),
+both audited. **A person's boxes follow their template:** they are kept as what
+was changed for them over their title's ticks, so whenever what lies under them
+changes — the template's ticks saved, the title pointed at another template —
+their cells are worked out again IN THE SAME TRANSACTION (`reapplied`; the save's
+`p_people`, `permission_title_move`, each person through
+`permission_user_tabs_set`; a person not on the template refuses the whole
+save). Else a box held back from one page would hold back what the template
+later gives through another, or a cell given with an old tick outlive it. A box
+whose tab they cannot View is not theirs (`personTicks`). Somebody retitled onto
+another template keeps boxes saved over the old one; their window says so and
+offers Save (`cellsOutOfStep`). carrie's six cells from before tabs read as eight
+boxes (Invoice + Billing Allocator Approve, Reconciliation + Journal Entries
+held back) and, on Finance · Maker's first save, become four cells — her access
+gains only Venture Pool export (dry-run on production, rolled back). Migs
+`20261011010000`, `20261011010100`, `20261011020000`; PGlite
+`tests/member-sql/validate-permission-tabs.mjs`. NEXT (8c): pages and the
+sidebar follow the tabs' View, the view switcher, the Department view.
+
 **PEOPLE WITHOUT THE SALARY TICK (2026-10-10, PR4b; the user chose 1b and
 2b).** The Executive office (Team · View at All) and the Department head (Team ·
 View at Dept) hold Team · View without Salary amounts, and the `team` key the

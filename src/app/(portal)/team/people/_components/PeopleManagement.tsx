@@ -40,7 +40,7 @@ interface Props {
 const SUBTITLE: Record<PeopleTab, string> = {
   people: 'Everyone on the payroll, the title they hold and the department it sits under. An account is what lets somebody sign in.',
   permissions:
-    'What each title may do, set once per template: a function, an action on it, and how far that reaches — their own records, their department, or the whole company. Titles point at a template; one person can still be raised or lowered on their own.',
+    'What each title may do, by view and tab. Titles point at a template; one person can still be raised or lowered on their own.',
 }
 
 /**

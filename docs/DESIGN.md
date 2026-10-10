@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -368,6 +368,27 @@ disagree, the file wins; every value is the prototype's.**
   + `--rv-kpi-ink`. Profile's row: `--rv-green-bg` / `--rv-kpi-ink` tile, a
   10.9px / 700 white count on the accent. Measured against the prototype
   (`states-pr7b.json`): only the .92 type scale's rounding.
+- **Permissions by view and tab** (v3.29, 2026-10-11; `team/_components/TabMatrix`
+  + `tab-matrix.module.css`, `people/_components/PermissionTemplates` +
+  `permissions.module.css`): the top row at 10px gaps — "Title template"
+  12px `--hv-brown`, a 260px select (8px 10px, 6px radius, `--hv-frame`),
+  the count, then Delete (7px 12px, `--hv-danger-border` edge, danger text,
+  no ground) and "+ New template" (7px 14px, `--hv-frame`, the accent edge on
+  hover); asking replaces them inline (Keep · Delete, or the name field, "copies
+  X", Cancel · Create). The lede 12.5px `--hv-body-2`, the name 500. The matrix:
+  a 200px rail (9px 12px rows, 8px radius; the open view peach with an inset
+  3px accent bar, 500; "8/11" mono 11px `--hv-brown`) beside a 10px-radius
+  `--hv-frame` table — head on `--hv-head` over `--hv-head-rule`, 10.5px /
+  600 uppercase .04em, `minmax(0,1fr) repeat(4,76px) 60px`; rows hairline,
+  the tab 8px 14px; 18px boxes (5px radius, `--hv-frame`; ticked accent with a
+  white ✓ 11px; a box the tab lacks dashed at .4; read-only keeps its colour);
+  "all" / "none" 12px underlined. The person window: a 170px rail (8px 10px,
+  12.5px, counts 10.5px), `repeat(4,64px) 44px`, rows 12.5px at 7px 12px, a
+  7px red dot (`--hv-danger`, white ring) on a changed box, Reset to title
+  (7px 12px, hairline) and Save (7px 16px, accent) in the footer before Full
+  page; above the matrix, in the legacy note's style, a line when their boxes
+  were saved over another template. Foot: 12px `--hv-brown` note, Save 7px 16px accent. Measured against
+  the prototype (`states-pr8a.json`).
 - **Cross-check** with a measuring script that finds each element by its text
   on both and diffs computed font / colour / size / padding / border / radius
   / background (`.design/revenue-app/tools/measure-pl.mjs` is the pattern).
