@@ -11,6 +11,8 @@ import type { DailyBankData } from '@/lib/daily-bank-data'
 
 const mocks = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }))
+// Get image draws the board with html-to-image; the test only needs a picture.
+vi.mock('html-to-image', () => ({ toBlob: async () => new Blob(['png'], { type: 'image/png' }) }))
 
 import DailyBankView from './DailyBankView'
 
@@ -147,5 +149,59 @@ describe('Daily Bank on the sheet', () => {
     expect(hlb.querySelector('tfoot')).toHaveTextContent('Available (after pending)')
     expect(hlb.querySelector('tfoot')).toHaveTextContent('1,400.00')
     expect(tableOf('Alliance').querySelector('tfoot .db-neg')).toHaveTextContent('(50.00)')
+  })
+
+  // 2026-10-10 — the handoff's phone: the long note stays on the desk, and By
+  // bank reads as a stacked list (the table would scroll sideways).
+  it('keeps the long note off a phone', () => {
+    render(<DailyBankView data={data()} today="2026-10-09" />)
+    expect(document.querySelector('.db-note')).toHaveClass('hidden', 'md:block')
+  })
+
+  it('on a phone reads By bank as a stacked list per bank', () => {
+    render(<DailyBankView data={data()} today="2026-10-09" />)
+    fireEvent.click(screen.getByRole('button', { name: /^By bank/ }))
+    expect(tableOf('Hong Leong').closest('.db-box')).toHaveClass('hidden', 'md:block')
+    const list = screen.getByRole('list', { name: 'Hong Leong' })
+    expect(list.closest('.md\\:hidden')).not.toBeNull()
+    const row = (text: string) => within(list).getByText(text).closest('[role="listitem"]') as HTMLElement
+    expect(row('Balance B/F')).toHaveTextContent('1,500.00')
+    expect(row('· HOUZS Century').querySelector('.db-in')).toHaveTextContent('200.00')
+    expect(row('· HOUZS Century')).toHaveTextContent('PV No. HV-OR-202610-0050')
+    expect(row('· HOUZS Century')).toHaveTextContent('Description Settles HV-INV-202610-0013')
+    expect(row('· Syarikat Logistik').querySelector('.db-pend')).toHaveTextContent('(300.00)')
+    expect(row('· Syarikat Logistik')).toHaveTextContent('Pending payment (RM)')
+    expect(list.querySelector('.fund-pfoot')).toHaveTextContent('Available (after pending)')
+    expect(list.querySelector('.fund-pfoot')).toHaveTextContent('1,400.00')
+    expect(screen.getByRole('list', { name: 'Alliance' }).querySelector('.fund-pfoot .db-neg')).toHaveTextContent('(50.00)')
+  })
+
+  // 2026-10-10 — the handoff: Get image says so in a toast, not an alert box.
+  it('confirms Get image with a toast', async () => {
+    const alert = vi.fn()
+    vi.stubGlobal('alert', alert)
+    const write = vi.fn(async () => {})
+    const had = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Object.defineProperty(navigator, 'clipboard', { value: { write }, configurable: true })
+    vi.stubGlobal('ClipboardItem', class { constructor(public items: unknown) {} })
+    render(<DailyBankView data={data()} today="2026-10-09" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Get image' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Image copied — paste it straight into WhatsApp/Telegram.')
+    expect(write).toHaveBeenCalled()
+    expect(alert).not.toHaveBeenCalled()
+    if (had) Object.defineProperty(navigator, 'clipboard', had)
+    else delete (navigator as { clipboard?: unknown }).clipboard
+    vi.unstubAllGlobals()
+  })
+
+  it('says in a toast when the browser cannot copy an image', async () => {
+    const alert = vi.fn()
+    vi.stubGlobal('alert', alert)
+    vi.stubGlobal('ClipboardItem', undefined)
+    render(<DailyBankView data={data()} today="2026-10-09" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Get image' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Copy not supported in this browser — use the PNG button instead.')
+    expect(alert).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
   })
 })

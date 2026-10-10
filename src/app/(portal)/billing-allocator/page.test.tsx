@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 
 // 2026-10-07 — the Billing Allocator on the sheet (the user approved the
 // allocator sample): the month beside the title, four cards — what the month
@@ -20,7 +20,14 @@ vi.mock('./_components/AllocatorTabs', () => ({
   ),
 }))
 vi.mock('./_components/AllocatorPeriod', () => ({
-  default: (p: { period: string }) => <input type="month" aria-label="Period" value={p.period} readOnly />,
+  default: (p: { period: string }) => <span data-testid="month">{p.period}</span>,
+}))
+vi.mock('./_components/AllocGenerateButton', () => ({
+  default: (p: { period: string; onlyOnRecords?: boolean }) => (
+    <button type="button" data-period={p.period} data-only-on-records={String(!!p.onlyOnRecords)}>
+      Generate invoices
+    </button>
+  ),
 }))
 
 import BillingAllocatorPage from './page'
@@ -94,11 +101,14 @@ describe('the Billing Allocator on the sheet', () => {
     database()
     render(await page())
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Billing Allocator')
-    expect(screen.getByLabelText('Period')).toHaveValue('2026-09')
+    // 2026-10-10 — the handoff: "← September 2026 →" beside the title.
+    expect(screen.getByRole('heading', { level: 1 }).parentElement).toContainElement(screen.getByTestId('month'))
+    expect(screen.getByTestId('month')).toHaveTextContent('2026-09')
     expect(card('Allocated · September')).toHaveAttribute('data-tone', 'primary')
     expect(card('Allocated · September')).toHaveTextContent('RM 22,992.38')
     expect(card('Allocated · September')).toHaveTextContent('3 expenses · 2 batches')
-    expect(card('To bill')).toHaveAttribute('data-tone', 'alert')
+    // Waiting on Finance to bill it: the handoff's blue wait tone (2026-10-10).
+    expect(card('To bill')).toHaveAttribute('data-tone', 'wait')
     expect(card('To bill')).toHaveTextContent('RM 1,289.52')
     expect(card('To bill')).toHaveTextContent('1 expense not yet billed · 2 companies')
     expect(card('Billed')).toHaveTextContent('RM 10,286.80')
@@ -106,6 +116,19 @@ describe('the Billing Allocator on the sheet', () => {
     expect(card('HV own share')).toHaveTextContent('RM 1,971.54')
     expect(card('HV own share')).toHaveTextContent('kept by HV · not billed')
     expect(JSON.parse(screen.getByTestId('tabs').textContent ?? '{}')).toEqual({ period: '2026-09', txns: 3, invoices: 5, companies: ['2990', 'CAR', 'HK'] })
+  })
+
+  // 2026-10-10 — the handoff puts Generate invoices, the primary, in the page
+  // head while Records is open and something is still to bill.
+  it('offers Generate invoices in the head while something is still to bill', async () => {
+    database()
+    const { unmount } = render(await page())
+    const button = within(document.querySelector('.page-head') as HTMLElement).getByRole('button', { name: 'Generate invoices' })
+    expect(button.dataset).toMatchObject({ period: '2026-09', onlyOnRecords: 'true' })
+    unmount()
+    database(TXNS.slice(0, 2))
+    render(await page())
+    expect(screen.queryByRole('button', { name: 'Generate invoices' })).toBeNull()
   })
 
   it('rests the To bill card when every allocation is billed, and says so when nothing is allocated yet', async () => {

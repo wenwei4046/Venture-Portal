@@ -41,9 +41,12 @@ const SEGMENT_LABEL: Record<string, string> = {
   treasury: 'Treasury',
   unallocated: 'Unallocated',
 }
-function segmentLabel(seg: string): string {
+/** A department by name: the five core ones here, the ones added since (IT,
+ *  Revenue Department) from the registry's `names` (2026-10-10 — they read
+ *  as their segment keys before). */
+function segmentLabel(seg: string, names: Record<string, string> = {}): string {
   if (seg === BLANK || !seg) return '(Blanks)'
-  return SEGMENT_LABEL[seg] ?? seg
+  return SEGMENT_LABEL[seg] ?? names[seg] ?? seg
 }
 function journalTypeLabel(jt: string): string {
   return jt === BLANK || !jt ? '(Blanks)' : jt
@@ -56,7 +59,7 @@ function isBfLine(l: LedgerLine): boolean {
   return l.description === 'BALANCE B/F' && l.entryDate === ''
 }
 
-function lineMatches(l: LedgerLine, q: string): boolean {
+function lineMatches(l: LedgerLine, q: string, names: Record<string, string>): boolean {
   if (!q) return true
   const haystack = [
     l.ref,
@@ -66,6 +69,7 @@ function lineMatches(l: LedgerLine, q: string): boolean {
     l.entryNo,
     segmentShort(l.segment),
     l.segment,
+    l.segment ? segmentLabel(l.segment, names) : '',
     l.entryDate,
     l.entryDate ? dayjs(l.entryDate).format('D MMM YYYY') : '',
     l.entryDate ? dayjs(l.entryDate).format('DD/MM/YYYY') : '',
@@ -77,7 +81,16 @@ function lineMatches(l: LedgerLine, q: string): boolean {
   return haystack.includes(q)
 }
 
-export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
+const NO_NAMES: Record<string, string> = {}
+
+export default function LedgerSections({
+  ledgers,
+  deptNames = NO_NAMES,
+}: {
+  ledgers: Ledger[]
+  /** The departments added since the five core ones, by segment (lib/ledger-view `ledgerDeptNames`). */
+  deptNames?: Record<string, string>
+}) {
   const [query, setQuery] = useState('')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   // Excel-style facet filters. null = no filter (every value passes).
@@ -119,7 +132,7 @@ export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
       const accountHit =
         !!q && (led.code.toLowerCase().includes(q) || led.accountName.toLowerCase().includes(q))
 
-      let kept = !q || accountHit ? realLines : realLines.filter((l) => lineMatches(l, q))
+      let kept = !q || accountHit ? realLines : realLines.filter((l) => lineMatches(l, q, deptNames))
       const narrowed = q || filtersActive
       const matchedCount = narrowed ? kept.length : 0
       if (narrowed && kept.length === 0) continue // hide sections with zero matches
@@ -130,7 +143,7 @@ export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
       out.push({ led, lines: finalLines, matchedCount })
     }
     return out
-  }, [ledgers, q, sortDir, segSel, jtSel])
+  }, [ledgers, q, sortDir, segSel, jtSel, deptNames])
 
   const filtersActive = !!segSel || !!jtSel
   const narrowed = !!q || filtersActive
@@ -175,7 +188,7 @@ export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
           tokens={segTokens}
           selected={segSel}
           onChange={setSegSel}
-          display={segmentLabel}
+          display={(seg) => segmentLabel(seg, deptNames)}
         />
         <FacetFilter
           label="Journal Type"
@@ -214,7 +227,7 @@ export default function LedgerSections({ ledgers }: { ledgers: Ledger[] }) {
       ) : (
         <div>
           {prepared.map(({ led, lines }) => (
-            <LedgerSection key={led.code} led={led} lines={lines} />
+            <LedgerSection key={led.code} led={led} lines={lines} deptNames={deptNames} />
           ))}
         </div>
       )}
@@ -300,7 +313,7 @@ function FacetFilter({
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜索值…"
+              placeholder="Search…"
               className="w-full mb-2 px-2 py-1 text-sm bg-paper border border-hairline rounded text-ink focus:outline-none focus:border-accent-border"
             />
             <div className="max-h-56 overflow-y-auto pr-1">
@@ -329,7 +342,7 @@ function FacetFilter({
             </div>
             <div className="flex items-center justify-between mt-2 pt-2 border-t border-hairline">
               <button type="button" onClick={() => onChange(null)} className="text-xs text-muted hover:text-ink">
-                Clear Filter
+                Clear filter
               </button>
               <button
                 type="button"
@@ -355,7 +368,7 @@ function FacetFilter({
  * journal type a chip and the department named, and a Closing balance row
  * with the period's debits and credits.
  */
-function LedgerSection({ led, lines }: { led: Ledger; lines: LedgerLine[] }) {
+function LedgerSection({ led, lines, deptNames }: { led: Ledger; lines: LedgerLine[]; deptNames: Record<string, string> }) {
   const count = lines.filter((l) => !isBfLine(l)).length
   return (
     <section className="mb-10">
@@ -404,8 +417,9 @@ function LedgerSection({ led, lines }: { led: Ledger; lines: LedgerLine[] }) {
                 ) : (
                   <LedgerRow key={i}>
                     <td className="font-mono text-xs whitespace-nowrap">{l.entryDate ? dayjs(l.entryDate).format('D MMM YYYY') : '—'}</td>
+                    {/* code · name on every line (2026-10-10, the handoff — was the name alone). */}
                     <td className="text-xs m-hide" data-label="Acc. Desc.">
-                      {l.accountDesc}
+                      {led.code} · {l.accountDesc || led.accountName}
                     </td>
                     <td className="m-hide" data-label="Journal Type">
                       {l.journalType ? (
@@ -417,11 +431,12 @@ function LedgerSection({ led, lines }: { led: Ledger; lines: LedgerLine[] }) {
                         '—'
                       )}
                     </td>
-                    <td className="font-mono text-xs m-hide" data-label="Ref. 1">
+                    {/* A reference number in the body face, Inter 500 (the handoff), not the mono. */}
+                    <td className="font-medium whitespace-nowrap m-hide" data-label="Ref. 1">
                       {l.ref}
                     </td>
                     <td className="m-hide" data-label="Dept">
-                      {l.segment ? segmentLabel(l.segment) : '—'}
+                      {l.segment ? segmentLabel(l.segment, deptNames) : '—'}
                     </td>
                     <td className="m-hide" data-label="Desc.">
                       {l.description}

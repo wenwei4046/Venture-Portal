@@ -6,7 +6,10 @@ import { formatMoneyBare } from '@/lib/utils'
 
 // The pool ledger (2026-10-09, the user's Claude Design handoff): sortable,
 // searched by description or type, each line's direction a chip — in green,
-// out in the info tone — and its amount signed.
+// out in the info tone — and its amount signed. 2026-10-10: every column
+// filters (▽; the date and the amount by a range too), the columns resize
+// against their neighbour and reorder in a box that scrolls, and money in
+// reads black (out stays red, in brackets).
 
 export interface PoolLine {
   id: string
@@ -25,6 +28,8 @@ const COLUMNS: SortableColumn<PoolLine>[] = [
     label: 'Date',
     render: (l) => <span className="font-mono text-xs whitespace-nowrap">{dayjs(l.date).format('D MMM YYYY')}</span>,
     sortValue: (l) => l.date,
+    filterable: true,
+    filterValue: (l) => dayjs(l.date).format('D MMM YYYY'),
     range: 'date',
     mobile: 'detail',
   },
@@ -43,27 +48,36 @@ const COLUMNS: SortableColumn<PoolLine>[] = [
     filterable: true,
     mobile: 'detail',
   },
-  { key: 'description', label: 'Description', render: (l) => l.description, sortValue: (l) => l.description, mobile: 'keep' },
+  { key: 'description', label: 'Description', render: (l) => l.description, sortValue: (l) => l.description, filterable: true, mobile: 'keep' },
   {
     key: 'amount',
     label: 'Amount',
     align: 'right',
-    render: (l) => <span className={l.amount < 0 ? 'text-danger' : 'text-ledger'}>{formatMoneyBare(l.amount)}</span>,
+    render: (l) => <span className={l.amount < 0 ? 'text-danger' : undefined}>{formatMoneyBare(l.amount)}</span>,
     sortValue: (l) => l.amount,
+    filterable: true,
     range: 'number',
     mobile: 'keep',
+    cellClassName: 'whitespace-nowrap',
   },
 ]
 
-export default function PoolLedgerTable({ lines }: { lines: PoolLine[] }) {
+export default function PoolLedgerTable({ lines, canSetDefault = false }: { lines: PoolLine[]; canSetDefault?: boolean }) {
   return (
-    <SortableTable
-      rows={lines}
-      columns={COLUMNS}
-      defaultSort={{ key: 'date', dir: 'desc' }}
-      getRowKey={(l) => l.id}
-      searchKeys={['description', 'type']}
-      searchPlaceholder="Search description, type…"
-    />
+    <div className="fin-queue">
+      <SortableTable
+        layoutId="venture-pool.ledger"
+        layoutTitle="Pool ledger"
+        canSetDefault={canSetDefault}
+        scrollBox
+        resizeMode="neighbour"
+        rows={lines}
+        columns={COLUMNS}
+        defaultSort={{ key: 'date', dir: 'desc' }}
+        getRowKey={(l) => l.id}
+        searchKeys={['description', 'type']}
+        searchPlaceholder="Search description, type…"
+      />
+    </div>
   )
 }

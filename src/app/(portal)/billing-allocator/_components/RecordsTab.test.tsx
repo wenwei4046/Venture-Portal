@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import type { AllocatorData, TxnRow } from './types'
 
 // 2026-10-07 — the allocator's Records on the sheet; 2026-10-09 — the user's
-// Claude Design handoff (照设计档): a strip for what still has to be billed,
-// the month's records with the split as ONE column of text, the batch and
-// the status as chips, a record opening its own page on a double-click, then
-// a By company table with each target's share, what is billed, what is still
-// to bill and its invoices.
+// Claude Design handoff (照设计档): the month's records with the split as ONE
+// column of text, the batch and the status as chips, a record opening its own
+// page on a double-click, then a By company table with each target's share,
+// what is billed, what is still to bill and its invoices. 2026-10-10 — the
+// handoff's notice for what is still to bill (its Generate invoices is the
+// page head's, AllocGenerateButton), "N EXPENSES · MONTH", a Total row and an
+// All companies row, and on a phone the record titled by its Txn.
 
 const mocks = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn(), deleteAllocTxn: vi.fn(), generateAllocatorInvoices: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh, push: mocks.push }) }))
@@ -86,14 +88,31 @@ const headers = (table: HTMLTableElement) =>
 beforeEach(() => vi.clearAllMocks())
 
 describe('the allocator’s Records on the sheet', () => {
-  it('heads the month’s records and says what still has to be billed', () => {
+  it('heads the month’s expenses and says in a notice what still has to be billed', () => {
     render(<RecordsTab data={data()} onEdit={vi.fn()} />)
-    expect(head('Allocations').querySelector('.count')).toHaveTextContent('3 RECORDS · SEPTEMBER 2026 · 2 BILLED')
-    const strip = screen.getByRole('region', { name: 'To bill' })
-    expect(strip).toHaveTextContent('1 expense not yet billed')
-    expect(strip).toHaveTextContent('RM 1,289.52')
-    expect(strip).toHaveTextContent('2 companies')
-    expect(within(strip).getByRole('button', { name: 'Generate draft invoices →' })).toBeEnabled()
+    expect(head('Allocations').querySelector('.count')).toHaveTextContent('3 EXPENSES · SEPTEMBER 2026')
+    const notice = document.querySelector('.bil-notice') as HTMLElement
+    expect(notice).toHaveTextContent('To bill RM 1,289.52 across 2 companies — Generate invoices bills every company’s share in one go.')
+    // The button is the page head's now.
+    expect(screen.queryByRole('button', { name: /Generate/ })).toBeNull()
+  })
+
+  it('ends the records on a Total row under the Amount', () => {
+    render(<RecordsTab data={data()} onEdit={vi.fn()} />)
+    const table = tableOf('Allocations')
+    const ths = Array.from(table.querySelectorAll('thead th')) as HTMLElement[]
+    const foot = Array.from(table.querySelectorAll('tfoot td')) as HTMLElement[]
+    expect(foot[ths.findIndex((th) => th.dataset.col === 'txn_no')]).toHaveTextContent('Total')
+    expect(foot[ths.findIndex((th) => th.dataset.col === 'amount')]).toHaveTextContent('RM 22,992.38')
+  })
+
+  it('on a phone titles a record by its Txn, the description as small print', () => {
+    render(<RecordsTab data={data()} onEdit={vi.fn()} />)
+    const table = tableOf('Allocations')
+    expect(table.querySelector('thead th[data-col="txn_no"]')).not.toHaveClass('m-hide')
+    expect(table.querySelector('thead th[data-col="description"]')).toHaveClass('m-hide')
+    const txn = within(table).getAllByText('ALC-202609-001')[0].closest('td') as HTMLElement
+    expect(txn.querySelector('.q-sub')).toHaveTextContent('Office Rental')
   })
 
   it('shows the split as one column of text, the batch and the status as chips', () => {
@@ -150,31 +169,21 @@ describe('the allocator’s Records on the sheet', () => {
     const own = within(table).getByText('HV own').closest('tr') as HTMLElement
     expect(own).toHaveTextContent('RM 1,971.54')
     expect(own).toHaveTextContent('not billed')
-    const foot = table.querySelector('tfoot') as HTMLElement
-    expect(foot).toHaveTextContent('Billable RM 11,576.32')
-    expect(foot).toHaveTextContent('billed RM 10,286.80')
-    expect(foot).toHaveTextContent('to bill RM 1,289.52')
-    expect(foot).toHaveTextContent('5 invoices · 3 paid · 2 issued')
+    // The handoff's All companies row, each total under its column.
+    const ths = Array.from(table.querySelectorAll('thead th')) as HTMLElement[]
+    const foot = Array.from(table.querySelectorAll('tfoot td')) as HTMLElement[]
+    const at = (col: string) => foot[ths.findIndex((th) => th.dataset.col === col)]
+    expect(at('target')).toHaveTextContent('All companies')
+    expect(at('share')).toHaveTextContent('RM 11,576.32')
+    expect(at('billed')).toHaveTextContent('RM 10,286.80')
+    expect(at('toBill')).toHaveTextContent('RM 1,289.52')
+    expect(at('invoices')).toHaveTextContent('5 invoices · 3 paid · 2 issued')
   })
 
-  it('raises the drafts for what is unbilled and reports them', async () => {
-    mocks.generateAllocatorInvoices.mockResolvedValue({
-      created: [{ company: '2990', invoiceNo: 'HV-INV-202609-0041' }, { company: 'CAR', invoiceNo: 'HV-INV-202609-0042' }],
-      skipped: [],
-    })
-    render(<RecordsTab data={data()} onEdit={vi.fn()} />)
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Generate draft invoices →' }))
-    })
-    expect(mocks.generateAllocatorInvoices).toHaveBeenCalledWith('2026-09')
-    expect(await screen.findByText('✓ 2990 → HV-INV-202609-0041')).toBeInTheDocument()
-    expect(mocks.refresh).toHaveBeenCalled()
-  })
-
-  it('keeps the strip away when every allocation is billed, and says so when the month has none', () => {
+  it('keeps the notice away when every allocation is billed, and says so when the month has none', () => {
     const { unmount } = render(<RecordsTab data={data(TXNS.filter((t) => t.locked))} onEdit={vi.fn()} />)
-    expect(screen.queryByRole('region', { name: 'To bill' })).toBeNull()
-    expect(head('Allocations').querySelector('.count')).toHaveTextContent('2 RECORDS · SEPTEMBER 2026 · ALL BILLED')
+    expect(document.querySelector('.bil-notice')).toBeNull()
+    expect(head('Allocations').querySelector('.count')).toHaveTextContent('2 EXPENSES · SEPTEMBER 2026')
     unmount()
     render(<RecordsTab data={data([])} onEdit={vi.fn()} />)
     expect(screen.getByText(/No allocations for September 2026 yet/)).toBeInTheDocument()

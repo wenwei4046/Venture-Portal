@@ -9,6 +9,9 @@ import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import AllocatorTabs from './_components/AllocatorTabs'
 import AllocatorPeriod from './_components/AllocatorPeriod'
+import AllocGenerateButton from './_components/AllocGenerateButton'
+import { AllocatorShell } from './_components/AllocatorShell'
+import { landingTab } from './_components/landing-tab'
 import type {
   AllocatorData, CoOpt, StaffRow, CategoryRow, TemplateRow, TxnRow, AllocInvoiceRow,
 } from './_components/types'
@@ -111,7 +114,14 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     (coSettings ?? []).filter((s) => s.enabled === false).map((s) => s.company_id as string),
   )
   const companies: CoOpt[] = allCompanies.filter((c) => !disabledCos.has(c.id))
-  const companySettings = allCompanies.map((c) => ({ ...c, enabled: !disabledCos.has(c.id) }))
+  // Setup's Companies table names each company with its code (2026-10-10, the handoff).
+  const companySettings = (cos ?? []).map((c) => ({
+    id: c.id as string,
+    label: (c.short_code ?? c.name) as string,
+    name: c.name as string,
+    code: (c.short_code as string | null) ?? '',
+    enabled: !disabledCos.has(c.id as string),
+  }))
   const departments: CoOpt[] = (depts ?? []).map((d) => ({
     id: `dept:${d.id}`,
     label: `${d.name} (dept)`,
@@ -260,16 +270,24 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
   const monthName = dayjs(pd).format('MMMM')
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
+  // 2026-10-10 — the handoff's head: "← September 2026 →" beside the title,
+  // and Generate invoices — the primary — on the right while Records is open
+  // and something is still to bill. The shell shares the open tab with it.
   return (
-    <div>
+    <AllocatorShell key={period} initialTab={landingTab(txnRows, sp.edit)}>
       <div className="page-head">
-        <div className="shrink-0">
+        <div className="min-w-0">
           <div className="page-eyebrow"><em>I.</em> BILLING · ALLOCATOR</div>
-          <h1 className="page-title">Billing Allocator</h1>
+          <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
+            <h1 className="page-title">Billing Allocator</h1>
+            <AllocatorPeriod period={period} />
+          </div>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
-          <AllocatorPeriod period={period} />
-        </div>
+        {summary.toBillCount > 0 ? (
+          <div className="flex flex-wrap items-start justify-end gap-2 min-w-0">
+            <AllocGenerateButton period={period} onlyOnRecords />
+          </div>
+        ) : null}
       </div>
 
       <StatCards label="Billing Allocator">
@@ -285,7 +303,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
           }
         />
         <StatCard
-          tone={summary.toBill > 0 ? 'alert' : 'default'}
+          tone={summary.toBill > 0 ? 'wait' : 'default'}
           label="To bill"
           value={formatMoney(summary.toBill)}
           icon="clock"
@@ -311,6 +329,6 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
       </StatCards>
 
       <AllocatorTabs data={data} initialEditId={sp.edit} />
-    </div>
+    </AllocatorShell>
   )
 }

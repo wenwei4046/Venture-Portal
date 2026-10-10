@@ -10,6 +10,7 @@ import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import DetailGroups from '@/components/sheet/DetailGroups'
 import ReturnLink from '@/components/layout/ReturnLink'
 import RecordActions, { type RecordInvoice } from './_components/RecordActions'
+import AllocGenerateButton from '../_components/AllocGenerateButton'
 
 // An allocation's own page (2026-10-09, the user's Claude Design handoff —
 // 照设计档): the record's number as the title with its status chip and the
@@ -125,6 +126,12 @@ export default async function AllocationRecordPage({ params }: Props) {
             {txn.description as string}{recorded ? ` · ${recorded}` : ''}
           </p>
         </div>
+        {/* The handoff: an unbilled record's primary, in the head (2026-10-10). */}
+        {canAct && !billed ? (
+          <div className="flex flex-wrap items-start justify-end gap-2 min-w-0">
+            <AllocGenerateButton period={period} />
+          </div>
+        ) : null}
       </div>
 
       {/* ───────── Cards ───────── */}

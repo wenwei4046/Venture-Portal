@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState, useTransition } from 'react'
+import { useId, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import { backdropDismiss } from '@/components/modal-dismiss'
 import dayjs from 'dayjs'
 import { officeToday } from '@/lib/office-time'
@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import SortableTable from '@/components/SortableTable'
 import { useRowLinks } from '@/components/row-links'
+import type { RowMenuItem } from '@/components/RowMenu'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import {
   createBa,
@@ -64,6 +65,16 @@ export interface LimitRow {
 
 const money = (n: number) => formatMoneyBare(n)
 
+/** A financing's charge, what HC is owed, the margin — lib/ba, as everywhere. */
+const calcOf = (r: BaRow) =>
+  calcBa({
+    face: r.faceAmount,
+    bankAnnualRate: r.bankAnnualRate,
+    days: r.tenorDays,
+    chargeRateMonthly: r.chargeRateMonthly,
+    hcRateMonthly: r.hcRateMonthly,
+  })
+
 // ── Shared calculator fields (used by the modal and the record form) ────────
 interface CalcFields {
   face: string
@@ -107,139 +118,191 @@ function useCalc(fields: CalcFields) {
   }, [fields])
 }
 
-function CalcInput({
+// ── The form's pieces (2026-10-10, the user's Claude Design handoff — its
+// financing form): a six-column grid, the label over each field and a line
+// under it; the box carries an RM before it or a unit after it. ─────────────
+
+function Field({
+  id,
   label,
+  span,
+  below,
+  belowTone,
+  children,
+}: {
+  id: string
+  label: string
+  span: 2 | 3 | 6
+  below?: ReactNode
+  belowTone?: 'in' | 'owe'
+  children: ReactNode
+}) {
+  return (
+    <div className={`fund-f fund-s${span}`}>
+      <label className="fund-f-label" htmlFor={id}>
+        {label}
+      </label>
+      {children}
+      {below ? <div className={`fund-f-below${belowTone ? ` fund-${belowTone}` : ''}`}>{below}</div> : null}
+    </div>
+  )
+}
+
+function BoxInput({
+  id,
   value,
   onChange,
   type = 'text',
+  prefix,
   suffix,
+  big = false,
+  mono = false,
+  right = false,
+  placeholder,
+  inputMode,
 }: {
-  label: string
+  id: string
   value: string
   onChange: (v: string) => void
   type?: string
+  prefix?: string
   suffix?: string
+  big?: boolean
+  mono?: boolean
+  right?: boolean
+  placeholder?: string
+  inputMode?: 'decimal' | 'numeric'
 }) {
   return (
-    <label className="block">
-      <span className="block text-xs font-sans text-graphite mb-1">{label}</span>
-      <span className="flex items-center gap-1.5">
-        <input
-          type={type}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          className="w-full px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
-        />
-        {suffix ? <span className="text-xs text-muted font-mono">{suffix}</span> : null}
-      </span>
-    </label>
+    <div className={`fund-box${big ? ' fund-big' : ''}`}>
+      {prefix ? <span className="fund-box-pre">{prefix}</span> : null}
+      <input
+        id={id}
+        type={type}
+        inputMode={inputMode}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${mono ? 'mono' : ''}${right ? ' text-right' : ''}`}
+      />
+      {suffix ? <span className="fund-box-suf">{suffix}</span> : null}
+    </div>
   )
 }
 
-function CalcResults({ c }: { c: ReturnType<typeof useCalc> }) {
+const DAY_CHIPS = [30, 60, 90, 120, 180]
+
+/** Face amount, the dates and the rates — the calculator's fields, each rate
+ *  with what it comes to under it, as it is typed. */
+function TermsFields({ uid, f, set, c }: { uid: string; f: CalcFields; set: (patch: Partial<CalcFields>) => void; c: ReturnType<typeof useCalc> }) {
+  const face = Number(f.face) || 0
   return (
-    <div className="border border-hairline rounded-md bg-surface p-4 space-y-1.5">
-      <div className="flex justify-between font-mono text-sm">
-        <span className="text-muted">Days / maturity</span>
-        <span className="text-ink">
-          {c.days} d{c.maturity ? ` · ${c.maturity}` : ''}
-        </span>
+    <>
+      <Field id={`${uid}-face`} label="Face amount" span={6} below={face > 0 ? `RM ${money(face)}` : null}>
+        <BoxInput id={`${uid}-face`} big prefix="RM" mono right placeholder="0.00" inputMode="decimal" value={f.face} onChange={(v) => set({ face: v })} />
+      </Field>
+      <Field id={`${uid}-start`} label="Start date" span={2}>
+        <BoxInput id={`${uid}-start`} type="date" mono value={f.startDate} onChange={(v) => set({ startDate: v })} />
+      </Field>
+      <Field id={`${uid}-days`} label="Days" span={2}>
+        {/* While a maturity date drives it, the days follow from the dates. */}
+        <BoxInput
+          id={`${uid}-days`}
+          suffix="days"
+          mono
+          right
+          inputMode="numeric"
+          value={f.endDate ? String(c.days) : f.days}
+          onChange={(v) => set({ days: v, endDate: '' })}
+        />
+        <div className="fund-chips" role="group" aria-label="Days presets">
+          {DAY_CHIPS.map((d) => {
+            const on = !f.endDate && f.days === String(d)
+            return (
+              <button key={d} type="button" aria-pressed={on} className={on ? 'fund-on' : undefined} onClick={() => set({ days: String(d), endDate: '' })}>
+                {d}
+              </button>
+            )
+          })}
+        </div>
+      </Field>
+      <Field id={`${uid}-end`} label="Maturity" span={2} below={f.endDate ? 'set by date · days follow' : 'from start + days'}>
+        <BoxInput id={`${uid}-end`} type="date" mono value={f.endDate || c.maturity} onChange={(v) => set({ endDate: v })} />
+      </Field>
+      <Field id={`${uid}-bank`} label="Bank rate" span={2} below={`= RM ${money(c.bankInterest)} · ref only`}>
+        <BoxInput id={`${uid}-bank`} suffix="%/yr" mono right placeholder="4.00" inputMode="decimal" value={f.bankRatePct} onChange={(v) => set({ bankRatePct: v })} />
+      </Field>
+      <Field id={`${uid}-charge`} label="Charge borrower" span={2} below={`= RM ${money(c.chargeToBorrower)}`} belowTone="in">
+        <BoxInput id={`${uid}-charge`} suffix="%/mo" mono right inputMode="decimal" value={f.chargePct} onChange={(v) => set({ chargePct: v })} />
+      </Field>
+      <Field id={`${uid}-hc`} label="To HC" span={2} below={`= RM ${money(c.oweToHc)}`} belowTone="owe">
+        <BoxInput id={`${uid}-hc`} suffix="%/mo" mono right inputMode="decimal" value={f.hcPct} onChange={(v) => set({ hcPct: v })} />
+      </Field>
+    </>
+  )
+}
+
+/** What the terms come to: the days, the charge (bill · 5028) and what HC is
+ *  owed (pay · 6001) as tiles, HV's margin in a framed box, and the reference
+ *  lines under it. */
+function Results({ c }: { c: ReturnType<typeof useCalc> }) {
+  return (
+    <div className="fund-res">
+      <div className="fund-res-days">
+        {c.days} days · matures {c.maturity ? dayjs(c.maturity).format('D MMM YYYY') : '—'}
       </div>
-      <div className="flex justify-between font-mono text-sm">
-        <span className="text-muted">Bank interest (HC&apos;s cost, ref)</span>
-        <span className="text-graphite">{money(c.bankInterest)}</span>
+      <div className="fund-res-tiles">
+        <div className="fund-tile fund-in">
+          <div className="fund-tile-l">Charge borrower</div>
+          <div className="fund-tile-v">{money(c.chargeToBorrower)}</div>
+          <div className="fund-tile-n">bill · 5028</div>
+        </div>
+        <div className="fund-tile fund-owe">
+          <div className="fund-tile-l">Owe HC</div>
+          <div className="fund-tile-v">{money(c.oweToHc)}</div>
+          <div className="fund-tile-n">pay · 6001</div>
+        </div>
       </div>
-      <div className="flex justify-between font-mono text-sm">
-        <span className="text-ledger">Charge borrower</span>
-        <span className="text-ledger font-semibold">{money(c.chargeToBorrower)}</span>
+      <div className="fund-margin">
+        <span className="fund-margin-l">HV margin</span>
+        <span className={`fund-margin-v${c.margin < 0 ? ' fund-neg' : ''}`}>{money(c.margin)}</span>
       </div>
-      <div className="flex justify-between font-mono text-sm">
-        <span className="text-alert">Owe HC</span>
-        <span className="text-alert font-semibold">{money(c.oweToHc)}</span>
-      </div>
-      <div className="flex justify-between font-mono text-sm border-t border-hairline pt-1.5">
-        <span className="text-ink">HV margin</span>
-        <span className="text-ink font-semibold">{money(c.margin)}</span>
-      </div>
-      <div className="flex justify-between font-mono text-xs text-muted">
-        <span>Collect at maturity / repay HC</span>
-        <span>
-          {money(c.collectTotal)} / {money(c.repayHcTotal)}
-        </span>
+      <div className="fund-res-lines">
+        <div>
+          <span>Collect at maturity / repay HC</span>
+          <span className="fund-res-fig">
+            {money(c.collectTotal)} / {money(c.repayHcTotal)}
+          </span>
+        </div>
+        <div>
+          <span>Bank interest (HC&apos;s cost, ref)</span>
+          <span className="fund-res-fig">{money(c.bankInterest)}</span>
+        </div>
       </div>
     </div>
   )
 }
 
-function CalcFieldsGrid({
-  f,
-  set,
-}: {
-  f: CalcFields
-  set: (patch: Partial<CalcFields>) => void
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <CalcInput label="Face amount (RM)" value={f.face} onChange={v => set({ face: v })} />
-      <CalcInput
-        label="Bank rate (%/yr, ref)"
-        value={f.bankRatePct}
-        onChange={v => set({ bankRatePct: v })}
-        suffix="%/yr"
-      />
-      <CalcInput
-        label="Start date"
-        type="date"
-        value={f.startDate}
-        onChange={v => set({ startDate: v })}
-      />
-      <CalcInput
-        label="Maturity (or leave blank, use days)"
-        type="date"
-        value={f.endDate}
-        onChange={v => set({ endDate: v })}
-      />
-      <CalcInput label="Days" value={f.days} onChange={v => set({ days: v, endDate: '' })} />
-      <div className="grid grid-cols-2 gap-3">
-        <CalcInput
-          label="Charge"
-          value={f.chargePct}
-          onChange={v => set({ chargePct: v })}
-          suffix="%/mo"
-        />
-        <CalcInput label="To HC" value={f.hcPct} onChange={v => set({ hcPct: v })} suffix="%/mo" />
-      </div>
-    </div>
-  )
-}
-
-// ── Calculator modal (no save) ──────────────────────────────────────────────
+// ── Financing calculator (no save) — the form's terms and results ──────────
 function CalculatorModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const uid = useId()
   const [f, setF] = useState<CalcFields>(emptyCalc())
   const c = useCalc(f)
   if (!open) return null
   return (
-    <div
-      className="fixed inset-0 z-50 bg-scrim/45 flex items-start justify-center pt-24 px-4"
-      {...backdropDismiss(onClose)}
-    >
-      <div
-        className="bg-paper border border-hairline rounded-md shadow-lg max-w-xl w-full p-6"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-baseline justify-between mb-4">
-          <h2 className="font-serif text-xl text-ink">BA Calculator</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-muted hover:text-ink text-sm font-sans"
-          >
-            ✕ Close
+    <div className="fund-scrim" {...backdropDismiss(onClose)}>
+      <div className="fund-modal" role="dialog" aria-modal="true" aria-label="Financing calculator" onClick={(e) => e.stopPropagation()}>
+        <div className="fund-modal-head">
+          <h2>Financing calculator</h2>
+          <button type="button" className="fund-x" aria-label="Close" onClick={onClose}>
+            ×
           </button>
         </div>
-        <div className="space-y-4">
-          <CalcFieldsGrid f={f} set={patch => setF(prev => ({ ...prev, ...patch }))} />
-          <CalcResults c={c} />
+        <div className="fund-form-grid">
+          <div className="fund-fields">
+            <TermsFields uid={uid} f={f} set={(patch) => setF((prev) => ({ ...prev, ...patch }))} c={c} />
+          </div>
+          <Results c={c} />
         </div>
       </div>
     </div>
@@ -262,6 +325,7 @@ function RecordForm({
   editing: BaRow | null
   onDone: () => void
 }) {
+  const uid = useId()
   const [f, setF] = useState<CalcFields>(
     editing
       ? {
@@ -283,6 +347,7 @@ function RecordForm({
   )
   const [notes, setNotes] = useState(editing?.notes ?? '')
   const [file, setFile] = useState<File | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const [readNote, setReadNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -305,6 +370,14 @@ function RecordForm({
     if (after <= l.limit) return null
     return `Over limit: ${l.label} has RM ${money(l.used - own)} active of RM ${money(l.limit)} — this BA takes it to RM ${money(after)}`
   }, [borrowerCompanyId, f.face, limits, editing])
+
+  // What saving still needs (2026-10-10, the handoff: a ref and a borrower too).
+  const missing = [
+    Number(f.face) > 0 ? null : 'the face amount',
+    c.days > 0 ? null : 'the days',
+    baNo.trim() ? null : 'the BA ref',
+    borrowerCompanyId || borrowerName.trim() ? null : 'the borrower',
+  ].filter((m): m is string => m !== null)
 
   const autoRead = () => {
     if (!file) return
@@ -384,26 +457,41 @@ function RecordForm({
     })
   }
 
+  // Record financing (2026-10-10, the handoff's form, kept inline on the
+  // page): the bank's advice, then the borrower, then the terms; the results
+  // beside them with the limit check, and Save once it has what it needs.
   return (
-    <div className="border border-hairline rounded-md bg-surface p-5 mb-8">
-      <h2 className="font-serif text-lg text-ink mb-4">
-        {editing ? (
-          <>
-            Editing — {editing.baNo ?? editing.id.slice(0, 8)}{' '}
-            <span className="font-serif italic text-alert text-sm">saving overwrites this BA</span>
-          </>
-        ) : (
-          'Record BA'
-        )}
-      </h2>
+    <section className="fund-rec" aria-labelledby={`${uid}-title`}>
+      <div className="fund-modal-head">
+        <h2 id={`${uid}-title`}>
+          {editing ? (
+            <>
+              Editing — {editing.baNo ?? editing.id.slice(0, 8)} <span className="fund-rec-warn">saving overwrites this BA</span>
+            </>
+          ) : (
+            'Record financing'
+          )}
+        </h2>
+        <button type="button" className="fund-x" aria-label="Close" onClick={onDone}>
+          ×
+        </button>
+      </div>
 
       {/* ── Bank document: attach + auto-read ── */}
-      <div className="border border-hairline rounded-md bg-paper p-3 mb-4 flex flex-wrap items-center gap-3">
+      <div className="fund-file">
+        <span className="fund-file-pick">
+          <button type="button" className="fund-file-btn" onClick={() => fileRef.current?.click()}>
+            Choose file
+          </button>
+          <span className="fund-file-name">{file?.name ?? 'No file chosen'}</span>
+        </span>
         <input
+          ref={fileRef}
           type="file"
+          aria-label="Bank advice file"
           accept="application/pdf,image/png,image/jpeg,image/webp,image/gif"
           onChange={e => setFile(e.target.files?.[0] ?? null)}
-          className="text-xs font-sans text-graphite"
+          className="hidden"
         />
         {autoReadAvailable ? (
           <button
@@ -411,176 +499,161 @@ function RecordForm({
             disabled={!file || isReading}
             onClick={autoRead}
             title="Read the BA document and prefill the fields — you review before saving"
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-xs px-3 py-1.5 rounded-md transition-colors disabled:opacity-50"
+            className="fund-btn-line"
           >
             {isReading ? 'Reading…' : 'Auto-read →'}
           </button>
         ) : null}
-        <span className="font-serif italic text-muted text-xs">
-          PDF or photo of the bank&apos;s BA advice — filed with the record on save.
-        </span>
-        {readNote ? <span className="font-sans text-xs text-ledger">{readNote}</span> : null}
+        <span className="fund-file-note">PDF or photo of the bank&apos;s advice — filed with the record on save.</span>
+        {readNote ? <span className="fund-file-read">{readNote}</span> : null}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <CalcInput label="BA ref #" value={baNo} onChange={setBaNo} />
-            <CalcInput label="Bank" value={bankName} onChange={setBankName} />
+      <div className="fund-form-grid fund-wide">
+        <div className="fund-fields">
+          <h3 className="fund-f-sec">Bank advice</h3>
+          <Field id={`${uid}-ref`} label="BA ref #" span={3}>
+            <BoxInput id={`${uid}-ref`} mono placeholder="e.g. BA-2610-02" value={baNo} onChange={setBaNo} />
+          </Field>
+          <Field id={`${uid}-bankname`} label="Bank" span={3}>
+            <BoxInput id={`${uid}-bankname`} placeholder="e.g. Maybank Islamic" value={bankName} onChange={setBankName} />
+          </Field>
+          <h3 className="fund-f-sec">Borrower</h3>
+          <Field id={`${uid}-company`} label="Company" span={3}>
+            <select id={`${uid}-company`} className="fund-select" value={borrowerCompanyId} onChange={e => setBorrowerCompanyId(e.target.value)}>
+              <option value="">— pick or type name →</option>
+              {companies.map(co => (
+                <option key={co.id} value={co.id}>
+                  {co.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field id={`${uid}-free`} label="Or free text" span={3}>
+            <BoxInput id={`${uid}-free`} placeholder="Name if not a group company" value={borrowerName} onChange={setBorrowerName} />
+          </Field>
+          <h3 className="fund-f-sec">Terms</h3>
+          <TermsFields uid={uid} f={f} set={patch => setF(prev => ({ ...prev, ...patch }))} c={c} />
+          <Field id={`${uid}-notes`} label="Notes" span={6}>
+            <BoxInput id={`${uid}-notes`} placeholder="Optional" value={notes} onChange={setNotes} />
+          </Field>
+        </div>
+        <div className="fund-side">
+          <Results c={c} />
+          {limitWarning ? <p className="fund-warn">⚠ {limitWarning} — saving is still allowed.</p> : null}
+          <div className="fund-save-row">
+            <button type="button" className="fund-btn-save" disabled={isPending || missing.length > 0} onClick={submit}>
+              {isPending ? 'Saving…' : editing ? 'Save changes →' : 'Save financing →'}
+            </button>
+            <span className="fund-save-note">
+              Registry + interest only — the principal never moves through HV&apos;s bank. Bill the borrower / pay HC from the row after
+              saving.
+            </span>
           </div>
-          <CalcFieldsGrid f={f} set={patch => setF(prev => ({ ...prev, ...patch }))} />
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="block text-xs font-sans text-graphite mb-1">Borrower (company)</span>
-              <select
-                value={borrowerCompanyId}
-                onChange={e => setBorrowerCompanyId(e.target.value)}
-                className="w-full px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-              >
-                <option value="">— pick or type name →</option>
-                {companies.map(co => (
-                  <option key={co.id} value={co.id}>
-                    {co.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <CalcInput label="Borrower (free text)" value={borrowerName} onChange={setBorrowerName} />
-          </div>
-          <CalcInput label="Notes" value={notes} onChange={setNotes} />
-        </div>
-        <div className="space-y-3">
-          <CalcResults c={c} />
-          {limitWarning ? (
-            <p className="text-xs font-sans text-danger border border-danger/40 rounded-md px-3 py-2">
-              ⚠ {limitWarning} — saving is still allowed.
-            </p>
-          ) : null}
-          <button
-            type="button"
-            disabled={isPending || !(Number(f.face) > 0) || c.days <= 0}
-            onClick={submit}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
-          >
-            {isPending ? 'Saving…' : editing ? 'Save changes →' : 'Save BA →'}
-          </button>
-          {error ? <p className="text-xs font-sans text-danger">{error}</p> : null}
-          <p className="font-serif italic text-muted text-xs">
-            Registry + interest only — the principal never moves through HV&apos;s bank. Bill the
-            borrower / pay HC from the row after saving.
-          </p>
+          {missing.length > 0 ? <p className="fund-save-need">To save, fill in {missing.join(', ')}.</p> : null}
+          {error ? <p className="fund-error">{error}</p> : null}
         </div>
       </div>
-    </div>
-  )
-}
-
-// ── Limits section ──────────────────────────────────────────────────────────
-function LimitsSection({ limits }: { limits: LimitRow[] }) {
-  const [open, setOpen] = useState(false)
-  const [drafts, setDrafts] = useState<Record<string, string>>({})
-  const [msg, setMsg] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
-
-  const withLimitOrUse = limits.filter(l => l.limit > 0 || l.used > 0)
-  const shown = open ? limits : withLimitOrUse
-
-  const save = (companyId: string) => {
-    const v = Number(drafts[companyId])
-    if (Number.isNaN(v) || v < 0) {
-      setMsg('Limit must be a number ≥ 0')
-      return
-    }
-    setMsg(null)
-    startTransition(async () => {
-      const r = await setBaLimit(companyId, v)
-      setMsg(r.error ? r.error : 'Saved ✓')
-    })
-  }
-
-  return (
-    <div className="border border-hairline rounded-md bg-surface p-5 mb-8">
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="font-serif text-lg text-ink">
-          Limits <span className="font-serif italic text-muted text-sm">per borrower — active face counts, settled releases; over-limit warns but never blocks</span>
-        </h2>
-        <button
-          type="button"
-          onClick={() => setOpen(v => !v)}
-          className="text-xs text-accent hover:text-accent-hover font-serif italic"
-        >
-          {open ? 'Show set only' : `Show all companies (${limits.length})`}
-        </button>
-      </div>
-      {shown.length === 0 ? (
-        <p className="font-serif italic text-muted text-sm">
-          No limits set yet — Show all companies and give each borrower a limit.
-        </p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="ledger-table">
-            <thead>
-              <tr>
-                <th>Company</th>
-                <th className="num">Limit</th>
-                <th className="num">Active (used)</th>
-                <th className="num">Available</th>
-                <th className="right">Set</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map(l => {
-                const available = Math.round((l.limit - l.used) * 100) / 100
-                const over = l.limit > 0 && l.used > l.limit
-                return (
-                  <tr key={l.companyId}>
-                    <td className="font-serif text-[15px] text-ink">{l.label}</td>
-                    <td className="num">{l.limit > 0 ? money(l.limit) : '—'}</td>
-                    <td className={`num ${over ? 'text-danger font-semibold' : ''}`}>
-                      {money(l.used)}
-                      {over ? ' ⚠' : ''}
-                    </td>
-                    <td className={`num ${available < 0 ? 'text-danger' : 'text-ledger'}`}>
-                      {l.limit > 0 ? money(available) : '—'}
-                    </td>
-                    <td className="text-right whitespace-nowrap">
-                      <input
-                        type="text"
-                        placeholder={l.limit > 0 ? String(l.limit) : '0'}
-                        value={drafts[l.companyId] ?? ''}
-                        onChange={e =>
-                          setDrafts(prev => ({ ...prev, [l.companyId]: e.target.value }))
-                        }
-                        className="w-28 px-2 py-1 bg-paper border border-hairline rounded-md text-xs font-mono tabular text-ink text-right focus:outline-none focus:border-accent-border mr-2"
-                      />
-                      <button
-                        type="button"
-                        disabled={isPending || !(drafts[l.companyId] ?? '').trim()}
-                        onClick={() => save(l.companyId)}
-                        className="text-xs text-accent hover:text-accent-hover font-serif italic disabled:opacity-50"
-                      >
-                        Save
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {msg ? <p className="text-xs font-sans text-graphite mt-2">{msg}</p> : null}
-    </div>
+    </section>
   )
 }
 
 // ── Per-company limit cards (user 2026-08-11: "我要类似这样的limit control") ──
 // Glanceable, bank-app style: outstanding vs limit with a % bar, available,
-// weighted avg bank rate, and the soonest maturities. Values to SET live in
-// the Limits table; these cards are the display.
+// weighted avg bank rate, and every active BA by maturity. 2026-10-10 — the
+// handoff's cards: each with its own Edit limit, "No active BA." when there
+// is none; the old table of limits is gone, a company without a card gets one
+// from the line under them.
+type LimitCardData = LimitRow & { active: BaRow[]; avgRatePa: number | null; pct: number | null; available: number }
+
+function LimitCard({ c }: { c: LimitCardData }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [msg, setMsg] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+  const tone = c.pct == null ? 'none' : c.pct >= 100 ? 'danger' : c.pct >= 70 ? 'alert' : 'ledger'
+
+  const open = () => {
+    setDraft(c.limit > 0 ? String(c.limit) : '')
+    setMsg(null)
+    setEditing(true)
+  }
+  const save = () => {
+    const v = Number(draft)
+    if (!draft.trim() || Number.isNaN(v) || v < 0) {
+      setMsg('Limit must be a number ≥ 0')
+      return
+    }
+    setMsg(null)
+    startTransition(async () => {
+      const r = await setBaLimit(c.companyId, v)
+      if (r?.error) setMsg(r.error)
+      else setEditing(false)
+    })
+  }
+
+  return (
+    <div className="fund-lim" data-tone={tone}>
+      <div className="fund-lim-top">
+        <div className="min-w-0">
+          <span className="fund-lim-name">{c.label}</span>
+          <span className="fund-lim-kind">BA limit</span>
+        </div>
+        <span className="fund-lim-pct">{c.pct != null ? `${Math.round(c.pct)}% of limit` : 'no limit set'}</span>
+      </div>
+      <div className="fund-lim-used">RM {money(c.used)}</div>
+      <div className="fund-lim-line">
+        outstanding · limit {c.limit > 0 ? `RM ${money(c.limit)}` : '—'} ·{' '}
+        <span className={c.available < 0 ? 'fund-lim-over' : undefined}>available {c.limit > 0 ? `RM ${money(c.available)}` : '—'}</span>
+        {c.avgRatePa != null ? ` · avg rate ${parseFloat((c.avgRatePa * 100).toFixed(2))}% p.a.` : ''}
+      </div>
+      <div className="fund-lim-bar">
+        <div style={{ width: `${c.pct != null ? Math.min(100, Math.max(2, c.pct)) : 0}%` }} />
+      </div>
+      <div className="fund-lim-bas">
+        {c.active.map(r => {
+          const daysLeft = dayjs(r.maturityDate).diff(officeToday(), 'day')
+          return (
+            <div key={r.id} className="fund-lim-ba" data-tone={daysLeft < 0 ? 'late' : daysLeft <= 14 ? 'soon' : undefined}>
+              ⏰ RM {money(r.faceAmount)}
+              {r.bankName ? ` — ${r.bankName}` : ''} ·{' '}
+              {daysLeft < 0 ? `overdue ${-daysLeft}d` : `matures ${dayjs(r.maturityDate).format('D MMM YYYY')} (${daysLeft}d)`}
+              {r.baNo ? ` · ${r.baNo}` : ''}
+            </div>
+          )
+        })}
+        {c.active.length === 0 ? <div className="fund-lim-none">No active BA.</div> : null}
+      </div>
+      {editing ? (
+        <div className="fund-lim-edit">
+          <input
+            type="text"
+            inputMode="decimal"
+            aria-label={`Limit for ${c.label}`}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            placeholder="0.00"
+          />
+          <button type="button" className="fund-btn-line" disabled={isPending || !draft.trim()} onClick={save}>
+            {isPending ? 'Saving…' : 'Save'}
+          </button>
+          <button type="button" className="fund-btn-quiet" onClick={() => setEditing(false)}>
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <div className="fund-lim-foot">
+          <button type="button" className="fund-btn-line" onClick={open}>
+            Edit limit
+          </button>
+        </div>
+      )}
+      {msg ? <p className="fund-lim-msg">{msg}</p> : null}
+    </div>
+  )
+}
+
 function LimitCards({ rows, limits }: { rows: BaRow[]; limits: LimitRow[] }) {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const cards = useMemo(() => {
+  const cards = useMemo<LimitCardData[]>(() => {
     return limits
       .filter(l => l.limit > 0 || l.used > 0)
       .map(l => {
@@ -605,99 +678,68 @@ function LimitCards({ rows, limits }: { rows: BaRow[]; limits: LimitRow[] }) {
   }, [rows, limits])
 
   if (cards.length === 0) return null
+  return (
+    <div className="fund-lims">
+      {cards.map(c => (
+        <LimitCard key={c.companyId} c={c} />
+      ))}
+    </div>
+  )
+}
+
+/** A company with no card yet is given its limit here (what the old Limits
+ *  table's "Show all companies" did). */
+function AddLimit({ limits }: { limits: LimitRow[] }) {
+  const uid = useId()
+  const options = limits.filter(l => !(l.limit > 0 || l.used > 0))
+  const [companyId, setCompanyId] = useState('')
+  const [draft, setDraft] = useState('')
+  const [msg, setMsg] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+  if (options.length === 0) return null
+
+  const save = () => {
+    const v = Number(draft)
+    if (!companyId || !draft.trim() || Number.isNaN(v) || v < 0) {
+      setMsg('Pick a company and a limit ≥ 0')
+      return
+    }
+    setMsg(null)
+    startTransition(async () => {
+      const r = await setBaLimit(companyId, v)
+      if (r?.error) setMsg(r.error)
+      else {
+        setCompanyId('')
+        setDraft('')
+        setMsg('Saved ✓')
+      }
+    })
+  }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-      {cards.map(c => {
-        const tone =
-          c.pct == null
-            ? '--graphite'
-            : c.pct >= 100
-              ? '--danger'
-              : c.pct >= 70
-                ? '--alert'
-                : '--ledger'
-        return (
-          <div key={c.companyId} className="border border-hairline rounded-md bg-surface p-4">
-            <div className="flex items-baseline justify-between mb-1">
-              <div className="font-serif text-base text-ink">
-                {c.label} <span className="font-serif italic text-muted text-xs">BA limit</span>
-              </div>
-              {c.pct != null ? (
-                <span
-                  className="font-mono text-xs font-semibold"
-                  style={{ color: `rgb(var(${tone}))` }}
-                >
-                  {Math.round(c.pct)}% of limit
-                </span>
-              ) : (
-                <span className="font-serif italic text-muted text-xs">no limit set</span>
-              )}
-            </div>
-            <div className="statement-amount text-num-ink mb-1">RM {money(c.used)}</div>
-            <div className="font-mono text-[11px] text-muted mb-2">
-              outstanding · limit {c.limit > 0 ? `RM ${money(c.limit)}` : '—'} ·{' '}
-              <span className={c.available < 0 ? 'text-danger font-semibold' : ''}>
-                available {c.limit > 0 ? `RM ${money(c.available)}` : '—'}
-              </span>
-              {c.avgRatePa != null
-                ? ` · avg rate ${parseFloat((c.avgRatePa * 100).toFixed(2))}% p.a.`
-                : ''}
-            </div>
-            {c.pct != null ? (
-              <div className="h-2 rounded-full bg-surface-2 border border-hairline overflow-hidden mb-2">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${Math.min(100, Math.max(2, c.pct))}%`,
-                    backgroundColor: `rgb(var(${tone}))`,
-                  }}
-                />
-              </div>
-            ) : null}
-            {(expanded[c.companyId] ? c.active : c.active.slice(0, 2)).map(r => {
-              const daysLeft = dayjs(r.maturityDate).diff(officeToday(), 'day')
-              return (
-                <div
-                  key={r.id}
-                  className={`font-mono text-[11px] rounded-md px-2 py-1 mt-1 ${
-                    daysLeft < 0 ? 'text-danger' : daysLeft <= 14 ? 'text-alert' : 'text-graphite'
-                  }`}
-                  style={{
-                    backgroundColor: `rgb(var(${
-                      daysLeft < 0 ? '--danger-bg' : daysLeft <= 14 ? '--alert-bg' : '--surface-2'
-                    }))`,
-                  }}
-                >
-                  ⏰ RM {money(r.faceAmount)}
-                  {r.bankName ? ` — ${r.bankName}` : ''}{' '}
-                  {daysLeft < 0
-                    ? `overdue ${-daysLeft}d`
-                    : `matures ${dayjs(r.maturityDate).format('D MMM YYYY')} (${daysLeft}d)`}
-                  {r.baNo ? ` · ${r.baNo}` : ''}
-                </div>
-              )
-            })}
-            {c.active.length > 2 ? (
-              <button
-                type="button"
-                onClick={() =>
-                  setExpanded(prev => ({ ...prev, [c.companyId]: !prev[c.companyId] }))
-                }
-                className="font-mono text-[11px] text-accent hover:text-accent-hover mt-1"
-              >
-                {expanded[c.companyId] ? 'Show less ↑' : `+${c.active.length - 2} more active ↓`}
-              </button>
-            ) : null}
-          </div>
-        )
-      })}
+    <div className="fund-lim-add" role="group" aria-labelledby={`${uid}-l`}>
+      <span id={`${uid}-l`} className="fund-lim-add-l">
+        Set a limit for another company
+      </span>
+      <select aria-label="Company" className="fund-select" value={companyId} onChange={e => setCompanyId(e.target.value)}>
+        <option value="">— pick a company —</option>
+        {options.map(o => (
+          <option key={o.companyId} value={o.companyId}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <input type="text" inputMode="decimal" aria-label="Limit" placeholder="Limit (RM)" value={draft} onChange={e => setDraft(e.target.value)} />
+      <button type="button" className="fund-btn-line" disabled={isPending || !companyId || !draft.trim()} onClick={save}>
+        {isPending ? 'Saving…' : 'Save'}
+      </button>
+      {msg ? <span className="fund-lim-msg">{msg}</span> : null}
     </div>
   )
 }
 
 // ── Generate-PV modal (pick bank + date) ────────────────────────────────────
-// Also used by a financing's own page (/ba/[id], 2026-10-09).
+// Also used by a financing's own page (/ba/[id], 2026-10-09) — its Generate PV.
 export function PvModal({
   row,
   banks,
@@ -709,17 +751,13 @@ export function PvModal({
   onClose: () => void
   onDone: (msg: string) => void
 }) {
+  const uid = useId()
   const [bankId, setBankId] = useState(banks[0]?.id ?? '')
   const [date, setDate] = useState(row.maturityDate)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const owe = calcBa({
-    face: row.faceAmount,
-    bankAnnualRate: row.bankAnnualRate,
-    days: row.tenorDays,
-    chargeRateMonthly: row.chargeRateMonthly,
-    hcRateMonthly: row.hcRateMonthly,
-  }).oweToHc
+  const owe = calcOf(row).oweToHc
+  const ref = row.baNo ?? row.id.slice(0, 8)
 
   const go = () => {
     setError(null)
@@ -731,53 +769,39 @@ export function PvModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-scrim/45 flex items-start justify-center pt-24 px-4"
-      {...backdropDismiss(onClose)}
-    >
-      <div
-        className="bg-paper border border-hairline rounded-md shadow-lg max-w-md w-full p-6"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-baseline justify-between mb-4">
-          <h2 className="font-serif text-xl text-ink">Pay HC — BA {row.baNo ?? row.id.slice(0, 8)}</h2>
-          <button type="button" onClick={onClose} className="text-muted hover:text-ink text-sm font-sans">
-            ✕
+    <div className="fund-scrim" {...backdropDismiss(onClose)}>
+      <div className="fund-modal fund-narrow" role="dialog" aria-modal="true" aria-label={`Generate PV — ${ref}`} onClick={e => e.stopPropagation()}>
+        <div className="fund-modal-head">
+          <h2>Generate PV — {ref}</h2>
+          <button type="button" className="fund-x" aria-label="Close" onClick={onClose}>
+            ×
           </button>
         </div>
-        <div className="space-y-3">
-          <p className="font-mono text-sm text-alert">
-            Interest to HOUZS Century: RM {money(owe)}
-            <span className="text-muted text-xs"> · 6001 Interest Expense - BA · venture pool</span>
-          </p>
-          <label className="block">
-            <span className="block text-xs font-sans text-graphite mb-1">Pay from bank</span>
-            <select
-              value={bankId}
-              onChange={e => setBankId(e.target.value)}
-              className="w-full px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-            >
+        <p className="fund-pv-owe">
+          Interest to HOUZS Century: RM {money(owe)}
+          <span> · 6001 Interest Expense - BA · venture pool</span>
+        </p>
+        <div className="fund-fields">
+          <Field id={`${uid}-bank`} label="Pay from bank" span={6}>
+            <select id={`${uid}-bank`} className="fund-select" value={bankId} onChange={e => setBankId(e.target.value)}>
               {banks.map(b => (
                 <option key={b.id} value={b.id}>
                   {b.label}
                 </option>
               ))}
             </select>
-          </label>
-          <CalcInput label="Payment date" type="date" value={date} onChange={setDate} />
-          <button
-            type="button"
-            disabled={isPending || !bankId}
-            onClick={go}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
-          >
+          </Field>
+          <Field id={`${uid}-date`} label="Payment date" span={6}>
+            <BoxInput id={`${uid}-date`} type="date" mono value={date} onChange={setDate} />
+          </Field>
+        </div>
+        <div className="fund-save-row">
+          <button type="button" className="fund-btn-save" disabled={isPending || !bankId} onClick={go}>
             {isPending ? 'Creating…' : 'Create PV (draft) →'}
           </button>
-          {error ? <p className="text-xs font-sans text-danger">{error}</p> : null}
-          <p className="font-serif italic text-muted text-xs">
-            Goes through the normal flow: draft → submit → Principal approves → paid.
-          </p>
+          <span className="fund-save-note">Goes through the normal flow: draft → submit → Principal approves → paid.</span>
         </div>
+        {error ? <p className="fund-error">{error}</p> : null}
       </div>
     </div>
   )
@@ -860,58 +884,21 @@ export function AttachmentChips({ row, full = false }: { row: BaRow; full?: bool
   )
 }
 
-// ── Interest cell: invoice + PV status / generate buttons ───────────────────
-export function InterestCell({
-  row,
-  onPv,
-  onMsg,
-}: {
-  row: BaRow
-  onPv: () => void
-  onMsg: (m: string) => void
-}) {
-  const [isPending, startTransition] = useTransition()
-
-  const invoice = () => {
-    startTransition(async () => {
-      const r = await generateBaInvoice(row.id)
-      if (r.error) onMsg(r.error)
-      else onMsg(`Invoice ${r.invoiceNo ?? ''} created as draft — review & issue it in Statements`)
-    })
-  }
-
+// ── Interest billing as a chip (2026-10-10, the handoff) ───────────────────
+// Billed green once the borrower's invoice exists, to bill amber until then;
+// the invoice and the PV to HC on hover. Billing and paying HC live on the
+// row's right-click and on the financing's own page.
+export function BillingChip({ row }: { row: BaRow }) {
+  const billed = !!row.interestInvoice
+  const title = [
+    row.interestInvoice ? `Invoice ${row.interestInvoice.no ?? ''} · ${row.interestInvoice.status}` : 'Not invoiced yet',
+    row.interestPv ? `PV ${row.interestPv.no ?? ''} · ${row.interestPv.status}` : 'HC not paid yet',
+  ].join(' — ')
   return (
-    <div className="flex flex-col items-end gap-0.5">
-      {row.interestInvoice ? (
-        <span className="font-mono text-[11px] text-ledger" title={`Invoice status: ${row.interestInvoice.status}`}>
-          ✓ {row.interestInvoice.no ?? 'invoice'} · {row.interestInvoice.status}
-        </span>
-      ) : (
-        <button
-          type="button"
-          disabled={isPending}
-          onClick={invoice}
-          title="Draft an invoice to the borrower for the 2.5% line (5028 Interest Income - BA)"
-          className="text-[11px] text-accent hover:text-accent-hover font-serif italic disabled:opacity-50"
-        >
-          {isPending ? '…' : 'Bill borrower →'}
-        </button>
-      )}
-      {row.interestPv ? (
-        <span className="font-mono text-[11px] text-alert" title={`PV status: ${row.interestPv.status}`}>
-          ✓ {row.interestPv.no ?? 'PV'} · {row.interestPv.status}
-        </span>
-      ) : (
-        <button
-          type="button"
-          onClick={onPv}
-          title="Draft a PV to HOUZS Century for the 1.5% line (6001 Interest Expense - BA)"
-          className="text-[11px] text-accent hover:text-accent-hover font-serif italic"
-        >
-          Pay HC →
-        </button>
-      )}
-    </div>
+    <span className={`chip ${billed ? 'ledger' : 'alert'}`} title={title}>
+      <i className="dot" />
+      {billed ? 'billed' : 'to bill'}
+    </span>
   )
 }
 
@@ -937,6 +924,9 @@ export function BaStatusChip({ row, large = false }: { row: Pick<BaRow, 'status'
   )
 }
 
+const periodText = (r: BaRow) => `${r.tenorDays}d · ${dayjs(r.startDate).format('D MMM')} – ${dayjs(r.maturityDate).format('D MMM')}`
+const billingText = (r: BaRow) => (r.interestInvoice ? 'billed' : 'to bill')
+
 // ── Main view ───────────────────────────────────────────────────────────────
 export default function BaView({
   rows,
@@ -945,6 +935,7 @@ export default function BaView({
   limits,
   autoReadAvailable,
   openCalc,
+  canSetDefault = false,
 }: {
   rows: BaRow[]
   companies: CompanyOption[]
@@ -952,10 +943,11 @@ export default function BaView({
   limits: LimitRow[]
   autoReadAvailable: boolean
   openCalc: boolean
+  /** The viewer may keep the register's arrangement as everyone's default. */
+  canSetDefault?: boolean
 }) {
   const [showCalc, setShowCalc] = useState(openCalc)
   const [showForm, setShowForm] = useState(false)
-  const [showLimits, setShowLimits] = useState(false)
   const [editing, setEditing] = useState<BaRow | null>(null)
   const [pvRow, setPvRow] = useState<BaRow | null>(null)
   const [banner, setBanner] = useState<string | null>(null)
@@ -970,13 +962,7 @@ export default function BaView({
   const active = rows.filter(r => r.status === 'active')
   const totals = active.reduce(
     (acc, r) => {
-      const c = calcBa({
-        face: r.faceAmount,
-        bankAnnualRate: r.bankAnnualRate,
-        days: r.tenorDays,
-        chargeRateMonthly: r.chargeRateMonthly,
-        hcRateMonthly: r.hcRateMonthly,
-      })
+      const c = calcOf(r)
       return {
         face: acc.face + r.faceAmount,
         charge: acc.charge + c.chargeToBorrower,
@@ -987,8 +973,45 @@ export default function BaView({
     { face: 0, charge: 0, owe: 0, margin: 0 },
   )
 
+  // What a row can do besides being opened (2026-10-10, the handoff: the
+  // register keeps only Mark settled; the rest moved to the right-click).
+  const billBorrower = (r: BaRow) =>
+    startTransition(async () => {
+      const res = await generateBaInvoice(r.id)
+      setBanner(res.error ? res.error : `Invoice ${res.invoiceNo ?? ''} created as draft — review & issue it in Statements`)
+    })
+  const setStatus = (r: BaRow, status: 'active' | 'settled') =>
+    startTransition(async () => {
+      const res = await setBaStatus(r.id, status)
+      if (res?.error) setBanner(res.error)
+    })
+  const remove = (r: BaRow) => {
+    if (!confirm(`Delete BA ${r.baNo ?? r.id.slice(0, 8)}? Its filed documents are removed too.`)) return
+    startTransition(async () => {
+      const res = await deleteBa(r.id)
+      if (res?.error) setBanner(res.error)
+    })
+  }
+
   // A financing's own page (2026-10-09, the handoff): a double-click opens it.
-  const links = useRowLinks<BaRow>({ href: r => `/ba/${r.id}`, title: r => r.baNo ?? r.id.slice(0, 8) })
+  const links = useRowLinks<BaRow>({
+    href: r => `/ba/${r.id}`,
+    title: r => r.baNo ?? r.id.slice(0, 8),
+    more: r => {
+      const items: RowMenuItem[] = []
+      if (!r.interestInvoice) items.push({ key: 'bill', label: 'Bill borrower', hint: 'invoice · 5028', onSelect: () => billBorrower(r) })
+      if (!r.interestPv) items.push({ key: 'pay', label: 'Pay HC', hint: 'PV · 6001', onSelect: () => setPvRow(r) })
+      if (r.status === 'settled') items.push({ key: 'reopen', label: 'Reopen', onSelect: () => setStatus(r, 'active') })
+      items.push({
+        key: 'edit',
+        label: 'Edit',
+        hint: r.interestInvoice || r.interestPv ? 'void the invoice / PV first' : undefined,
+        onSelect: () => startEdit(r),
+      })
+      items.push({ key: 'delete', label: 'Delete', danger: true, onSelect: () => remove(r) })
+      return items
+    },
+  })
   const toggleForm = () => {
     if (showForm) {
       setShowForm(false)
@@ -1043,7 +1066,7 @@ export default function BaView({
       {banner ? (
         <div className="border border-hairline rounded-md bg-surface px-4 py-2 mb-4 flex items-center justify-between">
           <span className="font-sans text-sm text-graphite">{banner}</span>
-          <button type="button" onClick={() => setBanner(null)} className="text-muted hover:text-ink text-xs font-sans ml-4">
+          <button type="button" onClick={() => setBanner(null)} className="text-muted hover:text-ink text-xs font-sans ml-4" aria-label="Dismiss">
             ✕
           </button>
         </div>
@@ -1080,6 +1103,7 @@ export default function BaView({
           <SortableTable<BaRow>
             layoutId="ba.facilities"
             layoutTitle="Financing register"
+            canSetDefault={canSetDefault}
             scrollBox
             resizeMode="neighbour"
             onRowOpen={links.onRowOpen}
@@ -1089,6 +1113,8 @@ export default function BaView({
             defaultSort={{ key: 'period', dir: 'desc' }}
             searchKeys={['baNo', 'bankName', 'borrower', 'notes']}
             searchPlaceholder="Search ref / bank / borrower / notes…"
+            // ▽ on every column; Face, Period, Charge and Owe HC by Range too
+            // (2026-10-10, the handoff) — the amounts in ringgit as shown.
             columns={[
               {
                 key: 'baNo',
@@ -1102,6 +1128,7 @@ export default function BaView({
                   </div>
                 ),
                 sortValue: r => r.baNo ?? '',
+                filterable: true,
               },
               {
                 key: 'borrower',
@@ -1119,65 +1146,53 @@ export default function BaView({
                 align: 'right',
                 render: r => money(r.faceAmount),
                 sortValue: r => r.faceAmount,
+                filterable: true,
+                filterValue: r => money(r.faceAmount),
+                range: 'number',
                 cellClassName: 'font-mono tabular',
               },
               {
                 key: 'period',
                 group: '日期',
                 label: 'Period',
-                render: r => (
-                  <span className="font-mono text-xs">
-                    {dayjs(r.startDate).format('D MMM')} → {dayjs(r.maturityDate).format('D MMM YYYY')}
-                    <span className="text-muted"> · {r.tenorDays}d</span>
-                  </span>
-                ),
+                render: periodText,
                 sortValue: r => new Date(r.startDate),
+                filterable: true,
+                filterValue: periodText,
+                range: 'date',
               },
               {
                 key: 'charge',
                 group: '金额',
                 label: 'Charge',
                 align: 'right',
-                render: r =>
-                  money(
-                    calcBa({
-                      face: r.faceAmount,
-                      bankAnnualRate: r.bankAnnualRate,
-                      days: r.tenorDays,
-                      chargeRateMonthly: r.chargeRateMonthly,
-                      hcRateMonthly: r.hcRateMonthly,
-                    }).chargeToBorrower,
-                  ),
-                sortValue: r => r.faceAmount * r.chargeRateMonthly * r.tenorDays,
-                cellClassName: 'font-mono tabular text-ledger',
+                render: r => money(calcOf(r).chargeToBorrower),
+                sortValue: r => calcOf(r).chargeToBorrower,
+                filterable: true,
+                filterValue: r => money(calcOf(r).chargeToBorrower),
+                range: 'number',
+                cellClassName: 'font-mono tabular fund-fig-in',
               },
               {
                 key: 'owe',
                 group: '金额',
                 label: 'Owe HC',
                 align: 'right',
-                render: r =>
-                  money(
-                    calcBa({
-                      face: r.faceAmount,
-                      bankAnnualRate: r.bankAnnualRate,
-                      days: r.tenorDays,
-                      chargeRateMonthly: r.chargeRateMonthly,
-                      hcRateMonthly: r.hcRateMonthly,
-                    }).oweToHc,
-                  ),
-                sortValue: r => r.faceAmount * r.hcRateMonthly * r.tenorDays,
-                cellClassName: 'font-mono tabular text-alert',
+                render: r => money(calcOf(r).oweToHc),
+                sortValue: r => calcOf(r).oweToHc,
+                filterable: true,
+                filterValue: r => money(calcOf(r).oweToHc),
+                range: 'number',
+                cellClassName: 'font-mono tabular',
               },
               {
                 key: 'interest',
                 group: '金额',
                 label: 'Interest billing',
-                align: 'right',
-                sortable: false,
-                render: r => (
-                  <InterestCell row={r} onPv={() => setPvRow(r)} onMsg={m => setBanner(m)} />
-                ),
+                render: r => <BillingChip row={r} />,
+                sortValue: billingText,
+                filterable: true,
+                filterValue: billingText,
               },
               {
                 key: 'status',
@@ -1194,68 +1209,18 @@ export default function BaView({
                 label: '',
                 sortable: false,
                 align: 'right',
-                render: r => (
-                  <div className="flex flex-col items-end gap-0.5">
-                    {r.status === 'active' ? (
-                      <button
-                        type="button"
-                        disabled={isPending}
-                        onClick={() =>
-                          startTransition(async () => {
-                            await setBaStatus(r.id, 'settled')
-                          })
-                        }
-                        className="text-xs text-accent hover:text-accent-hover font-serif italic disabled:opacity-50"
-                        title="Mark settled once collected from the borrower and repaid to HC — releases the limit"
-                      >
-                        Mark settled
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={isPending}
-                        onClick={() =>
-                          startTransition(async () => {
-                            await setBaStatus(r.id, 'active')
-                          })
-                        }
-                        className="text-xs text-muted hover:text-ink font-serif italic disabled:opacity-50"
-                      >
-                        Reopen
-                      </button>
-                    )}
-                    <span className="inline-flex items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={isPending}
-                        onClick={() => startEdit(r)}
-                        title={
-                          r.interestInvoice || r.interestPv
-                            ? 'Void/delete the generated invoice/PV first, then edit'
-                            : 'Load this BA into the form to correct it'
-                        }
-                        className="text-xs text-muted hover:text-accent font-serif italic disabled:opacity-50"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isPending}
-                        onClick={() => {
-                          if (!confirm(`Delete BA ${r.baNo ?? r.id.slice(0, 8)}? Its filed documents are removed too.`)) return
-                          startTransition(async () => {
-                            const res = await deleteBa(r.id)
-                            if (res.error) alert(res.error)
-                          })
-                        }}
-                        title="Delete this BA (blocked while a generated invoice/PV exists)"
-                        className="text-xs text-muted hover:text-danger font-serif italic disabled:opacity-50"
-                      >
-                        Delete
-                      </button>
-                    </span>
-                  </div>
-                ),
+                render: r =>
+                  r.status === 'active' ? (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => setStatus(r, 'settled')}
+                      className="fund-btn-line"
+                      title="Mark settled once collected from the borrower and repaid to HC — releases the limit"
+                    >
+                      Mark settled
+                    </button>
+                  ) : null,
               },
             ]}
           />
@@ -1273,12 +1238,9 @@ export default function BaView({
             {shownLimits.length} {shownLimits.length === 1 ? 'COMPANY' : 'COMPANIES'}
             {limitTotal > 0 ? ` · ${Math.round((usedTotal / limitTotal) * 100)}% USED` : ''}
           </span>
-          <button type="button" className="btn-quiet-sheet" onClick={() => setShowLimits(v => !v)}>
-            {showLimits ? 'Done' : 'Edit limits'}
-          </button>
         </div>
-        {showLimits ? <LimitsSection limits={limits} /> : null}
         <LimitCards rows={rows} limits={limits} />
+        <AddLimit limits={limits} />
       </section>
 
       <CalculatorModal open={showCalc} onClose={() => setShowCalc(false)} />

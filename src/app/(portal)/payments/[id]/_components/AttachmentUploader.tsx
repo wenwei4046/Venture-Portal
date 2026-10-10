@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef } from 'react'
+import { useFinView } from '@/components/layout/fin-view'
 import { uploadVoucherAttachment } from '../../actions'
 
 interface Props {
@@ -23,6 +24,8 @@ export default function AttachmentUploader({ voucherId, voucherStatus, canUpload
   const [success, setSuccess] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  // In English on the Finance view (2026-10-10, the handoff).
+  const fin = useFinView()
 
   if (!canUpload) {
     return (
@@ -88,7 +91,9 @@ export default function AttachmentUploader({ voucherId, voucherStatus, canUpload
       </div>
       {late ? (
         <p className="mb-3 font-sans text-sm text-graphite" data-testid="late-note">
-          这张凭单已经{voucherStatus === 'paid' ? '付款' : '批准'}：附件只能加、不能删，加了会记录是谁、什么时候加的。
+          {fin
+            ? `This voucher is already ${voucherStatus === 'paid' ? 'paid' : 'approved'}: files can be added but not removed, and each one is recorded with who added it and when.`
+            : `这张凭单已经${voucherStatus === 'paid' ? '付款' : '批准'}：附件只能加、不能删，加了会记录是谁、什么时候加的。`}
         </p>
       ) : null}
 

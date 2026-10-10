@@ -6,7 +6,8 @@ import LedgerPicker from './_components/LedgerPicker'
 import LedgerSections from './_components/LedgerSections'
 import dayjs from 'dayjs'
 import { officeTime, officeToday } from '@/lib/office-time'
-import { hasLedgerActivity, ledgerExportHref, ledgerPeriodLabel } from '@/lib/ledger-view'
+import { hasLedgerActivity, ledgerDeptNames, ledgerExportHref, ledgerPeriodLabel } from '@/lib/ledger-view'
+import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 
 interface Props {
   searchParams: Promise<{
@@ -139,7 +140,8 @@ async function LedgerBody({
             ? ` · hiding ${ledgers.length - visible.length} with no activity`
             : null}
         </p>
-        <LedgerSections ledgers={visible} />
+        {/* IT, Revenue Department …: named from the registry this request primed (no read). */}
+        <LedgerSections ledgers={visible} deptNames={ledgerDeptNames(extraReportSegments(primedRegistryRows()))} />
       </div>
     )
   } catch (err) {

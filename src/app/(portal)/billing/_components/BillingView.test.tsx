@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { withActions } from '@/test/with-actions'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 
 // 2026-10-07 — Service Billing on the sheet (the user approved the Invoice /
 // Statements sample, v6): the month beside the title, every control in a
@@ -25,16 +25,20 @@ vi.mock('@/lib/dept-registry', async (original) => ({
   extraBillingModeOptions: () => [],
   primedRegistryRows: () => [],
 }))
-vi.mock('./PeriodSelector', () => ({ default: (p: { currentPeriod: string }) => <span data-testid="period">{p.currentPeriod}</span> }))
-vi.mock('./GenerateInvoicesButton', () => ({ default: () => null }))
-vi.mock('./MarketingProjectList', () => ({ default: () => <div data-testid="marketing" /> }))
+// The head's tools (month, From payroll ▼, Export ▼, + Create Invoice ▼) are
+// BillingTools — tested on their own; here, what the page hands them.
+vi.mock('./BillingTools', () => ({
+  default: (p: { period: string; canCreate: boolean; companies: unknown[] }) => (
+    <span data-testid="tools" data-period={p.period} data-can-create={String(p.canCreate)} data-companies={p.companies.length} />
+  ),
+}))
+vi.mock('./MarketingProjectList', () => ({
+  default: (p: { invoiceByContract?: Record<string, { id: string; no: string | null }> }) => (
+    <pre data-testid="marketing">{JSON.stringify(p.invoiceByContract ?? null)}</pre>
+  ),
+}))
 vi.mock('./NonBillableList', () => ({ default: () => <div data-testid="non-billable" /> }))
 vi.mock('./CreditNotesList', () => ({ default: () => null }))
-vi.mock('./CreateInvoiceButton', () => ({ default: () => <button type="button">+ Create Invoice</button> }))
-vi.mock('./CreateMultiLineInvoiceButton', () => ({ default: () => <button type="button">+ Multi-line Invoice</button> }))
-vi.mock('./GenerateConsolidatedInvoicesButton', () => ({ default: () => <button type="button">Generate payroll invoices</button> }))
-vi.mock('./ReconcilePayrollBillingButton', () => ({ default: () => <button type="button">对数补差</button> }))
-vi.mock('./GenerateOwnShareInvoiceButton', () => ({ default: () => <button type="button">Own-share → Venture (Office)</button> }))
 vi.mock('@/components/department/DepartmentModeCard', () => ({
   default: (props: { segmentKey: string; department?: Promise<unknown> }) => {
     mocks.departmentModeCard(props)
@@ -65,7 +69,7 @@ const base = {
 const INVOICES = [
   { ...base, id: 'd1', invoice_no: 'HV-INV-202609-0055', billing_mode: 'director_attribution', total_amount: 9642.13, status: 'issued' },
   { ...base, id: 'c1', invoice_no: 'HV-INV-202609-0046', billing_mode: 'payroll_consolidated', total_amount: 8641.63, status: 'paid' },
-  { ...base, id: 'm1', invoice_no: 'HV-INV-202609-0039', billing_mode: 'marketing_project', total_amount: 2850, status: 'paid', company_id: 'co-hk' },
+  { ...base, id: 'm1', invoice_no: 'HV-INV-202609-0039', billing_mode: 'marketing_project', total_amount: 2850, status: 'paid', company_id: 'co-hk', contract_id: 'ct-1' },
   { ...base, id: 'v1', invoice_no: 'HV-INV-202610-0002', billing_mode: 'venture_attribution', total_amount: 1054.89, status: 'voided' },
 ]
 const LINES = [
@@ -163,31 +167,24 @@ describe('Service Billing on the sheet', () => {
     expect(screen.queryByText('HR OPEX')).toBeNull()
   })
 
-  // 2026-10-09 (the Finance revamp): the controls in ONE row beside the title —
-  // the month, then From payroll ▾, Export ▾ and + Create Invoice ▾, each a
-  // menu that holds the buttons the captioned band used to show.
-  it('keeps every control in one row: the month, then three menus', async () => {
+  // 2026-10-09 (the Finance revamp): the controls in ONE row beside the title.
+  // 2026-10-10 (the handoff): the eyebrow names the month, and the row is
+  // BillingTools — the month control, From payroll ▼, Export ▼, + Create
+  // Invoice ▼ — handed the page's month and whether Finance may create.
+  it('heads the page with the month in the eyebrow and the tools beside the title', async () => {
     database()
     await page()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Service Billing')
-    expect(screen.getByTestId('period')).toHaveTextContent(PERIOD)
+    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('DAILY OPERATIONS · SERVICE BILLING · SEPTEMBER 2026')
     expect(document.querySelector('.act-band')).toBeNull()
-    const head = document.querySelector('.page-head') as HTMLElement
-    const menu = (name: string) => {
-      fireEvent.click(within(head).getByRole('button', { name }))
-      return screen.getByRole('menu', { name })
-    }
-    const payroll = menu('From payroll')
-    for (const label of ['Generate payroll invoices', '对数补差', 'Own-share → Venture (Office)']) {
-      expect(within(payroll).getByRole('button', { name: label })).toBeInTheDocument()
-    }
-    const exp = menu('Export')
-    expect(within(exp).getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/statements/export?format=xlsx&period=2026-09')
-    expect(within(exp).getByRole('link', { name: 'PDF · list' })).toHaveAttribute('href', '/statements/export?format=pdf&period=2026-09')
-    expect(within(exp).getByRole('link', { name: 'PDF · per invoice' })).toHaveAttribute('href', '/billing/invoice-doc?period=2026-09')
-    const create = menu('+ Create Invoice')
-    expect(within(create).getByRole('button', { name: '+ Create Invoice' })).toBeInTheDocument()
-    expect(within(create).getByRole('button', { name: '+ Multi-line Invoice' })).toBeInTheDocument()
+    const tools = within(document.querySelector('.page-head') as HTMLElement).getByTestId('tools')
+    expect(tools.dataset).toMatchObject({ period: PERIOD, canCreate: 'true', companies: '2' })
+  })
+
+  it('hands Marketing projects the month’s invoice of each contract, for its Invoice button', async () => {
+    database()
+    await page()
+    expect(JSON.parse(screen.getByTestId('marketing').textContent ?? 'null')).toEqual({ 'ct-1': { id: 'm1', no: 'HV-INV-202609-0039' } })
   })
 
   it('folds the payroll basis above the invoices, its figures on the fold, counting the consolidated lines by department', async () => {
@@ -199,8 +196,27 @@ describe('Service Billing on the sheet', () => {
     expect(summary).toHaveTextContent('Payroll basis')
     expect(summary).toHaveTextContent('HR 1,352 / 5,797 · Finance 2,129 / 26,637 · Director Office 2,175 / 7,416 · IT 2,986 / 5,972 · Director 9,642 ✓ · Marketing 2,850 / 59,698')
     expect(within(fold).getByText('Director Salary Submission')).toBeInTheDocument()
+    // 2026-10-10 (the handoff): opened, the fold starts with a line per department.
+    const lines = Array.from(fold.querySelectorAll('.bil-fold-line')).map((l) => l.textContent?.replace(/s+/g, ' ').trim())
+    expect(lines[0]).toBe('HR · billed / from payroll1,352.45 / 5,797.05')
+    expect(lines).toContain('Director · billed / from payroll9,642.13 / 9,642.13')
+    expect(lines).toHaveLength(6)
     // Above the invoices, as before.
     expect(fold.compareDocumentPosition(screen.getByTestId('list')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('says "Director salary · pending" on the fold while the director submission has not come in', async () => {
+    const db = database()
+    const base = db.from.getMockImplementation()!
+    db.from.mockImplementation((table: string) => {
+      if (table !== 'director_salary_submissions') return base(table)
+      const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: null, error: null }) }
+      return q as never
+    })
+    await page()
+    const lines = Array.from(document.querySelectorAll('details.fin-fold .bil-fold-line')).map((l) => l.textContent?.replace(/\s+/g, ' ').trim())
+    expect(lines).toContain('Director salarypending')
+    expect(lines.some((l) => l?.startsWith('Director ·'))).toBe(false)
   })
 
   it('tells the list each invoice’s category from its lines, and that Finance may set the default arrangement', async () => {

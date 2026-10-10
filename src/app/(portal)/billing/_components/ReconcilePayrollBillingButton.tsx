@@ -19,6 +19,11 @@ function fmt(n: number): string {
 
 interface Props {
   currentPeriod: string
+  /** Arrive open, from a page-head menu (2026-10-10, the handoff's
+   *  "From payroll ▾" / "+ Create Invoice ▾"). */
+  autoOpen?: boolean
+  /** No trigger button of its own — the menu item is the trigger. */
+  hideTrigger?: boolean
 }
 
 // One instance per month — see CreateInvoiceButton. Both the delta lookup and
@@ -27,9 +32,9 @@ export default function ReconcilePayrollBillingButton(props: Props) {
   return <ReconcilePayrollBillingButtonBody key={props.currentPeriod} {...props} />
 }
 
-function ReconcilePayrollBillingButtonBody({ currentPeriod }: Props) {
+function ReconcilePayrollBillingButtonBody({ currentPeriod, autoOpen = false, hideTrigger = false }: Props) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(autoOpen)
   const [period, setPeriod] = useState(dayjs(currentPeriod).format('YYYY-MM'))
   const [rows, setRows] = useState<CompanyBillingDelta[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -81,6 +86,7 @@ function ReconcilePayrollBillingButtonBody({ currentPeriod }: Props) {
 
   return (
     <>
+      {hideTrigger ? null : (
       <button
         onClick={() => setOpen(true)}
         className="bg-surface hover:bg-paper border border-hairline text-graphite hover:text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
@@ -88,6 +94,7 @@ function ReconcilePayrollBillingButtonBody({ currentPeriod }: Props) {
       >
         对数补差
       </button>
+      )}
 
       {open && (
         <div

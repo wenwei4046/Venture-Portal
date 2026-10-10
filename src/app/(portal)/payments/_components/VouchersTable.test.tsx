@@ -288,7 +288,143 @@ describe('the Finance revamp', () => {
     fin(<VouchersTable rows={[repayment, a, b]} />)
     expect(screen.getByText(/2 vouchers/)).toBeInTheDocument()
     expect(screen.getByText('Expand')).toBeInTheDocument()
-    fireEvent.contextMenu(screen.getByText('The Cont').closest('tr') as HTMLElement)
+    // The payer is named twice on the Finance view: in its column, and as the
+    // phone's title of a row that has no number (2026-10-10).
+    fireEvent.contextMenu(screen.getAllByText('The Cont')[0].closest('tr') as HTMLElement)
     expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Openor double-click', 'Open in new tab', 'Change datewhen the date was keyed wrong', 'Change amountloan repayment rows'])
+  })
+})
+
+// 2026-10-10 — the handoff's list, on the Finance view (audit 2026-10-09 l,
+// items 3, 5, 6, 7, 9): plain figures in Inter-set rows, "pending", full
+// dates, a Total under the Amount column, each phone row with its status and
+// details in it, payroll batches as short lists, and the search's own words.
+describe('the handoff’s list on the Finance view', () => {
+  const fin = (ui: React.ReactElement) => render(<FinViewProvider value={true}>{ui}</FinViewProvider>)
+  const pending: VoucherRow = { ...voucher, id: 'pv-2', voucher_no: 'HV-PV-202609-0438', status: 'pending_approval', amount: 300, payee_name: 'GDex', paymentOrCreatedDate: '2026-09-05' }
+  const headKeys = () => Array.from(document.querySelectorAll('thead th')).map((th) => (th as HTMLElement).dataset.col ?? '')
+  const cell = (row: HTMLElement, key: string) => row.querySelectorAll(':scope > td')[headKeys().indexOf(key)] as HTMLElement
+  const footCell = (key: string) => document.querySelectorAll('tfoot tr td')[headKeys().indexOf(key)] as HTMLElement
+
+  it('sets the figures plain — no sign, the regular weight — and the date in full', () => {
+    fin(<VouchersTable rows={[voucher, pending]} />)
+    const row = rowOf('HV-PV-202609-0437')
+    const amount = cell(row, 'amount')
+    expect(amount).toHaveTextContent(/^1,200\.00/)
+    expect(amount).not.toHaveTextContent('−')
+    expect(amount.querySelector('.font-semibold')).toBeNull()
+    expect(cell(row, 'date')).toHaveTextContent('29 Sep 2026')
+    expect(cell(rowOf('HV-PV-202609-0438'), 'date')).toHaveTextContent('05 Sep 2026')
+  })
+
+  it('says "pending" in the chip, and every cell in the body’s 12px', () => {
+    fin(<VouchersTable rows={[voucher, pending]} />)
+    const row = rowOf('HV-PV-202609-0438')
+    expect(within(cell(row, 'status')).getByText('pending').closest('.chip')).toHaveClass('wait')
+    expect(cell(row, 'status')).not.toHaveTextContent('approval')
+    for (const key of ['poolLabel', 'payee_name', 'description']) {
+      expect(cell(row, key).className, key).not.toMatch(/font-mono|text-\[11px\]|text-\[15px\]|text-sm/)
+    }
+  })
+
+  it('a range on the amount reads the figure as it is shown, not as a negative', () => {
+    fin(<VouchersTable rows={[voucher, pending]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Amount' }))
+    const dialog = screen.getByRole('dialog', { name: 'Filter Amount' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Range' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '1k – 10k' }))
+    expect(screen.getByText('HV-PV-202609-0437')).toBeInTheDocument()
+    expect(screen.queryByText('HV-PV-202609-0438')).toBeNull()
+  })
+
+  it('a receipt’s figure is green, still without a sign', () => {
+    fin(<VouchersTable side="receipts" rows={[{ ...voucher, direction: 'credit' }]} />)
+    const amount = cell(rowOf('HV-PV-202609-0437'), 'amount')
+    expect(amount).not.toHaveTextContent('+')
+    expect(amount.querySelector('.text-ledger')).toHaveTextContent('1,200.00')
+  })
+
+  it('ends on a Total of the rows on show, under the Amount column', () => {
+    fin(<VouchersTable rows={[voucher, pending]} />)
+    expect(document.querySelectorAll('tfoot tr td')).toHaveLength(document.querySelectorAll('thead th').length)
+    expect(document.querySelector('tfoot tr td')).toHaveTextContent('Total')
+    expect(footCell('amount')).toHaveTextContent('1,500.00')
+    fireEvent.change(screen.getByPlaceholderText('Search voucher #, payee, description…'), { target: { value: 'gdex' } })
+    expect(footCell('amount')).toHaveTextContent('300.00')
+  })
+
+  it('on a phone, a row carries its status and its details under the number, and the figure says what it is', () => {
+    fin(<VouchersTable rows={[voucher]} />)
+    const row = rowOf('HV-PV-202609-0437')
+    const line = cell(row, 'voucher_no').querySelector('.pay-msub') as HTMLElement
+    expect(line).toHaveClass('md:hidden')
+    expect(line.querySelector('.chip.ledger')).toHaveTextContent('paid')
+    for (const text of ['Category utilities', 'Pool Venture', 'Payee TNB', 'Description September bill', 'Date 29 Sep 2026']) {
+      expect(line).toHaveTextContent(text)
+    }
+    const label = cell(row, 'amount').querySelector('.pay-mlabel') as HTMLElement
+    expect(label).toHaveClass('md:hidden')
+    expect(label).toHaveTextContent('Amount')
+  })
+
+  it('…and a row without a number is titled by whom it is from', () => {
+    fin(<VouchersTable side="receipts" rows={[repayment]} />)
+    const title = document.querySelector('tbody .pay-mtitle') as HTMLElement
+    expect(title).toHaveClass('md:hidden')
+    expect(title).toHaveTextContent('The Cont')
+  })
+
+  it('a payroll batch: the amount in red, and opened, a short list — number, person, amount, status — with no table of its own', () => {
+    const a: VoucherRow = { ...voucher, id: 'pv-a', voucher_no: 'HV-PV-202609-0300', payee_name: 'Aina', amount: 3200.5, batchKey: 'Payroll disbursement Aug 2026', paymentOrCreatedDate: '2026-09-05' }
+    const b: VoucherRow = { ...a, id: 'pv-b', voucher_no: 'HV-PV-202609-0301', payee_name: 'Bala', amount: 4100.25, status: 'pending_approval' }
+    fin(<VouchersTable rows={[a, b]} />)
+    const head = screen.getByRole('button', { name: /Payroll disbursement Aug 2026/ })
+    expect(head.querySelector('.pay-batch-amt')).toHaveTextContent('−7,300.75')
+    expect(head).toHaveTextContent('2 vouchers · 1 paid · 1 pending')
+    expect(head).toHaveTextContent('05 Sep')
+    fireEvent.click(head)
+    const list = screen.getByRole('list', { name: 'Payroll disbursement Aug 2026' })
+    const items = within(list).getAllByRole('listitem')
+    expect(items.map((li) => Array.from(li.children).map((c) => c.textContent))).toEqual([
+      ['HV-PV-202609-0300', 'Aina', '3,200.50', 'paid'],
+      ['HV-PV-202609-0301', 'Bala', '4,100.25', 'pending'],
+    ])
+    expect(document.querySelector('table')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Columns/ })).toBeNull()
+    fireEvent.doubleClick(within(items[1]).getByText('Bala'))
+    expect(push).toHaveBeenLastCalledWith('/payments/pv-b')
+    fireEvent.contextMenu(items[0])
+    expect(screen.getByRole('menu', { name: 'Actions for HV-PV-202609-0300 · paid' })).toBeInTheDocument()
+  })
+
+  it('a locked payroll batch reads in English: how many, their status, total only', () => {
+    const locked: VoucherRow = {
+      id: 'locked-Payroll disbursement Sep 2026', voucher_no: null, direction: 'debit', amount: 86420,
+      payee_name: 'Payroll disbursement Sep 2026', status: 'paid', catLabel: 'Payroll', poolLabel: '—',
+      description: '26 张 · 26 paid · 只显示总数', paymentOrCreatedDate: '2026-10-05', locked: true,
+      lockedNote: { count: 26, statusText: '26 paid' },
+    }
+    fin(<VouchersTable rows={[locked]} />)
+    const row = document.querySelector('tbody tr') as HTMLElement
+    expect(cell(row, 'description')).toHaveTextContent('26 vouchers · 26 paid · total only')
+    // The cells this table draws (the phone's chevron cell is SortableTable's own).
+    for (const td of Array.from(row.querySelectorAll(':scope > td:not(.lt-toggle)'))) expect(td.innerHTML).not.toMatch(/[㐀-鿿]/)
+  })
+
+  it('searches by the side’s own words', () => {
+    const { unmount } = fin(<VouchersTable rows={[voucher]} />)
+    expect(screen.getByPlaceholderText('Search voucher #, payee, description…')).toBeInTheDocument()
+    unmount()
+    fin(<VouchersTable side="receipts" rows={[{ ...voucher, direction: 'credit' }]} />)
+    expect(screen.getByPlaceholderText('Search receipt #, from, description…')).toBeInTheDocument()
+  })
+})
+
+// Audit 2026-10-09 l, item 5: the list kept its box only while no ?q= was set
+// (the flat, searched list had none). The list is boxed either way now.
+describe('the scroll box', () => {
+  it('stays when the batches are laid flat for a search', () => {
+    render(<VouchersTable rows={[voucher]} collapseBatches={false} />)
+    expect(document.querySelector('.st-box table')).not.toBeNull()
   })
 })

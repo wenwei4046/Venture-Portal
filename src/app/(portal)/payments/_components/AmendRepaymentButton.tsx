@@ -9,7 +9,45 @@
 import { useState, useTransition } from 'react'
 import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
+import { useFinView } from '@/components/layout/fin-view'
 import { amendRepayment } from '../../fund-out/actions'
+
+// In English on the Finance view (2026-10-10, the handoff — Receipt's row menu
+// already says "Change amount").
+const WORDS = {
+  zh: {
+    trigger: '改金额',
+    triggerTitle: '金额录错用这个:直接改这笔还款的金额,GL/银行/池自动同步并留注记',
+    title: '改这笔还款的金额',
+    intro: (label: string, now: string) =>
+      `${label} · 现在 RM ${now}。 改完 GL 分录、银行余额(和本金的池记录)自动跟着调,全部留注记。 整笔录错要重来的话,去贷款页用「撤销」再重录。`,
+    correct: '正确金额',
+    reason: '原因',
+    reasonHint: 'e.g. 利息录错',
+    notPositive: '金额必须大于 0',
+    same: '金额没有改变',
+    noReason: '写一句原因(会记进 GL 的审计注记)',
+    done: (from: string, to: string) => `改好了 — ${from} → ${to},GL/银行已同步。`,
+    saving: '改着…',
+    confirm: '确认改',
+  },
+  en: {
+    trigger: 'Change amount',
+    triggerTitle: 'For an amount keyed wrong: changes this repayment’s amount — the GL, bank and pool follow, each with a note',
+    title: 'Change this repayment’s amount',
+    intro: (label: string, now: string) =>
+      `${label} · now RM ${now}. The GL entries and the bank balance (and the principal’s pool record) follow, each with a note. To redo the whole repayment, undo it on the loan’s page and record it again.`,
+    correct: 'Correct amount',
+    reason: 'Reason',
+    reasonHint: 'e.g. interest keyed wrong',
+    notPositive: 'The amount must be more than 0',
+    same: 'The amount has not changed',
+    noReason: 'Write a reason (it goes into the GL’s audit note)',
+    done: (from: string, to: string) => `Changed — ${from} → ${to}; GL and bank updated.`,
+    saving: 'Changing…',
+    confirm: 'Confirm change',
+  },
+}
 
 export default function AmendRepaymentButton({
   repaymentId,
@@ -33,13 +71,14 @@ export default function AmendRepaymentButton({
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const w = useFinView() ? WORDS.en : WORDS.zh
 
   function submit() {
     setError(null)
     const n = parseFloat(amount)
-    if (!Number.isFinite(n) || n <= 0) return setError('金额必须大于 0')
-    if (Math.abs(n - currentAmount) < 0.005) return setError('金额没有改变')
-    if (!reason.trim()) return setError('写一句原因(会记进 GL 的审计注记)')
+    if (!Number.isFinite(n) || n <= 0) return setError(w.notPositive)
+    if (Math.abs(n - currentAmount) < 0.005) return setError(w.same)
+    if (!reason.trim()) return setError(w.noReason)
     const fd = new FormData()
     fd.set('repayment_id', repaymentId)
     fd.set('new_amount', amount)
@@ -50,7 +89,7 @@ export default function AmendRepaymentButton({
         setError(res.error)
         return
       }
-      setDone(`改好了 — ${res.old?.toFixed(2)} → ${res.newAmount?.toFixed(2)},GL/银行已同步。`)
+      setDone(w.done(`${res.old?.toFixed(2)}`, `${res.newAmount?.toFixed(2)}`))
       router.refresh()
     })
   }
@@ -67,9 +106,9 @@ export default function AmendRepaymentButton({
             setAmount(currentAmount.toFixed(2))
           }}
           className="ml-2 text-xs text-muted hover:text-accent font-serif italic"
-          title="金额录错用这个:直接改这笔还款的金额,GL/银行/池自动同步并留注记"
+          title={w.triggerTitle}
         >
-          改金额
+          {w.trigger}
         </button>
       )}
 
@@ -78,17 +117,15 @@ export default function AmendRepaymentButton({
           <div className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-hairline">
               <div className="font-serif italic text-accent text-sm">Amend repayment</div>
-              <div className="font-serif text-lg text-ink">改这笔还款的金额</div>
+              <div className="font-serif text-lg text-ink">{w.title}</div>
               <p className="font-serif italic text-muted text-xs mt-1">
-                {label} · 现在 RM {currentAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}。
-                改完 GL 分录、银行余额(和本金的池记录)自动跟着调,全部留注记。
-                整笔录错要重来的话,去贷款页用「撤销」再重录。
+                {w.intro(label, currentAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 }))}
               </p>
             </div>
             <div className="px-6 py-4 space-y-4">
               <div>
                 <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-                  正确金额 <span className="text-danger">*</span>
+                  {w.correct} <span className="text-danger">*</span>
                 </label>
                 <input
                   type="number"
@@ -101,12 +138,12 @@ export default function AmendRepaymentButton({
               </div>
               <div>
                 <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-                  原因 <span className="text-danger">*</span>
+                  {w.reason} <span className="text-danger">*</span>
                 </label>
                 <input
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="e.g. 利息录错"
+                  placeholder={w.reasonHint}
                   className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
                 />
               </div>
@@ -131,7 +168,7 @@ export default function AmendRepaymentButton({
                   disabled={isPending}
                   className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50"
                 >
-                  {isPending ? '改着…' : '确认改'}
+                  {isPending ? w.saving : w.confirm}
                 </button>
               ) : null}
             </div>

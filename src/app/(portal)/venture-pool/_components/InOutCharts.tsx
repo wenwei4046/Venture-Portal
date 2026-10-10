@@ -38,7 +38,8 @@ export default function InOutCharts({ monthIn, monthOut, trend }: { monthIn: num
   const pct = (n: number) => `${Math.round(n * 100)}%`
 
   return (
-    <div className="vp-charts">
+    // sch-vp-charts (2026-10-10, the handoff): the panels stand 1 : 1.6, stacked below 1100px.
+    <div className="vp-charts sch-vp-charts">
       <div className="vp-panel">
         <h3>In vs Out</h3>
         <div className="vp-sub">This month</div>

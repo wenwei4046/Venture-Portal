@@ -1,13 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import Link from 'next/link'
 import { officeTime } from '@/lib/office-time'
 import BaseRateTrendChart from './_components/BaseRateTrendChart'
-import LedgerRow from '@/components/LedgerRow'
+import BaseRateHistoryTable from './_components/BaseRateHistoryTable'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 export default async function BaseRateHistoryPage() {
-  await requirePermission('reports')
+  const user = await requirePermission('reports')
   const supabase = await createClient()
 
   const { data: history } = await supabase
@@ -92,39 +93,20 @@ export default async function BaseRateHistoryPage() {
               LAST {list.length} {list.length === 1 ? 'QUARTER' : 'QUARTERS'}
             </span>
           </div>
-          <div className="table-frame max-w-3xl">
-            <div className="table-frame-scroll">
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th>Quarter</th>
-                  <th className="right m-hide">Wtd Cost</th>
-                  <th className="right m-hide">Margin</th>
-                  <th className="right">Base Rate</th>
-                  <th className="m-hide">Approved</th>
-                  <th className="lt-toggle" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {history.map(h => (
-                  <LedgerRow key={h.id}>
-                    <td>
-                      <div className="font-serif text-md text-ink">{h.quarter}</div>
-                    </td>
-                    <td className="num text-graphite m-hide" data-label="Wtd Cost">{(Number(h.weighted_cost) * 100).toFixed(3)}%</td>
-                    <td className="num text-graphite m-hide" data-label="Margin">{(Number(h.op_margin) * 100).toFixed(3)}%</td>
-                    <td className="num text-num-ink font-semibold">{(Number(h.base_rate) * 100).toFixed(3)}%</td>
-                    <td className="m-hide" data-label="Approved">
-                      <div className="font-mono text-xs text-muted">
-                        {h.approved_at ? officeTime(h.approved_at).format('D MMM YYYY') : '—'}
-                      </div>
-                    </td>
-                  </LedgerRow>
-                ))}
-              </tbody>
-            </table>
-            </div>
-          </div>
+          {/* 2026-10-10 — the handoff's sheet table (it was a plain table). */}
+          <BaseRateHistoryTable
+            // Whoever runs Settings, where this page sits (Finance, the Principal).
+            canSetDefault={canDo(user, 'categories', 'manage')}
+            rows={history.map((h) => ({
+              id: h.id as string,
+              quarter: h.quarter as string,
+              weightedCost: Number(h.weighted_cost),
+              opMargin: Number(h.op_margin),
+              baseRate: Number(h.base_rate),
+              approvedDay: h.approved_at ? officeTime(h.approved_at).format('YYYY-MM-DD') : null,
+              approvedText: h.approved_at ? officeTime(h.approved_at).format('D MMM YYYY') : '—',
+            }))}
+          />
           <p className="max-w-3xl mt-4 text-xs text-graphite">
             Want to try a different rate?{' '}
             <Link href="/settings?tab=simulator" className="text-accent hover:text-accent-hover font-medium">

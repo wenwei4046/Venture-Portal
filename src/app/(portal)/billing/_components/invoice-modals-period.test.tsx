@@ -81,3 +81,25 @@ describe('Service Billing modals across periods', () => {
     <ReconcilePayrollBillingButton currentPeriod={p} />
   ))
 })
+
+/**
+ * 2026-10-10 — the handoff's head menus ("From payroll ▾", "+ Create Invoice
+ * ▾") hold these dialogs: a pick mounts the dialog already open, without a
+ * trigger button of its own, and on the page's month.
+ */
+describe('Service Billing modals opened from a menu', () => {
+  const cases: Array<[string, string, (p: string) => React.ReactElement]> = [
+    ['CreateInvoiceButton', '+ Create Invoice', (p) => <CreateInvoiceButton companies={companies} currentPeriod={p} autoOpen hideTrigger />],
+    ['CreateMultiLineInvoiceButton', '+ Multi-line Invoice', (p) => <CreateMultiLineInvoiceButton companies={companies} currentPeriod={p} autoOpen hideTrigger />],
+    ['GenerateConsolidatedInvoicesButton', 'Generate payroll invoices', (p) => <GenerateConsolidatedInvoicesButton currentPeriod={p} autoOpen hideTrigger />],
+    ['GenerateOwnShareInvoiceButton', 'Own-share → Venture (Office)', (p) => <GenerateOwnShareInvoiceButton currentPeriod={p} autoOpen hideTrigger />],
+    ['ReconcilePayrollBillingButton', '对数补差', (p) => <ReconcilePayrollBillingButton currentPeriod={p} autoOpen hideTrigger />],
+  ]
+  for (const [name, trigger, make] of cases) {
+    it(`${name} arrives open, on the page's month, with no trigger of its own`, () => {
+      render(make('2026-09-01'))
+      expect(modalMonth()).toHaveValue('2026-09')
+      expect(screen.queryByRole('button', { name: trigger })).toBeNull()
+    })
+  }
+})

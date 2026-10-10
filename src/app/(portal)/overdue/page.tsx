@@ -11,6 +11,7 @@ import { buildRepaymentPlan } from '@/lib/repayment-plan'
 import { overdueOf, type OverdueSummary } from '@/lib/repayment-calendar'
 import { fetchTermsHistory, isFundSourcePrincipal, termsForFundSource } from '@/lib/treasury-terms-data'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import LedgerRow from '@/components/LedgerRow'
 import { markOverduePaid } from './actions'
 import DetectOverdueButton from './_components/DetectOverdueButton'
 import EscalateButton from './_components/EscalateButton'
@@ -24,7 +25,10 @@ import OverdueTabs from './_components/OverdueTabs'
 //     something unpaid on them, read off its repayment plan (lib/repayment-
 //     plan, the same rows as its page's Repayment schedule).
 // Four cards each: what is overdue, the penalty, the longest overdue, what was
-// netted this month.
+// netted this month. 2026-10-10 (the handoff, more closely): the cards come
+// before the tabs, every month's table closes on its total, a loan they owe
+// us offers Net off (its Record repayment, where Netting is a type), the
+// netting log always shows, and on a phone a row opens onto the rest of it.
 
 type OverdueRow = {
   id: string
@@ -169,6 +173,11 @@ export default async function OverduePage({ searchParams }: Props) {
   for (const o of owed) inByMonth.set(o.due.oldestDue.slice(0, 7), [...(inByMonth.get(o.due.oldestDue.slice(0, 7)) ?? []), o])
   const monthsOf = (m: Map<string, unknown[]>) => Array.from(m.keys()).sort().reverse()
   const monthTitle = (ym: string) => dayjs(`${ym}-01`).format('MMMM YYYY')
+  const outOf = (loanId: string) => outstandingMap.get(loanId) ?? Number(loanMap.get(loanId)?.principal ?? 0)
+  // The handoff labels a month's foot "Total" over two rows or more; a phone,
+  // where the row's own label is all there is, always says it.
+  const footLabel = (n: number) => (n > 1 ? 'Total' : <span className="md:hidden">Total</span>)
+  const log = rows.filter((r) => r.status !== 'pending')
 
   return (
     <div>
@@ -183,30 +192,47 @@ export default async function OverduePage({ searchParams }: Props) {
         {canFinanceAct ? <DetectOverdueButton /> : null}
       </div>
 
+      {/* The cards, then the tabs (the handoff). */}
+      {tab === 'out' ? (
+        <StatCards label="Overdue · Fund OUT">
+          <StatCard tone="primary" label="Overdue outstanding" value={formatMoney(outOutstanding)} icon="alert" note={plural(loanIds.length, 'company', 'companies')} />
+          <StatCard tone={totalPenalty > 0 ? 'danger' : 'default'} label="Penalty accrued" value={formatMoney(totalPenalty)} icon="receipt" note="Since due date" />
+          <StatCard
+            tone={longestOut ? 'danger' : 'default'}
+            label="Longest overdue"
+            value={longestOut ? `${longestOut.overdue_days} days` : '—'}
+            icon="clock"
+            note={longestOut ? companyOf(longestOut.loan_id)?.name ?? '—' : 'Nothing overdue'}
+          />
+          <StatCard label="Netted this month" value={formatMoney(nettedTotal)} icon="swap" note={plural(netted.length, 'netting', 'nettings')} />
+        </StatCards>
+      ) : (
+        <StatCards label="Overdue · Fund IN">
+          <StatCard tone="primary" label="Overdue outstanding" value={formatMoney(inOutstanding)} icon="alert" note={`${plural(owed.length, 'fund source', 'fund sources')} · we owe`} />
+          <StatCard label="Penalty accrued" value={formatMoney(0)} icon="receipt" note="No penalty on fund sources" />
+          <StatCard
+            tone={longestIn ? 'danger' : 'default'}
+            label="Longest overdue"
+            value={longestIn ? `${longestIn.due.daysPast} days` : '—'}
+            icon="clock"
+            note={longestIn ? longestIn.name : 'Nothing overdue'}
+          />
+          <StatCard label="Netted this month" value={formatMoney(0)} icon="swap" note="Netting is on loans" />
+        </StatCards>
+      )}
+
       <Suspense fallback={null}>
         <OverdueTabs counts={{ out: loanIds.length, in: owed.length }} />
       </Suspense>
 
       {tab === 'out' ? (
         <>
-          <StatCards label="Overdue · Fund OUT">
-            <StatCard tone="primary" label="Overdue outstanding" value={formatMoney(outOutstanding)} icon="alert" note={plural(loanIds.length, 'company', 'companies')} />
-            <StatCard tone={totalPenalty > 0 ? 'danger' : 'default'} label="Penalty accrued" value={formatMoney(totalPenalty)} icon="receipt" note="Since due date" />
-            <StatCard
-              tone={longestOut ? 'danger' : 'default'}
-              label="Longest overdue"
-              value={longestOut ? `${longestOut.overdue_days} days` : '—'}
-              icon="clock"
-              note={longestOut ? companyOf(longestOut.loan_id)?.name ?? '—' : 'Nothing overdue'}
-            />
-            <StatCard label="Netted this month" value={formatMoney(nettedTotal)} icon="swap" note={plural(netted.length, 'netting', 'nettings')} />
-          </StatCards>
-
           {active.length === 0 ? (
             <AllClearState canFinanceAct={canFinanceAct} />
           ) : (
             monthsOf(outByMonth).map((ym) => {
               const list = outByMonth.get(ym)!
+              const penalty = list.reduce((s, r) => s + Number(r.penalty_amount ?? 0), 0)
               return (
                 <section key={ym} className="mb-9">
                   <div className="sect-head">
@@ -226,59 +252,64 @@ export default async function OverduePage({ searchParams }: Props) {
                           <th className="m-hide">Status</th>
                           <th className="text-right right m-hide">Penalty</th>
                           <th className="m-hide" />
+                          <th className="lt-toggle" aria-hidden />
                         </tr>
                       </thead>
                       <tbody>
                         {list.map((row) => {
                           const company = companyOf(row.loan_id)
-                          const outstanding = outstandingMap.get(row.loan_id) ?? Number(loanMap.get(row.loan_id)?.principal ?? 0)
                           return (
-                            <tr key={row.id}>
+                            <LedgerRow key={row.id}>
                               <td>
                                 <Link href={`/fund-out/${row.loan_id}`} className="text-ink hover:text-accent">
                                   {company?.name ?? '—'}
                                 </Link>
                                 <div className="text-[11px] text-graphite mt-0.5">{company?.code ?? ''}</div>
                               </td>
-                              <td className="num">{formatMoney(outstanding)}</td>
+                              <td className="num">{formatMoney(outOf(row.loan_id))}</td>
                               <td className="num">{row.overdue_days}</td>
-                              <td className="m-hide">
+                              <td className="m-hide" data-label="Status">
                                 <StageChip stage={row.overdue_stage} />
                               </td>
-                              <td className="num neg m-hide">{Number(row.penalty_amount ?? 0) ? formatMoney(-Number(row.penalty_amount)) : '—'}</td>
+                              <td className="num neg m-hide" data-label="Penalty">
+                                {Number(row.penalty_amount ?? 0) ? formatMoney(-Number(row.penalty_amount)) : '—'}
+                              </td>
                               <td className="m-hide text-right">
                                 {canFinanceAct || canMarkPaid ? (
-                                  <div className="flex items-center justify-end gap-3">
+                                  <div className="sch-row-acts">
                                     {canFinanceAct && row.overdue_stage === 'escalation' ? <EscalateButton overdueId={row.id} /> : null}
                                     {canMarkPaid ? (
                                       <form action={markOverduePaid}>
                                         <input type="hidden" name="id" value={row.id} />
-                                        <button type="submit" className="btn-quiet-sheet">
+                                        <button type="submit" className="sch-row-btn">
                                           Mark paid
                                         </button>
                                       </form>
                                     ) : null}
+                                    {/* Net off (the handoff): the loan's Record repayment, where Netting is a type. */}
+                                    {canFinanceAct ? (
+                                      <Link href={`/fund-out/${row.loan_id}#repayment-form`} className="sch-row-btn border-0">
+                                        Net off
+                                      </Link>
+                                    ) : null}
                                   </div>
                                 ) : null}
                               </td>
-                            </tr>
+                            </LedgerRow>
                           )
                         })}
                       </tbody>
-                      {list.length > 1 ? (
-                        <tfoot>
-                          <tr>
-                            <td>Total</td>
-                            <td className="num">
-                              {formatMoney(list.reduce((s, r) => s + (outstandingMap.get(r.loan_id) ?? Number(loanMap.get(r.loan_id)?.principal ?? 0)), 0))}
-                            </td>
-                            <td />
-                            <td className="m-hide" />
-                            <td className="num neg m-hide">{formatMoney(-list.reduce((s, r) => s + Number(r.penalty_amount ?? 0), 0))}</td>
-                            <td className="m-hide" />
-                          </tr>
-                        </tfoot>
-                      ) : null}
+                      <tfoot>
+                        <tr>
+                          <td>{footLabel(list.length)}</td>
+                          <td className="num">{formatMoney(list.reduce((s, r) => s + outOf(r.loan_id), 0))}</td>
+                          <td />
+                          <td className="m-hide" />
+                          <td className={`num m-hide${penalty ? ' neg' : ''}`}>{penalty ? formatMoney(-penalty) : '—'}</td>
+                          <td className="m-hide" />
+                          <td className="lt-toggle" aria-hidden />
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 </section>
@@ -286,14 +317,18 @@ export default async function OverduePage({ searchParams }: Props) {
             })
           )}
 
-          {/* ───────── The netting & penalty log ───────── */}
-          {rows.length > active.length ? (
-            <section className="mb-6">
-              <div className="sect-head">
-                <h2>Netting &amp; penalty log</h2>
-                <span className="rule" aria-hidden />
-                <span className="count">{plural(rows.length - active.length, 'RECORD', 'RECORDS')}</span>
-              </div>
+          {/* ───────── The netting & penalty log — always on show. The
+              handoff counts the last 30 days, but a record carries no day it
+              was netted or settled, so the log keeps every one and says so. ───────── */}
+          <section className="mb-6">
+            <div className="sect-head">
+              <h2>Netting &amp; penalty log</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">{plural(log.length, 'RECORD', 'RECORDS')} · ALL TIME</span>
+            </div>
+            {log.length === 0 ? (
+              <p className="text-sm text-graphite">Nothing netted or settled yet.</p>
+            ) : (
               <div className="overflow-x-auto">
                 <table className="ledger-table w-full">
                   <thead>
@@ -302,42 +337,30 @@ export default async function OverduePage({ searchParams }: Props) {
                       <th className="text-right right">Penalty</th>
                       <th className="text-right right m-hide">Days</th>
                       <th>Status</th>
+                      <th className="lt-toggle" aria-hidden />
                     </tr>
                   </thead>
                   <tbody>
-                    {rows
-                      .filter((r) => r.status !== 'pending')
-                      .map((row) => (
-                        <tr key={row.id}>
-                          <td>{companyOf(row.loan_id)?.name ?? '—'}</td>
-                          <td className="num">{formatMoney(Number(row.penalty_amount ?? 0))}</td>
-                          <td className="num m-hide">{row.overdue_days}</td>
-                          <td>
-                            <StageChip stage={row.overdue_stage} status={row.status} />
-                          </td>
-                        </tr>
-                      ))}
+                    {log.map((row) => (
+                      <LedgerRow key={row.id}>
+                        <td>{companyOf(row.loan_id)?.name ?? '—'}</td>
+                        <td className="num">{formatMoney(Number(row.penalty_amount ?? 0))}</td>
+                        <td className="num m-hide" data-label="Days">
+                          {row.overdue_days}
+                        </td>
+                        <td>
+                          <StageChip stage={row.overdue_stage} status={row.status} />
+                        </td>
+                      </LedgerRow>
+                    ))}
                   </tbody>
                 </table>
               </div>
-            </section>
-          ) : null}
+            )}
+          </section>
         </>
       ) : (
         <>
-          <StatCards label="Overdue · Fund IN">
-            <StatCard tone="primary" label="Overdue outstanding" value={formatMoney(inOutstanding)} icon="alert" note={`${plural(owed.length, 'fund source', 'fund sources')} · we owe`} />
-            <StatCard label="Penalty accrued" value={formatMoney(0)} icon="receipt" note="No penalty on fund sources" />
-            <StatCard
-              tone={longestIn ? 'danger' : 'default'}
-              label="Longest overdue"
-              value={longestIn ? `${longestIn.due.daysPast} days` : '—'}
-              icon="clock"
-              note={longestIn ? longestIn.name : 'Nothing overdue'}
-            />
-            <StatCard label="Netted this month" value={formatMoney(0)} icon="swap" note="Netting is on loans" />
-          </StatCards>
-
           {owed.length === 0 ? (
             <div className="py-16 text-center border border-hairline rounded-md bg-surface">
               <p className="font-sans text-ledger text-lg mb-2">Every fund source is current.</p>
@@ -363,11 +386,12 @@ export default async function OverduePage({ searchParams }: Props) {
                           <th className="m-hide">Status</th>
                           <th className="m-hide">Note</th>
                           <th className="m-hide" />
+                          <th className="lt-toggle" aria-hidden />
                         </tr>
                       </thead>
                       <tbody>
                         {list.map((o) => (
-                          <tr key={o.source.id}>
+                          <LedgerRow key={o.source.id}>
                             <td>
                               <Link href={`/fund-in/${o.source.id}`} className="text-ink hover:text-accent">
                                 {o.name}
@@ -375,25 +399,36 @@ export default async function OverduePage({ searchParams }: Props) {
                             </td>
                             <td className="num">{formatMoney(o.due.outstanding)}</td>
                             <td className="num">{o.due.daysPast}</td>
-                            <td className="m-hide">
+                            <td className="m-hide" data-label="Status">
                               <span className="chip alert">
                                 <i className="dot" />
                                 overdue
                               </span>
                             </td>
-                            <td className="m-hide text-graphite">
+                            <td className="m-hide text-graphite" data-label="Note">
                               Instalment {o.due.oldestNo}
                               {o.months ? ` of ${o.months}` : ''}
                               {o.due.count > 1 ? ` · ${o.due.count} unpaid` : ''}
                             </td>
                             <td className="m-hide text-right">
-                              <Link href={`/fund-in/${o.source.id}`} className="btn-quiet-sheet">
+                              <Link href={`/fund-in/${o.source.id}`} className="sch-row-btn border-0">
                                 Record payment
                               </Link>
                             </td>
-                          </tr>
+                          </LedgerRow>
                         ))}
                       </tbody>
+                      <tfoot>
+                        <tr>
+                          <td>{footLabel(list.length)}</td>
+                          <td className="num">{formatMoney(list.reduce((s, o) => s + o.due.outstanding, 0))}</td>
+                          <td />
+                          <td className="m-hide" />
+                          <td className="m-hide" />
+                          <td className="m-hide" />
+                          <td className="lt-toggle" aria-hidden />
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 </section>

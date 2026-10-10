@@ -4,8 +4,9 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoneyBare } from '@/lib/utils'
-import JvRowActions from './JvRowActions'
-import LedgerRow from '@/components/LedgerRow'
+import SortableTable from '@/components/SortableTable'
+import { useRowLinks } from '@/components/row-links'
+import { useJvRowActions } from './JvRowActions'
 
 export interface JvRow {
   id: string
@@ -15,15 +16,29 @@ export interface JvRow {
   segment: string | null
   total_amount: number
   lineCount: number
-  /** System-posted (payroll accrual) — shown read-only, no edit/delete. */
+  /** System-posted (payroll accrual) — tagged AUTO; its Edit is "Fix mistakes". */
   auto?: boolean
 }
 
+/** "director_office" → "Director Office"; no segment is a top-level adjustment. */
 function segLabel(seg: string | null): string {
-  return (seg ?? 'unallocated').replace(/_/g, ' ')
+  return (seg ?? 'unallocated').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-export default function JvList({ rows, canCreate = false, canEdit = false }: { rows: JvRow[]; canCreate?: boolean; canEdit?: boolean }) {
+const dateText = (iso: string) => dayjs(iso).format('DD MMM YYYY')
+
+export default function JvList({
+  rows,
+  canCreate = false,
+  canEdit = false,
+  canSetDefault = false,
+}: {
+  rows: JvRow[]
+  canCreate?: boolean
+  canEdit?: boolean
+  /** The viewer may keep the arrangement on show as everyone's default. */
+  canSetDefault?: boolean
+}) {
   const [q, setQ] = useState('')
   const query = q.trim().toLowerCase()
 
@@ -33,9 +48,9 @@ export default function JvList({ rows, canCreate = false, canEdit = false }: { r
     () =>
       rows.map((r) => ({
         row: r,
-        hay: `${r.entry_no} ${r.description ?? ''} ${segLabel(r.segment)} ${dayjs(
+        hay: `${r.entry_no} ${r.description ?? ''} ${segLabel(r.segment)} ${dayjs(r.transaction_date).format('D MMM YYYY')} ${dateText(
           r.transaction_date,
-        ).format('D MMM YYYY')} ${r.total_amount}${r.auto ? ' auto' : ''}`.toLowerCase(),
+        )} ${r.total_amount}${r.auto ? ' auto' : ''}`.toLowerCase(),
       })),
     [rows],
   )
@@ -45,7 +60,15 @@ export default function JvList({ rows, canCreate = false, canEdit = false }: { r
     [indexed, query],
   )
 
-  const total = Math.round(filtered.reduce((s, r) => s + Number(r.total_amount), 0) * 100) / 100
+  // 2026-10-10 — the handoff's sheet table: a double-click opens the voucher;
+  // a right-click offers that, a new tab, and what the row's Actions column
+  // used to hold (Edit / Copy / Delete).
+  const actions = useJvRowActions({ canCreate, canEdit })
+  const links = useRowLinks<JvRow>({
+    href: (r) => `/reconciliation/journal-entries/${r.id}`,
+    title: (r) => r.entry_no,
+    more: (r) => actions.items(r),
+  })
 
   return (
     <section>
@@ -80,6 +103,8 @@ export default function JvList({ rows, canCreate = false, canEdit = false }: { r
         </span>
       </div>
 
+      {actions.error ? <div className="sheet-danger mb-4">{actions.error}</div> : null}
+
       {filtered.length === 0 ? (
         <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
           <p className="text-sm">
@@ -87,65 +112,102 @@ export default function JvList({ rows, canCreate = false, canEdit = false }: { r
           </p>
         </div>
       ) : (
-        <div className="table-frame">
-        <div className="table-frame-scroll">
-        <table className="ledger-table [&_td.num]:whitespace-nowrap">
-          <thead>
-            <tr>
-              <th>Voucher</th>
-              <th className="m-hide">Date</th>
-              <th className="m-hide">Description</th>
-              <th className="m-hide">Segment</th>
-              <th className="right">Amount</th>
-              <th className="right m-hide">Actions</th>
-              <th className="lt-toggle" aria-hidden />
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((entry) => (
-              <LedgerRow key={entry.id}>
-                <td>
-                  {/* The voucher's own page (2026-10-09, the handoff). */}
-                  <Link href={`/reconciliation/journal-entries/${entry.id}`} className="font-mono text-[12.5px] font-medium">
-                    {entry.entry_no}
-                  </Link>
-                  {entry.auto ? (
-                    <span className="chip info ml-2" title="System-posted payroll accrual — open it to see the lines or fix mistakes">
-                      <span className="dot" />
-                      AUTO
+        <div className="fin-queue">
+          <SortableTable<JvRow>
+            layoutId="reconciliation.journal-entries"
+            layoutTitle="Journal entries"
+            canSetDefault={canSetDefault}
+            scrollBox
+            resizeMode="neighbour"
+            onRowOpen={links.onRowOpen}
+            onRowContextMenu={links.onRowContextMenu}
+            rows={filtered}
+            getRowKey={(r) => r.id}
+            defaultSort={{ key: 'transaction_date', dir: 'desc' }}
+            footer={(visible) => (
+              <tr>
+                <td colSpan={1000} className="q-foot">
+                  <span>Total</span>
+                  <span className="num">{formatMoneyBare(Math.round(visible.reduce((s, r) => s + Number(r.total_amount), 0) * 100) / 100)}</span>
+                </td>
+              </tr>
+            )}
+            columns={[
+              {
+                key: 'entry_no',
+                label: 'Voucher',
+                mobile: 'keep',
+                render: (r) => (
+                  <>
+                    {/* The voucher's own page; a link, so Ctrl-click opens a new tab.
+                        The number in the body face (2026-10-10, the handoff). */}
+                    <Link
+                      href={`/reconciliation/journal-entries/${r.id}`}
+                      className="font-sans text-[12.5px] font-medium text-ink hover:text-accent underline-offset-2 hover:underline"
+                    >
+                      {r.entry_no}
+                    </Link>
+                    {r.auto ? (
+                      <span className="adm-tag" title="System-posted payroll accrual — open it to see the lines or fix mistakes">
+                        AUTO
+                      </span>
+                    ) : null}
+                    <span className="adm-sub">
+                      {r.lineCount} {r.lineCount === 1 ? 'line' : 'lines'}
                     </span>
-                  ) : null}
-                  <div className="text-[11px] text-graphite mt-0.5">
-                    {entry.lineCount} {entry.lineCount === 1 ? 'line' : 'lines'}
-                  </div>
-                </td>
-                <td className="font-mono text-[12px] whitespace-nowrap m-hide" data-label="Date">
-                  {dayjs(entry.transaction_date).format('D MMM YYYY')}
-                </td>
-                <td className="m-hide" data-label="Description">{entry.description}</td>
-                <td className="m-hide capitalize" data-label="Segment">
-                  {segLabel(entry.segment)}
-                </td>
-                <td className="num">{formatMoneyBare(Number(entry.total_amount))}</td>
-                <td className="m-hide">
-                  <JvRowActions id={entry.id} entryNo={entry.entry_no} canCreate={canCreate} canEdit={canEdit} />
-                </td>
-              </LedgerRow>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td>Total</td>
-              <td className="m-hide" />
-              <td className="m-hide" />
-              <td className="m-hide" />
-              <td className="num">{formatMoneyBare(total)}</td>
-              <td className="m-hide" />
-              <td className="lt-toggle" aria-hidden />
-            </tr>
-          </tfoot>
-        </table>
-        </div>
+                    {/* The phone's small print: what it is for, and when. */}
+                    <span className="q-sub md:hidden">
+                      <span className="q-sub-no">{r.description}</span>
+                      <span className="q-sub-no">{dateText(r.transaction_date)}</span>
+                    </span>
+                  </>
+                ),
+                sortValue: (r) => r.entry_no,
+                filterable: true,
+                filterValue: (r) => r.entry_no,
+              },
+              {
+                key: 'transaction_date',
+                label: 'Date',
+                mobile: 'detail',
+                render: (r) => dateText(r.transaction_date),
+                sortValue: (r) => r.transaction_date,
+                filterable: true,
+                filterValue: (r) => dateText(r.transaction_date),
+                range: 'date',
+                cellClassName: 'whitespace-nowrap',
+              },
+              {
+                key: 'description',
+                label: 'Description',
+                mobile: 'detail',
+                render: (r) => r.description ?? '',
+                sortValue: (r) => r.description ?? '',
+                filterable: true,
+              },
+              {
+                key: 'segment',
+                label: 'Segment',
+                mobile: 'detail',
+                render: (r) => segLabel(r.segment),
+                sortValue: (r) => segLabel(r.segment),
+                filterable: true,
+                cellClassName: 'whitespace-nowrap',
+              },
+              {
+                key: 'total_amount',
+                label: 'Amount',
+                mobile: 'keep',
+                align: 'right',
+                render: (r) => formatMoneyBare(Number(r.total_amount)),
+                sortValue: (r) => Number(r.total_amount),
+                filterable: true,
+                range: 'number',
+                cellClassName: 'whitespace-nowrap',
+              },
+            ]}
+          />
+          {links.menu}
         </div>
       )}
     </section>

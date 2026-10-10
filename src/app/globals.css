@@ -5778,3 +5778,1212 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .fin-view .ledger-table thead th.cs-repay-sub { background: rgb(254 244 231); }
 .fin-view .ledger-table tr.cs-total td { background: rgb(221 229 240); box-shadow: inset 0 1.5px 0 rgb(46 92 138); color: rgb(29 43 74); }
 .fin-view .ledger-table tr.cs-total td:first-child { font-weight: 600; }
+
+/* The handoff's type and colour rules on Finance's pages (2026-10-10): the
+   muted greys for secondary text and hints (the sheet keeps them black on
+   other views), micro-labels at 0.05em, nothing under 10px. */
+.fin-view > .sheet-theme { --graphite: 117 100 86; --muted: 138 119 101; }
+.fin-view details.fin-fold > summary small { letter-spacing: 0.05em; }
+.fin-view .repay-cal .cal-net { font-size: 10px; }
+@media (max-width: 767px) {
+  .fin-view .vp-months span { font-size: 10px; }
+}
+
+/* ═══ The Finance handoff, the audit fixes (2026-10-10): each page group's own
+   classes — ov- Overview, pay- Payments / Receipt, bil- Invoice / Statements /
+   Billing Allocator, fund- Fund IN / OUT / Invoice Financing / Daily Bank,
+   sch- Repayment Schedule / Overdue / Dept Pool / Venture Pool / General
+   Ledger, adm- Reconciliation / Journal / Settings. ═══ */
+
+/* ── The treasury Overview's KPI rows (2026-10-10, the Finance handoff's
+   isKpi — dashboard/_components/KpiCards.tsx): Billing & dept pool and
+   Director salary as plain cards, not the page's summary cards — no top bar,
+   no icon; the label, the figure at 22px in the number face, a note. The
+   row's one primary figure in walnut with a walnut frame; a net figure green
+   as a profit, red as a loss; anything else grey. Three across, one on a
+   phone. ── */
+.ov-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 767px) {
+  .ov-kpis { grid-template-columns: minmax(0, 1fr); }
+}
+.ov-kpi {
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid rgb(var(--card-border, 232 225 216));
+  border-radius: 12px;
+  background: rgb(var(--surface));
+  box-shadow: 0 3px 12px rgb(90 62 43 / 5.5%);
+}
+.ov-kpi[data-tone='primary'] { border: 1.5px solid rgb(var(--card-primary-border, 134 102 76)); }
+.ov-kpi-label {
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgb(90 78 68);
+}
+.ov-kpi-value {
+  margin-top: 8px;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: rgb(84 90 102);
+  overflow-wrap: anywhere;
+}
+.ov-kpi[data-tone='primary'] .ov-kpi-value { color: rgb(var(--walnut, 90 62 43)); }
+.ov-kpi[data-tone='ledger'] .ov-kpi-value { color: rgb(var(--ledger, 21 110 78)); }
+.ov-kpi[data-tone='danger'] .ov-kpi-value { color: rgb(var(--danger, 176 40 34)); }
+.ov-kpi-note {
+  margin-top: 8px;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgb(var(--card-note, 138 119 101));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PAYMENTS / RECEIPT on the Finance view (2026-10-10) — the user's Claude
+   Design handoff (.design/finance-revamp: pagePayments, batchSection,
+   pageReceipts, pagePaymentDetail, pageReceiptDetail). Every rule hangs off
+   .fin-view and a pay-* class of its own, so a payroll voucher HR opens from
+   HR Payment keeps its page.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* The head's buttons (VoucherLedger): white secondaries, the one orange
+   action; on a phone only that action stays in the head. */
+.fin-view .pay-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+  background: #fff;
+  color: #000;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.fin-view .pay-act:hover { background: rgb(247 247 245); color: #000; }
+.fin-view .pay-act-pri { border-color: #E99A53; background: #E99A53; font-weight: 500; }
+.fin-view .pay-act-pri:hover { border-color: #DD8B42; background: #DD8B42; }
+@media (max-width: 767px) {
+  .fin-view .pay-act:not(.pay-act-pri) { display: none; }
+}
+
+/* The list on a phone (VouchersTable): the number — or, without one, whom it
+   is from — as the row's title, the figure on its right with "Amount" under
+   it, and the status chip and the other columns in a line beneath. */
+@media (max-width: 767px) {
+  .fin-view .pay-vno,
+  .fin-view .pay-mtitle {
+    display: block;
+    font-size: 14.5px;
+    font-weight: 500;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .fin-view .pay-msub {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    margin-top: 6px;
+    font-weight: 400;
+    white-space: normal;
+  }
+  .fin-view .pay-mmeta { font-size: 11.5px; color: rgb(90 78 68); overflow-wrap: anywhere; }
+  .fin-view .pay-mmeta b {
+    font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+    font-weight: 400;
+    color: #000;
+  }
+  .fin-view .pay-amt-cell { vertical-align: top; font-size: 14.5px; }
+  .fin-view .pay-mlabel {
+    display: block;
+    margin-top: 2px;
+    font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+    font-size: 10px;
+    color: rgb(117 100 86);
+  }
+}
+
+/* The Total row under the list (TotalFoot): the sheet's peach foot; the
+   label and the figure stay on one line. */
+.fin-view .pay-foot td { white-space: nowrap; }
+
+/* Payroll batches: a row per batch — what it is, how many, its total in red,
+   the day, Expand — and, opened, a short list of its vouchers. */
+.fin-view .pay-batches {
+  margin-bottom: 16px;
+  overflow: hidden;
+  border: 1px solid rgb(216 210 200);
+  border-radius: 10px;
+  background: #fff;
+}
+.fin-view .pay-batch-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 1px solid rgb(236 234 229);
+  background: #fff;
+  color: #000;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.fin-view .pay-batch-head:hover,
+.fin-view .pay-batch-head[aria-expanded='true'] { background: rgb(250 249 247); }
+.fin-view .pay-batch:last-child > :last-child { border-bottom: 0; }
+.fin-view .pay-batch-chev { flex: none; width: 10px; font-size: 10px; color: rgb(117 100 86); }
+.fin-view .pay-batch-title { display: flex; flex: 1; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+.fin-view .pay-batch-name { font-size: 14px; font-weight: 500; }
+.fin-view .pay-batch-meta { font-size: 11.5px; color: rgb(117 100 86); white-space: nowrap; }
+.fin-view .pay-batch-amt {
+  flex: none;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 13px;
+  color: #B02822;
+  white-space: nowrap;
+}
+.fin-view .pay-batch-date {
+  flex: none;
+  width: 56px;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 11.5px;
+  text-align: right;
+  color: rgb(90 78 68);
+  white-space: nowrap;
+}
+.fin-view .pay-batch-cta { flex: none; width: 52px; font-size: 12px; text-align: right; color: #C9741F; }
+.fin-view .pay-batch-list {
+  margin: 0;
+  padding: 4px 16px 10px 38px;
+  list-style: none;
+  border-bottom: 1px solid rgb(229 228 223);
+  background: rgb(250 249 247);
+}
+.fin-view .pay-batch-row {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) 120px 60px;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgb(236 234 229);
+  font-size: 12.5px;
+  cursor: default;
+}
+.fin-view .pay-batch-row:last-child { border-bottom: 0; }
+.fin-view .pay-batch-row:hover { background: rgb(255 245 233); }
+.fin-view .pay-batch-row:focus-visible { outline: 2px solid #E99A53; outline-offset: -2px; }
+.fin-view .pay-batch-no {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 12px;
+  color: rgb(60 52 46);
+  white-space: nowrap;
+}
+.fin-view .pay-batch-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fin-view .pay-batch-sum {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+.fin-view .pay-bpill {
+  justify-self: end;
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: #F7F7F5;
+  color: #000;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.fin-view .pay-bpill[data-tone='ledger'] { background: #DEF0E8; color: #156E4E; }
+.fin-view .pay-bpill[data-tone='wait'] { background: #E6EEF7; color: #2E5C8A; }
+.fin-view .pay-bpill[data-tone='accent'] { background: #FFF4E7; color: #000; }
+.fin-view .pay-bpill[data-tone='info'] { background: #EEEBE7; color: #6C6862; }
+@media (max-width: 767px) {
+  .fin-view .pay-batch-date,
+  .fin-view .pay-batch-cta { display: none; }
+  .fin-view .pay-batch-list { padding: 4px 14px 10px 28px; }
+  .fin-view .pay-batch-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'who sum' 'no pill';
+    gap: 2px 12px;
+  }
+  .fin-view .pay-batch-who { grid-area: who; }
+  .fin-view .pay-batch-sum { grid-area: sum; }
+  .fin-view .pay-batch-no { grid-area: no; font-size: 11px; }
+  .fin-view .pay-bpill { grid-area: pill; }
+}
+
+/* The voucher page (payments/[id]): the number in the figures' mono at 28px,
+   the cards at a 12px radius, the navy panel's amount in the mono at 32px, a
+   second line under the bank and the account, and the status note as one
+   navy box with a dot in the status's colour. */
+.fin-view .pay-back { font-size: 13px; color: rgb(90 78 68); }
+.fin-view .pay-back:hover { color: #000; text-decoration: none; }
+.fin-view .pay-eyebrow,
+.fin-view .pay-created { color: rgb(90 78 68); }
+.fin-view h1.pay-no {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #000;
+}
+@media (max-width: 680px) {
+  .fin-view h1.pay-no { font-size: 22px; }
+}
+.fin-view .pay-head-chip { padding: 3px 10px; font-size: 11px; }
+.fin-view .pay-vcard { border-radius: 12px; }
+@media (min-width: 640px) {
+  .fin-view .pay-vcard { padding: 18px 20px; }
+}
+.fin-view .pay-vcard-title { font-size: 15.5px; font-weight: 600; }
+.fin-view .pay-aside { border-top-width: 4px; border-radius: 10px; }
+.fin-view .pay-side-chip { padding: 2px 8px; font-size: 10.5px; letter-spacing: 0.02em; }
+.fin-view .pay-side-amt {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+.fin-view .pay-side-sub {
+  display: block;
+  margin-top: 1px;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 11px;
+  font-weight: 400;
+  color: rgb(169 179 199);
+}
+.fin-view .pay-note {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid rgb(62 78 112);
+  border-radius: 8px;
+  background: rgb(41 57 92);
+  color: #fff;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.fin-view .pay-note-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translateY(-1px);
+}
+.fin-view .pay-note-dot[data-tone='pending_approval'] { background: #2E5C8A; }
+.fin-view .pay-note-dot[data-tone='approved'] { background: #E99A53; }
+.fin-view .pay-note-dot[data-tone='paid'] { background: #156E4E; }
+.fin-view .pay-note-dot[data-tone='voided'] { background: #B02822; }
+
+/* ── Billing: Invoice (Service Billing), Statements, Billing Allocator ──
+   (2026-10-10, the Finance revamp handoff — agent "billing"). Every rule
+   hangs off a `bil-` class that only these pages' components carry. */
+
+/* The month control: "← October 2026 ▾ →" with the year's months under the
+   label (Service Billing), or the plain stepper beside a title (allocator). */
+.bil-month { position: relative; display: inline-flex; align-items: stretch; height: 34px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: #fff; }
+.bil-month-step { padding: 0 12px; border: 0; border-radius: 6px; background: #fff; color: #000; font-size: 12px; cursor: pointer; }
+.bil-month-label { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 12px; border: 0; border-left: 1px solid rgb(229 228 223); border-right: 1px solid rgb(229 228 223); background: #fff; color: #000; font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+button.bil-month-label { cursor: pointer; }
+.bil-month-step:hover:not(:disabled),
+button.bil-month-label:hover:not(:disabled) { background: rgb(247 247 245); }
+.bil-month :disabled { opacity: 0.6; cursor: default; }
+.bil-month-chev { font-size: 11px; color: rgb(117 100 86); }
+.bil-month.compact { height: auto; }
+.bil-month.compact .bil-month-step { padding: 6px 10px; font-size: 13px; }
+.bil-month.compact .bil-month-label { padding: 6px 10px; font-size: 12px; font-weight: 500; }
+.bil-month-pop { position: absolute; left: 0; top: calc(100% + 6px); z-index: 35; width: 250px; padding: 10px; border: 1px solid rgb(229 228 223); border-radius: 10px; background: #fff; box-shadow: 0 10px 30px rgb(43 31 23 / 0.14); }
+.bil-month-year { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 6px 8px; border-radius: 6px; background: rgb(246 246 244); font-size: 13px; font-weight: 600; }
+.bil-month-year button { padding: 0 4px; border: 0; background: transparent; font-size: 12px; cursor: pointer; }
+.bil-month-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.bil-month-grid button { height: 36px; border: 1px solid transparent; border-radius: 6px; background: #fff; color: #000; font-size: 12.5px; cursor: pointer; }
+.bil-month-grid button:hover { background: rgb(255 244 231); }
+.bil-month-grid button[data-now='true'] { border-color: rgb(117 100 86); }
+.bil-month-grid button[aria-pressed='true'] { border-color: #E99A53; background: #E99A53; font-weight: 600; }
+.bil-month-foot { display: flex; justify-content: flex-end; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgb(229 228 223); }
+.bil-month-foot button { border: 0; background: transparent; color: #96640C; font-size: 12px; font-weight: 500; cursor: pointer; }
+
+/* Service Billing's head: the month, then From payroll ▼, Export ▼,
+   + Create Invoice ▼ (the menus wear the existing .act-menu dress). */
+.bil-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
+.bil-menu-chev { font-size: 10px; opacity: 0.7; }
+@media (max-width: 767px) {
+  /* The phone: the month full width and 44px tall, From payroll and Export
+     side by side, Create full width. */
+  .bil-tools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; width: 100%; }
+  .bil-tools > .bil-month { grid-column: 1 / -1; height: 44px; }
+  .bil-tools > .bil-month .bil-month-label { flex: 1 1 auto; }
+  .bil-tools > .bil-menu { display: block; }
+  .bil-tools > .bil-menu.primary { grid-column: 1 / -1; }
+  .bil-tools > .bil-menu > .act-menu-btn { justify-content: center; width: 100%; min-height: 44px; }
+  .bil-tools > .bil-menu > .act-menu-pop { top: 50px; left: 0; right: auto; }
+  .bil-tools > .bil-menu:nth-child(3):not(.primary) > .act-menu-pop { left: auto; right: 0; }
+  .bil-tools > .bil-menu.primary > .act-menu-pop { left: 0; right: 0; }
+  /* The head scrolls away on a phone: three rows of tools would hold a third
+     of the screen under a sticky head. */
+  .page-head:has(> .bil-tools) { position: static; }
+}
+
+/* The opened Payroll basis fold starts with a line per department. */
+.bil-fold-lines { display: grid; gap: 6px; margin: 0 0 16px; }
+.bil-fold-line { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; border: 1px solid rgb(229 228 223); border-radius: 8px; background: rgb(247 247 245); font-size: 12px; color: #000; }
+.bil-fold-line .num { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; white-space: nowrap; }
+
+/* "No invoices.", "No Venture Pool transactions in …" — the handoff's empty box. */
+.bil-empty { padding: 24px; border: 1px solid rgb(229 228 223); border-radius: 12px; background: rgb(247 247 245); color: #000; font-size: 13px; text-align: center; }
+
+/* The invoice list's tab row: the statuses, and the "Include other months"
+   switch at its end, over one rule. */
+.bil-tabrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 20px; border-bottom: 1px solid rgb(var(--sheet-divider, 226 224 218)); }
+.bil-tabrow > nav[data-variant] { flex: 1 1 320px; min-width: 0; margin-bottom: 0; border-bottom: 0; }
+.bil-switch { flex: none; display: inline-flex; align-items: center; gap: 8px; margin-bottom: 4px; padding: 4px 12px 4px 4px; border: 1px solid rgb(229 228 223); border-radius: 99px; background: #fff; color: #000; font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 12px; white-space: nowrap; cursor: pointer; }
+.bil-switch-track { position: relative; width: 28px; height: 16px; border-radius: 99px; background: rgb(229 228 223); transition: background 0.15s; }
+.bil-switch-knob { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 0.2); transition: left 0.15s; }
+.bil-switch[aria-checked='true'] .bil-switch-track { background: #E99A53; }
+.bil-switch[aria-checked='true'] .bil-switch-knob { left: 14px; }
+
+/* What is ticked, above the table: "n selected · RM x", then Clear · Print
+   selected · Void selected · Settle n →. */
+.bil-selbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; padding: 10px 14px; border: 1px solid #E99A53; border-radius: 10px; background: rgb(255 244 231); color: #000; font-size: 12px; font-variant-numeric: tabular-nums; }
+.bil-selbar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Buttons: a quiet white one, the orange primary, a red-edged danger. */
+.bil-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: #fff; color: #000; font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 12px; font-style: normal; font-weight: 400; line-height: 1.2; white-space: nowrap; text-decoration: none; cursor: pointer; }
+.bil-btn:hover:not(:disabled) { background: rgb(247 247 245); }
+.bil-btn.primary { border-color: #E99A53; background: #E99A53; font-weight: 500; }
+.bil-btn.primary:hover:not(:disabled) { border-color: #DD8B42; background: #DD8B42; }
+.bil-btn.danger { border-color: rgb(176 40 34 / 0.4); color: #B02822; }
+.bil-btn.danger:hover:not(:disabled) { background: #FAE4E0; }
+.bil-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* A row's own button (Settle →, Invoice, PDF, Edit): white with an orange
+   edge, filled on hover. On a phone an invoice's Settle stays the pill. */
+.bil-row-btn { display: inline-flex; align-items: center; padding: 6px 12px; border: 0; border-radius: 6px; background: #fff; box-shadow: inset 0 0 0 1px #E99A53; color: #000; font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 11px; font-style: normal; font-weight: 500; line-height: 1.2; white-space: nowrap; text-decoration: none !important; cursor: pointer; transition: background 0.12s; }
+.bil-row-btn:hover:not(:disabled) { background: #E99A53; }
+.bil-row-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+@media (max-width: 767px) {
+  .fin-queue .bil-row-btn.inv-settle { padding: 7px 12px; background: rgb(var(--accent)); box-shadow: none; font-size: 13px; }
+}
+
+/* The orange notice ("To bill RM x across n companies — …"). */
+.bil-notice { margin-bottom: 20px; padding: 12px 14px; border: 1px solid #E99A53; border-radius: 10px; background: rgb(255 244 231); color: #000; font-size: 12px; line-height: 1.5; text-wrap: pretty; }
+
+/* The allocator's Generate invoices in a page head, and what it made. */
+.bil-gen { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.bil-gen > .bil-btn.primary { padding: 8px 16px; font-size: 13px; }
+.bil-gen-result { max-width: 360px; padding: 8px 12px; border: 1px solid rgb(229 228 223); border-radius: 8px; background: #fff; font-size: 12px; line-height: 1.5; text-align: left; }
+@media (max-width: 767px) {
+  .bil-gen { align-items: stretch; }
+}
+
+/* Calculate's form: a rule between one expense and the next. */
+.bil-form-rule { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid rgb(229 228 223); color: rgb(117 100 86); font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.bil-form-rule button { border: 0; background: none; letter-spacing: 0; text-transform: none; cursor: pointer; }
+
+/* The allocator's Staff actions: Import from HR's month picker, the saved
+   snapshots; the snapshot dialog's small headings. */
+.bil-inline { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bil-inline label { color: rgb(var(--graphite)); font-size: 11.5px; font-weight: 500; }
+.bil-inline select { padding: 7px 10px; border: 1px solid rgb(var(--hairline)); border-radius: 6px; background: rgb(var(--surface)); color: rgb(var(--ink)); font-size: 13px; }
+.bil-snapshots { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; color: rgb(117 100 86); font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.bil-snapshots .bil-row-btn { letter-spacing: 0; text-transform: none; }
+.bil-dlg-label { margin-bottom: 8px; color: rgb(117 100 86); font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+
+/* ── fund: Daily Bank · Fund IN / OUT · Invoice Financing · print schedule
+   (2026-10-10, the user's Claude Design handoff — audit l fixes). Every rule
+   hangs off a fund- class; nothing else is touched. ── */
+
+/* A list read on a phone as stacked cards (components/treasury/PhoneCards):
+   the name with its figure on the right, small print, chips and labelled
+   details, a chevron when the row opens its record, a peach Total at the foot. */
+.fund-plist { border: 1px solid rgb(216 210 200); border-radius: 10px; overflow: hidden; background: #fff; }
+.fund-pitem { display: block; }
+.fund-prow {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgb(229 228 223);
+  background: #fff;
+  color: #000;
+}
+.fund-plist > .fund-prow:last-child,
+.fund-plist > .fund-pitem:last-child > .fund-prow { border-bottom: 0; }
+.fund-plist .fund-prow-link { text-decoration: none; color: inherit; cursor: pointer; }
+.fund-plist .fund-prow-link:hover { background: rgb(255 245 233); }
+.fund-prow.fund-band { background: rgb(235 231 224); }
+.fund-prow.fund-band .fund-prow-title { font-weight: 600; }
+.fund-prow-main { flex: 1; min-width: 0; }
+.fund-prow-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.fund-prow-title { min-width: 0; font-size: 14.5px; font-weight: 500; line-height: 1.35; overflow-wrap: anywhere; }
+.fund-prow-fig { flex: none; text-align: right; }
+.fund-prow-val {
+  display: block;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 14.5px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.fund-prow-what { display: block; font-size: 10px; color: rgb(117 100 86); }
+.fund-prow-sub { margin-top: 5px; font-size: 13.5px; line-height: 1.4; color: #000; overflow-wrap: anywhere; }
+.fund-prow-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 6px; }
+.fund-prow-d { font-size: 11.5px; color: rgb(90 78 68); }
+.fund-prow-dv { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; color: #000; font-variant-numeric: tabular-nums; }
+.fund-prow-chev { flex: none; align-self: center; font-size: 16px; color: rgb(117 100 86); }
+.fund-pfoot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgb(255 244 231);
+  font-size: 13px;
+  font-weight: 600;
+}
+.fund-pfoot-fig { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; text-align: right; font-variant-numeric: tabular-nums; }
+.fund-pfoot-note {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  color: rgb(90 78 68);
+}
+.fund-pempty { padding: 24px; background: rgb(247 247 245); text-align: center; font-size: 13px; }
+.fund-psearch {
+  display: block;
+  width: 100%;
+  height: 34px;
+  margin: 0 0 12px;
+  padding: 0 11px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+  background: #fff;
+  color: #000;
+  font-size: 13px;
+}
+.fund-psearch:focus { outline: none; border-color: rgb(233 154 83); }
+
+/* The handoff's toast: one line at the foot of the screen, gone after 2.4 s. */
+.fund-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 70;
+  max-width: calc(100vw - 32px);
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: rgb(90 62 43);
+  color: rgb(246 238 230);
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 4px 12px rgb(43 31 23 / 0.2);
+}
+@media (max-width: 767px) {
+  .fund-toast { bottom: calc(74px + env(safe-area-inset-bottom, 0px)); white-space: normal; text-align: center; }
+}
+
+/* A list's Total row, each sum under its own column (AlignedFoot); the sheet
+   already paints a table's foot peach and bold. */
+tr.fund-foot td.num {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Terms over time: the segments in one box, the current one tagged green;
+   each change a grey card folding open onto its interest month by month. */
+.fund-segs { margin-bottom: 12px; border: 1px solid rgb(216 210 200); border-radius: 10px; overflow: hidden; background: #fff; }
+.fund-seg {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  padding: 11px 14px;
+  border-bottom: 1px solid rgb(229 228 223);
+  background: #fff;
+  font-size: 12px;
+}
+.fund-seg:last-child { border-bottom: 0; }
+.fund-seg.fund-current { background: rgb(251 251 250); }
+.fund-seg-range { min-width: 150px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; white-space: nowrap; }
+.fund-seg-tag {
+  padding: 2px 6px;
+  border: 1px solid rgb(21 110 78 / 0.4);
+  border-radius: 4px;
+  background: rgb(222 240 232);
+  color: rgb(21 110 78);
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.fund-seg-desc { flex: 1 1 280px; min-width: 0; order: 3; }
+details.fund-change { margin-bottom: 8px; border: 1px solid rgb(229 228 223); border-radius: 10px; background: rgb(246 246 244); }
+.fund-change-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.fund-change-head::-webkit-details-marker { display: none; }
+.fund-change-head b { font-weight: 600; }
+.fund-change-chev { flex: none; display: inline-block; font-size: 10px; transition: transform 0.15s ease; }
+details.fund-change[open] > .fund-change-head .fund-change-chev { transform: rotate(180deg); }
+.fund-change-body { padding: 0 14px 12px; }
+.fund-change-note { margin: 0 0 10px; font-size: 11.5px; line-height: 1.5; color: rgb(117 100 86); }
+.fund-short { color: rgb(176 40 34); }
+.fund-change-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid rgb(216 210 200);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  font-size: 12px;
+}
+.fund-change-table th {
+  padding: 8px 10px;
+  background: rgb(235 231 224);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  text-align: left;
+  color: #000;
+}
+.fund-change-table td {
+  padding: 8px 10px;
+  border-top: 1px solid rgb(229 228 223);
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  color: #000;
+}
+.fund-change-table .fund-r { text-align: right; }
+.fund-change-table tfoot td { background: rgb(255 244 231); font-weight: 600; }
+.fund-change-table tfoot td:first-child { font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; }
+.fund-change-table td.fund-diff { color: rgb(150 100 12); }
+.fund-change-table td.fund-diff-down { color: rgb(21 110 78); }
+.fund-change-table td.fund-diff-nil { color: rgb(138 119 101); }
+.fund-change-table td.fund-short { color: rgb(176 40 34); }
+details.fund-change-more { margin-top: 10px; }
+details.fund-change-more > summary { cursor: pointer; font-size: 11.5px; font-weight: 500; color: rgb(90 78 68); }
+.fund-change-scroll { margin-top: 8px; overflow-x: auto; }
+.fund-change-scroll .fund-change-table { min-width: 560px; }
+
+/* Print schedule: the letterhead and the title in Georgia (the serif font
+   variable they asked for is never defined), the Total row peach, a line to
+   sign under the table; the sheet prints in its own colours. */
+.sched-print .fund-print-serif { font-family: Georgia, 'Times New Roman', 'Noto Sans SC', serif; }
+.sched-print-table tfoot tr.fund-print-total td { background: rgb(255 244 231); border: 1px solid rgb(207 197 183); font-weight: 500; }
+.fund-print-sign { display: flex; justify-content: space-between; gap: 24px; margin-top: 40px; font-size: 11px; color: rgb(90 78 68); }
+.fund-print-sign > div { flex: 1; padding-top: 8px; border-top: 1px solid #000; }
+.fund-print-sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+/* ── Invoice Financing ── */
+/* The register's one action: an orange edge at rest, filled on hover. */
+.fund-btn-line {
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  display: inline-block;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgb(233 154 83);
+  color: #000;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.fund-btn-line:hover:not(:disabled) { background: rgb(233 154 83); }
+.fund-btn-line:disabled { opacity: 0.5; cursor: not-allowed; }
+.fund-btn-quiet { padding: 6px 10px; font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; border: 0; background: transparent; color: rgb(90 78 68); font-size: 11px; cursor: pointer; }
+.fund-btn-quiet:hover { color: #000; }
+
+/* The register's Charge in green, as money coming in (a cell's own colour
+   otherwise loses to the table's). */
+table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
+
+/* Record financing (inline) and the Financing calculator (a modal): fields
+   on a six-column grid beside the results. */
+.fund-rec {
+  margin-bottom: 32px;
+  padding: 22px 24px 24px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgb(90 62 43 / 0.055);
+}
+.fund-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 62;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 12px;
+  overflow-y: auto;
+  background: rgb(90 62 43 / 0.45);
+  backdrop-filter: blur(3px);
+}
+.fund-modal {
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  padding: 22px 24px 24px;
+  border-radius: 14px;
+  background: #fff;
+  color: #000;
+  box-shadow: 0 20px 50px rgb(43 31 23 / 0.25);
+}
+.fund-modal.fund-narrow { max-width: 460px; }
+.fund-modal .fund-save-row { margin-top: 16px; }
+.fund-modal .fund-error { margin-top: 12px; }
+.fund-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.fund-modal-head h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.015em; color: #000; }
+.fund-rec-warn { margin-left: 8px; font-size: 12px; font-weight: 400; letter-spacing: 0; color: rgb(150 100 12); }
+.fund-x { flex: none; padding: 0 4px; border: 0; background: transparent; color: #000; font-size: 24px; line-height: 1; cursor: pointer; }
+.fund-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border: 1px dashed rgb(207 197 183);
+  border-radius: 10px;
+  background: rgb(251 250 248);
+  font-size: 12px;
+}
+.fund-file-pick { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.fund-file-btn { height: 28px; font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; padding: 0 10px; border: 1px solid rgb(180 174 165); border-radius: 4px; background: #fff; color: #000; font-size: 12px; cursor: pointer; }
+.fund-file-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fund-file-note { color: rgb(90 78 68); }
+.fund-file-read { color: rgb(21 110 78); }
+.fund-form-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px 24px; align-items: start; }
+.fund-fields { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px 16px; align-content: start; }
+.fund-s2 { grid-column: span 2; }
+.fund-s3 { grid-column: span 3; }
+.fund-s6 { grid-column: 1 / -1; }
+.fund-f { min-width: 0; }
+.fund-f-sec {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgb(90 62 43);
+}
+.fund-f-sec::after { content: ''; flex: 1; height: 1px; background: rgb(229 228 223); }
+.fund-f-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgb(90 78 68);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fund-box {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+  background: rgb(246 246 244);
+  overflow: hidden;
+}
+.fund-box:focus-within { border-color: rgb(233 154 83); }
+.fund-box.fund-big { height: 46px; }
+.fund-box input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: #000;
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+.fund-box.fund-big input { font-size: 18px; }
+.fund-box-pre { flex: none; padding-left: 12px; font-size: 13px; font-weight: 600; color: rgb(117 100 86); }
+.fund-box-suf { flex: none; padding: 0 12px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(117 100 86); }
+.fund-select {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+  background: rgb(246 246 244);
+  color: #000;
+  font-size: 13px;
+}
+.fund-select:focus { outline: none; border-color: rgb(233 154 83); }
+.fund-chips {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-top: 6px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+.fund-chips button {
+  min-width: 0;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid rgb(236 234 229);
+  background: #fff;
+  color: #000;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+.fund-chips button:first-child { border-left: 0; }
+.fund-chips button:hover:not(.fund-on) { background: rgb(255 244 231); }
+.fund-chips button.fund-on { background: rgb(233 154 83); font-weight: 600; }
+.fund-f-below {
+  margin-top: 5px;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 10.5px;
+  color: rgb(117 100 86);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fund-f-below.fund-in { color: rgb(21 110 78); }
+.fund-f-below.fund-owe { color: rgb(150 100 12); }
+
+/* What the terms come to: tiles for the charge (green) and what HC is owed
+   (brown), the margin framed in walnut. */
+.fund-res { padding: 16px; border: 1px solid rgb(232 225 216); border-radius: 12px; background: rgb(251 250 248); }
+.fund-res-days { margin-bottom: 12px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; letter-spacing: 0.04em; color: rgb(90 78 68); }
+.fund-res-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.fund-tile { min-width: 0; padding: 12px; border-radius: 10px; }
+.fund-tile.fund-in { border: 1px solid rgb(21 110 78 / 0.25); background: rgb(222 240 232); color: rgb(21 110 78); }
+.fund-tile.fund-owe { border: 1px solid rgb(150 100 12 / 0.25); background: rgb(249 238 214); color: rgb(150 100 12); }
+.fund-tile-l { font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.fund-tile-v { margin-top: 4px; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.fund-tile-n { font-size: 10.5px; }
+.fund-margin {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px;
+  border: 1.5px solid rgb(134 102 76);
+  border-radius: 10px;
+  background: #fff;
+}
+.fund-margin-l { font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: rgb(90 62 43); }
+.fund-margin-v { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: #000; }
+.fund-margin-v.fund-neg { color: rgb(176 40 34); }
+.fund-res-lines { display: grid; gap: 4px; margin-top: 12px; font-size: 11.5px; color: rgb(90 78 68); }
+.fund-res-lines > div { display: flex; justify-content: space-between; gap: 12px; }
+.fund-res-fig { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; white-space: nowrap; }
+.fund-side { display: grid; gap: 14px; min-width: 0; }
+.fund-warn { margin: 0; padding: 8px 12px; border: 1px solid rgb(176 40 34 / 0.4); border-radius: 6px; font-size: 12px; color: rgb(176 40 34); }
+.fund-save-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.fund-btn-save {
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(233 154 83);
+  color: #000;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.fund-btn-save:hover:not(:disabled) { background: rgb(221 139 66); }
+.fund-btn-save:disabled { opacity: 1; background: rgb(246 205 168); cursor: not-allowed; }
+.fund-save-note { flex: 1 1 260px; font-size: 12px; line-height: 1.5; color: rgb(90 78 68); }
+.fund-save-need { margin: 0; font-size: 11px; color: rgb(138 119 101); }
+.fund-error { margin: 0; padding: 10px 12px; border: 1px solid rgb(176 40 34); border-radius: 6px; background: rgb(250 228 224); color: rgb(176 40 34); font-size: 12px; }
+.fund-pv-owe { margin: 0 0 14px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 13px; color: rgb(150 100 12); }
+.fund-pv-owe span { font-size: 11px; color: rgb(138 119 101); }
+
+/* Limits: a card per company — used of limit with its bar, every active BA
+   by maturity, its own Edit limit. */
+.fund-lims { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 12px; }
+.fund-lim {
+  --fund-tone: 117 100 86;
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid rgb(232 225 216);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgb(90 62 43 / 0.055);
+}
+.fund-lim[data-tone='ledger'] { --fund-tone: 21 110 78; }
+.fund-lim[data-tone='alert'] { --fund-tone: 150 100 12; }
+.fund-lim[data-tone='danger'] { --fund-tone: 176 40 34; }
+.fund-lim-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.fund-lim-name { font-size: 14px; font-weight: 600; }
+.fund-lim-kind { margin-left: 6px; font-size: 11px; color: rgb(117 100 86); }
+.fund-lim-pct { flex: none; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; font-weight: 500; color: rgb(var(--fund-tone)); }
+.fund-lim-used { font-size: 24px; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.fund-lim-line { margin: 4px 0 10px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(117 100 86); }
+.fund-lim-over { color: rgb(176 40 34); font-weight: 600; }
+.fund-lim-bar { height: 8px; border-radius: 99px; background: rgb(242 239 234); overflow: hidden; }
+.fund-lim-bar > div { height: 100%; border-radius: 99px; background: rgb(var(--fund-tone)); }
+.fund-lim-bas { display: grid; gap: 4px; margin-top: 10px; }
+.fund-lim-ba {
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgb(246 246 244);
+  color: rgb(90 78 68);
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.fund-lim-ba[data-tone='soon'] { background: rgb(249 238 214); color: rgb(150 100 12); }
+.fund-lim-ba[data-tone='late'] { background: rgb(250 228 224); color: rgb(176 40 34); }
+.fund-lim-none { font-size: 11px; color: rgb(117 100 86); }
+.fund-lim-foot { display: flex; justify-content: flex-end; margin-top: 10px; }
+.fund-lim-edit { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.fund-lim-edit input,
+.fund-lim-add input {
+  width: 150px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+  background: rgb(246 246 244);
+  color: #000;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 12px;
+  text-align: right;
+}
+.fund-lim-edit input:focus,
+.fund-lim-add input:focus { outline: none; border-color: rgb(233 154 83); }
+.fund-lim-msg { margin: 6px 0 0; font-size: 11px; color: rgb(90 78 68); }
+.fund-lim-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed rgb(207 197 183);
+  border-radius: 10px;
+  font-size: 12px;
+}
+.fund-lim-add-l { color: rgb(90 78 68); }
+.fund-lim-add .fund-select { width: auto; min-width: 200px; height: 30px; }
+.fund-lim-add .fund-lim-msg { margin: 0; }
+
+@media (max-width: 767px) {
+  .fund-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .fund-fields > * { grid-column: 1 / -1; }
+  .fund-rec { padding: 16px 14px 18px; }
+  .fund-modal { padding: 18px 16px 20px; }
+  .fund-lim-add .fund-select,
+  .fund-lim-add input { flex: 1 1 100%; width: 100%; }
+}
+
+/* ── schedule (2026-10-10, the Finance revamp handoff, audit list l): the
+   Repayment Schedule, Overdue & Netting, Dept Pool, Venture Pool and General
+   Ledger. Every class here is new (sch-); a rule only reaches an element that
+   carries one, or sits inside one. ── */
+
+/* A row's own action as the handoff draws it: white, an orange edge, filled on
+   hover (Record receipt / Record payment, Escalate, Mark paid, Net off). A link
+   carries `border-0` too, so the sheet's link underline leaves it alone. */
+.sch-row-btn {
+  display: inline-block;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #E99A53;
+  color: #000;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+.sch-row-btn:hover { background: #E99A53; color: #000; }
+.sch-row-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.sch-row-acts { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+
+/* ── Repayment Schedule · the calendar ── */
+/* The legend: the two sides edged in their colour, the four states filled. */
+.sch-swatch { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 3px; border: 1px solid rgb(160 150 138); background: #fff; }
+.sch-swatch.sch-collect { border-color: #156E4E; }
+.sch-swatch.sch-pay { border-color: #E99A53; }
+.sch-swatch.sch-paid { background: #DEF0E8; border-color: #156E4E; }
+.sch-swatch.sch-due { background: #fff; border-color: rgb(160 150 138); }
+.sch-swatch.sch-partial { background: #F9EED6; border-color: #96640C; }
+.sch-swatch.sch-overdue { background: #FAE4E0; border-color: #B02822; }
+
+/* An instalment on two lines: who, then the amount. */
+.repay-cal .sch-cal-item { flex-direction: column; align-items: stretch; gap: 0; padding: 2px 6px; border-radius: 4px; line-height: 1.4; overflow: hidden; }
+.sch-cal-who { display: flex; gap: 4px; min-width: 0; white-space: nowrap; }
+.sch-cal-who .arrow { flex: none; font-weight: 700; }
+.sch-cal-who .who { font-weight: 500; }
+.repay-cal .sch-cal-item .amt { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The hover card: the side and the status on one line, "Due …", what a click does. */
+.sch-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.sch-st { padding: 1px 8px; font-size: 10.5px; line-height: 1.5; white-space: nowrap; }
+.sch-card-date { margin: 2px 0 10px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(117 100 86); }
+.cal-card .sch-card-dl > div { padding: 2px 0; border-bottom: 0; }
+.cal-card .sch-card-dl dd { text-align: right; }
+.sch-card-foot { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgb(236 234 229); font-size: 11px; color: rgb(117 100 86); }
+
+/* The phone's day list (shown only where .cal-agenda is, below 768px): the
+   day and its net, then its instalments in one box. */
+.sch-agenda-day { min-width: 0; }
+.sch-agenda-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 12px; font-weight: 600; }
+.sch-agenda-net { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-weight: 400; white-space: pre; }
+.sch-agenda-net.sch-in { color: #156E4E; }
+.sch-agenda-net.sch-out { color: #96640C; }
+.sch-agenda-box { overflow: hidden; border: 1px solid rgb(229 228 223); border-radius: 10px; background: #fff; }
+.sch-agenda-item { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-bottom: 1px solid rgb(236 234 229); border-left: 3px solid #E99A53; color: #000; text-decoration: none; }
+.sch-agenda-item:last-child { border-bottom: 0; }
+.sch-agenda-item.sch-collect { border-left-color: #156E4E; }
+.sch-agenda-arrow { flex: none; font-weight: 700; color: #E99A53; }
+.sch-agenda-item.sch-collect .sch-agenda-arrow { color: #156E4E; }
+.sch-agenda-main { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.sch-agenda-who { font-size: 13px; font-weight: 500; }
+.sch-agenda-what { font-size: 11px; color: rgb(117 100 86); }
+.sch-agenda-side { display: flex; flex: none; flex-direction: column; align-items: flex-end; gap: 2px; }
+.sch-agenda-amt { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 13px; font-weight: 500; }
+.sch-agenda-side .sch-st { padding: 1px 7px; font-size: 10px; }
+
+/* ── Venture Pool: the two chart panels stand 1 : 1.6, one above the other
+   below 1100px (the prototype's "narrow"; was 1 : 2, stacked below 768px). ── */
+.sch-vp-charts { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); }
+@media (max-width: 1099px) {
+  .sch-vp-charts { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── Reconciliation / Journal / Settings — the audit's fixes (2026-10-10, agent "admin") ──
+   New classes only (adm-*). Values are the prototype's (Finance Revamp.dc.html:
+   the table cell's tag 440, the row button 441, the upload modal 996–1018). */
+
+/* The journal list: AUTO as the amber tag beside the voucher number, and the
+   line count under it (the phone shows the description and the date instead). */
+.adm-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgb(249 238 214);
+  color: rgb(150 100 12);
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.adm-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 400;
+  color: rgb(117 100 86);
+  white-space: normal;
+}
+@media (max-width: 767px) {
+  .adm-sub { display: none; }
+}
+
+/* A row's one button (Continue / Open on the reconciliations): an orange edge
+   at rest, filled on hover. */
+.adm-row-btn {
+  display: inline-block;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #E99A53;
+  color: #000;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+.adm-row-btn:hover { background: #E99A53; color: #000; }
+
+/* The Upload statement modal. */
+.adm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 62;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 12px 24px;
+  overflow-y: auto;
+  background: rgb(90 62 43 / 0.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.adm-modal-panel {
+  width: 100%;
+  max-width: 460px;
+  padding: 22px 24px 24px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 20px 50px rgb(43 31 23 / 0.25);
+  color: #000;
+  text-align: left;
+}
+.adm-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.adm-modal-head h2 {
+  margin: 0;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: #000;
+}
+.adm-modal-x {
+  border: 0;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  color: #000;
+  cursor: pointer;
+}
+.adm-modal-lede {
+  margin: 0 0 18px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: rgb(90 78 68);
+  text-wrap: pretty;
+}
+.adm-form { display: grid; gap: 14px; }
+.adm-field { display: block; min-width: 0; }
+.adm-field > span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgb(90 78 68);
+}
+.adm-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+  background: rgb(246 246 244);
+  color: #000;
+  font-size: 13.5px;
+  outline: none;
+}
+.adm-input:focus { border-color: #E99A53; }
+.adm-input:disabled { opacity: 0.6; }
+.adm-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 96px;
+  padding: 0 12px;
+  border: 1.5px dashed rgb(207 197 183);
+  border-radius: 10px;
+  background: rgb(251 250 248);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.12s, background-color 0.12s;
+}
+.adm-drop:hover,
+.adm-drop.is-over { border-color: #E99A53; background: rgb(255 248 240); }
+.adm-file:focus-visible + .adm-drop { outline: 2px solid #E99A53; outline-offset: 2px; }
+.adm-drop-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: #000;
+}
+.adm-drop-hint { font-size: 11.5px; color: rgb(117 100 86); }
+.adm-modal-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+.adm-btn {
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+  background: #fff;
+  color: #000;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.adm-btn:hover:not(:disabled) { background: rgb(247 247 245); }
+.adm-btn-pri { border: 0; background: #E99A53; font-weight: 600; }
+.adm-btn-pri:hover:not(:disabled) { background: #C9741F; }
+.adm-btn:disabled { opacity: 0.5; cursor: not-allowed; }

@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { seesAllSettings } from '@/lib/surfaces'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/paginate'
@@ -143,51 +144,36 @@ export default async function SettingsPage({ searchParams }: Props) {
           }
         : { eyebrow: 'ADMIN · CONFIGURATION', title: 'Settings', sub: null }
 
+  const headText = (
+    <div className="min-w-0">
+      <div className="page-eyebrow">
+        <em>I.</em> {head.eyebrow}
+      </div>
+      <h1 className="page-title">{head.title}</h1>
+      {head.sub ? <p className="page-sub">{head.sub}</p> : null}
+    </div>
+  )
+  // 2026-10-10 — the handoff has no tab strip: Finance's two tabs are the
+  // sidebar's Settings children (and the phone's More sheet lists them too).
+  // The Principal's strip, which reaches every Settings tab, stays.
+  const strip = isPrincipal ? (
+    <Suspense fallback={null}>
+      <SettingsTabs active={activeTabResolved} allTabs />
+    </Suspense>
+  ) : null
+  // Chart of Accounts and Departments draw the head themselves, so that their
+  // head buttons (Show inactive, + New account, + New department) sit beside
+  // the title, as the handoff has them; the strip and the cards go under it.
+  const sectionDrawsHead = activeTabResolved === 'accounts' || activeTabResolved === 'departments'
+
   return (
     <div>
-      <div className="page-head">
-        <div className="min-w-0">
-          <div className="page-eyebrow">
-            <em>I.</em> {head.eyebrow}
-          </div>
-          <h1 className="page-title">{head.title}</h1>
-          {head.sub ? <p className="page-sub">{head.sub}</p> : null}
-        </div>
-      </div>
-
-      <Suspense fallback={null}>
-        <SettingsTabs active={activeTabResolved} allTabs={isPrincipal} />
-      </Suspense>
-
-      {activeTabResolved === 'accounts' ? (
-        <div className="mt-6">
-          <StatCards label="Chart of accounts">
-            <StatCard
-              label="Active accounts"
-              value={String(activeAccounts.length)}
-              icon="layers"
-              tone="primary"
-              note={`${accountTypes} account ${accountTypes === 1 ? 'type' : 'types'}`}
-            />
-            <StatCard label="Inactive" value={String(accountList.length - activeAccounts.length)} icon="clock" note="Hidden until Show inactive" />
-          </StatCards>
-        </div>
-      ) : null}
-
-      {activeTabResolved === 'departments' ? (
-        <div className="mt-6">
-          <StatCards label="Departments">
-            <StatCard
-              label="Departments"
-              value={String(realDepartments.length)}
-              icon="layers"
-              tone="primary"
-              note={`${costCenters} cost ${costCenters === 1 ? 'center' : 'centers'}`}
-            />
-            <StatCard label="Bill back salary" value={String(billBack)} icon="swap" note="Own-share salary billed back" />
-          </StatCards>
-        </div>
-      ) : null}
+      {sectionDrawsHead ? null : (
+        <>
+          <div className="page-head">{headText}</div>
+          {strip}
+        </>
+      )}
 
       {activeTabResolved === 'treasury' && (
         <TreasuryConfigSection
@@ -250,6 +236,26 @@ export default async function SettingsPage({ searchParams }: Props) {
 
       {activeTabResolved === 'departments' && (
         <DepartmentsSection
+          head={headText}
+          intro={
+            <>
+              {strip}
+              <div className={strip ? 'mt-6' : undefined}>
+                <StatCards label="Departments">
+                  <StatCard
+                    label="Departments"
+                    value={String(realDepartments.length)}
+                    icon="layers"
+                    tone="primary"
+                    note={`${costCenters} cost ${costCenters === 1 ? 'center' : 'centers'}`}
+                  />
+                  <StatCard label="Bill back salary" value={String(billBack)} icon="swap" note="Own-share salary billed back" />
+                </StatCards>
+              </div>
+            </>
+          }
+          // Whoever runs the chart of accounts and the departments (Finance, the Principal).
+          canSetDefault={canDo(user, 'categories', 'manage')}
           departments={(departmentRows ?? []).map((d) => ({
             id: d.id as string,
             name: d.name as string,
@@ -285,6 +291,24 @@ export default async function SettingsPage({ searchParams }: Props) {
 
       {activeTabResolved === 'accounts' && (
         <AccountsSection
+          head={headText}
+          intro={
+            <>
+              {strip}
+              <div className={strip ? 'mt-6' : undefined}>
+                <StatCards label="Chart of accounts">
+                  <StatCard
+                    label="Active accounts"
+                    value={String(activeAccounts.length)}
+                    icon="layers"
+                    tone="primary"
+                    note={`${accountTypes} account ${accountTypes === 1 ? 'type' : 'types'}`}
+                  />
+                  <StatCard label="Inactive" value={String(accountList.length - activeAccounts.length)} icon="clock" note="Hidden until Show inactive" />
+                </StatCards>
+              </div>
+            </>
+          }
           accounts={(accountRows ?? []).map((a) => ({
             code: a.code,
             name: a.name,

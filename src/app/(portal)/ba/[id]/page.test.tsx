@@ -99,31 +99,39 @@ describe('a financing’s own page', () => {
     expect(screen.getByRole('region', { name: 'Documents' })).toHaveTextContent('bank-advice.pdf')
   })
 
-  it('bills the borrower, pays HC through a PV and marks it settled', async () => {
+  // 2026-10-10 — the handoff's Actions: Generate PV (the PV to HC, the primary)
+  // and Bill interest (the invoice to the borrower), Mark settled kept beside them.
+  it('generates the PV to HC, bills the interest and marks it settled', async () => {
     mocks.generateBaInvoice.mockResolvedValue({ invoiceNo: 'HV-INV-202610-0050' })
     mocks.setBaStatus.mockResolvedValue({})
     render(await page())
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Bill borrower' })) })
+    const actions = screen.getByRole('heading', { name: 'Actions' }).closest('section') as HTMLElement
+    expect(within(actions).getAllByRole('button').map((b) => b.textContent)).toEqual(['Generate PV', 'Bill interest', 'Mark settled'])
+    expect(within(actions).getByRole('button', { name: 'Generate PV' })).toHaveClass('btn-pri')
+    expect(within(actions).getByRole('button', { name: 'Bill interest' })).toHaveClass('btn-sec')
+    expect(actions).toHaveTextContent('Generate PV pays HC the interest')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Bill interest' })) })
     expect(mocks.generateBaInvoice).toHaveBeenCalledWith(BA.id)
     expect(await screen.findByText(/HV-INV-202610-0050/)).toBeInTheDocument()
     expect(mocks.refresh).toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Pay HC' }))
-    expect(screen.getByText(/Interest to HOUZS Century: RM 2,250.00/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Generate PV' }))
+    expect(screen.getByRole('dialog', { name: 'Generate PV — BA-2610-02' })).toHaveTextContent('Interest to HOUZS Century: RM 2,250.00')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Mark settled' })) })
     expect(mocks.setBaStatus).toHaveBeenCalledWith(BA.id, 'settled')
   })
 
-  it('says what was billed and paid, and a settled one is only reopened', async () => {
+  it('says what was billed and paid, and a settled one says it is done and is only reopened', async () => {
     database({ ...BA, status: 'settled' }, { invoice_no: 'HV-INV-202610-0050', status: 'issued' }, { voucher_no: 'HV-PV-202610-0090', status: 'paid' })
     render(await page())
     expect(document.querySelector('.page-head .chip')).toHaveClass('ledger')
     expect(card('Interest billing')).toHaveAttribute('data-tone', 'ledger')
     expect(card('Interest billing')).toHaveTextContent('HV-INV-202610-0050')
     const actions = screen.getByRole('heading', { name: 'Actions' }).closest('section') as HTMLElement
+    expect(actions).toHaveTextContent('Repaid on 16 Oct 2026. Nothing left to do on this BA.')
     expect(actions).toHaveTextContent('HV-INV-202610-0050 · issued')
     expect(actions).toHaveTextContent('HV-PV-202610-0090 · paid')
-    expect(within(actions).queryByRole('button', { name: 'Bill borrower' })).toBeNull()
-    expect(within(actions).getByRole('button', { name: 'Reopen' })).toBeInTheDocument()
+    expect(within(actions).queryByRole('button', { name: /Generate PV|Bill interest/ })).toBeNull()
+    expect(within(actions).getAllByRole('button').map((b) => b.textContent)).toEqual(['Reopen'])
   })
 
   it('404s a financing that is not there', async () => {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 
 // 2026-10-09 — the General Ledger per the user's Claude Design handoff
 // (Phase 4 of the Finance revamp): the period in the eyebrow, a line of what
@@ -13,11 +13,18 @@ vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/cfo-reports', () => ({ fetchLedgers: mocks.fetchLedgers }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+// The departments added since the five (2026-08-24): the registry signing in primes.
+const REGISTRY = [
+  { id: 'd-it', name: 'IT', segmentKey: 'it', poolGlCode: '2075', billingModeKey: 'it', isInternal: false },
+  { id: 'd-rev', name: 'Revenue Department', segmentKey: 'revenue_department', poolGlCode: '2076', billingModeKey: 'revenue_department', isInternal: false },
+]
+vi.mock('@/lib/dept-registry', async (orig) => ({ ...(await orig<object>()), primedRegistryRows: () => REGISTRY }))
 
 import LedgerPage from './page'
 
+// A line as fetchLedgers builds it: Acc. Desc. is the account's NAME.
 const line = (entryDate: string, journalType: string, ref: string, segment: string, description: string, debit: number, credit: number, runningBalance: number) => ({
-  entryDate, entryNo: ref, description, accountDesc: '1010 · Cash at Bank — Hong Leong', journalType, ref, segment, debit, credit, runningBalance,
+  entryDate, entryNo: ref, description, accountDesc: 'Cash at Bank — Hong Leong', journalType, ref, segment, debit, credit, runningBalance,
 })
 const LEDGERS = [
   {
@@ -27,6 +34,8 @@ const LEDGERS = [
       { entryDate: '', entryNo: '', description: 'BALANCE B/F', accountDesc: '', journalType: '', ref: '', segment: '', debit: 0, credit: 0, runningBalance: 1240500 },
       line('2026-10-01', 'OR', 'HV-OR-202610-0009', 'hr', 'HR shared service — Q3', 54000, 0, 1294500),
       line('2026-10-03', 'PV', 'HV-PV-202610-0038', 'corporate', 'Office renovation deposit', 0, 15000, 1279500),
+      line('2026-10-04', 'PV', 'HV-PV-202610-0041', 'it', 'Laptops', 0, 0, 1279500),
+      line('2026-10-05', 'OR', 'HV-OR-202610-0012', 'revenue_department', 'Fair takings', 0, 0, 1279500),
     ],
   },
   {
@@ -72,7 +81,7 @@ describe('the General Ledger on the sheet', () => {
     render(await page())
     expect(Array.from(document.querySelectorAll('.sect-head h2')).map((h) => h.textContent)).toEqual(['1010 · Cash at Bank — Hong Leong', '5027 · Interest Income - Loans'])
     const cash = section('1010 · Cash at Bank — Hong Leong')
-    expect(within(cash).getByText('2 LINES')).toBeInTheDocument()
+    expect(within(cash).getByText('4 LINES')).toBeInTheDocument()
     const rows = cash.querySelectorAll('tbody tr:not(.lt-detail)')
     expect(rows[0]).toHaveTextContent('Opening balance')
     expect(rows[0]).toHaveTextContent('1 Oct 2026')
@@ -88,5 +97,38 @@ describe('the General Ledger on the sheet', () => {
     expect(foot).toHaveTextContent('15,000.00')
     expect(foot).toHaveTextContent('1,279,500.00 Dr')
     expect(section('5027 · Interest Income - Loans').querySelector('tfoot')).toHaveTextContent('306,623.33 Cr')
+  })
+})
+
+// 2026-10-10 — the handoff, more closely: Acc. Desc. reads "code · name" on
+// every line; Ref. 1 is set in Inter 500, not the mono; the departments added
+// since the five (IT, Revenue Department) are named, not shown as their keys;
+// the filters' search is in English.
+describe('the General Ledger, per the handoff', () => {
+  it('reads Acc. Desc. as code · name on every line, and Ref. 1 in the body face', async () => {
+    render(await page())
+    const cash = section('1010 · Cash at Bank — Hong Leong')
+    const hr = within(cash).getByText('HR shared service — Q3').closest('tr') as HTMLElement
+    expect(hr.querySelector('td[data-label="Acc. Desc."]')).toHaveTextContent(/^1010 · Cash at Bank — Hong Leong$/)
+    const ref = hr.querySelector('td[data-label="Ref. 1"]') as HTMLElement
+    expect(ref).toHaveTextContent('HV-OR-202610-0009')
+    expect(ref).not.toHaveClass('font-mono')
+    expect(ref).toHaveClass('font-medium')
+  })
+
+  it('names IT and the Revenue Department from the registry', async () => {
+    render(await page())
+    const cash = section('1010 · Cash at Bank — Hong Leong')
+    expect((within(cash).getByText('Laptops').closest('tr') as HTMLElement).querySelector('td[data-label="Dept"]')).toHaveTextContent(/^IT$/)
+    expect((within(cash).getByText('Fair takings').closest('tr') as HTMLElement).querySelector('td[data-label="Dept"]')).toHaveTextContent(/^Revenue Department$/)
+    expect(cash).not.toHaveTextContent('revenue_department')
+  })
+
+  it('searches a filter’s values in English, the departments by name', async () => {
+    render(await page())
+    fireEvent.click(screen.getByRole('button', { name: /Dept/ }))
+    expect(screen.getByPlaceholderText('Search…')).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('搜索值…')).toBeNull()
+    expect(screen.getByRole('checkbox', { name: 'Revenue Department' })).toBeInTheDocument()
   })
 })

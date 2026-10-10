@@ -14,6 +14,14 @@ vi.mock('@/lib/auth', () => ({ requireAuth: mocks.requireAuth }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/approval-amounts', () => ({ resolveLiveApprovalAmounts: async () => new Map() }))
 vi.mock('@/lib/treasury-terms-data', async (orig) => ({ ...(await orig<object>()), fetchTermsHistory: async () => new Map() }))
+// 2026-10-10: the lists are sheet tables now (client components — a row opens
+// through the router; the saved column layout comes from the browser client).
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }))
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }),
+  }),
+}))
 
 import DashboardPage from './page'
 

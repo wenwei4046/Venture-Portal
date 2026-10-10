@@ -36,12 +36,8 @@ export default function DetectOverdueButton() {
           {message.text}
         </span>
       ) : null}
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={isPending}
-        className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
+      {/* The head's primary button, black on orange (2026-10-10, the handoff). */}
+      <button type="button" onClick={handleClick} disabled={isPending} className="btn-pri-sheet">
         {isPending ? 'Scanning…' : 'Detect overdue'}
       </button>
     </div>

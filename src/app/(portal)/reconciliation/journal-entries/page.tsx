@@ -109,7 +109,8 @@ export default async function JournalEntriesPage() {
           </p>
         </div>
       ) : (
-        <JvList rows={rows} canCreate={canCreate} canEdit={canEdit} />
+        // Whoever raises vouchers here may also set the list's default arrangement.
+        <JvList rows={rows} canCreate={canCreate} canEdit={canEdit} canSetDefault={canCreate} />
       )}
     </div>
   )

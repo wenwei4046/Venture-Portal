@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useFinView } from '@/components/layout/fin-view'
 
 interface Props {
   voucherId: string
@@ -36,6 +37,28 @@ const SECOND =
   'deal-side-btn2 block w-full rounded-md px-3 py-2 text-center font-sans text-[13.5px] transition-colors disabled:opacity-50'
 const QUIET = 'deal-side-link font-sans text-[12.5px] transition-colors disabled:opacity-50'
 
+// 2026-10-10 — the handoff (pagePaymentDetail / pageReceiptDetail): on the
+// Finance view the panel speaks its English, and the status note is one navy
+// box with a dot in the status's colour (`pay-note`).
+const EN = {
+  draft: 'Still a draft — not submitted yet.',
+  pending: 'Waiting for Principal approval. You can still edit or void it until then.',
+  pendingOnly: 'Waiting for Principal approval.',
+  approved: 'Approved — ready to pay.',
+  paid: 'Paid.',
+  received: 'Received — bank, pool and GL are updated.',
+  voided: 'Voided.',
+}
+
+function StatusNote({ tone, children }: { tone: string; children: string }) {
+  return (
+    <p className="pay-note">
+      <span className="pay-note-dot" data-tone={tone} aria-hidden />
+      <span>{children}</span>
+    </p>
+  )
+}
+
 export default function VoucherActions({
   voucherId,
   status,
@@ -56,6 +79,7 @@ export default function VoucherActions({
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [confirmAction, setConfirmAction] = useState<'approve' | null>(null)
   const [notes, setNotes] = useState('')
+  const fin = useFinView()
 
   // A payroll funding PV is a no-cash accrual (Dr 9030 / Cr 4020): it draws the
   // dept pools and books the salary expense but does NOT charge the source bank,
@@ -88,6 +112,10 @@ export default function VoucherActions({
       {message.text}
     </p>
   ) : null
+  // Back to draft — the button and why it is there.
+  const backToDraft = fin
+    ? { label: 'Return to draft', title: 'Back to draft: the approval card closes and it can be submitted again (when the wrong account went in)' }
+    : null
 
   // Status-driven rendering
   if (status === 'paid' || status === 'voided') {
@@ -102,18 +130,26 @@ export default function VoucherActions({
             : undefined
         : undefined
     const canReverse = !!reverseFn && can.void
-    const confirmText = isReceipt
-      ? '确认作废这张已付收据?会反冲银行、池、总账,并把发票退回未收。'
-      : '确认反转这张已付付款?会退回银行、反冲总账与池子,凭证转为作废。之后可重开一张正确的。'
-    const buttonLabel = isReceipt ? '作废收据 · Void receipt' : '反转付款 · Reverse payment'
-    const pendingLabel = isReceipt ? '作废中…' : '反转中…'
+    const confirmText = fin
+      ? isReceipt
+        ? 'Void this paid receipt? The bank, pool and GL entries are reversed, and its invoices go back to unpaid.'
+        : 'Reverse this paid payment? The money goes back to the bank, the GL and pool entries are reversed, and the voucher becomes void. A correct one can then be raised.'
+      : isReceipt
+        ? '确认作废这张已付收据?会反冲银行、池、总账,并把发票退回未收。'
+        : '确认反转这张已付付款?会退回银行、反冲总账与池子,凭证转为作废。之后可重开一张正确的。'
+    const buttonLabel = fin ? (isReceipt ? 'Void receipt' : 'Reverse payment') : isReceipt ? '作废收据 · Void receipt' : '反转付款 · Reverse payment'
+    const pendingLabel = fin ? (isReceipt ? 'Voiding…' : 'Reversing…') : isReceipt ? '作废中…' : '反转中…'
     return (
       <div className="mt-4 grid gap-2.5">
-        <p className={`${NOTE} ${status === 'paid' ? 'ok' : 'bad'}`}>
-          {status === 'paid'
-            ? `${isReceipt ? '已入账' : '已付款'}。银行、池、总账都已经记了。`
-            : '已作废。不再算进银行、池和总账。'}
-        </p>
+        {fin ? (
+          <StatusNote tone={status}>{status === 'paid' ? (isReceipt ? EN.received : EN.paid) : EN.voided}</StatusNote>
+        ) : (
+          <p className={`${NOTE} ${status === 'paid' ? 'ok' : 'bad'}`}>
+            {status === 'paid'
+              ? `${isReceipt ? '已入账' : '已付款'}。银行、池、总账都已经记了。`
+              : '已作废。不再算进银行、池和总账。'}
+          </p>
+        )}
         {result}
         {canReverse ? (
           confirmAction === 'approve' ? (
@@ -126,10 +162,10 @@ export default function VoucherActions({
                   onClick={() => handleAction(reverseFn!)}
                   className="deal-side-danger-solid rounded-md px-3.5 py-1.5 font-sans text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
-                  {isPending ? pendingLabel : '确认'}
+                  {isPending ? pendingLabel : fin ? 'Confirm' : '确认'}
                 </button>
                 <button type="button" onClick={() => setConfirmAction(null)} className={QUIET}>
-                  取消
+                  {fin ? 'Cancel' : '取消'}
                 </button>
               </div>
             </div>
@@ -140,7 +176,8 @@ export default function VoucherActions({
                 setMessage(null)
                 setConfirmAction('approve')
               }}
-              className="deal-side-danger w-full rounded-md px-3 py-2 font-sans text-[13.5px] transition-colors"
+              // The handoff draws both as the panel's secondary button (2026-10-10).
+              className={fin ? SECOND : 'deal-side-danger w-full rounded-md px-3 py-2 font-sans text-[13.5px] transition-colors'}
             >
               {buttonLabel}
             </button>
@@ -157,7 +194,7 @@ export default function VoucherActions({
           to be blocked from Submit because no_self_approval left the card
           unapprovable (PV-0111, 2026-07-24) — mig 20260806000000 lifted that,
           so Principal may now submit and approve their own voucher. */}
-      {status === 'draft' ? <p className={`${NOTE} plain`}>还是草稿，还没送批。</p> : null}
+      {status === 'draft' ? fin ? <StatusNote tone="draft">{EN.draft}</StatusNote> : <p className={`${NOTE} plain`}>还是草稿，还没送批。</p> : null}
       {status === 'draft' ? (
         <>
           {can.create ? (
@@ -188,7 +225,7 @@ export default function VoucherActions({
                 <p className={`${NOTE} plain`}>
                   Payroll funding — books the salary expense and draws the department pools; the bank is{' '}
                   <strong>not</strong> charged now (cash leaves when staff are paid). Short pools go negative
-                  (预支) — that&apos;s allowed.
+                  ({fin ? 'an advance' : '预支'}) — that&apos;s allowed.
                 </p>
               ) : bankBalance !== null && bankName ? (
                 <p className={`${NOTE} ${bankBalance < amount ? 'bad' : 'plain'}`}>
@@ -251,9 +288,10 @@ export default function VoucherActions({
 
           {!can.approve && (can.edit || can.void) ? (
             <>
-              <p className={NOTE}>等 Principal 批准。批准之前还可以改，或者作废。</p>
+              {fin ? <StatusNote tone="pending_approval">{EN.pending}</StatusNote> : <p className={NOTE}>等 Principal 批准。批准之前还可以改，或者作废。</p>}
               {can.edit ? (
-                <div className={`grid gap-2 ${returnToDraft ? 'grid-cols-2' : ''}`}>
+                // One under another on the Finance view, as the handoff stacks them.
+                <div className={`grid gap-2 ${returnToDraft && !fin ? 'grid-cols-2' : ''}`}>
                   <Link href={`/payments/${voucherId}/edit`} className={SECOND}>
                     Edit
                   </Link>
@@ -263,9 +301,9 @@ export default function VoucherActions({
                       disabled={isPending}
                       onClick={() => handleAction(returnToDraft)}
                       className={SECOND}
-                      title="单退回草稿、审批卡关掉,可重新 submit(交错账号时用)"
+                      title={backToDraft ? backToDraft.title : '单退回草稿、审批卡关掉,可重新 submit(交错账号时用)'}
                     >
-                      退回 Draft
+                      {backToDraft ? backToDraft.label : '退回 Draft'}
                     </button>
                   ) : null}
                 </div>
@@ -280,7 +318,7 @@ export default function VoucherActions({
 
           {/* An approver who also edits sees Edit alongside Approve, before they confirm */}
           {can.approve && can.edit && !confirmAction ? (
-            <div className={`grid gap-2 ${returnToDraft ? 'grid-cols-2' : ''}`}>
+            <div className={`grid gap-2 ${returnToDraft && !fin ? 'grid-cols-2' : ''}`}>
               <Link href={`/payments/${voucherId}/edit`} className={SECOND}>
                 Edit
               </Link>
@@ -290,19 +328,21 @@ export default function VoucherActions({
                   disabled={isPending}
                   onClick={() => handleAction(returnToDraft)}
                   className={SECOND}
-                  title="交错账号时用:单退回草稿,审批卡关掉,再用对的账号重新 submit"
+                  title={backToDraft ? backToDraft.title : '交错账号时用:单退回草稿,审批卡关掉,再用对的账号重新 submit'}
                 >
-                  退回 Draft
+                  {backToDraft ? backToDraft.label : '退回 Draft'}
                 </button>
               ) : null}
             </div>
           ) : null}
 
-          {!can.approve && !can.edit && !can.void ? <p className={NOTE}>等 Principal 批准。</p> : null}
+          {!can.approve && !can.edit && !can.void ? (
+            fin ? <StatusNote tone="pending_approval">{EN.pendingOnly}</StatusNote> : <p className={NOTE}>等 Principal 批准。</p>
+          ) : null}
         </>
       ) : null}
 
-      {status === 'approved' ? <p className={`${NOTE} plain`}>已批准。</p> : null}
+      {status === 'approved' ? fin ? <StatusNote tone="approved">{EN.approved}</StatusNote> : <p className={`${NOTE} plain`}>已批准。</p> : null}
 
       {result}
     </div>

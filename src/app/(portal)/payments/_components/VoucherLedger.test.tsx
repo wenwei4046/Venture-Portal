@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, screen, within } from '@testing-library/react'
+import { withActions } from '@/test/with-actions'
 
 const mocks = vi.hoisted(() => ({
   requirePermission: vi.fn(),
@@ -131,6 +132,19 @@ describe('Payments, for a treasury account without Payroll payouts', () => {
     }
   })
 
+  // 2026-10-10: the count and the status, apart, so the Finance view can say
+  // them in English ("26 vouchers · 26 paid · total only").
+  it('sends each batch’s count and status alongside, and nothing more', async () => {
+    database()
+    render(await VoucherLedger({ direction: 'debit', params: {} }))
+    const rows = sent() as Array<{ locked?: boolean; payee_name: string; lockedNote?: { count: number; statusText: string } }>
+    expect(rows.filter((r) => r.locked).map((r) => [r.payee_name, r.lockedNote])).toEqual([
+      ['KWSP Sep 2026', { count: 1, statusText: '1 paid' }],
+      ['Payroll bank transfer Sep 2026', { count: 1, statusText: '1 pending approval' }],
+      ['Payroll disbursement Sep 2026', { count: 2, statusText: '2 paid' }],
+    ])
+  })
+
   it('still totals every voucher in the summary, and counts the folded ones', async () => {
     database()
     render(await VoucherLedger({ direction: 'debit', params: {} }))
@@ -219,18 +233,22 @@ describe('the ledger on the sheet', () => {
   })
 
   // 2026-10-09 (the Finance revamp): payroll batches have a tab of their own.
-  it('the Payroll batches tab lists the batches’ vouchers only', async () => {
+  // 2026-10-10 — the handoff heads it "Payroll batches · N BATCHES · M VOUCHERS".
+  it('the Payroll batches tab lists the batches’ vouchers only, under a head that counts both', async () => {
     database()
     render(await VoucherLedger({ direction: 'debit', params: { status: 'payroll' } }))
     expect(sent().map((r) => r.id)).toEqual(['v-aina', 'v-bala'])
-    expect(document.querySelector('.sect-head')).toHaveTextContent('2 of 5 vouchers')
+    const head = document.querySelector('.sect-head') as HTMLElement
+    expect(head.querySelector('h2')).toHaveTextContent('Payroll batches')
+    expect(head.querySelector('.count')).toHaveTextContent('1 batch · 2 vouchers')
   })
 
+  // 2026-10-10 — the handoff: money in is the green (ledger) card.
   it('says Total received and Approved · to receive on the receipt side', async () => {
     database()
     mocks.fetchAllRows.mockResolvedValue(VOUCHERS.map((v) => ({ ...v, direction: 'credit' })))
     render(await VoucherLedger({ direction: 'credit', params: {} }))
-    expect(card('Total received')).toHaveAttribute('data-tone', 'primary')
+    expect(card('Total received')).toHaveAttribute('data-tone', 'ledger')
     expect(card('Approved · to receive')).toBeInTheDocument()
     expect(document.querySelector('.sect-head')).toHaveTextContent('Official receipts')
     // No payroll on the receipt side, so no tab for it.
@@ -244,6 +262,86 @@ describe('the ledger on the sheet', () => {
     const rows = sent() as Array<{ id: string; bankLabel?: string }>
     expect(rows.find((r) => r.id === 'v-tnb')?.bankLabel).toBe('Hong Leong')
     expect(rows.find((r) => r.id === 'v-kwsp')?.bankLabel).toBeUndefined()
+  })
+})
+
+// 2026-10-10 — the handoff (audit 2026-10-09 l): the head is Dept Requests ·
+// Payroll Requests · Create payment, the eyebrow names the month, the cards
+// speak English, and Receipts is "Receipt" with its green Total received.
+describe('the handoff’s head and cards', () => {
+  const head = () => document.querySelector('.page-head') as HTMLElement
+  const actions = () => within(head()).getAllByRole('link')
+  const card = (name: string) => screen.getByRole('group', { name })
+
+  beforeEach(() => {
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] }))
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('offers Dept Requests, then Payroll Requests with its count, then Create payment — and keeps the extras', async () => {
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] }))
+    database()
+    render(await VoucherLedger({ direction: 'debit', params: {} }))
+    expect(actions().map((a) => a.textContent)).toEqual([
+      'Export Excel', 'Export PDF', 'Dept Requests', 'Payroll Requests · 2', 'Claim Requests', 'Create payment',
+    ])
+    expect(within(head()).getByRole('link', { name: 'Dept Requests' })).toHaveAttribute('href', '/payments/dept-requests')
+  })
+
+  it('Dept Requests asks only for Treasury — its page’s own gate — so an account without Payroll payouts has it too', async () => {
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
+    database()
+    render(await VoucherLedger({ direction: 'debit', params: {} }))
+    expect(within(head()).getByRole('link', { name: 'Dept Requests' })).toBeInTheDocument()
+    expect(within(head()).queryByRole('link', { name: /Payroll Requests/ })).toBeNull()
+  })
+
+  it('on a phone only Create payment stays in the head', async () => {
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] }))
+    database()
+    render(await VoucherLedger({ direction: 'debit', params: {} }))
+    // .pay-act hides below 768px on the Finance view; .pay-act-pri is the one that stays.
+    expect(actions().filter((a) => a.classList.contains('pay-act') && !a.classList.contains('pay-act-pri')).map((a) => a.textContent)).toEqual([
+      'Export Excel', 'Export PDF', 'Dept Requests', 'Payroll Requests · 2', 'Claim Requests',
+    ])
+    expect(within(head()).getByRole('link', { name: 'Create payment' })).toHaveClass('pay-act', 'pay-act-pri')
+  })
+
+  it('names the month in the eyebrow — the office’s month', async () => {
+    // 01:00 on 1 Oct in the office is still 30 Sep on the server's clock.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-30T17:00:00Z'))
+    database()
+    render(await VoucherLedger({ direction: 'debit', params: {} }))
+    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('DAILY OPERATIONS · PAYMENT VOUCHERS · OCTOBER 2026')
+  })
+
+  it('counts the repayments and the loans out in English on the Total paid card', async () => {
+    database()
+    const extra = { voucher_no: null, direction: 'debit' as const, status: 'paid', poolLabel: '—', description: null, paymentOrCreatedDate: '2026-10-02' }
+    vi.mocked(fetchPaymentExtras).mockResolvedValueOnce([
+      { ...extra, id: 'fsr-1', amount: 500, payee_name: 'HOUZS Century (HC)', catLabel: '还款 · principal' },
+      { ...extra, id: 'fsr-2', amount: 80, payee_name: 'HOUZS Century (HC)', catLabel: '还款 · interest' },
+      { ...extra, id: 'lout-1', amount: 9000, payee_name: 'HOUZS Bedding (HB)', catLabel: 'Loan OUT · 借出' },
+    ])
+    render(await VoucherLedger({ direction: 'debit', params: {} }))
+    expect(card('Total paid')).toHaveTextContent('4 PVs · 2 repayments · 1 loan out')
+    expect(card('Total paid')).not.toHaveTextContent('还款')
+  })
+
+  it('the receipt side: titled Receipt, the month in its eyebrow, Loan repayment received beside Create receipt', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-10T03:00:00Z'))
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
+    database()
+    mocks.fetchAllRows.mockResolvedValue(VOUCHERS.map((v) => ({ ...v, direction: 'credit' })))
+    render(await VoucherLedger({ direction: 'credit', params: {} }))
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Receipt$/)
+    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('DAILY OPERATIONS · OFFICIAL RECEIPTS · OCTOBER 2026')
+    expect(actions().map((a) => a.textContent)).toEqual(['Export Excel', 'Export PDF', 'Loan repayment received', 'Create receipt'])
+    expect(within(head()).getByRole('link', { name: 'Loan repayment received' })).toHaveAttribute('href', '/payments/new?mode=loan_repayment')
+    expect(within(head()).queryByRole('link', { name: 'Dept Requests' })).toBeNull()
+    expect(head()).not.toHaveTextContent('收到')
   })
 })
 

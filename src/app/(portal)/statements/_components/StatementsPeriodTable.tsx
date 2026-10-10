@@ -1,9 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import SortableTable from '@/components/SortableTable'
 import { useRowLinks } from '@/components/row-links'
+import { useFinView } from '@/components/layout/fin-view'
+import ColumnFoot from '../../billing/_components/ColumnFoot'
 
 export interface StatementRow {
   id: string
@@ -27,7 +29,10 @@ function StatementStatus({ status }: { status: string }) {
   )
 }
 
+const companyLabel = (s: StatementRow) => (s.companyCode ? `${s.companyName} (${s.companyCode})` : s.companyName)
+
 export default function StatementsPeriodTable({ rows, canSetDefault = false }: { rows: StatementRow[]; canSetDefault?: boolean }) {
+  const fin = useFinView()
   // 2026-10-02: no View column. A double-click opens the statement; a
   // right-click offers the same, and a new tab. The sheet (2026-10-07) adds
   // an Open → at the end of the row for the mouse, and the phone's panel.
@@ -35,6 +40,118 @@ export default function StatementsPeriodTable({ rows, canSetDefault = false }: {
     href: (s) => `/statements/${s.id}`,
     title: (s) => `${s.companyName} · ${s.status}`,
   })
+
+  // 2026-10-10 — the handoff's month table, on the Finance view only (a
+  // Director reading treasury keeps the one below): Company / Total invoice /
+  // Total contra / Net / Status, no Open column (a double-click opens), ▽ on
+  // every column with a Range on the figures, a scroll box, neighbour resize,
+  // an "All companies" row summing each column, negatives red, and on a phone
+  // "Invoice x − contra y" under the company.
+  if (fin) {
+    return (
+      <div className="fin-queue">
+        <SortableTable<StatementRow>
+          layoutId="statements.period"
+          layoutTitle="Statements"
+          canSetDefault={canSetDefault}
+          scrollBox
+          resizeMode="neighbour"
+          onRowOpen={links.onRowOpen}
+          onRowContextMenu={links.onRowContextMenu}
+          openLabel="Open the statement →"
+          rows={rows}
+          getRowKey={(s) => s.id}
+          defaultSort={{ key: 'netAmount', dir: 'desc' }}
+          columns={[
+            {
+              key: 'companyName',
+              label: 'Company',
+              mobile: 'keep',
+              filterable: true,
+              render: (s) => (
+                <>
+                  <span className="text-ink">{companyLabel(s)}</span>
+                  <span className="q-sub md:hidden">
+                    <span className="q-sub-no">
+                      Invoice {formatMoneyBare(s.totalInvoice)}
+                      {s.totalContra > 0 ? ` − contra ${formatMoneyBare(s.totalContra)}` : ''}
+                    </span>
+                    <span className="q-sub-by">
+                      <span className="by">
+                        <StatementStatus status={s.status} />
+                      </span>
+                    </span>
+                  </span>
+                </>
+              ),
+              sortValue: (s) => companyLabel(s),
+              filterValue: (s) => companyLabel(s),
+            },
+            {
+              key: 'totalInvoice',
+              label: 'Total invoice',
+              align: 'right',
+              mobile: 'detail',
+              filterable: true,
+              range: 'number',
+              render: (s) => (s.totalInvoice !== 0 ? formatMoney(s.totalInvoice) : <span className="text-muted">—</span>),
+              sortValue: (s) => s.totalInvoice,
+              cellClassName: 'whitespace-nowrap',
+            },
+            {
+              key: 'totalContra',
+              label: 'Total contra',
+              align: 'right',
+              mobile: 'detail',
+              filterable: true,
+              range: 'number',
+              render: (s) =>
+                s.totalContra > 0 ? <span className="text-danger">{formatMoney(-s.totalContra)}</span> : <span className="text-muted">—</span>,
+              // Shown as a deduction, so it sorts and ranges as one.
+              sortValue: (s) => -s.totalContra,
+              cellClassName: 'whitespace-nowrap',
+            },
+            {
+              key: 'netAmount',
+              label: 'Net',
+              align: 'right',
+              mobile: 'keep',
+              filterable: true,
+              range: 'number',
+              render: (s) => <span className={s.netAmount < 0 ? 'text-danger' : undefined}>{formatMoney(s.netAmount)}</span>,
+              sortValue: (s) => s.netAmount,
+              cellClassName: 'whitespace-nowrap',
+            },
+            {
+              key: 'status',
+              label: 'Status',
+              mobile: 'drop',
+              filterable: true,
+              render: (s) => <StatementStatus status={s.status} />,
+              sortValue: (s) => s.status,
+            },
+          ]}
+          footer={(visible) => {
+            const invoice = visible.reduce((t, s) => t + s.totalInvoice, 0)
+            const contra = visible.reduce((t, s) => t + s.totalContra, 0)
+            const net = visible.reduce((t, s) => t + s.netAmount, 0)
+            return (
+              <ColumnFoot
+                label="All companies"
+                cells={{
+                  totalInvoice: formatMoney(invoice),
+                  totalContra: contra > 0 ? <span className="text-danger">{formatMoney(-contra)}</span> : '—',
+                  netAmount: <span className={net < 0 ? 'text-danger' : undefined}>{formatMoney(net)}</span>,
+                }}
+              />
+            )
+          }}
+        />
+        {links.menu}
+      </div>
+    )
+  }
+
   return (
     <div className="fin-queue">
       <SortableTable<StatementRow>

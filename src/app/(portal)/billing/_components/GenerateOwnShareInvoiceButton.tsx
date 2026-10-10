@@ -35,6 +35,11 @@ interface Category {
 interface Props {
   currentPeriod: string
   categories?: Category[]
+  /** Arrive open, from a page-head menu (2026-10-10, the handoff's
+   *  "From payroll ▾" / "+ Create Invoice ▾"). */
+  autoOpen?: boolean
+  /** No trigger button of its own — the menu item is the trigger. */
+  hideTrigger?: boolean
 }
 
 type Components = OwnShareInvoicePreview['groups'][number]['components']
@@ -60,9 +65,9 @@ export default function GenerateOwnShareInvoiceButton(props: Props) {
   return <GenerateOwnShareInvoiceButtonBody key={props.currentPeriod} {...props} />
 }
 
-function GenerateOwnShareInvoiceButtonBody({ currentPeriod, categories = [] }: Props) {
+function GenerateOwnShareInvoiceButtonBody({ currentPeriod, categories = [], autoOpen = false, hideTrigger = false }: Props) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(autoOpen)
   const [period, setPeriod] = useState(dayjs(currentPeriod).format('YYYY-MM'))
   const [preview, setPreview] = useState<OwnShareInvoicePreview | null>(null)
   const [loading, setLoading] = useState(false)
@@ -142,6 +147,7 @@ function GenerateOwnShareInvoiceButtonBody({ currentPeriod, categories = [] }: P
 
   return (
     <>
+      {hideTrigger ? null : (
       <button
         onClick={() => setOpen(true)}
         className="bg-surface hover:bg-surface-2 border border-hairline text-graphite hover:text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
@@ -149,6 +155,7 @@ function GenerateOwnShareInvoiceButtonBody({ currentPeriod, categories = [] }: P
       >
         Own-share → Venture (Office)
       </button>
+      )}
 
       {open && (
         <div

@@ -1,11 +1,14 @@
 'use client'
 
+import { useMemo, useState } from 'react'
 import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import SortableTable from '@/components/SortableTable'
 import { useRowLinks } from '@/components/row-links'
 import type { RowMenuItem } from '@/components/RowMenu'
+import AlignedFoot from '@/components/treasury/AlignedFoot'
+import PhoneCards from '@/components/treasury/PhoneCards'
 
 export interface LoanRow {
   id: string
@@ -47,6 +50,30 @@ export function LoanStatusChip({ status, overdue = false }: { status: LoanRow['s
   )
 }
 
+const day = (d: string) => dayjs(d).format('D MMM YYYY')
+const rateText = (l: LoanRow) => `${(l.effectiveRate * 100).toFixed(3)}%`
+/** What is still out — only an active loan has an outstanding. */
+const outstandingOf = (l: LoanRow) => (l.status === 'active' ? l.outstanding : null)
+
+/** The line under the company (2026-10-10, the handoff): its code, the day the
+ *  money went out — the day it was recorded until then — and the funding
+ *  source the loan was lent from (SC). */
+export function companyLine(l: LoanRow): string {
+  const when = l.disbursedAt ? day(l.disbursedAt) : officeTime(l.createdAt).format('D MMM YYYY')
+  return [l.companyCode, when, l.fundingSource ? `SC ${l.fundingSource}` : null].filter(Boolean).join(' · ')
+}
+
+// The columns in the order the code declares them — what the Total row lays
+// out before it has read the header as arranged.
+const FOOT_COLUMNS = [
+  { key: 'companyName' },
+  { key: 'principal', right: true },
+  { key: 'outstanding', right: true },
+  { key: 'rate', right: true },
+  { key: 'status' },
+  { key: 'disbursedAt' },
+]
+
 export default function LoansTable({
   rows,
   canSetDefault = false,
@@ -75,128 +102,162 @@ export default function LoansTable({
       return items
     },
   })
+
+  // The phone's cards (2026-10-10, the handoff's phone list): latest
+  // disbursement first, like the table, narrowed by their own search box.
+  const [q, setQ] = useState('')
+  const phoneRows = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    const when = (l: LoanRow) => l.disbursedAt ?? l.createdAt
+    return [...rows]
+      .filter((l) => !needle || [l.companyName, l.companyCode].some((t) => t.toLowerCase().includes(needle)))
+      .sort((a, b) => when(b).localeCompare(when(a)))
+  }, [rows, q])
+  const total = (list: LoanRow[]) => ({
+    principal: list.reduce((t, l) => t + l.principal, 0),
+    outstanding: list.reduce((t, l) => t + (outstandingOf(l) ?? 0), 0),
+  })
+  const phoneTotal = total(phoneRows)
+
   return (
     <>
-      <SortableTable<LoanRow>
-        layoutId="fund-out.loans"
-        layoutTitle="Fund out"
-        canSetDefault={canSetDefault}
-        scrollBox
-        resizeMode="neighbour"
-        onRowOpen={links.onRowOpen}
-        onRowContextMenu={links.onRowContextMenu}
-        rows={rows}
-        getRowKey={(l) => l.id}
-        defaultSort={{ key: 'disbursedAt', dir: 'desc' }}
-        searchKeys={['companyName', 'companyCode']}
-        searchPlaceholder="Search company name / code…"
-        footer={(visible) => {
-          const principal = visible.reduce((t, l) => t + l.principal, 0)
-          const outstanding = visible.filter((l) => l.status === 'active').reduce((t, l) => t + l.outstanding, 0)
-          return (
-            <tr>
-              <td colSpan={1000} className="q-foot">
-                <span>
-                  {visible.length} {visible.length === 1 ? 'loan' : 'loans'} · principal {formatMoney(principal)}
-                </span>
-                <span className="num">Outstanding {formatMoney(outstanding)}</span>
-              </td>
-            </tr>
-          )
-        }}
-        columns={[
-          {
-            key: 'companyName',
-            mobile: 'keep',
-            group: '基本',
-            label: 'Company',
-            render: (l) => (
-              <>
-                <div className="text-ink">
-                  {l.companyName}
-                  {l.fundingSource ? (
-                    <span
-                      className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
-                      title={`资金来源: ${l.fundingSource}`}
-                    >
-                      SC {l.fundingSource}
-                    </span>
-                  ) : null}
+      <div className="md:hidden">
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search company name / code…"
+          aria-label="Search loans"
+          className="fund-psearch"
+        />
+        <PhoneCards
+          label="Loans"
+          empty={`Nothing matches “${q}”.`}
+          cards={phoneRows.map((l) => {
+            const out = outstandingOf(l)
+            return {
+              key: l.id,
+              href: `/fund-out/${l.id}`,
+              title: l.companyName,
+              figure: formatMoneyBare(l.principal),
+              figureLabel: 'Principal',
+              sub: companyLine(l),
+              chips: <LoanStatusChip status={l.status} overdue={l.overdue} />,
+              details: [
+                { label: 'Outstanding', value: out != null ? formatMoneyBare(out) : null },
+                { label: 'Rate', value: rateText(l) },
+                { label: 'Disbursed', value: l.disbursedAt ? day(l.disbursedAt) : null },
+              ],
+            }
+          })}
+          foot={{ label: 'Total', value: formatMoneyBare(phoneTotal.principal), note: `Outstanding ${formatMoneyBare(phoneTotal.outstanding)}` }}
+        />
+      </div>
+      <div className="hidden md:block">
+        <SortableTable<LoanRow>
+          layoutId="fund-out.loans"
+          layoutTitle="Fund out"
+          canSetDefault={canSetDefault}
+          scrollBox
+          resizeMode="neighbour"
+          onRowOpen={links.onRowOpen}
+          onRowContextMenu={links.onRowContextMenu}
+          rows={rows}
+          getRowKey={(l) => l.id}
+          defaultSort={{ key: 'disbursedAt', dir: 'desc' }}
+          searchKeys={['companyName', 'companyCode']}
+          searchPlaceholder="Search company name / code…"
+          // The handoff's peach Total row: the sums under Principal and Outstanding (2026-10-10).
+          footer={(visible) => {
+            const t = total(visible)
+            return <AlignedFoot columns={FOOT_COLUMNS} values={{ principal: formatMoney(t.principal), outstanding: formatMoney(t.outstanding) }} />
+          }}
+          // ▽ on every column; the amounts and the date by Range too (2026-10-10, the handoff).
+          columns={[
+            {
+              key: 'companyName',
+              mobile: 'keep',
+              group: '基本',
+              label: 'Company',
+              render: (l) => (
+                <div>
+                  <div className="text-ink">{l.companyName}</div>
+                  <div className="text-[11px] text-graphite mt-0.5">{companyLine(l)}</div>
                 </div>
-                <div className="text-[11px] text-graphite mt-0.5">
-                  {l.companyCode} · {officeTime(l.createdAt).format('D MMM YYYY')}
-                </div>
-                {/* The phone's small print: the status and the disbursement. */}
-                <span className="q-sub md:hidden">
-                  <span className="q-sub-by">
-                    <span className="by">
-                      <LoanStatusChip status={l.status} overdue={l.overdue} />
-                    </span>
-                    <span className="on">{l.disbursedAt ? dayjs(l.disbursedAt).format('D MMM YYYY') : ''}</span>
-                  </span>
-                </span>
-              </>
-            ),
-            sortValue: (l) => l.companyName,
-          },
-          {
-            key: 'principal',
-            mobile: 'detail',
-            group: '金额',
-            label: 'Principal',
-            align: 'right',
-            render: (l) => formatMoney(l.principal),
-            sortValue: (l) => l.principal,
-            filterable: true,
-            range: 'number',
-            cellClassName: 'whitespace-nowrap',
-          },
-          {
-            key: 'outstanding',
-            mobile: 'keep',
-            group: '金额',
-            label: 'Outstanding',
-            align: 'right',
-            render: (l) =>
-              l.status === 'active' ? <span className="font-semibold">{formatMoney(l.outstanding)}</span> : <span className="text-muted">—</span>,
-            sortValue: (l) => (l.status === 'active' ? l.outstanding : -1),
-            cellClassName: 'whitespace-nowrap',
-          },
-          {
-            key: 'rate',
-            mobile: 'detail',
-            group: '金额',
-            label: 'Rate',
-            align: 'right',
-            render: (l) => `${(l.effectiveRate * 100).toFixed(3)}%`,
-            sortValue: (l) => l.effectiveRate,
-          },
-          {
-            key: 'status',
-            mobile: 'detail',
-            group: '基本',
-            label: 'Status',
-            render: (l) => <LoanStatusChip status={l.status} overdue={l.overdue} />,
-            sortValue: (l) => (l.overdue ? 'overdue' : l.status),
-            filterable: true,
-            filterValue: (l) => (l.status === 'active' && l.overdue ? 'overdue' : l.status.replace('_', ' ')),
-            cellClassName: 'whitespace-nowrap',
-          },
-          {
-            // 放款日 (business date), not record-creation date — created_at still
-            // shows in the small line under the company name.
-            key: 'disbursedAt',
-            mobile: 'detail',
-            group: '日期',
-            label: 'Disbursed',
-            render: (l) => (l.disbursedAt ? dayjs(l.disbursedAt).format('D MMM YYYY') : <span className="text-muted">—</span>),
-            sortValue: (l) => new Date(l.disbursedAt ?? l.createdAt),
-            filterable: true,
-            range: 'date',
-            cellClassName: 'text-graphite whitespace-nowrap',
-          },
-        ]}
-      />
+              ),
+              sortValue: (l) => l.companyName,
+              filterable: true,
+            },
+            {
+              key: 'principal',
+              mobile: 'detail',
+              group: '金额',
+              label: 'Principal',
+              align: 'right',
+              render: (l) => formatMoney(l.principal),
+              sortValue: (l) => l.principal,
+              filterable: true,
+              filterValue: (l) => formatMoneyBare(l.principal),
+              range: 'number',
+              cellClassName: 'whitespace-nowrap',
+            },
+            {
+              key: 'outstanding',
+              mobile: 'keep',
+              group: '金额',
+              label: 'Outstanding',
+              align: 'right',
+              render: (l) =>
+                l.status === 'active' ? <span className="font-semibold">{formatMoney(l.outstanding)}</span> : <span className="text-muted">—</span>,
+              // Nothing outstanding sorts below every figure (as −1 did) and
+              // falls outside any range.
+              sortValue: outstandingOf,
+              filterable: true,
+              filterValue: (l) => {
+                const out = outstandingOf(l)
+                return out != null ? formatMoneyBare(out) : ''
+              },
+              range: 'number',
+              cellClassName: 'whitespace-nowrap',
+            },
+            {
+              key: 'rate',
+              mobile: 'detail',
+              group: '金额',
+              label: 'Rate',
+              align: 'right',
+              render: rateText,
+              sortValue: (l) => l.effectiveRate,
+              filterable: true,
+              filterValue: rateText,
+            },
+            {
+              key: 'status',
+              mobile: 'detail',
+              group: '基本',
+              label: 'Status',
+              render: (l) => <LoanStatusChip status={l.status} overdue={l.overdue} />,
+              sortValue: (l) => (l.overdue ? 'overdue' : l.status),
+              filterable: true,
+              filterValue: (l) => (l.status === 'active' && l.overdue ? 'overdue' : l.status.replace('_', ' ')),
+              cellClassName: 'whitespace-nowrap',
+            },
+            {
+              // 放款日 (business date), not record-creation date.
+              key: 'disbursedAt',
+              mobile: 'detail',
+              group: '日期',
+              label: 'Disbursed',
+              render: (l) => (l.disbursedAt ? day(l.disbursedAt) : <span className="text-muted">—</span>),
+              sortValue: (l) => new Date(l.disbursedAt ?? l.createdAt),
+              filterable: true,
+              filterValue: (l) => (l.disbursedAt ? day(l.disbursedAt) : ''),
+              range: 'date',
+              cellClassName: 'text-graphite whitespace-nowrap',
+            },
+          ]}
+        />
+      </div>
       {links.menu}
     </>
   )

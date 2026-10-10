@@ -69,6 +69,12 @@ function emptyLine(): LineDraft {
   return { key: nextKey(), account_code: '', debit: '', credit: '', description: '' }
 }
 
+// 2026-10-10 — the handoff: a line nobody filled in (no account, no amount,
+// no note) is a leftover — it neither holds Post back nor posts.
+function isBlankLine(l: LineDraft): boolean {
+  return l.account_code === '' && !l.debit.trim() && !l.credit.trim() && !l.description.trim()
+}
+
 /** The office's today (an ISO string's date is UTC's — yesterday until 08:00). */
 function today() {
   return officeToday()
@@ -102,6 +108,12 @@ export default function JournalVoucherForm({ accounts, entry, prefill }: Props) 
   const [isPending, startTransition] = useTransition()
   const [isDeleting, startDeleting] = useTransition()
   const formRef = useRef<HTMLFormElement>(null)
+  const descriptionRef = useRef<HTMLInputElement>(null)
+
+  // 2026-10-10 — the handoff: the form opens with the cursor in Description.
+  useEffect(() => {
+    descriptionRef.current?.focus()
+  }, [])
 
   useEffect(() => {
     if (error && formRef.current) {
@@ -161,7 +173,9 @@ export default function JournalVoucherForm({ accounts, entry, prefill }: Props) 
   const isBalanced = Math.abs(totals.diff) < 0.005
   const hasAmount = totals.debit > 0
 
-  const everyLineValid = lines.every((l) => {
+  // What is checked and posted: every line but the untouched leftovers.
+  const filledLines = lines.filter((l) => !isBlankLine(l))
+  const everyLineValid = filledLines.every((l) => {
     const d = parseFloat(l.debit) || 0
     const c = parseFloat(l.credit) || 0
     const oneSide = (d > 0 && c === 0) || (c > 0 && d === 0)
@@ -170,7 +184,7 @@ export default function JournalVoucherForm({ accounts, entry, prefill }: Props) 
 
   const canSubmit =
     description.trim().length > 0 &&
-    lines.length >= 2 &&
+    filledLines.length >= 2 &&
     everyLineValid &&
     isBalanced &&
     hasAmount
@@ -184,7 +198,7 @@ export default function JournalVoucherForm({ accounts, entry, prefill }: Props) 
       transaction_date: transactionDate,
       description: description.trim(),
       segment,
-      lines: lines.map((l) => ({
+      lines: filledLines.map((l) => ({
         account_code: l.account_code,
         debit: parseFloat(l.debit) || 0,
         credit: parseFloat(l.credit) || 0,
@@ -263,6 +277,7 @@ export default function JournalVoucherForm({ accounts, entry, prefill }: Props) 
         <label className="jv-field">
           <span>Description</span>
           <input
+            ref={descriptionRef}
             id="description"
             name="description"
             type="text"

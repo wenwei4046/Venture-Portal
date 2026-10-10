@@ -16,9 +16,47 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { backdropDismiss } from '@/components/modal-dismiss'
+import { useFinView } from '@/components/layout/fin-view'
 import { officeDate } from '@/lib/office-clock'
 import { amendVoucherDate } from '../actions'
 import { amendRepaymentDate } from '../../fund-out/actions'
+
+// What the dialog says — in English on the Finance view (2026-10-10, the
+// handoff: its row menu already says "Change date").
+const WORDS = {
+  zh: {
+    trigger: '改日期',
+    triggerTitle: '日期录错用这个:直接改这笔的日期,总账的分录一起改并留注记',
+    now: '现在的日期',
+    correct: '对的日期',
+    reason: '原因',
+    reasonHint: 'e.g. 录错一天',
+    scope: '会一起改的:这笔记录,和它在总账的分录。不会动的:金额、银行、池。 那个月已经关账、或这笔已经对过银行账,就不让改。',
+    pickDate: '选一个日期',
+    same: '日期没有变',
+    future: '不能填未来的日期',
+    noReason: '写一句原因(会留在记录里)',
+    done: (from: string, to: string) => `改好了 — ${from} → ${to},总账已经跟着改。`,
+    saving: '改着…',
+    confirm: '确认改',
+  },
+  en: {
+    trigger: 'Change date',
+    triggerTitle: 'For a date keyed wrong: changes this record’s date — its GL entries move with it and keep a note',
+    now: 'Recorded date',
+    correct: 'Correct date',
+    reason: 'Reason',
+    reasonHint: 'e.g. keyed a day late',
+    scope: 'Changes with it: this record and its GL entries. Left alone: the amount, the bank and the pools. Not allowed once the month is closed or the line is reconciled with the bank.',
+    pickDate: 'Pick a date',
+    same: 'The date has not changed',
+    future: 'The date cannot be in the future',
+    noReason: 'Write a reason (it stays on the record)',
+    done: (from: string, to: string) => `Changed — ${from} → ${to}; the GL moved with it.`,
+    saving: 'Changing…',
+    confirm: 'Confirm change',
+  },
+}
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 /** "2026-10-01" → "1 Oct 2026". Built from the parts, so no zone can move it. */
@@ -56,13 +94,14 @@ export default function AmendDateButton({
   const [done, setDone] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const today = officeDate()
+  const w = useFinView() ? WORDS.en : WORDS.zh
 
   function submit() {
     setError(null)
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return setError('选一个日期')
-    if (date === currentDate) return setError('日期没有变')
-    if (date > today) return setError('不能填未来的日期')
-    if (!reason.trim()) return setError('写一句原因(会留在记录里)')
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return setError(w.pickDate)
+    if (date === currentDate) return setError(w.same)
+    if (date > today) return setError(w.future)
+    if (!reason.trim()) return setError(w.noReason)
     const fd = new FormData()
     fd.set('id', id)
     fd.set('new_date', date)
@@ -73,7 +112,7 @@ export default function AmendDateButton({
         setError(res.error)
         return
       }
-      setDone(`改好了 — ${plainDate(res.old)} → ${plainDate(res.newDate)},总账已经跟着改。`)
+      setDone(w.done(plainDate(res.old), plainDate(res.newDate)))
       router.refresh()
     })
   }
@@ -90,9 +129,9 @@ export default function AmendDateButton({
             setDate(currentDate)
           }}
           className={triggerClassName}
-          title="日期录错用这个:直接改这笔的日期,总账的分录一起改并留注记"
+          title={w.triggerTitle}
         >
-          改日期
+          {w.trigger}
         </button>
       )}
 
@@ -104,24 +143,26 @@ export default function AmendDateButton({
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="改日期"
+            aria-label={w.trigger}
             className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-md text-left"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-6 py-4 border-b border-hairline">
               <div className="font-serif italic text-accent text-sm">Amend date</div>
-              <div className="font-serif text-lg text-ink">改日期 — {label}</div>
+              <div className="font-serif text-lg text-ink">
+                {w.trigger} — {label}
+              </div>
             </div>
             <div className="px-6 py-4 space-y-4">
               <div>
-                <div className="text-sm font-sans font-medium text-graphite mb-1.5">现在的日期</div>
+                <div className="text-sm font-sans font-medium text-graphite mb-1.5">{w.now}</div>
                 <div className="px-3 py-2 bg-surface border border-hairline rounded-md text-sm text-graphite font-mono tabular">
                   {plainDate(currentDate)}
                 </div>
               </div>
               <div>
                 <label htmlFor="amend-date-new" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-                  对的日期 <span className="text-danger">*</span>
+                  {w.correct} <span className="text-danger">*</span>
                 </label>
                 <input
                   id="amend-date-new"
@@ -134,19 +175,18 @@ export default function AmendDateButton({
               </div>
               <div>
                 <label htmlFor="amend-date-reason" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-                  原因 <span className="text-danger">*</span>
+                  {w.reason} <span className="text-danger">*</span>
                 </label>
                 <input
                   id="amend-date-reason"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="e.g. 录错一天"
+                  placeholder={w.reasonHint}
                   className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
                 />
               </div>
               <p className="bg-accent-bg border border-accent-border rounded-md px-3 py-2 text-xs font-sans text-graphite leading-relaxed">
-                会一起改的:这笔记录,和它在总账的分录。不会动的:金额、银行、池。
-                那个月已经关账、或这笔已经对过银行账,就不让改。
+                {w.scope}
               </p>
               {error ? (
                 <div role="alert" className="bg-danger/10 border border-danger/30 text-danger rounded-md px-3 py-2 text-sm font-sans">
@@ -175,7 +215,7 @@ export default function AmendDateButton({
                   disabled={isPending}
                   className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50"
                 >
-                  {isPending ? '改着…' : '确认改'}
+                  {isPending ? w.saving : w.confirm}
                 </button>
               ) : null}
             </div>

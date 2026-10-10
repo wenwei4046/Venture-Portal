@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import dayjs from 'dayjs'
 import { generateBaInvoice, setBaStatus } from '../../actions'
 import { AttachmentChips, PvModal, type BankOption, type BaRow } from '../../_components/BaView'
 
@@ -9,6 +10,12 @@ import { AttachmentChips, PvModal, type BankOption, type BaRow } from '../../_co
 // handoff): bill the borrower for the charge (5028), pay HC through a PV
 // (6001), and mark it settled once collected and repaid — releasing the
 // limit — or reopen it. The same actions as the register's row.
+//
+// 2026-10-10 — in the handoff's words: Generate PV (the PV to HC, the primary
+// action — it opens the bank and day to pay from) and Bill interest (the
+// invoice to the borrower, while it is still to bill); Mark settled stays
+// beside them. A settled one: "Repaid on {its maturity}. Nothing left to do
+// on this BA." and Reopen.
 
 export function BaDocuments({ row }: { row: BaRow }) {
   return <AttachmentChips row={row} full />
@@ -35,22 +42,26 @@ export default function BaDetailActions({ row, banks }: { row: BaRow; banks: Ban
     })
   }
 
+  const trail = `${row.interestInvoice ? `Billed: ${row.interestInvoice.no ?? 'invoice'} · ${row.interestInvoice.status}. ` : ''}${
+    row.interestPv ? `Paid to HC: ${row.interestPv.no ?? 'PV'} · ${row.interestPv.status}. ` : ''
+  }`
+
   return (
     <>
       <div className="fin-actions">
+        {active && !row.interestPv ? (
+          <button type="button" className="btn-pri" disabled={isPending} onClick={() => setPaying(true)}>
+            Generate PV
+          </button>
+        ) : null}
         {active && !row.interestInvoice ? (
           <button
             type="button"
-            className="btn-pri"
+            className={row.interestPv ? 'btn-pri' : 'btn-sec'}
             disabled={isPending}
             onClick={() => run(() => generateBaInvoice(row.id), (r) => `Invoice ${(r.invoiceNo as string | null) ?? ''} created as draft — review & issue it in Service Billing`)}
           >
-            Bill borrower
-          </button>
-        ) : null}
-        {active && !row.interestPv ? (
-          <button type="button" className={row.interestInvoice ? 'btn-pri' : 'btn-sec'} disabled={isPending} onClick={() => setPaying(true)}>
-            Pay HC
+            Bill interest
           </button>
         ) : null}
         {active ? (
@@ -63,11 +74,11 @@ export default function BaDetailActions({ row, banks }: { row: BaRow; banks: Ban
           </button>
         ) : null}
         <span className="note">
-          {row.interestInvoice ? `Billed: ${row.interestInvoice.no ?? 'invoice'} · ${row.interestInvoice.status}. ` : ''}
-          {row.interestPv ? `Paid to HC: ${row.interestPv.no ?? 'PV'} · ${row.interestPv.status}. ` : ''}
           {active
-            ? 'Bill borrower drafts the charge as an invoice (5028); Pay HC drafts a PV to HOUZS Century (6001) for the bank and day you pick. Mark settled once it is collected and repaid — that releases the limit.'
-            : 'Settled — nothing left to do on this financing.'}
+            ? `${trail}Generate PV pays HC the interest (6001) — pick the bank and the payment date in the next step. Bill interest drafts the charge to the borrower as an invoice (5028). Mark settled once it is collected and repaid — that releases the limit.`
+            : row.status === 'settled'
+              ? `Repaid on ${dayjs(row.maturityDate).format('D MMM YYYY')}. Nothing left to do on this BA. ${trail}`.trim()
+              : `Cancelled — nothing left to do on this BA. ${trail}`.trim()}
         </span>
       </div>
       {message ? <div className="mt-3 border border-hairline rounded-md bg-surface p-3 text-sm font-sans text-ledger">✓ {message}</div> : null}

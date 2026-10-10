@@ -143,8 +143,13 @@ describe('an allocation’s own page', () => {
     expect(card('To bill')).toHaveTextContent('Not invoiced yet')
     expect(screen.getByRole('link', { name: 'Correct this record' })).toHaveAttribute('href', '/billing-allocator?period=2026-09&edit=t6')
     expect(screen.getByText(/^Not billed yet\./)).toBeInTheDocument()
+    // 2026-10-10 — the handoff: Generate invoices is the page head's primary,
+    // not one of the Actions panel's buttons.
+    const head = document.querySelector('.page-head') as HTMLElement
+    expect(within(head).getByRole('button', { name: 'Generate invoices' })).toBeInTheDocument()
+    expect(within(document.querySelector('.fin-actions') as HTMLElement).queryByRole('button', { name: 'Generate invoices' })).toBeNull()
 
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Generate invoices' })) })
+    await act(async () => { fireEvent.click(within(head).getByRole('button', { name: 'Generate invoices' })) })
     expect(mocks.generateAllocatorInvoices).toHaveBeenCalledWith('2026-09')
     expect(await screen.findByText('✓ 2990 → HV-INV-202609-0041')).toBeInTheDocument()
     expect(mocks.refresh).toHaveBeenCalled()

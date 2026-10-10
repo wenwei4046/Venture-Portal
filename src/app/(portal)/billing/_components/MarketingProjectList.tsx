@@ -1,7 +1,9 @@
+'use client'
+
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import type { ReactNode } from 'react'
 import { formatMoney } from '@/lib/utils'
+import SortableTable from '@/components/SortableTable'
 
 interface Contract {
   id: string
@@ -18,7 +20,10 @@ interface Props {
   contracts: Contract[]
   companyMap: Map<string, { name: string; code: string }>
   canCreate?: boolean
-  headerAction?: ReactNode
+  /** contract id → its invoice this month (invoices.contract_id). */
+  invoiceByContract?: Record<string, { id: string; no: string | null }>
+  /** The page's month, `YYYY-MM-01`. */
+  period: string
 }
 
 // Marketing project billing: Finance creates a service_contract per project
@@ -26,119 +31,176 @@ interface Props {
 // flows through Principal approval (new_contract approval type → Step 2
 // approval_cascade trigger activates it). Per spec, Marketing is the only
 // dept with real P&L — these contracts feed the Marketing dept pool.
-export default function MarketingProjectList({ contracts, companyMap, canCreate, headerAction }: Props) {
+//
+// 2026-10-10 — the handoff's sheet table: sortable, ▽ filters (a Range on the
+// amount and the dates), the status as a chip, "N PROJECTS", and an Invoice
+// button per project that opens the month's invoice for it (raised by
+// + Create Invoice ▼ › Generate Marketing invoices). Edit and + New contract
+// are the page's own and stay.
+
+function ContractStatus({ status, approvedBy }: { status: string; approvedBy: string | null }) {
+  // Active but not yet signed off waits on the Principal — blue.
+  const [label, tone] =
+    status === 'active' && !approvedBy
+      ? ['pending approval', ' wait']
+      : status === 'active'
+        ? ['active', ' ledger']
+        : [status, '']
+  return (
+    <span className={`chip${tone}`}>
+      <i className="dot" />
+      {label}
+    </span>
+  )
+}
+
+function statusLabel(c: Contract): string {
+  return c.status === 'active' && !c.approved_by ? 'pending approval' : c.status
+}
+
+/** "16 Oct – 31 Oct 2026", "1 Oct 2026 – 15 Jan 2027", one end alone, or —. */
+function datesOf(c: Contract): string {
+  const s = c.start_date ? dayjs(c.start_date) : null
+  const e = c.end_date ? dayjs(c.end_date) : null
+  if (s && e) return s.year() === e.year() ? `${s.format('D MMM')} – ${e.format('D MMM YYYY')}` : `${s.format('D MMM YYYY')} – ${e.format('D MMM YYYY')}`
+  if (s) return `from ${s.format('D MMM YYYY')}`
+  if (e) return `to ${e.format('D MMM YYYY')}`
+  return '—'
+}
+
+export default function MarketingProjectList({ contracts, companyMap, canCreate, invoiceByContract = {}, period }: Props) {
+  const companyOf = (c: Contract) => {
+    const co = companyMap.get(c.company_id)
+    return co ? `${co.name} (${co.code})` : '—'
+  }
+  const month = dayjs(period).format('MMMM YYYY')
+
   return (
     <section className="fin-queue mt-10">
       <div className="sect-head">
         <h2>Marketing projects</h2>
         <span className="rule" aria-hidden />
-        <span className="count">{contracts.filter((c) => c.status === 'active').length} ACTIVE</span>
-      </div>
-      <div className="flex items-baseline justify-end mb-4 gap-4">
-        <div className="flex items-baseline gap-4">
-          {headerAction}
-          {canCreate && (
-            <Link
-              href="/billing/contracts/new"
-              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-            >
-              + New contract
-            </Link>
-          )}
-        </div>
+        <span className="count">
+          {contracts.length} {contracts.length === 1 ? 'PROJECT' : 'PROJECTS'}
+        </span>
       </div>
 
       {contracts.length === 0 ? (
-        <div className="border border-hairline rounded-md bg-surface p-6 text-center">
-          <p className="font-serif italic text-muted text-sm">
-            No Marketing project contracts yet.{' '}
-            {canCreate ? (
-              <Link href="/billing/contracts/new" className="text-accent hover:underline">
-                Create the first contract
-              </Link>
-            ) : (
-              'Finance creates contracts via the Billing module.'
-            )}
-          </p>
+        <div className="bil-empty">
+          No Marketing project contracts yet.{' '}
+          {canCreate ? (
+            <Link href="/billing/contracts/new" className="text-accent hover:underline">
+              Create the first contract
+            </Link>
+          ) : (
+            'Finance creates contracts via the Billing module.'
+          )}
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                <th className="text-left py-3 pr-4 font-medium">Project</th>
-                <th className="text-left py-3 pr-4 font-medium">Company</th>
-                <th className="text-right py-3 pr-4 font-medium">Amount</th>
-                <th className="text-left py-3 pr-4 font-medium">Dates</th>
-                <th className="text-left py-3 pr-4 font-medium">Status</th>
-                {canCreate && <th className="text-left py-3 font-medium"></th>}
-              </tr>
-            </thead>
-            <tbody>
-              {contracts.map((c) => {
-                const company = companyMap.get(c.company_id)
+        <SortableTable<Contract>
+          layoutId="billing.marketing-projects"
+          layoutTitle="Marketing projects"
+          canSetDefault={canCreate}
+          resizeMode="neighbour"
+          rows={contracts}
+          getRowKey={(c) => c.id}
+          defaultSort={{ key: 'dates', dir: 'desc' }}
+          toolbarRight={
+            canCreate ? (
+              <Link href="/billing/contracts/new" className="bil-btn">
+                + New contract
+              </Link>
+            ) : undefined
+          }
+          columns={[
+            {
+              key: 'project',
+              group: 'Project',
+              label: 'Project',
+              mobile: 'keep',
+              filterable: true,
+              render: (c) => c.description ?? '—',
+              sortValue: (c) => c.description ?? '',
+            },
+            {
+              key: 'company',
+              group: 'Project',
+              label: 'Company',
+              mobile: 'detail',
+              filterable: true,
+              render: (c) => companyOf(c),
+              sortValue: (c) => companyOf(c),
+            },
+            {
+              key: 'amount',
+              group: 'Amount',
+              label: 'Amount',
+              align: 'right',
+              mobile: 'keep',
+              filterable: true,
+              range: 'number',
+              render: (c) => (c.amount != null ? formatMoney(Number(c.amount)) : '—'),
+              sortValue: (c) => (c.amount != null ? Number(c.amount) : null),
+              cellClassName: 'whitespace-nowrap',
+            },
+            {
+              key: 'dates',
+              group: 'Dates',
+              label: 'Dates',
+              mobile: 'detail',
+              filterable: true,
+              range: 'date',
+              render: (c) => datesOf(c),
+              sortValue: (c) => (c.start_date ? new Date(c.start_date) : null),
+              filterValue: (c) => datesOf(c),
+              cellClassName: 'whitespace-nowrap',
+            },
+            {
+              key: 'status',
+              group: 'Project',
+              label: 'Status',
+              mobile: 'detail',
+              filterable: true,
+              render: (c) => <ContractStatus status={c.status} approvedBy={c.approved_by} />,
+              sortValue: (c) => statusLabel(c),
+            },
+            {
+              key: 'action',
+              label: '',
+              sortable: false,
+              pinned: 'end',
+              resizable: false,
+              mobile: 'detail',
+              render: (c) => {
+                const inv = invoiceByContract[c.id]
                 return (
-                  <tr
-                    key={c.id}
-                    className="border-b border-hairline last:border-0"
-                  >
-                    <td className="py-3 pr-4 font-serif text-md text-ink">
-                      {c.description ?? '—'}
-                    </td>
-                    <td className="py-3 pr-4">
-                      <div className="font-serif italic text-graphite">
-                        {company?.name ?? '—'}
-                      </div>
-                      <div className="font-mono text-xs text-muted">
-                        {company?.code ?? ''}
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
-                      {c.amount != null ? formatMoney(Number(c.amount)) : '—'}
-                    </td>
-                    <td className="py-3 pr-4 font-mono text-xs text-muted">
-                      {c.start_date ? dayjs(c.start_date).format('D MMM YY') : '—'}
-                      {c.end_date ? ` → ${dayjs(c.end_date).format('D MMM YY')}` : ''}
-                    </td>
-                    <td className="py-3 pr-4">
-                      <ContractStatus status={c.status} approvedBy={c.approved_by} />
-                    </td>
-                    {canCreate && (
-                      <td className="py-3">
-                        <Link
-                          href={`/billing/contracts/${c.id}/edit`}
-                          className="text-xs text-accent hover:underline font-sans"
-                        >
-                          Edit
-                        </Link>
-                      </td>
+                  <span className="flex items-center justify-end gap-3 whitespace-nowrap">
+                    {inv ? (
+                      <Link href={`/invoices/${inv.id}`} className="bil-row-btn" title={inv.no ?? undefined}>
+                        Invoice
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        className="bil-row-btn"
+                        disabled
+                        title={`No invoice for this project in ${month} yet — + Create Invoice ▼ › Generate Marketing invoices raises them.`}
+                      >
+                        Invoice
+                      </button>
                     )}
-                  </tr>
+                    {canCreate ? (
+                      <Link href={`/billing/contracts/${c.id}/edit`} className="text-xs text-accent hover:underline font-sans">
+                        Edit
+                      </Link>
+                    ) : null}
+                  </span>
                 )
-              })}
-            </tbody>
-          </table>
-        </div>
+              },
+            },
+          ]}
+        />
       )}
     </section>
   )
-}
-
-function ContractStatus({
-  status,
-  approvedBy,
-}: {
-  status: string
-  approvedBy: string | null
-}) {
-  if (status === 'active' && !approvedBy) {
-    return <em className="font-serif text-alert text-sm">pending approval</em>
-  }
-  if (status === 'active') {
-    return <em className="font-serif text-graphite text-sm">active</em>
-  }
-  if (status === 'completed') {
-    return <em className="font-serif text-ledger text-sm">completed</em>
-  }
-  return <em className="font-serif text-muted text-sm">{status}</em>
 }

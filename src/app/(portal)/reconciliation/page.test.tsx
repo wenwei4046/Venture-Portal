@@ -1,21 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
 
 // 2026-10-09 — Bank Reconciliation and the Journal Entries list per the
 // user's Claude Design handoff (Phase 4 of the Finance revamp).
-// Reconciliation: Upload statement in the head (the form opens under the
-// cards), one card per bank — "✓ Ties to GL" or the difference — and the
-// monthly sessions with chips. Journal Entries: the list opens each voucher's
-// own page, AUTO as a chip, closing on a total.
+// Reconciliation: Upload statement in the head, one card per bank — "✓ Ties
+// to GL" or the difference — and the monthly sessions with chips. Journal
+// Entries: the list opens each voucher's own page, closing on a total.
+// 2026-10-10 — the audit's fixes: Upload statement opens a modal (it was a
+// form under the cards at ?upload=1), the sessions are a sheet table, and
+// AUTO is the amber tag (it was a grey chip).
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }))
 vi.mock('@/components/layout/ReturnLink', () => ({ default: (p: { href: string; children: React.ReactNode }) => <a href={p.href}>{p.children}</a> }))
 vi.mock('./_components/UploadStatementForm', () => ({ default: () => <form aria-label="Upload statement form" /> }))
-vi.mock('./_components/SessionRowActions', () => ({ default: () => null }))
+vi.mock('./actions', () => ({ setSessionStatus: vi.fn(), deleteSession: vi.fn(), uploadStatement: vi.fn() }))
 vi.mock('./journal-entries/actions', () => ({ deleteJournalVoucher: vi.fn() }))
+// The tables' saved column layouts come from the browser client; here there are none.
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }),
+  }),
+}))
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
     from: (table: string) => {
@@ -68,22 +76,28 @@ describe('Bank Reconciliation on the sheet', () => {
     expect(card('Maybank · bank vs GL')).toHaveTextContent('Cache 354,250.20 · GL 351,650.20')
   })
 
-  it('opens the upload form from the head', async () => {
+  it('opens the upload form in a modal from the head', async () => {
     render(await ReconciliationPage({ searchParams: Promise.resolve({}) }))
-    expect(screen.getByRole('link', { name: 'Upload statement' })).toHaveAttribute('href', '/reconciliation?upload=1')
-    expect(screen.queryByRole('form', { name: 'Upload statement form' })).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    const button = screen.getByRole('button', { name: 'Upload statement' })
+    expect(button.closest('.page-head')).not.toBeNull()
+    fireEvent.click(button)
+    const dialog = screen.getByRole('dialog', { name: 'Upload statement' })
+    expect(within(dialog).getByRole('form', { name: 'Upload statement form' })).toBeInTheDocument()
   })
 
-  it('shows the form when asked, and the sessions with chips', async () => {
+  it('opens the modal for an old ?upload=1 link, and lists the sessions with chips', async () => {
     render(await ReconciliationPage({ searchParams: Promise.resolve({ upload: '1' }) }))
-    expect(screen.getByRole('form', { name: 'Upload statement form' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Upload statement' })).toBeInTheDocument()
     const sessions = screen.getByRole('heading', { level: 2, name: 'Monthly reconciliations' }).closest('section') as HTMLElement
     expect(within(sessions).getByText('2 SESSIONS')).toBeInTheDocument()
+    expect(within(sessions).getByRole('table').closest('.st-box')).not.toBeNull()
+    const chip = (tr: HTMLElement, text: string) => within(tr).getAllByText(text).find((e) => !e.closest('.q-sub'))!.closest('.chip')
     const open = within(sessions).getByText('MBB-sep.xlsx').closest('tr') as HTMLElement
-    expect(within(open).getByText('open').closest('.chip')).toHaveClass('alert')
+    expect(chip(open, 'open')).toHaveClass('alert')
     expect(within(open).getByRole('link', { name: 'Continue' })).toHaveAttribute('href', '/reconciliation/s1')
     const done = within(sessions).getByText('HL_SEP26.csv').closest('tr') as HTMLElement
-    expect(within(done).getByText('done').closest('.chip')).toHaveClass('ledger')
+    expect(chip(done, 'done')).toHaveClass('ledger')
   })
 })
 
@@ -95,7 +109,8 @@ describe('the Journal Entries list on the sheet', () => {
     const list = screen.getByRole('heading', { level: 2, name: 'Vouchers' }).closest('section') as HTMLElement
     expect(within(list).getByText('2 ENTRIES')).toBeInTheDocument()
     expect(within(list).getByRole('link', { name: 'HV-JV-2610-024' })).toHaveAttribute('href', '/reconciliation/journal-entries/je1')
-    expect(within(list).getByText('AUTO').closest('.chip')).toHaveClass('info')
+    expect(within(list).getByText('AUTO')).toHaveClass('adm-tag')
     expect(list.querySelector('tfoot')).toHaveTextContent('51,083.33')
+    expect(list.querySelector('.st-box')).not.toBeNull()
   })
 })

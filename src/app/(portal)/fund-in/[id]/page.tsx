@@ -377,9 +377,15 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
         ]}
       />
 
-      {/* ───────── Fully repaid ───────── */}
+      {/* ───────── Fully repaid — under its own heading, the date as its
+          count (2026-10-10, the handoff) ───────── */}
       {isRepaid && source.repaid_at ? (
         <section className="mb-9" aria-label="Fully repaid">
+          <div className="sect-head">
+            <h2>Fully repaid</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">{officeTime(source.repaid_at).format('D MMM YYYY').toUpperCase()}</span>
+          </div>
           <div className="fin-notice ledger">
             Repaid on {officeTime(source.repaid_at).format('D MMM YYYY')}
             {repaidByName ? ` by ${repaidByName}` : ''}.

@@ -3,9 +3,11 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import type { AllocatorData, StaffRow } from './types'
 
 // 2026-10-07 — Calculate on the sheet (the user approved the allocator
-// sample): the headcount source in a toolbar, each expense a card with its
-// fields labelled, and the preview as a table — Bill to, the basis, the share
-// — with the billable total under it and Save allocation below.
+// sample): every field labelled, and the preview as a table — Bill to, the
+// basis, the share — with the billable total under it. 2026-10-10 — the
+// handoff's "Expense" form section: the headcount source and each expense's
+// fields in one form, Save allocation and + Add expense inside it, the Preview
+// ("BILLABLE TOTAL · HV OWN LEFT OUT") after it.
 
 const mocks = vi.hoisted(() => ({ refresh: vi.fn(), saveAllocBatch: vi.fn(), updateAllocTxn: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh, push: vi.fn() }) }))
@@ -39,8 +41,8 @@ function data(): AllocatorData {
 }
 
 function typeExpense() {
-  fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Office Rental' } })
-  fireEvent.change(screen.getByLabelText('Amount RM'), { target: { value: '1000' } })
+  fireEvent.change(screen.getAllByLabelText('Description')[0], { target: { value: 'Office Rental' } })
+  fireEvent.change(screen.getAllByLabelText('Amount RM')[0], { target: { value: '1000' } })
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -52,7 +54,7 @@ describe('Calculate on the sheet', () => {
     expect(screen.queryByRole('heading', { name: 'Preview' })).toBeNull()
     typeExpense()
     const head = screen.getByRole('heading', { name: 'Preview' }).closest('.sect-head') as HTMLElement
-    expect(head.querySelector('.count')).toHaveTextContent('1 EXPENSE · HEADCOUNT 2.00')
+    expect(head.querySelector('.count')).toHaveTextContent('BILLABLE TOTAL · HV OWN LEFT OUT')
     const table = screen.getByRole('table')
     expect(Array.from(table.querySelectorAll('thead th')).map((th) => th.textContent?.trim())).toEqual(['Bill to', 'Basis', 'Share'])
     const rowOf = (label: string) => within(table).getByText(label).closest('tr') as HTMLElement
@@ -64,6 +66,23 @@ describe('Calculate on the sheet', () => {
     expect(table.querySelector('tfoot')).toHaveTextContent('Billable total')
     expect(table.querySelector('tfoot')).toHaveTextContent('RM 750.00')
     expect(screen.getByRole('button', { name: 'Save allocation' })).toBeEnabled()
+  })
+
+  it('lays the expense out as the handoff’s form, Save and + Add expense inside it, the preview after it', () => {
+    render(<CalculateTab data={data()} onDoneEditing={vi.fn()} onSaved={vi.fn()} />)
+    const head = screen.getByRole('heading', { name: 'Expense' }).closest('.sect-head') as HTMLElement
+    expect(head.querySelector('.count')).toHaveTextContent('HEADCOUNT FROM · STAFF TAB · 2.00 HEADS')
+    const form = head.nextElementSibling as HTMLElement
+    expect(form).toHaveClass('fin-form')
+    for (const label of ['Headcount from', 'Template', 'Description', 'Amount RM', 'Method', 'Category']) {
+      expect(within(form).getByLabelText(label)).toBeInTheDocument()
+    }
+    expect(within(form).getByRole('button', { name: 'Save allocation' })).toBeDisabled()
+    fireEvent.click(within(form).getByRole('button', { name: '+ Add expense' }))
+    expect(within(form).getAllByLabelText('Description')).toHaveLength(2)
+    typeExpense()
+    const preview = screen.getByRole('heading', { name: 'Preview' })
+    expect(form.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('saves the month’s batch on the list it previewed', async () => {

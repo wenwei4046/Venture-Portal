@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
 
 // 2026-10-09 — Overdue & Netting per the user's Claude Design handoff (Phase 3
@@ -24,7 +24,7 @@ const record = (id: string, loan_id: string, period_month: string, overdue_days:
   id, loan_id, period_month, overdue_days, overdue_stage, is_overdue: true, penalty_rate: 0.01, penalty_amount, status, created_at: `${period_month}T02:00:00Z`,
 })
 
-function database() {
+function database(over: Record<string, unknown[]> = {}) {
   const tables: Record<string, unknown[]> = {
     overdue_records: [
       record('o1', 'l1', '2026-09-01', 47, 'escalation', 3672.4),
@@ -53,6 +53,7 @@ function database() {
     ],
     fund_source_repayments: [{ fund_source_id: 'fs1', amount: 4000, payment_date: '2026-08-15', payment_type: 'principal' }, { fund_source_id: 'fs1', amount: 120, payment_date: '2026-08-15', payment_type: 'interest' }],
     departments: [],
+    ...over,
   }
   mocks.createClient.mockResolvedValue({
     from: (table: string) => {
@@ -112,5 +113,73 @@ describe('Overdue & Netting on the sheet', () => {
     expect(row).toHaveTextContent('RM 4,120.00')
     expect(row).toHaveTextContent('Instalment 2 of 3')
     expect(within(row).getByRole('link', { name: 'Record payment' })).toHaveAttribute('href', '/fund-in/fs1')
+  })
+})
+
+// 2026-10-10 — the handoff, more closely: the cards come before the tabs;
+// every month's table closes on its total; Net off on a loan they owe us (its
+// Record repayment, where Netting is a type); the netting log always shows;
+// on a phone a row opens onto its status, penalty or note, and its actions;
+// Detect overdue is the head's primary button, Escalate a bordered one.
+describe('Overdue & Netting, per the handoff', () => {
+  it('puts the cards before the tabs, and Detect overdue in the head’s primary button', async () => {
+    render(await page())
+    const cards = screen.getByRole('region', { name: 'Overdue · Fund OUT' })
+    const tabs = screen.getByRole('button', { name: /^Fund OUT · they owe us/ })
+    expect(cards.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Detect overdue' })).toHaveClass('btn-pri-sheet')
+  })
+
+  it('closes every month on its total, a single loan’s too', async () => {
+    render(await page())
+    const october = screen.getByRole('heading', { name: 'October 2026' }).closest('section') as HTMLElement
+    expect(october.querySelector('tfoot')).toHaveTextContent('RM 6,400.00')
+    const september = screen.getByRole('heading', { name: 'September 2026' }).closest('section') as HTMLElement
+    const foot = september.querySelector('tfoot') as HTMLElement
+    expect(foot).toHaveTextContent('Total')
+    expect(foot).toHaveTextContent('RM 330,750.00')
+    expect(foot).toHaveTextContent('RM (3,887.00)')
+  })
+
+  it('closes a month of what we owe on its total too', async () => {
+    render(await page('in'))
+    const september = screen.getByRole('heading', { name: 'September 2026' }).closest('section') as HTMLElement
+    expect(september.querySelector('tfoot')).toHaveTextContent('RM 4,120.00')
+  })
+
+  it('offers Net off on a loan they owe us — its Record repayment', async () => {
+    render(await page())
+    const september = screen.getByRole('heading', { name: 'September 2026' }).closest('section') as HTMLElement
+    const hk = within(september).getByText('HOUZS Kitchen').closest('tr') as HTMLElement
+    expect(within(hk).getByRole('link', { name: 'Net off' })).toHaveAttribute('href', '/fund-out/l2#repayment-form')
+    expect(within(hk).getByRole('button', { name: 'Mark paid' })).toHaveClass('sch-row-btn')
+  })
+
+  it('on a phone, opens a row onto its status, penalty and actions', async () => {
+    render(await page())
+    const september = screen.getByRole('heading', { name: 'September 2026' }).closest('section') as HTMLElement
+    const hk = within(september).getByText('HOUZS Kitchen').closest('tr') as HTMLElement
+    fireEvent.click(within(hk).getByRole('button', { name: '展开明细' }))
+    const panel = hk.nextElementSibling as HTMLElement
+    expect(panel).toHaveClass('lt-detail')
+    expect(panel).toHaveTextContent('Status')
+    expect(panel).toHaveTextContent('overdue')
+    expect(panel).toHaveTextContent('Penalty')
+    expect(within(panel).getByRole('button', { name: 'Mark paid' })).toBeInTheDocument()
+    expect(within(panel).getByRole('link', { name: 'Net off' })).toBeInTheDocument()
+  })
+
+  it('always shows the netting log, even before anything was netted', async () => {
+    database({ overdue_records: [record('o1', 'l1', '2026-09-01', 47, 'escalation', 3672.4)] })
+    render(await page())
+    const log = screen.getByRole('heading', { name: 'Netting & penalty log' }).closest('section') as HTMLElement
+    expect(log).toHaveTextContent('0 RECORDS · ALL TIME')
+    expect(log).toHaveTextContent('Nothing netted or settled yet.')
+  })
+
+  it('counts the netting log over all time', async () => {
+    render(await page())
+    const log = screen.getByRole('heading', { name: 'Netting & penalty log' }).closest('section') as HTMLElement
+    expect(log).toHaveTextContent('1 RECORD · ALL TIME')
   })
 })

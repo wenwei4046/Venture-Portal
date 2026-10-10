@@ -15,8 +15,80 @@ import SortableTable from '@/components/SortableTable'
 import { SlidingTabs } from '@/components/motion/SlidingTabs'
 import RowMenu, { type RowMenuAnchor, type RowMenuItem } from '@/components/RowMenu'
 import type { AccountType } from '@/lib/coa'
+import { billingModeLabel, invoiceParty } from '@/lib/invoice-labels'
 import { copyInvoice, deleteDraftInvoice, settleInvoicesConsolidated, voidIssuedInvoices } from '../actions'
 import { payeeKey } from '@/lib/invoice-settlement'
+import ColumnFoot from './ColumnFoot'
+
+// What the list's own bars, banners and dialogs say: English on the Finance
+// view (2026-10-10, the handoff — "settle / void dialogs in English"), the
+// portal's Chinese everywhere else, as it always was.
+const money = (n: number) => n.toLocaleString('en-MY', { minimumFractionDigits: 2 })
+const WORDS = {
+  zh: {
+    dismiss: '知道了',
+    close: '关闭',
+    receiptBack: (no: string) => `收据 ${no} 已开 — 发票结清。`,
+    copyAsk: (no: string) => `复制 ${no} 为本月新草稿?复制后可在草稿里改金额/描述再 issue。`,
+    voidNone: '没有选到可作废的发票',
+    voidNoReason: '作废要写原因',
+    voided: (list: string[]) => `已作废 ${list.length} 张：${list.join('、')}`,
+    voidFailed: '作废失败',
+    oneCompany: '一张收据只能结同一家公司的单，请只勾选同一家公司的发票',
+    amountZero: '实收金额必须大于 0',
+    amountOver: (rem: number) => `实收金额超过发票余额 RM ${rem.toFixed(2)}`,
+    partial: (no: string, got: number, left: number) => `Receipt ${no} — 部分收款 RM ${got.toFixed(2)}，发票保持未结，余额还剩 RM ${left.toFixed(2)}。`,
+    settleHere: '就地开收据,不用离开 Billing',
+    settleVoucher: '部门间结算走冲账凭单,开好会带你回来',
+    more: '更多动作 — 也可以在这一行按右键',
+    settleTitle: '合并结算 · 生成收据',
+    settleSub: (n: number, total: number) => `${n} 张发票 · RM ${money(total)}。合并为一张收款凭证（Official Receipt），所选发票全部标记为已付。`,
+    amountLabel: '实收金额 (RM)',
+    balance: (rem: number) => `发票余额 RM ${rem.toFixed(2)}`,
+    received: (got: number) => `（已收 RM ${got.toFixed(2)}）`,
+    partialHint: '　·　少于余额 = 部分收款，发票保持未结，之后可以继续收。',
+    settling: '结算中…',
+    settleGo: (n: number) => `生成收据 · 结 ${n} 张`,
+    voidTitle: '作废发票',
+    voidSub: '开票的账会冲掉（报表自动不算），单号保留、状态变 voided。只能作废还没收钱、没 credit note 的 issued 发票。',
+    reason: '原因',
+    reasonHint: '例：开错金额，重开',
+    voiding: '作废中…',
+    voidGo: (n: number) => `作废 ${n} 张`,
+  },
+  en: {
+    dismiss: 'Dismiss',
+    close: 'Close',
+    receiptBack: (no: string) => `Receipt ${no} written — the invoice is settled.`,
+    copyAsk: (no: string) => `Copy ${no} as a new draft for this month? Change the amount or description in the draft, then issue it.`,
+    voidNone: 'No voidable invoice is selected',
+    voidNoReason: 'Give a reason for voiding',
+    voided: (list: string[]) => `Voided ${list.length}: ${list.join(', ')}`,
+    voidFailed: 'Void failed',
+    oneCompany: 'One receipt settles one company’s invoices — tick invoices of the same company only',
+    amountZero: 'The amount received must be more than 0',
+    amountOver: (rem: number) => `That is more than the invoice’s balance of RM ${rem.toFixed(2)}`,
+    partial: (no: string, got: number, left: number) => `Receipt ${no} — part payment RM ${got.toFixed(2)}; the invoice stays open with RM ${left.toFixed(2)} left.`,
+    settleHere: 'Write the receipt here, without leaving Billing',
+    settleVoucher: 'Settled through a netting voucher — it brings you back here',
+    more: 'More actions — or right-click the row',
+    settleTitle: 'Settle — one receipt',
+    settleSub: (n: number, total: number) =>
+      `${n} ${n === 1 ? 'invoice' : 'invoices'} · RM ${money(total)}. One official receipt covers them all; every invoice selected is marked paid.`,
+    amountLabel: 'Amount received (RM)',
+    balance: (rem: number) => `Balance RM ${rem.toFixed(2)}`,
+    received: (got: number) => ` (received RM ${got.toFixed(2)})`,
+    partialHint: ' · less than the balance is a part payment — the invoice stays open for the rest.',
+    settling: 'Settling…',
+    settleGo: (n: number) => `Settle ${n} ${n === 1 ? 'invoice' : 'invoices'}`,
+    voidTitle: 'Void invoices',
+    voidSub: 'The invoice’s entry is reversed (reports leave it out); its number stays and its status becomes voided. Only an issued invoice with no money in and no credit note can be voided.',
+    reason: 'Reason',
+    reasonHint: 'e.g. wrong amount — reissued',
+    voiding: 'Voiding…',
+    voidGo: (n: number) => `Void ${n}`,
+  },
+}
 
 interface Invoice {
   id: string
@@ -146,8 +218,10 @@ interface Props {
 // RPC. Until Step 5 ships, this section shows the empty state with an explanation.
 export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {}, paidByInvoice = {}, cnByInvoice = {}, extraOpenInvoices = [], extraModes = [], categoryByInvoice = {}, canSetDefault = false }: Props) {
   const router = useRouter()
-  // On the Finance view the row menu reads in English (2026-10-09).
+  // On the Finance view the row menu reads in English (2026-10-09), and since
+  // 2026-10-10 the list follows the handoff (see the test's last block).
   const fin = useFinView()
+  const W = fin ? WORDS.en : WORDS.zh
   /** An invoice's own page (2026-10-09, the Finance revamp). */
   const pageOf = (inv: Invoice) => `/invoices/${inv.id}`
   const [isPending, startTransition] = useTransition()
@@ -191,7 +265,9 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   const inTab = (inv: Invoice, tab: StatusTab) =>
     tab === 'all' ? true : tab === 'paid' ? inv.status === 'paid' || inv.status === 'paid_via_netting' : inv.status === tab
   const tabRows = displayRows.filter((inv) => inTab(inv, statusTab))
-  const tabCount = (tab: StatusTab) => invoices.filter((inv) => inTab(inv, tab)).length
+  // The handoff counts what the tab would show, the other months included once
+  // they are switched in (2026-10-10); elsewhere the month alone, as before.
+  const tabCount = (tab: StatusTab) => (fin ? displayRows : invoices).filter((inv) => inTab(inv, tab)).length
   const [showSettleModal, setShowSettleModal] = useState(false)
   const [settleBank, setSettleBank] = useState<string>('')
   const [settleDate, setSettleDate] = useState<string>(officeToday())
@@ -234,17 +310,17 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   }
   function handleVoid() {
     setVoidError(null)
-    if (voidTargetIds.length === 0) return setVoidError('没有选到可作废的发票')
-    if (!voidReason.trim()) return setVoidError('作废要写原因')
+    if (voidTargetIds.length === 0) return setVoidError(W.voidNone)
+    if (!voidReason.trim()) return setVoidError(W.voidNoReason)
     startTransition(async () => {
       try {
         const res = await voidIssuedInvoices({ ids: voidTargetIds, reason: voidReason.trim() })
         setShowVoidModal(false)
         setSelectedIds(new Set())
-        setVoidResult(`已作废 ${res.voided.length} 张：${res.voided.join('、')}`)
+        setVoidResult(W.voided(res.voided))
         router.refresh()
       } catch (err) {
-        setVoidError(err instanceof Error ? err.message : '作废失败')
+        setVoidError(err instanceof Error ? err.message : W.voidFailed)
       }
     })
   }
@@ -311,16 +387,15 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
     setSettleResult(null)
     if (!settleBank) return setSettleError('Pick a bank account')
     if (!settleDate) return setSettleError('Pick a payment date')
-    if (crossCompany) return setSettleError('一张收据只能结同一家公司的单，请只勾选同一家公司的发票')
+    if (crossCompany) return setSettleError(W.oneCompany)
     const ids = selectedInvoices.map((i) => i.id)
     if (ids.length === 0) return setSettleError('No settleable invoices selected')
     let partialAmount: number | undefined
     if (selectedInvoices.length === 1) {
       const remaining = remainingOf(selectedInvoices[0])
       const amt = Number(settleAmount)
-      if (!Number.isFinite(amt) || amt <= 0) return setSettleError('实收金额必须大于 0')
-      if (amt > remaining + 0.005)
-        return setSettleError(`实收金额超过发票余额 RM ${remaining.toFixed(2)}`)
+      if (!Number.isFinite(amt) || amt <= 0) return setSettleError(W.amountZero)
+      if (amt > remaining + 0.005) return setSettleError(W.amountOver(remaining))
       partialAmount = amt
     }
     startTransition(async () => {
@@ -333,7 +408,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
         })
         setSettleResult(
           res.isPartial
-            ? `Receipt ${res.voucherNo} — 部分收款 RM ${res.total.toFixed(2)}，发票保持未结，余额还剩 RM ${(remainingOf(selectedInvoices[0]) - res.total).toFixed(2)}。`
+            ? W.partial(res.voucherNo, res.total, remainingOf(selectedInvoices[0]) - res.total)
             : `Receipt ${res.voucherNo} — settled ${res.settledCount} invoice(s).`,
         )
         setSelectedIds(new Set())
@@ -362,7 +437,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   const openDialog = (kind: DialogKind, invoice: Invoice) => setDialog({ kind, invoice, nonce: Date.now() })
 
   function copyOne(inv: Invoice) {
-    if (!confirm(`复制 ${inv.invoice_no ?? '此发票'} 为本月新草稿?复制后可在草稿里改金额/描述再 issue。`)) return
+    if (!confirm(W.copyAsk(inv.invoice_no ?? (fin ? 'this invoice' : '此发票')))) return
     setRowError(null)
     startTransition(async () => {
       const fd = new FormData()
@@ -393,6 +468,10 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
     const items: RowMenuItem[] = [
       { key: 'open', label: fin ? 'Open' : '打开', hint: fin ? 'or double-click' : '发票页 · 双击也可以', onSelect: () => router.push(pageOf(inv)) },
     ]
+    // The handoff's row menu: Open, Open in new tab, then the page's own (2026-10-10).
+    if (fin) {
+      items.push({ key: 'new-tab', label: 'Open in new tab', onSelect: () => window.open(pageOf(inv), '_blank', 'noopener,noreferrer') })
+    }
     if (inv.status === 'draft') {
       items.push({
         key: 'approve',
@@ -473,25 +552,55 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
     window.history.replaceState(null, '', window.location.pathname + (query ? '?' + query : ''))
   }, [])
 
+  const otherCount = extraOpenInvoices.length
+  const dialogSub = fin ? 'text-graphite text-xs mt-1' : 'font-serif italic text-graphite text-xs mt-1'
+  const visibleTotal = (rows: Invoice[]) => rows.filter((inv) => inv.status !== 'voided').reduce((t, inv) => t + Number(inv.total_amount), 0)
+  /** Who the invoice bills, with what kind of party that is — the handoff's Bill to. */
+  const partyOf = (inv: Invoice) =>
+    invoiceParty(
+      {
+        company_id: inv.company_id,
+        billable_to_type: inv.billable_to_type ?? null,
+        billable_to_department_id: inv.billable_to_department_id ?? null,
+        billable_to_freetext_name: inv.billable_to_freetext_name ?? null,
+      },
+      companyMap,
+      departmentMap,
+    )
+  const tabs = (
+    <SlidingTabs
+      variant="control"
+      items={[
+        { key: 'all', label: 'All', count: tabCount('all') },
+        { key: 'issued', label: 'Issued', count: tabCount('issued') },
+        { key: 'paid', label: 'Paid', count: tabCount('paid') },
+        { key: 'draft', label: 'Draft', count: tabCount('draft') },
+        { key: 'voided', label: 'Voided', count: tabCount('voided') },
+      ]}
+      active={statusTab}
+      onTabChange={(key) => setStatusTab(key as StatusTab)}
+    />
+  )
+
   return (
     <section className="fin-queue invoices-sheet mb-12">
       {rowError ? (
         <div className="mb-4 flex items-baseline justify-between gap-3 bg-danger-bg border border-danger text-danger rounded-md px-3 py-2">
           <span className="font-sans text-sm">{rowError}</span>
           <button type="button" onClick={() => setRowError(null)} className="font-sans text-xs opacity-70 hover:opacity-100">
-            知道了
+            {W.dismiss}
           </button>
         </div>
       ) : null}
       {returnedReceipt ? (
         <div className="mb-4 flex items-baseline justify-between gap-3 border border-ledger/40 bg-ledger/10 text-ledger rounded-md px-3 py-2">
-          <span className="font-sans text-sm">收据 {returnedReceipt} 已开 — 发票结清。</span>
+          <span className="font-sans text-sm">{W.receiptBack(returnedReceipt)}</span>
           <button
             type="button"
             onClick={() => setReturnedReceipt(null)}
             className="font-sans text-xs opacity-70 hover:opacity-100"
           >
-            知道了
+            {W.dismiss}
           </button>
         </div>
       ) : null}
@@ -500,32 +609,90 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
         <span className="rule" aria-hidden />
         <span className="count">
           {invoices.length} {invoices.length === 1 ? 'INVOICE' : 'INVOICES'} · {dayjs(period).format('MMMM YYYY').toUpperCase()}
-          {selectedIds.size > 0 ? ` · ${selectedIds.size} SELECTED` : ''}
+          {fin
+            ? showAllOpen && otherCount > 0
+              ? ` + ${otherCount} OTHER ${otherCount === 1 ? 'MONTH' : 'MONTHS'}`
+              : ''
+            : selectedIds.size > 0
+              ? ` · ${selectedIds.size} SELECTED`
+              : ''}
         </span>
       </div>
 
-      {invoices.length === 0 && extraOpenInvoices.length === 0 ? (
-        <div className="border border-hairline rounded-md bg-surface p-6 text-center">
-          <p className="font-serif italic text-muted text-sm">
-            No invoices generated for this period yet. Finance generates them from
-            the HR cost submission + billing configs (Step 5 <em>Generate invoices</em>
-            button lands next).
-          </p>
-        </div>
+      {invoices.length === 0 && otherCount === 0 ? (
+        fin ? (
+          <div className="bil-empty">No invoices.</div>
+        ) : (
+          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
+            <p className="font-serif italic text-muted text-sm">
+              No invoices generated for this period yet. Finance generates them from
+              the HR cost submission + billing configs (Step 5 <em>Generate invoices</em>
+              button lands next).
+            </p>
+          </div>
+        )
       ) : (
         <>
-          <SlidingTabs
-            variant="control"
-            items={[
-              { key: 'all', label: 'All', count: tabCount('all') },
-              { key: 'issued', label: 'Issued', count: tabCount('issued') },
-              { key: 'paid', label: 'Paid', count: tabCount('paid') },
-              { key: 'draft', label: 'Draft', count: tabCount('draft') },
-              { key: 'voided', label: 'Voided', count: tabCount('voided') },
-            ]}
-            active={statusTab}
-            onTabChange={(key) => setStatusTab(key as StatusTab)}
-          />
+          {fin ? (
+            // The handoff's tab row: the statuses, and at its end the switch
+            // that brings other months' unsettled invoices in (跨月, 2026-08-20),
+            // so one receipt can cover a payer across months.
+            <div className="bil-tabrow">
+              {tabs}
+              {otherCount > 0 ? (
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={showAllOpen}
+                  onClick={() => setShowAllOpen((v) => !v)}
+                  title="Unsettled invoices from other months — tick them into the same receipt"
+                  className="bil-switch"
+                >
+                  <span className="bil-switch-track" aria-hidden>
+                    <span className="bil-switch-knob" />
+                  </span>
+                  Include other months · {otherCount}
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            tabs
+          )}
+
+          {/* The handoff's selection bar sits ABOVE the table (2026-10-10). */}
+          {fin && selectedIds.size > 0 && !showSettleModal ? (
+            <div className="bil-selbar" role="region" aria-label="What is ticked">
+              <span>
+                {selectedIds.size} selected · RM {money(selectedTotal)}
+              </span>
+              <div className="bil-selbar-actions">
+                <button type="button" onClick={clearSelection} className="bil-btn">
+                  Clear
+                </button>
+                <button type="button" onClick={printSelected} className="bil-btn">
+                  Print selected
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openVoidModal(selectedVoidable.map((i) => i.id))}
+                  disabled={selectedVoidable.length === 0 || isPending}
+                  title="Only an issued invoice with no money in and no credit note"
+                  className="bil-btn danger"
+                >
+                  Void selected {selectedVoidable.length}
+                </button>
+                <button
+                  type="button"
+                  onClick={openSettleModal}
+                  disabled={selectedInvoices.length === 0 || crossCompany}
+                  title={crossCompany ? 'One receipt settles one company’s invoices' : 'Settle them on one receipt'}
+                  className="bil-btn primary"
+                >
+                  {crossCompany ? 'Different companies can’t be combined' : `Settle ${selectedInvoices.length} →`}
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="overflow-x-auto">
             <SortableTable<Invoice>
@@ -540,18 +707,22 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
               rowClassName={(inv) =>
                 [selectedIds.has(inv.id) ? 'st-selected' : '', inv.status === 'voided' ? 'inv-void' : ''].filter(Boolean).join(' ') || undefined
               }
-              footer={(visible) => (
-                <tr>
-                  <td colSpan={1000} className="q-foot">
-                    <span>
-                      {visible.length} {visible.length === 1 ? 'invoice' : 'invoices'} · voided left out of the total
-                    </span>
-                    <span className="num">
-                      {formatMoney(visible.filter((inv) => inv.status !== 'voided').reduce((t, inv) => t + Number(inv.total_amount), 0))}
-                    </span>
-                  </td>
-                </tr>
-              )}
+              emptyState={fin ? <span className="text-muted text-sm">No invoices.</span> : undefined}
+              footer={(visible) =>
+                fin ? (
+                  // The handoff's Total row: the figure under the Amount, voided left out.
+                  <ColumnFoot label="Total" labelSkip={['_select']} cells={{ total_amount: formatMoney(visibleTotal(visible)) }} />
+                ) : (
+                  <tr>
+                    <td colSpan={1000} className="q-foot">
+                      <span>
+                        {visible.length} {visible.length === 1 ? 'invoice' : 'invoices'} · voided left out of the total
+                      </span>
+                      <span className="num">{formatMoney(visibleTotal(visible))}</span>
+                    </td>
+                  </tr>
+                )
+              }
               onRowOpen={(inv) => router.push(pageOf(inv))}
               onRowContextMenu={(inv, e) => {
                 e.preventDefault()
@@ -563,7 +734,20 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
               searchKeys={['invoice_no', 'company', 'billing_mode', 'description']}
               searchPlaceholder="Search invoice # / company / mode…"
               toolbarRight={
-                displayRows.some(isBatchSettleable) || displayRows.some(isVoidable) || extraOpenInvoices.length > 0 ? (
+                fin ? (
+                  // Extras the handoff lacks, kept: approve every draft at once,
+                  // and tick everything that can be settled.
+                  draftCount > 0 || displayRows.some(isBatchSettleable) ? (
+                    <>
+                      {draftCount > 0 ? <BulkIssueInvoicesButton period={period} count={draftCount} /> : null}
+                      {displayRows.some(isBatchSettleable) ? (
+                        <button type="button" onClick={selectAllIssued} className="bil-btn">
+                          Select all to settle
+                        </button>
+                      ) : null}
+                    </>
+                  ) : undefined
+                ) : displayRows.some(isBatchSettleable) || displayRows.some(isVoidable) || extraOpenInvoices.length > 0 ? (
                   <>
                     {draftCount > 0 ? <BulkIssueInvoicesButton period={period} count={draftCount} /> : null}
                     {extraOpenInvoices.length > 0 ? (
@@ -621,20 +805,36 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   key: 'invoice_no',
                   group: '基本',
                   label: 'Invoice #',
-                  // The phone's small print under Bill to carries the number.
-                  mobile: 'drop',
+                  // The phone's small print under Bill to carries the number —
+                  // on the Finance view the number titles the row (the handoff).
+                  mobile: fin ? 'keep' : 'drop',
                   // The number opens the invoice's page (2026-10-09) — a link, so
                   // a middle-click or Ctrl-click opens it in a new tab.
                   render: (inv) => (
-                    <Link
-                      href={pageOf(inv)}
-                      className="font-sans text-[12px] font-medium text-ink hover:text-accent transition-colors underline-offset-2 hover:underline"
-                    >
-                      {inv.invoice_no ?? inv.id.slice(0, 8)}
-                    </Link>
+                    <>
+                      <Link
+                        href={pageOf(inv)}
+                        className="font-sans text-[12px] font-medium text-ink hover:text-accent transition-colors underline-offset-2 hover:underline whitespace-nowrap"
+                      >
+                        {inv.invoice_no ?? inv.id.slice(0, 8)}
+                      </Link>
+                      {fin ? (
+                        // The phone's small print: who it bills, then the status and the date.
+                        <span className="q-sub md:hidden">
+                          <span className="q-sub-no">{partyOf(inv).name}</span>
+                          <span className="q-sub-by">
+                            <span className="by">
+                              <InvoiceStatus status={inv.status} />
+                            </span>
+                            <span className="on">{inv.invoice_date ? dayjs(inv.invoice_date).format('D MMM') : ''}</span>
+                          </span>
+                        </span>
+                      ) : null}
+                    </>
                   ),
                   sortValue: (inv) => inv.invoice_no ?? inv.id,
-                  cellClassName: 'whitespace-nowrap',
+                  // The Finance view's phone small print under the number may wrap.
+                  cellClassName: fin ? undefined : 'whitespace-nowrap',
                 },
                 {
                   // 2026-10-02 (user: "invoice 没有日期"). The date printed on the
@@ -655,8 +855,18 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   key: 'company',
                   group: '基本',
                   label: 'Bill to',
-                  mobile: 'keep',
+                  mobile: fin ? 'detail' : 'keep',
                   render: (inv) => {
+                    if (fin) {
+                      // The handoff's Bill to: the party's name, its kind under it.
+                      const party = partyOf(inv)
+                      return (
+                        <>
+                          <div className="text-ink">{party.name}</div>
+                          <div className="mt-0.5 text-[11px] text-muted">{party.kind}</div>
+                        </>
+                      )
+                    }
                     const labels = resolvePartyLabel(inv, companyMap, departmentMap)
                     // A subsidiary by its code, its name under it (the sheet, 2026-10-07).
                     const code = inv.company_id ? labels.sub : null
@@ -683,8 +893,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                       </>
                     )
                   },
-                  sortValue: (inv) => resolvePartyLabel(inv, companyMap, departmentMap).primary,
-                  filterValue: (inv) => resolvePartyLabel(inv, companyMap, departmentMap).primary,
+                  sortValue: (inv) => (fin ? partyOf(inv).name : resolvePartyLabel(inv, companyMap, departmentMap).primary),
+                  filterValue: (inv) => (fin ? partyOf(inv).name : resolvePartyLabel(inv, companyMap, departmentMap).primary),
                   filterable: true,
                 },
                 {
@@ -702,7 +912,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   sortValue: (inv) => inv.description ?? '',
                   filterValue: (inv) => inv.description ?? '',
                   filterable: true,
-                  cellClassName: 'font-serif italic text-graphite text-sm',
+                  // The handoff's UI text is the body face (2026-10-10).
+                  cellClassName: fin ? undefined : 'font-serif italic text-graphite text-sm',
                 },
                 {
                   // What the lines post to (2026-10-07): the account names, or
@@ -715,17 +926,18 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   render: (inv) => categoryOf(inv) ?? <span className="text-muted">—</span>,
                   sortValue: (inv) => categoryOf(inv) ?? '',
                   filterValue: (inv) => categoryOf(inv) ?? '',
-                  cellClassName: 'font-serif italic text-graphite text-sm',
+                  cellClassName: fin ? undefined : 'font-serif italic text-graphite text-sm',
                 },
                 {
                   key: 'billing_mode',
                   group: '入账',
                   label: 'Mode',
                   mobile: 'detail',
-                  render: (inv) => formatBillingMode(inv.billing_mode),
-                  sortValue: (inv) => formatBillingMode(inv.billing_mode),
+                  // The handoff names every mode in words ("HR attribution"); elsewhere as before.
+                  render: (inv) => (fin ? billingModeLabel(inv.billing_mode, extraModes) : formatBillingMode(inv.billing_mode)),
+                  sortValue: (inv) => (fin ? billingModeLabel(inv.billing_mode, extraModes) : formatBillingMode(inv.billing_mode)),
                   filterable: true,
-                  cellClassName: 'font-serif italic text-graphite text-sm',
+                  cellClassName: fin ? undefined : 'font-serif italic text-graphite text-sm',
                 },
                 {
                   key: 'total_amount',
@@ -753,7 +965,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                     )
                   },
                   sortValue: (inv) => Number(inv.total_amount),
-                  cellClassName: 'font-mono tabular font-medium text-ink',
+                  // Figures at 400 on the Finance view — the handoff keeps 500/600 for totals.
+                  cellClassName: fin ? 'font-mono tabular text-ink whitespace-nowrap' : 'font-mono tabular font-medium text-ink',
                 },
                 {
                   key: 'status',
@@ -785,16 +998,16 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                           <button
                             type="button"
                             onClick={() => settleOne(inv)}
-                            className="inv-settle text-xs text-accent hover:text-accent-hover font-serif italic"
-                            title="就地开收据,不用离开 Billing"
+                            className={fin ? 'inv-settle bil-row-btn' : 'inv-settle text-xs text-accent hover:text-accent-hover font-serif italic'}
+                            title={W.settleHere}
                           >
                             Settle →
                           </button>
                         ) : (
                           <Link
                             href={`/payments/new?invoice_id=${inv.id}&return_to=/billing`}
-                            className="inv-settle text-xs text-accent hover:text-accent-hover font-serif italic"
-                            title="部门间结算走冲账凭单,开好会带你回来"
+                            className={fin ? 'inv-settle bil-row-btn' : 'inv-settle text-xs text-accent hover:text-accent-hover font-serif italic'}
+                            title={W.settleVoucher}
                           >
                             Settle →
                           </Link>
@@ -804,7 +1017,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                         type="button"
                         aria-haspopup="menu"
                         aria-label={`Actions for ${inv.invoice_no ?? 'invoice'}`}
-                        title="更多动作 — 也可以在这一行按右键"
+                        title={W.more}
                         onClick={(e) => {
                           const r = e.currentTarget.getBoundingClientRect()
                           setMenu({ invoice: inv, anchor: { x: r.right - 220, y: r.bottom + 4 } })
@@ -822,7 +1035,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
 
           {/* What is ticked, and what to do with it (2026-10-07): the bar the
               Approvals queue has, instead of a summary squeezed into the toolbar. */}
-          {selectedIds.size > 0 && !showSettleModal ? (
+          {!fin && selectedIds.size > 0 && !showSettleModal ? (
             <div className="bulk-bar" role="region" aria-label="Decision on what is ticked">
               <div className="bulk-bar-l">
                 <b>{selectedIds.size}</b> selected · <b>RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</b>
@@ -943,11 +1156,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
           >
             <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline">
               <div>
-                <h2 className="font-serif text-2xl text-ink">合并结算 · 生成收据</h2>
-                <p className="font-serif italic text-graphite text-xs mt-1">
-                  {selectedInvoices.length} 张发票 · RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}。
-                  合并为一张收款凭证（Official Receipt），所选发票全部标记为已付。
-                </p>
+                <h2 className="font-serif text-2xl text-ink">{W.settleTitle}</h2>
+                <p className={dialogSub}>{W.settleSub(selectedInvoices.length, selectedTotal)}</p>
               </div>
               <button
                 onClick={() => !isPending && setShowSettleModal(false)}
@@ -992,7 +1202,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
               {selectedInvoices.length === 1 ? (
                 <label className="block">
                   <div className="text-xs font-sans font-medium text-graphite mb-1">
-                    实收金额 (RM) <span className="text-danger">*</span>
+                    {W.amountLabel} <span className="text-danger">*</span>
                   </div>
                   <input
                     type="text"
@@ -1002,11 +1212,9 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                     className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink font-mono tabular focus:outline-none focus:border-accent-border"
                   />
                   <p className="text-[11px] font-sans text-muted mt-1">
-                    发票余额 RM {remainingOf(selectedInvoices[0]).toFixed(2)}
-                    {paidByInvoice[selectedInvoices[0].id] ? (
-                      <>（已收 RM {(paidByInvoice[selectedInvoices[0].id] ?? 0).toFixed(2)}）</>
-                    ) : null}
-                    　·　少于余额 = 部分收款，发票保持未结，之后可以继续收。
+                    {W.balance(remainingOf(selectedInvoices[0]))}
+                    {paidByInvoice[selectedInvoices[0].id] ? W.received(paidByInvoice[selectedInvoices[0].id] ?? 0) : null}
+                    {W.partialHint}
                   </p>
                 </label>
               ) : null}
@@ -1043,9 +1251,9 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
               <button
                 onClick={handleBatchSettle}
                 disabled={isPending || selectedInvoices.length === 0 || crossCompany}
-                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`bg-accent hover:bg-accent-hover ${fin ? 'text-ink font-sans font-medium' : 'text-white font-serif italic'} text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                {isPending ? '结算中…' : `生成收据 · 结 ${selectedInvoices.length} 张`}
+                {isPending ? W.settling : W.settleGo(selectedInvoices.length)}
               </button>
             </div>
           </div>
@@ -1056,7 +1264,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
       {voidResult && !showVoidModal ? (
         <div className="mt-4 bg-surface border border-hairline rounded-md px-3 py-2 text-sm font-sans flex items-center justify-between">
           <span>{voidResult}</span>
-          <button type="button" onClick={() => setVoidResult(null)} className="text-xs text-muted hover:text-ink">关闭</button>
+          <button type="button" onClick={() => setVoidResult(null)} className="text-xs text-muted hover:text-ink">{W.close}</button>
         </div>
       ) : null}
       {showVoidModal ? (
@@ -1070,10 +1278,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
           >
             <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline">
               <div>
-                <h2 className="font-serif text-2xl text-ink">作废发票</h2>
-                <p className="font-serif italic text-graphite text-xs mt-1">
-                  开票的账会冲掉（报表自动不算），单号保留、状态变 voided。只能作废还没收钱、没 credit note 的 issued 发票。
-                </p>
+                <h2 className="font-serif text-2xl text-ink">{W.voidTitle}</h2>
+                <p className={dialogSub}>{W.voidSub}</p>
               </div>
               <button
                 onClick={() => !isPending && setShowVoidModal(false)}
@@ -1097,14 +1303,14 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
               </ul>
               <label className="block">
                 <div className="text-xs font-sans font-medium text-graphite mb-1">
-                  原因 <span className="text-danger">*</span>
+                  {W.reason} <span className="text-danger">*</span>
                 </div>
                 <input
                   type="text"
                   value={voidReason}
                   onChange={(e) => setVoidReason(e.target.value)}
                   disabled={isPending}
-                  placeholder="例：开错金额，重开"
+                  placeholder={W.reasonHint}
                   className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border disabled:opacity-50"
                 />
               </label>
@@ -1125,9 +1331,9 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
               <button
                 onClick={handleVoid}
                 disabled={isPending || voidTargetIds.length === 0 || !voidReason.trim()}
-                className="bg-danger hover:opacity-90 text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`bg-danger hover:opacity-90 text-white ${fin ? 'font-sans font-medium' : 'font-serif italic'} text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                {isPending ? '作废中…' : `作废 ${voidTargetIds.length} 张`}
+                {isPending ? W.voiding : W.voidGo(voidTargetIds.length)}
               </button>
             </div>
           </div>

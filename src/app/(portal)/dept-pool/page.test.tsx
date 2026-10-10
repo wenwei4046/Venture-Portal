@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
 
 // 2026-10-09 — Department Pools per the user's Claude Design handoff (Phase 4
@@ -17,6 +17,10 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/cfo-reports', () => ({ fetchIncomeStatement: mocks.fetchIncomeStatement }))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
 vi.mock('@/app/(portal)/hr-costing/actions', () => ({ executeHrCosting: vi.fn() }))
+// The tables' saved column layout comes from the browser client; here there is none.
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }) }),
+}))
 
 import DeptPoolPage from './page'
 
@@ -177,9 +181,58 @@ describe('Department Pools · the HR costing submission, for Finance', () => {
     expect(within(row('Marketing')).getByText('executed').closest('.chip')).toHaveClass('ledger')
     expect(within(row('HR')).getByText('ready to execute').closest('.chip')).toHaveClass('accent')
     expect(within(row('HR')).getByRole('button', { name: 'Mark executed' })).toBeInTheDocument()
-    expect(within(row('IT')).getByText('awaiting Principal').closest('.chip')).toHaveClass('alert')
+    // 2026-10-10 — the handoff: waiting on the Principal is the blue wait tone, not alert.
+    expect(within(row('IT')).getByText('awaiting Principal').closest('.chip')).toHaveClass('wait')
+    expect(within(row('IT')).getByText('awaiting Principal').closest('.chip')).not.toHaveClass('alert')
     expect(row('Finance')).toHaveTextContent('—')
     expect(within(row('Marketing')).queryByRole('button', { name: 'Mark executed' })).toBeNull()
+  })
+})
+
+// 2026-10-10 — the handoff: Balance by bank and By department are the sheet's
+// tables — ▽ on Department, a Range on the amounts, columns that resize and
+// reorder — still closing on "All departments", with every link, chip and
+// Mark executed kept. A bank's column is headed by its name alone.
+describe('Department Pools · the sheet tables, for Finance', () => {
+  it('heads each bank column with the bank’s name alone', async () => {
+    render(await DeptPoolPage({ searchParams: Promise.resolve({}) }))
+    const banks = section('Balance by bank')
+    expect(banks.querySelector('thead th[data-col="bank:1010"]')).toHaveTextContent(/^Hong Leong\W*$/)
+    expect(banks.querySelector('thead th[data-col="bank:1020"]')).toHaveTextContent(/^Alliance\W*$/)
+    expect(banks).not.toHaveTextContent('(1010)')
+  })
+
+  it('filters by department and by a range of amounts', async () => {
+    render(await DeptPoolPage({ searchParams: Promise.resolve({}) }))
+    const banks = section('Balance by bank')
+    expect(within(banks).getByRole('button', { name: 'Filter Department' })).toBeInTheDocument()
+    fireEvent.click(within(banks).getByRole('button', { name: 'Filter Total' }))
+    expect(within(screen.getByRole('dialog', { name: 'Filter Total' })).getByRole('button', { name: 'Range' })).toBeInTheDocument()
+
+    const depts = section('By department')
+    fireEvent.click(within(depts).getByRole('button', { name: 'Filter Department' }))
+    const filter = screen.getByRole('dialog', { name: 'Filter Department' })
+    fireEvent.click(within(filter).getByRole('checkbox', { name: 'Marketing' }))
+    expect(within(depts).queryByText('Marketing')).toBeNull()
+    expect(within(depts).getByText('HR')).toBeInTheDocument()
+    expect(within(depts).getByRole('button', { name: 'Filter In (to date)' })).toBeInTheDocument()
+  })
+
+  it('keeps the balance hidden until its header shows it', async () => {
+    render(await DeptPoolPage({ searchParams: Promise.resolve({}) }))
+    const depts = section('By department')
+    const hr = within(depts).getByText('HR').closest('tr') as HTMLElement
+    expect(hr).toHaveTextContent('••••••')
+    fireEvent.click(within(depts).getByRole('button', { name: /Balance/ }))
+    expect(hr).toHaveTextContent('98,750.00')
+  })
+
+  it('makes the accrual By department a sheet table too', async () => {
+    render(await DeptPoolPage({ searchParams: Promise.resolve({ basis: 'accrual' }) }))
+    const depts = section('By department')
+    expect(within(depts).getByRole('button', { name: 'Filter Department' })).toBeInTheDocument()
+    expect(within(depts).getByRole('button', { name: 'Filter = Net margin' })).toBeInTheDocument()
+    expect(within(depts).getByRole('link', { name: 'P&L' })).toHaveAttribute('href', '/dept-pool/marketing?tab=pnl')
   })
 })
 

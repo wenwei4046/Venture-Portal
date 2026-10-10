@@ -1,7 +1,9 @@
+'use client'
+
 import Link from 'next/link'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import type { DeptPoolAccrual } from '@/lib/dept-pool-accrual'
-import LedgerRow from '@/components/LedgerRow'
+import SortableTable, { type SortableColumn } from '@/components/SortableTable'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { BalanceProvider, BalanceToggle, BalanceValue } from './RevealAmount'
 import { executeHrCosting } from '@/app/(portal)/hr-costing/actions'
@@ -13,6 +15,9 @@ import dayjs from 'dayjs'
 // this draws them: cards, then the tables, each closing on "All departments".
 // Cash or Accrual (?basis=) is switched in the head since 2026-10-09, when the
 // sidebar began listing each department's own P&L and Cash Flow instead.
+// 2026-10-10 — the handoff: the tables are the sheet's (▽ on Department, a
+// Range on the amounts, columns that resize and reorder), a bank's column is
+// headed by its name, and a submission awaiting the Principal is blue (wait).
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
@@ -96,31 +101,31 @@ export interface CashDeptRow {
   hr?: { id: string; state: string; period: string } | null
 }
 
-/** A submission's state as the handoff names it. */
+/** A submission's state as the handoff names it; one awaiting the Principal
+ *  is waiting on someone — the blue wait tone (2026-10-10, was alert). */
 const HR_STATE: Record<string, { label: string; tone: string }> = {
   executed: { label: 'executed', tone: 'ledger' },
   approved_for_execution: { label: 'ready to execute', tone: 'accent' },
-  pending: { label: 'awaiting Principal', tone: 'alert' },
+  pending: { label: 'awaiting Principal', tone: 'wait' },
 }
+
+const hrLabel = (hr: CashDeptRow['hr']) => (hr ? HR_STATE[hr.state]?.label ?? hr.state : '—')
 
 /** The HR Costing Submission cell: the latest submission's state as a chip
  *  (its month and the approved total on hover), and Mark executed for a ready
  *  one — the same action as the submissions page; it moves no money. */
-function HrCell({ row, canExecute }: { row: CashDeptRow; canExecute: boolean }) {
-  if (!row.hr) return <span className="text-graphite">—</span>
-  const s = HR_STATE[row.hr.state] ?? { label: row.hr.state, tone: '' }
+function HrCell({ hr, costing, canExecute }: { hr: CashDeptRow['hr']; costing: number; canExecute: boolean }) {
+  if (!hr) return <span className="text-graphite">—</span>
+  const s = HR_STATE[hr.state] ?? { label: hr.state, tone: '' }
   return (
-    <span className="inline-flex flex-wrap items-center justify-end gap-2">
-      <span
-        className={`chip ${s.tone}`}
-        title={`${dayjs(row.hr.period).format('MMM YYYY')} · approved to date ${formatMoney(row.costing)}`}
-      >
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <span className={`chip ${s.tone}`} title={`${dayjs(hr.period).format('MMM YYYY')} · approved to date ${formatMoney(costing)}`}>
         <span className="dot" />
         {s.label}
       </span>
-      {canExecute && row.hr.state === 'approved_for_execution' ? (
+      {canExecute && hr.state === 'approved_for_execution' ? (
         <form action={executeHrCosting}>
-          <input type="hidden" name="id" value={row.hr.id} />
+          <input type="hidden" name="id" value={hr.id} />
           <button type="submit" className="btn-quiet-sheet">
             Mark executed
           </button>
@@ -136,6 +141,99 @@ export interface PerBankBreakdown {
   totals: { perBank: Record<string, number>; grand: number }
 }
 
+/** The foot's label: every department, or how many a filter leaves on show. */
+function footLabel(shown: number, all: number): string {
+  return shown === all ? 'All departments' : `${shown} of ${all} departments`
+}
+
+const sumOf = <T,>(rows: T[], f: (r: T) => number) => r2(rows.reduce((s, r) => s + f(r), 0))
+
+type BankRow = PerBankBreakdown['rows'][number]
+
+/** Each department's slice of each bank. A bank is named alone in its head,
+ *  unless two share a name (2026-10-10, the handoff — was "Hong Leong (1010)"). */
+function BalanceByBank({ perBank, canSetDefault }: { perBank: PerBankBreakdown; canSetDefault: boolean }) {
+  const head = (b: { code: string; name: string }) => (perBank.banks.filter((x) => x.name === b.name).length > 1 ? `${b.name} (${b.code})` : b.name)
+  const columns: SortableColumn<BankRow>[] = [
+    {
+      key: 'dept',
+      label: 'Department',
+      mobile: 'keep',
+      render: (r) => (r.label === 'Venture (Office)' ? VENTURE : <span className="font-medium">{r.label}</span>),
+      sortValue: (r) => r.label,
+      filterable: true,
+    },
+    ...perBank.banks.map(
+      (b): SortableColumn<BankRow> => ({
+        key: `bank:${b.code}`,
+        label: head(b),
+        align: 'right',
+        mobile: 'detail',
+        render: (r) => <Fig v={r.perBank[b.code] ?? 0} dash />,
+        sortValue: (r) => r.perBank[b.code] ?? 0,
+        filterable: true,
+        range: 'number',
+        cellClassName: 'whitespace-nowrap',
+      }),
+    ),
+    {
+      key: 'total',
+      label: 'Total',
+      align: 'right',
+      mobile: 'keep',
+      render: (r) => <Fig v={r.total} />,
+      sortValue: (r) => r.total,
+      filterable: true,
+      range: 'number',
+      cellClassName: 'whitespace-nowrap',
+    },
+  ]
+  return (
+    <div className="fin-queue">
+      <SortableTable<BankRow>
+        layoutId="dept-pool.banks"
+        layoutTitle="Balance by bank"
+        canSetDefault={canSetDefault}
+        scrollBox
+        resizeMode="neighbour"
+        rows={perBank.rows}
+        columns={columns}
+        getRowKey={(r) => r.segment}
+        defaultSort={{ key: 'dept', dir: 'asc' }}
+        footer={(visible) => {
+          // Every row on show: the totals the page worked out (down a column = that bank's balance).
+          const all = visible.length === perBank.rows.length
+          const bank = (code: string) => (all ? perBank.totals.perBank[code] ?? 0 : sumOf(visible, (r) => r.perBank[code] ?? 0))
+          return (
+            <tr>
+              <td colSpan={1000} className="q-foot">
+                <span>{footLabel(visible.length, perBank.rows.length)}</span>
+                <span className="num">
+                  {perBank.banks.map((b) => `${head(b)} ${formatMoneyBare(bank(b.code))}`).join(' · ')} · Total{' '}
+                  {formatMoneyBare(all ? perBank.totals.grand : sumOf(visible, (r) => r.total))}
+                </span>
+              </td>
+            </tr>
+          )
+        }}
+      />
+    </div>
+  )
+}
+
+interface DeptLine {
+  key: string
+  name: string
+  venture: boolean
+  href: string | null
+  pnlHref: string | null
+  balance: number
+  inAmt: number
+  outAmt: number
+  costing: number
+  hr: CashDeptRow['hr']
+}
+
 export function DeptPoolCashSheet({
   monthTitle,
   canNewContract,
@@ -144,12 +242,15 @@ export function DeptPoolCashSheet({
   perBank,
   total,
   canExecuteHr = false,
+  canSetDefault = false,
 }: {
   monthTitle: string
   canNewContract: boolean
   rows: CashDeptRow[]
   /** Treasury · Edit — Mark executed on a ready HR costing submission. */
   canExecuteHr?: boolean
+  /** The viewer may keep a table's arrangement as everyone's default. */
+  canSetDefault?: boolean
   venture: { balance: number; in_amt: number; out_amt: number } | null
   perBank: PerBankBreakdown | null
   /** Every department's balance plus Venture's — the physical bank balance. */
@@ -159,6 +260,76 @@ export function DeptPoolCashSheet({
   const outAll = r2(rows.reduce((s, r) => s + r.outAmt, 0) + (venture?.out_amt ?? 0))
   const below = [...rows.filter((r) => r.balance < -0.005).map((r) => r.name), ...(venture && venture.balance < -0.005 ? ['Venture (Office)'] : [])]
   const deptCount = `${rows.length} department${rows.length === 1 ? '' : 's'}${venture ? ' + Venture' : ''}`
+
+  const lines: DeptLine[] = [
+    ...rows.map((r) => ({ key: r.id, name: r.name, venture: false, href: r.href, pnlHref: r.pnlHref, balance: r.balance, inAmt: r.inAmt, outAmt: r.outAmt, costing: r.costing, hr: r.hr ?? null })),
+    ...(venture
+      ? [{ key: 'venture', name: 'Venture (Office)', venture: true, href: null, pnlHref: null, balance: venture.balance, inAmt: venture.in_amt, outAmt: venture.out_amt, costing: 0, hr: null }]
+      : []),
+  ]
+  const columns: SortableColumn<DeptLine>[] = [
+    {
+      key: 'dept',
+      label: 'Department',
+      mobile: 'keep',
+      render: (r) => (r.venture ? VENTURE : <DeptName name={r.name} href={r.href} pnlHref={r.pnlHref} />),
+      sortValue: (r) => r.name,
+      filterable: true,
+    },
+    {
+      // Hidden until its head shows it (the user's toggle), so it neither sorts nor filters.
+      key: 'balance',
+      label: 'Balance',
+      header: <BalanceToggle label="Balance" />,
+      align: 'right',
+      mobile: 'keep',
+      sortable: false,
+      render: (r) => <BalanceValue text={formatMoneyBare(r.balance)} />,
+      cellClassName: 'whitespace-nowrap',
+    },
+    {
+      key: 'in',
+      label: 'In (to date)',
+      align: 'right',
+      mobile: 'detail',
+      render: (r) => formatMoneyBare(r.inAmt),
+      sortValue: (r) => r.inAmt,
+      filterable: true,
+      range: 'number',
+      cellClassName: 'whitespace-nowrap',
+    },
+    {
+      key: 'out',
+      label: 'Out (to date)',
+      align: 'right',
+      mobile: 'detail',
+      render: (r) => formatMoneyBare(r.outAmt),
+      sortValue: (r) => r.outAmt,
+      filterable: true,
+      range: 'number',
+      cellClassName: 'whitespace-nowrap',
+    },
+    {
+      key: 'net',
+      label: 'Net (to date)',
+      align: 'right',
+      mobile: 'detail',
+      render: (r) => <Fig v={r2(r.inAmt - r.outAmt)} />,
+      sortValue: (r) => r2(r.inAmt - r.outAmt),
+      filterable: true,
+      range: 'number',
+      cellClassName: 'whitespace-nowrap',
+    },
+    {
+      key: 'hr',
+      label: 'HR Costing Submission',
+      mobile: 'detail',
+      render: (r) => (r.venture ? <span className="text-graphite">—</span> : <HrCell hr={r.hr} costing={r.costing} canExecute={canExecuteHr} />),
+      sortValue: (r) => hrLabel(r.hr),
+      filterable: true,
+      filterValue: (r) => hrLabel(r.hr),
+    },
+  ]
 
   return (
     <div>
@@ -188,51 +359,7 @@ export function DeptPoolCashSheet({
               {perBank.banks.length} {perBank.banks.length === 1 ? 'BANK' : 'BANKS'}
             </span>
           </div>
-          <div className="table-frame">
-            <div className="table-frame-scroll">
-              <table className="ledger-table [&_td.num]:whitespace-nowrap">
-                <thead>
-                  <tr>
-                    <th>Department</th>
-                    {perBank.banks.map((b) => (
-                      <th key={b.code} className="right m-hide">
-                        {b.name} <span className="font-mono">({b.code})</span>
-                      </th>
-                    ))}
-                    <th className="right">Total</th>
-                    <th className="lt-toggle" aria-hidden />
-                  </tr>
-                </thead>
-                <tbody>
-                  {perBank.rows.map((r) => (
-                    <LedgerRow key={r.segment}>
-                      <td>{r.label === 'Venture (Office)' ? VENTURE : <span className="font-medium">{r.label}</span>}</td>
-                      {perBank.banks.map((b) => (
-                        <td key={b.code} className="num m-hide" data-label={b.name}>
-                          <Fig v={r.perBank[b.code] ?? 0} dash />
-                        </td>
-                      ))}
-                      <td className="num">
-                        <Fig v={r.total} />
-                      </td>
-                    </LedgerRow>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td>All departments</td>
-                    {perBank.banks.map((b) => (
-                      <td key={b.code} className="num m-hide">
-                        {formatMoneyBare(perBank.totals.perBank[b.code] ?? 0)}
-                      </td>
-                    ))}
-                    <td className="num">{formatMoneyBare(perBank.totals.grand)}</td>
-                    <td className="lt-toggle" aria-hidden />
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
+          <BalanceByBank perBank={perBank} canSetDefault={canSetDefault} />
           <p className="text-xs text-graphite mt-3 max-w-3xl">
             Each department&rsquo;s cash slice on each HV bank account, from the journal lines. Down a bank column = that bank&rsquo;s
             balance; across a row = the department&rsquo;s total (as By department). Inter-billing recharges settle as an internal Hong
@@ -247,89 +374,41 @@ export function DeptPoolCashSheet({
           <span className="rule" aria-hidden />
           <span className="count">CASH · TO DATE</span>
         </div>
-        {rows.length === 0 && !venture ? (
+        {lines.length === 0 ? (
           <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
             <p className="text-sm">No departments visible to your role.</p>
           </div>
         ) : (
           <BalanceProvider>
-            <div className="table-frame">
-              <div className="table-frame-scroll">
-                <table className="ledger-table [&_td.num]:whitespace-nowrap">
-                  <thead>
+            <div className="fin-queue">
+              <SortableTable<DeptLine>
+                layoutId="dept-pool.departments"
+                layoutTitle="By department"
+                canSetDefault={canSetDefault}
+                scrollBox
+                resizeMode="neighbour"
+                rows={lines}
+                columns={columns}
+                getRowKey={(r) => r.key}
+                defaultSort={{ key: 'dept', dir: 'asc' }}
+                footer={(visible) => {
+                  // Every row on show: the page's own totals (the balance = the physical bank balance).
+                  const all = visible.length === lines.length
+                  const inn = all ? inAll : sumOf(visible, (r) => r.inAmt)
+                  const out = all ? outAll : sumOf(visible, (r) => r.outAmt)
+                  return (
                     <tr>
-                      <th>Department</th>
-                      <th className="right">
-                        <BalanceToggle label="Balance" />
-                      </th>
-                      <th className="right m-hide">In (to date)</th>
-                      <th className="right m-hide">Out (to date)</th>
-                      <th className="right m-hide">Net (to date)</th>
-                      <th className="right m-hide">HR Costing Submission</th>
-                      <th className="lt-toggle" aria-hidden />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r) => (
-                      <LedgerRow key={r.id}>
-                        <td>
-                          <DeptName name={r.name} href={r.href} pnlHref={r.pnlHref} />
-                        </td>
-                        <td className="num">
-                          <BalanceValue text={formatMoneyBare(r.balance)} />
-                        </td>
-                        <td className="num m-hide" data-label="In (to date)">
-                          {formatMoneyBare(r.inAmt)}
-                        </td>
-                        <td className="num m-hide" data-label="Out (to date)">
-                          {formatMoneyBare(r.outAmt)}
-                        </td>
-                        <td className="num m-hide" data-label="Net (to date)">
-                          <Fig v={r2(r.inAmt - r.outAmt)} />
-                        </td>
-                        <td className="right m-hide" data-label="HR Costing Submission">
-                          <HrCell row={r} canExecute={canExecuteHr} />
-                        </td>
-                      </LedgerRow>
-                    ))}
-                    {venture ? (
-                      <LedgerRow>
-                        <td>{VENTURE}</td>
-                        <td className="num">
-                          <BalanceValue text={formatMoneyBare(venture.balance)} />
-                        </td>
-                        <td className="num m-hide" data-label="In (to date)">
-                          {formatMoneyBare(venture.in_amt)}
-                        </td>
-                        <td className="num m-hide" data-label="Out (to date)">
-                          {formatMoneyBare(venture.out_amt)}
-                        </td>
-                        <td className="num m-hide" data-label="Net (to date)">
-                          <Fig v={r2(venture.in_amt - venture.out_amt)} />
-                        </td>
-                        <td className="right m-hide" data-label="HR Costing Submission">
-                          <span className="text-graphite">—</span>
-                        </td>
-                      </LedgerRow>
-                    ) : null}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td>All departments</td>
-                      <td className="num">
-                        <BalanceValue text={formatMoneyBare(total)} />
+                      <td colSpan={1000} className="q-foot">
+                        <span>{footLabel(visible.length, lines.length)}</span>
+                        <span className="num">
+                          Balance <BalanceValue text={formatMoneyBare(all ? total : sumOf(visible, (r) => r.balance))} /> · In {formatMoneyBare(inn)} · Out{' '}
+                          {formatMoneyBare(out)} · Net <Fig v={r2(inn - out)} />
+                        </span>
                       </td>
-                      <td className="num m-hide">{formatMoneyBare(inAll)}</td>
-                      <td className="num m-hide">{formatMoneyBare(outAll)}</td>
-                      <td className="num m-hide">
-                        <Fig v={r2(inAll - outAll)} />
-                      </td>
-                      <td className="m-hide" />
-                      <td className="lt-toggle" aria-hidden />
                     </tr>
-                  </tfoot>
-                </table>
-              </div>
+                  )
+                }}
+              />
             </div>
           </BalanceProvider>
         )}
@@ -354,27 +433,21 @@ export interface AccrualDeptRow {
   a: DeptPoolAccrual
 }
 
-function AccrualCells({ a }: { a: DeptPoolAccrual }) {
-  return (
-    <>
-      <td className="num m-hide" data-label="Revenue (bill)">
-        {formatMoneyBare(a.revenue)}
-      </td>
-      <td className="num m-hide" data-label="− Cost">
-        {formatMoneyBare(a.cost)}
-      </td>
-      <td className="num m-hide" data-label="− Expense">
-        {formatMoneyBare(a.expense)}
-      </td>
-      <td className="num m-hide" data-label="− Inter-billing">
-        {formatMoneyBare(a.interBilling)}
-      </td>
-      <td className="num">
-        <Fig v={a.netMargin} />
-      </td>
-    </>
-  )
+interface AccrualLine {
+  key: string
+  name: string
+  venture: boolean
+  href: string | null
+  pnlHref: string | null
+  a: DeptPoolAccrual
 }
+
+const ACCRUAL_FIGURES: Array<[keyof DeptPoolAccrual, string]> = [
+  ['revenue', 'Revenue (bill)'],
+  ['cost', '− Cost'],
+  ['expense', '− Expense'],
+  ['interBilling', '− Inter-billing'],
+]
 
 export function DeptPoolAccrualSheet({
   monthTitle,
@@ -382,6 +455,7 @@ export function DeptPoolAccrualSheet({
   canNewContract,
   rows,
   venture,
+  canSetDefault = false,
 }: {
   monthTitle: string
   /** D MMM YYYY — the end of the current period. */
@@ -389,11 +463,52 @@ export function DeptPoolAccrualSheet({
   canNewContract: boolean
   rows: AccrualDeptRow[]
   venture: DeptPoolAccrual | null
+  /** The viewer may keep the table's arrangement as everyone's default. */
+  canSetDefault?: boolean
 }) {
   const all = [...rows.map((r) => r.a), ...(venture ? [venture] : [])]
   const sum = (k: keyof DeptPoolAccrual) => r2(all.reduce((s, a) => s + a[k], 0))
   const totals: DeptPoolAccrual = { revenue: sum('revenue'), cost: sum('cost'), expense: sum('expense'), interBilling: sum('interBilling'), netMargin: sum('netMargin') }
   const deptCount = `${rows.length} department${rows.length === 1 ? '' : 's'}${venture ? ' + Venture' : ''}`
+
+  const lines: AccrualLine[] = [
+    ...rows.map((r) => ({ key: r.id, name: r.name, venture: false, href: r.href, pnlHref: r.pnlHref, a: r.a })),
+    ...(venture ? [{ key: 'venture', name: 'Venture (Office)', venture: true, href: null, pnlHref: null, a: venture }] : []),
+  ]
+  const columns: SortableColumn<AccrualLine>[] = [
+    {
+      key: 'dept',
+      label: 'Department',
+      mobile: 'keep',
+      render: (r) => (r.venture ? VENTURE : <DeptName name={r.name} href={r.href} pnlHref={r.pnlHref} />),
+      sortValue: (r) => r.name,
+      filterable: true,
+    },
+    ...ACCRUAL_FIGURES.map(
+      ([k, label]): SortableColumn<AccrualLine> => ({
+        key: k,
+        label,
+        align: 'right',
+        mobile: 'detail',
+        render: (r) => formatMoneyBare(r.a[k]),
+        sortValue: (r) => r.a[k],
+        filterable: true,
+        range: 'number',
+        cellClassName: 'whitespace-nowrap',
+      }),
+    ),
+    {
+      key: 'netMargin',
+      label: '= Net margin',
+      align: 'right',
+      mobile: 'keep',
+      render: (r) => <Fig v={r.a.netMargin} />,
+      sortValue: (r) => r.a.netMargin,
+      filterable: true,
+      range: 'number',
+      cellClassName: 'whitespace-nowrap',
+    },
+  ]
 
   return (
     <div>
@@ -419,56 +534,38 @@ export function DeptPoolAccrualSheet({
           <span className="rule" aria-hidden />
           <span className="count">ACCRUAL · TO DATE</span>
         </div>
-        {all.length === 0 ? (
+        {lines.length === 0 ? (
           <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
             <p className="text-sm">No departments visible to your role.</p>
           </div>
         ) : (
-          <div className="table-frame">
-            <div className="table-frame-scroll">
-              <table className="ledger-table [&_td.num]:whitespace-nowrap">
-                <thead>
+          <div className="fin-queue">
+            <SortableTable<AccrualLine>
+              layoutId="dept-pool.accrual"
+              layoutTitle="By department · accrual"
+              canSetDefault={canSetDefault}
+              scrollBox
+              resizeMode="neighbour"
+              rows={lines}
+              columns={columns}
+              getRowKey={(r) => r.key}
+              defaultSort={{ key: 'dept', dir: 'asc' }}
+              footer={(visible) => {
+                const every = visible.length === lines.length
+                const t = (k: keyof DeptPoolAccrual) => (every ? totals[k] : sumOf(visible, (r) => r.a[k]))
+                return (
                   <tr>
-                    <th>Department</th>
-                    <th className="right m-hide">Revenue (bill)</th>
-                    <th className="right m-hide">− Cost</th>
-                    <th className="right m-hide">− Expense</th>
-                    <th className="right m-hide">− Inter-billing</th>
-                    <th className="right">= Net margin</th>
-                    <th className="lt-toggle" aria-hidden />
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <LedgerRow key={r.id}>
-                      <td>
-                        <DeptName name={r.name} href={r.href} pnlHref={r.pnlHref} />
-                      </td>
-                      <AccrualCells a={r.a} />
-                    </LedgerRow>
-                  ))}
-                  {venture ? (
-                    <LedgerRow>
-                      <td>{VENTURE}</td>
-                      <AccrualCells a={venture} />
-                    </LedgerRow>
-                  ) : null}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td>All departments</td>
-                    <td className="num m-hide">{formatMoneyBare(totals.revenue)}</td>
-                    <td className="num m-hide">{formatMoneyBare(totals.cost)}</td>
-                    <td className="num m-hide">{formatMoneyBare(totals.expense)}</td>
-                    <td className="num m-hide">{formatMoneyBare(totals.interBilling)}</td>
-                    <td className="num">
-                      <Fig v={totals.netMargin} />
+                    <td colSpan={1000} className="q-foot">
+                      <span>{footLabel(visible.length, lines.length)}</span>
+                      <span className="num">
+                        Revenue {formatMoneyBare(t('revenue'))} · Cost {formatMoneyBare(t('cost'))} · Expense {formatMoneyBare(t('expense'))} · Inter-billing{' '}
+                        {formatMoneyBare(t('interBilling'))} · Net margin <Fig v={t('netMargin')} />
+                      </span>
                     </td>
-                    <td className="lt-toggle" aria-hidden />
                   </tr>
-                </tfoot>
-              </table>
-            </div>
+                )
+              }}
+            />
           </div>
         )}
       </section>

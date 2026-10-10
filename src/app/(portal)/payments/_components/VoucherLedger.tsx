@@ -18,6 +18,12 @@ import VouchersTable, { type VoucherRow } from './VouchersTable'
 import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
 
+// 2026-10-10 — the handoff's head buttons: `pay-act` is a secondary one (white,
+// hidden on a phone on the Finance view), `pay-act-pri` the page's one action.
+const ACT = 'pay-act bg-surface hover:bg-surface-2 border border-hairline text-graphite font-serif italic text-sm px-3 py-2 rounded-md transition-colors flex items-center gap-2'
+const ACT_LIT = 'pay-act bg-surface hover:bg-surface-2 border border-accent-border text-accent font-serif italic text-sm px-3 py-2 rounded-md transition-colors flex items-center gap-2'
+const ACT_PRI = 'pay-act pay-act-pri bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors'
+
 // Shared ledger page for /payments (debit, HV-PV-*) and /receipts (credit,
 // HV-OR-*) — split per user 2026-06-12: the payment side shows only PVs, the
 // receipt side only ORs. Same tabs/filters/table on both.
@@ -272,18 +278,29 @@ export default async function VoucherLedger({
     .reduce((sum, v) => sum + Number(v.amount), 0)
 
   const noun = isReceipts ? 'receipt' : 'voucher'
+  const payrollPending = payrollRequestsPending ?? 0
+
+  // The Payroll batches tab is headed by what it lists (2026-10-10, the
+  // handoff): "Payroll batches · N BATCHES · M VOUCHERS".
+  const shownBatches = new Set(filtered.map(batchKeyOf).filter((k): k is string => !!k)).size + lockedBatches.length
+  const shownVouchers = filtered.length + lockedCount
 
   return (
     <div>
       {/* ───────── Header ───────── */}
       <div className="page-head">
         <div>
+          {/* The month on the office's clock (2026-10-10, the handoff). */}
           <div className="page-eyebrow">
-            <em>I.</em> DAILY OPERATIONS · {isReceipts ? 'OFFICIAL RECEIPTS' : 'PAYMENT VOUCHERS'}
+            <em>I.</em> DAILY OPERATIONS · {isReceipts ? 'OFFICIAL RECEIPTS' : 'PAYMENT VOUCHERS'} · {officeTime().format('MMMM YYYY').toUpperCase()}
           </div>
-          <h1 className="page-title">{isReceipts ? 'Receipts' : 'Payments'}</h1>
+          <h1 className="page-title">{isReceipts ? 'Receipt' : 'Payments'}</h1>
         </div>
-        <div className="flex items-center gap-3">
+        {/* 2026-10-10 — the handoff's head: Dept Requests · Payroll Requests ·
+            Create payment (Loan repayment received · Create receipt). The
+            exports and Claim Requests are ours, kept. On a phone only the
+            primary stays (.pay-act, CSS). */}
+        <div className="flex flex-wrap items-center justify-end gap-3">
           {/* Export buttons */}
           {(() => {
             const exportQs = new URLSearchParams([
@@ -296,51 +313,34 @@ export default async function VoucherLedger({
               <>
                 <Link
                   href={`/payments/export?format=xlsx&${exportQs}`}
-                  className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+                  className="pay-act px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
                 >
                   Export Excel
                 </Link>
                 <Link
                   href={`/payments/export?format=pdf&${exportQs}`}
-                  className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+                  className="pay-act px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
                 >
                   Export PDF
                 </Link>
               </>
             )
           })()}
+          {/* Dept Requests answers to Treasury, as its page does — the same
+              gate as this ledger's, so whoever is here may go there. */}
+          {!isReceipts ? (
+            <Link href="/payments/dept-requests" className={ACT}>
+              Dept Requests
+            </Link>
+          ) : null}
           {!isReceipts && seesPayroll ? (
-            <Link
-              href="/payments/payroll-requests"
-              className={
-                (payrollRequestsPending ?? 0) > 0
-                  ? 'bg-surface hover:bg-surface-2 border border-accent-border text-accent font-serif italic text-sm px-3 py-2 rounded-md transition-colors flex items-center gap-2'
-                  : 'bg-surface hover:bg-surface-2 border border-hairline text-graphite font-serif italic text-sm px-3 py-2 rounded-md transition-colors flex items-center gap-2'
-              }
-            >
-              Payroll Requests
-              {(payrollRequestsPending ?? 0) > 0 ? (
-                <span className="bg-accent text-white font-mono text-[10px] px-1.5 py-0.5 rounded">
-                  {payrollRequestsPending}
-                </span>
-              ) : null}
+            <Link href="/payments/payroll-requests" className={payrollPending > 0 ? ACT_LIT : ACT}>
+              Payroll Requests{payrollPending > 0 ? ` · ${payrollPending}` : ''}
             </Link>
           ) : null}
           {!isReceipts ? (
-            <Link
-              href="/payments/claim-requests"
-              className={
-                claimRequestsPending > 0
-                  ? 'bg-surface hover:bg-surface-2 border border-accent-border text-accent font-serif italic text-sm px-3 py-2 rounded-md transition-colors flex items-center gap-2'
-                  : 'bg-surface hover:bg-surface-2 border border-hairline text-graphite font-serif italic text-sm px-3 py-2 rounded-md transition-colors flex items-center gap-2'
-              }
-            >
-              Claim Requests
-              {claimRequestsPending > 0 ? (
-                <span className="bg-accent text-white font-mono text-[10px] px-1.5 py-0.5 rounded">
-                  {claimRequestsPending}
-                </span>
-              ) : null}
+            <Link href="/payments/claim-requests" className={claimRequestsPending > 0 ? ACT_LIT : ACT}>
+              Claim Requests{claimRequestsPending > 0 ? ` · ${claimRequestsPending}` : ''}
             </Link>
           ) : null}
           {canDo(user, 'treasury', 'create') ? (
@@ -348,22 +348,16 @@ export default async function VoucherLedger({
               <>
                 <Link
                   href="/payments/new?mode=loan_repayment"
-                  className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+                  className="pay-act bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
                 >
-                  收到 loan 还款
+                  Loan repayment received
                 </Link>
-                <Link
-                  href="/payments/new?mode=receipt"
-                  className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-                >
+                <Link href="/payments/new?mode=receipt" className={ACT_PRI}>
                   Create receipt
                 </Link>
               </>
             ) : (
-              <Link
-                href="/payments/new"
-                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-              >
+              <Link href="/payments/new" className={ACT_PRI}>
                 Create payment
               </Link>
             )
@@ -375,8 +369,9 @@ export default async function VoucherLedger({
           Payments sample 2026-10-07). The paid total is the page's one primary;
           what is waiting reads as a warning only while something waits. ───────── */}
       <StatCards label={isReceipts ? 'Receipts' : 'Payments'}>
+        {/* Money in is the green card, money out the page's primary (2026-10-10, the handoff). */}
         <StatCard
-          tone="primary"
+          tone={isReceipts ? 'ledger' : 'primary'}
           label={isReceipts ? 'Total received' : 'Total paid'}
           value={formatMoney(totalPaid)}
           icon={isReceipts ? 'receipt' : 'bank'}
@@ -384,7 +379,7 @@ export default async function VoucherLedger({
             extraRows.length > 0
               ? isReceipts
                 ? `${counts.paid} receipts · ${nRepayments} loan rpy · ${nFundIn} fund in`
-                : `${counts.paid} PVs · ${nFsRepay} 还款 · ${nLoanOut} loan out`
+                : `${counts.paid} PVs · ${nFsRepay} repayment${nFsRepay === 1 ? '' : 's'} · ${nLoanOut} loan out`
               : `${counts.paid} ${noun}${counts.paid === 1 ? '' : 's'} executed`
           }
         />
@@ -429,17 +424,23 @@ export default async function VoucherLedger({
           </Suspense>
 
           <Suspense fallback={null}>
-            <PaymentFilters />
+            <PaymentFilters side={isReceipts ? 'receipts' : 'payments'} />
           </Suspense>
 
           <div className="sect-head">
-            <h2>{isReceipts ? 'Official receipts' : 'Payment vouchers'}</h2>
+            <h2>{payrollTab ? 'Payroll batches' : isReceipts ? 'Official receipts' : 'Payment vouchers'}</h2>
             <span className="rule" aria-hidden />
-            <span className="count">
-              {filtered.length + lockedCount + extraFiltered.length} of {all.length + extraRows.length} {noun}
-              {all.length + extraRows.length === 1 ? '' : 's'}
-              {tab !== 'all' ? ` · ${payrollTab ? 'payroll batches' : tab.replace('_', ' ')}` : ''}
-            </span>
+            {payrollTab ? (
+              <span className="count">
+                {shownBatches} {shownBatches === 1 ? 'batch' : 'batches'} · {shownVouchers} {shownVouchers === 1 ? 'voucher' : 'vouchers'}
+              </span>
+            ) : (
+              <span className="count">
+                {filtered.length + lockedCount + extraFiltered.length} of {all.length + extraRows.length} {noun}
+                {all.length + extraRows.length === 1 ? '' : 's'}
+                {tab !== 'all' ? ` · ${tab.replace('_', ' ')}` : ''}
+              </span>
+            )}
           </div>
 
           {filtered.length + lockedCount + extraFiltered.length === 0 ? (
@@ -513,6 +514,8 @@ export default async function VoucherLedger({
                   description: `${b.count} 张 · ${b.statusText} · 只显示总数`,
                   paymentOrCreatedDate: b.latest,
                   locked: true,
+                  // For the Finance view's English line (2026-10-10).
+                  lockedNote: { count: b.count, statusText: b.statusText },
                 })), ...extraFiltered]}
                 // A text search must be able to land on one person's salary
                 // PV, so the batches stay flat while ?q= is set.

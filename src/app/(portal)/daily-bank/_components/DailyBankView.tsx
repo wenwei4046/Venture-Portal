@@ -8,6 +8,8 @@ import { DB_COLUMNS, DB_COLUMN_LABELS, type BankDay, type SegAmounts } from '@/l
 import type { DailyBankData } from '@/lib/daily-bank-data'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { SlidingTabs } from '@/components/motion/SlidingTabs'
+import PhoneCards, { type PhoneCard } from '@/components/treasury/PhoneCards'
+import { useToast } from '@/components/treasury/Toast'
 
 // Daily Bank on the sheet (2026-10-09, the user's Claude Design handoff —
 // Phase 3 of the Finance revamp). The head carries the day between ← and →
@@ -60,6 +62,7 @@ export default function DailyBankView({ data, today }: { data: DailyBankData; to
   const [view, setView] = useState<'matrix' | 'banks'>('matrix')
   const [busy, setBusy] = useState(false)
   const captureRef = useRef<HTMLDivElement>(null)
+  const { say, toast } = useToast()
 
   const date = data.date
   const isToday = date === today
@@ -137,15 +140,16 @@ export default function DailyBankView({ data, today }: { data: DailyBankData; to
     }
   }
 
+  // 2026-10-10 — the handoff: the copy is confirmed in a toast, not an alert box.
   const copyImage = async () => {
     setBusy(true)
     try {
       const blob = await captureBlob()
       if (!blob) return
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
-      alert('Image copied — paste it straight into WhatsApp/Telegram.')
+      say('Image copied — paste it straight into WhatsApp/Telegram.')
     } catch {
-      alert('Copy not supported in this browser — use the PNG button instead.')
+      say('Copy not supported in this browser — use the PNG button instead.')
     } finally {
       setBusy(false)
     }
@@ -238,11 +242,13 @@ export default function DailyBankView({ data, today }: { data: DailyBankData; to
         variant="control"
       />
 
-      {/* The board — what Get image and PNG capture. */}
+      {/* The board — what Get image and PNG capture. The long note is the
+          desk's; a phone goes without it (2026-10-10, the handoff). */}
       <div ref={captureRef} className="dbank">
         {view === 'matrix' ? <MatrixView data={data} label={dayLabel} /> : <BanksView data={data} />}
-        <p className="db-note">{NOTE}</p>
+        <p className="db-note hidden md:block">{NOTE}</p>
       </div>
+      {toast}
     </div>
   )
 }
@@ -425,13 +431,57 @@ function BankRows({ b }: { b: BankDay }) {
 }
 
 // ── By bank ────────────────────────────────────────────────────────────────
+// On a phone each bank reads as a stacked list (2026-10-10, the handoff's
+// phone list) instead of a table that scrolls sideways: who paid in, in
+// green, who waits to be paid, in brown parentheses, the PV and description
+// as labelled details, and the Available (after pending) at its foot.
+function BankPhoneList({ b }: { b: BankDay }) {
+  const cards: PhoneCard[] = [{ key: 'bf', band: true, title: 'Balance B/F', figure: <Fig n={sumCols(b.bf)} dash={false} /> }]
+  if (sumCols(b.inToday) !== 0) {
+    cards.push({ key: 'in', title: <span className="db-in">Received today</span>, figure: <Fig n={sumCols(b.inToday)} kind="in" /> })
+  }
+  b.receipts.forEach((r, i) =>
+    cards.push({
+      key: `r${i}`,
+      title: `· ${r.payer}`,
+      figure: <Fig n={r.amount} kind="in" />,
+      figureLabel: 'Received (RM)',
+      details: [
+        { label: 'PV No.', value: r.voucherNo },
+        { label: 'Description', value: r.description },
+      ],
+    }),
+  )
+  if (b.otherInToday !== 0) {
+    cards.push({ key: 'other', title: '· Other (JV / transfer)', figure: <Fig n={b.otherInToday} kind="in" />, figureLabel: 'Received (RM)' })
+  }
+  b.pending.forEach((p, i) =>
+    cards.push({
+      key: `p${i}`,
+      title: <span className="db-pend-name">· {p.payee}</span>,
+      figure: <Fig n={p.total} kind="pend" />,
+      figureLabel: 'Pending payment (RM)',
+      details: [
+        { label: 'PV No.', value: p.voucherNo },
+        { label: 'Description', value: p.description },
+      ],
+    }),
+  )
+  return (
+    <div className="md:hidden">
+      <PhoneCards label={b.bankName} cards={cards} foot={{ label: 'Available (after pending)', value: <Fig n={sumCols(b.available)} dash={false} /> }} />
+    </div>
+  )
+}
+
 function BanksView({ data }: { data: DailyBankData }) {
   return (
     <>
       {data.banks.map((b) => (
         <section key={b.bankId} className="db-section">
           <SectHead title={b.bankName} count={`BANK BALANCE ${formatMoney(sumCols(b.current))}`} />
-          <div className="db-box">
+          <BankPhoneList b={b} />
+          <div className="db-box hidden md:block">
             <table className="ledger-table db-bybank">
               <thead>
                 <tr>

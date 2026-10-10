@@ -12,6 +12,7 @@ import { buildRepaymentPlan } from '@/lib/repayment-plan'
 import { monthEvents, type CalendarEntry } from '@/lib/repayment-calendar'
 import { fromCalendar } from '@/lib/deal-return'
 import { formatMoney } from '@/lib/utils'
+import { canDo } from '@/lib/permission-actions'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { listPayableFundSources } from '../fund-in/actions'
@@ -29,7 +30,7 @@ export default async function RepaymentSchedulePage({
 }: {
   searchParams: Promise<{ month?: string }>
 }) {
-  await requirePermission('treasury')
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
 
   // Which month's schedule to show — default to the current month; ?month=YYYY-MM
@@ -82,6 +83,12 @@ export default async function RepaymentSchedulePage({
       loanThisMonthByType.set(lid, cur)
     }
   }
+  // What came in on a loan this month, every type (2026-10-10, the handoff's
+  // "Received · <month>"): the sum the settled-this-month rows already show.
+  const loanReceived = (id: string) => {
+    const tm = loanThisMonthByType.get(id)
+    return tm ? r2(tm.principal + tm.interest) : 0
+  }
 
   const collectRows: SchedRow[] = []
   const collectNoTerm: NoTermRow[] = []
@@ -111,6 +118,7 @@ export default async function RepaymentSchedulePage({
         interestDue: tm.interest,
         totalDue: r2(tm.principal + tm.interest),
         done: true,
+        received: loanReceived(l.id as string),
         source,
       })
       continue
@@ -164,6 +172,7 @@ export default async function RepaymentSchedulePage({
         balance: cs.balance,
         accrued: r2(cs.balance - remainingPrincipal),
         thisMonthInterest: cs.thisMonthInterest,
+        received: loanReceived(l.id as string),
         source,
       })
       continue
@@ -177,6 +186,7 @@ export default async function RepaymentSchedulePage({
         // A deal turned no-term from X keeps the flat interest on what was
         // owed at X (user 2026-09-22, convention A).
         monthlyInterest: seg ? seg.interestPerMonth : r2(principal * rate),
+        received: loanReceived(l.id as string),
         source,
       })
       continue
@@ -209,6 +219,7 @@ export default async function RepaymentSchedulePage({
       interestDue: inst.interestDue,
       totalDue: r2(inst.principalDue + inst.interestDue),
       done: loanDoneThisMonth.has(l.id as string),
+      received: loanReceived(l.id as string),
       source,
     })
   }
@@ -271,6 +282,11 @@ export default async function RepaymentSchedulePage({
       fsThisMonthByType.set(fid, cur)
     }
   }
+  // What went out to a fund source this month, every type (the handoff's "Paid · <month>").
+  const fsPaid = (id: string) => {
+    const tm = fsThisMonthByType.get(id)
+    return tm ? r2(tm.principal + tm.interest) : 0
+  }
   const pendingPvByFs = new Map<string, { principal: number; interest: number; voucherNo: string }>()
   for (const pv of pendingPvs ?? []) {
     const fsId = pv.fund_source_id as string
@@ -320,6 +336,7 @@ export default async function RepaymentSchedulePage({
         balance: cs.balance,
         accrued: r2(cs.balance - p.outstanding),
         thisMonthInterest: cs.thisMonthInterest,
+        received: fsPaid(p.id),
       })
       continue
     }
@@ -335,6 +352,7 @@ export default async function RepaymentSchedulePage({
         interestDue: tm.interest,
         totalDue: r2(tm.principal + tm.interest),
         done: true,
+        received: fsPaid(p.id),
       })
       continue
     }
@@ -370,6 +388,7 @@ export default async function RepaymentSchedulePage({
         interestDue,
         totalDue: r2(p.monthly_principal + interestDue),
         done,
+        received: fsPaid(p.id),
         compound: compounding,
       })
     } else if (pendingPvByFs.has(p.id) && isCurrentMonth) {
@@ -384,6 +403,7 @@ export default async function RepaymentSchedulePage({
         interestDue: r2(bd.interest),
         totalDue: r2(bd.principal + bd.interest),
         done: false,
+        received: fsPaid(p.id),
         pending: true,
       })
     } else {
@@ -393,6 +413,7 @@ export default async function RepaymentSchedulePage({
         detail: `RM ${p.original_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(p.cost_rate * 100).toFixed(3)}%/mo · no fixed term`,
         outstanding: p.outstanding,
         monthlyInterest: p.monthly_interest,
+        received: fsPaid(p.id),
       })
     }
   }
@@ -481,6 +502,46 @@ export default async function RepaymentSchedulePage({
   const shortPay = shortOf('pay')
   const netMonth = r2(toCollect - toPay)
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+  const monShort = dayjs(`${currentYM}-01`).format('MMM')
+  const minOf = (rows: MinInterestRow[]) => ({
+    got: r2(rows.reduce((t, r) => t + r.paid, 0)),
+    short: r2(rows.reduce((t, r) => t + r.shortfall, 0)),
+  })
+
+  // The cards (2026-10-09, the handoff): the calendar's read the month's
+  // instalments; a list tab's (2026-10-10) read that side's minimum interest
+  // in cards 4–5 — what is in so far, what is not.
+  const headCards = (collectNote: string, payNote: string) => (
+    <>
+      <StatCard tone="ledger" label="To collect" value={formatMoney(toCollect)} icon="inbox" note={collectNote} />
+      <StatCard tone="danger" label="To pay" value={formatMoney(toPay)} icon="send" note={payNote} />
+      <StatCard tone="primary" label="Net this month" value={formatMoney(netMonth)} icon="swap" note={netMonth >= 0 ? 'Collect more than we pay' : 'Pay more than we collect'} />
+    </>
+  )
+  const sideCards = (word: 'Received' | 'Paid', min: { got: number; short: number }) => (
+    <StatCards label="Repayment Schedule">
+      {headCards('From borrowers', 'To fund sources')}
+      <StatCard tone="ledger" label={`${word} so far`} value={formatMoney(min.got)} icon="check" note={`Min interest · ${monShort}`} />
+      <StatCard tone={min.short > 0 ? 'danger' : 'default'} label="Short" value={formatMoney(min.short)} icon="alert" note="Min interest not yet in" />
+    </StatCards>
+  )
+  const cards = {
+    cal: (
+      <StatCards label="Repayment Schedule">
+        {headCards(`${plural(collectRows.length, 'instalment', 'instalments')} · Fund OUT`, `${plural(repayRows.length, 'instalment', 'instalments')} · Fund IN`)}
+        <StatCard label="Done so far" value={formatMoney(r2(collected + paid))} icon="check" note={`Received ${formatMoney(collected)} · paid ${formatMoney(paid)}`} />
+        <StatCard
+          tone={shortCollect + shortPay > 0 ? 'danger' : 'default'}
+          label="Overdue / short"
+          value={formatMoney(r2(shortCollect + shortPay))}
+          icon="alert"
+          note={`Collect ${formatMoney(shortCollect)} · pay ${formatMoney(shortPay)}`}
+        />
+      </StatCards>
+    ),
+    collect: sideCards('Received', minOf(collectMin)),
+    pay: sideCards('Paid', minOf(repayMin)),
+  }
 
   return (
     <div>
@@ -503,26 +564,15 @@ export default async function RepaymentSchedulePage({
         </div>
       </div>
 
-      {/* The cards (2026-10-09, the handoff). */}
-      <StatCards label="Repayment Schedule">
-        <StatCard tone="ledger" label="To collect" value={formatMoney(toCollect)} icon="inbox" note={`${plural(collectRows.length, 'instalment', 'instalments')} · Fund OUT`} />
-        <StatCard tone="danger" label="To pay" value={formatMoney(toPay)} icon="send" note={`${plural(repayRows.length, 'instalment', 'instalments')} · Fund IN`} />
-        <StatCard tone="primary" label="Net this month" value={formatMoney(netMonth)} icon="swap" note={netMonth >= 0 ? 'Collect more than we pay' : 'Pay more than we collect'} />
-        <StatCard label="Done so far" value={formatMoney(r2(collected + paid))} icon="check" note={`Received ${formatMoney(collected)} · paid ${formatMoney(paid)}`} />
-        <StatCard
-          tone={shortCollect + shortPay > 0 ? 'danger' : 'default'}
-          label="Overdue / short"
-          value={formatMoney(r2(shortCollect + shortPay))}
-          icon="alert"
-          note={`Collect ${formatMoney(shortCollect)} · pay ${formatMoney(shortPay)}`}
-        />
-      </StatCards>
-
       <ScheduleView
         monthLabel={monthLabel}
         month={currentYM}
+        linkMonth={month ?? null}
         today={today}
         events={events}
+        cards={cards}
+        canRecord={canDo(user, 'treasury', 'create')}
+        canSetDefault={canDo(user, 'treasury', 'create')}
         collectRows={collectRows}
         collectMin={collectMin}
         repayMin={repayMin}

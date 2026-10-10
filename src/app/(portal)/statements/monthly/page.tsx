@@ -8,6 +8,7 @@ import { statementsSummary } from '@/lib/billing-sheet'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import GenerateStatementsButton from '../_components/GenerateStatementsButton'
 import StatementsPeriodTable from '../_components/StatementsPeriodTable'
+import FinSwitch from '../_components/FinSwitch'
 
 // The monthly statements on the sheet (2026-10-07; the user approved the
 // Invoice / Statements sample): four summary cards, then each month as a
@@ -70,13 +71,32 @@ export default async function MonthlyStatementsPage() {
           <h1 className="page-title">Statements</h1>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
-          {canGenerate ? <GenerateStatementsButton /> : null}
-          <Link href="/statements/monthly/export?format=xlsx" className="btn-quiet-sheet">
-            Excel
-          </Link>
-          <Link href="/statements/monthly/export?format=pdf" className="btn-quiet-sheet">
-            PDF
-          </Link>
+          {/* The handoff's order on the Finance view (2026-10-10): Excel, PDF,
+              then Generate statements — the primary — last. */}
+          <FinSwitch
+            fin={
+              <>
+                <Link href="/statements/monthly/export?format=xlsx" className="btn-quiet-sheet">
+                  Excel
+                </Link>
+                <Link href="/statements/monthly/export?format=pdf" className="btn-quiet-sheet">
+                  PDF
+                </Link>
+                {canGenerate ? <GenerateStatementsButton /> : null}
+              </>
+            }
+            other={
+              <>
+                {canGenerate ? <GenerateStatementsButton /> : null}
+                <Link href="/statements/monthly/export?format=xlsx" className="btn-quiet-sheet">
+                  Excel
+                </Link>
+                <Link href="/statements/monthly/export?format=pdf" className="btn-quiet-sheet">
+                  PDF
+                </Link>
+              </>
+            }
+          />
         </div>
       </div>
 

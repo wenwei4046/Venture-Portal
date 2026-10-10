@@ -7,8 +7,10 @@ import CalculateTab from './CalculateTab'
 import RecordsTab from './RecordsTab'
 import StaffTab from './StaffTab'
 import SetupTab from './SetupTab'
+import { useAllocatorShell } from './AllocatorShell'
+import { landingTab, type AllocTab } from './landing-tab'
 
-type TabKey = 'calc' | 'records' | 'staff' | 'setup'
+type TabKey = AllocTab
 
 // One workspace per month. The month picker (AllocatorPeriod, in the page
 // head) navigates by ?period= only, which keeps this client subtree mounted —
@@ -26,7 +28,12 @@ function AllocatorTabsBody({ data, initialEditId }: { data: AllocatorData; initi
   // ?edit=<id>): Calculate opens with it loaded — unless the month does not
   // hold it, or it is billed and so locked.
   const initialEdit = initialEditId ? data.txns.find((t) => t.id === initialEditId && !t.locked) ?? null : null
-  const [tab, setTab] = useState<TabKey>(initialEdit ? 'calc' : data.txns.length > 0 ? 'records' : 'calc')
+  // The page's shell holds the open tab when there is one (2026-10-10: the
+  // head's Generate invoices shows while Records is open).
+  const shell = useAllocatorShell()
+  const [ownTab, setOwnTab] = useState<TabKey>(() => landingTab(data.txns, initialEditId))
+  const tab = shell ? shell.tab : ownTab
+  const setTab = shell ? shell.setTab : setOwnTab
   // A record being corrected: Records' Edit loads it into Calculate; saving
   // there overwrites the original (same ALC number).
   const [editTxn, setEditTxn] = useState<TxnRow | null>(initialEdit)

@@ -7,6 +7,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import BaView, {
   type BaRow,
   type CompanyOption,
@@ -23,7 +24,7 @@ export default async function BaPage({
 }: {
   searchParams: Promise<{ calc?: string }>
 }) {
-  await requirePermission('treasury')
+  const user = await requirePermission('treasury')
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { calc } = await searchParams
 
@@ -157,6 +158,9 @@ export default async function BaPage({
         limits={limits}
         autoReadAvailable={Boolean(process.env.ANTHROPIC_API_KEY)}
         openCalc={calc === '1'}
+        // The register's arrangement as everyone's default — whoever records
+        // financing, as on Fund IN / Fund OUT (2026-10-10, the handoff).
+        canSetDefault={canDo(user, 'treasury', 'create')}
       />
     </div>
   )

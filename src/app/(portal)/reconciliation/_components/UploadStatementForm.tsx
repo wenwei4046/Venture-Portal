@@ -1,24 +1,33 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useId, useState, useTransition, type DragEvent } from 'react'
 import { uploadStatement } from '../actions'
 
+// The statement upload (2026-08-08). 2026-10-10 — the handoff draws it as the
+// body of the Upload statement modal: Bank account, Statement month, a dashed
+// area to choose (or drop) the file, then Cancel / Upload & auto-match. The
+// upload itself is as before: one form to uploadStatement, which redirects to
+// the new session's review page.
 export default function UploadStatementForm({
   banks,
   defaultMonth,
+  onCancel,
 }: {
   banks: Array<{ id: string; label: string }>
   defaultMonth: string
+  /** Closes the modal the form sits in. */
+  onCancel?: () => void
 }) {
   const [bankId, setBankId] = useState(banks[0]?.id ?? '')
   const [month, setMonth] = useState(defaultMonth)
+  const [file, setFile] = useState<File | null>(null)
+  const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const fileRef = useRef<HTMLInputElement>(null)
+  const fileId = useId()
 
   const submit = () => {
     setError(null)
-    const file = fileRef.current?.files?.[0]
     if (!file) {
       setError('Pick a statement file (.xlsx / .csv)')
       return
@@ -39,54 +48,67 @@ export default function UploadStatementForm({
     })
   }
 
+  const onDrop = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault()
+    setDragOver(false)
+    const dropped = e.dataTransfer?.files?.[0]
+    if (dropped && !isPending) setFile(dropped)
+  }
+
   return (
-    <div className="border border-hairline rounded-md bg-surface p-5 max-w-2xl">
-      <div className="flex items-end gap-3 flex-wrap">
-        <label className="block">
-          <span className="block text-xs font-sans text-graphite mb-1">Bank</span>
-          <select
-            value={bankId}
-            onChange={e => setBankId(e.target.value)}
-            disabled={isPending}
-            className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
-            {banks.map(b => (
-              <option key={b.id} value={b.id}>
-                {b.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="block text-xs font-sans text-graphite mb-1">Statement month</span>
-          <input
-            type="month"
-            value={month}
-            onChange={e => setMonth(e.target.value)}
-            disabled={isPending}
-            className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
-          />
-        </label>
-        <label className="block flex-1 min-w-[220px]">
-          <span className="block text-xs font-sans text-graphite mb-1">File (.xlsx / .csv / .pdf)</span>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".xlsx,.xls,.csv,.txt,.pdf"
-            disabled={isPending}
-            className="block w-full text-sm text-graphite file:mr-3 file:px-3 file:py-2 file:rounded-md file:border file:border-hairline file:bg-paper file:text-sm file:text-ink file:font-sans hover:file:bg-surface-2"
-          />
-        </label>
-        <button
-          type="button"
-          onClick={submit}
+    <div className="adm-form">
+      <label className="adm-field">
+        <span>Bank account</span>
+        <select value={bankId} onChange={(e) => setBankId(e.target.value)} disabled={isPending} className="adm-input">
+          {banks.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="adm-field">
+        <span>Statement month</span>
+        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} disabled={isPending} className="adm-input font-mono" />
+      </label>
+      <div className="adm-field">
+        <span>File</span>
+        {/* The input stays in the tab order (hidden from sight); the dashed
+            area is its label, so a click or a drop both choose the file. */}
+        <input
+          id={fileId}
+          type="file"
+          aria-label="Statement file"
+          accept=".xlsx,.xls,.csv,.txt,.pdf"
           disabled={isPending}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          className="sr-only adm-file"
+        />
+        <label
+          htmlFor={fileId}
+          className={`adm-drop${dragOver ? ' is-over' : ''}`}
+          onDragOver={(e) => {
+            e.preventDefault()
+            setDragOver(true)
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
         >
-          {isPending ? 'Reconciling…' : 'Upload & reconcile →'}
+          <span className="adm-drop-name">{file ? file.name : 'Choose file'}</span>
+          <span className="adm-drop-hint">.xlsx or .csv · PDF needs your bank’s layout first</span>
+        </label>
+      </div>
+      {error ? <p className="sheet-danger">{error}</p> : null}
+      <div className="adm-modal-foot">
+        {onCancel ? (
+          <button type="button" onClick={onCancel} disabled={isPending} className="adm-btn">
+            Cancel
+          </button>
+        ) : null}
+        <button type="button" onClick={submit} disabled={isPending} className="adm-btn adm-btn-pri">
+          {isPending ? 'Uploading…' : 'Upload & auto-match'}
         </button>
       </div>
-      {error ? <p className="text-sm font-sans text-danger mt-3">{error}</p> : null}
     </div>
   )
 }

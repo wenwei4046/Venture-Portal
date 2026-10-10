@@ -2,31 +2,23 @@
 // redirect and the /statements page (Invoices landing after the reorder) can
 // share one implementation. All internal component paths are preserved.
 
-import Link from 'next/link'
 import dayjs from 'dayjs'
 import { officeDayStart, officeTime } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney, getPeriodMonth } from '@/lib/utils'
+import { formatMoney, formatMoneyBare, getPeriodMonth } from '@/lib/utils'
 import { directorBillingTarget } from '@/lib/billing'
 import { invoiceSummary, payrollBasisSummary, payrollBillingLines } from '@/lib/billing-sheet'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
-import ActMenu from '@/components/sheet/ActMenu'
 import type { AccountType } from '@/lib/coa'
-import PeriodSelector from './PeriodSelector'
-import GenerateInvoicesButton from './GenerateInvoicesButton'
+import BillingTools from './BillingTools'
 import MarketingProjectList from './MarketingProjectList'
 import NonBillableList from './NonBillableList'
 import InvoicesList from './InvoicesList'
 import CreditNotesList from './CreditNotesList'
 import { extraBillingModeOptions, primedRegistryRows } from '@/lib/dept-registry'
 import { fetchPaidByInvoice } from '@/lib/debtor-aging-data'
-import CreateInvoiceButton from './CreateInvoiceButton'
-import CreateMultiLineInvoiceButton from './CreateMultiLineInvoiceButton'
-import GenerateConsolidatedInvoicesButton from './GenerateConsolidatedInvoicesButton'
-import ReconcilePayrollBillingButton from './ReconcilePayrollBillingButton'
-import GenerateOwnShareInvoiceButton from './GenerateOwnShareInvoiceButton'
 import LedgerRow from '@/components/LedgerRow'
 import DepartmentModeCard from '@/components/department/DepartmentModeCard'
 import { loadDepartmentMode } from '@/lib/department-mode-server'
@@ -64,7 +56,8 @@ export default async function BillingView({ searchParams }: Props) {
   const invoicesRead = startRead(
     supabase
       .from('invoices')
-      .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, created_at, settlement_voucher_id')
+      // contract_id (2026-10-10): a marketing project's row opens its month's invoice.
+      .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, created_at, settlement_voucher_id, contract_id')
       .eq('period_month', period)
       .order('billing_mode', { ascending: true }),
   )
@@ -475,7 +468,16 @@ export default async function BillingView({ searchParams }: Props) {
     `Director salary ${directorSubmitted && directorSubmission?.submitted_at ? officeTime(directorSubmission.submitted_at).format('D MMM') : 'pending'}`,
     `${marketingContractsActive} marketing contract${marketingContractsActive === 1 ? '' : 's'}`,
   ].join(' · ')
-  const periodMonth = dayjs(period).format('YYYY-MM')
+  // 2026-10-10 — the handoff's opened fold starts with a line per department
+  // ("HR · billed / from payroll 6,612.00 / 0.00"), and "Director salary ·
+  // pending" while the director submission has not come in.
+  const directorPending = !directorSubmitted && directorFromPayroll <= 0
+  const foldLines = [
+    ...basisLines
+      .filter((l) => !(directorPending && l.key === 'director'))
+      .map((l) => ({ key: l.key, label: `${l.label} · billed / from payroll`, value: `${formatMoneyBare(l.billed)} / ${formatMoneyBare(l.required)}` })),
+    ...(directorPending ? [{ key: 'director-pending', label: 'Director salary', value: 'pending' }] : []),
+  ]
 
   const companyList = companies ?? []
   const companyMap = new Map(
@@ -508,6 +510,14 @@ export default async function BillingView({ searchParams }: Props) {
     else if (inv.category_code) categoryByInvoice[inv.id] = coaNameByCode.get(inv.category_code) ?? inv.category_code
   }
   const showBasis = basisLines.length > 0 || (directorSubmitted && directorByCompany.length > 0) || allocByDept.size > 0
+  // A marketing project's invoice this month (generate_monthly_invoices files
+  // it with its contract_id) — the project row's Invoice button opens it.
+  const invoiceByContract: Record<string, { id: string; no: string | null }> = {}
+  for (const inv of invoiceList as Array<{ id: string; invoice_no: string | null; status: string; contract_id?: string | null }>) {
+    if (inv.contract_id && inv.status !== 'voided' && !invoiceByContract[inv.contract_id]) {
+      invoiceByContract[inv.contract_id] = { id: inv.id, no: inv.invoice_no }
+    }
+  }
   // Section shows the PERIOD's CNs only — other-period invoices are fetched
   // just for the 跨月 settle toggle, their CNs belong to their own month view.
   const creditNoteRows = (cnRows ?? []).filter((cn) => invoiceById.has(cn.invoice_id as string)).map((cn) => {
@@ -535,54 +545,27 @@ export default async function BillingView({ searchParams }: Props) {
     <div>
       <div className="page-head sticky top-0 z-20 bg-paper pt-2">
         <div className="shrink-0">
+          {/* The handoff's eyebrow names the month (2026-10-10). */}
           <div className="page-eyebrow">
-            <em>I.</em> BILLING · SERVICE INVOICES
+            <em>I.</em> DAILY OPERATIONS · SERVICE BILLING · {dayjs(period).format('MMMM YYYY').toUpperCase()}
           </div>
           <h1 className="page-title">Service Billing</h1>
         </div>
-        {/* One row (2026-10-09, the Finance revamp): the month, then From
-            payroll ▾, Export ▾ and + Create Invoice ▾ — each a menu holding the
-            buttons the captioned band used to lay side by side. */}
-        <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
-          <PeriodSelector currentPeriod={period} />
-          {canFinanceCreate ? (
-            <ActMenu label="From payroll">
-              <GenerateConsolidatedInvoicesButton currentPeriod={period} categories={categoryList} />
-              <ReconcilePayrollBillingButton currentPeriod={period} />
-              <GenerateOwnShareInvoiceButton currentPeriod={period} categories={categoryList} />
-            </ActMenu>
-          ) : null}
-          <ActMenu label="Export">
-            <Link href={`/statements/export?format=xlsx&period=${periodMonth}`}>Excel</Link>
-            <Link href={`/statements/export?format=pdf&period=${periodMonth}`} title="Export the invoice list as a single-page table">
-              PDF · list
-            </Link>
-            <Link href={`/billing/invoice-doc?period=${periodMonth}`} target="_blank" rel="noopener noreferrer" title="Export each invoice as its own document page (batch PDF)">
-              PDF · per invoice
-            </Link>
-          </ActMenu>
-          {canFinanceCreate ? (
-            <ActMenu label="+ Create Invoice" primary>
-              <CreateInvoiceButton
-                companies={companyList}
-                currentPeriod={period}
-                departments={departments ?? []}
-                categories={categoryList}
-                extraModes={extraModes}
-              />
-              <CreateMultiLineInvoiceButton
-                companies={companyList}
-                currentPeriod={period}
-                departments={departments ?? []}
-                categories={categoryList}
-                extraModes={extraModes}
-              />
-            </ActMenu>
-          ) : null}
-        </div>
+        {/* One row (2026-10-09; 2026-10-10 the handoff's): the month control,
+            then From payroll ▼, Export ▼ and + Create Invoice ▼ (Single /
+            Multi-line / Generate Marketing invoices). Every reader of this
+            page holds Billing · View — Finance's own cell. */}
+        <BillingTools
+          period={period}
+          canCreate={canFinanceCreate}
+          companies={companyList.map((c) => ({ id: c.id as string, name: c.name as string, short_code: c.short_code as string }))}
+          departments={(departments ?? []).map((d) => ({ id: d.id as string, name: d.name as string }))}
+          categories={categoryList}
+          extraModes={extraModes}
+        />
       </div>
 
-      {/* Cost center or centralized — Finance's own switch (2026-09-30). */}      {/* Cost center or centralized — Finance's own switch (2026-09-30). */}
+      {/* Cost center or centralized — Finance's own switch (2026-09-30). */}
       <DepartmentModeCard segmentKey="finance" department={departmentModeRead} />
 
       <StatCards label="Service Billing">
@@ -619,7 +602,17 @@ export default async function BillingView({ searchParams }: Props) {
             <small>{basisLines.length > 0 ? `BILLED / FROM PAYROLL — ${payrollBasisSummary(basisLines)}` : 'nothing from payroll yet'}</small>
           </summary>
           <div className="fin-fold-inner">
-      {/* Director Payroll Submission — per-subsidiary contribution (mig 279).      {/* Director Payroll Submission — per-subsidiary contribution (mig 279).
+            {foldLines.length > 0 ? (
+              <div className="bil-fold-lines">
+                {foldLines.map((l) => (
+                  <div key={l.key} className="bil-fold-line">
+                    <span>{l.label}</span>
+                    <span className="num">{l.value}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+      {/* Director Payroll Submission — per-subsidiary contribution (mig 279).
           This is what Finance bills each subsidiary for director salary;
           Create Invoice → Director attribution auto-fills from the same data. */}
       {directorSubmitted && directorByCompany.length > 0 && (
@@ -789,20 +782,14 @@ export default async function BillingView({ searchParams }: Props) {
 
       {creditNoteRows.length > 0 ? <CreditNotesList rows={creditNoteRows} /> : null}
 
+      {/* Generate Marketing invoices moved to + Create Invoice ▼ (2026-10-10). */}
       <MarketingProjectList
         contracts={(marketingContracts ?? [])
           .filter((c): c is typeof c & { company_id: string } => c.company_id !== null)}
         companyMap={companyMap}
         canCreate={canFinanceCreate}
-        headerAction={
-          canFinanceCreate ? (
-            <GenerateInvoicesButton
-              currentPeriod={period}
-              modes={['marketing_project']}
-              label="Generate Marketing invoices"
-            />
-          ) : null
-        }
+        invoiceByContract={invoiceByContract}
+        period={period}
       />
       <NonBillableList
         transactions={(nonBillableTxns ?? []).map((t) => ({

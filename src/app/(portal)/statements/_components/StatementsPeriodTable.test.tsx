@@ -11,6 +11,7 @@ vi.mock('@/lib/supabase/client', () => ({
 }))
 
 import StatementsPeriodTable, { type StatementRow } from './StatementsPeriodTable'
+import { FinViewProvider } from '@/components/layout/fin-view'
 
 const statement: StatementRow = {
   id: 'st-1',
@@ -87,5 +88,55 @@ describe('the statements table on the sheet', () => {
     expect(panel).toHaveTextContent('Contra')
     fireEvent.click(within(panel).getByText('Open the statement →'))
     expect(push).toHaveBeenCalledWith('/statements/st-1')
+  })
+})
+
+// 2026-10-10 — the handoff's month table, as Finance and the Principal see it
+// (a Director reading treasury keeps the table above): Company / Total
+// invoice / Total contra / Net / Status, no Open column, ▽ filters with a
+// Range on the figures, the list in a scroll box, an "All companies" foot row
+// summing each column under it, negatives in red, and on a phone "Invoice x −
+// contra y" under the company.
+describe('the statements table on the Finance view', () => {
+  const fin = (rows: StatementRow[]) =>
+    render(
+      <FinViewProvider value={true}>
+        <StatementsPeriodTable rows={rows} />
+      </FinViewProvider>,
+    )
+  const heads = () => Array.from(document.querySelectorAll('thead th[data-col]')) as HTMLElement[]
+
+  it('heads the columns the handoff’s way, with no Open column, and filters every one', () => {
+    fin([statement, negative])
+    expect(heads().map((th) => th.dataset.col)).toEqual(['companyName', 'totalInvoice', 'totalContra', 'netAmount', 'status'])
+    expect(heads().map((th) => th.textContent?.replace(/[▲▼↕]/g, '').trim())).toEqual(['Company', 'Total invoice', 'Total contra', 'Net', 'Status'])
+    expect(screen.queryByRole('link', { name: 'Open →' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Filter Company' })).toBeInTheDocument()
+    for (const col of ['Total invoice', 'Total contra', 'Net']) {
+      fireEvent.click(screen.getByRole('button', { name: `Filter ${col}` }))
+      expect(within(screen.getByRole('dialog', { name: `Filter ${col}` })).getByRole('button', { name: 'Range' })).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: `Filter ${col}` }))
+    }
+    expect(document.querySelector('.st-box table')).not.toBeNull()
+  })
+
+  it('ends on an All companies row with each total under its column, negatives red', () => {
+    fin([statement, negative])
+    const foot = Array.from(document.querySelectorAll('tfoot td')) as HTMLElement[]
+    const at = (col: string) => heads().findIndex((th) => th.dataset.col === col)
+    expect(foot[at('companyName')]).toHaveTextContent('All companies')
+    expect(foot[at('totalInvoice')]).toHaveTextContent('RM 5,000.00')
+    expect(foot[at('totalContra')]).toHaveTextContent('RM (5,600.00)')
+    expect(foot[at('netAmount')]).toHaveTextContent('RM (600.00)')
+    expect(within(foot[at('netAmount')]).getByText('RM (600.00)')).toHaveClass('text-danger')
+    const row = screen.getByText('2990 (2990)').closest('tr') as HTMLElement
+    // Its contra and its net, both below zero, both red.
+    expect(within(row).getAllByText('RM (4,400.00)', { selector: '.text-danger' })).toHaveLength(2)
+  })
+
+  it('on a phone reads "Invoice x − contra y" under the company', () => {
+    fin([statement])
+    const cell = screen.getByText('Carres (CAR)').closest('td') as HTMLElement
+    expect(cell.querySelector('.q-sub')).toHaveTextContent('Invoice 5,000.00 − contra 1,200.00')
   })
 })

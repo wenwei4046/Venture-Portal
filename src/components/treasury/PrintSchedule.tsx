@@ -12,6 +12,9 @@ import type { RepaymentPlan } from '@/lib/repayment-plan'
 // shows only this sheet (globals.css › .sched-print). The list's right-click
 // "Print schedule" opens the record with ?print=1, which opens it straight
 // away.
+// 2026-10-10 — the handoff's finish: the letterhead and the title in Georgia
+// (the serif font variable they asked for is never defined), the Total row
+// peach, and a line to sign for Finance and for the Principal under the table.
 
 const money = (n: number | null) => (n === null ? '—' : formatMoneyBare(n))
 
@@ -61,16 +64,16 @@ export default function PrintSchedule({
                   Close
                 </button>
               </div>
-              <div className="sched-print-sheet">
+              <div className="sched-print-sheet fund-print-sheet">
                 <div className="sched-print-letterhead">
                   <div>
-                    <div className="sched-print-house">HOUZS Venture Sdn Bhd</div>
+                    <div className="sched-print-house fund-print-serif">HOUZS Venture Sdn Bhd</div>
                     <div className="sched-print-kicker">Internal ledger</div>
                   </div>
                   <div className="sched-print-printed">{printed}</div>
                 </div>
                 <div className="sched-print-kicker sched-print-what">{kicker}</div>
-                <h1 className="sched-print-title">{title}</h1>
+                <h1 className="sched-print-title fund-print-serif">{title}</h1>
                 <dl className="sched-print-meta">
                   {meta.map((m) => (
                     <div key={m.label}>
@@ -107,7 +110,7 @@ export default function PrintSchedule({
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr>
+                    <tr className="fund-print-total">
                       <td />
                       <td className="left">Total</td>
                       <td>{money(sum((r) => r.installment))}</td>
@@ -119,6 +122,10 @@ export default function PrintSchedule({
                     </tr>
                   </tfoot>
                 </table>
+                <div className="fund-print-sign">
+                  <div>Prepared by · Finance</div>
+                  <div>Approved by · Principal</div>
+                </div>
               </div>
             </div>,
             document.body,

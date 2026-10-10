@@ -28,6 +28,11 @@ interface Category {
 interface Props {
   currentPeriod: string
   categories?: Category[]
+  /** Arrive open, from a page-head menu (2026-10-10, the handoff's
+   *  "From payroll ▾" / "+ Create Invoice ▾"). */
+  autoOpen?: boolean
+  /** No trigger button of its own — the menu item is the trigger. */
+  hideTrigger?: boolean
 }
 
 const COMPONENTS: Array<[keyof ConsolidatedCompanyPreview['groups'][number]['components'], string]> = [
@@ -57,9 +62,9 @@ export default function GenerateConsolidatedInvoicesButton(props: Props) {
   return <GenerateConsolidatedInvoicesButtonBody key={props.currentPeriod} {...props} />
 }
 
-function GenerateConsolidatedInvoicesButtonBody({ currentPeriod, categories = [] }: Props) {
+function GenerateConsolidatedInvoicesButtonBody({ currentPeriod, categories = [], autoOpen = false, hideTrigger = false }: Props) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(autoOpen)
   const [period, setPeriod] = useState(dayjs(currentPeriod).format('YYYY-MM'))
   const [preview, setPreview] = useState<ConsolidatedCompanyPreview[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -128,6 +133,7 @@ function GenerateConsolidatedInvoicesButtonBody({ currentPeriod, categories = []
 
   return (
     <>
+      {hideTrigger ? null : (
       <button
         onClick={() => setOpen(true)}
         className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
@@ -135,6 +141,7 @@ function GenerateConsolidatedInvoicesButtonBody({ currentPeriod, categories = []
       >
         Generate payroll invoices
       </button>
+      )}
 
       {open && (
         <div

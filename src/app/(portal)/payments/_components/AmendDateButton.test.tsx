@@ -14,6 +14,7 @@ vi.mock('../../fund-out/actions', () => ({ amendRepaymentDate: mocks.amendRepaym
 vi.mock('@/lib/office-clock', () => ({ officeDate: () => '2026-10-02' }))
 
 import AmendDateButton from './AmendDateButton'
+import { FinViewProvider } from '@/components/layout/fin-view'
 
 const receipt = { kind: 'voucher' as const, id: 'v-455', currentDate: '2026-10-01', label: 'HV-OR-202610-0455' }
 const dateBox = () => screen.getByLabelText(/对的日期/) as HTMLInputElement
@@ -93,5 +94,27 @@ describe('AmendDateButton', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Sep 2026 is closed')
     expect(await screen.findByRole('button', { name: '确认改' })).toBeEnabled() // back from 改着…
     expect(mocks.refresh).not.toHaveBeenCalled()
+  })
+})
+
+// 2026-10-10 — the handoff: the Finance view is English throughout; the row
+// menu already says "Change date", and the dialog it opens says it too.
+describe('AmendDateButton on the Finance view', () => {
+  const fin = (ui: React.ReactElement) => render(<FinViewProvider value={true}>{ui}</FinViewProvider>)
+
+  it('is "Change date", in English through and through', async () => {
+    fin(<AmendDateButton {...receipt} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Change date' }))
+    const dialog = screen.getByRole('dialog', { name: 'Change date' })
+    expect(dialog).toHaveTextContent('Change date — HV-OR-202610-0455')
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('The date has not changed')
+    fireEvent.change(screen.getByLabelText(/Correct date/), { target: { value: '2026-09-30' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Write a reason')
+    fireEvent.change(screen.getByLabelText(/Reason/), { target: { value: 'keyed a day late' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm change' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Changed — 1 Oct 2026 → 30 Sep 2026')
+    expect(document.body.innerHTML).not.toMatch(/[㐀-鿿]/)
   })
 })

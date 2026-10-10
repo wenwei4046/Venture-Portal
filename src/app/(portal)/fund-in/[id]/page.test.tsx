@@ -135,7 +135,12 @@ describe('a fund source’s page', () => {
     database({ ...SOURCE, status: 'repaid', repaid_at: '2026-10-01T02:00:00Z', repaid_by: 'u1' })
     const { unmount } = render(await page())
     expect(document.querySelector('.page-head .chip')).toHaveClass('info')
-    expect(screen.getByRole('region', { name: 'Fully repaid' })).toHaveTextContent('Repaid on 1 Oct 2026 by Finance Manager.')
+    const repaid = screen.getByRole('region', { name: 'Fully repaid' })
+    expect(repaid).toHaveTextContent('Repaid on 1 Oct 2026 by Finance Manager.')
+    // 2026-10-10 — the handoff: the block under its own heading, the date as its count.
+    expect(within(repaid).getByRole('heading', { level: 2, name: 'Fully repaid' })).toBeInTheDocument()
+    expect(repaid.querySelector('.sect-head .count')).toHaveTextContent('1 OCT 2026')
+    expect(Array.from(document.querySelectorAll('.sect-head h2')).map((h) => h.textContent).slice(0, 3)).toEqual(['Details', 'Fully repaid', 'Repayment settings'])
     unmount()
     database({ ...SOURCE, status: 'pending_approval' }, [])
     render(await page())

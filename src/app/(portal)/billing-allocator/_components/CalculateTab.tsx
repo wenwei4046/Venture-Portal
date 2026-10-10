@@ -17,10 +17,11 @@ import type { AllocatorData, TxnRow } from './types'
 import { unwrap } from './unwrap'
 
 // Calculate on the sheet (2026-10-07; the user approved the allocator
-// sample): the headcount source in a toolbar, each expense a card with its
-// fields labelled, the preview as a table — Bill to, the basis, the share —
-// with the billable total under it, and Save allocation below. The engine,
-// the templates, the split editors and the save path are as they were.
+// sample; 2026-10-10, the handoff's "Expense" form section): the headcount
+// source and each expense's fields labelled in one form, Save allocation and
+// + Add expense inside it, then the preview as a table — Bill to, the basis,
+// the share — with the billable total under it. The engine, the templates,
+// the split editors and the save path are as they were.
 
 // Split-editor key for "HV bears this share itself" — engine gets null.
 const OWN_SPLIT = '__own__'
@@ -36,9 +37,6 @@ interface Row {
   custom: Record<string, string>
 }
 
-const fieldCls =
-  'w-full px-2.5 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border'
-const labelCls = 'block text-[10px] font-sans uppercase tracking-[0.06em] text-graphite mb-1'
 const monthName = (period: string) => dayjs(`${period}-01`).format('MMMM YYYY')
 
 export default function CalculateTab({
@@ -220,6 +218,7 @@ export default function CalculateTab({
 
   const activeCount = data.staff.filter((s) => s.status === 'active').length
   const month = monthName(data.period)
+  const sourceWord = hcSource === 'current' ? 'STAFF TAB' : `${monthName(hcSource).toUpperCase()} SNAPSHOT`
 
   return (
     <div className="alloc-sheet fin-queue">
@@ -234,40 +233,61 @@ export default function CalculateTab({
         </div>
       ) : null}
 
-      {/* Headcount source — any saved month's snapshot is pickable */}
-      <div className="sheet-toolbar">
-        <span className="flex flex-col gap-1">
-          <label htmlFor="alloc-hc-source" className={`${labelCls} mb-0`}>Headcount from</label>
-          <select id="alloc-hc-source" value={hcSource} onChange={(e) => setHcSource(e.target.value)}>
-            <option value="current">Current list · {activeCount} active</option>
-            {data.snapshotPeriods.length === 0 ? (
-              <option value="" disabled>No snapshot yet — save one on Staff</option>
-            ) : (
-              data.snapshotPeriods.map((p) => (
-                <option key={p} value={p}>{monthName(p)} snapshot</option>
-              ))
-            )}
-          </select>
-        </span>
-        <span className={`text-xs self-end pb-2 ${hcSource !== 'current' && hcSource !== data.period ? 'text-alert' : 'text-graphite'}`}>
-          {hcSource === 'current'
-            ? 'The list as it stands today.'
-            : hcSource !== data.period
-              ? `⚠ Using the ${monthName(hcSource)} list for ${month}.`
-              : `The ${monthName(hcSource)} snapshot — the rows that get saved with the record.`}
-        </span>
-      </div>
+      {/* The handoff's "Expense" form (2026-10-10): the headcount source and
+          each expense's fields in one panel, Save allocation and + Add
+          expense inside it; the Preview follows. */}
+      <section className="mb-8">
+        <div className="sect-head">
+          <h2>Expense</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">
+            HEADCOUNT FROM · {sourceWord}
+            {headcountTotal > 0 ? ` · ${headcountTotal.toFixed(2)} HEADS` : ''}
+          </span>
+        </div>
+        <div className="fin-form">
+          {/* Headcount source — any saved month's snapshot is pickable */}
+          <div className="fin-field">
+            <label htmlFor="alloc-hc-source">Headcount from</label>
+            <select id="alloc-hc-source" value={hcSource} onChange={(e) => setHcSource(e.target.value)}>
+              <option value="current">Current list · {activeCount} active</option>
+              {data.snapshotPeriods.length === 0 ? (
+                <option value="" disabled>No snapshot yet — save one on Staff</option>
+              ) : (
+                data.snapshotPeriods.map((p) => (
+                  <option key={p} value={p}>{monthName(p)} snapshot</option>
+                ))
+              )}
+            </select>
+          </div>
+          <p className={`fin-hint span-2 self-end ${hcSource !== 'current' && hcSource !== data.period ? 'text-alert' : ''}`}>
+            {hcSource === 'current'
+              ? 'The list as it stands today.'
+              : hcSource !== data.period
+                ? `⚠ Using the ${monthName(hcSource)} list for ${month}.`
+                : `The ${monthName(hcSource)} snapshot — the rows that get saved with the record.`}
+          </p>
 
-      {/* Expense rows */}
-      <div className="space-y-3">
-        {rows.map((r) => (
-          <div key={r.key} className="bg-surface border border-hairline rounded-md p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-              <div className="sm:col-span-3">
-                <label htmlFor={`alloc-tpl-${r.key}`} className={labelCls}>Template</label>
+          {rows.map((r, i) => (
+            <Fragment key={r.key}>
+              {rows.length > 1 ? (
+                <div className="span-3 bil-form-rule">
+                  <span>Expense {i + 1}</span>
+                  <button
+                    type="button"
+                    onClick={() => setRows((prev) => prev.filter((x) => x.key !== r.key))}
+                    className="text-muted hover:text-danger text-xs"
+                    aria-label="Remove expense"
+                    title="Remove this expense"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : null}
+              <div className="fin-field">
+                <label htmlFor={`alloc-tpl-${r.key}`}>Template</label>
                 <select
                   id={`alloc-tpl-${r.key}`}
-                  className={fieldCls}
                   defaultValue=""
                   onChange={(e) => {
                     if (e.target.value) update(r.key, applyTemplate(r, e.target.value))
@@ -281,35 +301,33 @@ export default function CalculateTab({
                     ))}
                 </select>
               </div>
-              <div className="sm:col-span-3">
-                <label htmlFor={`alloc-desc-${r.key}`} className={labelCls}>Description</label>
+              <div className="fin-field">
+                <label htmlFor={`alloc-desc-${r.key}`}>Description</label>
                 <input
                   id={`alloc-desc-${r.key}`}
                   value={r.description}
                   onChange={(e) => update(r.key, { description: e.target.value })}
-                  className={fieldCls}
                   placeholder="e.g. Office Rental"
                   required
                 />
               </div>
-              <div className="sm:col-span-2">
-                <label htmlFor={`alloc-amount-${r.key}`} className={labelCls}>Amount RM</label>
+              <div className="fin-field">
+                <label htmlFor={`alloc-amount-${r.key}`}>Amount RM</label>
                 <input
                   id={`alloc-amount-${r.key}`}
                   type="number" step="0.01" min="0"
                   value={r.amount}
                   onChange={(e) => update(r.key, { amount: e.target.value })}
-                  className={`${fieldCls} font-mono tabular text-right`}
+                  className="font-mono tabular text-right"
                   required
                 />
               </div>
-              <div className="sm:col-span-2">
-                <label htmlFor={`alloc-method-${r.key}`} className={labelCls}>Method</label>
+              <div className="fin-field">
+                <label htmlFor={`alloc-method-${r.key}`}>Method</label>
                 <select
                   id={`alloc-method-${r.key}`}
                   value={r.method}
                   onChange={(e) => update(r.key, { method: e.target.value as AllocMethod })}
-                  className={fieldCls}
                 >
                   <option value="headcount">Headcount</option>
                   <option value="percentage">Percentage</option>
@@ -317,74 +335,81 @@ export default function CalculateTab({
                   <option value="custom">Custom</option>
                 </select>
               </div>
-              <div className="sm:col-span-2">
-                <label htmlFor={`alloc-cat-${r.key}`} className={labelCls}>Category</label>
-                <div className="flex items-center gap-1.5">
-                  <select
-                    id={`alloc-cat-${r.key}`}
-                    value={r.categoryId}
-                    onChange={(e) => update(r.key, { categoryId: e.target.value })}
-                    className={fieldCls}
-                  >
-                    <option value="">—</option>
-                    {data.categories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => setRows((prev) => prev.filter((x) => x.key !== r.key))}
-                    className="text-muted hover:text-danger font-mono px-1"
-                    aria-label="Remove expense"
-                    title="Remove this expense"
-                  >
-                    ×
-                  </button>
-                </div>
+              <div className="fin-field span-2">
+                <label htmlFor={`alloc-cat-${r.key}`}>Category</label>
+                <select
+                  id={`alloc-cat-${r.key}`}
+                  value={r.categoryId}
+                  onChange={(e) => update(r.key, { categoryId: e.target.value })}
+                >
+                  <option value="">—</option>
+                  {data.categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
               </div>
-            </div>
 
-            {r.method === 'percentage' ? (
-              <SplitEditor
-                label="Each company's % — they must total 100; HV's own share goes in the first box"
-                companies={[{ id: OWN_SPLIT, label: 'HV own (not billed)' }, ...data.companies]}
-                values={r.pct}
-                suffix="%"
-                onChange={(pct) => update(r.key, { pct })}
-              />
+              {r.method === 'percentage' ? (
+                <div className="span-3">
+                  <SplitEditor
+                    label="Each company's % — they must total 100; HV's own share goes in the first box"
+                    companies={[{ id: OWN_SPLIT, label: 'HV own (not billed)' }, ...data.companies]}
+                    values={r.pct}
+                    suffix="%"
+                    onChange={(pct) => update(r.key, { pct })}
+                  />
+                </div>
+              ) : null}
+              {r.method === 'custom' ? (
+                <div className="span-3">
+                  <SplitEditor
+                    label="Each company's amount in RM — HV's own share goes in the first box"
+                    companies={[{ id: OWN_SPLIT, label: 'HV own (not billed)' }, ...data.companies]}
+                    values={r.custom}
+                    suffix="RM"
+                    onChange={(custom) => update(r.key, { custom })}
+                  />
+                </div>
+              ) : null}
+            </Fragment>
+          ))}
+
+          {error ? <p className="fin-error span-3">{error}</p> : null}
+
+          <div className="span-3 flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={save}
+              disabled={isPending || !previewOk}
+              className="bil-btn primary"
+            >
+              {isPending ? 'Saving…' : editTxn ? `Overwrite ${editTxn.txnNo}` : 'Save allocation'}
+            </button>
+            {!editTxn ? (
+              <button
+                type="button"
+                onClick={() => { setRows((prev) => [...prev, blankRow(nextKey)]); setNextKey((k) => k + 1) }}
+                className="btn-sec"
+              >
+                + Add expense
+              </button>
             ) : null}
-            {r.method === 'custom' ? (
-              <SplitEditor
-                label="Each company's amount in RM — HV's own share goes in the first box"
-                companies={[{ id: OWN_SPLIT, label: 'HV own (not billed)' }, ...data.companies]}
-                values={r.custom}
-                suffix="RM"
-                onChange={(custom) => update(r.key, { custom })}
-              />
-            ) : null}
+            <span className="fin-hint">
+              {editTxn
+                ? 'The record keeps its number; its split is replaced with this one.'
+                : `Saved into ${month}’s records; Generate invoices on Records then raises the drafts.`}
+            </span>
           </div>
-        ))}
-        {!editTxn ? (
-          <button
-            type="button"
-            onClick={() => { setRows((prev) => [...prev, blankRow(nextKey)]); setNextKey((k) => k + 1) }}
-            className="btn-quiet-sheet"
-          >
-            + Add another expense
-          </button>
-        ) : null}
-      </div>
+        </div>
+      </section>
 
       {/* Preview — who is billed, on what basis, how much */}
       {preview.length > 0 ? (
-        <section className="mt-8">
+        <section>
           <div className="sect-head">
             <h2>Preview</h2>
             <span className="rule" aria-hidden />
-            <span className="count">
-              {preview.length} {preview.length === 1 ? 'EXPENSE' : 'EXPENSES'}
-              {headcountTotal > 0 ? ` · HEADCOUNT ${headcountTotal.toFixed(2)}` : ''}
-            </span>
+            <span className="count">BILLABLE TOTAL · HV OWN LEFT OUT</span>
           </div>
           <div className="overflow-x-auto">
             <table className="ledger-table w-full">
@@ -437,26 +462,6 @@ export default function CalculateTab({
           </div>
         </section>
       ) : null}
-
-      {error ? (
-        <div className="mt-4 bg-danger-bg border border-danger text-danger rounded-md p-3 text-sm font-sans">{error}</div>
-      ) : null}
-
-      <div className="flex items-center gap-4 flex-wrap pt-5">
-        <button
-          type="button"
-          onClick={save}
-          disabled={isPending || !previewOk}
-          className="bulk-pri font-serif italic text-sm"
-        >
-          {isPending ? 'Saving…' : editTxn ? `Overwrite ${editTxn.txnNo}` : 'Save allocation'}
-        </button>
-        <span className="text-xs text-graphite">
-          {editTxn
-            ? 'The record keeps its number; its split is replaced with this one.'
-            : `Saved into ${month}’s records; Generate on Records then raises the drafts.`}
-        </span>
-      </div>
     </div>
   )
 }

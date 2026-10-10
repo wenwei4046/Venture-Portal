@@ -2,18 +2,22 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import dayjs from 'dayjs'
+import MonthBar from './MonthBar'
 
 interface Props {
   currentPeriod: string
 }
 
 // One selector instance per month. Changing the month is a query-string
-// navigation (/billing?period= → /statements?period=), which re-runs the
-// Server Components but keeps this client subtree mounted — so the local
-// `period` below only ever tracked the arrows, not the URL, and drifted after
-// browser Back/Forward. Keyed on the month the server rendered, it restarts
-// in sync. Same pattern as director-salary's CTCInputGrid (2026-09-11).
+// navigation (/statements?period=), which re-runs the Server Components but
+// keeps this client subtree mounted — so the local `period` below only ever
+// tracked the arrows, not the URL, and drifted after browser Back/Forward.
+// Keyed on the month the server rendered, it restarts in sync. Same pattern
+// as director-salary's CTCInputGrid (2026-09-11).
+//
+// 2026-10-10 — the handoff's month control: "← October 2026 ▾ →", the label
+// opening the year's months (MonthBar). It goes to /statements, the page
+// itself, rather than through the /billing redirect.
 export default function PeriodSelector(props: Props) {
   return <PeriodSelectorBody key={props.currentPeriod} {...props} />
 }
@@ -21,42 +25,16 @@ export default function PeriodSelector(props: Props) {
 function PeriodSelectorBody({ currentPeriod }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  // period is stored as YYYY-MM-01; navigate keeps that shape.
   const [period, setPeriod] = useState(currentPeriod)
 
-  // period is stored as YYYY-MM-01; navigate keeps that shape.
-  function go(next: string) {
+  function go(month: string) {
+    const next = `${month}-01`
     setPeriod(next)
     startTransition(() => {
-      router.push(`/billing?period=${next}`)
+      router.push(`/statements?period=${next}`)
     })
   }
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    if (e.target.value) go(`${e.target.value}-01`)
-  }
-  const prev = dayjs(period).subtract(1, 'month').format('YYYY-MM-01')
-  const next = dayjs(period).add(1, 'month').format('YYYY-MM-01')
 
-  const btn =
-    'px-2.5 py-2 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-graphite hover:text-ink transition-colors text-sm leading-none disabled:opacity-60'
-
-  return (
-    <div className="flex items-center gap-2">
-      <label
-        htmlFor="billing_period"
-        className="font-sans text-xs uppercase tracking-wide text-muted mr-1"
-      >
-        Period
-      </label>
-      <button type="button" onClick={() => go(prev)} disabled={isPending} className={btn} aria-label="Previous month" title="Previous month">‹</button>
-      <input
-        id="billing_period"
-        type="month"
-        value={period.slice(0, 7)}
-        onChange={handleChange}
-        disabled={isPending}
-        className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border disabled:opacity-60"
-      />
-      <button type="button" onClick={() => go(next)} disabled={isPending} className={btn} aria-label="Next month" title="Next month">›</button>
-    </div>
-  )
+  return <MonthBar month={period.slice(0, 7)} onGo={go} picker disabled={isPending} />
 }

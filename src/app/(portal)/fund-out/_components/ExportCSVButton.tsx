@@ -26,16 +26,13 @@ export default function ExportCSVButton() {
     })
   }
 
+  // 2026-10-10 — the handoff: one of the head's sheet buttons.
   return (
     <>
-      <button
-        onClick={handleExport}
-        disabled={isPending}
-        className="btn-secondary"
-      >
-        {isPending ? 'Exporting...' : 'Export CSV'}
+      <button type="button" onClick={handleExport} disabled={isPending} className="btn-quiet-sheet">
+        {isPending ? 'Exporting…' : 'Export CSV'}
       </button>
-      {error && <span className="text-sm font-serif italic text-danger ml-2">{error}</span>}
+      {error && <span className="text-xs text-danger ml-2">{error}</span>}
     </>
   )
 }

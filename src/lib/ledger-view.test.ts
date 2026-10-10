@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hasLedgerActivity, ledgerExportHref, ledgerPeriodLabel } from './ledger-view'
+import { hasLedgerActivity, ledgerDeptNames, ledgerExportHref, ledgerPeriodLabel } from './ledger-view'
 
 // 2026-10-09 — the General Ledger's head (the user's Claude Design handoff).
 
@@ -26,5 +26,16 @@ describe('the ledger export link', () => {
     expect(ledgerExportHref('pdf', { codes: ['1010', '5027'], from: '2026-10-01', to: '2026-10-31', showZero: true })).toBe(
       '/reports/ledger/export?format=pdf&codes=1010%2C5027&from=2026-10-01&to=2026-10-31&showZero=1',
     )
+  })
+})
+
+// 2026-10-10 — the Dept column names the departments added since the five.
+describe('the ledger’s department names', () => {
+  it('names each extra department by its segment', () => {
+    expect(ledgerDeptNames([{ value: 'it', label: 'IT' }, { value: 'revenue_department', label: 'Revenue Department' }])).toEqual({
+      it: 'IT',
+      revenue_department: 'Revenue Department',
+    })
+    expect(ledgerDeptNames([])).toEqual({})
   })
 })

@@ -23,14 +23,11 @@ export default function EscalateButton({ overdueId }: { overdueId: string }) {
     })
   }
 
+  // A bordered button, like the row's others (2026-10-10, the handoff — was an "Escalate →" link).
   if (!confirming) {
     return (
-      <button
-        type="button"
-        onClick={() => setConfirming(true)}
-        className="text-sm text-accent hover:text-accent-hover font-serif italic"
-      >
-        Escalate →
+      <button type="button" onClick={() => setConfirming(true)} className="sch-row-btn">
+        Escalate
       </button>
     )
   }

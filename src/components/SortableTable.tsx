@@ -1173,7 +1173,8 @@ function ColumnsPanel({
       >
         <div className="flex items-start justify-between gap-3 border-b border-hairline px-4 pt-4 pb-3">
           <div>
-            {title ? <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent">{title}</div> : null}
+            {/* The Finance view keeps micro-labels at 0.05em (2026-10-10, the handoff). */}
+            {title ? <div className={`text-[10.5px] font-semibold uppercase ${fin ? 'tracking-[0.05em]' : 'tracking-[0.14em]'} text-accent`}>{title}</div> : null}
             <h2 className="font-serif text-xl text-ink">Columns</h2>
             <p className="text-xs text-muted">{fin ? 'Tick the columns to show' : '勾选要显示的栏位'}</p>
           </div>
@@ -1209,7 +1210,7 @@ function ColumnsPanel({
             matches.map((g) => (
               <div key={g.name || '_'} role="group" aria-label={g.name || 'Columns'}>
                 {g.name ? (
-                  <div className="flex items-center gap-2 px-4 pt-3 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.13em] text-graphite">
+                  <div className={`flex items-center gap-2 px-4 pt-3 pb-1 text-[10.5px] font-semibold uppercase ${fin ? 'tracking-[0.05em]' : 'tracking-[0.13em]'} text-graphite`}>
                     {g.name}
                     <span className="font-mono font-normal tracking-normal text-muted">
                       {g.all.filter((c) => !off.has(c.key)).length}/{g.all.length}

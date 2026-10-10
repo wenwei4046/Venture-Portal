@@ -16,6 +16,7 @@ vi.mock('../_components/StatementsPeriodTable', () => ({
 }))
 
 import MonthlyStatementsPage from './page'
+import { FinViewProvider } from '@/components/layout/fin-view'
 
 const STATEMENTS = [
   { id: 's1', period_month: '2026-09-01', company_id: 'co-car', status: 'draft', total_invoice: 22507.9, total_contra: 600, net_amount: 21907.9, created_at: '2026-10-01' },
@@ -76,6 +77,20 @@ describe('the monthly Statements on the sheet', () => {
     expect(tables[0]).toHaveAttribute('data-can-set-default', 'true')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Statements')
     expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/statements/monthly/export?format=xlsx')
+  })
+
+  // 2026-10-10 — the handoff's head: Excel, PDF, then Generate statements, the
+  // primary, last. On the Finance view only; a Director keeps the old order.
+  it('orders the head Excel, PDF, Generate statements on the Finance view', async () => {
+    database()
+    const page = await MonthlyStatementsPage()
+    const { unmount } = render(<FinViewProvider value={true}>{page}</FinViewProvider>)
+    const order = () =>
+      Array.from((document.querySelector('.page-head') as HTMLElement).querySelectorAll('a, button')).map((el) => el.textContent?.trim())
+    expect(order()).toEqual(['Excel', 'PDF', 'Generate statements'])
+    unmount()
+    render(await MonthlyStatementsPage())
+    expect(order()).toEqual(['Generate statements', 'Excel', 'PDF'])
   })
 
   it('says so when there is nothing yet', async () => {

@@ -89,6 +89,14 @@ describe('the Repayment schedule', () => {
     expect(sheet).toHaveTextContent('RM 30,000.00')
     expect(sheet.querySelectorAll('tbody tr')).toHaveLength(3)
     expect(sheet).toHaveTextContent('Printed 9 Oct 2026 · Finance Manager')
+    // 2026-10-10 — the handoff: the letterhead and the title in Georgia, a
+    // peach Total row, and a line to sign for Finance and for the Principal.
+    expect(sheet.querySelector('.sched-print-house')).toHaveClass('fund-print-serif')
+    expect(sheet.querySelector('.sched-print-title')).toHaveClass('fund-print-serif')
+    expect(sheet.querySelector('tfoot tr')).toHaveClass('fund-print-total')
+    const sign = sheet.querySelector('.fund-print-sign') as HTMLElement
+    expect(Array.from(sign.children).map((c) => c.textContent)).toEqual(['Prepared by · Finance', 'Approved by · Principal'])
+    expect(sheet.querySelector('table')!.compareDocumentPosition(sign) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     fireEvent.click(within(sheet).getByRole('button', { name: 'Print' }))
     expect(print).toHaveBeenCalled()
     fireEvent.click(within(sheet).getByRole('button', { name: 'Close' }))

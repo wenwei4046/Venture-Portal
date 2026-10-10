@@ -8,13 +8,16 @@ import { officeTime } from '@/lib/office-time'
 import { allocatorSummary, batchLabel, byCompanyRows, splitSummary, type ByCompanyRow } from '@/lib/allocator-sheet'
 import SortableTable, { type SortableColumn } from '@/components/SortableTable'
 import { useRowLinks } from '@/components/row-links'
-import { deleteAllocTxn, generateAllocatorInvoices, type GenerateResult } from '../actions'
+import { deleteAllocTxn } from '../actions'
 import type { AllocatorData, TxnRow } from './types'
 import { unwrap } from './unwrap'
+import ColumnFoot from '../../billing/_components/ColumnFoot'
 
 // The month's records on the sheet (2026-10-07, the allocator sample; 2026-10-09,
-// the user's Claude Design handoff — 照设计档): a strip above the table for
-// what still has to be billed, the records with the split as ONE column of
+// the user's Claude Design handoff — 照设计档; 2026-10-10, its notice for what
+// is still to bill — Generate invoices is the page head's — "N EXPENSES ·
+// MONTH", a Total and an All companies row, the Txn titling a phone's row):
+// the records with the split as ONE column of
 // text ("2990 3.9% · CAR 19.4%", HV's own share left out), the batch and the
 // status as chips, a record opening its own page on a double-click, then a By
 // company table — each target's share, what is billed, what is to bill, and
@@ -68,7 +71,6 @@ export default function RecordsTab({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [genResult, setGenResult] = useState<GenerateResult | null>(null)
 
   const monthLabel = dayjs(`${data.period}-01`).format('MMMM YYYY')
   const summary = allocatorSummary(data.txns, data.invoices)
@@ -115,15 +117,29 @@ export default function RecordsTab({
       key: 'txn_no',
       group: '基本',
       label: 'Txn',
-      mobile: 'drop',
-      render: (t) => t.txnNo,
-      cellClassName: 'font-sans text-[12px] text-ink font-medium whitespace-nowrap',
+      // The handoff's phone row is titled by the Txn (2026-10-10).
+      mobile: 'keep',
+      render: (t) => (
+        <>
+          <span className="font-medium whitespace-nowrap">{t.txnNo}</span>
+          {/* The phone's small print: the description and the method, then the batch and how many shares. */}
+          <span className="q-sub md:hidden">
+            <span className="q-sub-no">{t.description} · {methodLabel(t.method)}</span>
+            <span className="q-sub-by">
+              <span className="by"><BatchChip t={t} /></span>
+              <span className="on">{t.details.length} {t.details.length === 1 ? 'share' : 'shares'}</span>
+            </span>
+          </span>
+        </>
+      ),
+      sortValue: (t) => t.txnNo,
+      cellClassName: 'font-sans text-[12px] text-ink',
     },
     {
       key: 'description',
       group: '基本',
       label: 'Description',
-      mobile: 'keep',
+      mobile: 'detail',
       render: (t) => (
         <>
           <span className="q-desc" title={t.description}>{t.description}</span>
@@ -132,14 +148,6 @@ export default function RecordsTab({
             {t.createdAt ? `${officeTime(t.createdAt).format('D MMM YYYY')} · ` : ''}
             {methodLabel(t.method)}
             {t.hcPeriod ? ` · HC ${dayjs(`${t.hcPeriod}-01`).format('MMM YYYY')}` : ''}
-          </span>
-          {/* The phone's small print: the number and the method, then the batch and how many shares. */}
-          <span className="q-sub md:hidden">
-            <span className="q-sub-no">{t.txnNo} · {methodLabel(t.method)}</span>
-            <span className="q-sub-by">
-              <span className="by"><BatchChip t={t} /></span>
-              <span className="on">{t.details.length} {t.details.length === 1 ? 'share' : 'shares'}</span>
-            </span>
           </span>
         </>
       ),
@@ -300,37 +308,13 @@ export default function RecordsTab({
 
   return (
     <div className="alloc-sheet fin-queue">
-      {/* What still has to be billed — the strip and its button; the month's
-          billed batches are never touched (only unbilled allocations go out). */}
+      {/* What still has to be billed — the handoff's notice; the head's
+          Generate invoices bills it. The month's billed batches are never
+          touched (only unbilled allocations go out). */}
       {summary.toBillCount > 0 ? (
-        <div className="gen-strip" role="region" aria-label="To bill">
-          <div>
-            <b>{summary.toBillCount}</b> {summary.toBillCount === 1 ? 'expense' : 'expenses'} not yet billed ·{' '}
-            <b>{formatMoney(summary.toBill)}</b> to {summary.toBillTargets} {summary.toBillTargets === 1 ? 'company' : 'companies'}{' '}
-            <small>· one draft invoice per company; review and issue on the Invoice page.</small>
-          </div>
-          <button
-            type="button"
-            onClick={() => run(async () => { setGenResult(unwrap(await generateAllocatorInvoices(data.period))) })}
-            disabled={isPending}
-            className="bulk-pri font-serif italic text-sm"
-          >
-            {isPending ? 'Generating…' : 'Generate draft invoices →'}
-          </button>
-        </div>
-      ) : null}
-
-      {genResult ? (
-        <div className="mb-4 border border-hairline rounded-md bg-surface p-4 text-sm font-sans space-y-1">
-          {genResult.created.map((c) => (
-            <div key={c.company} className="text-ledger">✓ {c.company} → {c.invoiceNo}</div>
-          ))}
-          {genResult.skipped.map((s) => (
-            <div key={s.company} className="text-muted">– {s.company} skipped: already has {s.reason}</div>
-          ))}
-          <button type="button" onClick={() => setGenResult(null)} className="text-xs text-muted hover:text-ink font-sans transition-colors">
-            Dismiss
-          </button>
+        <div className="bil-notice">
+          To bill {formatMoney(summary.toBill)} across {summary.toBillTargets} {summary.toBillTargets === 1 ? 'company' : 'companies'} —
+          Generate invoices bills every company’s share in one go.
         </div>
       ) : null}
 
@@ -343,8 +327,7 @@ export default function RecordsTab({
           <h2>Allocations</h2>
           <span className="rule" aria-hidden />
           <span className="count">
-            {summary.txnCount} {summary.txnCount === 1 ? 'RECORD' : 'RECORDS'} · {monthLabel.toUpperCase()} ·{' '}
-            {summary.toBillCount === 0 ? 'ALL BILLED' : `${summary.billedCount} BILLED`}
+            {summary.txnCount} {summary.txnCount === 1 ? 'EXPENSE' : 'EXPENSES'} · {monthLabel.toUpperCase()}
           </span>
         </div>
         <div className="overflow-x-auto">
@@ -363,17 +346,7 @@ export default function RecordsTab({
             onRowOpen={links.onRowOpen}
             onRowContextMenu={links.onRowContextMenu}
             openLabel="Open →"
-            footer={(visible) => (
-              <tr>
-                <td colSpan={1000} className="q-foot">
-                  <span>
-                    {visible.length} {visible.length === 1 ? 'record' : 'records'}
-                    {summary.ownShare > 0 ? ` · HV own ${formatMoney(summary.ownShare)} kept, not billed` : ''}
-                  </span>
-                  <span className="num">{formatMoney(visible.reduce((s, t) => s + t.amount, 0))}</span>
-                </td>
-              </tr>
-            )}
+            footer={(visible) => <ColumnFoot label="Total" cells={{ amount: formatMoney(visible.reduce((s, t) => s + t.amount, 0)) }} />}
           />
           {links.menu}
         </div>
@@ -402,19 +375,22 @@ export default function RecordsTab({
             rowOpens={() => false}
             rowClassName={(r) => (r.own ? 'own' : undefined)}
             footer={() => (
-              <tr>
-                <td colSpan={1000} className="q-foot">
-                  <span>
-                    Billable {formatMoney(billable)} · billed {formatMoney(summary.billed)} · to bill {formatMoney(summary.toBill)}
-                  </span>
-                  <span className="num">
-                    {data.invoices.length} {data.invoices.length === 1 ? 'invoice' : 'invoices'}
-                    {paidCount > 0 ? ` · ${paidCount} paid` : ''}
-                    {issuedCount > 0 ? ` · ${issuedCount} issued` : ''}
-                    {draftCount > 0 ? ` · ${draftCount} draft` : ''}
-                  </span>
-                </td>
-              </tr>
+              <ColumnFoot
+                label="All companies"
+                cells={{
+                  share: formatMoney(billable),
+                  billed: formatMoney(summary.billed),
+                  toBill: formatMoney(summary.toBill),
+                  invoices: [
+                    `${data.invoices.length} ${data.invoices.length === 1 ? 'invoice' : 'invoices'}`,
+                    paidCount > 0 ? `${paidCount} paid` : '',
+                    issuedCount > 0 ? `${issuedCount} issued` : '',
+                    draftCount > 0 ? `${draftCount} draft` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' · '),
+                }}
+              />
             )}
           />
         </div>

@@ -4,6 +4,8 @@ import { officeTime } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import PrintButton from './PrintButton'
+import { HandoffSections, type PrintLine } from './PrintSections'
+import FinSwitch from '../../_components/FinSwitch'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -52,6 +54,12 @@ export default async function StatementPrintPage({ params }: Props) {
     loan_principal: 'Loan Principal',
     other: 'Other',
   }
+  const printLine = (l: (typeof lineList)[number]): PrintLine => ({
+    id: l.id,
+    category: categoryLabels[l.category_code] ?? l.category_code,
+    description: l.description ?? null,
+    amount: Number(l.amount),
+  })
 
   return (
     <html lang="en-MY">
@@ -154,6 +162,27 @@ export default async function StatementPrintPage({ params }: Props) {
             font-family: Georgia, serif; font-style: italic; font-size: 14px;
           }
           .print-btn:hover { background: #B54A22; }
+          /* The handoff's two sides and net (2026-10-10, PrintSections). */
+          .bil-ps-box { margin: 18px 0; border: 1px solid rgba(21,110,78,0.3); border-left: 4px solid #156E4E; border-radius: 6px; padding: 12px 14px 4px; background: rgb(246,251,248); }
+          .bil-ps-box.b { border-color: rgba(176,40,34,0.3); border-left-color: #B02822; background: rgb(253,246,245); }
+          .bil-ps-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; margin-bottom: 6px; }
+          .bil-ps-head h2 { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 15px; font-weight: 400; font-style: normal; text-transform: none; letter-spacing: 0; color: #000; }
+          .bil-ps-box.b .bil-ps-head h2 { color: #B02822; }
+          .bil-ps-tag { font-family: Inter, 'Noto Sans SC', sans-serif; font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #156E4E; }
+          .bil-ps-box.b .bil-ps-tag { color: #B02822; }
+          .bil-ps-box table { margin-bottom: 14px; }
+          .bil-ps-box th { padding: 7px 8px; border-bottom: 1px solid #000; color: #000; font-style: normal; font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; }
+          .bil-ps-box td { padding: 7px 8px; border-bottom: 1px solid rgb(229,228,223); }
+          .bil-ps-box tfoot td { border-bottom: 0; padding: 8px; font-weight: 600; }
+          .bil-ps-box.b tfoot td, .bil-ps-box.b tfoot td:last-child { color: #B02822; }
+          .bil-ps-none { margin: 0 0 14px; font-size: 12px; font-style: italic; color: #9E8F7F; }
+          .bil-ps-net { margin-top: 6px; }
+          .bil-ps-net td { padding: 12px 8px; border-top: 2px solid #000; border-bottom: 2px solid #000; vertical-align: top; }
+          .bil-ps-net-l { font-family: Georgia, 'Times New Roman', serif; font-size: 15px; }
+          .bil-ps-why { margin-top: 3px; font-size: 10.5px; font-style: italic; color: #5A4E40; }
+          .bil-ps-net td:last-child { font-size: 16px; font-weight: 500; }
+          .bil-ps-net .pos { color: #156E4E; }
+          .bil-ps-net .neg { color: #B02822; }
         `}</style>
       </head>
       <body>
@@ -187,6 +216,20 @@ export default async function StatementPrintPage({ params }: Props) {
           </div>
         </div>
 
+        <FinSwitch
+          fin={
+            <HandoffSections
+              company={company?.name ?? '—'}
+              code={company?.short_code ?? company?.name ?? '—'}
+              invoiceLines={invoiceLines.map(printLine)}
+              contraLines={contraLines.map(printLine)}
+              totalInvoice={Number(statement.total_invoice)}
+              totalContra={Number(statement.total_contra)}
+              net={netAmount}
+            />
+          }
+          other={
+        <>
         {/* Invoice items */}
         <h2>Invoice Items (Billable)</h2>
         {invoiceLines.length === 0 ? (
@@ -264,6 +307,9 @@ export default async function StatementPrintPage({ params }: Props) {
             </tr>
           </tbody>
         </table>
+        </>
+          }
+        />
 
         <div className="footer">
           <div>This is a computer-generated document. No signature is required.</div>

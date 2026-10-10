@@ -131,6 +131,7 @@ export default async function DeptPoolPage({
             a,
           }))}
           venture={ventureAccrual}
+          canSetDefault={canDo(user, 'treasury', 'create')}
         />
       )
     }
@@ -591,6 +592,7 @@ export default async function DeptPoolPage({
           }
         })}
         canExecuteHr={canDo(user, 'treasury', 'edit')}
+        canSetDefault={canDo(user, 'treasury', 'create')}
         venture={ventureCash}
         perBank={perBankBreakdown}
         total={totalDeployed}

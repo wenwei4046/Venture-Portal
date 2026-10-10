@@ -1,5 +1,55 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-10 o (SHIPPED) — audit fixes, parts 2–4: every page group
+
+Six agents, each confined to its own folders (shared files were mine), closed list l
+items 5–7 page by page; their CSS is appended at the end of globals.css under the
+banner "The Finance handoff, the audit fixes" with prefixes ov- / pay- / bil- / fund- /
+sch- / adm-. Per group (details in the dated comments in each file):
+- **Overview** (treasury branch): Pending your hand, Recent actions, Subsidiaries,
+  Overdue instalments, Coming up → SortableTables (`dashboard/_components/OverviewTables.tsx`);
+  the pool fold's three titled tables; Alerts as Type | Message; KPI rows plain cards
+  (`KpiCards.tsx`); phone head = Record payment only. Awaiting Principal kept as is.
+- **Payments / Receipt**: Dept Requests button; month in the eyebrow; Total foot
+  (`TotalFoot.tsx`, aligned under Amount); plain cells / dates / "pending" chip; phone
+  rows; payroll batches compact list; voucher page English on the Treasury permission
+  (HR still sees Chinese); Receipt title / button / tone / placeholders / back link.
+  The old filter form was STILL THERE at this checkpoint (the user then said remove).
+- **Invoice / Statements / Allocator**: month bar with grid popover, menus in English
+  (old ActMenu dropped its dialogs — now unused), eyebrow, fold per-department rows,
+  bill-to name + type, English switch, selection bar above, Open in new tab, Total
+  row, sub-lists as sheet tables (Marketing "Invoice" opens the project's invoice —
+  `contract_id` added to the existing invoices select), phone; Statements head order,
+  columns, filters, All companies, print A/B boxes with the direction; Allocator wait
+  tone, ← month →, Generate invoices in the head, Expense form, Staff + Setup rebuilt
+  in English (Staff lists all, inactive greyed — question), record page head button.
+- **Fund IN / OUT / Financing / Daily Bank**: Total rows (`components/treasury/AlignedFoot`),
+  filters/ranges, phone cards (`PhoneCards`), Fund OUT company line, Export CSV style,
+  Fully repaid heading, Terms over time (segment box + 4-column card, extras in a fold),
+  Print schedule signature / peach total / Georgia; BA register chips, Mark settled +
+  row menu, period text, filters, per-card Edit limit (+ "Set a limit for another
+  company"), new-layout calculator / Record financing (same maths; ref + borrower
+  required), detail Generate PV / Bill interest. Daily Bank phone list, toast (`Toast`).
+- **Repayment Schedule / Overdue / Dept Pool / Venture Pool / GL**: the design's due
+  table per side (`DueTable.tsx`, `due-rows.ts`) over a closed "Full plans" fold with
+  the old four sections; English copy; calendar legend / hover card / phone lines;
+  Overdue cards above tabs, Net off → the loan's repayment form, month foots, log
+  always shown (ALL TIME — no netted date to cut 30 days), LedgerRow phone panels,
+  buttons; Dept Pool sheet tables (client DeptPoolSheet), bank names, wait chip;
+  Venture Pool filters / layout / black positives / 1 : 1.6 charts; GL code · name,
+  Ref Inter, registry dept names. Balance stays "x Dr / x Cr" (user 2026-10-10).
+- **Reconciliation / Journal / Settings / Base rate**: upload modal with drop area,
+  sessions + journal list as SortableTables with row menus (Actions column gone),
+  AUTO amber, empty voucher lines ignored, Description focused; Settings buttons in
+  the head, Finance without the tab strip (Principal keeps it), Departments and Base
+  rate history as sheet tables.
+- Mine: SortableTable Columns panel 0.05em on the Finance view; `.fin-view >
+  .sheet-theme` muted greys (graphite 117 100 86, muted 138 119 101); 10px minimums.
+
+User decisions 2026-10-10 (AskUserQuestion): REMOVE the Payments/Receipt filter form;
+KEEP GL Dr/Cr; DO aging As at (past dates); Company Statement repay → RED per the
+handoff (overrides the 2026-08-06 orange). Follow-ups in the next checkpoint.
+
 ## CHECKPOINT 2026-10-10 n (SHIPPED) — audit fixes, part 1b: TB segment, agings, Company Statement
 
 - **Trial Balance · Segment** (list l item 4): `fetchTrialBalance({ segment })` — with a

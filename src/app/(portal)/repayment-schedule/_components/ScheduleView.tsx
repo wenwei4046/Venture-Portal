@@ -1,9 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import { SlidingTabs } from '@/components/motion/SlidingTabs'
 import RepayCalendar, { type CalendarEvent } from './RepayCalendar'
+import DueTable from './DueTable'
+import { dueRows } from './due-rows'
 
 export interface SchedRow {
   key: string
@@ -14,6 +17,9 @@ export interface SchedRow {
   totalDue: number
   /** This month's installment already collected/paid (principal repayment recorded this month). */
   done: boolean
+  /** What came in (or went out) on the deal this month — every type, as the
+   *  settled-this-month rows count it (2026-10-10, the handoff's Received column). */
+  received?: number
   /** A repayment PV exists but is not yet approved (应付 only). */
   pending?: boolean
   /** Interest is computed with monthly compounding (利滚利). */
@@ -28,6 +34,8 @@ export interface NoTermRow {
   detail: string
   outstanding: number
   monthlyInterest: number
+  /** What came in (or went out) on the deal this month. */
+  received?: number
   /** Funding-source remark parsed from repayment_terms (资金来源: …), 应收 only. */
   source?: string | null
 }
@@ -42,6 +50,8 @@ export interface CompoundRow {
   accrued: number
   /** Interest the balance accrues this month (本月利息). */
   thisMonthInterest: number
+  /** What came in (or went out) on the deal this month. */
+  received?: number
   /** Funding-source remark parsed from repayment_terms (资金来源: …), 应收 only. */
   source?: string | null
 }
@@ -69,9 +79,12 @@ export interface MinInterestRow {
 type Mode = 'all' | 'outstanding'
 // 2026-10-09 (the Finance revamp, the user's Claude Design handoff): the
 // month as a calendar, then one tab per side — what we collect (Fund OUT) and
-// what we pay (Fund IN) — each with its scheduled installments, its minimum
-// interest, and its compounding and no-fixed-term deals (kept out of the
-// cash totals, as before). The cards sit on the page.
+// what we pay (Fund IN). 2026-10-10: each side is the handoff's one table,
+// "Due to collect" / "Due to pay"; its four tables of before — scheduled,
+// minimum interest, compounding, no fixed term, with the Full plan /
+// Outstanding only toggle — fold away under it, for what that table does not
+// show (the compounding balance, the outstanding of a deal with no term). The
+// cards are the page's, one row per tab.
 type Tab = 'cal' | 'collect' | 'pay'
 
 function r2(n: number): number {
@@ -81,8 +94,12 @@ function r2(n: number): number {
 export default function ScheduleView({
   monthLabel,
   month,
+  linkMonth = null,
   today,
   events,
+  cards,
+  canRecord = false,
+  canSetDefault = false,
   collectRows,
   collectMin,
   repayMin,
@@ -101,10 +118,17 @@ export default function ScheduleView({
   monthLabel: string
   /** YYYY-MM — the month on screen. */
   month: string
+  /** The month as the page's URL names it (null: this month) — a deal's Back returns to it. */
+  linkMonth?: string | null
   /** The office's today, YYYY-MM-DD. */
   today: string
   /** The month's installments, from each deal's repayment plan. */
   events: CalendarEvent[]
+  /** The cards over the tabs: the calendar's, and each side's (the handoff). */
+  cards?: Partial<Record<Tab, ReactNode>>
+  /** Treasury · Create — a short row offers its deal's record form. */
+  canRecord?: boolean
+  canSetDefault?: boolean
   collectRows: SchedRow[]
   collectMin: MinInterestRow[]
   repayMin: MinInterestRow[]
@@ -126,9 +150,12 @@ export default function ScheduleView({
   const visible = (rows: SchedRow[]) => (mode === 'all' ? rows : rows.filter((r) => !r.done))
   const collectCount = collectRows.length + collectMin.length + collectCompound.length + collectNoTerm.length
   const payCount = repayRows.length + repayMin.length + repayCompound.length + repayNoTerm.length
+  const first = dayjs(`${month}-01`)
 
   return (
     <div>
+      {cards?.[tab] ?? null}
+
       <SlidingTabs
         items={[
           { key: 'cal', label: 'Calendar' },
@@ -144,75 +171,104 @@ export default function ScheduleView({
         <RepayCalendar month={month} today={today} events={events} />
       ) : (
         <>
-          {/* Toggle — only affects the scheduled tables */}
-          <div className="flex flex-wrap items-center gap-2 mb-6" role="group" aria-label="View">
-            <button type="button" aria-pressed={mode === 'all'} onClick={() => setMode('all')} className={mode === 'all' ? 'btn-pri-sheet' : 'btn-quiet-sheet'}>
-              Full plan (incl. {tab === 'collect' ? 'collected' : 'paid'})
-            </button>
-            <button type="button" aria-pressed={mode === 'outstanding'} onClick={() => setMode('outstanding')} className={mode === 'outstanding' ? 'btn-pri-sheet' : 'btn-quiet-sheet'}>
-              Outstanding only
-            </button>
-          </div>
+          <DueTable
+            key={tab}
+            side={tab}
+            rows={
+              tab === 'collect'
+                ? dueRows({ rows: collectRows, min: collectMin, compound: collectCompound, noTerm: collectNoTerm })
+                : dueRows({ rows: repayRows, min: repayMin, compound: repayCompound, noTerm: repayNoTerm })
+            }
+            monthLong={first.format('MMMM YYYY')}
+            monthShort={first.format('MMM')}
+            linkMonth={linkMonth}
+            canRecord={canRecord}
+            canSetDefault={canSetDefault}
+          />
 
-          {tab === 'collect' ? (
-            <>
-              {collectMin.length > 0 ? (
-                <MinInterestSection title="Minimum interest — to collect" rows={collectMin} paidLabel="Received" monthLabel={monthLabel} />
-              ) : null}
-              <ScheduleSection title="To collect — scheduled loans" rows={visible(collectRows)} tone="credit" monthLabel={monthLabel} />
-              <CompoundSection
-                title="To collect — compounding"
-                note="Principal on these loans is not being collected yet — each month's interest rolls into the balance and compounds. Not counted in the cash to collect. Rolled interest = total interest capitalised so far."
-                rows={collectCompound}
-                totals={collectCompoundTotals}
-                tone="credit"
-              />
-              <NoTermSection
-                title="To collect — no fixed term"
-                note="Loans with no agreed rate / tenure / method — excluded from this month's collections. Outstanding principal and monthly interest listed for reference."
-                rows={collectNoTerm}
-                outstanding={collectNoTermOutstanding}
-                interest={collectNoTermInterest}
-              />
-            </>
-          ) : (
-            <>
-              {repayMin.length > 0 ? (
-                <MinInterestSection title="Minimum interest — to repay" rows={repayMin} paidLabel="Paid" monthLabel={monthLabel} />
-              ) : null}
-              <ScheduleSection title="To repay — scheduled fund sources" rows={visible(repayRows)} tone="debit" monthLabel={monthLabel} />
-              <CompoundSection
-                title="To repay — compounding"
-                note="Principal on these fund sources is not being repaid yet — monthly interest rolls into the balance. Not counted in the cash to repay."
-                rows={repayCompound}
-                totals={repayCompoundTotals}
-                tone="debit"
-              />
-              <NoTermSection
-                title="To repay — no fixed term"
-                note="Fund sources with no agreed tenure and no pending repayment PV — excluded from this month's repayments. To schedule one, edit it in Fund In and set the tenure."
-                rows={repayNoTerm}
-                outstanding={repayNoTermOutstanding}
-                interest={repayNoTermInterest}
-              />
-            </>
-          )}
+          <details className="fin-fold">
+            <summary>
+              Full plans
+              <small>MINIMUM INTEREST · SCHEDULED · COMPOUNDING · NO FIXED TERM</small>
+            </summary>
+            <div className="fin-fold-inner">
+              {/* Toggle — only affects the scheduled tables */}
+              <div className="flex flex-wrap items-center gap-2 mb-6" role="group" aria-label="View">
+                <button type="button" aria-pressed={mode === 'all'} onClick={() => setMode('all')} className={mode === 'all' ? 'btn-pri-sheet' : 'btn-quiet-sheet'}>
+                  Full plan (incl. {tab === 'collect' ? 'collected' : 'paid'})
+                </button>
+                <button type="button" aria-pressed={mode === 'outstanding'} onClick={() => setMode('outstanding')} className={mode === 'outstanding' ? 'btn-pri-sheet' : 'btn-quiet-sheet'}>
+                  Outstanding only
+                </button>
+              </div>
+    
+              {tab === 'collect' ? (
+                <>
+                  {collectMin.length > 0 ? (
+                    <MinInterestSection title="Minimum interest — to collect" rows={collectMin} paidLabel="Received" monthLabel={monthLabel} />
+                  ) : null}
+                  <ScheduleSection title="To collect — scheduled loans" rows={visible(collectRows)} tone="credit" monthLabel={monthLabel} />
+                  <CompoundSection
+                    title="To collect — compounding"
+                    note="Principal on these loans is not being collected yet — each month's interest rolls into the balance and compounds. Not counted in the cash to collect. Rolled interest = total interest capitalised so far."
+                    rows={collectCompound}
+                    totals={collectCompoundTotals}
+                    tone="credit"
+                  />
+                  <NoTermSection
+                    title="To collect — no fixed term"
+                    note="Loans with no agreed rate / tenure / method — excluded from this month's collections. Outstanding principal and monthly interest listed for reference."
+                    rows={collectNoTerm}
+                    outstanding={collectNoTermOutstanding}
+                    interest={collectNoTermInterest}
+                  />
+                </>
+              ) : (
+                <>
+                  {repayMin.length > 0 ? (
+                    <MinInterestSection title="Minimum interest — to repay" rows={repayMin} paidLabel="Paid" monthLabel={monthLabel} />
+                  ) : null}
+                  <ScheduleSection title="To repay — scheduled fund sources" rows={visible(repayRows)} tone="debit" monthLabel={monthLabel} />
+                  <CompoundSection
+                    title="To repay — compounding"
+                    note="Principal on these fund sources is not being repaid yet — monthly interest rolls into the balance. Not counted in the cash to repay."
+                    rows={repayCompound}
+                    totals={repayCompoundTotals}
+                    tone="debit"
+                  />
+                  <NoTermSection
+                    title="To repay — no fixed term"
+                    note="Fund sources with no agreed tenure and no pending repayment PV — excluded from this month's repayments. To schedule one, edit it in Fund In and set the tenure."
+                    rows={repayNoTerm}
+                    outstanding={repayNoTermOutstanding}
+                    interest={repayNoTermInterest}
+                  />
+                </>
+              )}
+            </div>
+          </details>
         </>
       )}
     </div>
   )
 }
 
-/** Funding-source chip — same style as the Fund OUT list's SC badge. */
+/** A word on a row, as the sheet's chips (Inter, 2026-10-10 — was a mono tag). */
+function Tag({ tone, title, children }: { tone: string; title?: string; children: ReactNode }) {
+  return (
+    <span className={`chip ${tone} ml-2`} title={title}>
+      {children}
+    </span>
+  )
+}
+
+/** Funding-source chip — the Fund OUT list's SC badge. */
 function SourceChip({ source }: { source?: string | null }) {
   if (!source) return null
   return (
-    <span
-      className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
-      title={`Source of capital: ${source}`}
-    >
+    <Tag tone="info" title={`Source of capital: ${source}`}>
       SC {source}
-    </span>
+    </Tag>
   )
 }
 
@@ -243,8 +299,8 @@ function MinInterestSection({
         </span>
       </div>
       <p className="font-serif italic text-muted text-xs mb-3">
-        最低还息单 — 本金可以慢慢还，但当月利息一定要{paidLabel === 'Received' ? '收' : '付'}齐。
-        Not counted in the cash totals above.
+        Minimum interest — principal can be repaid gradually, but each month&rsquo;s interest must be {paidLabel === 'Received' ? 'received' : 'paid'} in
+        full. Not counted in the cash totals above.
       </p>
       <table className="ledger-table">
         <thead>
@@ -252,7 +308,7 @@ function MinInterestSection({
             <th>Counterparty</th>
             <th className="num">Min interest</th>
             <th className="num">{paidLabel} · {monthLabel}</th>
-            <th className="num">Short 还差</th>
+            <th className="num">Short</th>
           </tr>
         </thead>
         <tbody>
@@ -261,11 +317,7 @@ function MinInterestSection({
               <td>
                 <div className="font-serif text-md text-ink">
                   {r.counterparty}
-                  {r.met ? (
-                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-ledger border border-hairline rounded px-1.5 py-0.5">Met ✓</span>
-                  ) : (
-                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-danger border border-hairline rounded px-1.5 py-0.5">Short</span>
-                  )}
+                  {r.met ? <Tag tone="ledger">met</Tag> : <Tag tone="danger">short</Tag>}
                 </div>
                 <div className="font-mono text-xs text-muted">{r.detail}</div>
               </td>
@@ -322,9 +374,9 @@ function ScheduleSection({ title, rows, tone, monthLabel }: { title: string; row
                   <div className="font-serif text-md text-ink">
                     {r.counterparty}
                     <SourceChip source={r.source} />
-                    {r.compound ? <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5">Compound</span> : null}
-                    {r.done ? <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-ledger border border-hairline rounded px-1.5 py-0.5">Paid in {monthLabel}</span> : null}
-                    {r.pending ? <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-alert border border-hairline rounded px-1.5 py-0.5">Pending PV</span> : null}
+                    {r.compound ? <Tag tone="info">compound</Tag> : null}
+                    {r.done ? <Tag tone="ledger">paid in {monthLabel}</Tag> : null}
+                    {r.pending ? <Tag tone="wait">pending PV</Tag> : null}
                   </div>
                   <div className="font-mono text-xs text-muted">{r.detail}</div>
                 </td>
@@ -386,7 +438,7 @@ function CompoundSection({
                 <div className="font-serif text-md text-ink">
                   {r.counterparty}
                   <SourceChip source={r.source} />
-                  <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5">Compound</span>
+                  <Tag tone="info">compound</Tag>
                 </div>
                 <div className="font-mono text-xs text-muted">{r.detail}</div>
               </td>

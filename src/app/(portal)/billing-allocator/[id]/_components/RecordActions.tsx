@@ -4,14 +4,14 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
-import { deleteAllocTxn, generateAllocatorInvoices, type GenerateResult } from '../../actions'
+import { deleteAllocTxn } from '../../actions'
 import { unwrap } from '../../_components/unwrap'
 
 // What Finance can do to an allocation from its own page (2026-10-09, the
 // handoff's Actions panel). Billed: open the batch's invoices. Not billed:
-// raise the month's draft invoices (every unbilled allocation of the month
-// goes out together — the same action as the Records strip), send the record
-// back to Calculate to be corrected, or delete it.
+// send the record back to Calculate to be corrected, or delete it — and
+// raise the month's draft invoices with the page head's Generate invoices
+// (2026-10-10, the handoff: the primary sits in the head).
 
 export interface RecordInvoice {
   id: string
@@ -37,7 +37,6 @@ export default function RecordActions({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [genResult, setGenResult] = useState<GenerateResult | null>(null)
   const listHref = `/billing-allocator?period=${period}`
   const monthLabel = dayjs(`${period}-01`).format('MMMM YYYY')
 
@@ -65,19 +64,6 @@ export default function RecordActions({
           ))
         ) : (
           <>
-            <button
-              type="button"
-              className="btn-pri"
-              disabled={isPending}
-              onClick={() =>
-                run(async () => {
-                  setGenResult(unwrap(await generateAllocatorInvoices(period)))
-                  router.refresh()
-                })
-              }
-            >
-              {isPending ? 'Working…' : 'Generate invoices'}
-            </button>
             <Link href={`${listHref}&edit=${id}`} className="btn-sec">
               Correct this record
             </Link>
@@ -100,20 +86,9 @@ export default function RecordActions({
         <span className="note">
           {billed
             ? 'Billed — each invoice carries its company’s share. To undo, delete the batch’s draft invoices on the Invoice page, or credit-note an issued one.'
-            : `Not billed yet. Generate invoices raises one draft per company for every unbilled allocation of ${monthLabel}; correcting reloads this record in Calculate; deleting removes it before any invoice is made.`}
+            : `Not billed yet. Generate invoices (above) raises one draft per company for every unbilled allocation of ${monthLabel}; correcting reloads this record in Calculate; deleting removes it before any invoice is made.`}
         </span>
       </div>
-
-      {genResult ? (
-        <div className="mt-3 border border-hairline rounded-md bg-surface p-4 text-sm font-sans space-y-1">
-          {genResult.created.map((c) => (
-            <div key={c.company} className="text-ledger">✓ {c.company} → {c.invoiceNo}</div>
-          ))}
-          {genResult.skipped.map((s) => (
-            <div key={s.company} className="text-muted">– {s.company} skipped: already has {s.reason}</div>
-          ))}
-        </div>
-      ) : null}
 
       {error ? <div className="mt-3 bg-danger-bg border border-danger text-danger rounded-md p-3 text-sm font-sans">{error}</div> : null}
     </>

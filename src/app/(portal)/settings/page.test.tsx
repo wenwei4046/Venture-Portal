@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { withActions } from '@/test/with-actions'
 
 // 2026-10-09 — Settings per the user's Claude Design handoff (Phase 4 of the
@@ -18,8 +19,31 @@ vi.mock('@/lib/department-mode-server', () => ({
     { id: 'd2', name: 'Finance', segmentKey: 'finance', isInternal: false, costModel: 'cost_center', openSplitPeople: 0, canSwitch: false },
   ],
 }))
-vi.mock('./_components/AccountsSection', () => ({ default: () => <div data-testid="accounts" /> }))
-vi.mock('./_components/DepartmentsSection', () => ({ default: () => <div data-testid="departments" /> }))
+// 2026-10-10 — the two sections draw the page head themselves (their head
+// buttons hold their state); the page hands them the title block and what
+// goes under it.
+type SectionProps = { head?: ReactNode; intro?: ReactNode; canSetDefault?: boolean }
+vi.mock('./_components/AccountsSection', () => ({
+  default: (p: SectionProps) => (
+    <div data-testid="accounts">
+      <div className="page-head">{p.head}</div>
+      {p.intro}
+    </div>
+  ),
+}))
+vi.mock('./_components/DepartmentsSection', () => ({
+  default: (p: SectionProps) => (
+    <div data-testid="departments" data-can-set-default={String(!!p.canSetDefault)}>
+      <div className="page-head">{p.head}</div>
+      {p.intro}
+    </div>
+  ),
+}))
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }),
+  }),
+}))
 vi.mock('./_components/TreasuryConfigSection', () => ({ default: () => <div data-testid="treasury" /> }))
 vi.mock('./_components/BaseRateSimulator', () => ({ default: () => null }))
 vi.mock('../reports/base-rate/_components/BaseRateTrendChart', () => ({ default: () => null }))
@@ -89,6 +113,33 @@ describe('Settings for Finance', () => {
     render(await SettingsPage({ searchParams: Promise.resolve({ tab: 'treasury' }) }))
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Settings')
   })
+
+  // 2026-10-10 — the handoff has no Accounts | Departments strip: Finance's
+  // two tabs are the sidebar's Settings children. The Principal's strip, which
+  // reaches all ten tabs, stays.
+  it('draws no tab strip for Finance', async () => {
+    for (const tab of ['accounts', 'departments']) {
+      const { unmount } = render(await SettingsPage({ searchParams: Promise.resolve({ tab }) }))
+      expect(document.querySelector('[data-tab-key]')).toBeNull()
+      expect(document.querySelectorAll('.page-head')).toHaveLength(1)
+      unmount()
+    }
+  })
+
+  it('keeps the strip for the Principal, under the head', async () => {
+    mocks.requirePermission.mockResolvedValue(withActions({ id: 'p', role: 'principal', permissions: ['categories', 'settings', 'reports'] }))
+    const { unmount } = render(await SettingsPage({ searchParams: Promise.resolve({ tab: 'accounts' }) }))
+    expect(document.querySelector('[data-tab-key="treasury"]')).not.toBeNull()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Chart of Accounts')
+    unmount()
+    render(await SettingsPage({ searchParams: Promise.resolve({ tab: 'treasury' }) }))
+    expect(document.querySelector('[data-tab-key="accounts"]')).not.toBeNull()
+  })
+
+  it('lets whoever runs the chart of accounts set the Departments table’s default', async () => {
+    render(await SettingsPage({ searchParams: Promise.resolve({ tab: 'departments' }) }))
+    expect(screen.getByTestId('departments')).toHaveAttribute('data-can-set-default', 'true')
+  })
 })
 
 describe('Base Rate History on the sheet', () => {
@@ -104,5 +155,25 @@ describe('Base Rate History on the sheet', () => {
     expect(card('Change vs last quarter')).toHaveTextContent('vs 2026 Q3')
     expect(screen.getByRole('link', { name: 'Export Excel' })).toHaveAttribute('href', '/reports/base-rate/export?format=xlsx')
     expect(screen.getByRole('heading', { level: 2, name: 'History' })).toBeInTheDocument()
+  })
+
+  // 2026-10-10 — the history as the handoff's sheet table, the rate at the
+  // figures' own weight (the prototype's accent tone draws it in black).
+  it('lists the history as a sheet table, with a range on the dates and the rates', async () => {
+    render(await BaseRateHistoryPage())
+    const history = screen.getByRole('heading', { level: 2, name: 'History' }).closest('section') as HTMLElement
+    expect(within(history).getByRole('table').closest('.st-box')).not.toBeNull()
+    for (const name of ['Approved', 'Base rate', 'Wtd cost', 'Margin']) {
+      fireEvent.click(within(history).getByRole('button', { name: `Filter ${name}` }))
+      expect(within(screen.getByRole('dialog', { name: `Filter ${name}` })).getByRole('button', { name: 'Range' })).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    }
+    const q4 = within(history).getByText('2026 Q4').closest('tr') as HTMLElement
+    expect(q4).toHaveTextContent('0.610%')
+    expect(q4).toHaveTextContent('0.250%')
+    expect(q4).toHaveTextContent('1 Oct 2026')
+    const rate = within(q4).getByText('0.860%')
+    expect(rate.closest('td')).toHaveClass('num')
+    expect(rate.closest('.font-semibold')).toBeNull()
   })
 })

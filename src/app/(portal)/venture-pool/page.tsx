@@ -2,6 +2,7 @@ import dayjs from 'dayjs'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
+import { canDo } from '@/lib/permission-actions'
 import { fetchAllRows } from '@/lib/paginate'
 import { ventureRefLabel } from '@/lib/venture-pool'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
@@ -16,7 +17,7 @@ import PoolLedgerTable, { type PoolLine } from './_components/PoolLedgerTable'
 // captures generic HV expenses + historical OFFICE-tagged manual_jv.
 
 export default async function VenturePoolPage() {
-  await requirePermission('venture_pool')
+  const user = await requirePermission('venture_pool')
   const supabase = await createClient()
 
   const period = getPeriodMonth()
@@ -176,7 +177,7 @@ export default async function VenturePoolPage() {
             <p className="text-sm">No movements yet.</p>
           </div>
         ) : (
-          <PoolLedgerTable lines={lines} />
+          <PoolLedgerTable lines={lines} canSetDefault={canDo(user, 'treasury', 'create')} />
         )}
         <p className="text-xs text-graphite mt-3">
           The latest 50 lines, from the journal lines (corporate and treasury segments on HV bank accounts, reversal pairs left out).

@@ -8,11 +8,14 @@ import { resolveLiveApprovalAmounts, type ApprovalAmountRow } from '@/lib/approv
 import { startRead } from '@/lib/start-read'
 import { decidesEverything, overviewFor, raisesForSignOff } from '@/lib/surfaces'
 import { canDo } from '@/lib/permission-actions'
-import { bookWindow, loadRepaymentBook, type BookDeal, type BookEntry } from '@/lib/repayment-book'
+import { bookWindow, loadRepaymentBook, type BookDeal } from '@/lib/repayment-book'
 import { fetchAllRows } from '@/lib/paginate'
 import { fetchDeptInvoiceSettlements } from '@/lib/dept-receipt-payment'
 import LedgerRow from '@/components/LedgerRow'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import { DecidedTable, InstalmentsTable, PendingTable, SubsidiariesTable } from './_components/OverviewTables'
+import { KpiCard, KpiCards, netTone } from './_components/KpiCards'
+import { RequestChip } from './_components/cells'
 
 // Always re-fetch on request — dept pool balances change after every approve
 // & pay, so cached renders go stale within seconds.
@@ -914,24 +917,17 @@ export default async function DashboardPage() {
   // Where the margin panel stood before: beside the hero for anybody but the
   // Principal, and below it for the Principal once there is money to measure.
   const showMargin = !isPrincipal || hasAnyData
-  const subsidiaryTotals = subsidiaries.reduce(
-    (acc, s) => ({
-      savings: acc.savings + Number(s.savings_deposited ?? 0),
-      loans: acc.loans + Number(s.loans_outstanding ?? 0),
-      net: acc.net + Number(s.net_position ?? 0),
-    }),
-    { savings: 0, loans: 0, net: 0 },
-  )
   const hvBalance = Number(summary.hv_fund_balance ?? 0)
 
   // The head and the book around today (2026-10-09, the handoff): Daily Bank
   // for whoever reads the treasury, Record payment for whoever raises a
   // voucher (the Payments page's own test), and the installments behind and
-  // coming up from every live deal's plan.
+  // coming up from every live deal's plan. Whoever may record a payment may
+  // also set the Overview tables' arrangement as everyone's default, as on
+  // Fund IN / OUT (2026-10-10).
   const monthTitle = officeTime().format('MMMM YYYY')
   const canRecordPayment = canDo(user, 'treasury', 'create')
   const book = bookWindow(bookRead ? await bookRead : [], officeToday())
-  const upcomingNet = Math.round(book.upcoming.reduce((s, e) => s + (e.kind === 'collect' ? e.outstanding : -e.outstanding), 0) * 100) / 100
 
   return (
     <div>
@@ -943,14 +939,26 @@ export default async function DashboardPage() {
           <h1 className="page-title">Overview</h1>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Link href="/daily-bank" className="btn-quiet-sheet">
-            Daily Bank
-          </Link>
           {canRecordPayment ? (
-            <Link href="/payments/new" className="btn-pri-sheet">
-              Record payment
+            <>
+              {/* 2026-10-10 — the handoff: a phone's head keeps only the
+                  primary action. A wrapper, since .btn-quiet-sheet's own
+                  display would out-rank a utility on the link itself. */}
+              <span className="hidden md:inline-flex">
+                <Link href="/daily-bank" className="btn-quiet-sheet">
+                  Daily Bank
+                </Link>
+              </span>
+              <Link href="/payments/new" className="btn-pri-sheet">
+                Record payment
+              </Link>
+            </>
+          ) : (
+            // The head's only action stays on a phone too.
+            <Link href="/daily-bank" className="btn-quiet-sheet">
+              Daily Bank
             </Link>
-          ) : null}
+          )}
         </div>
       </div>
 
@@ -1002,53 +1010,71 @@ export default async function DashboardPage() {
         summary.pool_breakdown ? (
           <details className="fin-fold">
             <summary>Pool breakdown</summary>
-            <div className="fin-fold-inner grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="fin-fold-inner grid grid-cols-1 lg:grid-cols-3 gap-x-7 gap-y-6">
               {/* The three sources, side by side. They are not added up
                   here: the pool is the dept pools plus the Venture Pool, and
-                  the fund sources are what fed them. */}
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>Source</th>
-                    <th className="right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Fund sources</td>
-                    <td className="num">{formatMoney(summary.pool_breakdown.fund_sources)}</td>
-                  </tr>
-                  <tr>
-                    <td>Dept pool</td>
-                    <td className="num">{formatMoney(summary.pool_breakdown.dept_pool)}</td>
-                  </tr>
-                  <tr>
-                    <td>Venture Pool</td>
-                    <td className="num">{formatMoney(summary.pool_breakdown.venture_pool)}</td>
-                  </tr>
-                </tbody>
-              </table>
+                  the fund sources are what fed them. 2026-10-10 — the
+                  handoff: each table under its own title, its first column
+                  headed for what it lists. */}
+              <section className="min-w-0">
+                <div className="sect-head">
+                  <h2>Source</h2>
+                  <span className="rule" aria-hidden />
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="ledger-table [&_td.num]:whitespace-nowrap">
+                    <thead>
+                      <tr>
+                        <th>Source</th>
+                        <th className="right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Fund sources</td>
+                        <td className="num">{formatMoney(summary.pool_breakdown.fund_sources)}</td>
+                      </tr>
+                      <tr>
+                        <td>Dept pool</td>
+                        <td className="num">{formatMoney(summary.pool_breakdown.dept_pool)}</td>
+                      </tr>
+                      <tr>
+                        <td>Venture Pool</td>
+                        <td className="num">{formatMoney(summary.pool_breakdown.venture_pool)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
 
               {/* Fund source type breakdown */}
               {summary.fund_source_breakdown?.length > 0 ? (
-                <table className="ledger-table">
-                  <thead>
-                    <tr>
-                      <th>By fund source type</th>
-                      <th className="right">Count</th>
-                      <th className="right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summary.fund_source_breakdown.map((fs) => (
-                      <tr key={fs.source_type}>
-                        <td className="capitalize">{fs.source_type.replace(/_/g, ' ')}</td>
-                        <td className="num">{fs.count}</td>
-                        <td className="num">{formatMoney(Number(fs.amount))}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <section className="min-w-0">
+                  <div className="sect-head">
+                    <h2>By fund source type</h2>
+                    <span className="rule" aria-hidden />
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="ledger-table [&_td.num]:whitespace-nowrap">
+                      <thead>
+                        <tr>
+                          <th>Type</th>
+                          <th className="right">Count</th>
+                          <th className="right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {summary.fund_source_breakdown.map((fs) => (
+                          <tr key={fs.source_type}>
+                            <td className="capitalize">{fs.source_type.replace(/_/g, ' ')}</td>
+                            <td className="num">{fs.count}</td>
+                            <td className="num">{formatMoney(Number(fs.amount))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
               ) : null}
 
               {/* Dept pool by department (+ Venture from corporate+treasury GL) */}
@@ -1067,24 +1093,33 @@ export default async function DashboardPage() {
                 rows.sort((a, b) => b.balance - a.balance)
                 if (rows.length === 0) return null
                 return (
-                  <table className="ledger-table">
-                    <thead>
-                      <tr>
-                        <th>Dept pool by department</th>
-                        <th className="right">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((r) => (
-                        <tr key={r.key}>
-                          <td>{r.name}</td>
-                          <td className="num">
-                            {r.balance < 0 ? <span className="neg">{formatMoney(r.balance)}</span> : formatMoney(r.balance)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <section className="min-w-0">
+                    <div className="sect-head">
+                      <h2>Dept pool by department</h2>
+                      <span className="rule" aria-hidden />
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="ledger-table [&_td.num]:whitespace-nowrap">
+                        <thead>
+                          <tr>
+                            <th>Department</th>
+                            <th className="right">Balance</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((r) => (
+                            <tr key={r.key}>
+                              <td>{r.name}</td>
+                              <td className="num">
+                                {/* Negatives red (README › Tables). */}
+                                {r.balance < 0 ? <span className="neg text-danger">{formatMoney(r.balance)}</span> : formatMoney(r.balance)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
                 )
               })()}
             </div>
@@ -1120,62 +1155,37 @@ export default async function DashboardPage() {
                   <p className="text-xs mt-1">No approvals waiting.</p>
                 </div>
               ) : (
-                <div className="table-frame">
-                  <div className="table-frame-scroll">
-                    <table className="ledger-table [&_td.num]:whitespace-nowrap">
-                      <thead>
-                        <tr>
-                          <th>Description</th>
-                          <th className="m-hide">Request</th>
-                          <th className="right">Amount</th>
-                          <th className="m-hide">By</th>
-                          <th className="right m-hide">Submitted</th>
-                          <th className="lt-toggle" aria-hidden />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pendingApprovals.slice(0, 5).map((req) => {
-                          const amt = pendingApprovalAmounts.has(req.id)
-                            ? pendingApprovalAmounts.get(req.id)
-                            : req.amount == null
-                              ? null
-                              : Number(req.amount)
-                          return (
-                            <LedgerRow key={req.id}>
-                              <td>
-                                <Link
-                                  href={approvalHref({
-                                    id: req.id,
-                                    request_type: req.request_type,
-                                    reference_id: pendingApprovalRefs.get(req.id) ?? null,
-                                  })}
-                                >
-                                  {req.description ?? '—'}
-                                </Link>
-                              </td>
-                              <td className="m-hide" data-label="Request">
-                                <RequestChip type={req.request_type} />
-                              </td>
-                              <td className="num">{amt != null ? formatMoney(amt) : '—'}</td>
-                              <td className="m-hide" data-label="By">{req.submitted_by_name ?? '—'}</td>
-                              <td className="right m-hide font-mono text-xs" data-label="Submitted">
-                                {officeTime(req.created_at).format('D MMM')}
-                              </td>
-                            </LedgerRow>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                <>
+                  {/* 2026-10-10 — the handoff: a sheet table (OverviewTables). */}
+                  <PendingTable
+                    canSetDefault={canRecordPayment}
+                    rows={pendingApprovals.slice(0, 5).map((req) => ({
+                      id: req.id,
+                      href: approvalHref({
+                        id: req.id,
+                        request_type: req.request_type,
+                        reference_id: pendingApprovalRefs.get(req.id) ?? null,
+                      }),
+                      description: req.description,
+                      requestType: req.request_type,
+                      amount: pendingApprovalAmounts.has(req.id)
+                        ? (pendingApprovalAmounts.get(req.id) ?? null)
+                        : req.amount == null
+                          ? null
+                          : Number(req.amount),
+                      by: req.submitted_by_name,
+                      submittedAt: req.created_at,
+                    }))}
+                  />
                   {pendingCount > 5 ? (
-                    <div className="table-frame-foot">
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2.5 px-0.5 text-[11px]">
                       <span>Showing 5 of {pendingCount}</span>
                       <Link href="/approvals" className="underline underline-offset-4">
                         See all {pendingCount} →
                       </Link>
                     </div>
                   ) : null}
-                </div>
+                </>
               )}
             </section>
           ) : null}
@@ -1255,46 +1265,19 @@ export default async function DashboardPage() {
                     <p className="text-xs mt-1">Decisions will appear here once Principal acts.</p>
                   </div>
                 ) : (
-                  <div className="table-frame">
-                    <div className="table-frame-scroll">
-                      <table className="ledger-table [&_td.num]:whitespace-nowrap">
-                        <thead>
-                          <tr>
-                            <th>Description</th>
-                            <th className="m-hide">Request</th>
-                            <th>Decision</th>
-                            <th className="right">Amount</th>
-                            <th className="right m-hide">Decided</th>
-                            <th className="lt-toggle" aria-hidden />
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {financeRecentList.map((req) => (
-                            <LedgerRow key={req.id}>
-                              <td>
-                                <Link href={approvalHref(req)}>{req.description ?? '—'}</Link>
-                              </td>
-                              <td className="m-hide" data-label="Request">
-                                <RequestChip type={req.request_type} />
-                              </td>
-                              <td>
-                                <span className={`${req.status === 'approved' ? 'chip ledger' : 'chip danger'} whitespace-nowrap`}>
-                                  <span className="dot" />
-                                  {req.status}
-                                </span>
-                              </td>
-                              <td className="num">
-                                {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
-                              </td>
-                              <td className="right m-hide font-mono text-xs" data-label="Decided">
-                                {officeTime(req.approved_at || req.created_at).format('D MMM')}
-                              </td>
-                            </LedgerRow>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                  // 2026-10-10 — the handoff: a sheet table (OverviewTables).
+                  <DecidedTable
+                    canSetDefault={canRecordPayment}
+                    rows={financeRecentList.map((req) => ({
+                      id: req.id,
+                      href: approvalHref(req),
+                      description: req.description,
+                      requestType: req.request_type,
+                      decision: req.status,
+                      amount: req.amount != null ? Number(req.amount) : null,
+                      decidedAt: req.approved_at || req.created_at,
+                    }))}
+                  />
                 )}
               </section>
             </>
@@ -1336,66 +1319,26 @@ export default async function DashboardPage() {
             <p className="text-sm">No companies configured. Visit Settings to add subsidiaries.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th>Company</th>
-                  <th className="right m-hide">Savings</th>
-                  <th className="right m-hide">Loans</th>
-                  <th className="right">Net</th>
-                  <th className="m-hide">Position</th>
-                  <th className="lt-toggle" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {subsidiaries.map((sub) => (
-                  <LedgerRow key={sub.id}>
-                    <td>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium">{sub.name}</span>
-                        {sub.has_overdue ? (
-                          <span className="chip danger">
-                            <span className="dot" />
-                            overdue
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="font-mono text-[11px] mt-0.5">{sub.short_code}</div>
-                    </td>
-                    <td className="num m-hide" data-label="Savings">
-                      {sub.savings_deposited > 0 ? formatMoney(sub.savings_deposited) : '—'}
-                    </td>
-                    <td className="num m-hide" data-label="Loans">
-                      {sub.loans_outstanding > 0 ? formatMoney(sub.loans_outstanding) : '—'}
-                    </td>
-                    <td className="num">
-                      <SignedFigure value={sub.net_position} />
-                    </td>
-                    <td className="m-hide" data-label="Position">
-                      <PositionLabel position={sub.position} />
-                    </td>
-                  </LedgerRow>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td>All subsidiaries</td>
-                  <td className="num m-hide">{formatMoney(subsidiaryTotals.savings)}</td>
-                  <td className="num m-hide">{formatMoney(subsidiaryTotals.loans)}</td>
-                  <td className="num">
-                    <SignedFigure value={subsidiaryTotals.net} />
-                  </td>
-                  <td className="m-hide" />
-                  <td className="lt-toggle" aria-hidden />
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          // 2026-10-10 — the handoff: a sheet table (OverviewTables); its
+          // foot totals the companies on show.
+          <SubsidiariesTable
+            canSetDefault={canRecordPayment}
+            rows={subsidiaries.map((sub) => ({
+              id: sub.id,
+              name: sub.name,
+              shortCode: sub.short_code,
+              savings: Number(sub.savings_deposited ?? 0),
+              loans: Number(sub.loans_outstanding ?? 0),
+              net: Number(sub.net_position ?? 0),
+              position: sub.position,
+              hasOverdue: sub.has_overdue,
+            }))}
+          />
         )}
       </section>
 
-      {/* ───────── Alerts ───────── */}
+      {/* ───────── Alerts ─────────
+          2026-10-10 — the handoff: a table, Type and Message. */}
       {alerts.length > 0 ? (
         <section className="mb-10">
           <div className="sect-head">
@@ -1403,19 +1346,31 @@ export default async function DashboardPage() {
             <span className="rule" aria-hidden />
             <span className="count">{alerts.length} OPEN</span>
           </div>
-          <ul className="table-frame divide-y divide-hairline">
-            {alerts.map((alert, i) => (
-              <li key={i} className="flex items-baseline gap-3 px-[14px] py-[11px] text-[12px]">
-                {/* dashboard_summary() sends a severity and a message; the
-                    chip names the severity when no type comes with it. */}
-                <span className={`${ALERT_CHIP[alert.severity] ?? 'chip'} shrink-0`}>
-                  <span className="dot" />
-                  {alert.type ?? alert.severity}
-                </span>
-                <span>{alert.message}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto">
+            <table className="ledger-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 120 }}>Type</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                {alerts.map((alert, i) => (
+                  <tr key={i}>
+                    <td>
+                      {/* dashboard_summary() sends a severity and a message; the
+                          chip names the severity when no type comes with it. */}
+                      <span className={`${ALERT_CHIP[alert.severity] ?? 'chip'} whitespace-nowrap`}>
+                        <span className="dot" />
+                        {alert.type ?? alert.severity}
+                      </span>
+                    </td>
+                    <td>{alert.message}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       ) : null}
 
@@ -1465,30 +1420,29 @@ export default async function DashboardPage() {
         </section>
       ) : null}
 
-      {/* ───────── Phase 2 — Billing + Dept Pool snapshot ───────── */}
+      {/* ───────── Phase 2 — Billing + Dept Pool snapshot ─────────
+          2026-10-10 — the handoff's KPI rows: plain cards (KpiCards). */}
       <section className="mb-10">
         <div className="sect-head">
           <h2>Billing &amp; dept pool</h2>
           <span className="rule" aria-hidden />
           <span className="count">THIS MONTH</span>
         </div>
-        <StatCards label="Billing and department pools">
-          <StatCard
+        <KpiCards label="Billing and department pools">
+          <KpiCard
             label="Billing float"
             value={formatMoney(Number(summary.billing_float ?? 0))}
-            icon="receipt"
             tone="primary"
             note="Unpaid invoices (draft + issued)"
           />
-          <StatCard
+          <KpiCard
             label="Dept pool total"
             value={formatMoney(Number(summary.dept_pool_total ?? 0))}
-            icon="building"
             tone={Number(summary.dept_pool_total ?? 0) < 0 ? 'danger' : 'default'}
             note="Sum of positive dept pool balances"
           />
           <MarketingNpCard mkNp={summary.marketing_np_this_month} />
-        </StatCards>
+        </KpiCards>
       </section>
 
       {/* ───────── Phase 3 — Director Salary + Director Pool ───────── */}
@@ -1500,11 +1454,10 @@ export default async function DashboardPage() {
             DIRECTOR POOL →
           </Link>
         </div>
-        <StatCards label="Director salary and pools">
-          <StatCard
+        <KpiCards label="Director salary and pools">
+          <KpiCard
             label="Director Pool"
             value={formatMoney(Number(summary.salary_pool_total ?? 0))}
-            icon="briefcase"
             tone="primary"
             note={
               (summary.payouts_pending ?? 0) === 0
@@ -1512,20 +1465,18 @@ export default async function DashboardPage() {
                 : `${summary.payouts_pending} draft payout${summary.payouts_pending === 1 ? '' : 's'} pending`
             }
           />
-          <StatCard
+          <KpiCard
             label="Venture Pool"
             value={formatMoney(hvBalance)}
-            icon="wallet"
             tone={hvBalance < 0 ? 'danger' : 'default'}
             note="HV group-level running balance"
           />
-          <StatCard
+          <KpiCard
             label="Director Invoice"
             value={formatMoney(Number(summary.invoice_pool_balance ?? 0))}
-            icon="receipt"
             note="25% director invoice accumulation"
           />
-        </StatCards>
+        </KpiCards>
       </section>
 
       {/* ───────── The book around today (2026-10-09, the handoff) ─────────
@@ -1539,7 +1490,7 @@ export default async function DashboardPage() {
             <span className="rule" aria-hidden />
             <span className="count">{book.overdue.length} BEHIND</span>
           </div>
-          <BookTable entries={book.overdue} late />
+          <InstalmentsTable entries={book.overdue} late canSetDefault={canRecordPayment} />
         </section>
       ) : null}
       <section className={book.overdue.length > 0 ? 'mb-4' : 'mb-4 mt-10'}>
@@ -1555,7 +1506,8 @@ export default async function DashboardPage() {
             <p className="text-sm">Nothing due in the next 14 days.</p>
           </div>
         ) : (
-          <BookTable entries={book.upcoming} late={false} net={upcomingNet} />
+          // Its Net is of the instalments on show (all of them until a ▽ narrows the list).
+          <InstalmentsTable entries={book.upcoming} late={false} net canSetDefault={canRecordPayment} />
         )}
       </section>
     </div>
@@ -1589,63 +1541,21 @@ function UnplacedDashboard({ message }: { message: string }) {
   )
 }
 
-/** What kind of request a row is — a label, not a status, so no colour. */
-function RequestChip({ type }: { type: string }) {
-  return <span className="chip whitespace-nowrap">{type.replace(/_/g, ' ')}</span>
-}
-
-/** A net position: a dash at zero, green and signed when HV owes, red in
- *  brackets when HV is owed. */
-function SignedFigure({ value }: { value: number }) {
-  if (value === 0) return <>—</>
-  if (value > 0) {
-    return <span className="text-ledger font-semibold">+{formatMoneyBare(value)}</span>
-  }
-  return <span className="text-danger font-semibold neg">{formatMoneyBare(value)}</span>
-}
-
+// The net is a figure like any other (2026-10-10, the handoff): green as a
+// profit, red as a loss.
 function MarketingNpCard({ mkNp }: { mkNp: MarketingNp | undefined }) {
   const revenue = Number(mkNp?.revenue ?? 0)
   const staffCost = Number(mkNp?.staff_cost ?? 0)
   const expenses = Number(mkNp?.expenses ?? 0)
   const netProfit = Number(mkNp?.net_profit ?? 0)
-  const isLoss = netProfit < 0
 
   return (
-    <StatCard
+    <KpiCard
       label="Marketing NP this month"
       value={formatMoney(netProfit)}
-      icon="chart"
-      tone={isLoss ? 'danger' : 'default'}
+      tone={netTone(netProfit)}
       note={`Revenue ${formatMoney(revenue)} − Staff ${formatMoney(staffCost)} − Expenses ${formatMoney(expenses)}`}
     />
-  )
-}
-
-// A position is a word on a wash: green when HV owes the subsidiary, amber
-// when the subsidiary owes HV, plain when they are even.
-function PositionLabel({ position }: { position: Subsidiary['position'] }) {
-  if (position === 'creditor') {
-    return (
-      <span className="chip ledger" title="HV owes this subsidiary">
-        <span className="dot" />
-        creditor
-      </span>
-    )
-  }
-  if (position === 'debtor') {
-    return (
-      <span className="chip alert" title="Subsidiary owes HV">
-        <span className="dot" />
-        debtor
-      </span>
-    )
-  }
-  return (
-    <span className="chip">
-      <span className="dot" />
-      even
-    </span>
   )
 }
 
@@ -1719,84 +1629,5 @@ function InterestPanel({ summary }: { summary: DashboardSummary }) {
         </tr>
       </tfoot>
     </table>
-  )
-}
-
-/**
- * Installments from the deals' repayment plans (2026-10-09, the handoff):
- * due day, the counterparty with the installment's place in the plan, which
- * way the money goes, what is unpaid on it, and the deal's own page — which
- * then says "← Back to Overview".
- */
-function BookTable({ entries, late, net }: { entries: BookEntry[]; late: boolean; net?: number }) {
-  return (
-    <div className="table-frame">
-      <div className="table-frame-scroll">
-        <table className="ledger-table [&_td.num]:whitespace-nowrap">
-          <thead>
-            <tr>
-              <th>Due</th>
-              <th>Counterparty</th>
-              <th className="m-hide">Direction</th>
-              <th className="right">{late ? 'Outstanding' : 'Amount'}</th>
-              <th className="m-hide" aria-label="Open" />
-              <th className="lt-toggle" aria-hidden />
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((e) => {
-              const href = `${e.href}?from=overview`
-              return (
-                <LedgerRow key={`${e.kind}-${e.id}-${e.no}`}>
-                  <td className="font-mono text-xs whitespace-nowrap">{dayjs(e.due).format('D MMM YYYY')}</td>
-                  <td>
-                    <Link href={href} className="font-medium">
-                      {e.name}
-                    </Link>
-                    <div className="text-[11px] text-graphite mt-0.5">
-                      Instalment {e.no}
-                      {e.months ? ` of ${e.months}` : ''}
-                    </div>
-                  </td>
-                  <td className="m-hide" data-label="Direction">
-                    {e.kind === 'collect' ? (
-                      <span className="chip ledger whitespace-nowrap">
-                        <span className="dot" />↓ collect
-                      </span>
-                    ) : (
-                      <span className="chip accent whitespace-nowrap">
-                        <span className="dot" />↑ pay
-                      </span>
-                    )}
-                  </td>
-                  <td className="num">
-                    {late ? <span className="text-danger">{formatMoneyBare(e.outstanding)}</span> : formatMoneyBare(e.outstanding)}
-                  </td>
-                  <td className="m-hide right" data-label="Open">
-                    <Link href={href} className="btn-quiet-sheet">
-                      Open
-                    </Link>
-                  </td>
-                </LedgerRow>
-              )
-            })}
-          </tbody>
-          {net != null ? (
-            <tfoot>
-              <tr>
-                <td />
-                <td>Net</td>
-                <td className="m-hide" />
-                <td className="num">
-                  <span className={net < 0 ? 'text-danger' : 'text-ledger'}>{formatMoney(net)}</span>
-                </td>
-                <td className="m-hide" />
-                <td className="lt-toggle" aria-hidden />
-              </tr>
-            </tfoot>
-          ) : null}
-        </table>
-      </div>
-    </div>
   )
 }

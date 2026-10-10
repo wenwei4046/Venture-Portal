@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 
 // 2026-10-09 — the Venture Pool per the user's Claude Design handoff (Phase 4
 // of the Finance revamp): Export in the head; four cards (in / out this month,
@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.f
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/venture-pool', useSearchParams: () => new URLSearchParams() }))
+// The ledger's saved column layout comes from the browser client; here there is none.
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }) }),
+}))
 
 import VenturePoolPage from './page'
 
@@ -99,5 +103,36 @@ describe('the Venture Pool on the sheet', () => {
     expect(topUp).toHaveTextContent('(20,000.00)')
     const interest = within(ledger).getByText('HB advance — Oct interest').closest('tr') as HTMLElement
     expect(within(interest).getByText('in').closest('.chip')).toHaveClass('ledger')
+  })
+})
+
+// 2026-10-10 — the handoff: the ledger filters by every column (▽, a Range
+// on the date and the amount), its columns resize against their neighbour in
+// a box that scrolls; money in reads black, money out red in brackets; the
+// two chart panels stand 1 : 1.6.
+describe('the Venture Pool, per the handoff', () => {
+  it('filters the ledger by any column, the date and the amount by a range too', async () => {
+    render(await VenturePoolPage())
+    const ledger = section('Pool ledger')
+    for (const name of ['Date', 'Type', 'Direction', 'Description', 'Amount']) {
+      expect(within(ledger).getByRole('button', { name: `Filter ${name}` })).toBeInTheDocument()
+    }
+    fireEvent.click(within(ledger).getByRole('button', { name: 'Filter Date' }))
+    expect(within(screen.getByRole('dialog', { name: 'Filter Date' })).getByRole('button', { name: 'Range' })).toBeInTheDocument()
+    expect(ledger.querySelector('.st-box table')).toBeInTheDocument()
+  })
+
+  it('reads money in black and money out red', async () => {
+    render(await VenturePoolPage())
+    const ledger = section('Pool ledger')
+    const inn = within(ledger).getByText('4,126.50')
+    expect(inn).not.toHaveClass('text-ledger')
+    expect(inn).not.toHaveClass('text-danger')
+    expect(within(ledger).getByText('(20,000.00)')).toHaveClass('text-danger')
+  })
+
+  it('stands the chart panels 1 : 1.6', async () => {
+    render(await VenturePoolPage())
+    expect(section('In vs Out').querySelector('.vp-charts')).toHaveClass('sch-vp-charts')
   })
 })

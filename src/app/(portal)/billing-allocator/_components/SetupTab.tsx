@@ -13,8 +13,12 @@ import type { AllocatorData, TemplateRow } from './types'
 import { unwrap } from './unwrap'
 import LedgerRow from '@/components/LedgerRow'
 
-const inputCls =
-  'px-2.5 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border'
+// The allocator's Setup (2026-10-10, the handoff, in English): three tables —
+// Companies (Company / Code / an "In allocation" chip, "x / y ENABLED"),
+// Categories (Account / Name) and Templates (Name / Method / Default RM /
+// Category / a Status chip). A Percentage template's per-company % stays as
+// Split % (the handoff's table has no column for it). Switching a company on
+// or off, and adding or editing a category or a template, stay.
 
 interface TplEdit {
   id?: string
@@ -24,6 +28,17 @@ interface TplEdit {
   categoryId: string
   status: 'active' | 'inactive'
   pct: Record<string, string>
+}
+
+const METHOD: Record<string, string> = { headcount: 'Headcount', percentage: 'Percentage', equal: 'Equal', custom: 'Custom' }
+
+function Chip({ label, tone }: { label: string; tone: '' | 'ledger' | 'info' }) {
+  return (
+    <span className={tone ? `chip ${tone}` : 'chip'}>
+      <i className="dot" />
+      {label}
+    </span>
+  )
 }
 
 export default function SetupTab({ data }: { data: AllocatorData }) {
@@ -55,100 +70,145 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
     )
   }
 
+  const enabled = data.companySettings.filter((c) => c.enabled).length
+  const companyLabel = (id: string) => data.companies.find((c) => c.id === id)?.label ?? data.companySettings.find((c) => c.id === id)?.label ?? '?'
+
   return (
     <div className="space-y-10">
       {error ? (
         <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 text-sm font-sans">{error}</div>
       ) : null}
 
-      {/* ── Participating companies ── */}
+      {/* ── Companies ── */}
       <section>
         <div className="sect-head">
-          <h2>参与分摊的公司 · Companies</h2>
+          <h2>Companies</h2>
           <span className="rule" aria-hidden />
-          <span className="count">{data.companySettings.filter((c) => c.enabled).length} / {data.companySettings.length}</span>
+          <span className="count">
+            {enabled} / {data.companySettings.length} ENABLED
+          </span>
         </div>
-        <p className="font-serif italic text-muted text-xs mb-3 max-w-2xl">
-          只影响 Allocator:关掉的公司不再出现在分摊格 / Equal / 名单选项里,
-          系统其他地方(loan、invoice)完全不受影响;旧记录照样显示它的名字。
+        <div className="overflow-x-auto">
+          <table className="ledger-table w-full">
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Code</th>
+                <th>In allocation</th>
+                <th aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {data.companySettings.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.name ?? c.label}</td>
+                  <td className="font-sans font-medium text-[12px]">{c.code || c.label}</td>
+                  <td>
+                    <Chip label={c.enabled ? 'enabled' : 'off'} tone={c.enabled ? 'ledger' : ''} />
+                  </td>
+                  <td className="text-right">
+                    <button
+                      type="button"
+                      onClick={() => run(async () => { unwrap(await setAllocCompanyEnabled(c.id, !c.enabled)) })}
+                      disabled={isPending}
+                      title={c.enabled ? 'Take it out of the allocation' : 'Bring it back into the allocation'}
+                      className="bil-row-btn"
+                    >
+                      {c.enabled ? 'Turn off' : 'Turn on'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-xs text-muted max-w-3xl">
+          Only the Allocator is affected: a company switched off leaves the split grid, Equal and the staff list’s choices. Loans, invoices and
+          everything else are untouched, and old records still show its name.
         </p>
-        <div className="flex flex-wrap gap-2">
-          {data.companySettings.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => run(async () => { unwrap(await setAllocCompanyEnabled(c.id, !c.enabled)) })}
-              disabled={isPending}
-              title={c.enabled ? '点一下关掉(不再参与分摊)' : '点一下开回来'}
-              className={`px-3 py-1.5 rounded-md border font-mono text-sm transition-colors disabled:opacity-50 ${
-                c.enabled
-                  ? 'bg-accent-bg text-ink border-accent-border'
-                  : 'bg-surface text-muted border-hairline line-through'
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
       </section>
 
       {/* ── Categories ── */}
       <section>
         <div className="sect-head">
-          <h2>类别 · Categories</h2>
+          <h2>Categories</h2>
           <span className="rule" aria-hidden />
           <span className="count">{data.categories.length}</span>
         </div>
-        <p className="font-serif italic text-muted text-xs mb-3 max-w-2xl">
-          可选填一个 COA 收入科目 — 开出来的 invoice 行会用它入帐;留空则走系统默认(5000)。
-        </p>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {data.categories.map((c) => (
-            <span key={c.id} className="inline-flex items-center gap-2 px-2.5 py-1 bg-surface border border-hairline rounded-md text-sm">
-              <span className="font-serif text-ink">{c.name}</span>
-              {c.coaCode ? <span className="font-mono text-[10px] text-accent">{c.coaCode}</span> : null}
-              <button type="button" onClick={() => setCatEdit({ id: c.id, name: c.name, coaCode: c.coaCode })} className="text-accent hover:text-accent-hover font-serif italic text-xs">
-                edit
-              </button>
-              <button type="button" onClick={() => run(async () => { unwrap(await deleteAllocCategory(c.id)) })} disabled={isPending} className="text-muted hover:text-danger font-mono text-xs">
-                ×
-              </button>
-            </span>
-          ))}
+        <div className="overflow-x-auto mb-3">
+          <table className="ledger-table w-full">
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Name</th>
+                <th aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {data.categories.map((c) => (
+                <tr key={c.id}>
+                  <td className="font-sans font-medium text-[12px]">{c.coaCode || <span className="text-muted">default</span>}</td>
+                  <td>{c.name}</td>
+                  <td className="text-right whitespace-nowrap">
+                    <button type="button" onClick={() => setCatEdit({ id: c.id, name: c.name, coaCode: c.coaCode })} className="bil-row-btn mr-3">
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => run(async () => { unwrap(await deleteAllocCategory(c.id)) })}
+                      disabled={isPending}
+                      aria-label={`Delete ${c.name}`}
+                      className="text-muted hover:text-danger text-sm disabled:opacity-40"
+                    >
+                      ×
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {data.categories.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="text-muted text-sm">No categories yet.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
+        <p className="mb-3 text-xs text-muted max-w-3xl">
+          A category may name a COA income account — the invoice lines raised for it post there; left empty, they post to the default (5000).
+        </p>
         {catEdit ? (
-          <div className="flex items-end gap-2 flex-wrap border border-accent-border bg-accent-bg rounded-md p-3">
-            <div>
-              <label className="block text-xs font-sans text-graphite mb-1">名称 *</label>
-              <input value={catEdit.name} onChange={(e) => setCatEdit({ ...catEdit, name: e.target.value })} className={inputCls} />
+          <div className="fin-form">
+            <div className="fin-field">
+              <label htmlFor="alloc-cat-name">Name</label>
+              <input id="alloc-cat-name" value={catEdit.name} onChange={(e) => setCatEdit({ ...catEdit, name: e.target.value })} />
             </div>
-            <div className="w-80 max-w-full">
-              <label className="block text-xs font-sans text-graphite mb-1">
-                COA 科目(可选 — 打字搜、点了选)
-              </label>
+            <div className="fin-field span-2">
+              <span className="fin-label">COA account (optional — type to search, click to pick)</span>
               <AccountPicker
                 accounts={data.coaAccounts}
                 value={catEdit.coaCode}
                 onChange={(code) => setCatEdit({ ...catEdit, coaCode: code })}
                 name="coa_code"
-                placeholder="搜科目号或名字…"
+                placeholder="Search an account code or name…"
               />
             </div>
-            <button
-              type="button"
-              onClick={() => run(async () => { unwrap(await saveAllocCategory(catEdit)); setCatEdit(null) })}
-              disabled={isPending || !catEdit.name.trim()}
-              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-1.5 rounded-md disabled:opacity-50"
-            >
-              Save
-            </button>
-            <button type="button" onClick={() => setCatEdit(null)} className="text-sm text-graphite hover:text-ink font-sans px-2 py-1.5">
-              Cancel
-            </button>
+            <div className="span-3 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => run(async () => { unwrap(await saveAllocCategory(catEdit)); setCatEdit(null) })}
+                disabled={isPending || !catEdit.name.trim()}
+                className="bil-btn primary"
+              >
+                Save
+              </button>
+              <button type="button" onClick={() => setCatEdit(null)} className="text-sm text-graphite hover:text-ink">
+                Cancel
+              </button>
+            </div>
           </div>
         ) : (
-          <button type="button" onClick={() => setCatEdit({ name: '', coaCode: '' })} className="text-sm text-accent hover:text-accent-hover font-serif italic">
-            + 加类别
+          <button type="button" onClick={() => setCatEdit({ name: '', coaCode: '' })} className="bil-btn">
+            + Add category
           </button>
         )}
       </section>
@@ -156,86 +216,108 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
       {/* ── Templates ── */}
       <section>
         <div className="sect-head">
-          <h2>费用模板 · Templates</h2>
+          <h2>Templates</h2>
           <span className="rule" aria-hidden />
           <span className="count">{data.templates.length}</span>
         </div>
-        <p className="font-serif italic text-muted text-xs mb-3 max-w-2xl">
-          每月重复的费用存成模板,计算时一选就带出名称 / 金额 / 方法 / 类别;
-          Percentage 模板连各家比例一起带。
-        </p>
-        <div className="overflow-x-auto border border-hairline rounded-md mb-3">
+        <div className="overflow-x-auto mb-3">
           <table className="ledger-table w-full">
             <thead>
-              <tr><th>Name</th><th className="m-hide">Method</th><th className="num">Default RM</th><th className="m-hide">Category</th><th className="m-hide">%</th><th className="m-hide">Status</th><th className="m-hide"></th><th className="lt-toggle" aria-hidden /></tr>
+              <tr>
+                <th>Name</th>
+                <th className="m-hide">Method</th>
+                <th className="text-right right">Default RM</th>
+                <th className="m-hide">Category</th>
+                <th className="m-hide">Split %</th>
+                <th className="m-hide">Status</th>
+                <th className="m-hide" aria-label="Actions" />
+                <th className="lt-toggle" aria-hidden />
+              </tr>
             </thead>
             <tbody>
               {data.templates.map((t) => (
+                // On a phone the row folds; its arrow opens the rest (LedgerRow).
                 <LedgerRow key={t.id}>
-                  <td className="font-serif text-md text-ink">{t.name}</td>
-                  <td className="m-hide" data-label="Method"><span className="px-2 py-0.5 bg-surface-2 rounded-md font-mono text-[10px] uppercase">{t.method}</span></td>
-                  <td className="num font-mono tabular">{t.amount > 0 ? t.amount.toLocaleString('en-MY', { minimumFractionDigits: 2 }) : '—'}</td>
-                  <td className="text-sm text-graphite m-hide" data-label="Category">{data.categories.find((c) => c.id === t.categoryId)?.name ?? '—'}</td>
-                  <td className="m-hide" data-label="%">
-                    <div className="flex flex-wrap gap-1 py-1">
-                      {t.splits.map((s) => (
-                        <span key={s.companyId} className="px-1.5 py-0.5 bg-accent-bg border border-accent-border rounded font-mono text-[10px]">
-                          {data.companies.find((c) => c.id === s.companyId)?.label} {s.pct}%
-                        </span>
-                      ))}
-                    </div>
+                  <td>{t.name}</td>
+                  <td className="m-hide" data-label="Method">{METHOD[t.method] ?? t.method}</td>
+                  <td className="num">{t.amount > 0 ? t.amount.toLocaleString('en-MY', { minimumFractionDigits: 2 }) : '—'}</td>
+                  <td className="m-hide" data-label="Category">{data.categories.find((c) => c.id === t.categoryId)?.name ?? '—'}</td>
+                  <td className="m-hide text-graphite" data-label="Split %">
+                    {t.splits.length > 0 ? t.splits.map((s) => `${companyLabel(s.companyId)} ${s.pct}%`).join(' · ') : '—'}
                   </td>
-                  <td className="font-mono text-[10px] uppercase text-muted m-hide" data-label="Status">{t.status}</td>
-                  <td className="text-right whitespace-nowrap m-hide">
-                    <button type="button" onClick={() => startTpl(t)} className="text-accent hover:text-accent-hover font-serif italic text-sm mr-3">Edit</button>
-                    <button type="button" onClick={() => run(async () => { unwrap(await deleteAllocTemplate(t.id)) })} disabled={isPending} className="text-muted hover:text-danger font-mono text-sm">×</button>
+                  <td className="m-hide" data-label="Status">
+                    <Chip label={t.status} tone={t.status === 'active' ? 'ledger' : 'info'} />
+                  </td>
+                  <td className="m-hide text-right whitespace-nowrap" data-label="Actions">
+                    <button type="button" onClick={() => startTpl(t)} className="bil-row-btn mr-3">
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => run(async () => { unwrap(await deleteAllocTemplate(t.id)) })}
+                      disabled={isPending}
+                      aria-label={`Delete ${t.name}`}
+                      className="text-muted hover:text-danger text-sm disabled:opacity-40"
+                    >
+                      ×
+                    </button>
                   </td>
                 </LedgerRow>
               ))}
               {data.templates.length === 0 ? (
-                <tr><td colSpan={8} className="font-serif italic text-muted text-sm">还没有模板。</td></tr>
+                <tr>
+                  <td colSpan={8} className="text-muted text-sm">No templates yet.</td>
+                </tr>
               ) : null}
             </tbody>
           </table>
         </div>
+        <p className="mb-3 text-xs text-muted max-w-3xl">
+          Save a monthly expense as a template: picking it in Calculate fills the name, amount, method and category, and a Percentage template
+          brings each company’s share too.
+        </p>
 
         {tplEdit ? (
-          <div className="border border-accent-border bg-accent-bg rounded-md p-4 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-sans text-graphite mb-1">Name *</label>
-                <input value={tplEdit.name} onChange={(e) => setTplEdit({ ...tplEdit, name: e.target.value })} className={`${inputCls} w-full`} />
-              </div>
-              <div>
-                <label className="block text-xs font-sans text-graphite mb-1">Method</label>
-                <select value={tplEdit.method} onChange={(e) => setTplEdit({ ...tplEdit, method: e.target.value as AllocMethod })} className={`${inputCls} w-full`}>
-                  <option value="headcount">Headcount</option>
-                  <option value="percentage">Percentage</option>
-                  <option value="equal">Equal</option>
-                  <option value="custom">Custom</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-sans text-graphite mb-1">Default RM</label>
-                <input type="number" step="0.01" min="0" value={tplEdit.amount} onChange={(e) => setTplEdit({ ...tplEdit, amount: e.target.value })} className={`${inputCls} w-full font-mono tabular`} />
-              </div>
-              <div>
-                <label className="block text-xs font-sans text-graphite mb-1">Category</label>
-                <select value={tplEdit.categoryId} onChange={(e) => setTplEdit({ ...tplEdit, categoryId: e.target.value })} className={`${inputCls} w-full`}>
-                  <option value="">—</option>
-                  {data.categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
+          <div className="fin-form">
+            <div className="fin-field">
+              <label htmlFor="alloc-tpl-name">Name</label>
+              <input id="alloc-tpl-name" value={tplEdit.name} onChange={(e) => setTplEdit({ ...tplEdit, name: e.target.value })} />
+            </div>
+            <div className="fin-field">
+              <label htmlFor="alloc-tpl-method">Method</label>
+              <select id="alloc-tpl-method" value={tplEdit.method} onChange={(e) => setTplEdit({ ...tplEdit, method: e.target.value as AllocMethod })}>
+                <option value="headcount">Headcount</option>
+                <option value="percentage">Percentage</option>
+                <option value="equal">Equal</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div className="fin-field">
+              <label htmlFor="alloc-tpl-amount">Default RM</label>
+              <input
+                id="alloc-tpl-amount"
+                type="number" step="0.01" min="0"
+                value={tplEdit.amount}
+                onChange={(e) => setTplEdit({ ...tplEdit, amount: e.target.value })}
+                className="font-mono tabular text-right"
+              />
+            </div>
+            <div className="fin-field">
+              <label htmlFor="alloc-tpl-cat">Category</label>
+              <select id="alloc-tpl-cat" value={tplEdit.categoryId} onChange={(e) => setTplEdit({ ...tplEdit, categoryId: e.target.value })}>
+                <option value="">—</option>
+                {data.categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             </div>
             {tplEdit.method === 'percentage' ? (
-              <div>
-                <div className="text-xs font-sans text-graphite mb-1.5">各公司默认 %</div>
+              <div className="span-3">
+                <div className="text-[11.5px] font-medium text-graphite mb-1.5">Each company’s default %</div>
                 <div className="flex flex-wrap gap-2">
                   {data.companies.map((c) => (
                     <label key={c.id} className="flex items-center gap-1.5 bg-paper border border-hairline rounded-md px-2 py-1">
-                      <span className="font-mono text-xs text-graphite">{c.label}</span>
+                      <span className="text-xs text-graphite">{c.label}</span>
                       <input
                         type="number" step="0.01" min="0"
                         value={tplEdit.pct[c.id] ?? ''}
@@ -249,7 +331,7 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
                 </div>
               </div>
             ) : null}
-            <div className="flex items-center gap-3">
+            <div className="span-3 flex items-center gap-3">
               <button
                 type="button"
                 onClick={() =>
@@ -269,16 +351,18 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
                   })
                 }
                 disabled={isPending || !tplEdit.name.trim()}
-                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-1.5 rounded-md disabled:opacity-50"
+                className="bil-btn primary"
               >
                 {isPending ? 'Saving…' : 'Save'}
               </button>
-              <button type="button" onClick={() => setTplEdit(null)} className="text-sm text-graphite hover:text-ink font-sans">Cancel</button>
+              <button type="button" onClick={() => setTplEdit(null)} className="text-sm text-graphite hover:text-ink">
+                Cancel
+              </button>
             </div>
           </div>
         ) : (
-          <button type="button" onClick={() => startTpl()} className="text-sm text-accent hover:text-accent-hover font-serif italic">
-            + 加模板
+          <button type="button" onClick={() => startTpl()} className="bil-btn">
+            + Add template
           </button>
         )}
       </section>

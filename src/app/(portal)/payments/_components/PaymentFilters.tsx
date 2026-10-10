@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useState, useTransition, useEffect } from 'react'
+import { useFinView } from '@/components/layout/fin-view'
 
 const VOUCHER_TYPES = [
   { value: '', label: 'Any type' },
@@ -31,11 +32,18 @@ const POOLS = [
 const fieldCls = 'flex flex-col gap-1 text-[10px] font-medium uppercase tracking-[0.06em] text-graphite'
 const inputCls = 'text-ink focus:outline-none'
 
-export default function PaymentFilters() {
+export default function PaymentFilters({ side = 'payments' }: { side?: 'payments' | 'receipts' }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [, startTransition] = useTransition()
+  // The search box in the handoff's words, on the Finance view (2026-10-10).
+  const fin = useFinView()
+  const searchHint = fin
+    ? side === 'receipts'
+      ? 'Search receipt #, from, description…'
+      : 'Search voucher #, payee, description…'
+    : 'voucher #, description, payee…'
 
   // Local state mirrors URL — initialized from URL on mount/URL change
   const [q, setQ] = useState(searchParams.get('q') ?? '')
@@ -91,7 +99,7 @@ export default function PaymentFilters() {
           type="text"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="voucher #, description, payee…"
+          placeholder={searchHint}
           className={inputCls}
         />
       </label>

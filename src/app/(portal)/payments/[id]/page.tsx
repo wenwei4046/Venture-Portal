@@ -42,6 +42,12 @@ interface Props {
 export default async function PaymentDetailPage({ params }: Props) {
   const user = await requirePermission('treasury', 'hr_costing')
   const canReadTreasury = can(user, 'treasury')
+  // 2026-10-10 — the handoff (audit 2026-10-09 l, item 8): the voucher page is
+  // English throughout on the Finance view, in the builders' words
+  // (pagePaymentDetail / pageReceiptDetail). Who reads the treasury is
+  // Finance's view of this page; HR, opening a payroll voucher from HR
+  // Payment, keeps the page as it was.
+  const en = canReadTreasury
   const { id } = await params
   const supabase = await createClient()
 
@@ -68,11 +74,14 @@ export default async function PaymentDetailPage({ params }: Props) {
   let bankName: string | null = null
   // The same account as the panel prints it: "Hong Leong Bank ···7890".
   let bankLabel: string | null = null
+  // The handoff's panel (2026-10-10): the bank, its account number under it.
+  let bankParts: { name: string; number: string | null } | null = null
   if (voucher.bank_account_id) {
     const { data: b } = await supabase.from('bank_accounts').select('bank_name, account_number').eq('id', voucher.bank_account_id).single()
     if (b) {
       bankName = `${b.bank_name} — ${b.account_number}`
       bankLabel = bankShort(b.bank_name, b.account_number ?? '')
+      bankParts = { name: b.bank_name, number: b.account_number ?? null }
     }
   }
 
@@ -159,6 +168,8 @@ export default async function PaymentDetailPage({ params }: Props) {
     )
   )
   const categoryLabel = categoryLabels.length > 0 ? categoryLabels.join(' + ') : null
+  // The GL code under the account's name in the panel (2026-10-10, the handoff).
+  const accountCodes = Array.from(new Set(sourceRows.map((r) => r.account_code).filter((c): c is string => !!c))).join(' + ')
 
   // Mig 20260910150000: a payroll disbursement voucher knows who it pays —
   // one line for a per-person PV, N lines for a department PV.
@@ -299,62 +310,76 @@ export default async function PaymentDetailPage({ params }: Props) {
 
   const chip = STATUS_CHIP[status] ?? { tone: '', side: '', zh: status }
   const statusZh = status === 'paid' ? (isCredit ? '已收' : '已付') : chip.zh
+  // The handoff's chip says the status alone: "pending approval", "paid".
+  const statusText = status.replace(/_/g, ' ')
+  const W = en ? WORDS.en : WORDS.zh
 
   // ── What happened to it, in order. Money received is booked on the spot, so a
-  // receipt has no approval to show; a payment goes 建立 → 送批 → 批准 → 付款.
+  // receipt has no approval to show; a payment goes 建立 → 送批 → 批准 → 付款
+  // (Created → Submitted → Approved → Paid on the Finance view).
   // No column records WHEN a voucher was submitted or voided: updated_at is the
   // submit time only while it is still pending, and the void time once voided.
-  const steps: TrailStep[] = [{ label: '建立', by: createdByName, at: voucher.created_at, state: 'done' }]
+  const steps: TrailStep[] = [{ label: W.created, by: createdByName, at: voucher.created_at, state: 'done' }]
   if (status === 'voided') {
-    if (!isCredit && voucher.approved_at) steps.push({ label: '批准', by: approvedByName, at: voucher.approved_at, state: 'done' })
-    if (voucher.executed_at) steps.push({ label: isCredit ? '已入账' : '付款', at: voucher.executed_at, state: 'done' })
-    steps.push({ label: '作废', at: voucher.updated_at, state: 'bad' })
+    if (!isCredit && voucher.approved_at) steps.push({ label: W.approved, by: approvedByName, at: voucher.approved_at, state: 'done' })
+    if (voucher.executed_at) steps.push({ label: isCredit ? W.received : W.paid, at: voucher.executed_at, state: 'done' })
+    steps.push({ label: W.voided, at: voucher.updated_at, state: 'bad' })
   } else if (isCredit) {
     steps.push(
       voucher.executed_at
-        ? { label: '已入账', at: voucher.executed_at, note: '收到的钱即时入账，不用批准', state: 'done' }
-        : { label: '入账', note: '还没入账', state: 'todo' },
+        ? // The handoff's Received step names the bank it came into.
+          en
+          ? { label: W.received, by: bankParts?.name ?? null, at: voucher.executed_at, state: 'done' }
+          : { label: '已入账', at: voucher.executed_at, note: '收到的钱即时入账，不用批准', state: 'done' }
+        : { label: en ? W.received : '入账', note: en ? 'Not received yet' : '还没入账', state: 'todo' },
     )
   } else {
     const submitted = status !== 'draft'
-    steps.push({ label: '送批', at: status === 'pending_approval' ? voucher.updated_at : null, state: submitted ? 'done' : 'todo' })
+    steps.push({ label: W.submitted, at: status === 'pending_approval' ? voucher.updated_at : null, state: submitted ? 'done' : 'todo' })
     steps.push(
       voucher.approved_at
-        ? { label: '批准', by: approvedByName, at: voucher.approved_at, state: 'done' }
-        : { label: '批准', note: submitted ? '等 Principal' : undefined, state: 'todo' },
+        ? { label: W.approved, by: approvedByName, at: voucher.approved_at, state: 'done' }
+        : { label: W.approved, note: submitted ? W.waiting : undefined, state: 'todo' },
     )
     steps.push(
       voucher.executed_at
-        ? { label: '付款', at: voucher.executed_at, note: voucher.payment_reference ? `Ref: ${voucher.payment_reference}` : undefined, state: 'done' }
-        : { label: '付款', state: 'todo' },
+        ? { label: W.paid, at: voucher.executed_at, note: voucher.payment_reference ? `Ref: ${voucher.payment_reference}` : undefined, state: 'done' }
+        : { label: W.paid, state: 'todo' },
     )
   }
 
   const methodLabel = voucher.payment_method ? voucher.payment_method.replace(/_/g, ' ') : null
+  // "Bank transfer", as the handoff writes it (CSS `capitalize` made it "Bank Transfer").
+  const methodText = methodLabel ? methodLabel.charAt(0).toUpperCase() + methodLabel.slice(1) : null
   let cardNo = 0
 
+  // A receipt goes back to Receipt, its own list (2026-10-10, the handoff).
+  const backHref = canReadTreasury ? (isCredit ? '/receipts' : '/payments') : '/hr-costing/payment'
+  const backLabel = canReadTreasury ? (isCredit ? 'Receipt' : 'Payments') : 'HR Payment'
+
   return (
-    <div className="max-w-[1180px]">
-      <Link href={canReadTreasury ? '/payments' : '/hr-costing/payment'} className="text-sm text-muted hover:text-accent font-sans transition-colors">
-        ← Back to {canReadTreasury ? 'Payments' : 'HR Payment'}
+    <div className={`max-w-[1180px]${en ? ' pay-detail' : ''}`}>
+      <Link href={backHref} className={`text-sm text-muted hover:text-accent font-sans transition-colors${en ? ' pay-back' : ''}`}>
+        ← Back to {backLabel}
       </Link>
 
       {/* ── Header: the number, its status, who made it ── */}
       <div className="mt-2 mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <div className="font-sans text-[11px] uppercase tracking-[0.14em] text-muted mb-1">
+          <div className={`font-sans text-[11px] uppercase ${en ? 'pay-eyebrow tracking-[0.05em]' : 'tracking-[0.14em]'} text-muted mb-1`}>
             {isCredit ? 'Official receipt' : 'Payment voucher'}
             {categoryLabel ? ` · ${categoryLabel}` : ''}
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <h1 className="title-number">{voucher.voucher_no ?? 'Draft'}</h1>
-            <span className={`chip lg status-morph ${chip.tone}`}>
+            {/* The number in the figures' mono, 28px, on the Finance view (pay-no). */}
+            <h1 className={en ? 'title-number pay-no' : 'title-number'}>{voucher.voucher_no ?? 'Draft'}</h1>
+            <span className={`chip lg status-morph ${chip.tone}${en ? ' pay-head-chip' : ''}`}>
               <span className="dot" />
-              {statusZh} · {status.replace(/_/g, ' ')}
+              {en ? statusText : `${statusZh} · ${statusText}`}
             </span>
           </div>
-          <p className="font-sans text-[12.5px] text-muted mt-1">
-            {createdByName ?? 'Unknown'} 建立 · {officeStamp(voucher.created_at)}
+          <p className={`font-sans text-[12.5px] text-muted mt-1${en ? ' pay-created' : ''}`}>
+            {en ? `Created by ${createdByName ?? 'Unknown'} · ${officeStamp(voucher.created_at)}` : `${createdByName ?? 'Unknown'} 建立 · ${officeStamp(voucher.created_at)}`}
           </p>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
@@ -373,22 +398,28 @@ export default async function PaymentDetailPage({ params }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_316px] gap-4 lg:gap-5 items-start">
         {/* ── The cards ── */}
         <div className="order-2 lg:order-1 grid gap-3.5 min-w-0">
-          <Card n={++cardNo} title={isCredit ? '收自谁' : '付给谁'} en={isCredit ? 'Received from' : 'Pay to'}>
+          <Card
+            n={++cardNo}
+            fin={en}
+            title={en ? (isCredit ? 'Received from' : 'Pay to') : isCredit ? '收自谁' : '付给谁'}
+            en={en ? undefined : isCredit ? 'Received from' : 'Pay to'}
+          >
             <div className="font-sans text-[19px] font-semibold leading-snug text-ink">{voucher.payee_name}</div>
             {payeeCompanyName ? <div className="font-mono text-xs text-muted mt-0.5">{payeeCompanyName}</div> : null}
             <dl className="mt-3 grid grid-cols-[76px_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
-              <dt className="font-sans text-[12.5px] text-muted pt-px">说明</dt>
+              {/* The handoff's labels (2026-10-10): rgb(117 100 86), the Finance view's graphite. */}
+              <dt className={`font-sans text-[12.5px] ${en ? 'text-graphite' : 'text-muted'} pt-px`}>{en ? 'Description' : '说明'}</dt>
               <dd className="m-0 font-sans text-ink whitespace-pre-wrap break-words">{voucher.description || '—'}</dd>
               {methodLabel ? (
                 <>
-                  <dt className="font-sans text-[12.5px] text-muted pt-px">方式</dt>
+                  <dt className={`font-sans text-[12.5px] ${en ? 'text-graphite' : 'text-muted'} pt-px`}>{en ? 'Method' : '方式'}</dt>
                   <dd className="m-0 font-sans text-ink capitalize">{methodLabel}</dd>
                 </>
               ) : null}
               {voucher.notes ? (
                 <>
-                  <dt className="font-sans text-[12.5px] text-muted pt-px">备注</dt>
-                  <dd className="m-0 font-sans text-graphite whitespace-pre-wrap break-words">{voucher.notes}</dd>
+                  <dt className={`font-sans text-[12.5px] ${en ? 'text-graphite' : 'text-muted'} pt-px`}>{en ? 'Notes' : '备注'}</dt>
+                  <dd className={`m-0 font-sans ${en ? 'text-ink' : 'text-graphite'} whitespace-pre-wrap break-words`}>{voucher.notes}</dd>
                 </>
               ) : null}
             </dl>
@@ -398,8 +429,9 @@ export default async function PaymentDetailPage({ params }: Props) {
           {sourceRows.length > 0 ? (
             <Card
               n={++cardNo}
-              title={isCredit ? '进哪个池' : '从哪个池出'}
-              en={isCredit ? 'Credited to' : 'Deducted from'}
+              fin={en}
+              title={en ? (isCredit ? 'Credited to' : 'Deducted from') : isCredit ? '进哪个池' : '从哪个池出'}
+              en={en ? undefined : isCredit ? 'Credited to' : 'Deducted from'}
               aside={
                 reassignFrom.length > 0 ? (
                   <ReassignGlAccountButton voucherId={voucher.id} fromOptions={reassignFrom} accountOptions={accountOptions} />
@@ -439,8 +471,9 @@ export default async function PaymentDetailPage({ params }: Props) {
           {peopleOnVoucher.length > 0 ? (
             <Card
               n={++cardNo}
-              title="这张单付给谁"
-              en="People on this voucher"
+              fin={en}
+              title={en ? 'People on this voucher' : '这张单付给谁'}
+              en={en ? undefined : 'People on this voucher'}
               aside={
                 <span className="font-mono text-[11px] text-muted">
                   {salaryPeople} {salaryPeople === 1 ? 'PERSON' : 'PEOPLE'} · {peopleOnVoucher.length} {peopleOnVoucher.length === 1 ? 'PAYMENT' : 'PAYMENTS'}
@@ -500,8 +533,9 @@ export default async function PaymentDetailPage({ params }: Props) {
           {statutoryCoverage.length > 0 ? (
             <Card
               n={++cardNo}
-              title="这张单缴的法定供款"
-              en="Statutory contributions on this voucher"
+              fin={en}
+              title={en ? 'Statutory contributions on this voucher' : '这张单缴的法定供款'}
+              en={en ? undefined : 'Statutory contributions on this voucher'}
               titleId="statutory-coverage-title"
               aside={
                 <span className="font-mono text-[11px] text-muted">
@@ -543,8 +577,9 @@ export default async function PaymentDetailPage({ params }: Props) {
           {canReadTreasury ? (
             <Card
               n={++cardNo}
-              title="附件"
-              en="Attachments"
+              fin={en}
+              title={en ? 'Attachments' : '附件'}
+              en={en ? undefined : 'Attachments'}
               aside={
                 <span className="font-mono text-[11px] text-muted">
                   {(attachments ?? []).length} FILE{(attachments ?? []).length === 1 ? '' : 'S'}
@@ -559,7 +594,17 @@ export default async function PaymentDetailPage({ params }: Props) {
               {voucher.status === 'voided' ? (
                 <AttachmentUploader voucherId={voucher.id} voucherStatus={voucher.status} canUpload={false} />
               ) : (
-                <DealMore summary={attachmentsOpen ? '加附件 · Add attachments' : '补附件 · Add attachments'}>
+                <DealMore
+                  summary={
+                    en
+                      ? attachmentsOpen
+                        ? 'Add attachments'
+                        : 'Add a late attachment'
+                      : attachmentsOpen
+                        ? '加附件 · Add attachments'
+                        : '补附件 · Add attachments'
+                  }
+                >
                   <AttachmentUploader voucherId={voucher.id} voucherStatus={voucher.status} canUpload late={!attachmentsOpen} />
                 </DealMore>
               )}
@@ -571,13 +616,13 @@ export default async function PaymentDetailPage({ params }: Props) {
                   lateAfter={voucher.direction === 'credit' ? null : voucher.approved_at}
                 /></div>
               ) : (
-                <p className="font-sans text-sm text-muted mt-2">还没有附件。</p>
+                <p className="font-sans text-sm text-muted mt-2">{en ? 'No attachments yet.' : '还没有附件。'}</p>
               )}
             </Card>
           ) : null}
 
           {/* ── What happened to it ── */}
-          <Card n={++cardNo} title="记录" en="Trail">
+          <Card n={++cardNo} fin={en} title={en ? 'Trail' : '记录'} en={en ? undefined : 'Trail'}>
             <ol className="trail-steps m-0 p-0 list-none">
               {steps.map((step, i) => (
                 <li
@@ -598,54 +643,117 @@ export default async function PaymentDetailPage({ params }: Props) {
         </div>
 
         {/* ── The panel: what this voucher is, and what can be done to it ── */}
-        <aside className="order-1 lg:order-2 cf-scope deal-side lg:sticky lg:top-6 rounded-md p-4 sm:p-5 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <span className="deal-side-muted font-sans text-[11px] uppercase tracking-[0.14em]">
-              {isCredit ? '收据 · Receipt' : '付款凭单 · Payment'}
-            </span>
-            <span className={`deal-side-chip ${chip.side}`}>{statusZh}</span>
-          </div>
-          <div className={`font-sans text-[30px] font-semibold leading-tight tracking-[-0.02em] tabular-nums ${isCredit ? 'deal-side-in' : ''}`}>
-            {isCredit ? '+' : ''}
-            {formatMoney(amount)}
-          </div>
-          <p className="deal-side-muted font-sans text-sm mt-0.5 mb-3.5 break-words">
-            {isCredit ? '收自' : '付给'} {voucher.payee_name}
-          </p>
+        <aside className={`order-1 lg:order-2 cf-scope deal-side lg:sticky lg:top-6 rounded-md p-4 sm:p-5 min-w-0${en ? ' pay-aside' : ''}`}>
+          {en ? (
+            <>
+              {/* The handoff's panel head (2026-10-10): "Payment voucher" / "Receipt",
+                  the status in its own chip, the amount in the figures' mono. */}
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="deal-side-muted font-sans text-[11px] uppercase tracking-[0.05em]">{isCredit ? 'Receipt' : 'Payment voucher'}</span>
+                <span className={`chip pay-side-chip ${chip.tone}`}>
+                  <span className="dot" />
+                  {statusText}
+                </span>
+              </div>
+              <div className="pay-side-amt font-sans text-[30px] font-semibold leading-tight tracking-[-0.02em] tabular-nums">
+                {isCredit ? '+' : ''}
+                {formatMoney(amount)}
+              </div>
+              <p className="deal-side-muted font-sans text-sm mt-0.5 mb-3.5 break-words">
+                {isCredit ? 'Received from' : 'Pay to'} {voucher.payee_name}
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="deal-side-muted font-sans text-[11px] uppercase tracking-[0.14em]">
+                  {isCredit ? '收据 · Receipt' : '付款凭单 · Payment'}
+                </span>
+                <span className={`deal-side-chip ${chip.side}`}>{statusZh}</span>
+              </div>
+              <div className={`font-sans text-[30px] font-semibold leading-tight tracking-[-0.02em] tabular-nums ${isCredit ? 'deal-side-in' : ''}`}>
+                {isCredit ? '+' : ''}
+                {formatMoney(amount)}
+              </div>
+              <p className="deal-side-muted font-sans text-sm mt-0.5 mb-3.5 break-words">
+                {isCredit ? '收自' : '付给'} {voucher.payee_name}
+              </p>
+            </>
+          )}
           <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-[7px] text-[13px] m-0">
             {/* The panel's two groups (2026-10-09, the Finance revamp): when and where, then the booking. */}
             <div className="deal-side-sec col-span-2">When & where</div>
-            <PanelRow
-              label={isCredit ? '收款日期' : '付款日期'}
-              value={
+            {(() => {
+              // A paid voucher's date is corrected in place; a draft or pending
+              // one with Edit; payroll's from HR Payment.
+              const amendDate =
+                voucherCan.edit && status === 'paid' && voucher.payment_date && !isPayrollVoucher ? (
+                  <AmendDateButton
+                    kind="voucher"
+                    id={voucher.id}
+                    currentDate={String(voucher.payment_date).slice(0, 10)}
+                    label={voucher.voucher_no ?? 'voucher'}
+                    triggerClassName="deal-side-link ml-2 font-sans text-[11.5px] underline underline-offset-2"
+                  />
+                ) : null
+              const booking = poolLabel || categoryLabel || settledInvoices.length > 0 || methodLabel ? <div className="deal-side-sec col-span-2">Booking</div> : null
+              // The handoff's rows (2026-10-10): its words, the bank's account
+              // number and the account's GL code each on a second line, the
+              // values in the body face and the date and invoice in the mono.
+              return en ? (
                 <>
-                  {voucher.payment_date ? dayjs(voucher.payment_date).format('D MMM YYYY') : '还没定'}
-                  {/* A paid voucher's date is corrected in place; a draft or pending
-                      one with Edit; payroll's from HR Payment. */}
-                  {voucherCan.edit && status === 'paid' && voucher.payment_date && !isPayrollVoucher ? (
-                    <AmendDateButton
-                      kind="voucher"
-                      id={voucher.id}
-                      currentDate={String(voucher.payment_date).slice(0, 10)}
-                      label={voucher.voucher_no ?? 'voucher'}
-                      triggerClassName="deal-side-link ml-2 font-sans text-[11.5px] underline underline-offset-2"
+                  <PanelRow
+                    fin
+                    mono
+                    label={isCredit ? 'Received date' : 'Payment date'}
+                    value={
+                      <>
+                        {voucher.payment_date ? dayjs(voucher.payment_date).format('DD MMM YYYY') : 'Not set'}
+                        {amendDate}
+                      </>
+                    }
+                  />
+                  {bankParts ? <PanelRow fin label={isCredit ? 'Into bank' : 'From bank'} value={bankParts.name} sub={bankParts.number} /> : null}
+                  {booking}
+                  {poolLabel ? <PanelRow fin label={isCredit ? 'Credited to pool' : 'Pool'} value={poolLabel} /> : null}
+                  {categoryLabel ? <PanelRow fin label="Account" value={categoryLabel} sub={accountCodes || null} /> : null}
+                  {settledInvoices.length > 0 ? (
+                    <PanelRow
+                      fin
+                      mono
+                      label="Settles invoice"
+                      value={settledInvoices.length === 1 ? settledInvoices[0] : `${settledInvoices[0]} + ${settledInvoices.length - 1} more`}
+                      title={settledInvoices.join('\n')}
                     />
                   ) : null}
+                  {methodText ? <PanelRow fin label="Method" value={methodText} /> : null}
                 </>
-              }
-            />
-            {bankLabel ? <PanelRow label={isCredit ? '进银行' : '从银行'} value={bankLabel} title={bankName ?? undefined} /> : null}
-            {poolLabel || categoryLabel || settledInvoices.length > 0 || methodLabel ? <div className="deal-side-sec col-span-2">Booking</div> : null}
-            {poolLabel ? <PanelRow label={isCredit ? '进哪个池' : '扣哪个池'} value={poolLabel} /> : null}
-            {categoryLabel ? <PanelRow label="科目" value={categoryLabel} /> : null}
-            {settledInvoices.length > 0 ? (
-              <PanelRow
-                label="结哪张发票"
-                value={settledInvoices.length === 1 ? settledInvoices[0] : `${settledInvoices[0]} 等 ${settledInvoices.length} 张`}
-                title={settledInvoices.join('\n')}
-              />
-            ) : null}
-            {methodLabel ? <PanelRow label="方式" value={<span className="capitalize">{methodLabel}</span>} /> : null}
+              ) : (
+                <>
+                  <PanelRow
+                    label={isCredit ? '收款日期' : '付款日期'}
+                    value={
+                      <>
+                        {voucher.payment_date ? dayjs(voucher.payment_date).format('D MMM YYYY') : '还没定'}
+                        {amendDate}
+                      </>
+                    }
+                  />
+                  {bankLabel ? <PanelRow label={isCredit ? '进银行' : '从银行'} value={bankLabel} title={bankName ?? undefined} /> : null}
+                  {booking}
+                  {poolLabel ? <PanelRow label={isCredit ? '进哪个池' : '扣哪个池'} value={poolLabel} /> : null}
+                  {categoryLabel ? <PanelRow label="科目" value={categoryLabel} /> : null}
+                  {settledInvoices.length > 0 ? (
+                    <PanelRow
+                      label="结哪张发票"
+                      value={settledInvoices.length === 1 ? settledInvoices[0] : `${settledInvoices[0]} 等 ${settledInvoices.length} 张`}
+                      title={settledInvoices.join('\n')}
+                    />
+                  ) : null}
+                  {methodLabel ? <PanelRow label="方式" value={<span className="capitalize">{methodLabel}</span>} /> : null}
+                </>
+              )
+            })()}
           </dl>
 
           {/* ── Actions ── */}
@@ -680,6 +788,12 @@ const STATUS_CHIP: Record<string, { tone: string; side: string; zh: string }> = 
   voided: { tone: 'danger', side: 'bad', zh: '已作废' },
 }
 
+/** The trail's steps — the Finance view's in the handoff's English (2026-10-10). */
+const WORDS = {
+  zh: { created: '建立', submitted: '送批', approved: '批准', paid: '付款', received: '已入账', voided: '作废', waiting: '等 Principal' },
+  en: { created: 'Created', submitted: 'Submitted', approved: 'Approved', paid: 'Paid', received: 'Received', voided: 'Voided', waiting: 'Waiting for Principal' },
+}
+
 interface TrailStep {
   label: string
   by?: string | null
@@ -694,6 +808,7 @@ function Card({
   n,
   title,
   en,
+  fin = false,
   titleId,
   aside,
   children,
@@ -701,18 +816,20 @@ function Card({
   n: number
   title: string
   en?: string
+  /** The Finance view: an English title alone, small caps at 0.05em (2026-10-10). */
+  fin?: boolean
   titleId?: string
   aside?: ReactNode
   children: ReactNode
 }) {
   return (
-    <section className="bg-surface border border-hairline rounded-md p-4 sm:p-5" aria-labelledby={titleId}>
+    <section className={`bg-surface border border-hairline rounded-md p-4 sm:p-5${fin ? ' pay-vcard' : ''}`} aria-labelledby={titleId}>
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mb-3">
-        <h2 id={titleId} className="flex items-center gap-2.5 font-sans text-[11px] uppercase tracking-[0.14em] text-muted">
+        <h2 id={titleId} className={`flex items-center gap-2.5 font-sans text-[11px] uppercase ${fin ? 'tracking-[0.05em]' : 'tracking-[0.14em]'} text-muted`}>
           <span className="inline-grid place-items-center h-5 w-5 rounded-full bg-accent-bg text-accent text-[11px] font-semibold tracking-normal">
             {n}
           </span>
-          <span className="font-serif text-[15px] tracking-normal normal-case text-ink">{title}</span>
+          <span className={`font-serif text-[15px] tracking-normal normal-case text-ink${fin ? ' pay-vcard-title' : ''}`}>{title}</span>
           {en ? <span>{en}</span> : null}
         </h2>
         {aside ? <div className="ml-auto">{aside}</div> : null}
@@ -722,12 +839,30 @@ function Card({
   )
 }
 
-function PanelRow({ label, value, title }: { label: string; value: ReactNode; title?: string }) {
+function PanelRow({
+  label,
+  value,
+  title,
+  sub,
+  mono = false,
+  fin = false,
+}: {
+  label: string
+  value: ReactNode
+  title?: string
+  /** A second line under the value — a bank's account number, an account's GL code. */
+  sub?: string | null
+  /** In the figures' mono on the Finance view (a date, an invoice number). */
+  mono?: boolean
+  /** The handoff's row (2026-10-10): the value in the body face unless `mono`. */
+  fin?: boolean
+}) {
   return (
     <>
       <dt className="deal-side-muted font-sans text-xs self-baseline whitespace-nowrap">{label}</dt>
-      <dd className="m-0 text-right font-mono tabular break-words" title={title}>
+      <dd className={fin ? `m-0 text-right font-medium break-words${mono ? ' font-mono tabular' : ''}` : 'm-0 text-right font-mono tabular break-words'} title={title}>
         {value}
+        {sub ? <span className="pay-side-sub">{sub}</span> : null}
       </dd>
     </>
   )

@@ -391,11 +391,131 @@ describe('the Finance revamp', () => {
     expect(within(screen.getByRole('dialog', { name: 'Filter Date' })).getByRole('button', { name: 'Range' })).toBeInTheDocument()
   })
 
+  // 2026-10-10 — the handoff adds "Open in new tab" under Open.
   it('reads the row menu in English on the Finance view', () => {
     render(<FinViewProvider value={true}>{list('2026-09-01', [invoice('a', 'INV-1', '2026-09-01')])}</FinViewProvider>)
     fireEvent.contextMenu(screen.getByLabelText('Select INV-1').closest('tr') as HTMLElement)
     expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((b) => b.firstChild?.textContent)).toEqual([
-      'Open', 'Settle', 'Edit', 'PDF', 'Copy', '+ Credit note', 'Change account', 'Void',
+      'Open', 'Open in new tab', 'Settle', 'Edit', 'PDF', 'Copy', '+ Credit note', 'Change account', 'Void',
     ])
+  })
+})
+
+// 2026-10-10 — the handoff's invoice list, as Finance sees it: the month's
+// count with "+ n OTHER MONTHS" once the "Include other months · n" switch on
+// the tab row is on; Bill to as the party's name with its kind under it; the
+// selection bar ABOVE the table (Clear · Print selected · Void selected ·
+// Settle n →) and the settle / void dialogs in English; Open in new tab; a
+// "Total" foot row under the Amount; "No invoices." when there are none; on a
+// phone the row titled by the invoice number. The other views keep the list
+// exactly as it was (the blocks above).
+describe('the invoice list on the Finance view', () => {
+  const window2 = { ...invoice('inv-o', 'INV-AUG-1', '2026-08-01'), invoice_date: '2026-08-29' }
+  const other = { ...invoice('inv-k', 'INV-K', '2026-09-01'), company_id: 'co-hk', total_amount: 250 }
+  const companies = new Map([
+    ['co-hc', { name: 'HOUZS Century', code: 'HC' }],
+    ['co-hk', { name: 'HOUZS Kitchen', code: 'HK' }],
+  ])
+  const fin = (rows: Array<ReturnType<typeof invoice>>, extra: Array<ReturnType<typeof invoice>> = []) =>
+    render(
+      <FinViewProvider value={true}>
+        <InvoicesList invoices={rows} extraOpenInvoices={extra} companyMap={companies} departmentMap={departmentMap} period="2026-09-01" bankAccounts={banks} />
+      </FinViewProvider>,
+    )
+  const count = () => document.querySelector('.sect-head .count')
+  const tickRow = (no: string) => fireEvent.click(screen.getByLabelText(`Select ${no}`))
+
+  it('counts the month, and the Include other months switch on the tab row brings the other months in', () => {
+    fin([invoice('inv-1', 'INV-1', '2026-09-01'), other], [window2])
+    expect(count()).toHaveTextContent('2 INVOICES · SEPTEMBER 2026')
+    expect(count()).not.toHaveTextContent('OTHER')
+    expect(screen.queryByText(/跨月/)).toBeNull()
+    const sw = screen.getByRole('switch', { name: 'Include other months · 1' })
+    expect(sw).toHaveAttribute('aria-checked', 'false')
+    expect(sw.closest('.bil-tabrow')?.querySelector('nav[data-variant]')).not.toBeNull()
+    expect(screen.queryByRole('link', { name: 'INV-AUG-1' })).toBeNull()
+    fireEvent.click(sw)
+    expect(sw).toHaveAttribute('aria-checked', 'true')
+    expect(count()).toHaveTextContent('2 INVOICES · SEPTEMBER 2026 + 1 OTHER MONTH')
+    expect(screen.getByRole('link', { name: 'INV-AUG-1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^All/ }).querySelector('[data-tab-count]')).toHaveTextContent('3')
+  })
+
+  it('reads Bill to as the name with the party’s kind under it', () => {
+    fin([invoice('inv-1', 'INV-1', '2026-09-01')])
+    const heads = Array.from(document.querySelectorAll('thead th')) as HTMLElement[]
+    const cell = (document.querySelector('tbody tr') as HTMLElement).querySelectorAll('td')[heads.findIndex((th) => th.dataset.col === 'company')] as HTMLElement
+    expect(cell).toHaveTextContent('HOUZS Century (HC)')
+    expect(within(cell).getByText('Subsidiary')).toBeInTheDocument()
+  })
+
+  it('puts the selection bar above the table, in English, and settles in an English dialog', () => {
+    fin([invoice('inv-1', 'INV-1', '2026-09-01'), other])
+    expect(document.querySelector('.bil-selbar')).toBeNull()
+    tickRow('INV-1')
+    const bar = document.querySelector('.bil-selbar') as HTMLElement
+    expect(document.querySelector('.bulk-bar')).toBeNull()
+    expect(bar.compareDocumentPosition(document.querySelector('table') as HTMLElement) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(bar).toHaveTextContent('1 selected · RM 1,000.00')
+    for (const name of ['Clear', 'Print selected', 'Void selected 1']) expect(within(bar).getByRole('button', { name })).toBeInTheDocument()
+    fireEvent.click(within(bar).getByRole('button', { name: 'Settle 1 →' }))
+    expect(screen.getByRole('heading', { name: 'Settle — one receipt' })).toBeInTheDocument()
+    expect(screen.getByText(/^1 invoice · RM 1,000\.00/)).toBeInTheDocument()
+    expect(screen.getByText('Amount received (RM)')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Settle 1 invoice' })).toBeInTheDocument()
+    expect(screen.queryByText(/张/)).toBeNull()
+  })
+
+  it('will not combine two companies on one receipt, and says so in English', () => {
+    fin([invoice('inv-1', 'INV-1', '2026-09-01'), other])
+    tickRow('INV-1')
+    tickRow('INV-K')
+    const bar = document.querySelector('.bil-selbar') as HTMLElement
+    expect(bar).toHaveTextContent('2 selected · RM 1,250.00')
+    expect(within(bar).getByRole('button', { name: 'Different companies can’t be combined' })).toBeDisabled()
+    fireEvent.click(within(bar).getByRole('button', { name: 'Clear' }))
+    expect(document.querySelector('.bil-selbar')).toBeNull()
+  })
+
+  it('voids in an English dialog that asks for a reason', () => {
+    fin([invoice('inv-1', 'INV-1', '2026-09-01')])
+    tickRow('INV-1')
+    fireEvent.click(screen.getByRole('button', { name: 'Void selected 1' }))
+    expect(screen.getByRole('heading', { name: 'Void invoices' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Void 1' })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText(/Reason/), { target: { value: 'Wrong amount — reissued' } })
+    expect(screen.getByRole('button', { name: 'Void 1' })).toBeEnabled()
+  })
+
+  it('ends the table on a Total row under the Amount, voided left out', () => {
+    fin([invoice('inv-1', 'INV-1', '2026-09-01'), { ...other, status: 'voided' }, { ...invoice('inv-p', 'INV-P', '2026-09-01'), status: 'paid', total_amount: 300 }])
+    const foot = Array.from(document.querySelectorAll('tfoot td')) as HTMLElement[]
+    const heads = Array.from(document.querySelectorAll('thead th')) as HTMLElement[]
+    const at = (col: string) => heads.findIndex((th) => th.dataset.col === col)
+    expect(foot[at('invoice_no')]).toHaveTextContent('Total')
+    expect(foot[at('total_amount')]).toHaveTextContent('RM 1,300.00')
+  })
+
+  it('says "No invoices." when the month has none', () => {
+    fin([])
+    expect(screen.getByText('No invoices.')).toBeInTheDocument()
+    expect(screen.queryByText(/Step 5/)).toBeNull()
+  })
+
+  it('keeps Select all to settle, in English, beside the search', () => {
+    fin([invoice('inv-1', 'INV-1', '2026-09-01'), other])
+    fireEvent.click(screen.getByRole('button', { name: 'Select all to settle' }))
+    expect(screen.getByLabelText('Select INV-1')).toBeChecked()
+    expect(screen.getByLabelText('Select INV-K')).toBeChecked()
+    expect(screen.queryByText('全选可结算发票')).toBeNull()
+  })
+
+  it('on a phone titles the row by the invoice number, the party and status as small print', () => {
+    fin([invoice('inv-1', 'INV-1', '2026-09-01')])
+    expect(document.querySelector('thead th[data-col="invoice_no"]')).not.toHaveClass('m-hide')
+    expect(document.querySelector('thead th[data-col="company"]')).toHaveClass('m-hide')
+    const no = screen.getByRole('link', { name: 'INV-1' }).closest('td') as HTMLElement
+    expect(no.querySelector('.q-sub')).toHaveTextContent('HOUZS Century (HC)')
+    expect(within(no.querySelector('.q-sub') as HTMLElement).getByText('issued')).toHaveClass('chip')
   })
 })

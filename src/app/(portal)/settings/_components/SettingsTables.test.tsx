@@ -9,6 +9,11 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 // billing mode in words, the Mode as a chip (a switch for whoever may
 // switch), Bill back salary as a tick, + New department.
 
+// 2026-10-10 — the audit's fixes: Show inactive, + New account and + New
+// department sit in the page head beside the title (they were in the band
+// over the table), and the Departments table is a sheet table (▽ filters,
+// widths, a default arrangement) with every control kept in it.
+
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }))
 vi.mock('../actions', () => ({
   createAccount: vi.fn(),
@@ -19,9 +24,17 @@ vi.mock('../actions', () => ({
   setDepartmentBillback: vi.fn(),
 }))
 vi.mock('../department-mode-actions', () => ({ setDepartmentCostModel: vi.fn() }))
+// The saved column layout is fetched from the browser client; here it has none.
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }),
+  }),
+}))
 
 import AccountsSection from './AccountsSection'
 import DepartmentsSection from './DepartmentsSection'
+
+const HEAD = <h1 className="page-title">Settings page</h1>
 
 const acc = (code: string, name: string, type: string, parent_code: string | null, is_active = true) => ({
   code, name, type: type as 'asset', cash_flow_category: 'operating' as const, parent_code, is_active, sort_order: 0,
@@ -64,7 +77,23 @@ describe('the Chart of Accounts table', () => {
 
   it('offers + New account', () => {
     render(<AccountsSection accounts={ACCOUNTS} />)
-    expect(screen.getByRole('button', { name: '+ New account' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '+ New account' }))
+    expect(screen.getByRole('dialog', { name: 'New account' })).toBeInTheDocument()
+  })
+
+  it('puts Show inactive and + New account in the page head, beside the title, and what the page puts under it', () => {
+    render(<AccountsSection accounts={ACCOUNTS} head={HEAD} intro={<div data-testid="cards" />} />)
+    const head = screen.getByRole('heading', { level: 1, name: 'Settings page' }).closest('.page-head') as HTMLElement
+    expect(within(head).getByRole('button', { name: 'Show inactive' })).toBeInTheDocument()
+    expect(within(head).getByRole('button', { name: '+ New account' })).toBeInTheDocument()
+    expect(head.nextElementSibling).toBe(screen.getByTestId('cards'))
+    // The band over the table keeps the search and the folding.
+    const band = screen.getByRole('searchbox', { name: 'Search code or name' }).closest('.gl-toolbar') as HTMLElement
+    expect(within(band).getByRole('button', { name: 'Collapse all' })).toBeInTheDocument()
+    expect(within(band).queryByRole('button', { name: 'Show inactive' })).toBeNull()
+    fireEvent.click(within(head).getByRole('button', { name: 'Show inactive' }))
+    expect(within(head).getByRole('button', { name: 'Hide inactive' })).toBeInTheDocument()
+    expect(screen.getByText('Cash — RHB (closed)')).toBeInTheDocument()
   })
 })
 
@@ -106,5 +135,51 @@ describe('the Departments table', () => {
     render(<DepartmentsSection departments={DEPTS} />)
     fireEvent.click(screen.getByRole('button', { name: '+ New department' }))
     expect(screen.getByLabelText('Department name')).toBeInTheDocument()
+  })
+
+  it('puts + New department in the page head, beside the title', () => {
+    render(<DepartmentsSection departments={DEPTS} head={HEAD} intro={<div data-testid="cards" />} />)
+    const head = screen.getByRole('heading', { level: 1, name: 'Settings page' }).closest('.page-head') as HTMLElement
+    fireEvent.click(within(head).getByRole('button', { name: '+ New department' }))
+    expect(within(head).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Department name')).toBeInTheDocument()
+    expect(head.nextElementSibling).toBe(screen.getByTestId('cards'))
+  })
+
+  it('is a sheet table: ▽ filters on every column but Actions, in a scroll box', () => {
+    render(<DepartmentsSection departments={DEPTS} modes={[mode('d1', 'Marketing', 'centralized'), mode('d2', 'Finance', 'cost_center')]} />)
+    expect(screen.getByRole('table').closest('.st-box')).not.toBeNull()
+    for (const name of ['Name', 'Segment', 'Pool GL', 'Billing mode', 'Mode', 'Bill back salary']) {
+      expect(screen.getByRole('button', { name: `Filter ${name}` })).toBeInTheDocument()
+    }
+    expect(screen.queryByRole('button', { name: 'Filter Actions' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Mode' }))
+    const pick = screen.getByRole('dialog', { name: 'Filter Mode' })
+    expect(within(pick).getByText('cost center')).toBeInTheDocument()
+    expect(within(pick).getByText('centralized')).toBeInTheDocument()
+  })
+
+  it('keeps the provision flow and the bill-back tick in the table', async () => {
+    const actions = await import('../actions')
+    render(<DepartmentsSection departments={DEPTS} />)
+    const ops = screen.getByText('Operations').closest('tr') as HTMLElement
+    fireEvent.click(within(ops).getByRole('button', { name: 'Provision' }))
+    expect(within(ops).getByLabelText('Segment key')).toHaveValue('operations')
+    expect(within(ops).getByRole('button', { name: 'Confirm' })).toBeEnabled()
+    fireEvent.click(within(ops).getByRole('button', { name: 'Cancel' }))
+    expect(within(ops).getByRole('button', { name: 'Provision' })).toBeInTheDocument()
+    expect(screen.getByText('Marketing').closest('tr')).toHaveTextContent('Full department')
+
+    fireEvent.click(within(screen.getByText('Finance').closest('tr') as HTMLElement).getByRole('checkbox'))
+    await vi.waitFor(() => expect(actions.setDepartmentBillback).toHaveBeenCalledTimes(1))
+    const fd = vi.mocked(actions.setDepartmentBillback).mock.calls[0][0] as FormData
+    expect(fd.get('id')).toBe('d2')
+    expect(fd.get('own_share_billback')).toBe('true')
+  })
+
+  it('lets the arrangement be kept as the default by whoever may', () => {
+    render(<DepartmentsSection departments={DEPTS} canSetDefault />)
+    fireEvent.click(screen.getByRole('button', { name: /Columns/ }))
+    expect(screen.getByRole('button', { name: '设为预设' })).toBeInTheDocument()
   })
 })

@@ -19,6 +19,13 @@ export function hasLedgerActivity(l: { lines: readonly unknown[]; openingBalance
   return l.lines.length > 1 || Math.abs(l.openingBalance) >= 0.005 || Math.abs(l.closingBalance) >= 0.005
 }
 
+/** The Dept column's names for the departments added since the five core ones
+ *  (2026-10-10): the registry's extras (IT, Revenue Department) — they read as
+ *  their segment keys ("it", "revenue_department") before. */
+export function ledgerDeptNames(extras: ReadonlyArray<{ value: string; label: string }>): Record<string, string> {
+  return Object.fromEntries(extras.map((s) => [s.value, s.label]))
+}
+
 export function ledgerExportHref(format: 'xlsx' | 'pdf', p: { codes: readonly string[]; from: string; to: string; showZero: boolean }): string {
   const qs = new URLSearchParams()
   qs.set('format', format)

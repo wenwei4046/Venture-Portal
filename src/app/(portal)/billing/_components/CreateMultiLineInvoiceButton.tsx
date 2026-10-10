@@ -45,6 +45,11 @@ interface Props {
   categories?: Category[]
   /** Dynamically provisioned dept modes (dept-registry) appended to the list. */
   extraModes?: Array<{ value: string; label: string }>
+  /** Arrive open, from a page-head menu (2026-10-10, the handoff's
+   *  "From payroll ▾" / "+ Create Invoice ▾"). */
+  autoOpen?: boolean
+  /** No trigger button of its own — the menu item is the trigger. */
+  hideTrigger?: boolean
 }
 
 const BILLABLE_OPTIONS: Array<{ value: BillableToKind; label: string }> = [
@@ -90,10 +95,12 @@ function CreateMultiLineInvoiceButtonBody({
   departments = [],
   categories = [],
   extraModes = [],
+  autoOpen = false,
+  hideTrigger = false,
 }: Props) {
   const router = useRouter()
   const poolOptions = [...POOL_OPTIONS, ...(extraModes as unknown as typeof POOL_OPTIONS)]
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(autoOpen)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -278,6 +285,7 @@ function CreateMultiLineInvoiceButtonBody({
 
   return (
     <>
+      {hideTrigger ? null : (
       <button
         onClick={() => setOpen(true)}
         className="bg-surface hover:bg-surface-2 border border-hairline text-graphite hover:text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
@@ -285,6 +293,7 @@ function CreateMultiLineInvoiceButtonBody({
       >
         + Multi-line Invoice
       </button>
+      )}
 
       {open && (
         <div

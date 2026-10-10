@@ -36,6 +36,22 @@ const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const STATUS_LABEL: Record<CalendarEvent['status'], string> = { paid: 'paid', due: 'due', partial: 'part paid', overdue: 'overdue' }
 const MAX = 4
 
+// 2026-10-10 — the handoff's legend: the two sides, then the four states, each a swatch.
+const LEGEND: Array<[string, string]> = [
+  ['sch-collect', '↓ We collect (Fund OUT)'],
+  ['sch-pay', '↑ We pay (Fund IN)'],
+  ['sch-paid', 'Paid'],
+  ['sch-due', 'Due'],
+  ['sch-partial', 'Part paid'],
+  ['sch-overdue', 'Overdue'],
+]
+
+/** An instalment in words, as the phone's day list reads it. */
+function whatItIs(e: CalendarEvent): string {
+  const short = e.outstanding > 0.005 && e.outstanding < e.amount - 0.005 ? ` · short ${formatMoneyBare(e.outstanding)}` : ''
+  return `${e.kind === 'collect' ? 'Collect' : 'Pay'} · instalment ${e.no}${e.months ? ` of ${e.months}` : ''}${short}`
+}
+
 interface Hover {
   e: CalendarEvent
   x: number
@@ -76,15 +92,24 @@ export default function RepayCalendar({ month, today, events }: { month: string;
     setHover({ e, x: Math.max(8, x), y: Math.max(8, Math.min(rc.top, (typeof window !== 'undefined' ? window.innerHeight : 800) - 260)) })
   }
 
+  const count = [...byDay.values()].reduce((n, list) => n + list.length, 0)
+
   return (
     <div className="repay-cal">
+      <div className="sect-head">
+        <h2>Calendar</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">
+          {count} {count === 1 ? 'INSTALMENT' : 'INSTALMENTS'} · {first.format('MMMM YYYY').toUpperCase()}
+        </span>
+      </div>
       <div className="cal-legend" aria-hidden>
-        <span><i className="bar collect" />↓ We collect · Fund OUT</span>
-        <span><i className="bar pay" />↑ We pay · Fund IN</span>
-        <span><i className="swatch paid" />paid</span>
-        <span><i className="swatch due" />due</span>
-        <span><i className="swatch partial" />part paid</span>
-        <span><i className="swatch overdue" />overdue</span>
+        {LEGEND.map(([cls, label]) => (
+          <span key={cls}>
+            <i className={`sch-swatch ${cls}`} />
+            {label}
+          </span>
+        ))}
       </div>
 
       <div className="cal-wrap">
@@ -116,14 +141,17 @@ export default function RepayCalendar({ month, today, events }: { month: string;
                   <Link
                     key={k}
                     href={e.href}
-                    className={`cal-item ${e.kind} ${e.status}`}
+                    className={`cal-item sch-cal-item ${e.kind} ${e.status}`}
                     onMouseEnter={show(e)}
                     onMouseLeave={() => setHover(null)}
                     onFocus={show(e)}
                     onBlur={() => setHover(null)}
                   >
-                    <span className="arrow">{e.kind === 'collect' ? '↓' : '↑'}</span>
-                    <span className="who">{e.name}</span>
+                    {/* Two lines (the handoff): who, then the amount. */}
+                    <span className="sch-cal-who">
+                      <span className="arrow">{e.kind === 'collect' ? '↓' : '↑'}</span>
+                      <span className="who">{e.name}</span>
+                    </span>
                     <span className="amt">{formatMoneyBare(e.amount)}</span>
                   </Link>
                 ))}
@@ -145,33 +173,43 @@ export default function RepayCalendar({ month, today, events }: { month: string;
         </div>
       </div>
 
-      {/* A phone reads the month as days. */}
+      {/* A phone reads the month as days: the day and its net, then its
+          instalments in one box, each saying what it is and where it stands
+          (2026-10-10, the handoff). */}
       <div className="cal-agenda">
         {[...byDay.keys()].sort().map((iso) => {
           const list = byDay.get(iso)!
           const { inn, out } = net(list)
           return (
-            <div key={iso} className="cal-agenda-day">
-              <div className="cal-agenda-head">
+            <div key={iso} className="sch-agenda-day">
+              <div className="sch-agenda-head">
                 <span>
                   {dayjs(iso).format('D MMM YYYY')}
                   {iso === today ? ' · today' : ''}
                 </span>
-                <span className={inn >= out ? 'in' : 'out'}>
+                <span className={`sch-agenda-net ${inn >= out ? 'sch-in' : 'sch-out'}`}>
                   {inn ? `+${formatMoneyBare(inn)}` : ''}
                   {inn && out ? '  ' : ''}
                   {out ? `−${formatMoneyBare(out)}` : ''}
                 </span>
               </div>
-              {list.map((e, k) => (
-                <Link key={k} href={e.href} className={`cal-agenda-item ${e.kind} ${e.status}`}>
-                  <span>
-                    {e.kind === 'collect' ? '↓' : '↑'} {e.name}
-                    <small> · {STATUS_LABEL[e.status]}</small>
-                  </span>
-                  <span className="amt">{formatMoneyBare(e.amount)}</span>
-                </Link>
-              ))}
+              <div className="sch-agenda-box">
+                {list.map((e, k) => (
+                  <Link key={k} href={e.href} className={`sch-agenda-item sch-${e.kind}`}>
+                    <span className="sch-agenda-arrow" aria-hidden>
+                      {e.kind === 'collect' ? '↓' : '↑'}
+                    </span>
+                    <span className="sch-agenda-main">
+                      <span className="sch-agenda-who">{e.name}</span>
+                      <span className="sch-agenda-what">{whatItIs(e)}</span>
+                    </span>
+                    <span className="sch-agenda-side">
+                      <span className="sch-agenda-amt">{formatMoneyBare(e.amount)}</span>
+                      <span className={`cal-card-status ${e.status} sch-st`}>{STATUS_LABEL[e.status]}</span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
             </div>
           )
         })}
@@ -179,10 +217,13 @@ export default function RepayCalendar({ month, today, events }: { month: string;
 
       {hover ? (
         <div role="tooltip" className="cal-card" style={{ left: hover.x, top: hover.y }}>
-          <div className={`cal-card-kind ${hover.e.kind}`}>{hover.e.kind === 'collect' ? '↓ We collect · Fund OUT' : '↑ We pay · Fund IN'}</div>
+          <div className="sch-card-top">
+            <span className={`cal-card-kind ${hover.e.kind}`}>{hover.e.kind === 'collect' ? '↓ We collect · Fund OUT' : '↑ We pay · Fund IN'}</span>
+            <span className={`cal-card-status ${hover.e.status} sch-st`}>{STATUS_LABEL[hover.e.status]}</span>
+          </div>
           <div className="cal-card-name">{hover.e.name}</div>
-          <div className="cal-card-date">{dayjs(hover.e.date).format('D MMM YYYY')}</div>
-          <dl>
+          <div className="cal-card-date sch-card-date">Due {dayjs(hover.e.date).format('D MMM YYYY')}</div>
+          <dl className="sch-card-dl">
             <div>
               <dt>Instalment</dt>
               <dd>{`${hover.e.no}${hover.e.months ? ` of ${hover.e.months}` : ''}`}</dd>
@@ -206,7 +247,7 @@ export default function RepayCalendar({ month, today, events }: { month: string;
               <dd>{formatMoney(hover.e.principal)}</dd>
             </div>
           </dl>
-          <span className={`cal-card-status ${hover.e.status}`}>{STATUS_LABEL[hover.e.status]}</span>
+          <div className="sch-card-foot">Click to open the full record</div>
         </div>
       ) : null}
     </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useTransition, useMemo } from 'react'
+import { Fragment, useState, useTransition, useMemo, type ReactNode } from 'react'
 import { backdropDismiss } from '@/components/modal-dismiss'
 import {
   ACCOUNT_TYPES,
@@ -25,6 +25,12 @@ interface Account {
 
 interface Props {
   accounts: Account[]
+  /** The page head's title block. The section draws the head, so that Show
+   *  inactive and + New account — whose state is the section's — sit beside
+   *  the title, as the handoff has them (2026-10-10). */
+  head?: ReactNode
+  /** What the page puts between its head and the table (strip, cards). */
+  intro?: ReactNode
 }
 
 const CFC_LABELS: Record<CashFlowCategory, string> = {
@@ -33,7 +39,7 @@ const CFC_LABELS: Record<CashFlowCategory, string> = {
   financing: 'Financing',
 }
 
-export default function AccountsSection({ accounts }: Props) {
+export default function AccountsSection({ accounts, head, intro }: Props) {
   const [isPending, startTransition] = useTransition()
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
@@ -182,282 +188,291 @@ export default function AccountsSection({ accounts }: Props) {
   const shown = sections.reduce((n, s) => n + s.rows.length, 0)
 
   // The Chart of Accounts per the user's Claude Design handoff (2026-10-09):
-  // Search, Show inactive and + New account in one band; one table with a
-  // band per account type; a parent's count of sub-accounts under its name;
-  // the status as a chip. Drag a row onto another to move it (as before).
+  // one table with a band per account type; a parent's count of sub-accounts
+  // under its name; the status as a chip. Drag a row onto another to move it
+  // (as before). 2026-10-10 — Show inactive and + New account in the page
+  // head; the band over the table keeps the search and the folding.
   return (
-    <section>
-      <div className="gl-toolbar">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search code or name…"
-          aria-label="Search code or name"
-          className="search-plain flex-1 min-w-[200px] px-3 py-2 bg-white border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
-        />
-        <button type="button" className="btn-quiet-sheet" onClick={() => setShowInactive((v) => !v)}>
-          {showInactive ? 'Hide inactive' : 'Show inactive'}
-        </button>
-        {childCounts.size > 0 ? (
-          <>
-            <button type="button" className="btn-quiet-sheet" onClick={() => setCollapsed(new Set(childCounts.keys()))}>
-              Collapse all
-            </button>
-            <button type="button" className="btn-quiet-sheet" onClick={() => setCollapsed(new Set())}>
-              Expand all
-            </button>
-          </>
-        ) : null}
-        <button
-          type="button"
-          className="btn-pri-sheet"
-          onClick={() => {
-            setShowCreate(true)
-            setError(null)
-          }}
-        >
-          + New account
-        </button>
-      </div>
-
-      {error ? <div className="sheet-danger mb-4">{error}</div> : null}
-      {notice ? <p className="fin-notice mb-4">{notice}</p> : null}
-
-      {showCreate ? (
-        <div
-          className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
-          {...backdropDismiss(() => !isPending && setShowCreate(false))}
-        >
-          <div
-            className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-2xl my-4"
-            role="dialog"
-            aria-label="New account"
-            onClick={(e) => e.stopPropagation()}
+    <>
+      <div className="page-head">
+        {head ?? <div className="min-w-0" />}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button type="button" className="btn-quiet-sheet" onClick={() => setShowInactive((v) => !v)}>
+            {showInactive ? 'Hide inactive' : 'Show inactive'}
+          </button>
+          <button
+            type="button"
+            className="btn-pri-sheet"
+            onClick={() => {
+              setShowCreate(true)
+              setError(null)
+            }}
           >
-            <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline">
-              <div>
-                <h2 className="text-lg font-semibold text-ink">New account</h2>
-                <p className="text-xs text-graphite mt-1">Code is auto-allocated within the type&apos;s range.</p>
-              </div>
-              <button
-                onClick={() => !isPending && setShowCreate(false)}
-                disabled={isPending}
-                className="text-muted hover:text-ink text-2xl leading-none pt-1 disabled:opacity-50"
-                aria-label="Close"
-              >
-                ×
+            + New account
+          </button>
+        </div>
+      </div>
+      {intro}
+      <section>
+        <div className="gl-toolbar">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search code or name…"
+            aria-label="Search code or name"
+            className="search-plain flex-1 min-w-[200px] px-3 py-2 bg-white border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+          />
+          {childCounts.size > 0 ? (
+            <>
+              <button type="button" className="btn-quiet-sheet" onClick={() => setCollapsed(new Set(childCounts.keys()))}>
+                Collapse all
               </button>
-            </div>
-            <div className="p-6">
-              <AccountForm
-                mode="create"
-                isPending={isPending}
-                allAccounts={accounts}
-                onSubmit={(fd) =>
-                  startTransition(async () => {
-                    try {
-                      const result = await createAccount(fd)
-                      if (result?.error) {
-                        setError(result.error)
-                        return
+              <button type="button" className="btn-quiet-sheet" onClick={() => setCollapsed(new Set())}>
+                Expand all
+              </button>
+            </>
+          ) : null}
+        </div>
+
+        {error ? <div className="sheet-danger mb-4">{error}</div> : null}
+        {notice ? <p className="fin-notice mb-4">{notice}</p> : null}
+
+        {showCreate ? (
+          <div
+            className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
+            {...backdropDismiss(() => !isPending && setShowCreate(false))}
+          >
+            <div
+              className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-2xl my-4"
+              role="dialog"
+              aria-label="New account"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline">
+                <div>
+                  <h2 className="text-lg font-semibold text-ink">New account</h2>
+                  <p className="text-xs text-graphite mt-1">Code is auto-allocated within the type&apos;s range.</p>
+                </div>
+                <button
+                  onClick={() => !isPending && setShowCreate(false)}
+                  disabled={isPending}
+                  className="text-muted hover:text-ink text-2xl leading-none pt-1 disabled:opacity-50"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="p-6">
+                <AccountForm
+                  mode="create"
+                  isPending={isPending}
+                  allAccounts={accounts}
+                  onSubmit={(fd) =>
+                    startTransition(async () => {
+                      try {
+                        const result = await createAccount(fd)
+                        if (result?.error) {
+                          setError(result.error)
+                          return
+                        }
+                        setShowCreate(false)
+                        setError(null)
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : 'Failed to create')
                       }
-                      setShowCreate(false)
-                      setError(null)
-                    } catch (e) {
-                      setError(e instanceof Error ? e.message : 'Failed to create')
-                    }
-                  })
-                }
-              />
+                    })
+                  }
+                />
+              </div>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      <div className="sect-head">
-        <h2>Accounts</h2>
-        <span className="rule" aria-hidden />
-        <span className="count">{shown} SHOWN</span>
-      </div>
-
-      {visible.length === 0 ? (
-        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
-          <p className="text-sm">
-            No accounts yet — <strong>+ New account</strong> starts the chart.
-          </p>
+        <div className="sect-head">
+          <h2>Accounts</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{shown} SHOWN</span>
         </div>
-      ) : (
-        <div className="table-frame">
-          <div className="table-frame-scroll">
-            <table className="ledger-table coa-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th className="w-24">Code</th>
-                  <th className="w-28 m-hide">Cash flow</th>
-                  <th className="w-28 m-hide">Status</th>
-                  <th className="w-20" aria-label="Actions" />
-                </tr>
-              </thead>
-              <tbody>
-                {sections.map(({ t, rows }) => {
-                  const [start, end] = rangeFor(t)
-                  return (
-                    <Fragment key={t}>
-                      <tr className="tb-block">
-                        <td colSpan={5}>
-                          {typeLabel(t)} accounts <span className="coa-range">{start}–{end}</span>
-                        </td>
-                      </tr>
-                      {draggingType === t ? (
-                        <tr
-                          onDragOver={(e) => {
-                            e.preventDefault()
-                            setDropTarget('__top__' + t)
-                          }}
-                          onDragLeave={() => setDropTarget(null)}
-                          onDrop={(e) => {
-                            e.preventDefault()
-                            handleDrop(null)
-                          }}
-                          className={dropTarget === '__top__' + t ? 'bg-accent-bg' : undefined}
-                        >
-                          <td colSpan={5} className="text-center text-xs text-graphite py-2 border border-dashed border-accent-border">
-                            Drop here to make it a top-level account
+
+        {visible.length === 0 ? (
+          <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+            <p className="text-sm">
+              No accounts yet — <strong>+ New account</strong> starts the chart.
+            </p>
+          </div>
+        ) : (
+          <div className="table-frame">
+            <div className="table-frame-scroll">
+              <table className="ledger-table coa-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th className="w-24">Code</th>
+                    <th className="w-28 m-hide">Cash flow</th>
+                    <th className="w-28 m-hide">Status</th>
+                    <th className="w-20" aria-label="Actions" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {sections.map(({ t, rows }) => {
+                    const [start, end] = rangeFor(t)
+                    return (
+                      <Fragment key={t}>
+                        <tr className="tb-block">
+                          <td colSpan={5}>
+                            {typeLabel(t)} accounts <span className="coa-range">{start}–{end}</span>
                           </td>
                         </tr>
-                      ) : null}
-                      {rows.map(({ acc, depth }) => {
-                        const isEditing = editing === acc.code
-                        const isHeader = (childCounts.get(acc.code) ?? 0) > 0
-                        const isCollapsed = isHeader && !searchKeep && collapsed.has(acc.code)
-                        const isDragSource = dragging === acc.code
-                        // Valid drop target: same type, not the dragged row.
-                        const isDropOk = dragging !== null && !isDragSource && draggingType === acc.type
-                        return (
-                          <tr key={acc.code}>
-                            {isEditing ? (
-                              <td colSpan={5} className="p-0">
-                                <div className="p-4">
-                                  <AccountForm
-                                    mode="edit"
-                                    isPending={isPending}
-                                    initial={acc}
-                                    allAccounts={accounts}
-                                    onSubmit={(fd) =>
-                                      startTransition(async () => {
-                                        try {
-                                          const result = await updateAccount(fd)
-                                          if (result?.error) {
-                                            setError(result.error)
-                                            return
+                        {draggingType === t ? (
+                          <tr
+                            onDragOver={(e) => {
+                              e.preventDefault()
+                              setDropTarget('__top__' + t)
+                            }}
+                            onDragLeave={() => setDropTarget(null)}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              handleDrop(null)
+                            }}
+                            className={dropTarget === '__top__' + t ? 'bg-accent-bg' : undefined}
+                          >
+                            <td colSpan={5} className="text-center text-xs text-graphite py-2 border border-dashed border-accent-border">
+                              Drop here to make it a top-level account
+                            </td>
+                          </tr>
+                        ) : null}
+                        {rows.map(({ acc, depth }) => {
+                          const isEditing = editing === acc.code
+                          const isHeader = (childCounts.get(acc.code) ?? 0) > 0
+                          const isCollapsed = isHeader && !searchKeep && collapsed.has(acc.code)
+                          const isDragSource = dragging === acc.code
+                          // Valid drop target: same type, not the dragged row.
+                          const isDropOk = dragging !== null && !isDragSource && draggingType === acc.type
+                          return (
+                            <tr key={acc.code}>
+                              {isEditing ? (
+                                <td colSpan={5} className="p-0">
+                                  <div className="p-4">
+                                    <AccountForm
+                                      mode="edit"
+                                      isPending={isPending}
+                                      initial={acc}
+                                      allAccounts={accounts}
+                                      onSubmit={(fd) =>
+                                        startTransition(async () => {
+                                          try {
+                                            const result = await updateAccount(fd)
+                                            if (result?.error) {
+                                              setError(result.error)
+                                              return
+                                            }
+                                            setEditing(null)
+                                            setError(null)
+                                            setNotice(result?.message ?? null)
+                                          } catch (e) {
+                                            setError(e instanceof Error ? e.message : 'Failed to update')
                                           }
-                                          setEditing(null)
-                                          setError(null)
-                                          setNotice(result?.message ?? null)
-                                        } catch (e) {
-                                          setError(e instanceof Error ? e.message : 'Failed to update')
-                                        }
-                                      })
-                                    }
-                                    onCancel={() => setEditing(null)}
-                                  />
-                                </div>
-                              </td>
-                            ) : (
-                              <>
-                                <td
-                                  draggable={!isPending}
-                                  onDragStart={(e) => {
-                                    e.dataTransfer.effectAllowed = 'move'
-                                    setDragging(acc.code)
-                                  }}
-                                  onDragEnd={() => {
-                                    setDragging(null)
-                                    setDropTarget(null)
-                                  }}
-                                  onDragOver={(e) => {
-                                    if (!isDropOk) return
-                                    e.preventDefault()
-                                    setDropTarget(acc.code)
-                                  }}
-                                  onDragLeave={() => {
-                                    if (dropTarget === acc.code) setDropTarget(null)
-                                  }}
-                                  onDrop={(e) => {
-                                    if (!isDropOk) return
-                                    e.preventDefault()
-                                    handleDrop(acc.code)
-                                  }}
-                                  onClick={isHeader ? () => toggleCollapsed(acc.code) : undefined}
-                                  className={[
-                                    'select-none',
-                                    isHeader ? 'cursor-pointer' : 'cursor-grab',
-                                    isDragSource ? 'opacity-40' : '',
-                                    dropTarget === acc.code ? 'bg-accent-bg' : '',
-                                  ].join(' ')}
-                                  title={isHeader ? 'Click to expand or collapse · drag a row onto me to adopt it' : 'Drag onto another account to move it there'}
-                                >
-                                  <span className="coa-name" style={{ paddingLeft: depth * 18 }}>
-                                    <span className="coa-chev" aria-hidden>
-                                      {isHeader ? (isCollapsed ? '▶' : '▼') : ''}
+                                        })
+                                      }
+                                      onCancel={() => setEditing(null)}
+                                    />
+                                  </div>
+                                </td>
+                              ) : (
+                                <>
+                                  <td
+                                    draggable={!isPending}
+                                    onDragStart={(e) => {
+                                      e.dataTransfer.effectAllowed = 'move'
+                                      setDragging(acc.code)
+                                    }}
+                                    onDragEnd={() => {
+                                      setDragging(null)
+                                      setDropTarget(null)
+                                    }}
+                                    onDragOver={(e) => {
+                                      if (!isDropOk) return
+                                      e.preventDefault()
+                                      setDropTarget(acc.code)
+                                    }}
+                                    onDragLeave={() => {
+                                      if (dropTarget === acc.code) setDropTarget(null)
+                                    }}
+                                    onDrop={(e) => {
+                                      if (!isDropOk) return
+                                      e.preventDefault()
+                                      handleDrop(acc.code)
+                                    }}
+                                    onClick={isHeader ? () => toggleCollapsed(acc.code) : undefined}
+                                    className={[
+                                      'select-none',
+                                      isHeader ? 'cursor-pointer' : 'cursor-grab',
+                                      isDragSource ? 'opacity-40' : '',
+                                      dropTarget === acc.code ? 'bg-accent-bg' : '',
+                                    ].join(' ')}
+                                    title={isHeader ? 'Click to expand or collapse · drag a row onto me to adopt it' : 'Drag onto another account to move it there'}
+                                  >
+                                    <span className="coa-name" style={{ paddingLeft: depth * 18 }}>
+                                      <span className="coa-chev" aria-hidden>
+                                        {isHeader ? (isCollapsed ? '▶' : '▼') : ''}
+                                      </span>
+                                      {depth > 0 ? (
+                                        <span className="text-graphite" aria-hidden>
+                                          └
+                                        </span>
+                                      ) : null}
+                                      <span className={isHeader ? 'font-medium' : undefined}>{acc.name}</span>
                                     </span>
-                                    {depth > 0 ? (
-                                      <span className="text-graphite" aria-hidden>
-                                        └
+                                    {isHeader ? (
+                                      <span className="coa-sub" style={{ paddingLeft: depth * 18 }}>
+                                        {childCounts.get(acc.code)} sub-accounts
                                       </span>
                                     ) : null}
-                                    <span className={isHeader ? 'font-medium' : undefined}>{acc.name}</span>
-                                  </span>
-                                  {isHeader ? (
-                                    <span className="coa-sub" style={{ paddingLeft: depth * 18 }}>
-                                      {childCounts.get(acc.code)} sub-accounts
+                                  </td>
+                                  <td className="font-mono text-xs">{acc.code}</td>
+                                  <td className="m-hide" data-label="Cash flow">
+                                    {CFC_LABELS[acc.cash_flow_category]}
+                                  </td>
+                                  <td className="m-hide" data-label="Status">
+                                    <span className={`chip ${acc.is_active ? 'ledger' : ''}`}>
+                                      <span className="dot" />
+                                      {acc.is_active ? 'active' : 'inactive'}
                                     </span>
-                                  ) : null}
-                                </td>
-                                <td className="font-mono text-xs">{acc.code}</td>
-                                <td className="m-hide" data-label="Cash flow">
-                                  {CFC_LABELS[acc.cash_flow_category]}
-                                </td>
-                                <td className="m-hide" data-label="Status">
-                                  <span className={`chip ${acc.is_active ? 'ledger' : ''}`}>
-                                    <span className="dot" />
-                                    {acc.is_active ? 'active' : 'inactive'}
-                                  </span>
-                                </td>
-                                <td className="right">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setEditing(acc.code)
-                                      setError(null)
-                                      setNotice(null)
-                                    }}
-                                    className="btn-quiet-sheet"
-                                  >
-                                    Edit
-                                  </button>
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        )
-                      })}
-                    </Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
+                                  </td>
+                                  <td className="right">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setEditing(acc.code)
+                                        setError(null)
+                                        setNotice(null)
+                                      }}
+                                      className="btn-quiet-sheet"
+                                    >
+                                      Edit
+                                    </button>
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          )
+                        })}
+                      </Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
-      <p className="text-xs text-graphite mt-3 max-w-3xl">
-        Drag a row onto another account to make it a sub-account. Same type only; accounts with postings can&apos;t become parents.
-        Codes are allocated by type, and the cash flow category decides Operating / Investing / Financing on the Cash Flow Statement.
-      </p>
-    </section>
+        )}
+        <p className="text-xs text-graphite mt-3 max-w-3xl">
+          Drag a row onto another account to make it a sub-account. Same type only; accounts with postings can&apos;t become parents.
+          Codes are allocated by type, and the cash flow category decides Operating / Investing / Financing on the Cash Flow Statement.
+        </p>
+      </section>
+    </>
   )
 }
 
