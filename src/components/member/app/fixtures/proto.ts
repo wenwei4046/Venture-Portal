@@ -84,12 +84,12 @@ const memo = (id: string, time: string, title: string, sub: string) => ({
 });
 
 /** `quote`: the brand and the sheet the preview opens on (the prototype's `quoteBrand`, `sofaSheet` …). */
-export function protoFixture(quote: { brand?: string; sheet?: string; charges?: boolean } = {}): AppFixture {
+export function protoFixture(quote: { brand?: string; sheet?: string; charges?: boolean; track?: boolean } = {}): AppFixture {
   return {
     insight: protoInsight(),
     arena: protoArena(),
     quote: protoQuote(quote),
-    profile: protoProfile(),
+    profile: protoProfile({ track: quote.track }),
     greeting: "Good morning",
     cartItems: 4,
     brands: [

@@ -51,6 +51,8 @@ export default async function MemberPreview({
     sheet?: string;
     /** `1`: the fixture's bed frames carry charged options (2026-10-05). */
     charges?: string;
+    /** `sample`: Waiting list & replacements on the handoff's sample requests (2026-10-10). */
+    track?: string;
   }>;
 }) {
   if (process.env.NODE_ENV !== "development") {
@@ -63,7 +65,7 @@ export default async function MemberPreview({
   if (params.app === "proto") {
     const device = params.device === "android" || params.device === "desktop" ? params.device : "ios";
     const search = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => typeof e[1] === "string")).toString();
-    return <RevenueApp initialData={protoData({ principal: params.role === "principal" })} initialSearch={search ? `?${search}` : ""} device={device} today="2026-10-03" fixture={protoFixture({ brand: params.brand, sheet: params.sheet, charges: params.charges === "1" })} />;
+    return <RevenueApp initialData={protoData({ principal: params.role === "principal" })} initialSearch={search ? `?${search}` : ""} device={device} today="2026-10-03" fixture={protoFixture({ brand: params.brand, sheet: params.sheet, charges: params.charges === "1", track: params.track === "sample" })} />;
   }
   // What /member shows while it loads (loading.tsx) or when it cannot (error.tsx), held on
   // screen: `&page=` picks the tab.

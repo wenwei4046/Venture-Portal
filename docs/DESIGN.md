@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -347,6 +347,27 @@ disagree, the file wins; every value is the prototype's.**
   attached · name". Measured against the prototype at 410 × 864
   (`.design/hr-revamp/tools/states-pr7a.json`; the tool takes a viewport per
   state now).
+- **Waiting list & replacements** (v3.28, 2026-10-10; the Revenue app's
+  `profile/TrackPage` + `track.module.css`): the page head, then a segmented
+  control (3px padding on `--rv-sand`, 12px radius; 36px tabs, 9px radius,
+  13.5px × type, the chosen one white / 650 / `0 1px 3px` ink shadow). The
+  queue card: 1px `--rv-line`, 20px radius, 16px padding, "Fair waiting
+  list" 15px / 650 and its count 13px `--rv-sub`; rows 6px apart, a
+  `38px 1fr auto` grid at 9px 12px, 12px radius, hairline — the member's own
+  on `--rv-cream` with an accent edge, its "#2" 16px / 800 accent and "Yours"
+  11.5px / 650 accent. The history list reuses the Requests rows. The request
+  sheet: header (handle, 20px / 700 title, 13px code, an 11.5px / 650 chip at
+  4px 9px) over a scrolling body at 16px 20px 26px, 16px apart — facts as
+  plain rows (14px, label `--rv-sub`, value 600), *Edit request* a 46px
+  outlined-accent button with a 15px pencil, the locked note 12.5px on
+  `--rv-sand`, the edit fields 46px inputs under 13px / 650 labels, Cancel
+  (50px, hairline) beside Update (48px accent, `1fr 1.4fr`), AUDIT HISTORY
+  11.5px / 700 at .08em with 8px dots (the last accent) on a 1px
+  `--rv-rule` rail, Done 50px. Request chips: Pending review / More info
+  needed / Scheduled `--rv-gold-tint` + `--rv-amber`; Accepted `--rv-green-bg`
+  + `--rv-kpi-ink`. Profile's row: `--rv-green-bg` / `--rv-kpi-ink` tile, a
+  10.9px / 700 white count on the accent. Measured against the prototype
+  (`states-pr7b.json`): only the .92 type scale's rounding.
 - **Cross-check** with a measuring script that finds each element by its text
   on both and diffs computed font / colour / size / padding / border / radius
   / background (`.design/revenue-app/tools/measure-pl.mjs` is the pattern).

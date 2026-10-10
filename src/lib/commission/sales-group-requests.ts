@@ -98,22 +98,33 @@ const STEP_ORDER: Record<string, number> = {
   draft: 0, submitted: 1, needs_info: 2, approved: 3, waiting: 3, reserved: 4, accepted: 5, scheduled: 6, allocated: 7,
 }
 
+/** The note `member_prepare_request` writes on a member's edit (mig 20261010190000). */
+const UPDATED = 'Updated by the member'
+
 /**
  * The history a person reads: one step per status it moved to. The database
  * writes a status change once from the app and, on some paths, once more from
- * its own trigger; the same move a second later is the same step.
+ * its own trigger; the same move a second later is the same step. A member's
+ * edit is a step of its own — "Updated by the member", its note what changed
+ * (the handoff: "Changed: phone number, preferred start date").
  */
 export function historyOf(events: readonly RequestEvent[]): Array<RequestEvent & { what: string }> {
   const out: Array<RequestEvent & { what: string }> = []
   const order = (e: RequestEvent) => STEP_ORDER[e.to] ?? 9
   for (const e of [...events].sort((a, b) => a.at.localeCompare(b.at) || order(a) - order(b))) {
+    const updated = e.to === 'submitted' && !!e.note && e.note.startsWith(UPDATED)
     const last = out[out.length - 1]
-    if (last && last.to === e.to) {
+    if (last && last.to === e.to && !updated) {
       if (!last.by && e.by) last.by = e.by
       if (!last.note && e.note) last.note = e.note
       continue
     }
-    out.push({ ...e, what: EVENT_WORDS[e.to] ?? e.to })
+    if (updated) {
+      const changed = e.note!.slice(UPDATED.length).replace(/^\s*·\s*/, '')
+      out.push({ ...e, what: UPDATED, note: changed ? `Changed: ${changed}` : null })
+    } else {
+      out.push({ ...e, what: EVENT_WORDS[e.to] ?? e.to })
+    }
   }
   return out
 }

@@ -65,9 +65,12 @@ import { schemeVM } from "./profile/scheme-model";
 import { brandMonthVM, picksToSave } from "./profile/brand-weeks-model";
 import TeamPage, { PersonSheet } from "./profile/TeamPage";
 import RequestsPage, { RequestSheet, type RequestFilter } from "./profile/RequestsPage";
+import TrackPage, { RequestInfoSheet, type TrackSegment } from "./profile/TrackPage";
+import { editChanges, editProblem, revisionForm } from "@/lib/member/request-edit";
+import type { WaitingQueue } from "@/lib/member/waiting-queue";
 import RequestForm, { type FormOptions, type SubmitOutcome } from "./profile/RequestForm";
 import MemosPage, { MemoSheet, type MemoTab } from "./profile/MemosPage";
-import { claimWeeks, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestRowsVM, teamVM, vaGroupsVM, waitingChoices, type RequestEvent } from "./profile/profile-model";
+import { claimWeeks, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestRowsVM, teamVM, trackVM, vaGroupsVM, waitingChoices, type RequestEvent } from "./profile/profile-model";
 import type { ClaimRates } from "@/lib/member/claim-rules";
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
@@ -205,6 +208,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const [revising, setRevising] = useState<{ id: string; detail: Record<string, unknown> } | null>(null);
   const [reqBusy, setReqBusy] = useState(false);
   const [reqError, setReqError] = useState<string | null>(null);
+  const [trackSeg, setTrackSeg] = useState<TrackSegment>("waiting");
   const [memoTab, setMemoTab] = useState<MemoTab>("all");
   const [memoPick, setMemoPick] = useState<string | null>(null);
   const [memoBusy, setMemoBusy] = useState(false);
@@ -634,6 +638,13 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   }, [data.memberships]);
   // The viewed person's requests (a Principal's snapshot holds everybody's).
   const myRequests = useMemo(() => (principal ? (viewed ? requests.filter(r => r.staffId === viewed.id) : []) : requests), [principal, viewed, requests]);
+  // Waiting list & replacements (2026-10-10): the member's waiting lists — a place on one shows on Requests too.
+  const queueContext = principal && viewed ? { staffId: viewed.id } : undefined;
+  const queueRead = useKeyedRead<WaitingQueue[]>(`queue:${viewed?.id ?? "me"}`,
+    !fxp && route.screen === "account" && (route.pf === "requests" || route.pf === "track") && !(principal && !viewed) && memoryReady, gen,
+    () => (source.waitingQueue ? source.waitingQueue(queueContext) : Promise.resolve({ ok: false as const, error: "Preview data only." })), track,
+    () => source.peek?.<WaitingQueue[]>(ask.waitingQueue(queueContext)));
+  const queues = useMemo(() => queueRead.value ?? [], [queueRead.value]);
   // View as: the memos read as the viewed person read them — their receipts, not the Principal's.
   const viewedId = viewed?.id ?? "";
   const receiptsRead = useKeyedRead(viewedId, !fxp && principal && !!viewedId && memoryReady, gen, () => source.memoReceipts(viewedId), track,
@@ -656,9 +667,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   }, [fxp, principal, viewed, me, membership?.name, myRequests, memoVMs]);
   const [cancelled, setCancelled] = useState<ReadonlySet<string>>(() => new Set());
   const reqRows = useMemo(() => {
-    const rows = fxp ? fxp.requests.rows : requestRowsVM(myRequests, nameOf);
+    const rows = fxp ? fxp.requests.rows : requestRowsVM(myRequests, nameOf, queues);
     return rows.map(r => (cancelled.has(r.id) ? { ...r, status: "Cancelled", tone: "none" as const } : r));
-  }, [fxp, myRequests, nameOf, cancelled]);
+  }, [fxp, myRequests, nameOf, queues, cancelled]);
+  const trackView = useMemo(() => (fxp ? fxp.track : trackVM({ requests: myRequests, queues, subDepartmentId: membership?.id ?? "", nameOf })),
+    [fxp, myRequests, queues, membership?.id, nameOf]);
   // A request's history, and the pull it was read at — opened again after a pull, it is read again.
   const [history, setHistory] = useState<Record<string, { gen: number; events: RequestEvent[] }>>({});
   const reqDetail = useMemo(() => {
@@ -670,8 +683,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         log: [...d.log.map(e => ({ ...e, dot: "past" as const })), { what: "Cancelled", who: "You", when: "Just now", note: "", dot: "bad" as const }] };
     }
     const r = myRequests.find(x => x.id === reqPick);
-    return r ? requestDetailVM(r, history[r.id]?.events ?? null, { nameOf, readOnly: readOnlyView }) : null;
-  }, [reqPick, fxp, cancelled, myRequests, history, nameOf, readOnlyView]);
+    return r ? requestDetailVM(r, history[r.id]?.events ?? null, { nameOf, readOnly: readOnlyView, queues }) : null;
+  }, [reqPick, fxp, cancelled, myRequests, history, nameOf, readOnlyView, queues]);
+  // A waiting list or replacement opens the handoff's sheet (Edit request → Update); a claim keeps its own.
+  const reqKind = fxp ? (reqPick ? fxp.requests.rows.find(r => r.id === reqPick)?.kind ?? null : null) : myRequests.find(r => r.id === reqPick)?.kind ?? null;
   const vaGroups = useMemo(() => (fxp
     ? protoVaGroups(fxp.va.people, fxp.va.departments, vaQuery, viewed?.id ?? "")
     : vaGroupsVM(data.memberships, vaQuery, viewed?.id ?? "")), [fxp, data.memberships, vaQuery, viewed?.id]);
@@ -727,6 +742,25 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     if (refreshed.ok) setData(refreshed.data);
     void source.requestHistory(reqPick).then(r => { if (r.ok) setHistory(prev => ({ ...prev, [reqPick]: { gen, events: r.data } })); });
   }, [reqPick, readOnlyView, fxp, source, gen]);
+  // Edit request → Update (2026-10-10): the three fields changed, sent again as a revision of itself.
+  const editRequest = useCallback(async (values: Record<string, string>): Promise<boolean> => {
+    // The design preview sends nothing: the fields just close.
+    if (fxp) return true;
+    const r = myRequests.find(x => x.id === reqPick);
+    if (!r || readOnlyView) return false;
+    if (!editChanges(r, values).length) return true;
+    const problem = editProblem(r, values);
+    if (problem) { setReqError(problem); return false; }
+    setReqBusy(true); setReqError(null);
+    const result = await source.submitRequest(revisionForm(r, values));
+    setReqBusy(false);
+    if (!result.ok) { setReqError(result.error); return false; }
+    setHistory(prev => { const next = { ...prev }; delete next[r.id]; return next; });
+    const refreshed = await source.refresh();
+    if (refreshed.ok) setData(refreshed.data);
+    void source.requestHistory(r.id).then(h => { if (h.ok) setHistory(prev => ({ ...prev, [r.id]: { gen, events: h.data } })); });
+    return true;
+  }, [fxp, myRequests, reqPick, readOnlyView, source, gen]);
   const updateRequest = useCallback(() => {
     const r = myRequests.find(x => x.id === reqPick);
     if (!r) return;
@@ -1038,7 +1072,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     const pf = route.pf;
     const pick = principal && !viewed && !fxp && pf !== "memos" && pf !== "team" && pf !== "crm" && pf !== null;
     if (pick) {
-      page = <PickSomebody title={pf === "income" || pf === "incOrders" ? "My income" : pf === "honours" ? "My honours" : pf === "brandWeeks" ? "My brand weeks" : "Requests"}
+      page = <PickSomebody title={pf === "income" || pf === "incOrders" ? "My income" : pf === "honours" ? "My honours" : pf === "brandWeeks" ? "My brand weeks" : pf === "track" ? "Waiting list & replacements" : "Requests"}
         onBack={back} onViewAs={() => setVaOpen(true)} />;
     } else if (pf === "income") {
       page = <IncomePage vm={incomeView} hidden={hidden} message={incomeRead.error} onBack={back} onPeriod={() => setPfDateOpen(true)} onToggleHide={() => setHidden(!hidden)}
@@ -1054,6 +1088,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else if (pf === "requests") {
       page = <RequestsPage rows={reqRows} filter={reqFilter} onFilter={setReqFilter} onBack={back}
         onNew={k => { setRevising(null); setReqForm(k); }} onOpen={openRequest} />;
+    } else if (pf === "track") {
+      page = <TrackPage vm={trackView} segment={trackSeg} onSegment={setTrackSeg} onBack={back} onOpen={openRequest}
+        onNew={() => goScreen("account", { pf: "requests" })} />;
     } else if (pf === "crm" && crm) {
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} onExit={back} />;
@@ -1155,9 +1192,12 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
           )}
           {route.pf === "honours" && <HonourSheet open={honPlace !== null} place={honPlace} vm={honoursView} periodLabel={honoursView?.periodLabel ?? ""} onClose={() => setHonPlace(null)} />}
           {route.pf === "team" && <PersonSheet open={personPick !== null} vm={personPick ? teamView?.sheets[personPick] ?? null : null} onClose={() => setPersonPick(null)} />}
-          {route.pf === "requests" && (
+          {(route.pf === "requests" || route.pf === "track") && (
             <>
-              <RequestSheet open={reqPick !== null} vm={reqDetail} busy={reqBusy} error={reqError} onCancel={() => void cancelRequest()} onUpdate={updateRequest} onClose={() => setReqPick(null)} />
+              <RequestSheet open={reqPick !== null && reqKind === "claim"} vm={reqKind === "claim" ? reqDetail : null} busy={reqBusy} error={reqError}
+                onCancel={() => void cancelRequest()} onUpdate={updateRequest} onClose={() => setReqPick(null)} />
+              <RequestInfoSheet open={reqPick !== null && reqKind !== null && reqKind !== "claim"} vm={reqKind !== "claim" ? reqDetail : null} busy={reqBusy} error={reqError}
+                onSave={editRequest} onCancel={() => void cancelRequest()} onClose={() => { setReqPick(null); setReqError(null); }} />
               <RequestForm kind={reqForm} options={formOptions} revising={revising} readOnly={readOnlyView} onSubmit={submitRequest}
                 formLink={fxp ? undefined : source.waitingFormLink} onClose={() => { setReqForm(null); setRevising(null); }} />
             </>

@@ -18,6 +18,7 @@ import {
   loadMemberClaimRates,
   loadMemberWaitingForm,
   loadMemberWaitingFormLink,
+  loadMemberWaitingQueue,
   loadPrincipalMemoReceipts,
   loadMemberIncome,
   loadDepartmentIncome,
@@ -96,6 +97,10 @@ export async function fetchMemberWaitingForm() {
 /** Download form: a fresh ten-minute link to HR's uploaded application form, or null for the built one. */
 export async function fetchMemberWaitingFormLink() {
   return loadMemberWaitingFormLink();
+}
+/** Waiting list & replacements: the member's sub-departments' waiting lists (the viewed member's in View as). */
+export async function fetchMemberWaitingQueue(context?: Pick<MemberReadContext, "staffId">) {
+  return loadMemberWaitingQueue(context);
 }
 export async function acknowledgeMemberMemo(id: string, ack: boolean) {
   const result = await acknowledge(id, ack);
