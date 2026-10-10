@@ -26,7 +26,7 @@ import s from './guest.module.css'
  * "Submitted via guest link". From 900px the Preview column shows what HR
  * will see.
  */
-export function HireFlow({ code, data, onClosed }: { code: string; data: GuestOpen; onClosed: () => void }) {
+export function HireFlow({ code, data, hidden = false, onClosed }: { code: string; data: GuestOpen; hidden?: boolean; onClosed: () => void }) {
   const groups = useMemo(() => hireGroups(data.hireForm, data.subs), [data.hireForm, data.subs])
   const [ans, setAns] = useState<Record<string, string>>({ headcount: '1' })
   const [file, setFile] = useState<{ name: string; path: string } | null>(null)
@@ -175,7 +175,7 @@ export function HireFlow({ code, data, onClosed }: { code: string; data: GuestOp
   const preview = hirePreview(groups, ans, fileName)
 
   return (
-    <div className={s.cols} data-preview={done ? 'false' : 'true'}>
+    <div className={s.cols} data-preview={done ? 'false' : 'true'} hidden={hidden}>
       <div className={s.main}>
         <div className={s.h1}>Request manpower</div>
         {done ? (

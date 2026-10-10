@@ -253,10 +253,10 @@
   outline: none;
   box-sizing: border-box;
   background: rgb(255 255 255);
-  color: inherit;
+  /* The browser's own black, and no change on focus — the prototype's fields are outline:none and nothing else. */
+  color: rgb(0 0 0);
 }
 .input::placeholder { color: rgb(117 117 117); }
-.input:focus { border-color: rgb(233 154 83); }
 .select.select {
   height: 46px;
   padding: 0 10px;
@@ -264,7 +264,7 @@
   font: inherit;
   font-size: 14px;
   background-color: rgb(255 255 255);
-  color: inherit;
+  color: rgb(0 0 0);
   width: 100%;
   background-position: right 13px center !important;
 }
@@ -485,6 +485,7 @@
   background: rgb(43 31 23 / 0.35);
   animation: gFade 0.2s ease;
 }
+.window:focus { outline: none; }
 .window {
   position: sticky;
   top: 50%;
@@ -609,10 +610,9 @@
   /* Five 14px lines, as the prototype — the phone's 16px input floor (globals.css) would make it taller. */
   height: 130.5px;
   background: rgb(255 255 255);
-  color: inherit;
+  color: rgb(0 0 0);
 }
 .textarea::placeholder { color: rgb(117 117 117); }
-.textarea:focus { border-color: rgb(233 154 83); }
 .hStepper { align-self: flex-start; }
 .hCount { min-width: 48px; text-align: center; font-size: 16px; font-weight: 600; }
 .pills { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -643,10 +643,9 @@
   font-size: 14px;
   outline: none;
   background: rgb(255 255 255);
-  color: inherit;
+  color: rgb(0 0 0);
 }
 .rangeInput::placeholder { color: rgb(117 117 117); }
-.rangeInput:focus { border-color: rgb(233 154 83); }
 .rangeTo { color: rgb(117 100 86); }
 .fileBox {
   display: flex;

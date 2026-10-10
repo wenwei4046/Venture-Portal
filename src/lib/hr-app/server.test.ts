@@ -132,3 +132,26 @@ describe('Member services’ requests and the meeting rooms', () => {
     expect(bookingOf({ ...b, source: 'guest', canChange: false, guestCompany: 'Akemi Retail Sdn Bhd', department: null } as Booking)).toMatchObject({ guest: true, mine: false, company: 'Akemi Retail Sdn Bhd', dept: '' })
   })
 })
+
+describe('viewing the app as somebody (the roles audit, 2026-10-11)', () => {
+  it('greets the person viewed, not the signed-in account the database answers for, and names them for the read-only strip', async () => {
+    const { readRoomsPeople, readRoomsRange } = await import('@/lib/rooms/read')
+    const { adminMemberAction } = await import('@/lib/member/server')
+    const { createClient } = await import('@/lib/supabase/server')
+    const { loadDocumentation } = await import('@/lib/documentation/server')
+    const { loadHiringBoard } = await import('@/lib/hiring/board')
+    vi.mocked(readRoomsRange).mockResolvedValue({ ok: false, reason: 'none' } as never)
+    vi.mocked(readRoomsPeople).mockResolvedValue({ ok: true, data: { me: { name: 'Principal Account', staffId: 'p1' }, account: 'Principal', people: [], departments: [] } } as never)
+    vi.mocked(adminMemberAction).mockResolvedValue({ ok: false } as never)
+    vi.mocked(createClient).mockResolvedValue({ rpc: async () => ({ data: null, error: { message: 'none' } }) } as never)
+    vi.mocked(loadDocumentation).mockResolvedValue({ ok: false } as never)
+    vi.mocked(loadHiringBoard).mockResolvedValue({ ok: false } as never)
+    const { loadHrAppData } = await import('./server')
+
+    const viewing = await loadHrAppData(hrUser({ name: 'Nurul Huda', viewingAs: { id: 'u2', name: 'Nurul Huda' } }))
+    expect(viewing).toMatchObject({ greetName: 'Nurul', viewingAs: 'Nurul Huda', meId: null })
+
+    const own = await loadHrAppData(hrUser({}))
+    expect(own).toMatchObject({ greetName: 'Principal', viewingAs: null, meId: 'p1' })
+  })
+})

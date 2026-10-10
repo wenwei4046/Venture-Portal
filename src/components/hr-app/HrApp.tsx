@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo, useState, useTransition, type ReactNode } from 'react'
+import { Fragment, useMemo, useState, useTransition, type ReactNode } from 'react'
 import { officeTime } from '@/lib/office-time'
 import { Select } from '@/components/hrv/select'
+import ViewingAsBanner from '@/components/layout/ViewingAsBanner'
 import {
   CAND_STAGE, CHIP, HIRE_FILTERS, MAJOR_EVENTS, MEMBER_KIND, ORANGE, SLATE,
-  bookingTimes, budgetLabel, candChip, clashOf, dayLabel, daysToFill, hireChip, hm, initials, isPendingHire,
+  bookingTimes, budgetLabel, candChip, clashOf, dayLabel, daysToFill, hireChip, hm, hourFrom, initials, isPendingHire,
   isPendingRequest, missingFor, pipeline, positionLabel, requestTitle, reviewItems, shiftDay, slotAt,
   type CandStage, type HrAppData, type HrBooking, type HrHire,
 } from '@/lib/hr-app/model'
@@ -158,6 +159,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
 
   return (
     <div className={s.app} data-hr-app="">
+      {d.viewingAs ? <ViewingAsBanner name={d.viewingAs} /> : null}
       <div className={s.scroller}>
         <header className={s.head}>
           {stack.length > 0 ? (
@@ -182,7 +184,9 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
           ) : null}
         </header>
 
-        <div className={s.body} key={view + (top && 'id' in top ? top.id : '')}>
+        {/* The body slides in once, as the prototype's; each screen is new when the view or its page changes. */}
+        <div className={s.body}>
+          <Fragment key={view + (top && 'id' in top ? top.id : '')}>
           {error ? <div className={s.formErr} role="alert">{error}</div> : null}
 
           {view === 'home' ? (
@@ -287,7 +291,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
             <RoomsScreen
               d={d} day={day} today={today} setDate={setDate} roomView={roomView} setRoomView={setRoomView}
               openBooking={id => openSheet({ k: 'booking', id })}
-              bookAt={d.may.book ? (roomId, from) => openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: defaultDept(d), room: roomId, from: String(from), to: String(from + 60) }) : undefined}
+              bookAt={d.may.book ? (roomId, from) => openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: defaultDept(d), room: roomId, from: String(from), to: String(hourFrom(from)) }) : undefined}
             />
           ) : null}
 
@@ -410,6 +414,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
               {d.letters.filter(l => l.staffId === pp.id).length === 0 ? <div className={s.noLetters}>No letters on file.</div> : null}
             </>
           ) : null}
+          </Fragment>
         </div>
       </div>
 
@@ -744,6 +749,27 @@ function InsightsScreen({ d }: { d: HrAppData }) {
   )
 }
 
+// Declared here, not inside SheetView: a component made afresh on every render is a new
+// component each time, and React would remount its input after every keystroke (2026-10-11).
+// A group of controls (Attending, Total pax) is a div, not a label: a label clicks its first button when its
+// text is pressed — pressing "Attending" removed the first person, "Total pax" took one off (the prototype's
+// × and − are spans, so its labels never did).
+function Field({ label, group = false, children }: { label: string; group?: boolean; children: ReactNode }) {
+  const Box = group ? 'div' : 'label'
+  return <Box className={s.field}><span className={s.fieldL}>{label}</span>{children}</Box>
+}
+
+function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: Array<{ v: string; l: string }> }) {
+  return (
+    <Field label={label}>
+      <Select bare className={s.selectBox} value={value} onChange={e => onChange(e.target.value)}>
+        <option value="">Choose…</option>
+        {options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+      </Select>
+    </Field>
+  )
+}
+
 function SheetView(p: {
   d: HrAppData
   sheet: Sheet
@@ -795,23 +821,14 @@ function SheetView(p: {
     })
   }
 
-  const Field = ({ label, children }: { label: string; children: ReactNode }) => (
-    <label className={s.field}><span className={s.fieldL}>{label}</span>{children}</label>
-  )
-  const SelectField = ({ k, label, options }: { k: string; label: string; options: Array<{ v: string; l: string }> }) => (
-    <Field label={label}>
-      <Select bare className={s.selectBox} value={str(k)} onChange={e => set(k)(e.target.value)}>
-        <option value="">Choose…</option>
-        {options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-      </Select>
-    </Field>
-  )
+  // A select's value and its setter, by the form's key.
+  const pick = (k: string) => ({ value: str(k), onChange: set(k) })
 
   if (sh.k === 'ack' && hr) {
     title = `Acknowledge ${hr.id}`
     body = (
       <>
-        <SelectField k="owner" label="Owner" options={d.owners.map(o => ({ v: o.id, l: o.name }))} />
+        <SelectField {...pick('owner')} label="Owner" options={d.owners.map(o => ({ v: o.id, l: o.name }))} />
         {formErr ? <span className={s.formErr}>{formErr}</span> : null}
         <div className={s.btnRow}>
           {cancelBtn}
@@ -848,8 +865,8 @@ function SheetView(p: {
     title = 'Mark filled'
     body = (
       <>
-        <SelectField k="hired" label="Hired" options={hr.candidates.filter(c => c.stage !== 'rejected').map(c => ({ v: c.name, l: c.name }))} />
-        <SelectField k="source" label="Hired through" options={d.sources.map(x => ({ v: x, l: x }))} />
+        <SelectField {...pick('hired')} label="Hired" options={hr.candidates.filter(c => c.stage !== 'rejected').map(c => ({ v: c.name, l: c.name }))} />
+        <SelectField {...pick('source')} label="Hired through" options={d.sources.map(x => ({ v: x, l: x }))} />
         <Field label="Hiring cost (RM)">
           <input className={s.input} placeholder="0" value={str('cost')} onChange={e => set('cost')(e.target.value)} />
         </Field>
@@ -893,21 +910,21 @@ function SheetView(p: {
     body = (
       <>
         <Field label="Meeting title"><input className={s.input} placeholder="e.g. Interview" value={str('title')} onChange={e => set('title')(e.target.value)} /></Field>
-        <SelectField k="dept" label="Department" options={d.bookDepts.map(x => ({ v: x.id, l: x.name }))} />
-        <SelectField k="room" label="Room" options={d.rooms.map(r => ({ v: r.id, l: `${r.name} · ${r.seats} seats` }))} />
-        <SelectField k="from" label="From" options={times} />
-        <SelectField k="to" label="To" options={times} />
-        <Field label="Attending">
+        <SelectField {...pick('dept')} label="Department" options={d.bookDepts.map(x => ({ v: x.id, l: x.name }))} />
+        <SelectField {...pick('room')} label="Room" options={d.rooms.map(r => ({ v: r.id, l: `${r.name} · ${r.seats} seats` }))} />
+        <SelectField {...pick('from')} label="From" options={times} />
+        <SelectField {...pick('to')} label="To" options={times} />
+        <Field label="Attending" group>
           <div className={s.people}>
             <div className={s.picked}>
               {att.map(id => (
                 <span key={id} className={s.pickedChip}>
                   {d.staff.find(x => x.id === id)?.name ?? id}
-                  <button type="button" className={s.pickedX} aria-label="Remove" onClick={() => setForm({ ...F, att: att.filter(x => x !== id) })}>×</button>
+                  <button type="button" className={s.pickedX} aria-label={`Remove ${d.staff.find(x => x.id === id)?.name ?? id}`} onClick={() => setForm({ ...F, att: att.filter(x => x !== id) })}>×</button>
                 </span>
               ))}
             </div>
-            <input className={s.peopleInput} placeholder="Add a colleague — type a name" value={str('pq')} onChange={e => setForm({ ...F, pq: e.target.value })} />
+            <input className={s.peopleInput} placeholder="Add a colleague — type a name" aria-label="Add a colleague" value={str('pq')} onChange={e => setForm({ ...F, pq: e.target.value })} />
             {pq ? (
               <div className={s.picked}>
                 {d.staff.filter(x => !att.includes(x.id) && x.name.toLowerCase().includes(pq)).slice(0, 6).map(x => (
@@ -917,7 +934,7 @@ function SheetView(p: {
             ) : null}
           </div>
         </Field>
-        <Field label={`Total pax · ${att.length} named`}>
+        <Field label={`Total pax · ${att.length} named`} group>
           <span className={s.stepper}>
             <button type="button" className={s.stepBtn} aria-label="One fewer" onClick={() => setForm({ ...F, pax: Math.max(att.length, total - 1) })}>−</button>
             <span className={s.stepV}>{total}</span>

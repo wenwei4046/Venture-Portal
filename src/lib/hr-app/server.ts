@@ -210,11 +210,14 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
   // Everybody working here: the Data center's list when Documentation is theirs, else the rooms' (the same people).
   const center = docs?.ok ? dataCenterOf(docs.data) : null
   const staff = center?.staff ?? (who?.people ?? []).map(p => ({ id: p.id, name: p.name, title: p.title ?? '', dept: p.department ?? '' }))
-  const meName = who?.me?.name ?? who?.account ?? user.name ?? ''
+  // Viewing as a person, the database still answers for the signed-in account: greet the person being viewed,
+  // who is nobody's attendee here (the app is read-only then).
+  const meName = user.viewingAs?.name ?? who?.me?.name ?? who?.account ?? user.name ?? ''
 
   return {
     greetName: meName.split(' ')[0] || meName,
-    meId: who?.me?.staffId ?? null,
+    meId: user.viewingAs ? null : who?.me?.staffId ?? null,
+    viewingAs: user.viewingAs?.name ?? null,
     today,
     staff,
     // Who may own a request: HR's own people, as the portal's Acknowledge offers them.

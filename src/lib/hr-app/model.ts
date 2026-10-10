@@ -139,6 +139,8 @@ export interface HrAppData {
   greetName: string
   /** The viewer's person, when the account is one. */
   meId: string | null
+  /** The Principal is viewing the app as this person (View as a person): read-only, and the app says so. */
+  viewingAs: string | null
   today: string
   staff: HrStaff[]
   /** Who may own a hiring request: the HR department's people. */
@@ -315,6 +317,11 @@ export const bookingTimes = (): Array<{ v: string; l: string }> => {
 export function slotAt(offsetY: number, columnHeight: number): number {
   const m = 480 + Math.floor(((offsetY / columnHeight) * 720) / 30) * 30
   return Math.min(Math.max(m, 480), 1170)
+}
+
+/** A booking started from a pressed half hour: an hour long, but never past 20:00 — the day's end, past which the server refuses it. */
+export function hourFrom(from: number): number {
+  return Math.min(from + 60, 1200)
 }
 
 /** A booking that overlaps the asked slot in the same room on the same day. */

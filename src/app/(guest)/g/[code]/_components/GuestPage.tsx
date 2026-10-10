@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Select } from '@/components/hrv/select'
 import { hm } from '@/lib/rooms/model'
 import { guestBook, guestCancel, guestDay } from '@/lib/guest/actions'
@@ -135,7 +135,19 @@ export default function GuestPage({
     return () => window.removeEventListener('keydown', onKey)
   }, [viewId, nameModal])
 
+  // The name window takes the focus itself, not its field: no keyboard pops up and no ring shows, as the
+  // prototype's, and a screen reader is still inside the window.
+  const nameWin = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (nameModal) nameWin.current?.focus({ preventScroll: true })
+  }, [nameModal])
+
   const page = open && (tab === 'home' || (tab === 'hire' ? open.hiring : open.booking)) ? tab : 'home'
+  // Request manpower stays where it was when the guest steps back to Home, as the prototype's does.
+  const [hireKept, setHireKept] = useState(false)
+  useEffect(() => {
+    if (page === 'hire') setHireKept(true)
+  }, [page])
   const dayTaken = taken[date] ?? []
   const sub = open?.subs.find(x => x.id === co) ?? null
   const room = open?.rooms.find(r => r.id === pick.room) ?? null
@@ -277,7 +289,7 @@ export default function GuestPage({
   const note = paxNote(room, pax)
 
   return (
-    <div className={s.root}>
+    <div className={s.root} data-guest-page="">
       <div className={s.wrap}>
         <div className={s.head}>
           <span className={s.tile}>H</span>
@@ -353,7 +365,7 @@ export default function GuestPage({
           </button>
         ) : null}
 
-        {open && page === 'hire' ? <HireFlow code={code} data={open} onClosed={() => setClosedNow(true)} /> : null}
+        {open && open.hiring && (page === 'hire' || hireKept) ? <HireFlow code={code} data={open} hidden={page !== 'hire'} onClosed={() => setClosedNow(true)} /> : null}
 
         <div className={s.cols} data-preview={showPreview ? 'true' : 'false'} hidden={page === 'hire'}>
           <div className={s.main}>
@@ -725,7 +737,7 @@ export default function GuestPage({
 
       {open && nameModal ? (
         <div className={s.scrim}>
-          <div className={s.window} role="dialog" aria-modal="true" aria-label={ask ? 'Cancel meeting' : 'Save changes'}>
+          <div ref={nameWin} tabIndex={-1} className={s.window} role="dialog" aria-modal="true" aria-label={ask ? 'Cancel meeting' : 'Save changes'}>
             <div>
               <div className={s.nmTitle}>{ask ? `Cancel “${ask.title || 'meeting'}”?` : 'Save changes'}</div>
               <div className={s.nmSub}>
@@ -738,13 +750,9 @@ export default function GuestPage({
               maxLength={80}
               placeholder="Your name"
               autoComplete="name"
-              autoFocus
               onChange={e => {
                 setActor(e.target.value)
                 setActorErr('')
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter') void nameGo()
               }}
             />
             {actorErr ? <span className={s.nmErr}>{actorErr}</span> : null}

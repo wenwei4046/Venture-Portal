@@ -179,7 +179,8 @@
   border-radius: 12px;
   font: inherit;
   font-size: calc(15.2174px * var(--rv-type));
-  color: var(--rv-ink);
+  /* The browser's own black, as on the prototype. */
+  color: rgb(0 0 0);
   outline: none;
   background: var(--rv-white);
 }
