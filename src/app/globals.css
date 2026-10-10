@@ -1472,31 +1472,6 @@ table.ledger-table.tight tbody td.group-cell {
 }
 .group-btn .count em { font-style: normal; color: rgb(246 214 150); }
 
-/* Monogram tile. The roster has no photographs and should not need any —
-   initials give each row a shape to recognise, and the tinted variant is how
-   "this person can sign in" reads across a whole screen without spending a
-   column on an email address. */
-.mono-tile {
-  display: inline-grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  flex: none;
-  border-radius: 6px;
-  font-family: var(--font-mono), 'Chivo Mono', monospace;
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  background: rgb(var(--surface-2));
-  color: rgb(var(--graphite));
-  border: 1px solid rgb(var(--hairline));
-}
-.mono-tile.linked {
-  background: rgb(var(--accent-bg));
-  color: rgb(var(--accent));
-  border-color: rgb(var(--accent-border));
-}
-.mono-tile-lg { width: 42px; height: 42px; border-radius: 10px; font-size: 14px; }
 
 /* Icon action button — a pencil that reads as a control. Text links called
    "Edit" and "Deactivate" in the same grey gave the destructive one the same
@@ -4809,7 +4784,6 @@ a.stat-card:hover { border-color: rgb(var(--accent)); box-shadow: 0 4px 14px rgb
 /* A login's monogram tile on the roster and the person window is lettered in
    the accent, which on the sheet is orange: the initials go black on the
    peach wash, the orange edge stays — `.chip.accent`'s treatment. */
-:where(.sheet-theme) .mono-tile.linked { color: rgb(var(--ink)); }
 /* The row pencil (and every `.icon-btn`) lit orange on hover; on the sheet the
    glyph goes black inside its lifted box instead. `.icon-btn.danger` keeps
    its red — it is one class heavier. */
@@ -5105,42 +5079,6 @@ pre.perm-keylist {
 .perm-link:hover { text-decoration-color: rgb(var(--ink)); }
 .perm-held { padding: 10px 20px 14px; border-top: 1px solid rgb(var(--hairline)); background: rgb(var(--alert-bg) / 0.45); font-size: 11.5px; line-height: 1.6; }
 .perm-held li { margin-top: 2px; }
-/* The invite drawer: a right-hand panel over a walnut scrim. */
-.drawer-scrim { position: fixed; inset: 0; z-index: 40; background: rgb(var(--scrim) / 0.28); }
-.drawer-panel {
-  position: fixed; top: 10px; right: 10px; bottom: 10px; z-index: 41; width: 640px; max-width: calc(100vw - 20px);
-  display: flex; flex-direction: column; overflow: hidden; font-size: 13px; color: rgb(var(--ink));
-  background: rgb(var(--surface)); border: 1px solid rgb(var(--hairline)); border-radius: 16px;
-  box-shadow: 0 10px 40px rgb(var(--ink) / 0.15);
-}
-.drawer-step { padding: 16px; border: 1px solid rgb(var(--hairline)); border-radius: 12px; background: rgb(var(--surface-2)); }
-.drawer-step > h2 {
-  display: flex; align-items: baseline; gap: 8px; margin: 0 0 14px; padding-bottom: 8px;
-  border-bottom: 1px solid rgb(var(--hairline)); font-size: 14px; font-weight: 600;
-}
-.drawer-step > h2 .n { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; font-weight: 500; }
-.drawer-label { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.025em; }
-.drawer-input {
-  width: 100%; padding: 8px 12px; font-size: 13px; outline: none;
-  background: rgb(var(--surface)); border: 1px solid rgb(var(--hairline)); border-radius: 6px;
-}
-.drawer-input:focus { border-color: rgb(var(--accent)); }
-.drawer-pick { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; border-bottom: 1px solid rgb(var(--perm-hatch)); }
-.drawer-pick:hover { background: rgb(var(--sheet-row-hover)); }
-.drawer-band {
-  padding: 6px 12px; background: rgb(var(--sheet-table-head)); border-left: 3px solid rgb(var(--walnut));
-  font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase;
-}
-.pw-seg { width: 22px; height: 4px; border-radius: 2px; background: rgb(var(--hairline)); }
-.pw-seg.weak { background: rgb(var(--danger)); }
-.pw-seg.fair { background: rgb(var(--card-alert-bar)); }
-.pw-seg.strong { background: rgb(var(--ledger)); }
-/* The roster row's Invite: the sheet's row-Save treatment. */
-.invite-cell {
-  padding: 3px 10px; border: 1px solid rgb(var(--accent)); border-radius: 6px; background: rgb(var(--surface));
-  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 11px; color: rgb(var(--ink)); cursor: pointer;
-}
-.invite-cell:hover { background: rgb(var(--accent)); }
 
 /* ── Audit Log › Changes (2026-10-08) ──
    A save's records, each with its fields as a two-column list: the field,

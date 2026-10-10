@@ -4,11 +4,11 @@ import { requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { can } from '@/lib/permissions'
 import { readStaffPrivate } from '@/lib/private-fields'
-import { onFile, sees } from '@/lib/sensitive'
+import { onFile } from '@/lib/sensitive'
 import { readDirectory, readsStaffTable } from '@/lib/team-directory'
 import { loadPermissionsData, type PermissionsData } from '../_lib/permission-templates'
 import type { PersonRow, AccountRow } from './_components/PeopleDirectory'
-import type { InviteCandidate } from './_components/InviteDrawer'
+import type { InviteCandidate } from './_components/InviteDialog'
 import PeopleManagement from './_components/PeopleManagement'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -208,7 +208,6 @@ export default async function PeopleManagementPage({
       canSeeHistory={can(user, 'permissions_manage', 'audit_log')}
       canInvite={canDo(user, 'accounts', 'create')}
       canAddPeople={canDo(user, 'team', 'create')}
-      canEditPeople={canDo(user, 'team', 'edit') && sees(user, 'salary')}
       candidates={candidates}
       initialTemplateId={params.template && UUID.test(params.template) ? params.template : null}
       initialInvite={invite}
@@ -253,7 +252,6 @@ async function DirectoryPeople({
       canSeeHistory={false}
       canInvite={false}
       canAddPeople={false}
-      canEditPeople={false}
       candidates={[]}
       initialTemplateId={null}
       initialInvite={null}

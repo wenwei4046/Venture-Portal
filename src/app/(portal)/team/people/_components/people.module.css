@@ -1,0 +1,259 @@
+/* People › Management (2026-10-10, the HR revamp handoff, variant A) — the prototype's, value for value. */
+
+/* ── Head ── */
+/* The handoff hangs them 9px below the head's own bottom edge, nearer its rule. */
+.headActions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: -9px; }
+.headActions .headBtn { padding: 8px 16px; }
+.notice {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgb(var(--hv-panel));
+  border: 1px solid rgb(var(--hv-hairline));
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.noticeDismiss {
+  flex: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ── The roster ── */
+.directory { margin-bottom: 48px; }
+/* The grid lets the right-click menu out (no overflow: hidden), so its first and
+   last rows round themselves into the frame, as the handoff's head does. */
+.rosterWrap [role='table'] > :first-child { border-radius: 10px 10px 0 0; }
+.rosterWrap [role='table'] > :last-child { border-radius: 0 0 10px 10px; }
+.toolbar { margin-bottom: 14px; }
+.search { flex: 1; min-width: 200px; max-width: 440px; }
+.pills { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* A department's band: walnut rule, the cream wash, ▼ that folds it. */
+.band {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: rgb(241 237 230);
+  border: 0;
+  border-left: 3px solid rgb(var(--hv-dark));
+  border-bottom: 1px solid rgb(var(--hv-hairline));
+  font: inherit;
+  line-height: normal;
+  text-align: left;
+  color: rgb(var(--hv-ink));
+  cursor: pointer;
+}
+.band:focus-visible { outline: 2px solid rgb(var(--hv-ink)); outline-offset: -2px; }
+.bandChev { font-size: 9px; color: rgb(var(--hv-dark)); display: inline-block; transform: rotate(-90deg); transition: transform 0.12s; }
+.bandChev[data-open='true'] { transform: none; }
+.bandName { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.bandCount { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; }
+.bandMissing { color: rgb(var(--hv-alert)); }
+
+/* A person's row. */
+.cell { padding: 9px 14px; min-width: 0; }
+.nameCell { padding: 9px 14px; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tile {
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 7px;
+  border: 1px solid rgb(var(--hv-hairline));
+  background: rgb(var(--hv-panel));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+}
+.tile[data-login='true'] { border-color: rgb(var(--hv-accent)); background: rgb(var(--hv-peach)); }
+.name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: underline;
+  text-decoration-color: rgb(var(--hv-hairline));
+  text-underline-offset: 3px;
+}
+.titleCell { padding: 9px 14px; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.level { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10px; flex: none; }
+.nameCell[data-faded='true'], .titleCell[data-faded='true'] { opacity: 0.55; }
+.rankCell { padding: 9px 14px; display: flex; align-items: center; gap: 8px; }
+.rankChip {
+  padding: 2px 8px;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 999px;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.rate { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10px; }
+.code { padding: 9px 14px; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empCell { padding: 9px 14px; display: flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 0; }
+.missing {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(249 238 214);
+  color: rgb(var(--hv-alert));
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10.5px;
+}
+.seen { padding: 9px 14px; font-size: 12px; color: rgb(var(--hv-body-2)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seenWarn { color: rgb(var(--hv-alert)); }
+.chev { color: rgb(var(--hv-brown)); text-align: center; }
+
+/* Right-click: Invite user · Open card. */
+.menu {
+  position: absolute;
+  z-index: 25;
+  width: 190px;
+  background: rgb(255 255 255);
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 9px;
+  box-shadow: 0 8px 24px rgb(51 36 27 / 0.14);
+  padding: 5px;
+  cursor: default;
+}
+.menuItem {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  line-height: normal;
+  text-align: left;
+  color: rgb(0 0 0);
+  cursor: pointer;
+}
+.menuItem:hover { background: rgb(var(--hv-panel-2)); }
+.menuItem[data-quiet='true'] { color: rgb(170 160 150); }
+
+/* Accounts nobody on the roster holds. */
+.accounts { margin-top: 40px; }
+.accountsHead { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.accountsTitle { font-size: 15px; font-weight: 500; margin: 0; }
+.accountsHead::after { content: ''; order: 1; flex: 1; height: 1px; background: rgb(var(--hv-hairline)); }
+.accountsCount { order: 2; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; letter-spacing: 0.08em; }
+.accountsNote { font-size: 12.5px; color: rgb(var(--hv-body-2)); margin: 0 0 12px; max-width: 672px; line-height: 1.5; }
+.accountName { padding: 9px 14px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.accountName a { color: inherit; text-decoration: underline; text-decoration-color: rgb(var(--hv-hairline)); text-underline-offset: 3px; }
+
+/* ── The person window ── */
+.pwHead { display: flex; gap: 14px; padding: 18px 20px 0; }
+.pwTile {
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 10px;
+  border: 1px solid rgb(var(--hv-hairline));
+  background: rgb(var(--hv-panel));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-weight: 500;
+}
+.pwWho { flex: 1; min-width: 0; }
+.pwName { font-size: 19px; font-weight: 600; letter-spacing: 0.01em; margin: 0; line-height: normal; }
+.pwLine { font-size: 12.5px; color: rgb(var(--hv-body-2)); margin-top: 2px; }
+.pwChips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.pwTabs { padding: 12px 20px 0; border-bottom: 1px solid rgb(var(--hv-hairline)); }
+.pwTabs > [role='tablist'] { border-bottom: 0; margin: 0; }
+.pwBody { flex: 1; overflow-y: auto; padding: 18px 20px; }
+.pwFields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+.pwLabel { font-size: 11px; color: rgb(var(--hv-brown)); text-transform: uppercase; letter-spacing: 0.06em; }
+.pwValue { margin-top: 3px; overflow-wrap: anywhere; }
+.pwValue[data-mono='true'] { font-family: var(--font-mono), 'Chivo Mono', monospace; }
+.pwValue[data-missing='true'] { color: rgb(var(--hv-alert)); }
+.pwEmpty {
+  border: 1px solid rgb(var(--hv-hairline));
+  background: rgb(var(--hv-panel-2));
+  border-radius: 12px;
+  padding: 22px;
+  text-align: center;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.pwEmptyAction { margin-top: 12px; }
+.pwEmptyAction .headBtn { padding: 8px 16px; }
+.pwLoading { color: rgb(var(--hv-brown)); }
+.pwError { color: rgb(var(--hv-danger)); }
+.pwFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid rgb(var(--hv-hairline));
+  background: rgb(var(--hv-panel-2));
+}
+.pwHint { font-size: 12px; color: rgb(var(--hv-body-2)); }
+.pwFull { padding: 7px 14px; }
+
+/* ── Invite user ── */
+.inv { display: flex; flex-direction: column; gap: 14px; }
+.invTitle { font-size: 17px; font-weight: 500; margin: 0; line-height: normal; }
+.invSub { font-size: 12.5px; color: rgb(var(--hv-body-2)); margin-top: 4px; line-height: normal; }
+.invField { display: flex; flex-direction: column; gap: 5px; }
+.invLabel { font-size: 12px; color: rgb(var(--hv-brown)); display: flex; justify-content: space-between; gap: 8px; }
+.invErr { color: rgb(var(--hv-danger)); }
+.invInput {
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  outline: none;
+  color: rgb(var(--hv-ink));
+  background: rgb(255 255 255);
+  min-width: 0;
+}
+.invInput:focus-visible { border-color: rgb(var(--hv-accent)); }
+.invPwRow { display: flex; gap: 8px; }
+.invPw { flex: 1; font-family: var(--font-mono), 'Chivo Mono', monospace; }
+.invRegen {
+  padding: 8px 12px;
+  border: 1px solid rgb(var(--hv-frame));
+  border-radius: 6px;
+  background: rgb(255 255 255);
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  color: rgb(var(--hv-ink));
+  cursor: pointer;
+}
+.invRole { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.invRoleLabel { color: rgb(var(--hv-brown)); }
+.invRoleChip { padding: 4px 10px; border-radius: 6px; background: rgb(var(--hv-panel)); border: 1px solid rgb(var(--hv-hairline)); }
+.invFoot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.invFoot .invCancel { padding: 8px 14px; }
+.invFoot .invSend { padding: 8px 16px; }
+.invRefusal { flex: 1; align-self: center; color: rgb(var(--hv-danger)); font-size: 12.5px; }
+
+@media (max-width: 767px) {
+  /* Stacked under the title on a phone: nothing to hang below. */
+  .headActions { margin-bottom: 0; }
+  .pwFields { grid-template-columns: minmax(0, 1fr); }
+}

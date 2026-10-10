@@ -13,6 +13,8 @@ import { readDirectory, readsStaffTable } from '@/lib/team-directory'
 import ActivityLog from '../../_components/ActivityLog'
 import PersonAccess from '../../_components/PersonAccess'
 import { loadPersonAccess } from '../../_lib/person-permissions'
+import PersonChanges from '../_components/PersonChanges'
+import { getPersonCard } from '../card-actions'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -39,6 +41,9 @@ export default async function StaffDetailPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()
   const direct = readsStaffTable(viewer)
+  // Promote and end / restore their employment live here since the HR revamp's
+  // window only reads (2026-10-10) — read beside the page's own, Team · Edit.
+  const changes = canDo(viewer, 'team', 'edit') ? getPersonCard(id).catch(() => null) : Promise.resolve(null)
 
   // The row without its NRIC and account numbers, which come through the
   // reader beside it — the table no longer hands them out (2026-10-09, PR4).
@@ -97,6 +102,8 @@ export default async function StaffDetailPage({ params }: PageProps) {
         { id: row.title_id ?? null, name: titleName, templateId: row.titles?.template_id ?? null },
       )
     : null
+
+  const card = await changes
 
   return (
     <div>
@@ -240,6 +247,17 @@ export default async function StaffDetailPage({ params }: PageProps) {
           </>
         )}
       </div>
+
+      {card?.can.promote ? (
+        <PersonChanges
+          personId={card.staff.id}
+          personName={card.staff.employee_name}
+          title={card.title}
+          department={card.department}
+          ladder={card.ladder}
+          active={card.active}
+        />
+      ) : null}
 
       {access ? <PersonAccess access={access} canEdit={canManagePermissions(viewer)} /> : null}
 
