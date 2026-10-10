@@ -79,9 +79,11 @@ describe('who may decide what', () => {
     expect(decision(office, ['payment_voucher'], ['f'])).toEqual({ may: false, why: expect.stringMatching(/Not yours to decide/) })
   })
 
-  it('a Principal masked as Finance decides nothing in that view', () => {
-    const masked: Approver = { ...account('p', 'finance', ['treasury', 'billing']), actualRole: 'principal' }
-    expect(approvableTypes(masked)).toEqual([])
+  // HR's and Finance's views are lenses over the account's own power (2026-10-11).
+  it('the Principal in Finance’s view still decides everything, their own included', () => {
+    const lens: Approver = { ...principal, role: 'finance', actualRole: 'principal' }
+    expect(approvableTypes(lens)).toHaveLength(Object.keys(APPROVAL_DOMAIN).length)
+    expect(canDecide(lens, ['payroll_run'], ['p'])).toBe(true)
   })
 
   it('nobody decides nothing', () => {

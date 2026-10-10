@@ -308,6 +308,20 @@ revoke; refuses to run without the readers) once the code is live.
 `tests/member-sql/validate-sensitive-fields.mjs`,
 `src/lib/private-columns.test.ts`.
 
+**SWITCHING VIEW KEEPS YOUR POWER (2026-10-11, the user: "switch view is still
+can be edit, full access means = ultimate access").** HR's and Finance's views
+are LENSES, no longer masks: `getUser` keeps the account's own keys, actions,
+tabs and sensitive fields and only sets `role` to the view (`actualRole` = the
+account's), so every gate, button and Server Action answers as the account —
+the Principal in HR's view runs payroll, approves and sees salaries as in their
+own. What the view changes: the shell (HR's for `hr`, Finance's for `finance`),
+the Overview (`lensOverview` — HR's, the treasury's), and the menus, which list
+only that view's tabs (`lensNav` in PortalFrame: `hr.*` / `fin.*` — the user's
+point 5); a page from elsewhere still opens. The owner kind follows the account
+(`isOwnerKind`: `actualRole ?? role`), so the Principal self-approves in any
+view. Only the member app's Revenue View still masks (role defaults). Seeing the
+portal exactly as somebody else does is View as a person, read-only (next).
+
 **PAGES AND SIDEBARS FOLLOW THE TABS (2026-10-11, the HR revamp 8b — point 6:
 app gates per tab).** Every portal page asks `await requirePage('<its route>')`
 FIRST — its route as the folders spell it, `/fund-in/[id]/edit` — and

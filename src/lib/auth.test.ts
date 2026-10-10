@@ -53,11 +53,24 @@ describe('getUser view mask', () => {
     expect(mocks.maskLookup).not.toHaveBeenCalled()
   })
 
-  it.each(['hr', 'finance'])('still honours the %s view on the portal', async view => {
+  // 2026-10-11, the user: "switch view is still can be edit, full access means = ultimate access" —
+  // HR's and Finance's views are lenses: the view's shell over the account's own power.
+  it.each(['hr', 'finance'])('draws the %s view over the account’s own power', async view => {
     mocks.cookie = view
+    mocks.rpc.mockImplementation(async (fn: string) => ({
+      data: fn === 'current_permissions' ? ['dashboard', 'revenue', 'view_switch']
+        : fn === 'current_actions' ? { 'revenue.view': 'all', 'revenue.manage': 'all' }
+        : fn === 'current_sensitive_fields' ? ['salary', 'nric', 'bank']
+        : null,
+    }))
     const user = await getUser()
-    expect(user).toMatchObject({ role: view, actualRole: 'principal' })
-    expect(mocks.maskLookup).toHaveBeenCalledWith('role', view)
+    expect(user).toMatchObject({
+      role: view, actualRole: 'principal', canSwitchView: true,
+      permissions: ['dashboard', 'revenue', 'view_switch'],
+      actions: { 'revenue.view': 'all', 'revenue.manage': 'all' },
+      sensitive: ['salary', 'nric', 'bank'],
+    })
+    expect(mocks.maskLookup).not.toHaveBeenCalled()
   })
 
   it.each(['revenue_member', 'hr'])('never elevates a real %s account through a forged view cookie', async role => {

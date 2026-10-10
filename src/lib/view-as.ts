@@ -79,3 +79,37 @@ export function isPrincipalAccount(user: MaskableUser): boolean {
 export function isMasked(user: MaskableUser): boolean {
   return !!user.actualRole && user.actualRole !== user.role
 }
+
+// ── HR's and Finance's views are LENSES (2026-10-11) ─────────────────────────
+// The user: "switch view is still can be edit, full access means = ultimate
+// access". Switching to HR's or Finance's view changes the shell, the sidebar
+// and the Overview — never what the account may do (lib/auth.ts keeps its own
+// keys, actions, tabs and sensitive fields). Seeing the portal exactly as
+// somebody else does is View as a person, read-only.
+
+export type LensView = 'hr' | 'finance'
+
+/** The view a lens draws, when the account switched to HR's or Finance's — null in its own. */
+export function lensView(user: MaskableUser): LensView | null {
+  return isMasked(user) && (user.role === 'hr' || user.role === 'finance') ? user.role : null
+}
+
+const LENS_TABS: Readonly<Record<LensView, string>> = { hr: 'hr.', finance: 'fin.' }
+
+/**
+ * The account as a lens's sidebar reads it: only that view's tabs (the user's
+ * point 5 — the sidebar is the view's View-ticked tabs), so Finance's view
+ * lists Finance's pages although the account opens every page. Pages are not
+ * narrowed: a link from elsewhere still opens what the account may open.
+ */
+export function lensNav<T extends MaskableUser & { tabs?: string[] }>(user: T): T {
+  const view = lensView(user)
+  if (!view) return user
+  return { ...user, tabs: (user.tabs ?? []).filter(t => t.startsWith(LENS_TABS[view])) }
+}
+
+/** The Overview a lens opens on — HR's, or the treasury's for Finance — null in the account's own view. */
+export function lensOverview(user: MaskableUser): 'hr' | 'treasury' | null {
+  const view = lensView(user)
+  return view === 'hr' ? 'hr' : view === 'finance' ? 'treasury' : null
+}
