@@ -33,7 +33,8 @@ export function navVM(ctx: SalesCtx) {
   return {
     nav3b: NAV.map(([id, label, icon]) => ({
       label, icon, badge: badges[id], color: ui.tab === id ? RUST : SUB, weight: ui.tab === id ? 600 : 500,
-      go: () => { if (ui.tab !== id) set(u => ({ ...u, tab: id, profSub: null, hist: [...u.hist, u.tab].slice(-20) })); },
+      // Insight opens on Me, with no list or info sheet left open (rev 1010 §5.2).
+      go: () => { if (ui.tab !== id) set(u => ({ ...u, tab: id, profSub: null, hist: [...u.hist, u.tab].slice(-20), ...(id === "insight" ? { insScope: "me" as const, insList: null, insInfo: null } : {}) })); },
     })),
   };
 }

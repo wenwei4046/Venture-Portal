@@ -88,6 +88,10 @@ export interface SalesUi {
   insPeriod: "month" | "week" | "day" | "range";
   insRange: { a: number; b: number } | null;
   insSheet: { cm: [number, number]; a: number | null; b: number | null; dragged?: boolean } | null;
+  /** rev 1010 §5: Team | Me (Me on every open), the Leads / Appointments / Upcoming list (its measured height) and its Customer info. */
+  insScope: "team" | "me";
+  insList: { kind: "leads" | "appts" | "up"; h: string } | null;
+  insInfo: string | null;
   // Profile
   profSub: null | "notif" | "auto" | "quick";
   teamOpen: boolean;
@@ -102,7 +106,7 @@ export const initialSalesUi = (): SalesUi => ({
   hover: null, menu: null, reply: null, draft: {}, att: false, qr: false, qrPage: null, qrNew: { s: "", m: "" }, qrEditIdx: null,
   hm: null, cform: null, book: null, cancelAsk: null, tpl: false, templates: null, sending: false,
   calView: "month", calSel: null, calYM: null, outcomeAsk: null, celebrate: null, rebookFor: null,
-  insPeriod: "month", insRange: null, insSheet: null,
+  insPeriod: "month", insRange: null, insSheet: null, insScope: "me", insList: null, insInfo: null,
   profSub: null, teamOpen: false, swOpen: false, tp: null,
 });
 

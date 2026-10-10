@@ -102,7 +102,7 @@ function attrs(n, scope) {
   }
   if (hover) {
     // The design's hover styles, by fixed name (crm.module.css has each).
-    const HOVER = { "background: #FBF7F3;": "hov1", "background: #FBF4EE;": "hov2", "background: #FFF8F2;": "hov3", "border-color: #387557;": "hov4", "background: #F5EEE9;": "hov5" };
+    const HOVER = { "background: #FBF7F3;": "hov1", "background: #FBF4EE;": "hov2", "background: #FFF8F2;": "hov3", "border-color: #387557;": "hov4", "background: #F5EEE9;": "hov5", "color: rgb(150 58 20);": "hov6", "background: #F5EBE3;": "hov7" };
     const k = HOVER[hover.trim()];
     if (!k) throw new Error("A hover style crm.module.css does not have: " + hover);
     hoverClasses.set(hover, k);

@@ -8,6 +8,29 @@ const out = path.join(repo, "src/components/member/crm/sales");
 fs.mkdirSync(out, { recursive: true });
 const lines = (a, b) => src.slice(a - 1, b).join("\n");
 
+// rev 1010 (docs/design/rev1010): new blocks are taken from the prototypes VERBATIM — one node, balanced, by a marker inside it.
+const proto = name => fs.readFileSync(path.join(repo, "docs/design/rev1010/prototypes", name + ".dc.html"), "utf8");
+/** The whole <sc-if> whose opening tag carries `marker` (e.g. "{{ lsOpen }}"), from the prototype, balanced. */
+function protoNode(name, marker) {
+  const s = proto(name), at = s.indexOf('<sc-if value="' + marker + '"');
+  if (at < 0) throw new Error(name + ": no <sc-if " + marker);
+  const re = /<(\/?)sc-if(?=[\s>])/g; re.lastIndex = at;
+  let depth = 0, m;
+  while ((m = re.exec(s))) { depth += m[1] ? -1 : 1; if (!depth) return s.slice(at, s.indexOf(">", m.index) + 1); }
+  throw new Error(name + ": unbalanced " + marker);
+}
+const once = (text, from, to) => { if (text.split(from).length !== 2) throw new Error("not exactly once: " + from.slice(0, 60)); return text.replace(from, to); };
+// rev 1010 §5 Insight: Team | Me under the title, the three hero figures open lists, the list sheet and Customer info with ‹ back.
+const insightFrag = (() => {
+  let f = lines(432, 491);
+  const periods = '<div style="display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: #F5EBE3;">';
+  f = once(f, periods, protoNode("RS Insight", "{{ canTeam }}") + periods);
+  f = once(f, 'onClick="{{ goInbox }}" title="Open Inbox"', 'onClick="{{ openLeads }}" title="See leads"');
+  f = f.replace('onClick="{{ goCal }}" title="Open Calendar"', 'onClick="{{ openAppts }}" title="See appointments"');
+  f = once(f, 'onClick="{{ goCal }}" title="Open Calendar"', 'onClick="{{ openUp }}" title="See upcoming"');
+  return [f, protoNode("RS Insight", "{{ lsOpen }}"), protoNode("RS Insight", "{{ ctOpen }}"), protoNode("RS Insight", "{{ cfOpen }}")].join("\n");
+})();
+
 const line34 = src[33];
 const shellPart = line34.slice(line34.indexOf('<sc-if value="{{ rdX }}"'));
 
@@ -19,7 +42,7 @@ const parts = [
   // rev 1010 §3: a visit opens Contacts' Customer info sheet (lines 145–150) and its form (127–144) on the Calendar too.
   ["SalesCalendar", "CalendarVM", lines(183, 301) + "\n" + lines(145, 150) + "\n" + lines(127, 144), "Calendar: Month / Week / Day, Today with Show up / No show, upcoming, outcome and celebration; Customer info and its form."],
   ["SalesProfile", "ProfileVM", lines(304, 429), "Profile: card, View my team, workspace, Notifications, Quick replies, Auto-reply."],
-  ["SalesInsight", "InsightVM", lines(432, 491), "Insight: Month / Week / Day / Range, the walnut hero and leads by status."],
+  ["SalesInsight", "InsightVM", insightFrag, "Insight: Month / Week / Day / Range, the walnut hero and leads by status; Team | Me, the lists and Customer info."],
   ["SalesChat", "ChatVM", lines(496, 741), "A chat: header menu, messages, booking, quick replies, templates and every sheet."],
   // The customer form alone, for the Control panel's chat (Book visit asks for the details first, as here).
   ["SalesCustomerForm", "CustomerFormVM", lines(127, 144), "The customer form (name, phone, property, budget) — step 1 of a first booking, or Edit.", "customer"],

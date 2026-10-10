@@ -6,13 +6,24 @@
  *   Won rate    = visits won ÷ visits showed
  *   Avg. reply  = customer's message → our next reply (auto-replies don't count)
  */
-import type { PointerEvent as RPointerEvent } from "react";
-import { BORDER, gb, day0, DAY, isCold, stop, urgencyOf, type SalesCtx } from "./common";
+import type { MouseEvent, PointerEvent as RPointerEvent } from "react";
+import type { CrmCustomer } from "@/lib/member/crm-data";
+import { downlineOf } from "../../shared/people";
+import { BORDER, gb, day0, DAY, ini, isCold, lastReal, stop, timeLabel, urgencyOf, type SalesCtx } from "./common";
+import { customerFormVM, infoRows, phoneLabel } from "./customer";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export function insightVM(ctx: SalesCtx) {
-  const { ui, set, patch, data, now, mine, refs } = ctx;
+  const { ui, set, patch, data, now, refs, owner, me, nameOf, act } = ctx;
+  // Team | Me (rev 1010 §5.2): only for somebody with a direct downline (People › Hierarchy), Me on every open.
+  // Team = them + their WHOLE downline, every level down — never upline or sideways.
+  const canTeam = data.people.some(p => p.uplineId === owner.id);
+  const scope = canTeam ? ui.insScope : "me";
+  const teamIds = new Set([owner.id, ...downlineOf(owner.id, data.people)]);
+  const mine: CrmCustomer[] = scope === "team"
+    ? [...ctx.mine, ...data.customers.filter(c => c.assignedTo && teamIds.has(c.assignedTo) && !ctx.mine.some(x => x.id === c.id))]
+    : ctx.mine;
   const T = day0(now), wk0 = T - ((now.getDay() + 6) % 7) * DAY;
   const per = ui.insPeriod === "range" && !ui.insRange ? "month" : ui.insPeriod;
   const [R0, R1] = per === "day" ? [T, T] : per === "week" ? [wk0, wk0 + 6 * DAY]
@@ -93,7 +104,53 @@ export function insightVM(ctx: SalesCtx) {
     };
   }
 
+  // Leads / Appointments / Upcoming → a list → Customer info → chat (rev 1010 §5.1).
+  const p2 = (n: number) => String(n).padStart(2, "0"), dOnly = (d: Date) => `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}`;
+  const lastAt = (c: CrmCustomer) => lastReal(c)?.at ?? c.createdAt;
+  const ownerOf = (c: CrmCustomer) => scope === "team" ? (c.assignedTo === me.id ? "You" : nameOf(c.assignedTo)) : "";
+  // The sheet's top sits ~10 px under the Leads · Appointments · Upcoming row (measured on open); else 72%.
+  const openList = (kind: "leads" | "appts" | "up") => (e: MouseEvent<HTMLElement>) => {
+    let h: number | null = null;
+    try {
+      const row = e.currentTarget.parentElement!, root = e.currentTarget.closest<HTMLElement>("[data-revenue-app]")!;
+      h = root.clientHeight - (row.getBoundingClientRect().bottom - root.getBoundingClientRect().top + 10);
+    } catch { /* fall back to 72% */ }
+    patch({ insList: { kind, h: h && h > 200 ? h + "px" : "72%" }, insInfo: null });
+  };
+  const kind = ui.insList?.kind ?? "leads";
+  const vList = (kind === "up" ? visits.filter(v => v.state === "booked" && new Date(v.start) > now) : visits).slice()
+    .sort((a, b) => kind === "up" ? a.start.localeCompare(b.start) : b.start.localeCompare(a.start));
+  const byId = new Map(mine.map(c => [c.id, c]));
+  const row = (c: CrmCustomer, at: Date, n: number) => ({ name: c.name, ini: ini(c.name), phone: phoneLabel(c.phone) || "—", owner: ownerOf(c), date: dOnly(at), time: timeLabel(at),
+    rule: n ? "1px solid #EBDDD2" : "0", open: () => patch({ insInfo: c.id }) });
+  const lsRows = kind === "leads"
+    ? [...leads].sort((a, b) => lastAt(b).localeCompare(lastAt(a))).map((c, n) => row(c, new Date(lastAt(c)), n))
+    : vList.flatMap((v, n) => { const c = byId.get(v.customerId); return c ? [row(c, new Date(v.start), n)] : []; });
+  const lsN = kind === "leads" ? leads.length : vList.length;
+  const ci = ui.insInfo ? data.customers.find(c => c.id === ui.insInfo) : undefined;
+  const list = {
+    canTeam,
+    scopes: ([["team", "Team", "M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M16 4a4 4 0 0 1 0 8m6 9v-2a4 4 0 0 0-3-3.87M12 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"], ["me", "Me", "M20 21a8 8 0 0 0-16 0M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"]] as const).map(([k, label, icon]) => {
+      const on = scope === k;
+      // Switching closes any open list or info sheet.
+      return { label, icon, pick: () => patch({ insScope: k, insList: null, insInfo: null }), title: "", bg: on ? "#BD4A19" : "transparent", fg: on ? "#fff" : "#3F2B22", weight: on ? 650 : 500, cur: "pointer" };
+    }),
+    openLeads: openList("leads"), openAppts: openList("appts"), openUp: openList("up"),
+    lsOpen: !!ui.insList, lsH: ui.insList?.h ?? "72%", lsClose: () => patch({ insList: null }),
+    lsTitle: (kind === "leads" ? "Leads" : kind === "appts" ? "Appointments" : "Upcoming") + " · " + (per === "month" ? now.toLocaleDateString("en-GB", { month: "long" }) : per === "week" ? "This week" : per === "day" ? "Today" : (R0 === R1 ? f(new Date(R0)) : f(new Date(R0)) + " – " + f(new Date(R1)))),
+    lsCount: kind === "leads" ? lsN + (lsN === 1 ? " lead" : " leads") : lsN + (lsN === 1 ? " appointment" : " appointments"),
+    lsEmpty: !lsN, lsHasRows: !!lsN,
+    lsEmptyText: kind === "leads" ? "No leads in this period." : kind === "appts" ? "No appointments in this period." : "No upcoming appointments.",
+    lsRows,
+    // Customer info over the list: ‹ back to the list; the backdrop closes both.
+    ctOpen: !!ci, ctClose: () => patch({ insInfo: null, insList: null }), ctBack: () => patch({ insInfo: null }), ctName: ci?.name ?? "", ctIni: ci ? ini(ci.name) : "",
+    ctRows: ci ? infoRows(ci) : [],
+    ctChat: () => { if (!ci) return; set(u => ({ ...u, tab: "inbox", chat: ci.id, insInfo: null, insList: null, hist: [...u.hist, u.tab].slice(-20) })); act.openChat(ci.id); },
+    ctEdit: () => { if (ci) set(u => ({ ...u, cform: { customerId: ci.id, edit: true }, insInfo: null })); },
+  };
+
   return {
+    ...list, ...customerFormVM(ctx),
     stop,
     pRange: per === "day" ? "Today · " + gb(now, { weekday: "short", day: "numeric", month: "short" })
       : per === "range" ? "Custom · " + (R0 === R1 ? f(new Date(R0)) : `${f(new Date(R0))} – ${f(new Date(R1))}`)
@@ -113,8 +170,6 @@ export function insightVM(ctx: SalesCtx) {
       reply: fmtM(reply), replyNote: gaps.length ? `across ${gaps.length} replies` : "No replies yet", replyFg: reply != null && reply > 60 ? "#F6B48A" : "#FFFFFF",
     },
     pStatus: status.map(([label, n, c]) => ({ label, n, c, w: `${tot ? n / tot * 100 : 0}%` })),
-    goInbox: () => set(u => ({ ...u, tab: "inbox", chat: null, filter: null, hist: [...u.hist, "insight" as const].slice(-20) })),
-    goCal: () => set(u => ({ ...u, tab: "calendar", chat: null, calView: per === "day" ? "day" : per === "week" ? "week" : "month", calSel: T, calYM: [now.getFullYear(), now.getMonth()], hist: [...u.hist, "insight" as const].slice(-20) })),
     irOpen: !!sh, irClose: () => patch({ insSheet: null }),
     ...ir,
     _border: BORDER,

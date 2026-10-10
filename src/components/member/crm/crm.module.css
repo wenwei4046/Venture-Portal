@@ -10,6 +10,9 @@
 .hov3:hover { background: #FFF8F2 !important; }
 .hov4:hover { border-color: #387557 !important; }
 .hov5:hover { background: #F5EEE9 !important; }
+/* rev 1010 (Insight, Profile › Notifications). */
+.hov6:hover { color: rgb(150 58 20) !important; }
+.hov7:hover { background: #F5EBE3 !important; }
 
 /* The app: full screen on a phone, the design's own font and colours. */
 .app {
