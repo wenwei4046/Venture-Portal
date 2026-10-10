@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.36 (the Revenue app's Book a room and Documentation: By room / Timeline at 64px an hour, the book sheet, the files HR shares) / v3.35 (the Guest link: Admin › Guest Link, and the public /g page — phone first, a Preview column on a computer) / v3.34 (Meeting Rooms: a day's rooms side by side, the Book and booking drawers, rooms as cards) / v3.32 (Hiring › Requests: the review inbox, the Listing and its right-click menu, Form settings, a request's page with its candidates, the résumé drawer) / v3.31 (Documentation: Documents, Data center, Letters, Publish and the 640px preview) / v3.30 (the HR revamp, round 2: the soft dropdown and the drawers' motion) / v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.36 (the Revenue app's Book a room and Documentation: By room / Timeline at 64px an hour, the book sheet, the files HR shares) / v3.35 (the Guest link: Admin › Guest Link, and the public /g page — phone first, a Preview column on a computer) / v3.34 (Meeting Rooms: a day's rooms side by side, the Book and booking drawers, rooms as cards) / v3.33 (Hiring › Insights and the Talent Bank: six cards against the month before, the days each fill took, by source and department, every request sideways; the bank's tree, table, panel and a talent's own page) / v3.32 (Hiring › Requests: the review inbox, the Listing and its right-click menu, Form settings, a request's page with its candidates, the résumé drawer) / v3.31 (Documentation: Documents, Data center, Letters, Publish and the 640px preview) / v3.30 (the HR revamp, round 2: the soft dropdown and the drawers' motion) / v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -566,6 +566,65 @@ Edit).
 - **Phone width**: the inbox, the page and the new-request grid fall to one
   column, the stats two to a row, the listing and Form settings scroll
   sideways inside their cards, and a drawer is never wider than the frame.
+
+### Hiring › Insights and the Talent Bank (v3.33, 2026-10-11)
+
+The rest of **V. HIRING** (README §12–13; the handoff's `Revenue App.dc.html`
+lines 1145–1270, the drawers 1334–1364 and 1484–1497). Values in
+`hiring/_components/hiring.module.css`.
+
+- **Insights** (`/hiring/insights`, *How long each request takes, from
+  submitted to acknowledged to filled.*). The period bar: a white segmented
+  box (3px, radius 10) — **This month** · **All time** · a 1px rule ·
+  **Pick a month** (calendar and chevron; the picked one dark `43 31 23` on
+  cream, 500) — then the range in words (`1 Oct 2026 – 31 Oct 2026`, 12.5px).
+  Pick a month opens a 264px card (radius 12, 12px): *LAST 12 MONTHS*, then a
+  4-column grid of months (`Oct` 13px 500 over `2026` 10px at .7). **Six
+  cards** in a row (gap 9, 146px tall, the kit's card look): Requests
+  submitted · People hired (a ledger bar) · Avg days to acknowledge · Avg days
+  to fill · Hiring cost · Cost per hire (alert bars); the figure 28px, 22px
+  past six characters; at the foot the change on the month before
+  (`▲ 12% vs Sep` — ledger when it is good news, danger when not, `0% vs Sep`
+  brown; none for all time) and the card's icon. **Days from submitted to
+  filled**: the period's fills two to a row (`170px | bar | 44px`), the bar
+  10px on `240 238 234` split into *To acknowledge* (`205 184 162`) and
+  *Acknowledged to filled* (accent), longest first, with its legend. **By
+  source** (people hired, `2 pax`, the cost) and **By department** (`1 open ·
+  3 hired`, `25 days to fill` / *No fills*) side by side, each a 6px slate bar
+  of its share. **Every request** scrolls sideways: 15 columns (`80px 230px
+  150px …`), the ID sticky, money and days mono and right-aligned, an open
+  request's *N d so far* in alert. A row opens the **440px panel**: `HR-202 ·
+  Revenue · Fair`, the title 19px, its chip and owner, a ledger *Hired: …*
+  band, its facts (`150px | 1fr`; budget, cost and start in clay 600), the
+  Audit trail, **Close** and **View full →**. A request is in the period when
+  it was submitted or filled in it.
+- **Talent Bank** (`/hiring/talent`, *Good candidates kept on file, ready to
+  invite when a role opens.*): `260px | 1fr`. The left card: *Search name or
+  notes*, **All talent** and each department with its count; a department
+  opens (its ▸ turns, `.2s`) to the positions under it, indented behind a
+  rule; the picked row peach, 600 (a position's in clay). The right: the
+  heading (`Revenue Specialist`, `Revenue · 1 person`) and **+ Add talent**;
+  the table `1.2fr 1.1fr 1.8fr 110px 170px` — name 500 over *From HR-202* /
+  *Added directly*, what they fit over their department, the first line of
+  their notes cut with an ellipsis, the day saved (mono), *Interviewing ·
+  HR-203* (alert) or *Available* (ledger). A right-press: **Open**, **Remove
+  from Talent Bank** (danger). **+ Add talent** is a 520px drawer (*Add to
+  Talent Bank* · *Someone worth calling back when a role opens.*; name,
+  phone, email, what they fit, department, a résumé, why keep them; *Save
+  talent*). A row opens the **460px panel**: `T-103`, the name 19px, the
+  chip; their facts, *HR NOTES*, the résumé (a 36px olive tile, **View**),
+  *LATEST*; **Remove** (asks once more: *Confirm remove*), **Close**, **Full
+  page →**.
+- **A talent's page** (`/hiring/talent/[id]`): *‹ Talent Bank*, `T-104`, the
+  name 24px, *Good fit for … · saved 24 Sep 2026 by Grace Lim*, the chip;
+  `1fr | 340px`. **Profile** tiles (`minmax(170px, 1fr)`, values 500), **HR
+  notes** (a 14px / 1.7 textarea, saved as it is written), the résumé (a 38px
+  tile, **Open**, **Replace**); on the right **Invite to interview** (the open
+  requests, the one that fits picked first; or *No open hiring requests right
+  now.*) and **Remove from Talent Bank** (asked twice), then **History**
+  (8px dots, the newest in the accent).
+- On a request's page a candidate who is in the bank offers **★ Open in
+  Talent Bank** (ledger).
 
 ### Meeting Rooms (v3.34, 2026-10-11)
 
@@ -3271,6 +3330,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-11 v3.33 (Hiring › Insights and the Talent Bank)** — V. HIRING gains **Insights** (this month, a month of the last twelve or all time: six cards with their change on the month before, the days each fill took, hires by source, requests by department, every request in a sideways table that opens a 440px panel) and the **Talent Bank** (departments and positions in a tree, the people as a table with a right-click to remove, + Add talent, a 460px panel and a talent's own page: notes saved as they are written, the résumé replaced, Invite to interview on an open request). A request's candidate in the bank opens there. See *Hiring › Insights and the Talent Bank*.
 - **2026-10-11 v3.32 (Hiring › Requests)** — HR's sidebar gains **V. HIRING** (clay) with Requests: a review inbox (Pending · Info requested · Declined; Acknowledge with an owner from HR, Request more info, Decline with a note; a declined request may be reconsidered), the Listing (five counts that filter, a right-click menu) and Form settings (the requester form's fields and the hiring sources, saved as you go); *+ New request* is a 640px drawer; a request's own page holds its requirements, candidates (résumés, stages, the Talent Bank both ways), pipeline, actions and audit trail. Drawers are never wider than the frame on a phone. See *Hiring › Requests*.
 - **2026-10-10 (Sheets · above the phone's buttons)** — on a phone with three-button navigation the Revenue app's sheets no longer end behind the phone's buttons: *Start a quote*'s last brand, *Add to cart* and its quantity, the end of *All models*, Notifications and View as all stand clear of them (12–28px), the sheet's white running on underneath. An iPhone gains 4px, so it looks as drawn (a review note the user passed on: adding the whole inset would have grown every iPhone sheet's foot from ~30 to ~64px). See "The phone's own navigation bar".
 - **2026-10-10 (Bottom bars · after a reload)** — the Revenue app's bottom bar no longer slides under the phone's own buttons after Update, a pull that met a new release, or Try again (user's screenshot: only its top edge and the Quote circle showed). Every bottom bar and what clears it pads by `--safe-bottom`, the browser's navigation-bar inset or, when a reload comes back with 0 in the same window, the one the tab remembers. Nothing moves where the browser reads right. See "The phone's own navigation bar".
