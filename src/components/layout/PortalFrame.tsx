@@ -11,13 +11,17 @@ import { FinViewProvider } from './fin-view'
 import FinSwipeBack from './FinSwipeBack'
 import FinScrollMemory from './FinScrollMemory'
 import { useViewAsSync } from './useViewAsSync'
-import { navRootPaths, type NavData } from './nav-config'
+import { navRootPaths, withPathRevenueSub, type NavData } from './nav-config'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import BottomTabBar from './BottomTabBar'
 import MoreSheet from './MoreSheet'
 import BackToTop from '@/components/BackToTop'
 import RouteFreshener from './RouteFreshener'
+import HrSidebar from './HrSidebar'
+import HrTopBar from './HrTopBar'
+import { isHrView } from '@/lib/hr-view'
+import { ToastHost } from '@/components/hrv/toast'
 
 // Portal shell.
 //
@@ -31,18 +35,26 @@ import RouteFreshener from './RouteFreshener'
 // in the header.
 export default function PortalFrame({
   user,
-  navData,
+  navData: layoutNav,
+  hrNavCollapsed = false,
   children,
 }: {
   user: User
   /** The nav rows that come from the database — Revenue's sub-departments. */
   navData: NavData
+  /** HR's sidebar folded to its 64px rail (a cookie, so it draws folded). */
+  hrNavCollapsed?: boolean
   children: React.ReactNode
 }) {
   const [moreOpen, setMoreOpen] = useState(false)
   // Wide data reports (month-matrix P&L / Cash Flow) opt out of the 1280px
   // reading-width cap so the many month columns can use the full content area.
   const pathname = usePathname()
+  // A Revenue page's own sub-department is the one its links open (the
+  // switcher on its head picks it; the layout's cookie covers every other page).
+  const navData = useMemo(() => withPathRevenueSub(layoutNav, pathname ?? ''), [layoutNav, pathname])
+  // HR's view (2026-10-10, the HR revamp handoff): its own shell.
+  const hr = isHrView(user.role)
   const wide = pathname?.startsWith('/reports/monthly-') ?? false
   // The white sheet (DESIGN.md › "Sheet theme"): HR's pages sit on one rounded
   // panel in the Comm Cal month's tone, the shell around it unchanged. Drawn
@@ -80,6 +92,46 @@ export default function PortalFrame({
 
   // View-as switched in another tab → this shell is drawn in the old view.
   useViewAsSync(user.role, user.canSwitchView === true)
+
+  if (hr) {
+    // HR's shell: the square sidebar, the white greeting bar, and the sheet as
+    // the scroller inside a 10px frame — the frame is where drawers, windows
+    // and the toast are drawn, so they cover the sheet and nothing else.
+    return (
+      <FinViewProvider value={false}>
+        <div className="hrv-shell flex h-screen overflow-hidden print:h-auto print:overflow-visible">
+          <div className="print:hidden contents">
+            <HrSidebar user={user} revenueSub={navData.revenueSub ?? null} initialCollapsed={hrNavCollapsed} />
+          </div>
+          <div className="flex flex-col flex-1 min-w-0 overflow-hidden print:overflow-visible">
+            <div className="print:hidden contents">
+              <HrTopBar user={user} />
+              <div className="md:hidden">
+                <TopBar user={user} />
+              </div>
+            </div>
+            <div className="hrv-frame" data-hrv-overlay="">
+              <main ref={mainRef} className="sheet-theme sheet hrv-sheet route-surface page-enter print:p-0">
+                {children}
+              </main>
+              <ToastHost />
+            </div>
+          </div>
+          <BottomTabBar
+            role={user.role}
+            viewer={user}
+            moreOpen={moreOpen}
+            onMoreClick={() => setMoreOpen((o) => !o)}
+            fin={false}
+          />
+          <MoreSheet user={user} navData={navData} open={moreOpen} onClose={() => setMoreOpen(false)} />
+          <Suspense fallback={null}>
+            <RouteFreshener />
+          </Suspense>
+        </div>
+      </FinViewProvider>
+    )
+  }
 
   return (
     <FinViewProvider value={fin}>
@@ -126,6 +178,8 @@ export default function PortalFrame({
       />
 
       <BackToTop />
+      {/* The revamped pages flash a line after a save wherever they are opened. */}
+      <ToastHost fixed />
       {/* A page answered from the router's memory is read again behind itself (2026-10-08). */}
       <Suspense fallback={null}>
         <RouteFreshener />

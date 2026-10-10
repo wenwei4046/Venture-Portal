@@ -1,0 +1,174 @@
+/* Comm Cal (2026-10-10, the HR revamp handoff) — the prototype's, value for value. */
+
+/* The status strip: ERP · Pays from · Data source. */
+.strip {
+  display: flex;
+  align-items: center;
+  border: 1px solid rgb(var(--hv-hairline));
+  background: rgb(var(--hv-panel));
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-size: 12.5px;
+}
+.erp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-right: 1px solid rgb(var(--hv-hairline));
+  white-space: nowrap;
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--hv-ledger)); flex: none; }
+.dot[data-state='waiting'] { background: rgb(var(--hv-alert)); }
+.dot[data-state='off'] { background: rgb(var(--hv-faint)); }
+.strong { font-weight: 500; }
+.quiet { color: rgb(var(--hv-brown)); }
+.pays {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  flex: 1;
+  min-width: 0;
+}
+.paysNote {
+  color: rgb(var(--hv-brown));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.change {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  line-height: normal;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.source {
+  padding: 10px 16px;
+  border: 0;
+  border-left: 1px solid rgb(var(--hv-hairline));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: normal;
+  color: rgb(var(--hv-ink));
+  cursor: pointer;
+  border-radius: 0 10px 10px 0;
+  background: transparent;
+  align-self: stretch;
+}
+.source:hover,
+.source[data-open='true'] { background: rgb(var(--hv-panel-3)); }
+.sourceChev { display: flex; transition: transform 0.15s; }
+
+/* The months table. */
+.monthLabel { font-weight: 500; }
+.claims {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgb(var(--hv-danger));
+  margin-top: 2px;
+  text-decoration: underline;
+  display: inline-block;
+}
+.file {
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10.5px;
+  color: rgb(var(--hv-brown));
+  margin-top: 4px;
+}
+
+/* The empty month. */
+.emptyEyebrow { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 8px; }
+.emptyTitle { font-size: 18px; font-weight: 600; margin: 0 0 12px; }
+.emptyText { font-size: 13px; max-width: 520px; margin: 0 auto 24px; line-height: 1.55; }
+
+/* The Data source drawer. */
+.dsBody { display: flex; flex-direction: column; gap: 14px; }
+.dsRow { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.dsTitle { font-size: 15px; font-weight: 500; }
+.dsMono { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; }
+.dsLabel { font-size: 10.5px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(var(--hv-brown)); }
+.dsUrl {
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 11px;
+  margin-top: 6px;
+  word-break: break-all;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: copy;
+  line-height: normal;
+}
+.dsLinks { display: flex; gap: 16px; font-size: 12.5px; }
+.dsLinks .dsDanger { color: rgb(var(--hv-danger)); }
+.dsRule { height: 1px; background: rgb(var(--hv-hairline)); margin: 6px 0; }
+.dsText { font-size: 12.5px; line-height: 1.5; }
+.dsListRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgb(var(--hv-hairline));
+  font-size: 12.5px;
+}
+.dsListRow b { font-weight: 500; }
+.dsId { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; color: rgb(var(--hv-brown)); }
+.putBack {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 11.5px;
+  color: rgb(var(--hv-brown));
+  text-decoration: underline;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+  line-height: normal;
+}
+.dsListRow:hover .putBack,
+.putBack:focus-visible { opacity: 1; }
+.dsSub { font-size: 13px; font-weight: 500; margin-top: 4px; }
+.dsCard {
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dsInline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dsNote { font-size: 12px; color: rgb(var(--hv-body-2)); line-height: 1.5; }
+.dsError { font-size: 12px; color: rgb(var(--hv-danger)); }
+.dsDetails summary { cursor: pointer; font-size: 12.5px; font-weight: 500; }
+.dsEvent { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgb(var(--hv-hairline)); font-size: 12px; }
+
+/* A phone stacks the strip: ERP, then Pays from, then Data source. */
+@media (max-width: 767px) {
+  .strip { flex-direction: column; align-items: stretch; }
+  .erp { border-right: 0; border-bottom: 1px solid rgb(var(--hv-hairline)); white-space: normal; flex-wrap: wrap; }
+  .pays { flex-wrap: wrap; }
+  .paysNote { white-space: normal; }
+  .source { border-left: 0; border-top: 1px solid rgb(var(--hv-hairline)); border-radius: 0 0 10px 10px; justify-content: space-between; }
+}
+
+/* "Pays from" window. */
+.form { padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+.formTitle { font-size: 17px; font-weight: 500; }
+.formSub { font-size: 12.5px; color: rgb(var(--hv-body-2)); margin-top: 4px; line-height: 1.45; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.fieldLabel { font-size: 12px; color: rgb(var(--hv-brown)); }
+.formFoot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; align-items: center; }

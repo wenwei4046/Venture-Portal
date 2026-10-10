@@ -4,7 +4,7 @@ import { fetchAllRows } from '@/lib/paginate'
 
 /**
  * What the Comm Cal page shows about the ERP live feed. Read here, rendered
- * by _components/ErpSyncPanel.tsx. The existing Houzs ERP endpoint owns Fair;
+ * by the Data source drawer (_components/commcal/CommCalBody.tsx). The existing Houzs ERP endpoint owns Fair;
  * another programme must never display or replay its deliveries.
  */
 

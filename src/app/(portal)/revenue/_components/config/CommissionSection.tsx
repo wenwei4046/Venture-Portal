@@ -18,7 +18,6 @@ import {
   upsertRankDef,
 } from '../../config-actions'
 import KpiItemsSection from './KpiItemsSection'
-import NewSubDepartmentForm from './NewSubDepartmentForm'
 import PromotionCriteria from './PromotionCriteria'
 import {
   ActionButton,
@@ -83,12 +82,14 @@ const PILL = 'px-3 py-1.5 rounded-full border text-xs transition-colors'
 export default function CommissionSection({
   data,
   subDept,
+  head,
 }: {
   data: CommissionSettingsData
   subDept: { name: string; slug: string }
+  /** The page's head (2026-10-10: the revamp's, with the sub-department switcher). */
+  head: ReactNode
 }) {
   const searchParams = useSearchParams()
-  const [showNewSub, setShowNewSub] = useState(false)
 
   const scheme = data.scheme
   const tabs = scheme
@@ -111,43 +112,9 @@ export default function CommissionSection({
 
   return (
     <div>
-      <div className={scheme ? 'page-head tabbed' : 'page-head'}>
-        <div>
-          <div className="page-eyebrow">
-            <em>I.</em> REVENUE · {subDept.name.toUpperCase()}
-          </div>
-          <h1 className="page-title">Rules</h1>
-          <p className="text-sm mt-3">
-            What {subDept.name} pays, and to whom. <em>Every figure a run produces comes from
-            here.</em>
-          </p>
-        </div>
-        {/* Navigation into a side form, not a decision: an outline button, so
-            the orange stays with each table's Save. */}
-        <button
-          type="button"
-          onClick={() => setShowNewSub(v => !v)}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors whitespace-nowrap sm:mb-3"
-        >
-          {showNewSub ? 'Cancel' : '+ Generate new sub-department'}
-        </button>
-      </div>
+      {head}
 
       {scheme ? <SlidingTabs items={tabs} active={tab} onTabChange={goTo} variant="control" /> : null}
-
-      {showNewSub ? (
-        <section className="mb-10">
-          <SectionHead title="New sub-department" count={`${data.subDepartments.length} SO FAR`} />
-          <Hint>
-            Each sub-department calculates differently, so every rule on this page belongs to{' '}
-            <em>{subDept.name}</em> alone — the sidebar is what switches between them. A new
-            sub-department can <em>follow</em> an existing one&apos;s rules — every rank, item group,
-            KPI item, SKU cost ratio, threshold, Open Bill rate, brand and margin band is copied — or start blank for
-            a ruleset of its own, with every switch off and every table empty until you write it.
-          </Hint>
-          <NewSubDepartmentForm data={data} onDone={() => setShowNewSub(false)} />
-        </section>
-      ) : null}
 
       {!scheme ? (
         <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">

@@ -4,7 +4,7 @@ import { secretConfigured } from '@/lib/erp-sync/auth'
 
 /**
  * What the Comm Cal page shows about the ERP's feed key — everything about it
- * and never the key. Read here, rendered by _components/ErpLinkPanel.tsx.
+ * and never the key. Read here, rendered by the Data source drawer (_components/commcal/CommCalBody.tsx).
  *
  * erp_links postdates database.types.ts — untyped-client convention, as for
  * erp_sync_events.

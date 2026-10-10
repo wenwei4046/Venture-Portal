@@ -1,82 +1,73 @@
 import Link from 'next/link'
-import WarmLink from '@/components/layout/WarmLink'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
-import LedgerRow from '@/components/LedgerRow'
-import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import { canDo } from '@/lib/permission-actions'
+import { HvPage, PageHead, btn, hv } from '@/components/hrv/kit'
 import { requireSubDepartment } from '../_lib/sub-departments'
 import { headers } from 'next/headers'
 import { loadErpSyncPanelData } from '../_lib/erp-sync-panel'
 import { loadErpLinkView, receiverUrlFor } from '../_lib/erp-link'
 import { loadClosedMonthsOrNone, loadCutoverOrNone, settledByHand } from '../_lib/erp-feed-month'
-import PaysFromControl from '../_components/PaysFromControl'
 import { loadDoubleClaims } from '../_lib/double-claims'
+import { loadSwitcherData } from '../_lib/switcher'
 import { openClaimsByMonth } from '@/lib/commission/double-claims'
-import ErpSyncPanel from '../_components/ErpSyncPanel'
-import ErpLinkPanel from '../_components/ErpLinkPanel'
 import { formatAgo } from '@/lib/erp-sync/format'
+import SubDeptSwitcher from '../_components/SubDeptSwitcher'
+import CommCalBody, { type CommCalCard, type CommCalMonth } from '../_components/commcal/CommCalBody'
+import s from '../_components/commcal/CommCal.module.css'
 
 interface PageProps {
   params: Promise<{ sub: string }>
 }
 
-function label(period: string): string {
-  return new Date(period + 'T00:00:00Z').toLocaleString('en-US', {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  })
+/** A sub-department with no month yet (the handoff's IR). */
+function NoSalesData({ period, importHref }: { period: string; importHref: string | null }) {
+  return (
+    <div className={hv.empty} style={{ padding: '48px 24px' }}>
+      <p className={s.emptyEyebrow}>{label(period)}</p>
+      <p className={s.emptyTitle}>No sales data yet.</p>
+      <p className={s.emptyText}>
+        Commission is worked out from the ERP&apos;s sales orders — one row per product line, with the salesperson on each
+        order. They arrive live from the ERP once its key is pasted below and its feed is switched on; until then, import a
+        month&apos;s export to begin.
+      </p>
+      {importHref ? (
+        <Link href={importHref} className={btn('primary')} style={{ display: 'inline-block', padding: '9px 20px' }}>
+          Import sales orders
+        </Link>
+      ) : null}
+    </div>
+  )
 }
 
-/**
- * A run's state is a word on a wash (the sheet never says a thing in coloured
- * lettering alone): amber still waits on a compute, orange is computed and
- * ready to apply, green has reached payroll.
- */
-function RunChip({ status }: { status: string | null }) {
-  if (!status) {
-    return (
-      <span className="chip">
-        <span className="dot" />
-        not computed
-      </span>
-    )
-  }
-  const tone =
-    status === 'applied' || status === 'locked'
-      ? 'ledger'
-      : status === 'computed'
-        ? 'accent'
-        : status === 'draft'
-          ? 'alert'
-          : null
-  return (
-    <span className={tone ? `chip ${tone}` : 'chip'}>
-      <span className="dot" />
-      {status}
-    </span>
-  )
+function label(period: string): string {
+  return new Date(period + 'T00:00:00Z').toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+}
+function monthOnly(period: string): string {
+  return new Date(period + 'T00:00:00Z').toLocaleString('en-US', { month: 'long', timeZone: 'UTC' })
 }
 
 /**
  * Commission Calculation: the months that have sales data, and what this
- * sub-department has made of each one.
+ * sub-department has made of each one (2026-10-10, the HR revamp handoff:
+ * a status strip, five cards, the months; the ERP link and its feed in the
+ * Data source drawer; the first month paid behind Change).
  *
  * Batches and runs both belong to this sub-department. Membership in more
  * than one programme never makes an order pay through several programmes.
  */
 export default async function CommissionCalculationPage({ params }: PageProps) {
-  await requirePermission('revenue')
+  const user = await requirePermission('revenue')
   const { sub } = await params
   const subDept = await requireSubDepartment(sub)
   const supabase = (await createClient()) as unknown as SupabaseClient
 
   const thisPeriod = getPeriodMonth()
 
-  const [{ data: batches }, { data: runs }, sync] = await Promise.all([
+  const [{ data: batches }, { data: runs }, sync, switcher] = await Promise.all([
     supabase
       .from('sales_import_batches')
       .select('id, period_month, file_name, source, last_synced_at, order_count, out_of_period_count, cancelled_count, unmatched_agent_count, created_at')
@@ -88,10 +79,11 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
       .select('period_month, status, total_commission, staff_count')
       .eq('sub_department_id', subDept.id),
     loadErpSyncPanelData(supabase, subDept.id),
+    loadSwitcherData(user, subDept),
   ])
-  // The link card belongs to the programme the ERP feed belongs to (Fair),
-  // which is what a non-null sync panel says. The receiver address the ERP
-  // must send to is this very host.
+  // The link belongs to the programme the ERP feed belongs to (Fair), which is
+  // what a non-null sync panel says. The receiver address the ERP must send to
+  // is this very host.
   let link = null
   if (sync) {
     const h = await headers()
@@ -113,7 +105,7 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
       .map(r => [r.period_month, r]),
   )
 
-  const rows = ((batches ?? []) as Array<{
+  const rows = (batches ?? []) as Array<{
     id: string
     period_month: string
     file_name: string
@@ -122,38 +114,120 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
     order_count: number
     unmatched_agent_count: number
     created_at: string
-  }>)
+  }>
 
-  // The summary cards, from what the page has already read — nothing is
-  // queried for them. Rows come newest first, so the first is the latest
-  // month and the last the oldest; a paper claimed twice counts once, however
+  const months: CommCalMonth[] = rows.map(b => {
+    const run = runByPeriod.get(b.period_month)
+    const held = heldByMonth.get(b.period_month)
+    const file = b.source === 'erp_sync' ? null : b.file_name
+    // A month's source is a state — a word on a wash — with the file it came
+    // from on a line of its own.
+    const source: CommCalMonth['source'] = settledByHand(b.period_month, cutover)
+      ? { tone: 'info', text: `Settled by hand${held ? ` · ${held} held` : ''}`, file }
+      : closedMonths.has(b.period_month)
+        ? { tone: 'alert', text: `ERP closed${held ? ` · ${held} held` : ''}`, file }
+        : b.source === 'erp_sync'
+          ? { tone: 'ledger', text: `ERP live · ${formatAgo(b.last_synced_at)}`, file: null }
+          : { tone: 'info', text: 'Imported file', file }
+    return {
+      period: b.period_month,
+      label: label(b.period_month),
+      href: revenuePath(subDept.slug, b.period_month),
+      orders: b.order_count,
+      unmatched: b.unmatched_agent_count,
+      run: run ? { status: run.status, total: Number(run.total_commission) } : null,
+      claims: claimsByMonth.get(b.period_month) ?? 0,
+      source,
+    }
+  })
+
+  // The cards, from what the page has already read — nothing is queried for
+  // them. Rows come newest first; a paper claimed twice counts once, however
   // many months it turns up in.
   const latest = rows[0] ?? null
+  const previous = rows[1] ?? null
   const oldest = rows.length > 0 ? rows[rows.length - 1] : null
   const latestRun = latest ? runByPeriod.get(latest.period_month) ?? null : null
   const openDoubleClaims = doubleClaims.groups.filter(g => !g.dismissed).length
+  const claimMonth = months.find(m => m.claims > 0)
+
+  const cards: CommCalCard[] = latest && oldest
+    ? [
+        { label: 'Months with sales data', value: String(rows.length), note: `Since ${label(oldest.period_month)}`, icon: 'calendar', tone: 'default' },
+        latestRun
+          ? {
+              label: `${monthOnly(latest.period_month)} commission`,
+              value: formatMoney(Number(latestRun.total_commission)),
+              note: `${label(latest.period_month)} · ${latestRun.status}`,
+              icon: 'percent',
+              tone: 'primary',
+              href: revenuePath(subDept.slug, latest.period_month),
+            }
+          : {
+              // Not the walnut card with "—" (the handoff): the month waits on a compute.
+              label: `${monthOnly(latest.period_month)} commission`,
+              value: 'Not computed',
+              note: `Open ${monthOnly(latest.period_month)} to compute`,
+              icon: 'percent',
+              tone: 'alert',
+              href: revenuePath(subDept.slug, latest.period_month),
+              noteLink: true,
+            },
+        {
+          label: `${monthOnly(latest.period_month)} orders`,
+          value: String(latest.order_count),
+          note: previous ? `${previous.order_count} in ${monthOnly(previous.period_month)}` : label(latest.period_month),
+          icon: 'receipt',
+          tone: 'default',
+        },
+        {
+          label: 'Unmatched agents',
+          value: String(latest.unmatched_agent_count),
+          note: label(latest.period_month),
+          icon: 'people',
+          tone: latest.unmatched_agent_count > 0 ? 'danger' : 'default',
+        },
+        {
+          label: 'Possible double claims',
+          value: doubleClaims.unavailable ? '—' : String(openDoubleClaims),
+          note: doubleClaims.unavailable ? 'Could not be checked' : 'Across every month',
+          icon: 'fileAlert',
+          tone: !doubleClaims.unavailable && openDoubleClaims > 0 ? 'danger' : 'default',
+          href: claimMonth ? `${claimMonth.href}?view=claims` : undefined,
+        },
+      ]
+    : []
+
+  const settled = months.filter(m => settledByHand(m.period, cutover)).map(m => m.period).sort()
+  const settledRange = settled.length === 0
+    ? null
+    : settled.length === 1
+      ? monthOnly(settled[0])
+      : `${monthOnly(settled[0])}–${monthOnly(settled[settled.length - 1])}`
+
+  const importHref = revenuePath(subDept.slug, thisPeriod, 'import')
+  const canImport = canDo(user, 'revenue', 'create')
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <div className="page-eyebrow">
-            <em>I.</em> REVENUE · {subDept.name.toUpperCase()}
-          </div>
-          <h1 className="page-title">Commission Calculation</h1>
-        </div>
-        <Link
-          href={revenuePath(subDept.slug, thisPeriod, 'import')}
-          className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors"
-        >
-          Import sales orders
-        </Link>
-      </div>
+    <HvPage>
+      <PageHead
+        eyebrow={`Revenue · ${subDept.name}`}
+        title="Commission Calculation"
+        right={
+          <>
+            <SubDeptSwitcher data={switcher} view="cc" />
+            {rows.length > 0 && canImport ? (
+              <Link href={importHref} className={btn('primary')} style={{ padding: '9px 16px', fontSize: 13.5 }}>
+                Import sales orders
+              </Link>
+            ) : null}
+          </>
+        }
+      />
 
       {!subDept.schemeId ? (
         <div className="sheet-notice">
-          {subDept.name} has no active scheme, so nothing can be computed for it yet. Set one up
-          under{' '}
+          {subDept.name} has no active scheme, so nothing can be computed for it yet. Set one up under{' '}
           <Link href={revenuePath(subDept.slug, 'rules')} className="text-accent hover:underline">
             Rules
           </Link>
@@ -161,167 +235,26 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
         </div>
       ) : null}
 
-      {latest && oldest ? (
-        <StatCards label={`Commission Calculation for ${subDept.name}`}>
-          <StatCard
-            label="Months with sales data"
-            value={String(rows.length)}
-            icon="calendar"
-            note={`Since ${label(oldest.period_month)}`}
-          />
-          <StatCard
-            label="Latest month's commission"
-            value={latestRun ? formatMoney(Number(latestRun.total_commission)) : '—'}
-            icon="percent"
-            tone="primary"
-            note={`${label(latest.period_month)} · ${latestRun ? latestRun.status : 'not computed'}`}
-          />
-          <StatCard
-            label="Latest month's orders"
-            value={String(latest.order_count)}
-            icon="receipt"
-            note={label(latest.period_month)}
-          />
-          <StatCard
-            label="Unmatched agents"
-            value={String(latest.unmatched_agent_count)}
-            icon="people"
-            tone={latest.unmatched_agent_count > 0 ? 'danger' : undefined}
-            note={label(latest.period_month)}
-          />
-          <StatCard
-            label="Possible double claims"
-            value={doubleClaims.unavailable ? '—' : String(openDoubleClaims)}
-            icon="file-alert"
-            tone={!doubleClaims.unavailable && openDoubleClaims > 0 ? 'danger' : undefined}
-            note={doubleClaims.unavailable ? 'Could not be checked' : 'Across every month'}
-          />
-        </StatCards>
-      ) : null}
-
-      {subDept.schemeId ? <PaysFromControl subDepartmentId={subDept.id} cutover={cutover} /> : null}
-
-      {rows.length > 0 ? (
-        <section className="mb-10">
-          <div className="sect-head">
-            <h2>Months with sales data</h2>
-            <span className="rule" aria-hidden />
-            <span className="count">
-              {rows.length} PERIOD{rows.length === 1 ? '' : 'S'}
-            </span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th>Month</th>
-                  <th className="right m-hide">Orders</th>
-                  <th className="right m-hide">Unmatched agents</th>
-                  <th className="m-hide">Run</th>
-                  <th className="right">Commission</th>
-                  <th className="m-hide">Source</th>
-                  <th className="lt-toggle" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(b => {
-                  const run = runByPeriod.get(b.period_month)
-                  return (
-                    <LedgerRow key={b.id}>
-                      <td>
-                        {/* Rendered while the pointer rests on it: a month is
-                            the heaviest page in the department (2026-09-26). */}
-                        <WarmLink
-                          href={revenuePath(subDept.slug, b.period_month)}
-                          className="font-medium text-ink hover:text-accent"
-                        >
-                          {label(b.period_month)}
-                        </WarmLink>
-                        {claimsByMonth.get(b.period_month) ? (
-                          // Straight to the month's Double claims tab, where each
-                          // one says why it was flagged (2026-09-30).
-                          <Link
-                            href={`${revenuePath(subDept.slug, b.period_month)}?view=claims`}
-                            className="block text-[11px] font-medium text-danger mt-0.5 hover:underline"
-                          >
-                            {claimsByMonth.get(b.period_month)} possible double claim{claimsByMonth.get(b.period_month) === 1 ? '' : 's'}
-                          </Link>
-                        ) : null}
-                      </td>
-                      <td className="num m-hide" data-label="Orders">{b.order_count}</td>
-                      <td className="num m-hide" data-label="Unmatched agents">
-                        {b.unmatched_agent_count > 0 ? (
-                          <span className="neg">{b.unmatched_agent_count}</span>
-                        ) : (
-                          0
-                        )}
-                      </td>
-                      <td className="m-hide" data-label="Run">
-                        <RunChip status={run ? run.status : null} />
-                      </td>
-                      <td className="num">
-                        {run ? formatMoney(Number(run.total_commission)) : '—'}
-                      </td>
-                      <td className="m-hide" data-label="Source">
-                        {/* The month's source is a state too — a word on a
-                            wash. A file's name is not a state, so it stays
-                            plain beside the chip. */}
-                        {settledByHand(b.period_month, cutover) ? (
-                          <>
-                            <span className="chip info">
-                              <span className="dot" />
-                              Settled by hand{heldByMonth.get(b.period_month) ? ` · ${heldByMonth.get(b.period_month)} held` : ''}
-                            </span>
-                            {b.source === 'erp_sync' ? null : (
-                              <span className="ml-2 font-mono text-[11px]">{b.file_name}</span>
-                            )}
-                          </>
-                        ) : closedMonths.has(b.period_month) ? (
-                          <>
-                            <span className="chip alert">
-                              <span className="dot" />
-                              ERP closed{heldByMonth.get(b.period_month) ? ` · ${heldByMonth.get(b.period_month)} held` : ''}
-                            </span>
-                            {b.source === 'erp_sync' ? null : (
-                              <span className="ml-2 font-mono text-[11px]">{b.file_name}</span>
-                            )}
-                          </>
-                        ) : b.source === 'erp_sync' ? (
-                          <span className="chip ledger">
-                            <span className="dot" />
-                            ERP live · {formatAgo(b.last_synced_at)}
-                          </span>
-                        ) : (
-                          <span className="font-mono text-[11px]">{b.file_name}</span>
-                        )}
-                      </td>
-                    </LedgerRow>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
+      {/* A sub-department the ERP feeds keeps its strip with nothing in it
+          yet — Data source is where its key is pasted. */}
+      {rows.length > 0 || sync ? (
+        <CommCalBody
+          data={{
+            sub: { id: subDept.id, name: subDept.name, slug: subDept.slug, schemeId: subDept.schemeId },
+            months,
+            cards,
+            cutover,
+            settledRange,
+            link,
+            sync,
+            canManage: canDo(user, 'revenue', 'manage'),
+            canEdit: canDo(user, 'revenue', 'edit'),
+          }}
+          empty={rows.length === 0 ? <NoSalesData period={thisPeriod} importHref={canImport ? importHref : null} /> : null}
+        />
       ) : (
-        <div className="border border-hairline rounded-card bg-surface-2 px-6 py-12 text-center mb-10">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.06em] mb-2">{label(thisPeriod)}</p>
-          <p className="text-lg font-semibold mb-3">No sales data yet.</p>
-          <p className="text-sm mb-6 max-w-lg mx-auto">
-            Commission is worked out from the ERP&apos;s sales orders — one row per product line,
-            with the salesperson on each order. They arrive live from the ERP once its key is
-            pasted below and its feed is switched on; until then, import a month&apos;s export to begin.
-          </p>
-          <Link
-            href={revenuePath(subDept.slug, thisPeriod, 'import')}
-            className="inline-block bg-accent hover:bg-accent-hover text-sm px-5 py-2 rounded-control transition-colors"
-          >
-            Import sales orders
-          </Link>
-        </div>
+        <NoSalesData period={thisPeriod} importHref={canImport ? importHref : null} />
       )}
-
-      {link ? <ErpLinkPanel view={link} lastEventAt={sync?.lastEventAt ?? null} /> : null}
-      {sync ? <ErpSyncPanel data={sync} /> : null}
-    </div>
+    </HvPage>
   )
 }

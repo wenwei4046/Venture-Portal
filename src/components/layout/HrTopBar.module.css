@@ -1,0 +1,62 @@
+/* HR's greeting bar (2026-10-10) — the prototype's, value for value. */
+.bar {
+  height: 60px;
+  flex: none;
+  box-sizing: border-box;
+  background: rgb(var(--hvs-top));
+  margin: 10px 10px 0;
+  border-radius: 16px;
+  border: 1px solid rgb(var(--hvs-top-border));
+  padding: 0 22px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  line-height: normal;
+}
+.greet { font-size: 13px; color: rgb(var(--hvs-top-ink)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.name { color: rgb(var(--hvs-top-name)); }
+.right { display: flex; align-items: center; gap: 20px; }
+.view { display: flex; align-items: center; gap: 6px; color: rgb(var(--hvs-top-view)); }
+.dot { width: 5px; height: 5px; border-radius: 50%; background: rgb(var(--hvs-top-dot)); flex: none; }
+.viewLabel { font-size: 13.5px; }
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  /* As wide as the view it names, not the longest option — "HR view" sits
+     20px from the date, as the prototype's words do. */
+  field-sizing: content;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: normal;
+  color: rgb(var(--hvs-top-view));
+  cursor: pointer;
+}
+.select:focus-visible { outline: 2px solid rgb(var(--hvs-nav-bar)); outline-offset: 2px; border-radius: 4px; }
+.select:disabled { opacity: 0.6; }
+.clock {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 11px;
+  color: rgb(var(--hvs-muted));
+  letter-spacing: 0.02em;
+}
+.sep { opacity: 0.7; }
+.signOut {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  line-height: normal;
+  color: rgb(var(--hvs-muted));
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+.signOut:hover { color: rgb(var(--hvs-ink)); }

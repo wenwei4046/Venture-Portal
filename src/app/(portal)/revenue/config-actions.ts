@@ -136,6 +136,26 @@ export async function createSubDepartment(formData: FormData) {
   // /revenue, or it stays missing until the next hard load.
   revalidatePath('/', 'layout')
   refresh()
+  return { slug }
+}
+
+export type NewSubDepartmentResult = { ok: true; slug: string } | { ok: false; reason: string }
+
+/**
+ * The sub-department switcher's "+ New sub-department" (2026-10-10): the same
+ * write, answering with where the new one lives — or why not, as a value,
+ * because a production build masks a thrown message (the name clashes are
+ * the ones somebody has to act on).
+ */
+export async function newSubDepartment(formData: FormData): Promise<NewSubDepartmentResult> {
+  try {
+    const { slug } = await createSubDepartment(formData)
+    return { ok: true, slug }
+  } catch (err) {
+    // A gate's redirect is not a refusal to report — let it through.
+    if (err && typeof err === 'object' && 'digest' in err && String((err as { digest?: unknown }).digest).startsWith('NEXT_REDIRECT')) throw err
+    return { ok: false, reason: err instanceof Error ? err.message : 'Could not create the sub-department' }
+  }
 }
 
 /**
