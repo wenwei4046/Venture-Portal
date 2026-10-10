@@ -88,6 +88,49 @@ describe('Select', () => {
     expect(rows.map(r => r.textContent?.replace('✓', ''))).toEqual(['Director', 'Director Office'])
   })
 
+  it('opens above when the whole menu does not fit below and there is more room above', () => {
+    // A phone (844px tall), the field low on the screen, a menu 330px tall: dropdown.js opened it below
+    // (more than 200px were free) and it ran off the screen's bottom (the phone audit, 2026-10-11).
+    const tall = Object.getOwnPropertyDescriptor(window, 'innerHeight')
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 })
+    const rect = (top: number, height: number, width = 358) =>
+      ({ top, bottom: top + height, left: 16, right: 16 + width, width, height, x: 16, y: top, toJSON: () => ({}) }) as DOMRect
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.tagName === 'SELECT') return rect(579, 46)
+      if (this.hasAttribute('data-soft-menu')) return rect(0, 330)
+      return rect(0, 0, 0)
+    })
+    try {
+      render(<Picker />)
+      open()
+      const menu = document.querySelector<HTMLElement>('[data-soft-menu]')!
+      // Above the field: 579 − 330 − 6.
+      expect(menu.style.top).toBe('243px')
+      // Its list sized to the room above (567px, capped at 320, less its padding).
+      expect(screen.getByRole('listbox').style.maxHeight).toBe('308px')
+    } finally {
+      spy.mockRestore()
+      if (tall) Object.defineProperty(window, 'innerHeight', tall)
+    }
+  })
+
+  it('still opens below when it fits there', () => {
+    const rect = (top: number, height: number, width = 358) =>
+      ({ top, bottom: top + height, left: 16, right: 16 + width, width, height, x: 16, y: top, toJSON: () => ({}) }) as DOMRect
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.tagName === 'SELECT') return rect(100, 46)
+      if (this.hasAttribute('data-soft-menu')) return rect(0, 180)
+      return rect(0, 0, 0)
+    })
+    try {
+      render(<Picker />)
+      open()
+      expect(document.querySelector<HTMLElement>('[data-soft-menu]')!.style.top).toBe('152px')
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it('stays shut while disabled', () => {
     render(
       <Select aria-label="Type" disabled defaultValue="">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  budgetLabel, clashOf, daysToFill, hm, initials, missingFor, pipeline, positionLabel, requestTitle, reviewItems, shiftDay, slotAt,
+  budgetLabel, clashOf, daysToFill, hm, hourFrom, initials, missingFor, pipeline, positionLabel, requestTitle, reviewItems, shiftDay, slotAt,
   type HrBooking, type HrHire, type HrMemberRequest,
 } from './model'
 
@@ -79,6 +79,12 @@ describe('the HR app model', () => {
     expect(slotAt(95, 768)).toBe(540)
     expect(slotAt(768, 768)).toBe(1170)
     expect(hm(slotAt(400, 768))).toBe('14:00')
+  })
+
+  it('a booking from the last half hour ends at 20:00, not 20:30 (which the server refuses)', () => {
+    expect(hourFrom(540)).toBe(600)
+    expect(hourFrom(1140)).toBe(1200)
+    expect(hourFrom(1170)).toBe(1200)
   })
 
   it('refuses a booking that overlaps another in the same room that day', () => {

@@ -75,4 +75,26 @@ describe('the guest page', () => {
     expect(screen.getByRole('alert').textContent).toBe('Add company, department, your name, a time slot, a meeting title.')
     expect(guestBook).not.toHaveBeenCalled()
   })
+
+  it('opens the name window on itself — no keyboard, no ring, as the prototype — and Enter sends nothing', async () => {
+    render(<GuestPage code="hv-ABCDEFGH" initial={data} initialTaken={taken} />)
+    fireEvent.click(screen.getByText('Meeting room schedule'))
+    fireEvent.click(await screen.findByText('Showroom kickoff'))
+    fireEvent.click(screen.getByText('Cancel meeting'))
+    expect(document.activeElement).toBe(screen.getByRole('dialog', { name: 'Cancel meeting' }))
+    const field = screen.getByPlaceholderText('Your name')
+    fireEvent.change(field, { target: { value: 'Siti' } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+    expect(guestCancel).not.toHaveBeenCalled()
+  })
+
+  it('keeps Request manpower where it was when the guest steps back to Home', () => {
+    render(<GuestPage code="hv-ABCDEFGH" initial={{ ...data, hiring: true }} initialTaken={taken} />)
+    fireEvent.click(screen.getByRole('button', { name: /Request manpower/ }))
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Siti' } })
+    fireEvent.click(screen.getByRole('button', { name: '‹ Back' }))
+    expect(screen.queryByRole('textbox')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Request manpower/ }))
+    expect(screen.getByRole('textbox')).toHaveValue('Siti')
+  })
 })

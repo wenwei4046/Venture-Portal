@@ -89,9 +89,10 @@
   font-size: 13px;
   outline: none;
   margin-bottom: 2px;
-  box-sizing: border-box;
+  /* An input's own box, as dropdown.js's: 34px of content, 36 with its border; the browser's black text. */
+  box-sizing: content-box;
   background: rgb(255 255 255);
-  color: inherit;
+  color: rgb(0 0 0);
 }
 .search::placeholder { color: rgb(117 117 117); }
 .search:focus { border-color: rgb(233 154 83); box-shadow: 0 0 0 3px rgb(233 154 83 / 0.15); }

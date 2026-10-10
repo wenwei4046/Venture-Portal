@@ -89,8 +89,13 @@ function SoftMenu({ select, onClose }: { select: HTMLSelectElement; onClose: () 
     [select, onClose],
   )
 
-  // Placed as dropdown.js places it: measured once open, below the field
-  // unless there is no room, never off the window's edges.
+  // Placed as dropdown.js places it — measured once open, below the field,
+  // never off the window's edges — except that it opens ABOVE when the whole
+  // menu does not fit below and there is more room above, its list sized to
+  // the side it opens on (README 18.1: "above if no room"). dropdown.js opened
+  // below whenever 200px were free and sized the list from the larger side, so
+  // on a phone a long list ran off the screen; the canvas never showed it, its
+  // menu sitting on the 1200px page (2026-10-11).
   useLayoutEffect(() => {
     const el = menu.current
     const box = list.current
@@ -103,11 +108,13 @@ function SoftMenu({ select, onClose }: { select: HTMLSelectElement; onClose: () 
     const o = el.getBoundingClientRect()
     const below = window.innerHeight - r.bottom - 12
     const above = r.top - 12
-    const maxH = Math.min(320, Math.max(below, above))
-    box.style.maxHeight = `${maxH - (searchable ? 48 : 12)}px`
+    const pad = searchable ? 48 : 12
+    box.style.maxHeight = `${Math.min(320, Math.max(below, above)) - pad}px`
+    const down = below >= el.getBoundingClientRect().height || below >= above
+    box.style.maxHeight = `${Math.min(320, down ? below : above) - pad}px`
     const er = el.getBoundingClientRect()
     const wantL = Math.max(8, Math.min(r.left, window.innerWidth - er.width - 8))
-    const wantT = below >= Math.min(er.height, 200) || below >= above ? r.bottom + 6 : r.top - er.height - 6
+    const wantT = down ? r.bottom + 6 : r.top - er.height - 6
     el.style.left = `${wantL - o.left}px`
     el.style.top = `${wantT - o.top}px`
     const on = box.querySelector<HTMLElement>('[aria-selected="true"]')
@@ -166,7 +173,8 @@ function SoftMenu({ select, onClose }: { select: HTMLSelectElement; onClose: () 
   }
 
   return createPortal(
-    <div ref={menu} className={s.menu} onKeyDown={onListKey}>
+    // data-soft-menu: the portal's field rules (globals.css) leave the menu's search box as dropdown.js draws it.
+    <div ref={menu} className={s.menu} onKeyDown={onListKey} data-soft-menu="">
       {searchable ? (
         <input
           ref={search}
