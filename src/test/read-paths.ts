@@ -201,6 +201,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // A replacement runs itself on its date (mig 20261010170000): HR's two ask member_is_manager; the
   // hourly sweep is the service role's (api/member-queue).
   'member_schedule_replacement', 'member_unschedule_replacement', 'member_run_due_replacements',
+  // The Revenue app's Waiting list & replacements (mig 20261010190000): member_requests, or member_is_manager for View as.
+  'member_waiting_queue',
   'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_cancel_topup',
   'payroll_close_month', 'payroll_complete_rows', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status',
   'payroll_open_topup', 'payroll_reopen_month', 'payroll_send_back_batch', 'payroll_submit_batch', 'payroll_uncomplete_rows',

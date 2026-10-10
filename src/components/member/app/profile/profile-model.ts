@@ -1,10 +1,12 @@
 import type { MemberMemo, MemberMembership, MemberOrgMap, MemberRequest } from "@/lib/member/types";
 import { arenaMonthFridays, arenaWeekendLabel, type ArenaPerson, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { claimPayoutLine, readClaimPayout } from "@/lib/member/claim-payout";
+import { canEditRequest, EDIT_FIELDS, editValues, lockedNote } from "@/lib/member/request-edit";
+import { placeOf, type WaitingQueue } from "@/lib/member/waiting-queue";
 import { MONTHS_SHORT, dayRange, initials, klDate, klDayTime, klLongTime, monthShort, rm, rm2, shortDay } from "../format";
 import type {
   ClaimWeek, MemoCat, MemoVM, PersonSheetVM, ProfileMainVM, RequestDetailVM, RequestEventVM, RequestKindVM, RequestRowVM,
-  TeamDot, TeamKidVM, TeamLevelVM, TeamNodeVM, TeamVM, Tone, VaGroupVM,
+  TeamDot, TeamKidVM, TeamLevelVM, TeamNodeVM, TeamVM, Tone, TrackVM, VaGroupVM,
 } from "./profile-vm";
 
 /**
@@ -33,6 +35,7 @@ export function profileMainVM(input: {
     rank: input.rank,
     badges: {
       ...(pending ? { requests: `${pending} pending` } : {}),
+      ...(trackedCount(input.requests) ? { track: String(trackedCount(input.requests)) } : {}),
       ...(fresh ? { memos: `${fresh} new` } : {}),
     },
   };
@@ -50,31 +53,38 @@ export interface RequestEvent {
   note: string | null;
 }
 
+// The handoff's request words (the HR revamp's Revenue app, 2026-10-10 — `pill()` in
+// Revenue Member App.dc.html): gold while it is with HR, deep green on the waiting list.
 const STATUS: Record<string, [string, Tone]> = {
   draft: ["Draft", "none"],
-  submitted: ["Pending HR", "warn"],
-  needs_info: ["Needs info", "bad"],
+  submitted: ["Pending review", "pending"],
+  needs_info: ["More info needed", "pending"],
   approved: ["Approved", "good"],
   rejected: ["Rejected", "bad"],
-  waiting: ["Waiting list", "warn"],
-  reserved: ["Place reserved", "warn"],
-  accepted: ["Accepted", "warn"],
-  allocated: ["Allocated", "good"],
-  executed: ["Done", "good"],
+  waiting: ["Accepted", "accepted"],
+  reserved: ["Place reserved", "pending"],
+  accepted: ["Accepted", "accepted"],
+  allocated: ["Joined", "good"],
+  executed: ["Completed", "good"],
   paid: ["Paid", "good"],
   withdrawn: ["Cancelled", "none"],
   expired: ["Expired", "bad"],
-  // The HR revamp (2026-10-10): taken off the waiting list; a replacement set for a later date.
-  failed: ["Not placed", "bad"],
-  scheduled: ["Scheduled", "warn"],
+  failed: ["Failed · removed", "bad"],
+  scheduled: ["Scheduled", "pending"],
 };
-export const requestStatus = (status: string): [string, Tone] => STATUS[status] ?? [status, "neutral"];
+/** "Accepted · #2" on the waiting list, "Scheduled · 31 Oct" for a replacement HR set a date for. */
+export const requestStatus = (status: string, at?: { position?: number | null; date?: string | null }): [string, Tone] => {
+  const [word, tone] = STATUS[status] ?? [status, "none"];
+  if (status === "waiting" && at?.position) return [`${word} · #${at.position}`, tone];
+  if (status === "scheduled" && at?.date) return [`${word} · ${shortDay(at.date)}`, tone];
+  return [word, tone];
+};
 
 const KIND_LABEL: Record<RequestKindVM, string> = { claim: "Claim", replacement: "Replacement", waiting: "Waiting list" };
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v !== "" ? Number(v) : NaN);
 
-/** `Outstation claim · Mid Valley Megamall`, `Waiting list · Amelia Tan`, `Replacement · Darren Ong`. */
+/** `Outstation claim · Mid Valley Megamall`, `Amelia Tan · Waiting List`, `DARREN ONG · Replacement`. */
 export function requestTitle(r: MemberRequest, nameOf: (staffId: string) => string | null): string {
   const d = r.detail ?? {};
   if (r.kind === "claim") {
@@ -85,10 +95,20 @@ export function requestTitle(r: MemberRequest, nameOf: (staffId: string) => stri
     if (type === "airbnb") return `Airbnb claim${where ? ` · ${where}` : ""}`;
     return r.title;
   }
-  if (r.kind === "waiting") return `Waiting list · ${str(d.newPerson) || "New member"}`;
-  const original = nameOf(str(d.originalStaffId));
-  return `Replacement · ${original ?? (str(d.newPerson) || "Release position")}`;
+  if (r.kind === "waiting") return `${str(d.newPerson) || "New member"} · Waiting List`;
+  return `${nameOf(str(d.originalStaffId)) ?? (str(d.newPerson) || "A member")} · Replacement`;
 }
+
+/** A replacement as Waiting list & replacements names it: who leaves → who takes the seat. */
+function replacementLine(r: MemberRequest, nameOf: (staffId: string) => string | null): string {
+  const d = r.detail ?? {};
+  const original = nameOf(str(d.originalStaffId)) ?? "A member";
+  const successor = str(d.allocatedName) || str(d.newPerson) || "seat released";
+  return `${original} → ${successor}`;
+}
+
+/** The day HR set it to run, else the one the member planned. */
+const replacementDate = (r: MemberRequest) => str(r.detail?.effectiveOn) || str(r.detail?.effective);
 
 /** What was sent, in one line — the first audit entry's note. */
 export function requestSummary(r: MemberRequest, nameOf: (staffId: string) => string | null): string {
@@ -116,13 +136,24 @@ export function requestCode(r: MemberRequest): string {
   return typeof number === "string" && number ? number : `RQ-${r.id.slice(0, 8).toUpperCase()}`;
 }
 
-export function requestRowsVM(requests: readonly MemberRequest[], nameOf: (staffId: string) => string | null): RequestRowVM[] {
+/** A request's words with where it stands: its place on the waiting list, the day a replacement runs. */
+function statusOf(r: MemberRequest, queues: readonly WaitingQueue[]): [string, Tone] {
+  return requestStatus(r.status, {
+    position: r.kind === "waiting" ? placeOf(queues, r.id)?.position ?? null : null,
+    date: r.kind === "replacement" ? replacementDate(r) || null : null,
+  });
+}
+
+const sent = (r: MemberRequest) => (r.submittedAt ?? r.createdAt);
+const newestFirst = (a: MemberRequest, b: MemberRequest) => sent(b).localeCompare(sent(a));
+
+export function requestRowsVM(requests: readonly MemberRequest[], nameOf: (staffId: string) => string | null, queues: readonly WaitingQueue[] = []): RequestRowVM[] {
   return [...requests]
     .filter(r => r.status !== "draft")
-    .sort((a, b) => (b.submittedAt ?? b.createdAt).localeCompare(a.submittedAt ?? a.createdAt))
+    .sort(newestFirst)
     .map(r => {
-      const [status, tone] = requestStatus(r.status);
-      return { id: r.id, kind: r.kind, title: requestTitle(r, nameOf), sub: `${shortDay(klDate(r.submittedAt ?? r.createdAt))} · ${requestCode(r)}`, status, tone };
+      const [status, tone] = statusOf(r, queues);
+      return { id: r.id, kind: r.kind, title: requestTitle(r, nameOf), sub: `${requestCode(r)} · ${shortDay(klDate(sent(r)))}`, status, tone };
     });
 }
 
@@ -133,48 +164,135 @@ const WHAT: Record<string, string> = {
   failed: "Removed from the waiting list", scheduled: "Scheduled",
 };
 
+const DESTINATION: Record<string, string> = {
+  member_exit: "Leave this department only", resignation: "Leave the company", transfer: "Transfer to another department",
+};
+
+/** "Updated by the member · phone number, start date" → "Changed: phone number, start date" (null when it names nothing). */
+function changedNote(note: string): string | null {
+  const at = note.indexOf(" · ");
+  return at < 0 ? null : `Changed: ${note.slice(at + 3)}`;
+}
+
 export function requestDetailVM(r: MemberRequest, events: readonly RequestEvent[] | null, options: {
   nameOf: (staffId: string) => string | null;
   readOnly: boolean;
+  /** The waiting lists, for a waiting list's place on its own. */
+  queues?: readonly WaitingQueue[];
 }): RequestDetailVM {
-  const [status, tone] = requestStatus(r.status);
+  const queues = options.queues ?? [];
+  const [status, tone] = statusOf(r, queues);
   const d = r.detail ?? {};
   const amount = num(d.amount);
   // A resubmission is a second "Submitted"; a status that did not change is bookkeeping.
   const shown = (events ?? []).filter(e => e.status !== "draft" && e.status !== e.from);
   const log: RequestEventVM[] = shown.map((e, i) => {
     const last = i === shown.length - 1;
-    const what = e.status === "allocated" ? `Allocated to ${str(d.department) || "the team"}` : (e.from === "needs_info" && e.status === "submitted" ? "Updated and sent again" : WHAT[e.status] ?? e.status);
+    // An edit the member made in the sheet names what changed (mig 20261010190000); one sent
+    // again after HR asked for more is an update too.
+    const edited = e.status === "submitted" && !!e.note && e.note.startsWith("Updated by the member");
+    const resent = e.status === "submitted" && (e.from === "needs_info" || shown[i - 1]?.status === "needs_info");
+    const what = edited ? "Updated by the member" : e.status === "allocated" ? `Allocated to ${str(d.department) || "the team"}`
+      : resent ? "Updated and sent again" : WHAT[e.status] ?? e.status;
     const who = e.actor === "you" ? "You" : e.actor === "hr" ? (e.actorName ? `${e.actorName} (HR)` : "HR") : e.actor === "finance" ? "Finance"
       : e.actor === "principal" ? (e.actorName ?? "Principal") : "Revenue system";
     const bad = ["needs_info", "rejected", "withdrawn", "expired", "failed"].includes(e.status);
     return {
       what, who, when: klDayTime(e.at),
-      note: e.note ?? (i === 0 && e.status === "submitted" ? requestSummary(r, options.nameOf) : ""),
+      note: edited ? changedNote(e.note ?? "") ?? "" : resent && e.note && shown[i - 1]?.note === e.note ? ""
+        : e.note ?? (i === 0 && e.status === "submitted" ? requestSummary(r, options.nameOf) : ""),
       dot: last ? (bad ? "bad" : "good") : "past",
     };
   });
   if (!log.length) {
-    log.push({ what: "Submitted", who: "You", when: klDayTime(r.submittedAt ?? r.createdAt), note: requestSummary(r, options.nameOf), dot: r.status === "withdrawn" ? "bad" : "good" });
+    log.push({ what: "Submitted", who: "You", when: klDayTime(sent(r)), note: requestSummary(r, options.nameOf), dot: r.status === "withdrawn" ? "bad" : "good" });
   }
   // An approved claim says where its money is coming from (2026-10-08).
   const payout = r.kind === "claim" ? claimPayoutLine(readClaimPayout(r.payout), r.status, "member") : null;
+  const place = r.kind === "waiting" && r.status === "waiting" ? placeOf(queues, r.id) : null;
+  // The handoff's facts for a waiting list and a replacement; a claim keeps its own.
+  const facts = r.kind === "waiting"
+    ? [
+        { l: "Applicant", v: str(d.newPerson) },
+        { l: "Phone", v: str(d.contact) },
+        { l: "Start date", v: str(d.start) ? shortDay(str(d.start)) : "" },
+        { l: "Sub-department", v: str(d.department) ? `Revenue · ${str(d.department)}` : "" },
+        { l: "Queue position", v: place ? `#${place.position} of ${place.total}` : "" },
+      ]
+    : r.kind === "replacement"
+      ? [
+          { l: "Original member", v: options.nameOf(str(d.originalStaffId)) ?? "" },
+          { l: "Arrangement", v: DESTINATION[str(d.destination)] ?? "" },
+          { l: "Replacement", v: str(d.allocatedName) || str(d.newPerson) || "Seat released" },
+          { l: "Effective date", v: replacementDate(r) ? shortDay(replacementDate(r)) : "" },
+          { l: "Reason", v: str(d.reason) },
+        ]
+      : [
+          { l: "Type", v: KIND_LABEL[r.kind] },
+          { l: "Submitted", v: shortDay(klDate(sent(r))) },
+          ...(Number.isFinite(amount) ? [{ l: "Claim amount", v: rm2(amount) }] : []),
+          { l: "Current step", v: status },
+          ...(payout ? [{ l: "Payment", v: payout }] : []),
+        ];
+  const editable = !options.readOnly && canEditRequest(r);
   return {
     id: r.id,
-    title: requestTitle(r, options.nameOf),
+    title: r.kind === "replacement" ? replacementLine(r, options.nameOf) : requestTitle(r, options.nameOf),
     code: requestCode(r),
     status,
     tone,
-    facts: [
-      { l: "Type", v: KIND_LABEL[r.kind] },
-      { l: "Submitted", v: shortDay(klDate(r.submittedAt ?? r.createdAt)) },
-      ...(r.kind === "claim" && Number.isFinite(amount) ? [{ l: "Claim amount", v: rm2(amount) }] : []),
-      { l: "Current step", v: status },
-      ...(payout ? [{ l: "Payment", v: payout }] : []),
-    ],
+    facts: facts.filter(f => f.v !== ""),
     log,
     canCancel: !options.readOnly && (r.status === "submitted" || r.status === "needs_info"),
-    canUpdate: !options.readOnly && r.status === "needs_info",
+    // A waiting list or replacement is edited in the sheet; a returned claim opens its whole form again.
+    canUpdate: !options.readOnly && r.status === "needs_info" && r.kind === "claim",
+    edit: editable && (r.kind === "waiting" || r.kind === "replacement") ? { fields: EDIT_FIELDS[r.kind], values: editValues(r) } : null,
+    lockedNote: lockedNote(r),
+  };
+}
+
+// ── Waiting list & replacements ──
+
+/** Still in flight: what the Profile row's badge counts (the handoff's: pending or accepted, not completed). */
+export function trackedCount(requests: readonly MemberRequest[]): number {
+  return requests.filter(r => (r.kind === "waiting" && ["submitted", "needs_info", "waiting", "reserved", "accepted"].includes(r.status))
+    || (r.kind === "replacement" && ["submitted", "needs_info", "approved", "scheduled"].includes(r.status))).length;
+}
+
+/**
+ * The handoff's Waiting list & replacements: the member's sub-department's
+ * waiting list ("#2 Siti Aisyah · Yours", others by an initial), then what
+ * they sent — each waiting list with how many are ahead of it, each
+ * replacement with who takes the seat and when.
+ */
+export function trackVM(input: {
+  requests: readonly MemberRequest[];
+  queues: readonly WaitingQueue[];
+  /** The sub-department the member is looking at — its list is the one shown. */
+  subDepartmentId: string;
+  nameOf: (staffId: string) => string | null;
+}): TrackVM {
+  const list = input.queues.find(q => q.subDepartmentId === input.subDepartmentId) ?? input.queues[0] ?? null;
+  const mine = [...input.requests].filter(r => r.status !== "draft").sort(newestFirst);
+  const waiting = mine.filter(r => r.kind === "waiting").map(r => {
+    const [status, tone] = statusOf(r, input.queues);
+    const place = r.status === "waiting" ? placeOf(input.queues, r.id) : null;
+    const sub = [requestCode(r), str(r.detail?.department), place ? `${place.ahead} ahead` : ""].filter(Boolean).join(" · ");
+    return { id: r.id, title: requestTitle(r, input.nameOf), sub, status, tone };
+  });
+  const replacements = mine.filter(r => r.kind === "replacement").map(r => {
+    const [status, tone] = statusOf(r, input.queues);
+    const date = replacementDate(r);
+    return { id: r.id, title: replacementLine(r, input.nameOf), sub: [requestCode(r), date ? `effective ${shortDay(date)}` : ""].filter(Boolean).join(" · "), status, tone };
+  });
+  return {
+    queue: list ? {
+      title: `${list.name} waiting list`,
+      total: `${list.rows.length} in queue`,
+      rows: list.rows.map(q => ({ pos: `#${q.position}`, name: q.name, mine: q.mine })),
+    } : null,
+    waiting,
+    replacements,
   };
 }
 

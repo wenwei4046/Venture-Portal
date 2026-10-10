@@ -5,7 +5,7 @@ import Sheet, { SheetHandle } from "../Sheet";
 import type { CoSheetVM, IncomeOrdersVM, IncomeVM, Tone } from "./profile-vm";
 import s from "./profile.module.css";
 
-export const TONE: Record<Tone, string> = { good: s.toneGood, neutral: s.toneNeutral, warn: s.toneWarn, bad: s.toneBad, none: s.toneNone };
+export const TONE: Record<Tone, string> = { good: s.toneGood, neutral: s.toneNeutral, warn: s.toneWarn, bad: s.toneBad, none: s.toneNone, pending: s.tonePending, accepted: s.toneAccepted };
 
 /** ‹ Back, the period chip, the title — every page inside Profile opens this way. */
 export function PageHead({ back, title, period, lede, centered, onBack, onPeriod }: {

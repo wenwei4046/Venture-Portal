@@ -162,3 +162,56 @@ describe("a member's own request", () => {
     expect(sent.get("location")).toBeNull();
   });
 });
+
+// HR revamp 7b (2026-10-10): Waiting list & replacements — the queue, and Edit request → Update.
+describe("a member's waiting lists and replacements", () => {
+  const WAITING = (id: string, status: string, person: string, no: string): MemberRequest => ({
+    id, kind: "waiting", title: `${person} · Waiting List`, status, createdAt: "2026-10-04T04:00:00Z", submittedAt: "2026-10-04T04:00:00Z",
+    requestNo: no, staffId: "jia",
+    detail: { newPerson: person, contact: "012-345 6789", start: "2026-11-03", signature: "Jia En", consent: true, subDepartmentId: "fair", department: "Fair" },
+  });
+  const withRequests = () => ({ ...memberData(), requests: [WAITING("w1", "waiting", "Siti Aisyah", "RQ-2610-004"), WAITING("w2", "submitted", "Amelia Tan", "RQ-2610-006")] });
+  const QUEUE = [{ subDepartmentId: "fair", name: "Fair", rows: [
+    { position: 1, name: "Daniel L.", mine: false, requestId: null },
+    { position: 2, name: "Siti Aisyah", mine: true, requestId: "w1" },
+  ] }];
+
+  it("shows the list, then sends an edit as a revision of the request", async () => {
+    const search = "?page=account&view=track&department=fair";
+    window.history.replaceState({}, "", `/member${search}`);
+    const live = { ...source(withRequests), waitingQueue: vi.fn(async () => ({ ok: true as const, data: QUEUE })) };
+    render(<RevenueApp initialData={withRequests()} initialSearch={search} today="2026-10-05" source={live} />);
+    expect(await screen.findByRole("heading", { name: "Waiting list & replacements" })).toBeInTheDocument();
+    await waitFor(() => expect(live.waitingQueue).toHaveBeenCalledWith(undefined));
+    expect(await screen.findByText("Daniel L.")).toBeInTheDocument();
+    expect(screen.getByText("Accepted · #2")).toBeInTheDocument();
+    expect(screen.getByText("RQ-2610-004 · Fair · 1 ahead")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Amelia Tan · Waiting List/ }));
+    const sheet = within(screen.getByRole("dialog", { name: "Amelia Tan · Waiting List" }));
+    fireEvent.click(sheet.getByRole("button", { name: "Edit request" }));
+    fireEvent.change(sheet.getByLabelText("Phone number"), { target: { value: "011-222 3333" } });
+    fireEvent.click(sheet.getByRole("button", { name: "Update" }));
+    await waitFor(() => expect(live.submitRequest).toHaveBeenCalledTimes(1));
+    const sent = live.submitRequest.mock.calls[0][0];
+    expect(Object.fromEntries(sent.entries())).toMatchObject({
+      kind: "waiting", requestId: "w2", subDepartmentId: "fair", targetDepartmentId: "fair",
+      newPerson: "Amelia Tan", contact: "011-222 3333", start: "2026-11-03", signature: "Jia En", consent: "true",
+    });
+    await waitFor(() => expect(live.refresh).toHaveBeenCalled());
+  });
+
+  it("a Principal viewing a member reads their list, and cannot edit", async () => {
+    const search = "?page=account&view=track&department=fair&staff=anthony";
+    const viewedRequests = () => ({ ...principalData(), requests: [{ ...WAITING("w2", "submitted", "Amelia Tan", "RQ-2610-006"), staffId: "anthony" }] });
+    window.history.replaceState({}, "", `/member${search}`);
+    const live = { ...source(viewedRequests), waitingQueue: vi.fn(async () => ({ ok: true as const, data: [] })) };
+    render(<RevenueApp initialData={viewedRequests()} initialSearch={search} today="2026-10-05" source={live} />);
+    expect(await screen.findByRole("heading", { name: "Waiting list & replacements" })).toBeInTheDocument();
+    await waitFor(() => expect(live.waitingQueue).toHaveBeenCalledWith({ staffId: "anthony" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Amelia Tan · Waiting List/ }));
+    const sheet = within(screen.getByRole("dialog", { name: "Amelia Tan · Waiting List" }));
+    expect(sheet.queryByRole("button", { name: "Edit request" })).not.toBeInTheDocument();
+    expect(sheet.queryByRole("button", { name: "Cancel request" })).not.toBeInTheDocument();
+  });
+});

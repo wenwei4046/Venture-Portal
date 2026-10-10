@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@/types'
 import type { MemberBand, MemberData, QuoteInput } from './types'
-import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, loadMemberWaitingForm, loadMemberWaitingFormLink, submitMemberRequest } from './server'
+import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, loadMemberWaitingForm, loadMemberWaitingFormLink, loadMemberWaitingQueue, submitMemberRequest } from './server'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), createClient: vi.fn(), adminClient: vi.fn(), rpc: vi.fn(), adminRpc: vi.fn(),
@@ -436,6 +436,34 @@ describe('a member sends a request', () => {
       }))
       expect(upload).not.toHaveBeenCalled()
     })
+  })
+})
+
+// HR revamp 7b (2026-10-10): Waiting list & replacements reads the member's waiting lists.
+describe('the waiting list a member sees', () => {
+  const staff = '10000000-0000-4000-8000-000000000030'
+  const queue = [{ subDepartmentId: 'fair', name: 'Fair', rows: [{ position: 1, name: 'Daniel L.', mine: false, requestId: 'leak' }] }]
+
+  it('is the member’s own, through member_waiting_queue — nobody else’s request id comes back', async () => {
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal', 'member_requests'] }))
+    mocks.rpc.mockResolvedValueOnce({ data: queue, error: null })
+    expect(await loadMemberWaitingQueue()).toEqual({ ok: true, data: [{ subDepartmentId: 'fair', name: 'Fair', rows: [{ position: 1, name: 'Daniel L.', mine: false, requestId: null }] }] })
+    expect(mocks.rpc).toHaveBeenCalledWith('member_waiting_queue', undefined)
+  })
+
+  it('the Principal reads a viewed member’s, and must name them', async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: [], error: null })
+    expect(await loadMemberWaitingQueue({ staffId: staff })).toEqual({ ok: true, data: [] })
+    expect(mocks.rpc).toHaveBeenCalledWith('member_waiting_queue', { p_staff: staff })
+    expect((await loadMemberWaitingQueue()).ok).toBe(false)
+  })
+
+  it('a member cannot ask for somebody else’s, and an account without requests asks nothing', async () => {
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal', 'member_requests'] }))
+    expect(await loadMemberWaitingQueue({ staffId: staff })).toEqual({ ok: false, error: 'Only Principal can select another member to view.' })
+    mocks.getUser.mockResolvedValue(user({ role: 'finance', permissions: ['treasury'] }))
+    expect((await loadMemberWaitingQueue()).ok).toBe(false)
+    expect(mocks.rpc).not.toHaveBeenCalled()
   })
 })
 

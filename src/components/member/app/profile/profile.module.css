@@ -144,11 +144,14 @@
 .toneHonours { background: var(--rv-amber-bg); color: var(--rv-amber); }
 .toneTeam { background: var(--rv-orange-bg); color: var(--rv-accent); }
 .toneRequests { background: var(--rv-sand); color: var(--rv-brown); }
+.toneTrack { background: var(--rv-green-bg); color: var(--rv-kpi-ink); }
 .toneMemos { background: var(--rv-red-bg); color: var(--rv-red); }
 .toneLeads { background: var(--rv-orange-bg); color: var(--rv-accent); }
 .workText { min-width: 0; }
 .workLabel { display: flex; align-items: center; gap: 8px; font-size: calc(16px * var(--rv-type)); font-weight: 650; }
 .workBadge { font-size: calc(11.5px * var(--rv-type)); font-weight: 650; color: var(--rv-amber); background: var(--rv-amber-bg); border-radius: 10px; padding: 1px 7px; }
+/* A count on its own (Waiting list & replacements, the handoff's): white on the accent. */
+.workCount { font-size: calc(10.9px * var(--rv-type)); font-weight: 700; color: var(--rv-white); background: var(--rv-accent); border-radius: 9px; padding: 1px 7px; }
 .workSub { display: block; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); margin-top: 3px; text-wrap: pretty; }
 /* Install the app (not in the prototype — kept from the old Profile): the iOS / in-app steps open under the row */
 .installSteps { margin: 2px 0 6px 62px; font-size: calc(13.5px * var(--rv-type)); line-height: 1.45; color: var(--rv-sub); }
@@ -324,6 +327,9 @@
 .toneWarn { background: var(--rv-amber-bg); color: var(--rv-amber); }
 .toneBad { background: var(--rv-red-bg); color: var(--rv-red); }
 .toneNone { background: var(--rv-sand); color: var(--rv-sub); }
+/* A request still with HR, and one accepted onto the waiting list (the HR revamp's handoff, 2026-10-10). */
+.tonePending { background: var(--rv-gold-tint); color: var(--rv-amber); }
+.toneAccepted { background: var(--rv-green-bg); color: var(--rv-kpi-ink); }
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--rv-line); border-radius: 16px; }
 .cell { padding: 12px; }
 .cell:not(:last-child) { border-right: 1px solid var(--rv-line); }

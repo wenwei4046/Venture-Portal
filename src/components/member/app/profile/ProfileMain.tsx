@@ -10,6 +10,8 @@ const ROWS: { key: WorkKey; label: string; sub: string; d: string; tone: string 
   { key: "honours", label: "My honours", sub: "Medals and Fair records", d: ICON.trophy, tone: s.toneHonours },
   { key: "team", label: "Team & capacity", sub: "Department map and your reporting tree", d: ICON.team, tone: s.toneTeam },
   { key: "requests", label: "Requests", sub: "Claims, team changes and waiting lists", d: ICON.receipt, tone: s.toneRequests },
+  // The HR revamp (2026-10-10): where the waiting lists and replacements the member sent stand.
+  { key: "track", label: "Waiting list & replacements", sub: "Queue position and status of what you sent", d: ICON.queue, tone: s.toneTrack },
   // The CRM (2026-10-09, prototype 2a: Profile › My leads & appointments).
   { key: "crm", label: "My leads & appointments", sub: "Manage your leads and appointments", d: ICON.chat, tone: s.toneLeads },
   { key: "memos", label: "Memos & notifications", sub: "Read published team updates", d: ICON.bell, tone: s.toneMemos },
@@ -71,7 +73,7 @@ export default function ProfileMain({ vm, hidden, actions, crm = true }: { vm: P
             <button key={r.key} className={s.workRow} onClick={() => actions.open(r.key)}>
               <span className={`${s.workIcon} ${r.tone}`}><Svg d={r.d} size={22} sw={1.7} /></span>
               <span className={s.workText}>
-                <span className={s.workLabel}>{r.label}{vm.badges[r.key] && <span className={s.workBadge}>{vm.badges[r.key]}</span>}</span>
+                <span className={s.workLabel}>{r.label}{vm.badges[r.key] && <span className={r.key === "track" ? s.workCount : s.workBadge}>{vm.badges[r.key]}</span>}</span>
                 <span className={s.workSub}>{r.sub}</span>
               </span>
               <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />

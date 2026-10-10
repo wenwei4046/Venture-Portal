@@ -21,6 +21,7 @@ import { loadCommissionInput } from "@/app/(portal)/revenue/_lib/commission-inpu
 import { monthFinishes, type HonourBoard } from "./honours";
 import { formFromRow, type WaitingForm } from "@/lib/commission/waiting-form";
 import { waitingAnswersFrom, type WaitingAnswer } from "./waiting-answers";
+import { queuesFrom, type WaitingQueue } from "./waiting-queue";
 import type { MemberArenaSnapshot } from "./arena";
 import type { ArenaHistorySnapshot } from "./arena-history";
 import type {
@@ -1343,6 +1344,24 @@ export async function loadMemberWaitingForm(): Promise<MemberOutcome<MemberWaiti
     const form = formFromRow(await rpc<unknown>(client, "member_waiting_form"));
     if (!form) throw new Error("The waiting-list form could not be read. Pull to refresh.");
     return { form };
+  });
+}
+
+/**
+ * Waiting list & replacements (2026-10-10, HR revamp 7b): the waiting list of
+ * each sub-department the member belongs to, in the order HR accepted them —
+ * their own applicants by name, everybody else's by a first name and an
+ * initial (`member_waiting_queue`). The Principal reads a viewed member's.
+ */
+export async function loadMemberWaitingQueue(context?: Pick<MemberReadContext, "staffId">): Promise<MemberOutcome<WaitingQueue[]>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    const principal = isPrincipalAccount(user);
+    if (context !== undefined && !principal) throw new Error("Only Principal can select another member to view.");
+    if (principal && context === undefined) throw new Error("Choose a member to view this feature.");
+    const client = await session("member_requests", principal);
+    return queuesFrom(await rpc<unknown>(client, "member_waiting_queue", principal ? { p_staff: uuid(context!.staffId, "member") } : undefined));
   });
 }
 

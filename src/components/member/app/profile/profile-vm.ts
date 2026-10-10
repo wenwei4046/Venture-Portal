@@ -1,5 +1,6 @@
 import type { ClaimRates } from "@/lib/member/claim-rules";
 import type { MemberWaitingForm } from "@/lib/member/server";
+import type { EditField } from "@/lib/member/request-edit";
 
 /**
  * What every Profile screen draws — strings and flags only, ready to render.
@@ -8,10 +9,11 @@ import type { MemberWaitingForm } from "@/lib/member/server";
  * so both run the very same screens.
  */
 
-export type Tone = "good" | "neutral" | "warn" | "bad" | "none";
+/** `pending` and `accepted` are a request's (the HR revamp's handoff, 2026-10-10): gold for still with HR, deep green for on the waiting list. */
+export type Tone = "good" | "neutral" | "warn" | "bad" | "none" | "pending" | "accepted";
 
 // ── Profile ──
-export type WorkKey = "income" | "honours" | "team" | "requests" | "crm" | "memos";
+export type WorkKey = "income" | "honours" | "team" | "requests" | "track" | "crm" | "memos";
 export interface ProfileMainVM {
   name: string;
   ini: string;
@@ -216,8 +218,27 @@ export interface RequestDetailVM {
   facts: { l: string; v: string }[];
   log: RequestEventVM[];
   canCancel: boolean;
-  /** HR returned it: the member updates it and sends it again. */
+  /** HR returned a claim: the member updates it and sends it again (the whole form). */
   canUpdate: boolean;
+  /** A waiting list or replacement still with HR: Edit request → Update in the sheet (2026-10-10). */
+  edit?: { fields: readonly EditField[]; values: Record<string, string> } | null;
+  /** Decided, so it can no longer be changed — the handoff's words. */
+  lockedNote?: string | null;
+}
+
+// ── Waiting list & replacements (the HR revamp, 2026-10-10) ──
+export interface TrackRowVM {
+  id: string;
+  title: string;
+  sub: string;
+  status: string;
+  tone: Tone;
+}
+export interface TrackVM {
+  /** The member's sub-department's waiting list: theirs by name, everybody else's by an initial. */
+  queue: { title: string; total: string; rows: { pos: string; name: string; mine: boolean }[] } | null;
+  waiting: TrackRowVM[];
+  replacements: TrackRowVM[];
 }
 
 // ── Memos ──

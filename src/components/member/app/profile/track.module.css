@@ -1,0 +1,141 @@
+/* Waiting list & replacements and its request sheet — the HR revamp's handoff
+   (Revenue Member App.dc.html, 2026-10-10). Sizes are the prototype's ÷ .92,
+   so the phone's --rv-type lands them exactly; its spans are content-box, so a
+   bordered 44 / 48px button is 46 / 50 here. */
+
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 12px; background: var(--rv-sand); }
+.segBtn {
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--rv-sub);
+  font: inherit;
+  font-size: calc(13.5px * var(--rv-type));
+  font-weight: 500;
+}
+.segOn { background: var(--rv-white); color: var(--rv-ink); font-weight: 650; box-shadow: 0 1px 3px var(--rv-ink-14); }
+
+.queue { border: 1px solid var(--rv-line); border-radius: 20px; padding: 16px; }
+.queueHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.queueTitle { font-size: calc(15px * var(--rv-type)); font-weight: 650; }
+.queueTotal { font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
+.queueRows { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.queueRow {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--rv-white);
+  border: 1px solid var(--rv-line);
+}
+.queueMine { background: var(--rv-cream); border-color: var(--rv-accent); }
+.queuePos { font-size: calc(16px * var(--rv-type)); font-weight: 800; color: var(--rv-sub); }
+.queueMine .queuePos { color: var(--rv-accent); }
+.queueName { min-width: 0; font-size: calc(14.5px * var(--rv-type)); font-weight: 500; overflow-wrap: anywhere; }
+.queueMine .queueName { font-weight: 650; }
+.queueYours { font-size: calc(11.5px * var(--rv-type)); font-weight: 650; color: var(--rv-accent); }
+.queueEmpty { margin: 6px 0; text-align: center; font-size: calc(14px * var(--rv-type)); color: var(--rv-sub); }
+
+.histHead { margin: 0 0 4px; font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.02em; }
+.newLink {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: calc(14px * var(--rv-type));
+  font-weight: 600;
+  color: var(--rv-accent);
+}
+
+/* The request sheet */
+.panel { display: flex; flex-direction: column; }
+.head { flex: 0 0 auto; padding: 10px 20px 12px; border-bottom: 1px solid var(--rv-rule); display: flex; flex-direction: column; gap: 10px; }
+.headRow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.title { display: block; font-size: calc(20px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
+.code { display: block; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); margin-top: 3px; }
+.chip { flex: 0 0 auto; font-size: calc(11.5px * var(--rv-type)); font-weight: 650; border-radius: 8px; padding: 4px 9px; white-space: nowrap; }
+.body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; padding: 16px 20px 26px; display: flex; flex-direction: column; gap: 16px; }
+.body::-webkit-scrollbar { display: none; }
+
+.facts { display: flex; flex-direction: column; gap: 10px; }
+.fact { display: flex; justify-content: space-between; gap: 16px; font-size: calc(14px * var(--rv-type)); }
+.factLabel { color: var(--rv-sub); }
+.factValue { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+
+.edit {
+  height: 46px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--rv-accent);
+  background: transparent;
+  color: var(--rv-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  font-size: calc(14.5px * var(--rv-type));
+  font-weight: 600;
+}
+.locked { margin: 0; font-size: calc(12.5px * var(--rv-type)); line-height: 1.5; color: var(--rv-sub); background: var(--rv-sand); border-radius: 12px; padding: 10px 12px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.fieldLabel { font-size: calc(13px * var(--rv-type)); font-weight: 650; }
+.input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--rv-handle);
+  background: var(--rv-white);
+  color: var(--rv-ink);
+  font: inherit;
+  font-size: calc(15px * var(--rv-type));
+  outline: none;
+}
+.editBtns { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; align-items: start; }
+.ghost {
+  height: 50px;
+  padding: 0;
+  border-radius: 14px;
+  border: 1px solid var(--rv-line);
+  background: var(--rv-white);
+  color: var(--rv-ink);
+  font: inherit;
+  font-size: calc(15px * var(--rv-type));
+  font-weight: 600;
+}
+.update {
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: var(--rv-accent);
+  color: var(--rv-white);
+  font: inherit;
+  font-size: calc(15px * var(--rv-type));
+  font-weight: 600;
+  box-shadow: 0 3px 9px var(--rv-accent-18);
+}
+.ghost:disabled, .update:disabled { opacity: .55; }
+
+.audit { margin: 0 0 10px; font-size: calc(11.5px * var(--rv-type)); font-weight: 700; letter-spacing: .08em; color: var(--rv-sub); }
+.event { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; }
+.rail { display: flex; flex-direction: column; align-items: center; }
+.dot { flex: 0 0 auto; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--rv-handle); }
+.dotLast { background: var(--rv-accent); }
+.line { flex: 1; width: 1px; margin-top: 3px; background: var(--rv-rule); }
+.lineLast { background: transparent; }
+.eventBody { padding-bottom: 12px; min-width: 0; }
+.eventTop { display: flex; justify-content: space-between; gap: 10px; font-size: calc(14px * var(--rv-type)); }
+.eventWhat { font-weight: 600; }
+.eventWhen { font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); white-space: nowrap; }
+.eventWho { font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); }
+.eventNote { font-size: calc(12.5px * var(--rv-type)); margin-top: 2px; }

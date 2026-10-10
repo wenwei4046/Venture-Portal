@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { MemberMemo, MemberMembership, MemberOrgMap, MemberRequest } from "@/lib/member/types";
 import type { ArenaPerson, MemberArenaSnapshot } from "@/lib/member/arena";
 import {
-  claimWeeks, memoCat, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestRowsVM, teamVM, vaGroupsVM, waitingChoices,
+  claimWeeks, memoCat, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestRowsVM, requestStatus, teamVM, trackedCount, trackVM, vaGroupsVM, waitingChoices,
   type RequestEvent,
 } from "./profile-model";
 
@@ -15,9 +15,10 @@ const request = (over: Partial<MemberRequest> = {}): MemberRequest => ({
 const nameOf = (id: string) => ({ s2: "DARREN ONG" } as Record<string, string>)[id] ?? null;
 
 describe("requests", () => {
-  it("lists a request by what it is for, its day in Kuala Lumpur and its number", () => {
+  // The HR revamp's words (2026-10-10): the number first, then the day; gold while HR has it.
+  it("lists a request by what it is for, its number and its day in Kuala Lumpur", () => {
     const [row] = requestRowsVM([request()], nameOf);
-    expect(row).toMatchObject({ title: "Outstation claim · Mid Valley Megamall", sub: "5 Oct · RQ-2610-001", status: "Pending HR", tone: "warn" });
+    expect(row).toMatchObject({ title: "Outstation claim · Mid Valley Megamall", sub: "RQ-2610-001 · 5 Oct", status: "Pending review", tone: "pending" });
   });
 
   it("names a replacement by the member it replaces, and leaves drafts out", () => {
@@ -25,7 +26,7 @@ describe("requests", () => {
       request({ id: "a", kind: "replacement", detail: { originalStaffId: "s2", replacementSource: "new" } }),
       request({ id: "b", status: "draft" }),
     ], nameOf);
-    expect(rows.map(r => r.title)).toEqual(["Replacement · DARREN ONG"]);
+    expect(rows.map(r => r.title)).toEqual(["DARREN ONG · Replacement"]);
   });
 
   it("falls back to the id's head before the number existed", () => {
@@ -241,7 +242,97 @@ describe("the request forms' choices", () => {
     ]);
     expect(choices).toEqual([
       { id: "w1", name: "Siti Aminah", sub: "RQ-2610-002 · start 1 Nov", status: "Approved", ok: true },
-      { id: "w2", name: "Lee Wei", sub: "RQ-2610-003 · submitted 5 Oct", status: "Pending HR", ok: false },
+      { id: "w2", name: "Lee Wei", sub: "RQ-2610-003 · submitted 5 Oct", status: "Pending review", ok: false },
+    ]);
+  });
+});
+
+// HR revamp 7b (2026-10-10): Waiting list & replacements, and a request opened from it.
+describe("waiting list & replacements", () => {
+  const queues = [{ subDepartmentId: "fair", name: "Fair", rows: [
+    { position: 1, name: "Daniel L.", mine: false, requestId: null },
+    { position: 2, name: "Siti Aisyah", mine: true, requestId: "w1" },
+  ] }];
+  const accepted = request({ id: "w1", kind: "waiting", status: "waiting", requestNo: "RQ-2610-004",
+    detail: { newPerson: "Siti Aisyah", contact: "019-880 3312", start: "2026-11-02", department: "Fair", subDepartmentId: "fair" } });
+  const pending = request({ id: "w2", kind: "waiting", status: "submitted", requestNo: "RQ-2610-006", submittedAt: "2026-10-06T01:00:00Z",
+    detail: { newPerson: "Amelia Tan", contact: "012-345 6789", start: "2026-11-03", department: "Fair", subDepartmentId: "fair" } });
+  const scheduled = request({ id: "r1", kind: "replacement", status: "scheduled", requestNo: "RQ-2610-005",
+    detail: { originalStaffId: "s2", destination: "member_exit", newPerson: "", allocatedName: "RYAN TAN", effective: "2026-10-25", effectiveOn: "2026-10-31", reason: "Leaving Fair" } });
+
+  it("words a request the handoff's way: its place on the list, the day a replacement runs", () => {
+    expect(requestStatus("waiting", { position: 2 })).toEqual(["Accepted · #2", "accepted"]);
+    expect(requestStatus("scheduled", { date: "2026-10-31" })).toEqual(["Scheduled · 31 Oct", "pending"]);
+    expect(requestStatus("needs_info")).toEqual(["More info needed", "pending"]);
+    expect(requestStatus("failed")).toEqual(["Failed · removed", "bad"]);
+    expect(requestStatus("allocated")).toEqual(["Joined", "good"]);
+  });
+
+  it("shows the sub-department's list — the member's own by name — and what they sent", () => {
+    const vm = trackVM({ requests: [accepted, pending, scheduled], queues, subDepartmentId: "fair", nameOf });
+    expect(vm.queue).toEqual({ title: "Fair waiting list", total: "2 in queue", rows: [
+      { pos: "#1", name: "Daniel L.", mine: false }, { pos: "#2", name: "Siti Aisyah", mine: true },
+    ] });
+    expect(vm.waiting).toEqual([
+      { id: "w2", title: "Amelia Tan · Waiting List", sub: "RQ-2610-006 · Fair", status: "Pending review", tone: "pending" },
+      { id: "w1", title: "Siti Aisyah · Waiting List", sub: "RQ-2610-004 · Fair · 1 ahead", status: "Accepted · #2", tone: "accepted" },
+    ]);
+    expect(vm.replacements).toEqual([
+      { id: "r1", title: "DARREN ONG → RYAN TAN", sub: "RQ-2610-005 · effective 31 Oct", status: "Scheduled · 31 Oct", tone: "pending" },
+    ]);
+    expect(trackVM({ requests: [], queues: [], subDepartmentId: "fair", nameOf }).queue).toBeNull();
+  });
+
+  it("counts what is still in flight on Profile's row", () => {
+    expect(trackedCount([accepted, pending, scheduled, request({ id: "x", kind: "waiting", status: "rejected" })])).toBe(3);
+    expect(profileMainVM({ name: "Jia En", title: "T", rank: "R", subName: "Fair", requests: [accepted], memos: [] }).badges.track).toBe("1");
+  });
+
+  it("opens a waiting list on its facts and place, editable while HR has not acted", () => {
+    const vm = requestDetailVM(pending, null, { nameOf, readOnly: false, queues });
+    expect(vm.title).toBe("Amelia Tan · Waiting List");
+    expect(vm.facts).toEqual([
+      { l: "Applicant", v: "Amelia Tan" }, { l: "Phone", v: "012-345 6789" }, { l: "Start date", v: "3 Nov" }, { l: "Sub-department", v: "Revenue · Fair" },
+    ]);
+    expect(vm.edit?.fields.map(f => f.label)).toEqual(["New member name", "Phone number", "Preferred start date"]);
+    expect(vm.edit?.values).toEqual({ newPerson: "Amelia Tan", contact: "012-345 6789", start: "2026-11-03" });
+    expect(vm.lockedNote).toBeNull();
+    expect(vm.canCancel).toBe(true);
+    expect(vm.canUpdate).toBe(false);
+    // A Principal viewing it reads it, and changes nothing.
+    expect(requestDetailVM(pending, null, { nameOf, readOnly: true, queues }).edit).toBeNull();
+  });
+
+  it("locks one HR accepted, and says where it stands", () => {
+    const vm = requestDetailVM(accepted, null, { nameOf, readOnly: false, queues });
+    expect(vm.facts).toContainEqual({ l: "Queue position", v: "#2 of 2" });
+    expect(vm.status).toBe("Accepted · #2");
+    expect(vm.edit).toBeNull();
+    expect(vm.lockedNote).toBe("This request has been accepted, so it can no longer be edited. Ask HR if something needs to change.");
+  });
+
+  it("names a replacement by who leaves and who takes the seat, on HR's date", () => {
+    const vm = requestDetailVM(scheduled, null, { nameOf, readOnly: false, queues });
+    expect(vm.title).toBe("DARREN ONG → RYAN TAN");
+    expect(vm.facts).toEqual([
+      { l: "Original member", v: "DARREN ONG" }, { l: "Arrangement", v: "Leave this department only" }, { l: "Replacement", v: "RYAN TAN" },
+      { l: "Effective date", v: "31 Oct" }, { l: "Reason", v: "Leaving Fair" },
+    ]);
+    expect(vm.lockedNote).toContain("has been approved");
+  });
+
+  it("tells an edit by what changed, and an update after HR asked for more", () => {
+    const events: RequestEvent[] = [
+      { at: "2026-10-06T01:00:00Z", status: "submitted", from: "draft", actor: "you", actorName: null, note: null },
+      { at: "2026-10-06T02:00:00Z", status: "submitted", from: "draft", actor: "you", actorName: null, note: "Updated by the member · phone number, preferred start date" },
+      { at: "2026-10-07T01:00:00Z", status: "needs_info", from: "submitted", actor: "hr", actorName: "Nadia", note: "Which IC?" },
+      { at: "2026-10-07T02:00:00Z", status: "submitted", from: "draft", actor: "you", actorName: null, note: "Which IC?" },
+    ];
+    expect(requestDetailVM(pending, events, { nameOf, readOnly: false, queues }).log.map(e => [e.what, e.note])).toEqual([
+      ["Submitted", "Amelia Tan · preferred start 3 Nov"],
+      ["Updated by the member", "Changed: phone number, preferred start date"],
+      ["Returned · needs info", "Which IC?"],
+      ["Updated and sent again", ""],
     ]);
   });
 });

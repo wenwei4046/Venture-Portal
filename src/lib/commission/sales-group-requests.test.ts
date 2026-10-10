@@ -131,4 +131,18 @@ describe('historyOf', () => {
     ])
     expect(steps.map(s => s.what)).toEqual(['Submitted', 'Scheduled', 'Completed'])
   })
+
+  // HR revamp 7b (2026-10-10): the member's Edit request → Update is a step of its own, saying what changed.
+  it('reads a member’s edit as its own step, with what changed', () => {
+    const steps = historyOf([
+      { to: 'submitted', at: '2026-10-09T01:00:00Z', note: null, by: 'KAR JUN' },
+      { to: 'submitted', at: '2026-10-09T03:00:00Z', note: 'Updated by the member · phone number, preferred start date', by: 'KAR JUN' },
+      { to: 'submitted', at: '2026-10-09T04:00:00Z', note: 'Updated by the member', by: 'KAR JUN' },
+    ])
+    expect(steps.map(s => [s.what, s.note])).toEqual([
+      ['Submitted', null],
+      ['Updated by the member', 'Changed: phone number, preferred start date'],
+      ['Updated by the member', null],
+    ])
+  })
 })

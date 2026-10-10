@@ -6,10 +6,11 @@
  */
 import type {
   CoSheetVM, HonourBoard, HonourKind, HonoursVM, IncomeOrdersVM, IncomeVM, MemoVM, PersonSheetVM,
-  ProfileMainVM, RequestDetailVM, RequestRowVM, TeamVM, Tone, VaGroupVM,
+  ProfileMainVM, RequestDetailVM, RequestRowVM, TeamVM, Tone, TrackVM, VaGroupVM,
 } from "../profile/profile-vm";
 import type { FormOptions } from "../profile/RequestForm";
 import { BUILT_FORM_NAME, BUILTIN_FIELDS } from "@/lib/commission/waiting-form";
+import { EDIT_FIELDS } from "@/lib/member/request-edit";
 import { ordinal, rm, rm2 } from "../format";
 
 export interface ProfileFixture {
@@ -22,6 +23,8 @@ export interface ProfileFixture {
   memos: MemoVM[];
   va: { people: { id: string; departmentId: string; name: string; ini: string; sub: string; level: number }[]; departments: Record<string, string> };
   form: FormOptions;
+  /** Waiting list & replacements as the handoff's member app opens on its own: Fair's list empty, nothing sent. */
+  track: TrackVM;
 }
 
 /** The prototype's `ini`: the first two words' letters. */
@@ -265,19 +268,69 @@ export function protoVaGroups(people: ProfileFixture["va"]["people"], department
   }).filter(g => g.people.length);
 }
 
-export function protoProfile(): ProfileFixture {
+
+/**
+ * Waiting list & replacements on the handoff's sample requests — Kar Jun's, in
+ * Revenue App.dc.html's REQUESTS (2026-10-10): Fair's list holds Amelia Tan and
+ * Daniel Lee (nobody's of his), his own waiting list is still with HR, and two
+ * replacements. The preview's `?track=sample`, to see the rows and the sheet.
+ */
+function trackSample(): { track: TrackVM; rows: RequestRowVM[]; details: Record<string, RequestDetailVM> } {
+  const pending = { status: "Pending review", tone: "pending" as Tone };
+  const sent = (who: string, when: string) => [{ what: "Submitted", who, when, note: "", dot: "good" as const }];
+  const details: Record<string, RequestDetailVM> = {
+    "MR-0421": {
+      id: "MR-0421", title: "Siti Aisyah · Waiting List", code: "MR-0421", ...pending,
+      facts: [{ l: "Applicant", v: "Siti Aisyah" }, { l: "Phone", v: "019-880 3312" }, { l: "Start date", v: "2 Nov" }, { l: "Sub-department", v: "Revenue · Fair" }],
+      log: sent("Kar Jun", "8 Oct"), canCancel: true, canUpdate: false,
+      edit: { fields: EDIT_FIELDS.waiting, values: { newPerson: "Siti Aisyah", contact: "019-880 3312", start: "2026-11-02" } }, lockedNote: null,
+    },
+    "MR-0405": {
+      id: "MR-0405", title: "Marcus → Ryan Tan", code: "MR-0405", ...pending,
+      facts: [{ l: "Original member", v: "Marcus" }, { l: "Arrangement", v: "Leave this department only" }, { l: "Replacement", v: "Ryan Tan" },
+        { l: "Effective date", v: "8 Oct" }, { l: "Reason", v: "Marcus leaves Fair; Ryan Tan takes the seat" }],
+      log: sent("Kar Jun", "1 Oct"), canCancel: true, canUpdate: false,
+      edit: { fields: EDIT_FIELDS.replacement, values: { newPerson: "Ryan Tan", effective: "2026-10-08", reason: "Marcus leaves Fair; Ryan Tan takes the seat" } }, lockedNote: null,
+    },
+    "MR-0423": {
+      id: "MR-0423", title: "Louis → seat released", code: "MR-0423", ...pending,
+      facts: [{ l: "Original member", v: "Louis" }, { l: "Arrangement", v: "Leave the company" }, { l: "Replacement", v: "Seat released" },
+        { l: "Effective date", v: "31 Oct" }, { l: "Reason", v: "Resigning at the end of the month" }],
+      log: sent("Kar Jun", "9 Oct"), canCancel: true, canUpdate: false,
+      edit: { fields: EDIT_FIELDS.replacement, values: { newPerson: "", effective: "2026-10-31", reason: "Resigning at the end of the month" } }, lockedNote: null,
+    },
+  };
+  const waiting = [{ id: "MR-0421", title: "Siti Aisyah · Waiting List", sub: "MR-0421 · Fair", ...pending }];
+  const replacements = [
+    { id: "MR-0405", title: "Marcus → Ryan Tan", sub: "MR-0405 · effective 8 Oct", ...pending },
+    { id: "MR-0423", title: "Louis → seat released", sub: "MR-0423 · effective 31 Oct", ...pending },
+  ];
+  return {
+    track: { queue: { title: "Fair waiting list", total: "2 in queue", rows: [{ pos: "#1", name: "Amelia T.", mine: false }, { pos: "#2", name: "Daniel L.", mine: false }] }, waiting, replacements },
+    rows: [
+      ...waiting.map(r => ({ ...r, kind: "waiting" as const })),
+      ...replacements.map(r => ({ ...r, kind: "replacement" as const })),
+    ],
+    details,
+  };
+}
+
+export function protoProfile(opts: { track?: boolean } = {}): ProfileFixture {
+  const sample = opts.track ? trackSample() : null;
+  const base = requests();
   return {
     main: profileMain(),
     income: { shown: income(false), hidden: income(true) },
     orders: { shown: orders(false), hidden: orders(true) },
     honours: { monthly: honours("monthly"), quarterly: honours("quarterly"), annual: honours("annual") },
     team: team(),
-    requests: requests(),
+    requests: sample ? { rows: [...sample.rows, ...base.rows], details: { ...base.details, ...sample.details } } : base,
     memos: memos(),
     va: {
       people: VA_PEOPLE.map(p => ({ id: p.id, departmentId: p.sub, name: p.name, ini: ini(p.name), sub: `${p.title} · ${p.rank}`, level: p.lv })),
       departments: { fair: "Fair", ir: "IR" },
     },
+    track: sample?.track ?? { queue: { title: "Fair waiting list", total: "0 in queue", rows: [] }, waiting: [], replacements: [] },
     form: {
       subName: "Fair",
       weeks: MY_FAIRS.map((f, i) => ({ key: `w${i}`, month: "SEP", n: `W${i + 1}`, brandWeek: `${f.brand} week`, brand: f.brand.toUpperCase(), dates: f.dates, venue: f.venue, org: f.org,
