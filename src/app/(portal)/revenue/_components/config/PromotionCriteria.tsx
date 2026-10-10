@@ -7,11 +7,12 @@ import {
   type PromotionRule,
   type PromotionStep,
 } from '@/lib/commission/promotion-steps'
-import { Hint, SectionHead } from '@/components/RowForm'
 import type { MarginBandRow, PromotionRuleRow, RankRow } from './types'
 
 /**
- * VIII. Promotion criteria — one block per step up the ladder.
+ * Rules › Promotion criteria — one block per step up the ladder. Under the
+ * section's title and one line since 2026-10-10 (the HR revamp); the numbered
+ * head and its hint went with the rail.
  *
  * The rows were a flat list: `ta_7 → ta_8` five times, an "Alt" column of
  * 1 / 1 / 2 / 2 / 3 to say which rows go together, and an "Enforced" column
@@ -36,19 +37,11 @@ export default function PromotionCriteria({
   const bandLabel = (key: string) => bands.find(b => b.band_key === key)?.label ?? key
 
   return (
-    <section>
-      <SectionHead title="VIII. Promotion criteria" count="RECORDED · NOT ENFORCED" />
-      <Hint>
-        One block per step up the ladder. A <em>route</em> is met when every line in it holds;
-        a step with several routes needs only one of them. Nothing reads these yet — the only gate
-        the engine applies is the group-sales target on the ladder above, marked where a line
-        matches it.
-      </Hint>
-
+    <section aria-label="Promotion criteria · recorded, not enforced">
       {steps.length === 0 ? (
         <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
           <p className="text-sm">
-            The ladder is empty — add ranks in section II first.
+            The ladder is empty — add its rungs on the Title ladder first.
           </p>
         </div>
       ) : (

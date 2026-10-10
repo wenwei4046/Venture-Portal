@@ -565,12 +565,9 @@ export default function MemberAdmin({
         )}
         <div className={s.tabs}>
           {[
-            ...(data.canManageRequests
-              ? [
-                  ["requests", "Request reviews"],
-                  ["capacity", "Capacity & waiting list"],
-                ]
-              : []),
+            // The headcount limit moved to Revenue › Rules › Capacity
+            // (2026-10-10, the HR revamp): it is the sub-department's own rule.
+            ...(data.canManageRequests ? [["requests", "Request reviews"]] : []),
             // The back office of My brand weeks (2026-10-03): live data, so
             // the portal page only, not the member app's admin preview.
             ...(portal && !demo && data.canManageRequests
@@ -858,10 +855,10 @@ export default function MemberAdmin({
                       {request.kind === "waiting" &&
                         request.status === "waiting" && (
                           <p className={s.notice}>
-                            The applicant is on the waiting list. An available
-                            position can be reserved when the joining date is
-                            eligible. View or run matching in Capacity & waiting
-                            list.
+                            The applicant is on the waiting list. A free
+                            position is reserved for them once the joining date
+                            is eligible. The headcount limit is set on Revenue ›
+                            Rules › Capacity.
                           </p>
                         )}
                       {request.kind === "waiting" &&
@@ -1154,66 +1151,6 @@ export default function MemberAdmin({
               </p>
             </section>
           </div>
-        )}
-        {tab === "capacity" && (
-          <section className={s.card}>
-            <h2>Department capacity & reservations</h2>
-            <p className={s.sub}>
-              Capacity includes active members and reserved positions. Set an
-              explicit limit for each department.
-            </p>
-            {data.departments.map((d) => (
-              <form
-                key={d.id}
-                className={s.listRow}
-                style={{ flexWrap: "wrap" }}
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void run({
-                    action: "set_capacity",
-                    subDepartmentId: d.id,
-                    capacity: Number(
-                      new FormData(e.currentTarget).get("capacity"),
-                    ),
-                  });
-                }}
-              >
-                <div>
-                  <h3>{d.name}</h3>
-                  <p className={s.sub}>
-                    Active {d.occupied} · Reserved {d.reserved}
-                  </p>
-                </div>
-                <label className={s.field} style={{ width: 120 }}>
-                  <span>Member limit</span>
-                  <input
-                    name="capacity"
-                    type="number"
-                    min={1}
-                    max={10000}
-                    defaultValue={d.capacity ?? ""}
-                    required
-                  />
-                </label>
-                <button
-                  className={s.button}
-                  disabled={busy || !data.canManageRequests}
-                >
-                  Save capacity
-                </button>
-                <button
-                  className={s.button}
-                  type="button"
-                  disabled={busy || !data.canManageRequests}
-                  onClick={() =>
-                    void run({ action: "process_queue", subDepartmentId: d.id })
-                  }
-                >
-                  Match vacancies
-                </button>
-              </form>
-            ))}
-          </section>
         )}
         {tab === "weeks" && (
           <MemberBrandWeeksAdmin

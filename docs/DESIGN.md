@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -210,6 +210,23 @@ disagree, the file wins; every value is the prototype's.**
   "—"), the months as a grid with each source a chip and its file below it;
   Data source is a 440px drawer holding everything the ERP link and feed
   panels did.
+- **Rules** (v3.20, 2026-10-10; `_components/rules/`): a 200px side list beside
+  the section (`gap 28`), grouped *Pay structure · Item rules · Headcount ·
+  Policy* (10px/600/.12em brown caps), each section a 13px row (7px 10px, 7px
+  radius; the open one peach, 600, `inset 3px 0 0` orange), a hairline and
+  "Item rules appear when their switch on Scheme rules is on." under them. A
+  section opens with its 20px/500 title and one 13px `90 78 68` line.
+  **Scheme rules** = the eight components as rows of a 10px `216 210 200` box
+  (44px toggle · 250px label · description; an off label in brown; a 6px
+  orange dot on a switch changed since the save), what a component needs
+  opened under its row in `250 250 249` cards (Group incentive's three layer
+  settings, mono 15px values), *Defaults* below, and Save at the title's right
+  (`242 241 238` / `152 142 130` "Saved" until something moves, then orange).
+  **Ranks** = a grid table Rank · Product rate · Held by (shown), Edit in
+  place on a peach strip. **Capacity** = four 12px-radius figure cards (24px
+  / 600), the *Headcount limit* box (640px content-box, an 80px mono input,
+  orange Save) and how many wait for a seat. The other sections keep their
+  tables under the new title — the prototype's "same content as today".
 - **Cross-check** with a measuring script that finds each element by its text
   on both and diffs computed font / colour / size / padding / border / radius
   / background (`.design/revenue-app/tools/measure-pl.mjs` is the pattern).

@@ -308,17 +308,7 @@ export default function KpiItemsSection({
   const count = listed.length
 
   return (
-    <section>
-      <SectionHead title="XI. KPI items" count={`${plural(count, 'ITEM').toUpperCase()}`} />
-      <Hint>
-        Which items count as KPI, and what each pays. Pick a SKU from the SKU Master, or a special from
-        Maintenance — a bed frame&apos;s <em>HB Straight</em>, a sofa&apos;s <em>Wooden Arm</em> — and give it an
-        amount. When the commission calculation finds one on a bill (the SKU on a line, the special among the
-        options printed on the bed frame or sofa), its amount comes off the bill&apos;s sales — the margin is judged
-        on what is left — and is paid flat as KPI: a SKU per unit, a bed frame special per bed frame, a sofa special
-        once per bill. A change counts from this month; earlier months keep what they were worked out at.
-      </Hint>
-
+    <section aria-label={`KPI items · ${plural(count, 'item')}`}>
       {!scheme.enable_kpi ? (
         <p className="sheet-warning">
           <strong>KPI item allowance is off</strong> for {subName}: nothing below comes off a bill or is paid until it
