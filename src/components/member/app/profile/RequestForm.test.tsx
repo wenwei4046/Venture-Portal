@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import RequestForm, { type ClaimWeek, type FormOptions } from "./RequestForm";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { BUILT_FORM_NAME, BUILTIN_FIELDS, type WaitingForm } from "@/lib/commission/waiting-form";
+import RequestForm, { type ClaimWeek, type FormLink, type FormOptions } from "./RequestForm";
 import RequestsPage from "./RequestsPage";
 
 afterEach(cleanup);
@@ -265,6 +266,150 @@ describe("a member's own claim (user 2026-10-06)", () => {
       expect(screen.queryByLabelText("Invoice total (RM)")).not.toBeInTheDocument();
       expect(claimed()).toBe("RM 260.00");
       expect(screen.getByText("Set by the fixed rate. You can't edit the amount.")).toBeInTheDocument();
+    });
+  });
+});
+
+// HR revamp 7a (2026-10-10): the waiting list is drawn from the form Sales Groups › Form settings
+// versions — the four built-ins, HR's own questions, the application form to download and upload.
+describe("a waiting list, on HR's form", () => {
+  const form = (over: Partial<WaitingForm> = {}): WaitingForm => ({
+    version: 3, requireUpload: true, templatePath: null, templateName: BUILT_FORM_NAME, createdAt: null,
+    fields: [
+      ...BUILTIN_FIELDS,
+      { id: "ic", label: "IC number", type: "text", required: true, placeholder: "e.g. 900101-14-5678" },
+      { id: "heard", label: "How did they hear about us", type: "dropdown", required: false, options: ["Referral", "Roadshow"] },
+      { id: "transport", label: "Has own transport", type: "yesno", required: false },
+    ],
+    ...over,
+  });
+  const waiting = (onSubmit = vi.fn(), over: Partial<WaitingForm> = {}, extra: { revising?: { id: string; detail: Record<string, unknown> }; formLink?: FormLink } = {}) =>
+    render(<RequestForm kind="waiting" options={{ ...options, waitingForm: { form: form(over) } }} revising={extra.revising ?? null} readOnly={false}
+      onSubmit={onSubmit} onClose={() => {}} formLink={extra.formLink} />);
+  const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label, { exact: false }), { target: { value } });
+  const fill = () => {
+    type("New member name", "Amelia Tan");
+    type("Phone number", "012-345 6789");
+    type("Preferred start date", "2026-11-01");
+    type("IC number", "900101-14-5678");
+    fireEvent.click(screen.getByRole("button", { name: "Roadshow" }));
+    fireEvent.change(screen.getByPlaceholderText("Type your full name"), { target: { value: "Jia En" } });
+  };
+  const upload = (container: HTMLElement, name = "form.pdf") =>
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [new File(["%PDF-1.7"], name, { type: "application/pdf" })] } });
+
+  it("asks HR's questions after the built-ins, the optional ones marked, under the capacity", () => {
+    waiting();
+    expect(screen.getByText("Fair capacity").nextElementSibling).toHaveTextContent("1 of 27 open");
+    expect(screen.getByText("How did they hear about us (optional)")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Has own transport" })).toHaveTextContent("YesNo");
+    expect(screen.getByRole("group", { name: "Preferred sub-department" })).toHaveTextContent("FairIR");
+    expect(screen.getByText("Application form")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Upload signed form" })).toBeInTheDocument();
+  });
+
+  it("names what is missing, marks each, then wants the signed form, then the signature", () => {
+    const onSubmit = vi.fn();
+    const { container } = waiting(onSubmit);
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Fill in new member name, phone number, preferred start date, IC number.");
+    expect(screen.getAllByText("Required")).toHaveLength(4);
+    fill();
+    fireEvent.change(screen.getByPlaceholderText("Type your full name"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit" }));
+    expect(screen.queryAllByText("Required")).toHaveLength(0);
+    expect(screen.getByRole("alert")).toHaveTextContent("Upload the signed application form.");
+    upload(container);
+    expect(screen.getByText("✓ form.pdf")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Replace file" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Type your full name to sign.");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("sends the built-ins as before, HR's answers with the form's version, and the signed form", async () => {
+    const onSubmit = vi.fn(async (data: FormData) => { void data; return { ok: true as const, code: "RQ-2610-009" }; });
+    const { container } = waiting(onSubmit);
+    fill();
+    upload(container);
+    fireEvent.click(screen.getByRole("button", { name: "IR" }));
+    expect(screen.getByText("IR capacity").nextElementSibling).toHaveTextContent("4 · no limit");
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit" }));
+    expect(await screen.findByText("RQ-2610-009")).toBeInTheDocument();
+    expect(screen.getByText("Signed form attached · form.pdf")).toBeInTheDocument();
+    const { signedForm, answers, ...fields } = sent(onSubmit);
+    expect((signedForm as File).name).toBe("form.pdf");
+    expect(JSON.parse(String(answers))).toEqual([
+      { id: "ic", label: "IC number", value: "900101-14-5678" },
+      { id: "heard", label: "How did they hear about us", value: "Roadshow" },
+      { id: "transport", label: "Has own transport", value: "" },
+    ]);
+    expect(fields).toEqual({ kind: "waiting", subDepartmentId: "fair", newPerson: "Amelia Tan", contact: "012-345 6789", targetDepartmentId: "ir",
+      start: "2026-11-01", consent: "true", formVersion: "3", signature: "Jia En" });
+  });
+
+  it("goes without a signed form when HR does not ask for one", async () => {
+    const onSubmit = vi.fn(async (data: FormData) => { void data; return { ok: true as const, code: "RQ-2610-010" }; });
+    waiting(onSubmit, { requireUpload: false });
+    expect(screen.getByText("Application form (optional)")).toBeInTheDocument();
+    fill();
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit" }));
+    expect(await screen.findByText("RQ-2610-010")).toBeInTheDocument();
+    expect(sent(onSubmit)).not.toHaveProperty("signedForm");
+  });
+
+  it("an update keeps the answers and the signed form it was sent with", async () => {
+    const onSubmit = vi.fn(async (data: FormData) => { void data; return { ok: true as const, code: "RQ-2610-011" }; });
+    const hash = "a".repeat(64);
+    waiting(onSubmit, {}, { revising: { id: "r1", detail: { newPerson: "Amelia Tan", contact: "012", start: "2026-11-01", targetDepartmentId: "fair",
+      answers: [{ id: "ic", label: "IC number", value: "900101" }], signedFormName: "signed.jpg", signedFormHash: hash } } });
+    expect(screen.getByLabelText("IC number", { exact: false })).toHaveValue("900101");
+    expect(screen.getByText("✓ signed.jpg")).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("Type your full name"), { target: { value: "Jia En" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send the update" }));
+    expect(await screen.findByText("RQ-2610-011")).toBeInTheDocument();
+    expect(sent(onSubmit)).toMatchObject({ requestId: "r1", signedFormName: "signed.jpg", signedFormHash: hash });
+    expect(sent(onSubmit)).not.toHaveProperty("signedForm");
+  });
+
+  describe("Download form", () => {
+    const saved: { name: string; href: string }[] = [];
+    beforeEach(() => {
+      saved.length = 0;
+      URL.createObjectURL = vi.fn(() => "blob:form");
+      URL.revokeObjectURL = vi.fn();
+      vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) { saved.push({ name: this.download, href: this.href }); });
+    });
+    afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+    it("builds the black-and-white form from the questions when HR uploaded none", async () => {
+      const formLink = vi.fn();
+      waiting(vi.fn(), {}, { formLink });
+      fireEvent.click(screen.getByRole("button", { name: "Download form" }));
+      await waitFor(() => expect(saved).toEqual([{ name: BUILT_FORM_NAME, href: "blob:form" }]));
+      expect(formLink).not.toHaveBeenCalled();
+      const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob;
+      const html = await blob.text();
+      expect(html).toContain("Revenue Department · Fair · Form v3");
+      expect(html).toContain("IC number *");
+    });
+
+    it("hands over HR's own form through a fresh link", async () => {
+      const formLink = vi.fn(async () => ({ ok: true as const, data: { url: "https://files.example/form.pdf?token=1", name: "HR form.pdf" } }));
+      const fetchMock = vi.fn(async () => new Response(new Blob(["%PDF-1.7"]), { status: 200 }));
+      vi.stubGlobal("fetch", fetchMock);
+      waiting(vi.fn(), { templatePath: "templates/x/HR form.pdf", templateName: "HR form.pdf" }, { formLink });
+      fireEvent.click(screen.getByRole("button", { name: "Download form" }));
+      await waitFor(() => expect(saved).toEqual([{ name: "HR form.pdf", href: "blob:form" }]));
+      expect(formLink).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith("https://files.example/form.pdf?token=1");
+    });
+
+    it("says when HR's form cannot be fetched", async () => {
+      waiting(vi.fn(), { templatePath: "templates/x/HR form.pdf" }, { formLink: async () => ({ ok: false as const, error: "HR's application form could not be downloaded. Try again." }) });
+      fireEvent.click(screen.getByRole("button", { name: "Download form" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("HR's application form could not be downloaded. Try again.");
+      expect(saved).toEqual([]);
     });
   });
 });

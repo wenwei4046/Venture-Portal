@@ -6,6 +6,7 @@ import {
   fetchDepartmentIncome,
   fetchMemberCatalogue,
   fetchMemberClaimRates,
+  fetchMemberWaitingForm,
   fetchMemberHonours,
   fetchMemberIncome,
   fetchMemberInsight,
@@ -34,6 +35,7 @@ export type MemberRead =
   | { kind: "honours"; subDepartmentId: string; from: string; until: string; context?: MemberReadContext }
   | { kind: "memoReceipts"; staffId: string }
   | { kind: "claimRates" }
+  | { kind: "waitingForm" }
   | { kind: "requestHistory"; id: string };
 
 /** A read's answer, or the message of what it threw — the client rejects that read alone. */
@@ -73,6 +75,7 @@ function readOne(read: MemberRead): Promise<unknown> {
     case "honours": return fetchMemberHonours(read.subDepartmentId, read.from, read.until, read.context);
     case "memoReceipts": return fetchPrincipalMemoReceipts(read.staffId);
     case "claimRates": return fetchMemberClaimRates();
+    case "waitingForm": return fetchMemberWaitingForm();
     case "requestHistory": return fetchMemberRequestHistory(read.id);
     default: return Promise.reject(new Error("Unknown read."));
   }

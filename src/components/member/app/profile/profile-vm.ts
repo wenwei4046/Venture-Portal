@@ -1,4 +1,5 @@
 import type { ClaimRates } from "@/lib/member/claim-rules";
+import type { MemberWaitingForm } from "@/lib/member/server";
 
 /**
  * What every Profile screen draws — strings and flags only, ready to render.
@@ -291,4 +292,6 @@ export interface FormOptions {
   waitingList: { id: string; name: string; sub: string; status: string; ok: boolean }[];
   /** First choices, as the design preview shows them. Live: nothing is chosen for the member. */
   initial?: { member?: string; male?: number; female?: number; department?: string };
+  /** The waiting-list form HR set (2026-10-10) — its own questions and whether the signed form must come with it. */
+  waitingForm?: MemberWaitingForm | null;
 }

@@ -16,6 +16,8 @@ import {
   cancelMemberRequest as cancel,
   loadMemberRequestHistory,
   loadMemberClaimRates,
+  loadMemberWaitingForm,
+  loadMemberWaitingFormLink,
   loadPrincipalMemoReceipts,
   loadMemberIncome,
   loadDepartmentIncome,
@@ -86,6 +88,14 @@ export async function fetchMemberHonours(subDepartmentId: string, from: string, 
 }
 export async function fetchMemberClaimRates() {
   return loadMemberClaimRates();
+}
+/** The waiting-list form HR set (Sales Groups › Form settings) — the Revenue app draws it. */
+export async function fetchMemberWaitingForm() {
+  return loadMemberWaitingForm();
+}
+/** Download form: a fresh ten-minute link to HR's uploaded application form, or null for the built one. */
+export async function fetchMemberWaitingFormLink() {
+  return loadMemberWaitingFormLink();
 }
 export async function acknowledgeMemberMemo(id: string, ack: boolean) {
   const result = await acknowledge(id, ack);

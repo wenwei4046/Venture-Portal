@@ -9,6 +9,7 @@ import type {
   ProfileMainVM, RequestDetailVM, RequestRowVM, TeamVM, Tone, VaGroupVM,
 } from "../profile/profile-vm";
 import type { FormOptions } from "../profile/RequestForm";
+import { BUILT_FORM_NAME, BUILTIN_FIELDS } from "@/lib/commission/waiting-form";
 import { ordinal, rm, rm2 } from "../format";
 
 export interface ProfileFixture {
@@ -289,11 +290,19 @@ export function protoProfile(): ProfileFixture {
         fairs: Object.fromEntries(MY_FAIRS.map((f, i) => [`f${i}`, { venue: f.venue, regionId: "Penang" }])),
       },
       members: ["Darren Ong", "Priya Nair", "Siti Aminah", "Jason Teh"].map(n => ({ id: n, name: n })),
-      departments: [{ id: "fair-kv", name: "Fair · Klang Valley", capacity: 27, occupied: 26 }, { id: "fair-pg", name: "Fair · Penang", capacity: null, occupied: 0 }, { id: "showroom", name: "Showroom · Puchong", capacity: null, occupied: 0 }],
-      departmentId: "fair-kv",
+      // The HR revamp's handoff (2026-10-10): Fair and IR, "2 of 30 open".
+      departments: [{ id: "fair", name: "Fair", capacity: 30, occupied: 28 }, { id: "ir", name: "IR", capacity: null, occupied: 4 }],
+      departmentId: "fair",
       waitingList: [["Amelia Tan", "RQ-2609-018 · start 1 Oct", "Approved", true], ["Nur Aisyah Hamid", "RQ-2609-022 · start 15 Oct", "Approved", true], ["Kenneth Loh", "RQ-2608-031 · start 1 Nov", "Approved", true], ["Wong Li Ying", "RQ-2610-002 · submitted 2 Oct", "Pending HR", false]]
         .map(([name, sub, status, ok]) => ({ id: String(name), name: String(name), sub: String(sub), status: String(status), ok: Boolean(ok) })),
-      initial: { member: "Siti Aminah", male: 1, female: 1, department: "fair-kv" },
+      initial: { member: "Siti Aminah", male: 1, female: 1, department: "fair" },
+      // The handoff's waitform.js: the four built-ins, then the questions HR added as samples.
+      waitingForm: { form: { version: 1, requireUpload: true, templatePath: null, templateName: BUILT_FORM_NAME, createdAt: null, fields: [
+        ...BUILTIN_FIELDS,
+        { id: "ic", label: "IC number", type: "text", required: true, placeholder: "e.g. 900101-14-5678" },
+        { id: "heard", label: "How did they hear about us", type: "dropdown", required: false, options: ["Referral", "Roadshow", "Social media", "Walk-in"] },
+        { id: "transport", label: "Has own transport", type: "yesno", required: false },
+      ] } },
     },
   };
 }

@@ -833,10 +833,40 @@
 .capPill { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--rv-green-bg); }
 .capPillLabel { font-size: calc(13.5px * var(--rv-type)); font-weight: 650; color: var(--rv-kpi-ink); }
 .capPillValue { font-size: calc(15px * var(--rv-type)); font-weight: 800; color: var(--rv-kpi-ink); }
+/* The waiting list's questions, as HR set them (the handoff's Submit waiting list, 2026-10-10). */
+.qHead { display: flex; justify-content: space-between; gap: 8px; }
+.qErr { color: var(--rv-red); font-weight: 500; }
+.inputErr { border-color: var(--rv-red); }
+.appForm { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--rv-line); border-radius: 14px; }
+.appFormTitle { font-size: calc(13px * var(--rv-type)); font-weight: 650; color: var(--rv-ink); }
+.appFormNote { font-size: calc(12px * var(--rv-type)); line-height: 1.5; color: var(--rv-sub); }
+.appFormBtns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.appFormBtn {
+  /* The handoff's 40px is content-box: 42 with its border. */
+  height: 42px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--rv-handle);
+  background: var(--rv-white);
+  color: var(--rv-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: calc(13.5px * var(--rv-type));
+  font-weight: 600;
+  font-family: inherit;
+}
+.appFormBtnPlain { background: transparent; }
+.appFormBtnOn { border-color: var(--rv-green); background: var(--rv-green-bg); color: var(--rv-kpi-ink); }
+.appFormBtnErr { border-color: var(--rv-red); }
+.appFormFile { display: flex; align-items: center; gap: 6px; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-green); overflow-wrap: anywhere; }
+.doneFile { font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); overflow-wrap: anywhere; }
 .sigTabs { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 12px; background: var(--rv-sand); }
-.sigTab { height: 34px; border: 0; border-radius: 9px; background: transparent; color: var(--rv-sub); font-size: calc(13px * var(--rv-type)); font-weight: 500; }
+.sigTab { height: 34px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: var(--rv-sub); font-size: calc(13px * var(--rv-type)); font-weight: 500; }
 .sigOn { background: var(--rv-white); box-shadow: 0 1px 3px var(--rv-ink-14); color: var(--rv-ink); font-weight: 650; }
-.sigPad { position: relative; height: 110px; border-radius: 14px; border: 1.5px dashed var(--rv-tree-line); background: var(--rv-paper-warm); display: grid; place-items: center; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); overflow: hidden; touch-action: none; }
+/* The handoff's canvas: 110px inside a 1px dashed edge (content-box there, so 112 here). */
+.sigPad { position: relative; height: 112px; border-radius: 12px; border: 1px dashed var(--rv-handle); background: transparent; overflow: hidden; touch-action: none; }
 .sigCanvas { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--rv-ink); }
 .sigClear { position: absolute; right: 8px; top: 8px; height: 26px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--rv-line); background: var(--rv-white); color: var(--rv-sub); font-size: calc(12px * var(--rv-type)); font-weight: 600; }
 .check { display: flex; gap: 10px; align-items: flex-start; font-size: calc(12.5px * var(--rv-type)); line-height: 1.5; color: var(--rv-sub); }

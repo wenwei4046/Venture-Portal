@@ -10,6 +10,7 @@ import {
   defaultSeat,
   effectiveWhen,
   filterRequests,
+  hasSignedForm,
   isOpen,
   memoLine,
   memoReadsFromRow,
@@ -64,6 +65,25 @@ describe('Request reviews · words and facts', () => {
       'Applicant: Amelia Tan', 'Mobile number: 012-345 6789', 'Joining date: 20 Oct 2026', 'Signed by: Amelia Tan',
       'Request department: Revenue · Fair', 'Submitted by: CHEA HUAN', 'Signed form: Paper form on file',
     ])
+  })
+
+  // HR revamp 7a (2026-10-10): the answers to HR's own questions, the signed form and the form's version.
+  it('lists what the waiting-list form asked, the signed form it came with and its version', () => {
+    const hash = 'b'.repeat(64)
+    const r = req({ detail: { subDepartmentId: FAIR, newPerson: 'Amelia Tan', contact: '012', start: '2026-10-20', signature: 'Jia En', formVersion: 3,
+      answers: [{ id: 'ic', label: 'IC number', value: '900101-14-5678' }, { id: 'heard', label: 'How did they hear about us', value: '' }, { id: 'x' }],
+      signedFormName: 'amelia-form.jpg', signedFormHash: hash } })
+    expect(requestFacts(r, undefined, { departments }).map(f => `${f.l}: ${f.v}`).slice(-4)).toEqual([
+      'Request department: Revenue · Fair', 'IC number: 900101-14-5678', 'Signed form: amelia-form.jpg · black & white record', 'Form version: v3',
+    ])
+    expect(hasSignedForm(r)).toBe(true)
+    expect(hasSignedForm(req({ detail: { signedFormName: 'x.jpg', signedFormHash: 'nope' } }))).toBe(false)
+    expect(hasSignedForm(req({ kind: 'claim', detail: { signedFormName: 'x.jpg', signedFormHash: hash } }))).toBe(false)
+    const facts = requestFactsFromRow({ r1: { submittedBy: 'KAR JUN', events: [
+      { to: 'submitted', at: '2026-10-09T01:00:00Z', by: 'KAR JUN' }, { to: 'needs_info', at: '2026-10-09T02:00:00Z', note: 'Which IC?', by: 'HR' },
+      { to: 'submitted', at: '2026-10-09T03:00:00Z', by: 'KAR JUN' }] } }).r1
+    expect(requestHistory(facts, 'waiting', r.detail).map(e => e.note)).toEqual([null, 'Which IC?', 'Signed form attached: amelia-form.jpg'])
+    expect(requestHistory(facts, 'waiting', { signedFormName: '' }).map(e => e.note)).toEqual([null, 'Which IC?', null])
   })
 
   it('words a replacement’s arrangement and a claim’s money', () => {

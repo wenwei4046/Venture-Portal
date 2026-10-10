@@ -60,6 +60,14 @@ export const BUILTIN_TYPES: Readonly<Record<string, WaitingFieldType>> = {
 /** The built form's file name (and the form's name until HR uploads one). */
 export const BUILT_FORM_NAME = 'HOUZS Revenue - Waiting list application.html'
 
+/** The four as version 1 seeds them (mig 20261010140000) — what the Revenue app asks until HR's form arrives. */
+export const BUILTIN_FIELDS: readonly WaitingField[] = [
+  { id: 'newPerson', label: 'New member name', type: 'text', required: true, builtin: true, placeholder: 'Full name as per IC' },
+  { id: 'contact', label: 'Phone number', type: 'phone', required: true, builtin: true, placeholder: 'e.g. 012-345 6789' },
+  { id: 'target', label: 'Preferred sub-department', type: 'dropdown', required: true, builtin: true },
+  { id: 'start', label: 'Preferred start date', type: 'date', required: true, builtin: true },
+]
+
 const TYPE_KEYS = new Set<string>(FIELD_TYPES.map(t => t[0]))
 
 /** `member_waiting_form()`'s answer, or null when it is not one. */
