@@ -4,6 +4,20 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-11 — Documentation, Hiring, Meeting rooms and the Guest link (HR revamp round 2)
+Four new rows, every reach All. Documentation: View · Create (upload a document, file a
+letter, publish a memo or letter) · Edit (remove a document, the letter types). Hiring:
+View (requests, listing, insights, Talent Bank) · Create (a new request, a candidate, a
+talent) · Edit (candidates, Form settings, hiring sources, talent notes) · Approve
+(acknowledge, ask for more information, decline, mark filled, cancel, reopen, change the
+owner). Meeting rooms: View · Create (book; change or cancel your OWN booking) · Edit (the
+rooms themselves; cancel a booking made through the guest link). Guest link: View · Edit.
+Each has its key (Meeting rooms two: booking, and managing the rooms). The Principal and HR
+hold all of it; Finance, a department manager and every other portal template book rooms
+(the user: Meeting Rooms in every view); the Revenue app templates get none — members book
+from the app. The modules' tables are read and written only through their own database
+functions, which ask these cells. Nothing anybody had moves. Mig `20261011060000`.
+---
 ⚡ AMENDMENT 2026-10-10 — The CRM in the matrix
 The Revenue team's CRM (WhatsApp / Messenger customers, showroom visits) decided who
 may do what from job titles alone. It is now a row of the matrix — CRM: View · Edit ·

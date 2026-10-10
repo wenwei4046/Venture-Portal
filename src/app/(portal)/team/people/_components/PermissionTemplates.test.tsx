@@ -88,7 +88,8 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     expect(screen.getByText(/gets these, unless their own Permissions tab overrides one/)).toHaveTextContent('Everyone holding HR · Payroll gets these, unless their own Permissions tab overrides one.')
     // A template with no ticks stored is drawn from its cells: Overview, HR Costing's three pages, Audit Log (Changes).
     expect(screen.getByRole('tab', { name: /HR view/ })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('5/14')
+    // Of the HR view's 20 tabs (round 2 added Documentation, Hiring ×3, Meeting Rooms, Guest Link).
+    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('5/20')
     expect(box('Payroll · View')).toHaveAttribute('aria-checked', 'true')
     expect(box('Payroll · Approve')).toHaveAttribute('aria-checked', 'false')
     expect(box('Overview · Create')).toBeDisabled()

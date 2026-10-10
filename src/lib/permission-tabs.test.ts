@@ -36,7 +36,9 @@ describe('the tab catalog (HR revamp 8)', () => {
     for (const v of ['hr', 'fin', 'pri', 'dept']) expect(PERMISSION_TABS.find(t => t.id === `${v}.overview`)).toBeDefined()
     expect(PERMISSION_TABS.filter(t => t.view === 'hr').map(t => t.label)).toEqual([
       'Overview', 'HR Costing', 'Payroll', 'Payment', 'Director Salary', 'Director Pool', 'Comm Cal', 'Sales Groups', 'Rules',
-      'People Management', 'Permissions', 'Hierarchy', 'Member Services', 'Audit Log',
+      'People Management', 'Permissions', 'Hierarchy', 'Member Services',
+      // Round 2 (20261011060000), in the handoff's order.
+      'Documentation', 'Hiring requests', 'Hiring insights', 'Talent Bank', 'Meeting Rooms', 'Guest Link', 'Audit Log',
     ])
     expect(PERMISSION_TABS.filter(t => t.view === 'rev').map(t => t.label).slice(0, 8)).toEqual([
       'Today', 'Insight', 'Quote', 'Arena', 'Profile · My income', 'Profile · Requests', 'Profile · Waiting list & replacements', 'Profile · Team & capacity',
@@ -95,7 +97,10 @@ describe('moving the eleven templates onto tabs loses nothing', () => {
     expect(views(moved('staff'))).toEqual(['dept'])
     expect(views(moved('hr'))).toEqual(['hr', 'dept'])
     expect(views(moved('revenue_team'))).toEqual(['rev'])
-    expect([...moved('staff')].sort()).toEqual(['dept.my_claims.create', 'dept.my_claims.edit', 'dept.my_claims.view', 'dept.overview.view'])
+    // Every portal template books a room (round 2) — Staff · Basic from its own view, the Department view.
+    expect([...moved('staff')].sort()).toEqual([
+      'dept.meeting_rooms.create', 'dept.meeting_rooms.view', 'dept.my_claims.create', 'dept.my_claims.edit', 'dept.my_claims.view', 'dept.overview.view',
+    ])
   })
 })
 

@@ -72,6 +72,10 @@ const OPEX: Opens = { view: ['opex.view', 'opex.export'] }
 const MY_BILLING: Opens = { view: ['my_billing.view'], create: ['my_billing.create'] }
 const REVENUE_APP: Opens = { view: ['revenue_app.view'] }
 const REVENUE_APP_SENDS: Opens = { view: ['revenue_app.view'], create: ['revenue_app.create'] }
+// HR revamp round 2 (mig 20261011060000).
+const HIRING: Opens = { view: ['hiring.view'], create: ['hiring.create'], edit: ['hiring.edit'], approve: ['hiring.approve'] }
+const ROOMS: Opens = { view: ['rooms.view'], create: ['rooms.create'], edit: ['rooms.edit'] }
+const ROOMS_KEYS = ['meeting_rooms', 'meeting_rooms_manage']
 
 // The Overview is the company's in every view (the dashboard has no narrower reach).
 const tab = (view: TabView, id: string, label: string, keys: readonly string[], opens: Opens, reach?: Scope): PermissionTab => ({
@@ -108,6 +112,14 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // Titles and the ladder are managed on Hierarchy.
   tab('hr', 'hierarchy', 'Hierarchy', ['team', 'team_directory'], { view: ['team.view'], edit: ['team.edit', 'team.manage'] }),
   tab('hr', 'member_services', 'Member Services', ['member_requests_manage', 'member_memos_manage'], { view: ['member.view'], edit: ['member.manage'] }),
+  // Round 2 (the handoff's second package): Documentation, Hiring, and the Admin pages.
+  tab('hr', 'documentation', 'Documentation', ['documentation'], { view: ['documentation.view'], create: ['documentation.create'], edit: ['documentation.edit'] }),
+  tab('hr', 'hiring_requests', 'Hiring requests', ['hiring'], HIRING),
+  tab('hr', 'hiring_insights', 'Hiring insights', ['hiring'], { view: ['hiring.view'] }),
+  tab('hr', 'talent_bank', 'Talent Bank', ['hiring'], { view: ['hiring.view'], create: ['hiring.create'], edit: ['hiring.edit'] }),
+  // Every view books a room (the user, 2026-10-11): one page, a tab in each.
+  shared('meeting_rooms', tab('hr', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS)),
+  tab('hr', 'guest_link', 'Guest Link', ['guest_link'], { view: ['guest_link.view'], edit: ['guest_link.edit'] }),
   // HR's Audit Log is Changes: what it shows follows the reader's other boxes, so its own box opens nothing more.
   shared('audit_changes', tab('hr', 'audit_log', 'Audit Log', AUDIT_CHANGES_KEYS, {})),
 
@@ -135,6 +147,7 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   shared('dept_pool', tab('fin', 'dept_pool', 'Dept Pool', ['dept_pool'], DEPT_POOL)),
   shared('venture_pool', tab('fin', 'venture_pool', 'Venture Pool', ['venture_pool'], VENTURE_POOL)),
   tab('fin', 'chart_of_account', 'Chart of Account', ['categories'], { view: ['categories.view'], edit: ['categories.manage'] }),
+  shared('meeting_rooms', tab('fin', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS)),
   // Finance reads Audit Log › Changes for its own areas, as HR does for theirs.
   shared('audit_changes', tab('fin', 'audit_log', 'Audit Log', AUDIT_CHANGES_KEYS, {})),
 
@@ -146,6 +159,7 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('pri', 'opex', 'OPEX', ['opex'], OPEX),
   tab('pri', 'my_billing', 'My Billing', ['my_billing'], MY_BILLING),
   shared('reports', tab('pri', 'reports', 'Reports', ['reports'], REPORTS)),
+  shared('meeting_rooms', tab('pri', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS)),
   tab('pri', 'audit_log', 'Audit Log', ['audit_log'], { view: ['audit_log.view', 'audit_log.export'] }),
   tab('pri', 'settings', 'Settings', ['settings'], { view: ['settings.view'], edit: ['settings.manage'] }),
   tab('pri', 'switch_views', 'Switch views', ['view_switch'], { view: ['view_switch.view'] }),
@@ -160,6 +174,8 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('dept', 'my_claims', 'My claims', ['claims'], { view: ['claims.view'], create: ['claims.create'], edit: ['claims.edit'] }, 'own'),
   tab('dept', 'reports', 'Reports', ['dept_reports'], DEPT_REPORTS),
   tab('dept', 'people', 'People', ['team', 'team_directory'], { view: ['team.view'] }),
+  // The rooms are the company's: booked at the company's reach from the Department view too.
+  shared('meeting_rooms', tab('dept', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS, 'all')),
 
   // ── Revenue app (the holder's own records) ──
   tab('rev', 'today', 'Today', ['member_portal'], REVENUE_APP),
