@@ -6,7 +6,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import BaView, {
   type BaRow,
@@ -24,6 +24,7 @@ export default async function BaPage({
 }: {
   searchParams: Promise<{ calc?: string }>
 }) {
+  await requirePage('/ba')
   const user = await requirePermission('treasury')
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { calc } = await searchParams

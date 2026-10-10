@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
@@ -60,6 +60,7 @@ function monthOnly(period: string): string {
  * than one programme never makes an order pay through several programmes.
  */
 export default async function CommissionCalculationPage({ params }: PageProps) {
+  await requirePage('/revenue/[sub]')
   const user = await requirePermission('revenue')
   const { sub } = await params
   const subDept = await requireSubDepartment(sub)

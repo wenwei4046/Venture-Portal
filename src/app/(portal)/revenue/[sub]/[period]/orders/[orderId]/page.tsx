@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatDate } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
@@ -118,6 +118,7 @@ interface PaymentRow {
  * run is checked against.
  */
 export default async function OrderDetailPage({ params, searchParams }: PageProps) {
+  await requirePage('/revenue/[sub]/[period]/orders/[orderId]')
   await requirePermission('revenue')
   const { sub, period, orderId } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()

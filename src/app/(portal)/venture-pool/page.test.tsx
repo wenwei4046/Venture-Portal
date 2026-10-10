@@ -8,7 +8,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 // ledger, each line's direction a chip.
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/venture-pool', useSearchParams: () => new URLSearchParams() }))
 // The ledger's saved column layout comes from the browser client; here there is none.

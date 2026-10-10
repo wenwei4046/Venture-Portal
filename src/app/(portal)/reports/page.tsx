@@ -1,4 +1,4 @@
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import Link from 'next/link'
 
 const reports = [
@@ -52,6 +52,7 @@ const reports = [
 ]
 
 export default async function ReportsPage() {
+  await requirePage('/reports')
   await requirePermission('reports', 'hr_costing')
 
   return (

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRowsAsWritten, fetchByKeys } from '@/lib/paginate'
 import { revenuePath } from '@/lib/revenue'
@@ -32,6 +32,7 @@ function label(period: string): string {
  * spreadsheet exercise across 473 orders.
  */
 export default async function OpenBillPage({ params }: PageProps) {
+  await requirePage('/revenue/[sub]/[period]/open-bill')
   await requirePermission('revenue')
   const { sub, period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()

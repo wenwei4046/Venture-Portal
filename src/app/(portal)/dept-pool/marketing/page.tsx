@@ -2,7 +2,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
 import { notFound } from 'next/navigation'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
@@ -20,6 +20,7 @@ interface Props {
 }
 
 export default async function MarketingDeptPoolPage({ searchParams }: Props) {
+  await requirePage('/dept-pool/marketing')
   const user = await requirePermission('dept_pool')
   const supabase = await createClient()
 

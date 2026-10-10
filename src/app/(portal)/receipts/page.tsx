@@ -1,3 +1,4 @@
+import { requirePage } from '@/lib/auth'
 import VoucherLedger, { type LedgerSearchParams } from '../payments/_components/VoucherLedger'
 
 // Receipt side: credit vouchers (HV-OR-*) only — same tabs/filters/table as
@@ -7,5 +8,6 @@ export default async function ReceiptsPage({
 }: {
   searchParams: Promise<LedgerSearchParams>
 }) {
+  await requirePage('/receipts')
   return <VoucherLedger direction="credit" params={await searchParams} />
 }

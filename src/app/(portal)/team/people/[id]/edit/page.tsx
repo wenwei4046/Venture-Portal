@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireAction, requirePage } from '@/lib/auth'
 import { offersVariablePay, type TitleRow } from '@/lib/staff-form'
 import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
 import { readStaffPrivate } from '@/lib/private-fields'
@@ -13,6 +13,7 @@ interface PageProps {
 }
 
 export default async function EditStaffPage({ params }: PageProps) {
+  await requirePage('/team/people/[id]/edit')
   const viewer = await requireAction('team', 'edit')
   const { id } = await params
   const supabase = await createClient()

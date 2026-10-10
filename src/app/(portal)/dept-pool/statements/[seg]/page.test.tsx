@@ -28,7 +28,7 @@ const mocks = vi.hoisted(() => ({
     throw new Error('NEXT_NOT_FOUND')
   }),
 }))
-vi.mock('@/lib/auth', () => ({ requireAction: mocks.requireAction }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireAction: mocks.requireAction }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/gl-reports', () => ({ fetchAllJournalLines: async () => [], fetchCoaAccounts: async () => [] }))
 vi.mock('@/lib/consolidation', () => ({ fetchInterBillingElimination: mocks.elim, eliminateInterBilling: (l: unknown) => l }))

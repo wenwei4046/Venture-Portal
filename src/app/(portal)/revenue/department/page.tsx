@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { revenuePath } from '@/lib/revenue'
 import { listSubDepartments } from '../_lib/sub-departments'
 import DepartmentModeCard from '@/components/department/DepartmentModeCard'
@@ -12,6 +12,7 @@ import DepartmentModeCard from '@/components/department/DepartmentModeCard'
  * too once it is set up.
  */
 export default async function RevenueDepartmentPage() {
+  await requirePage('/revenue/department')
   await requirePermission('revenue')
   const subs = await listSubDepartments()
 

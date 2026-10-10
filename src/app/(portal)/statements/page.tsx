@@ -5,6 +5,7 @@
 // (BillingView), beside the generating and the creating, so this is the view
 // and nothing else.
 
+import { requirePage } from '@/lib/auth'
 import BillingView from '../billing/_components/BillingView'
 
 interface Props {
@@ -12,5 +13,6 @@ interface Props {
 }
 
 export default async function StatementsPage(props: Props) {
+  await requirePage('/statements')
   return <BillingView searchParams={props.searchParams} />
 }

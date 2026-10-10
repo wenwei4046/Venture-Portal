@@ -3,7 +3,7 @@ import { Suspense } from 'react'
 import dayjs from 'dayjs'
 import { officeToday } from '@/lib/office-time'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, fundingSourceFromTerms } from '@/lib/utils'
@@ -45,6 +45,7 @@ interface Props {
 }
 
 export default async function FundOutPage({ searchParams }: Props) {
+  await requirePage('/fund-out')
   const user = await requirePermission('treasury')
   // Recording a loan raises one; the CSV is an export; amending a booked loan
   // is Treasury · Approve (2026-10-08, PR2).

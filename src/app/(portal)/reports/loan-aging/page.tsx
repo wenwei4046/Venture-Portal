@@ -7,7 +7,7 @@
 
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { fetchLoanMonitorData, type MonitorSide } from '@/lib/loan-monitor'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
@@ -171,6 +171,7 @@ function OutstandingTables({ side }: { side: MonitorSide }) {
 }
 
 export default async function LoanMonitorPage({ searchParams }: { searchParams: Promise<{ as_at?: string }> }) {
+  await requirePage('/reports/loan-aging')
   await requirePermission('reports')
   const supabase = await createClient()
 

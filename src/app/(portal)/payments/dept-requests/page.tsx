@@ -1,12 +1,13 @@
 import Link from 'next/link'
 import { officeTime } from '@/lib/office-time'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import GenerateDeptPvForm from './_components/GenerateDeptPvForm'
 import { cancelDeptRequest } from './actions'
 
 export default async function DeptRequestsPage() {
+  await requirePage('/payments/dept-requests')
   await requirePermission('treasury')
   const supabase = await createClient()
 

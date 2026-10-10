@@ -6,7 +6,7 @@
 import Link from 'next/link'
 import { officeTime } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -19,6 +19,7 @@ import { StatCard, StatCards } from '@/components/sheet/StatCard'
 export const dynamic = 'force-dynamic'
 
 export default async function ReconciliationPage({ searchParams }: { searchParams: Promise<{ upload?: string }> }) {
+  await requirePage('/reconciliation')
   const user = await requirePermission('reconciliation')
   const supabase = (await createClient()) as unknown as SupabaseClient
 

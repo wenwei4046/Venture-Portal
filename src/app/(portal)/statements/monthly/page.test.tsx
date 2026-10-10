@@ -6,7 +6,7 @@ import { render, screen } from '@testing-library/react'
 // Statements sample): four cards, then each month as a section over its table.
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('../_components/GenerateStatementsButton', () => ({ default: () => <button type="button">Generate statements</button> }))
 vi.mock('../_components/StatementsPeriodTable', () => ({

@@ -10,6 +10,7 @@ import { actionsFromJson, actionsFromKeys, canDo, type FunctionKey } from '@/lib
 import { approvableTypes, canSeeApprovals } from '@/lib/approval-domains'
 import { isSensitiveField, type Action, type Scope } from '@/lib/permission-matrix'
 import { sensitiveFromKeys } from '@/lib/sensitive'
+import { opensPage, storedTabsFrom, userTabs, type PageRoute } from '@/lib/page-tabs'
 
 // Per-request dedup. Middleware, layout, and Server Actions all converge
 // on getUser(); wrapping with React.cache() collapses the Supabase calls
@@ -41,7 +42,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   // only in the member app (lib/view-as.ts, 2026-09-27).
   const viewAs = honouredViewAs((await cookies()).get(VIEW_AS_COOKIE)?.value, surface)
 
-  const [{ data }, { data: perms }, { data: acts }, { data: fields }, masked] = await Promise.all([
+  const [{ data }, { data: perms }, { data: acts }, { data: fields }, { data: stored }, masked] = await Promise.all([
     supabase.from('users').select('*').eq('id', authUserId).single(),
     // Resolved in the database because that is where the answer lives: an
     // explicit per-person row, then the holder's title, then their role's
@@ -55,6 +56,9 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
     // Which of salary amounts, NRIC / IC and bank accounts they may see
     // (2026-10-09, PR4) — the same answer the database's readers give.
     (supabase as unknown as { rpc: (fn: string) => PromiseLike<{ data: unknown }> }).rpc('current_sensitive_fields'),
+    // Which tabs their template ticks, and their own boxes (2026-10-11, 8b) —
+    // null without a template: then their cells and keys give their tabs.
+    (supabase as unknown as { rpc: (fn: string) => PromiseLike<{ data: unknown }> }).rpc('current_tabs'),
     viewAs
       ? supabase.from('role_default_permissions').select('permission_key').eq('role', viewAs)
       : null,
@@ -69,6 +73,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
     actions: actionsFromJson(acts),
     sensitive: (Array.isArray(fields) ? fields : []).filter(isSensitiveField),
   }
+  user.tabs = userTabs(storedTabsFrom(stored), user.actions, user.permissions)
   // Switching views is its own permission since 2026-10-08: Ultimate full
   // access has it, Full access is everything else without it. Read off the
   // REAL account's keys — a masked session keeps it, so it can switch back.
@@ -76,13 +81,15 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
 
   if (canSwitchView && viewAs && masked) {
     const maskedKeys = (masked.data ?? []).map(r => (r as { permission_key: string }).permission_key)
+    const maskedActions = actionsFromKeys(maskedKeys, viewAs)
     return {
       ...user,
       role: viewAs,
       actualRole: user.role,
       canSwitchView,
       permissions: maskedKeys,
-      actions: actionsFromKeys(maskedKeys, viewAs),
+      actions: maskedActions,
+      tabs: userTabs(null, maskedActions, maskedKeys),
       // The page masks as the viewed role would see it; the database still
       // answers for the real account, so lib/private-fields.ts masks again.
       sensitive: sensitiveFromKeys(maskedKeys, viewAs),
@@ -136,6 +143,19 @@ export async function requireAuth(): Promise<User> {
 export async function requirePermission(...keys: Permission[]): Promise<User> {
   const user = await requireAuth()
   if (!can(user, ...keys)) {
+    redirect('/dashboard')
+  }
+  return user
+}
+
+/**
+ * The tab a page belongs to (2026-10-11, HR revamp 8b): View on any tab
+ * lib/page-tabs.ts lists for the route. Asked ON TOP of the page's own gate —
+ * a tab can close a page, never open one.
+ */
+export async function requirePage(route: PageRoute): Promise<User> {
+  const user = await requireAuth()
+  if (!opensPage(user.tabs, route)) {
     redirect('/dashboard')
   }
   return user

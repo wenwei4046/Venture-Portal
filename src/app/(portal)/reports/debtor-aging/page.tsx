@@ -2,7 +2,7 @@ import dayjs from 'dayjs'
 import { officeMonth, officeToday } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney } from '@/lib/utils'
 import { buildDebtorAging, debtorAgingView, invoicesAsAt, resolveAgingAsAt, type RawInvoice } from '@/lib/debtor-aging'
@@ -15,6 +15,7 @@ import { StatCard, StatCards } from '@/components/sheet/StatCard'
 export const dynamic = 'force-dynamic'
 
 export default async function DebtorAgingPage({ searchParams }: { searchParams: Promise<{ as_at?: string }> }) {
+  await requirePage('/reports/debtor-aging')
   // dept_manager sees only their own segment's invoices (RLS on invoices).
   const user = await requirePermission('dept_reports')
   const supabase = await createClient()

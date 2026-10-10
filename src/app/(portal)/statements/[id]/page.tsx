@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -23,6 +23,7 @@ interface Props {
 }
 
 export default async function StatementDetailPage({ params }: Props) {
+  await requirePage('/statements/[id]')
   const user = await requirePermission('treasury')
   const { id } = await params
   const supabase = await createClient()

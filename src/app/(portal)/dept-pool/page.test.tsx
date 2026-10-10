@@ -12,7 +12,7 @@ import { withActions } from '@/test/with-actions'
 // keeps the page as it was.
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), fetchIncomeStatement: vi.fn(), redirect: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/cfo-reports', () => ({ fetchIncomeStatement: mocks.fetchIncomeStatement }))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))

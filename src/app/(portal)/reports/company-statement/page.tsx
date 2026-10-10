@@ -8,7 +8,7 @@
 import { officeTime } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { fetchCounterpartyStatement } from '@/lib/counterparty-statement-data'
 import StatementView from './_components/StatementView'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
@@ -17,6 +17,7 @@ import { StatCard, StatCards } from '@/components/sheet/StatCard'
 export const dynamic = 'force-dynamic'
 
 export default async function CompanyStatementPage() {
+  await requirePage('/reports/company-statement')
   await requirePermission('reports')
   // Untyped client — database.types.ts predates repayment_start_month (same
   // convention as lib/loan-monitor's caller).

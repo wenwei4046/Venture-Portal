@@ -11,7 +11,7 @@ import { withActions } from '@/test/with-actions'
 // Principal's own tabs keep the Settings head.
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/settings' }))
 vi.mock('@/lib/department-mode-server', () => ({
   loadDepartmentModes: async () => [

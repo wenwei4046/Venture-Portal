@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { revenuePath } from '@/lib/revenue'
 import { listSubDepartments } from './_lib/sub-departments'
 import { loadCommissionSettings } from './_components/config/load'
@@ -13,6 +13,7 @@ import FirstSubDepartment from './_components/FirstSubDepartment'
  * portal where nobody has created a sub-department yet.
  */
 export default async function RevenueIndexPage() {
+  await requirePage('/revenue')
   await requirePermission('revenue')
 
   const subs = await listSubDepartments()

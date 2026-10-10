@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { sees } from '@/lib/sensitive'
 import { formatMoney, formatIntlDate } from '@/lib/utils'
@@ -60,6 +60,7 @@ interface LineRow {
  * somebody already sent to Resubmit them or add a Second payroll; Total Close ends the month.
  */
 export default async function PayrollGridPage({ params }: PageProps) {
+  await requirePage('/hr-costing/payroll/[period]')
   const user = await requirePermission('hr_costing')
   // Opening the month or importing it raises rows; copying last month edits
   // them (2026-10-08, PR2).

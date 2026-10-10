@@ -1,3 +1,4 @@
+import { requirePage } from '@/lib/auth'
 import VoucherLedger, { type LedgerSearchParams } from './_components/VoucherLedger'
 
 // Payment side: debit vouchers (HV-PV-*) only. Receipts (HV-OR-*) live on
@@ -7,5 +8,6 @@ export default async function PaymentsPage({
 }: {
   searchParams: Promise<LedgerSearchParams>
 }) {
+  await requirePage('/payments')
   return <VoucherLedger direction="debit" params={await searchParams} />
 }

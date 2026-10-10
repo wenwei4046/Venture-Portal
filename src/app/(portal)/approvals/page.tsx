@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
-import { requireApprovalQueue } from '@/lib/auth'
+import { requireApprovalQueue, requirePage } from '@/lib/auth'
 import { decision } from '@/lib/approval-domains'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -32,6 +32,7 @@ function waitLabel(days: number): string {
 }
 
 export default async function ApprovalsPage() {
+  await requirePage('/approvals')
   // The queue opens for whoever may see it or decide anything in it; what each
   // may decide is asked row by row below (2026-10-09, approvals by domain).
   const user = await requireApprovalQueue()

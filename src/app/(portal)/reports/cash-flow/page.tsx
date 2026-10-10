@@ -8,7 +8,7 @@ import dayjs from 'dayjs'
 import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import {
   applyGlRefs,
   buildCashFlow,
@@ -42,6 +42,7 @@ interface Props {
 }
 
 export default async function CashFlowPage({ searchParams }: Props) {
+  await requirePage('/reports/cash-flow')
   const user = await requirePermission('dept_reports')
   const supabase = await createClient()
 

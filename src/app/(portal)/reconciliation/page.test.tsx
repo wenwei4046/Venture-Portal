@@ -12,7 +12,7 @@ import { withActions } from '@/test/with-actions'
 // AUTO is the amber tag (it was a grey chip).
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }))
 vi.mock('@/components/layout/ReturnLink', () => ({ default: (p: { href: string; children: React.ReactNode }) => <a href={p.href}>{p.children}</a> }))
 vi.mock('./_components/UploadStatementForm', () => ({ default: () => <form aria-label="Upload statement form" /> }))

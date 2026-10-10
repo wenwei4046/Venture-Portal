@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   notFound: vi.fn(),
   getVoucherDetailContext: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requireAuth: mocks.requireAuth }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireAuth: mocks.requireAuth }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/navigation', () => ({ notFound: mocks.notFound }))
 vi.mock('@/lib/voucher-detail', async (original) => ({

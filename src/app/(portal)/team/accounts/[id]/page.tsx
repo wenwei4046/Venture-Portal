@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import ActivityLog from '../../_components/ActivityLog'
 
 interface PageProps {
@@ -17,6 +17,7 @@ interface PageProps {
  * links here any more.
  */
 export default async function AccountDetailPage({ params }: PageProps) {
+  await requirePage('/team/accounts/[id]')
   await requirePermission('team_invite')
   const { id } = await params
   const supabase = await createClient()

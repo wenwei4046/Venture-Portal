@@ -1,10 +1,11 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { formatMoney } from '@/lib/utils'
 import { canAccessAuditLog, canInviteUsers, canManagePermissions } from '@/lib/roles'
+import { hasTab } from '@/lib/page-tabs'
 import { isFullyCommissionBased, isVariablePay } from '@/lib/staff-form'
 import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
 import { readStaffPrivate } from '@/lib/private-fields'
@@ -34,6 +35,7 @@ const PCB_LABELS: Record<string, string> = {
 }
 
 export default async function StaffDetailPage({ params }: PageProps) {
+  await requirePage('/team/people/[id]')
   // The roster's own key — or Team · View without the Salary tick, which reads
   // this person through the directory, and only inside its reach (2026-10-10,
   // PR4b: a Department head opens their own department's people).
@@ -136,7 +138,7 @@ export default async function StaffDetailPage({ params }: PageProps) {
         <div className="flex items-center gap-2 shrink-0">
           {/* One person, one login — so this is offered only while they have
               none, and only to the role that may mint one. */}
-          {canInviteUsers(viewer) && !account && staff.status !== 'inactive' ? (
+          {canInviteUsers(viewer) && hasTab(viewer.tabs, 'hr.permissions', 'create') && !account && staff.status !== 'inactive' ? (
             <Link
               href={`/team/people?invite=${staff.id}`}
               className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
@@ -259,7 +261,9 @@ export default async function StaffDetailPage({ params }: PageProps) {
         />
       ) : null}
 
-      {access ? <PersonAccess access={access} canEdit={canManagePermissions(viewer)} personName={staff.employee_name} /> : null}
+      {access ? (
+        <PersonAccess access={access} canEdit={canManagePermissions(viewer) && hasTab(viewer.tabs, 'hr.permissions', 'edit')} personName={staff.employee_name} />
+      ) : null}
 
       {canSeeActivity ? <ActivityLog userId={account!.id} /> : null}
     </div>

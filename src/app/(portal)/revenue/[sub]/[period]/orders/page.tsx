@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
@@ -67,6 +67,7 @@ function label(period: string): string {
  * narrow queue: only the days still resting on a suggestion.
  */
 export default async function MonthOrdersPage({ params, searchParams }: PageProps) {
+  await requirePage('/revenue/[sub]/[period]/orders')
   await requirePermission('revenue')
   const { sub, period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { requireAction } from '@/lib/auth'
+import { requireAction, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import JournalVoucherForm from '../../_components/JournalVoucherForm'
 
@@ -9,6 +9,7 @@ export default async function EditJournalVoucherPage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  await requirePage('/reconciliation/journal-entries/[id]/edit')
   await requireAction('reconciliation', 'edit')
   const { id } = await params
   const supabase = await createClient()

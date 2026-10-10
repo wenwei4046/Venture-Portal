@@ -182,7 +182,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'bump_bank_for_paid_credit', 'calculate_dept_np', 'cancel_dept_payment_request', 'cancel_loan_and_approval',
   'change_account_type', 'claim_create_payment_voucher', 'claim_payment_queue', 'comm_effective_direct_line_limits',
   'comm_home_sub_department', 'comm_open_bill_on', 'comm_staff_can_recruit', 'create_manual_journal_voucher',
-  'create_payroll_statutory_selection', 'current_actions', 'current_permissions', 'current_sensitive_fields',
+  'create_payroll_statutory_selection', 'current_actions', 'current_permissions', 'current_sensitive_fields', 'current_tabs',
   'delete_manual_journal_voucher', 'delete_voucher_attachment', 'department_modes', 'department_set_cost_model',
   'dept_invoice_settlements', 'dept_request_pv_rejected', 'director_payroll_complete', 'director_payroll_uncomplete',
   'director_private_fields', 'erp_feed_month_closed', 'erp_feed_secret', 'erp_link_drop_secret', 'erp_link_put_secret',

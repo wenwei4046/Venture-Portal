@@ -8,7 +8,7 @@
 import dayjs from 'dayjs'
 import { officeMonth, officeTime, officeToday } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { deptNameToSegment } from '@/lib/billing'
 import { fetchDeptCashLines, fetchDeptInvoiceSettlements, monthRange } from '@/lib/dept-receipt-payment'
@@ -23,6 +23,7 @@ export const dynamic = 'force-dynamic'
 const r2 = (n: number) => Math.round(n * 100) / 100
 
 export default async function MyBillingPage() {
+  await requirePage('/my-billing')
   const user = await requirePermission('my_billing')
   const supabase = await createClient()
 

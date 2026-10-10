@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatIntlDate, formatMoney } from '@/lib/utils'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
@@ -20,6 +20,7 @@ const day = (iso: string | null) =>
  * is the Principal's in Approvals, and the claim turns paid with it.
  */
 export default async function ClaimRequestsPage() {
+  await requirePage('/payments/claim-requests')
   await requirePermission('treasury')
   const supabase = await createClient()
 

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import dayjs from 'dayjs'
 import { officeToday } from '@/lib/office-time'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -46,6 +46,7 @@ interface Props {
 }
 
 export default async function FundInPage({ searchParams }: Props) {
+  await requirePage('/fund-in')
   const user = await requirePermission('treasury')
   // Recording a fund source raises one: Treasury · Create (2026-10-08, PR2);
   // amending a booked one is Treasury · Approve.

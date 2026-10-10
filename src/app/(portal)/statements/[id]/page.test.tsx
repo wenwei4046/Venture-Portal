@@ -9,7 +9,7 @@ import { withActions } from '@/test/with-actions'
 // allows — Issue for a draft, Mark as paid once issued.
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), notFound: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/navigation', () => ({ notFound: mocks.notFound }))
 vi.mock('../actions', () => ({ issueStatement: vi.fn(), markStatementPaid: vi.fn() }))

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -27,6 +27,7 @@ function statusMix(statements: Array<{ status: string }>): string {
 }
 
 export default async function MonthlyStatementsPage() {
+  await requirePage('/statements/monthly')
   const user = await requirePermission('treasury')
   const supabase = await createClient()
 

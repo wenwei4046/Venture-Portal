@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), createClient: vi.fn(), adminClient: vi.fn(), rpc: vi.fn(), adminRpc: vi.fn(),
 }))
 vi.mock('server-only', () => ({}))
-vi.mock('@/lib/auth', () => ({ getMemberUser: mocks.getUser }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, getMemberUser: mocks.getUser }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/supabase/admin', () => ({ adminClient: mocks.adminClient }))
 

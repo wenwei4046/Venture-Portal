@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { decidesPoolClaims } from '@/lib/surfaces'
 import { formatMoney } from '@/lib/utils'
 import { officeTime } from '@/lib/office-time'
@@ -27,6 +27,7 @@ const STATUS_CHIP: Record<string, string> = {
  * benefit claims move to Member services when they come.
  */
 export default async function ClaimsPage() {
+  await requirePage('/claims')
   const user = await requirePermission('claims')
   const supabase = await createClient()
 

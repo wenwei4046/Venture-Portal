@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -32,6 +32,7 @@ interface Props {
 const r2 = (n: number) => Math.round(n * 100) / 100
 
 export default async function InvoicePage({ params }: Props) {
+  await requirePage('/invoices/[id]')
   const user = await requirePermission('billing')
   const { id } = await params
   const supabase = await createClient()

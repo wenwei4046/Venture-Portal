@@ -13,7 +13,7 @@ import { FinViewProvider } from '@/components/layout/fin-view'
 // below it, folded. Cards 4–5 on those tabs read the month's minimum interest.
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), listPayableFundSources: vi.fn(), push: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('../fund-in/actions', () => ({ listPayableFundSources: mocks.listPayableFundSources }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }), useSearchParams: () => new URLSearchParams() }))

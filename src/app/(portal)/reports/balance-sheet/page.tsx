@@ -7,7 +7,7 @@
 import dayjs from 'dayjs'
 import { officeMonth } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import {
   applyGlRefs,
   buildBalanceSheet,
@@ -31,6 +31,7 @@ interface Props {
 }
 
 export default async function BalanceSheetPage({ searchParams }: Props) {
+  await requirePage('/reports/balance-sheet')
   await requirePermission('reports')
   const supabase = await createClient()
 

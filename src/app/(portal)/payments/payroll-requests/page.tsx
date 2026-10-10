@@ -2,7 +2,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { officeTime, officeToday } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requirePayrollPayouts } from '@/lib/auth'
+import { requirePayrollPayouts, requirePage } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { round2 } from '@/lib/payroll-funding'
 import { topupSummary } from '@/lib/payroll-lifecycle'
@@ -51,6 +51,7 @@ function batchLabel(raw: unknown): string | null {
 }
 
 export default async function PayrollRequestsPage() {
+  await requirePage('/payments/payroll-requests')
   // What each department's payroll comes to, and a department can be one
   // person: Treasury WITH Payroll payouts (2026-10-02).
   await requirePayrollPayouts('treasury')

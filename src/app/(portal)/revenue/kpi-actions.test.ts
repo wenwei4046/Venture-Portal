@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   permission: vi.fn(), createClient: vi.fn(), rpc: vi.fn(), from: vi.fn(), refresh: vi.fn(),
   select: vi.fn(), is: vi.fn(), or: vi.fn(), order: vi.fn(), limit: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.permission, requireAction: mocks.permission, requireAnyAction: mocks.permission, requirePayrollPayoutsAction: mocks.permission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.permission, requireAction: mocks.permission, requireAnyAction: mocks.permission, requirePayrollPayoutsAction: mocks.permission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.refresh }))
 

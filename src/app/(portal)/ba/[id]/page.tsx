@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { officeToday } from '@/lib/office-time'
 import { calcBa } from '@/lib/ba'
@@ -24,6 +24,7 @@ export const dynamic = 'force-dynamic'
 const baRef = (id: string) => `BA-${id.slice(0, 8)}`
 
 export default async function BaPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePage('/ba/[id]')
   await requirePermission('treasury')
   const { id } = await params
   const supabase = (await createClient()) as unknown as SupabaseClient

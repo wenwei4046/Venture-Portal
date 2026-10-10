@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { can } from '@/lib/permissions'
 import { revenuePath } from '@/lib/revenue'
 import { titleCanRecruit } from '@/lib/commission/titles'
@@ -49,6 +49,7 @@ interface PageProps {
  * so they are never among the `people` and the Team tab lists them apart.
  */
 export default async function StaffHierarchyPage({ params }: PageProps) {
+  await requirePage('/revenue/[sub]/hierarchy')
   const user = await requirePermission('revenue')
   const canManageEmployment = can(user, 'team')
   // Employment dates follow Malaysia's calendar, regardless of server timezone.

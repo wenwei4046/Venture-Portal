@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney } from '@/lib/utils'
 import Link from 'next/link'
 
 export default async function ClaimsSummaryPage() {
+  await requirePage('/reports/claims')
   await requirePermission('reports', 'claims_approve')
   const supabase = await createClient()
 

@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { seesAllSettings } from '@/lib/surfaces'
 import { createClient } from '@/lib/supabase/server'
@@ -38,6 +38,7 @@ interface Props {
 }
 
 export default async function SettingsPage({ searchParams }: Props) {
+  await requirePage('/settings')
   // Finance is allowed in for the Categories tabs only — every other tab
   // re-checks role inside the conditional below and renders nothing otherwise.
   // SettingsTabs hides the disallowed tabs from the rail.

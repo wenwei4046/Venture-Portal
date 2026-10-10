@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -36,6 +36,7 @@ interface Line {
 }
 
 export default async function AllocationRecordPage({ params }: Props) {
+  await requirePage('/billing-allocator/[id]')
   const user = await requirePermission('billing')
   const { id } = await params
   // alloc_* tables aren't in the generated database.types yet — untyped client,

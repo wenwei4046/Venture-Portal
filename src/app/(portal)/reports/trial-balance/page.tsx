@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { fetchTrialBalance, isCalendarDay } from '@/lib/cfo-reports'
 import dayjs from 'dayjs'
@@ -16,6 +16,7 @@ interface Props {
 }
 
 export default async function TrialBalancePage({ searchParams }: Props) {
+  await requirePage('/reports/trial-balance')
   await requirePermission('reports')
   const supabase = await createClient()
 

@@ -8,7 +8,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { fetchReconReport } from '@/lib/recon-report-data'
 import { formatMoney } from '@/lib/utils'
@@ -61,6 +61,7 @@ export default async function ReconReportPage({
 }: {
   params: Promise<{ sessionId: string }>
 }) {
+  await requirePage('/reconciliation/[sessionId]/report')
   await requirePermission('reconciliation')
   const { sessionId } = await params
   const supabase = (await createClient()) as unknown as SupabaseClient

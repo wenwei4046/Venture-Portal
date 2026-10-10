@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { formatMoney, formatIntlDate } from '@/lib/utils'
 import { OFFICE_TZ } from '@/lib/office-clock'
 import { calculateRevenuePayrollSplit } from '@/lib/revenue-payroll'
@@ -39,6 +39,7 @@ const STATUS_TONE: Record<string, string> = {
 }
 
 export default async function PayslipPage({ params }: PageProps) {
+  await requirePage('/hr-costing/payroll/[period]/[staffId]/payslip')
   await requirePermission('hr_costing')
   const { period, staffId } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()

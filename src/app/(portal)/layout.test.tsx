@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
     { id: 'rd', name: 'Revenue Department', segmentKey: 'revenue_department', poolGlCode: '1090', billingModeKey: 'revenue_department_attribution', isInternal: false },
   ],
 }))
-vi.mock('@/lib/auth', () => ({ requireAuth: mocks.requireAuth }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireAuth: mocks.requireAuth }))
 vi.mock('./revenue/_lib/sub-departments', () => ({ listSubDepartments: mocks.listSubDepartments }))
 vi.mock('@/lib/dept-registry', async (orig) => ({ ...(await orig<object>()), primedRegistryRows: () => mocks.REGISTRY }))
 vi.mock('@/components/layout/PortalFrame', () => ({ default: () => null }))

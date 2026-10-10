@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { requireAnyAction } from '@/lib/auth'
+import { requireAnyAction, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import ContractForm from '../../_components/ContractForm'
 import { canDo } from '@/lib/permission-actions'
 
 export default async function NewContractPage() {
+  await requirePage('/billing/contracts/new')
   const user = await requireAnyAction(['billing', 'create'], ['my_billing', 'create', 'dept'])
   const supabase = await createClient()
 

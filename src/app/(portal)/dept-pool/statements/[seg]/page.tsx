@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { requireAction } from '@/lib/auth'
+import { requireAction, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { officeMonth } from '@/lib/office-time'
@@ -32,6 +32,7 @@ interface Props {
 }
 
 export default async function DeptStatementPage({ params, searchParams }: Props) {
+  await requirePage('/dept-pool/statements/[seg]')
   const user = await requireAction('reports', 'view')
   if (!canDo(user, 'dept_pool', 'view')) notFound()
 

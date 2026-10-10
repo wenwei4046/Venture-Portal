@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   requirePermission: vi.fn(), createClient: vi.fn(), notFound: vi.fn(), refresh: vi.fn(),
   generateBaInvoice: vi.fn(), generateBaPv: vi.fn(), setBaStatus: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/navigation', () => ({ notFound: mocks.notFound, useRouter: () => ({ push: vi.fn(), refresh: mocks.refresh }) }))
 vi.mock('@/lib/office-time', async (orig) => ({ ...(await orig<object>()), officeToday: () => '2026-10-09' }))

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requirePayrollPayouts } from '@/lib/auth'
+import { requirePayrollPayouts, requirePage } from '@/lib/auth'
 import { raisesForSignOff } from '@/lib/surfaces'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney, formatMoneyBare, formatIntlDate } from '@/lib/utils'
@@ -7,6 +7,7 @@ import { OFFICE_TZ } from '@/lib/office-clock'
 import RequestReleaseButton from './_components/RequestReleaseButton'
 
 export default async function InvoicePoolPage() {
+  await requirePage('/invoice-pool')
   // Each director's invoice payout, by name: Treasury WITH Payroll payouts.
   const user = await requirePayrollPayouts('treasury')
   const supabase = await createClient()

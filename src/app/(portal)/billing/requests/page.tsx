@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
-import { requirePermission } from '@/lib/auth'
+import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import RequestActionButtons from './_components/RequestActionButtons'
@@ -12,6 +12,7 @@ interface LineItem {
 }
 
 export default async function InvoiceRequestsPage() {
+  await requirePage('/billing/requests')
   await requirePermission('billing')
   const supabase = await createClient()
 

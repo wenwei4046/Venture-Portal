@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // Finance revamp handoff): the months from From, Accumulated over them.
 
 const mocks = vi.hoisted(() => ({ requireAction: vi.fn(), exportXlsxResponse: vi.fn(), buildMatrixXlsx: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requireAction: mocks.requireAction }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireAction: mocks.requireAction }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({}) }))
 vi.mock('@/lib/gl-reports', () => ({ fetchAllJournalLines: async () => [], fetchCoaAccounts: async () => [] }))
 vi.mock('@/lib/consolidation', () => ({ fetchInterBillingElimination: async () => null, eliminateInterBilling: (l: unknown) => l }))
