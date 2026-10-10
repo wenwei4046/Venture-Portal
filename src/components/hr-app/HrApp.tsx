@@ -243,6 +243,8 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
                   </button>
                 )
               })}
+              {/* Not in the handoff (its sample always has requests): the Review's own empty card. */}
+              {d.hires.every(h => !(HIRE_FILTERS.find(f => f.key === hFilter)?.statuses ?? []).includes(h.status)) ? <div className={s.emptyCard}>No requests here.</div> : null}
             </>
           ) : null}
 
@@ -318,6 +320,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
                   </span>
                 </button>
               ))}
+              {d.talents.length === 0 ? <div className={s.emptyCard}>Nobody kept on file yet.</div> : null}
             </>
           ) : null}
 

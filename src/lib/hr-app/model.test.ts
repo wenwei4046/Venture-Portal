@@ -11,7 +11,7 @@ const hire = (h: Partial<HrHire>): HrHire => ({
   id: 'HR-1', status: 'submitted', position: 'Revenue Specialist', headcount: 1, dept: 'Revenue · Fair', budget: '2,800–3,200', start: 'Within 1 month',
   ownerName: null, requester: 'Chea Huan', when: '28 Sep 2026', candidates: [], events: [], ...h,
 })
-const req = (r: Partial<HrMemberRequest>): HrMemberRequest => ({ id: 'MR-1', kind: 'waiting', status: 'submitted', sub: 'Fair', byName: 'Kar Jun', ...r })
+const req = (r: Partial<HrMemberRequest>): HrMemberRequest => ({ id: 'MR-1', code: 'RQ-2610-001', kind: 'waiting', status: 'submitted', sub: 'Fair', byName: 'Kar Jun', ...r })
 
 describe('the HR app model', () => {
   it('lists pending hiring requests first, then member requests waiting for a decision', () => {
@@ -43,7 +43,7 @@ describe('the HR app model', () => {
   it('finds the compulsory letters a person has nothing on file for', () => {
     const d = {
       docTypes: [{ id: 'offer', name: 'Offer letter', compulsory: true }, { id: 'inc', name: 'Increment letter', compulsory: false }],
-      letters: [{ id: 'L1', staffId: 'zack', typeId: 'inc', file: 'a.pdf' }, { id: 'L2', staffId: 'chea', typeId: 'offer', file: 'b.pdf' }],
+      letters: [{ id: 'L1', staffId: 'zack', typeId: 'inc', typeName: 'Increment letter', file: 'a.pdf' }, { id: 'L2', staffId: 'chea', typeId: 'offer', typeName: 'Offer letter', file: 'b.pdf' }],
     }
     expect(missingFor(d, 'zack')).toEqual(['Offer letter'])
     expect(missingFor(d, 'chea')).toEqual([])

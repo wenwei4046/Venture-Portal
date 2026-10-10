@@ -7,19 +7,22 @@ import type { MemberRequest } from '@/lib/member/types'
 import { readRoomsPeople, readRoomsRange } from '@/lib/rooms/read'
 import { loadDocumentation } from '@/lib/documentation/server'
 import { deptLabel, type Documentation } from '@/lib/documentation/model'
+import { loadHiringBoard } from '@/lib/hiring/board'
+import { dayLabel as hiringDay, hrOwners } from '@/lib/hiring/view'
+import type { HiringBoard, HiringRequest, HiringTalent } from '@/lib/hiring/types'
 import type { Booking } from '@/lib/rooms/model'
 import { officeToday } from '@/lib/office-time'
 import { canDo } from '@/lib/permission-actions'
 import { can } from '@/lib/permissions'
 import type { User } from '@/types'
-import { shiftDay, type HrAppData, type HrBooking, type HrMemberRequest, type MemberKind } from './model'
+import { shiftDay, type HrAppData, type HrBooking, type HrHire, type HrMemberRequest, type HrTalent, type MemberKind } from './model'
 
 /**
  * The HR phone app's data (2026-10-11, HR revamp round 2): read from the
  * portal's own modules under the viewer's session — each asks its own cell,
  * and a module the viewer may not read comes back empty rather than failing
  * the app. Meeting rooms (lib/rooms) and Member services (the member back
- * office) today; Hiring and Documentation join when their modules land.
+ * office), Hiring (lib/hiring) and Documentation's Data center.
  */
 
 const CATEGORY: Readonly<Record<string, string>> = {
@@ -82,6 +85,48 @@ export function bookingOf(b: Booking): HrBooking {
   }
 }
 
+/** "3200–3800" → "3,200–3,800": a range answer as the app writes money. */
+const grouped = (v: string) => v.split('–').map(x => x.trim()).map(x => (/^\d+(\.\d+)?$/.test(x) ? Number(x).toLocaleString('en-US') : x)).join('–')
+
+/** A hiring request as the app draws it — the requester form's answers by the handoff's own field ids. */
+export function hireOf(r: HiringRequest, board: Pick<HiringBoard, 'people'>): HrHire {
+  const a = (id: string) => (r.answers[id] ?? '').trim()
+  const n = Number(a('headcount'))
+  return {
+    id: r.id,
+    status: r.status,
+    position: a('position'),
+    headcount: Number.isFinite(n) && n > 0 ? Math.floor(n) : 1,
+    dept: a('dept'),
+    budget: a('budget') ? grouped(a('budget')) : '',
+    start: a('start'),
+    employment: a('emp') || undefined,
+    reason: a('reason') || undefined,
+    age: a('age') || undefined,
+    gender: a('gender') || undefined,
+    race: a('race') || undefined,
+    jd: a('jd') || undefined,
+    notes: a('notes') || undefined,
+    ownerName: board.people.find(p => p.id === r.ownerId)?.name ?? null,
+    requester: r.requesterName,
+    company: r.requesterCompany,
+    when: hiringDay(r.submittedAt),
+    hired: r.hiredNames.length ? r.hiredNames.join(', ') : null,
+    source: r.hiredThrough,
+    cost: r.hiringCost === null ? null : r.hiringCost.toLocaleString('en-US', { maximumFractionDigits: 2 }),
+    candidates: r.candidates.map(c => ({ id: c.id, name: c.name, phone: c.phone || undefined, note: c.note || undefined, source: c.source, stage: c.stage })),
+    events: r.events.map(e => ({ what: e.what, when: hiringDay(e.at), who: e.who, note: e.note || undefined })),
+  }
+}
+
+/** Somebody in the Talent Bank as the app draws them. */
+export function talentOf(t: HiringTalent): HrTalent {
+  return {
+    id: t.id, name: t.name, phone: t.phone || undefined, email: t.email || undefined, position: t.position, dept: t.department,
+    from: t.fromRequest, when: hiringDay(t.savedAt), notes: t.notes,
+  }
+}
+
 /** People › Documentation's Data center as the app draws it: everybody, the letter types, the letters on file. */
 export function dataCenterOf(doc: Pick<Documentation, 'people' | 'departments' | 'letterTypes' | 'letters'>): Pick<HrAppData, 'staff' | 'docTypes' | 'letters'> {
   const dept = new Map(doc.departments.map(d => [d.id, deptLabel(d.name)]))
@@ -97,13 +142,16 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
   const readsRequests = can(user, 'member_requests_manage')
   const readsRooms = canDo(user, 'rooms', 'view')
   const readsDocs = canDo(user, 'documentation', 'view')
-  const [members, factsRead, range, people, docs] = await Promise.all([
+  const readsHiring = canDo(user, 'hiring', 'view')
+  const [members, factsRead, range, people, docs, hiring] = await Promise.all([
     readsRequests ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
     readsRequests ? (async () => (await client()).rpc('member_admin_request_facts'))() : Promise.resolve(null),
     readsRooms ? readRoomsRange(today, shiftDay(today, 6)) : Promise.resolve(null),
     readsRooms ? readRoomsPeople() : Promise.resolve(null),
     readsDocs ? loadDocumentation() : Promise.resolve(null),
+    readsHiring ? loadHiringBoard() : Promise.resolve(null),
   ])
+  const board = hiring?.ok ? hiring.board : null
 
   const snapshot = members && members.ok ? (members.data as AdminMemberData) : null
   const facts = factsRead && !factsRead.error ? requestFactsFromRow(factsRead.data) : {}
@@ -124,13 +172,14 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     meId: who?.me?.staffId ?? null,
     today,
     staff,
-    owners: staff.filter(p => p.dept === 'HR'),
-    hires: [],
+    // Who may own a request: HR's own people, as the portal's Acknowledge offers them.
+    owners: board ? hrOwners(board).map(p => ({ id: p.id, name: p.name, title: p.title, dept: p.department })) : staff.filter(p => p.dept === 'HR'),
+    hires: board ? board.requests.map(r => hireOf(r, board)) : [],
     requests,
     rooms,
     bookings,
-    sources: [],
-    talents: [],
+    sources: board ? board.sources.filter(x => x.active).map(x => x.name) : [],
+    talents: board ? board.talents.map(talentOf) : [],
     docTypes: center?.docTypes ?? [],
     letters: center?.letters ?? [],
     bookDepts: (who?.departments ?? []).map(d => ({ id: d.id, name: d.name })),
