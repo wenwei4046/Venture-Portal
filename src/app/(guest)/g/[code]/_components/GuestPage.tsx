@@ -26,6 +26,7 @@ import {
   type GuestTaken,
   type SlotPick,
 } from '@/lib/guest/model'
+import { HireFlow } from './HireFlow'
 import s from './guest.module.css'
 
 /**
@@ -39,15 +40,16 @@ import s from './guest.module.css'
  * user, 2026-10-11). From 900px wide the Book step gets the Preview column.
  */
 
-type Tab = 'home' | 'book' | 'sched'
+type Tab = 'home' | 'book' | 'sched' | 'hire'
 type Done = GuestBooked & { edited?: boolean; cancelled?: boolean }
 
 const CLOSED = 'This link is closed.'
 const NO_PICK: SlotPick = { room: null, start: null, end: null }
 
-const ICONS: Record<'book' | 'sched', string[]> = {
+const ICONS: Record<'book' | 'sched' | 'hire', string[]> = {
   book: ['M3.5 6.5h17v10h-17z', 'M8 20h8M12 16.5V20'],
   sched: ['M3.5 5h17v15h-17z', 'M8 3v4M16 3v4M3.5 10h17', 'M8 14h3M8 17h6'],
+  hire: ['M10 11a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z', 'M4 20c0-3.6 2.7-6 6-6 1.2 0 2.3.3 3.2.8', 'M18 14v6M15 17h6'],
 }
 
 function Icon({ paths }: { paths: string[] }) {
@@ -133,7 +135,7 @@ export default function GuestPage({
     return () => window.removeEventListener('keydown', onKey)
   }, [viewId, nameModal])
 
-  const page = open && (tab === 'home' || open.booking) ? tab : 'home'
+  const page = open && (tab === 'home' || (tab === 'hire' ? open.hiring : open.booking)) ? tab : 'home'
   const dayTaken = taken[date] ?? []
   const sub = open?.subs.find(x => x.id === co) ?? null
   const room = open?.rooms.find(r => r.id === pick.room) ?? null
@@ -327,6 +329,20 @@ export default function GuestPage({
                   </button>
                 </>
               ) : null}
+              {open.hiring ? (
+                <button type="button" className={s.homeCard} onClick={() => setTab('hire')}>
+                  <span className={s.homeTile} style={{ background: 'rgb(249 231 216)', color: 'rgb(163 78 37)' }}>
+                    <Icon paths={ICONS.hire} />
+                  </span>
+                  <div className={s.homeText}>
+                    <div className={s.homeTitle}>Request manpower</div>
+                    <div className={s.homeDesc}>Ask HR to hire for your team. Attach a job description if you have one.</div>
+                  </div>
+                  <span className={s.start}>
+                    Start <span className={s.arrow}>→</span>
+                  </span>
+                </button>
+              ) : null}
             </div>
           </>
         ) : null}
@@ -337,7 +353,9 @@ export default function GuestPage({
           </button>
         ) : null}
 
-        <div className={s.cols} data-preview={showPreview ? 'true' : 'false'}>
+        {open && page === 'hire' ? <HireFlow code={code} data={open} onClosed={() => setClosedNow(true)} /> : null}
+
+        <div className={s.cols} data-preview={showPreview ? 'true' : 'false'} hidden={page === 'hire'}>
           <div className={s.main}>
             {open && page === 'sched' ? (
               <>

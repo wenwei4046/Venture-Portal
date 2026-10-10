@@ -68,6 +68,38 @@ export async function guestBook(input: GuestBookInput): Promise<GuestDone<{ book
   return booked ? { ok: true, booked } : { ok: false, reason: 'The room could not be booked. Please try again.' }
 }
 
+export interface GuestHireInput {
+  code: string
+  subsidiary: string
+  name: string
+  /** Hiring › Form settings' fields, by id (a range "2500–3000"). */
+  answers: Record<string, string>
+  /** The job description the browser put under guest/<code>/, if any. */
+  attachmentPath: string | null
+  attachmentName: string | null
+}
+
+/** Send a hiring request to HR (Request manpower). */
+export async function guestHire(input: GuestHireInput): Promise<GuestDone<{ id: string; position: string }>> {
+  if (!isGuestCode(input.code)) return { ok: false, reason: CLOSED }
+  const answers = Object.fromEntries(
+    Object.entries(input.answers && typeof input.answers === 'object' ? input.answers : {})
+      .filter(([k]) => /^[a-z][a-z0-9_]{0,40}$/.test(k))
+      .map(([k, v]) => [k, text(v, 4000)]),
+  )
+  const { data, error } = await guestClient().rpc('guest_link_hire', {
+    p_code: input.code,
+    p_subsidiary: isId(input.subsidiary) ? input.subsidiary : null,
+    p_name: text(input.name, 120),
+    p_answers: answers,
+    p_attachment_path: input.attachmentPath ? text(input.attachmentPath, 300) : null,
+    p_attachment_name: input.attachmentName ? text(input.attachmentName, 200) : null,
+  })
+  if (error) return { ok: false, reason: words(error, 'The request could not be sent. Please try again.') }
+  const r = (data ?? {}) as { id?: string; position?: string }
+  return { ok: true, id: String(r.id ?? ''), position: String(r.position ?? 'the role') }
+}
+
 /** Cancel a booking made through the link, saying who. */
 export async function guestCancel(code: string, id: string, actor: string): Promise<GuestDone<{ title: string }>> {
   if (!isGuestCode(code)) return { ok: false, reason: CLOSED }

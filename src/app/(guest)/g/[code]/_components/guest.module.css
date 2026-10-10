@@ -113,6 +113,7 @@
 }
 
 .cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
+.cols[hidden] { display: none; }
 @media (min-width: 900px) {
   .cols[data-preview='true'] { grid-template-columns: minmax(0, 1fr) 340px; }
 }
@@ -568,6 +569,160 @@
 }
 .root .nmGo[data-danger='true'] { background: rgb(176 40 34); color: rgb(255 255 255); }
 .root .nmGo:disabled, .root .vCancel:disabled, .root .cancelBtn:disabled { cursor: progress; opacity: 0.7; }
+
+/* ── Request manpower (the step-by-step form) ── */
+.steps { display: flex; flex-direction: column; gap: 8px; }
+.stepsTop { display: flex; justify-content: space-between; font-size: 12.5px; }
+.stepName { font-weight: 600; }
+.stepCount { color: rgb(117 100 86); }
+.stepBars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.stepBar { height: 4px; border-radius: 2px; background: rgb(229 222 212); }
+.stepBar[data-on='true'] { background: rgb(233 154 83); }
+.hGroup {
+  background: rgb(255 255 255);
+  border: 1px solid rgb(229 222 212);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.hTitle { font-size: 15px; font-weight: 600; }
+.hDesc { font-size: 12.5px; color: rgb(117 100 86); margin-top: 2px; }
+.hFields { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px 12px; }
+.hField { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.hLabel { font-size: 12.5px; color: rgb(90 78 68); font-weight: 500; }
+.reqMark { color: rgb(176 40 34); }
+.optMark { font-weight: 400; color: rgb(140 125 112); }
+.hInput { width: 100%; }
+.textarea {
+  padding: 10px 12px;
+  border: 1px solid rgb(222 214 203);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.55;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  width: 100%;
+  /* Five 14px lines, as the prototype — the phone's 16px input floor (globals.css) would make it taller. */
+  height: 130.5px;
+  background: rgb(255 255 255);
+  color: inherit;
+}
+.textarea::placeholder { color: rgb(117 117 117); }
+.textarea:focus { border-color: rgb(233 154 83); }
+.hStepper { align-self: flex-start; }
+.hCount { min-width: 48px; text-align: center; font-size: 16px; font-weight: 600; }
+.pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.root .pill {
+  box-sizing: content-box;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgb(222 214 203);
+  background: rgb(255 255 255);
+  color: rgb(43 31 23);
+  display: flex;
+  align-items: center;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.root .pill[aria-pressed='true'] { border-color: rgb(43 31 23); background: rgb(43 31 23); color: rgb(246 238 230); }
+.range { display: flex; align-items: center; gap: 8px; }
+.rangeInput {
+  box-sizing: content-box;
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  padding: 0 12px;
+  border: 1px solid rgb(222 214 203);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  background: rgb(255 255 255);
+  color: inherit;
+}
+.rangeInput::placeholder { color: rgb(117 117 117); }
+.rangeInput:focus { border-color: rgb(233 154 83); }
+.rangeTo { color: rgb(117 100 86); }
+.fileBox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px dashed rgb(216 205 190);
+  border-radius: 12px;
+  background: rgb(250 247 243);
+  cursor: pointer;
+}
+.fileExt {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgb(238 240 226);
+  color: rgb(88 98 68);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  flex: none;
+}
+.fileText { flex: 1; min-width: 0; }
+.fileName { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fileHint { display: block; font-size: 12px; color: rgb(117 100 86); margin-top: 2px; }
+.fileBtn { font-size: 13px; font-weight: 600; color: rgb(163 78 37); }
+.review { background: rgb(255 255 255); border: 1px solid rgb(229 222 212); border-radius: 16px; padding: 6px 18px; }
+.rvGroup { padding: 14px 0; border-bottom: 1px solid rgb(240 234 226); }
+.rvHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.rvTitle { font-size: 13.5px; font-weight: 600; }
+.root .rvEdit { font-size: 13px; font-weight: 600; color: rgb(163 78 37); cursor: pointer; }
+.rvRows { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 6px 12px; font-size: 13px; }
+.rvPair { display: contents; }
+.rvL { color: rgb(117 100 86); }
+.rvV { white-space: pre-wrap; overflow-wrap: anywhere; }
+.navBtns { display: flex; gap: 8px; }
+.root .backBtn {
+  box-sizing: content-box;
+  flex: 1;
+  height: 52px;
+  border-radius: 12px;
+  border: 1px solid rgb(222 214 203);
+  background: rgb(255 255 255);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  cursor: pointer;
+}
+.root .nextBtn {
+  flex: 2;
+  height: 52px;
+  border-radius: 12px;
+  background: rgb(233 154 83);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.root .nextBtn:disabled { cursor: progress; opacity: 0.7; }
+.hDone { gap: 12px; }
+.doneLine { font-size: 13.5px; color: rgb(90 78 68); line-height: 1.5; }
+.root .another {
+  height: 46px;
+  border-radius: 10px;
+  background: rgb(43 31 23);
+  color: rgb(246 238 230);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
 
 @keyframes gFade {
   from { opacity: 0; }

@@ -371,9 +371,10 @@ with `member_documents_of` (Documentation · View, mig `20261011110000`).
 The rules: `.claude/rules/revenue/revenue-app.md`.
 
 **THE GUEST LINK: WHAT THE PUBLISHABLE KEY MAY CALL (2026-10-11, mig
-`20261011091000`; the user: Guest link at launch OFF).** Besides the five row-policy helpers, four SECURITY DEFINER
+`20261011091000`; the user: Guest link at launch OFF).** Besides the five row-policy helpers, six SECURITY DEFINER
 functions are granted to `anon` BY NAME — `guest_link_page`, `guest_link_day`,
-`guest_link_book`, `guest_link_cancel` — the public page `/g/<code>` calls them
+`guest_link_book`, `guest_link_cancel`, `guest_link_hire` and `guest_link_may_upload` (the
+storage policy `guest_link_uploads`'s question; mig `20261011092000`) — the public page `/g/<code>` calls them
 with the publishable key and no session (`lib/guest/client.ts`). None asks a
 permission: each asks the link instead (on, the CURRENT code — `hv-` + 8 of 32
 letters and digits — and the part open), touches only bookings made through
