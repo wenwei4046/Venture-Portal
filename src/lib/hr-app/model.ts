@@ -234,6 +234,19 @@ export function candChip(stage: CandStage): { label: string; bg: string; fg: str
   return { label, bg: CHIP[tone][0], fg: CHIP[tone][1], tone }
 }
 
+/**
+ * A member request's status in words — the Revenue app's own (profile-model.ts), never the raw token (a
+ * waiting request read "needs_info" on its page; the phone audit, 2026-10-11).
+ */
+const REQUEST_STATUS: Readonly<Record<string, string>> = {
+  submitted: 'Pending review', needs_info: 'More info needed', approved: 'Approved', rejected: 'Rejected', waiting: 'Accepted',
+  reserved: 'Place reserved', accepted: 'Accepted', allocated: 'Joined', executed: 'Completed', paid: 'Paid', withdrawn: 'Cancelled',
+  expired: 'Expired', failed: 'Failed · removed', scheduled: 'Scheduled',
+}
+export function requestStatusLabel(status: string): string {
+  return REQUEST_STATUS[status] ?? status.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase())
+}
+
 export const isPendingHire = (h: HrHire) => h.status === 'submitted'
 export const isPendingRequest = (r: HrMemberRequest) => r.status === 'submitted' || r.status === 'needs_info'
 

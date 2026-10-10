@@ -45,7 +45,8 @@ export default function RoomsPage({ data, message, today, day, mode, canBook, on
       <button className={r.back} onClick={onBack}><Svg d={BACK} size={18} sw={2} />Profile</button>
       <div className={r.headRow}>
         <h1 className={r.title}>Meeting rooms</h1>
-        {canBook && <button className={r.book} onClick={() => onNew()}>+ Book</button>}
+        {/* With no room yet there is nothing to book: the portal's "+ Book a room" greys out too. */}
+        {canBook && <button className={r.book} disabled={!!data && rooms.length === 0} onClick={() => onNew()}>+ Book</button>}
       </div>
       <div className={r.modes} role="tablist" aria-label="Show">
         {MODES.map(([id, label]) => (

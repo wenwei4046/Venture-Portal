@@ -7,7 +7,7 @@ import ViewingAsBanner from '@/components/layout/ViewingAsBanner'
 import {
   CAND_STAGE, CHIP, HIRE_FILTERS, MAJOR_EVENTS, MEMBER_KIND, ORANGE, SLATE,
   bookingTimes, budgetLabel, candChip, clashOf, dayLabel, daysToFill, hireChip, hm, hourFrom, initials, isPendingHire,
-  isPendingRequest, missingFor, pipeline, positionLabel, requestTitle, reviewItems, shiftDay, slotAt,
+  isPendingRequest, missingFor, pipeline, positionLabel, requestStatusLabel, requestTitle, reviewItems, shiftDay, slotAt,
   type CandStage, type HrAppData, type HrBooking, type HrHire,
 } from '@/lib/hr-app/model'
 import s from './hr-app.module.css'
@@ -178,7 +178,8 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
             <div className={s.title} role="heading" aria-level={1}>{title}</div>
           </div>
           {view === 'rooms' && d.may.book ? (
-            <button type="button" className={s.headAction} onClick={() => openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: defaultDept(d) })}>
+            // With no room yet there is nothing to book: the portal's "+ Book a room" greys out too.
+            <button type="button" className={s.headAction} disabled={!d.rooms.length} onClick={() => openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: defaultDept(d) })}>
               + Book
             </button>
           ) : null}
@@ -259,7 +260,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
           {view === 'req' && rr ? (
             <>
               <div className={s.reqChips}>
-                <span className={s.pageChip} style={{ background: 'rgb(249 238 214)', color: 'rgb(150 100 12)' }}>{rr.status === 'submitted' ? 'Pending review' : rr.status}</span>
+                <span className={s.pageChip} style={{ background: 'rgb(249 238 214)', color: 'rgb(150 100 12)' }}>{requestStatusLabel(rr.status)}</span>
                 <span className={s.pageChip} style={{ background: 'rgb(240 236 230)' }}>{MEMBER_KIND[rr.kind]}</span>
               </div>
               <section className={s.facts}>
@@ -738,6 +739,7 @@ function InsightsScreen({ d }: { d: HrAppData }) {
       </div>
       <section className={s.bars}>
         <div className={s.trailTitle}>Days to fill</div>
+        {days.length === 0 ? <div className={s.noLetters}>No request filled yet.</div> : null}
         {days.map(x => (
           <div key={x.hire.id} className={s.barRow}>
             <div className={s.barTop}><span>{x.hire.position}</span><span className={s.mono}>{x.days} d</span></div>

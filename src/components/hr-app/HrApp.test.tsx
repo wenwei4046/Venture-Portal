@@ -94,3 +94,11 @@ describe('the HR app viewed as somebody', () => {
     expect(screen.queryByText(/Viewing as/)).toBeNull()
   })
 })
+
+describe('the HR app with no meeting room yet', () => {
+  it('greys out + Book: there is nothing to book', () => {
+    render(<HrApp data={{ ...data, rooms: [] }} actions={actions} />)
+    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'Rooms' }))
+    expect(screen.getByRole('button', { name: '+ Book' })).toBeDisabled()
+  })
+})
