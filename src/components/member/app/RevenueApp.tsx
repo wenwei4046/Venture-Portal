@@ -1002,9 +1002,12 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     closePanels: () => { setSheet(null); setNfOpen(false); setVaOpen(false); },
     setDraft: draft => { productDraft.current = draft; },
   }), [desk, nfOpen, sheet, vaOpen]);
-  const showHeader = route.screen === "today" || route.screen === "calc";
-  // Profile's glow runs up into the status bar until the page scrolls (or View as covers it).
-  const statusBg = route.screen === "account" && !route.pf && !compact && !vaOpen ? "var(--rv-peach)" : "var(--rv-white)";
+  // The phone's header — the sub-department, the bell, Profile — is Today's. With Today closed to them, the
+  // page the app opens on carries it (2026-10-11): nowhere else on a phone switches sub-department or rings.
+  const atHome = route.screen === home && route.pf === null && route.ins === "main" && route.arena === "hub";
+  const showHeader = route.screen === "today" || route.screen === "calc" || (home !== "today" && atHome);
+  // Profile's glow runs up into the status bar until the page scrolls (or View as covers it, or the header sits above it).
+  const statusBg = route.screen === "account" && !route.pf && !compact && !vaOpen && !showHeader ? "var(--rv-peach)" : "var(--rv-white)";
   const screenVars = {
     "--status-bg": statusBg,
     "--status-h": live ? "env(safe-area-inset-top, 0px)" : android ? "38px" : "54px",

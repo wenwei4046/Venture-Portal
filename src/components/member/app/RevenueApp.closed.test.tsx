@@ -97,10 +97,16 @@ describe("a page their ticks close is neither shown nor reachable", () => {
     expect(screen.getAllByText("Sales")).toHaveLength(2);
   });
 
-  it("Today closed: the app opens on Insight instead", async () => {
+  it("Today closed: the app opens on Insight instead, which carries the phone's header", async () => {
+    await open("?page=insight&department=fair");
+    // Nothing closed: Insight has no phone header — only the desk header switches sub-department.
+    expect(navButtons("Switch sub-department")).toHaveLength(1);
+    cleanup();
     await open("?department=fair", { pages: ["today"], sends: [] });
     await waitFor(() => expect(new URLSearchParams(window.location.search).get("page")).toBe("insight"));
     expect(navButtons("Today")).toEqual([]);
+    // The bell and the sub-department switch live in the phone's header, Today's until now.
+    expect(navButtons("Switch sub-department")).toHaveLength(2);
   });
 
   it("Profile lists only the workspace pages left open", async () => {
