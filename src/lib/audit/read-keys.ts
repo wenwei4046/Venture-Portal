@@ -33,4 +33,6 @@ export const AUDIT_READ_KEYS = [
   'meeting_rooms_manage',
   // People › Documentation (mig 20261011070000).
   'documentation',
+  // The guest link and its subsidiaries (2026-10-11).
+  'guest_link',
 ] as const satisfies readonly Permission[]

@@ -361,6 +361,20 @@ was addressed to them. Its memos reach PEOPLE, not sub-departments
 (`member_memo_recipients`, read by `member_visible_memo`). The rules:
 `.claude/rules/hr/documentation.md`.
 
+**THE GUEST LINK: WHAT THE PUBLISHABLE KEY MAY CALL (2026-10-11, mig
+`20261011091000`; the user: Guest link at launch OFF).** Besides the five row-policy helpers, four SECURITY DEFINER
+functions are granted to `anon` BY NAME — `guest_link_page`, `guest_link_day`,
+`guest_link_book`, `guest_link_cancel` — the public page `/g/<code>` calls them
+with the publishable key and no session (`lib/guest/client.ts`). None asks a
+permission: each asks the link instead (on, the CURRENT code — `hv-` + 8 of 32
+letters and digits — and the part open), touches only bookings made through
+the link, and answers a wrong or old code with "closed", nothing more. No
+service role. Everything else of Meeting Rooms and the Guest Link stays
+signed-in only (`guest_link.view` / `guest_link.edit`, `rooms.*`). A new
+function for the guest page is granted the same way, by name, and checks the
+code itself — `tests/member-sql/validate-guest-link.mjs` lists what anon may
+call. The rules of the page: `../hr/rooms.md`.
+
 **VIEW AS A PERSON, READ-ONLY (2026-10-11, the user: "can set a function is
 view as a user, same like in revenue app, i can view as a member").** Both view
 switchers end with *View as a person…*: a picker of everybody who signs in to

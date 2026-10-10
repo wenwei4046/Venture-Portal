@@ -1,0 +1,407 @@
+import { departmentBadge, hm, isDay, shiftDay } from '@/lib/rooms/model'
+
+/**
+ * The guest link (2026-10-11, the HR revamp's second package — README §15–16,
+ * mig 20261011091000): what the public page /g/<code> and Admin › Guest Link
+ * read, and the page's arithmetic — the days a guest may pick, which half
+ * hours are free, the availability bar, the schedule's blocks, the words of
+ * each line — as `Guest Booking.dc.html` has them. Pure, so it is tested.
+ */
+
+/** The guest page's day: 08:00–20:00, half hours, 64px an hour on its schedule. */
+export const G_START = 480
+export const G_END = 1200
+export const G_HOUR_PX = 64
+
+export interface GuestRoom {
+  id: string
+  name: string
+  seats: number
+  location: string
+  facilities: string
+}
+
+export interface GuestSub {
+  id: string
+  code: string
+  name: string
+  departments: string[]
+}
+
+export interface GuestOpen {
+  on: true
+  booking: boolean
+  hiring: boolean
+  days: number
+  today: string
+  /** The rooms guests may book. */
+  rooms: GuestRoom[]
+  /** Every bookable room — the schedule's columns. */
+  allRooms: GuestRoom[]
+  subs: GuestSub[]
+}
+
+export type GuestData = { on: false } | GuestOpen
+
+/** A meeting on the day asked — a guest-link one (`guest`) is a guest's to change. */
+export interface GuestTaken {
+  id: string
+  ref: string | null
+  room: string
+  day: string
+  from: number
+  to: number
+  title: string
+  guest: boolean
+  code: string
+  company: string | null
+  subsidiary: string | null
+  department: string | null
+  subDepartment: string | null
+  by: string
+  pax: number
+}
+
+/** What a booking (or a change) came back as. */
+export interface GuestBooked {
+  id: string
+  ref: string
+  room: string
+  roomName: string
+  day: string
+  from: number
+  to: number
+  title: string
+  pax: number
+  company: string
+  department: string | null
+  name: string
+}
+
+// ── Reading the database's answers ────────────────────────────────────────
+
+const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null)
+const str = (v: unknown): string => (typeof v === 'string' ? v : '')
+const strOrNull = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null)
+const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : Number(v) || 0)
+
+function roomOf(v: unknown): GuestRoom | null {
+  const r = obj(v)
+  if (!r || !str(r.id) || !str(r.name)) return null
+  return { id: str(r.id), name: str(r.name), seats: num(r.seats), location: str(r.location), facilities: str(r.facilities) }
+}
+
+function subOf(v: unknown): GuestSub | null {
+  const s = obj(v)
+  if (!s || !str(s.id) || !str(s.name)) return null
+  const departments = Array.isArray(s.departments) ? s.departments.filter((d): d is string => typeof d === 'string' && d.trim() !== '') : []
+  return { id: str(s.id), code: str(s.code), name: str(s.name), departments }
+}
+
+const listOf = <T>(v: unknown, f: (x: unknown) => T | null): T[] => (Array.isArray(v) ? v.map(f).filter((x): x is T => x !== null) : [])
+
+/** The link's subsidiaries, as listed. */
+export function subsFromRows(v: unknown): GuestSub[] {
+  return listOf(v, subOf)
+}
+
+export function guestDataFromRow(v: unknown): GuestData {
+  const d = obj(v)
+  if (!d || d.on !== true || !isDay(d.today)) return { on: false }
+  return {
+    on: true,
+    booking: d.booking === true,
+    hiring: d.hiring === true,
+    days: Math.max(1, Math.min(num(d.days) || 7, 21)),
+    today: d.today,
+    rooms: listOf(d.rooms, roomOf),
+    allRooms: listOf(d.allRooms, roomOf),
+    subs: listOf(d.subs, subOf),
+  }
+}
+
+export function takenFromRows(v: unknown): GuestTaken[] {
+  return listOf(v, x => {
+    const b = obj(x)
+    if (!b || !str(b.id) || !str(b.room) || !isDay(b.day)) return null
+    return {
+      id: str(b.id),
+      ref: strOrNull(b.ref),
+      room: str(b.room),
+      day: b.day,
+      from: num(b.from),
+      to: num(b.to),
+      title: str(b.title),
+      guest: b.guest === true,
+      code: str(b.code),
+      company: strOrNull(b.company),
+      subsidiary: strOrNull(b.subsidiary),
+      department: strOrNull(b.department),
+      subDepartment: strOrNull(b.subDepartment),
+      by: str(b.by),
+      pax: num(b.pax),
+    }
+  })
+}
+
+export function bookedFromRow(v: unknown): GuestBooked | null {
+  const b = obj(v)
+  if (!b || !str(b.id) || !str(b.ref) || !isDay(b.day)) return null
+  return {
+    id: str(b.id),
+    ref: str(b.ref),
+    room: str(b.room),
+    roomName: str(b.roomName),
+    day: b.day,
+    from: num(b.from),
+    to: num(b.to),
+    title: str(b.title),
+    pax: num(b.pax),
+    company: str(b.company),
+    department: strOrNull(b.department),
+    name: str(b.name),
+  }
+}
+
+// ── Days, in the page's words ─────────────────────────────────────────────
+
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const WD_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function partsOf(day: string) {
+  const [y, m, d] = day.split('-').map(Number)
+  return { y, m, d, dow: new Date(Date.UTC(y, m - 1, d)).getUTCDay() }
+}
+
+/** "Sat 10 Oct" — en-GB's order, a three-letter month. */
+export function shortDay(day: string): string {
+  const { m, d, dow } = partsOf(day)
+  return `${WD[dow]} ${d} ${MON[m - 1]}`
+}
+
+/** "Sat, 10 Oct 2026". */
+export function fullDay(day: string): string {
+  const { y, m, d, dow } = partsOf(day)
+  return `${WD[dow]}, ${d} ${MON[m - 1]} ${y}`
+}
+
+/** "Saturday 10 Oct". */
+export function longDay(day: string): string {
+  const { m, d, dow } = partsOf(day)
+  return `${WD_LONG[dow]} ${d} ${MON[m - 1]}`
+}
+
+/** The days a guest may pick: today and the next ones, at most 21. */
+export function guestDays(today: string, days: number): string[] {
+  const n = Math.max(1, Math.min(Math.floor(days) || 7, 21))
+  return Array.from({ length: n }, (_, i) => shiftDay(today, i))
+}
+
+/** A day chip: "Today" / "Mon" over the date. */
+export function dayChip(day: string, today: string): { wd: string; n: string } {
+  const { d, dow } = partsOf(day)
+  return { wd: day === today ? 'Today' : WD[dow], n: String(d) }
+}
+
+// ── Slots ─────────────────────────────────────────────────────────────────
+
+/** Every half hour a meeting may start at. */
+export function guestSlots(): number[] {
+  const out: number[] = []
+  for (let m = G_START; m < G_END; m += 30) out.push(m)
+  return out
+}
+
+/** Whether the half hour at `m` runs into a meeting in this room (the one being changed aside). */
+export function busyAt(taken: readonly GuestTaken[], room: string, m: number, exceptId: string | null): boolean {
+  return taken.some(b => b.room === room && b.id !== exceptId && b.from < m + 30 && m < b.to)
+}
+
+export interface SlotPick {
+  room: string | null
+  start: number | null
+  end: number | null
+}
+
+/**
+ * A tap on a half hour: the first tap starts a selection, a later one extends
+ * it to that slot — refused in words when the stretch runs into a meeting. A
+ * booked half hour does nothing (null).
+ */
+export function pickSlot(sel: SlotPick, room: string, m: number, taken: readonly GuestTaken[], exceptId: string | null): { pick: SlotPick; err: string } | null {
+  if (busyAt(taken, room, m, exceptId)) return null
+  const s = sel.room === room ? sel : { room, start: null, end: null }
+  if (s.start == null || s.end == null || m < s.start || (s.end - s.start > 30 && m < s.end)) {
+    return { pick: { room, start: m, end: m + 30 }, err: '' }
+  }
+  for (let x = s.start; x <= m; x += 30) {
+    if (busyAt(taken, room, x, exceptId)) return { pick: sel, err: 'That range runs into another booking.' }
+  }
+  return { pick: { room, start: s.start, end: m + 30 }, err: '' }
+}
+
+/** "6.5 h free" / "Fully booked". */
+export function freeLine(taken: readonly GuestTaken[], room: string, exceptId: string | null): string {
+  const free = guestSlots().filter(m => !busyAt(taken, room, m, exceptId)).length
+  return free ? `${free / 2} h free` : 'Fully booked'
+}
+
+/** The room card's 08–20 bar: each meeting, and the picked stretch in orange. */
+export function availabilityBars(taken: readonly GuestTaken[], room: string, pick: SlotPick | null): Array<{ left: string; width: string; picked: boolean }> {
+  const span = G_END - G_START
+  const pct = (v: number) => `${(v / span) * 100}%`
+  const bars = taken.filter(b => b.room === room).map(b => ({ left: pct(b.from - G_START), width: pct(b.to - b.from), picked: false }))
+  if (pick && pick.room === room && pick.start != null && pick.end != null) {
+    bars.push({ left: pct(pick.start - G_START), width: pct(pick.end - pick.start), picked: true })
+  }
+  return bars
+}
+
+/** "Meeting Room 1 seats 8" / "Too many for Meeting Room 1 (8 seats)" / before a room: "Including you and any visitors". */
+export function paxNote(room: GuestRoom | null, pax: number): { line: string; over: boolean } {
+  if (!room) return { line: 'Including you and any visitors', over: false }
+  const over = room.seats > 0 && pax > room.seats
+  if (over) return { line: `Too many for ${room.name} (${room.seats} seats)`, over }
+  return { line: room.seats > 0 ? `${room.name} seats ${room.seats}` : room.name, over }
+}
+
+/** What is still missing, as the page says it: "Add company, your name." */
+export function missingLine(f: { company: string; department: string; departmentNeeded: boolean; name: string; slot: boolean; title: string }): string | null {
+  const miss = [
+    !f.company && 'company',
+    f.departmentNeeded && !f.department && 'department',
+    !f.name.trim() && 'your name',
+    !f.slot && 'a time slot',
+    !f.title.trim() && 'a meeting title',
+  ].filter((x): x is string => !!x)
+  return miss.length ? `Add ${miss.join(', ')}.` : null
+}
+
+/** "Meeting Room 1 · Sat 10 Oct · 09:00–10:00" — the picked slot, under the rooms. */
+export function selectionLine(room: GuestRoom | null, day: string, pick: SlotPick): string {
+  if (!room || pick.start == null || pick.end == null) return ''
+  return `${room.name} · ${shortDay(day)} · ${hm(pick.start)}–${hm(pick.end)}`
+}
+
+// ── The schedule ──────────────────────────────────────────────────────────
+
+/** A meeting's code: its subsidiary's, or HQ's department (RV, HR, FIN …). */
+export function takenCode(b: Pick<GuestTaken, 'guest' | 'code' | 'department'>): string {
+  if (b.guest) return b.code
+  return b.department ? departmentBadge(b.department).code : ''
+}
+
+/** "Department" as the schedule's window shows it: "HIN · Project", "RV · Revenue · Fair". */
+export function takenDepartment(b: GuestTaken): string {
+  const code = takenCode(b)
+  const name = b.guest ? b.department ?? '' : b.department ? departmentBadge(b.department).label + (b.subDepartment ? ` · ${b.subDepartment}` : '') : ''
+  return (code ? `${code} · ` : '') + (name || '—')
+}
+
+/** "Room 1" — the schedule's narrow column heads. */
+export function shortRoomName(name: string): string {
+  return name.replace('Meeting Room', 'Room')
+}
+
+export interface CalBlock {
+  id: string
+  title: string
+  time: string
+  clamp: number
+  centred: boolean
+  top: number
+  height: number
+  guest: boolean
+}
+
+/** One room's meetings on the schedule: 64px an hour, 1px in, 2px short; long titles wrap to 3 or 5 lines. */
+export function calBlocks(taken: readonly GuestTaken[], room: string): CalBlock[] {
+  return taken.filter(b => b.room === room).map(b => {
+    const dur = b.to - b.from
+    const code = takenCode(b)
+    return {
+      id: b.id,
+      title: b.title || 'Booked',
+      time: hm(b.from) + (code && dur > 30 ? ` ${code}` : ''),
+      clamp: dur <= 30 ? 1 : dur <= 60 ? 3 : 5,
+      centred: dur <= 30,
+      top: ((b.from - G_START) / 60) * G_HOUR_PX + 1,
+      height: (dur / 60) * G_HOUR_PX - 2,
+      guest: b.guest,
+    }
+  })
+}
+
+/** The schedule window's facts. */
+export function takenFacts(b: GuestTaken, roomName: string): Array<{ l: string; v: string }> {
+  return [
+    { l: 'Room', v: roomName },
+    { l: 'Company', v: b.company || 'HOUZS Venture' },
+    { l: 'Department', v: takenDepartment(b) },
+    { l: 'Booked by', v: b.by || '—' },
+    { l: 'People', v: `${b.pax || 0} pax` },
+  ]
+}
+
+// ── The finished booking, and the desktop preview ─────────────────────────
+
+export function bookedFacts(b: GuestBooked): Array<{ l: string; v: string }> {
+  return [
+    { l: 'Room', v: b.roomName },
+    { l: 'When', v: `${shortDay(b.day)} · ${hm(b.from)}–${hm(b.to)}` },
+    { l: 'Meeting', v: b.title },
+    { l: 'People', v: `${b.pax} pax` },
+    { l: 'Booked by', v: [b.name, b.company, b.department].filter(Boolean).join(' · ') },
+  ]
+}
+
+export interface PreviewRow {
+  l: string
+  v: string
+  filled: boolean
+}
+
+const pvRow = (l: string, v: string): PreviewRow => ({ l, v: v || 'Not filled yet', filled: !!v })
+
+/** The desktop's Preview: Who, When, Meeting — and how much of it is filled. */
+export function bookingPreview(f: {
+  company: string
+  department: string
+  name: string
+  room: GuestRoom | null
+  day: string
+  pick: SlotPick
+  title: string
+  pax: number
+}): { groups: Array<{ title: string; rows: PreviewRow[] }>; done: string; pct: string } {
+  const slot = !!f.room && f.pick.start != null && f.pick.end != null
+  const groups = [
+    { title: 'Who', rows: [pvRow('Company', f.company), pvRow('Department', f.department), pvRow('Name', f.name.trim())] },
+    {
+      title: 'When',
+      rows: [
+        pvRow('Room', f.room ? f.room.name : ''),
+        pvRow('Date', slot ? fullDay(f.day) : ''),
+        pvRow('Time', slot ? `${hm(f.pick.start!)} – ${hm(f.pick.end!)}` : ''),
+      ],
+    },
+    {
+      title: 'Meeting',
+      rows: [pvRow('Title', f.title.trim()), pvRow('People', `${f.pax} pax${f.room && f.room.seats ? ` · room seats ${f.room.seats}` : ''}`)],
+    },
+  ]
+  const all = groups.flatMap(g => g.rows)
+  const n = all.filter(r => r.filled).length
+  return { groups, done: `${n} of ${all.length} filled`, pct: `${Math.round((n / Math.max(1, all.length)) * 100)}%` }
+}
+
+/** The link guests open, on this site. */
+export function guestUrl(origin: string, code: string): string {
+  return `${origin.replace(/\/+$/, '')}/g/${code}`
+}
+
+/** A guest link code as the database makes them (hv- and eight of 32 letters and digits). */
+export function isGuestCode(v: unknown): v is string {
+  return typeof v === 'string' && /^hv-[A-HJ-NP-Z2-9]{8}$/.test(v)
+}

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node validate-member.mjs && node validate-director-reporting.mjs && node validate-ir-specialist-downlines.mjs && node validate-employee-chart-lifecycle.mjs && node validate-fair-calendar.mjs && node validate-catalogue.mjs && node validate-upsales.mjs && node validate-closed-month.mjs && node validate-pays-from.mjs && node validate-open-bill-months.mjs && node validate-kpi-add-ons.mjs && node validate-member-claims.mjs && node validate-permission-templates.mjs && node validate-permission-tabs.mjs && node validate-seats.mjs && node validate-app-audit.mjs && node validate-permission-actions.mjs && node validate-definer-login.mjs && node validate-table-writes.mjs && node validate-function-actions.mjs && node validate-reach.mjs && node validate-sensitive-fields.mjs && node validate-overview-actions.mjs && node validate-table-reads.mjs && node validate-team-directory.mjs && node validate-crm-whatsapp.mjs && node validate-crm-team.mjs && node validate-crm-assign.mjs && node validate-crm-writes.mjs && node validate-crm-messenger.mjs && node validate-crm-redesign.mjs && node validate-crm-control.mjs && node validate-crm-ir.mjs && node validate-crm-permissions.mjs && node validate-meeting-rooms.mjs",
+    "test": "node validate-member.mjs && node validate-director-reporting.mjs && node validate-ir-specialist-downlines.mjs && node validate-employee-chart-lifecycle.mjs && node validate-fair-calendar.mjs && node validate-catalogue.mjs && node validate-upsales.mjs && node validate-closed-month.mjs && node validate-pays-from.mjs && node validate-open-bill-months.mjs && node validate-kpi-add-ons.mjs && node validate-member-claims.mjs && node validate-permission-templates.mjs && node validate-permission-tabs.mjs && node validate-seats.mjs && node validate-app-audit.mjs && node validate-permission-actions.mjs && node validate-definer-login.mjs && node validate-table-writes.mjs && node validate-function-actions.mjs && node validate-reach.mjs && node validate-sensitive-fields.mjs && node validate-overview-actions.mjs && node validate-table-reads.mjs && node validate-team-directory.mjs && node validate-crm-whatsapp.mjs && node validate-crm-team.mjs && node validate-crm-assign.mjs && node validate-crm-writes.mjs && node validate-crm-messenger.mjs && node validate-crm-redesign.mjs && node validate-crm-control.mjs && node validate-crm-ir.mjs && node validate-crm-permissions.mjs && node validate-meeting-rooms.mjs && node validate-guest-link.mjs",
     "test:director-reporting": "node validate-director-reporting.mjs",
     "test:ir-specialist-downlines": "node validate-ir-specialist-downlines.mjs",
     "test:employee-chart-lifecycle": "node validate-employee-chart-lifecycle.mjs",
@@ -38,7 +38,8 @@
     "test:overview-actions": "node validate-overview-actions.mjs",
     "test:table-reads": "node validate-table-reads.mjs",
     "test:team-directory": "node validate-team-directory.mjs",
-    "test:meeting-rooms": "node validate-meeting-rooms.mjs"
+    "test:meeting-rooms": "node validate-meeting-rooms.mjs",
+    "test:guest-link": "node validate-guest-link.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.8"

@@ -70,13 +70,14 @@ export function RoomsSchedule({
           Today
         </button>
         <span className={s.summary}>{meetingCount(bookings.length)}</span>
-        <span className={s.spacer} />
-        {codes.map(c => (
-          <span key={c.key} className={s.legend} title={c.full}>
-            <span className={s.swatch} style={{ background: TONES[c.tone].light, borderLeft: `3px solid ${TONES[c.tone].deep}` }} />
-            {c.label}
-          </span>
-        ))}
+        <span className={s.codes}>
+          {codes.map(c => (
+            <span key={c.key} className={s.legend} title={c.full}>
+              <span className={s.swatch} style={{ background: TONES[c.tone].light, borderLeft: `3px solid ${TONES[c.tone].deep}` }} />
+              {c.label}
+            </span>
+          ))}
+        </span>
         {canBook ? (
           <button type="button" className={s.bookBtn} onClick={() => onBook(null, null)} disabled={rooms.length === 0}>
             + Book a room
