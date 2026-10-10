@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition, type ReactNode } from 'react'
+import { officeTime } from '@/lib/office-time'
 import { Select } from '@/components/hrv/select'
 import {
   CAND_STAGE, CHIP, HIRE_FILTERS, MAJOR_EVENTS, MEMBER_KIND, ORANGE, SLATE,
@@ -255,7 +256,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
               </div>
               <section className={s.facts}>
                 {([
-                  ['Reference', rr.id], ['Sub-department', rr.sub], ['Submitted by', rr.byName],
+                  ['Reference', rr.code], ['Sub-department', rr.sub], ['Submitted by', rr.byName],
                   ...(rr.kind === 'waiting'
                     ? [['Applicant', rr.newPerson], ['Mobile', rr.contact], ['Joining', rr.start]]
                     : rr.kind === 'claim'
@@ -376,7 +377,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
               {d.letters.filter(l => l.staffId === pp.id).map(l => (
                 <div key={l.id} className={s.letter}>
                   <span className={s.letterIcon}>{(l.file.split('.').pop() || 'PDF').toUpperCase().slice(0, 4)}</span>
-                  <span className={s.letterType}>{d.docTypes.find(t => t.id === l.typeId)?.name ?? l.typeId}</span>
+                  <span className={s.letterType}>{d.docTypes.find(t => t.id === l.typeId)?.name ?? l.typeName}</span>
                   <button
                     type="button"
                     className={s.viewBtn}
@@ -495,6 +496,7 @@ function HomeScreen({ d, items, goTab, push, openBooking, staffName }: {
             </span>
           </button>
         ))}
+        {meetings.length === 0 ? <div className={s.meetNone}>No meetings today.</div> : null}
       </section>
     </>
   )
@@ -502,7 +504,7 @@ function HomeScreen({ d, items, goTab, push, openBooking, staffName }: {
 
 /** "afternoon" — by the office's clock (UTC+8), as the portal greets. */
 function greeting(): string {
-  const h = Number(new Date().toLocaleString('en-GB', { timeZone: 'Asia/Kuala_Lumpur', hour: '2-digit', hour12: false }))
+  const h = officeTime().hour()
   return h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening'
 }
 
@@ -626,7 +628,10 @@ function RoomsScreen({ d, day, today, setDate, roomView, setRoomView, openBookin
           </button>
         ))}
       </div>
-      {roomView === 'timeline' ? (
+      {d.rooms.length === 0 ? (
+        // Rooms start empty (the user, 2026-10-11): HR adds them on Admin › Meeting Rooms.
+        <div className={s.noLetters}>No meeting rooms yet.</div>
+      ) : roomView === 'timeline' ? (
         <>
           <div className={s.tl}>
             <div className={s.tlHead} style={{ gridTemplateColumns: cols }}>

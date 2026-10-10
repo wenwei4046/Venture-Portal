@@ -5,6 +5,8 @@ import { adminMemberAction, type AdminMemberData } from '@/lib/member/server'
 import { requestFactsFromRow, type RequestFacts } from '@/lib/member/member-services'
 import type { MemberRequest } from '@/lib/member/types'
 import { readRoomsPeople, readRoomsRange } from '@/lib/rooms/read'
+import { loadDocumentation } from '@/lib/documentation/server'
+import { deptLabel, type Documentation } from '@/lib/documentation/model'
 import type { Booking } from '@/lib/rooms/model'
 import { officeToday } from '@/lib/office-time'
 import { canDo } from '@/lib/permission-actions'
@@ -40,8 +42,11 @@ export function memberRequestOf(r: MemberRequest, facts: RequestFacts | undefine
   if (r.kind !== 'waiting' && r.kind !== 'replacement' && r.kind !== 'claim') return null
   const d = r.detail ?? {}
   const amount = d.amount !== null && d.amount !== undefined && d.amount !== '' && Number.isFinite(Number(d.amount)) ? Number(d.amount).toLocaleString('en-US', { maximumFractionDigits: 2 }) : null
+  const no = r.requestNo ?? (d as Record<string, unknown>).requestNo
   return {
     id: r.id,
+    // The member app's own words for it (requestCode, profile-model.ts).
+    code: typeof no === 'string' && no ? no : `RQ-${r.id.slice(0, 8).toUpperCase()}`,
     kind: r.kind as MemberKind,
     status: r.status,
     sub: subs.find(x => x.id === str(d.subDepartmentId))?.name ?? '',
@@ -77,15 +82,27 @@ export function bookingOf(b: Booking): HrBooking {
   }
 }
 
+/** People › Documentation's Data center as the app draws it: everybody, the letter types, the letters on file. */
+export function dataCenterOf(doc: Pick<Documentation, 'people' | 'departments' | 'letterTypes' | 'letters'>): Pick<HrAppData, 'staff' | 'docTypes' | 'letters'> {
+  const dept = new Map(doc.departments.map(d => [d.id, deptLabel(d.name)]))
+  return {
+    staff: doc.people.map(p => ({ id: p.id, name: p.name, title: p.title ?? '', dept: (p.departmentId && dept.get(p.departmentId)) || '' })),
+    docTypes: doc.letterTypes.map(t => ({ id: t.id, name: t.name, compulsory: t.compulsory })),
+    letters: doc.letters.map(l => ({ id: l.id, staffId: l.staffId, typeId: l.typeId ?? '', typeName: l.typeName, file: l.fileName })),
+  }
+}
+
 export async function loadHrAppData(user: User): Promise<HrAppData> {
   const today = officeToday()
   const readsRequests = can(user, 'member_requests_manage')
   const readsRooms = canDo(user, 'rooms', 'view')
-  const [members, factsRead, range, people] = await Promise.all([
+  const readsDocs = canDo(user, 'documentation', 'view')
+  const [members, factsRead, range, people, docs] = await Promise.all([
     readsRequests ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
     readsRequests ? (async () => (await client()).rpc('member_admin_request_facts'))() : Promise.resolve(null),
     readsRooms ? readRoomsRange(today, shiftDay(today, 6)) : Promise.resolve(null),
     readsRooms ? readRoomsPeople() : Promise.resolve(null),
+    readsDocs ? loadDocumentation() : Promise.resolve(null),
   ])
 
   const snapshot = members && members.ok ? (members.data as AdminMemberData) : null
@@ -97,7 +114,9 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
   const rooms = range?.ok ? range.data.rooms.filter(r => r.bookable).map(r => ({ id: r.id, name: r.name, seats: r.seats })) : []
   const bookings = range?.ok ? range.data.bookings.filter(b => !b.cancelled).map(bookingOf) : []
   const who = people?.ok ? people.data : null
-  const staff = (who?.people ?? []).map(p => ({ id: p.id, name: p.name, title: p.title ?? '', dept: p.department ?? '' }))
+  // Everybody working here: the Data center's list when Documentation is theirs, else the rooms' (the same people).
+  const center = docs?.ok ? dataCenterOf(docs.data) : null
+  const staff = center?.staff ?? (who?.people ?? []).map(p => ({ id: p.id, name: p.name, title: p.title ?? '', dept: p.department ?? '' }))
   const meName = who?.me?.name ?? who?.account ?? user.name ?? ''
 
   return {
@@ -112,8 +131,8 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     bookings,
     sources: [],
     talents: [],
-    docTypes: [],
-    letters: [],
+    docTypes: center?.docTypes ?? [],
+    letters: center?.letters ?? [],
     bookDepts: (who?.departments ?? []).map(d => ({ id: d.id, name: d.name })),
   }
 }

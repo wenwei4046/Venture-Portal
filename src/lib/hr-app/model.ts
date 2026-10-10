@@ -5,6 +5,8 @@
  * the tests read the same answers. Every word and colour is the prototype's.
  */
 
+import { formatIntlDate } from '@/lib/utils'
+
 export type HireStatus = 'submitted' | 'needs_info' | 'acknowledged' | 'filled' | 'cancelled' | 'declined'
 export type CandStage = 'shortlisted' | 'appointment' | 'offered' | 'hired' | 'rejected'
 export type ChipTone = 'alert' | 'ledger' | 'danger' | 'info' | 'plain'
@@ -65,6 +67,8 @@ export type MemberKind = 'waiting' | 'replacement' | 'claim'
 
 export interface HrMemberRequest {
   id: string
+  /** The number HR and the member both quote (`RQ-2610-004`). */
+  code: string
   kind: MemberKind
   status: string
   sub: string
@@ -124,7 +128,9 @@ export interface HrDocType {
 export interface HrLetter {
   id: string
   staffId: string
+  /** '' for a published type of HR's own (a memo saved to the Data center). */
   typeId: string
+  typeName: string
   file: string
 }
 
@@ -196,8 +202,9 @@ export function shiftDay(day: string, n: number): string {
   return x.toISOString().slice(0, 10)
 }
 
+/** en-GB's order with the portal's three-letter month (en-GB writes September "Sept" — CLAUDE.md › Date handling). */
 export function dayLabel(day: string, opts: Intl.DateTimeFormatOptions): string {
-  return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'UTC', ...opts })
+  return formatIntlDate(new Date(`${day}T00:00:00Z`), { timeZone: 'UTC', ...opts }, 'en-GB')
 }
 
 /** "3,200–3,800" → "RM 3,200–3,800"; one end → that end; nothing → "—". */
@@ -254,7 +261,7 @@ export function reviewItems(d: Pick<HrAppData, 'hires' | 'requests'>): ReviewIte
     })),
     ...d.requests.filter(isPendingRequest).map(r => ({
       k: 'req' as const, id: r.id, tag: MEMBER_TAG[r.kind] ?? 'REQ', tagBg: 'rgb(230 237 241)', tagFg: SLATE,
-      title: requestTitle(r), meta: `${MEMBER_KIND[r.kind]} · ${r.sub} · ${r.byName}`, when: r.id,
+      title: requestTitle(r), meta: `${MEMBER_KIND[r.kind]} · ${r.sub} · ${r.byName}`, when: r.code,
     })),
   ]
 }

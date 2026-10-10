@@ -5,6 +5,7 @@ import { useMemo } from 'react'
 import { adminMemberAction } from '@/app/(member)/member/actions'
 import { bookRoom, cancelBooking } from '@/lib/rooms/actions'
 import { ACCEPT_NOTE } from '@/lib/member/member-services'
+import { openDocumentationFile } from '@/lib/documentation/actions'
 import type { HrAppData } from '@/lib/hr-app/model'
 import HrApp, { type ActResult, type HrAppActions } from './HrApp'
 
@@ -26,7 +27,11 @@ export default function HrAppLive({ data }: { data: HrAppData }) {
     candAdd: notYet,
     talentNotes: notYet,
     talentRemove: notYet,
-    letterLink: async () => ({ ok: false, reason: 'Not available yet.' }),
+    letterLink: async id => {
+      // People › Documentation's own short link, made at the press (never kept).
+      const res = await openDocumentationFile('letter', id, 'view')
+      return res.ok ? { ok: true, url: res.url } : { ok: false, reason: res.reason }
+    },
     requestDecide: async (id, decision, note) => {
       // The desktop's own moves (Member services): Accept onto the waiting list,
       // a claim approved into the payroll (its main button), or Reject.
