@@ -184,6 +184,8 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'revenue.manage': 'all',
   'rooms.create': 'all',
   'rooms.edit': 'all',
+  // The HR phone app reads the rooms only for an account whose cell opens them (2026-10-11).
+  'rooms.view': 'all',
   'settings.manage': 'all',
   'team.create': 'all',
   'team.edit': 'all',
