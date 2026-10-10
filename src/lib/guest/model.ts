@@ -39,6 +39,8 @@ export interface GuestOpen {
   /** Every bookable room — the schedule's columns. */
   allRooms: GuestRoom[]
   subs: GuestSub[]
+  /** Request manpower: Hiring › Form settings' fields (none while the part is closed). */
+  hireForm: HireField[]
 }
 
 export type GuestData = { on: false } | GuestOpen
@@ -117,6 +119,7 @@ export function guestDataFromRow(v: unknown): GuestData {
     rooms: listOf(d.rooms, roomOf),
     allRooms: listOf(d.allRooms, roomOf),
     subs: listOf(d.subs, subOf),
+    hireForm: hireFormFromRows(d.hireForm),
   }
 }
 
@@ -404,4 +407,128 @@ export function guestUrl(origin: string, code: string): string {
 /** A guest link code as the database makes them (hv- and eight of 32 letters and digits). */
 export function isGuestCode(v: unknown): v is string {
   return typeof v === 'string' && /^hv-[A-HJ-NP-Z2-9]{8}$/.test(v)
+}
+
+// ── Request manpower (the step-by-step form) ──────────────────────────────
+
+/** One of Hiring › Form settings' fields, as the guest page asks it. */
+export interface HireField {
+  id: string
+  label: string
+  type: 'text' | 'number' | 'longtext' | 'select' | 'range' | 'file'
+  /** A select's choices: the value kept, the words shown. */
+  options: Array<{ v: string; label: string }>
+  required: boolean
+}
+
+export interface HireGroup {
+  key: 'you' | 'role' | 'req' | 'desc'
+  title: string
+  desc: string
+  fields: HireField[]
+}
+
+const HIRE_KINDS = new Set(['text', 'number', 'longtext', 'select', 'range'])
+const ROLE_IDS = ['position', 'dept', 'headcount', 'budget', 'start', 'emp', 'reason']
+const REQ_IDS = ['age', 'gender', 'race']
+
+/** The form as the database hands it (Hiring › Form settings). */
+export function hireFormFromRows(v: unknown): HireField[] {
+  return listOf(v, x => {
+    const f = obj(x)
+    if (!f || !/^[a-z][a-z0-9_]{0,40}$/.test(str(f.id)) || !str(f.label) || !HIRE_KINDS.has(str(f.type))) return null
+    const options = str(f.options).split(',').map(o => o.trim()).filter(Boolean).map(o => ({ v: o, label: o }))
+    return { id: str(f.id), label: str(f.label), type: str(f.type) as HireField['type'], options, required: f.required === true }
+  })
+}
+
+/** About you, The role, Candidate requirements, Job description — the prototype's four steps (empty ones left out). */
+export function hireGroups(form: readonly HireField[], subs: readonly GuestSub[]): HireGroup[] {
+  const you: HireField[] = [
+    { id: '_co', label: 'Company', type: 'select', options: subs.map(s => ({ v: s.id, label: s.name })), required: true },
+    { id: '_name', label: 'Your name', type: 'text', options: [], required: true },
+  ]
+  const role = form.filter(f => ROLE_IDS.includes(f.id) || (!REQ_IDS.includes(f.id) && f.type !== 'longtext'))
+  const req = form.filter(f => REQ_IDS.includes(f.id))
+  const desc: HireField[] = [
+    ...form.filter(f => f.type === 'longtext'),
+    { id: '_file', label: 'Attach a job description', type: 'file', options: [], required: false },
+  ]
+  const groups: HireGroup[] = [
+    { key: 'you', title: 'About you', desc: 'So HR knows who to reply to.', fields: you },
+    { key: 'role', title: 'The role', desc: '', fields: role },
+    { key: 'req', title: 'Candidate requirements', desc: 'Leave as Any if it does not matter.', fields: req },
+    { key: 'desc', title: 'Job description', desc: 'Type it, attach a file, or both.', fields: desc },
+  ]
+  return groups.filter(g => g.fields.length)
+}
+
+/** A short choice (five or fewer, not the company) is a row of pills. */
+export function isChips(f: HireField): boolean {
+  return f.type === 'select' && f.options.length <= 5 && f.id !== '_co'
+}
+
+/** Long text, the file, and a row of more than three pills take the whole width. */
+export function spansRow(f: HireField): boolean {
+  return f.type === 'longtext' || f.type === 'file' || (isChips(f) && f.options.length > 3)
+}
+
+const HIRE_PLACEHOLDER: Record<string, string> = {
+  position: 'e.g. Warehouse Assistant',
+  budget: 'e.g. 2,500 – 3,000',
+  jd: 'What will they do day to day?',
+  notes: 'Anything HR should know — shifts, driving licence, languages',
+}
+
+export function hirePlaceholder(f: HireField): string {
+  return HIRE_PLACEHOLDER[f.id] ?? (f.type === 'select' ? 'Choose…' : '')
+}
+
+/** Whether a field is answered — a range needs one end, the file a file. */
+export function hireFilled(f: HireField, answers: Readonly<Record<string, string>>, file: string | null): boolean {
+  if (f.type === 'file') return !!file
+  return String(answers[f.id] ?? '').replace('–', '').trim() !== ''
+}
+
+/** "Fill in Position, Headcount." — the required fields here still empty. */
+export function hireMissing(fields: readonly HireField[], answers: Readonly<Record<string, string>>, file: string | null): string | null {
+  const miss = fields.filter(f => f.required && !hireFilled(f, answers, file)).map(f => f.label)
+  return miss.length ? `Fill in ${miss.join(', ')}.` : null
+}
+
+/** A field's answer in words ("—" when empty): the company's name, the file's name. */
+export function hireValue(f: HireField, answers: Readonly<Record<string, string>>, file: string | null): string {
+  if (f.type === 'file') return file || '—'
+  const v = String(answers[f.id] ?? '').replace(/^–$/, '')
+  if (!v) return '—'
+  if (f.type === 'select') return f.options.find(o => o.v === v)?.label ?? v
+  return v
+}
+
+/** What HR will see, filled in as the guest goes — the desktop's Preview. */
+export function hirePreview(groups: readonly HireGroup[], answers: Readonly<Record<string, string>>, file: string | null) {
+  const out = groups.map(g => ({
+    title: g.title,
+    rows: g.fields.map(f => {
+      const v = hireValue(f, answers, file)
+      const shown = v === '—' ? '' : f.id === 'budget' ? `RM ${v.replace('–', ' – ')}` : v
+      return { l: f.type === 'file' ? 'Attachment' : f.label, v: shown || 'Not filled yet', filled: !!shown }
+    }),
+  }))
+  const all = out.flatMap(g => g.rows)
+  const n = all.filter(r => r.filled).length
+  return { groups: out, done: `${n} of ${all.length} filled`, pct: `${Math.round((n / Math.max(1, all.length)) * 100)}%` }
+}
+
+/** The answers the Hiring module keeps: the form's own fields, not the page's (_co, _name, _file). */
+export function hireAnswers(answers: Readonly<Record<string, string>>): Record<string, string> {
+  return Object.fromEntries(Object.entries(answers).filter(([k, v]) => !k.startsWith('_') && String(v ?? '').trim() !== ''))
+}
+
+/** A file a guest may attach: PDF, Word or a photo, under 10 MB (the bucket's own limits). */
+export function attachable(name: string, size: number): { ext: string } | { reason: string } {
+  const ext = (name.split('.').pop() ?? '').toLowerCase()
+  if (!['pdf', 'doc', 'docx', 'png', 'jpg', 'jpeg', 'webp'].includes(ext)) return { reason: 'Attach a PDF, a Word file or a photo.' }
+  if (size > 10 * 1024 * 1024) return { reason: 'Attach a file under 10 MB.' }
+  return { ext }
 }

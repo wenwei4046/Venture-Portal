@@ -20,6 +20,7 @@ const data: GuestData = {
   rooms: [{ id: 'r1', name: 'Meeting Room 1', seats: 8, location: 'Level 3', facilities: '' }],
   allRooms: [{ id: 'r1', name: 'Meeting Room 1', seats: 8, location: 'Level 3', facilities: '' }],
   subs: [{ id: '11111111-1111-4111-8111-111111111111', code: 'HIN', name: 'HOUZS Interior', departments: ['Project'] }],
+  hireForm: [],
 }
 const taken: GuestTaken[] = [
   { id: 'hq1', ref: null, room: 'r1', day: '2026-10-10', from: 540, to: 600, title: 'Fair weekly sync', guest: false, code: '', company: null, subsidiary: null,

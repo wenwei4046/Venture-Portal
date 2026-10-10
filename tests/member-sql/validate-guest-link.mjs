@@ -74,6 +74,26 @@ try {
       p_diff boolean DEFAULT false, p_salary text[] DEFAULT '{}', p_nric text[] DEFAULT '{}', p_bank text[] DEFAULT '{}',
       p_needs text DEFAULT NULL, p_actor_column text DEFAULT NULL, p_reason text DEFAULT NULL)
       RETURNS text LANGUAGE sql AS $$ SELECT p_table $$;
+    -- Supabase Storage's objects, and its folder helper (all but the file's own name).
+    CREATE SCHEMA storage;
+    CREATE TABLE storage.objects(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bucket_id text NOT NULL, name text NOT NULL);
+    CREATE FUNCTION storage.foldername(name text) RETURNS text[] LANGUAGE sql IMMUTABLE AS
+      $$ SELECT (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
+    ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+    GRANT USAGE ON SCHEMA storage TO anon, authenticated;
+    GRANT INSERT ON storage.objects TO anon, authenticated;
+    -- The Hiring module's guest door (mig 20261011080000), as it answers: the form, and a request filed.
+    CREATE TABLE hire_calls(company text, department text, name text, phone text, answers jsonb, path text, file text);
+    CREATE FUNCTION public.hiring_guest_form() RETURNS jsonb LANGUAGE sql STABLE AS
+      $$ SELECT '[{"id":"position","label":"Position","type":"text","options":"","required":true,"core":true}]'::jsonb $$;
+    CREATE FUNCTION public.hiring_file_guest_request(p_company text, p_department text, p_name text, p_phone text, p_answers jsonb,
+      p_attachment_path text DEFAULT NULL, p_attachment_name text DEFAULT NULL) RETURNS text LANGUAGE plpgsql AS $$
+    BEGIN
+      INSERT INTO hire_calls VALUES (p_company, p_department, p_name, p_phone, p_answers, p_attachment_path, p_attachment_name);
+      RETURN 'HR-' || (300 + (SELECT count(*) FROM hire_calls))::text;
+    END $$;
+    REVOKE ALL ON FUNCTION public.hiring_guest_form() FROM PUBLIC, anon, authenticated;
+    REVOKE ALL ON FUNCTION public.hiring_file_guest_request(text, text, text, text, jsonb, text, text) FROM PUBLIC, anon, authenticated;
   `)
   await q(`INSERT INTO users VALUES ($1, 'HR account', 'hr@x')`, [ADMIN])
   await q(`INSERT INTO departments VALUES ($1, 'HR')`, [HR])
@@ -214,6 +234,41 @@ try {
     'public.meeting_rooms_book(uuid, uuid, date, integer, integer, text, uuid, uuid, uuid[], jsonb, integer, text, uuid)'].map(anonMay)),
     [false, false, false, false, false, false, false], 'nothing else')
   check(await one(`SELECT has_table_privilege('anon', 'public.guest_link', 'SELECT')`), false, 'the code is not read straight')
+
+  // ── Request manpower (mig 20261011092000) ──
+  await db.exec((await readFile(new URL('20261011092000_guest_link_hire.sql', migrations), 'utf8')).replace(/\r\n/g, '\n'))
+  await asAnon()
+  const hirePage = (await q(`SELECT public.guest_link_page($1) AS r`, [fresh]))[0].r
+  check([hirePage.hiring, hirePage.hireForm.map(f => f.id)], [true, ['position']], 'the part opens with Hiring › Form settings’ fields')
+  const HIRE = `SELECT public.guest_link_hire($1, $2, $3, $4::jsonb, $5, $6) AS r`
+  await reject(HIRE, [fresh, null, ' ', '{}', null, null], /Fill in Company, Your name\./, 'who is asking, in the form’s words')
+  const sent = (await q(HIRE, [fresh, HK, 'Wong Mei Yee', '{"position":"Driver","headcount":"2"}', null, null]))[0].r
+  check(sent, { id: 'HR-301', position: 'Driver' }, 'filed through the Hiring module’s guest door')
+  await db.exec('RESET ROLE')
+  check(await q(`SELECT company, name, answers, path FROM hire_calls`),
+    [{ company: 'Hookka Sdn Bhd', name: 'Wong Mei Yee', answers: { position: 'Driver', headcount: '2' }, path: null }], 'as the company, the guest and the answers')
+
+  // A job description: the browser's file under guest/<code>/, only while the part is open.
+  const FILE = `guest/${fresh}/0b5f6a1e-4c1d-4f3a-9a77-2f1d0c3b4e5a.pdf`
+  await asAnon()
+  await q(`INSERT INTO storage.objects(bucket_id, name) VALUES ('hiring-files', $1)`, [FILE])
+  await reject(`INSERT INTO storage.objects(bucket_id, name) VALUES ('hiring-files', 'attachments/x.pdf')`, [], /row-level security/, 'nowhere but guest/')
+  await reject(`INSERT INTO storage.objects(bucket_id, name) VALUES ('hiring-files', $1)`, [`guest/${code}/0b5f6a1e-4c1d-4f3a-9a77-2f1d0c3b4e5a.pdf`], /row-level security/,
+    'and never under an old code')
+  await reject(HIRE, [fresh, HK, 'Wong', '{}', `guest/${code}/0b5f6a1e-4c1d-4f3a-9a77-2f1d0c3b4e5a.pdf`, 'jd.pdf'], /Attach the file again/, 'a request names only this link’s files')
+  await reject(HIRE, [fresh, HK, 'Wong', '{}', `guest/${fresh}/11111111-4c1d-4f3a-9a77-2f1d0c3b4e5a.pdf`, 'jd.pdf'], /Attach the file again/, 'that are there')
+  const withFile = (await q(HIRE, [fresh, HK, 'Wong', '{}', FILE, 'JD Driver.pdf']))[0].r
+  check(withFile, { id: 'HR-302', position: 'the role' }, 'a request with its file')
+  await as(ADMIN, ['guest_link.edit'])
+  await q(`SELECT public.guest_link_set(NULL, NULL, false, NULL)`)
+  await asAnon()
+  await reject(`INSERT INTO storage.objects(bucket_id, name) VALUES ('hiring-files', $1)`, [`guest/${fresh}/22222222-4c1d-4f3a-9a77-2f1d0c3b4e5a.pdf`], /row-level security/,
+    'Request manpower off: no file goes in')
+  await reject(HIRE, [fresh, HK, 'Wong', '{}', null, null], /This link is closed/, 'and no request')
+  check((await q(`SELECT public.guest_link_page($1) AS r`, [fresh]))[0].r.hiring, false, 'and the page knows')
+  await db.exec('RESET ROLE')
+  check(await Promise.all(['public.guest_link_hire(text, uuid, text, jsonb, text, text)', 'public.guest_link_may_upload(text)'].map(anonMay)), [true, true],
+    'the request and the upload question are the link’s too')
 
   console.log(`guest link: ${checks} checks passed`)
 } finally {

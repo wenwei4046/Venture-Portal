@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.36 (the Revenue app's Book a room and Documentation: By room / Timeline at 64px an hour, the book sheet, the files HR shares) / v3.35 (the Guest link: Admin › Guest Link, and the public /g page — phone first, a Preview column on a computer) / v3.34 (Meeting Rooms: a day's rooms side by side, the Book and booking drawers, rooms as cards) / v3.33 (Hiring › Insights and the Talent Bank: six cards against the month before, the days each fill took, by source and department, every request sideways; the bank's tree, table, panel and a talent's own page) / v3.32 (Hiring › Requests: the review inbox, the Listing and its right-click menu, Form settings, a request's page with its candidates, the résumé drawer) / v3.31 (Documentation: Documents, Data center, Letters, Publish and the 640px preview) / v3.30 (the HR revamp, round 2: the soft dropdown and the drawers' motion) / v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.37 (the guest link's Request manpower: five steps, pills for short choices, the file, Check and send, and its Preview) / v3.36 (the Revenue app's Book a room and Documentation: By room / Timeline at 64px an hour, the book sheet, the files HR shares) / v3.35 (the Guest link: Admin › Guest Link, and the public /g page — phone first, a Preview column on a computer) / v3.34 (Meeting Rooms: a day's rooms side by side, the Book and booking drawers, rooms as cards) / v3.33 (Hiring › Insights and the Talent Bank: six cards against the month before, the days each fill took, by source and department, every request sideways; the bank's tree, table, panel and a talent's own page) / v3.32 (Hiring › Requests: the review inbox, the Listing and its right-click menu, Form settings, a request's page with its candidates, the résumé drawer) / v3.31 (Documentation: Documents, Data center, Letters, Publish and the 640px preview) / v3.30 (the HR revamp, round 2: the soft dropdown and the drawers' motion) / v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -787,6 +787,36 @@ writes them ÷ .92 against `--rv-type`, like the rest of the app. Values in
   yet.* when empty; under the list, once a file is tapped, *Opening
   HV_Employee_Handbook_v3.2.pdf* in a cream note (12px 14px, radius 14,
   `--rv-open-line`, 12.4px brown).
+
+### Guest link — Request manpower (v3.37, 2026-10-11)
+
+The guest page's third card (README §16, guest-phone-04, guest-desktop-03;
+`Guest Booking.dc.html`'s step-by-step form), measured against the canvas's 3b
+phone and 3c computer artboards. The fields are Hiring › Form settings'.
+
+- **Steps** — *About you* (Company, Your name) → *The role* → *Candidate
+  requirements* → *Job description* → *Check and send*. Over them the step's
+  name (12.5px 600) with *Step 1 of 5* in grey, and five 4px bars, orange up
+  to the step. Each step is one white card (radius 16, 18px): its title 15px
+  600 and a grey line under it, then the fields two to a row from 400px
+  (`minmax(200px, 1fr)`). A label is 12.5px 500 `90 78 68`, a red *
+  when required, a grey *· optional* when not.
+- **Fields** — text 46px; a number as a 46px − n + stepper (16px 600);
+  a range as two 46px number boxes with *to*; a choice of five or fewer as
+  pills (40px, radius 999, the picked one dark), more as the soft dropdown;
+  long text as a five-line box (14px / 1.55); the file as a dashed
+  `250 247 243` box with a 40px olive tile (`+`, then the file's kind),
+  *Upload a file / PDF, Word or a photo* and *Choose* (*Replace*).
+- **Buttons** — *Back* (white, 52px) and the orange *Next* twice as wide;
+  *Review* on the last step, *Send to HR* on Check and send, where each step
+  is a block of label / value rows with its *Edit*. Missing fields in one red
+  line: *Fill in Company, Your name.* Done: ✓ *Sent to HR*, the request's
+  number (mono) and *Send another request* (dark).
+- **Desktop** — the 340px Preview: *Your request / This is what HR will
+  see*, *n of 15 filled*, the four groups, the budget as *RM 2500 – 3000*.
+- A phone keeps the portal's 16px floor for what is typed (globals.css; iOS
+  zooms on anything smaller) — the text box is held to the prototype's five
+  14px lines all the same.
 
 ### Product List — a page of the Revenue app (v3.13, 2026-10-08)
 

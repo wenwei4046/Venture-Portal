@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  availabilityBars, bookedFacts, bookingPreview, busyAt, calBlocks, dayChip, freeLine, fullDay, guestDataFromRow, guestDays, guestUrl, isGuestCode,
+  attachable, availabilityBars, bookedFacts, bookingPreview, busyAt, calBlocks, dayChip, freeLine, fullDay, guestDataFromRow, guestDays, guestUrl, isGuestCode,
+  hireAnswers, hireFormFromRows, hireGroups, hireMissing, hirePlaceholder, hirePreview, hireValue, isChips, spansRow,
   longDay, missingLine, paxNote, pickSlot, selectionLine, shortDay, shortRoomName, takenDepartment, takenFacts, takenFromRows,
   type GuestTaken,
 } from './model'
@@ -136,5 +137,63 @@ describe('the schedule', () => {
     expect(bookedFacts({ id: 'b', ref: 'BK-G302', room: 'r1', roomName: 'Meeting Room 1', day: '2026-10-10', from: 600, to: 660, title: 'Sync', pax: 5,
       company: 'HOUZS Interior', department: null, name: 'Wong Mei Yee' }).map(f => f.v))
       .toEqual(['Meeting Room 1', 'Sat 10 Oct · 10:00–11:00', 'Sync', '5 pax', 'Wong Mei Yee · HOUZS Interior'])
+  })
+})
+
+describe('request manpower', () => {
+  const form = hireFormFromRows([
+    { id: 'position', label: 'Position', type: 'text', options: '', required: true },
+    { id: 'dept', label: 'Department', type: 'select', options: 'Revenue · Fair, Revenue · IR, HR, Finance, Marketing, IT, Director Office', required: true },
+    { id: 'headcount', label: 'Headcount', type: 'number', options: '', required: true },
+    { id: 'budget', label: 'Budget (RM / month)', type: 'range', options: '', required: true },
+    { id: 'gender', label: 'Gender', type: 'select', options: 'Any, Male, Female', required: false },
+    { id: 'shift', label: 'Shift', type: 'select', options: 'Day, Night', required: false },
+    { id: 'jd', label: 'Job description', type: 'longtext', options: '', required: true },
+    { id: 'Bad id', label: 'x', type: 'text' },
+    { id: 'colour', label: 'Colour', type: 'date' },
+  ])
+  const subs = [{ id: 's1', code: 'HIN', name: 'HOUZS Interior', departments: [] }]
+
+  it('reads Hiring › Form settings, keeping only fields it can ask', () => {
+    expect(form.map(f => f.id)).toEqual(['position', 'dept', 'headcount', 'budget', 'gender', 'shift', 'jd'])
+    expect(form[1].options[0]).toEqual({ v: 'Revenue · Fair', label: 'Revenue · Fair' })
+  })
+
+  it('asks it in the prototype’s four steps', () => {
+    const groups = hireGroups(form, subs)
+    expect(groups.map(g => [g.title, g.fields.map(f => f.id)])).toEqual([
+      ['About you', ['_co', '_name']],
+      ['The role', ['position', 'dept', 'headcount', 'budget', 'shift']],
+      ['Candidate requirements', ['gender']],
+      ['Job description', ['jd', '_file']],
+    ])
+    expect(groups[0].fields[0].options).toEqual([{ v: 's1', label: 'HOUZS Interior' }])
+    expect(hireGroups(form.filter(f => f.id !== 'gender'), subs).map(g => g.key)).toEqual(['you', 'role', 'desc'])
+  })
+
+  it('draws short choices as pills, long ones as a dropdown', () => {
+    const [dept, gender] = [form[1], form[4]]
+    expect([isChips(dept), isChips(gender), spansRow(gender), spansRow(form[6])]).toEqual([false, true, false, true])
+    expect(hirePlaceholder(form[0])).toBe('e.g. Warehouse Assistant')
+    expect(hirePlaceholder(dept)).toBe('Choose…')
+  })
+
+  it('says what is missing, then reads the answers back as HR will see them', () => {
+    const groups = hireGroups(form, subs)
+    expect(hireMissing(groups[0].fields, {}, null)).toBe('Fill in Company, Your name.')
+    expect(hireMissing(groups[1].fields, { position: 'Driver', dept: 'HR', headcount: '1', budget: '–' }, null)).toBe('Fill in Budget (RM / month).')
+    const answers = { _co: 's1', _name: 'Wong', position: 'Driver', budget: '2500–3000', headcount: '2' }
+    expect(hireValue(groups[0].fields[0], answers, null)).toBe('HOUZS Interior')
+    const pv = hirePreview(groups, answers, 'jd.pdf')
+    expect(pv.groups[1].rows.find(r => r.l === 'Budget (RM / month)')).toEqual({ l: 'Budget (RM / month)', v: 'RM 2500 – 3000', filled: true })
+    expect(pv.groups[3].rows.at(-1)).toEqual({ l: 'Attachment', v: 'jd.pdf', filled: true })
+    expect(pv.done).toBe('6 of 10 filled')
+    expect(hireAnswers({ ...answers, _file: 'x', notes: '  ' })).toEqual({ position: 'Driver', budget: '2500–3000', headcount: '2' })
+  })
+
+  it('attaches a PDF, Word file or photo under 10 MB', () => {
+    expect(attachable('JD.PDF', 1000)).toEqual({ ext: 'pdf' })
+    expect(attachable('jd.exe', 1000)).toEqual({ reason: 'Attach a PDF, a Word file or a photo.' })
+    expect(attachable('jd.pdf', 11 * 1024 * 1024)).toEqual({ reason: 'Attach a file under 10 MB.' })
   })
 })
