@@ -43,9 +43,10 @@ export interface User {
   // View on top of their own gates. Absent on a value built before it existed:
   // read as "not asked".
   tabs?: string[]
-  // Their tabs are the ones ticked — a template saved on tabs (2026-10-11): then
-  // a page's writes follow its own tabs' boxes (lib/page-tabs.ts `actionsOnPage`).
-  tabsExplicit?: boolean
+  // The boxes somebody unticked for them (2026-10-11, lib/page-tabs.ts
+  // `closedBoxes`): a page's writes follow its own tabs' boxes (`actionsOnPage`)
+  // and the Revenue app hides the pages they close. Empty or absent: nothing.
+  closed?: string[]
   // Set while an account that may switch views sees the portal AS this person
   // (2026-10-11): everything above is theirs, `actualRole` the viewer's kind,
   // and the session reads only (lib/supabase/read-only.ts).

@@ -310,9 +310,9 @@ revoke; refuses to run without the readers) once the code is live.
 
 **WRITES FOLLOW THE TAB BOXES (2026-10-11, the user: "yes sepertae by tab").**
 Since 8b a page OPENS by its tabs' View; now what it lets you DO follows the
-same tabs' Create / Edit / Approve: `actionsOnPage(actions, tabs, route)` keeps
+same tabs' Create / Edit / Approve: `actionsOnPage(actions, closed, route)` keeps
 a write cell (create, edit, approve, void, manage) only while one of THIS
-page's tabs that stands for it has that box ticked — Receipt · Create creates a
+page's tabs that stands for it still has that box open — Receipt · Create creates a
 receipt, Payments · Create does not, though both are treasury.create underneath.
 View and Export never narrow; a write none of the page's tabs stands for stays
 as held. `requirePage` narrows the request's account IN PLACE (getUser is cached
@@ -320,12 +320,16 @@ per request, so every later canDo on the page — each button, a form page's
 requireAction — asks the narrowed actions); a Server Action has no requirePage,
 so `requireAction` / `requireAnyAction` / `requireApprover` narrow by the page
 it was sent from (`next-action` request with a Referer; no page to go by = as
-held). ONLY for an account whose tabs are explicit (`tabsAreExplicit`: its
-template is saved on tabs; not legacy own cells without boxes) — ticks worked
-out from cells can leave a cell unticked the account still holds (Finance's
-Void without Approve), so nobody untemplated, and no template not yet saved on
-tabs, is narrowed. The database still asks the function cell (point 6): per-tab
-writes are the app's, as per-tab pages are.
+held). ONLY WHAT SOMEBODY UNTICKED CLOSES (`closedBoxes` → `User.closed`; it
+replaced the same day's `tabsExplicit`, which missed a person's own box over a
+template not saved on tabs): a template saved on tabs closes every box its
+ticks, with the person's own boxes over them, leave out; over a template not
+saved yet, only the boxes their own were unticked (a View with its whole tab);
+legacy own cells without boxes, and every untemplated account, close nothing —
+ticks worked out from cells can leave a cell unticked the account still holds
+(Finance's Void without Approve). The database still asks the function cell
+(point 6): per-tab writes are the app's, as per-tab pages are. The Revenue app
+follows the same list (`revenue/revenue-app.md` › THE APP FOLLOWS THE TICKS).
 
 **VIEW AS A PERSON, READ-ONLY (2026-10-11, the user: "can set a function is
 view as a user, same like in revenue app, i can view as a member").** Both view

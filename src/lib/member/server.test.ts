@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@/types'
 import type { MemberBand, MemberData, QuoteInput } from './types'
-import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, loadMemberWaitingForm, loadMemberWaitingFormLink, loadMemberWaitingQueue, submitMemberRequest } from './server'
+import { acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, loadMemberWaitingForm, loadMemberWaitingFormLink, loadMemberWaitingQueue, submitMemberRequest } from './server'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), createClient: vi.fn(), adminClient: vi.fn(), rpc: vi.fn(), adminRpc: vi.fn(),
@@ -696,5 +696,49 @@ describe('the catalogue behind the member calculator', () => {
     const result = await calculateMemberQuote(sofaQuote({ height: '30', tier: 'PRICE_2', specials: ['<script>'] }))
     expect(result.ok).toBe(false)
     expect(mocks.adminClient).not.toHaveBeenCalled()
+  })
+})
+
+// The Revenue app's sends follow their page's Create box (2026-10-11): the button is not drawn,
+// and a stale page or a hand-made request is refused before anything is asked.
+describe('a send whose page’s Create was unticked', () => {
+  const requestId = '10000000-0000-4000-8000-000000000041'
+  const member = (closed: string[]) => user({ role: 'revenue_member', permissions: ['member_portal', 'member_quote', 'member_requests'], closed })
+  const kindForm = (kind: string) => { const data = new FormData(); data.set('kind', kind); return data }
+  const stored = (kind: string) => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { kind }, error: null }) }) }) })
+
+  it('prices no quote once the Quote’s Create is closed', async () => {
+    mocks.getUser.mockResolvedValue(member(['rev.quote.create']))
+    expect(await calculateMemberQuote(quote)).toEqual({ ok: false, error: 'Pricing a quote is not open to your account.' })
+    expect(mocks.rpc).not.toHaveBeenCalled()
+    expect(mocks.adminClient).not.toHaveBeenCalled()
+  })
+
+  it('sends no claim once Requests’ Create is closed — a waiting list is not that box’s', async () => {
+    mocks.getUser.mockResolvedValue(member(['rev.requests.create']))
+    expect(await submitMemberRequest(kindForm('claim'))).toEqual({ ok: false, error: 'Sending a claim is not open to your account.' })
+    expect(mocks.rpc).not.toHaveBeenCalled()
+    const waiting = await submitMemberRequest(kindForm('waiting'))
+    expect(waiting.ok ? '' : waiting.error).not.toMatch(/not open to your account/)
+  })
+
+  it('sends and withdraws no waiting list or replacement once their page’s Create is closed', async () => {
+    mocks.getUser.mockResolvedValue(member(['rev.track.create']))
+    const refused = { ok: false, error: 'Sending a waiting list or a replacement is not open to your account.' }
+    expect(await submitMemberRequest(kindForm('replacement'))).toEqual(refused)
+    mocks.createClient.mockResolvedValue({ rpc: mocks.rpc, from: () => stored('waiting') })
+    expect(await cancelMemberRequest(requestId)).toEqual(refused)
+    expect(mocks.rpc).not.toHaveBeenCalled()
+    // A claim of theirs still withdraws.
+    mocks.createClient.mockResolvedValue({ rpc: mocks.rpc, from: () => stored('claim') })
+    mocks.rpc.mockResolvedValue({ data: { id: requestId, kind: 'claim', title: 'Outstation claim', status: 'withdrawn', createdAt: '', detail: {} }, error: null })
+    expect((await cancelMemberRequest(requestId)).ok).toBe(true)
+    expect(mocks.rpc).toHaveBeenCalledWith('member_cancel_request', { p_request: requestId })
+  })
+
+  it('nothing is refused for an account nobody unticked a box for', async () => {
+    mocks.getUser.mockResolvedValue(member([]))
+    mocks.rpc.mockResolvedValue({ data: { bands: [band] }, error: null })
+    expect((await calculateMemberQuote(quote)).ok).toBe(true)
   })
 })

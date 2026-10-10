@@ -58,15 +58,23 @@ const NAV: { id: Exclude<Screen, "quote" | "calc">; label: string; d: string }[]
   { id: "account", label: "Profile", d: ICON.user },
 ];
 
-/** The bottom bar: Today · Insight · Quote (raised) · Arena · Profile. */
-export function BottomNav({ active, android, live, onGo, onQuote }: {
+const NONE: readonly Screen[] = [];
+
+/** The bottom bar: Today · Insight · Quote (raised) · Arena · Profile — less any their ticks close (2026-10-11). */
+export function BottomNav({ active, android, live, hidden = NONE, onGo, onQuote }: {
   active: Screen;
   android: boolean;
   live: boolean;
+  /** Screens their ticks close: not in the bar (Profile never is). */
+  hidden?: readonly Screen[];
   onGo: (screen: Screen) => void;
   onQuote: () => void;
 }) {
   const tab = active === "calc" ? "quote" : active;
+  const left = NAV.slice(0, 2).filter(n => !hidden.includes(n.id));
+  const right = NAV.slice(2).filter(n => !hidden.includes(n.id));
+  const quote = !hidden.includes("quote");
+  const columns = left.length + right.length + (quote ? 1 : 0);
   const item = (n: (typeof NAV)[number]) => {
     const on = tab === n.id;
     return (
@@ -78,13 +86,15 @@ export function BottomNav({ active, android, live, onGo, onQuote }: {
   };
   return (
     <nav className={`${s.nav} ${live ? s.navLive : ""}`}>
-      <div className={s.navGrid}>
-        {NAV.slice(0, 2).map(item)}
-        <button className={`${s.navQuote} ${tab === "quote" ? s.navQuoteOn : ""}`} onClick={onQuote} aria-label="Quote">
-          <span className={s.navQuoteCircle}><Svg d={ICON.quote} size={25} sw={1.8} /></span>
-          <span className={s.navQuoteLabel}>Quote</span>
-        </button>
-        {NAV.slice(2).map(item)}
+      <div className={s.navGrid} style={columns === 5 ? undefined : { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+        {left.map(item)}
+        {quote && (
+          <button className={`${s.navQuote} ${tab === "quote" ? s.navQuoteOn : ""}`} onClick={onQuote} aria-label="Quote">
+            <span className={s.navQuoteCircle}><Svg d={ICON.quote} size={25} sw={1.8} /></span>
+            <span className={s.navQuoteLabel}>Quote</span>
+          </button>
+        )}
+        {right.map(item)}
       </div>
       {!live && (android
         ? <div className={s.homeAndroid}><span className={s.homeAndroidBar} /></div>
@@ -152,8 +162,12 @@ function ModuleSwitcher({ current, onPick }: { current: ModuleId; onPick: (id: M
 }
 
 /** Desktop: the 240px sidebar. */
-export function DeskAside({ active, count, notifOpen, me, products, modules, onGo, onQuote, onNotif, onProfile }: {
+export function DeskAside({ active, count, notifOpen, me, products, modules, hidden = NONE, home = "today", onGo, onQuote, onNotif, onProfile }: {
   active: Screen;
+  /** Screens their ticks close: not listed (2026-10-11). */
+  hidden?: readonly Screen[];
+  /** Where the wordmark goes: Today, unless their ticks close it. */
+  home?: Screen;
   count: number;
   notifOpen: boolean;
   /** Absent while /member is still loading (`AppLoading`): no card at the foot. */
@@ -171,11 +185,11 @@ export function DeskAside({ active, count, notifOpen, me, products, modules, onG
   const productsOn = active === "products";
   return (
     <aside className={s.aside}>
-      <button className={s.asideLogo} onClick={() => onGo("today")}>
+      <button className={s.asideLogo} onClick={() => onGo(home)}>
         <span className={s.asideWord}>HOUZS VENTURE</span>
         <span className={s.asideDept}>Revenue</span>
       </button>
-      {DESK_NAV.map(n => {
+      {DESK_NAV.filter(n => !hidden.includes(n.id)).map(n => {
         const on = tab === n.id;
         return (
           <button key={n.id} className={`${s.asideNav} ${on ? s.asideNavOn : ""}`} onClick={() => (n.id === "quote" ? onQuote() : onGo(n.id))} aria-current={on ? "page" : undefined}>
