@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.30 (the HR revamp, round 2: the soft dropdown and the drawers' motion) / v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.34 (Meeting Rooms: a day's rooms side by side, the Book and booking drawers, rooms as cards) / v3.30 (the HR revamp, round 2: the soft dropdown and the drawers' motion) / v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -418,6 +418,55 @@ Guest link and an HR phone app. Two things every page of it shares:
   (`hvDrawerIn .34s cubic-bezier(.2,.8,.2,1)`), its scrim fades in `.25s`, a
   centred window fades in `.2s` — the kit's `Drawer` / `Window` do it, so
   round 1's drawers move the same way. Reduced motion turns them off.
+
+### Meeting Rooms (v3.34, 2026-10-11)
+
+Admin › Meeting Rooms, `/admin/rooms` (README §14; the handoff's `Revenue
+App.dc.html` lines 890–938, the drawers 1284–1332), in every view's sidebar —
+HR's Admin section above Audit Log, the old shell's Reports & Admin. Values in
+`admin/rooms/_components/rooms.module.css`.
+
+- **Schedule** (the first tab; the tabs show only to whoever may manage the
+  rooms). The toolbar: a date pager (‹ · `Sat, 10 Oct 2026 · today` 500 in a
+  190px label · ›) in one `229 228 223` box radius 6, **Today**, the day's
+  count in words (12.5px `90 78 68`), then the legend (10px swatches radius 3,
+  mono 11.5px 600 codes) and **+ Book a room** (the accent, black, 8px 18px).
+  The grid: radius 10 in a `216 210 200` edge, at most 640px tall and
+  scrolling; a 56px hour column (mono 10.5px) then one column per room
+  (`minmax(170px, 1fr)`) under a sticky `235 231 224` head (name 500 13px,
+  `8 seats · Level 3` 11px). **08:00–20:00, 52px an hour**, half-hour rules
+  drawn by one repeating gradient. A meeting is a block 4px in from each side,
+  1px down and 3px short, its department's light tone with a 3px deep-tone
+  left edge: title 500 12px, the time mono 10.5px, `RV · Chea Huan · 6 pax`
+  11px — hover rings it in the accent. Pressing empty space opens Book at that
+  half hour (never later than 19:00).
+- **Department tones** (`lib/rooms/model.ts` `departmentBadge`): Revenue RV
+  slate, HR clay, Finance FIN gold — the handoff's — then MKT walnut, IT slate,
+  DO, DIR, VO, and any other its first three letters in walnut. A guest-link
+  booking is olive under its subsidiary's code. The legend lists HQ first.
+- **Book a room** — the 520px drawer (eyebrow MEETING ROOM in slate, head and
+  body 18px 22px): Meeting title; Room · Date, From · To, Booked by · From
+  department in pairs (every select the kit's `Select`); Attending · internal
+  as chips with a type-a-name search and six suggestions; external guests as
+  name / company rows with *+ Add an external guest*; **Total pax** in a grey
+  box with a 38px − 1 + stepper that never goes under the named count (− greys
+  there) and says `· too many` in red past the room's seats. The footer's red
+  line says the first problem in words — a clash reads `Meeting Room 1 is
+  taken 09:00–10:00 by “Fair weekly sync”.` A guest-link booking opens without
+  the who-fields.
+- **A booking** — the 440px drawer: kicker `ROOM · DEPARTMENT` in slate, the
+  title 19px, the day and time mono; facts (Booked by, From department, Room,
+  Reference `BK-301`; a guest one Company and Department and `· guest link`);
+  ATTENDING · N with the booker marked and outside guests in `160 90 30`; the
+  audit trail (8px dots, the last in the accent). Whoever booked it sees
+  **Cancel meeting** (asks once more: *Confirm cancel*) and **Edit**; anyone
+  else reads *Only Chea Huan can cancel this meeting.*
+- **Rooms** — cards in `repeat(auto-fill, minmax(260px, 1fr))`, radius 12,
+  16px: the name edited in place (15px 500), × to remove (refused while it has
+  bookings ahead), Seats (70px mono) · Location · Facilities saved as you
+  leave the field, the bookings ahead and a **Bookable** switch (28×16, `.2s`;
+  a room switched off leaves the schedule and its card fades to .6); a dashed
+  **+ Add meeting room** card. Rooms start empty.
 
 ### Product List — a page of the Revenue app (v3.13, 2026-10-08)
 

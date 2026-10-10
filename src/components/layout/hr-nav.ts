@@ -23,6 +23,7 @@ import {
   canAccessTeam,
   canOpenPeople,
   canSeeAuditChanges,
+  canAccessMeetingRooms,
 } from '@/lib/roles'
 import type { NavIconName } from '@/components/hrv/icons'
 import type { NavViewer } from './nav-config'
@@ -117,7 +118,11 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
     {
       label: 'Admin',
       tone: 'walnut',
-      items: [{ key: 'audit', label: 'Audit Log', icon: 'report', href: '/audit-log', match: p => under(p, '/audit-log'), visible: canSeeAuditChanges }],
+      items: [
+        // Round 2 (2026-10-11): every view books a room.
+        { key: 'rooms', label: 'Meeting Rooms', icon: 'room', href: '/admin/rooms', match: p => under(p, '/admin/rooms'), visible: canAccessMeetingRooms },
+        { key: 'audit', label: 'Audit Log', icon: 'report', href: '/audit-log', match: p => under(p, '/audit-log'), visible: canSeeAuditChanges },
+      ],
     },
   ]
 }
