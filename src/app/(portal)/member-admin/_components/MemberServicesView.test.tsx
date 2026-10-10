@@ -2,9 +2,10 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminMemberData } from '@/lib/member/server'
 
-// People › Member services (2026-10-10, the HR revamp): four tabs by what the
-// viewer manages; Brand weeks reads its month only when it is first opened —
-// never as the page's own Server Action — and a tab keeps what was typed.
+// People › Member services (2026-10-10, the HR revamp): three tabs for whoever
+// manages member requests — Publish memo moved to People › Documentation
+// (round 2, 2026-10-11); Brand weeks reads its month only when it is first
+// opened — never as the page's own Server Action — and a tab keeps its state.
 
 const fetchWeeks = vi.hoisted(() => vi.fn(() => new Promise(() => {})))
 vi.mock('../brand-weeks-actions', () => ({ fetchBrandWeeksAdmin: fetchWeeks, saveBrandWeeksAdmin: vi.fn() }))
@@ -21,7 +22,7 @@ const data: AdminMemberData = {
 }
 
 function show(over: Partial<AdminMemberData> = {}) {
-  return render(<MemberServicesView data={{ ...data, ...over }} facts={{}} memoReads={{}} claimRates={null} initialRequestId={null} />)
+  return render(<MemberServicesView data={{ ...data, ...over }} facts={{}} claimRates={null} initialRequestId={null} />)
 }
 
 beforeEach(() => {
@@ -30,10 +31,10 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('MemberServicesView', () => {
-  it('heads the page and offers the four tabs — Capacity and Product options are gone', () => {
+  it('heads the page and offers the three tabs — Capacity, Product options and Publish memo are gone', () => {
     show()
     expect(screen.getByRole('heading', { level: 1, name: 'Member services' })).toBeInTheDocument()
-    expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual(['Request reviews', 'Brand weeks', 'Claim rates', 'Publish memo'])
+    expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual(['Request reviews', 'Brand weeks', 'Claim rates'])
     expect(screen.getByRole('tab', { name: 'Request reviews' })).toHaveAttribute('aria-selected', 'true')
   })
 
@@ -47,18 +48,9 @@ describe('MemberServicesView', () => {
     expect(fetchWeeks).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps a typed memo across tabs', () => {
-    show()
-    fireEvent.click(screen.getByRole('tab', { name: 'Publish memo' }))
-    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), { target: { value: 'Draft' } })
-    fireEvent.click(screen.getByRole('tab', { name: 'Request reviews' }))
-    fireEvent.click(screen.getByRole('tab', { name: 'Publish memo' }))
-    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Draft')
-  })
-
   it('offers only what the viewer manages', () => {
     show({ canManageRequests: false })
     expect(screen.queryByRole('tab')).toBeNull()
-    expect(screen.getByRole('heading', { name: 'Publish a new memo' })).toBeInTheDocument()
+    expect(screen.getByText(/Memos are published from People › Documentation/)).toBeInTheDocument()
   })
 })

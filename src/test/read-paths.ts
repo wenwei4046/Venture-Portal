@@ -198,6 +198,11 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_waiting_form', 'member_save_waiting_form', 'member_fail_waiting', 'member_waiting_transfer',
   // Member services' readers (mig 20261010160000): member_requests_manage / member_memos_manage.
   'member_admin_request_facts', 'member_memo_reads',
+  // People › Documentation (mig 20261011070000): each asks has_any_action for its Documentation cell; the
+  // member's two ask member_staff_id().
+  'hr_documentation', 'hr_documentation_file', 'hr_documentation_log', 'hr_document_add', 'hr_document_delete',
+  'hr_letter_type_add', 'hr_letter_type_set_compulsory', 'hr_letter_type_delete', 'hr_letter_file',
+  'hr_publish_type_add', 'hr_publish_type_delete', 'hr_publish', 'member_documents', 'member_document_open',
   // A replacement runs itself on its date (mig 20261010170000): HR's two ask member_is_manager; the
   // hourly sweep is the service role's (api/member-queue).
   'member_schedule_replacement', 'member_unschedule_replacement', 'member_run_due_replacements',

@@ -350,6 +350,16 @@ the module's SECURITY DEFINER functions asking `has_any_action` for its cell
 (the guest link's ask the link's code instead and are granted to anon by name,
 no service role). Nothing anybody had moved: the five logins gained exactly
 those keys (dry-run per login, then applied; `page-tabs.fixtures.ts`).
+**Documentation's files (2026-10-11, mig `20261011070000`)** are the one
+place a storage policy asks a cell: the private bucket `hr-documents` takes an
+INSERT only under `documents/` · `letters/` · `publish/` from a session with
+Documentation · Create (the browser uploads — a file is bigger than a Server
+Action carries; the action then asks `hr_doc_file_present`), and a SELECT
+(signed links, made at the click) for Documentation · View or, for a member,
+`hr_file_readable_by_member(name)` — their department's documents and what
+was addressed to them. Its memos reach PEOPLE, not sub-departments
+(`member_memo_recipients`, read by `member_visible_memo`). The rules:
+`.claude/rules/hr/documentation.md`.
 
 **VIEW AS A PERSON, READ-ONLY (2026-10-11, the user: "can set a function is
 view as a user, same like in revenue app, i can view as a member").** Both view

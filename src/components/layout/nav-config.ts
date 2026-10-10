@@ -21,6 +21,7 @@ import {
   canAccessDeptReports,
   canAccessDirectorPool,
   canAccessDirectorSalary,
+  canAccessDocumentation,
   canAccessMyBilling,
   canAccessOpex,
   canAccessReconciliation,
@@ -393,6 +394,7 @@ function navEntries(data: NavData): NavEntry[] {
     { href: '/team/people', label: 'People Management', section: 'People', visible: canOpenPeople },
     { href: '/member-admin', label: 'Member Services', section: 'People', visible: v => can(v, 'member_requests_manage') || can(v, 'member_memos_manage') },
     { href: '/team/hierarchy', label: 'Hierarchy', section: 'People', visible: canOpenPeople },
+    { href: '/team/documentation', label: 'Documentation', section: 'People', visible: canAccessDocumentation },
 
     // ── Reports & Admin ──
     { href: '/reports/ledger', label: 'General Ledger', section: 'Reports & Admin', visible: canAccessReports },

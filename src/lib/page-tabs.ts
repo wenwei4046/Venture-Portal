@@ -87,6 +87,8 @@ export const PAGE_TABS = {
   '/team/accounts/[id]': ['hr.permissions'],
   '/team/hierarchy': ['hr.hierarchy', 'dept.people'],
   '/member-admin': ['hr.member_services'],
+  // HR revamp round 2: People › Documentation.
+  '/team/documentation': ['hr.documentation'],
   // Changes: what it shows follows the reader's other boxes (each view's Audit Log).
   '/audit-log': ['hr.audit_log', 'fin.audit_log', 'pri.audit_log'],
   // Admin › Meeting Rooms (2026-10-11): every view books a room.

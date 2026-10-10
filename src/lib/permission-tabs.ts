@@ -86,7 +86,7 @@ const tab = (view: TabView, id: string, label: string, keys: readonly string[], 
 const shared = (page: string, t: PermissionTab): PermissionTab => ({ ...t, page })
 
 const TREASURY_KEYS = ['treasury']
-const AUDIT_CHANGES_KEYS = ['audit_log', 'treasury', 'reports', 'approvals', 'billing', 'venture_pool', 'categories', 'reconciliation', 'settings', 'hr_costing', 'payroll_payouts', 'claims_approve']
+const AUDIT_CHANGES_KEYS = ['audit_log', 'treasury', 'reports', 'approvals', 'billing', 'venture_pool', 'categories', 'reconciliation', 'settings', 'hr_costing', 'payroll_payouts', 'claims_approve', 'documentation']
 
 /**
  * Every view's tabs, in the order its sidebar lists them — the handoff's

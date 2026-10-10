@@ -19,6 +19,7 @@ import { revenuePath } from '@/lib/revenue'
 import {
   canAccessDirectorPool,
   canAccessDirectorSalary,
+  canAccessDocumentation,
   canAccessRevenue,
   canAccessTeam,
   canOpenPeople,
@@ -113,6 +114,7 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
         { key: 'ppl', label: 'People Management', icon: 'staff', href: '/team/people', match: p => under(p, '/team/people') || under(p, '/team/accounts') || under(p, '/team/permissions'), visible: canOpenPeople },
         { key: 'hier', label: 'Hierarchy', icon: 'org', href: '/team/hierarchy', match: p => under(p, '/team/hierarchy') || under(p, '/team/roles'), visible: canOpenPeople },
         { key: 'mem', label: 'Member Services', icon: 'approve', href: '/member-admin', match: p => under(p, '/member-admin'), visible: seesMemberServices },
+        { key: 'docs', label: 'Documentation', icon: 'doc', href: '/team/documentation', match: p => under(p, '/team/documentation'), visible: canAccessDocumentation },
       ],
     },
     {

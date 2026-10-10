@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.34 (Meeting Rooms: a day's rooms side by side, the Book and booking drawers, rooms as cards) / v3.30 (the HR revamp, round 2: the soft dropdown and the drawers' motion) / v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.34 (Meeting Rooms: a day's rooms side by side, the Book and booking drawers, rooms as cards) / v3.31 (Documentation: Documents, Data center, Letters, Publish and the 640px preview) / v3.30 (the HR revamp, round 2: the soft dropdown and the drawers' motion) / v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -282,8 +282,7 @@ disagree, the file wins; every value is the prototype's.**
   title with its Save (`242 241 238` "Saved" until something differs), the
   `2fr 3fr` Outstation / Airbnb boxes, the regions grid `1.6fr 150px 140px
   150px 100px` (zebra rows, a 14px box for Flown to) and the venues grid.
-  Publish memo: two cards — Title, Body, ☑ audience chips (peach when on),
-  orange Publish; Published rows with a mono date and "· read by N".
+  Publish memo moved to People › Documentation › Publish (v3.31).
 - **Replacement review** (v3.24, 2026-10-10; `RequestReviews`): under the
   step "Approve and choose the replacement", a 12px "Replaced by · from
   People Management" label over a wrapping row of choice chips (6px 11px on a
@@ -418,6 +417,64 @@ Guest link and an HR phone app. Two things every page of it shares:
   (`hvDrawerIn .34s cubic-bezier(.2,.8,.2,1)`), its scrim fades in `.25s`, a
   centred window fades in `.2s` — the kit's `Drawer` / `Window` do it, so
   round 1's drawers move the same way. Reduced motion turns them off.
+
+### Documentation (v3.31, 2026-10-11)
+
+People › Documentation, `/team/documentation` (README §10; the handoff's
+`Revenue App.dc.html` lines 703–900, the preview 1498–1552). The kit head
+(eyebrow *People · Documentation*), compact tabs Documents · Data center ·
+Letters · Publish with no counts (`margin: -4px 0 18px`). Values in
+`team/documentation/_components/documentation.module.css`; cards, the table and
+the quiet buttons have NO fill of their own — they sit on the white sheet.
+
+- **Documents**: `1fr 1.5fr`, gap 20. Cards: 1px hairline, radius 12, 18px
+  20px, a 15px / 500 title. Upload a document: Name (8px 10px, radius 6), a
+  dashed file box (*No file chosen* · *PDF, Excel, Word or image*, Upload →
+  Replace in a white 7px 14px button), department chips (6px 12px, radius 7,
+  gap 6 — the ☑/☐ its own item; peach with an orange rim when on), Save (the
+  accent, 8px 18px), the 12px note. The list: a row per file — a 38px olive
+  tile (`238 240 226` / `88 98 68`, mono 10px 500 extension), the name 500, a
+  12px brown `file · day · who` line, department pills (1px 8px, radius 999,
+  11px), View · Download (5px 10px, radius 6, unfilled, orange rim on hover)
+  and Delete (red, white; *Confirm delete* on `250 228 224`); *Show deleted
+  (n)*; a deleted row at .55 with a mono red *Deleted*.
+- **Data center**: `280px 1fr`. People: *Find a person*, a 9px-radius button
+  per person (name 13px 500, an 11px line, a 16px red "!" when a compulsory
+  letter is missing, a mono count; peach with an orange rim when open). The
+  record: name 18px 500, `title · code · dept · N letters on file`, the
+  orange Upload with its arrow; *On file*; a missing compulsory letter as a
+  `251 239 237` row with its own Upload; each letter a row with the page icon
+  (38×46, folded corner, two lines, the extension), the type 14.5px 600, View
+  (eye) and Download (arrow). On a phone the list scrolls in its own 420px box
+  and picking a person brings the record into view.
+- **Upload a letter**: the kit Window, 460px, scrim .22 — Letter type (the
+  soft dropdown drawn as a full field; *+ Add a new letter type…* opens a name
+  field), a dashed drop (`+` or the extension in a tile, *Choose a file* · *PDF,
+  Word or a scan*, Browse → Replace), Cancel (unfilled) · Upload (the accent).
+- **Letters**: the "Letter type" switcher (8px 12px, radius 8, min 260px, the
+  chevron turning over in .2s; its menu 360px, radius 10, 6px — rows 7px 8px
+  7px 10px radius 6, a mono count, *Compulsory* with a 28×16 switch red when
+  on, ×; *New letter type* + *+ Add* at its foot), the red pill *Compulsory ·
+  N people missing*, the count line; the table (radius 10 in `216 210 200`,
+  head `10.5px` 600 uppercase): Person (underlined on hover — opens Data
+  center) · Letter · File · Filed (mono) · Status (mono 10.5px chips:
+  Delivered info, Opened alert, Acknowledged ledger) · View · Download.
+- **Publish**: `1.3fr 1fr`. Type switcher (min 220px, menu 300px; added types
+  have ×), for a Letter its letter type and *Saved under this type in Data
+  center*; Title, Body (5 rows), the attachment box; Audience — chips with a
+  mono count, then per department a box (*N of M selected*, *Select all* with
+  ✓ / – / empty) of person chips; the green summary; Publish (the accent, or
+  outlined when a file is attached, beside *Publish & save*). Published: a
+  kind chip (olive), the title, a mono short day, the audience, the file line,
+  a 4px green bar and *N of M acknowledged*.
+- **Preview** (the kit Drawer, `bare`, 640px — never wider than the frame): an
+  olive 10px kicker, a 19px title, the mono `file · ref` line, Download
+  (unfilled) and ×; tabs Preview · Audit trail (count) — peach with an inset
+  orange rule when on. Preview on `236 233 228`: a PDF in an iframe (min
+  640px), a picture as it is, else *No preview for .xlsx files. / Download it
+  to open.* Audit trail: facts (`130px 1fr`), *Audit trail*, then the rail —
+  8px dots (`205 184 162`, the last orange), a 1px line, what 500 · when mono
+  11px · who 12px brown · a note.
 
 ### Meeting Rooms (v3.34, 2026-10-11)
 
