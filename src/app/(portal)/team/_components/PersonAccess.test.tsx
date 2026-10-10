@@ -49,7 +49,7 @@ describe('a person’s own permissions, by view and tab (HR revamp 8)', () => {
     render(<PersonAccess access={access()} canEdit onSaved={onSaved} personName="Anthony" />)
     expect(screen.getByText(/From title/)).toHaveTextContent('From title TEAM LEADER. A red dot marks a box changed for Anthony only.')
     expect(screen.getByRole('tab', { name: /Revenue app/ })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: /Revenue app/ })).toHaveTextContent('8/11')
+    expect(screen.getByRole('tab', { name: /Revenue app/ })).toHaveTextContent('10/13')
     fireEvent.click(box('Quote · Create'))
     expect(box('Quote · Create')).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByLabelText('changed for this person')).toBeInTheDocument()
@@ -116,8 +116,8 @@ describe('a person’s own permissions, by view and tab (HR revamp 8)', () => {
   })
 
   it('counts the tabs they see for the tab badge', () => {
-    expect(accessCount(access())).toBe(8)
-    expect(accessCount(access({ boxes: [{ tab: 'rev.today', action: 'view', granted: false }] }))).toBe(7)
+    expect(accessCount(access())).toBe(10)
+    expect(accessCount(access({ boxes: [{ tab: 'rev.today', action: 'view', granted: false }] }))).toBe(9)
     expect(accessCount({ kind: 'legacy', userId: USER, source: 'the finance role', rows: [
       { key: 'reports', label: 'Reports', section: 'Reports', inherited: true, override: false },
       { key: 'treasury', label: 'Treasury', section: 'Daily', inherited: true, override: null },

@@ -13,6 +13,8 @@
 .dimB { background: var(--rv-dim-brown); }
 .dimC { background: var(--rv-dim-35); }
 .dimD { background: var(--rv-dim-40); }
+/* Book a room's sheet (2026-10-11): the handoff's rgb(43 31 23 / .4) */
+.dimE { background: var(--rv-dim-sheet); }
 
 .panel {
   position: absolute;
@@ -42,7 +44,7 @@
 .handle { align-self: center; width: 40px; height: 5px; border-radius: 3px; background: var(--rv-handle); }
 
 @container rv (min-width: 1024px) {
-  .dimA, .dimB, .dimC, .dimD { background: transparent; }
+  .dimA, .dimB, .dimC, .dimD, .dimE { background: transparent; }
   .panel {
     left: calc(100% - 400px);
     right: 0;

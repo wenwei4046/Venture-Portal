@@ -68,6 +68,10 @@ import { brandMonthVM, picksToSave } from "./profile/brand-weeks-model";
 import TeamPage, { PersonSheet } from "./profile/TeamPage";
 import RequestsPage, { RequestSheet, type RequestFilter } from "./profile/RequestsPage";
 import TrackPage, { RequestInfoSheet, type TrackSegment } from "./profile/TrackPage";
+import RoomsPage, { RoomBookSheet, RoomViewSheet } from "./profile/RoomsPage";
+import { useMemberRooms } from "./profile/useMemberRooms";
+import DocsPage from "./profile/DocsPage";
+import { useMemberDocs } from "./profile/useMemberDocs";
 import { editChanges, editProblem, revisionForm } from "@/lib/member/request-edit";
 import type { WaitingQueue } from "@/lib/member/waiting-queue";
 import RequestForm, { type FormOptions, type SubmitOutcome } from "./profile/RequestForm";
@@ -191,7 +195,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     [onProducts, baseRoute, closed]);
   const home = landing(closed);
   const hiddenScreens = useMemo<Screen[]>(() => (["today", "insight", "quote", "arena"] as const).filter(page => !shows(closed, page)), [closed]);
-  const closedRows = useMemo<WorkKey[]>(() => (["income", "requests", "track", "team"] as const).filter(page => !shows(closed, page)), [closed]);
+  const closedRows = useMemo<WorkKey[]>(() => (["income", "requests", "track", "team", "rooms", "docs"] as const).filter(page => !shows(closed, page)), [closed]);
   const requestKinds = useMemo(() => (["claim", "replacement", "waiting"] as const).filter(kind => sends(closed, requestPageOf(kind))), [closed]);
   const quoteSends = sends(closed, "quote");
   useEffect(() => {
@@ -658,6 +662,17 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const fxp = fixture?.profile;
   /** A Principal looking at somebody else's app: nothing can be sent or changed. */
   const readOnlyView = principal;
+  // Book a room (2026-10-11): the schedule is everybody's — a Principal sees it without picking anybody.
+  const rooms = useMemberRooms({
+    active: memoryReady && route.screen === "account" && route.pf === "rooms", source, today, fixture: fixture?.rooms,
+    readOnly: readOnlyView, canBook: sends(closed, "rooms"),
+  });
+  // Documentation (2026-10-11): read on Profile too, for its row's count of new files; a Principal reads the viewed member's.
+  const docs = useMemberDocs({
+    active: memoryReady && route.screen === "account" && (route.pf === null || route.pf === "docs") && !(principal && !viewed) && shows(closed, "docs"),
+    onPage: route.screen === "account" && route.pf === "docs",
+    source, staffId: principal && viewed ? viewed.id : undefined, fixture: fixture?.docs, readOnly: readOnlyView,
+  });
   const nameOf = useCallback((staffId: string) => {
     for (const m of data.memberships) { const p = m.people.find(x => x.id === staffId); if (p) return p.name; }
     return null;
@@ -1102,9 +1117,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   } else if (route.screen === "account") {
     const back = () => goScreen("account");
     const pf = route.pf;
-    const pick = principal && !viewed && !fxp && pf !== "memos" && pf !== "team" && pf !== "crm" && pf !== null;
+    const pick = principal && !viewed && !fxp && pf !== "memos" && pf !== "team" && pf !== "crm" && pf !== "rooms" && pf !== null;
     if (pick) {
-      page = <PickSomebody title={pf === "income" || pf === "incOrders" ? "My income" : pf === "honours" ? "My honours" : pf === "brandWeeks" ? "My brand weeks" : pf === "track" ? "Waiting list & replacements" : "Requests"}
+      page = <PickSomebody title={pf === "income" || pf === "incOrders" ? "My income" : pf === "honours" ? "My honours" : pf === "brandWeeks" ? "My brand weeks" : pf === "docs" ? "Documentation" : pf === "track" ? "Waiting list & replacements" : "Requests"}
         onBack={back} onViewAs={() => setVaOpen(true)} />;
     } else if (pf === "income") {
       page = <IncomePage vm={incomeView} hidden={hidden} message={incomeRead.error} onBack={back} onPeriod={() => setPfDateOpen(true)} onToggleHide={() => setHidden(!hidden)}
@@ -1125,6 +1140,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       page = <TrackPage vm={trackView} segment={trackSeg} onSegment={setTrackSeg} onBack={back} onOpen={openRequest}
         onNew={!sends(closed, "track") ? undefined : shows(closed, "requests") ? () => goScreen("account", { pf: "requests" })
           : () => { setRevising(null); setReqForm(trackSeg); }} />;
+    } else if (pf === "rooms") {
+      page = <RoomsPage {...rooms.page} onBack={back} />;
+    } else if (pf === "docs") {
+      page = <DocsPage docs={docs.docs} message={docs.message} opening={docs.opening} onBack={back} onOpen={docs.open} />;
     } else if (pf === "crm" && crm) {
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} onExit={back} />;
@@ -1134,7 +1153,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       page = <BrandWeeksPage months={bwMonths} backOffice={backOffice} busy={bwBusy} error={bwError} saved={bwSaved}
         onPick={pickBrandWeek} onSave={() => void saveBrandWeeks()} onBack={back} />;
     } else {
-      page = <ProfileMain vm={profileVM} hidden={hidden} crm={crm} closedRows={closedRows} actions={{
+      page = <ProfileMain vm={docs.unseen ? { ...profileVM, badges: { ...profileVM.badges, docs: String(docs.unseen) } } : profileVM} hidden={hidden} crm={crm} closedRows={closedRows} actions={{
         open: (key: WorkKey) => goScreen("account", { pf: key }),
         scheme: () => setSchemeOpen(true),
         brandWeeks: () => goScreen("account", { pf: "brandWeeks" }),
@@ -1235,6 +1254,12 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
                 onSave={editRequest} onCancel={() => void cancelRequest()} onClose={() => { setReqPick(null); setReqError(null); }} />
               <RequestForm kind={reqForm} options={formOptions} revising={revising} readOnly={readOnlyView} onSubmit={submitRequest}
                 formLink={fxp ? undefined : source.waitingFormLink} onClose={() => { setReqForm(null); setRevising(null); }} />
+            </>
+          )}
+          {route.pf === "rooms" && (
+            <>
+              <RoomBookSheet {...rooms.book} />
+              <RoomViewSheet {...rooms.view} />
             </>
           )}
           {route.pf === "memos" && <MemoSheet open={memoPick !== null} memo={memoPickVM} busy={memoBusy} readOnly={readOnlyView} error={memoError} onAck={() => void ackMemo()} onClose={() => setMemoPick(null)} />}

@@ -16,6 +16,10 @@ import { protoInsight } from "./proto-insight";
 import { protoArena, type ArenaFixture } from "./proto-arena";
 import { protoQuote, type QuoteFixture } from "./proto-quote";
 import { protoProfile, type ProfileFixture } from "./proto-profile";
+import { protoRooms } from "./proto-rooms";
+import { protoDocs } from "./proto-docs";
+import type { MemberDocument } from "@/lib/documentation/member";
+import type { MemberRoomsData } from "../profile/rooms-model";
 
 export interface InsightFixture {
   /** The month Insight opens on (the prototype: September, on 3 October). */
@@ -41,6 +45,10 @@ export interface AppFixture {
   arena?: ArenaFixture;
   quote?: QuoteFixture;
   profile?: ProfileFixture;
+  /** Book a room: the round-2 handoff's rooms and meetings (its own day, Sat 10 Oct). */
+  rooms?: MemberRoomsData;
+  /** Documentation: the handoff's files shared with Revenue, the newest not yet opened. */
+  docs?: MemberDocument[];
 }
 
 const membership = (id: string, name: string, code: string, title: string, rank: string, calculator: boolean) => ({
@@ -90,6 +98,8 @@ export function protoFixture(quote: { brand?: string; sheet?: string; charges?: 
     arena: protoArena(),
     quote: protoQuote(quote),
     profile: protoProfile({ track: quote.track }),
+    rooms: protoRooms(),
+    docs: protoDocs(),
     greeting: "Good morning",
     cartItems: 4,
     brands: [

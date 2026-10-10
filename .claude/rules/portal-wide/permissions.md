@@ -360,6 +360,15 @@ Action carries; the action then asks `hr_doc_file_present`), and a SELECT
 was addressed to them. Its memos reach PEOPLE, not sub-departments
 (`member_memo_recipients`, read by `member_visible_memo`). The rules:
 `.claude/rules/hr/documentation.md`.
+**The Revenue app's Book a room and Documentation (2026-10-11)** are tabs of
+their own — Profile · Book a room (`rev.rooms`: View, Create) and Profile ·
+Documentation (`rev.documentation`: View) over the app's `revenue_app`
+cells; a member holds no `rooms` or `documentation` cell. The database lets
+*Revenue app · View (own)* read the schedule and book for THEMSELVES from the
+app (`p_source 'app'`), and a member reads their department's documents
+through `member_staff_id()`; the Principal's View as reads one member's list
+with `member_documents_of` (Documentation · View, mig `20261011110000`).
+The rules: `.claude/rules/revenue/revenue-app.md`.
 
 **THE GUEST LINK: WHAT THE PUBLISHABLE KEY MAY CALL (2026-10-11, mig
 `20261011091000`; the user: Guest link at launch OFF).** Besides the five row-policy helpers, four SECURITY DEFINER

@@ -16,6 +16,10 @@ import {
 import { saveMemberArenaBrandWeeks, savePrincipalArenaBrandWeeks, type fetchMemberArena } from "@/app/(member)/member/arena-actions";
 import type { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
 import { readMemberBatch, type MemberRead } from "@/app/(member)/member/batch-actions";
+import { bookMemberRoom, cancelMemberBooking, type MemberBookInput, type fetchMemberRooms } from "@/app/(member)/member/rooms-actions";
+import type { MemberRoomsData } from "./profile/rooms-model";
+import { openMemberDoc, type fetchMemberDocuments } from "@/app/(member)/member/docs-actions";
+import type { MemberDocument } from "@/lib/documentation/member";
 import { createReadBatcher } from "./read-batch";
 import { createReadMemory, idbStore, readKey, type ReadStore } from "./read-memory";
 
@@ -62,6 +66,8 @@ export const ask = {
   waitingQueue: (context?: Pick<MemberReadContext, "staffId">): MemberRead => ({ kind: "waitingQueue", context: context ? { staffId: context.staffId } : undefined }),
   requestHistory: (id: string): MemberRead => ({ kind: "requestHistory", id }),
   catalogue: (): MemberRead => ({ kind: "catalogue" }),
+  rooms: (from: string, to: string): MemberRead => ({ kind: "rooms", from, to }),
+  documents: (context?: { staffId: string }): MemberRead => (context ? { kind: "documents", staffId: context.staffId } : { kind: "documents" }),
 };
 
 /**
@@ -110,6 +116,16 @@ export interface RevenueSource {
   saveBrandWeeks(subDepartmentId: string, period: string, picks: ArenaWeekPicks, context?: MemberReadContext): Promise<Outcome<true>>;
   /** The Quote's catalogue (2026-10-08) — read when the Quote needs it, no longer with every open. */
   catalogue?(): Promise<Outcome<MemberCatalogue>>;
+  /** Book a room (2026-10-11): the rooms and their bookings from one day to another, and who may be picked. */
+  rooms?(from: string, to: string): Promise<Outcome<MemberRoomsData>>;
+  /** Book a room for yourself. */
+  bookRoom?(input: MemberBookInput): Promise<Outcome<{ id: string; ref: string }>>;
+  /** Cancel a meeting you booked. */
+  cancelBooking?(id: string): Promise<Outcome<true>>;
+  /** Documentation (2026-10-11): the files HR shares with the member's department — or, View as, with the viewed one's. */
+  documents?(context?: { staffId: string }): Promise<Outcome<MemberDocument[]>>;
+  /** A file's short link, made at the tap (never kept). */
+  openDocument?(id: string, context?: { staffId: string }): Promise<Outcome<{ url: string; fileName: string }>>;
   /**
    * What the phone kept from an earlier open (the live app only, 2026-10-08):
    * the last answer to a read (`ask.*`), shown while it is read again.
@@ -186,6 +202,11 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     departmentIncome: (subDepartmentId, period) => go<Answer<typeof fetchDepartmentIncome>>(ask.departmentIncome(subDepartmentId, period)),
     honours: (subDepartmentId, from, until, context) => go<Answer<typeof fetchMemberHonours>>(ask.honours(subDepartmentId, from, until, context)),
     catalogue: () => go<Answer<typeof fetchMemberCatalogue>>(ask.catalogue()),
+    rooms: (from, to) => go<Answer<typeof fetchMemberRooms>>(ask.rooms(from, to)),
+    bookRoom: input => bookMemberRoom(input),
+    cancelBooking: id => cancelMemberBooking(id),
+    documents: context => go<Answer<typeof fetchMemberDocuments>>(ask.documents(context)),
+    openDocument: (id, context) => openMemberDoc(id, context?.staffId),
     async saveBrandWeeks(subDepartmentId, period, picks, context) {
       const result = context
         ? await savePrincipalArenaBrandWeeks(subDepartmentId, period, picks, context)

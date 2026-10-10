@@ -15,6 +15,9 @@ export const ICON = {
   chat: "M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z",
   bell: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4",
   calendar: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14",
+  /* Book a room and Documentation (the HR revamp's second package, 2026-10-11): the handoff's `calendar` and `doc` */
+  room: "M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM16 3v4M8 3v4M3 10h18",
+  doc: "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8ZM14 3v5h5M9 13h6M9 17h4",
   /* Waiting list & replacements (the HR revamp's handoff, 2026-10-10) */
   queue: "M4 6h16M4 12h16M4 18h10M21 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z",
   install: "M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm4 5v7m-3-3 3 3 3-3m-4 7h2",

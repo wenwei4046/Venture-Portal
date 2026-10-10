@@ -3,7 +3,7 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import s from "./sheet.module.css";
 
-export type SheetDim = "a" | "b" | "c" | "d";
+export type SheetDim = "a" | "b" | "c" | "d" | "e";
 
 export interface SheetProps {
   open: boolean;
@@ -28,7 +28,7 @@ export interface SheetProps {
   children: ReactNode;
 }
 
-const dims = { a: s.dimA, b: s.dimB, c: s.dimC, d: s.dimD } as const;
+const dims = { a: s.dimA, b: s.dimB, c: s.dimC, d: s.dimD, e: s.dimE } as const;
 /** A press that travels further than this before the click is a drag, not a click outside. */
 const DRAG_PX = 6;
 

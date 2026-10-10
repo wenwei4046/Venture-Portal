@@ -13,7 +13,7 @@ import type { EditField } from "@/lib/member/request-edit";
 export type Tone = "good" | "neutral" | "warn" | "bad" | "none" | "pending" | "accepted";
 
 // ── Profile ──
-export type WorkKey = "income" | "honours" | "team" | "requests" | "track" | "crm" | "memos";
+export type WorkKey = "income" | "honours" | "team" | "requests" | "track" | "rooms" | "docs" | "crm" | "memos";
 export interface ProfileMainVM {
   name: string;
   ini: string;

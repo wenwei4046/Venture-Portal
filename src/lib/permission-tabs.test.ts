@@ -105,7 +105,7 @@ describe('moving the eleven templates onto tabs loses nothing', () => {
 })
 
 it('counts a view the way the rail does', () => {
-  expect(viewCount('rev', new Set([grantOf('rev.today', 'view'), grantOf('rev.quote', 'create')]))).toEqual({ seen: 1, of: 11 })
+  expect(viewCount('rev', new Set([grantOf('rev.today', 'view'), grantOf('rev.quote', 'create')]))).toEqual({ seen: 1, of: 13 })
 })
 
 describe('what the Permissions tab and a person’s window work with', () => {

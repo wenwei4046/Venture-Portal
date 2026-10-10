@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.35 (the Guest link: Admin › Guest Link, and the public /g page — phone first, a Preview column on a computer) / v3.34 (Meeting Rooms: a day's rooms side by side, the Book and booking drawers, rooms as cards) / v3.31 (Documentation: Documents, Data center, Letters, Publish and the 640px preview) / v3.30 (the HR revamp, round 2: the soft dropdown and the drawers' motion) / v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.36 (the Revenue app's Book a room and Documentation: By room / Timeline at 64px an hour, the book sheet, the files HR shares) / v3.35 (the Guest link: Admin › Guest Link, and the public /g page — phone first, a Preview column on a computer) / v3.34 (Meeting Rooms: a day's rooms side by side, the Book and booking drawers, rooms as cards) / v3.31 (Documentation: Documents, Data center, Letters, Publish and the 640px preview) / v3.30 (the HR revamp, round 2: the soft dropdown and the drawers' motion) / v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -576,6 +576,67 @@ canvas's 3a phone and 3c computer artboards). Values in
 - **Desktop (≥900px)** — the page widens to 1100px; while booking, a 340px
   **Preview** column (sticky, 35px down): *Your booking*, *n of 8 filled* with
   a 4px orange bar, then Who / When / Meeting, *Not filled yet* in grey.
+### The Revenue app — Book a room and Documentation (v3.36, 2026-10-11)
+
+Profile › Your workspace (README 18.4, the handoff's `Revenue Member App.dc.html`
+lines 103–152 and the sheet at 189–211), in the handoff's order after *Waiting
+list & replacements*: **Book a room** — slate tile (`--rv-slate-bg` /
+`--rv-slate`), the handoff's calendar (a rounded 18×16 box, two posts, a rule) —
+and **Documentation** — sand tile, the handoff's doc — with the white-on-orange
+count of files not opened yet. Sizes below are the handoff's phone px; the CSS
+writes them ÷ .92 against `--rv-type`, like the rest of the app. Values in
+`components/member/app/profile/rooms.module.css` and `docs.module.css`.
+
+- **Meeting rooms** (app-08 / 09) — the page 10px 20px 32px, gap 14: *‹ Profile*
+  (13.3px 600 accent, the handoff's 18px chevron at stroke 2), then the title
+  row 6px up: **Meeting rooms** 25.8px 700 −.03em and **+ Book** (a 38px accent
+  pill, 0 16px, 13.3px 650 white). *By room | Timeline* in a sand track (3px, radius
+  12; each 36px radius 9, 12.4px — the picked one white, black 650, a
+  `0 1px 3px rgba(63,43,34,.12)` lift). Seven day chips 52×58 radius 16 with a
+  1px line (11px weekday — *Today* first — over 17px 700 date), the picked one
+  filled with the accent, scrolling sideways edge to edge.
+- **By room** — a white card a room (radius 20, the line, 12px 16px): name 14.7px
+  650 · `8 seats` 12px; each meeting under a rule — the time mono 11.5px in 78px,
+  then a 3px bar and the title 13.3px 600 (one line, …) over `Chea Huan · 6 pax`
+  11.5px; a free day reads *Free all day · tap to book* 12.4px 600 green.
+- **Timeline** — one white card (radius 20, clipped): a `--rv-grid-head` head row
+  of short room names (*Room 1*, 11.5px 650, ruled), a 38px column of hours (mono
+  10px `--rv-hour`) and a column a room, **64px an hour**, 768px tall, its hour
+  and half-hour lines one repeating gradient (`--rv-grid-hour` / `--rv-grid-half`);
+  a meeting is a block 3px in, 1px down, 2px short, radius 8, its tone's fill
+  and 3px bar, title 10.5px 650 on 1 / 3 / 5 lines by length, time mono 9px. A
+  press on empty space books that half hour (never later than 19:30); the
+  cursor is `copy`. *Tap an empty slot to book it.* 12px under it.
+- **Tones** — the member's own meetings `--rv-accent` on `--rv-peach-bg`, the
+  rest of HQ `--rv-slate` on `--rv-slate-bg`, the guest link's subsidiaries
+  `--rv-accent-soft` on `--rv-guest-bg`.
+- **The sheets** — the app's `Sheet` (`dim="e"`: the handoff's `rgb(43 31 23 /
+  .4)`), max 88%, 8px 20px 26px, gap 12, a 40×5 grabber in the line colour,
+  the title 18.4px 700. **Book a room · Sat 10 Oct**: labels 12.4px 600 sub; a
+  text field 46px + its border (content-box, radius 12, 14px); every select the
+  soft dropdown with the canvas's soft field (radius 10, the chevron) — Department
+  (*Revenue · Fair*, *Revenue · IR*, then HQ's departments), Room
+  (`Meeting Room 1 · 8 seats`), From / To side by side (`—`, 08:00–20:00 by half
+  hours); *Attending* — peach chips 32px (12.9px 600 accent, a 22px ×) over
+  *Add a colleague — type a name* and its dashed suggestions; *Total pax* with
+  `1 named + 2 more` (11.5px `--rv-hour`) and a 44px − n + stepper in a radius-12
+  box; the red line (12.9px `--rv-err`); **Cancel** (flex 1, outlined, 650) and
+  **Book** (flex 2, the accent, 700), both 48px pills. A meeting opened: the
+  title, `Sat 10 Oct · 15:00–16:00` 13.3px sub 6px up, four facts (Room, Booked
+  by, From, People) 13.3px over rules, then **Cancel meeting** (48px, `--rv-err`
+  on white in an `--rv-err-line` ring; a first tap fills it `--rv-err-bg` and
+  reads *Tap again to cancel*) for the booker, else *Only Chea Huan can cancel
+  this meeting.* 12.4px sub. Viewing as somebody, the sheets' button reads
+  *Read-only while viewing as*.
+- **Documentation** (app-06) — the page 10px 20px 32px, gap 20: the back link,
+  **Documentation** 25.8px 700, *Shared with Revenue by HR.* 12.9px sub; rows
+  `44px minmax(0,1fr) 16px` gap 12, 13px 0 over a rule: a 44px sand tile radius
+  12 with the file's kind (`XLSX`, `PDF` — 10px 700 brown, .02em), the name
+  13.8px 650 with a white *New* on the accent (10px 700, radius 9, 1px 7px),
+  `Added 1 Oct 2026` 11.5px sub, the 16px chevron. *Nothing shared with you
+  yet.* when empty; under the list, once a file is tapped, *Opening
+  HV_Employee_Handbook_v3.2.pdf* in a cream note (12px 14px, radius 14,
+  `--rv-open-line`, 12.4px brown).
 
 ### Product List — a page of the Revenue app (v3.13, 2026-10-08)
 
