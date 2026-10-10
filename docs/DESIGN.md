@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -297,6 +297,25 @@ disagree, the file wins; every value is the prototype's.**
   an underlined "Take off the schedule →"; the hourly run's refusal sits under
   it in 12.5px danger. Completed: "Replaced automatically." with the link to
   the record it changed.
+- **People** (v3.25, 2026-10-10; `team/people/_components/`): the kit head
+  with Invite user · Import InfoTech · + Add person (8px 16px, hung 9px
+  below the head's bottom edge), compact tabs, five People cards (132px, a
+  24px label, a 26px figure, no icon), the toolbar (a 440px-max search, pills
+  with boxed counts), then one grid — `1.7fr 1.4fr 130px 80px 1.3fr 100px
+  40px`, an 11px 14px head on `235 231 224`, a band per department (`241 237
+  230`, a 3px walnut left rule, 9px ▼, 13px / 700 uppercase name, 11px mono
+  count, "· N incomplete" in amber), rows at 9px 14px on zebra `250 250 249`
+  and an orange-cream hover: a 28px / 7px tile (orange rim on peach when they
+  can sign in), the name 500 underlined in hairline, title + a 10px mono
+  L-level, a 999px rank chip + 10px rate, 11px mono code, soft status chips,
+  12px Last seen, a brown ›. Right-click opens a 190px menu (9px radius, 5px
+  padding). The person window is 760px (900 on a login's Permissions): a 44px
+  tile, the name 19px / 600 in capitals, a 12.5px line, 10.5px chips; small
+  tabs on a hairline; Details two columns of an 11px uppercase label over its
+  value ("missing" in amber); a `247 247 245` foot with "Esc closes." and
+  Full page. Invite user: 420px of content (22px padding, 14px radius, the
+  1px rim), 17px title, Email, Password with Regenerate, the Role chip on
+  `246 246 244`, Cancel · Send invite.
 - **Cross-check** with a measuring script that finds each element by its text
   on both and diffs computed font / colour / size / padding / border / radius
   / background (`.design/revenue-app/tools/measure-pl.mjs` is the pattern).

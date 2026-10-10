@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { SlidingTabs, type TabItem } from '@/components/motion/SlidingTabs'
+import { HvPage, PageHead, btn } from '@/components/hrv/kit'
+import { Tabs } from '@/components/hrv/tabs'
 import type { PermissionsData } from '../../_lib/permission-templates'
 import PeopleDirectory, { type AccountRow, type PersonRow } from './PeopleDirectory'
 import PermissionTemplates from './PermissionTemplates'
-import InviteDrawer, { type InviteCandidate } from './InviteDrawer'
+import InviteDialog, { type InviteCandidate } from './InviteDialog'
+import s from './people.module.css'
 
 export type PeopleTab = 'people' | 'permissions'
 
@@ -28,21 +30,25 @@ interface Props {
   canInvite: boolean
   /** Team · Create — adding somebody, by hand or from InfoTech (2026-10-08, PR2). */
   canAddPeople: boolean
-  /** Team · Edit with the Salary tick — the roster's pencil (PR4b). */
-  canEditPeople: boolean
   candidates: InviteCandidate[]
   /** `?template=` — the template a Hierarchy › Roles link opens on. */
   initialTemplateId: string | null
-  /** `?invite=` — the drawer opens on load, with that person picked if one was named. */
+  /** `?invite=` — the invite window opens on load, with that person picked if one was named. */
   initialInvite: { staffId: string | null } | null
 }
 
+const SUBTITLE: Record<PeopleTab, string> = {
+  people: 'Everyone on the payroll, the title they hold and the department it sits under. An account is what lets somebody sign in.',
+  permissions:
+    'What each title may do, set once per template: a function, an action on it, and how far that reaches — their own records, their department, or the whole company. Titles point at a template; one person can still be raised or lowered on their own.',
+}
+
 /**
- * People Management (2026-10-08, the Claude Design handoff): the roster and,
- * a tab over, the permission templates — Permissions merged in from its own
- * page, as Roles merged into Hierarchy. The tab is `?tab=`, pushed with the
- * browser's own history the way Hierarchy's is, so switching is a re-render
- * and Back returns to the last view. Invite user is a drawer over either.
+ * People Management as the HR revamp draws it (2026-10-10, the handoff's
+ * variant A): the kit's head with Invite user · Import InfoTech · + Add
+ * person, compact tabs People · Permissions, the roster below. The tab is
+ * `?tab=`, pushed with the browser's own history so Back returns to the last
+ * view; Invite user is a window over either.
  */
 export default function PeopleManagement({
   people,
@@ -54,7 +60,6 @@ export default function PeopleManagement({
   canSeeHistory,
   canInvite,
   canAddPeople,
-  canEditPeople,
   candidates,
   initialTemplateId,
   initialInvite,
@@ -64,7 +69,7 @@ export default function PeopleManagement({
   const [notice, setNotice] = useState<string | null>(null)
   const [invite, setInvite] = useState<{ staffId: string | null } | null>(canInvite ? initialInvite : null)
 
-  // A deep link opens the drawer once; it should not reopen it on every refresh.
+  // A deep link opens the window once; it should not reopen it on every refresh.
   useEffect(() => {
     if (!searchParams.get('invite')) return
     const params = new URLSearchParams(searchParams.toString())
@@ -84,62 +89,53 @@ export default function PeopleManagement({
     window.history.pushState(null, '', qs ? `?${qs}` : window.location.pathname)
   }
 
-  const tabs: TabItem[] = [
-    { key: 'people', label: 'People', count: people.filter(p => p.active).length },
-    ...(showPermissions ? [{ key: 'permissions', label: 'Permissions', count: permissions.templates.length }] : []),
-  ]
-
   return (
-    <div>
-      <div className="page-head tabbed">
-        <div>
-          <div className="page-eyebrow">
-            <em>I.</em> PEOPLE · MANAGEMENT
-          </div>
-          <h1 className="page-title">People</h1>
-          <p className="text-[12px] leading-normal mt-3 max-w-[672px]">
-            {tab === 'permissions'
-              ? 'What each title may do, set once per template: a function, an action on it, and how far that reaches — their own records, their department, or the whole company. Titles point at a template; one person can still be raised or lowered on their own.'
-              : 'Everyone on the payroll, the title they hold and the department it sits under. An account is what lets somebody sign in — most of the roster has none yet.'}
-          </p>
-        </div>
-        {/* One orange action — adding somebody; the other two are the sheet's
-            outlined buttons. */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          {canInvite ? (
-            <button
-              type="button"
-              onClick={() => setInvite({ staffId: null })}
-              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors whitespace-nowrap"
-            >
-              Invite user
-            </button>
-          ) : null}
-          {canAddPeople ? (
-            <>
-              <Link
-                href="/team/people/import"
-                className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors whitespace-nowrap"
-              >
-                Import InfoTech
-              </Link>
-              <Link
-                href="/team/people/new"
-                className="bg-accent hover:bg-accent-hover text-ink text-sm px-4 py-2 rounded-control transition-colors whitespace-nowrap"
-              >
-                + Add person
-              </Link>
-            </>
-          ) : null}
-        </div>
-      </div>
+    <HvPage>
+      <PageHead
+        eyebrow="People · Management"
+        title="People"
+        subtitle={SUBTITLE[tab]}
+        right={
+          canInvite || canAddPeople ? (
+            <div className={s.headActions}>
+              {canInvite ? (
+                <button type="button" className={`${btn('outline')} ${s.headBtn}`} onClick={() => setInvite({ staffId: null })}>
+                  Invite user
+                </button>
+              ) : null}
+              {canAddPeople ? (
+                <>
+                  <Link href="/team/people/import" className={`${btn('outline')} ${s.headBtn}`}>
+                    Import InfoTech
+                  </Link>
+                  <Link href="/team/people/new" className={`${btn('primary')} ${s.headBtn}`}>
+                    + Add person
+                  </Link>
+                </>
+              ) : null}
+            </div>
+          ) : undefined
+        }
+      />
 
-      <SlidingTabs items={tabs} active={tab} onTabChange={goTo} variant="control" />
+      {showPermissions ? (
+        <Tabs
+          items={[
+            { key: 'people', label: 'People' },
+            { key: 'permissions', label: 'Permissions' },
+          ]}
+          active={tab}
+          onSelect={goTo}
+          size="compact"
+          label="People"
+          style={{ margin: '-4px 0 16px' }}
+        />
+      ) : null}
 
       {notice ? (
-        <div className="sheet-notice !mt-0 mb-4 flex justify-between gap-3" role="status">
+        <div className={s.notice} role="status">
           <span>{notice}</span>
-          <button type="button" className="perm-link shrink-0" onClick={() => setNotice(null)}>
+          <button type="button" className={s.noticeDismiss} onClick={() => setNotice(null)}>
             Dismiss
           </button>
         </div>
@@ -159,17 +155,13 @@ export default function PeopleManagement({
           unattachedAccounts={unattachedAccounts}
           canSeeActivity={canSeeActivity}
           onInvite={canInvite ? staffId => setInvite({ staffId }) : undefined}
-          canEdit={canEditPeople}
         />
       )}
 
       {invite ? (
-        <InviteDrawer
+        <InviteDialog
           candidates={candidates}
           templates={permissions.templates}
-          functions={permissions.functions}
-          cellKeys={permissions.cellKeys}
-          canSetCells={canManagePermissions}
           initialStaffId={invite.staffId}
           onClose={() => setInvite(null)}
           onCreated={message => {
@@ -178,6 +170,6 @@ export default function PeopleManagement({
           }}
         />
       ) : null}
-    </div>
+    </HvPage>
   )
 }
