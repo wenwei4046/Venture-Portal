@@ -6,12 +6,20 @@ import MemberLoginScreen from "@/components/member/MemberLoginScreen";
 
 export const metadata = { title: "Sign In · HOUZS Venture" };
 
+/**
+ * Where a sign-in may return to (2026-10-11): only the installed HR app, which
+ * sends `?next=/hr-app` — anything else is ignored, so the address can never
+ * send a signed-in person off the portal.
+ */
+const RETURNS: ReadonlySet<string> = new Set(["/hr-app"]);
+
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, next } = await searchParams;
+  const back = next && RETURNS.has(next) ? next : null;
 
   async function signIn(form: FormData) {
     "use server";
@@ -42,7 +50,7 @@ export default async function LoginPage({
     // the shared office PC the next account must not inherit a read-only browser.
     (await cookies()).delete(VIEW_AS_PERSON_COOKIE);
     (await cookies()).delete(VIEW_AS_PERSON_MARK);
-    redirect(profile.role === "revenue_member" ? "/member" : "/dashboard");
+    redirect(back ?? (profile.role === "revenue_member" ? "/member" : "/dashboard"));
   }
 
   return <MemberLoginScreen action={signIn} initialError={error} />;
