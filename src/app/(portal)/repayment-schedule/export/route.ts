@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { buildXlsxBuffer } from '@/lib/export/excel'
 import { exportXlsxResponse } from '@/lib/export/response'
@@ -9,7 +9,9 @@ import { DUE_TYPE_LABEL, dueRows, dueTotals, type DueRow } from '../_components/
 // The Repayment Schedule's Export (2026-10-10, the user's Claude Design
 // handoff; user: 做完他): the month's two due tables as one spreadsheet — "Due
 // to collect", then "Due to pay" — each row as the page shows it, short in
-// brackets ("clear" when nothing is), each side closed by its Total.
+// brackets ("clear" when nothing is), each side closed by its Total. Gated as
+// every treasury export is, Treasury · Export — and Treasury · View, which the
+// deals' terms history opens to (treasury_terms_history: view, not export).
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +38,8 @@ function total(rows: DueRow[]): Cell[] {
 }
 
 export async function GET(req: Request): Promise<Response> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'view')
+  await requireAction('treasury', 'export')
   const supabase = await createClient()
   const s = await loadRepaymentSchedule(supabase, new URL(req.url).searchParams.get('month'))
 

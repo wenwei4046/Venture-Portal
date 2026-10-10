@@ -125,12 +125,14 @@ export default async function RepaymentSchedulePage({
             &ldquo;Pending PV&rdquo; tag and only count as paid once approved.
           </p>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {/* The month's two due tables as a spreadsheet (2026-10-10, the handoff). */}
-          <a href={`/repayment-schedule/export?month=${currentYM}`} className="btn-quiet-sheet" download>
-            Export
-          </a>
-        </div>
+        {canDo(user, 'treasury', 'export') ? (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {/* The month's two due tables as a spreadsheet (2026-10-10, the handoff). */}
+            <a href={`/repayment-schedule/export?month=${currentYM}`} className="btn-quiet-sheet" download>
+              Export
+            </a>
+          </div>
+        ) : null}
       </div>
 
       <ScheduleView

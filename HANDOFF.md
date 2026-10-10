@@ -11,6 +11,9 @@
 - **Repayment Schedule Export**: head button → `/repayment-schedule/export?month=YYYY-MM`
   (xlsx: "Due to collect · <Month>" then "Due to pay", rows as the page's DueTables — short
   in brackets, "clear", note for pending PV / source of capital — each side closed by Total).
+  Gate: `requireAction('treasury','view')` + `('treasury','export')` — export as every
+  treasury export, view because treasury_terms_history opens to view, not export (the
+  read-paths guard asks it); the button shows only with `canDo(user,'treasury','export')`.
   The page's data moved verbatim into `repayment-schedule/_lib/schedule-data.ts`
   `loadRepaymentSchedule(supabase, month)`; page and export both call it. `DUE_TYPE_LABEL`
   in due-rows.ts is the Type text for the chip and the export.

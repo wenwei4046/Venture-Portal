@@ -222,4 +222,10 @@ describe('the Repayment Schedule’s head', () => {
     await page()
     expect(screen.getByRole('link', { name: 'Export' })).toHaveAttribute('href', '/repayment-schedule/export?month=2026-10')
   })
+
+  it('not to an account that may read the treasury but not export it', async () => {
+    mocks.requirePermission.mockResolvedValue({ ...withActions({ role: 'finance', permissions: ['treasury'] }), actions: { 'treasury.view': 'all' } })
+    await page()
+    expect(screen.queryByRole('link', { name: 'Export' })).toBeNull()
+  })
 })
