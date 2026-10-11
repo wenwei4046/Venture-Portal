@@ -7,8 +7,8 @@
  * Director answer anyone (crm_can_reply).
  */
 import type { ChangeEvent } from "react";
-import type { CrmCustomer } from "@/lib/member/crm-data";
-import { DAY, day0, dayLabel, daySep, msgTime } from "../../sales/vm/common";
+import type { CrmChatMessage, CrmCustomer } from "@/lib/member/crm-data";
+import { DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel } from "../../sales/vm/common";
 import { roomClosed, roomSlots, slotAt, windowLeft } from "../../sales/vm/chat";
 import { infoRows } from "../../sales/vm/customer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
@@ -37,10 +37,22 @@ export function leadVM(ctx: PanelCtx) {
   const on = !!c && ["overview", "calendar", "assign", "inbox"].includes(ui.tab);
   const ow = c?.assignedTo ?? null, ownerName = ow ? nameOf(ow) : "No one yet";
   const rec = c ? ui.movedRec[c.id] : undefined;
+  const visitCard = (card: CrmChatMessage["card"]) => {
+    const cd = card ? new Date(card.start) : null;
+    return { ev: card && cd ? {
+      kind: card.kind, title: "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()), mon: gb(cd, { month: "short" }),
+      time: timeLabel(cd), room: card.room, addr: card.addr,
+      bg: card.kind === "Cancelled" ? "#F5EBE3" : "#FFF0E4", fg: card.kind === "Cancelled" ? "#806B60" : "#BD4A19", deco: card.kind === "Cancelled" ? "line-through" : "none",
+      go: () => patch({ lead: null, tab: "calendar", cView: "grid", cDay: day0(cd), cGM: [cd.getFullYear(), cd.getMonth()] }),
+    } : null };
+  };
   const msgs = (c?.messages ?? []).map((m, k, arr) => {
     const sep = daySep(m.at, now), mine = m.from === "me", by = mine && m.by && m.by !== ow ? `Sent by ${nameOf(m.by)}` : m.auto ? "Auto-reply" : "";
     return { sep: !k || daySep(arr[k - 1].at, now) !== sep ? sep : "", time: msgTime(m.at), mine, text: m.text || (m.media ? `[${m.media.kind === "image" ? "Photo" : m.media.kind === "audio" ? "Voice note" : m.media.kind === "video" ? "Video" : "File"}]` : ""), at: msgTime(m.at),
-      by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? "#FCD6B8" : "#fff", bd: mine ? "#FCD6B8" : "#fff", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px" };
+      by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? "#FCD6B8" : "#fff", bd: mine ? "#FCD6B8" : "#fff", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+      // A visit sent to the customer shows as the visit card, as in the salesperson's chat (sales/vm/chat.ts › ev), not
+      // as its text with the map links (user 2026-10-11). Tap → Calendar on that day.
+      ...visitCard(m.card), pDisp: m.card ? "none" : "block" };
   });
   return {
     onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),

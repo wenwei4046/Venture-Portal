@@ -30,6 +30,7 @@ const off = <T,>() => undefined as unknown as T;
 export function panelAppVM(ctx: PanelCtx) {
   const { ui, set, now } = ctx, tab = ui.tab, lead = !!ui.lead;
   const show = { ov: tab === "overview" && !lead, ib: tab === "inbox" && !lead, ld: lead, ad: tab === "ads", as: tab === "assign" && !lead, cal: tab === "calendar" && !lead, pf: tab === "profile" };
+  const ld = show.ld ? leadVM(ctx) : off<ReturnType<typeof leadVM>>();
   const cf = customerForm({
     form: ui.pForm, data: ctx.data, saveDetails: ctx.act.saveDetails,
     setForm: f => set(u => ({ ...u, pForm: typeof f === "function" ? (u.pForm ? f(u.pForm) : null) : f })),
@@ -55,7 +56,7 @@ export function panelAppVM(ctx: PanelCtx) {
     cl: calendarListVM(ctx, cal), ci: calendarInfoVM(ctx),
     ov: show.ov ? overviewVM(ctx) : off<ReturnType<typeof overviewVM>>(),
     ib: show.ib ? inboxVM(ctx) : off<ReturnType<typeof inboxVM>>(),
-    ld: show.ld ? leadVM(ctx) : off<ReturnType<typeof leadVM>>(),
+    ld,
     ad: show.ad ? adsVM(ctx) : off<ReturnType<typeof adsVM>>(),
     as: as ?? off<NonNullable<typeof as>>(),
     asx: x.asx, ftx: x.ftx, bp: x.bp, hl: x.hl,
@@ -63,7 +64,9 @@ export function panelAppVM(ctx: PanelCtx) {
     cal: cal ?? off<ReturnType<typeof calendarVM>>(),
     pf: show.pf ? profileVM(ctx) : off<ReturnType<typeof profileVM>>(),
     rm: roomsVM(ctx), ol: overlaysVM(ctx), nv: navVM(ctx),
-    toast: ui.toast, toastBottom: lead ? "92px" : "78px",
+    // In the prototype the chat keeps a toast of its own (ld.toast); here both read ui.toast, so with a chat open only the
+    // chat's shows — not the same words twice (user 2026-10-11).
+    toast: ld.onLead ? "" : ui.toast, toastBottom: lead ? "92px" : "78px",
   };
 }
 export type PanelAppVM = ReturnType<typeof panelAppVM>;
