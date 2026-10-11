@@ -459,6 +459,28 @@
   padding: 0;
 }
 .removeSmall:hover { background: rgb(var(--hv-card-danger-icon-bg)); color: rgb(var(--hv-danger)); }
+/* File types (2026-10-11): the sources' cards — ✎ hovers quietly (renaming is no danger), a type turned off is
+   greyed as the old states are elsewhere, Résumé says it is built in. */
+.renameSmall {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: rgb(var(--hv-brown));
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  padding: 0;
+}
+.renameSmall:hover { background: rgb(var(--hv-panel-2)); color: rgb(var(--hv-ink)); }
+.source[data-off='true'] .sourceName { color: rgb(var(--hv-quiet)); }
+.typeBuiltIn { font-size: 11px; color: rgb(var(--hv-brown)); white-space: nowrap; }
+/* The name being renamed takes the name's place: the card's own 22px line, not a 34px field. */
+.typeRename { flex: 1; min-width: 0; padding: 2px 8px; font-size: 13px; }
 
 /* ── New hiring request (640px drawer) ── */
 .newForm { display: flex; flex-direction: column; gap: 14px; }
@@ -886,6 +908,9 @@
   .listCols { min-width: 1040px; }
   .decideGrid, .newGrid, .twoCol, .fillGrid { grid-template-columns: minmax(0, 1fr); }
   .fsCard { overflow-x: auto; }
+  /* Form settings' "+ Add field / source / type" rows: the field gives way to its button (its 240px ran the
+     button past the card on a phone). */
+  .addInput { width: auto; flex: 1; min-width: 0; }
   .fsCols { min-width: 720px; }
 }
 /* ── Insights (README §12; the handoff's lines 1145–1202, the 440px panel 1484–1497) ── */

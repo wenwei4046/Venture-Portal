@@ -57,6 +57,10 @@ export interface HiringFileType {
   name: string
   /** 'resume' for the Résumé — the one a candidate's résumé button and "Download résumé" open. */
   builtin: 'resume' | null
+  /** Off in Form settings (mig 20261011210000): out of the picker; the files filed under it keep it. */
+  active: boolean
+  /** Files filed under it. */
+  used: number
 }
 
 /** A file on a candidate or a talent: its type, the name it came with, who added it. */

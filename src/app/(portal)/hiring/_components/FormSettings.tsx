@@ -3,17 +3,21 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { flash } from '@/components/hrv/toast'
 import { Select } from '@/components/hrv/select'
-import { addHiringSource, removeHiringSource, saveHiringFormFields, setHiringSourceActive } from '@/lib/hiring/actions'
-import type { HiringBoard, HiringField, HiringFieldType } from '@/lib/hiring/types'
+import {
+  addHiringFileType, addHiringSource, removeHiringSource, renameHiringFileType, saveHiringFormFields, setHiringFileTypeActive,
+  setHiringSourceActive,
+} from '@/lib/hiring/actions'
+import type { HiringBoard, HiringField, HiringFieldType, HiringFileType } from '@/lib/hiring/types'
 import s from './hiring.module.css'
 
 /**
  * Hiring › Requests › Form settings (README §11, portal-33): what requesters
  * fill in — each field's order (↑ ↓), name, answer type, choices and whether it
  * is required; Position and Department are Core (renamed, never removed). And
- * the hiring sources, each with its hires, On / Off, × while unused. A change
- * is kept as it is made, as the handoff's are (a name or choices once typing
- * stops).
+ * the hiring sources, each with its hires, On / Off, × while unused. And
+ * (2026-10-11, the user: rename and turn off) the file types, each with its
+ * files, ✎ to rename, On / Off — Résumé is built in. A change is kept as it is
+ * made, as the handoff's are (a name or choices once typing stops).
  */
 const TYPES: ReadonlyArray<{ v: HiringFieldType; label: string }> = [
   { v: 'text', label: 'Short text' },
@@ -245,6 +249,131 @@ export default function FormSettings({ board, onPreview }: { board: HiringBoard;
           </button>
         </div>
       </section>
+
+      <FileTypes types={board.fileTypes} />
     </>
+  )
+}
+
+/**
+ * File types (2026-10-11, mig 20261011210000 — the user: rename and turn
+ * off): the hiring sources' cards — the name and its files, ✎ to rename (Enter
+ * or leaving the field keeps it, Esc lets it be), On / Off; Résumé says *Built
+ * in*. A type turned off leaves the picker and keeps the files already filed
+ * under it. *+ Add type* names a new one (one that was off comes back on).
+ */
+function FileTypes({ types }: { types: readonly HiringFileType[] }) {
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
+  const [newType, setNewType] = useState('')
+  const [, start] = useTransition()
+  const field = useRef<HTMLInputElement>(null)
+  const cancelled = useRef(false)
+  const renamingId = renaming?.id ?? null
+  useEffect(() => {
+    if (renamingId) field.current?.focus()
+  }, [renamingId])
+
+  // Leaving the field ends a rename — Enter leaves it, Esc leaves it unkept — so a name is kept once.
+  const rename = (t: HiringFileType) => {
+    const name = renaming?.id === t.id ? renaming.name.trim() : ''
+    setRenaming(null)
+    if (cancelled.current) {
+      cancelled.current = false
+      return
+    }
+    if (!name || name === t.name) return
+    start(async () => {
+      const out = await renameHiringFileType(t.id, name)
+      if (!out.ok) flash(out.reason)
+    })
+  }
+  const addType = () => {
+    const name = newType.trim()
+    if (!name) return
+    if (types.some(t => t.active && t.name.toLowerCase() === name.toLowerCase())) return flash('That type is already there.')
+    start(async () => {
+      const out = await addHiringFileType(name)
+      if (!out.ok) return flash(out.reason)
+      setNewType('')
+    })
+  }
+
+  return (
+    <section className={s.fsCard} aria-label="File types">
+      <div className={s.fsTitle} style={{ marginBottom: 4 }}>File types</div>
+      <div className={s.fsLede4}>
+        What a candidate&apos;s or a talent&apos;s file is, picked when it is added. Turn off the ones you don&apos;t use: they leave the picker, and the files already filed under them keep them.
+      </div>
+      <div className={s.sources}>
+        {types.map(t => (
+          <div key={t.id} className={s.source} data-off={t.active ? undefined : 'true'}>
+            {renaming?.id === t.id ? (
+              <input
+                ref={field}
+                className={`${s.input} ${s.typeRename}`}
+                value={renaming.name}
+                maxLength={60}
+                aria-label={`New name for ${t.name}`}
+                onChange={e => setRenaming({ id: t.id, name: e.target.value })}
+                onKeyDown={e => {
+                  if (e.key === 'Escape') cancelled.current = true
+                  if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur()
+                }}
+                onBlur={() => rename(t)}
+              />
+            ) : (
+              <span className={s.sourceName}>
+                {t.name}
+                <span className={s.sourceUsed}>{t.used === 1 ? '1 file' : `${t.used} files`}</span>
+              </span>
+            )}
+            {t.builtin ? (
+              <span className={s.typeBuiltIn}>Built in</span>
+            ) : (
+              <>
+                {renaming?.id === t.id ? null : (
+                  <button type="button" className={s.renameSmall} title="Rename" aria-label={`Rename ${t.name}`} onClick={() => setRenaming({ id: t.id, name: t.name })}>
+                    ✎
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={s.toggleRight}
+                  aria-pressed={t.active}
+                  aria-label={`${t.name}: ${t.active ? 'on' : 'off'}`}
+                  onClick={() =>
+                    start(async () => {
+                      const out = await setHiringFileTypeActive(t.id, !t.active)
+                      if (!out.ok) flash(out.reason)
+                    })
+                  }
+                >
+                  {t.active ? 'On' : 'Off'}
+                  <span className={s.track} data-on={t.active ? 'true' : 'false'} aria-hidden="true">
+                    <span className={s.knob} />
+                  </span>
+                </button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className={s.addRow}>
+        <input
+          className={`${s.input} ${s.addInput}`}
+          value={newType}
+          maxLength={60}
+          placeholder="New type, e.g. Driving licence"
+          aria-label="New file type"
+          onChange={e => setNewType(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') addType()
+          }}
+        />
+        <button type="button" className={`${s.btnGhost} ${s.addBtn}`} onClick={addType}>
+          + Add type
+        </button>
+      </div>
+    </section>
   )
 }

@@ -322,7 +322,7 @@ export async function removeHiringFile(file: string): Promise<HiringOutcome> {
   return deleted ? { ok: true } : { ok: true, warning: LEFT_IN_STORAGE }
 }
 
-/** "+ Add a new file type…": the type of that name, made if new (Edit). */
+/** "+ Add a new file type…": the type of that name — made if new, turned back on if it was off (Edit). */
 export async function addHiringFileType(name: string): Promise<HiringIdOutcome> {
   await requireAction('hiring', 'edit')
   if (!name.trim()) return { ok: false, reason: 'Name the file type.' }
@@ -330,6 +330,19 @@ export async function addHiringFileType(name: string): Promise<HiringIdOutcome> 
   if (error) return { ok: false, reason: refusal(error, 'The file type could not be added. Please try again.') }
   refresh()
   return { ok: true, id: String(data) }
+}
+
+/** Form settings › File types: a new name; the files under it read it at once. Résumé keeps its own (Edit). */
+export async function renameHiringFileType(type: string, name: string): Promise<HiringOutcome> {
+  await requireAction('hiring', 'edit')
+  if (!name.trim()) return { ok: false, reason: 'Name the file type.' }
+  return call('hiring_file_type_rename', { p_type: type, p_name: name }, 'The file type could not be renamed. Please try again.')
+}
+
+/** Form settings › File types › On / Off: off leaves the picker, the files filed under it keep it. Résumé stays on (Edit). */
+export async function setHiringFileTypeActive(type: string, active: boolean): Promise<HiringOutcome> {
+  await requireAction('hiring', 'edit')
+  return call('hiring_file_type_set_active', { p_type: type, p_active: active }, 'The file type could not be changed. Please try again.')
 }
 
 // ── Form settings ───────────────────────────────────────────────────────────
