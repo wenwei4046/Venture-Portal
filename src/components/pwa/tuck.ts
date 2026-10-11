@@ -6,8 +6,13 @@ import { useEffect, useState, type RefObject } from 'react'
  * The phone's bottom bar steps out of the way while you read on (2026-10-11 —
  * the user: "滑上去的时候，它是会收下来的 … 等这个爬升来的时候，它才可以又再跑
  * 起来"): scrolling down (the finger moving up) tucks it away, scrolling back
- * up brings it back, and near the top of a page it always shows. A new page
- * shows it again (`resetKey`).
+ * up brings it back, and near the top of a page it always shows.
+ *
+ * - On entering, it is there (the user, the same day: "点进去的时候理应能看到下面
+ *   的 bar，只有滑下去的时候才看不到"): a new page (`resetKey`) shows it and starts
+ *   counting afresh — a run carried over from the page before tucked it at the
+ *   first 1px of the next — and so does coming back to the app from the home
+ *   screen, another app or the lock screen, which resumes it as it was left.
  *
  * - Any vertical scroller counts — the app's own frame, a page's list, the
  *   window — read in the capture phase, since a scroll event does not bubble.
@@ -42,10 +47,6 @@ function scrollBox(target: EventTarget | null): Box | null {
 export function useTuckOnScroll(bar: RefObject<HTMLElement | null>, enabled = true, resetKey?: unknown): boolean {
   const [tucked, setTucked] = useState(false)
 
-  useEffect(() => {
-    setTucked(false)
-  }, [resetKey])
-
   // The bar's own height, kept current (a safe-area inset, a font size): what
   // the stylesheet pulls it down by (`--bar-h`, tuck.module.css).
   useEffect(() => {
@@ -59,14 +60,20 @@ export function useTuckOnScroll(bar: RefObject<HTMLElement | null>, enabled = tr
     return () => watch.disconnect()
   }, [bar])
 
+  // A new page: the bar is there, and the count starts afresh.
   useEffect(() => {
-    if (!enabled) {
-      setTucked(false)
-      return
-    }
+    setTucked(false)
+    if (!enabled) return
     const last = new WeakMap<object, number>()
     let run = 0
     let way = 0
+    // Back in the app — it resumes as it was left: the bar is there.
+    const onReturn = () => {
+      if (document.visibilityState !== 'visible') return
+      run = 0
+      way = 0
+      setTucked(false)
+    }
     const onScroll = (e: Event) => {
       const box = scrollBox(e.target)
       if (!box) return
@@ -97,8 +104,14 @@ export function useTuckOnScroll(bar: RefObject<HTMLElement | null>, enabled = tr
       }
     }
     document.addEventListener('scroll', onScroll, { capture: true, passive: true })
-    return () => document.removeEventListener('scroll', onScroll, { capture: true })
-  }, [enabled, bar])
+    document.addEventListener('visibilitychange', onReturn)
+    window.addEventListener('pageshow', onReturn)
+    return () => {
+      document.removeEventListener('scroll', onScroll, { capture: true })
+      document.removeEventListener('visibilitychange', onReturn)
+      window.removeEventListener('pageshow', onReturn)
+    }
+  }, [enabled, bar, resetKey])
 
   return enabled && tucked
 }

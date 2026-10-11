@@ -7,6 +7,7 @@ import { PUSH_WORDS, pushState, turnPushOff, turnPushOn, type PushState, type Pu
 import PushAsk from '@/components/pwa/PushAsk'
 import { useTuckOnScroll } from '@/components/pwa/tuck'
 import tuck from '@/components/pwa/tuck.module.css'
+import { pageKeyOf, usePageScroll } from './page-scroll'
 import { Select } from '@/components/hrv/select'
 import ViewingAsBanner from '@/components/layout/ViewingAsBanner'
 import {
@@ -120,9 +121,13 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
   const d = useMemo(() => (data.parts.hiring ? data : { ...data, hires: [] }), [data])
   const top = stack[stack.length - 1]
   const view: string = top ? top.k : tab
-  // The tab bar steps out of the way while reading on, and is back on scrolling up or on another page (2026-10-11).
+  // Every page opens at its top and Back returns to where its page was left; the tab bar steps out of the way while
+  // reading on, and is back on scrolling up or on another page (2026-10-11).
+  const page = pageKeyOf(tab, stack)
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  usePageScroll(scrollerRef, page)
   const barRef = useRef<HTMLElement>(null)
-  const tucked = useTuckOnScroll(barRef, true, `${view}:${stack.length}`)
+  const tucked = useTuckOnScroll(barRef, true, page)
   const today = d.today
   const day = date ?? today
   const live = d.bookings
@@ -225,7 +230,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
       {d.viewingAs ? <ViewingAsBanner name={d.viewingAs} /> : null}
       {/* The first open asks once whether this phone gets notifications (2026-10-11, the user). */}
       {!d.viewingAs ? <PushAsk app="hr" save={actions.pushSave} trouble={actions.pushTrouble} onState={setPushNow} /> : null}
-      <div className={s.scroller}>
+      <div ref={scrollerRef} className={s.scroller}>
         <header className={s.head}>
           {stack.length > 0 ? (
             <button type="button" className={s.back} onClick={pop} aria-label="Back">

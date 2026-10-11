@@ -1239,7 +1239,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         <ProductsDock items={quote.items} itemsText={itemsText(quote.cart, quote.catalog.name)} open={quote.cartOpen} onBag={quote.toggleCart} onSetPrice={toCalc} />
       )}
       {route.screen === "calc" && quote.catalog && <CalcDock ready={!!customer} onPreview={() => { if (customer) quote.setPreviewOpen(true); }} />}
-      <BottomNav active={route.screen} android={android} live={live} hidden={hiddenScreens} onGo={goScreen} onQuote={() => openSheet("brand")} />
+      <BottomNav active={route.screen} page={`${route.screen}/${route.pf ?? ""}/${route.ins}/${route.arena}/${route.board}`} android={android} live={live} hidden={hiddenScreens} onGo={goScreen} onQuote={() => openSheet("brand")} />
       <SubDeptSheet open={sheet === "sd"} options={subOptions} current={membership?.id ?? ""} onClose={() => setSheet(null)}
         onPick={id => { setSheet(null); go({ department: id, staff: principal ? route.staff : "" }); }} />
       <Notifications open={nfOpen} summary={nfSummaryVM} tab={nfTab} groups={nfGroupsVM}

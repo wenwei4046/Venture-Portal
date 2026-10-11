@@ -66,24 +66,22 @@ self.addEventListener('push', (event) => {
 })
 
 /*
- * A tap brings the app forward FIRST and only then takes it to the notice's
- * place: the right to bring a window forward lasts only a moment after the tap,
- * and the first version loaded the page before asking — on the user's phone the
- * moment had passed and the tap seemed to do nothing (2026-10-11). The window
- * used most recently comes forward (matchAll lists it first) — it is one app,
- * whichever face it shows; with none open, the app opens at the url.
+ * A tap opens the notice's place in the installed app (2026-10-11), always
+ * through openWindow: Chrome on Android hands a url inside an installed app's
+ * scope to that app and makes it go there even when it is already open
+ * (ServiceTabLauncher: findFirstWebApkPackage, forceNavigation = true); an
+ * iPhone opens it in the Home Screen app, the only place its pushes arrive.
+ *
+ * Twice the same day a tap went wrong by reusing an open window instead:
+ * loading the page before focusing it let the moment a tap allows for focusing
+ * pass (the tap seemed to do nothing), and focusing the most recently used
+ * window brought a Chrome TAB forward — clients.matchAll lists the browser's
+ * tabs of this site too, and nothing tells a tab from the installed app.
  */
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const url = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href
-  event.waitUntil(
-    (async () => {
-      const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      const front = open.length ? await open[0].focus().catch(() => null) : null
-      if (!front) return self.clients.openWindow(url)
-      if (front.url !== url) await front.navigate(url).catch(() => undefined)
-    })(),
-  )
+  event.waitUntil(self.clients.openWindow(url))
 })
 
 self.addEventListener('fetch', (event) => {

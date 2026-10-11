@@ -225,7 +225,7 @@ describe('the HR app’s tab bar while reading on (2026-10-11)', () => {
     let top = 0
     Object.defineProperty(page, 'clientHeight', { configurable: true, get: () => 600 })
     Object.defineProperty(page, 'scrollHeight', { configurable: true, get: () => 2000 })
-    Object.defineProperty(page, 'scrollTop', { configurable: true, get: () => top })
+    Object.defineProperty(page, 'scrollTop', { configurable: true, get: () => top, set: (v: number) => { top = v } })
     const at = (y: number) => { top = y; act(() => { page.dispatchEvent(new Event('scroll')) }) }
     at(0)
     at(200)
@@ -237,6 +237,8 @@ describe('the HR app’s tab bar while reading on (2026-10-11)', () => {
     expect(nav).toHaveAttribute('data-tucked')
     fireEvent.click(within(nav).getByRole('button', { name: 'Rooms' }))
     expect(nav).not.toHaveAttribute('data-tucked')
+    // …and the page it opens starts at its top (the user: "每次点进去都从最上面开始").
+    expect(top).toBe(0)
     vi.restoreAllMocks()
   })
 })
