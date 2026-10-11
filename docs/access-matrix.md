@@ -4,6 +4,15 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-12 — Change password, a login of one's own only
+Not a cell of the matrix, and no template grants it: whoever signs in with a login a People
+record names (every login Invite user makes) changes its own password — Admin › Change
+password in the portal, More in the HR app, Profile in the Revenue app — with the current
+password, then the new one twice. The four shared accounts (principal@, finance@, hr@,
+marketing@) never can (the user: "just for that personal acc"): several people sign in with
+each. Nobody does while viewing the portal as somebody. The database answers which kind a
+login is for the caller only (`my_login_is_personal()`, mig `20261012000000`).
+---
 ⚡ AMENDMENT 2026-10-11 — Documentation, Hiring, Meeting rooms and the Guest link (HR revamp round 2)
 Four new rows, every reach All. Documentation: View · Create (upload a document, file a
 letter, publish a memo or letter) · Edit (remove a document, the letter types). Hiring:

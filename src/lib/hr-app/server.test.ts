@@ -6,6 +6,8 @@ vi.mock('@/lib/member/server', () => ({ adminMemberAction: vi.fn() }))
 vi.mock('@/lib/rooms/read', () => ({ readRoomsPeople: vi.fn(), readRoomsRange: vi.fn() }))
 vi.mock('@/lib/documentation/server', () => ({ loadDocumentation: vi.fn() }))
 vi.mock('@/lib/hiring/board', () => ({ loadHiringBoard: vi.fn() }))
+// Whether the login is a person's own (2026-10-12): More's Change password.
+vi.mock('@/lib/account/personal-login', () => ({ loginIsPersonal: vi.fn(async () => true) }))
 
 import type { HiringRequest, HiringTalent } from '@/lib/hiring/types'
 import type { MemberRequest } from '@/lib/member/types'
@@ -151,8 +153,10 @@ describe('viewing the app as somebody (the roles audit, 2026-10-11)', () => {
 
     const viewing = await loadHrAppData(hrUser({ name: 'Nurul Huda', viewingAs: { id: 'u2', name: 'Nurul Huda' } }))
     expect(viewing).toMatchObject({ greetName: 'Nurul', viewingAs: 'Nurul Huda', meId: null })
+    // Never somebody else's password from their screen (2026-10-12).
+    expect(viewing.personalLogin).toBe(false)
 
     const own = await loadHrAppData(hrUser({}))
-    expect(own).toMatchObject({ greetName: 'Principal', viewingAs: null, meId: 'p1' })
+    expect(own).toMatchObject({ greetName: 'Principal', viewingAs: null, meId: 'p1', personalLogin: true })
   })
 })

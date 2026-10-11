@@ -148,6 +148,16 @@ export function canAccessGuestLink(u: PermissionHolder): boolean {
   return can(u, 'guest_link')
 }
 
+/**
+ * Change password (2026-10-12 — the user: "just for that personal acc"): a login a person on the
+ * People roster holds, never a shared account (principal@, finance@, hr@, marketing@) — no key
+ * decides it, the layout reads it (`personalLogin`, lib/account/personal-login.ts). Never while the
+ * portal is viewed as somebody: their screen, a read-only session.
+ */
+export function canChangePassword(u: { personalLogin?: boolean; viewingAs?: unknown }): boolean {
+  return u.personalLogin === true && !u.viewingAs
+}
+
 export function canAccessAuditLog(u: PermissionHolder): boolean {
   // The whole history, and Audit Log › Access (who read what).
   return can(u, 'audit_log')

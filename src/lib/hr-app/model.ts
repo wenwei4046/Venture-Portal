@@ -168,6 +168,11 @@ export interface HrAppData {
    * views a person (the banner ends that).
    */
   views?: { current: HrAppView } | null
+  /**
+   * The login is a person's own, not a shared account like hr@ (2026-10-12): More offers Change password.
+   * Never while viewing as somebody. Absent reads as shared.
+   */
+  personalLogin?: boolean
 }
 
 /** A view of the one app (setViewAs): the portal as the Principal or Finance, this app, the Revenue app. */

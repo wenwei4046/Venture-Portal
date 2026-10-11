@@ -110,6 +110,14 @@ const NAV = {
       <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
     </>
   ),
+  // Change password (2026-10-12): a padlock in the set's own hand.
+  lock: (
+    <>
+      <rect x="5" y="10.5" width="14" height="10" rx="2" />
+      <path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" />
+      <path d="M12 14.5v2" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>
 
 const CARD = {

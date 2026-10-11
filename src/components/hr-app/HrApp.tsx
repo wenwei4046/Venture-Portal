@@ -10,6 +10,8 @@ import tuck from '@/components/pwa/tuck.module.css'
 import { pageKeyOf, usePageScroll } from './page-scroll'
 import { Select } from '@/components/hrv/select'
 import ViewingAsBanner from '@/components/layout/ViewingAsBanner'
+import { PASSWORD_CHANGED, useChangePassword, type ChangePassword } from '@/components/account/use-change-password'
+import { MIN_PASSWORD_LENGTH } from '@/lib/account/password'
 import {
   CAND_STAGE, CHIP, HIRE_FILTERS, HR_APP_VIEWS, MAJOR_EVENTS, MEMBER_KIND, ORANGE, SLATE,
   bookingTimes, budgetLabel, candChip, clashOf, dayLabel, daysToFill, hireChip, hm, hourFrom, initials, isPendingHire,
@@ -49,6 +51,8 @@ export interface HrAppActions {
   pushTrouble: PushTrouble
   /** Another view of the one app (setViewAs): it opens where that view lives. */
   switchView(view: HrAppView): void
+  /** This login's own password (2026-10-12): the current one, then the new one twice — a personal login only. */
+  changePassword: ChangePassword
   /** After a write: read the app's data again. */
   refresh(): void
 }
@@ -72,6 +76,7 @@ type Sheet =
   | { k: 'book' }
   | { k: 'booking'; id: string }
   | { k: 'approve'; id: string }
+  | { k: 'password' }
 
 type Form = Record<string, string | string[] | number | undefined>
 
@@ -396,6 +401,19 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
                   <span className={s.moreIcon} style={{ background: 'rgb(255 240 228)', color: 'rgb(189 74 25)' }}>●</span>
                   <span className={s.grow}><span className={s.moreTitle}>Phone notifications</span><span className={s.moreSub}>{pushNow ? PUSH_WORDS[pushNow] : '…'}</span></span>
                   <span className={s.pushSwitch} data-on={pushNow === 'on' ? '1' : undefined} aria-hidden="true" />
+                </button>
+              ) : null}
+              {/* Not in the handoff (2026-10-12 — the user: a change password "in their profile tab", "just for that
+                  personal acc"): a login of their own only, never hr@ or another shared one, never while viewing as. */}
+              {d.personalLogin && !d.viewingAs ? (
+                <button type="button" className={s.moreRow} onClick={() => openSheet({ k: 'password' })}>
+                  <span className={s.moreIcon} style={{ background: 'rgb(238 235 231)', color: 'rgb(90 78 68)' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3M12 14.5v2" />
+                    </svg>
+                  </span>
+                  <span className={s.grow}><span className={s.moreTitle}>Change password</span><span className={s.moreSub}>The current one, then a new one twice</span></span>
+                  <Chevron />
                 </button>
               ) : null}
             </section>
@@ -912,6 +930,51 @@ function SelectField({ label, value, onChange, options }: { label: string; value
   )
 }
 
+/**
+ * More › Change password's sheet (2026-10-12): the current password, the new one, the new one again —
+ * the portal's own rules and action (lib/account). Done, it says so and closes on Done.
+ */
+function PasswordForm({ change, close, onBusy }: { change: ChangePassword; close: () => void; onBusy: (busy: boolean) => void }) {
+  const f = useChangePassword(change)
+  const type = f.shown ? 'text' : 'password'
+  // While it is being sent the sheet stays (its scrim and Cancel wait): the answer is said here (the review, 2026-10-12).
+  useEffect(() => { onBusy(f.busy) }, [f.busy, onBusy])
+  useEffect(() => () => onBusy(false), [onBusy])
+  const go = { borderColor: ORANGE, background: ORANGE, color: 'rgb(43 31 23)' }
+  if (f.done) {
+    return (
+      <>
+        <p className={s.replNote} role="status">{PASSWORD_CHANGED}</p>
+        <div className={s.btnRow}>
+          <button type="button" className={s.formBtn} style={{ ...go, flex: 1 }} onClick={close}>Done</button>
+        </div>
+      </>
+    )
+  }
+  return (
+    <form className={s.pwForm} noValidate onSubmit={e => { e.preventDefault(); f.submit() }}>
+      <Field label="Current password">
+        <input className={s.input} type={type} autoComplete="current-password" spellCheck={false} value={f.form.current} onChange={e => f.set('current')(e.target.value)} />
+      </Field>
+      <Field label={`New password · at least ${MIN_PASSWORD_LENGTH} characters`}>
+        <input className={s.input} type={type} autoComplete="new-password" spellCheck={false} value={f.form.next} onChange={e => f.set('next')(e.target.value)} />
+      </Field>
+      <Field label="Confirm new password">
+        <input className={s.input} type={type} autoComplete="new-password" spellCheck={false} value={f.form.confirm} onChange={e => f.set('confirm')(e.target.value)} />
+      </Field>
+      <label className={s.pwShow}>
+        <input type="checkbox" checked={f.shown} onChange={e => f.setShown(e.target.checked)} />
+        Show passwords
+      </label>
+      {f.error ? <span className={s.formErr} role="alert">{f.error}</span> : null}
+      <div className={s.btnRow}>
+        <button type="button" className={s.formBtn} style={{ borderColor: 'rgb(222 214 203)', background: 'rgb(255 255 255)', color: 'rgb(43 31 23)', flex: 1 }} onClick={close} disabled={f.busy}>Cancel</button>
+        <button type="submit" className={s.formBtn} style={{ ...go, flex: 2 }} disabled={f.busy}>{f.busy ? 'Changing…' : 'Change password'}</button>
+      </div>
+    </form>
+  )
+}
+
 function SheetView(p: {
   d: HrAppData
   sheet: Sheet
@@ -932,6 +995,8 @@ function SheetView(p: {
   live: HrBooking[]
 }) {
   const { d, sheet: sh, hr, day, form: F, setForm, formErr, setFormErr, busy, arm, setArm, close, pop, run, actions, live } = p
+  // A send in flight (Change password): its scrim does not close it until the answer is in.
+  const [locked, setLocked] = useState(false)
   const set = (k: string) => (v: string) => { setForm({ ...F, [k]: v }); setFormErr('') }
   const str = (k: string) => (F[k] == null ? '' : String(F[k]))
   const outline = { borderColor: 'rgb(222 214 203)', background: 'rgb(255 255 255)', color: 'rgb(43 31 23)' }
@@ -982,6 +1047,12 @@ function SheetView(p: {
         </div>
       </>
     )
+  }
+
+  // More › Change password (2026-10-12): its boxes keep their own state, so a sheet closed and opened starts empty.
+  if (sh.k === 'password') {
+    title = 'Change password'
+    body = <PasswordForm change={actions.changePassword} close={close} onBusy={setLocked} />
   }
 
   if (sh.k === 'ack' && hr) {
@@ -1145,7 +1216,7 @@ function SheetView(p: {
 
   return (
     <>
-      <div className={s.scrim} onClick={close} aria-hidden="true" />
+      <div className={s.scrim} onClick={locked ? undefined : close} aria-hidden="true" />
       <div className={s.sheet} role="dialog" aria-modal="true" aria-label={title}>
         <span className={s.grab} aria-hidden="true" />
         <div className={s.sheetTitle}>{title}</div>

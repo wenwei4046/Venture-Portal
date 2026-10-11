@@ -187,11 +187,13 @@ export type PageRoute = keyof typeof PAGE_TABS
 
 /**
  * Pages no tab closes: the Overview, where every refused gate lands; a request's
- * own approval pages, opened by whoever it involves; and the old addresses that
- * only send on to a page that asks for itself.
+ * own approval pages, opened by whoever it involves; the old addresses that
+ * only send on to a page that asks for itself; and Admin › Change password,
+ * every personal login's own (2026-10-12 — it asks for that itself).
  */
 export const OPEN_PAGES: ReadonlySet<string> = new Set([
   '/dashboard',
+  '/admin/password',
   '/approvals/[id]',
   '/approvals/payroll-run/[id]',
   '/billing',

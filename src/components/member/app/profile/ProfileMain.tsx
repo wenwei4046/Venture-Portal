@@ -32,6 +32,11 @@ export interface ProfileMainActions {
   signOut: () => void;
   /** A Principal not viewing anybody yet: the way into View as. */
   viewAs?: () => void;
+  /**
+   * Change password (2026-10-12 — the user: "in their profile tab", "just for that personal acc"): present only for a
+   * login of their own, never a shared one, never while viewing a member, never on the preview's demo.
+   */
+  changePassword?: () => void;
 }
 
 const NO_ROWS: readonly WorkKey[] = [];
@@ -142,6 +147,15 @@ export default function ProfileMain({ vm, hidden, actions, crm = true, closedRow
             <h2 className={s.h2}>Privacy</h2>
             <button className={s.hideBtn} onClick={actions.toggleHide}>
               {hidden ? "Show income amounts" : "Hide income amounts"}<Svg d={hidden ? ICON.eyeOff : ICON.eye} size={20} sw={1.7} />
+            </button>
+          </section>
+        ) : null}
+        {/* Not in the prototype (2026-10-12): the login's own password, drawn as Privacy's button. */}
+        {actions.changePassword ? (
+          <section className={s.privacy} aria-label="Account">
+            <h2 className={s.h2}>Account</h2>
+            <button className={s.hideBtn} onClick={actions.changePassword}>
+              Change password<Svg d={ICON.lock} size={20} sw={1.7} />
             </button>
           </section>
         ) : null}

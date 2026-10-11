@@ -65,6 +65,8 @@ import { snapshotIncome, type DepartmentIncome, type IncomeMonth, type MemberInc
 import HonoursPage, { HonourSheet } from "./profile/HonoursPage";
 import BrandWeeksPage from "./profile/BrandWeeksPage";
 import SchemeSheet from "./profile/SchemeSheet";
+import PasswordSheet from "./profile/PasswordSheet";
+import type { ChangePassword } from "@/components/account/use-change-password";
 import { schemeVM } from "./profile/scheme-model";
 import { brandMonthVM, picksToSave } from "./profile/brand-weeks-model";
 import TeamPage, { PersonSheet } from "./profile/TeamPage";
@@ -108,6 +110,12 @@ export interface RevenueAppProps {
   closed?: AppClosed;
   /** What the database told them (2026-10-11, mig 20261011180000) — the bell's UPDATES. None for the Principal. */
   notices?: Notices;
+  /**
+   * Profile › Change password (2026-10-12): the portal's own action (lib/account/actions.ts), handed in by the layout
+   * only for a login that is a person's own, never a shared account (lib/account/personal-login.ts). Absent on the
+   * previews.
+   */
+  changePassword?: ChangePassword;
   /** A preview draws the prototype's device around the app. */
   device?: Device;
   /** Fixtures: a fixed "today" and the source the preview reads. */
@@ -172,7 +180,7 @@ function useDesk(ref: RefObject<HTMLDivElement | null>): boolean {
 
 const NO_NOTICES: Notices = { unread: 0, items: [] };
 
-export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
+export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
   // The live app keeps its answers on the phone, per account (2026-10-08, read-memory.ts): the next open shows them
   // at once and reads everything again behind them.
   const account = initialData.demo ? "" : initialData.profile.userId;
@@ -237,6 +245,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const [honPlace, setHonPlace] = useState<number | null>(null);
   const [personPick, setPersonPick] = useState<string | null>(null);
   const [schemeOpen, setSchemeOpen] = useState(false);
+  // Profile › Change password's sheet (2026-10-12).
+  const [pwOpen, setPwOpen] = useState(false);
   const [reqFilter, setReqFilter] = useState<RequestFilter>("all");
   const [reqPick, setReqPick] = useState<string | null>(null);
   const [reqForm, setReqForm] = useState<RequestKindVM | null>(null);
@@ -254,7 +264,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const [incPeriod, setIncPeriod] = useState<string | null>(null);
   const closeProfileSheets = useCallback(() => {
     setCoPick(null); setHonPlace(null); setPersonPick(null); setReqPick(null); setReqForm(null); setMemoPick(null); setReqError(null); setMemoError(null); setPfDateOpen(false);
-    setSchemeOpen(false);
+    setSchemeOpen(false); setPwOpen(false);
   }, []);
 
   useEffect(() => {
@@ -1049,7 +1059,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
 
   // ── layout ──
   const quotePanel = quote.sheet !== null || quote.cartOpen || quote.allOpen || quote.previewOpen;
-  const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPick !== null || pfDateOpen || schemeOpen);
+  const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPick !== null || pfDateOpen || schemeOpen || pwOpen);
+  // Change password: the login is a person's own (the layout hands the action only then), and it is their own Profile —
+  // not a member viewed, not the demo.
+  const ownPassword = changePassword && !viewed && !data.demo && !fixture ? changePassword : null;
   const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel || profilePanel;
   // A pull only from the page itself — never while a sheet is up — and never on the preview's fixtures,
   // nor on the Product List, which holds its edits until Save.
@@ -1207,6 +1220,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         toggleHide: incomeShut ? undefined : () => setHidden(!hidden),
         signOut,
         viewAs: principal && !viewed ? () => setVaOpen(true) : undefined,
+        changePassword: ownPassword ? () => setPwOpen(true) : undefined,
       }} views={live && !desk && principal && !viewed ? { current: "revenue", pick: pickModule } : null} />;
     }
   } else {
@@ -1314,6 +1328,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
           )}
           {route.pf === "memos" && <MemoSheet open={memoPick !== null} memo={memoPickVM} busy={memoBusy} readOnly={readOnlyView} error={memoError} onAck={() => void ackMemo()} onClose={() => setMemoPick(null)} />}
           {!route.pf && shows(closed, "scheme") && <SchemeSheet open={schemeOpen} vm={schemeView} onClose={() => setSchemeOpen(false)} />}
+          {!route.pf && ownPassword && <PasswordSheet open={pwOpen} onClose={() => setPwOpen(false)} change={ownPassword} />}
         </>
       )}
       {principal && <ViewAsPage open={vaOpen} query={vaQuery} groups={vaGroups} onQuery={setVaQuery} onPick={pickVa} onClose={() => setVaOpen(false)} />}
