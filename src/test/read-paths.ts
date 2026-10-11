@@ -196,6 +196,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_sub_department_requests',
   // Sales Groups › Waiting list's flow (mig 20261010140000): each asks member_is_manager (the form also lets in member_requests).
   'member_waiting_form', 'member_save_waiting_form', 'member_fail_waiting', 'member_waiting_transfer',
+  // …and the Replacement list's form (mig 20261011130000), the same gates.
+  'member_replacement_form', 'member_save_replacement_form',
   // Member services' readers (mig 20261010160000): member_requests_manage / member_memos_manage.
   'member_admin_request_facts', 'member_memo_reads',
   // People › Documentation (mig 20261011070000): each asks has_any_action for its Documentation cell; the

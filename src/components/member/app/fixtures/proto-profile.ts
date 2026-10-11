@@ -9,7 +9,7 @@ import type {
   ProfileMainVM, RequestDetailVM, RequestRowVM, TeamVM, Tone, TrackVM, VaGroupVM,
 } from "../profile/profile-vm";
 import type { FormOptions } from "../profile/RequestForm";
-import { BUILT_FORM_NAME, BUILTIN_FIELDS } from "@/lib/commission/waiting-form";
+import { BUILT_FORM_NAME, BUILTIN_FIELDS, REPLACEMENT_BUILTIN_FIELDS, REPLACEMENT_FORM_NAME } from "@/lib/commission/waiting-form";
 import { EDIT_FIELDS } from "@/lib/member/request-edit";
 import { ordinal, rm, rm2 } from "../format";
 
@@ -355,6 +355,11 @@ export function protoProfile(opts: { track?: boolean } = {}): ProfileFixture {
         { id: "ic", label: "IC number", type: "text", required: true, placeholder: "e.g. 900101-14-5678" },
         { id: "heard", label: "How did they hear about us", type: "dropdown", required: false, options: ["Referral", "Roadshow", "Social media", "Walk-in"] },
         { id: "transport", label: "Has own transport", type: "yesno", required: false },
+      ] } },
+      // The handoff's v1 replacement form (README 18.5): the five built-ins, then "Handover done?".
+      replacementForm: { form: { version: 1, requireUpload: false, templatePath: null, templateName: REPLACEMENT_FORM_NAME, createdAt: null, fields: [
+        ...REPLACEMENT_BUILTIN_FIELDS,
+        { id: "q_handover", label: "Handover done?", type: "yesno", required: false },
       ] } },
     },
   };

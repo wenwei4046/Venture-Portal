@@ -101,12 +101,6 @@ export function revisionForm(r: Pick<MemberRequest, "id" | "kind" | "detail">, v
     form.set("consent", "true");
     form.set("signature", str(d.signature));
     if (str(d.signatureImage)) form.set("signatureImage", str(d.signatureImage));
-    if (typeof d.formVersion === "number") form.set("formVersion", String(d.formVersion));
-    if (Array.isArray(d.answers)) form.set("answers", JSON.stringify(d.answers));
-    if (str(d.signedFormName) && str(d.signedFormHash)) {
-      form.set("signedFormName", str(d.signedFormName));
-      form.set("signedFormHash", str(d.signedFormHash));
-    }
   } else {
     form.set("originalStaffId", str(d.originalStaffId));
     form.set("destination", str(d.destination));
@@ -116,6 +110,14 @@ export function revisionForm(r: Pick<MemberRequest, "id" | "kind" | "detail">, v
     form.set("newPerson", v("newPerson"));
     form.set("effective", v("effective"));
     form.set("reason", v("reason"));
+  }
+  // HR's answers and the signed form ride along unchanged — a waiting list's
+  // since 2026-10-10, a replacement's since 2026-10-11 (its own Form settings).
+  if (typeof d.formVersion === "number") form.set("formVersion", String(d.formVersion));
+  if (Array.isArray(d.answers)) form.set("answers", JSON.stringify(d.answers));
+  if (str(d.signedFormName) && str(d.signedFormHash)) {
+    form.set("signedFormName", str(d.signedFormName));
+    form.set("signedFormHash", str(d.signedFormHash));
   }
   return form;
 }

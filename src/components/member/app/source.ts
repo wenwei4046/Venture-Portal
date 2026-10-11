@@ -8,8 +8,8 @@ import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { ArenaWeekPicks, ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
 import {
-  acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberWaitingFormLink, submitMemberRequest,
-  type fetchDepartmentIncome, type fetchMemberCatalogue, type fetchMemberClaimRates, type fetchMemberWaitingForm, type fetchMemberWaitingQueue, type fetchMemberHonours, type fetchMemberIncome, type fetchMemberInsight,
+  acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberReplacementFormLink, fetchMemberWaitingFormLink, submitMemberRequest,
+  type fetchDepartmentIncome, type fetchMemberCatalogue, type fetchMemberClaimRates, type fetchMemberReplacementForm, type fetchMemberWaitingForm, type fetchMemberWaitingQueue, type fetchMemberHonours, type fetchMemberIncome, type fetchMemberInsight,
   type fetchMemberInsightRange, type fetchMemberOrderBook, type fetchMemberOrgMap, type fetchMemberRequestHistory, type fetchPrincipalMemoReceipts,
   type refreshMemberData,
 } from "@/app/(member)/member/actions";
@@ -63,6 +63,7 @@ export const ask = {
   memoReceipts: (staffId: string): MemberRead => ({ kind: "memoReceipts", staffId }),
   claimRates: (): MemberRead => ({ kind: "claimRates" }),
   waitingForm: (): MemberRead => ({ kind: "waitingForm" }),
+  replacementForm: (): MemberRead => ({ kind: "replacementForm" }),
   waitingQueue: (context?: Pick<MemberReadContext, "staffId">): MemberRead => ({ kind: "waitingQueue", context: context ? { staffId: context.staffId } : undefined }),
   requestHistory: (id: string): MemberRead => ({ kind: "requestHistory", id }),
   catalogue: (): MemberRead => ({ kind: "catalogue" }),
@@ -102,6 +103,10 @@ export interface RevenueSource {
   waitingForm?(): Promise<Outcome<MemberWaitingForm>>;
   /** Download form: a fresh link to HR's uploaded application form — null when the app builds it. Never kept. */
   waitingFormLink?(): Promise<Outcome<{ url: string; name: string } | null>>;
+  /** The replacement form HR set (2026-10-11, round 2's README 18.5). */
+  replacementForm?(): Promise<Outcome<MemberWaitingForm>>;
+  /** Download form on a replacement — the waiting list's way. Never kept. */
+  replacementFormLink?(): Promise<Outcome<{ url: string; name: string } | null>>;
   /** Waiting list & replacements: the member's sub-departments' waiting lists, in acceptance order. */
   waitingQueue?(context?: Pick<MemberReadContext, "staffId">): Promise<Outcome<WaitingQueue[]>>;
   /** My income: one month as Comm Cal works it out (live until the close), and the months paid. */
@@ -196,6 +201,8 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     },
     waitingForm: () => go<Answer<typeof fetchMemberWaitingForm>>(ask.waitingForm()),
     waitingFormLink: () => fetchMemberWaitingFormLink(),
+    replacementForm: () => go<Answer<typeof fetchMemberReplacementForm>>(ask.replacementForm()),
+    replacementFormLink: () => fetchMemberReplacementFormLink(),
     waitingQueue: context => go<Answer<typeof fetchMemberWaitingQueue>>(ask.waitingQueue(context)),
     memoReceipts: staffId => go<Answer<typeof fetchPrincipalMemoReceipts>>(ask.memoReceipts(staffId)),
     income: (subDepartmentId, period, context) => go<Answer<typeof fetchMemberIncome>>(ask.income(subDepartmentId, period, context)),

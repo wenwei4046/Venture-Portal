@@ -7,6 +7,7 @@ import {
   fetchMemberCatalogue,
   fetchMemberClaimRates,
   fetchMemberWaitingForm,
+  fetchMemberReplacementForm,
   fetchMemberWaitingQueue,
   fetchMemberHonours,
   fetchMemberIncome,
@@ -39,6 +40,7 @@ export type MemberRead =
   | { kind: "memoReceipts"; staffId: string }
   | { kind: "claimRates" }
   | { kind: "waitingForm" }
+  | { kind: "replacementForm" }
   | { kind: "waitingQueue"; context?: Pick<MemberReadContext, "staffId"> }
   | { kind: "requestHistory"; id: string }
   | { kind: "rooms"; from: string; to: string }
@@ -82,6 +84,7 @@ function readOne(read: MemberRead): Promise<unknown> {
     case "memoReceipts": return fetchPrincipalMemoReceipts(read.staffId);
     case "claimRates": return fetchMemberClaimRates();
     case "waitingForm": return fetchMemberWaitingForm();
+    case "replacementForm": return fetchMemberReplacementForm();
     case "waitingQueue": return fetchMemberWaitingQueue(read.context);
     case "requestHistory": return fetchMemberRequestHistory(read.id);
     case "rooms": return fetchMemberRooms(read.from, read.to);

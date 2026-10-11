@@ -5,8 +5,8 @@ import { SecLabel, Toggle, btn } from '@/components/hrv/kit'
 import { Drawer } from '@/components/hrv/overlay'
 import { flash } from '@/components/hrv/toast'
 import {
-  BUILT_FORM_NAME,
   FIELD_TYPES,
+  FORM_KINDS,
   addQuestion,
   applicationFormHtml,
   cleanedFields,
@@ -17,11 +17,28 @@ import {
   withOption,
   withType,
   withoutOption,
+  type MemberFormKind,
   type WaitingField,
   type WaitingForm,
 } from '@/lib/commission/waiting-form'
-import { saveWaitingForm, waitingFormTemplateLink } from '../../../waiting-actions'
+import { replacementFormTemplateLink, saveReplacementForm, saveWaitingForm, waitingFormTemplateLink } from '../../../waiting-actions'
 import w from './waiting.module.css'
+
+/** The drawer's words for each list (the handoff: fKind / fDesc). */
+const WORDS: Readonly<Record<MemberFormKind, { list: string; desc: string; on: string; saved: (v: number) => string }>> = {
+  waiting: {
+    list: 'Waiting list',
+    desc: 'What the Revenue team fills in when they submit a waiting list.',
+    on: 'Uploaded on the waiting list',
+    saved: v => `Waiting-list form saved as v${v}`,
+  },
+  replacement: {
+    list: 'Replacement list',
+    desc: 'What the Revenue team fills in when they submit a replacement.',
+    on: 'Uploaded on the replacement list',
+    saved: v => `Replacement form saved as v${v} — the Revenue app uses it from now on`,
+  },
+}
 
 /**
  * Waiting list › Form settings (2026-10-10, the HR revamp): what the Revenue
@@ -31,12 +48,16 @@ import w from './waiting.module.css'
  * upload the signed form. Save makes the next version — the form members
  * filled in before keeps its own.
  *
+ * The Replacement list's is the same drawer (2026-10-11, round 2's README
+ * 18.5), its five built-ins and its own versions — `kind="replacement"`.
+ *
  * Mounted only while open, so every opening starts from the saved form.
  */
 export default function WaitingFormSettings({
   form,
   subName,
   subOptions,
+  kind = 'waiting',
   onClose,
   onSaved,
 }: {
@@ -44,9 +65,12 @@ export default function WaitingFormSettings({
   subName: string
   /** The department's sub-departments — the built-in "Preferred sub-department" offers them. */
   subOptions: string[]
+  kind?: MemberFormKind
   onClose: () => void
   onSaved: (form: WaitingForm) => void
 }) {
+  const words = WORDS[kind]
+  const builtName = FORM_KINDS[kind].formName
   const [fields, setFields] = useState<WaitingField[]>(() => form.fields.map(f => ({ ...f, ...(f.options ? { options: [...f.options] } : {}) })))
   const [requireUpload, setRequireUpload] = useState(form.requireUpload)
   const [useBuiltForm, setUseBuiltForm] = useState(false)
@@ -69,7 +93,7 @@ export default function WaitingFormSettings({
   async function download() {
     setError(null)
     if (uploaded) {
-      const link = await waitingFormTemplateLink()
+      const link = kind === 'replacement' ? await replacementFormTemplateLink() : await waitingFormTemplateLink()
       if (!link.ok) {
         setError(link.reason)
         return
@@ -78,12 +102,13 @@ export default function WaitingFormSettings({
       return
     }
     const html = applicationFormHtml(
-      { version: changed ? form.version + 1 : form.version, fields: cleanedFields(fields), templateName: BUILT_FORM_NAME },
+      { version: changed ? form.version + 1 : form.version, fields: cleanedFields(fields), templateName: builtName },
       subName,
       subOptions,
+      kind,
     )
     const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
-    clickLink(url, BUILT_FORM_NAME)
+    clickLink(url, builtName)
     setTimeout(() => URL.revokeObjectURL(url), 2000)
   }
 
@@ -96,21 +121,22 @@ export default function WaitingFormSettings({
       return
     }
     const cleaned = cleanedFields(fields)
-    const refused = waitingFormRefusal(cleaned)
+    const refused = waitingFormRefusal(cleaned, kind)
     if (refused) {
       setError(refused)
       return
     }
     setBusy(true)
     setError(null)
-    const done = await saveWaitingForm({ fields: cleaned, requireUpload, useBuiltForm })
+    const draft = { fields: cleaned, requireUpload, useBuiltForm }
+    const done = kind === 'replacement' ? await saveReplacementForm(draft) : await saveWaitingForm(draft)
     setBusy(false)
     if (!done.ok) {
       setError(done.reason)
       return
     }
     onSaved(done.form)
-    flash(`Waiting-list form saved as v${done.form.version}`)
+    flash(words.saved(done.form.version))
     onClose()
   }
 
@@ -119,9 +145,9 @@ export default function WaitingFormSettings({
       open
       onClose={onClose}
       width={600}
-      eyebrow={`Waiting list · v${form.version}`}
+      eyebrow={`${words.list} · v${form.version}`}
       title="Form settings"
-      sub="What the Revenue team fills in when they submit a waiting list."
+      sub={words.desc}
       bodyStyle={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}
       footer={
         <>
@@ -192,7 +218,11 @@ export default function WaitingFormSettings({
                 </div>
               )}
               {f.builtin && f.type === 'dropdown' ? (
-                <div className={w.builtinOptions}>Options: {subOptions.join(' · ') || '—'} (from the sub-departments)</div>
+                kind === 'waiting' && f.id === 'target' ? (
+                  <div className={w.builtinOptions}>Options: {subOptions.join(' · ') || '—'} (from the sub-departments)</div>
+                ) : (
+                  <div className={w.builtinOptions}>Options: {(f.options ?? []).join(' · ') || '—'}</div>
+                )
               ) : null}
               {!f.builtin && f.type === 'dropdown' ? (
                 <div className={w.options}>
@@ -236,11 +266,11 @@ export default function WaitingFormSettings({
         <div className={w.formRow}>
           <span className={w.paper} aria-hidden="true" />
           <div className={w.formText}>
-            <div className={w.formName}>{uploaded ? form.templateName : BUILT_FORM_NAME}</div>
+            <div className={w.formName}>{uploaded ? form.templateName : builtName}</div>
             <div className={w.formSub}>
               {uploaded ? (
                 <>
-                  Uploaded on the waiting list · members download this file ·{' '}
+                  {words.on} · members download this file ·{' '}
                   <button type="button" onClick={() => setUseBuiltForm(true)}>
                     use the built form
                   </button>
