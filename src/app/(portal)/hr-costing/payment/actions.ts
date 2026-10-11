@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction, requireAnyAction } from '@/lib/auth'
+import { requireActionOn, requireAnyActionOn } from '@/lib/auth'
 import { needsTick, sees } from '@/lib/sensitive'
 import type { SalaryComponentSelection } from '@/lib/payment-cycle'
 
@@ -32,7 +32,7 @@ export async function generateStatutorySelection(
   paymentDate?: string,
   expected?: { total: number; voucherCount: number },
 ): Promise<DisbursementResult> {
-  await requireAction('hr_costing', 'create')
+  await requireActionOn('/hr-costing/payment', 'hr_costing', 'create')
   if (!/^\d{4}-\d{2}-01$/.test(period)) throw new Error('Choose a payroll month')
   if (paymentDate && !/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) throw new Error('Invalid payment date')
   if (!Array.isArray(schemes) || schemes.length === 0 || schemes.some(s => !['KWSP', 'SOCSO', 'EIS', 'PCB', 'SKBBK'].includes(s)) || new Set(schemes).size !== schemes.length) throw new Error('Choose valid contribution schemes')
@@ -71,7 +71,7 @@ export async function createPayrollDisbursement(
   payrollRowIds: string[] | null = null,
   componentSelections: SalaryComponentSelection[] | null = null,
 ): Promise<DisbursementResult> {
-  const user = await requireAction('hr_costing', 'create')
+  const user = await requireActionOn('/hr-costing/payment', 'hr_costing', 'create')
   // A salary PV carries each person's account number, and the preview it is
   // checked against showed them (2026-10-09, PR4): Bank accounts ticked. The
   // database refuses it too (create_payroll_disbursement_vouchers).
@@ -141,7 +141,7 @@ export async function generateStatutoryScheme(
   scheme: StatutoryScheme,
   paymentDate?: string,
 ): Promise<void> {
-  await requireAnyAction(['hr_costing', 'create'], ['treasury', 'create'])
+  await requireAnyActionOn('/hr-costing/payment', ['hr_costing', 'create'], ['treasury', 'create'])
   const supabase = await createClient()
 
   if (paymentDate && !/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) {
@@ -176,7 +176,7 @@ export async function generateStatutoryDirectorTopup(
   scheme: StatutoryScheme,
   paymentDate?: string,
 ): Promise<void> {
-  await requireAnyAction(['hr_costing', 'create'], ['treasury', 'create'])
+  await requireAnyActionOn('/hr-costing/payment', ['hr_costing', 'create'], ['treasury', 'create'])
   const supabase = await createClient()
 
   if (paymentDate && !/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) {
@@ -204,7 +204,7 @@ export async function generateStatutoryDirectorTopup(
  * editor is Finance-gated, but payroll payment dates are HR's knowledge).
  */
 export async function setPayrollPvDate(voucherId: string, paymentDate: string): Promise<void> {
-  await requireAnyAction(['hr_costing', 'edit'], ['treasury', 'edit'])
+  await requireAnyActionOn('/hr-costing/payment', ['hr_costing', 'edit'], ['treasury', 'edit'])
   const supabase = await createClient()
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) throw new Error('Invalid payment date')

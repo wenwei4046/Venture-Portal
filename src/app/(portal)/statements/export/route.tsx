@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildInvoicesXlsx } from './_format/xlsx'
 import { InvoicesPdf } from './_format/pdf'
@@ -49,7 +49,7 @@ function formatBillingMode(mode: string): string {
 }
 
 export async function GET(req: Request) {
-  await requireAction('treasury', 'export')
+  await requireActionOn('/statements', 'treasury', 'export')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const period = url.searchParams.get('period') ?? officeMonth()

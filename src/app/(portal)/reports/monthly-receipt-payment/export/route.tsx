@@ -4,7 +4,7 @@
 import dayjs from 'dayjs'
 import { officeMonth } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
 import { buildMonthlyCashFlowSides, buildSideMatrixRows } from '@/lib/cash-flow-custom'
 import {
@@ -24,7 +24,7 @@ import { reportsCompanyWide } from '@/lib/surfaces'
 
 export async function GET(req: Request) {
   // dept_manager may export their own segment (RLS scopes journal_lines).
-  const user = await requireAction('dept_reports', 'export', 'dept')
+  const user = await requireActionOn('/reports/monthly-receipt-payment', 'dept_reports', 'export', 'dept')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const periodRaw = url.searchParams.get('period') ?? ''

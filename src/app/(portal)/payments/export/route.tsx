@@ -1,6 +1,6 @@
 import React from 'react'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { filterLockedBatches, isPayrollReference, lockPayrollBatches } from '@/lib/payroll-vouchers'
 import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
@@ -37,7 +37,7 @@ const POOL_LABELS: Record<string, string> = {
 }
 
 export async function GET(req: Request) {
-  const user = await requireAction('treasury', 'export')
+  const user = await requireActionOn('/payments', 'treasury', 'export')
   const seesPayroll = canSeePayrollPayouts(user)
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'

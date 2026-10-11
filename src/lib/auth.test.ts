@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@/types'
 import { redirect } from 'next/navigation'
-import { getMemberUser, getUser, requireAction, requirePage, requirePayrollPayouts } from './auth'
+import { getMemberUser, getUser, requireActionOn, requirePage, requirePayrollPayouts } from './auth'
 
 const mocks = vi.hoisted(() => ({
   subject: 'signed-in-id' as string | null,
@@ -248,29 +248,28 @@ describe('a page’s writes follow its own tabs’ boxes', () => {
     expect((await requirePage('/payments')).actions?.['treasury.create']).toBe('all')
   })
 
-  it('a Server Action follows the page it was sent from', async () => {
-    mocks.header = { 'next-action': 'a1', referer: 'https://portal.example/receipts' }
-    await requireAction('treasury', 'create')
+  it('a write follows the page its gate names (2026-10-11, plan C)', async () => {
+    await requireActionOn('/receipts', 'treasury', 'create')
     expect(redirect).toHaveBeenCalledWith('/dashboard')
     vi.mocked(redirect).mockClear()
-    mocks.header = { 'next-action': 'a1', referer: 'https://portal.example/payments?tab=draft' }
-    await requireAction('treasury', 'create')
+    await requireActionOn('/payments', 'treasury', 'create')
     expect(redirect).not.toHaveBeenCalled()
   })
 
-  it('with no page to go by — no Referer, or not a Server Action — the account acts as held', async () => {
+  it('whatever page the request says it came from — a Referer is the sender\'s to write', async () => {
+    mocks.header = { 'next-action': 'a1', referer: 'https://portal.example/payments?tab=draft' }
+    await requireActionOn('/receipts', 'treasury', 'create')
+    expect(redirect).toHaveBeenCalledWith('/dashboard')
+    vi.mocked(redirect).mockClear()
     mocks.header = { 'next-action': 'a1' }
-    await requireAction('treasury', 'create')
-    mocks.header = { referer: 'https://portal.example/receipts' }
-    await requireAction('treasury', 'create')
-    expect(redirect).not.toHaveBeenCalled()
+    await requireActionOn('/receipts', 'treasury', 'create')
+    expect(redirect).toHaveBeenCalledWith('/dashboard')
   })
 
   it('never narrows an account whose tabs are worked out from its cells', async () => {
     mocks.rpc.mockImplementation(answers(null))
     expect((await requirePage('/receipts')).actions?.['treasury.create']).toBe('all')
-    mocks.header = { 'next-action': 'a1', referer: 'https://portal.example/receipts' }
-    await requireAction('treasury', 'create')
+    await requireActionOn('/receipts', 'treasury', 'create')
     expect(redirect).not.toHaveBeenCalled()
   })
 

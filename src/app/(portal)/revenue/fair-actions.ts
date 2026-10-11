@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 
 /**
  * Put bills into the month of the fair they were written at.
@@ -27,7 +27,7 @@ import { requireAction } from '@/lib/auth'
  * run's input.
  */
 export async function moveConfirmedFairBills(subDepartmentId: string): Promise<{ moved: number; months: string[] }> {
-  await requireAction('revenue', 'edit')
+  await requireActionOn('/revenue', 'revenue', 'edit')
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { data, error } = await supabase.rpc('revenue_apply_fair_calendar', {
     p_sub_department_id: subDepartmentId,

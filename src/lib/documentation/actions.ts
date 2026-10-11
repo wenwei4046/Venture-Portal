@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
-import { requireAction, requireAnyAction } from '@/lib/auth'
+import { requireActionOn, requireAnyActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { DOC_BUCKET, documentationFileLink, type FileLink } from './server'
 
@@ -47,7 +47,7 @@ export async function saveDocument(input: {
   size: number
   departmentIds: string[]
 }): Promise<DocIdOutcome> {
-  await requireAction('documentation', 'create')
+  await requireActionOn('/team/documentation', 'documentation', 'create')
   const { data, error } = await (await client()).rpc('hr_document_add', {
     p_name: input.name,
     p_path: input.path,
@@ -62,7 +62,7 @@ export async function saveDocument(input: {
 }
 
 export async function deleteDocument(id: string): Promise<DocOutcome> {
-  await requireAction('documentation', 'edit')
+  await requireActionOn('/team/documentation', 'documentation', 'edit')
   const supabase = await client()
   const { error } = await supabase.rpc('hr_document_delete', { p_id: id })
   if (error) return { ok: false, reason: refusal(error, 'The document could not be deleted. Please try again.') }
@@ -94,7 +94,7 @@ async function removeLeftoverFiles(supabase: SupabaseClient): Promise<void> {
  * somebody the line is not written — the link still opens.
  */
 export async function openDocumentationFile(kind: 'document' | 'letter', id: string, mode: 'view' | 'download'): Promise<FileLink> {
-  await requireAction('documentation', 'view')
+  await requireActionOn('/team/documentation', 'documentation', 'view')
   const link = await documentationFileLink(kind, id, mode)
   if (!link.ok) return link
   const { error } = await (await client()).rpc('hr_documentation_log', { p_kind: kind, p_id: id, p_what: mode === 'view' ? 'Viewed' : 'Downloaded' })
@@ -105,7 +105,7 @@ export async function openDocumentationFile(kind: 'document' | 'letter', id: str
 // ── Letter types ────────────────────────────────────────────────────────────
 
 export async function addLetterType(name: string): Promise<DocIdOutcome> {
-  await requireAnyAction(['documentation', 'create'], ['documentation', 'edit'])
+  await requireAnyActionOn('/team/documentation', ['documentation', 'create'], ['documentation', 'edit'])
   const { data, error } = await (await client()).rpc('hr_letter_type_add', { p_name: name })
   if (error) return { ok: false, reason: refusal(error, 'The letter type could not be added. Please try again.') }
   revalidateDocs()
@@ -113,7 +113,7 @@ export async function addLetterType(name: string): Promise<DocIdOutcome> {
 }
 
 export async function setLetterTypeCompulsory(id: string, compulsory: boolean): Promise<DocOutcome> {
-  await requireAction('documentation', 'edit')
+  await requireActionOn('/team/documentation', 'documentation', 'edit')
   const { error } = await (await client()).rpc('hr_letter_type_set_compulsory', { p_id: id, p_compulsory: compulsory })
   if (error) return { ok: false, reason: refusal(error, 'The letter type could not be changed. Please try again.') }
   revalidateDocs()
@@ -121,7 +121,7 @@ export async function setLetterTypeCompulsory(id: string, compulsory: boolean): 
 }
 
 export async function deleteLetterType(id: string): Promise<DocOutcome> {
-  await requireAction('documentation', 'edit')
+  await requireActionOn('/team/documentation', 'documentation', 'edit')
   const { error } = await (await client()).rpc('hr_letter_type_delete', { p_id: id })
   if (error) return { ok: false, reason: refusal(error, 'The letter type could not be deleted. Please try again.') }
   revalidateDocs()
@@ -138,7 +138,7 @@ export async function fileLetter(input: {
   contentType: string | null
   size: number
 }): Promise<DocIdOutcome> {
-  await requireAction('documentation', 'create')
+  await requireActionOn('/team/documentation', 'documentation', 'create')
   const { data, error } = await (await client()).rpc('hr_letter_file', {
     p_staff: input.staffId,
     p_type: input.typeId,
@@ -162,7 +162,7 @@ export type WithdrawOutcome = { ok: true; person: string; type: string } | { ok:
  * record holds it (`hr_letter_withdraw`, mig 20261011170000).
  */
 export async function withdrawLetter(id: string): Promise<WithdrawOutcome> {
-  await requireAction('documentation', 'edit')
+  await requireActionOn('/team/documentation', 'documentation', 'edit')
   const supabase = await client()
   const { data, error } = await supabase.rpc('hr_letter_withdraw', { p_id: id })
   if (error) return { ok: false, reason: refusal(error, 'The letter could not be withdrawn. Please try again.') }
@@ -175,7 +175,7 @@ export async function withdrawLetter(id: string): Promise<WithdrawOutcome> {
 // ── Publish ─────────────────────────────────────────────────────────────────
 
 export async function addPublishType(name: string): Promise<DocIdOutcome> {
-  await requireAnyAction(['documentation', 'create'], ['documentation', 'edit'])
+  await requireAnyActionOn('/team/documentation', ['documentation', 'create'], ['documentation', 'edit'])
   const { data, error } = await (await client()).rpc('hr_publish_type_add', { p_name: name })
   if (error) return { ok: false, reason: refusal(error, 'The type could not be added. Please try again.') }
   revalidateDocs()
@@ -183,7 +183,7 @@ export async function addPublishType(name: string): Promise<DocIdOutcome> {
 }
 
 export async function deletePublishType(id: string): Promise<DocOutcome> {
-  await requireAction('documentation', 'edit')
+  await requireActionOn('/team/documentation', 'documentation', 'edit')
   const { error } = await (await client()).rpc('hr_publish_type_delete', { p_id: id })
   if (error) return { ok: false, reason: refusal(error, 'The type could not be removed. Please try again.') }
   revalidateDocs()
@@ -224,7 +224,7 @@ export async function publishDocumentation(input: {
   audience: string
   save: boolean
 }): Promise<PublishOutcome> {
-  await requireAction('documentation', 'create')
+  await requireActionOn('/team/documentation', 'documentation', 'create')
   const { data, error } = await (await client()).rpc('hr_publish', {
     p_kind: input.kind,
     p_letter_type: input.letterTypeId,

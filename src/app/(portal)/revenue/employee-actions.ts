@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { safeReason } from '@/lib/hierarchy-writes'
 
@@ -45,10 +45,10 @@ async function write(args: {
 
 /** Move is one database transaction: a failed destination cannot remove the source. */
 export async function moveEmployee(data: FormData): Promise<EmployeeOutcome> {
-  await requireAction('revenue', 'edit')
+  await requireActionOn('/revenue', 'revenue', 'edit')
   const destinationKind = field(data, 'destination_kind')
   // A move to another department changes the company roster too: both.
-  if (destinationKind === 'department') await requireAction('team', 'edit')
+  if (destinationKind === 'department') await requireActionOn('/revenue', 'team', 'edit')
   const staffId = field(data, 'staff_id')
   const sourceSchemeId = field(data, 'source_scheme_id')
   const destinationId = field(data, 'destination_id')
@@ -63,7 +63,7 @@ export async function moveEmployee(data: FormData): Promise<EmployeeOutcome> {
 
 /** A department removal keeps employment and every other membership intact. */
 export async function removeEmployeeMembership(data: FormData): Promise<EmployeeOutcome> {
-  await requireAction('revenue', 'edit')
+  await requireActionOn('/revenue', 'revenue', 'edit')
   const staffId = field(data, 'staff_id')
   const sourceSchemeId = field(data, 'source_scheme_id')
   if (!staffId || !sourceSchemeId) return { ok: false, note: 'Choose the employee and the membership to remove.' }
@@ -72,8 +72,8 @@ export async function removeEmployeeMembership(data: FormData): Promise<Employee
 
 /** Record a completed employment exit without deleting payroll or commission history. */
 export async function terminateEmployee(data: FormData): Promise<EmployeeOutcome> {
-  await requireAction('revenue', 'edit')
-  await requireAction('team', 'edit')
+  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue', 'team', 'edit')
   const staffId = field(data, 'staff_id')
   const sourceSchemeId = field(data, 'source_scheme_id')
   const date = field(data, 'resignation_date')

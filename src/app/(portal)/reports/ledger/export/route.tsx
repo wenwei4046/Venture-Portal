@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { fetchLedger, fetchLedgers } from '@/lib/cfo-reports'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildLedgerXlsx, buildLedgersXlsx } from './_format/xlsx'
@@ -8,7 +8,7 @@ import { hasLedgerActivity } from '@/lib/ledger-view'
 import { officeTime, officeToday } from '@/lib/office-time'
 
 export async function GET(req: Request) {
-  await requireAction('reports', 'export')
+  await requireActionOn('/reports/ledger', 'reports', 'export')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const code = url.searchParams.get('code')

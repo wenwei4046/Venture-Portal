@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { pushSoon } from '@/lib/push/outbox'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
-import { requireAction, requireAnyAction } from '@/lib/auth'
+import { requireActionOn, requireAnyActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { HIRING_BUCKET, previewKind } from './files'
 import type { CandidateField, CandidateStage, HiringField } from './types'
@@ -140,7 +140,7 @@ function answersFrom(raw: string): Record<string, string> | null {
 
 /** "+ New request" → Submit to HR: filed for somebody working here today. */
 export async function submitHiringRequest(input: { requestedBy: string; answers: Record<string, string> }): Promise<HiringIdOutcome> {
-  await requireAction('hiring', 'create')
+  await requireActionOn('/hiring/requests', 'hiring', 'create')
   if (!input.requestedBy) return { ok: false, reason: 'Pick who is asking.' }
   const { data, error } = await (await client()).rpc('hiring_submit', { p_requested_by: input.requestedBy, p_answers: input.answers })
   if (error) return { ok: false, reason: refusal(error, 'The request could not be sent. Please try again.') }
@@ -150,47 +150,47 @@ export async function submitHiringRequest(input: { requestedBy: string; answers:
 
 /** Acknowledge: somebody in HR takes the hire on. */
 export async function acknowledgeHiringRequest(id: string, owner: string, note = ''): Promise<HiringOutcome> {
-  await requireAction('hiring', 'approve')
+  await requireActionOn('/hiring/requests', 'hiring', 'approve')
   if (!owner) return { ok: false, reason: 'Pick the owner first.' }
   return call('hiring_acknowledge', { p_id: id, p_owner: owner, p_note: note || null }, 'The request could not be acknowledged. Please try again.')
 }
 
 export async function requestHiringInfo(id: string, note: string): Promise<HiringOutcome> {
-  await requireAction('hiring', 'approve')
+  await requireActionOn('/hiring/requests', 'hiring', 'approve')
   if (!note.trim()) return { ok: false, reason: 'Write what you need from the requester.' }
   return call('hiring_request_info', { p_id: id, p_note: note }, 'The request could not be sent back. Please try again.')
 }
 
 export async function declineHiringRequest(id: string, note: string): Promise<HiringOutcome> {
-  await requireAction('hiring', 'approve')
+  await requireActionOn('/hiring/requests', 'hiring', 'approve')
   if (!note.trim()) return { ok: false, reason: 'Give a reason for declining.' }
   return call('hiring_decline', { p_id: id, p_note: note }, 'The request could not be declined. Please try again.')
 }
 
 export async function cancelHiringRequest(id: string, note = ''): Promise<HiringOutcome> {
-  await requireAction('hiring', 'approve')
+  await requireActionOn('/hiring/requests', 'hiring', 'approve')
   return call('hiring_cancel', { p_id: id, p_note: note || null }, 'The request could not be cancelled. Please try again.')
 }
 
 export async function reopenHiringRequest(id: string): Promise<HiringOutcome> {
-  await requireAction('hiring', 'approve')
+  await requireActionOn('/hiring/requests', 'hiring', 'approve')
   return call('hiring_reopen', { p_id: id }, 'The request could not be reopened. Please try again.')
 }
 
 export async function setHiringOwner(id: string, owner: string): Promise<HiringOutcome> {
-  await requireAction('hiring', 'approve')
+  await requireActionOn('/hiring/requests', 'hiring', 'approve')
   return call('hiring_set_owner', { p_id: id, p_owner: owner }, 'The owner could not be changed. Please try again.')
 }
 
 /** Helped by others: who assisted (or nobody again). */
 export async function setHiringAssist(id: string, staff: string | null): Promise<HiringOutcome> {
-  await requireAnyAction(['hiring', 'edit'], ['hiring', 'approve'])
+  await requireAnyActionOn('/hiring/requests', ['hiring', 'edit'], ['hiring', 'approve'])
   return call('hiring_set_assist', { p_id: id, p_staff: staff }, 'Who helped could not be recorded. Please try again.')
 }
 
 /** Mark filled: who was hired (this request's candidates), through which source, at what cost. */
 export async function fillHiringRequest(id: string, input: { hired: string[]; source: string; cost: string; note: string }): Promise<HiringOutcome> {
-  await requireAction('hiring', 'approve')
+  await requireActionOn('/hiring/requests', 'hiring', 'approve')
   const hired = input.hired.map(h => h.trim()).filter(Boolean)
   if (hired.length === 0) return { ok: false, reason: 'Choose who was hired, then Mark filled' }
   if (!input.source) return { ok: false, reason: 'Pick where you found them, then Mark filled' }
@@ -211,7 +211,7 @@ export async function fillHiringRequest(id: string, input: { hired: string[]; so
  */
 export async function saveHiringCandidate(form: FormData): Promise<HiringOutcome> {
   const candidate = text(form, 'candidate')
-  await requireAction('hiring', candidate ? 'edit' : 'create')
+  await requireActionOn('/hiring/requests', 'hiring', candidate ? 'edit' : 'create')
   const answers = answersFrom(text(form, 'answers'))
   if (!answers) return { ok: false, reason: 'The details are not in the right shape.' }
   const files = uploadsFrom(text(form, 'files'))
@@ -242,7 +242,7 @@ export async function saveHiringCandidate(form: FormData): Promise<HiringOutcome
 
 /** Change status ▸ — one candidate's stage. */
 export async function setCandidateStage(candidate: string, stage: CandidateStage): Promise<HiringOutcome> {
-  await requireAction('hiring', 'edit')
+  await requireActionOn('/hiring/requests', 'hiring', 'edit')
   return call('hiring_candidate_stage', { p_candidate: candidate, p_stage: stage }, 'The status could not be changed. Please try again.')
 }
 
@@ -255,7 +255,7 @@ export async function setCandidateStage(candidate: string, stage: CandidateStage
 export async function hiringFileLink(kind: 'candidate' | 'talent' | 'file' | 'attachment', id: string, download = false): Promise<
   { ok: true; url: string; name: string; preview: 'pdf' | 'image' | 'none' } | { ok: false; reason: string }
 > {
-  await requireAction('hiring', 'view')
+  await requireActionOn('/hiring/requests', 'hiring', 'view')
   const supabase = await client()
   const { data, error } = await supabase.rpc('hiring_file_path', { p_kind: kind, p_id: id })
   if (error) return { ok: false, reason: refusal(error, 'The file could not be found. Please try again.') }
@@ -280,7 +280,8 @@ export async function hiringFileLink(kind: 'candidate' | 'talent' | 'file' | 'at
 
 /** "+ Add file" on a candidate or a talent: the browser's uploads filed, each with its type (Create or Edit). */
 export async function addHiringFiles(kind: 'candidate' | 'talent', owner: string, uploads: UploadedFile[]): Promise<HiringOutcome> {
-  await requireAnyAction(['hiring', 'create'], ['hiring', 'edit'])
+  // A talent's files are the Talent Bank's write, a candidate's the request's (2026-10-11, plan C).
+  await requireAnyActionOn(kind === 'talent' ? '/hiring/talent' : '/hiring/requests', ['hiring', 'create'], ['hiring', 'edit'])
   const files = uploadsFrom(JSON.stringify(uploads ?? []))
   if (!files) return { ok: false, reason: 'The files are not in the right shape.' }
   if (!files.length) return { ok: false, reason: 'Choose a file.' }
@@ -297,7 +298,7 @@ export async function addHiringFiles(kind: 'candidate' | 'talent', owner: string
 
 /** Replace: a new upload in a file's place, its type kept; the old one is deleted once nobody names it (Edit). */
 export async function replaceHiringFile(file: string, upload: { path: string; name: string }): Promise<HiringOutcome> {
-  await requireAction('hiring', 'edit')
+  await requireActionOn('/hiring/requests', 'hiring', 'edit')
   const supabase = await client()
   const { data, error } = await supabase.rpc('hiring_file_replace', { p_file: file, p_path: upload.path, p_name: upload.name })
   if (error) {
@@ -312,7 +313,7 @@ export async function replaceHiringFile(file: string, upload: { path: string; na
 
 /** Remove: a file off its record, and out of the bucket once nobody else's record names it (Edit). */
 export async function removeHiringFile(file: string): Promise<HiringOutcome> {
-  await requireAction('hiring', 'edit')
+  await requireActionOn('/hiring/requests', 'hiring', 'edit')
   const supabase = await client()
   const { data, error } = await supabase.rpc('hiring_file_remove', { p_file: file })
   if (error) return { ok: false, reason: refusal(error, 'The file could not be removed. Please try again.') }
@@ -324,7 +325,7 @@ export async function removeHiringFile(file: string): Promise<HiringOutcome> {
 
 /** "+ Add a new file type…": the type of that name — made if new, turned back on if it was off (Edit). */
 export async function addHiringFileType(name: string): Promise<HiringIdOutcome> {
-  await requireAction('hiring', 'edit')
+  await requireActionOn('/hiring/requests', 'hiring', 'edit')
   if (!name.trim()) return { ok: false, reason: 'Name the file type.' }
   const { data, error } = await (await client()).rpc('hiring_file_type_add', { p_name: name })
   if (error) return { ok: false, reason: refusal(error, 'The file type could not be added. Please try again.') }
@@ -349,30 +350,30 @@ export async function setHiringFileTypeActive(type: string, active: boolean): Pr
 
 /** What requesters fill in — the whole list, in order. */
 export async function saveHiringFormFields(fields: HiringField[]): Promise<HiringOutcome> {
-  await requireAction('hiring', 'edit')
+  await requireActionOn('/hiring/requests', 'hiring', 'edit')
   const payload = fields.map(f => ({ id: f.id, label: f.label, type: f.type, options: f.options, required: f.required }))
   return call('hiring_save_form_fields', { p_fields: payload }, 'The form could not be saved. Please try again.')
 }
 
 /** Candidate fields — what HR fills in for each candidate. */
 export async function saveCandidateFields(fields: CandidateField[]): Promise<HiringOutcome> {
-  await requireAction('hiring', 'edit')
+  await requireActionOn('/hiring/requests', 'hiring', 'edit')
   const payload = fields.map(f => ({ id: f.id, label: f.label, type: f.type, options: f.options }))
   return call('hiring_save_candidate_fields', { p_fields: payload }, 'The candidate fields could not be saved. Please try again.')
 }
 
 export async function addHiringSource(name: string): Promise<HiringOutcome> {
-  await requireAction('hiring', 'edit')
+  await requireActionOn('/hiring/requests', 'hiring', 'edit')
   return call('hiring_source_add', { p_name: name }, 'The source could not be added. Please try again.')
 }
 
 export async function setHiringSourceActive(id: string, active: boolean): Promise<HiringOutcome> {
-  await requireAction('hiring', 'edit')
+  await requireActionOn('/hiring/requests', 'hiring', 'edit')
   return call('hiring_source_set_active', { p_id: id, p_active: active }, 'The source could not be changed. Please try again.')
 }
 
 export async function removeHiringSource(id: string): Promise<HiringOutcome> {
-  await requireAction('hiring', 'edit')
+  await requireActionOn('/hiring/requests', 'hiring', 'edit')
   return call('hiring_source_remove', { p_id: id }, 'The source could not be removed. Please try again.')
 }
 
@@ -385,7 +386,7 @@ export async function removeHiringSource(id: string): Promise<HiringOutcome> {
  * `UploadedFile[]`).
  */
 export async function saveHiringTalent(form: FormData): Promise<HiringIdOutcome> {
-  await requireAction('hiring', 'create')
+  await requireActionOn('/hiring/talent', 'hiring', 'create')
   const candidate = text(form, 'candidate')
   if (!text(form, 'name').trim() || !text(form, 'position').trim()) {
     return { ok: false, reason: candidate ? 'Name and position are needed.' : 'Add a name and the position they fit.' }
@@ -414,12 +415,12 @@ export async function saveHiringTalent(form: FormData): Promise<HiringIdOutcome>
 
 /** Pick from Talent Bank / Invite to interview: the talent joins a request as a shortlisted candidate. */
 export async function inviteHiringTalent(talent: string, request: string): Promise<HiringOutcome> {
-  await requireAction('hiring', 'create')
+  await requireActionOn('/hiring/talent', 'hiring', 'create')
   return call('hiring_talent_invite', { p_talent: talent, p_request: request }, 'The talent could not be invited. Please try again.')
 }
 
 export async function saveTalentNotes(talent: string, notes: string): Promise<HiringOutcome> {
-  await requireAction('hiring', 'edit')
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
   return call('hiring_talent_update', { p_talent: talent, p_notes: notes }, 'The notes could not be saved. Please try again.')
 }
 
@@ -429,7 +430,7 @@ export async function saveTalentNotes(talent: string, notes: string): Promise<Hi
  * record names them (a candidate they were may still).
  */
 export async function removeHiringTalent(talent: string): Promise<HiringOutcome> {
-  await requireAction('hiring', 'edit')
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
   const supabase = await client()
   const { data, error } = await supabase.rpc('hiring_talent_remove', { p_talent: talent })
   if (error) return { ok: false, reason: refusal(error, 'The talent could not be removed. Please try again.') }

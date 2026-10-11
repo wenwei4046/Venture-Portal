@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction, requireAuth } from '@/lib/auth'
+import { requireActionOn, requireAuth } from '@/lib/auth'
 import { can } from '@/lib/permissions'
 import { cellKeysFromRows, grantsFromRows, isSensitiveField, personCellsFromRows, type CellKey, type PersonCells, type Scope } from '@/lib/permission-matrix'
 import {
@@ -51,7 +51,7 @@ async function db(): Promise<SupabaseClient> {
 
 /** A person's old per-key exceptions, cleared so their template and their cells decide. */
 export async function clearLegacyExceptions(userId: string): Promise<Result<{ cleared: number }>> {
-  await requireAction('accounts', 'manage')
+  await requireActionOn('/team/people', 'accounts', 'manage')
   if (!UUID.test(userId)) return { ok: false, reason: 'Reload the page and try again.' }
   const supabase = await db()
   const { data, error } = await supabase.rpc('permission_user_clear_legacy', { p_user: userId })
@@ -100,7 +100,7 @@ export async function loadPermissionHistory(): Promise<Result<{ entries: History
  * denial; null removes the exception.
  */
 export async function setUserPermission(userId: string, key: string, granted: boolean | null): Promise<void> {
-  await requireAction('accounts', 'manage')
+  await requireActionOn('/team/people', 'accounts', 'manage')
   if (!userId || !key) throw new Error('Which person, and which permission?')
 
   const supabase = await createClient()
@@ -198,7 +198,7 @@ export async function saveTemplateTabs(input: {
   tabs: string[]
   sensitive: string[]
 }): Promise<Result<{ version: number; titles: number }>> {
-  await requireAction('accounts', 'manage')
+  await requireActionOn('/team/people', 'accounts', 'manage')
   if (
     !input ||
     !UUID.test(input.templateId) ||
@@ -235,7 +235,7 @@ export async function saveTemplateTabs(input: {
  * has boxes of their own keeps them, over the new template's ticks.
  */
 export async function setTitleTemplate(titleId: string, templateId: string | null): Promise<Result> {
-  await requireAction('accounts', 'manage')
+  await requireActionOn('/team/people', 'accounts', 'manage')
   if (!UUID.test(titleId) || (templateId !== null && !UUID.test(templateId))) {
     return { ok: false, reason: 'Reload the page and try again.' }
   }
@@ -258,7 +258,7 @@ export async function setTitleTemplate(titleId: string, templateId: string | nul
 
 /** One person's boxes over their title's template — the whole set ([] = back to the title). */
 export async function setPersonTabs(input: { userId: string; templateId: string; boxes: PersonBox[] }): Promise<Result> {
-  await requireAction('accounts', 'manage')
+  await requireActionOn('/team/people', 'accounts', 'manage')
   if (
     !input ||
     !UUID.test(input.userId) ||
@@ -285,7 +285,7 @@ export async function setPersonTabs(input: { userId: string; templateId: string;
 
 /** The handoff's Delete: a template no title points at. */
 export async function deleteTemplate(input: { templateId: string; version: number }): Promise<Result> {
-  await requireAction('accounts', 'manage')
+  await requireActionOn('/team/people', 'accounts', 'manage')
   if (!input || !UUID.test(input.templateId) || !Number.isInteger(input.version)) {
     return { ok: false, reason: 'Reload the page and try again.' }
   }
@@ -298,7 +298,7 @@ export async function deleteTemplate(input: { templateId: string; version: numbe
 
 /** "+ New template": a copy of the one open — its cells, fields and, once it has them, its ticks. */
 export async function copyTemplate(input: { name: string; from: string }): Promise<Result<{ id: string }>> {
-  await requireAction('accounts', 'manage')
+  await requireActionOn('/team/people', 'accounts', 'manage')
   const name = (input?.name ?? '').trim()
   if (!name || name.length > 80) return { ok: false, reason: 'Give the template a name, up to 80 characters.' }
   if (!UUID.test(input.from)) return { ok: false, reason: 'Reload the page and try again.' }

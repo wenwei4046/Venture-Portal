@@ -1,4 +1,4 @@
-import { requireAction, requirePage } from '@/lib/auth'
+import { requireActionOn, requirePage } from '@/lib/auth'
 import { HvPage, PageHead } from '@/components/hrv/kit'
 import { canDo } from '@/lib/permission-actions'
 import { loadDocumentation } from '@/lib/documentation/server'
@@ -16,7 +16,7 @@ const TABS: readonly DocTab[] = ['documents', 'data-center', 'letters', 'publish
  */
 export default async function DocumentationPage({ searchParams }: { searchParams: Promise<{ tab?: string; person?: string }> }) {
   await requirePage('/team/documentation')
-  const user = await requireAction('documentation', 'view')
+  const user = await requireActionOn('/team/documentation', 'documentation', 'view')
   const { tab, person } = await searchParams
   const read = await loadDocumentation()
   if (!read.ok) {

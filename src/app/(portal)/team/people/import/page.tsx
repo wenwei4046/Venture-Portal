@@ -1,11 +1,11 @@
 import Link from 'next/link'
-import { requireAction, requirePage } from '@/lib/auth'
+import { requireActionOn, requirePage } from '@/lib/auth'
 import { sees } from '@/lib/sensitive'
 import ImportStaffWizard from './_components/ImportStaffWizard'
 
 export default async function ImportStaffPage() {
   await requirePage('/team/people/import')
-  const viewer = await requireAction('team', 'create')
+  const viewer = await requireActionOn('/team/people/import', 'team', 'create')
   // The file carries NRICs, account numbers and pay, and the import writes
   // them as they are (2026-10-09, PR4): all three ticks, or no import.
   const allowed = sees(viewer, 'nric') && sees(viewer, 'bank') && sees(viewer, 'salary')

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requireAction, requirePage } from '@/lib/auth'
+import { requireActionOn, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { revenuePath } from '@/lib/revenue'
 import { loadAgentMatchingData } from '../../../import-actions'
@@ -24,7 +24,7 @@ function label(period: string): string {
 /** The selected sub-department owns every order imported by this wizard. */
 export default async function SalesImportPage({ params }: PageProps) {
   await requirePage('/revenue/[sub]/[period]/import')
-  await requireAction('revenue', 'create')
+  await requireActionOn('/revenue/[sub]/[period]/import', 'revenue', 'create')
   const { sub, period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 

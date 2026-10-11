@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { loadLineFacts, moveReportingLine, type LineResult } from '@/lib/hierarchy-writes'
 import { undoPlan } from '@/lib/hierarchy-undo'
 
@@ -31,7 +31,7 @@ export async function setReportsTo(
   staffId: string,
   reportsToId: string | null,
 ): Promise<LineResult> {
-  await requireAction('team', 'edit')
+  await requireActionOn('/team/hierarchy', 'team', 'edit')
   const supabase = await createClient()
   const result = await moveReportingLine(supabase, staffId?.trim() ?? '', reportsToId?.trim() || null)
   if (result.ok) await revalidateHierarchy()
@@ -76,7 +76,7 @@ export interface UndoOutcome {
 export async function undoHierarchyMove(input: UndoMoveInput): Promise<UndoOutcome> {
   // The same gate as the move itself. An undo is not a smaller permission than
   // the thing it reverses — it writes the same column.
-  await requireAction('team', 'edit')
+  await requireActionOn('/team/hierarchy', 'team', 'edit')
 
   const staffId = input.staffId?.trim() ?? ''
   if (!staffId) throw new Error('Which person?')

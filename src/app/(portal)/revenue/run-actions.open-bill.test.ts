@@ -6,7 +6,7 @@ vi.mock('server-only', () => ({}))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidate }))
 vi.mock('@/lib/auth', () => {
   const gate = vi.fn(async () => ({ id: 'user-1' }))
-  return { requirePermission: gate, requireAction: gate, requireAnyAction: gate, requirePayrollPayoutsAction: gate }
+  return { requirePermission: gate, requireActionOn: gate, requireAnyActionOn: gate, requirePayrollPayoutsActionOn: gate }
 })
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.client }))
 vi.mock('./_lib/commission-input', () => ({ loadCommissionInput: vi.fn() }))

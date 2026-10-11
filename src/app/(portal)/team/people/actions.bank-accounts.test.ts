@@ -15,7 +15,7 @@ const { insert, update, query, createClient } = vi.hoisted(() => {
 })
 vi.mock('@/lib/supabase/server', () => ({ createClient }))
 const { gate } = vi.hoisted(() => ({ gate: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: gate, requireAction: gate, requireAnyAction: gate, requirePayrollPayoutsAction: gate }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: gate, requireActionOn: gate, requireAnyActionOn: gate, requirePayrollPayoutsActionOn: gate }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 import { addStaff, updateStaff } from './actions'
 

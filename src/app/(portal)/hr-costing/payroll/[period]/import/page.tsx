@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { requireAction, requirePage } from '@/lib/auth'
+import { requireActionOn, requirePage } from '@/lib/auth'
 import ImportWizard from './_components/ImportWizard'
 import PeriodPicker from '../../_components/PeriodPicker'
 
@@ -15,7 +15,7 @@ function formatPeriodLabel(period: string): string {
 
 export default async function ImportPage({ params }: PageProps) {
   await requirePage('/hr-costing/payroll/[period]/import')
-  await requireAction('hr_costing', 'create')
+  await requireActionOn('/hr-costing/payroll/[period]/import', 'hr_costing', 'create')
   const { period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 

@@ -17,7 +17,7 @@ const fx = vi.hoisted(() => ({
   ],
 }))
 const mocks = vi.hoisted(() => ({
-  requireAction: vi.fn(),
+  requireActionOn: vi.fn(),
   createClient: vi.fn(),
   buildPnlAccounts: vi.fn(),
   buildCustomPnlRows: vi.fn(),
@@ -28,7 +28,7 @@ const mocks = vi.hoisted(() => ({
     throw new Error('NEXT_NOT_FOUND')
   }),
 }))
-vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireAction: mocks.requireAction }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireActionOn: mocks.requireActionOn }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/gl-reports', () => ({ fetchAllJournalLines: async () => [], fetchCoaAccounts: async () => [] }))
 vi.mock('@/lib/consolidation', () => ({ fetchInterBillingElimination: mocks.elim, eliminateInterBilling: (l: unknown) => l }))
@@ -86,7 +86,7 @@ const FINANCE = withActions({ id: 'f', role: 'finance', permissions: ['reports',
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requireAction.mockResolvedValue(FINANCE)
+  mocks.requireActionOn.mockResolvedValue(FINANCE)
   mocks.createClient.mockResolvedValue({ rpc: async () => ({ data: ['3000'], error: null }) })
   mocks.elim.mockResolvedValue(null)
   mocks.bridge.mockResolvedValue({ lines: [] })
@@ -115,7 +115,7 @@ describe('a department’s own P&L under Dept Pool', () => {
 
   it('reads the department’s P&L — the one Reports shows with it picked', async () => {
     render(await page('marketing'))
-    expect(mocks.requireAction).toHaveBeenCalledWith('reports', 'view')
+    expect(mocks.requireActionOn).toHaveBeenCalledWith(expect.any(String), 'reports', 'view')
     expect(mocks.buildPnlAccounts).toHaveBeenCalledWith([], [], { year: 2026, throughMonth: 10, segment: ['marketing'] })
     // One segment is never the consolidated view: nothing is eliminated.
     expect(mocks.elim).not.toHaveBeenCalled()
@@ -179,7 +179,7 @@ describe('who and what the page is for', () => {
   })
 
   it('is no page for somebody who reads only their own department’s pool', async () => {
-    mocks.requireAction.mockResolvedValue(withActions({ id: 'm', role: 'dept_manager', permissions: ['dept_reports', 'dept_pool'] }))
+    mocks.requireActionOn.mockResolvedValue(withActions({ id: 'm', role: 'dept_manager', permissions: ['dept_reports', 'dept_pool'] }))
     await expect(page('marketing')).rejects.toThrow('NEXT_NOT_FOUND')
     expect(mocks.buildPnlAccounts).not.toHaveBeenCalled()
   })

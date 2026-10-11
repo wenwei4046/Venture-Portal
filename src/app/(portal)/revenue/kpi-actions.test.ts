@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   permission: vi.fn(), createClient: vi.fn(), rpc: vi.fn(), from: vi.fn(), refresh: vi.fn(),
   select: vi.fn(), is: vi.fn(), or: vi.fn(), order: vi.fn(), limit: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.permission, requireAction: mocks.permission, requireAnyAction: mocks.permission, requirePayrollPayoutsAction: mocks.permission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.permission, requireActionOn: mocks.permission, requireAnyActionOn: mocks.permission, requirePayrollPayoutsActionOn: mocks.permission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.refresh }))
 
@@ -35,7 +35,7 @@ describe('Rules › KPI items — saving', () => {
       changes: [{ id: ITEM, amount: '250' }],
       removes: [],
     })).toEqual({ ok: true, saved: 2 })
-    expect(mocks.permission).toHaveBeenCalledExactlyOnceWith('revenue', 'manage')
+    expect(mocks.permission).toHaveBeenCalledExactlyOnceWith(expect.any(String), 'revenue', 'manage')
     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('catalogue_save_kpi_items', {
       p_scheme: SCHEME,
       p_adds: [{ source: 'option', option_pool: 'bedframe_specials', option_value: 'HB Straight', kpi_amount: 200 }],

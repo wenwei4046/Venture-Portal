@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   deleteUser: vi.fn(),
   revalidatePath: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission, requireActionOn: mocks.requirePermission, requireAnyActionOn: mocks.requirePermission, requirePayrollPayoutsActionOn: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/supabase/admin', () => ({
   adminClient: () => ({ auth: { admin: { createUser: mocks.createUser, deleteUser: mocks.deleteUser } } }),
@@ -76,7 +76,7 @@ describe('inviting somebody on the roster', () => {
 
   it('creates the login with the account kind their title’s template hands out, and attaches it', async () => {
     expect(await invite()).toEqual({ ok: true, name: 'ONG SIEW LAN', email: 'siew@houzs.com' })
-    expect(mocks.requirePermission).toHaveBeenCalledWith('accounts', 'create')
+    expect(mocks.requirePermission).toHaveBeenCalledWith(expect.any(String), 'accounts', 'create')
     expect(db.writes).toEqual([
       { table: 'users', row: { id: 'new-user', email: 'siew@houzs.com', name: 'ONG SIEW LAN', role: 'finance', department_id: 'finance' } },
       { table: 'hr_staff_costs', row: { user_id: 'new-user', email: 'siew@houzs.com' }, id: ONG },

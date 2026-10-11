@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { cookies, headers } from 'next/headers'
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import type { User, UserRole } from '@/types'
@@ -10,7 +10,7 @@ import { actionsFromJson, actionsFromKeys, canDo, type FunctionKey } from '@/lib
 import { approvableTypes, canSeeApprovals } from '@/lib/approval-domains'
 import { isSensitiveField, type Action, type Scope } from '@/lib/permission-matrix'
 import { sensitiveFromKeys } from '@/lib/sensitive'
-import { actionsOnPage, closedBoxes, opensPage, routeOf, storedTabsFrom, userTabs, type PageRoute } from '@/lib/page-tabs'
+import { actionsOnPage, closedBoxes, opensPage, storedTabsFrom, userTabs, type PageRoute } from '@/lib/page-tabs'
 
 // Per-request dedup. Middleware, layout, and Server Actions all converge
 // on getUser(); wrapping with React.cache() collapses the Supabase calls
@@ -225,46 +225,42 @@ export async function requirePage(route: PageRoute): Promise<User> {
 const NARROWED = new WeakSet<User>()
 
 /**
- * The account a write on this request acts as: on a page, narrowed to its
- * tabs' boxes (requirePage); in a Server Action, to the tabs of the page it
- * was sent from — its Referer, the page the browser was on. With no page to go
- * by, as held. Only an account somebody unticked a box for is ever narrowed.
+ * The account a write acts as, on the page it belongs to (2026-10-11, the
+ * user's answer C — "现在就做完整的"): narrowed to that page's tabs' boxes
+ * (`actionsOnPage`). The page is NAMED IN CODE at every gate, never read off
+ * the request: a Referer is whatever the sender writes, so a hand-made request
+ * once chose the page it was narrowed by. A form page already narrowed by
+ * requirePage keeps it. Only an account somebody unticked a box for is ever
+ * narrowed.
  */
-async function actingUser(): Promise<User> {
+async function actingUser(page: PageRoute): Promise<User> {
   const user = await requireAuth()
   if (!user.closed?.length || NARROWED.has(user)) return user
-  const h = await headers()
-  if (!h.get('next-action')) return user
-  let route: PageRoute | null = null
-  try {
-    route = routeOf(new URL(h.get('referer') ?? '').pathname)
-  } catch {
-    route = null
-  }
-  return route ? { ...user, actions: actionsOnPage(user.actions ?? {}, user.closed, route) } : user
+  return { ...user, actions: actionsOnPage(user.actions ?? {}, user.closed, page) }
 }
 
 /**
- * The gate a WRITE stands behind (2026-10-08, PR2): the action it is, at least
- * this far — `requireAction('treasury', 'create')`, `requireAction('claims',
- * 'approve', 'dept')`. Holding the function's page (its module key) is part of
- * it (canDo). Several pairs means OR, like requirePermission's keys.
+ * The gate a WRITE stands behind (2026-10-08, PR2; its page since 2026-10-11):
+ * the page it belongs to, and the action it is, at least this far —
+ * `requireActionOn('/payments', 'treasury', 'create')`, `requireActionOn('/claims',
+ * 'claims', 'approve', 'dept')`. Holding the
+ * function's page (its module key) is part of it (canDo).
  *
  * Redirects like requirePermission: the button that calls it is not drawn for
  * somebody who may not, so reaching here without the action is a stale page or
  * a hand-made request, and the dashboard is the honest answer to either.
  */
-export async function requireAction(fn: FunctionKey, action: Action, scope: Scope = 'all'): Promise<User> {
-  const user = await actingUser()
+export async function requireActionOn(page: PageRoute, fn: FunctionKey, action: Action, scope: Scope = 'all'): Promise<User> {
+  const user = await actingUser(page)
   if (!canDo(user, fn, action, scope)) {
     redirect('/dashboard')
   }
   return user
 }
 
-/** requireAction for a write reachable as either of two actions. */
-export async function requireAnyAction(...wants: Array<[FunctionKey, Action] | [FunctionKey, Action, Scope]>): Promise<User> {
-  const user = await actingUser()
+/** requireActionOn for a write reachable as either of two actions. Several pairs means OR. */
+export async function requireAnyActionOn(page: PageRoute, ...wants: Array<[FunctionKey, Action] | [FunctionKey, Action, Scope]>): Promise<User> {
+  const user = await actingUser(page)
   if (!wants.some(([fn, action, scope]) => canDo(user, fn, action, scope ?? 'all'))) {
     redirect('/dashboard')
   }
@@ -277,8 +273,8 @@ export async function requireAnyAction(...wants: Array<[FunctionKey, Action] | [
  * HR Costing, Director Salary; lib/approval-domains.ts). Each request is then
  * asked about on its own, as the database's approver_may() asks.
  */
-export async function requireApprover(): Promise<User> {
-  const user = await actingUser()
+export async function requireApproverOn(page: PageRoute): Promise<User> {
+  const user = await actingUser(page)
   if (approvableTypes(user).length === 0) {
     redirect('/dashboard')
   }
@@ -308,11 +304,12 @@ export async function requirePayrollPayouts(...keys: Permission[]): Promise<User
   return user
 }
 
-/** requireAnyAction, for a write about what one named person is paid (requirePayrollPayouts). */
-export async function requirePayrollPayoutsAction(
+/** requireAnyActionOn, for a write about what one named person is paid (requirePayrollPayouts). */
+export async function requirePayrollPayoutsActionOn(
+  page: PageRoute,
   ...wants: Array<[FunctionKey, Action] | [FunctionKey, Action, Scope]>
 ): Promise<User> {
-  const user = await requireAnyAction(...wants)
+  const user = await requireAnyActionOn(page, ...wants)
   if (!canSeePayrollPayouts(user)) {
     redirect('/dashboard')
   }

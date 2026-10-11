@@ -6,7 +6,7 @@ import { adminClient } from '@/lib/supabase/admin'
 import { viewingAsSomebody } from '@/lib/view-as-person'
 import { READ_ONLY_MESSAGE } from '@/lib/supabase/read-only'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { validateInvite, type RawInvite } from '@/lib/invite'
 
@@ -39,7 +39,7 @@ export type InviteResult = { ok: true; name: string; email: string } | { ok: fal
  */
 export async function inviteUser(raw: RawInvite): Promise<InviteResult> {
   // Minting a login is the Principal's, not HR's: an account is access.
-  const actor = await requireAction('accounts', 'create')
+  const actor = await requireActionOn('/team/people', 'accounts', 'create')
   // A login is minted with the service role, around the read-only session: refused while viewing as somebody (2026-10-11).
   if (await viewingAsSomebody()) return { ok: false, reason: READ_ONLY_MESSAGE }
 

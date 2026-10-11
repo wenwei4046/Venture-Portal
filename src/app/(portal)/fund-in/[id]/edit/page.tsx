@@ -1,7 +1,7 @@
 import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { requireAnyAction, requirePage } from '@/lib/auth'
+import { requireAnyActionOn, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import type { AccountType } from '@/lib/coa'
@@ -17,7 +17,7 @@ export default async function EditFundSourcePage({ params }: Props) {
   await requirePage('/fund-in/[id]/edit')
   // Two flows share the page: editing a pending request (Treasury · Edit) and
   // amending a booked fund source (Treasury · Approve).
-  const user = await requireAnyAction(['treasury', 'edit'], ['treasury', 'approve'])
+  const user = await requireAnyActionOn('/fund-in/[id]/edit', ['treasury', 'edit'], ['treasury', 'approve'])
   const { id } = await params
   const supabase = await createClient()
 

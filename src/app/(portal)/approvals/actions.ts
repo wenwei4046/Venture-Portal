@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireApprovalQueue, requireApprover } from '@/lib/auth'
+import { requireApprovalQueue, requireApproverOn } from '@/lib/auth'
 import { decision } from '@/lib/approval-domains'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { officeToday } from '@/lib/office-time'
@@ -363,7 +363,7 @@ async function performApproval(
 // revalidate + redirect back to the queue.
 
 export async function approveRequest(formData: FormData) {
-  const user = await requireApprover()
+  const user = await requireApproverOn('/approvals')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -428,7 +428,7 @@ export async function approveRequestsBulk(args: {
   notes?: string
   allowOverdraw?: boolean
 }): Promise<BulkApproveResult> {
-  const user = await requireApprover()
+  const user = await requireApproverOn('/approvals')
   const supabase = await createClient()
 
   const ids = Array.from(new Set((args.ids ?? []).filter(Boolean)))
@@ -515,7 +515,7 @@ export async function approveRequestsBulk(args: {
 // ─── Reject request (Principal) ───────────────────────────────────────────────
 
 export async function rejectRequest(formData: FormData) {
-  const user = await requireApprover()
+  const user = await requireApproverOn('/approvals')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -651,7 +651,7 @@ export async function rejectRequestsBulk(args: {
   groupIds?: string[]
   notes: string
 }): Promise<BulkRejectResult> {
-  const user = await requireApprover()
+  const user = await requireApproverOn('/approvals')
   const supabase = await createClient()
 
   const notes = (args.notes ?? '').trim()
@@ -716,7 +716,7 @@ export async function rejectRequestsBulk(args: {
 // once.
 
 export async function approveRequestGroup(formData: FormData) {
-  const user = await requireApprover()
+  const user = await requireApproverOn('/approvals')
   const supabase = await createClient()
 
   const groupId = (formData.get('group_id') as string) ?? ''
@@ -989,7 +989,7 @@ async function performGroupApproval(
 // ─── Reject combined group (Principal) — Phase 7 Step 9 ──────────────────────
 
 export async function rejectRequestGroup(formData: FormData) {
-  const user = await requireApprover()
+  const user = await requireApproverOn('/approvals')
   const supabase = await createClient()
 
   const groupId = (formData.get('group_id') as string) ?? ''
@@ -1087,7 +1087,7 @@ export async function approveRequestGroupPartial(args: {
   approveNotes: string
   rejectReason: string
 }) {
-  const user = await requireApprover()
+  const user = await requireApproverOn('/approvals')
   const supabase = await createClient()
 
   const { data: pendingRows } = await supabase

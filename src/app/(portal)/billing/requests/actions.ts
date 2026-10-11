@@ -2,10 +2,10 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 
 export async function generateInvoicesFromRequest(requestId: string) {
-  await requireAction('billing', 'create')
+  await requireActionOn('/billing/requests', 'billing', 'create')
   const supabase = await createClient()
   const { error } = await supabase.rpc('generate_invoices_from_request', { p_request_id: requestId })
   if (error) throw new Error(error.message)
@@ -15,7 +15,7 @@ export async function generateInvoicesFromRequest(requestId: string) {
 }
 
 export async function rejectInvoiceRequest(requestId: string, reason: string) {
-  await requireAction('billing', 'edit')
+  await requireActionOn('/billing/requests', 'billing', 'edit')
   const supabase = await createClient()
   if (!reason.trim()) throw new Error('Rejection reason is required')
   const { error } = await supabase.rpc('reject_invoice_request', {

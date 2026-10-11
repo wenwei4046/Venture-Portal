@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('server-only', () => ({}))
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), exportPdfResponse: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission, requireActionOn: mocks.requirePermission, requireAnyActionOn: mocks.requirePermission, requirePayrollPayoutsActionOn: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/export/response', () => ({ exportPdfResponse: mocks.exportPdfResponse }))
 import { GET } from './route'
@@ -50,7 +50,7 @@ describe('voucher PDF statutory coverage', () => {
   it('adds only immutable coverage for the requested statutory PV and preserves other voucher data', async () => {
     const { from, calls } = mockDatabase([voucher('stat', 'payroll_statutory'), voucher('salary', 'payroll_disbursement')])
     await GET(new Request('http://localhost/payments/voucher-doc?ids=stat,salary'))
-    expect(mocks.requirePermission).toHaveBeenCalledWith(['treasury', 'export'], ['hr_costing', 'export'])
+    expect(mocks.requirePermission).toHaveBeenCalledWith(expect.any(String), ['treasury', 'export'], ['hr_costing', 'export'])
     expect(calls).toContainEqual({ table: 'payroll_statutory_voucher_lines', column: 'voucher_id', values: ['stat'] })
     expect(from.mock.calls.map(([table]) => table)).not.toContain('hr_monthly_payroll')
     const docs = mocks.exportPdfResponse.mock.calls[0][0].element.props.vouchers
