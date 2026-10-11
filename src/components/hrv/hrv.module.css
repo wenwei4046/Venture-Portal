@@ -557,18 +557,19 @@
 /* On a phone the frame (and the window) runs on under the bottom tab bar — 54px
    and the home strip: a drawer and its scrim end where the sheet ends, and the
    toast stands as high above it as it does above the sheet's foot on a desktop
-   (the parity audit, 2026-10-11: + New request's Submit to HR sat under the bar). */
+   (the parity audit, 2026-10-11: + New request's Submit to HR sat under the bar). The bar is --tabbar-h
+   (globals.css): 54px, or nothing while a scroll down has tucked it away — all of these follow it. */
 @media (max-width: 767px) {
-  .scrim { bottom: calc(54px + 10px + var(--safe-bottom)); }
+  .scrim { bottom: calc(var(--tabbar-h, 54px) + 10px + var(--safe-bottom)); }
   .scrimFixed { bottom: 0; }
   .drawer,
-  .drawerFixed { bottom: calc(54px + 10px + var(--safe-bottom)); }
+  .drawerFixed { bottom: calc(var(--tabbar-h, 54px) + 10px + var(--safe-bottom)); }
   /* A window centres in what is left above the bar, and a tall one scrolls inside its body there. */
   .window {
-    top: calc(50% - (54px + var(--safe-bottom)) / 2);
-    max-height: min(760px, calc(100% - 94px - var(--safe-bottom)));
+    top: calc(50% - (var(--tabbar-h, 54px) + var(--safe-bottom)) / 2);
+    max-height: min(760px, calc(100% - 40px - var(--tabbar-h, 54px) - var(--safe-bottom)));
   }
-  .toast { bottom: calc(54px + 30px + var(--safe-bottom)); }
+  .toast { bottom: calc(var(--tabbar-h, 54px) + 30px + var(--safe-bottom)); }
 }
 
 /* ── Toggle ── */

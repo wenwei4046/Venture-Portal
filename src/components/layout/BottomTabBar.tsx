@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link, { useLinkStatus } from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import type { UserRole } from '@/types'
@@ -8,6 +8,8 @@ import { createClient } from '@/lib/supabase/client'
 import { canApprove } from '@/lib/roles'
 import { opensPath } from '@/lib/page-tabs'
 import { warmRoute } from '@/lib/nav-warm'
+import { useTuckOnScroll } from '@/components/pwa/tuck'
+import tuck from '@/components/pwa/tuck.module.css'
 import { moreTabLabel, tabsForRole, type NavViewer, type TabDef } from './nav-config'
 import { useNavOwner } from './nav-owner'
 
@@ -227,9 +229,25 @@ export default function BottomTabBar({ role, viewer, moreOpen, onMoreClick, fin 
     tabs.forEach((t) => warmRoute(router, t.href))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The bar steps out of the way while reading on, and is back on scrolling up
+  // or on another page (2026-10-11, components/pwa/tuck.ts) — never while the
+  // More sheet is open. What sits on it (a bulk bar, a drawer, a toast) comes
+  // down with it: `--tabbar-h` reads 0 under html[data-tabbar-tucked].
+  const barRef = useRef<HTMLElement>(null)
+  const tucked = useTuckOnScroll(barRef, !moreOpen, pathname)
+  useEffect(() => {
+    if (!tucked) return
+    const root = document.documentElement
+    root.setAttribute('data-tabbar-tucked', '')
+    return () => root.removeAttribute('data-tabbar-tucked')
+  }, [tucked])
+
   return (
     <nav
-      className={`md:hidden print:hidden fixed bottom-0 inset-x-0 z-40 border-t border-hairline pb-[var(--safe-bottom)] ${fin ? 'fin-tabbar' : 'bg-chrome'}`}
+      ref={barRef}
+      className={`md:hidden print:hidden fixed bottom-0 inset-x-0 z-40 border-t border-hairline pb-[var(--safe-bottom)] ${fin ? 'fin-tabbar' : 'bg-chrome'} ${tuck.tuckable}`}
+      data-tucked={tucked ? '' : undefined}
+      inert={tucked || undefined}
       aria-label="Primary"
     >
       <ul className="flex items-stretch">

@@ -86,7 +86,7 @@ describe('a narrowing gate’s DEFINER writes ask its pages in the database too'
   })
 
   it('every DEFINER write behind a narrowing gate asks its pages, or is named with why not', () => {
-    const definers = new Set<string>(DEFINER_RPCS as readonly string[])
+    const definers = new Set<string>(DEFINER_RPCS)
     const behind = new Map<string, RpcSite[]>()
     for (const s of sites) {
       if (!definers.has(s.rpc) || !s.wants.some(w => narrows(s.pages, w))) continue

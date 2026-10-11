@@ -785,7 +785,11 @@ h3.font-serif { font-size: 15px; font-weight: 500; font-style: normal; }
    browser's own inset off. */
 :root {
   --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-bottom-floor, 0px));
+  /* The phone’s tab bar as what sits on it sees it (2026-10-11): 54px, or nothing while a scroll down has
+     tucked it away (BottomTabBar, components/pwa/tuck.ts) — a bulk bar, a drawer, a toast come down with it. */
+  --tabbar-h: 54px;
 }
+:root[data-tabbar-tucked] { --tabbar-h: 0px; }
 .safe-bottom-probe {
   position: fixed;
   left: 0;
@@ -4327,9 +4331,10 @@ details.fin-fold .fin-fold-inner { padding: 4px 0 18px; }
   /* The arrow cell: the whole of it is the button, not the 15px chevron. */
   .fin-queue table.ledger-table td.lt-toggle { padding: 0; }
   .fin-queue table.ledger-table td.lt-toggle > button { width: 34px; height: auto; min-height: 44px; margin: 0; }
-  /* The bar sits on the tab bar, not under it. */
+  /* The bar sits on the tab bar, not under it — and comes down with it when it tucks away. */
   .fin-queue .bulk-bar {
-    bottom: calc(54px + 8px + var(--safe-bottom));
+    bottom: calc(var(--tabbar-h) + 8px + var(--safe-bottom));
+    transition: bottom 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
     padding: 10px 12px;
     gap: 8px 10px;
   }

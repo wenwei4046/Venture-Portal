@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { HrAppData } from '@/lib/hr-app/model'
 vi.mock('@/components/layout/view-as-actions', () => ({ stopViewingAsPerson: vi.fn() }))
@@ -213,5 +213,30 @@ describe('the HR app’s views', () => {
   it('is not there for anybody else', () => {
     openMore(null)
     expect(screen.queryByRole('region', { name: 'Switch view' })).toBeNull()
+  })
+})
+
+describe('the HR app’s tab bar while reading on (2026-10-11)', () => {
+  it('steps out of the way on a scroll down, and is back on a scroll up or on another tab', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(70)
+    render(<HrApp data={data} actions={actions} />)
+    const nav = screen.getByRole('navigation', { name: 'HR app' })
+    const page = nav.parentElement!.querySelector('header')!.parentElement!
+    let top = 0
+    Object.defineProperty(page, 'clientHeight', { configurable: true, get: () => 600 })
+    Object.defineProperty(page, 'scrollHeight', { configurable: true, get: () => 2000 })
+    Object.defineProperty(page, 'scrollTop', { configurable: true, get: () => top })
+    const at = (y: number) => { top = y; act(() => { page.dispatchEvent(new Event('scroll')) }) }
+    at(0)
+    at(200)
+    expect(nav).toHaveAttribute('data-tucked')
+    expect(nav).toHaveAttribute('inert')
+    at(150)
+    expect(nav).not.toHaveAttribute('data-tucked')
+    at(400)
+    expect(nav).toHaveAttribute('data-tucked')
+    fireEvent.click(within(nav).getByRole('button', { name: 'Rooms' }))
+    expect(nav).not.toHaveAttribute('data-tucked')
+    vi.restoreAllMocks()
   })
 })

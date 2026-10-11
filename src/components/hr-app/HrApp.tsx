@@ -1,10 +1,12 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState, useTransition, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import { officeTime } from '@/lib/office-time'
 import { openTarget, type Notice, type NoticeRef } from '@/lib/push/notices'
 import { PUSH_WORDS, pushState, turnPushOff, turnPushOn, type PushState, type PushTrouble } from '@/components/pwa/push-client'
 import PushAsk from '@/components/pwa/PushAsk'
+import { useTuckOnScroll } from '@/components/pwa/tuck'
+import tuck from '@/components/pwa/tuck.module.css'
 import { Select } from '@/components/hrv/select'
 import ViewingAsBanner from '@/components/layout/ViewingAsBanner'
 import {
@@ -118,6 +120,9 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
   const d = useMemo(() => (data.parts.hiring ? data : { ...data, hires: [] }), [data])
   const top = stack[stack.length - 1]
   const view: string = top ? top.k : tab
+  // The tab bar steps out of the way while reading on, and is back on scrolling up or on another page (2026-10-11).
+  const barRef = useRef<HTMLElement>(null)
+  const tucked = useTuckOnScroll(barRef, true, `${view}:${stack.length}`)
   const today = d.today
   const day = date ?? today
   const live = d.bookings
@@ -520,7 +525,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
 
       {view === 'hire' && hr && d.may.hireApprove ? <HireBar hr={hr} busy={busy} openSheet={openSheet} cancel={() => run(() => actions.hireCancel(hr.id), undefined, false)} meId={d.meId} /> : null}
 
-      <nav className={s.tabs} aria-label="HR app">
+      <nav ref={barRef} className={`${s.tabs} ${tuck.tuckable}`} data-tucked={tucked ? '' : undefined} inert={tucked || undefined} aria-label="HR app">
         {TABS.map(([k, label]) => {
           const on = tab === k
           const badge = k === 'review' && items.length ? String(items.length) : ''

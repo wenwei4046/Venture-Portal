@@ -1,0 +1,17 @@
+/* The phone's bottom bar tucked away while reading on (2026-10-11, components/pwa/tuck.ts).
+   A bar in its frame's flow (the HR app's tabs, the Revenue app's nav) gives its height back but for the phone's
+   own bar at the foot (--safe-bottom): the page grows into the space and still ends above the home indicator or
+   Android's buttons, and what sat on the bar (a dock, an action bar) comes down onto that strip. A fixed bar (the
+   portal's tab bar, bottom: 0) is moved down by the same margin. The transform takes the rest out of sight — the
+   strip, and 24px more for the Revenue app's Quote circle (22px above its bar) and the Finance bar's shadow; the
+   frame clips it (overflow: hidden). --bar-h is the bar's own height, measured by the hook. */
+.tuckable {
+  transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1), margin-bottom 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.tuckable[data-tucked] {
+  transform: translateY(calc(var(--safe-bottom, 0px) + 24px));
+  margin-bottom: calc(var(--safe-bottom, 0px) - var(--bar-h, 0px));
+}
+@media (prefers-reduced-motion: reduce) {
+  .tuckable { transition: none; }
+}
