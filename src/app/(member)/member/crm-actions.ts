@@ -7,7 +7,7 @@ import { canDo } from "@/lib/permission-actions";
 import { createClient } from "@/lib/supabase/server";
 import { crmFromRows, messageFromRow, type CrmLiveData, type CrmMessageRow, type CrmPeopleRow, type CrmRows } from "@/lib/member/crm-live";
 import type { CrmMessage } from "@/lib/member/crm";
-import { cleanText, fetchWhatsAppTemplates, fillTemplate, mediaMessage, reactionMessage, sendWhatsApp, sendWhatsAppText, templateMessage, textMessage, uploadWhatsAppMedia, windowOpen, type WaTemplate } from "@/lib/whatsapp/send";
+import { cleanText, fetchWhatsAppTemplateStatuses, fillTemplate, mediaMessage, metaTemplateBody, metaTemplateName, reactionMessage, sendWhatsApp, sendWhatsAppText, submitWhatsAppTemplate, templateMessage, textMessage, uploadWhatsAppMedia, windowOpen, type WaTemplate } from "@/lib/whatsapp/send";
 import { messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from "@/lib/messenger/send";
 import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText, whatsappVisitMessage } from "@/lib/member/crm-maps";
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
@@ -128,6 +128,8 @@ const CRM_WRITES = [
   "crm_save_showroom_full", "crm_slot_counts", "crm_mark_reminded",
   // The Control panel (mig 20261009180000).
   "crm_send_to", "crm_save_ad_assign", "crm_save_fulltime", "crm_read_notifs",
+  // Cold lead templates (mig 20261011140000); submitting to Meta is submitCrmTemplate.
+  "crm_save_template", "crm_template_on", "crm_delete_template",
 ] as const;
 export type CrmWrite = (typeof CRM_WRITES)[number];
 
@@ -187,6 +189,7 @@ const requireCrm = async (need: "view" | "edit" | "manage") => {
 const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ad_rule", "crm_save_fulltime",
   "crm_save_team_shares", "crm_set_full_time", "crm_save_showroom", "crm_save_showroom_full",
+  "crm_save_template", "crm_template_on", "crm_delete_template",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
@@ -210,12 +213,12 @@ export async function fetchCrmData(): Promise<{ ok: true; data: CrmData } | { ok
       if (error) throw new Error(error.message);
       return (data ?? []) as T;
     };
-    const [people, can, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs, adRules, ftRules] = await Promise.all([
+    const [people, can, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs, adRules, ftRules, templates] = await Promise.all([
       read<CrmDataRows["people"]>(db.rpc("crm_people")),
       // What they may do (mig 20261010030000) — the screens follow it; a database without it yet answers by role.
       Promise.resolve(db.rpc("crm_my_can")).then(r => (r.error ? null : r.data), () => null),
       fetchAllRowsParallel<CrmDataRows["contacts"][number]>((from, to, withCount) => db.from("crm_contacts")
-        .select("id, channel, account_id, external_id, name, phone, ad_source_id, ad_headline, status, lost_reason, lost_note, previous_status, assigned_to, team_id, last_customer_at, unread, created_at, property_type, unit_size, unit_location, requirement, budget, won_amount, details_at, assigned_at, assigned_by", withCount ? { count: "exact" } : undefined)
+        .select("id, channel, account_id, external_id, name, phone, ad_source_id, ad_headline, status, lost_reason, lost_note, previous_status, assigned_to, team_id, last_customer_at, unread, created_at, property_type, unit_size, unit_location, requirement, budget, won_amount, details_at, assigned_at, assigned_by, held_reason", withCount ? { count: "exact" } : undefined)
         .order("created_at").order("id").range(from, to), "crm contacts"),
       fetchAllRowsParallel<CrmDataRows["messages"][number]>((from, to, withCount) => db.from("crm_messages")
         .select("id, contact_id, direction, kind, body, media_id, auto, sent_by, sent_at, status, error, reply_to, my_reaction, card", withCount ? { count: "exact" } : undefined)
@@ -232,10 +235,12 @@ export async function fetchCrmData(): Promise<{ ok: true; data: CrmData } | { ok
       read<CrmDataRows["shares"]>(db.from("crm_contact_shares").select("contact_id, staff_id, invited_by, joined_at")),
       read<CrmDataRows["events"]>(db.from("crm_events").select("id, kind, contact_id, actor, owner, data, at").order("at", { ascending: false }).limit(500)),
       read<CrmDataRows["staffPrefs"]>(db.from("crm_staff_prefs").select("notifs_seen_at, notif_read")),
-      read<CrmDataRows["adRules"]>(db.from("crm_ad_assign").select("ad_source_id, ad_label, mode, team_split, people_mode, people, started_at")),
+      read<CrmDataRows["adRules"]>(db.from("crm_ad_assign").select("ad_source_id, ad_label, mode, team_split, people_mode, people, started_at, team_modes")),
       read<CrmDataRows["ftRules"]>(db.from("crm_fulltime_rules").select("tl_id, mode, days, vals")),
+      // Every template for the Control panel; Approved + On for everybody else (the row policy decides).
+      read<NonNullable<CrmDataRows["templates"]>>(db.from("crm_templates").select("id, name, channel, body, status, is_on, meta_name, language, reject_reason").order("created_at")),
     ]);
-    return { ok: true, data: crmDataFromRows({ people, can, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs, adRules, ftRules }) };
+    return { ok: true, data: crmDataFromRows({ people, can, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs, adRules, ftRules, templates }) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The CRM could not be loaded. Please try again.";
     return { ok: false, error: /schema cache|does not exist|could not find|permission denied for/i.test(message)
@@ -340,13 +345,62 @@ export async function reactToMessage(messageId: string, emoji: string): Promise<
 /** The WhatsApp Business Account's approved templates (for a cold lead). */
 export async function fetchCrmTemplates(): Promise<{ ok: true; templates: WaTemplate[] } | { ok: false; error: string }> {
   try {
-    await session();
+    const db = await session();
     await requireCrm("edit");
-    const token = process.env.META_SYSTEM_USER_TOKEN?.trim(), wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim();
-    if (!token || !wabaId) throw new Error("WhatsApp is not connected on this server yet. Ask your administrator.");
-    return await fetchWhatsAppTemplates({ wabaId, token });
+    // rev 1011: only the CRM's own templates the Control panel switched on (Approved + On) — the row policy holds the rest back.
+    const { data, error } = await db.from("crm_templates").select("name, body, meta_name, language, category")
+      .eq("channel", "whatsapp").eq("status", "approved").eq("is_on", true).not("meta_name", "is", null).order("created_at");
+    if (error) throw new Error(error.message);
+    return { ok: true, templates: (data ?? []).map(t => {
+      const text = metaTemplateBody(t.body as string);
+      return { name: t.meta_name as string, label: t.name as string, language: t.language as string, category: t.category as string, text, params: text.includes("{{1}}") ? 1 : 0 };
+    }) };
   } catch (error) {
     return { ok: false, error: friendly(error, "The templates could not be loaded.") };
+  }
+}
+
+const whatsappAccount = () => {
+  const token = process.env.META_SYSTEM_USER_TOKEN?.trim(), wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim();
+  if (!token || !wabaId) throw new Error("WhatsApp is not connected on this server yet. Ask your administrator.");
+  return { token, wabaId };
+};
+
+/** Submit a WhatsApp template for Meta's review (CRM · Manage). Answers its new status. */
+export async function submitCrmTemplate(id: string): Promise<{ ok: true; status: "review" | "approved" | "rejected"; metaName: string } | { ok: false; error: string }> {
+  try {
+    const db = await session();
+    await requireCrm("manage");
+    const { data: t, error } = await db.from("crm_templates").select("id, name, channel, body, status, language, category").eq("id", id).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!t) throw new Error("That template is gone. Reload.");
+    if (t.channel !== "whatsapp") throw new Error("Messenger templates are not connected yet — only WhatsApp templates go to review.");
+    if (t.status !== "draft" && t.status !== "rejected") throw new Error("This template is already with Meta.");
+    const { token, wabaId } = whatsappAccount();
+    const metaName = metaTemplateName(t.name as string, `${(t.id as string).slice(0, 4)}${Date.now().toString(36).slice(-4)}`);
+    const sent = await submitWhatsAppTemplate({ wabaId, token, name: metaName, language: t.language as string, category: t.category as string, body: t.body as string });
+    if (!sent.ok) throw new Error(sent.error);
+    const { error: saveError } = await db.rpc("crm_template_submitted", { p_id: id, p_meta_name: metaName, p_meta_id: sent.id, p_status: sent.status });
+    if (saveError) throw new Error(`Sent to Meta for review, but it could not be saved here (${saveError.message}). Reload before submitting again.`);
+    return { ok: true, status: sent.status, metaName };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "The template could not be submitted.") };
+  }
+}
+
+/** Meta's review of every submitted template, brought into the CRM (CRM · Manage) — on opening the templates page. */
+export async function refreshCrmTemplates(): Promise<{ ok: true; changed: number } | { ok: false; error: string }> {
+  try {
+    const db = await session();
+    await requireCrm("manage");
+    const { token, wabaId } = whatsappAccount();
+    const meta = await fetchWhatsAppTemplateStatuses({ wabaId, token });
+    if (!meta.ok) throw new Error(meta.error);
+    const { data, error } = await db.rpc("crm_template_statuses", { p_rows: meta.rows });
+    if (error) throw new Error(error.message);
+    return { ok: true, changed: Number(data ?? 0) };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "Meta's review could not be read.") };
   }
 }
 
@@ -357,9 +411,13 @@ export async function sendCrmTemplate(contactId: string, template: { name: strin
     await requireCrm("edit");
     const { contact, token } = await reachable(db, contactId, false);
     if (contact.channel !== "whatsapp") throw new Error("Messenger has no templates. Call the customer instead.");
-    const sent = await sendWhatsApp({ phoneNumberId: contact.account_id, token, message: templateMessage(contact.external_id, template.name, template.language, params) });
+    // Only a template the Control panel switched on (rev 1011), in its own words — never what the browser says it is.
+    const { data: own } = await db.from("crm_templates").select("body, language").eq("meta_name", template.name).eq("status", "approved").eq("is_on", true).maybeSingle();
+    if (!own) throw new Error("That template is not switched on any more. Close and open the templates again.");
+    const text = metaTemplateBody(own.body as string), language = own.language as string;
+    const sent = await sendWhatsApp({ phoneNumberId: contact.account_id, token, message: templateMessage(contact.external_id, template.name, language, params) });
     if (!sent.ok) throw new Error(sent.error);
-    const message = await recorded(db, { contact: contactId, externalId: sent.wamid, kind: "template", body: fillTemplate(template.text, params) || template.name });
+    const message = await recorded(db, { contact: contactId, externalId: sent.wamid, kind: "template", body: fillTemplate(text, params) || template.name });
     if (!message) return { ok: false, error: "Sent to the customer on WhatsApp, but it could not be saved here. Reload before sending again." };
     return { ok: true, message };
   } catch (error) {

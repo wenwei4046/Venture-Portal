@@ -4,9 +4,10 @@
 // design converter — markup and styles exactly as designed. Behaviour lives in
 // ./vm/profile.ts. To change the look, change the design and regenerate.
 import { Fragment } from "react";
+import H from "../crm.module.css";
 import type { ProfileVM } from "./vm/profile";
 
-/** Profile: card, View my team, workspace, Notifications, Quick replies, Auto-reply. */
+/** Profile: card, View my team, workspace, Notifications (Unread | Read), Quick replies, Auto-reply. */
 export default function SalesProfile({ v }: { v: ProfileVM }) {
   return (<>
             
@@ -126,7 +127,28 @@ export default function SalesProfile({ v }: { v: ProfileVM }) {
         </div>
       </>)}
       {!!(v.profNotif) && (<>
-        <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Notifications</h1>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "12px" }}>
+          <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Notifications</h1>
+          {!!(v.canMarkAll) && (<>
+            <span onClick={v.markAll} style={{ flex: "none", fontSize: "13px", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }} className={H.hov6}>Mark all as read</span>
+          </>)}
+        </div>
+        <div style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "12px", background: "#F5EBE3" }}>
+          {(v.nTabs).map((t, t_i) => (<Fragment key={t_i}>
+            <span onClick={t.pick} style={{ flex: "1", height: "34px", borderRadius: "9px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "13px", fontWeight: t.weight, background: t.bg, color: t.fg, boxShadow: t.shadow, cursor: "pointer" }}>{t.label}{!!(t.n) && (<>
+                <span style={{ minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", background: "#BD4A19", color: "#fff", display: "grid", placeItems: "center", fontSize: "11px", fontWeight: "700", fontVariantNumeric: "tabular-nums" }}>{t.n}</span>
+              </>)}</span>
+          </Fragment>))}
+        </div>
+        {!!(v.nEmpty) && (<>
+          <div style={{ padding: "40px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", color: "#806B60", textAlign: "center" }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m5 12 5 5 9-10">
+              </path>
+            </svg>
+            <span style={{ fontSize: "14px" }}>{v.nEmptyText}</span>
+          </div>
+        </>)}
         {!!(v.hasInv) && (<>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: ".05em", color: "#806B60" }}>INVITATIONS</span>
@@ -162,7 +184,7 @@ export default function SalesProfile({ v }: { v: ProfileVM }) {
             <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: ".05em", color: "#806B60" }}>UPDATES</span>
             <div style={{ padding: "0 14px", borderRadius: "18px", background: "#fff", border: "1px solid #EBDDD2" }}>
               {(v.notifUpd).map((u, u_i) => (<Fragment key={u_i}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: u.rule }}>
+                <div onClick={u.open} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: u.rule, cursor: "pointer" }}>
                   <span style={{ flex: "none", width: "34px", height: "34px", borderRadius: "50%", background: u.bg, color: u.c, display: "grid", placeItems: "center" }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                       <path d={u.icon}>
@@ -170,9 +192,13 @@ export default function SalesProfile({ v }: { v: ProfileVM }) {
                     </svg>
                   </span>
                   <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                    <span style={{ fontSize: "14px", fontWeight: "600", lineHeight: "1.3" }}>{u.text}</span>
+                    <span style={{ fontSize: "14px", fontWeight: u.weight, lineHeight: "1.3", color: u.fg }}>{u.text}</span>
                     <span style={{ fontSize: "12px", color: "#806B60" }}>{u.meta}</span>
                   </span>
+                  {!!(u.unread) && (<>
+                    <span style={{ flex: "none", width: "9px", height: "9px", borderRadius: "50%", background: "#BD4A19" }}>
+                    </span>
+                  </>)}
                 </div>
               </Fragment>))}
             </div>

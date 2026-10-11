@@ -10,6 +10,15 @@
 .hov3:hover { background: #FFF8F2 !important; }
 .hov4:hover { border-color: #387557 !important; }
 .hov5:hover { background: #F5EEE9 !important; }
+/* rev 1010 (Insight, Profile › Notifications). */
+.hov6:hover { color: rgb(150 58 20) !important; }
+.hov7:hover { background: #F5EBE3 !important; }
+/* rev 1011 (Control panel). */
+.hov8:hover { background: #963A14 !important; }
+.hov9:hover { background: #EEF3F9 !important; }
+.hov10:hover { border-color: #B9CCE3 !important; }
+.hov11:hover { border-color: #D9C7BA !important; }
+.hov12:hover { border-color: #E9BFA0 !important; }
 
 /* The app: full screen on a phone, the design's own font and colours. */
 .app {
@@ -57,6 +66,24 @@
 .loading { flex: 1; display: grid; place-items: center; padding: 24px; text-align: center; font-size: 14px; color: #806B60; }
 .problem { margin: 0; padding: 10px 20px; font-size: 13px; color: #A3371A; background: #FBEAE6; }
 .panel { background: #FBF7F3; }
+
+/*
+ * iPhone safe areas (rev 1010 / 1011, MUST): nothing in the CRM sits under the camera / Dynamic Island,
+ * the status bar or the home indicator. The page is viewportFit "cover" and .app is fixed over it, so
+ * .app pads itself by the insets (the bottom through --safe-bottom, globals.css, never the bare env —
+ * src/lib/safe-area.test.ts). The status-bar strip shows the page's top colour: #FFFFFF (RS, any chat),
+ * #FBF7F3 (Control panel); under the panel's white bottom bar the strip stays white.
+ */
+.app {
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) var(--safe-bottom) env(safe-area-inset-left, 0px);
+}
+.app.panel { background: linear-gradient(#FBF7F3, #FBF7F3) top / 100% calc(100% - var(--safe-bottom)) no-repeat, #FFFFFF; }
+.app.panel:has(main [data-chat-list]) { background: #FFFFFF; }
+/* A layer positioned against .app spans its padding, so it keeps its own content clear of the insets
+   with a transparent border its own background paints under (the design's padding is left exactly as is):
+   a bottom sheet lifts above the home indicator; a full-screen page (slideIn) starts below the status bar. */
+.app > [style*="absolute"] > [style*="sheetUp"] { border-bottom: var(--safe-bottom) solid transparent; }
+.app > [style*="slideIn"] { border-top: env(safe-area-inset-top, 0px) solid transparent; border-bottom: var(--safe-bottom) solid transparent; }
 /* The reply box's hint stays on one line ("Reply to Hakimi…"), cut with an ellipsis, and the box shows no scrollbar. */
 .app textarea[data-draft]::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app textarea[data-draft] { scrollbar-width: none; }

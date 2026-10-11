@@ -86,6 +86,7 @@ export function overlaysVM(ctx: PanelCtx) {
 
   const nf = notifsVM(ctx), pc = contactsVM(ctx);
   return { stop, ...undo, ...sd, ...mv, ...att, ...va, ...pc,
-    notifOpen: nf.notifOpen, closeNotifs: nf.closeNotifs, readAll: nf.readAll, readAllFg: nf.readAllFg, nfChips: nf.nfChips, nfGroups: nf.nfGroups, nfEmpty: nf.nfEmpty };
+    notifOpen: nf.notifOpen, closeNotifs: nf.closeNotifs, readAll: nf.readAll, readAllFg: nf.readAllFg, nfChips: nf.nfChips, nfGroups: nf.nfGroups, nfEmpty: nf.nfEmpty,
+    nfEmptyText: nf.nfEmptyText, nfTabs: nf.nfTabs, readAllShow: nf.readAllShow };
 }
 export type OverlaysVM = ReturnType<typeof overlaysVM>;

@@ -72,8 +72,10 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
   return out.sort((a, b) => b.time - a.time);
 }
 
-/** Unread: newer than the last time the page was opened (a pending invitation stays until answered or seen). */
-export const unreadNotifs = (list: SalesNotif[], seenAt: string | null) => {
-  const seen = seenAt ? new Date(seenAt).getTime() : 0;
-  return list.filter(n => n.time > seen).length;
-};
+/**
+ * Read one by one (rev 1010 §6): an update is read once tapped (its id in crm_staff_prefs.notif_read, the newest 500
+ * kept) or older than the last Mark all as read (notifs_seen_at). An invitation stays unread until it is answered.
+ */
+export const isReadNotif = (n: SalesNotif, read: { notifRead: string[]; notifsSeenAt: string | null }) =>
+  !n.pending && (read.notifRead.includes(n.id) || (!!read.notifsSeenAt && n.time <= new Date(read.notifsSeenAt).getTime()));
+export const unreadNotifs = (list: SalesNotif[], read: { notifRead: string[]; notifsSeenAt: string | null }) => list.filter(n => !isReadNotif(n, read)).length;

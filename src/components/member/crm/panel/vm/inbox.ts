@@ -22,8 +22,9 @@ function chatRow(ctx: PanelCtx, c: CrmCustomer) {
     who: c.assignedTo ? nameOf(c.assignedTo) : `${seat.name || "Team"} · to assign`, wc: seat.c, ownBg: seat.own,
     preview: last ? (last.from === "me" ? "You: " : "") + (last.text || "Attachment") : "", at: last ? lastChat(last.at, now) : "",
     stBg: u.level === "overdue" ? "#FBE4DE" : u.level === "urgent" ? "#FBF1E3" : u.level === "soon" ? "#F5EEE9" : "transparent", hasSt: !!state,
-    // A chat opens in its owner's CRM; one still waiting in a team opens here.
-    open: () => (c.assignedTo ? ctx.openCrmOf(c.assignedTo, c.id) : ctx.patch({ lead: c.id, pick: "", toast: "" })),
+    // rev 1011 §1.1: a chat opens here, as the Principal / Director, whoever has it (as Calendar and Awaiting reply do);
+    // acting as a salesperson is Profile › View as only.
+    open: () => ctx.patch({ lead: c.id, pick: "", toast: "" }),
   };
 }
 

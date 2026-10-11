@@ -10,7 +10,7 @@ import type { ChangeEvent, FocusEvent } from "react";
 import type { CrmAdRule } from "@/lib/member/crm-data";
 import type { AdDraft, FtDraft } from "../ui";
 import { waitingByLevel } from "./overlays";
-import { first, ini, periodRange, inRange, type PanelCtx, type Team } from "./common";
+import { evenShare, first, ini, periodRange, inRange, type PanelCtx, type Team } from "./common";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], ALL7 = [0, 1, 2, 3, 4, 5, 6];
 const ROLE: Record<string, string> = { stl: "Senior TL", tl: "Team Lead", ta: "Team Assistant", rs: "Revenue Specialist", hod: "HOD" };
@@ -58,7 +58,8 @@ function mkPeople(teams: Team[], m: "cnt" | "pct", pp: Record<string, number>, t
 
 /** One ad, as the Assignment card and its editor draw it. */
 function mkRow(teams: Team[], a: AdDraft, set: (p: Partial<AdDraft>) => void) {
-  const cur = a.mode === "split" ? "split" : a.mode === "people" ? "people" : "even";
+  // rev 1011 §6.6: Evenly · By team only — By people is merged into By team, and an old By people rule opens as By team.
+  const cur = (a.mode === "split" || a.mode === "people" ? "split" : "even") as "split" | "even" | "people";
   const total = teams.reduce((x, t) => x + (a.split[t.id] || 0), 0), pm = a.pm, pp = a.pp;
   const P = mkPeople(teams, pm, pp, pm === "pct" ? 100 : a.leads, (id, n, lk) => set({ mode: "people", pp: id === null ? (n as Record<string, number>) : { ...pp, [id]: Math.max(0, n as number) }, ...(lk ? { lockP: lk } : {}) }), a.lockP, false);
   const segs = cur === "split" ? teams.map(t => ({ w: a.split[t.id] || 0, c: t.c, op: 1 }))
@@ -67,9 +68,10 @@ function mkRow(teams: Team[], a: AdDraft, set: (p: Partial<AdDraft>) => void) {
   const tw = segs.reduce((x, g) => x + g.w, 0) || 1;
   return {
     name: a.label, page: a.page, leads: a.leads, isSplit: cur === "split", isPeople: cur === "people", isEven: cur === "even",
-    tag: cur === "split" ? "By team" : cur === "people" ? (pm === "pct" ? "By people · %" : "By people · max") : a.mode === "even" ? "Evenly" : "Not set",
-    tagBg: a.mode === "unset" ? "#FFF0E4" : "#E6F0EA", tagFg: a.mode === "unset" ? "#BD4A19" : "#387557",
-    modes: [seg(cur, "even", "Evenly", () => set({ mode: "even" })), seg(cur, "split", "By team", () => set({ mode: "split" })), seg(cur, "people", "By people", () => set({ mode: "people" }))],
+    tag: cur === "split" ? "By team" : cur === "people" ? (pm === "pct" ? "By people · %" : "By people · max") : a.mode === "even" ? "Evenly" : "Evenly · default",
+    // §6.3: an ad with no setting is dealt evenly to every team — "Evenly · default", muted.
+    tagBg: a.mode === "unset" ? "#F5EBE3" : "#E6F0EA", tagFg: a.mode === "unset" ? "#806B60" : "#387557",
+    modes: [seg(cur, "even", "Evenly", () => set({ mode: "even" })), seg(cur, "split", "By team", () => set({ mode: "split" }))],
     evenN: teams.reduce((x, t) => x + t.people.length, 0),
     evenTeams: teams.map(t => ({ team: t.name, c: t.c, names: t.people.map(p => first(p.name)).join(", "), av: t.people.map((p, k) => ({ ini: ini(p.name), ml: k ? "-8px" : "0" })) })),
     splits: teams.map(t => {
@@ -104,7 +106,8 @@ export function assignVM(ctx: PanelCtx) {
   const month = periodRange("month", null, now);
 
   // Organic Leads: no rule placed them, so somebody has to.
-  const organic = data.customers.filter(c => !c.assignedTo && !c.teamId)
+  // Organic Leads: no team and not held Over the limit (a held lead keeps its team).
+  const organic = data.customers.filter(c => !c.assignedTo && !c.teamId && !c.held)
     .map(c => ({ c, at: [...c.messages].reverse().find(m => m.from === "lead")?.at ?? c.createdAt })).sort((a, b) => b.at.localeCompare(a.at));
   const waitList = organic.map(({ c, at }, k) => ({ name: c.name, ad: `${c.ad} · ${c.channel === "messenger" ? "Messenger" : "WhatsApp"}`, when: ago(at, now), rule: k ? "1px solid #F3E9E1" : "0", openSend: () => patch({ sendFor: c.id, sdSel: null }),
     // Tapping the name reads the chat first (and may answer it) before choosing who gets it.
@@ -121,7 +124,17 @@ export function assignVM(ctx: PanelCtx) {
       mode: r?.mode ?? "unset", split: r && Object.keys(r.split).length ? { ...r.split } : even, pm: r?.pm ?? "cnt", pp: { ...(r?.pp ?? {}) }, lockT: [], lockP: [] };
   };
   const ads = adIds.map(draftOf).sort((a, b) => b.leads - a.leads || a.label.localeCompare(b.label));
-  const saveAd = (d: AdDraft) => act.saveAdRule(d.id, d.label, { mode: d.mode === "unset" ? null : d.mode, split: d.split, pm: d.pm, pp: d.pp });
+  // By team from the card (rev 1011 §6.6): each team keeps its inside mode; a team never set is By % with an even split.
+  const saveAd = (d: AdDraft) => {
+    if (d.mode !== "split" && d.mode !== "people") return act.saveAdRule(d.id, d.label, { mode: d.mode === "unset" ? null : d.mode, split: d.split, pm: d.pm, pp: d.pp });
+    const tm = { ...(ruleOf(d.id)?.tm ?? {}) }, pp = { ...d.pp };
+    teams.forEach(t => {
+      if (!((d.split[t.id] ?? 0) > 0)) return;
+      const m = (tm[t.id] ??= "pct");
+      if (m === "pct" && t.people.reduce((s, p) => s + (pp[p.id] ?? 0), 0) !== 100) { const es = evenShare(t.people.length || 1); t.people.forEach((p, k) => { pp[p.id] = es(k); }); }
+    });
+    return act.saveAdRule(d.id, d.label, { mode: "split", split: d.split, pm: "pct", pp, tm });
+  };
   const adRows = ads.map(a => ({
     ...mkRow(teams, a, p => void saveAd({ ...a, ...p })),
     edit: () => patch({ adEd: { ...a, split: { ...a.split }, pp: { ...a.pp } } }),
@@ -146,7 +159,8 @@ export function assignVM(ctx: PanelCtx) {
     if (!r) return { m: "cnt" as const, on: [4, 5, 6], v: zeros(t) };
     const v = zeros(t);
     for (const [id, days] of Object.entries(r.vals)) { v[id] = { ...(v[id] ?? {}) }; for (const [d, n] of Object.entries(days)) v[id][Number(d)] = Number(n) || 0; }
-    return { m: r.mode, on: [...r.days].sort(), v };
+    // The old Max / By % editor reads a "turns" rule as Max (rev 1011 replaced it with assign-1011.ts › ftx).
+    return { m: r.mode === "turns" ? "cnt" as const : r.mode, on: [...r.days].sort(), v };
   };
   const dLbl = (ds: number[]) => (!ds.length ? "Off" : ds.length === 7 ? "Every day" : ds.join("") === "01234" ? "Mon – Fri" : ds.join("") === "56" ? "Sat, Sun" : ds.join("") === "456" ? "Fri – Sun" : ds.map(d => WKL[d]).join(", "));
   const ftSum = teams.map(t => {

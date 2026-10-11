@@ -4,16 +4,25 @@
  * move a customer, undo either, the ad rules and full-time allocation, the
  * showrooms, and which notifications are read. Saved first, as everywhere.
  */
-import { crmWrite } from "@/app/(member)/member/crm-actions";
-import type { CrmData, CrmRoom } from "@/lib/member/crm-data";
+import { crmWrite, refreshCrmTemplates, submitCrmTemplate } from "@/app/(member)/member/crm-actions";
+import type { CrmData, CrmRoom, CrmTemplate } from "@/lib/member/crm-data";
 import type { SalesActions } from "../sales/actions";
 import { teamOf } from "../shared/people";
 import type { Dispatch, SetStateAction } from "react";
 
 export interface PanelActions extends SalesActions {
   sendTo(customerId: string, staffId: string | null): Promise<boolean>;
-  saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | "people" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number> }): Promise<boolean>;
-  saveFtRule(tlId: string, mode: "cnt" | "pct", days: number[], vals: Record<string, Record<string, number>>): Promise<boolean>;
+  /** Saved: how many leads waiting Over the limit for this ad the database dealt at once (rev 1011 §6.6); false: not saved. */
+  saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { dealt: number }>;
+  saveFtRule(tlId: string, mode: "cnt" | "pct" | "turns", days: number[], vals: Record<string, Record<string, number>>): Promise<boolean>;
+  /** Member work type (rev 1011): full time or part time; part time clears their ticked Full time days. */
+  setFullTime(staffId: string, on: boolean): Promise<boolean>;
+  /** Cold lead templates (rev 1011): save a draft, or save and submit a WhatsApp one for Meta's review. */
+  saveTemplate(t: { id: string | null; name: string; ch: CrmTemplate["ch"]; body: string }, submit: boolean): Promise<CrmTemplate | false>;
+  templateOn(id: string, on: boolean): Promise<boolean>;
+  deleteTemplate(id: string): Promise<boolean>;
+  /** Meta's review brought in (on opening the page); the changes arrive with the next read. */
+  refreshTemplates(): Promise<void>;
   readNotifs(keys: string[], all?: boolean): void;
   saveRoom(room: Omit<CrmRoom, "id"> & { id: string | null }): Promise<boolean>;
   removeRoom(id: string): Promise<boolean>;
@@ -35,18 +44,68 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       return true;
     },
     async saveAdRule(ad, label, rule) {
-      if (!(await write("crm_save_ad_assign", { p_ad: ad, p_label: label, p_mode: rule.mode, p_team_split: rule.split, p_people_mode: rule.pm, p_people: rule.pp }))) return false;
+      const tm = rule.mode === "split" ? rule.tm ?? {} : {};
+      const r = await write("crm_save_ad_assign", { p_ad: ad, p_label: label, p_mode: rule.mode, p_team_split: rule.split, p_people_mode: rule.pm, p_people: rule.pp, p_team_modes: tm });
+      if (!r) return false;
       setData(d => ({
         ...d,
         adRules: [...d.adRules.filter(r => r.adId !== ad),
-          ...(rule.mode ? [{ adId: ad, label, mode: rule.mode, split: rule.split, pm: rule.pm, pp: rule.pp, startedAt: d.adRules.find(r => r.adId === ad)?.startedAt ?? new Date().toISOString() }] : [])],
+          ...(rule.mode ? [{ adId: ad, label, mode: rule.mode, split: rule.split, pm: rule.pm, pp: rule.pp, tm, startedAt: d.adRules.find(r => r.adId === ad)?.startedAt ?? new Date().toISOString() }] : [])],
       }));
-      return true;
+      // The leads it dealt arrive with the next read (every 5 s); the toast says how many.
+      return { dealt: Number((r.data as { dealt?: number } | null)?.dealt ?? 0) };
     },
     async saveFtRule(tlId, mode, days, vals) {
       if (!(await write("crm_save_fulltime", { p_tl: tlId, p_mode: mode, p_days: days, p_vals: vals }))) return false;
       setData(d => ({ ...d, ftRules: [...d.ftRules.filter(r => r.tlId !== tlId), { tlId, mode, days, vals }] }));
       return true;
+    },
+    async setFullTime(staffId, on) {
+      if (!(await write("crm_set_full_time", { p_staff: staffId, p_full_time: on }))) return false;
+      setData(d => ({
+        ...d,
+        people: d.people.map(p => (p.id === staffId ? { ...p, fullTime: on } : p)),
+        // Part time leaves Full time lead allocation: the database cleared their ticked days; so does the screen.
+        ftRules: on ? d.ftRules : d.ftRules.map(r => { const { [staffId]: _gone, ...vals } = r.vals; return { ...r, vals }; }),
+      }));
+      return true;
+    },
+    async saveTemplate(t, submit) {
+      const putT = (x: CrmTemplate) => setData(d => ({ ...d, templates: (d.templates ?? []).some(y => y.id === x.id) ? (d.templates ?? []).map(y => (y.id === x.id ? x : y)) : [...(d.templates ?? []), x] }));
+      if (submit && t.ch !== "whatsapp") { base.toast("Messenger templates are not connected yet — save it as a draft."); return false; }
+      if (!live) {
+        const was = (data().templates ?? []).find(y => y.id === t.id);
+        const x: CrmTemplate = { id: t.id ?? `t${Date.now()}`, name: t.name.trim(), ch: t.ch, body: t.body.trim(), st: submit ? "review" : "draft", on: false, metaName: was?.metaName ?? null, language: "en", reason: null };
+        putT(x);
+        return x;
+      }
+      const r = await write("crm_save_template", { p_id: t.id, p_name: t.name, p_channel: t.ch, p_body: t.body });
+      if (!r) return false;
+      const row = r.data as { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null };
+      let x: CrmTemplate = { id: row.id, name: row.name, ch: row.channel, body: row.body, st: row.status, on: row.is_on, metaName: row.meta_name, language: row.language, reason: row.reject_reason };
+      putT(x);
+      // Unchanged and already with Meta (In review / Approved): nothing to submit again.
+      if (!submit || (x.st !== "draft" && x.st !== "rejected")) return x;
+      const s = await submitCrmTemplate(x.id);
+      if (!s.ok) { base.toast(s.error); return false; }
+      x = { ...x, st: s.status, on: false, metaName: s.metaName, reason: null };
+      putT(x);
+      return x;
+    },
+    async templateOn(id, on) {
+      if (!(await write("crm_template_on", { p_id: id, p_on: on }))) return false;
+      setData(d => ({ ...d, templates: (d.templates ?? []).map(y => (y.id === id ? { ...y, on } : y)) }));
+      return true;
+    },
+    async deleteTemplate(id) {
+      if (!(await write("crm_delete_template", { p_id: id }))) return false;
+      setData(d => ({ ...d, templates: (d.templates ?? []).filter(y => y.id !== id) }));
+      return true;
+    },
+    async refreshTemplates() {
+      if (!live) return;
+      const r = await refreshCrmTemplates();
+      if (!r.ok) base.toast(r.error);
     },
     readNotifs(keys, all = false) {
       setData(d => ({ ...d, notifRead: all ? [] : [...new Set([...d.notifRead, ...keys])], notifsSeenAt: all ? new Date().toISOString() : d.notifsSeenAt }));

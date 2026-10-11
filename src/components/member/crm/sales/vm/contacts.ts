@@ -5,7 +5,7 @@
  */
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from "react";
 import { STATUS_LABEL, ini, stop, type PEvent, type SalesCtx } from "./common";
-import { customerFormVM, infoRows, phoneLabel, telHref } from "./customer";
+import { contactInfoVM, customerFormVM, phoneLabel, telHref } from "./customer";
 
 const letterOf = (n: string) => { const c = n.trim().charAt(0).toUpperCase(); return c >= "A" && c <= "Z" ? c : "#"; };
 const AZ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".split("");
@@ -30,7 +30,7 @@ export function contactsVM(ctx: SalesCtx) {
     const cancel = (e?: { stopPropagation(): void }) => { e?.stopPropagation(); patch({ rename: null }); };
     const sx = sw ? sw.x : 0;
     return {
-      head, name: c.name, ini: ini(c.name), status: STATUS_LABEL[c.status], phone: phoneLabel(c.phone) || "—", tel: telHref(c.phone), hasTel: !!c.phone.replace(/D/g, ""),
+      head, name: c.name, ini: ini(c.name), status: STATUS_LABEL[c.status], phone: phoneLabel(c.phone) || "—", tel: telHref(c.phone), hasTel: !!c.phone.replace(/\D/g, ""),
       sx, sTrans: sw && sw.drag ? "none" : "transform 220ms ease", actOp: sx < -4 ? 1 : 0,
       open: () => { if (refs.moved) { refs.moved = false; return; } if (sw) { patch({ cSwipe: null }); return; } if (!ui.rename) patch({ cInfo: c.id, cSwipe: null }); },
       sDown: (e: PEvent) => { if (ui.rename) return; refs.cs = { id: c.id, x0: e.clientX, b: sx }; refs.moved = false; },
@@ -60,7 +60,6 @@ export function contactsVM(ctx: SalesCtx) {
     };
   });
   const have = new Set(contacts.map(p => letterOf(p.name)));
-  const ci = ui.cInfo ? data.customers.find(c => c.id === ui.cInfo) : undefined;
   return {
     cq: ui.cq, setCq: (e: ChangeEvent<HTMLInputElement>) => patch({ cq: e.target.value }),
     contacts, contactsEmpty: !contacts.length, // stop comes with the customer form below
@@ -74,10 +73,7 @@ export function contactsVM(ctx: SalesCtx) {
         if (el) list.scrollTop = el.offsetTop - list.offsetTop - 4;
       },
     })),
-    ctOpen: !!ci, ctClose: () => patch({ cInfo: null }), ctName: ci?.name ?? "", ctIni: ci ? ini(ci.name) : "",
-    ctRows: ci ? infoRows(ci) : [],
-    ctChat: () => { if (!ci) return; set(u => ({ ...u, tab: "inbox", chat: ci.id, cInfo: null, hist: [...u.hist, u.tab].slice(-20) })); act.openChat(ci.id); },
-    ctEdit: () => { if (!ci) return; set(u => ({ ...u, cform: { customerId: ci.id, edit: true }, cInfo: null })); },
+    ...contactInfoVM(ctx),
     ...customerFormVM(ctx),
   };
 }

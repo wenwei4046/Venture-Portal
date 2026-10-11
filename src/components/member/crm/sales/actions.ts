@@ -34,7 +34,8 @@ export interface SalesActions {
   /** An auto-reply's picture: uploaded to the person's own folder; returns its public link. */
   uploadAutoReplyImage(file: File): Promise<string | null>;
   saveAutoReplies(set: CrmAutoReplySet): void;
-  seenNotifs(): void;
+  /** Mark notifications read: these ids, or (all) everything up to now — invitations stay until answered. */
+  readNotifs(keys: string[], all?: boolean): void;
   invite(kind: "share" | "move", customerId: string, to: string): Promise<boolean>;
   answerInvite(inviteId: string, accept: boolean): Promise<void>;
   loadTemplates(): Promise<WaTemplate[] | null>;
@@ -240,9 +241,9 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
         timer = setTimeout(() => { void crmWrite("crm_save_auto_replies", { p_settings: set }).then(r => { if (!r.ok) toast(r.error); }); }, 700);
       };
     })(),
-    seenNotifs() {
-      setData(d => ({ ...d, notifsSeenAt: new Date().toISOString() }));
-      if (live) void crmWrite("crm_seen_notifications", {});
+    readNotifs(keys, all = false) {
+      setData(d => ({ ...d, notifRead: all ? [] : [...new Set([...d.notifRead, ...keys])], notifsSeenAt: all ? new Date().toISOString() : d.notifsSeenAt }));
+      if (live) void crmWrite("crm_read_notifs", { p_keys: keys, p_all: all });
     },
     async invite(kind, customerId, to) {
       const r = await write("crm_invite", { p_kind: kind, p_contact: customerId, p_to: to });
@@ -257,10 +258,11 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       setData(d => ({ ...d, invites: d.invites.map(i => (i.id === inviteId ? { ...i, state: accept ? "accepted" : "declined", decidedAt: new Date().toISOString() } : i)) }));
     },
     async loadTemplates() {
-      if (!live) return [
-        { name: "follow_up", language: "en", category: "MARKETING", text: "Hi {{1}}, just checking in. Are you still interested in the item you enquired about? We'd be happy to help.", params: 1 },
-        { name: "visit_invite", language: "en", category: "MARKETING", text: "Hi {{1}}, we'd love to see you at our showroom. Reply to this message and we'll book a time that suits you.", params: 1 },
-      ];
+      // Demo: the switched-on WhatsApp templates of the demo data, as the live read gives them (rev 1011).
+      if (!live) return (data().templates ?? []).filter(t => t.ch === "whatsapp" && t.st === "approved" && t.on && t.metaName).map(t => {
+        const text = t.body.replace(/\{name\}/g, "{{1}}");
+        return { name: t.metaName!, label: t.name, language: t.language, category: "MARKETING", text, params: text.includes("{{1}}") ? 1 : 0 };
+      });
       const r = await fetchCrmTemplates();
       if (!r.ok) { toast(r.error); return null; }
       return r.templates;

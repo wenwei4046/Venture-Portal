@@ -12,7 +12,7 @@ import type { ChatVM } from "./vm/chat";
 export default function SalesChat({ v }: { v: ChatVM }) {
   return (<>
             
-    <main style={{ position: "relative", flex: "1 1 auto", minHeight: "0", boxSizing: "border-box", padding: "6px 20px 8px", display: "flex", flexDirection: "column", gap: "12px" }}>
+    <main style={{ position: "relative", flex: "1 1 auto", minHeight: "0", boxSizing: "border-box", padding: "16px 20px 8px", display: "flex", flexDirection: "column", gap: "12px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", paddingBottom: "12px", borderBottom: "1px solid rgb(235 221 210)" }}>
         <span onClick={v.closeChat} style={{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid rgb(235 221 210)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
@@ -34,7 +34,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
           <span style={{ fontSize: "12px", color: "#387557", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.cl.ad}</span>
         </div>
         <span style={{ flex: "none", position: "relative" }}>
-          <span onClick={v.hm.toggle} title="More" style={{ width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid rgb(235 221 210)", background: v.hm.btnBg, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <span data-hm-toggle="1" onClick={v.hm.toggle} title="More" style={{ width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid rgb(235 221 210)", background: v.hm.btnBg, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="12" cy="5" r="1.8">
               </circle>
@@ -45,9 +45,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
             </svg>
           </span>
           {!!(v.hm.open) && (<>
-            <div onClick={v.hm.close} style={{ position: "fixed", inset: "0", zIndex: "6" }}>
-            </div>
-            <div style={{ position: "absolute", top: "52px", right: "0", zIndex: "7", width: "264px", padding: "6px", boxSizing: "border-box", borderRadius: "20px", background: "#fff", border: "1px solid #F0E4DA", boxShadow: "0 16px 36px rgba(63,43,34,.16), 0 2px 6px rgba(63,43,34,.06)", display: "flex", flexDirection: "column", gap: "2px", animation: "fadeIn 140ms ease-out" }}>
+            <div data-hm-menu="1" style={{ position: "absolute", top: "52px", right: "0", zIndex: "7", width: "264px", padding: "6px", boxSizing: "border-box", borderRadius: "20px", background: "#fff", border: "1px solid #F0E4DA", boxShadow: "0 16px 36px rgba(63,43,34,.16), 0 2px 6px rgba(63,43,34,.06)", display: "flex", flexDirection: "column", gap: "2px", animation: "fadeIn 140ms ease-out" }}>
               {(v.hm.items).map((it, it_i) => (<Fragment key={it_i}>
                 <div onClick={it.go} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 10px", borderRadius: "14px", cursor: "pointer" }} className={H.hov2}>
                   <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "11px", background: it.bg, color: it.fg, display: "grid", placeItems: "center" }}>
@@ -87,17 +85,14 @@ export default function SalesChat({ v }: { v: ChatVM }) {
           {!!v.simReplyShow && (<span onClick={v.simReply} style={{ alignSelf: "flex-start", height: "30px", padding: "0 12px", boxSizing: "border-box", borderRadius: "15px", border: "1px dashed #3E5C7A", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>Demo: customer replies</span>)}
         </div>
       </>)}
-      <p style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "6px", margin: "0", fontSize: "12px", color: "rgb(128 107 96)" }}>
-        <span style={{ color: "rgb(56 117 87)" }}>{v.cl.window}</span>
-      </p>
-      <div data-chat-list="1" style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "10px", padding: "6px 0" }}>
+      <div data-chat-list="1" style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "10px", margin: "0 -20px", padding: "10px 20px", backgroundColor: v.wallBg, backgroundImage: v.wallImg, backgroundSize: v.wallSize }}>
         {(v.msgs3b).map((m, m_i) => (<Fragment key={m_i}>
           {!!(m.sep) && (<>
-            <span style={{ alignSelf: "center", margin: "6px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "#F5EBE3", color: "#4E2F20", fontSize: "12px", fontWeight: "600" }}>{m.sep}</span>
+            <span style={{ alignSelf: "center", margin: "6px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "#FFFFFF", boxShadow: "0 1px 1px rgba(63,43,34,.10)", color: "#4E2F20", fontSize: "12px", fontWeight: "600" }}>{m.sep}</span>
           </>)}
           {!!(m.plain) && (<>
             <div onMouseEnter={m.enter} onMouseLeave={m.leave} style={{ position: "relative", alignSelf: m.align, maxWidth: m.max, display: "flex", flexDirection: m.rowDir, alignItems: "center", gap: "6px", marginBottom: m.rxGap }}>
-              <div style={{ position: "relative", minWidth: "0", padding: "10px 13px", boxSizing: "border-box", borderRadius: m.radius, background: m.bg, border: `1px ${m.borderStyle} ${m.border}`, textAlign: m.textAlign, color: m.fg }}>
+              <div style={{ position: "relative", minWidth: "0", padding: "10px 13px", boxSizing: "border-box", borderRadius: m.radius, boxShadow: "0 1px 1px rgba(63,43,34,.10)", background: m.bg, border: `1px ${m.borderStyle} ${m.border}`, textAlign: m.textAlign, color: m.fg }}>
                 {!!(m.quote) && (<>
                   <div style={{ margin: "-3px -6px 6px", padding: "6px 10px", borderRadius: "8px", borderLeft: "3px solid #BD4A19", background: "rgba(63,43,34,.06)", display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}>
                     <strong style={{ fontSize: "13px", fontWeight: "650", color: "#BD4A19" }}>{m.quote.who}</strong>
@@ -628,7 +623,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
               <span style={{ fontSize: "13px", fontWeight: "600", color: "#3F2B22" }}>Time</span>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" }}>
                 {(v.slots).map((s, s_i) => (<Fragment key={s_i}>
-                  <span onClick={s.pick} style={{ height: "40px", borderRadius: "12px", border: `1px solid ${s.border}`, background: s.bg, color: s.fg, display: "grid", placeItems: "center", fontSize: "14px", fontWeight: s.weight, textDecoration: s.deco, cursor: s.cursor }}>{s.t}</span>
+                  <span onClick={s.pick} style={{ height: "46px", borderRadius: "12px", border: `1px solid ${s.border}`, background: s.bg, color: s.fg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px", cursor: s.cursor }}><span style={{ fontSize: "14px", fontWeight: s.weight, textDecoration: s.deco }}>{s.t}</span><small style={{ fontSize: "10px", fontWeight: "600", opacity: ".8" }}>{s.left}</small></span>
                 </Fragment>))}
               </div>
             </div>

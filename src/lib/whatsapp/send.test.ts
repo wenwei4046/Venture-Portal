@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { cleanText, sendError, sendWhatsAppText, textRequest, windowOpen } from "./send";
+import { cleanText, metaTemplateBody, metaTemplateName, sendError, sendWhatsAppText, submitWhatsAppTemplate, templateStatusOf, templateSubmitRequest, textRequest, windowOpen } from "./send";
 
 describe("the 24-hour window", () => {
   const now = new Date("2026-10-02T12:00:00Z");
@@ -54,5 +54,35 @@ describe("sending", () => {
 
   it("never puts the token in an error", () => {
     for (const code of [131047, 190, 10, 131026, 1, undefined]) expect(sendError(400, { error: { code, message: "TOKEN leaked?" } })).not.toContain("TOKEN");
+  });
+});
+
+describe("cold lead templates for Meta (rev 1011)", () => {
+  it("writes {name} as Meta's {{1}}, with an example", () => {
+    expect(metaTemplateBody(" Hi {name}, still keen? ")).toBe("Hi {{1}}, still keen?");
+    expect(templateSubmitRequest({ name: "crm_x_ab", language: "en", category: "MARKETING", body: "Hi {name}" }).components)
+      .toEqual([{ type: "BODY", text: "Hi {{1}}", example: { body_text: [["Sarah"]] } }]);
+    expect(templateSubmitRequest({ name: "crm_x_ab", language: "en", category: "MARKETING", body: "Hello" }).components).toEqual([{ type: "BODY", text: "Hello" }]);
+  });
+  it("names it as Meta allows: lowercase, digits, underscores, with a tag", () => {
+    expect(metaTemplateName("Follow up visit!", "AB12-cd34")).toBe("crm_follow_up_visit_ab12cd34");
+    expect(metaTemplateName("出租", "x1")).toBe("crm_template_x1");
+  });
+  it("reads Meta's review", () => {
+    expect([templateStatusOf("APPROVED"), templateStatusOf("PENDING"), templateStatusOf("REJECTED"), templateStatusOf("DISABLED"), templateStatusOf(undefined)])
+      .toEqual(["approved", "review", "rejected", "rejected", "review"]);
+  });
+  it("submits to the account and answers Meta's id", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ id: "987", status: "PENDING", category: "MARKETING" }), { status: 200 }));
+    const r = await submitWhatsAppTemplate({ wabaId: "WABA1", token: "T", name: "crm_a_b", language: "en", category: "MARKETING", body: "Hi {name}" }, fetchImpl as unknown as typeof fetch);
+    expect(r).toEqual({ ok: true, id: "987", status: "review" });
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain("/WABA1/message_templates");
+    expect(JSON.parse(String(init.body)).components[0].text).toBe("Hi {{1}}");
+  });
+  it("says Meta's own reason when it refuses", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ error: { code: 100, error_user_msg: "Name already exists" } }), { status: 400 }));
+    const r = await submitWhatsAppTemplate({ wabaId: "W", token: "T", name: "n", language: "en", category: "MARKETING", body: "x" }, fetchImpl as unknown as typeof fetch);
+    expect(r).toEqual({ ok: false, error: "WhatsApp refused the template: Name already exists" });
   });
 });

@@ -4,13 +4,31 @@ import { salesNotifs, unreadNotifs } from "./notifs";
 import { teamName, teamOf, titleOf } from "../../shared/people";
 import type { SalesTab } from "../ui";
 
+/**
+ * Team | Mine (rev 1010 §7.3): the Director and anyone with a downline; Mine is this CRM, Team the Control panel scoped
+ * to them. Viewing somebody (View as) shows it as THEY would see it — CrmApp hands their Team (user 2026-10-11). On
+ * Inbox it sits in the title row, left of All ads (user 2026-10-11); on the other pages in the top bar. Never inside a
+ * chat (neither is drawn there).
+ */
+export function teamMineVM(ctx: SalesCtx) {
+  const toTeam = ctx.embedded?.toTeam;
+  return {
+    hasTM: !!toTeam,
+    tmTabs: ([["Team", false], ["Mine", true]] as const).map(([label, on]) => ({ label, bg: on ? "#fff" : "transparent", fg: on ? "#3F2B22" : "#806B60", sh: on ? "0 1px 3px rgba(63,43,34,.14)" : "none",
+      pick: on ? undefined : () => toTeam?.(ctx.ui.tab) })),
+  };
+}
+
 export function headerVM(ctx: SalesCtx, onExit: () => void) {
   const { ui, set, data } = ctx;
-  const unread = unreadNotifs(salesNotifs(ctx), data.notifsSeenAt);
+  const unread = unreadNotifs(salesNotifs(ctx), data);
+  const tm = teamMineVM(ctx);
   return {
+    hasTM: tm.hasTM && ui.tab !== "inbox", tmTabs: tm.tmTabs,
     backLabel: "Back to Revenue app", backVis: "visible" as const,
     crmBack: () => { if (ui.profSub) { set(u => ({ ...u, profSub: null })); return; } onExit(); },
-    openNotifTop: () => { set(u => ({ ...u, tab: "profile", profSub: "notif", hist: [...u.hist, u.tab].slice(-20) })); ctx.act.seenNotifs(); },
+    // Opening Notifications reads nothing by itself any more: each update is read when tapped (rev 1010 §6).
+    openNotifTop: () => { set(u => ({ ...u, tab: "profile", profSub: "notif", nTab: "unread", hist: [...u.hist, u.tab].slice(-20) })); },
     hasNotifBadge: unread > 0, notifBadge: unread ? String(unread) : "",
   };
 }
@@ -26,14 +44,15 @@ const NAV: [SalesTab, string, string][] = [
 
 export function navVM(ctx: SalesCtx) {
   const { ui, set, data, mine, now } = ctx;
-  const unread = unreadNotifs(salesNotifs(ctx), data.notifsSeenAt);
+  const unread = unreadNotifs(salesNotifs(ctx), data);
   const ids = new Set(mine.map(c => c.id));
   const upcoming = data.visits.filter(v => ids.has(v.customerId) && v.state === "booked" && new Date(v.start) > now).length;
   const badges: Record<SalesTab, number> = { inbox: mine.reduce((n, c) => n + (c.unread || 0), 0), contacts: 0, calendar: upcoming, insight: 0, profile: unread };
   return {
     nav3b: NAV.map(([id, label, icon]) => ({
       label, icon, badge: badges[id], color: ui.tab === id ? RUST : SUB, weight: ui.tab === id ? 600 : 500,
-      go: () => { if (ui.tab !== id) set(u => ({ ...u, tab: id, profSub: null, hist: [...u.hist, u.tab].slice(-20) })); },
+      // Insight opens on Me, with no list or info sheet left open (rev 1010 §5.2).
+      go: () => { if (ui.tab !== id) set(u => ({ ...u, tab: id, profSub: null, hist: [...u.hist, u.tab].slice(-20), ...(id === "insight" ? { insList: null, insInfo: null } : {}) })); },
     })),
   };
 }
@@ -45,7 +64,8 @@ export function shellVM(ctx: SalesCtx) {
   const list = embedded?.switchList ?? [];
   const groupOf = (p: (typeof list)[number]) => (p.role === "boss" ? "Principal" : p.role === "hod" ? "Director" : teamName(teamOf(p.id, ctx.data.people)) || "Others");
   return {
-    rdX: !!embedded?.rdMode && !viewingOther, toPanelX: () => embedded?.toPanel?.(),
+    // The old Control panel | My CRM banner gives way to Team | Mine in the top bar (rev 1010 §7.3).
+    rdX: false, toPanelX: () => embedded?.toPanel?.(),
     asOnX: viewingOther, asNameX: firstName(owner.name),
     canSwitchX: viewingOther && list.length > 1,
     swOpenX: ui.swOpen, openSwX: () => set(u => ({ ...u, swOpen: true })), closeSwX: () => set(u => ({ ...u, swOpen: false })),

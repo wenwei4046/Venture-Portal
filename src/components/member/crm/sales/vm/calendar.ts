@@ -9,6 +9,7 @@ import { createElement, type ChangeEvent, type MouseEvent, type ReactNode } from
 import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import { BORDER, gb, day0, DAY, dayLabel, firstName, ini, money, stop, timeLabel, type PEvent, type SalesCtx } from "./common";
 import type { OutcomeAsk } from "../ui";
+import { contactInfoVM, customerFormVM } from "./customer";
 
 export const LOST_OPTIONS: [string, string, string][] = [
   ["Price", "too_expensive", "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"],
@@ -49,7 +50,9 @@ export function calendarVM(ctx: SalesCtx) {
   const cv = ui.calView, ym = ui.calYM ?? [now.getFullYear(), now.getMonth()], sel = ui.calSel ?? T;
   const first = new Date(ym[0], ym[1], 1), lead0 = (first.getDay() + 6) % 7, dim = new Date(ym[0], ym[1] + 1, 0).getDate();
   const weeks = Math.ceil((lead0 + dim) / 7);
-  const openChat = (c: CrmCustomer) => () => { set(u => ({ ...u, tab: "inbox", chat: c.id, hist: [...u.hist, u.tab].slice(-20) })); act.openChat(c.id); };
+  // A visit opens Customer info first, then the chat (rev 1010 §3). A chip in a Month cell / Week column keeps its tap from the
+  // cell's select-day; a tap that ends a swipe opens nothing.
+  const openInfo = (c: CrmCustomer) => (e?: MouseEvent<HTMLElement>) => { e?.stopPropagation(); if (refs.calSwiped) return; patch({ cInfo: c.id }); };
   const setSel = (t: number) => { const d = new Date(t); patch({ calSel: day0(d), calYM: [d.getFullYear(), d.getMonth()] }); };
   const step = cv === "week" ? 7 : 1;
   const wkStart = sel - ((new Date(sel).getDay() + 6) % 7) * DAY;
@@ -134,7 +137,7 @@ export function calendarVM(ctx: SalesCtx) {
 
   const cel = ui.celebrate;
   return {
-    stop,
+    // stop comes with the customer form below
     calTitle: first.toLocaleDateString("en-GB", ym[0] === now.getFullYear() ? { month: "long" } : { month: "long", year: "numeric" }),
     calToday: (e: MouseEvent<HTMLElement>) => {
       const main = e.currentTarget.closest("main");
@@ -160,7 +163,9 @@ export function calendarVM(ctx: SalesCtx) {
       const d = new Date(ym[0], ym[1], 1 - lead0 + k), t = d.getTime(), inM = d.getMonth() === ym[1], isT = t === T, isS = t === sel, ev = evOn(t);
       return { n: d.getDate(), pick: guard(() => patch({ calSel: t, calYM: [d.getFullYear(), d.getMonth()] })), edge: k % 7 ? "1px solid #F3E9E1" : "0",
         bg: isS && !isT ? "#FFF8F2" : "transparent", dotBg: isT ? "#BD4A19" : "transparent", fg: isT ? "#fff" : inM ? "#3F2B22" : "#C9B5A8", weight: isT || isS ? 700 : 500,
-        ev: ev.slice(0, 2).map(a => ({ t: timeLabel(a.at).replace(":00", "").replace(" ", "") + " " + firstName(a.c.name), bg: colOf(a) })).concat(ev.length > 2 ? [{ t: "+" + (ev.length - 2), bg: "#806B60" }] : []) };
+        ev: ev.slice(0, 2).map(a => ({ t: timeLabel(a.at).replace(":00", "").replace(" ", "") + " " + firstName(a.c.name), bg: colOf(a), open: openInfo(a.c) as ((e: MouseEvent<HTMLElement>) => void) | undefined }))
+          // "+N" keeps the cell's select-day.
+          .concat(ev.length > 2 ? [{ t: "+" + (ev.length - 2), bg: "#806B60", open: undefined }] : []) };
     }),
     calPrev: () => setSel(sel - step * DAY + 3 * 3_600_000), calNext: () => setSel(sel + step * DAY + 3 * 3_600_000),
     calSwDown: (e: PEvent) => { refs.calSw = { x: e.clientX, y: e.clientY }; },
@@ -177,16 +182,16 @@ export function calendarVM(ctx: SalesCtx) {
       const d = wd(k), t = d.getTime(), isT = t === T, isS = t === sel;
       return { wk: d.toLocaleDateString("en-GB", { weekday: "short" }), n: d.getDate(), edge: k ? "1px solid #F3E9E1" : "0", bg: isS && !isT ? "#FFF8F2" : "transparent",
         dotBg: isT ? "#BD4A19" : "transparent", fg: isT ? "#fff" : "#3F2B22", weight: isT || isS ? 700 : 500, pick: guard(() => setSel(t)),
-        ev: evOn(t).map(a => ({ time: timeLabel(a.at), name: firstName(a.c.name), bg: colOf(a) })) };
+        ev: evOn(t).map(a => ({ time: timeLabel(a.at), name: firstName(a.c.name), bg: colOf(a), open: openInfo(a.c) })) };
     }),
     selLabel: (sel === T ? "Today · " : "") + new Date(sel).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }),
     dayHours: Array.from({ length: 12 }, (_, k) => {
       const hr = 10 + k, items = evOn(sel).filter(a => a.at.getHours() === hr);
-      return { label: (hr % 12 || 12) + (hr < 12 ? " am" : " pm"), ev: items.map(a => ({ name: a.c.name, time: timeLabel(a.at), room: a.room, bg: colOf(a), open: openChat(a.c) })) };
+      return { label: (hr % 12 || 12) + (hr < 12 ? " am" : " pm"), ev: items.map(a => ({ name: a.c.name, time: timeLabel(a.at), room: a.room, bg: colOf(a), open: openInfo(a.c) })) };
     }),
     hasToday: todayV.length > 0 && inView(now), todayCount: earlier ? `${today} today · ${earlier} to mark` : `${todayV.length} today`,
     todayList: todayV.map(a => ({
-      name: a.c.name, room: a.room, open: openChat(a.c),
+      name: a.c.name, room: a.room, open: openInfo(a.c),
       time: day0(a.at) === T ? timeLabel(a.at) : `${gb(a.at, { weekday: "short", day: "numeric", month: "short" })}, ${timeLabel(a.at)}`,
       change: change(a), came: () => patch({ outcomeAsk: ask(a) }), noShow: () => patch({ outcomeAsk: ask(a, "noshow") }),
     })),
@@ -199,11 +204,13 @@ export function calendarVM(ctx: SalesCtx) {
     upList: upV.map(a => {
       const done = !!a.v.remindedAt;
       return { name: a.c.name, ini: ini(a.c.name), time: timeLabel(a.at), room: a.room, wk: a.at.toLocaleDateString("en-GB", { weekday: "short" }), dn: a.at.getDate(),
-        open: openChat(a.c), isToday: false, later: true, came: () => patch({ outcomeAsk: ask(a) }),
+        open: openInfo(a.c), isToday: false, later: true, came: () => patch({ outcomeAsk: ask(a) }),
         rLabel: done ? "Sent" : "Send reminder", rIcon: done ? "m5 12 5 5 9-10" : "M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z",
         rBg: done ? "#fff" : "#BD4A19", rFg: done ? "#387557" : "#fff", rBd: done ? "#CFE3D6" : "#BD4A19", rCur: done ? "default" : "pointer",
         remind: done ? undefined : () => { void act.remind(a.v.id); } };
     }),
+    // Customer info (Edit · Open chat) and its form, as on Contacts (rev 1010 §3).
+    ...contactInfoVM(ctx), ...customerFormVM(ctx),
   };
 }
 export type CalendarVM = ReturnType<typeof calendarVM>;

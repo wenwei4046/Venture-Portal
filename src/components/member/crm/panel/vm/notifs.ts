@@ -54,7 +54,9 @@ export function notifsVM(ctx: PanelCtx) {
   const all = panelNotifs(ctx), f = ui.nfF;
   const isRead = (n: PanelNotif) => data.notifRead.includes(n.key) || (!!data.notifsSeenAt && n.at <= data.notifsSeenAt);
   const unread = all.filter(n => !isRead(n));
-  const list = all.filter(n => !f || n.kind === f);
+  // Unread | Read (rev 1011, as RS rev 1010 §6): the kind chips filter inside the chosen tab and count only that tab.
+  const rt = ui.nfR === "read" ? "read" : "unread", inTab = (n: PanelNotif) => rt === "read" ? isRead(n) : !isRead(n);
+  const list = all.filter(n => inTab(n) && (!f || n.kind === f));
   const T = day0(now);
   const dayOf = (iso: string) => { const d = day0(new Date(iso)); return d === T ? "Today" : d === T - DAY ? "Yesterday" : gb(new Date(iso), { weekday: "short", day: "numeric", month: "short" }); };
   const row = (n: PanelNotif, k: number) => {
@@ -71,8 +73,14 @@ export function notifsVM(ctx: PanelCtx) {
     readAll: () => { if (unread.length) act.readNotifs(unread.map(n => n.key), true); }, readAllFg: unread.length ? "#BD4A19" : "#C9B5A8",
     nfChips: ([["", "All", "#3F2B22"], ["move", "Move", K.move[1]], ["share", "Share", K.share[1]], ["won", "Won", K.won[1]], ["lost", "Lost", K.lost[1]], ["overdue", "Overdue 9 h+", K.overdue[1]]] as const).map(([k, label, dot]) => {
       const on = f === k;
-      return { label, dot: on ? "#fff" : dot, n: all.filter(n => !k || n.kind === k).length, bg: on ? "#3F2B22" : "#fff", fg: on ? "#fff" : "#3F2B22", bd: on ? "#3F2B22" : "#EBDDD2", pick: () => patch({ nfF: k }) };
+      return { label, dot: on ? "#fff" : dot, n: all.filter(n => inTab(n) && (!k || n.kind === k)).length, bg: on ? "#3F2B22" : "#fff", fg: on ? "#fff" : "#3F2B22", bd: on ? "#3F2B22" : "#EBDDD2", pick: () => patch({ nfF: k }) };
     }),
     nfGroups: groups, nfEmpty: !list.length,
+    nfEmptyText: rt === "unread" ? "You're all caught up." : "Nothing read yet.",
+    nfTabs: ([["unread", "Unread", unread.length], ["read", "Read", 0]] as const).map(([k, label, n]) => ({
+      label, n: n ? String(n) : "", pick: () => patch({ nfR: k }),
+      bg: rt === k ? "#fff" : "transparent", fg: rt === k ? "#3F2B22" : "#806B60", w: rt === k ? 650 : 500, sh: rt === k ? "0 1px 3px rgba(63,43,34,.12)" : "none" })),
+    // Mark all read on Unread only.
+    readAllShow: rt === "unread",
   };
 }

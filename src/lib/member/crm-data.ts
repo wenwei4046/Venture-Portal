@@ -54,6 +54,9 @@ export interface CrmCustomer {
   previous?: "won" | "lost";
   wonAmount: number | null;
   assignedTo: string | null;
+  /** Over the limit (rev 1011 §6.6): a By max team was full, so the customer waits, kept in that team, nobody yet. */
+  held?: boolean;
+  heldTeam?: string | null;
   /** When the customer was given to them, and by whom (null: the CRM dealt it) — the bell's "new enquiry for you". */
   assignedAt?: string | null;
   assignedBy?: string | null;
@@ -127,9 +130,14 @@ export interface CrmEvent {
 }
 
 /** Ads to teams (mig 20261009180000): how one ad's enquiries are dealt. */
-export interface CrmAdRule { adId: string; label: string; mode: "even" | "split" | "people"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; startedAt: string }
+export interface CrmAdRule {
+  adId: string; label: string; mode: "even" | "split" | "people"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; startedAt: string;
+  /** By team, inside each team (rev 1011 §6.6): Evenly · By % (the default) · By max. Absent = By % with an even split. */
+  tm?: Record<string, "even" | "pct" | "cnt">;
+}
 /** Full time lead allocation for one team: on these weekdays (0 = Monday) the full-time RS take their maximum or % first. */
-export interface CrmFtRule { tlId: string; mode: "cnt" | "pct"; days: number[]; vals: Record<string, Record<string, number>> }
+/** rev 1011 §6.2: "turns" — vals[staff][day] = 1 where ticked; one ticked gets that day's leads, two or more take turns. */
+export interface CrmFtRule { tlId: string; mode: "cnt" | "pct" | "turns"; days: number[]; vals: Record<string, Record<string, number>> }
 
 /**
  * What the signed-in person may do in the CRM — their CRM cells in the
@@ -186,6 +194,14 @@ export interface CrmData {
   notifRead: string[];
   adRules: CrmAdRule[];
   ftRules: CrmFtRule[];
+  /** Cold lead templates (rev 1011, mig 20261011140000): every one for the Control panel, Approved + On for everybody else. */
+  templates?: CrmTemplate[];
+}
+
+/** A cold lead template. `body` writes the customer's first name as {name}; `metaName` is what Meta keeps it by. */
+export interface CrmTemplate {
+  id: string; name: string; ch: "whatsapp" | "messenger"; st: "draft" | "review" | "approved" | "rejected"; body: string; on: boolean;
+  metaName: string | null; language: string; reason: string | null;
 }
 
 /* ── Defaults the design starts with ───────────────────────────────────── */
@@ -220,6 +236,8 @@ export interface CrmContactRowX extends CrmContactRow {
   details_at?: string | null;
   assigned_at?: string | null;
   assigned_by?: string | null;
+  /** rev 1011: "limit" while it waits Over the limit in its team (mig 20261011130000). */
+  held_reason?: string | null;
 }
 export interface CrmMessageRowX extends CrmMessageRow {
   reply_to?: string | null;
@@ -257,8 +275,9 @@ export interface CrmDataRows {
   shares: { contact_id: string; staff_id: string; invited_by: string | null; joined_at: string }[];
   events: CrmEventRow[];
   staffPrefs: { notifs_seen_at: string | null; notif_read?: string[] | null }[];
-  adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string }[];
-  ftRules: { tl_id: string; mode: "cnt" | "pct"; days: number[] | null; vals: Record<string, Record<string, number>> | null }[];
+  adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string; team_modes?: Record<string, "even" | "pct" | "cnt"> | null }[];
+  ftRules: { tl_id: string; mode: CrmFtRule["mode"]; days: number[] | null; vals: Record<string, Record<string, number>> | null }[];
+  templates?: { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null }[];
   /** crm_my_can()'s answer; null when the database did not give one. */
   can?: unknown;
 }
@@ -312,6 +331,7 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
     assignedTo: row.assigned_to,
     assignedAt: row.assigned_at ?? null,
     assignedBy: row.assigned_by ?? null,
+    ...(row.held_reason === "limit" ? { held: true, heldTeam: row.team_id } : {}),
     teamId: row.team_id,
     lastCustomerAt: row.last_customer_at ?? null,
     createdAt: row.created_at,
@@ -368,8 +388,9 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     events: rows.events.map(e => ({ id: e.id, kind: e.kind, customerId: e.contact_id, actor: e.actor, owner: e.owner, data: e.data ?? {}, at: e.at })),
     notifsSeenAt: rows.staffPrefs[0]?.notifs_seen_at ?? null,
     notifRead: rows.staffPrefs[0]?.notif_read ?? [],
-    adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at })),
+    adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at, ...(r.team_modes ? { tm: r.team_modes } : {}) })),
     ftRules: rows.ftRules.map(r => ({ tlId: r.tl_id, mode: r.mode, days: r.days ?? [], vals: r.vals ?? {} })),
+    templates: (rows.templates ?? []).map(t => ({ id: t.id, name: t.name, ch: t.channel, st: t.status, body: t.body, on: t.is_on, metaName: t.meta_name, language: t.language, reason: t.reject_reason })),
   };
 }
 

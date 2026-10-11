@@ -5,6 +5,7 @@
  * the header + the open tab + the bottom bar, or a chat. The generated screens
  * (Sales*.tsx) draw; the view models (vm/*.ts) decide.
  */
+import { useCallback } from "react";
 import SalesShellBanners from "./SalesShellBanners";
 import SalesHeader from "./SalesHeader";
 import SalesInbox from "./SalesInbox";
@@ -23,11 +24,14 @@ import { profileVM } from "./vm/profile";
 import { chatVM } from "./vm/chat";
 import type { SalesCtx } from "./vm/common";
 import { useFollowNewest } from "../shared/stick";
+import { useCloseOnOutside } from "./outside";
 
 export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: () => void }) {
   const { ui } = ctx;
   const chat = chatVM(ctx);
   useFollowNewest(ui.chat, ctx.data.customers.find(c => c.id === ui.chat)?.messages.length ?? 0);
+  const { set } = ctx;
+  useCloseOnOutside(!!ui.hm?.menu, useCallback(() => set(u => ({ ...u, hm: null })), [set]));
   return (<>
     <SalesShellBanners v={shellVM(ctx)} />
     {!chat && (<>

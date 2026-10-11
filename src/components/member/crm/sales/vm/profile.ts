@@ -8,7 +8,7 @@ import type { ChangeEvent } from "react";
 import { DEFAULT_QUICK_REPLIES, type CrmAutoReplySet } from "@/lib/member/crm-data";
 import { downlineOf, jobTitle, titleOf } from "../../shared/people";
 import { firstName, ini, stop, type SalesCtx } from "./common";
-import { salesNotifs, unreadNotifs } from "./notifs";
+import { isReadNotif, salesNotifs } from "./notifs";
 
 const swv = (on: boolean) => ({ Bg: on ? "#387557" : "#D9C7BA", X: on ? "21px" : "3px" });
 const to12 = (hhmm: string) => { const [H, M] = hhmm.split(":").map(Number); return { h: H % 12 || 12, m: M, ap: (H < 12 ? "AM" : "PM") as "AM" | "PM" }; };
@@ -16,7 +16,10 @@ const lbl = (hhmm: string) => { const t = to12(hhmm); return `${t.h}:${String(t.
 
 export function profileVM(ctx: SalesCtx) {
   const { ui, set, patch, data, owner, viewingOther, act, embedded } = ctx;
-  const notifs = salesNotifs(ctx), unread = unreadNotifs(notifs, data.notifsSeenAt);
+  // Unread | Read (rev 1010 §6): an update is read once tapped; an invitation stays unread until answered.
+  const notifs = salesNotifs(ctx), isRead = (n: (typeof notifs)[number]) => isReadNotif(n, data);
+  const unread = notifs.filter(n => !isRead(n)).length, nTab = ui.nTab;
+  const vis = notifs.filter(n => (nTab === "unread") === !isRead(n));
   const team = viewingOther ? [] : downlineOf(owner.id, data.people).map(id => data.people.find(p => p.id === id)!).filter(Boolean);
   const K = { share: ["#BD4A19", "#FFF0E4", "M16 11a4 4 0 1 0-8 0M4 20a8 8 0 0 1 16 0M19 8v6M16 11h6"], move: ["#2F6FB5", "#E4EDF8", "M5 12h14m-5-5 5 5-5 5"] } as const;
 
@@ -42,21 +45,29 @@ export function profileVM(ctx: SalesCtx) {
     profMain: !ui.profSub, profNotif: ui.profSub === "notif", profAuto: ui.profSub === "auto", profQuick: ui.profSub === "quick",
     meNameX: owner.name, meTitleX: jobTitle(owner), meIniX: ini(owner.name),
     meRankX: owner.role === "rs" ? (owner.fullTime ? "Full time" : "Part time") : "—",
-    hasTeam: team.length > 0, teamSub: team.map(p => firstName(p.name)).join(", "),
+    // No View my team (rev 1010 §7.3): team views live on the Team side.
+    hasTeam: false, teamSub: team.map(p => firstName(p.name)).join(", "),
     teamOpen: ui.teamOpen, openTeam: () => patch({ teamOpen: true }), closeTeam: () => patch({ teamOpen: false }),
     teamList: team.map(p => ({ name: p.name, title: titleOf(p), ini: ini(p.name), go: () => { set(u => ({ ...u, teamOpen: false, chat: null, tab: "inbox", filter: null })); embedded?.onSwitch?.(p.id); } })),
     hasNotifBadge: unread > 0, notifBadge: unread ? String(unread) : "",
-    openNotif: () => { patch({ profSub: "notif" }); act.seenNotifs(); },
+    openNotif: () => patch({ profSub: "notif", nTab: "unread" }),
+    nTabs: ([["unread", "Unread", unread], ["read", "Read", 0]] as const).map(([k, label, n]) => ({
+      label, n: n || 0, pick: () => patch({ nTab: k }), bg: nTab === k ? "#fff" : "transparent", fg: nTab === k ? "#3F2B22" : "#806B60", weight: nTab === k ? 650 : 500, shadow: nTab === k ? "0 1px 3px rgba(63,43,34,.12)" : "none" })),
+    // Mark all as read: every update, never an invitation still to answer.
+    canMarkAll: nTab === "unread" && notifs.some(n => !n.pending && !isRead(n)),
+    markAll: () => act.readNotifs(notifs.filter(n => !n.pending && !isRead(n)).map(n => n.id), true),
+    nEmpty: !vis.length, nEmptyText: nTab === "unread" ? "You're all caught up." : "Nothing read yet.",
     openAuto: () => patch({ profSub: "auto" }), openQuick: () => patch({ profSub: "quick" }),
     // Pending invitations stay as cards; once answered they move into Updates.
-    hasInv: notifs.some(n => n.pending),
-    notifInv: notifs.filter(n => n.pending).map(n => ({
+    hasInv: vis.some(n => n.pending),
+    notifInv: vis.filter(n => n.pending).map(n => ({
       text: n.text, lead: n.lead, at: n.at, ini: n.ini, c: K[n.kind === "move" ? "move" : "share"][0], bg: K[n.kind === "move" ? "move" : "share"][1], icon: K[n.kind === "move" ? "move" : "share"][2],
       pending: true, done: false, doneLabel: "", doneFg: "", doneBg: "",
       accept: () => { if (n.inviteId) void act.answerInvite(n.inviteId, true); }, decline: () => { if (n.inviteId) void act.answerInvite(n.inviteId, false); },
     })),
-    hasUpd: notifs.some(n => !n.pending),
-    notifUpd: notifs.filter(n => !n.pending).map((n, k) => ({
+    hasUpd: vis.some(n => !n.pending),
+    notifUpd: vis.filter(n => !n.pending).map((n, k) => ({
+      unread: !isRead(n), weight: isRead(n) ? 500 : 650, fg: isRead(n) ? "#806B60" : "#3F2B22", open: () => { if (!isRead(n)) act.readNotifs([n.id]); },
       text: n.text, meta: n.lead ? `${n.lead} · ${n.at}` : n.at, rule: k ? "1px solid #EBDDD2" : "0",
       c: n.ok ? "#387557" : "#A3371A", bg: n.ok ? "#E4F1E8" : "#FBEAE6", icon: n.ok ? "m5 12 5 5 9-10" : "M6 6l12 12M18 6 6 18",
     })),

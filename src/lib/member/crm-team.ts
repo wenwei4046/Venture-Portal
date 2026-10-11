@@ -308,6 +308,119 @@ export function leadsHeld(leads: Pick<CrmLead, "assignedTo">[]): Record<string, 
   return given;
 }
 
+/* ── The dealer, rev 1011 (mig 20261011130000) ──────────────────────────── */
+
+/**
+ * The TypeScript twin of crm_assign_contact / crm_pick_inside / crm_fulltime_pick as rev 1011 has them (the functions
+ * above are the 2026-10-03 dealer the old MemberCrm screens still draw). Keep the two in step: crm-team.test.ts runs the
+ * same cases as tests/member-sql/validate-crm-control.mjs.
+ *   - No ad: Organic Leads (nobody, no team) — sent by hand.
+ *   - An ad with no rule: the team with fewest of this ad's enquiries (ties: lowest id), then inside it Evenly.
+ *   - Evenly: everybody in every team, fewest from this ad first; that team's Full time days first.
+ *   - By team: the team furthest below its % (held leads count), then inside it Full time days, else its own mode —
+ *     Evenly · By % (the default; no values = Evenly) · By max (nobody below their max → the lead is HELD in that team).
+ *   - Full time = days per person, ticked; whoever got one from this team least recently.
+ */
+export type CrmInsideMode = "even" | "pct" | "cnt";
+export interface CrmDealRule {
+  mode: "even" | "split";
+  /** TL → % (adding up to 100), By team. */
+  split: Record<string, number>;
+  /** Person → their % or maximum inside their team. */
+  people: Record<string, number>;
+  /** TL → the inside-team mode; a team left out is By %. */
+  teamModes?: Record<string, CrmInsideMode>;
+}
+/** One team's Full time lead allocation: the chosen weekdays (0 = Monday) and, per person, the ticked days (1). */
+export interface CrmDealFullTime { days: number[]; ticked: Record<string, Record<string, number>> }
+/** What the next pick balances against, for this ad (since its rule started; 30 days with no rule). */
+export interface CrmDealCounts {
+  /** Person → this ad's enquiries given to them. */
+  given: Record<string, number>;
+  /** TL → this ad's enquiries in their team (given or held). */
+  team: Record<string, number>;
+  /** TL → this ad's enquiries held Over the limit in their team. */
+  held: Record<string, number>;
+  /** Person → when they were last given an enquiry from their team (ms) — Full time turns. */
+  lastAt: Record<string, number>;
+}
+export interface CrmDeal {
+  teamId: string | null;
+  memberId: string | null;
+  held?: boolean;
+  by: "organic" | "even" | "full_time" | "percent" | "max" | "over_the_limit" | `default_${"even" | "full_time"}`;
+}
+
+/** The weekday in Kuala Lumpur, 0 = Monday — as the database counts it. */
+export const officeWeekday = (at: Date) => (new Date(at.getTime() + 8 * 3_600_000).getUTCDay() + 6) % 7;
+
+const fewest = (ids: string[], score: (id: string) => number) =>
+  [...ids].sort((a, b) => score(a) - score(b) || (a < b ? -1 : a > b ? 1 : 0))[0] ?? null;
+
+/** Full time first: the ticked full-time people of the team today, in turn. */
+export function fullTimePick(teamId: string, at: Date, ft: CrmDealFullTime | undefined, counts: CrmDealCounts, members: CrmMember[]): string | null {
+  const day = officeWeekday(at);
+  if (!ft || !ft.days.includes(day)) return null;
+  const ticked = teamHandlers(teamId, members).filter(m => m.fullTime && (ft.ticked[m.id]?.[day] ?? 0) > 0).map(m => m.id);
+  return fewest(ticked, id => counts.lastAt[id] ?? -Infinity);
+}
+
+/** Who inside a team: Full time days first, else the team's own mode. */
+export function pickInside(teamId: string, mode: CrmInsideMode, people: Record<string, number>, at: Date, ft: CrmDealFullTime | undefined,
+  counts: CrmDealCounts, members: CrmMember[]): { memberId: string | null; hold: boolean; by: CrmDeal["by"] } {
+  const fullTime = fullTimePick(teamId, at, ft, counts, members);
+  if (fullTime) return { memberId: fullTime, hold: false, by: "full_time" };
+  const hs = teamHandlers(teamId, members).map(m => m.id), g = (id: string) => counts.given[id] ?? 0;
+  const valued = hs.filter(id => (people[id] ?? 0) > 0);
+  if (mode === "cnt") {
+    const memberId = fewest(valued.filter(id => g(id) < people[id]), g);
+    return memberId ? { memberId, hold: false, by: "max" } : { memberId: null, hold: true, by: "over_the_limit" };
+  }
+  if (mode === "pct" && valued.length) return { memberId: fewest(valued, id => (g(id) + 1) / people[id]), hold: false, by: "percent" };
+  return { memberId: fewest(hs, g), hold: false, by: "even" };
+}
+
+/** Who gets a new enquiry from this ad (null: none) arriving at `at`. */
+export function dealEnquiry(ad: string | null, at: Date, rule: CrmDealRule | undefined, fullTime: Record<string, CrmDealFullTime>,
+  counts: CrmDealCounts, members: CrmMember[]): CrmDeal {
+  const organic: CrmDeal = { teamId: null, memberId: null, by: "organic" };
+  if (!ad) return organic;
+  const tls = allTeams(members).map(t => t.id);
+  if (!rule) {
+    const teamId = fewest(tls, id => counts.team[id] ?? 0);
+    if (!teamId) return organic;
+    const p = pickInside(teamId, "even", {}, at, fullTime[teamId], counts, members);
+    return p.memberId ? { teamId, memberId: p.memberId, by: p.by === "full_time" ? "default_full_time" : "default_even" } : organic;
+  }
+  if (rule.mode === "even") {
+    const all = [...new Set(tls.flatMap(t => teamHandlers(t, members).map(m => m.id)))];
+    let memberId = fewest(all, id => counts.given[id] ?? 0);
+    if (!memberId) return organic;
+    const teamId = teamOf(memberId, members) ?? null;
+    const ft = teamId ? fullTimePick(teamId, at, fullTime[teamId], counts, members) : null;
+    if (ft) memberId = ft;
+    return { teamId, memberId, by: ft ? "full_time" : "even" };
+  }
+  const shares = Object.entries(rule.split).filter(([id, n]) => n > 0 && tls.includes(id));
+  const teamId = fewest(shares.map(([id]) => id), id => ((counts.team[id] ?? 0) + 1) / rule.split[id]); // team = given + held, as the SQL adds them
+  if (!teamId) return organic;
+  const p = pickInside(teamId, rule.teamModes?.[teamId] ?? "pct", rule.people, at, fullTime[teamId], counts, members);
+  if (p.hold) return { teamId, memberId: null, held: true, by: "over_the_limit" };
+  return p.memberId ? { teamId, memberId: p.memberId, by: p.by } : organic;
+}
+
+/** The counts after a deal — what the next one balances against. */
+export function afterDeal(counts: CrmDealCounts, deal: CrmDeal, at: Date): CrmDealCounts {
+  if (!deal.teamId) return counts;
+  const add = (r: Record<string, number>, k: string) => ({ ...r, [k]: (r[k] ?? 0) + 1 });
+  return {
+    team: add(counts.team, deal.teamId),
+    held: deal.held ? add(counts.held, deal.teamId) : counts.held,
+    given: deal.memberId ? add(counts.given, deal.memberId) : counts.given,
+    lastAt: deal.memberId ? { ...counts.lastAt, [deal.memberId]: at.getTime() } : counts.lastAt,
+  };
+}
+
 /* ── Numbers ────────────────────────────────────────────────────────────── */
 
 export interface CrmMemberStats {

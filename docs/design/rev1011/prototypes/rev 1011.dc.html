@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet">
+<style>
+body { margin: 0; background: #F3F1EE; font-family: Inter, sans-serif; color: #3F2B22; }
+a { color: #BD4A19; } a:hover { color: rgb(150 58 20); }
+</style>
+</helmet>
+<section data-screen-label="Principal · Control panel" style="padding: 56px; display: flex; flex-direction: column; gap: 28px;">
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <div style="font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #806B60;">rev 1011 · Control panel</div>
+    <h1 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -.03em;">Principal: all pages</h1>
+    <p style="margin: 0; max-width: 720px; font-size: 14px; line-height: 1.55; color: #806B60;">Rebuilt from the live code (src/components/member/crm/panel). The screens run the repo’s own view models (vm/*.ts) on the repo’s demo team: Principal Alex Wong, HOD Peter, Senior TL Marcus Tan, Teams Kelvin, Priya and Ryan. Each frame is the whole Control panel: the bottom bar, sheets, Send to, Undo and replies work inside it.</p>
+  </div>
+  <div style="display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start;">
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">1 · Insight</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="overview" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">D1 · Director · Insight (Team | Mine)</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="overview" viewer="director" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">D2 · Director · Inbox</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="inbox" viewer="director" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">D3 · Director · Mine › Insight (RS screens)</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="RS Insight" viewer="director" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">L1 · Team leader (Kelvin Lee) · Team › Insight</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="overview" viewer="leader" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">L2 · Team leader · Team › Inbox</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="inbox" viewer="leader" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">L3 · Team leader · Team › Calendar</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="calendar" viewer="leader" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">L4 · Team leader · Team › Profile</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="profile" viewer="leader" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">1.1 · Insight › Awaiting reply</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="attention" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">2 · Inbox</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="inbox" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">2.1 · Inbox › Chat (Hakimi Yusof)</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="chat" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">3 · Assignment (overview)</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="assign" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">3.1 · Assignment › Ads to teams</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="assignAds" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">3.2 · Assignment › Full time · Team Kelvin</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="assignFt" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">3.3 · Assignment › Over the limit</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="assignHeld" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">4 · Calendar</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="calendar" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">5 · Profile</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="profile" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">5.1 · Profile › Notifications</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="notifs" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">5.2 · Profile › Showrooms</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="rooms" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">5.4 · Profile › Member work type</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="ftStaff" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">5.5 · Profile › Cold lead templates</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="coldTpl" hint-size="390px,844px"></dc-import></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 13px; font-weight: 650;">5.3 · Profile › Ads Performance</div>
+      <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63,43,34,.12);"><dc-import name="Principal Panel" screen="ads" hint-size="390px,844px"></dc-import></div>
+    </div>
+  </div>
+</section>
+</x-dc>
+</body>
+</html>

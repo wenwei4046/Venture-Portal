@@ -6,7 +6,7 @@ import type { ChangeEvent } from "react";
 import type { CrmCustomer } from "@/lib/member/crm-data";
 import type { CrmData } from "@/lib/member/crm-data";
 import type { CustomerForm } from "../ui";
-import { CHANNEL, STATUS_LABEL, day0, stop, type SalesCtx } from "./common";
+import { CHANNEL, STATUS_LABEL, day0, ini, lastReal, stop, timeLabel, type SalesCtx } from "./common";
 
 /** A Malaysian number as people write it: 60123456789 → 012-345 6789. */
 export function phoneLabel(raw: string): string {
@@ -24,10 +24,13 @@ export const telHref = (raw: string) => {
 const p2 = (n: number) => String(n).padStart(2, "0");
 
 export function infoRows(c: CrmCustomer) {
-  const fd = new Date(c.createdAt);
+  // First contact and Last chat in one format, dd/mm/yyyy, h:mm am (rev 1010 §4); Last chat = the newest message either side, as Inbox.
+  const dmy = (d: Date) => `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}, ${timeLabel(d)}`;
+  const last = lastReal(c);
   return ([
     ["Phone", phoneLabel(c.phone) || "—"],
-    ["First contact", `${p2(fd.getDate())}/${p2(fd.getMonth() + 1)}/${fd.getFullYear()}`],
+    ["First contact", dmy(new Date(c.createdAt))],
+    ["Last chat", last ? dmy(new Date(last.at)) : "—"],
     ["Platform", CHANNEL[c.channel].name], ["Ad", c.ad], ["Status", STATUS_LABEL[c.status]],
     ["Property type", c.details.type || "—"], ["Unit size", c.details.size || "—"], ["Location", c.details.loc || "—"],
     ["Requirement", c.details.req || "—"], ["Budget", c.details.budget ? "RM " + c.details.budget : "—"],
@@ -89,4 +92,16 @@ export function customerForm({ form: f, data, saveDetails, setForm, onSaved }: {
   };
 }
 export type CustomerFormVM = ReturnType<typeof customerForm>;
+
+/** The Customer info sheet (Contacts, and the Calendar since rev 1010 §3): the rows, Edit, and Open chat. */
+export function contactInfoVM(ctx: SalesCtx) {
+  const { ui, set, patch, data, act } = ctx;
+  const ci = ui.cInfo ? data.customers.find(c => c.id === ui.cInfo) : undefined;
+  return {
+    ctOpen: !!ci, ctClose: () => patch({ cInfo: null }), ctName: ci?.name ?? "", ctIni: ci ? ini(ci.name) : "",
+    ctRows: ci ? infoRows(ci) : [],
+    ctChat: () => { if (!ci) return; set(u => ({ ...u, tab: "inbox", chat: ci.id, cInfo: null, hist: [...u.hist, u.tab].slice(-20) })); act.openChat(ci.id); },
+    ctEdit: () => { if (!ci) return; set(u => ({ ...u, cform: { customerId: ci.id, edit: true }, cInfo: null })); },
+  };
+}
 interface Chip { label: string; pick: () => void; bg: string; fg: string; bd: string }
