@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useCallback, useState, useTransition } from 'react'
 import { NOT_CHANGED, NO_PASSWORD_CHANGE, passwordChangeProblem, type PasswordChange } from '@/lib/account/password'
 
 /** The Server Action, or a stand-in for it in a test or a preview. */
@@ -50,13 +50,13 @@ export function useChangePassword(change: ChangePassword) {
     })
   }
 
-  /** Back to empty boxes — a sheet closed and opened again starts afresh. */
-  const reset = () => {
+  /** Back to empty boxes — a sheet closed starts afresh, and nothing typed stays behind it. Stable, for an effect. */
+  const reset = useCallback(() => {
     setForm(NO_PASSWORD_CHANGE)
     setShown(false)
     setError('')
     setDone(false)
-  }
+  }, [])
 
   return { form, set, shown, setShown, error, done, busy, submit, reset }
 }

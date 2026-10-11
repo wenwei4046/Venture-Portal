@@ -3,7 +3,6 @@
 import { useId } from 'react'
 import { btn } from '@/components/hrv/kit'
 import { PASSWORD_CHANGED, useChangePassword, type ChangePassword } from '@/components/account/use-change-password'
-import { changeMyPassword } from '@/lib/account/actions'
 import { MIN_PASSWORD_LENGTH, type PasswordChange } from '@/lib/account/password'
 import s from './change-password.module.css'
 
@@ -16,10 +15,10 @@ const BOXES: Array<{ key: keyof PasswordChange; label: string; autoComplete: 'cu
 
 /**
  * Admin › Change password's form (2026-10-12): the current password, the new one, the new one again,
- * Show passwords, what happened, and the button. Enter sends it. `change` is the Server Action —
- * a stand-in in tests.
+ * Show passwords, what happened, and the button. Enter sends it. `change` is the Server Action,
+ * handed in by the page — a stand-in in tests.
  */
-export default function ChangePasswordForm({ email, change = changeMyPassword }: { email: string; change?: ChangePassword }) {
+export default function ChangePasswordForm({ email, change }: { email: string; change: ChangePassword }) {
   const f = useChangePassword(change)
   const id = useId()
   return (

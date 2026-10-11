@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { requireAuth } from '@/lib/auth'
 import { loginIsPersonal } from '@/lib/account/personal-login'
+import { changeMyPassword } from '@/lib/account/actions'
 import { HvPage, PageHead } from '@/components/hrv/kit'
 import ChangePasswordForm from './_components/ChangePasswordForm'
 
@@ -22,7 +23,7 @@ export default async function ChangePasswordPage() {
   return (
     <HvPage>
       <PageHead eyebrow="Admin · Account" title="Change password" subtitle={`Signed in as ${user.email}`} />
-      <ChangePasswordForm email={user.email} />
+      <ChangePasswordForm email={user.email} change={changeMyPassword} />
     </HvPage>
   )
 }

@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-
-vi.mock('@/lib/account/actions', () => ({ changeMyPassword: vi.fn() }))
-
 import ChangePasswordForm from './ChangePasswordForm'
 
 // Admin › Change password (2026-10-12): the current password, the new one, the new one again.
