@@ -165,6 +165,64 @@ try {
   await as({ 'billing.create': 'all' }, { ...invoiceShut, ticks: invoiceShut.ticks.filter(t => t !== 'fin.payments.create') })
   await reject(`SELECT public.demo_bump(5)`, [], /a box in your permissions is unticked/, 'a gate whose action they lack opens nothing for the other')
 
+  // ── The Revenue app's requests ask their page's Create box (mig 20261011220200) ──
+  const roomsSql = (await readFile(new URL('20261011150000_rooms_on_behalf_and_app_ticks.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  const boxClosed = /CREATE OR REPLACE FUNCTION public\.tab_box_closed\(p_tab text, p_action text\)[\s\S]*?\$fn\$;/.exec(roomsSql)
+  assert.ok(boxClosed, 'tab_box_closed is in mig 20261011150000')
+  await db.exec(boxClosed[0])
+  await db.exec(`
+    CREATE TABLE public.member_requests(id uuid PRIMARY KEY, kind text NOT NULL);
+    INSERT INTO public.member_requests VALUES ('00000000-0000-4000-8000-0000000000c1', 'claim'), ('00000000-0000-4000-8000-0000000000a1', 'waiting');
+    CREATE FUNCTION public.member_prepare_request(p_kind text, p_sub_department uuid, p_detail jsonb, p_idempotency uuid, p_revision uuid)
+    RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+    DECLARE
+      v_staff uuid := NULL;
+    BEGIN
+      RETURN 'drafted ' || p_kind;
+    END
+    $$;
+    CREATE FUNCTION public.member_submit_request(p_request uuid)
+    RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+    DECLARE
+      r public.member_requests%ROWTYPE;
+    BEGIN
+      SELECT * INTO r FROM public.member_requests WHERE id = p_request;
+      RETURN 'sent ' || r.kind;
+    END
+    $$;
+    CREATE FUNCTION public.member_cancel_request(p_request uuid)
+    RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+    DECLARE
+      r public.member_requests%ROWTYPE;
+    BEGIN
+      SELECT * INTO r FROM public.member_requests WHERE id = p_request;
+      RETURN 'withdrawn ' || r.kind;
+    END
+    $$;
+  `)
+  const sendsSql = (await readFile(new URL('20261011220200_member_sends_ask_their_tab.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(sendsSql)
+  await db.exec(sendsSql)
+  check(Number(await one(`SELECT count(*) FROM pg_proc WHERE prosrc LIKE '%PERFORM public.member_send_guard(%'`)), 3, 'three sends ask, once each — run twice')
+  const CLAIM = '00000000-0000-4000-8000-0000000000c1'
+  const WAITING = '00000000-0000-4000-8000-0000000000a1'
+  const draft = kind => one(`SELECT public.member_prepare_request($1, NULL, '{}'::jsonb, gen_random_uuid(), NULL)`, [kind])
+  // Requests' Create unticked, Waiting list & replacements' ticked.
+  await as({ 'revenue_app.create': 'own' }, { ticks: ['rev.requests.view', 'rev.track.view', 'rev.track.create'], boxes: [], cells: false })
+  await reject(`SELECT public.member_prepare_request('claim', NULL, '{}'::jsonb, gen_random_uuid(), NULL)`, [],
+    /Sending a claim is not open to your account\./, 'Requests’ Create unticked: no claim is drafted')
+  await reject(`SELECT public.member_submit_request($1)`, [CLAIM], /Sending a claim is not open to your account\./, 'nor sent')
+  await reject(`SELECT public.member_cancel_request($1)`, [CLAIM], /Sending a claim is not open to your account\./, 'nor withdrawn')
+  check(await draft('waiting'), 'drafted waiting', 'a waiting list is Waiting list & replacements’ to send')
+  check(await one(`SELECT public.member_submit_request($1)`, [WAITING]), 'sent waiting', 'and is sent (the guard reads the request’s kind past the function’s own r)')
+  // Waiting list & replacements' Create unticked.
+  await as({ 'revenue_app.create': 'own' }, { ticks: ['rev.requests.view', 'rev.requests.create', 'rev.track.view'], boxes: [], cells: false })
+  await reject(`SELECT public.member_prepare_request('replacement', NULL, '{}'::jsonb, gen_random_uuid(), NULL)`, [],
+    /Sending a waiting list or a replacement is not open to your account\./, 'a replacement is closed with its page')
+  check(await draft('claim'), 'drafted claim', 'while a claim is open')
+  await as({ 'revenue_app.create': 'own' }, null)
+  check(await one(`SELECT public.member_cancel_request($1)`, [CLAIM]), 'withdrawn claim', 'nobody unticked anything for them: as before')
+
   console.log(`tab writes: ${checks} checks passed`)
 } finally {
   await db.close()

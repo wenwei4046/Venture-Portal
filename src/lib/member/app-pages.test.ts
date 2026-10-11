@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { closedBoxes } from '@/lib/page-tabs'
-import { APP_PAGE_TABS, NOTHING_CLOSED, appClosed, requestPageOf } from './app-pages'
+import { APP_PAGE_TABS, NOTHING_CLOSED, SEND_REFUSED, appClosed, requestPageOf } from './app-pages'
 import { TAB_BY_ID } from '@/lib/permission-tabs'
 
 // The Revenue app follows its holder's ticks (2026-10-11, the user: "勾掉 Arena，手机 app 就不显示").
@@ -32,5 +34,14 @@ describe('the Revenue app’s pages and their tabs', () => {
     expect(requestPageOf('claim')).toBe('requests')
     expect(requestPageOf('waiting')).toBe('track')
     expect(requestPageOf('replacement')).toBe('track')
+  })
+
+  it('the database asks the same box, and says the same words (mig 20261011220200 › member_send_guard)', () => {
+    const sql = readFileSync(resolve(process.cwd(), 'supabase/migrations/20261011220200_member_sends_ask_their_tab.sql'), 'utf8')
+    const guard = /CREATE OR REPLACE FUNCTION public\.member_send_guard[\s\S]*?\$fn\$;/.exec(sql)?.[0] ?? ''
+    expect(guard).toContain(`CASE WHEN p_kind = 'claim' THEN '${APP_PAGE_TABS[requestPageOf('claim')]}' ELSE '${APP_PAGE_TABS[requestPageOf('waiting')]}' END, 'create'`)
+    expect(APP_PAGE_TABS[requestPageOf('replacement')]).toBe(APP_PAGE_TABS[requestPageOf('waiting')])
+    expect(guard).toContain(`THEN '${SEND_REFUSED.requests}'`)
+    expect(guard).toContain(`ELSE '${SEND_REFUSED.track}' END`)
   })
 })
