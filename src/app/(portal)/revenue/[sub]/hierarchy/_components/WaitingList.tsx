@@ -170,10 +170,10 @@ export default function WaitingList({
         head={
           open ? (
             <>
-              <div className={hv.drawerEyebrow} style={{ color: 'rgb(var(--hv-orange-text))' }}>
-                #{open.position} of {list.length} on {subDeptName}&apos;s waiting list
+              {/* Round 2 (README 18.5): no "#1 of 2 on Fair's waiting list" above the name. */}
+              <div className={hv.drawerTitle} style={{ marginTop: 0 }}>
+                {open.newPerson ?? '—'}
               </div>
-              <div className={hv.drawerTitle}>{open.newPerson ?? '—'}</div>
               {open.requestNo ? <div className={w.candNo}>{open.requestNo}</div> : null}
             </>
           ) : null

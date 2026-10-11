@@ -104,7 +104,8 @@ describe('an applicant’s drawer', () => {
     show()
     fireEvent.click(screen.getAllByRole('row')[1])
     const drawer = screen.getByRole('dialog')
-    expect(drawer).toHaveTextContent("#1 of 2 on Fair's waiting list")
+    // Round 2 (README 18.5): the head is the name and the request number only.
+    expect(drawer).not.toHaveTextContent(/of 2 on Fair/)
     expect(drawer).toHaveTextContent('Revenue · Fair')
     expect(drawer).toHaveTextContent('Accepted onto the waiting list')
     expect(drawer).toHaveTextContent('Only the employee details — NRIC, bank account — are left.')

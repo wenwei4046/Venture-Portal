@@ -3857,6 +3857,11 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   --hv-ink-warm: 51 36 27;
   --hv-olive: 88 98 68;
   --hv-olive-bg: 238 240 226;
+  /* The sub-department switcher (round 2, portal-42): the rule inside the
+     button, the menu's edge and a row's hover. */
+  --hv-switch-rule: 229 222 212;
+  --hv-menu-edge: 236 229 219;
+  --hv-menu-hover: 247 244 239;
 }
 
 /* HR's view of the shell. The shell is drawn light, as the prototype draws
