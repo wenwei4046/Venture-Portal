@@ -10,7 +10,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { fetchCrmData } from "@/app/(member)/member/crm-actions";
-import type { CrmData } from "@/lib/member/crm-data";
+import { canFromRole, type CrmData } from "@/lib/member/crm-data";
 import { crmDemoData } from "@/lib/member/crm-demo-data";
 import H from "./crm.module.css";
 import { KEYFRAMES } from "./keyframes";
@@ -147,9 +147,17 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
     // Their own view: the Director (or whoever holds View at All) every team; a leader their own line.
     const wide = panelFor.id === me.id ? full : panelFor.role === "hod";
     const mine = new Set([panelFor.id, ...downlineOf(panelFor.id, data.people)]);
-    const teams = wide ? teamsOf(data) : teamsOf(data).filter(t => mine.has(t.id) || t.people.some(p => p.id === panelFor.id));
+    // Viewing a leader's Team: only what THEIR session would read — their line's customers and visits — and their own
+    // cells, as the database gives them when they sign in (user 2026-10-11: View as showed the whole company).
+    const pdata: CrmData = panelFor.id === me.id || wide ? data : (() => {
+      const shared = new Set(data.shares.filter(s => mine.has(s.staffId)).map(s => s.customerId));
+      const customers = data.customers.filter(c => (c.assignedTo && mine.has(c.assignedTo)) || (c.teamId && mine.has(c.teamId)) || shared.has(c.id));
+      const ids = new Set(customers.map(c => c.id));
+      return { ...data, viewerId: panelFor.id, can: canFromRole(panelFor.role), customers, visits: data.visits.filter(v => ids.has(v.customerId)) };
+    })();
+    const teams = wide ? teamsOf(pdata) : teamsOf(pdata).filter(t => mine.has(t.id) || t.people.some(p => p.id === panelFor.id));
     const pctx: PanelCtx = {
-      data, me: panelFor, now, live, ui: panelUi, set: setPanelUi, patch: p => setPanelUi(u => ({ ...u, ...p })), act: panelAct, nameOf, teams,
+      data: pdata, me: panelFor, now, live, ui: panelUi, set: setPanelUi, patch: p => setPanelUi(u => ({ ...u, ...p })), act: panelAct, nameOf, teams,
       directors: wide ? data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) : [],
       teamOfStaff: id => { const tl = id ? teams.find(t => t.id === id || t.people.some(p => p.id === id)) : undefined; return tl; },
       openCrmOf,
