@@ -20,6 +20,8 @@ import { initialSalesUi, type SalesRefs, type SalesTab, type SalesUi } from "./s
 import { type SalesCtx } from "./sales/vm/common";
 import { lastAt } from "./sales/vm/inbox";
 import SalesScreens from "./sales/SalesScreens";
+import SalesShellBanners from "./sales/SalesShellBanners";
+import { shellVM } from "./sales/vm/header";
 import { byTeam, downlineOf } from "./shared/people";
 import PanelScreens from "./panel/PanelScreens";
 import { makePanelActions } from "./panel/actions";
@@ -144,6 +146,9 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
     setUi(u => ({ ...initialSalesUi(), toast: u.toast, chat: customerId ?? null }));
   };
   // Who has a Team side: the Director, and anyone with somebody below them (rev 1011).
+  // Whose CRM may be on screen: one's own, or someone below (View my team) — anyone, for the Principal and the Director.
+  const below = full ? data.people.filter(p => p.id !== me.id && ["hod", "stl", "tl", "ta", "rs"].includes(p.role)).map(p => p.id) : downlineOf(me.id, data.people);
+  const switchList = byTeam(below.map(id => personOf(id, data.people)!).filter(Boolean), data.people);
   const hasTeamSide = (p: { id: string; role: string }) => p.role === "hod" || data.people.some(q => q.uplineId === p.id);
   const viewed = viewing ? personOf(viewing, data.people) : undefined;
   const panelFor = viewed && teamAs === viewed.id ? viewed : !viewing && (full || leads) && (!sells || mode === "panel") ? me : undefined;
@@ -171,14 +176,23 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
         : sells ? () => { openCrmOf(me.id); setUi(u => ({ ...u, tab: MINE_TAB[panelUi.tab] })); } : undefined,
       exitApp: onExit, slotCounts,
     };
+    // Viewing somebody's Team: the same "Viewing X's CRM · Switch · Exit" banner their own CRM has (user 2026-10-11).
+    // Switch stays on the Team side when the next person has one; Exit is back to one's own panel.
+    const banner = panelFor.id !== me.id ? shellVM({
+      ui, set: setUi, owner: panelFor, viewingOther: true, data,
+      embedded: {
+        rdMode: false, switchList,
+        onSwitch: (id: string) => { const p = personOf(id, data.people); setViewing(id); setTeamAs(p && hasTeamSide(p) ? id : null); },
+        exitAs: () => { setTeamAs(null); setViewing(null); },
+      },
+    } as unknown as SalesCtx) : null;
     return shell(<>
       {problem && <p className={H.problem}>{problem}</p>}
+      {banner && <SalesShellBanners v={banner} />}
       <PanelScreens ctx={pctx} />
     </>, H.panel);
   }
 
-  // Whose CRM is on screen: one's own, or someone below (View my team) — anyone, for the Principal and the Director.
-  const below = full ? data.people.filter(p => p.id !== me.id && ["hod", "stl", "tl", "ta", "rs"].includes(p.role)).map(p => p.id) : downlineOf(me.id, data.people);
   const owner = (viewing && below.includes(viewing) ? personOf(viewing, data.people) : undefined) ?? me;
   const hidden = (id: string) => !!(data.prefs[id]?.hidden);
   const shared = new Set(data.shares.filter(s => s.staffId === owner.id).map(s => s.customerId));
@@ -197,7 +211,7 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
       // Team opens on the same page, team-wide (user 2026-10-11: from Inbox / Calendar / Contacts it landed on Insight).
       toTeam: owner.id !== me.id ? (hasTeamSide(owner) ? from => { setTeamAs(owner.id); setPanelUi({ ...initialPanelUi(), tab: TEAM_TAB[from] }); } : undefined)
         : (full && sells) || leads ? from => { setHodMode("panel"); setViewing(null); setPanelUi(u => ({ ...u, tab: TEAM_TAB[from], lead: null })); } : undefined,
-      switchList: byTeam(below.map(id => personOf(id, data.people)!).filter(Boolean), data.people),
+      switchList,
       // Assign to somebody: assignment is CRM · Manage's.
       assignTo: data.can.manage ? (customerId, staffId) => panelAct.sendTo(customerId, staffId) : undefined,
       onSwitch: id => { setViewing(id); setUi(u => ({ ...u, tab: "inbox", chat: null, filter: null, profSub: null })); },
