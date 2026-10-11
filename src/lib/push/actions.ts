@@ -1,6 +1,7 @@
 'use server'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { headers } from 'next/headers'
 import { getUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { PushApp } from './config'
@@ -43,6 +44,8 @@ export async function savePushSubscription(input: { endpoint: string; p256dh: st
   if (input.app !== 'revenue' && input.app !== 'hr') return { ok: false, reason: 'Say which app this phone is for.' }
   const db = await client()
   const { error } = await db.rpc('push_subscribe', { p_endpoint: input.endpoint, p_p256dh: input.p256dh, p_auth: input.auth, p_app: input.app })
+  // The database's own words go to the server's log — the phone is told only the plain reason.
+  if (error) console.error('[push] push_subscribe refused', JSON.stringify({ code: error.code, message: error.message }))
   return error ? { ok: false, reason: reasonOf(error, 'Notifications could not be turned on. Please try again.') } : { ok: true }
 }
 
@@ -53,4 +56,22 @@ export async function removePushSubscription(endpoint: string): Promise<Act> {
   const db = await client()
   const { error } = await db.rpc('push_unsubscribe', { p_endpoint: endpoint })
   return error ? { ok: false, reason: reasonOf(error, 'Notifications could not be turned off. Please try again.') } : { ok: true }
+}
+
+/**
+ * A phone that could not turn its notifications on says why (2026-10-11): the
+ * reason goes to the server's own log (Vercel's runtime log) with the browser
+ * it came from — nothing is stored. Signed-in accounts only.
+ */
+export async function reportPushTrouble(t: { app: PushApp; stage: string; message: string }): Promise<void> {
+  const user = await getUser()
+  if (!user?.is_active) return
+  const ua = (await headers()).get('user-agent') ?? ''
+  console.error('[push] trouble', JSON.stringify({
+    user: user.id,
+    app: String(t?.app ?? '').slice(0, 10),
+    stage: String(t?.stage ?? '').slice(0, 12),
+    message: String(t?.message ?? '').slice(0, 300),
+    ua: ua.slice(0, 220),
+  }))
 }

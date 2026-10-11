@@ -7,6 +7,8 @@ import type { ProductListAccess } from "@/lib/member/product-access";
 import { NOTHING_CLOSED, requestPageOf, type AppClosed } from "@/lib/member/app-pages";
 import { allowedRoute, landing, requestPage, sends, shows } from "./app-access";
 import { setViewAs } from "@/components/layout/view-as-actions";
+import PushAsk from "@/components/pwa/PushAsk";
+import { reportPushTrouble, savePushSubscription } from "@/lib/push/actions";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import { arenaRankings, type ArenaWeekBrand, type ArenaWeekPicks, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { championshipMonth, championshipStandings } from "@/lib/member/championship";
@@ -1220,6 +1222,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         unread={nfCount > 0 || nf.items.some(n => n.unread)} onSubDept={() => openSheet("sd")} onNotif={toggleNotif}
         onSignOut={() => { const f = document.createElement("form"); f.method = "post"; f.action = "/member/signout"; document.body.appendChild(f); f.submit(); }} />
       {viewed && <ViewingAsBar me={me} onSwitch={() => setVaOpen(true)} onExit={() => goScreen("account", { staff: "" })} />}
+      {/* The first open asks once whether this phone gets notifications (2026-10-11, the user) — not the Principal's, as Profile's row. */}
+      {live && !principal && !data.demo && !fixture ? <PushAsk app="revenue" save={savePushSubscription} trouble={reportPushTrouble} /> : null}
       {showHeader && (
         <MobileHeader ruled={scrolled} back={route.screen === "calc"} subName={membership?.name ?? ""} count={nfCount} me={me}
           onLogo={() => goScreen(home)} onBack={() => goScreen("quote")} onSubDept={() => openSheet("sd")} onBell={openNotif}
