@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ackLine, audienceGroups, audienceLabel, contentTypeOf, dataCenterPeople, deptLabel, documentationFromRow, fileExt, fileRefusal,
   LETTER_STATUS, letterStatus, letterTrail, liveLetters, missingCount, missingFor, nameFromFile, objectPath, previewKind, publishRefusal, publishSummary,
-  publishedAudience, safeFileName, type DocPerson, type LetterType, type PersonLetter,
+  publishedAudience, safeFileName, withdrawnLine, type DocPerson, type LetterType, type PersonLetter, type Published,
 } from './model'
 
 // People › Documentation (2026-10-11, HR revamp round 2): the arithmetic its
@@ -33,13 +33,20 @@ describe('documentationFromRow', () => {
       letterTypes: [{ id: 'offer', name: 'Offer letter', compulsory: true, count: '2' }],
       letters: [{ id: 'l1', staffId: 'zack', typeId: 'offer', withdrawnAt: '2026-10-11T03:00:00Z' }, { id: 'l2', staffId: 'zack', typeId: 'offer' }],
       publishTypes: [{ id: 'm', name: 'Memo', builtin: true }],
-      published: [{ id: 'p', kind: 'Memo', title: 'Hi', publishedAt: '2026-10-06', audience: 'Revenue · everyone', recipients: 12, acknowledged: 9 }],
+      published: [
+        { id: 'p', kind: 'Memo', title: 'Hi', publishedAt: '2026-10-06', audience: 'Revenue · everyone', recipients: 12, acknowledged: 9 },
+        { id: 'w', kind: 'Memo', title: 'Old', publishedAt: '2026-10-01', withdrawnAt: '2026-10-11T03:00:00Z', withdrawnBy: 'Grace Lim', withdrawnNote: 'Had reached 2 people · 1 acknowledged' },
+      ],
     })
     expect(doc?.departments[0].people).toBe(32)
     expect(doc?.documents[0].events[0].note).toBe('Shared with Revenue Department')
     expect(doc?.letterTypes[0].count).toBe(2)
     expect(doc?.letters.map(l => l.withdrawnAt)).toEqual(['2026-10-11T03:00:00Z', null])
     expect(doc?.published[0].subDepartments).toEqual([])
+    expect(doc?.published.map(m => [m.withdrawnAt, m.withdrawnBy, m.withdrawnNote, m.attachmentDeletedAt])).toEqual([
+      [null, null, null, null],
+      ['2026-10-11T03:00:00Z', 'Grace Lim', 'Had reached 2 people · 1 acknowledged', null],
+    ])
     expect(documentationFromRow(null)).toBeNull()
     expect(documentationFromRow([])).toBeNull()
   })
@@ -144,10 +151,23 @@ describe('publish', () => {
   })
 
   it('says how many acknowledged, and what an older memo can', () => {
-    const m = { id: 'p', kind: 'Memo', title: 'T', publishedAt: '', audience: 'Revenue · everyone', subDepartments: [], attachmentName: null, saved: false, recipients: 12, acknowledged: 9 }
+    const m: Published = {
+      id: 'p', kind: 'Memo', title: 'T', publishedAt: '', audience: 'Revenue · everyone', subDepartments: [], attachmentName: null, saved: false,
+      recipients: 12, acknowledged: 9, withdrawnAt: null, withdrawnBy: null, withdrawnNote: null, attachmentDeletedAt: null,
+    }
     expect(ackLine(m)).toEqual({ line: '9 of 12 acknowledged', pct: 75 })
     expect(ackLine({ ...m, recipients: 0, acknowledged: 3 })).toEqual({ line: '3 acknowledged', pct: 0 })
     expect(publishedAudience({ ...m, audience: null, subDepartments: ['Fair', 'IR'] })).toBe('Fair, IR')
+  })
+})
+
+describe('a withdrawn memo', () => {
+  it('says when, by whom, what it had reached and that its attachment is gone', () => {
+    const gone = { withdrawnAt: '2026-10-11T03:00:00Z', withdrawnBy: 'Grace Lim', withdrawnNote: 'Had reached 12 people · 9 acknowledged', attachmentDeletedAt: null }
+    expect(withdrawnLine(gone)).toBe('Withdrawn 11 Oct by Grace Lim · Had reached 12 people · 9 acknowledged')
+    expect(withdrawnLine({ ...gone, attachmentDeletedAt: '2026-10-11T03:00:05Z' })).toBe('Withdrawn 11 Oct by Grace Lim · Had reached 12 people · 9 acknowledged · attachment deleted')
+    expect(withdrawnLine({ ...gone, withdrawnBy: null, withdrawnNote: null })).toBe('Withdrawn 11 Oct')
+    expect(withdrawnLine({ ...gone, withdrawnAt: null })).toBe('')
   })
 })
 

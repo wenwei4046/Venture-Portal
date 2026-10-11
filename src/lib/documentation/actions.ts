@@ -192,6 +192,27 @@ export async function deletePublishType(id: string): Promise<DocOutcome> {
 
 export type PublishOutcome = { ok: true; recipients: number } | { ok: false; reason: string }
 
+export type MemoWithdrawOutcome = { ok: true; title: string; reached: number } | { ok: false; reason: string }
+
+/**
+ * Withdraw a published memo (2026-10-11, the user: "加"): it reaches nobody any
+ * more — the Revenue app, View as, Member services — every copy "Publish &
+ * save" filed into a Data center is withdrawn with it, and its attachment goes
+ * from the bucket. It stays on the Published list as withdrawn, with what it
+ * had reached (`hr_memo_withdraw`, mig 20261011200000).
+ */
+export async function withdrawMemo(id: string): Promise<MemoWithdrawOutcome> {
+  await requireAction('documentation', 'edit')
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('hr_memo_withdraw', { p_id: id })
+  if (error) return { ok: false, reason: refusal(error, 'It could not be withdrawn. Please try again.') }
+  await removeLeftoverFiles(supabase)
+  revalidateDocs()
+  const said = (data ?? {}) as { title?: unknown; reached?: unknown }
+  const reached = Number(said.reached)
+  return { ok: true, title: typeof said.title === 'string' ? said.title : 'The memo', reached: Number.isFinite(reached) ? reached : 0 }
+}
+
 export async function publishDocumentation(input: {
   kind: string
   letterTypeId: string | null

@@ -1,18 +1,23 @@
-// Local PostgreSQL regression for 20261011170000 (2026-10-11, People ›
-// Documentation after the user's answer E): a file really goes, and a letter
-// can be withdrawn. Documentation's migrations (20261011070000, 070100), Hiring's
-// (their tables are in the review hardening's grants) and the review hardening
-// (20261011120100) run VERBATIM over stand-ins for the tables they read, the
-// storage schema and the permission check they ask; then the migration under
-// test. What is under test: only Documentation · Edit withdraws; a withdrawn
+// Local PostgreSQL regression for 20261011170000 and 20261011200000 (2026-10-11,
+// People › Documentation after the user's answers): a file really goes, a letter
+// can be withdrawn, and so can a published memo. Documentation's migrations
+// (20261011070000, 070100), Hiring's (their tables are in the review hardening's
+// grants) and the review hardening (20261011120100) run VERBATIM over stand-ins
+// for the tables they read, the storage schema and the permission check they
+// ask; then the migrations under test (the Revenue app's tick, 20261011190000,
+// has its own section below). What is under test: only Documentation · Edit withdraws; a withdrawn
 // Data center letter's memo, recipient and receipts go, what its person had
 // opened and acknowledged stays on the letter's trail, its person no longer
 // opens the file, the page counts it for nothing and signs no link to it; a
 // withdrawn published letter takes its person off the memo and leaves the rest,
-// and the memo goes once it reaches nobody; the bucket lets Edit delete only a
-// file no live record holds; the leftovers are the files of deleted documents
-// and withdrawn letters and a day-old upload nobody saved; "File deleted" is
-// written once, only for a file really gone. No live I/O.
+// and the memo stays on the Published list as withdrawn once it reaches nobody;
+// a published memo withdrawn from the list reaches nobody — its saved copies
+// withdrawn, its receipts, recipients and audiences gone, Member services
+// leaving it out — and keeps its line (what it had reached); the bucket lets
+// Edit delete only a file no live record holds; the leftovers are the files of
+// deleted documents, withdrawn letters and withdrawn memos and a day-old upload
+// nobody saved; "File deleted" is written once, only for a file really gone,
+// and a withdrawn memo's attachment is stamped gone. No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
@@ -143,12 +148,14 @@ try {
     '20261011070000_documentation.sql', '20261011070100_documentation_published_letter_type.sql',
     '20261011080000_hiring.sql', '20261011080100_hiring_file_reads.sql', '20261011080200_hiring_reconsider_declined.sql',
     '20261011120100_round2_review_hardening.sql', '20261011170000_documentation_withdraw_and_delete_files.sql',
+    '20261011200000_documentation_memo_withdraw.sql',
   ]) {
     await db.exec(await readFile(new URL(f, migrations), 'utf8'))
   }
-  // Applying it twice changes nothing (each swap sees it is done).
+  // Applying them twice changes nothing (each swap sees it is done).
   await db.exec(await readFile(new URL('20261011170000_documentation_withdraw_and_delete_files.sql', migrations), 'utf8')
     .then(s => s.replace(/CREATE POLICY hr_documents_delete[\s\S]*?;\r?\n/, '')))
+  await db.exec(await readFile(new URL('20261011200000_documentation_memo_withdraw.sql', migrations), 'utf8'))
 
   const OFFER = await one(`SELECT id FROM public.hr_letter_types WHERE name = 'Offer letter'`)
   const WARNING = await one(`SELECT id FROM public.hr_letter_types WHERE name = 'Warning letter'`)
@@ -233,14 +240,15 @@ try {
   check((await page()).published.find(m => m.id === M2).recipients, 1, 'Publish counts one recipient now')
 
   await one(`SELECT public.hr_letter_withdraw($1)`, [L3])
-  check(Number(await one(`SELECT count(*) FROM member_memos WHERE id = $1`, [M2])), 0, 'reaching nobody, the memo goes')
-  check((await q(`SELECT memo_id FROM hr_person_letters WHERE id = ANY ($1) ORDER BY ref`, [[L2, L3]])).map(r => r.memo_id), [null, null],
-    'both letters let go of it')
+  check((await q(`SELECT withdrawn_at IS NOT NULL AS w, withdrawn_note AS note FROM member_memos WHERE id = $1`, [M2]))[0],
+    { w: true, note: "Its last copy was withdrawn from Chea Huan's record" }, 'reaching nobody, the memo stays on the Published list as withdrawn')
+  check((await page()).published.find(m => m.id === M2).withdrawnBy, 'Grace Lim', 'by whom')
   check(await one(`SELECT public.hr_documentation_leftovers()`), [rulesFile], 'and its attachment is a leftover')
   await asGrace('authenticated')
   check(await removeAs(rulesFile), 1, 'deleted')
   await asGrace()
-  check(await one(`SELECT public.hr_documentation_files_removed($1)`, [[rulesFile]]), 2, '"File deleted" on both trails')
+  check(await one(`SELECT public.hr_documentation_files_removed($1)`, [[rulesFile]]), 3, '"File deleted" on both trails, the memo stamped')
+  check(typeof (await page()).published.find(m => m.id === M2).attachmentDeletedAt, 'string', 'its line says its attachment is gone')
 
   // ── A type whose letters were all withdrawn may go ───────────────────────
   const E2E = await one(`SELECT public.hr_letter_type_add('E2E type')`)
@@ -319,6 +327,80 @@ try {
   check(((await one(`SELECT public.member_document_open($1)`, [D2])) ?? {}).fileName, 'Handbook.pdf', 'ticked: it opens again')
   await db.exec('RESET ROLE')
   await tabs(null)
+
+  // ── A published memo withdrawn from the Published list (20261011200000) ──
+  const FAIR = id(31)
+  await q(`INSERT INTO comm_sub_departments VALUES ($1, 'Fair')`, [FAIR])
+  const noticeFile = `publish/${id(117)}/Notice.pdf`
+  await put(noticeFile)
+  await asGrace()
+  const M3 = (await one(`SELECT public.hr_publish('Memo', NULL, 'E2E notice', 'Read me', $1, 'Notice.pdf', 'application/pdf', 10, $2, $3, 'Revenue · everyone', false)`,
+    [noticeFile, [REV], [KARJUN, CHEA]])).id
+  await q(`INSERT INTO member_memo_receipts VALUES ($1, $2, 1, now(), now()), ($1, $3, 1, now(), NULL)`, [M3, KJ_USER, CHEA_USER])
+  check(await readable(KJ_USER, noticeFile), true, 'the attachment opens for its people')
+  await as(VIEWER_USER, ['documentation.view', 'documentation.create'])
+  await reject(`SELECT public.hr_memo_withdraw($1)`, [M3], /Documentation · Edit/, 'withdrawing a memo needs Edit')
+  check(await one(`SELECT has_function_privilege('anon', 'public.hr_memo_withdraw(uuid)', 'EXECUTE')`), false, 'not the publishable key’s')
+  await asGrace()
+  const mw = await one(`SELECT public.hr_memo_withdraw($1)`, [M3])
+  check([mw.title, mw.reached], ['E2E notice', 2], 'it says what and how many')
+  check([
+    Number(await one(`SELECT count(*) FROM member_memo_recipients WHERE memo_id = $1`, [M3])),
+    Number(await one(`SELECT count(*) FROM member_memo_receipts WHERE memo_id = $1`, [M3])),
+  ], [0, 0], 'nobody receives it, no receipt is left')
+  let m3 = (await page()).published.find(m => m.id === M3)
+  check([typeof m3.withdrawnAt, m3.withdrawnBy, m3.withdrawnNote, m3.recipients], ['string', 'Grace Lim', 'Had reached 2 people · 1 acknowledged', 0],
+    'it stays on the Published list with its line')
+  check([await readable(KJ_USER, noticeFile), await readable(CHEA_USER, noticeFile)], [false, false], 'nobody opens its attachment')
+  await asGrace()
+  await reject(`SELECT public.hr_memo_withdraw($1)`, [M3], /already withdrawn/, 'withdrawn once')
+  check((await one(`SELECT public.hr_documentation_leftovers()`)).includes(noticeFile), true, 'its attachment is a leftover at once')
+  await asGrace('authenticated')
+  check(await removeAs(noticeFile), 1, 'Edit deletes it')
+  await asGrace()
+  check(await one(`SELECT public.hr_documentation_files_removed($1)`, [[noticeFile]]), 1, 'the memo is stamped')
+  check(await one(`SELECT public.hr_documentation_files_removed($1)`, [[noticeFile]]), 0, 'once')
+  m3 = (await page()).published.find(m => m.id === M3)
+  check(typeof m3.attachmentDeletedAt, 'string', 'its line says the attachment is gone')
+
+  // Publish & save: every copy filed into a Data center goes with it.
+  const savedFile = `publish/${id(118)}/Policy.pdf`
+  await put(savedFile)
+  const M4 = (await one(`SELECT public.hr_publish('Letter', $1, 'E2E policy', '', $2, 'Policy.pdf', 'application/pdf', 10, $3, $4, 'Revenue · everyone', true)`,
+    [WARNING, savedFile, [REV], [KARJUN, CHEA]])).id
+  const kjCopy = await one(`SELECT id FROM hr_person_letters WHERE memo_id = $1 AND staff_id = $2`, [M4, KARJUN])
+  const cheaCopy = await one(`SELECT id FROM hr_person_letters WHERE memo_id = $1 AND staff_id = $2`, [M4, CHEA])
+  await q(`INSERT INTO member_memo_receipts VALUES ($1, $2, 1, now(), NULL)`, [M4, KJ_USER])
+  check((await page()).letterTypes.find(t => t.id === WARNING).count, 2, 'two copies on file')
+  await one(`SELECT public.hr_memo_withdraw($1)`, [M4])
+  check(await trail(kjCopy), ['Published', 'Saved to Data center', 'Sent to Revenue app', 'Opened in Revenue app', 'Withdrawn'], 'his copy keeps what he did')
+  check(await trail(cheaCopy), ['Published', 'Saved to Data center', 'Sent to Revenue app', 'Withdrawn'], 'hers')
+  check((await q(`SELECT note FROM hr_letter_events WHERE letter_id = $1 AND what = 'Withdrawn'`, [cheaCopy]))[0].note,
+    'The memo was withdrawn from everyone it reached', 'in words')
+  check((await page()).letterTypes.find(t => t.id === WARNING).count, 0, 'no copy counts any more')
+  check((await one(`SELECT public.hr_documentation_leftovers()`)).includes(savedFile), true, 'its attachment is a leftover')
+  await asGrace('authenticated')
+  check(await removeAs(savedFile), 1, 'deleted')
+  await asGrace()
+  check(await one(`SELECT public.hr_documentation_files_removed($1)`, [[savedFile]]), 3, '"File deleted" on both copies, the memo stamped')
+
+  // A memo from before Documentation, addressed to a sub-department: it reaches nobody, and Member services leaves it out.
+  const M5 = await one(`INSERT INTO member_memos (title, body, sender) VALUES ('E2E old memo', 'Fair news', 'HR') RETURNING id`)
+  await q(`INSERT INTO member_memo_audiences VALUES ($1, $2)`, [M5, FAIR])
+  check((await one(`SELECT public.member_admin_snapshot()`)).memos.includes(M5), true, 'Member services lists the old memo')
+  await one(`SELECT public.hr_memo_withdraw($1)`, [M5])
+  check(Number(await one(`SELECT count(*) FROM member_memo_audiences WHERE memo_id = $1`, [M5])), 0, 'its audience goes')
+  check((await page()).published.find(m => m.id === M5).withdrawnNote, 'Had reached Fair · 0 acknowledged', 'its line names whom it had reached')
+  const listed = (await one(`SELECT public.member_admin_snapshot()`)).memos ?? []
+  check([listed.includes(M5), listed.some(m => [M2, M3, M4].includes(m))], [false, false], 'Member services leaves out every withdrawn memo')
+
+  // A Data center letter's own memo is withdrawn with its letter, not from the list.
+  const dcFile = `letters/${KARJUN}/${id(119)}/Increment.pdf`
+  await put(dcFile)
+  const INCREMENT = await one(`SELECT id FROM hr_letter_types WHERE name = 'Increment letter'`)
+  const L5 = await one(`SELECT public.hr_letter_file($1, $2, $3, 'Increment.pdf', 'application/pdf', 1)`, [KARJUN, INCREMENT, dcFile])
+  const M6 = await one(`SELECT memo_id FROM hr_person_letters WHERE id = $1`, [L5])
+  await reject(`SELECT public.hr_memo_withdraw($1)`, [M6], /not on the Published list/, 'a letter’s memo is not the list’s')
 
   console.log(`validate-documentation: ${checks} checks passed`)
 } finally {
