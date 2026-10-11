@@ -58,7 +58,8 @@ function mkPeople(teams: Team[], m: "cnt" | "pct", pp: Record<string, number>, t
 
 /** One ad, as the Assignment card and its editor draw it. */
 function mkRow(teams: Team[], a: AdDraft, set: (p: Partial<AdDraft>) => void) {
-  const cur = a.mode === "split" ? "split" : a.mode === "people" ? "people" : "even";
+  // rev 1011 §6.6: Evenly · By team only — By people is merged into By team, and an old By people rule opens as By team.
+  const cur = (a.mode === "split" || a.mode === "people" ? "split" : "even") as "split" | "even" | "people";
   const total = teams.reduce((x, t) => x + (a.split[t.id] || 0), 0), pm = a.pm, pp = a.pp;
   const P = mkPeople(teams, pm, pp, pm === "pct" ? 100 : a.leads, (id, n, lk) => set({ mode: "people", pp: id === null ? (n as Record<string, number>) : { ...pp, [id]: Math.max(0, n as number) }, ...(lk ? { lockP: lk } : {}) }), a.lockP, false);
   const segs = cur === "split" ? teams.map(t => ({ w: a.split[t.id] || 0, c: t.c, op: 1 }))
@@ -67,9 +68,10 @@ function mkRow(teams: Team[], a: AdDraft, set: (p: Partial<AdDraft>) => void) {
   const tw = segs.reduce((x, g) => x + g.w, 0) || 1;
   return {
     name: a.label, page: a.page, leads: a.leads, isSplit: cur === "split", isPeople: cur === "people", isEven: cur === "even",
-    tag: cur === "split" ? "By team" : cur === "people" ? (pm === "pct" ? "By people · %" : "By people · max") : a.mode === "even" ? "Evenly" : "Not set",
-    tagBg: a.mode === "unset" ? "#FFF0E4" : "#E6F0EA", tagFg: a.mode === "unset" ? "#BD4A19" : "#387557",
-    modes: [seg(cur, "even", "Evenly", () => set({ mode: "even" })), seg(cur, "split", "By team", () => set({ mode: "split" })), seg(cur, "people", "By people", () => set({ mode: "people" }))],
+    tag: cur === "split" ? "By team" : cur === "people" ? (pm === "pct" ? "By people · %" : "By people · max") : a.mode === "even" ? "Evenly" : "Evenly · default",
+    // §6.3: an ad with no setting is dealt evenly to every team — "Evenly · default", muted.
+    tagBg: a.mode === "unset" ? "#F5EBE3" : "#E6F0EA", tagFg: a.mode === "unset" ? "#806B60" : "#387557",
+    modes: [seg(cur, "even", "Evenly", () => set({ mode: "even" })), seg(cur, "split", "By team", () => set({ mode: "split" }))],
     evenN: teams.reduce((x, t) => x + t.people.length, 0),
     evenTeams: teams.map(t => ({ team: t.name, c: t.c, names: t.people.map(p => first(p.name)).join(", "), av: t.people.map((p, k) => ({ ini: ini(p.name), ml: k ? "-8px" : "0" })) })),
     splits: teams.map(t => {
@@ -104,7 +106,8 @@ export function assignVM(ctx: PanelCtx) {
   const month = periodRange("month", null, now);
 
   // Organic Leads: no rule placed them, so somebody has to.
-  const organic = data.customers.filter(c => !c.assignedTo && !c.teamId)
+  // Organic Leads: no team and not held Over the limit (a held lead keeps its team).
+  const organic = data.customers.filter(c => !c.assignedTo && !c.teamId && !c.held)
     .map(c => ({ c, at: [...c.messages].reverse().find(m => m.from === "lead")?.at ?? c.createdAt })).sort((a, b) => b.at.localeCompare(a.at));
   const waitList = organic.map(({ c, at }, k) => ({ name: c.name, ad: `${c.ad} · ${c.channel === "messenger" ? "Messenger" : "WhatsApp"}`, when: ago(at, now), rule: k ? "1px solid #F3E9E1" : "0", openSend: () => patch({ sendFor: c.id, sdSel: null }),
     // Tapping the name reads the chat first (and may answer it) before choosing who gets it.
@@ -146,7 +149,8 @@ export function assignVM(ctx: PanelCtx) {
     if (!r) return { m: "cnt" as const, on: [4, 5, 6], v: zeros(t) };
     const v = zeros(t);
     for (const [id, days] of Object.entries(r.vals)) { v[id] = { ...(v[id] ?? {}) }; for (const [d, n] of Object.entries(days)) v[id][Number(d)] = Number(n) || 0; }
-    return { m: r.mode, on: [...r.days].sort(), v };
+    // The old Max / By % editor reads a "turns" rule as Max (rev 1011 replaced it with assign-1011.ts › ftx).
+    return { m: r.mode === "turns" ? "cnt" as const : r.mode, on: [...r.days].sort(), v };
   };
   const dLbl = (ds: number[]) => (!ds.length ? "Off" : ds.length === 7 ? "Every day" : ds.join("") === "01234" ? "Mon – Fri" : ds.join("") === "56" ? "Sat, Sun" : ds.join("") === "456" ? "Fri – Sun" : ds.map(d => WKL[d]).join(", "));
   const ftSum = teams.map(t => {

@@ -34,7 +34,8 @@ export function calendarVM(ctx: PanelCtx) {
   const view = ui.cView, segv = (k: "list" | "grid", label: string) => ({ label, pick: () => patch({ cView: k }), bg: view === k ? "#fff" : "transparent", fg: view === k ? "#3F2B22" : "#806B60", w: view === k ? 650 : 500, sh: view === k ? "0 1px 3px rgba(63,43,34,.12)" : "none" });
   const sel = ui.cDay, shown = view === "grid" && sel != null ? list.filter(a => day0(a.at) === sel) : list;
   const item = (a: typeof all[number], k: number) => ({ name: a.name, who: nameOf(a.who), room: a.room, time: tm(a.at), tc: a.seat.c, rule: k ? "1px solid #EBDDD2" : "0", ...statusOf(a),
-    open: () => patch({ lead: a.v.customerId, pick: "", toast: "" }) });
+    // rev 1011 §5.1: a visit opens Customer info first (Open chat there), as RS rev 1010 §3.
+    open: () => patch({ calInfo: a.v.customerId }) });
   const days: { day: string; color: string; items: ReturnType<typeof item>[] }[] = [];
   shown.forEach(a => {
     const lab = (day0(a.at) === T ? "Today · " : "") + gb(a.at, { weekday: "short", day: "numeric", month: "short" });
@@ -50,7 +51,16 @@ export function calendarVM(ctx: PanelCtx) {
   const groups = pickGroups(ctx, { sel: pp, pick: id => patch({ cPerson: id, cpSheet: false }), hodLabel: "Director" })
     .map(g => ({ ...g, people: g.people.filter(p => inTeam(p.id) && ctx.data.people.find(x => x.id === p.id)?.role !== "ta") })).map(g => ({ ...g, n: g.people.length })).filter(g => g.n);
   const persons = groups.reduce((n, g) => n + g.n, 0);
+  // Leads in the range (rev 1011: the hero's first figure), by the team / person chips.
+  const leadsIn = data.customers.filter(c => {
+    const d = day0(new Date(c.createdAt)), who = c.assignedTo ?? null;
+    return d >= rg.a && d <= rg.b && (ts === "all" || (seatOf(ctx, who) ?? NO_SEAT).id === ts) && (!pp || who === pp);
+  });
   const base = {
+    // What the Leads / Upcoming / Showed up lists show (vm/app.ts › calendarListVM).
+    cLeadIds: leadsIn.map(c => c.id),
+    cUpV: list.filter(a => !isPast(a)).map(a => ({ cid: a.v.customerId, start: a.v.start })),
+    cCameV: list.filter(a => a.v.state === "attended").map(a => ({ cid: a.v.customerId, start: a.v.start })),
     onCal: ui.tab === "calendar" && !ui.lead, stop,
     cRangeLabel: `${list.length} visits · ${up} upcoming`, cRangeBtn: `${f(rg.a)} – ${f(rg.b)}`,
     cTeams: [["all", "All teams", ""], ...(ctx.directors.length ? [["hod", "Director", "#387557"]] : []), ...ctx.teams.map(t => [t.id, t.name, t.c])].map(([k, label, dot]) => ({ label, dot,
@@ -59,7 +69,10 @@ export function calendarVM(ctx: PanelCtx) {
     cpIsOpen: ui.cpSheet, cpOpen: () => patch({ cpSheet: true }), cpClose: () => patch({ cpSheet: false }), cpGroups: groups,
     cpSub: ts === "all" ? "All teams" : seatName(ts), cpAll: { bg: pp ? "transparent" : "#FFF8F2", sub: `${persons} people`, pick: () => patch({ cPerson: "", cpSheet: false }) },
     cViews: [segv("list", "List"), segv("grid", "Calendar")], cIsGrid: view === "grid",
-    cStats: ([["Visits", list.length, "#fff"], ["Upcoming", up, "#F6B48A"], ["Showed up", came, "#fff"], ["Show-up", came + no ? `${Math.round((came / (came + no)) * 100)}%` : "—", "#fff"]] as const).map(([label, v, fg]) => ({ label, v, fg })),
+    // Leads (was Visits) · Upcoming · Showed up open their lists; Show-up % does not (rev 1011).
+    cStats: ([["Leads", leadsIn.length, "#fff"], ["Upcoming", up, "#F6B48A"], ["Showed up", came, "#fff"], ["Show-up", came + no ? `${Math.round((came / (came + no)) * 100)}%` : "—", "#fff"]] as const).map(([label, v, fg]) => ({ label, v, fg,
+      open: label === "Show-up" ? undefined : () => patch({ cLs: label === "Leads" ? "leads" as const : label === "Upcoming" ? "up" as const : "came" as const }),
+      cur: label === "Show-up" ? "default" : "pointer", deco: label === "Show-up" ? "none" : "underline dotted rgba(255,255,255,.5)" })),
     cByTeam: (ts === "all" ? teamKeys : [ts]).map(id => {
       const L = list.filter(a => a.seat.id === id), c = L.filter(a => a.v.state === "attended").length, n = L.filter(a => a.v.state === "no_show").length;
       return { name: seatName(id), n: L.length, rate: c + n ? `${Math.round((c / (c + n)) * 100)}%` : "—", w: `${list.length ? (L.length / list.length) * 100 : 0}%`, c: seatC(id) };

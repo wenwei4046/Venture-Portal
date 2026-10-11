@@ -13,6 +13,12 @@
 /* rev 1010 (Insight, Profile › Notifications). */
 .hov6:hover { color: rgb(150 58 20) !important; }
 .hov7:hover { background: #F5EBE3 !important; }
+/* rev 1011 (Control panel). */
+.hov8:hover { background: #963A14 !important; }
+.hov9:hover { background: #EEF3F9 !important; }
+.hov10:hover { border-color: #B9CCE3 !important; }
+.hov11:hover { border-color: #D9C7BA !important; }
+.hov12:hover { border-color: #E9BFA0 !important; }
 
 /* The app: full screen on a phone, the design's own font and colours. */
 .app {

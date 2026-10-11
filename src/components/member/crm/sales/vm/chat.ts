@@ -227,7 +227,7 @@ export function chatVM(ctx: SalesCtx) {
     isWeekView: true, isMonthView: false, viewWeek: () => {}, viewMonth: () => {}, viewWeekBg: "#fff", viewWeekFg: "#3F2B22", viewMonthBg: "transparent", viewMonthFg: "#806B60",
     days: [] as { wk: string; n: number; pick?: () => void; bg: string; fg: string; border: string }[], wkHead: [] as string[],
     monthCells: [] as { n: number | string; pick?: () => void; cursor: string; weight: number; deco: string; bg: string; fg: string; border: string }[],
-    slots: [] as { t: string; pick?: () => void; cursor: string; deco: string; bg: string; fg: string; border: string; weight: number }[],
+    slots: [] as { t: string; left: string; pick?: () => void; cursor: string; deco: string; bg: string; fg: string; border: string; weight: number }[],
     confirmLabel: "", confirmBg: RUST, confirmBook: undefined as undefined | (() => void),
     dateLeft: (_: MouseEvent) => {}, dateRight: (_: MouseEvent) => {}, dateWheel: (_: WheelEvent<HTMLElement>) => {}, dateDown: (_: RPointerEvent<HTMLElement>) => {}, dateMove: (_: RPointerEvent<HTMLElement>) => {}, dateUp: (_: RPointerEvent<HTMLElement>) => {}, dateClickGuard: (_: MouseEvent) => {},
     mDown: (_: RPointerEvent<HTMLElement>) => {}, mUp: (_: RPointerEvent<HTMLElement>) => {}, mCancel: () => {}, mClickGuard: (_: MouseEvent) => {},

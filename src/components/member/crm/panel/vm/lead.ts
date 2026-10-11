@@ -40,13 +40,14 @@ export function leadVM(ctx: PanelCtx) {
   const msgs = (c?.messages ?? []).map((m, k, arr) => {
     const sep = daySep(m.at, now), mine = m.from === "me", by = mine && m.by && m.by !== ow ? `Sent by ${nameOf(m.by)}` : m.auto ? "Auto-reply" : "";
     return { sep: !k || daySep(arr[k - 1].at, now) !== sep ? sep : "", time: msgTime(m.at), mine, text: m.text || (m.media ? `[${m.media.kind === "image" ? "Photo" : m.media.kind === "audio" ? "Voice note" : m.media.kind === "video" ? "Video" : "File"}]` : ""), at: msgTime(m.at),
-      by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? "#FFF0E4" : "#fff", bd: mine ? "#FFF0E4" : "#EBDDD2", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px" };
+      by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? "#FCD6B8" : "#fff", bd: mine ? "#FCD6B8" : "#fff", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px" };
   });
   return {
     onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
     ld: {
       name: c?.name ?? "", ini: c ? ini(c.name) : "", ad: c?.ad ?? "", ownerFirst: ow ? first(ownerName) : "No one", ownerName,
-      windowNote: c && windowLeft(c, now) ? " " + windowLeft(c, now) : "",
+      // No "· reply window open Xh Ym" under the name (rev 1011 §2.3, as RS rev 1010 §1.4); the cold banner stays.
+      windowNote: "",
       msgs, stop,
       movedTo: c && rec ? `${c.name} moved from ${rec.from ? nameOf(rec.from) : "Organic Leads"} to ${nameOf(rec.to)} · by you` : "",
       // Assign to (⋮) moves at once, as the design's inbox mode does.
@@ -109,7 +110,8 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   })() : null;
   const info = c ? (() => {
     const rows = infoRows(c);
-    rows.splice(5, 0, { k: "Owner", v: c.assignedTo ? nameOf(c.assignedTo) : "No one yet", rule: "1px solid #EBDDD2", vFg: c.assignedTo ? "#3F2B22" : "#B5A398" });
+    // Owner right after Status (the shared rows gained Last chat, rev 1010 §4).
+    rows.splice(rows.findIndex(r => r.k === "Status") + 1, 0, { k: "Owner", v: c.assignedTo ? nameOf(c.assignedTo) : "No one yet", rule: "1px solid #EBDDD2", vFg: c.assignedTo ? "#3F2B22" : "#B5A398" });
     return rows;
   })() : [];
   return {

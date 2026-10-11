@@ -16,7 +16,7 @@ export function navVM(ctx: PanelCtx) {
   const badge: Record<PanelTab, number> = {
     overview: 0, profile: 0, ads: 0,
     inbox: data.customers.filter(c => urgencyOf(c, now).level !== "none").length,
-    assign: data.customers.filter(c => !c.assignedTo && !c.teamId).length,
+    assign: data.customers.filter(c => !c.assignedTo && !c.teamId && !c.held).length,
     calendar: data.visits.filter(v => v.state === "booked" && new Date(v.start) > now).length,
   };
   return {
@@ -25,7 +25,8 @@ export function navVM(ctx: PanelCtx) {
       // Ads Performance lives under Profile, so Profile stays lit while it is open.
       const on = ui.tab === id || (id === "profile" && ui.tab === "ads");
       return { label, icon, badge: badge[id] || 0, color: on ? "#BD4A19" : "#806B60", w: on ? 600 : 500,
-        go: () => set(u => ({ ...u, tab: id, lead: null, toast: "", pMenu: false, reSheet: false, pick: "" })) };
+        // Leaving a tab closes what it had open: Assignment back to its overview, Calendar its list and Customer info (rev 1011).
+        go: () => set(u => ({ ...u, tab: id, lead: null, toast: "", pMenu: false, reSheet: false, pick: "", asSec: null, ftx: null, hlOpen: false, calInfo: null, cLs: false, ftsOpen: false, tplOpen: false, tplEd: null })) };
     }),
   };
 }

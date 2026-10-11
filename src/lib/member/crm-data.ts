@@ -54,6 +54,9 @@ export interface CrmCustomer {
   previous?: "won" | "lost";
   wonAmount: number | null;
   assignedTo: string | null;
+  /** Over the limit (rev 1011 §6.6): a By max team was full, so the customer waits, kept in that team, nobody yet. */
+  held?: boolean;
+  heldTeam?: string | null;
   /** When the customer was given to them, and by whom (null: the CRM dealt it) — the bell's "new enquiry for you". */
   assignedAt?: string | null;
   assignedBy?: string | null;
@@ -127,9 +130,14 @@ export interface CrmEvent {
 }
 
 /** Ads to teams (mig 20261009180000): how one ad's enquiries are dealt. */
-export interface CrmAdRule { adId: string; label: string; mode: "even" | "split" | "people"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; startedAt: string }
+export interface CrmAdRule {
+  adId: string; label: string; mode: "even" | "split" | "people"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; startedAt: string;
+  /** By team, inside each team (rev 1011 §6.6): Evenly · By % (the default) · By max. Absent = By % with an even split. */
+  tm?: Record<string, "even" | "pct" | "cnt">;
+}
 /** Full time lead allocation for one team: on these weekdays (0 = Monday) the full-time RS take their maximum or % first. */
-export interface CrmFtRule { tlId: string; mode: "cnt" | "pct"; days: number[]; vals: Record<string, Record<string, number>> }
+/** rev 1011 §6.2: "turns" — vals[staff][day] = 1 where ticked; one ticked gets that day's leads, two or more take turns. */
+export interface CrmFtRule { tlId: string; mode: "cnt" | "pct" | "turns"; days: number[]; vals: Record<string, Record<string, number>> }
 
 /**
  * What the signed-in person may do in the CRM — their CRM cells in the

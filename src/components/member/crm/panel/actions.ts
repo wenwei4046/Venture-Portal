@@ -12,8 +12,8 @@ import type { Dispatch, SetStateAction } from "react";
 
 export interface PanelActions extends SalesActions {
   sendTo(customerId: string, staffId: string | null): Promise<boolean>;
-  saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | "people" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number> }): Promise<boolean>;
-  saveFtRule(tlId: string, mode: "cnt" | "pct", days: number[], vals: Record<string, Record<string, number>>): Promise<boolean>;
+  saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | "people" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<boolean>;
+  saveFtRule(tlId: string, mode: "cnt" | "pct" | "turns", days: number[], vals: Record<string, Record<string, number>>): Promise<boolean>;
   readNotifs(keys: string[], all?: boolean): void;
   saveRoom(room: Omit<CrmRoom, "id"> & { id: string | null }): Promise<boolean>;
   removeRoom(id: string): Promise<boolean>;
