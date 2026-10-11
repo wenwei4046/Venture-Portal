@@ -89,6 +89,14 @@
   cursor: pointer;
 }
 
+/* Select all (2026-10-11): the first row under the head, on the cream wash, its name 500;
+   a column only partly ticked shows "–" on peach inside the accent edge. */
+.allRow { background: rgb(var(--hv-cream)); }
+.allRow .tabCell { font-weight: 500; }
+.boxSome { background: rgb(var(--hv-peach)); border-color: rgb(var(--hv-accent)); color: rgb(var(--hv-ink)); font-weight: 600; }
+/* A ticked tab whose page opens nothing yet: why, under its name. */
+.held { display: block; margin-top: 2px; font-size: 11px; line-height: 1.35; color: rgb(var(--hv-alert)); }
+
 /* The person window's tighter matrix (170px rail, 64px boxes). */
 .gridCompact { grid-template-columns: 170px minmax(0, 1fr); gap: 14px; }
 .gridCompact .row { grid-template-columns: minmax(0, 1fr) repeat(4, 64px) 44px; font-size: 12.5px; }

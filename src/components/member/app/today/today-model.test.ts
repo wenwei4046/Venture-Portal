@@ -123,6 +123,13 @@ describe("Needs your action", () => {
       ["Save October brand weeks", "Due 18 Oct"],
     ]);
   });
+  it("My brand weeks closed by their ticks (2026-10-11): no reminder to save them, nor a pointer to the page", () => {
+    const weeks = arena([], { weekLocks: [{ week: "2026-10-09", closesOn: "2026-10-18", locked: false }], brandWeeks: { weeks: 5, counts: { AKEMI: 0, ERGOTEX: 0, ZANOTTI: 0, DUNLOP: 0 }, picks: {} } });
+    const m = todayModel({ ...base, arena: weeks, brandWeeks: false });
+    expect(m.todo.map(t => t.title)).not.toContain("Save October brand weeks");
+    expect(m.week?.venue).toBeNull();
+    expect(todayModel({ ...base, arena: weeks }).week?.venue).toBe("Pick your brand in My brand weeks");
+  });
 });
 
 describe("This week and Your Arena", () => {

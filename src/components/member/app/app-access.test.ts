@@ -6,13 +6,25 @@ import { readRoute } from "./route";
 const closing = (pages: AppClosed["pages"], sent: AppClosed["sends"] = []): AppClosed => ({ pages, sends: sent });
 
 describe("where the app may go once ticks close some of its pages (2026-10-11)", () => {
-  it("knows which page a route is on — and Profile, honours, memos and the CRM are no tab’s", () => {
+  it("knows which page a route is on — and Profile, memos and the CRM are no tab’s", () => {
     expect(pageOfRoute(readRoute("?page=calc"))).toBe("quote");
     expect(pageOfRoute(readRoute("?page=account&view=incOrders"))).toBe("income");
     expect(pageOfRoute(readRoute("?page=account&view=track"))).toBe("track");
+    // The rest of Profile has its own boxes since 2026-10-11.
+    expect(pageOfRoute(readRoute("?page=account&view=honours"))).toBe("honours");
+    expect(pageOfRoute(readRoute("?page=account&view=brandWeeks"))).toBe("brandWeeks");
     expect(pageOfRoute(readRoute("?page=account"))).toBeNull();
-    expect(pageOfRoute(readRoute("?page=account&view=honours"))).toBeNull();
+    // Memos & notifications stays open to all: HR's memos must be acknowledged.
+    expect(pageOfRoute(readRoute("?page=account&view=memos"))).toBeNull();
     expect(pageOfRoute(readRoute("?page=account&view=crm"))).toBeNull();
+  });
+
+  it("a closed My honours or My brand weeks is not drawn: the app opens where it opens", () => {
+    const honours = readRoute("?page=account&view=honours");
+    expect(allowedRoute(honours, closing(["honours"])).screen).toBe("today");
+    expect(allowedRoute(honours, closing(["brandWeeks"]))).toBe(honours);
+    const weeks = readRoute("?page=account&view=brandWeeks");
+    expect(allowedRoute(weeks, closing(["brandWeeks"])).pf).toBeNull();
   });
 
   it("opens on Today, else the first of Insight and the Arena, else Profile", () => {

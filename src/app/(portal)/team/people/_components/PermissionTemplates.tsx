@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { officeTime } from '@/lib/office-time'
 import {
@@ -14,10 +14,13 @@ import {
 import {
   TAB_VIEWS,
   grantsOfTicks,
+  heldTabs,
   sameTicks,
   templateTicks,
   toggleBox,
+  toggleColumn,
   toggleRow,
+  toggleView,
   viewCount,
   type TabAction,
   type TabView,
@@ -26,7 +29,8 @@ import type { HistoryEntry } from '@/lib/permission-history'
 import { btn, hv } from '@/components/hrv/kit'
 import type { PermissionsData, TemplateLogin, TemplateRecord, TemplateTitle } from '../../_lib/permission-templates'
 import TabMatrix from '../../_components/TabMatrix'
-import { copyTemplate, deleteTemplate, loadPermissionHistory, saveTemplateTabs, setTitleTemplate } from '../permission-actions'
+import { deleteTemplate, loadPermissionHistory, saveTemplateTabs, setTitleTemplate } from '../permission-actions'
+import NewTemplateWindow from './NewTemplateWindow'
 import p from './permissions.module.css'
 import { Select } from '@/components/hrv/select'
 
@@ -51,8 +55,10 @@ function firstView(ticks: ReadonlySet<string>): TabView {
  * People Management › Permissions (2026-10-11, the HR revamp — the user's
  * choice B): a title's template, ticked view by view and tab by tab — View,
  * Create, Edit, Approve — as the handoff draws it: the template picked at the
- * top with Delete and "+ New template" (a copy of the one open), the views on
- * the left, their tabs on the right, Save at the foot. The cells the database
+ * top with Delete and "+ New template" (a window asking its name, the views it
+ * can see and its sensitive fields — the user, 2026-10-11), the views on the
+ * left, their tabs on the right under a Select all row, Save at the foot. A
+ * ticked tab whose page would still not open says why. The cells the database
  * asks for are worked out from the ticks on the server (lib/permission-tabs).
  *
  * Kept below the handoff's drawing because nothing else does them: the three
@@ -64,12 +70,15 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
   const [selectedId, setSelectedId] = useState<string | null>(
     initialTemplateId && templates.some(t => t.id === initialTemplateId) ? initialTemplateId : (templates[0]?.id ?? null),
   )
-  const template = templates.find(t => t.id === selectedId) ?? null
+  // A template just made is picked before the refreshed list carries it: the one on screen stays until then.
+  const shown = useRef<TemplateRecord | null>(null)
+  const template = templates.find(t => t.id === selectedId) ?? (shown.current && templates.find(t => t.id === shown.current!.id)) ?? null
+  shown.current = template
   const saved = useMemo(() => (template ? templateTicks(template, cellKeys) : new Set<string>()), [template, cellKeys])
   const [view, setView] = useState<TabView>(() => firstView(saved))
   const [draft, setDraft] = useState<Draft | null>(null)
-  const [mode, setMode] = useState<'idle' | 'adding' | 'deleting'>('idle')
-  const [newName, setNewName] = useState('')
+  const [mode, setMode] = useState<'idle' | 'deleting'>('idle')
+  const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
@@ -77,6 +86,7 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
   const sensitive = draft?.sensitive ?? template?.sensitive ?? []
   const dirty = !!template && !!draft && (!sameTicks(draft.ticks, saved) || !sameSensitive(draft.sensitive, template.sensitive))
   const warnings = useMemo(() => sodWarnings(grantsOfTicks(ticks), functions), [ticks, functions])
+  const held = useMemo(() => (template ? heldTabs(ticks, sensitive, template.baseRole, cellKeys) : new Map<string, string>()), [ticks, sensitive, template, cellKeys])
 
   const titlesOf = (id: string) => titles.filter(t => t.templateId === id)
   const peopleOn = (id: string) => titlesOf(id).reduce((n, t) => n + t.people, 0)
@@ -109,19 +119,22 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
     })
   }
 
-  function onCreate() {
-    if (!template || pending || !newName.trim()) return
+  function onCreated(created: { id: string; name: string; views: TabView[] }) {
+    setCreating(false)
     setError(null)
-    startTransition(async () => {
-      const result = await copyTemplate({ name: newName, from: template.id })
-      if (!result.ok) return setError(result.reason)
-      setMode('idle')
-      setNewName('')
-      setSelectedId(result.id)
-      setDraft(null)
-      onNotice(`${newName.trim()} created as a copy of ${template.name}. Point titles at it below.`)
-      router.refresh()
-    })
+    setSelectedId(created.id)
+    setDraft(null)
+    setMode('idle')
+    setView(created.views[0] ?? 'hr')
+    const views = TAB_VIEWS.filter(v => created.views.includes(v.id)).map(v => v.label)
+    onNotice(`${created.name} created — View ticked on every tab of ${views.join(', ')}. Tick Create, Edit and Approve where they need them, then point titles at it below.`)
+    router.refresh()
+  }
+
+  function newTemplate() {
+    if (dirty && !window.confirm(`Discard your changes to ${template?.name}?`)) return
+    setDraft(null)
+    setCreating(true)
   }
 
   function onDelete() {
@@ -152,7 +165,17 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
 
   if (!template) {
     return (
-      <div className={hv.gtEmpty}>No permission templates yet.</div>
+      <div className={p.wrap}>
+        <div className={hv.gtEmpty}>No permission templates yet.</div>
+        {canManage ? (
+          <div className={p.top}>
+            <button type="button" className={p.ghostWide} onClick={newTemplate}>+ New template</button>
+          </div>
+        ) : null}
+        {creating ? (
+          <NewTemplateWindow names={[]} cellKeys={cellKeys} onClose={() => setCreating(false)} onCreated={onCreated} />
+        ) : null}
+      </div>
     )
   }
 
@@ -172,16 +195,6 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
         </Select>
         <span className={p.topLabel}>{templates.length} templates</span>
         <span className={p.spacer} />
-        {canManage && mode === 'adding' ? (
-          <span className={p.inline}>
-            <input className={p.newName} value={newName} onChange={e => setNewName(e.target.value)} maxLength={80} autoFocus
-              placeholder="Template name, e.g. Area Manager" aria-label="New template's name"
-              onKeyDown={e => { if (e.key === 'Enter') onCreate(); if (e.key === 'Escape') setMode('idle') }} />
-            <span className={p.copies}>copies {template.name}</span>
-            <button type="button" className={p.ghost} onClick={() => { setMode('idle'); setNewName('') }}>Cancel</button>
-            <button type="button" className={p.primary} onClick={onCreate} disabled={pending || !newName.trim()}>{pending ? 'Creating…' : 'Create'}</button>
-          </span>
-        ) : null}
         {canManage && mode === 'deleting' ? (
           <span className={p.inline}>
             <span className={p.confirm}>
@@ -196,10 +209,13 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
         {canManage && mode === 'idle' ? (
           <>
             <button type="button" className={p.deleteBtn} title="Delete this template" onClick={() => setMode('deleting')} disabled={templates.length <= 1}>Delete</button>
-            <button type="button" className={p.ghostWide} onClick={() => setMode('adding')}>+ New template</button>
+            <button type="button" className={p.ghostWide} onClick={newTemplate}>+ New template</button>
           </>
         ) : null}
       </div>
+      {creating ? (
+        <NewTemplateWindow names={templates.map(t => t.name)} cellKeys={cellKeys} onClose={() => setCreating(false)} onCreated={onCreated} />
+      ) : null}
       <div className={p.lede}>
         Everyone holding <b>{template.name}</b> gets these, unless their own Permissions tab overrides one.
       </div>
@@ -209,8 +225,11 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
         view={view}
         onView={setView}
         canEdit={canManage}
+        held={held}
         onToggle={(tabId, action: TabAction) => edit(d => ({ ...d, ticks: toggleBox(d.ticks, tabId, action) }))}
         onRow={tabId => edit(d => ({ ...d, ticks: toggleRow(d.ticks, tabId) }))}
+        onColumn={action => edit(d => ({ ...d, ticks: toggleColumn(d.ticks, view, action) }))}
+        onAll={() => edit(d => ({ ...d, ticks: toggleView(d.ticks, view) }))}
       />
 
       <div className={p.foot}>

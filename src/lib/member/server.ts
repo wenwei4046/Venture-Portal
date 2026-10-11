@@ -633,6 +633,9 @@ export async function loadMemberHonours(
   return outcome(async () => {
     const user = await getMemberUser();
     if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    // Its box unticked (People › Permissions › Revenue app, 2026-10-11): the finishes are read with the service
+    // role below, which has no tabs to ask, so this is the gate.
+    if (appClosed(user.closed).pages.includes("honours")) throw new Error("My honours is not open to your account.");
     insightWindow(subDepartmentId, from, until, context);
     const principal = principalReadContext(user, context);
     const client = await session("member_insight", principal);

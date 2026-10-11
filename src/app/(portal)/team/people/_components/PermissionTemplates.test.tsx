@@ -5,7 +5,7 @@ import type { PermFunction } from '@/lib/permission-matrix'
 
 const mocks = vi.hoisted(() => ({
   saveTemplateTabs: vi.fn(),
-  copyTemplate: vi.fn(),
+  createTemplate: vi.fn(),
   deleteTemplate: vi.fn(),
   setTitleTemplate: vi.fn(),
   loadPermissionHistory: vi.fn(),
@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh, push: vi.fn() }) }))
 vi.mock('../permission-actions', () => ({
   saveTemplateTabs: mocks.saveTemplateTabs,
-  copyTemplate: mocks.copyTemplate,
+  createTemplate: mocks.createTemplate,
   deleteTemplate: mocks.deleteTemplate,
   setTitleTemplate: mocks.setTitleTemplate,
   loadPermissionHistory: mocks.loadPermissionHistory,
@@ -77,7 +77,7 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     vi.clearAllMocks()
     mocks.saveTemplateTabs.mockResolvedValue({ ok: true, version: 4, titles: 1 })
     mocks.setTitleTemplate.mockResolvedValue({ ok: true })
-    mocks.copyTemplate.mockResolvedValue({ ok: true, id: '00000000-0000-4000-8000-000000000009' })
+    mocks.createTemplate.mockResolvedValue({ ok: true, id: '00000000-0000-4000-8000-000000000009' })
     mocks.deleteTemplate.mockResolvedValue({ ok: true })
   })
 
@@ -138,14 +138,81 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     expect(screen.getByRole('alert')).toHaveTextContent('changed by somebody else')
   })
 
-  it('+ New template copies the one open', async () => {
+  it('+ New template opens a window: its name, the views it can see and its sensitive fields', async () => {
     const { onNotice } = renderTab()
     fireEvent.click(screen.getByRole('button', { name: '+ New template' }))
-    expect(screen.getByText('copies HR · Payroll')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText("New template's name"), { target: { value: 'Area Manager' } })
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Create' })))
-    expect(mocks.copyTemplate).toHaveBeenCalledWith({ name: 'Area Manager', from: HR })
-    expect(onNotice).toHaveBeenCalledWith('Area Manager created as a copy of HR · Payroll. Point titles at it below.')
+    const win = within(screen.getByRole('dialog', { name: 'New template' }))
+    // Nothing filled in yet: it says what is missing and sends nothing.
+    await act(async () => fireEvent.click(win.getByRole('button', { name: 'Create template' })))
+    expect(win.getByText('Give it a name')).toBeInTheDocument()
+    expect(win.getByText('Pick at least one')).toBeInTheDocument()
+    fireEvent.change(win.getByPlaceholderText('e.g. Area Manager'), { target: { value: 'hr · payroll' } })
+    expect(win.getByText('There is already a template called that')).toBeInTheDocument()
+    fireEvent.change(win.getByPlaceholderText('e.g. Area Manager'), { target: { value: 'Area Manager' } })
+    // Each view with how many tabs it has.
+    expect(win.getByText('Department view').closest('label')).toHaveTextContent('Department view9 tabs')
+    fireEvent.click(win.getByRole('checkbox', { name: /Department view/ }))
+    fireEvent.click(win.getByRole('checkbox', { name: /Salary amounts/ }))
+    expect(win.getByText('Its holders sign in to the portal.')).toBeInTheDocument()
+    await act(async () => fireEvent.click(win.getByRole('button', { name: 'Create template' })))
+    expect(mocks.createTemplate).toHaveBeenCalledWith({ name: 'Area Manager', views: ['dept'], sensitive: ['salary'] })
+    expect(onNotice).toHaveBeenCalledWith(
+      'Area Manager created — View ticked on every tab of Department view. Tick Create, Edit and Approve where they need them, then point titles at it below.')
+    expect(mocks.refresh).toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: 'New template' })).toBeNull()
+  })
+
+  it('the window says which of those tabs would not open yet, and that the Revenue app alone is an app account', async () => {
+    renderTab()
+    fireEvent.click(screen.getByRole('button', { name: '+ New template' }))
+    const win = within(screen.getByRole('dialog', { name: 'New template' }))
+    fireEvent.click(win.getByRole('checkbox', { name: /HR view/ }))
+    // HR Costing's pages show pay: without Salary amounts they stay shut.
+    const pay = win.getByText(/HR Costing, Payroll, Payment/).closest('div') as HTMLElement
+    expect(pay).toHaveTextContent('Not open yet — it shows pay: tick Salary amounts')
+    fireEvent.click(win.getByRole('checkbox', { name: /Salary amounts/ }))
+    expect(win.queryByText(/HR Costing, Payroll, Payment/)).toBeNull()
+    fireEvent.click(win.getByRole('checkbox', { name: /HR view/ }))
+    fireEvent.click(win.getByRole('checkbox', { name: /Revenue app/ }))
+    expect(win.getByText('Only the Revenue app: its holders sign in to the Revenue app.')).toBeInTheDocument()
+    mocks.createTemplate.mockResolvedValue({ ok: false, reason: 'There is already a template called Fair Junior' })
+    fireEvent.change(win.getByPlaceholderText('e.g. Area Manager'), { target: { value: 'Fair Junior' } })
+    await act(async () => fireEvent.click(win.getByRole('button', { name: 'Create template' })))
+    expect(mocks.createTemplate).toHaveBeenCalledWith({ name: 'Fair Junior', views: ['rev'], sensitive: ['salary'] })
+    expect(win.getByRole('alert')).toHaveTextContent('There is already a template called Fair Junior')
+  })
+
+  it('Select all ticks a whole column of the view, then every box, then none', () => {
+    renderTab()
+    expect(box('Select all · Approve')).toHaveAttribute('aria-checked', 'false')
+    // HR · Payroll holds some Views of the HR view, not all: "–".
+    expect(box('Select all · View')).toHaveAttribute('aria-checked', 'mixed')
+    expect(box('Select all · View')).toHaveTextContent('–')
+    fireEvent.click(box('Select all · Approve'))
+    expect(box('Payroll · Approve')).toHaveAttribute('aria-checked', 'true')
+    expect(box('Hiring requests · Approve')).toHaveAttribute('aria-checked', 'true')
+    // Approve brings each tab's View with it.
+    expect(box('Hiring requests · View')).toHaveAttribute('aria-checked', 'true')
+    expect(box('Select all · Approve')).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(box('Select all · Approve'))
+    expect(box('Payroll · Approve')).toHaveAttribute('aria-checked', 'false')
+    expect(box('Hiring requests · View')).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(box('Select all · every box in HR view'))
+    expect(box('Director Pool · Edit')).toHaveAttribute('aria-checked', 'true')
+    expect(box('Select all · every box in HR view')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('20/20')
+    fireEvent.click(box('Select all · every box in HR view'))
+    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('0/20')
+    expect(screen.getByText('Unsaved changes to HR · Payroll')).toBeInTheDocument()
+  })
+
+  it('a ticked tab whose page would not open says why under its name', () => {
+    renderTab()
+    const payroll = () => box('Payroll · View').closest('[role="row"]') as HTMLElement
+    expect(within(payroll()).queryByText(/Not open yet/)).toBeNull()
+    // Without Salary amounts HR's pay pages stay shut, whatever is ticked.
+    fireEvent.click(screen.getByRole('checkbox', { name: /Salary amounts/ }))
+    expect(within(payroll()).getByText('Not open yet — it shows pay: tick Salary amounts')).toBeInTheDocument()
   })
 
   it('Delete asks first, and a template on a title says to move it', async () => {
@@ -168,6 +235,7 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     renderTab({ canManage: false })
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
     expect(screen.queryByRole('button', { name: '+ New template' })).toBeNull()
+    expect(screen.queryByRole('checkbox', { name: 'Select all · View' })).toBeNull()
     expect(box('Payroll · View')).toBeDisabled()
     expect(screen.getByLabelText('Template for HR EXECUTIVE')).toBeDisabled()
   })

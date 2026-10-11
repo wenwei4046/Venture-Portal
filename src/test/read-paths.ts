@@ -218,6 +218,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_waiting_queue',
   // People › Permissions by view and tab (migs 20261011010000, 20261011020000): each asks has_perm('permissions_manage').
   'permission_template_tabs_save', 'permission_user_tabs_set', 'permission_template_delete', 'permission_title_move',
+  // "+ New template"'s window (mig 20261011233200): has_any_action(accounts.manage), then the two above ask permissions_manage.
+  'permission_template_new',
   // Hiring (migs 20261011080000, 20261011080100, 20261011160000, 20261011210000): each asks its Hiring cell itself (view / create / edit / approve).
   'hiring_board', 'hiring_file_path', 'hiring_resume_downloaded', 'hiring_submit', 'hiring_acknowledge', 'hiring_request_info',
   'hiring_decline', 'hiring_set_owner', 'hiring_set_assist', 'hiring_fill', 'hiring_cancel', 'hiring_reopen', 'hiring_candidate_add',

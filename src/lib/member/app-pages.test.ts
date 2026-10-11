@@ -18,11 +18,13 @@ describe('the Revenue app’s pages and their tabs', () => {
 
   it('a template saved on tabs closes the pages it leaves unticked, and the sends whose Create it does', () => {
     // A Revenue Specialist as the handoff's sample has it, without the Arena: every View, the Quote's and Requests' Create
-    // (and, round 2, booking a room).
+    // (and, round 2, booking a room; 2026-10-11, the rest of Profile).
     const ticks = ['rev.today.view', 'rev.insight.view', 'rev.quote.view', 'rev.quote.create', 'rev.income.view',
       'rev.requests.view', 'rev.requests.create', 'rev.track.view', 'rev.team.view', 'rev.rooms.view', 'rev.rooms.create',
-      'rev.documentation.view']
+      'rev.documentation.view', 'rev.honours.view', 'rev.brand_weeks.view', 'rev.scheme.view']
     expect(appClosed(closedBoxes({ ticks, boxes: [], cells: false }))).toEqual({ pages: ['arena'], sends: ['track'] })
+    // A template saved before those three were boxes leaves them unticked — so they close with it.
+    expect(appClosed(closedBoxes({ ticks: ticks.slice(0, 12), boxes: [], cells: false })).pages).toEqual(['arena', 'honours', 'brandWeeks', 'scheme'])
   })
 
   it('a View held back closes its page and its sends with it', () => {

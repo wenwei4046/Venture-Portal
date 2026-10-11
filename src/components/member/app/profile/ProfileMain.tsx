@@ -23,8 +23,9 @@ const ROWS: { key: WorkKey; label: string; sub: string; d: string; tone: string 
 
 export interface ProfileMainActions {
   open: (key: WorkKey) => void;
-  scheme: () => void;
-  brandWeeks: () => void;
+  /** Absent while their ticks close the page (2026-10-11, People › Permissions › Revenue app): no chip. */
+  scheme?: () => void;
+  brandWeeks?: () => void;
   /** Absent while My income is closed (2026-10-11): the income stays hidden, so Privacy has nothing to show. */
   toggleHide?: () => void;
   signOut: () => void;
@@ -61,10 +62,12 @@ export default function ProfileMain({ vm, hidden, actions, crm = true, closedRow
               <div className={s.fact}><span className={s.factLabel}>Rank</span><span className={s.factValue}>{vm.rank}</span></div>
             </div>
           </div>
-          <div className={s.chips}>
-            <button className={s.chip} onClick={actions.scheme}><span className={s.chipIcon}><Svg d={ICON.receipt} size={18} sw={1.7} /></span>Commission scheme</button>
-            <button className={s.chip} onClick={actions.brandWeeks}><span className={s.chipIcon}><Svg d={ICON.calendar} size={18} sw={1.7} /></span>My brand weeks</button>
-          </div>
+          {actions.scheme || actions.brandWeeks ? (
+            <div className={`${s.chips} ${actions.scheme && actions.brandWeeks ? "" : s.chipsOne}`}>
+              {actions.scheme && <button className={s.chip} onClick={actions.scheme}><span className={s.chipIcon}><Svg d={ICON.receipt} size={18} sw={1.7} /></span>Commission scheme</button>}
+              {actions.brandWeeks && <button className={s.chip} onClick={actions.brandWeeks}><span className={s.chipIcon}><Svg d={ICON.calendar} size={18} sw={1.7} /></span>My brand weeks</button>}
+            </div>
+          ) : null}
         </section>
       </div>
       {actions.viewAs && (

@@ -1,6 +1,7 @@
 "use server";
 
 import { getMemberUser } from "@/lib/auth";
+import { appClosed } from "@/lib/member/app-pages";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isPrincipalAccount } from "@/lib/view-as";
@@ -73,10 +74,14 @@ export async function savePrincipalArenaBrandWeeks(membershipId: string, period:
   } catch (error) { return failure(error); }
 }
 
-/** The brand the member worked each week of the month (2026-10-03): their own row only, closed weeks as they are. */
+/**
+ * The brand the member worked each week of the month (2026-10-03): their own row only, closed weeks as they are.
+ * Refused once My brand weeks' box was unticked for them (2026-10-11) — the database asks the same box.
+ */
 export async function saveMemberArenaBrandWeeks(membershipId: string, period: string, picks: ArenaWeekPicks) {
   try {
     if (!uuid.test(membershipId) || !validPeriod(period) || !validArenaWeekPicks(period, picks)) throw new Error("Pick Akemi, Dunlopillo, Zanotti or Ergotex for the weeks of this month.");
+    if (appClosed((await getMemberUser())?.closed).pages.includes("brandWeeks")) throw new Error("My brand weeks is not open to your account.");
     const { db } = await client(undefined, true);
     const { error } = await db.rpc("member_arena_save_brand_week_picks", { p_sub_department: membershipId, p_period: period, p_picks: arenaWeekPicksToSave(period, picks) });
     if (error) throw new Error(error.message);
