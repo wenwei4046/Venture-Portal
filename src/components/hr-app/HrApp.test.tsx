@@ -263,6 +263,23 @@ describe('the HR app’s Change password', () => {
     expect(screen.queryByRole('dialog', { name: 'Change password' })).toBeNull()
   })
 
+  it('stays while it is being sent: Cancel and the scrim wait for the answer', async () => {
+    let answer: (v: { ok: true }) => void = () => {}
+    openMore({ personalLogin: true }, vi.fn(() => new Promise<{ ok: true }>(r => { answer = r })) as never)
+    fireEvent.click(screen.getByRole('button', { name: /Change password/ }))
+    fill('old-pass', 'new-pass-1', 'new-pass-1')
+    const sheet = screen.getByRole('dialog', { name: 'Change password' })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Change password' }))
+    await waitFor(() => expect(within(sheet).getByRole('button', { name: 'Cancel' })).toBeDisabled())
+    fireEvent.click(sheet.previousElementSibling as Element)
+    expect(screen.getByRole('dialog', { name: 'Change password' })).toBeInTheDocument()
+    await act(async () => { answer({ ok: true }) })
+    await waitFor(() => expect(screen.getByText(/Password changed\./)).toBeInTheDocument())
+    // Answered, the scrim closes it again.
+    fireEvent.click(screen.getByRole('dialog', { name: 'Change password' }).previousElementSibling as Element)
+    expect(screen.queryByRole('dialog', { name: 'Change password' })).toBeNull()
+  })
+
   it('shows the server’s refusal in the sheet', async () => {
     openMore({ personalLogin: true }, vi.fn(async () => ({ ok: false as const, reason: 'Your current password is not right.' })) as never)
     fireEvent.click(screen.getByRole('button', { name: /Change password/ }))

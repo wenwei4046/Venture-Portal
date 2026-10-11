@@ -934,9 +934,12 @@ function SelectField({ label, value, onChange, options }: { label: string; value
  * More › Change password's sheet (2026-10-12): the current password, the new one, the new one again —
  * the portal's own rules and action (lib/account). Done, it says so and closes on Done.
  */
-function PasswordForm({ change, close }: { change: ChangePassword; close: () => void }) {
+function PasswordForm({ change, close, onBusy }: { change: ChangePassword; close: () => void; onBusy: (busy: boolean) => void }) {
   const f = useChangePassword(change)
   const type = f.shown ? 'text' : 'password'
+  // While it is being sent the sheet stays (its scrim and Cancel wait): the answer is said here (the review, 2026-10-12).
+  useEffect(() => { onBusy(f.busy) }, [f.busy, onBusy])
+  useEffect(() => () => onBusy(false), [onBusy])
   const go = { borderColor: ORANGE, background: ORANGE, color: 'rgb(43 31 23)' }
   if (f.done) {
     return (
@@ -965,7 +968,7 @@ function PasswordForm({ change, close }: { change: ChangePassword; close: () => 
       </label>
       {f.error ? <span className={s.formErr} role="alert">{f.error}</span> : null}
       <div className={s.btnRow}>
-        <button type="button" className={s.formBtn} style={{ borderColor: 'rgb(222 214 203)', background: 'rgb(255 255 255)', color: 'rgb(43 31 23)', flex: 1 }} onClick={close}>Cancel</button>
+        <button type="button" className={s.formBtn} style={{ borderColor: 'rgb(222 214 203)', background: 'rgb(255 255 255)', color: 'rgb(43 31 23)', flex: 1 }} onClick={close} disabled={f.busy}>Cancel</button>
         <button type="submit" className={s.formBtn} style={{ ...go, flex: 2 }} disabled={f.busy}>{f.busy ? 'Changing…' : 'Change password'}</button>
       </div>
     </form>
@@ -992,6 +995,8 @@ function SheetView(p: {
   live: HrBooking[]
 }) {
   const { d, sheet: sh, hr, day, form: F, setForm, formErr, setFormErr, busy, arm, setArm, close, pop, run, actions, live } = p
+  // A send in flight (Change password): its scrim does not close it until the answer is in.
+  const [locked, setLocked] = useState(false)
   const set = (k: string) => (v: string) => { setForm({ ...F, [k]: v }); setFormErr('') }
   const str = (k: string) => (F[k] == null ? '' : String(F[k]))
   const outline = { borderColor: 'rgb(222 214 203)', background: 'rgb(255 255 255)', color: 'rgb(43 31 23)' }
@@ -1047,7 +1052,7 @@ function SheetView(p: {
   // More › Change password (2026-10-12): its boxes keep their own state, so a sheet closed and opened starts empty.
   if (sh.k === 'password') {
     title = 'Change password'
-    body = <PasswordForm change={actions.changePassword} close={close} />
+    body = <PasswordForm change={actions.changePassword} close={close} onBusy={setLocked} />
   }
 
   if (sh.k === 'ack' && hr) {
@@ -1211,7 +1216,7 @@ function SheetView(p: {
 
   return (
     <>
-      <div className={s.scrim} onClick={close} aria-hidden="true" />
+      <div className={s.scrim} onClick={locked ? undefined : close} aria-hidden="true" />
       <div className={s.sheet} role="dialog" aria-modal="true" aria-label={title}>
         <span className={s.grab} aria-hidden="true" />
         <div className={s.sheetTitle}>{title}</div>

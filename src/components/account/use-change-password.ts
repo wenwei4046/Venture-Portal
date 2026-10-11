@@ -61,5 +61,9 @@ export function useChangePassword(change: ChangePassword) {
   return { form, set, shown, setShown, error, done, busy, submit, reset }
 }
 
-/** Said under the form once the password has changed. */
-export const PASSWORD_CHANGED = 'Password changed. You stay signed in here — your other devices will ask for the new password.'
+/**
+ * Said under the form once the password has changed. The auth server revokes the account's other sessions at once,
+ * but a device keeps the access token it holds (an hour, checked locally) until its refresh is refused — so "within
+ * an hour", not "now" (the review, 2026-10-12).
+ */
+export const PASSWORD_CHANGED = 'Password changed. You stay signed in here; your other devices are signed out within an hour and need the new password.'

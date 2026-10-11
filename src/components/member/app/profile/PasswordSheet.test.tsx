@@ -56,6 +56,20 @@ describe("the Change password sheet", () => {
     expect(close).toHaveBeenCalled();
   });
 
+  it("stays while it is being sent — Cancel and the backdrop wait for the answer", async () => {
+    let answer: (v: { ok: true }) => void = () => {};
+    const change = vi.fn(() => new Promise<{ ok: true }>(r => { answer = r; }));
+    const close = vi.fn();
+    render(<PasswordSheet open onClose={close} change={change} />);
+    fill("old-pass", "new-pass-1", "new-pass-1");
+    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled());
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(close).not.toHaveBeenCalled();
+    answer({ ok: true });
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Password changed."));
+  });
+
   it("forgets what was typed once it is closed", () => {
     const { rerender } = render(<PasswordSheet open onClose={vi.fn()} change={vi.fn()} />);
     fill("old-pass", "new-pass-1", "new-pass-1");

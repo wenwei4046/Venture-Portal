@@ -22,8 +22,11 @@ export default function PasswordSheet({ open, onClose, change }: { open: boolean
   const f = useChangePassword(change);
   const { reset } = f;
   useEffect(() => { if (!open) reset(); }, [open, reset]);
+  // While it is being sent the sheet stays: its answer is said here (the review, 2026-10-12 — closed mid-send, the
+  // password changed with nobody told, or a stale answer waited for the next open).
+  const close = () => { if (!f.busy) onClose(); };
   return (
-    <Sheet open={open} onClose={onClose} z={21} dim="e" maxHeight="88%" scroll className={p.sheet} label="Change password">
+    <Sheet open={open} onClose={close} z={21} dim="e" maxHeight="88%" scroll className={p.sheet} label="Change password">
       <span className={p.grab} />
       <div className={p.title}>Change password</div>
       {f.done ? (
@@ -48,7 +51,7 @@ export default function PasswordSheet({ open, onClose, change }: { open: boolean
           </label>
           {f.error && <span className={p.err} role="alert">{f.error}</span>}
           <div className={p.actions}>
-            <button type="button" className={p.cancel} onClick={onClose}>Cancel</button>
+            <button type="button" className={p.cancel} onClick={close} disabled={f.busy}>Cancel</button>
             <button type="submit" className={p.go} disabled={f.busy}>{f.busy ? "Changing…" : "Change password"}</button>
           </div>
         </form>

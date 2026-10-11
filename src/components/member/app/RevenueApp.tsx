@@ -264,7 +264,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const [incPeriod, setIncPeriod] = useState<string | null>(null);
   const closeProfileSheets = useCallback(() => {
     setCoPick(null); setHonPlace(null); setPersonPick(null); setReqPick(null); setReqForm(null); setMemoPick(null); setReqError(null); setMemoError(null); setPfDateOpen(false);
-    setSchemeOpen(false);
+    setSchemeOpen(false); setPwOpen(false);
   }, []);
 
   useEffect(() => {

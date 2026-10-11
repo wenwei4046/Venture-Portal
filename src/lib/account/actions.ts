@@ -5,8 +5,8 @@ import { getAccountUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { READ_ONLY_MESSAGE } from '@/lib/supabase/read-only'
 import { viewingAsSomebody } from '@/lib/view-as-person'
-import { loginIsPersonal } from './personal-login'
-import { SHARED_LOGIN, passwordChangeProblem, passwordRefusal, type AuthRefusal, type PasswordChange } from './password'
+import { askPersonalLogin } from './personal-login'
+import { NOT_CHANGED, SHARED_LOGIN, passwordChangeProblem, passwordRefusal, type AuthRefusal, type PasswordChange } from './password'
 
 type Act = { ok: true } | { ok: false; reason: string }
 
@@ -25,7 +25,8 @@ type Act = { ok: true } | { ok: false; reason: string }
  *      accepted, this device holds a fresh session (which also satisfies an auth server that wants
  *      a recent sign-in before a password changes);
  *   2. the new password — and the auth server signs every OTHER session of the account out, so other
- *      phones and computers sign in again with it; this device stays signed in.
+ *      phones and computers sign in again with it (once the access token each holds runs out, within
+ *      an hour); this device stays signed in.
  *
  * Answers `{ ok: false, reason }` for a refusal somebody should read: a thrown message reaches
  * production's browser only as a digest.
@@ -42,7 +43,10 @@ export async function changeMyPassword(input: PasswordChange): Promise<Act> {
   const user = await getAccountUser()
   if (!user?.is_active) return { ok: false, reason: 'Sign in with an active work account.' }
   if (await viewingAsSomebody()) return { ok: false, reason: READ_ONLY_MESSAGE }
-  if (!(await loginIsPersonal())) return { ok: false, reason: SHARED_LOGIN }
+  // An unanswered question is not a shared login: say only that it did not work.
+  const personal = await askPersonalLogin()
+  if (personal === null) return { ok: false, reason: NOT_CHANGED }
+  if (!personal) return { ok: false, reason: SHARED_LOGIN }
 
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { data: who } = await supabase.auth.getUser()

@@ -31,8 +31,10 @@ export default function ChangePasswordForm({ email, change }: { email: string; c
         f.submit()
       }}
     >
-      {/* Whose password this is, for the browser's password manager (a hidden field is how Chrome asks for it). */}
-      <input type="email" name="username" autoComplete="username" value={email} readOnly hidden />
+      {/* Whose password this is, for the browser's password manager (a hidden field is how Chrome asks for it).
+          No box here has a `name`: a submit before the page hydrates is the browser's own GET, and a named box
+          would put the passwords in the address — its history, the server's logs (the review, 2026-10-12). */}
+      <input type="email" autoComplete="username" value={email} readOnly hidden />
       {BOXES.map(box => (
         <div key={box.key} className={s.field}>
           <label className={s.label} htmlFor={`${id}-${box.key}`}>
@@ -42,7 +44,6 @@ export default function ChangePasswordForm({ email, change }: { email: string; c
             id={`${id}-${box.key}`}
             className={s.input}
             type={f.shown ? 'text' : 'password'}
-            name={`${box.key}-password`}
             autoComplete={box.autoComplete}
             spellCheck={false}
             value={f.form[box.key]}

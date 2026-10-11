@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { READ_ONLY_MESSAGE } from '@/lib/supabase/read-only'
-import { SHARED_LOGIN } from './password'
+import { NOT_CHANGED, SHARED_LOGIN } from './password'
 
 // Change password's one Server Action (2026-10-12): who may, and the auth server asked in order —
 // the current password proved by a sign-in first, the new one set only after.
@@ -8,14 +8,14 @@ import { SHARED_LOGIN } from './password'
 const m = vi.hoisted(() => ({
   user: { id: 'u1', is_active: true } as { id: string; is_active: boolean } | null,
   viewing: false,
-  personal: true,
+  personal: true as boolean | null,
   getUser: vi.fn(),
   signInWithPassword: vi.fn(),
   updateUser: vi.fn(),
 }))
 vi.mock('@/lib/auth', () => ({ getAccountUser: async () => m.user }))
 vi.mock('@/lib/view-as-person', () => ({ viewingAsSomebody: async () => m.viewing }))
-vi.mock('./personal-login', () => ({ loginIsPersonal: async () => m.personal }))
+vi.mock('./personal-login', () => ({ askPersonalLogin: async () => m.personal }))
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({ auth: { getUser: m.getUser, signInWithPassword: m.signInWithPassword, updateUser: m.updateUser } }),
 }))
@@ -64,6 +64,12 @@ describe('changeMyPassword', () => {
     m.personal = true
     m.user = null
     expect(await changeMyPassword(change)).toEqual({ ok: false, reason: 'Sign in with an active work account.' })
+    expect(askedAuth()).toBe(0)
+  })
+
+  it('says only that it did not work when the database could not be asked — never "a shared login"', async () => {
+    m.personal = null
+    expect(await changeMyPassword(change)).toEqual({ ok: false, reason: NOT_CHANGED })
     expect(askedAuth()).toBe(0)
   })
 

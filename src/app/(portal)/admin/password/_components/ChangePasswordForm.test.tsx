@@ -22,6 +22,12 @@ describe('ChangePasswordForm', () => {
     expect(screen.getByLabelText('New password')).toHaveAttribute('type', 'text')
   })
 
+  it('names no box: a submit before the page hydrates is a plain GET, and would put the passwords in the address', () => {
+    render(<ChangePasswordForm email="carrie@example.com" change={vi.fn()} />)
+    const form = screen.getByRole('form', { name: 'Change password' })
+    expect([...form.querySelectorAll('input')].filter(i => i.hasAttribute('name'))).toEqual([])
+  })
+
   it('says what is wrong before anything is sent', () => {
     const change = vi.fn()
     render(<ChangePasswordForm email="carrie@example.com" change={change} />)

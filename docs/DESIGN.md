@@ -2193,9 +2193,13 @@ see it, and nobody does while viewing the portal as somebody. One set of rules a
   52px outline button *Change password* with the padlock — opening a sheet in Book a room's fields (46px boxes
   at radius 12, sizes × `--rv-type`), Cancel | **Change password**, then *Password changed* and **Done**. Never
   on a member viewed, nor on the preview's demo. The sheet forgets what was typed once it closes.
-- **Words, everywhere:** *Password changed. You stay signed in here — your other devices will ask for the new
-  password.* (the auth server signs the account's other sessions out); refusals in `passwordChangeProblem` /
-  `passwordRefusal` (`lib/account/password.ts`).
+- **Words, everywhere:** *Password changed. You stay signed in here; your other devices are signed out within an
+  hour and need the new password.* (the auth server revokes the account's other sessions; each keeps its hour-long
+  access token until its refresh is refused); refusals in `passwordChangeProblem` / `passwordRefusal`
+  (`lib/account/password.ts`).
+- **While it is being sent** the button reads *Changing…*, and on the two sheets Cancel and the scrim / backdrop
+  wait for the answer — it is always said where it was asked. The portal's boxes carry no `name` (a submit before
+  the page hydrates would otherwise put the passwords in the address).
 
 ### Audit log — Changes (2026-10-08 — Audit Log › Changes, the app-wide history)
 
