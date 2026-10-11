@@ -162,6 +162,28 @@ export interface HrAppData {
   may: { decide: boolean; hireApprove: boolean; hireEdit: boolean; hireCreate: boolean; talentEdit: boolean; book: boolean }
   /** Their notifications (mig 20261011180000): none while viewing as somebody. */
   notices: Notices
+  /**
+   * The views they may switch between from More (2026-10-11 — one app, lib/one-app.ts): the portal's view
+   * switcher, as the Revenue app's module menu has it. Null when the account may not switch, and while it
+   * views a person (the banner ends that).
+   */
+  views?: { current: HrAppView } | null
+}
+
+/** A view of the one app (setViewAs): the portal as the Principal or Finance, this app, the Revenue app. */
+export type HrAppView = 'principal' | 'finance' | 'hr' | 'revenue_member'
+
+/** The switcher's rows: the view, its name (the Revenue app's module menu's), where it opens, its dot. */
+export const HR_APP_VIEWS: ReadonlyArray<readonly [HrAppView, string, string, string]> = [
+  ['principal', 'Principal', 'The portal', 'rgb(128 96 72)'],
+  ['finance', 'Finance', 'The portal', 'rgb(59 104 148)'],
+  ['hr', 'HR', 'This app', 'rgb(46 125 90)'],
+  ['revenue_member', 'Revenue team', 'The Revenue app', 'rgb(233 154 83)'],
+]
+
+/** Which row of the switcher an account's view is. */
+export function hrAppViewOf(role: string): HrAppView {
+  return role === 'finance' || role === 'hr' || role === 'revenue_member' ? role : 'principal'
 }
 
 export const CHIP: Readonly<Record<ChipTone, [string, string]>> = {

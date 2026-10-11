@@ -1,7 +1,8 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useMemo } from 'react'
+import { useMemo, useTransition } from 'react'
+import { setViewAs } from '@/components/layout/view-as-actions'
 import {
   hrAppAcknowledge, hrAppAddCandidate, hrAppBook, hrAppCancelBooking, hrAppCancelHire, hrAppCandidateStage, hrAppDecide, hrAppDecline,
   hrAppFill, hrAppLetterLink, hrAppRemoveTalent, hrAppRequestInfo, hrAppTalentNotes,
@@ -17,6 +18,7 @@ import HrApp, { type HrAppActions } from './HrApp'
 
 export default function HrAppLive({ data }: { data: HrAppData }) {
   const router = useRouter()
+  const [, startSwitch] = useTransition()
   const actions = useMemo<HrAppActions>(() => ({
     hireAck: hrAppAcknowledge,
     hireInfo: hrAppRequestInfo,
@@ -34,6 +36,12 @@ export default function HrAppLive({ data }: { data: HrAppData }) {
     requestDecide: hrAppDecide,
     book: hrAppBook,
     bookCancel: hrAppCancelBooking,
+    // Another view of the one app: the server action opens where it lives (on a phone, HR's is this app).
+    switchView: view => {
+      const form = new FormData()
+      form.set('role', view)
+      startSwitch(async () => { await setViewAs(form) })
+    },
     refresh: () => router.refresh(),
   }), [router])
   return <HrApp data={data} actions={actions} />

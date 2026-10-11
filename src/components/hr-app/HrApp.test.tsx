@@ -40,6 +40,7 @@ const actions = {
   requestDecide: done, book: done, bookCancel: done, talentNotes: done, talentRemove: done,
   letterLink: vi.fn(async () => ({ ok: false as const, reason: 'none' })),
   noticesRead: done, pushSave: done, pushRemove: done,
+  switchView: vi.fn(),
   refresh: vi.fn(),
 } as unknown as HrAppActions
 
@@ -183,5 +184,34 @@ describe('the HR app with no meeting room yet', () => {
     render(<HrApp data={{ ...data, rooms: [] }} actions={actions} />)
     fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'Rooms' }))
     expect(screen.getByRole('button', { name: '+ Book' })).toBeDisabled()
+  })
+})
+
+// One app (2026-10-11, lib/one-app.ts): the HR app is HR's view of it on a phone, and More moves an account that
+// may switch views to the others — the portal's switcher, as the Revenue app's module menu has it.
+describe('the HR app’s views', () => {
+  function openMore(views: HrAppData['views']) {
+    render(<HrApp data={{ ...data, views }} actions={actions} />)
+    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'More' }))
+  }
+
+  it('lists every view for an account that may switch, this one marked as here', () => {
+    openMore({ current: 'hr' })
+    const views = screen.getByRole('region', { name: 'Switch view' })
+    expect(within(views).getAllByRole('button').map(b => b.textContent)).toEqual([
+      'PrincipalThe portal', 'FinanceThe portal', 'HRYou are here', 'Revenue teamThe Revenue app',
+    ])
+    expect(within(views).getByRole('button', { name: /HR/ })).toBeDisabled()
+  })
+
+  it('switches with the portal’s own action', () => {
+    openMore({ current: 'hr' })
+    fireEvent.click(within(screen.getByRole('region', { name: 'Switch view' })).getByRole('button', { name: /Revenue team/ }))
+    expect(actions.switchView).toHaveBeenCalledWith('revenue_member')
+  })
+
+  it('is not there for anybody else', () => {
+    openMore(null)
+    expect(screen.queryByRole('region', { name: 'Switch view' })).toBeNull()
   })
 })
