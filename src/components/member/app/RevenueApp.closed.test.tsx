@@ -6,6 +6,7 @@ import type { MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import type { MemberData, MemberRequest } from "@/lib/member/types";
 import { BUILTIN_FIELDS, REPLACEMENT_BUILTIN_FIELDS, type WaitingForm } from "@/lib/commission/waiting-form";
+import { protoData, protoFixture } from "./fixtures/proto";
 import type { RevenueSource } from "./source";
 import RevenueApp from "./RevenueApp";
 
@@ -139,6 +140,23 @@ describe("a page their ticks close is neither shown nor reachable", () => {
     cleanup();
     await open("?page=account&department=fair");
     expect(screen.getByRole("button", { name: /Hide income amounts/ })).toBeInTheDocument();
+  });
+
+  // The preview's Today is written out, not worked out: it hid nothing — not even for its own eye —
+  // until it went through hideIncome too (found on production, 2026-10-11).
+  it("the preview's written-out income hides the same way, for its eye and for My income closed", async () => {
+    window.history.replaceState({}, "", "/member/preview");
+    const { unmount } = render(<RevenueApp initialData={protoData()} initialSearch="" today="2026-10-03" fixture={protoFixture()} closed={{ pages: ["income"], sends: [] }} />);
+    await act(async () => {});
+    expect(screen.getByText("RM ••••••")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hide amounts" })).not.toBeInTheDocument();
+    unmount();
+    render(<RevenueApp initialData={protoData()} initialSearch="" today="2026-10-03" fixture={protoFixture()} />);
+    await act(async () => {});
+    expect(screen.queryByText("RM ••••••")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Hide amounts" }));
+    expect(screen.getByText("RM ••••••")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Hide amounts" }));
   });
 
   it("a returned claim with Requests closed is not on Today’s to-dos, nor in the bell", async () => {

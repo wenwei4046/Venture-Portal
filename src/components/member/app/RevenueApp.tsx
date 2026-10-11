@@ -38,7 +38,7 @@ import PullRefresh from "./shell/PullRefresh";
 import { RETURN_REFRESH_MS, isStaleAppError, reloader } from "./shell/pull-refresh";
 import StatusBar from "./shell/StatusBar";
 import Today from "./today/Today";
-import { todayModel, type TodayTodo } from "./today/today-model";
+import { hideIncome, todayModel, type TodayTodo } from "./today/today-model";
 import SubDeptSheet, { type SubDeptOption } from "./overlays/SubDeptSheet";
 import BrandPicker, { type BrandOption } from "./overlays/BrandPicker";
 import Notifications from "./notifications/Notifications";
@@ -656,10 +656,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const arDateOptions = useMemo(() => fixture?.arena?.dateOptions[arKind] ?? periodOptions(arKind, period, monthState), [fixture, arKind, period, monthState]);
   const setArenaKind = (kind: PeriodKind) => { setArKind(kind); setArFrom(null); };
   const todayVM = useMemo(() => {
-    const vm = fixture?.today ?? model;
+    // The preview's figures are written out: the eye — and My income closed — hide them as todayModel does.
+    const vm = fixture?.today ? (hidden || incomeShut ? hideIncome(fixture.today) : fixture.today) : model;
     const todo = vm.todo.filter(t => t.target !== "requests" || requestPage(closed, t.requestKind ?? "claim") !== null);
     return todo.length === vm.todo.length ? vm : { ...vm, todo };
-  }, [fixture, model, closed]);
+  }, [fixture, model, closed, hidden, incomeShut]);
   const nfCount = fixture?.notifications.count ?? nf.count;
   const nfGroupsVM = fixture?.notifications.groups ?? notifGroups(nf.items, nfTab, settledMonth);
   const nfSummaryVM = fixture?.notifications.summary ?? notifSummary(nf.count, settledMonth);

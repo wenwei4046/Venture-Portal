@@ -222,6 +222,18 @@ const LOADING_METRICS: TodayMetric[] = [
   { key: "kpi", label: "KPI", value: "", tag: "", tagTone: "sub", loading: true },
 ];
 
+const HIDDEN_AMOUNT = "RM ••••••";
+const HIDDEN_SPLIT = "Amounts hidden";
+
+/**
+ * The income card as the eye hides it — and as My income closed keeps it
+ * (2026-10-11). The preview's figures are written out, not worked out, so it
+ * hides them through this too.
+ */
+export function hideIncome<T extends Pick<TodayModel, "heroAmount" | "heroLoading" | "heroSplit">>(model: T): T {
+  return { ...model, heroAmount: HIDDEN_AMOUNT, heroLoading: false, heroSplit: HIDDEN_SPLIT };
+}
+
 export function todayModel(input: TodayInput, championRank: number | null = null): TodayModel {
   const income = input.income;
   const commission = income?.total ?? null;
@@ -234,9 +246,9 @@ export function todayModel(input: TodayInput, championRank: number | null = null
     hello: `Hello, ${input.first}`,
     helloSub: [dayLabel(input.today), input.title, input.rank].filter(Boolean).join(" · "),
     heroLabel: dept ? `${month} · ${dept} commission` : `${month} · ${settled ? "Settled income" : "Estimated income"}`,
-    heroAmount: input.hidden ? "RM ••••••" : pending ? "RM —" : dept ? rm2(commission ?? 0) : commission === null ? rm2(fixed) : rm2(fixed + commission),
+    heroAmount: input.hidden ? HIDDEN_AMOUNT : pending ? "RM —" : dept ? rm2(commission ?? 0) : commission === null ? rm2(fixed) : rm2(fixed + commission),
     heroLoading: !input.hidden && pending === "loading",
-    heroSplit: input.hidden ? "Amounts hidden"
+    heroSplit: input.hidden ? HIDDEN_SPLIT
       : pending === "loading" ? `Working out ${month}'s commission…`
       : pending === "failed" ? `${month}'s commission is unavailable right now`
       : dept ? `Everybody in ${dept}, before salaries · View as a member for their own`
