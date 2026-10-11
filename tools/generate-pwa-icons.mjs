@@ -13,6 +13,12 @@
 //   src/app/apple-icon.png (180)              iOS home screen — full bleed, no
 //                                             transparency (iOS would fill it
 //                                             black) and iOS rounds the corners
+//   public/icons/badge-96.png                 a notification's small icon in
+//                                             Android's status bar (sw.js
+//                                             `badge`): Android keeps only the
+//                                             alpha, so the H alone, white on
+//                                             transparent — the tile made a
+//                                             solid white square (2026-10-11)
 //
 // Re-run after changing icon.svg.
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -33,6 +39,13 @@ const fullBleed = (scale) =>
   `<rect width="32" height="32" fill="${fill}"/>` +
   `<g transform="translate(16 16) scale(${scale}) translate(-16 -16)">${glyph}</g></svg>`
 
+// The H alone, white on transparent, grown to fill the badge with a heavier stroke so it reads at 24dp.
+const badge =
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">` +
+  `<g transform="translate(16 16) scale(1.45) translate(-16 -16)">` +
+  glyph.replace(/stroke="[^"]+"/, 'stroke="#FFFFFF"').replace(/stroke-width="[^"]+"/, 'stroke-width="3"') +
+  `</g></svg>`
+
 const render = (svg, size) => sharp(Buffer.from(svg), { density: 72 * (size / 32) * 2 }).resize(size, size).png().toBuffer()
 
 const outputs = [
@@ -40,6 +53,7 @@ const outputs = [
   ['public/icons/icon-512.png', mark, 512],
   ['public/icons/maskable-512.png', fullBleed(1), 512],
   ['src/app/apple-icon.png', fullBleed(1.15), 180],
+  ['public/icons/badge-96.png', badge, 96],
 ]
 
 for (const [file, svg, size] of outputs) {
