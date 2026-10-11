@@ -1,7 +1,7 @@
 // The handoff's own sample data (Revenue App.dc.html: HIRES, TALENTS, HIRE_FIELDS,
 // HIRE_SOURCES, STAFF) as a HiringBoard — the Hiring tests' one board. Instants are
 // noon in the office (04:00 UTC) of the prototype's days.
-import type { HiringBoard, HiringCandidate, HiringEvent, HiringField, HiringRequest, HiringTalent } from '@/lib/hiring/types'
+import type { HiringBoard, HiringCandidate, HiringEvent, HiringField, HiringFile, HiringFileType, HiringRequest, HiringTalent } from '@/lib/hiring/types'
 
 const MON: Record<string, string> = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' }
 const iso = (d: string) => {
@@ -21,6 +21,16 @@ const OTHER = [
   { id: 'priya', name: 'Priya Nair', title: 'Account Assistant', department: 'Finance' },
 ]
 const STAFF = [...PEOPLE, ...OTHER]
+
+/** The file types the database starts with (mig 20261011160000). */
+export const FILE_TYPES: HiringFileType[] = [
+  { id: 'ft-resume', name: 'Résumé', builtin: 'resume' },
+  { id: 'ft-ic', name: 'IC', builtin: null },
+  { id: 'ft-cert', name: 'Certificate', builtin: null },
+]
+/** The prototype's one résumé file, as a Résumé on record. */
+const resumeFile = (id: string, name: string | undefined, at: string, by: string): HiringFile[] =>
+  name ? [{ id: 'f-' + id, typeId: 'ft-resume', type: 'Résumé', resume: true, name, addedAt: at, addedBy: by }] : []
 const nameOf = (id: string) => STAFF.find(p => p.id === id)?.name ?? id
 const deptOf = (id: string) => STAFF.find(p => p.id === id)?.department ?? ''
 
@@ -73,13 +83,13 @@ const requests: HiringRequest[] = RAW.map(r => {
     fields: FIELDS, answers: r.a, ownerId: r.owner ?? null, assistedBy: null, hiredNames: r.hired ? [r.hired] : [], hiredThrough: filled?.[0] ?? null, hiringCost: filled?.[1] ?? null,
     attachmentName: null, submittedAt: iso(r.when), acknowledgedAt: at(r, 'Acknowledged'), filledAt: r.status === 'filled' ? at(r, 'Filled') : null,
     closedAt: at(r, 'Filled') ?? at(r, 'Cancelled'),
-    candidates: (r.cands ?? []).map(c => ({ id: c.id!, name: c.name!, phone: c.phone ?? '', source: c.source ?? 'Applied', stage: c.stage!, talentId: c.talent ?? null, answers: c.x ?? {}, note: c.note ?? '', resumeName: c.file ?? null })),
+    candidates: (r.cands ?? []).map(c => ({ id: c.id!, name: c.name!, phone: c.phone ?? '', source: c.source ?? 'Applied', stage: c.stage!, talentId: c.talent ?? null, answers: c.x ?? {}, note: c.note ?? '', files: resumeFile(c.id!, c.file, iso(r.when), nameOf(r.owner ?? r.by)) })),
     events: evs(events),
   }
 })
 
 const T = (t: { id: string; name: string; phone: string; email: string; position: string; dept: string; from: string; when: string; by: string; file: string; notes: string; events: Ev[] }): HiringTalent => ({
-  id: t.id, no: t.id, name: t.name, phone: t.phone, email: t.email, position: t.position, department: t.dept, fromRequest: t.from || null, notes: t.notes, resumeName: t.file, savedBy: nameOf(t.by), savedAt: iso(t.when), events: evs(t.events),
+  id: t.id, no: t.id, name: t.name, phone: t.phone, email: t.email, position: t.position, department: t.dept, fromRequest: t.from || null, notes: t.notes, files: resumeFile(t.id, t.file, iso(t.when), nameOf(t.by)), savedBy: nameOf(t.by), savedAt: iso(t.when), events: evs(t.events),
 })
 const talents: HiringTalent[] = [
   T({ id: 'T-104', name: 'Nur Iman', phone: '012-778 4410', email: 'nur.iman@gmail.com', position: 'Revenue Specialist', dept: 'Revenue', from: 'HR-202', when: '24 Sep 2026', by: 'grace', file: 'Nur_Iman_CV.pdf', notes: 'Runner-up for Team Assistant (HR-202). Very good with walk-in customers at the Mid Valley roadshow trial day; closed two bookings on her own.\n\nWants a sales role more than admin. Available with two weeks notice. Call back for the next Fair opening.', events: [['Saved to Talent Bank', '24 Sep 2026', 'Grace Lim', 'From HR-202 · Team Assistant'], ['Invited to interview', '29 Sep 2026', 'Grace Lim', 'HR-203 · Revenue Specialist']] }),
@@ -96,6 +106,7 @@ export const HIRING_BOARD: HiringBoard = {
     { id: 'avail', label: 'Available from', type: 'date', options: '' },
     { id: 'transport', label: 'Own transport', type: 'choice', options: 'Yes, No' },
   ],
+  fileTypes: FILE_TYPES,
   people: STAFF,
   requests,
   talents,

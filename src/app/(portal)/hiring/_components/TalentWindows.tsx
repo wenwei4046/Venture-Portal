@@ -58,7 +58,7 @@ export function PickTalentWindow({ board, request: r, open, onClose }: { board: 
   )
 }
 
-/** Move to Talent Bank… (README §11): a candidate kept on file — name, phone, email, department, what they fit, why keep them; their résumé goes with them. */
+/** Move to Talent Bank… (README §11): a candidate kept on file — name, phone, email, department, what they fit, why keep them; their files go with them. */
 export function MoveToTalentWindow({
   board,
   request: r,
@@ -71,6 +71,8 @@ export function MoveToTalentWindow({
   onClose: () => void
 }) {
   const departments = departmentNames(board)
+  const files = c?.files ?? []
+  const onlyResume = files.length === 1 && files[0].resume
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -157,9 +159,12 @@ export function MoveToTalentWindow({
           <span className={s.labelText}>Why keep them</span>
           <textarea className={s.textarea} rows={4} value={notes} onChange={e => setNotes(e.target.value)} />
         </label>
+        {/* Their one file a résumé, the row keeps the handoff's words (Résumé · CV.pdf); otherwise each with its type. */}
         <div className={s.resumeRow}>
-          <span className={s.labelText}>Résumé</span>
-          <span className={s.resumeRowName}>{c?.resumeName || 'No résumé'}</span>
+          <span className={s.labelText}>{onlyResume ? 'Résumé' : 'Files'}</span>
+          <span className={s.resumeRowName}>
+            {!files.length ? 'No files' : onlyResume ? files[0].name : files.map(f => `${f.type} · ${f.name}`).join(', ')}
+          </span>
         </div>
       </div>
       <div className={s.winFoot}>

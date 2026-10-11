@@ -821,6 +821,60 @@
 .cvNoneSay { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgb(var(--hv-dark)); font-size: 12.5px; color: rgb(var(--hv-graphite)); }
 .cvNote { padding: 12px 22px; border-top: 1px solid rgb(var(--hv-hairline)); font-size: 12.5px; color: rgb(var(--hv-graphite)); }
 .cvNoteLabel { font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(var(--hv-brown)); margin-right: 8px; }
+/* Which of a candidate's files the drawer shows: a pill each, the shown one peach on an orange rim. */
+.cvPills { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 22px; border-bottom: 1px solid rgb(var(--hv-hairline)); }
+.cvPill {
+  max-width: 260px;
+  padding: 4px 10px;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 999px;
+  background: transparent;
+  color: rgb(var(--hv-ink));
+  font: inherit;
+  font-size: 12px;
+  line-height: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.cvPill[aria-pressed='true'] { background: rgb(var(--hv-peach)); border-color: rgb(var(--hv-accent)); }
+
+/* ── Files (2026-10-11, mig 20261011160000): a record's files, each with its type. No prototype draws them:
+   a file is the résumé row it replaces (the olive tile, the name, its kind under it), in the panel's hairline box. ── */
+.hfGroup { display: flex; flex-direction: column; gap: 8px; }
+.hfRow { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px; border: 1px solid rgb(var(--hv-hairline)); border-radius: 10px; }
+.hfMain { flex: 1; min-width: 140px; display: flex; flex-direction: column; }
+.hfName { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hfKind { font-size: 12px; color: rgb(var(--hv-brown)); margin-top: 2px; }
+.hfRow[data-struck='true'] .hfName { text-decoration: line-through; color: rgb(var(--hv-quiet)); }
+.hfType { width: 184px; }
+/* Content-box like every input here: 162 + its padding and border is the picker's 184. */
+.hfTypeNew { width: 162px; }
+/* In a file's row the new type's name goes under its picker: after the ×, right-aligned, clear of it. */
+.hfRow .hfTypeNew { order: 1; margin-left: auto; margin-right: 38px; }
+.hfX {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgb(var(--hv-brown));
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.hfX:hover { background: rgb(var(--hv-panel-2)); }
+.hfRemove[data-armed='true'] { background: rgb(var(--hv-danger-bg)); border-color: rgb(var(--hv-danger-border)); color: rgb(var(--hv-danger)); }
+.hfNone { font-size: 13px; color: rgb(var(--hv-brown)); }
+/* The talent page's Files card: rows on its own rules, not boxes; "+ Add file" beside the label. */
+.hfHead { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.hfCard .hfRow { border: 0; border-top: 1px solid rgb(var(--hv-hairline)); border-radius: 0; padding: 12px 0; }
+.hfHead + .hfRow { border-top: 0; }
+.hfCard .extTile { width: 38px; height: 38px; }
+.hfAdd { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-top: 12px; border-top: 1px solid rgb(var(--hv-hairline)); }
 
 @keyframes hiringFade { from { opacity: 0; } to { opacity: 1; } }
 
@@ -1061,20 +1115,7 @@
 .ctxItem[data-tone='danger']:hover { background: rgb(var(--hv-card-danger-icon-bg)); }
 .ctxItem[data-tone='ink'] { color: rgb(var(--hv-ink)); }
 .addGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.fileBtn {
-  padding: 7px 12px;
-  border: 1px solid rgb(var(--hv-hairline));
-  border-radius: 6px;
-  cursor: pointer;
-  white-space: nowrap;
-  font-size: 12.5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgb(255 255 255);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+
 .addFoot { display: flex; align-items: center; gap: 10px; }
 .drawerSub { font-size: 12px; color: rgb(var(--hv-brown)); margin-top: 4px; }
 .tsBody { display: flex; flex-direction: column; gap: 16px; }
@@ -1093,7 +1134,6 @@
   font-weight: 500;
   flex: none;
 }
-.extTile[data-size='38'] { width: 38px; height: 38px; }
 .tsFileName { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tsLatest { font-size: 13px; color: rgb(var(--hv-body-2)); }
 .tsLabel { margin-bottom: 6px; }
@@ -1120,10 +1160,6 @@
   color: rgb(var(--hv-ink));
 }
 .tvNotes:focus-visible { border-color: rgb(var(--hv-accent)); }
-.tvFileCard { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.tvFileMain { flex: 1; min-width: 160px; }
-.tvFileName { font-weight: 500; }
-.tvFileKind { font-size: 12px; color: rgb(var(--hv-brown)); margin-top: 2px; }
 .inviteCard { display: flex; flex-direction: column; gap: 10px; }
 .inviteBtn { text-align: center; padding: 8px 16px; }
 .noOpen { font-size: 13px; color: rgb(var(--hv-brown)); }

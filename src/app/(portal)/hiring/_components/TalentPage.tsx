@@ -6,15 +6,18 @@ import { useRouter } from 'next/navigation'
 import { Chip, HvPage, PageHead, SecLabel } from '@/components/hrv/kit'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
-import { hiringFileLink, inviteHiringTalent, removeHiringTalent, replaceTalentResume, saveTalentNotes } from '@/lib/hiring/actions'
-import { extLabel } from '@/lib/hiring/files'
+import { addHiringFiles, hiringFileLink, inviteHiringTalent, removeHiringFile, removeHiringTalent, replaceHiringFile, saveTalentNotes } from '@/lib/hiring/actions'
+import { HIRING_ACCEPT, startingType } from '@/lib/hiring/files'
+import { uploadHiringFile } from '@/lib/hiring/upload'
 import { OPEN, answerOf, dayLabel, talentStatus } from '@/lib/hiring/view'
-import type { HiringBoard, HiringTalent } from '@/lib/hiring/types'
+import type { HiringBoard, HiringFile, HiringTalent } from '@/lib/hiring/types'
+import { FileRow, FileTypePick, NEW_TYPE, sendWaiting } from './HiringFiles'
 import s from './hiring.module.css'
 
 /**
  * A talent's own page (README §13, portal-36): their profile, HR's notes
- * (saved as they are written), the résumé (Open, Replace), Invite to
+ * (saved as they are written), their files (2026-10-11: each with its type —
+ * Open, Replace, Remove asked twice, "+ Add file" with a type), Invite to
  * interview on an open request, Remove from Talent Bank (asked twice) and
  * their history.
  */
@@ -28,7 +31,6 @@ export default function TalentPage({ board, talent: t, can }: { board: HiringBoa
   const [invite, setInvite] = useState(suggested?.id ?? '')
   const inviteId = open.some(r => r.id === invite) ? invite : (suggested?.id ?? '')
   const status = talentStatus(board, t)
-  const fileInput = useRef<HTMLInputElement>(null)
 
   // HR notes save themselves a moment after the last key, and on leaving the field.
   const saved = useRef(t.notes)
@@ -45,22 +47,6 @@ export default function TalentPage({ board, talent: t, can }: { board: HiringBoa
     if (timer.current) clearTimeout(timer.current)
   }, [])
 
-  const openFile = () =>
-    start(async () => {
-      if (!t.resumeName) return flash('No résumé yet')
-      const out = await hiringFileLink('talent', t.id, true)
-      if (!out.ok) return flash(out.reason)
-      window.location.assign(out.url)
-    })
-  const replace = (file: File) => {
-    const data = new FormData()
-    data.set('talent', t.id)
-    data.set('file', file)
-    start(async () => {
-      const out = await replaceTalentResume(data)
-      flash(out.ok ? 'Résumé replaced' : out.reason)
-    })
-  }
   const inviteNow = () => {
     const r = open.find(x => x.id === inviteId)
     if (!r) return
@@ -137,34 +123,7 @@ export default function TalentPage({ board, talent: t, can }: { board: HiringBoa
               }}
             />
           </section>
-          <section className={`${s.card} ${s.tvFileCard}`} aria-label="Résumé">
-            <span className={s.extTile} data-size="38">
-              {extLabel(t.resumeName)}
-            </span>
-            <div className={s.tvFileMain}>
-              <div className={s.tvFileName}>{t.resumeName || 'No résumé uploaded'}</div>
-              <div className={s.tvFileKind}>Résumé</div>
-            </div>
-            <button type="button" className={s.btnGhost} onClick={openFile}>
-              Open
-            </button>
-            {can.edit ? (
-              <label className={s.btnGhost} style={{ cursor: 'pointer' }}>
-                Replace
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept=".pdf,.doc,.docx,image/*"
-                  className={s.hiddenFile}
-                  onChange={e => {
-                    const f = e.target.files?.[0]
-                    e.target.value = ''
-                    if (f) replace(f)
-                  }}
-                />
-              </label>
-            ) : null}
-          </section>
+          <TalentFiles board={board} talent={t} can={can} />
         </div>
         <div className={s.pSide}>
           <section className={`${s.card} ${s.inviteCard}`} aria-label="Invite to interview">
@@ -218,5 +177,125 @@ export default function TalentPage({ board, talent: t, can }: { board: HiringBoa
         </div>
       </div>
     </HvPage>
+  )
+}
+
+/**
+ * Their files (2026-10-11 — a row each where the résumé card was): the
+ * extension tile, the name, its type under it; Open (a download link made at
+ * the press), Replace (a new upload in its place, the type kept — Edit), Remove
+ * (asked twice — Edit); "+ Add file" (Create or Edit): the type, then the file,
+ * filed as soon as it is chosen.
+ */
+function TalentFiles({ board, talent: t, can }: { board: HiringBoard; talent: HiringTalent; can: { create: boolean; edit: boolean } }) {
+  const [adding, setAdding] = useState(false)
+  const [typeId, setTypeId] = useState('')
+  const [newName, setNewName] = useState('')
+  const [armed, setArmed] = useState<string | null>(null)
+  const [busy, start] = useTransition()
+
+  const open = (f: HiringFile) =>
+    start(async () => {
+      const out = await hiringFileLink('file', f.id, true)
+      if (!out.ok) return flash(out.reason)
+      window.location.assign(out.url)
+    })
+  const replace = (f: HiringFile, file: File) =>
+    start(async () => {
+      const up = await uploadHiringFile(file)
+      if (!up.ok) return flash(up.reason)
+      const out = await replaceHiringFile(f.id, { path: up.path, name: up.name })
+      flash(out.ok ? (out.warning ?? `${f.type} replaced`) : out.reason)
+    })
+  const remove = (f: HiringFile) => {
+    if (armed !== f.id) return setArmed(f.id)
+    setArmed(null)
+    start(async () => {
+      const out = await removeHiringFile(f.id)
+      flash(out.ok ? (out.warning ?? `${f.name} removed`) : out.reason)
+    })
+  }
+  const begin = () => {
+    setTypeId(startingType(board.fileTypes, t.files, []))
+    setNewName('')
+    setAdding(true)
+  }
+  const add = (file: File) => {
+    if (!typeId) return flash('Pick what kind of file it is.')
+    if (typeId === NEW_TYPE && !newName.trim()) return flash('Name the new file type.')
+    start(async () => {
+      const sent = await sendWaiting([{ key: file.name, file, typeId, newName }], board.fileTypes)
+      if (!sent.ok) return flash(sent.reason)
+      const out = await addHiringFiles('talent', t.id, sent.files)
+      if (!out.ok) return flash(out.reason)
+      flash(`${file.name} added`)
+      setAdding(false)
+    })
+  }
+
+  return (
+    <section className={`${s.card} ${s.hfCard}`} aria-label="Files">
+      <div className={s.hfHead}>
+        <SecLabel>Files</SecLabel>
+        <span className={s.grow} />
+        {(can.create || can.edit) && !adding ? (
+          <button type="button" className={s.btnGhost} onClick={begin}>
+            + Add file
+          </button>
+        ) : null}
+      </div>
+      {t.files.map(f => (
+        <FileRow key={f.id} name={f.name} type={f.type}>
+          <button type="button" className={s.btnGhost} onClick={() => open(f)}>
+            Open
+          </button>
+          {can.edit ? (
+            <label className={s.btnGhost} style={{ cursor: 'pointer' }}>
+              Replace
+              <input
+                type="file"
+                accept={HIRING_ACCEPT}
+                className={s.hiddenFile}
+                aria-label={`Replace ${f.name}`}
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (file) replace(f, file)
+                }}
+              />
+            </label>
+          ) : null}
+          {can.edit ? (
+            <button type="button" className={`${s.btnGhost} ${s.hfRemove}`} data-armed={armed === f.id ? 'true' : undefined} onClick={() => remove(f)}>
+              {armed === f.id ? 'Confirm remove' : 'Remove'}
+            </button>
+          ) : null}
+        </FileRow>
+      ))}
+      {t.files.length === 0 && !adding ? <div className={s.hfNone}>No files yet.</div> : null}
+      {adding ? (
+        <div className={s.hfAdd}>
+          <FileTypePick types={board.fileTypes} value={typeId} newName={newName} canAdd={can.edit} label="What the file is" onChange={setTypeId} onNewName={setNewName} />
+          <label className={s.btnOrange} style={{ cursor: busy ? 'wait' : 'pointer' }}>
+            Choose file
+            <input
+              type="file"
+              accept={HIRING_ACCEPT}
+              className={s.hiddenFile}
+              aria-label="Choose the file"
+              disabled={busy}
+              onChange={e => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (file) add(file)
+              }}
+            />
+          </label>
+          <button type="button" className={s.btnPlain} onClick={() => setAdding(false)}>
+            Cancel
+          </button>
+        </div>
+      ) : null}
+    </section>
   )
 }

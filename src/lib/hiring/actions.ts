@@ -1,11 +1,10 @@
 'use server'
 
-import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireAction, requireAnyAction } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { HIRING_BUCKET, contentTypeOf, fileRefusal, objectPath, previewKind } from './files'
+import { HIRING_BUCKET, previewKind } from './files'
 import type { CandidateField, CandidateStage, HiringField } from './types'
 
 /**
@@ -16,14 +15,25 @@ import type { CandidateField, CandidateStage, HiringField } from './types'
  * with Approve (acknowledge, more info, decline, fill, cancel, reopen),
  * worked on with Edit (candidates, settings, the Talent Bank's notes).
  *
+ * Files (mig 20261011160000): the browser uploads (`upload.ts`), these file
+ * them — several per candidate and talent, each with a type — and delete from
+ * the bucket what no record names any more, under the caller's own session
+ * (the bucket's delete policy asks Edit). A deletion the bucket refuses is
+ * SAID (`warning`), never swallowed; the object is then a leftover that a
+ * later file write clears (`sweep`).
+ *
  * Refusals come back as `{ ok: false, reason }`: a thrown message reaches
  * production's browser only as a digest.
  */
 
-export type HiringOutcome = { ok: true } | { ok: false; reason: string }
+export type HiringOutcome = { ok: true; warning?: string } | { ok: false; reason: string }
 export type HiringIdOutcome = { ok: true; id: string } | { ok: false; reason: string }
+/** A file the browser has put in the bucket, to be filed: where, its own name, its type. */
+export type UploadedFile = { path: string; name: string; typeId: string }
 
 const NO_ACCESS = 'Hiring needs the right permission for that.'
+/** Said when the record changed but the bucket kept a file nobody needs any more. */
+const LEFT_IN_STORAGE = 'Saved, but the removed file is still in storage. It will be deleted with the next file change.'
 
 async function client(): Promise<SupabaseClient> {
   return (await createClient()) as unknown as SupabaseClient
@@ -48,27 +58,66 @@ async function call(fn: string, args: Record<string, unknown>, fallback: string)
   return { ok: true }
 }
 
-/** A file from a form, put in the bucket: its path and name, or why not. */
-async function keepFile(supabase: SupabaseClient, folder: 'resumes' | 'attachments', file: unknown): Promise<{ path: string; name: string } | { error: string } | null> {
-  if (!(file instanceof File) || file.size === 0) return null
-  const refused = fileRefusal(file)
-  if (refused) return { error: refused }
-  const path = objectPath(folder, randomUUID(), file.name)
-  const { error } = await supabase.storage
-    .from(HIRING_BUCKET)
-    .upload(path, Buffer.from(await file.arrayBuffer()), { contentType: contentTypeOf(file.name) ?? undefined, upsert: false })
-  if (error) return { error: `The file could not be uploaded: ${error.message}` }
-  return { path, name: file.name.trim().slice(0, 160) }
+/**
+ * Objects deleted from the bucket. True only when every one went: the bucket
+ * answers a refused deletion with nothing deleted, not an error.
+ */
+async function deleteObjects(supabase: SupabaseClient, paths: readonly string[]): Promise<boolean> {
+  if (!paths.length) return true
+  const res = await supabase.storage.from(HIRING_BUCKET).remove([...paths]).then(r => r, () => null)
+  return !!res && !res.error && (res.data?.length ?? 0) >= paths.length
 }
 
-async function dropFile(supabase: SupabaseClient, path: string | null | undefined) {
-  if (!path) return
-  await supabase.storage.from(HIRING_BUCKET).remove([path]).then(() => undefined, () => undefined)
+/** The objects a function says nobody names any more (`{ orphans: [...] }`). */
+function orphansOf(data: unknown): string[] {
+  const list = data && typeof data === 'object' ? (data as { orphans?: unknown }).orphans : null
+  return Array.isArray(list) ? list.filter((p): p is string => typeof p === 'string') : []
+}
+
+/**
+ * The leftovers (`hiring_orphan_files`): objects nobody names, put in the bucket
+ * over a day ago — a guest's upload never sent, a window closed before Save, a
+ * deletion refused. Each file write by somebody with Edit clears up to 50.
+ * Best effort: it never fails the write it follows (without Edit it is refused
+ * and nothing happens).
+ */
+async function sweep(supabase: SupabaseClient) {
+  const { data, error } = await supabase.rpc('hiring_orphan_files', { p_limit: 50 })
+  if (error || !Array.isArray(data) || data.length === 0) return
+  await supabase.storage.from(HIRING_BUCKET).remove(data.filter((p): p is string => typeof p === 'string')).then(() => undefined, () => undefined)
 }
 
 const text = (form: FormData, key: string) => {
   const v = form.get(key)
   return typeof v === 'string' ? v : ''
+}
+
+/** Uploads handed in by the browser, as the database files them, or null when not in shape. */
+function uploadsFrom(raw: string): Array<{ path: string; name: string; type: string }> | null {
+  if (!raw) return []
+  try {
+    const v = JSON.parse(raw) as unknown
+    if (!Array.isArray(v) || v.length > 20) return null
+    const out: Array<{ path: string; name: string; type: string }> = []
+    for (const f of v) {
+      const o = f && typeof f === 'object' ? (f as Record<string, unknown>) : null
+      if (!o || typeof o.path !== 'string' || typeof o.name !== 'string' || typeof o.typeId !== 'string') return null
+      out.push({ path: o.path, name: o.name, type: o.typeId })
+    }
+    return out
+  } catch {
+    return null
+  }
+}
+
+function idsFrom(raw: string): string[] | null {
+  if (!raw) return []
+  try {
+    const v = JSON.parse(raw) as unknown
+    return Array.isArray(v) && v.every(x => typeof x === 'string') ? (v as string[]) : null
+  } catch {
+    return null
+  }
 }
 
 function answersFrom(raw: string): Record<string, string> | null {
@@ -152,36 +201,40 @@ export async function fillHiringRequest(id: string, input: { hired: string[]; so
 
 /**
  * Add candidate / Edit candidate (the 560px window): name, phone, status,
- * the candidate fields, a note and a résumé. FormData: `request`, `candidate`
- * (absent to add), `name`, `phone`, `stage`, `note`, `answers` (JSON), `file`.
+ * the candidate fields, a note and their files. FormData: `request`,
+ * `candidate` (absent to add), `name`, `phone`, `stage`, `note`, `answers`
+ * (JSON), `files` (JSON — the uploads to file, `UploadedFile[]`), `remove`
+ * (JSON — ids of files to take off; Edit only).
  */
 export async function saveHiringCandidate(form: FormData): Promise<HiringOutcome> {
   const candidate = text(form, 'candidate')
   await requireAction('hiring', candidate ? 'edit' : 'create')
   const answers = answersFrom(text(form, 'answers'))
   if (!answers) return { ok: false, reason: 'The details are not in the right shape.' }
+  const files = uploadsFrom(text(form, 'files'))
+  const remove = idsFrom(text(form, 'remove'))
+  if (!files || !remove) return { ok: false, reason: 'The files are not in the right shape.' }
   if (!text(form, 'name').trim()) return { ok: false, reason: candidate ? 'Name can’t be empty' : 'Add the candidate’s name' }
   const supabase = await client()
-  const kept = await keepFile(supabase, 'resumes', form.get('file'))
-  if (kept && 'error' in kept) return { ok: false, reason: kept.error }
   const args = {
     p_name: text(form, 'name'),
     p_phone: text(form, 'phone'),
     p_stage: (text(form, 'stage') || 'shortlisted') as CandidateStage,
     p_note: text(form, 'note'),
     p_answers: answers,
-    p_resume_path: kept?.path ?? null,
-    p_resume_name: kept?.name ?? null,
+    p_files: files.length ? files : null,
   }
-  const { error } = candidate
-    ? await supabase.rpc('hiring_candidate_edit', { p_candidate: candidate, ...args })
+  const { data, error } = candidate
+    ? await supabase.rpc('hiring_candidate_edit', { p_candidate: candidate, ...args, p_remove: remove.length ? remove : null })
     : await supabase.rpc('hiring_candidate_add', { p_request: text(form, 'request'), ...args })
   if (error) {
-    await dropFile(supabase, kept?.path)
+    await deleteObjects(supabase, files.map(f => f.path))
     return { ok: false, reason: refusal(error, 'The candidate could not be saved. Please try again.') }
   }
+  const deleted = await deleteObjects(supabase, orphansOf(data))
+  if (files.length || remove.length) await sweep(supabase)
   refresh()
-  return { ok: true }
+  return deleted ? { ok: true } : { ok: true, warning: LEFT_IN_STORAGE }
 }
 
 /** Change status ▸ — one candidate's stage. */
@@ -191,11 +244,12 @@ export async function setCandidateStage(candidate: string, stage: CandidateStage
 }
 
 /**
- * A résumé or an attachment, through a link that works for ten minutes — made
- * at the press, never kept in a page. A résumé downloaded is a step of the
- * request's trail.
+ * A file, through a link that works for ten minutes — made at the press, never
+ * kept in a page: a candidate's or a talent's résumé (`candidate` / `talent`,
+ * their newest), any one of their files (`file`, by its id) or a request's
+ * attachment. A candidate's file downloaded is a step of the request's trail.
  */
-export async function hiringFileLink(kind: 'candidate' | 'talent' | 'attachment', id: string, download = false): Promise<
+export async function hiringFileLink(kind: 'candidate' | 'talent' | 'file' | 'attachment', id: string, download = false): Promise<
   { ok: true; url: string; name: string; preview: 'pdf' | 'image' | 'none' } | { ok: false; reason: string }
 > {
   await requireAction('hiring', 'view')
@@ -203,7 +257,7 @@ export async function hiringFileLink(kind: 'candidate' | 'talent' | 'attachment'
   const { data, error } = await supabase.rpc('hiring_file_path', { p_kind: kind, p_id: id })
   if (error) return { ok: false, reason: refusal(error, 'The file could not be found. Please try again.') }
   const file = data as { path?: string; name?: string } | null
-  if (!file?.path) return { ok: false, reason: 'No file has been attached.' }
+  if (!file?.path) return { ok: false, reason: kind === 'candidate' || kind === 'talent' ? 'No résumé yet' : 'No file has been attached.' }
   const name = file.name || 'file'
   const { data: link, error: linkError } = await supabase.storage
     .from(HIRING_BUCKET)
@@ -212,8 +266,67 @@ export async function hiringFileLink(kind: 'candidate' | 'talent' | 'attachment'
   if (download && kind === 'candidate') {
     await supabase.rpc('hiring_resume_downloaded', { p_candidate: id })
     refresh()
+  } else if (download && kind === 'file') {
+    await supabase.rpc('hiring_file_downloaded', { p_file: id })
+    refresh()
   }
   return { ok: true, url: link.signedUrl, name, preview: previewKind(name) }
+}
+
+// ── Files (mig 20261011160000) ──────────────────────────────────────────────
+
+/** "+ Add file" on a candidate or a talent: the browser's uploads filed, each with its type (Create or Edit). */
+export async function addHiringFiles(kind: 'candidate' | 'talent', owner: string, uploads: UploadedFile[]): Promise<HiringOutcome> {
+  await requireAnyAction(['hiring', 'create'], ['hiring', 'edit'])
+  const files = uploadsFrom(JSON.stringify(uploads ?? []))
+  if (!files) return { ok: false, reason: 'The files are not in the right shape.' }
+  if (!files.length) return { ok: false, reason: 'Choose a file.' }
+  const supabase = await client()
+  const { error } = await supabase.rpc('hiring_files_add', { p_kind: kind, p_owner: owner, p_files: files })
+  if (error) {
+    await deleteObjects(supabase, files.map(f => f.path))
+    return { ok: false, reason: refusal(error, 'The file could not be added. Please try again.') }
+  }
+  await sweep(supabase)
+  refresh()
+  return { ok: true }
+}
+
+/** Replace: a new upload in a file's place, its type kept; the old one is deleted once nobody names it (Edit). */
+export async function replaceHiringFile(file: string, upload: { path: string; name: string }): Promise<HiringOutcome> {
+  await requireAction('hiring', 'edit')
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('hiring_file_replace', { p_file: file, p_path: upload.path, p_name: upload.name })
+  if (error) {
+    await deleteObjects(supabase, [upload.path])
+    return { ok: false, reason: refusal(error, 'The file could not be replaced. Please try again.') }
+  }
+  const deleted = await deleteObjects(supabase, orphansOf(data))
+  await sweep(supabase)
+  refresh()
+  return deleted ? { ok: true } : { ok: true, warning: LEFT_IN_STORAGE }
+}
+
+/** Remove: a file off its record, and out of the bucket once nobody else's record names it (Edit). */
+export async function removeHiringFile(file: string): Promise<HiringOutcome> {
+  await requireAction('hiring', 'edit')
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('hiring_file_remove', { p_file: file })
+  if (error) return { ok: false, reason: refusal(error, 'The file could not be removed. Please try again.') }
+  const deleted = await deleteObjects(supabase, orphansOf(data))
+  await sweep(supabase)
+  refresh()
+  return deleted ? { ok: true } : { ok: true, warning: LEFT_IN_STORAGE }
+}
+
+/** "+ Add a new file type…": the type of that name, made if new (Edit). */
+export async function addHiringFileType(name: string): Promise<HiringIdOutcome> {
+  await requireAction('hiring', 'edit')
+  if (!name.trim()) return { ok: false, reason: 'Name the file type.' }
+  const { data, error } = await (await client()).rpc('hiring_file_type_add', { p_name: name })
+  if (error) return { ok: false, reason: refusal(error, 'The file type could not be added. Please try again.') }
+  refresh()
+  return { ok: true, id: String(data) }
 }
 
 // ── Form settings ───────────────────────────────────────────────────────────
@@ -250,9 +363,10 @@ export async function removeHiringSource(id: string): Promise<HiringOutcome> {
 // ── The Talent Bank ─────────────────────────────────────────────────────────
 
 /**
- * Add talent, or Move to Talent Bank… from a candidate. FormData: `name`,
- * `phone`, `email`, `position`, `department`, `notes`, `candidate` (from a
- * request), `file`.
+ * Add talent, or Move to Talent Bank… from a candidate (who brings all their
+ * files). FormData: `name`, `phone`, `email`, `position`, `department`,
+ * `notes`, `candidate` (from a request), `files` (JSON — the uploads to file,
+ * `UploadedFile[]`).
  */
 export async function saveHiringTalent(form: FormData): Promise<HiringIdOutcome> {
   await requireAction('hiring', 'create')
@@ -260,9 +374,9 @@ export async function saveHiringTalent(form: FormData): Promise<HiringIdOutcome>
   if (!text(form, 'name').trim() || !text(form, 'position').trim()) {
     return { ok: false, reason: candidate ? 'Name and position are needed.' : 'Add a name and the position they fit.' }
   }
+  const files = uploadsFrom(text(form, 'files'))
+  if (!files) return { ok: false, reason: 'The files are not in the right shape.' }
   const supabase = await client()
-  const kept = await keepFile(supabase, 'resumes', form.get('file'))
-  if (kept && 'error' in kept) return { ok: false, reason: kept.error }
   const { data, error } = await supabase.rpc('hiring_talent_save', {
     p_name: text(form, 'name'),
     p_phone: text(form, 'phone'),
@@ -270,14 +384,14 @@ export async function saveHiringTalent(form: FormData): Promise<HiringIdOutcome>
     p_position: text(form, 'position'),
     p_department: text(form, 'department'),
     p_notes: text(form, 'notes'),
-    p_resume_path: kept?.path ?? null,
-    p_resume_name: kept?.name ?? null,
     p_from_candidate: candidate || null,
+    p_files: files.length ? files : null,
   })
   if (error) {
-    await dropFile(supabase, kept?.path)
+    await deleteObjects(supabase, files.map(f => f.path))
     return { ok: false, reason: refusal(error, 'The talent could not be saved. Please try again.') }
   }
+  if (files.length) await sweep(supabase)
   refresh()
   return { ok: true, id: String(data) }
 }
@@ -293,23 +407,18 @@ export async function saveTalentNotes(talent: string, notes: string): Promise<Hi
   return call('hiring_talent_update', { p_talent: talent, p_notes: notes }, 'The notes could not be saved. Please try again.')
 }
 
-/** A talent's résumé replaced. FormData: `talent`, `file`. */
-export async function replaceTalentResume(form: FormData): Promise<HiringOutcome> {
-  await requireAction('hiring', 'edit')
-  const supabase = await client()
-  const kept = await keepFile(supabase, 'resumes', form.get('file'))
-  if (!kept) return { ok: false, reason: 'Choose a file.' }
-  if ('error' in kept) return { ok: false, reason: kept.error }
-  const { error } = await supabase.rpc('hiring_talent_update', { p_talent: text(form, 'talent'), p_notes: null, p_resume_path: kept.path, p_resume_name: kept.name })
-  if (error) {
-    await dropFile(supabase, kept.path)
-    return { ok: false, reason: refusal(error, 'The résumé could not be replaced. Please try again.') }
-  }
-  refresh()
-  return { ok: true }
-}
-
+/**
+ * Remove from Talent Bank: they leave the bank (their row stays for its
+ * history) and their files come off — out of the bucket once nobody else's
+ * record names them (a candidate they were may still).
+ */
 export async function removeHiringTalent(talent: string): Promise<HiringOutcome> {
   await requireAction('hiring', 'edit')
-  return call('hiring_talent_remove', { p_talent: talent }, 'The talent could not be removed. Please try again.')
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('hiring_talent_remove', { p_talent: talent })
+  if (error) return { ok: false, reason: refusal(error, 'The talent could not be removed. Please try again.') }
+  const deleted = await deleteObjects(supabase, orphansOf(data))
+  await sweep(supabase)
+  refresh()
+  return deleted ? { ok: true } : { ok: true, warning: LEFT_IN_STORAGE }
 }

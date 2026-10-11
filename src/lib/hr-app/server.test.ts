@@ -60,7 +60,7 @@ const REQUEST: HiringRequest = {
   answers: { position: 'Senior Revenue Specialist', dept: 'Revenue · IR', headcount: '2', budget: '3200–3800', start: 'Within 1 month', emp: 'Full-time', reason: 'Expansion', age: '25–40', gender: 'Any', race: 'Any', jd: 'Lead fair sales for IR.', notes: '' },
   ownerId: 'grace', assistedBy: null, hiredNames: [], hiredThrough: null, hiringCost: null, attachmentName: null,
   submittedAt: '2026-10-09T01:00:00Z', acknowledgedAt: '2026-10-09T03:00:00Z', filledAt: null, closedAt: null,
-  candidates: [{ id: 'c1', name: 'Melissa Ong', phone: '012-345 6789', source: 'Applied', stage: 'appointment', talentId: null, answers: {}, note: 'Referred by Chea Huan', resumeName: null }],
+  candidates: [{ id: 'c1', name: 'Melissa Ong', phone: '012-345 6789', source: 'Applied', stage: 'appointment', talentId: null, answers: {}, note: 'Referred by Chea Huan', files: [] }],
   events: [{ what: 'Submitted', who: 'Kar Jun', note: '', at: '2026-10-09T01:00:00Z' }, { what: 'Acknowledged', who: 'Grace Lim', note: 'Grace Lim owns it', at: '2026-10-09T03:00:00Z' }],
 }
 const PEOPLE = [{ id: 'grace', name: 'Grace Lim', title: 'HR Manager', department: 'HR' }]
@@ -85,7 +85,7 @@ describe('a hiring request, as the app draws it', () => {
   it('keeps somebody in the Talent Bank by their own words', () => {
     const t: HiringTalent = {
       id: 't1', no: 'T-001', name: 'Joyce Tan', phone: '', email: 'joyce@example.invalid', position: 'Account Executive', department: 'Finance',
-      fromRequest: 'HR-199', notes: 'Strong on AR.', resumeName: null, savedBy: 'Grace Lim', savedAt: '2026-09-02T08:00:00Z', events: [],
+      fromRequest: 'HR-199', notes: 'Strong on AR.', files: [], savedBy: 'Grace Lim', savedAt: '2026-09-02T08:00:00Z', events: [],
     }
     expect(talentOf(t)).toEqual({ id: 't1', name: 'Joyce Tan', phone: undefined, email: 'joyce@example.invalid', position: 'Account Executive', dept: 'Finance', from: 'HR-199', when: '2 Sep 2026', notes: 'Strong on AR.' })
   })

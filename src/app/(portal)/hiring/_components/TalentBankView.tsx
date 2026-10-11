@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useMemo, useRef, useState, useTransition } from 'react'
+import { Fragment, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Chip, HvPage, PageHead, SecLabel } from '@/components/hrv/kit'
 import { Drawer } from '@/components/hrv/overlay'
@@ -9,7 +9,8 @@ import { flash } from '@/components/hrv/toast'
 import { hiringFileLink, removeHiringTalent, saveHiringTalent } from '@/lib/hiring/actions'
 import { extLabel } from '@/lib/hiring/files'
 import { dayLabel, departmentNames, talentStatus } from '@/lib/hiring/view'
-import type { HiringBoard, HiringTalent } from '@/lib/hiring/types'
+import type { HiringBoard, HiringFile, HiringFileType, HiringTalent } from '@/lib/hiring/types'
+import { WaitingFiles, sendWaiting, waitingProblem, type Waiting } from './HiringFiles'
 import s from './hiring.module.css'
 
 type Nav = { dept?: string; pos?: string }
@@ -46,12 +47,11 @@ export default function TalentBankView({ board, can }: { board: HiringBoard; can
       setSel(null)
       setMenu(null)
       setArmed(false)
-      flash(`${t.name} removed from the Talent Bank`)
+      flash(out.warning ?? `${t.name} removed from the Talent Bank`)
     })
-  const view = (t: HiringTalent) =>
+  const view = (f: HiringFile) =>
     start(async () => {
-      if (!t.resumeName) return flash('No résumé yet')
-      const out = await hiringFileLink('talent', t.id)
+      const out = await hiringFileLink('file', f.id)
       if (!out.ok) return flash(out.reason)
       window.open(out.url, '_blank', 'noopener')
     })
@@ -192,7 +192,7 @@ export default function TalentBankView({ board, can }: { board: HiringBoard; can
         </div>
       </div>
 
-      <AddTalentDrawer open={adding} depts={depts} onClose={() => setAdding(false)} />
+      <AddTalentDrawer open={adding} depts={depts} types={board.fileTypes} canAddType={can.edit} onClose={() => setAdding(false)} />
 
       <Drawer
         open={!!picked}
@@ -255,13 +255,27 @@ export default function TalentBankView({ board, can }: { board: HiringBoard; can
               <SecLabel style={{ marginBottom: 6 }}>HR notes</SecLabel>
               <div className={s.tsNotes}>{picked.notes || 'No notes yet.'}</div>
             </div>
-            <div className={s.tsFile}>
-              <span className={s.extTile}>{extLabel(picked.resumeName)}</span>
-              <span className={s.tsFileName}>{picked.resumeName || 'No résumé'}</span>
-              <button type="button" className={s.btnGhost} onClick={() => view(picked)}>
-                View
-              </button>
-            </div>
+            {picked.files.length ? (
+              <div className={s.hfGroup} role="group" aria-label="Files">
+                {picked.files.map(f => (
+                  <div key={f.id} className={s.tsFile}>
+                    <span className={s.extTile}>{extLabel(f.name)}</span>
+                    <span className={s.hfMain}>
+                      <span className={s.hfName}>{f.name}</span>
+                      <span className={s.hfKind}>{f.type}</span>
+                    </span>
+                    <button type="button" className={s.btnGhost} aria-label={`View ${f.name}`} onClick={() => view(f)}>
+                      View
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className={s.tsFile}>
+                <span className={s.extTile}>—</span>
+                <span className={s.tsFileName}>No files</span>
+              </div>
+            )}
             <div>
               <SecLabel style={{ marginBottom: 6 }}>Latest</SecLabel>
               <div className={s.tsLatest}>{latestOf(picked)}</div>
@@ -289,29 +303,44 @@ function Pair({ label, value, strong }: { label: string; value: string; strong: 
   )
 }
 
-/** + Add talent (README §13 — the 520px drawer): a name and what they fit are needed; the rest helps. */
-function AddTalentDrawer({ open, depts, onClose }: { open: boolean; depts: string[]; onClose: () => void }) {
+/** + Add talent (README §13 — the 520px drawer): a name and what they fit are needed; the rest helps — their files too, each with its type. */
+function AddTalentDrawer({
+  open,
+  depts,
+  types,
+  canAddType,
+  onClose,
+}: {
+  open: boolean
+  depts: string[]
+  types: readonly HiringFileType[]
+  canAddType: boolean
+  onClose: () => void
+}) {
   const [form, setForm] = useState({ name: '', phone: '', email: '', position: '', department: depts[0] ?? '', notes: '' })
-  const [file, setFile] = useState<File | null>(null)
+  const [waiting, setWaiting] = useState<Waiting[]>([])
   const [err, setErr] = useState('')
   const [pending, start] = useTransition()
-  const input = useRef<HTMLInputElement>(null)
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => {
     setForm(f => ({ ...f, [k]: e.target.value }))
     setErr('')
   }
   const close = () => {
     setForm({ name: '', phone: '', email: '', position: '', department: depts[0] ?? '', notes: '' })
-    setFile(null)
+    setWaiting([])
     setErr('')
     onClose()
   }
   const save = () => {
     if (!form.name.trim() || !form.position.trim()) return setErr('Add a name and the position they fit.')
-    const data = new FormData()
-    for (const [k, v] of Object.entries(form)) data.set(k, v)
-    if (file) data.set('file', file)
+    const problem = waitingProblem(waiting)
+    if (problem) return setErr(problem)
     start(async () => {
+      const sent = await sendWaiting(waiting, types)
+      if (!sent.ok) return setErr(sent.reason)
+      const data = new FormData()
+      for (const [k, v] of Object.entries(form)) data.set(k, v)
+      data.set('files', JSON.stringify(sent.files))
       const out = await saveHiringTalent(data)
       if (!out.ok) return setErr(out.reason)
       flash(`${form.name.trim()} added to the Talent Bank`)
@@ -345,19 +374,9 @@ function AddTalentDrawer({ open, depts, onClose }: { open: boolean; depts: strin
             </option>
           ))}
         </Select>
-        <label className={s.fileBtn}>
-          {file?.name ?? 'Upload résumé'}
-          <input
-            ref={input}
-            type="file"
-            accept=".pdf,.doc,.docx,image/*"
-            className={s.hiddenFile}
-            onChange={e => {
-              setFile(e.target.files?.[0] ?? null)
-              e.target.value = ''
-            }}
-          />
-        </label>
+      </div>
+      <div className={s.hfGroup} role="group" aria-label="Files">
+        <WaitingFiles types={types} kept={[]} waiting={waiting} canAddType={canAddType} onChange={next => { setWaiting(next); setErr('') }} />
       </div>
       <textarea className={s.textarea} rows={3} value={form.notes} placeholder="Why keep them — strengths, what to check next time" aria-label="Why keep them" onChange={set('notes')} />
       <div className={s.addFoot}>
