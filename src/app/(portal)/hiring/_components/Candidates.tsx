@@ -4,12 +4,13 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
 import { hiringFileLink, setCandidateStage } from '@/lib/hiring/actions'
+import { resumeOf } from '@/lib/hiring/files'
 import { STAGE, STAGE_ORDER, candidateInfo, candidateMeta, initials } from '@/lib/hiring/view'
 import type { HiringBoard, HiringCandidate, HiringRequest } from '@/lib/hiring/types'
 import { STAGE_COLOURS, StageChip } from './bits'
 import CandidateWindow from './CandidateWindow'
 import CandidateFieldsWindow from './CandidateFieldsWindow'
-import ResumeDrawer from './ResumeDrawer'
+import FilesDrawer from './FilesDrawer'
 import { MoveToTalentWindow, PickTalentWindow } from './TalentWindows'
 import s from './hiring.module.css'
 
@@ -18,8 +19,9 @@ import s from './hiring.module.css'
  * candidate · Pick from Talent Bank) and ⋯ (Candidate fields); a row per
  * candidate in their stage's colour — initials, name and stage, source and
  * phone, the candidate fields as pills, the note on an orange rule; the
- * résumé button and ⋯: Edit details · Change status ▸ · Download résumé ·
- * Move to Talent Bank… / Open in Talent Bank.
+ * files button (their résumé and other files, 2026-10-11) and ⋯: Edit
+ * details · Change status ▸ · Download résumé · Move to Talent Bank… / Open in
+ * Talent Bank.
  */
 export default function Candidates({
   board,
@@ -134,8 +136,14 @@ export default function Candidates({
               {c.note ? <div className={s.candNote}>{c.note}</div> : null}
             </div>
             <div className={s.candSide}>
-              {c.resumeName ? (
-                <button type="button" className={s.sq} title="View résumé" aria-label={`View ${c.name}'s résumé`} onClick={() => setCv(c)}>
+              {c.files.length ? (
+                <button
+                  type="button"
+                  className={s.sq}
+                  title={resumeOf(c.files) && c.files.length === 1 ? 'View résumé' : 'View files'}
+                  aria-label={resumeOf(c.files) && c.files.length === 1 ? `View ${c.name}'s résumé` : `View ${c.name}'s files`}
+                  onClick={() => setCv(c)}
+                >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" />
                     <path d="M14 3v5h5M9 13h6M9 17h4" />
@@ -179,7 +187,7 @@ export default function Candidates({
                         ))}
                       </div>
                     ) : null}
-                    {c.resumeName ? (
+                    {resumeOf(c.files) ? (
                       <button type="button" role="menuitem" className={s.menuItem} onClick={() => download(c)}>
                         <span className={s.menuIcon}>↓</span>Download résumé
                       </button>
@@ -216,11 +224,12 @@ export default function Candidates({
         board={board}
         request={r}
         state={form}
+        canAddType={can.edit}
         onClose={() => setForm(null)}
         onFields={() => setFieldsOpen(true)}
       />
       <CandidateFieldsWindow board={board} open={fieldsOpen} onClose={() => setFieldsOpen(false)} />
-      <ResumeDrawer request={r} candidate={cv} onClose={() => setCv(null)} />
+      <FilesDrawer request={r} candidate={cv ? (r.candidates.find(x => x.id === cv.id) ?? cv) : null} onClose={() => setCv(null)} />
       <PickTalentWindow board={board} request={r} open={pickOpen} onClose={() => setPickOpen(false)} />
       <MoveToTalentWindow board={board} request={r} candidate={toBank} onClose={() => setToBank(null)} />
     </section>

@@ -216,12 +216,13 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_waiting_queue',
   // People › Permissions by view and tab (migs 20261011010000, 20261011020000): each asks has_perm('permissions_manage').
   'permission_template_tabs_save', 'permission_user_tabs_set', 'permission_template_delete', 'permission_title_move',
-  // Hiring (migs 20261011080000, 20261011080100): each asks its Hiring cell itself (view / create / edit / approve).
+  // Hiring (migs 20261011080000, 20261011080100, 20261011160000): each asks its Hiring cell itself (view / create / edit / approve).
   'hiring_board', 'hiring_file_path', 'hiring_resume_downloaded', 'hiring_submit', 'hiring_acknowledge', 'hiring_request_info',
   'hiring_decline', 'hiring_set_owner', 'hiring_set_assist', 'hiring_fill', 'hiring_cancel', 'hiring_reopen', 'hiring_candidate_add',
   'hiring_candidate_edit', 'hiring_candidate_stage', 'hiring_save_form_fields', 'hiring_save_candidate_fields', 'hiring_source_add',
   'hiring_source_set_active', 'hiring_source_remove', 'hiring_talent_save', 'hiring_talent_invite', 'hiring_talent_update',
-  'hiring_talent_remove',
+  'hiring_talent_remove', 'hiring_files_add', 'hiring_file_replace', 'hiring_file_remove', 'hiring_file_type_add', 'hiring_file_downloaded',
+  'hiring_orphan_files',
   // View as a person (mig 20261011050000): each asks has_perm(view_switch).
   'view_as_person', 'view_as_people',
   // Admin › Meeting Rooms (mig 20261011090000): each asks has_any_action(rooms.*), a member's revenue_app.view:own.

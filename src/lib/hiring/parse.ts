@@ -7,6 +7,8 @@ import type {
   HiringEvent,
   HiringField,
   HiringFieldType,
+  HiringFile,
+  HiringFileType,
   HiringPerson,
   HiringRequest,
   HiringSource,
@@ -50,6 +52,22 @@ function eventFromJson(v: unknown): HiringEvent {
   return { what: str(o.what), who: str(o.who), note: str(o.note), at: str(o.at) }
 }
 
+function fileFromJson(v: unknown): HiringFile {
+  const o = obj(v)
+  return {
+    id: str(o.id),
+    typeId: str(o.typeId),
+    type: str(o.type) || 'File',
+    resume: o.resume === true,
+    name: str(o.name) || 'file',
+    addedAt: str(o.addedAt),
+    addedBy: str(o.addedBy),
+  }
+}
+
+/** A record's files: only the ones with an id — what a link and a removal name. */
+const filesFromJson = (v: unknown): HiringFile[] => arr(v).map(fileFromJson).filter(f => f.id)
+
 function candidateFromJson(v: unknown): HiringCandidate {
   const o = obj(v)
   return {
@@ -61,7 +79,7 @@ function candidateFromJson(v: unknown): HiringCandidate {
     talentId: strOrNull(o.talentId),
     answers: strings(o.answers),
     note: str(o.note),
-    resumeName: strOrNull(o.resumeName),
+    files: filesFromJson(o.files),
   }
 }
 
@@ -105,7 +123,7 @@ function talentFromJson(v: unknown): HiringTalent {
     department: str(o.department),
     fromRequest: strOrNull(o.fromRequest),
     notes: str(o.notes),
-    resumeName: strOrNull(o.resumeName),
+    files: filesFromJson(o.files),
     savedBy: str(o.savedBy),
     savedAt: str(o.savedAt),
     events: arr(o.events).map(eventFromJson),
@@ -130,6 +148,12 @@ export function boardFromJson(v: unknown): HiringBoard {
         options: str(x.options),
       }
     }),
+    fileTypes: arr(o.fileTypes)
+      .map((t): HiringFileType => {
+        const x = obj(t)
+        return { id: str(x.id), name: str(x.name), builtin: x.builtin === 'resume' ? 'resume' : null }
+      })
+      .filter(t => t.id && t.name),
     people: arr(o.people).map((p): HiringPerson => {
       const x = obj(p)
       return { id: str(x.id), name: str(x.name), title: str(x.title), department: str(x.department) }

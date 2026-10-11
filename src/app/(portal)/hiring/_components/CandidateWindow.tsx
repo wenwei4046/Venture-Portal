@@ -1,29 +1,35 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { Window } from '@/components/hrv/overlay'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { saveHiringCandidate } from '@/lib/hiring/actions'
 import { STAGE, STAGE_ORDER, answerOf } from '@/lib/hiring/view'
 import type { CandidateStage, HiringBoard, HiringCandidate, HiringRequest } from '@/lib/hiring/types'
+import { FileRow, WaitingFiles, sendWaiting, waitingProblem, type Waiting } from './HiringFiles'
 import s from './hiring.module.css'
 
 /**
  * Add candidate / Edit candidate (README §11, portal-32 — a centred 560px
  * window): Name *, Phone, Status, the candidate fields, a reference or special
- * note, the résumé, and "Change which fields appear here".
+ * note, their files, and "Change which fields appear here". Files (2026-10-11):
+ * the ones on record, each to Remove (on Save), and new ones with their type
+ * — uploaded, then filed with the rest on Save.
  */
 export default function CandidateWindow({
   board,
   request: r,
   state,
+  canAddType,
   onClose,
   onFields,
 }: {
   board: HiringBoard
   request: HiringRequest
   state: { mode: 'add' } | { mode: 'edit'; candidate: HiringCandidate } | null
+  /** Hiring · Edit names new file types. */
+  canAddType: boolean
   onClose: () => void
   onFields: () => void
 }) {
@@ -33,9 +39,9 @@ export default function CandidateWindow({
   const [stage, setStage] = useState<CandidateStage>('shortlisted')
   const [note, setNote] = useState('')
   const [answers, setAnswers] = useState<Record<string, string>>({})
-  const [file, setFile] = useState<File | null>(null)
+  const [waiting, setWaiting] = useState<Waiting[]>([])
+  const [removing, setRemoving] = useState<string[]>([])
   const [pending, start] = useTransition()
-  const input = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!state) return
@@ -45,29 +51,34 @@ export default function CandidateWindow({
     setStage(c?.stage ?? 'shortlisted')
     setNote(c?.note ?? '')
     setAnswers(c ? { ...c.answers } : {})
-    setFile(null)
+    setWaiting([])
+    setRemoving([])
   }, [state])
 
+  const kept = editing?.files ?? []
   const save = () => {
     if (!name.trim()) return flash(editing ? 'Name can’t be empty' : 'Add the candidate’s name')
-    const form = new FormData()
-    form.set('request', r.id)
-    if (editing) form.set('candidate', editing.id)
-    form.set('name', name)
-    form.set('phone', phone)
-    form.set('stage', stage)
-    form.set('note', note)
-    form.set('answers', JSON.stringify(answers))
-    if (file) form.set('file', file)
+    const problem = waitingProblem(waiting)
+    if (problem) return flash(problem)
     start(async () => {
+      const sent = await sendWaiting(waiting, board.fileTypes)
+      if (!sent.ok) return flash(sent.reason)
+      const form = new FormData()
+      form.set('request', r.id)
+      if (editing) form.set('candidate', editing.id)
+      form.set('name', name)
+      form.set('phone', phone)
+      form.set('stage', stage)
+      form.set('note', note)
+      form.set('answers', JSON.stringify(answers))
+      form.set('files', JSON.stringify(sent.files))
+      if (editing) form.set('remove', JSON.stringify(removing))
       const out = await saveHiringCandidate(form)
       if (!out.ok) return flash(out.reason)
-      flash(name.trim() + (editing ? ' saved' : ' added'))
+      flash(out.warning ?? name.trim() + (editing ? ' saved' : ' added'))
       onClose()
     })
   }
-
-  const fileLabel = file ? file.name : editing?.resumeName ? editing.resumeName : 'Upload résumé'
 
   return (
     <Window open={!!state} onClose={onClose} width={560} scrim={0.22} label={editing ? 'Edit candidate' : 'Add candidate'}>
@@ -131,20 +142,26 @@ export default function CandidateWindow({
           <span className={s.labelText}>Reference / special note</span>
           <textarea className={s.textarea} rows={3} value={note} placeholder="e.g. Referred by Chea Huan; strong at roadshows" onChange={e => setNote(e.target.value)} />
         </label>
-        <label className={s.fileDrop}>
-          <span className={s.fileDropName}>{fileLabel}</span>
-          <span className={s.fileDropBtn}>Choose file</span>
-          <input
-            ref={input}
-            type="file"
-            accept=".pdf,.doc,.docx,image/*"
-            className={s.hiddenFile}
-            onChange={e => {
-              setFile(e.target.files?.[0] ?? null)
-              e.target.value = ''
-            }}
-          />
-        </label>
+        {/* A group, not a <label>: pressing a label's text presses the first button inside it. */}
+        <div className={s.hfGroup} role="group" aria-label="Files">
+          {kept.length ? <span className={s.labelText}>Files</span> : null}
+          {kept.map(f => {
+            const off = removing.includes(f.id)
+            return (
+              <FileRow key={f.id} name={f.name} type={f.type} struck={off}>
+                <button
+                  type="button"
+                  className={s.btnGhost}
+                  aria-label={`${off ? 'Keep' : 'Remove'} ${f.name}`}
+                  onClick={() => setRemoving(list => (off ? list.filter(id => id !== f.id) : [...list, f.id]))}
+                >
+                  {off ? 'Undo' : 'Remove'}
+                </button>
+              </FileRow>
+            )
+          })}
+          <WaitingFiles types={board.fileTypes} kept={kept.filter(f => !removing.includes(f.id))} waiting={waiting} canAddType={canAddType} onChange={setWaiting} />
+        </div>
         <button type="button" className={s.linkQuiet} style={{ alignSelf: 'flex-start', fontSize: 12 }} onClick={onFields}>
           Change which fields appear here
         </button>

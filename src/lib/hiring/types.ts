@@ -51,6 +51,28 @@ export interface HiringEvent {
   at: string
 }
 
+/** What a file is (mig 20261011160000): Résumé (built in), IC, Certificate, and whatever HR names. */
+export interface HiringFileType {
+  id: string
+  name: string
+  /** 'resume' for the Résumé — the one a candidate's résumé button and "Download résumé" open. */
+  builtin: 'resume' | null
+}
+
+/** A file on a candidate or a talent: its type, the name it came with, who added it. */
+export interface HiringFile {
+  id: string
+  typeId: string
+  /** The type's name ("Résumé", "IC" …). */
+  type: string
+  /** Of the built-in Résumé type. */
+  resume: boolean
+  name: string
+  /** An instant (ISO). */
+  addedAt: string
+  addedBy: string
+}
+
 export interface HiringCandidate {
   id: string
   name: string
@@ -61,7 +83,8 @@ export interface HiringCandidate {
   talentId: string | null
   answers: Record<string, string>
   note: string
-  resumeName: string | null
+  /** Résumé first, then by type, then as added. */
+  files: HiringFile[]
 }
 
 export interface HiringRequest {
@@ -102,7 +125,8 @@ export interface HiringTalent {
   department: string
   fromRequest: string | null
   notes: string
-  resumeName: string | null
+  /** Résumé first, then by type, then as added. */
+  files: HiringFile[]
   savedBy: string
   savedAt: string
   events: HiringEvent[]
@@ -112,6 +136,8 @@ export interface HiringBoard {
   fields: HiringField[]
   sources: HiringSource[]
   candidateFields: CandidateField[]
+  /** In their order: Résumé, IC, Certificate, then what HR added. */
+  fileTypes: HiringFileType[]
   people: HiringPerson[]
   requests: HiringRequest[]
   talents: HiringTalent[]
