@@ -7,10 +7,11 @@ import s from "./today.module.css";
 /**
  * What Today's taps open. Insight's two and the Arena's two are absent when
  * their holder's ticks close that page (2026-10-11): the figures then stay,
- * opening nothing, and Your Arena is not shown.
+ * opening nothing, and Your Arena is not shown. With My income closed the
+ * income stays hidden, so there is no eye to show it (`toggleHide` absent).
  */
 export interface TodayActions {
-  toggleHide: () => void;
+  toggleHide?: () => void;
   openMetric?: (key: "sales" | "margin" | "kpi") => void;
   openTodo: (todo: TodayTodo) => void;
   openOrders?: () => void;
@@ -34,9 +35,11 @@ export default function Today({ model, hidden, actions }: { model: TodayModel; h
       <section className={s.hero}>
         <div className={s.heroTop}>
           <span className={s.heroLabel}>{model.heroLabel}</span>
-          <button className={s.heroEye} onClick={actions.toggleHide} aria-label="Hide amounts">
-            <Svg d={hidden ? ICON.eyeOff : ICON.eye} size={18} sw={1.7} />
-          </button>
+          {actions.toggleHide && (
+            <button className={s.heroEye} onClick={actions.toggleHide} aria-label="Hide amounts">
+              <Svg d={hidden ? ICON.eyeOff : ICON.eye} size={18} sw={1.7} />
+            </button>
+          )}
         </div>
         {model.heroLoading
           ? <span className={`${s.skel} ${s.heroSkel}`} role="img" aria-label="Working out your income" />
