@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  budgetLabel, clashOf, daysToFill, hm, hourFrom, initials, missingFor, pipeline, positionLabel, requestTitle, reviewItems, shiftDay, slotAt,
+  budgetLabel, clashOf, daysToFill, hm, hourFrom, initials, missingFor, pipeline, positionLabel, requestStatusLabel, requestTitle, reviewItems, shiftDay, slotAt,
   type HrBooking, type HrHire, type HrMemberRequest,
 } from './model'
 
@@ -79,6 +79,12 @@ describe('the HR app model', () => {
     expect(slotAt(95, 768)).toBe(540)
     expect(slotAt(768, 768)).toBe(1170)
     expect(hm(slotAt(400, 768))).toBe('14:00')
+  })
+
+  it('names a member request’s status in the Revenue app’s words, never its raw token', () => {
+    expect(requestStatusLabel('submitted')).toBe('Pending review')
+    expect(requestStatusLabel('needs_info')).toBe('More info needed')
+    expect(requestStatusLabel('some_new_state')).toBe('Some new state')
   })
 
   it('a booking from the last half hour ends at 20:00, not 20:30 (which the server refuses)', () => {

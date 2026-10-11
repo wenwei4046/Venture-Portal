@@ -131,6 +131,17 @@ describe("Book a room", () => {
     expect(screen.getByText("Tap an empty slot to book it.")).toBeInTheDocument();
   });
 
+  it("greys out + Book while there is no room to book (as the portal's + Book a room)", async () => {
+    window.history.replaceState({}, "", "/member?page=account&view=rooms");
+    const live = source();
+    const none = rooms();
+    live.rooms.mockResolvedValue({ ok: true, data: { ...none, range: { ...none.range, rooms: [], bookings: [] } } });
+    render(<RevenueApp initialData={memberData()} initialSearch="?page=account&view=rooms" today="2026-10-05" source={live} />);
+    await act(async () => {});
+    expect(await screen.findByText("No meeting rooms yet.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+ Book" })).toBeDisabled();
+  });
+
   it("books for the member from the app, then reads the schedule again", async () => {
     const live = await open("?page=account&view=rooms");
     await screen.findByRole("region", { name: "Meeting Room 1" });

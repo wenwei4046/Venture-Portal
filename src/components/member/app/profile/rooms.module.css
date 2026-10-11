@@ -37,6 +37,7 @@
   font-size: calc(14.5px * var(--rv-type));
   font-weight: 650;
 }
+.book:disabled { opacity: .5; cursor: default; }
 
 /* By room | Timeline */
 .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 12px; background: var(--rv-sand); }
