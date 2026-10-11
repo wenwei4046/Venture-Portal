@@ -11,9 +11,14 @@ describe('the phone tab bar', () => {
     expect(moreTabLabel('finance')).toBe('More')
     expect(moreTabLabel('principal')).toBe('More')
   })
-  it('is untouched for HR and a department manager', () => {
-    expect(tabsForRole('hr').map((t) => t.label)).toEqual(['总览', '薪资', '员工', '董事'])
+  it('is untouched for a department manager', () => {
     expect(tabsForRole('dept_manager')[0].label).toBe('总览')
+    expect(moreTabLabel('dept_manager')).toBe('更多')
+  })
+  // 2026-10-11 (one app, lib/one-app.ts): HR's view on a phone is the HR app; Payroll, People and Director
+  // Salary are the computer's. The bar keeps only its Overview, for an HR account the HR app has nothing for.
+  it('is gone for HR — its phone is the HR app', () => {
+    expect(tabsForRole('hr').map((t) => t.label)).toEqual(['总览'])
     expect(moreTabLabel('hr')).toBe('更多')
   })
 })

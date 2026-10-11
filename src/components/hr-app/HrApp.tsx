@@ -7,10 +7,10 @@ import { PUSH_WORDS, pushState, turnPushOff, turnPushOn, type PushState } from '
 import { Select } from '@/components/hrv/select'
 import ViewingAsBanner from '@/components/layout/ViewingAsBanner'
 import {
-  CAND_STAGE, CHIP, HIRE_FILTERS, MAJOR_EVENTS, MEMBER_KIND, ORANGE, SLATE,
+  CAND_STAGE, CHIP, HIRE_FILTERS, HR_APP_VIEWS, MAJOR_EVENTS, MEMBER_KIND, ORANGE, SLATE,
   bookingTimes, budgetLabel, candChip, clashOf, dayLabel, daysToFill, hireChip, hm, hourFrom, initials, isPendingHire,
   isPendingRequest, missingFor, noticeAgo, noticeTag, pipeline, positionLabel, requestStatusLabel, requestTitle, reviewItems, shiftDay, slotAt,
-  type CandStage, type HrAppData, type HrBooking, type HrHire,
+  type CandStage, type HrAppData, type HrAppView, type HrBooking, type HrHire,
 } from '@/lib/hr-app/model'
 import s from './hr-app.module.css'
 
@@ -41,6 +41,8 @@ export interface HrAppActions {
   /** This phone's pushes on / off. */
   pushSave(s: { endpoint: string; p256dh: string; auth: string; app: 'hr' | 'revenue' }): Promise<ActResult>
   pushRemove(endpoint: string): Promise<ActResult>
+  /** Another view of the one app (setViewAs): it opens where that view lives. */
+  switchView(view: HrAppView): void
   /** After a write: read the app's data again. */
   refresh(): void
 }
@@ -381,6 +383,24 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
                   <span className={s.pushSwitch} data-on={pushNow === 'on' ? '1' : undefined} aria-hidden="true" />
                 </button>
               ) : null}
+            </section>
+          ) : null}
+          {/* Not in the handoff (2026-10-11 — one app, lib/one-app.ts): the views of the app, for an account that may
+              switch them — the portal's switcher, as the Revenue app's module menu has it. */}
+          {view === 'more' && d.views ? (
+            <section className={s.more} style={{ marginTop: 12 }} aria-label="Switch view">
+              {HR_APP_VIEWS.map(([v, name, where, dot]) => {
+                const here = v === d.views?.current
+                return (
+                  <button key={v} type="button" className={s.moreRow} disabled={here} aria-current={here ? 'true' : undefined} onClick={() => actions.switchView(v)}>
+                    <span className={s.moreIcon} style={{ background: 'rgb(246 242 236)' }}>
+                      <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 5, background: dot }} />
+                    </span>
+                    <span className={s.grow}><span className={s.moreTitle}>{name}</span><span className={s.moreSub}>{here ? 'You are here' : where}</span></span>
+                    {here ? null : <Chevron />}
+                  </button>
+                )
+              })}
             </section>
           ) : null}
 

@@ -588,13 +588,11 @@ const TABS_BY_ROLE: Record<UserRole, TabDef[]> = {
     { href: '/receipts', label: 'Receipts', icon: 'in' },
     { href: '/statements', label: 'Invoices', icon: 'invoice', exact: true },
   ],
-  // HR never touches the treasury ledgers; their loop is payroll → staff →
-  // director salary.
+  // HR's view on a phone is the HR app (2026-10-11 — one app, lib/one-app.ts;
+  // the user: Payroll, People, Director Salary "只在电脑用"). This bar is left
+  // only for an HR account the HR app has nothing for.
   hr: [
     { href: '/dashboard', label: '总览', icon: 'home' },
-    { href: '/hr-costing/payroll', label: '薪资', icon: 'payroll' },
-    { href: '/team/people', label: '员工', icon: 'staff' },
-    { href: '/director-salary', label: '董事', icon: 'director' },
   ],
   // Dept managers see one department. Billing and OPEX are the two pages they
   // live in; reports is their read-only rollup.

@@ -17,7 +17,7 @@ import { canDo } from '@/lib/permission-actions'
 import { actionsOnPage, opensPage, type PageRoute } from '@/lib/page-tabs'
 import { can } from '@/lib/permissions'
 import type { User } from '@/types'
-import { shiftDay, type HrAppData, type HrBooking, type HrHire, type HrMemberRequest, type HrTalent, type MemberKind } from './model'
+import { hrAppViewOf, shiftDay, type HrAppData, type HrBooking, type HrHire, type HrMemberRequest, type HrTalent, type MemberKind } from './model'
 
 /**
  * The HR phone app's data (2026-10-11, HR revamp round 2): read from the
@@ -33,10 +33,8 @@ const CATEGORY: Readonly<Record<string, string>> = {
 }
 const str = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : String(v))
 
-/** Who may open the HR app at all: a holder of one of HR's own areas. */
-export function opensHrApp(user: User): boolean {
-  return can(user, 'hiring', 'documentation', 'member_requests_manage')
-}
+/** Who may open the HR app at all: a holder of one of HR's own areas (lib/one-app.ts — the portal asks it too). */
+export { opensHrApp } from '@/lib/one-app'
 
 async function client(): Promise<SupabaseClient> {
   return (await createClient()) as unknown as SupabaseClient
@@ -258,5 +256,6 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     parts,
     may,
     notices: notices && !notices.error ? noticesFromRow(notices.data) : { unread: 0, items: [] },
+    views: user.canSwitchView && !user.viewingAs ? { current: hrAppViewOf(user.role) } : null,
   }
 }
