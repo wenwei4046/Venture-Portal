@@ -37,26 +37,35 @@ function declarations(css: string, selector: RegExp): string {
   return m ? m[1].replace(/\s+/g, ' ').trim() : ''
 }
 
+// The bar is --tabbar-h (2026-10-11): 54px, or nothing while a scroll down has tucked it away
+// (components/pwa/tuck.ts). The frame, its drawers, windows and toast all follow it, so they stay together.
+
 describe('the kit on a phone', () => {
   const kit = phoneRules(read('components/hrv/hrv.module.css'))
-  const frame = phoneRules(read('app/globals.css'))
+  const root = read('app/globals.css')
+  const frame = phoneRules(root)
 
-  it('the frame clears the tab bar by 54px, the home strip and its 10px of ground', () => {
-    expect(declarations(frame, /\.hrv-frame/)).toContain('padding-bottom: calc(54px + 10px + var(--safe-bottom))')
+  it('the bar is 54px, and nothing while it is tucked away', () => {
+    expect(root).toMatch(/:root \{[^}]*--tabbar-h: 54px;/)
+    expect(root).toContain(':root[data-tabbar-tucked] { --tabbar-h: 0px; }')
+  })
+
+  it('the frame clears the tab bar, the home strip and its 10px of ground', () => {
+    expect(declarations(frame, /\.hrv-frame/)).toContain('padding-bottom: calc(var(--tabbar-h) + 10px + var(--safe-bottom))')
   })
 
   it('a drawer and its scrim end where the sheet ends', () => {
-    expect(declarations(kit, /\.drawer,\s*\.drawerFixed/)).toContain('bottom: calc(54px + 10px + var(--safe-bottom))')
-    expect(declarations(kit, /\.scrim/)).toContain('bottom: calc(54px + 10px + var(--safe-bottom))')
+    expect(declarations(kit, /\.drawer,\s*\.drawerFixed/)).toContain('bottom: calc(var(--tabbar-h) + 10px + var(--safe-bottom))')
+    expect(declarations(kit, /\.scrim/)).toContain('bottom: calc(var(--tabbar-h) + 10px + var(--safe-bottom))')
   })
 
   it('a window centres above the bar and is never taller than the room left there', () => {
     const w = declarations(kit, /\.window/)
-    expect(w).toContain('top: calc(50% - (54px + var(--safe-bottom)) / 2)')
-    expect(w).toContain('max-height: min(760px, calc(100% - 94px - var(--safe-bottom)))')
+    expect(w).toContain('top: calc(50% - (var(--tabbar-h) + var(--safe-bottom)) / 2)')
+    expect(w).toContain('max-height: min(760px, calc(100% - 40px - var(--tabbar-h) - var(--safe-bottom)))')
   })
 
   it('the toast stands as far above the bar as it stands above the sheet on a desktop', () => {
-    expect(declarations(kit, /\.toast/)).toContain('bottom: calc(54px + 30px + var(--safe-bottom))')
+    expect(declarations(kit, /\.toast/)).toContain('bottom: calc(var(--tabbar-h) + 30px + var(--safe-bottom))')
   })
 })
