@@ -43,8 +43,9 @@ self.addEventListener('activate', (event) => {
  * tap opens the app at its url, in a window already open if there is one.
  *
  * `badge` is the small icon in Android's status bar, which keeps only the
- * image's alpha: the H alone on transparent (badge-96.png). The app's tile
- * there showed as a solid white square.
+ * image's alpha and paints it white: the mark's tile with its H cut out
+ * (badge-tile-96.png). The opaque tile there showed as a solid white square,
+ * and a bare H looked plain to the user.
  */
 self.addEventListener('push', (event) => {
   let msg = {}
@@ -59,7 +60,7 @@ self.addEventListener('push', (event) => {
       body: typeof msg.body === 'string' ? msg.body : '',
       tag: typeof msg.tag === 'string' ? msg.tag : undefined,
       icon: '/icons/icon-192.png',
-      badge: '/icons/badge-96.png',
+      badge: '/icons/badge-tile-96.png',
       data: { url: typeof msg.url === 'string' && msg.url.startsWith('/') ? msg.url : '/' },
     }),
   )
