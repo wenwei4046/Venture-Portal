@@ -216,6 +216,62 @@ describe('the HR app’s views', () => {
   })
 })
 
+// Change password (2026-10-12 — the user: "in their profile tab", "just for that personal acc"): More offers it to a
+// login of their own — never hr@ or another shared one, never while viewing as somebody.
+describe('the HR app’s Change password', () => {
+  function openMore(over: Partial<HrAppData>, change = vi.fn(async () => ({ ok: true as const }))) {
+    render(<HrApp data={{ ...data, ...over }} actions={{ ...actions, changePassword: change }} />)
+    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'More' }))
+    return change
+  }
+  const fill = (current: string, next: string, confirm: string) => {
+    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: current } })
+    fireEvent.change(screen.getByLabelText(/^New password/), { target: { value: next } })
+    fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: confirm } })
+  }
+
+  it('is in More for a personal login only', () => {
+    openMore({ personalLogin: true })
+    expect(screen.getByRole('button', { name: /Change password/ })).toBeInTheDocument()
+    cleanup()
+    openMore({})
+    expect(screen.queryByRole('button', { name: /Change password/ })).toBeNull()
+    cleanup()
+    openMore({ personalLogin: true, viewingAs: 'Nurul Huda' })
+    expect(screen.queryByRole('button', { name: /Change password/ })).toBeNull()
+  })
+
+  it('asks the current password, then the new one twice, and says what is wrong before sending', () => {
+    const change = openMore({ personalLogin: true })
+    fireEvent.click(screen.getByRole('button', { name: /Change password/ }))
+    const sheet = screen.getByRole('dialog', { name: 'Change password' })
+    expect(within(sheet).getByLabelText('Current password')).toHaveAttribute('type', 'password')
+    fill('old-pass', 'new-pass-1', 'new-pass-2')
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Change password' }))
+    expect(within(sheet).getByRole('alert')).toHaveTextContent('The two new passwords do not match.')
+    expect(change).not.toHaveBeenCalled()
+  })
+
+  it('sends it, says it is done, and Done closes the sheet', async () => {
+    const change = openMore({ personalLogin: true })
+    fireEvent.click(screen.getByRole('button', { name: /Change password/ }))
+    fill('old-pass', 'new-pass-1', 'new-pass-1')
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Change password' })).getByRole('button', { name: 'Change password' }))
+    await waitFor(() => expect(screen.getByText(/Password changed\./)).toBeInTheDocument())
+    expect(change).toHaveBeenCalledWith({ current: 'old-pass', next: 'new-pass-1', confirm: 'new-pass-1' })
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('dialog', { name: 'Change password' })).toBeNull()
+  })
+
+  it('shows the server’s refusal in the sheet', async () => {
+    openMore({ personalLogin: true }, vi.fn(async () => ({ ok: false as const, reason: 'Your current password is not right.' })) as never)
+    fireEvent.click(screen.getByRole('button', { name: /Change password/ }))
+    fill('wrong-one', 'new-pass-1', 'new-pass-1')
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Change password' })).getByRole('button', { name: 'Change password' }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Your current password is not right.'))
+  })
+})
+
 describe('the HR app’s tab bar while reading on (2026-10-11)', () => {
   it('steps out of the way on a scroll down, and is back on a scroll up or on another tab', () => {
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(70)

@@ -238,6 +238,9 @@
 .stepBtn { width: 46px; height: 46px; display: grid; place-items: center; font-size: 18px; }
 .stepV { min-width: 44px; text-align: center; font-size: 16px; font-weight: 700; }
 .formErr { font-size: 13px; color: rgb(176 40 34); }
+/* More › Change password (2026-10-12, not in the handoff): the sheet's own fields, a form so Enter sends it. */
+.pwForm { display: flex; flex-direction: column; gap: 12px; }
+.pwShow { display: flex; align-items: center; gap: 8px; align-self: flex-start; font-size: 13px; color: rgb(90 78 68); }
 .formBtn { height: 48px; border-radius: 14px; border: 1px solid; display: grid; place-items: center; font-weight: 700; }
 .bookWhen { font-size: 13.5px; color: rgb(90 78 68); margin-top: -6px; }
 .bookFacts { display: flex; flex-direction: column; }

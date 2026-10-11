@@ -9,6 +9,7 @@ import {
 } from '@/lib/hr-app/actions'
 import type { HrAppData } from '@/lib/hr-app/model'
 import { readNotices, removePushSubscription, reportPushTrouble, savePushSubscription } from '@/lib/push/actions'
+import { changeMyPassword } from '@/lib/account/actions'
 import HrApp, { type HrAppActions } from './HrApp'
 
 // The HR app on the portal's own Server Actions (2026-10-11): each write goes
@@ -37,6 +38,8 @@ export default function HrAppLive({ data }: { data: HrAppData }) {
     requestDecide: hrAppDecide,
     book: hrAppBook,
     bookCancel: hrAppCancelBooking,
+    // The account's own, not a module's: the portal's one action, which asks for a personal login itself.
+    changePassword: changeMyPassword,
     // Another view of the one app: the server action opens where it lives (on a phone, HR's is this app).
     switchView: view => {
       const form = new FormData()
