@@ -54,7 +54,7 @@ async function tap(listeners: Record<string, Listener>, url: string) {
 const NOTICE = '/hr-app?open=booking:abc'
 
 describe('a push on the phone', () => {
-  it('shows the H alone as the status-bar badge, and the app tile as the icon', async () => {
+  it('shows the tile with its H cut out as the status-bar badge, and the app tile as the icon', async () => {
     const { listeners, showNotification } = worker()
     let work: Promise<unknown> = Promise.resolve()
     listeners.push({
@@ -63,16 +63,21 @@ describe('a push on the phone', () => {
     })
     await work
     expect(showNotification).toHaveBeenCalledWith('Booked for you', expect.objectContaining({
-      body: 'Meeting Room 1 · 10:00', tag: 'n1', icon: '/icons/icon-192.png', badge: '/icons/badge-96.png', data: { url: NOTICE },
+      body: 'Meeting Room 1 · 10:00', tag: 'n1', icon: '/icons/icon-192.png', badge: '/icons/badge-tile-96.png', data: { url: NOTICE },
     }))
   })
 
-  it('the badge is white on transparent, 96px — Android keeps only its alpha', async () => {
-    const { data, info } = await sharp(resolve(ROOT, 'public/icons/badge-96.png')).raw().toBuffer({ resolveWithObject: true })
+  // Android keeps only a badge's alpha and paints it white: a bare H looked plain to the user (2026-10-11), so the
+  // badge is the mark's tile, white, with the H cut out — a tile, the one shape that place can show.
+  it('the badge is a white tile with the H cut out, 96px, on transparent', async () => {
+    const { data, info } = await sharp(resolve(ROOT, 'public/icons/badge-tile-96.png')).raw().toBuffer({ resolveWithObject: true })
     const alpha = (x: number, y: number) => data[(y * info.width + x) * info.channels + 3]
     expect([info.width, info.height, info.channels]).toEqual([96, 96, 4])
     expect([alpha(0, 0), alpha(95, 0), alpha(0, 95), alpha(95, 95)]).toEqual([0, 0, 0, 0])
-    expect(alpha(48, 48)).toBe(255)
+    expect(alpha(48, 20)).toBe(255) // the tile, between the H's legs above its bar
+    expect(alpha(12, 48)).toBe(255) // the tile, left of the H
+    expect(alpha(48, 48)).toBe(0) // the H's bar, cut out
+    expect(alpha(30, 40)).toBe(0) // its left leg, cut out
   })
 })
 

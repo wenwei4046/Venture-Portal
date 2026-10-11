@@ -50,6 +50,9 @@ const mine = async user => {
   return r
 }
 const titlesOf = async user => (await mine(user)).items.map(i => i.title).reverse()
+/** Let the clock move on before a write whose notice must come out newer: PGlite's now() counts in milliseconds, two
+ *  writes in the same one share it, and the newest-first list then puts their notices either way round (CI, 2026-10-11). */
+const tick = () => new Promise(resolve => setTimeout(resolve, 3))
 
 try {
   await db.exec(`
@@ -161,6 +164,7 @@ try {
   await q(`INSERT INTO hiring_requests(id, requested_by, requester_name, answers) VALUES ('HR-302', $1, 'Kar Jun', '{"position": "Fair Promoter"}')`, [S_KARJUN])
   await as(GRACE, ['hiring.approve'])
   await q(`UPDATE hiring_requests SET status = 'acknowledged' WHERE id = 'HR-302'`)
+  await tick()
   await q(`UPDATE hiring_requests SET status = 'filled', hired_names = ARRAY['Ali', 'Siti'] WHERE id = 'HR-302'`)
   await db.exec('RESET ROLE')
   const kj = (await mine(KARJUN)).items.filter(i => i.refId === 'HR-302').reverse()
@@ -175,6 +179,7 @@ try {
   const claim = await one(`INSERT INTO member_requests(staff_id, kind, status, title) VALUES ($1, 'claim', 'submitted', 'Travel · RM 120.00') RETURNING id`, [S_KARJUN])
   check((await mine(GRACE)).items[0].title, 'New claim · Kar Jun', 'a claim sent tells member.requests')
   await q(`UPDATE member_requests SET status = 'needs_info' WHERE id = $1`, [claim])
+  await tick()
   await q(`UPDATE member_requests SET status = 'submitted' WHERE id = $1`, [claim])
   check((await mine(GRACE)).items[0].title, 'Claim answered · Kar Jun', 'and again when the member answers')
 
