@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { shareOrder, unshareOrder } from '../../../../run-actions'
 import type { BillShareAnswer } from '@/lib/commission/bill-share'
+import { Select } from '@/components/hrv/select'
 
 export interface ShareHolder {
   staffId: string
@@ -122,7 +123,7 @@ export default function ShareControl({
         )
       ) : open ? (
         <div className="mt-1 flex flex-wrap items-center gap-1.5 bg-surface border border-hairline rounded-control p-1.5">
-          <select
+          <Select bare
             value={staffId}
             onChange={e => setStaffId(e.target.value)}
             aria-label="Share with"
@@ -134,7 +135,7 @@ export default function ShareControl({
                 {m.name}
               </option>
             ))}
-          </select>
+          </Select>
           <input
             type="number"
             min={1}

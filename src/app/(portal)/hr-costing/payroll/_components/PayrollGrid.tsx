@@ -17,6 +17,7 @@ import { isTopupKind, rowActions, rowStatusView, type LifecycleRow, type RowStat
 import { completePayrollRows, deletePayrollRows, unlockPayrollRows } from '../actions'
 import PayrollRow from './PayrollRow'
 import PayrollRowMenu, { type RowMenuAnchor } from './PayrollRowMenu'
+import { Select } from '@/components/hrv/select'
 
 export interface PayrollRowData {
   id: string
@@ -317,7 +318,7 @@ export default function PayrollGrid({ rows, period, monthClosed = false }: Props
       <div className="sheet-toolbar">
         <label className="flex items-center gap-2 text-xs font-medium">
           Department
-          <select
+          <Select bare
             value={department}
             onChange={event => {
               setDepartment(event.target.value)
@@ -329,7 +330,7 @@ export default function PayrollGrid({ rows, period, monthClosed = false }: Props
           >
             <option value="">All departments</option>
             {groups.map(group => <option key={group.dept} value={group.dept}>{group.dept}</option>)}
-          </select>
+          </Select>
         </label>
         <span className="sheet-count ml-auto">{people(visibleRows.length)}</span>
       </div>

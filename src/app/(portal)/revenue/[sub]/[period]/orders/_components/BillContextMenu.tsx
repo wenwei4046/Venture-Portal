@@ -12,6 +12,7 @@ import {
 } from '@/lib/commission/bill-share'
 import MenuPanel, { beside, type MenuAnchor } from '../../../hierarchy/_components/ContextMenuPanel'
 import styles from '../../../hierarchy/_components/membership-controls.module.css'
+import { Select, inSoftMenu } from '@/components/hrv/select'
 
 /** The one bill a menu is about, already resolved on the server. */
 export interface BillMenuBill {
@@ -122,10 +123,13 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
     const outside = (event: PointerEvent) => {
       // A row's ⋯ toggles the menu itself; closing here would reopen it on the click.
       if (event.target instanceof Element && event.target.closest('[data-bill-menu-trigger]')) return
+      // The Share list's soft menu lives on <body>: a pick there is the menu's own work.
+      if (inSoftMenu(event.target)) return
       if (!writing.current && !boundary.current?.contains(event.target as Node)) onClose()
     }
     const dismiss = (event: Event) => {
-      // Scrolling the table moves the bill out from under its menu.
+      // Scrolling the table moves the bill out from under its menu (scrolling the soft menu's list does not).
+      if (inSoftMenu(event.target)) return
       if (!writing.current && !(event.target instanceof Node && boundary.current?.contains(event.target))) onClose()
     }
     document.addEventListener('pointerdown', outside)
@@ -471,7 +475,7 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
           </p>
           <label className={styles.dateField} htmlFor={shareWithId}>
             Share with
-            <select id={shareWithId} data-autofocus value={shareWith} disabled={pending}
+            <Select bare id={shareWithId} data-autofocus value={shareWith} disabled={pending}
               onChange={event => chooseShareWith(event.target.value)}>
               <option value="">Choose a salesperson…</option>
               {candidates.map(c => {
@@ -482,7 +486,7 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
                   </option>
                 )
               })}
-            </select>
+            </Select>
           </label>
           <label className={styles.dateField} htmlFor={partId}>
             Their part

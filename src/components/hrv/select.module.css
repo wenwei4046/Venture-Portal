@@ -20,7 +20,9 @@
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .field:hover { border-color: rgb(214 202 188) !important; }
-.field:focus { outline: none; border-color: rgb(233 154 83) !important; box-shadow: 0 0 0 3px rgb(233 154 83 / 0.18); }
+/* The ring too is !important: the portal's focus glow (globals.css, 0,3,1)
+   would put its own .12 ring over the prototype's .18. */
+.field:focus { outline: none; border-color: rgb(233 154 83) !important; box-shadow: 0 0 0 3px rgb(233 154 83 / 0.18) !important; }
 .field:disabled { cursor: not-allowed; }
 /* The guest page's fields are a little rounder. */
 .round12 { border-radius: 12px !important; }
@@ -78,6 +80,18 @@
 .item[data-placeholder='true'] { color: rgb(150 138 126); }
 .item[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
 .item > span { flex: 1; }
+/* An <optgroup>'s label over its options (2026-10-11, Part 1 — dropdown.js
+   flattens groups; People's Invite picks a person by department): a quiet
+   caps line, not a row. */
+.group {
+  padding: 8px 12px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(117 100 86);
+  white-space: nowrap;
+}
 .tick { font-weight: 600; font-size: 12px; opacity: 0; }
 .item[aria-selected='true'] .tick { opacity: 1; }
 .search {

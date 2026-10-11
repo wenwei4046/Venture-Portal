@@ -11,6 +11,7 @@ import { flash } from '@/components/hrv/toast'
 import { newSubDepartment } from '../config-actions'
 import type { SwitcherData } from '../_lib/switcher'
 import s from './SubDeptSwitcher.module.css'
+import { Select } from '@/components/hrv/select'
 
 // The sub-department switcher (2026-10-10, the HR revamp handoff; round 2's
 // one-line design 2026-10-11, portal-42): top right of every Revenue page's
@@ -177,11 +178,11 @@ function NewSubDepartmentWindow({ open, onClose, data, view }: { open: boolean; 
             <span className={s.fieldLabel}>
               <span>Department</span>
             </span>
-            <select name="department_id" defaultValue={data.current.departmentId} className={hv.select}>
+            <Select name="department_id" defaultValue={data.current.departmentId}>
               {data.departments.map(d => (
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
-            </select>
+            </Select>
           </label>
         ) : null}
         <div className={s.field}>

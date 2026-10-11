@@ -17,6 +17,7 @@ import {
   type CommitResult,
   type ImportOrderDto,
 } from '../../../../import-actions'
+import { Select } from '@/components/hrv/select'
 
 interface Props {
   period: string
@@ -330,7 +331,7 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
                   <td className="num">{a.orders}</td>
                   <td className="num">{formatMoney(a.total)}</td>
                   <td>
-                    <select
+                    <Select bare
                       value={agentMap[a.key] ?? ''}
                       onChange={e =>
                         setAgentMap(m => ({ ...m, [a.key]: e.target.value }))
@@ -345,7 +346,7 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
                           {s.code ? ` · ${s.code}` : ''}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </td>
                 </tr>
               ))}

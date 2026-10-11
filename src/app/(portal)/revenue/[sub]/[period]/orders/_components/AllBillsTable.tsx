@@ -15,6 +15,7 @@ import BillShareNotice from './BillShareNotice'
 import OpenBillPicker from './OpenBillPicker'
 import ShareControl, { type ShareHolder, type TeamMember } from './ShareControl'
 import { useBillMenu } from './useBillMenu'
+import { Select } from '@/components/hrv/select'
 
 /** One bill, already resolved on the server — nothing here reads the database. */
 export interface BillRow {
@@ -258,16 +259,16 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
     <div className={s.toolbar}>
       <input className={s.search} aria-label="Search bills" placeholder="Search order, Ref No., salesperson, customer, venue or brand…"
         value={query} onChange={e => setQuery(e.target.value)} />
-      <select aria-label="Filter brand" value={brand} onChange={e => setBrand(e.target.value)}>
+      <Select bare aria-label="Filter brand" value={brand} onChange={e => setBrand(e.target.value)}>
         <option value="">All brands</option>{brands.map(b => <option key={b}>{b}</option>)}
-      </select>
-      <select aria-label="Sort bills" value={sort} onChange={e => setSort(e.target.value)}>
+      </Select>
+      <Select bare aria-label="Sort bills" value={sort} onChange={e => setSort(e.target.value)}>
         <option value="date_asc">Date · oldest first</option>
         <option value="date_desc">Date · newest first</option>
         <option value="salesperson">Salesperson · A → Z</option>
         <option value="sales_desc">Sales value · highest first</option>
         <option value="commission_desc">Commission · highest first</option>
-      </select>
+      </Select>
       <label className={s.chip}>
         <input type="checkbox" checked={showExcluded} onChange={e => setShowExcluded(e.target.checked)} />
         Show excluded ({excludedCount})

@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState, type SelectHTMLAttributes } from 'react'
+import { Fragment, forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState, type SelectHTMLAttributes } from 'react'
 import { createPortal } from 'react-dom'
 import k from './hrv.module.css'
 import s from './select.module.css'
@@ -14,16 +14,24 @@ import s from './select.module.css'
 // outside, Esc, a resize or a scroll. A pick sets the select's value the way
 // the browser would and fires `change`, so a React onChange hears it.
 
-type Option = { value: string; text: string; disabled: boolean }
+/** `group`: the label of the <optgroup> it sits in — drawn over the first of its options. */
+type Option = { value: string; text: string; disabled: boolean; group: string | null }
 
 export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   /** The field's radius: 10, or 12 on the guest page. */
   round?: 10 | 12
   /** Leave out the kit's field box (padding, border, size) — the caller draws it. */
   bare?: boolean
+  /**
+   * Keep the caller's field exactly as it is drawn — its box, its radius, its
+   * own caret or none — and replace only the popup (2026-10-11, round 2's
+   * Part 1). For a select the prototype draws as something else: the Members
+   * grid's 6px boxes with a ▾, the top bar's "HR view" words.
+   */
+  plain?: boolean
 }
 
-export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select({ className, round = 10, bare = false, children, ...props }, outer) {
+export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select({ className, round = 10, bare = false, plain = false, children, ...props }, outer) {
   const ref = useRef<HTMLSelectElement | null>(null)
   const [open, setOpen] = useState(false)
   const setRef = useCallback(
@@ -47,7 +55,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
     return () => el.removeEventListener('mousedown', onDown)
   }, [])
 
-  const cls = [bare ? '' : k.select, s.field, round === 12 ? s.round12 : '', className ?? ''].filter(Boolean).join(' ')
+  const cls = plain
+    ? className ?? ''
+    : [bare ? '' : k.select, s.field, round === 12 ? s.round12 : '', className ?? ''].filter(Boolean).join(' ')
   return (
     <>
       <select ref={setRef} {...props} className={cls} data-dd-open={open ? '1' : undefined}>
@@ -57,6 +67,16 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
     </>
   )
 })
+
+/**
+ * Whether an event happened on an open soft menu. The menu is portaled to
+ * <body>, so a popover that closes on a press or a scroll outside itself asks
+ * this first — else picking from a select inside it closes the popover before
+ * the pick lands (the bill menu's Share list, 2026-10-11).
+ */
+export function inSoftMenu(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest('[data-soft-menu]') !== null
+}
 
 /** Set the select's value as the browser would, and say so. */
 function choose(select: HTMLSelectElement, value: string) {
@@ -71,7 +91,14 @@ function SoftMenu({ select, onClose }: { select: HTMLSelectElement; onClose: () 
   const menu = useRef<HTMLDivElement>(null)
   const list = useRef<HTMLDivElement>(null)
   const search = useRef<HTMLInputElement>(null)
-  const [options] = useState<Option[]>(() => Array.from(select.options).map(o => ({ value: o.value, text: o.text, disabled: o.disabled })))
+  const [options] = useState<Option[]>(() =>
+    Array.from(select.options).map(o => ({
+      value: o.value,
+      text: o.text,
+      disabled: o.disabled,
+      group: o.parentElement instanceof HTMLOptGroupElement ? o.parentElement.label : null,
+    })),
+  )
   const [query, setQuery] = useState('')
   const [keyAt, setKeyAt] = useState(-1)
   const current = select.value
@@ -190,23 +217,29 @@ function SoftMenu({ select, onClose }: { select: HTMLSelectElement; onClose: () 
       ) : null}
       <div ref={list} className={s.list} role="listbox" tabIndex={searchable ? undefined : -1}>
         {shown.map((o, i) => (
-          <div
-            key={`${o.value}-${i}`}
-            role="option"
-            aria-selected={o.value === current && o.value !== ''}
-            aria-disabled={o.disabled || undefined}
-            data-placeholder={o.value === '' ? 'true' : undefined}
-            data-key={i === keyAt ? 'true' : undefined}
-            className={s.item}
-            onMouseDown={e => {
-              e.preventDefault()
-              e.stopPropagation()
-              pick(o)
-            }}
-          >
-            <span>{o.text}</span>
-            <b className={s.tick} aria-hidden="true">✓</b>
-          </div>
+          <Fragment key={`${o.value}-${i}`}>
+            {o.group !== null && o.group !== (shown[i - 1]?.group ?? null) ? (
+              <div className={s.group} role="presentation">
+                {o.group}
+              </div>
+            ) : null}
+            <div
+              role="option"
+              aria-selected={o.value === current && o.value !== ''}
+              aria-disabled={o.disabled || undefined}
+              data-placeholder={o.value === '' ? 'true' : undefined}
+              data-key={i === keyAt ? 'true' : undefined}
+              className={s.item}
+              onMouseDown={e => {
+                e.preventDefault()
+                e.stopPropagation()
+                pick(o)
+              }}
+            >
+              <span>{o.text}</span>
+              <b className={s.tick} aria-hidden="true">✓</b>
+            </div>
+          </Fragment>
         ))}
       </div>
     </div>,

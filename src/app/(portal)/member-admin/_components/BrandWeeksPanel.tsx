@@ -8,6 +8,7 @@ import { brandWeekChanges, brandWeeksAdminRows, brandWeeksToSave, type BrandWeek
 import { nextWeekBrand, weekBrand, weeksChangedText } from '@/lib/member/member-services'
 import { formatIntlDate, formatMoney } from '@/lib/utils'
 import s from './member-services.module.css'
+import { Select } from '@/components/hrv/select'
 
 const thisMonth = () => new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', timeZone: 'Asia/Kuala_Lumpur' }).format(new Date()).slice(0, 7)
 const monthLabel = (period: string) => formatIntlDate(new Date(`${period}-01T00:00:00Z`), { month: 'short', year: 'numeric', timeZone: 'UTC' }, 'en-GB')
@@ -132,7 +133,8 @@ export default function BrandWeeksPanel({ departments }: { departments: Array<{ 
         <span className={s.bwSub}>Set any member&apos;s brand for each Friday&apos;s week — closed weeks too.</span>
         <span className={s.spacer} />
         {departments.length > 1 ? (
-          <select
+          <Select
+            plain
             className={s.subChip}
             aria-label="Sub-department"
             value={subId}
@@ -146,7 +148,7 @@ export default function BrandWeeksPanel({ departments }: { departments: Array<{ 
             {departments.map(d => (
               <option key={d.id} value={d.id}>Revenue · {d.name}</option>
             ))}
-          </select>
+          </Select>
         ) : (
           <span className={s.subChip}>Revenue · {sub?.name}</span>
         )}

@@ -41,6 +41,7 @@ import { useSalespersonCloses } from './useSalespersonCloses'
 import { SheetIcon } from '@/components/sheet/SheetIcon'
 import s from './commission-workbench.module.css'
 import c from './close-controls.module.css'
+import { Select } from '@/components/hrv/select'
 
 type Tab = WorkbenchTab
 const TABS: [Tab, string][] = [
@@ -660,10 +661,10 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         disabled={!openEnabled || locked || saving || !!order?.upsale || !!closed}
         title={closed ?? undefined}
         onChange={e => changePick(row.orderId, e.target.checked ? 1 : null)} />
-      {row.openBillRank != null && <select aria-label={`Open Bill rank ${row.orderNo}`} value={row.openBillRank}
+      {row.openBillRank != null && <Select bare aria-label={`Open Bill rank ${row.orderNo}`} value={row.openBillRank}
         disabled={!openEnabled || locked || saving || !!closed} onChange={e => changePick(row.orderId, Number(e.target.value) as 1 | 2 | 3)}>
         <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option>
-      </select>}
+      </Select>}
       <span>{money(row.openBillBonus)}</span>
     </div>
   }
@@ -922,8 +923,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       </div>
       {view === 'deposit' && <p className={`${s.subtitle} ${s.tabNote}`}>{depositNote}</p>}
       <div className={s.toolbar}><input className={s.search} aria-label="Search sales orders" placeholder="Search order, Ref No., venue or brand…" value={query} onChange={e => setQuery(e.target.value)} />
-        <select aria-label="Filter brand" value={brand} onChange={e => setBrand(e.target.value)}><option value="">All brands</option>{brands.map(b => <option key={b}>{b}</option>)}</select>
-        {view !== 'deposit' && <select aria-label="Sort sales orders" value={sort} onChange={e => setSort(e.target.value as LedgerSort)}><option value="date_asc">Date · oldest first</option><option value="date_desc">Date · newest first</option><option value="commission_desc">Commission · highest first</option></select>}
+        <Select bare aria-label="Filter brand" value={brand} onChange={e => setBrand(e.target.value)}><option value="">All brands</option>{brands.map(b => <option key={b}>{b}</option>)}</Select>
+        {view !== 'deposit' && <Select bare aria-label="Sort sales orders" value={sort} onChange={e => setSort(e.target.value as LedgerSort)}><option value="date_asc">Date · oldest first</option><option value="date_desc">Date · newest first</option><option value="commission_desc">Commission · highest first</option></Select>}
         {view !== 'deposit' && <label className={s.chip}><input type="checkbox" checked={showExcluded} onChange={e => setShowExcluded(e.target.checked)} />Show not counted ({personNotCounted.length})</label>}
         {drafting && <details className={s.editMenu}><summary className={s.button}>Review edits</summary><div className={s.editOptions}>
           <p className={s.muted}>Preview changes only. Payroll is unchanged.</p>
@@ -995,10 +996,10 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         <div className={s.overviewTotal}><span>Total sales value</span><strong>{money(exhibitionTotals.total)}</strong></div></div>
       <div className={s.toolbar}>
         <input className={s.search} aria-label="Search exhibitions" placeholder="Search brand, venue or organizer…" value={query} onChange={e => setQuery(e.target.value)} />
-        <select aria-label="Filter exhibitions by brand" value={brand} onChange={e => setBrand(e.target.value)}>
+        <Select bare aria-label="Filter exhibitions by brand" value={brand} onChange={e => setBrand(e.target.value)}>
           <option value="">All brands</option>
           {exhibitionBrands.map(b => <option key={b ?? NO_BRAND} value={b ?? NO_BRAND}>{brandLabel(b)}</option>)}
-        </select>
+        </Select>
       </div>
       <div className={s.tableFrame}><div className={s.tableScroll} role="region" aria-label="Sales exhibition, scroll horizontally" tabIndex={0}><table className={s.table} aria-label="Sales exhibition">
         <thead><tr><th className={s.stickyFirst}>Brand</th><th>Venue</th><th>Event</th><th>Organizer</th><th>Salespeople</th><th>Bills</th><th className={s.stickyTotal} title={SALES_VALUE_HINT}>Sales value</th></tr></thead>

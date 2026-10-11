@@ -14,6 +14,7 @@ import {
 } from '@/lib/member/claim-rates-admin'
 import { formatIntlDate, formatMoney } from '@/lib/utils'
 import s from './member-services.module.css'
+import { Select } from '@/components/hrv/select'
 
 const REGION_COLS = 'minmax(0,1.6fr) 150px 140px 150px 100px'
 const VENUE_COLS = 'minmax(0,1.6fr) minmax(0,1fr)'
@@ -91,12 +92,12 @@ export default function ClaimRatesPanel({ initial }: { initial: ClaimRatesAdmin 
           <span className={s.crBoxTitle}>Outstation</span>
           <label className={s.crLine} title="Where every outstation route starts">
             <span className={s.crLabel}>Base</span>
-            <select className={s.crSelect} value={draft.base.trim()} onChange={e => edit({ base: e.target.value })} disabled={saving}>
+            <Select bare className={s.crSelect} value={draft.base.trim()} onChange={e => edit({ base: e.target.value })} disabled={saving}>
               {baseOptions.length === 0 ? <option value="">Add a region first</option> : null}
               {baseOptions.map(n => (
                 <option key={n} value={n}>{n}</option>
               ))}
-            </select>
+            </Select>
           </label>
           <label className={s.crLine} title={'Spots × this rate, counted from the base. Blank = not set; members see "Rate not set yet"'}>
             <span className={s.crLabel}>Rate per spot</span>
@@ -225,7 +226,7 @@ export default function ClaimRatesPanel({ initial }: { initial: ClaimRatesAdmin 
                     {v.fairs} fair{v.fairs === 1 ? '' : 's'}{v.lastFair ? ` · last ${day(v.lastFair)}` : ''}
                   </span>
                 </span>
-                <select
+                <Select bare
                   className={s.crVenueSelect}
                   value={region}
                   data-unset={region ? undefined : 'true'}
@@ -237,7 +238,7 @@ export default function ClaimRatesPanel({ initial }: { initial: ClaimRatesAdmin 
                   {draft.regions.filter(g => g.name.trim()).map(g => (
                     <option key={g.key} value={g.key}>{g.name.trim()}</option>
                   ))}
-                </select>
+                </Select>
               </div>
             )
           })}

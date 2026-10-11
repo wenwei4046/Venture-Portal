@@ -29,6 +29,7 @@ import type { MembershipDestination } from '../../../_lib/membership-destination
 import type { EmployeeDepartmentDestination } from '../../../_lib/employee-destinations'
 import type { DirectorRow, MemberCandidate, RankRow, SalespersonRow, TitleRow } from '../../../_components/config/types'
 import s from './sales-groups.module.css'
+import { Select } from '@/components/hrv/select'
 
 // Sales Groups › Members (2026-10-10, the HR revamp, variant A): who the
 // sub-department reports to as chips, + Add member, and the members as a grid
@@ -361,7 +362,8 @@ function CellSelect({
 }) {
   return (
     <span className={s.cellWrap} style={{ width } as CSSProperties}>
-      <select
+      <Select
+        plain
         className={s.cellSelect}
         data-dirty={dirty ? 'true' : 'false'}
         data-caret={caret ? 'true' : 'false'}
@@ -376,7 +378,7 @@ function CellSelect({
             {o.label}
           </option>
         ))}
-      </select>
+      </Select>
       {caret ? (
         <span className={s.cellCaret} aria-hidden="true">
           ▾
@@ -566,7 +568,7 @@ function AddMemberWindow({
       <div className={s.addBody}>
         <label className={s.addField}>
           <span>Person</span>
-          <select className={hv.select} value={staffId} onChange={e => setStaffId(e.target.value)} aria-label="Person to add">
+          <Select value={staffId} onChange={e => setStaffId(e.target.value)} aria-label="Person to add">
             <option value="">— pick somebody —</option>
             {candidates.map(c => (
               <option key={c.staff_id} value={c.staff_id}>
@@ -574,18 +576,18 @@ function AddMemberWindow({
                 {c.company_title_name ? ` · ${c.company_title_name}` : ''}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className={s.addField}>
           <span>Title in {subDeptName}</span>
-          <select className={hv.select} value={titleId} onChange={e => setTitleId(e.target.value)} aria-label={`Title held in ${subDeptName}`}>
+          <Select value={titleId} onChange={e => setTitleId(e.target.value)} aria-label={`Title held in ${subDeptName}`}>
             <option value="">— pick a title —</option>
             {holdable.map(t => (
               <option key={t.id} value={t.id}>
                 {t.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         {holdable.length === 0 ? <p className={s.addNote}>No title has a rung on this ladder yet — set the Title ladder under Rules first.</p> : null}
         {error ? (

@@ -8,6 +8,7 @@ import { saveSchemeRules } from '../../config-actions'
 import type { SchemeRow } from '../config/types'
 import { SectionTop } from './SectionTop'
 import s from './rules.module.css'
+import { Select } from '@/components/hrv/select'
 
 // Rules › Scheme rules (2026-10-10, the HR revamp): the eight components as
 // switches in the prototype's order, a dot on each one changed since the
@@ -213,7 +214,8 @@ export default function SchemePanel({ scheme, subName, canManage }: { scheme: Sc
                   {param(
                     'Paid as',
                     'the Open Bill rates tab sets each rank',
-                    <select
+                    <Select
+                      plain
                       className={s.paramValue}
                       value={f.basis}
                       onChange={e => setF(p => ({ ...p, basis: e.target.value as Form['basis'] }))}
@@ -222,7 +224,7 @@ export default function SchemePanel({ scheme, subName, canManage }: { scheme: Sc
                     >
                       <option value="uplift_on_commission">uplift on that bill’s commission</option>
                       <option value="pct_of_revenue">% of that bill’s revenue</option>
-                    </select>,
+                    </Select>,
                   )}
                 </div>
               ) : null}
@@ -277,7 +279,8 @@ export default function SchemePanel({ scheme, subName, canManage }: { scheme: Sc
           <span className={s.defName}>Default rate mode</span>
           <span>
             <span className={s.modeWrap}>
-              <select
+              <Select
+                plain
                 className={s.modeSelect}
                 value={f.rateMode}
                 onChange={e => setF(p => ({ ...p, rateMode: e.target.value as Form['rateMode'] }))}
@@ -286,7 +289,7 @@ export default function SchemePanel({ scheme, subName, canManage }: { scheme: Sc
               >
                 <option value="variable">Scheme target — recomputed monthly</option>
                 <option value="fixed">Manual — whatever rank they are moved to</option>
-              </select>
+              </Select>
               <span className={s.modeCaret} aria-hidden="true">▾</span>
             </span>
           </span>
