@@ -116,6 +116,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       replacementForm={replacementForm}
       capacity={capacity?.ok ? capacity.data : null}
       canTransfer={canDo(user, 'team', 'create')}
+      canAddToWaiting={seesRequests && canDo(user, 'member', 'manage')}
       head={head}
     />
   )

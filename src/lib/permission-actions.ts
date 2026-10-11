@@ -171,6 +171,8 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'hiring.create': 'all',
   'hiring.edit': 'all',
   'hiring.view': 'all',
+  // Sales Groups › Waiting list's "+" (2026-10-11): Member services · Edit.
+  'member.manage': 'all',
   'my_billing.create': 'dept',
   'opex.view': 'all',
   'product_list.edit': 'all',

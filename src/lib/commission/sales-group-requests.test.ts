@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ADDED_NOTE,
+  addedHere,
   arrangementOf,
   dayLabel,
   historyOf,
@@ -98,6 +100,33 @@ describe('words', () => {
     expect(dayLabel('2026-10-04T17:00:00Z')).toBe('5 Oct 2026')
     expect(dayLabel(null)).toBe('—')
     expect(shortDay('2026-09-09T03:00:00Z')).toBe('9 Sep')
+  })
+})
+
+// Sales Groups › Waiting list's "+" (2026-10-11): HR puts somebody on the list
+// without a member ever sending it — the step says so, the drawer too.
+describe('added with "+"', () => {
+  it('knows a row HR added from one a member sent', () => {
+    const added = req({ events: [{ to: 'draft', at: '2026-10-11T07:00:00Z', note: null, by: 'HR' }, { to: 'waiting', at: '2026-10-11T07:00:01Z', note: ADDED_NOTE, by: 'HR' }] })
+    const sent = req({ events: [{ to: 'submitted', at: '2026-10-09T02:00:00Z', note: null, by: 'CHEA HUAN' }, { to: 'waiting', at: '2026-10-10T02:00:00Z', note: 'Accepted onto the waiting list.', by: 'HR' }] })
+    expect([addedHere(added), addedHere(sent), addedHere({ ...added, kind: 'replacement' })]).toEqual([true, false, false])
+  })
+
+  it('reads its step as "Added to the waiting list", and a draft as nobody’s step', () => {
+    const steps = historyOf([
+      { to: 'waiting', at: '2026-10-11T07:00:01Z', note: ADDED_NOTE, by: 'Grace Lim' },
+      { to: 'draft', at: '2026-10-11T07:00:00Z', note: null, by: 'Grace Lim' },
+    ])
+    expect(steps.map(e => [e.what, e.by, e.note])).toEqual([['Added to the waiting list', 'Grace Lim', null]])
+  })
+
+  it('leaves a member’s accepted step as it was', () => {
+    const steps = historyOf([
+      { to: 'draft', at: '2026-10-09T01:59:00Z', note: null, by: 'CHEA HUAN' },
+      { to: 'submitted', at: '2026-10-09T02:00:00Z', note: null, by: 'CHEA HUAN' },
+      { to: 'waiting', at: '2026-10-10T02:00:00Z', note: 'Accepted onto the waiting list.', by: 'HR' },
+    ])
+    expect(steps.map(e => e.what)).toEqual(['Submitted', 'Accepted onto the waiting list'])
   })
 })
 

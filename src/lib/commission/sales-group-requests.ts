@@ -101,17 +101,28 @@ const STEP_ORDER: Record<string, number> = {
 /** The note `member_prepare_request` writes on a member's edit (mig 20261010190000). */
 const UPDATED = 'Updated by the member'
 
+/** The note `member_waiting_add` puts on the step onto the list (mig 20261011230000). */
+export const ADDED_NOTE = 'Added on Sales Groups'
+
+/** Put on the list with "+" on Sales Groups (2026-10-11) — never sent by a member, never signed. */
+export function addedHere(r: Pick<SubDeptRequest, 'kind' | 'events'>): boolean {
+  return r.kind === 'waiting' && r.events.some(e => e.to === 'waiting' && e.note === ADDED_NOTE)
+}
+
 /**
  * The history a person reads: one step per status it moved to. The database
  * writes a status change once from the app and, on some paths, once more from
  * its own trigger; the same move a second later is the same step. A member's
  * edit is a step of its own — "Updated by the member", its note what changed
- * (the handoff: "Changed: phone number, preferred start date").
+ * (the handoff: "Changed: phone number, preferred start date"). A draft is
+ * nobody's step: it is the request being written. HR's "+" puts somebody on
+ * the list without a member ever sending it — "Added to the waiting list".
  */
 export function historyOf(events: readonly RequestEvent[]): Array<RequestEvent & { what: string }> {
   const out: Array<RequestEvent & { what: string }> = []
   const order = (e: RequestEvent) => STEP_ORDER[e.to] ?? 9
   for (const e of [...events].sort((a, b) => a.at.localeCompare(b.at) || order(a) - order(b))) {
+    if (e.to === 'draft') continue
     const updated = e.to === 'submitted' && !!e.note && e.note.startsWith(UPDATED)
     const last = out[out.length - 1]
     if (last && last.to === e.to && !updated) {
@@ -122,6 +133,8 @@ export function historyOf(events: readonly RequestEvent[]): Array<RequestEvent &
     if (updated) {
       const changed = e.note!.slice(UPDATED.length).replace(/^\s*·\s*/, '')
       out.push({ ...e, what: UPDATED, note: changed ? `Changed: ${changed}` : null })
+    } else if (e.to === 'waiting' && e.note === ADDED_NOTE) {
+      out.push({ ...e, what: 'Added to the waiting list', note: null })
     } else {
       out.push({ ...e, what: EVENT_WORDS[e.to] ?? e.to })
     }

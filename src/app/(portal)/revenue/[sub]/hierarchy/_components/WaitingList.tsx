@@ -8,11 +8,13 @@ import { Drawer } from '@/components/hrv/overlay'
 import { Chevron } from '@/components/hrv/icons'
 import { flash } from '@/components/hrv/toast'
 import { revenuePath } from '@/lib/revenue'
-import { dayLabel, historyOf, shortDay, waitingList, type SubDeptRequest } from '@/lib/commission/sales-group-requests'
+import { addedHere, dayLabel, historyOf, shortDay, waitingList, type SubDeptRequest } from '@/lib/commission/sales-group-requests'
 import type { WaitingForm } from '@/lib/commission/waiting-form'
+import type { SubmitterGroup } from '@/lib/commission/waiting-add'
 import type { SubDepartmentCapacity } from '@/lib/commission/capacity'
 import { failWaitingApplicant } from '../../../waiting-actions'
 import MemberFormTools from './MemberFormTools'
+import AddToWaitingList from './AddToWaitingList'
 import s from './sales-groups.module.css'
 import w from './waiting.module.css'
 
@@ -23,6 +25,10 @@ import w from './waiting.module.css'
 // next: Transfer (People Management's employee form) or Fail (they didn't
 // come when called, and the next one moves up). No place is held for anybody
 // any more; the headcount limit is asked at Transfer.
+//
+// "+" (2026-10-11, the user) first in the row puts somebody straight onto the
+// list — at the end, as if accepted today. Such a row was never sent by a
+// member: its drawer says who added it instead of who signed.
 
 const COLS = '56px minmax(0,1.5fr) minmax(0,1fr) 140px 140px 28px'
 
@@ -34,6 +40,9 @@ export default function WaitingList({
   capacity,
   canTransfer,
   subOptions,
+  subDepartmentId = '',
+  submitters = [],
+  canAdd = false,
 }: {
   rows: SubDeptRequest[]
   subDeptName: string
@@ -46,6 +55,12 @@ export default function WaitingList({
   canTransfer: boolean
   /** The department's sub-departments, for the built-in "Preferred sub-department". */
   subOptions: string[]
+  /** This sub-department's id — the list "+" adds to. */
+  subDepartmentId?: string
+  /** "Submitted by": the Revenue team, this sub-department first. */
+  submitters?: SubmitterGroup[]
+  /** Member services · Edit: "+" is drawn. */
+  canAdd?: boolean
 }) {
   const router = useRouter()
   const list = waitingList(rows)
@@ -82,7 +97,22 @@ export default function WaitingList({
 
   return (
     <section aria-label={`${subDeptName} waiting list`}>
-      <MemberFormTools kind="waiting" form={initialForm} subName={subDeptName} subOptions={subOptions} />
+      <MemberFormTools
+        kind="waiting"
+        form={initialForm}
+        subName={subDeptName}
+        subOptions={subOptions}
+        lead={
+          canAdd && subDepartmentId ? (
+            <AddToWaitingList
+              subDepartmentId={subDepartmentId}
+              subDeptName={subDeptName}
+              submitters={submitters}
+              form={initialForm.ok ? initialForm.form : null}
+            />
+          ) : null
+        }
+      />
 
       <GridTable label={`${subDeptName} waiting list`}>
         <GridHead cols={COLS} cells={['#', 'Applicant', 'Submitted by', 'Joining date', 'Accepted', '']} />
@@ -105,7 +135,7 @@ export default function WaitingList({
         ))}
         {list.length === 0 ? <div className={s.listEmpty}>Nobody is on {subDeptName}&apos;s waiting list.</div> : null}
       </GridTable>
-      <div className={s.hint}>Applicants accepted in Member services, in the order they were accepted.</div>
+      <div className={s.hint}>Applicants accepted in Member services or added here, in the order they joined the list.</div>
 
       <Drawer
         open={open !== null}
@@ -164,14 +194,25 @@ export default function WaitingList({
         {open ? (
           <>
             <Facts
-              rows={[
-                { l: 'Mobile number', v: open.contact ?? '—' },
-                { l: 'Joining date', v: dayLabel(open.start) },
-                { l: 'Department', v: `Revenue · ${subDeptName}` },
-                { l: 'Submitted by', v: open.submittedBy ?? '—' },
-                { l: 'Signed by', v: open.signature ?? '—' },
-                { l: 'Accepted', v: open.acceptedAt ? `${dayLabel(open.acceptedAt)} · Member services` : '—' },
-              ]}
+              rows={
+                addedHere(open)
+                  ? [
+                      { l: 'Mobile number', v: open.contact ?? '—' },
+                      { l: 'Joining date', v: dayLabel(open.start) },
+                      { l: 'Department', v: `Revenue · ${subDeptName}` },
+                      { l: 'Submitted by', v: open.submittedBy ?? '—' },
+                      { l: 'Added by', v: open.events.find(e => e.to === 'waiting')?.by ?? 'HR' },
+                      { l: 'Accepted', v: open.acceptedAt ? `${dayLabel(open.acceptedAt)} · added here` : '—' },
+                    ]
+                  : [
+                      { l: 'Mobile number', v: open.contact ?? '—' },
+                      { l: 'Joining date', v: dayLabel(open.start) },
+                      { l: 'Department', v: `Revenue · ${subDeptName}` },
+                      { l: 'Submitted by', v: open.submittedBy ?? '—' },
+                      { l: 'Signed by', v: open.signature ?? '—' },
+                      { l: 'Accepted', v: open.acceptedAt ? `${dayLabel(open.acceptedAt)} · Member services` : '—' },
+                    ]
+              }
             />
             <SecLabel style={{ margin: '22px 0 10px' }}>Action history</SecLabel>
             <div>
