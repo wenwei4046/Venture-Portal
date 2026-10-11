@@ -95,7 +95,7 @@ function norm(code: string): string {
 }
 
 export async function commitSalesImport(input: CommitInput): Promise<CommitResult> {
-  const user = await requireActionOn('/revenue', 'revenue', 'create')
+  const user = await requireActionOn('/revenue/[sub]/[period]/import', 'revenue', 'create')
   const supabase = await client()
 
   if (!/^\d{4}-\d{2}-01$/.test(input.periodMonth)) {

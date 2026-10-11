@@ -454,7 +454,7 @@ export async function deleteRankDef(id: string) {
  * keeps the key: it is a name, not a description.
  */
 export async function upsertRank(formData: FormData) {
-  await requireActionOn('/revenue', 'revenue', 'manage')
+  await requireActionOn('/revenue/[sub]/rules', 'revenue', 'manage')
   const supabase = await client()
 
   const id = text(formData, 'id')
@@ -636,7 +636,7 @@ async function resequenceRanks(supabase: SupabaseClient, schemeId: string): Prom
  * engine adds both to their commission on Comm Cal.
  */
 export async function upsertDirectorPay(formData: FormData) {
-  await requireActionOn('/revenue', 'revenue', 'manage')
+  await requireActionOn('/revenue/[sub]/rules', 'revenue', 'manage')
   const supabase = await client()
   const schemeId = required(formData, 'scheme_id', 'Scheme')
   const staffId = required(formData, 'staff_id', 'Director')
@@ -659,7 +659,7 @@ export async function upsertDirectorPay(formData: FormData) {
 // ─── Item groups ────────────────────────────────────────────────────────────
 
 export async function upsertItemGroup(formData: FormData) {
-  await requireActionOn('/revenue', 'revenue', 'manage')
+  await requireActionOn('/revenue/[sub]/rules', 'revenue', 'manage')
   const supabase = await client()
 
   const row = {
@@ -688,7 +688,7 @@ export async function upsertItemGroup(formData: FormData) {
 // a special, effective-dated. The threshold ladder below is on the same tab.
 
 export async function upsertKpiThreshold(formData: FormData) {
-  await requireActionOn('/revenue', 'revenue', 'manage')
+  await requireActionOn('/revenue/[sub]/rules', 'revenue', 'manage')
   const supabase = await client()
 
   const id = text(formData, 'id')
@@ -716,7 +716,7 @@ export async function upsertKpiThreshold(formData: FormData) {
 }
 
 export async function deleteKpiThreshold(id: string) {
-  await requireActionOn('/revenue', 'revenue', 'manage')
+  await requireActionOn('/revenue/[sub]/rules', 'revenue', 'manage')
   const supabase = await client()
   check((await supabase.from('comm_kpi_thresholds').delete().eq('id', id)).error, 'Could not remove the threshold')
   refresh()
@@ -725,7 +725,7 @@ export async function deleteKpiThreshold(id: string) {
 // ─── Open Bill ──────────────────────────────────────────────────────────────
 
 export async function updateOpenBillRule(formData: FormData) {
-  await requireActionOn('/revenue', 'revenue', 'manage')
+  await requireActionOn('/revenue/[sub]/rules', 'revenue', 'manage')
   const supabase = await client()
 
   const id = required(formData, 'id', 'Rule')
@@ -739,7 +739,7 @@ export async function updateOpenBillRule(formData: FormData) {
 // ─── Brands and margin bands ────────────────────────────────────────────────
 
 export async function upsertBrand(formData: FormData) {
-  await requireActionOn('/revenue', 'revenue', 'manage')
+  await requireActionOn('/revenue/[sub]/rules', 'revenue', 'manage')
   const supabase = await client()
 
   const id = text(formData, 'id')
@@ -769,7 +769,7 @@ export async function upsertBrand(formData: FormData) {
 }
 
 export async function upsertMarginBand(formData: FormData) {
-  await requireActionOn('/revenue', 'revenue', 'manage')
+  await requireActionOn('/revenue/[sub]/rules', 'revenue', 'manage')
   const supabase = await client()
 
   const id = text(formData, 'id')
@@ -811,7 +811,7 @@ export async function upsertMarginBand(formData: FormData) {
 }
 
 export async function deleteMarginBand(id: string) {
-  await requireActionOn('/revenue', 'revenue', 'manage')
+  await requireActionOn('/revenue/[sub]/rules', 'revenue', 'manage')
   const supabase = await client()
   check((await supabase.from('comm_margin_bands').delete().eq('id', id)).error, 'Could not remove the band')
   refresh()
@@ -838,7 +838,7 @@ export type SchemeSwitch = 'open_bill' | 'margin' | 'kpi'
  * A month whose run has paid keeps what it paid.
  */
 export async function setMonthOpenBill(subDepartmentId: string, period: string, on: boolean | null): Promise<void> {
-  const user = await requireActionOn('/revenue', 'revenue', 'manage')
+  const user = await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'manage')
   if (!/^\d{4}-\d{2}-01$/.test(period)) throw new Error('A month is its first day, e.g. 2026-08-01')
   const supabase = await client()
 
@@ -875,7 +875,7 @@ export async function setMonthOpenBill(subDepartmentId: string, period: string, 
 }
 
 export async function setSchemeSwitch(schemeId: string, which: SchemeSwitch, on: boolean): Promise<void> {
-  await requireActionOn('/revenue', 'revenue', 'manage')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'manage')
   const supabase = await client()
   const patch =
     which === 'open_bill'

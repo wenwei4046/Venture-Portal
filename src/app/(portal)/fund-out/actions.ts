@@ -391,7 +391,7 @@ export async function recordRepayment(formData: FormData) {
 // proven recordRepayment logic (one call per non-zero type). Mirrors the
 // outgoing payment form's "this is a loan repayment" option.
 export async function recordLoanRepaymentReceived(formData: FormData) {
-  await requireActionOn('/fund-out', 'treasury', 'create')
+  await requireActionOn('/payments/new', 'treasury', 'create')
   const loanId = (formData.get('loan_id') as string) ?? ''
   const paymentDate = (formData.get('payment_date') as string) ?? ''
   const bankAccountId = (formData.get('bank_account_id') as string) || ''
@@ -523,7 +523,7 @@ export async function voidRepayment(formData: FormData): Promise<{ error: string
 export async function amendRepayment(
   formData: FormData,
 ): Promise<{ error?: string; old?: number; newAmount?: number }> {
-  await requireActionOn('/fund-out', 'treasury', 'edit')
+  await requireActionOn(['/payments', '/receipts'], 'treasury', 'edit')
   const supabase = await createClient()
 
   const repaymentId = ((formData.get('repayment_id') as string) ?? '').trim()
@@ -558,7 +558,7 @@ export async function amendRepayment(
 export async function amendRepaymentDate(
   formData: FormData,
 ): Promise<{ error?: string; old?: string; newDate?: string }> {
-  await requireActionOn('/fund-out', 'treasury', 'edit')
+  await requireActionOn(['/payments', '/payments/[id]', '/receipts'], 'treasury', 'edit')
   const supabase = await createClient()
 
   const repaymentId = ((formData.get('id') as string) ?? '').trim()

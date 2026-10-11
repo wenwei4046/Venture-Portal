@@ -197,8 +197,8 @@ describe('GATED_ACTIONS', () => {
     for (const file of walk(resolve(process.cwd(), 'src'))) {
       if (/lib[\/](auth|permission-actions)\.ts$/.test(file)) continue
       const s = readFileSync(file, 'utf8')
-      // A write gate names its page first (2026-10-11, plan C).
-      for (const m of s.matchAll(/requireActionOn\(\s*'[^']+',\s*'(\w+)',\s*'(\w+)'(?:,\s*'(\w+)')?\s*\)/g)) note(m[1], m[2], m[3])
+      // A write gate names its page(s) first (2026-10-11, plan C): one, a list, or a choice between two.
+      for (const m of s.matchAll(/requireActionOn\(\s*(?:'[^']+'|\[[^\]]*\]|[^,()]*\?[^,()]*)\s*,\s*'(\w+)',\s*'(\w+)'(?:,\s*'(\w+)')?\s*\)/g)) note(m[1], m[2], m[3])
       for (const m of s.matchAll(/(?:requireAnyActionOn|requirePayrollPayoutsActionOn|canDoAny)\(([^)]*)\)/g)) {
         for (const p of m[1].matchAll(/\[\s*'(\w+)',\s*'(\w+)'(?:,\s*'(\w+)')?\s*\]/g)) note(p[1], p[2], p[3])
       }

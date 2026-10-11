@@ -777,7 +777,7 @@ export async function createPaymentVoucher(
 // ─── Submit for approval (Finance) ───────────────────────────────────────────
 
 export async function submitForApproval(formData: FormData) {
-  const user = await requireActionOn('/payments', 'treasury', 'create')
+  const user = await requireActionOn('/payments/[id]', 'treasury', 'create')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -831,7 +831,7 @@ export async function submitForApproval(formData: FormData) {
 // card; whoever then clicks Submit for approval becomes the new submitter.
 // Nothing financial has posted at pending stage, so this is bookkeeping-free.
 export async function returnVoucherToDraft(formData: FormData) {
-  await requireActionOn('/payments', 'treasury', 'edit')
+  await requireActionOn('/payments/[id]', 'treasury', 'edit')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -854,7 +854,7 @@ export async function returnVoucherToDraft(formData: FormData) {
 // the money + marks the voucher paid in the same action.
 
 export async function approveVoucher(formData: FormData) {
-  const user = await requireApproverOn('/payments')
+  const user = await requireApproverOn('/payments/[id]')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -910,7 +910,7 @@ export async function approveVoucher(formData: FormData) {
 // Transaction-specific links (invoice/loan/fund_source/repayment_breakdown) are
 // deliberately NOT copied — a copy is a new expense, not a re-run of a repayment.
 export async function copyPaymentVoucher(formData: FormData): Promise<void> {
-  const user = await requireActionOn('/payments', 'treasury', 'create')
+  const user = await requireActionOn('/payments/[id]', 'treasury', 'create')
   const supabase = await createClient()
 
   const sourceId = (formData.get('voucher_id') as string) ?? ''
@@ -1252,7 +1252,7 @@ export async function updatePaymentVoucher(formData: FormData) {
 export async function amendVoucherDate(
   formData: FormData,
 ): Promise<{ error?: string; old?: string; newDate?: string }> {
-  await requireActionOn('/payments', 'treasury', 'edit')
+  await requireActionOn(['/payments', '/payments/[id]', '/receipts'], 'treasury', 'edit')
   const supabase = await createClient()
 
   const id = ((formData.get('id') as string) ?? '').trim()
@@ -1290,7 +1290,7 @@ export async function reassignVoucherGlAccount(
   formData: FormData,
 ): Promise<{ error?: string; changed?: number }> {
   try {
-    await requireActionOn('/payments', 'treasury', 'edit')
+    await requireActionOn('/payments/[id]', 'treasury', 'edit')
     const supabase = await createClient()
 
     const id = ((formData.get('id') as string) ?? '').trim()
@@ -1322,7 +1322,7 @@ export async function reassignVoucherGlAccount(
 // ─── Void voucher (Finance, only draft/pending) ─────────────────────────────
 
 export async function voidVoucher(formData: FormData) {
-  const user = await requireActionOn('/payments', 'treasury', 'void')
+  const user = await requireActionOn('/payments/[id]', 'treasury', 'void')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -1365,7 +1365,7 @@ export async function voidVoucher(formData: FormData) {
 // a wrong receipt can be undone. Steps: reverse bank cache, reverse each linked
 // GL entry, reverse the pool credits, un-settle the invoice(s), mark voided.
 export async function voidPaidReceipt(formData: FormData) {
-  const user = await requireActionOn('/payments', 'treasury', 'void')
+  const user = await requireActionOn('/payments/[id]', 'treasury', 'void')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -1525,7 +1525,7 @@ export async function voidPaidReceipt(formData: FormData) {
 // pointer to the right flow — reversing them generically would leave their
 // downstream records (loans, payroll accruals, claims, dept requests) dangling.
 export async function reversePaidPayment(formData: FormData) {
-  const user = await requireActionOn('/payments', 'treasury', 'void')
+  const user = await requireActionOn('/payments/[id]', 'treasury', 'void')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -1799,7 +1799,7 @@ export async function getAttachmentPreviewUrls(
 export async function deleteVoucherAttachment(
   attachmentId: string,
 ): Promise<{ voucherId: string }> {
-  await requireActionOn('/payments', 'treasury', 'edit')
+  await requireActionOn(['/approvals', '/payments/[id]'], 'treasury', 'edit')
   const supabase = await createClient()
   if (!attachmentId) throw new Error('attachment id is required')
 
@@ -1849,7 +1849,7 @@ const UPLOADABLE_STATUSES = ['draft', 'pending_approval', 'approved', 'paid']
 const UNDECIDED_STATUSES = ['draft', 'pending_approval']
 
 export async function uploadVoucherAttachment(formData: FormData): Promise<{ count: number }> {
-  const user = await requireActionOn('/payments', 'treasury', 'edit')
+  const user = await requireActionOn('/payments/[id]', 'treasury', 'edit')
   const supabase = await createClient()
 
   const voucherId = (formData.get('voucher_id') as string) ?? ''

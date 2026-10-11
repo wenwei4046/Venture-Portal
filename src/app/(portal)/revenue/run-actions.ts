@@ -78,7 +78,7 @@ async function assertOpenBillEnabled(supabase: SupabaseClient, subDepartmentId: 
  * failures are reported as partial and every single edit rechecks its locks.
  */
 export async function saveOpenBillPicks(changes: OpenBillPickChange[]): Promise<void> {
-  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   if (!Array.isArray(changes)) throw new Error('Open Bill changes must be a list.')
   const ids = new Set<string>()
   for (const change of changes) {
@@ -168,7 +168,7 @@ export async function setOpenBillRank(orderId: string, rank: 1 | 2 | 3 | null): 
 }
 
 async function writeOpenBillRank(orderId: string, rank: BillRank | null, allowMove: boolean, expectedRank?: BillRank | null): Promise<void> {
-  const user = await requireActionOn('/revenue', 'revenue', 'edit')
+  const user = await requireActionOn('/revenue/[sub]/[period]/orders', 'revenue', 'edit')
   assertBillRank(rank)
   const supabase = await client()
   const [order] = await readOpenBillOrders(supabase, [orderId])
@@ -343,7 +343,7 @@ const SHARE_REFUSALS = new Set(['23RUN', '23SHR'])
  * production hands the browser only a digest of what an action throws.
  */
 export async function shareOrder(orderId: string, staffId: string, pct = 0.5): Promise<BillShareAnswer> {
-  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   if (typeof orderId !== 'string' || !orderId || typeof staffId !== 'string' || !staffId) {
     return { ok: false, reason: 'Which bill, and who with?' }
   }
@@ -381,7 +381,7 @@ export async function shareOrder(orderId: string, staffId: string, pct = 0.5): P
 
 /** Take a share back: the owner holds that part again. Refusals answered, like `shareOrder`. */
 export async function unshareOrder(orderId: string, staffId: string): Promise<BillShareAnswer> {
-  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   if (typeof orderId !== 'string' || !orderId || typeof staffId !== 'string' || !staffId) {
     return { ok: false, reason: 'Which bill, and who?' }
   }
@@ -431,7 +431,7 @@ export interface BillCountResult {
  * whose run has paid (23RUN) and a bill already out for another reason (23EXC).
  */
 export async function excludeOrder(orderId: string, note?: string | null): Promise<BillCountResult> {
-  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   if (typeof orderId !== 'string' || !orderId) throw new Error('Which bill?')
   const why = typeof note === 'string' ? note.trim().slice(0, 500) : ''
   const supabase = await client()
@@ -448,7 +448,7 @@ export async function excludeOrder(orderId: string, note?: string | null): Promi
  * pick back while nobody has claimed that rank by hand.
  */
 export async function includeOrder(orderId: string): Promise<BillCountResult> {
-  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   if (typeof orderId !== 'string' || !orderId) throw new Error('Which bill?')
   const supabase = await client()
   await assertBillsNotClosed(supabase, [orderId])
@@ -478,7 +478,7 @@ export interface BillBrandResult {
  * month whose run has paid (23RUN). Kept through every ERP re-send.
  */
 export async function setOrderBrand(orderId: string, brandCode: string | null): Promise<BillBrandResult> {
-  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   if (typeof orderId !== 'string' || !orderId) throw new Error('Which bill?')
   const code = typeof brandCode === 'string' && brandCode.trim() ? brandCode.trim() : null
   const supabase = await client()
@@ -576,7 +576,7 @@ export interface RecostResult {
  * anybody's behalf.
  */
 export async function recostMonth(subDepartmentId: string, period: string): Promise<RecostResult> {
-  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]/orders', 'revenue', 'edit')
   const supabase = await client()
 
   const { data, error } = await supabase.rpc('recost_sales_order_lines', {

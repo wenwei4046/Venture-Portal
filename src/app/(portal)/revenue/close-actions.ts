@@ -55,7 +55,7 @@ export interface CloseResult {
 }
 
 export async function closeSalespeople(request: CloseRequest): Promise<CloseResult> {
-  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   const { subDepartmentId, period, people } = request ?? ({} as CloseRequest)
   assertMonth(subDepartmentId, period)
   if (!Array.isArray(people) || people.length === 0) throw new Error('Tick somebody to close.')
@@ -115,7 +115,7 @@ export interface ReopenRequest {
 }
 
 export async function reopenSalespeople(request: ReopenRequest): Promise<{ reopened: number }> {
-  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   const { subDepartmentId, period, staffIds } = request ?? ({} as ReopenRequest)
   assertMonth(subDepartmentId, period)
   if (!Array.isArray(staffIds) || staffIds.length === 0) throw new Error('Tick somebody to reopen.')

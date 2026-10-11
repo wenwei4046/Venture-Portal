@@ -23,7 +23,7 @@ export interface SavePayLinesResult {
 }
 
 export async function savePayLines(input: SavePayLinesInput): Promise<SavePayLinesResult> {
-  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   const save = checkSavePayLines(input)
   const supabase = (await createClient()) as unknown as SupabaseClient
 

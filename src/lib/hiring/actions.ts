@@ -255,7 +255,7 @@ export async function setCandidateStage(candidate: string, stage: CandidateStage
 export async function hiringFileLink(kind: 'candidate' | 'talent' | 'file' | 'attachment', id: string, download = false): Promise<
   { ok: true; url: string; name: string; preview: 'pdf' | 'image' | 'none' } | { ok: false; reason: string }
 > {
-  await requireActionOn('/hiring/requests', 'hiring', 'view')
+  await requireActionOn(['/hiring/requests', '/hiring/talent'], 'hiring', 'view')
   const supabase = await client()
   const { data, error } = await supabase.rpc('hiring_file_path', { p_kind: kind, p_id: id })
   if (error) return { ok: false, reason: refusal(error, 'The file could not be found. Please try again.') }
@@ -298,7 +298,7 @@ export async function addHiringFiles(kind: 'candidate' | 'talent', owner: string
 
 /** Replace: a new upload in a file's place, its type kept; the old one is deleted once nobody names it (Edit). */
 export async function replaceHiringFile(file: string, upload: { path: string; name: string }): Promise<HiringOutcome> {
-  await requireActionOn('/hiring/requests', 'hiring', 'edit')
+  await requireActionOn('/hiring/talent/[id]', 'hiring', 'edit')
   const supabase = await client()
   const { data, error } = await supabase.rpc('hiring_file_replace', { p_file: file, p_path: upload.path, p_name: upload.name })
   if (error) {
@@ -313,7 +313,7 @@ export async function replaceHiringFile(file: string, upload: { path: string; na
 
 /** Remove: a file off its record, and out of the bucket once nobody else's record names it (Edit). */
 export async function removeHiringFile(file: string): Promise<HiringOutcome> {
-  await requireActionOn('/hiring/requests', 'hiring', 'edit')
+  await requireActionOn('/hiring/talent/[id]', 'hiring', 'edit')
   const supabase = await client()
   const { data, error } = await supabase.rpc('hiring_file_remove', { p_file: file })
   if (error) return { ok: false, reason: refusal(error, 'The file could not be removed. Please try again.') }
@@ -325,7 +325,7 @@ export async function removeHiringFile(file: string): Promise<HiringOutcome> {
 
 /** "+ Add a new file type…": the type of that name — made if new, turned back on if it was off (Edit). */
 export async function addHiringFileType(name: string): Promise<HiringIdOutcome> {
-  await requireActionOn('/hiring/requests', 'hiring', 'edit')
+  await requireActionOn(['/hiring/requests/[id]', '/hiring/talent'], 'hiring', 'edit')
   if (!name.trim()) return { ok: false, reason: 'Name the file type.' }
   const { data, error } = await (await client()).rpc('hiring_file_type_add', { p_name: name })
   if (error) return { ok: false, reason: refusal(error, 'The file type could not be added. Please try again.') }
@@ -386,7 +386,7 @@ export async function removeHiringSource(id: string): Promise<HiringOutcome> {
  * `UploadedFile[]`).
  */
 export async function saveHiringTalent(form: FormData): Promise<HiringIdOutcome> {
-  await requireActionOn('/hiring/talent', 'hiring', 'create')
+  await requireActionOn(['/hiring/requests/[id]', '/hiring/talent'], 'hiring', 'create')
   const candidate = text(form, 'candidate')
   if (!text(form, 'name').trim() || !text(form, 'position').trim()) {
     return { ok: false, reason: candidate ? 'Name and position are needed.' : 'Add a name and the position they fit.' }
@@ -415,7 +415,7 @@ export async function saveHiringTalent(form: FormData): Promise<HiringIdOutcome>
 
 /** Pick from Talent Bank / Invite to interview: the talent joins a request as a shortlisted candidate. */
 export async function inviteHiringTalent(talent: string, request: string): Promise<HiringOutcome> {
-  await requireActionOn('/hiring/talent', 'hiring', 'create')
+  await requireActionOn(['/hiring/requests/[id]', '/hiring/talent/[id]'], 'hiring', 'create')
   return call('hiring_talent_invite', { p_talent: talent, p_request: request }, 'The talent could not be invited. Please try again.')
 }
 

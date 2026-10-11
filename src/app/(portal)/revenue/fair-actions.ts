@@ -27,7 +27,7 @@ import { requireActionOn } from '@/lib/auth'
  * run's input.
  */
 export async function moveConfirmedFairBills(subDepartmentId: string): Promise<{ moved: number; months: string[] }> {
-  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { data, error } = await supabase.rpc('revenue_apply_fair_calendar', {
     p_sub_department_id: subDepartmentId,

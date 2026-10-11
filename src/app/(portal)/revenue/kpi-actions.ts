@@ -46,7 +46,7 @@ function refusal(err: { message: string; code?: string }): string | null {
 
 /** One sub-department's KPI items: added, re-priced, taken off — all or nothing. */
 export async function saveKpiItems(schemeId: string, edit: KpiItemsEdit): Promise<SaveKpiItemsResult> {
-  await requireActionOn('/revenue', 'revenue', 'manage')
+  await requireActionOn('/revenue/[sub]/rules', 'revenue', 'manage')
   if (typeof schemeId !== 'string' || !UUID.test(schemeId)) return { ok: false, reason: 'No sub-department chosen.' }
   let plan
   try {

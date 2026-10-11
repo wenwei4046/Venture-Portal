@@ -10,7 +10,7 @@ import { actionsFromJson, actionsFromKeys, canDo, type FunctionKey } from '@/lib
 import { approvableTypes, canSeeApprovals } from '@/lib/approval-domains'
 import { isSensitiveField, type Action, type Scope } from '@/lib/permission-matrix'
 import { sensitiveFromKeys } from '@/lib/sensitive'
-import { actionsOnPage, closedBoxes, opensPage, storedTabsFrom, userTabs, type PageRoute } from '@/lib/page-tabs'
+import { actionsOnPage, actionsOnPages, closedBoxes, opensPage, storedTabsFrom, userTabs, type PageRoute } from '@/lib/page-tabs'
 
 // Per-request dedup. Middleware, layout, and Server Actions all converge
 // on getUser(); wrapping with React.cache() collapses the Supabase calls
@@ -233,11 +233,18 @@ const NARROWED = new WeakSet<User>()
  * requirePage keeps it. Only an account somebody unticked a box for is ever
  * narrowed.
  */
-async function actingUser(page: PageRoute): Promise<User> {
+async function actingUser(pages: WritePages): Promise<User> {
   const user = await requireAuth()
   if (!user.closed?.length || NARROWED.has(user)) return user
-  return { ...user, actions: actionsOnPage(user.actions ?? {}, user.closed, page) }
+  return { ...user, actions: actionsOnPages(user.actions ?? {}, user.closed, typeof pages === 'string' ? [pages] : pages) }
 }
+
+/**
+ * The pages a write's buttons are on: one, or each page that offers it — then
+ * it counts while any of them keeps it (`actionsOnPages`). Exactly the pages
+ * whose screens use the action (write-pages.test.ts holds every gate to it).
+ */
+export type WritePages = PageRoute | readonly PageRoute[]
 
 /**
  * The gate a WRITE stands behind (2026-10-08, PR2; its page since 2026-10-11):
@@ -250,7 +257,7 @@ async function actingUser(page: PageRoute): Promise<User> {
  * somebody who may not, so reaching here without the action is a stale page or
  * a hand-made request, and the dashboard is the honest answer to either.
  */
-export async function requireActionOn(page: PageRoute, fn: FunctionKey, action: Action, scope: Scope = 'all'): Promise<User> {
+export async function requireActionOn(page: WritePages, fn: FunctionKey, action: Action, scope: Scope = 'all'): Promise<User> {
   const user = await actingUser(page)
   if (!canDo(user, fn, action, scope)) {
     redirect('/dashboard')
@@ -259,7 +266,7 @@ export async function requireActionOn(page: PageRoute, fn: FunctionKey, action: 
 }
 
 /** requireActionOn for a write reachable as either of two actions. Several pairs means OR. */
-export async function requireAnyActionOn(page: PageRoute, ...wants: Array<[FunctionKey, Action] | [FunctionKey, Action, Scope]>): Promise<User> {
+export async function requireAnyActionOn(page: WritePages, ...wants: Array<[FunctionKey, Action] | [FunctionKey, Action, Scope]>): Promise<User> {
   const user = await actingUser(page)
   if (!wants.some(([fn, action, scope]) => canDo(user, fn, action, scope ?? 'all'))) {
     redirect('/dashboard')
@@ -273,7 +280,7 @@ export async function requireAnyActionOn(page: PageRoute, ...wants: Array<[Funct
  * HR Costing, Director Salary; lib/approval-domains.ts). Each request is then
  * asked about on its own, as the database's approver_may() asks.
  */
-export async function requireApproverOn(page: PageRoute): Promise<User> {
+export async function requireApproverOn(page: WritePages): Promise<User> {
   const user = await actingUser(page)
   if (approvableTypes(user).length === 0) {
     redirect('/dashboard')
@@ -306,7 +313,7 @@ export async function requirePayrollPayouts(...keys: Permission[]): Promise<User
 
 /** requireAnyActionOn, for a write about what one named person is paid (requirePayrollPayouts). */
 export async function requirePayrollPayoutsActionOn(
-  page: PageRoute,
+  page: WritePages,
   ...wants: Array<[FunctionKey, Action] | [FunctionKey, Action, Scope]>
 ): Promise<User> {
   const user = await requireAnyActionOn(page, ...wants)

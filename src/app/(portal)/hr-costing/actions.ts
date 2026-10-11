@@ -88,7 +88,7 @@ export async function submitHRCostSummary(formData: FormData) {
 // movement here — billing already consumes the snapshot.
 
 export async function executeHrCosting(formData: FormData) {
-  const user = await requireActionOn('/hr-costing', 'treasury', 'edit')
+  const user = await requireActionOn(['/dept-pool', '/hr-costing'], 'treasury', 'edit')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''

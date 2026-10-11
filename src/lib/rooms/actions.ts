@@ -65,7 +65,7 @@ export interface BookInput {
 
 /** Book a room, or change a booking you may change. */
 export async function bookRoom(input: BookInput): Promise<Done<{ id: string; ref: string; room: string; time: string; pax: number }>> {
-  await requireActionOn('/admin/rooms', 'rooms', 'create')
+  await requireActionOn(['/admin/guest-link', '/admin/rooms'], 'rooms', 'create')
   const source = input.source === 'hr_app' ? 'hr_app' : 'portal'
   if (input.id != null && !isId(input.id)) return { ok: false, reason: 'That booking is not there.' }
   if (!isId(input.room)) return { ok: false, reason: 'Pick a room.' }
@@ -104,7 +104,7 @@ export async function bookRoom(input: BookInput): Promise<Done<{ id: string; ref
 
 /** Cancel a booking you may change. */
 export async function cancelBooking(id: string): Promise<Done<{ title: string; room: string }>> {
-  await requireAnyActionOn('/admin/rooms', ['rooms', 'create'], ['rooms', 'edit'])
+  await requireAnyActionOn(['/admin/guest-link', '/admin/rooms'], ['rooms', 'create'], ['rooms', 'edit'])
   if (!isId(id)) return { ok: false, reason: 'That booking is not there.' }
   const { data, error } = await (await client()).rpc('meeting_rooms_cancel', { p_id: id })
   if (error) return { ok: false, reason: words(error, 'The meeting could not be cancelled. Please try again.') }

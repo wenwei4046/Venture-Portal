@@ -20,7 +20,7 @@ async function client(): Promise<SupabaseClient> {
 
 /** "Checked — these are separate sales." Returns how many bills the answer covers. */
 export async function dismissDoubleClaim(subDepartmentId: string, billRef: string, note?: string): Promise<number> {
-  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   if (!subDepartmentId || !billRef.trim()) throw new Error('Nothing to answer')
 
   const supabase = await client()
@@ -37,7 +37,7 @@ export async function dismissDoubleClaim(subDepartmentId: string, billRef: strin
 
 /** Take the answer back, so the group is asked about again. */
 export async function restoreDoubleClaim(subDepartmentId: string, billRef: string): Promise<void> {
-  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   if (!subDepartmentId || !billRef.trim()) throw new Error('Nothing to restore')
 
   const supabase = await client()

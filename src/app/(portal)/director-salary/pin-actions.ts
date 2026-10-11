@@ -71,7 +71,7 @@ export async function isDirectorPinVerified(): Promise<boolean> {
 }
 
 export async function setDirectorPin(formData: FormData): Promise<{ ok: boolean; error?: string }> {
-  await requireActionOn('/director-salary', 'settings', 'manage')
+  await requireActionOn('/settings', 'settings', 'manage')
   const supabase = await createClient()
 
   const pin = (formData.get('pin') as string) ?? ''

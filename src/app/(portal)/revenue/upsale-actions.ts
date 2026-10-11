@@ -45,7 +45,7 @@ async function assertMonthOpen(supabase: SupabaseClient, subDepartmentId: string
  * paid in another month or dismissed. Refused once a run has paid it.
  */
 export async function reopenErpAdjustment(adjustmentId: string): Promise<void> {
-  await requireActionOn('/revenue', 'revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   const supabase = await client()
 
   const { data: row, error: readError } = await supabase
@@ -108,7 +108,7 @@ export async function reopenErpAdjustment(adjustmentId: string): Promise<void> {
  * document; it is paid in the month somebody says yes.
  */
 export async function confirmErpAdjustment(adjustmentId: string, period: string): Promise<void> {
-  const user = await requireActionOn('/revenue', 'revenue', 'edit')
+  const user = await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   assertPeriod(period)
   const supabase = await client()
 
@@ -153,7 +153,7 @@ export async function confirmErpAdjustment(adjustmentId: string, period: string)
  * real change is measured from it.
  */
 export async function dismissErpAdjustment(adjustmentId: string): Promise<void> {
-  const user = await requireActionOn('/revenue', 'revenue', 'edit')
+  const user = await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   const supabase = await client()
 
   const { error } = await supabase

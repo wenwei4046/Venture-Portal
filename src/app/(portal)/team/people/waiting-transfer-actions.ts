@@ -25,7 +25,7 @@ export type TransferOutcome = { ok: true; staffId: string; code: string | null }
  * so the title must tick both (2026-10-09, PR4).
  */
 export async function transferFromWaitingList(input: TransferInput): Promise<TransferOutcome> {
-  const user = await requireActionOn('/team/people', 'team', 'create')
+  const user = await requireActionOn('/team/people/new', 'team', 'create')
   if (!user.permissions.includes('member_requests_manage')) {
     return { ok: false, reason: 'Transferring from the waiting list needs HR request management access.' }
   }

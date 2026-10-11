@@ -116,7 +116,7 @@ export async function revertTermsChange(
   kind: 'loan' | 'fund_source',
   id: string,
 ): Promise<{ error: string } | undefined> {
-  await requireActionOn('/fund-in', 'treasury', 'approve')
+  await requireActionOn(kind === 'loan' ? '/fund-out' : '/fund-in', 'treasury', 'approve')
   const supabase = await createClient()
   if (!id) return { error: 'Record id is required' }
   const { error } = await supabase.rpc('revert_terms_change', { p_record_kind: kind, p_record_id: id })

@@ -256,6 +256,14 @@ describe('a page’s writes follow its own tabs’ boxes', () => {
     expect(redirect).not.toHaveBeenCalled()
   })
 
+  it('a write offered on several pages counts while any of them keeps it', async () => {
+    await requireActionOn(['/receipts', '/fund-in'], 'treasury', 'create')
+    expect(redirect).toHaveBeenCalledWith('/dashboard')
+    vi.mocked(redirect).mockClear()
+    await requireActionOn(['/receipts', '/payments'], 'treasury', 'create')
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
   it('whatever page the request says it came from — a Referer is the sender\'s to write', async () => {
     mocks.header = { 'next-action': 'a1', referer: 'https://portal.example/payments?tab=draft' }
     await requireActionOn('/receipts', 'treasury', 'create')

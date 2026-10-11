@@ -354,7 +354,7 @@ export async function createMultiLineInvoice(
     lines: InvoiceLineInput[]
   },
 ): Promise<{ id: string; invoice_no: string | null }> {
-  const user = await requireActionOn('/invoices/[id]', 'billing', 'create')
+  const user = await requireActionOn(['/ba', '/billing-allocator', '/statements'], 'billing', 'create')
   const supabase = await createClient()
 
   if (!['subsidiary', 'director', 'dept_pool', 'freetext'].includes(payload.billableType)) {
@@ -631,7 +631,7 @@ export async function generateMonthlyInvoices(
 // ─── Create marketing project contract (Finance) ────────────────────────────
 
 export async function createContract(formData: FormData) {
-  const user = await requireAnyActionOn('/billing/contracts/new', ['billing', 'create'], ['my_billing', 'create', 'dept'])
+  const user = await requireAnyActionOn(['/billing/contracts/new', '/dept-pool/contracts/new'], ['billing', 'create'], ['my_billing', 'create', 'dept'])
   const supabase = await createClient()
 
   const companyId = (formData.get('company_id') as string) ?? ''
@@ -708,7 +708,7 @@ export async function createContract(formData: FormData) {
 // ─── Update marketing project contract (Finance) ────────────────────────────
 
 export async function updateContract(formData: FormData) {
-  await requireActionOn('/billing/contracts/[id]/edit', 'billing', 'edit')
+  await requireActionOn(['/billing/contracts/new', '/dept-pool/contracts/new'], 'billing', 'edit')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
