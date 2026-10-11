@@ -23,6 +23,8 @@ export type FunctionKey =
   | 'director_salary' | 'director_pool' | 'team' | 'accounts' | 'member' | 'revenue_app' | 'dept_pool'
   | 'venture_pool' | 'opex' | 'my_billing' | 'claims' | 'reports' | 'dept_reports' | 'reconciliation'
   | 'audit_log' | 'settings' | 'view_switch' | 'crm'
+  // HR revamp round 2 (mig 20261011060000).
+  | 'documentation' | 'hiring' | 'rooms' | 'guest_link'
 
 /** Anybody gates can be asked about: their keys, and their actions when they were loaded. */
 export interface ActionHolder extends PermissionHolder {
@@ -100,6 +102,13 @@ export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.
   member_crm: ['crm.view', 'crm.edit'],
   crm_manage: ['crm.view', 'crm.edit', 'crm.manage'],
   view_switch: ['view_switch.view'],
+  // HR revamp round 2 (20261011060000): Documentation, Hiring, Meeting rooms
+  // (booking, and the rooms themselves), the Guest link.
+  documentation: ['documentation.view', 'documentation.create', 'documentation.edit'],
+  hiring: ['hiring.view', 'hiring.create', 'hiring.edit', 'hiring.approve'],
+  meeting_rooms: ['rooms.view', 'rooms.create'],
+  meeting_rooms_manage: ['rooms.view', 'rooms.create', 'rooms.edit'],
+  guest_link: ['guest_link.view', 'guest_link.edit'],
 }
 
 /**
@@ -146,13 +155,24 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'dept_pool.view': 'own',
   'dept_reports.export': 'dept',
   'director_pool.edit': 'all',
+  'documentation.create': 'all',
+  'documentation.edit': 'all',
+  'documentation.view': 'all',
   'director_salary.approve': 'all',
   'director_salary.edit': 'all',
+  'guest_link.edit': 'all',
   'hr_costing.approve': 'all',
   'hr_costing.create': 'all',
   'hr_costing.edit': 'all',
   'hr_costing.export': 'all',
   'hr_costing.view': 'all',
+  // Hiring (round 2, 2026-10-11).
+  'hiring.approve': 'all',
+  'hiring.create': 'all',
+  'hiring.edit': 'all',
+  'hiring.view': 'all',
+  // Sales Groups › Waiting list's "+" (2026-10-11): Member services · Edit.
+  'member.manage': 'all',
   'my_billing.create': 'dept',
   'opex.view': 'all',
   'product_list.edit': 'all',
@@ -164,6 +184,10 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'revenue.create': 'all',
   'revenue.edit': 'all',
   'revenue.manage': 'all',
+  'rooms.create': 'all',
+  'rooms.edit': 'all',
+  // The HR phone app reads the rooms only for an account whose cell opens them (2026-10-11).
+  'rooms.view': 'all',
   'settings.manage': 'all',
   'team.create': 'all',
   'team.edit': 'all',

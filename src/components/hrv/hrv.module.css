@@ -443,6 +443,7 @@
   border-radius: 16px;
   background: rgb(var(--hv-dark) / 0.18);
   z-index: 30;
+  animation: hvFade 0.25s ease;
 }
 .scrimFixed { position: fixed; inset: 0; border-radius: 0; }
 .drawer {
@@ -451,11 +452,14 @@
   top: 10px;
   right: 10px;
   bottom: 10px;
+  /* Never wider than the frame it opens in (a phone): 10px clear each side, its 1px edge included. */
+  max-width: calc(100% - 21px);
   background: rgb(255 255 255);
   border-left: 1px solid rgb(var(--hv-hairline));
   border-radius: 0 16px 16px 0;
   z-index: 31;
   box-shadow: -12px 0 32px rgb(var(--hv-dark) / 0.12);
+  animation: hvDrawerIn 0.34s cubic-bezier(0.2, 0.8, 0.2, 1);
   display: flex;
   flex-direction: column;
   line-height: normal;
@@ -463,6 +467,8 @@
   font-size: 13px;
 }
 .drawerFixed { position: fixed; top: 10px; right: 10px; bottom: 10px; max-width: calc(100vw - 20px); }
+/* Inside the frame too a drawer never runs past its left edge (a 640px preview on a phone). */
+.drawer:not(.drawerFixed) { max-width: calc(100% - 20px); }
 .drawerHead {
   display: flex;
   align-items: flex-start;
@@ -516,6 +522,7 @@
   border-radius: 16px;
   z-index: 31;
   box-shadow: 0 20px 60px rgb(var(--hv-dark) / 0.25);
+  animation: hvFade 0.2s ease;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -546,6 +553,24 @@
 }
 .toastFixed { position: fixed; }
 .toastDot { color: rgb(233 154 83); }
+
+/* On a phone the frame (and the window) runs on under the bottom tab bar — 54px
+   and the home strip: a drawer and its scrim end where the sheet ends, and the
+   toast stands as high above it as it does above the sheet's foot on a desktop
+   (the parity audit, 2026-10-11: + New request's Submit to HR sat under the bar). The bar is --tabbar-h
+   (globals.css): 54px, or nothing while a scroll down has tucked it away — all of these follow it. */
+@media (max-width: 767px) {
+  .scrim { bottom: calc(var(--tabbar-h) + 10px + var(--safe-bottom)); }
+  .scrimFixed { bottom: 0; }
+  .drawer,
+  .drawerFixed { bottom: calc(var(--tabbar-h) + 10px + var(--safe-bottom)); }
+  /* A window centres in what is left above the bar, and a tall one scrolls inside its body there. */
+  .window {
+    top: calc(50% - (var(--tabbar-h) + var(--safe-bottom)) / 2);
+    max-height: min(760px, calc(100% - 40px - var(--tabbar-h) - var(--safe-bottom)));
+  }
+  .toast { bottom: calc(var(--tabbar-h) + 30px + var(--safe-bottom)); }
+}
 
 /* ── Toggle ── */
 .toggle {
@@ -665,6 +690,18 @@
   .gtScroll > .gt { min-width: 720px; }
   .facts { grid-template-columns: 110px minmax(0, 1fr); }
 }
+/* Round 2 (README 18.2): every right drawer slides in 40px and fades, its
+   scrim fades in .25s, a centred window fades in .2s. */
+@keyframes hvDrawerIn {
+  from { transform: translateX(40px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes hvFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .toggle, .knob, .card, .gtRow { transition: none; }
+  .scrim, .drawer, .window { animation: none; }
 }

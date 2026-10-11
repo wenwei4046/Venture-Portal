@@ -287,6 +287,53 @@ try {
   check([await one('SELECT count(*)::int FROM permission_templates WHERE id = $1', [blank]), await ticksOf(blank)], [0, []],
     'an unused one goes, its ticks with it')
 
+  // ── "+ New template"'s window (mig 20261011233200): permission_template_new ──
+  // This world predates PR2's actions: has_any_action stands in, holding Logins & invites · Manage for
+  // whoever manages permissions — what current_actions() gives an untemplated Principal.
+  await asSystem()
+  await db.exec(`
+    CREATE OR REPLACE FUNCTION public.has_any_action(p_wants text[]) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+    AS $$ SELECT 'accounts.manage' = ANY (p_wants) AND public.has_perm('permissions_manage') $$;
+    GRANT EXECUTE ON FUNCTION public.has_any_action(text[]) TO authenticated;
+  `)
+  await db.exec(await migrationText('20261011233200_permission_template_new'))
+  const newSql = 'SELECT permission_template_new($1, $2::text[], $3::jsonb, $4::text[])'
+  const AREA_TICKS = ['dept.overview.view', 'dept.claims.view', 'dept.my_claims.view']
+  const AREA_CELLS = [{ function_key: 'claims', action: 'view', scope: 'dept' }, { function_key: 'dashboard', action: 'view', scope: 'all' }]
+  const APP_TICKS = ['rev.today.view', 'rev.honours.view', 'rev.scheme.view']
+  const APP_CELLS = [{ function_key: 'revenue_app', action: 'view', scope: 'own' }]
+  const templateCount = () => one('SELECT count(*)::int FROM permission_templates')
+  const madeBefore = await templateCount()
+  await as(HR_SHARED)
+  await reject(newSql, ['Area Manager', AREA_TICKS, json(AREA_CELLS), []], /Only whoever manages permissions makes a template/,
+    'HR cannot make a template')
+  await as(PRINCIPAL)
+  const area = await one(newSql, ['Area Manager', AREA_TICKS, json(AREA_CELLS), ['salary']])
+  await asSystem()
+  check(await q('SELECT base_role::text AS kind, version FROM permission_templates WHERE id = $1', [area]), [{ kind: 'staff', version: 2 }],
+    'a blank portal template with no role defaults, made and saved in one go')
+  check(await ticksOf(area), sorted(AREA_TICKS), 'its ticks are stored')
+  check(await q('SELECT function_key, action, scope FROM permission_template_grants WHERE template_id = $1 ORDER BY function_key, action', [area]),
+    AREA_CELLS, 'with the cells they stand for')
+  check((await q('SELECT field FROM permission_template_sensitive WHERE template_id = $1', [area])).map(r => r.field), ['salary'],
+    'and its sensitive fields')
+  await as(PRINCIPAL)
+  const appOnly = await one(newSql, ['Fair Junior', APP_TICKS, json(APP_CELLS), []])
+  await asSystem()
+  check(await one('SELECT base_role::text FROM permission_templates WHERE id = $1', [appOnly]), 'revenue_member',
+    'only the Revenue app: its holders are Revenue app accounts')
+  await as(PRINCIPAL)
+  await reject(newSql, ['area manager', AREA_TICKS, json(AREA_CELLS), []], /There is already a template called/, 'a name is used once')
+  await reject(newSql, ['Broken', [...AREA_TICKS, 'dept.claims.sign'], json(AREA_CELLS), []], /is not a box of the matrix/,
+    'a box that is no box is refused')
+  await reject(newSql, ['Empty', [], '[]', []], /Pick at least one view/, 'and no box at all')
+  await asSystem()
+  check([await templateCount(), await one("SELECT count(*)::int FROM permission_templates WHERE name IN ('Broken', 'Empty')")],
+    [madeBefore + 2, 0], 'a refused one leaves nothing behind — the template and its ticks are one transaction')
+  await as(null, 'anon')
+  await reject(newSql, ['Anon', AREA_TICKS, json(AREA_CELLS), []], /permission denied/, 'the publishable key makes none')
+
   // ── Who can call what ─────────────────────────────────────────────────────
   await as(PRINCIPAL)
   await reject('SELECT permission_people_reapply($1, \'[]\'::jsonb)', [T.fin_maker], /permission denied/,

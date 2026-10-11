@@ -1,0 +1,260 @@
+/* Admin › Guest Link (2026-10-11, the HR revamp's second package — README §15,
+   `.design/hr-r2/handoff/design/Revenue App.dc.html` lines 940–977). Every
+   value is the prototype's; boxes it sizes with padding or a border are
+   content-box (Tailwind's preflight would make them border-box). */
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card {
+  border: 1px solid rgb(229 228 223);
+  border-radius: 12px;
+  padding: 18px 20px;
+  background: rgb(255 255 255);
+}
+.linkCard { display: flex; flex-direction: column; gap: 12px; }
+.subsCard { display: flex; flex-direction: column; gap: 10px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.cardTitle { font-size: 15px; font-weight: 500; flex: 1; }
+.btnReset {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  text-align: inherit;
+  line-height: inherit;
+}
+
+/* The switch (30×18, the knob .2s) and Link on / off beside it. */
+.onSwitch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: rgb(117 100 86);
+}
+.onSwitch[aria-checked='true'] { color: rgb(21 110 78); }
+.track {
+  width: 30px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgb(229 228 223);
+  position: relative;
+  flex: none;
+  transition: background 0.2s;
+}
+.track[data-on='true'] { background: rgb(233 154 83); }
+.knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgb(255 255 255);
+  transition: left 0.2s;
+}
+.track[data-on='true'] .knob { left: 14px; }
+.btnReset:disabled, .btnReset[aria-disabled='true'] { cursor: default; }
+
+.desc { font-size: 12.5px; color: rgb(90 78 68); line-height: 1.5; }
+.urlRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 8px;
+  background: rgb(250 248 245);
+}
+.url {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.url[data-off='true'] { opacity: 0.45; }
+.smallBtn {
+  padding: 7px 12px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: normal;
+  background: rgb(255 255 255);
+  color: inherit;
+}
+.smallBtn:disabled { cursor: default; opacity: 0.5; }
+.plainBtn { background: transparent; }
+
+.parts { display: flex; flex-direction: column; gap: 2px; border-top: 1px solid rgb(229 228 223); padding-top: 10px; }
+.part {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  cursor: pointer;
+  width: 100%;
+}
+.partText { flex: 1; }
+.partLabel { font-weight: 500; }
+.partDesc { font-size: 12px; color: rgb(117 100 86); margin-top: 1px; }
+
+.days { display: flex; align-items: center; gap: 10px; border-top: 1px solid rgb(229 228 223); padding-top: 10px; }
+.daysText { flex: 1; font-size: 13px; }
+.daysInput {
+  box-sizing: content-box;
+  width: 56px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  background: rgb(255 255 255);
+  padding: 6px 8px;
+  text-align: right;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  color: inherit;
+  line-height: normal;
+}
+.daysInput:focus { border-color: rgb(233 154 83); }
+.daysUnit { font-size: 13px; }
+
+.sub { font-size: 12px; color: rgb(117 100 86); }
+.roomsTitle { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+.roomsSub { margin-bottom: 8px; }
+.roomRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgb(240 238 234);
+  cursor: pointer;
+  width: 100%;
+}
+.roomText { flex: 1; }
+.roomName { font-weight: 500; }
+.roomMeta { font-size: 12px; color: rgb(117 100 86); margin-left: 8px; }
+.empty { color: rgb(117 100 86); font-size: 13px; }
+
+/* ── Subsidiaries ── */
+.subCard {
+  border: 1px solid rgb(229 228 223);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.subTop { display: flex; align-items: center; gap: 8px; }
+.code {
+  box-sizing: content-box;
+  width: 54px;
+  padding: 5px 6px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 8px;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  text-align: center;
+  outline: none;
+  background: rgb(255 255 255);
+  color: inherit;
+  line-height: normal;
+}
+.code::placeholder { color: rgb(117 117 117); text-transform: none; }
+.code:focus { border-color: rgb(233 154 83); }
+.subName {
+  box-sizing: content-box;
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 4px 6px;
+  margin-left: -6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  line-height: normal;
+}
+.subName:hover { border-color: rgb(229 228 223); }
+.subName:focus { border-color: rgb(233 154 83); }
+.remove {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: rgb(117 100 86);
+  flex: none;
+}
+.remove:hover { background: rgb(251 239 237); color: rgb(176 40 34); }
+.depts { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.dept {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 999px;
+  font-size: 12.5px;
+}
+.deptX { padding: 0 5px; cursor: pointer; color: rgb(117 100 86); }
+.newDept {
+  box-sizing: content-box;
+  width: 120px;
+  padding: 4px 9px;
+  border: 1px dashed rgb(216 210 200);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  line-height: normal;
+}
+.newDept::placeholder { color: rgb(117 117 117); }
+.newDept:focus { border-color: rgb(233 154 83); }
+
+/* ── Booked through the link ── */
+.bkHead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+.bkTitle { font-size: 15px; font-weight: 500; }
+.bkCount { font-size: 12px; color: rgb(117 100 86); }
+.bkRow { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgb(240 238 234); }
+.bkText { flex: 1; min-width: 0; }
+.bkName { font-weight: 500; }
+.bkMeta { font-size: 12px; color: rgb(117 100 86); margin-top: 2px; }
+.bkWho { font-size: 12px; color: rgb(90 78 68); margin-top: 1px; }
+.hireLine {
+  margin-top: 12px;
+  font-size: 12.5px;
+  color: rgb(90 78 68);
+  cursor: pointer;
+  text-decoration: underline;
+  display: inline-block;
+}
+
+@media (max-width: 900px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .track, .knob { transition: none; }
+}

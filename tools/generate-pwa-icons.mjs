@@ -13,6 +13,14 @@
 //   src/app/apple-icon.png (180)              iOS home screen — full bleed, no
 //                                             transparency (iOS would fill it
 //                                             black) and iOS rounds the corners
+//   public/icons/badge-tile-96.png            a notification's small icon in
+//                                             Android's status bar (sw.js
+//                                             `badge`): Android keeps only the
+//                                             alpha and paints it white, so the
+//                                             mark's tile with the H cut out —
+//                                             the opaque tile was a solid white
+//                                             square, a bare H looked plain
+//                                             (2026-10-11)
 //
 // Re-run after changing icon.svg.
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -33,6 +41,18 @@ const fullBleed = (scale) =>
   `<rect width="32" height="32" fill="${fill}"/>` +
   `<g transform="translate(16 16) scale(${scale}) translate(-16 -16)">${glyph}</g></svg>`
 
+// The mark's own tile in white with its H cut out (the user, 2026-10-11: "got background colour, dont want just
+// plain h"). Android draws a status-bar icon from its alpha alone, in white — no colour can reach it — so a tile
+// with the H showing through is as close to the coloured mark as that place allows. The H's stroke is a little
+// heavier than the mark's so the cut still reads at 24dp.
+const tileRx = mark.match(/<rect[^>]*rx="([^"]+)"/)?.[1] ?? '4'
+const badge =
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><defs><mask id="h">` +
+  `<rect width="32" height="32" fill="#FFFFFF"/>` +
+  glyph.replace(/stroke="[^"]+"/, 'stroke="#000000"').replace(/stroke-width="[^"]+"/, 'stroke-width="3"') +
+  `</mask></defs>` +
+  `<rect x="2" y="2" width="28" height="28" rx="${tileRx}" fill="#FFFFFF" mask="url(#h)"/></svg>`
+
 const render = (svg, size) => sharp(Buffer.from(svg), { density: 72 * (size / 32) * 2 }).resize(size, size).png().toBuffer()
 
 const outputs = [
@@ -40,6 +60,7 @@ const outputs = [
   ['public/icons/icon-512.png', mark, 512],
   ['public/icons/maskable-512.png', fullBleed(1), 512],
   ['src/app/apple-icon.png', fullBleed(1.15), 180],
+  ['public/icons/badge-tile-96.png', badge, 96],
 ]
 
 for (const [file, svg, size] of outputs) {

@@ -209,6 +209,12 @@ export interface MemberMemo {
   readAt: string | null;
   acknowledgedAt: string | null;
   departments: string[];
+  /**
+   * A memo addressed to PEOPLE (People › Documentation's Publish, a letter in its Data center — 2026-10-11) has no
+   * sub-department: the Principal's snapshot names them, by staff id, so View as shows it only for one of them.
+   * A member's own snapshot holds only theirs and leaves this out.
+   */
+  recipients?: string[];
 }
 export interface MemberData {
   /** Authenticated Principal overview; never an impersonated staff account. */

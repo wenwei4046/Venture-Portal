@@ -151,6 +151,10 @@ export function requestFacts(r: MemberRequest, facts: RequestFacts | undefined, 
             ["Reason and notes", str(d.reason)],
             ["Request department", department],
             ["Submitted by", facts?.submittedBy ?? ""],
+            // HR's own questions on the replacement form (2026-10-11), and what came with it.
+            ...waitingAnswers(d).map(a => [a.label, a.value] as [string, string]),
+            ["Signed form", str(d.signedFormName) ? `${str(d.signedFormName)} · black & white record` : ""],
+            ["Form version", Number.isInteger(d.formVersion) && Number(d.formVersion) > 0 ? `v${d.formVersion}` : ""],
           ]
         : [
             ["Claim category", CATEGORY[str(d.category)] ?? str(d.category)],
@@ -171,9 +175,9 @@ function waitingAnswers(d: Record<string, unknown>): { label: string; value: str
   });
 }
 
-/** A waiting list sent with its signed application form — Member services opens it (`signed_form`). */
+/** A waiting list (or, since 2026-10-11, a replacement) sent with its signed form — Member services opens it (`signed_form`). */
 export function hasSignedForm(r: Pick<MemberRequest, "kind" | "detail">): boolean {
-  return r.kind === "waiting" && !!str(r.detail.signedFormName) && /^[0-9a-f]{64}$/.test(str(r.detail.signedFormHash));
+  return (r.kind === "waiting" || r.kind === "replacement") && !!str(r.detail.signedFormName) && /^[0-9a-f]{64}$/.test(str(r.detail.signedFormHash));
 }
 
 /** What HR does next, as the section under the facts names it. */
@@ -216,7 +220,7 @@ export const ACCEPT_NOTE = "Accepted onto the waiting list.";
  */
 export function requestHistory(facts: RequestFacts | undefined, kind?: string, detail?: Record<string, unknown>) {
   const steps = historyOf(facts?.events ?? []);
-  if (kind === "waiting" && detail && str(detail.signedFormName)) {
+  if ((kind === "waiting" || kind === "replacement") && detail && str(detail.signedFormName)) {
     // The handoff's sending step says what came with it: "Signed form attached: …".
     const sent = steps.map(e => e.to === "submitted" && !e.note).lastIndexOf(true);
     if (sent >= 0) steps[sent] = { ...steps[sent], note: `Signed form attached: ${str(detail.signedFormName)}` };

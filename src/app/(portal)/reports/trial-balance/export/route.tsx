@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { fetchTrialBalance, isCalendarDay } from '@/lib/cfo-reports'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildTrialBalanceXlsx } from './_format/xlsx'
@@ -8,7 +8,7 @@ import { officeToday } from '@/lib/office-time'
 import { segmentFilterFor } from '../../_components/report-segments'
 
 export async function GET(req: Request) {
-  await requireAction('reports', 'export')
+  await requireActionOn('/reports/trial-balance', 'reports', 'export')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const asOf = url.searchParams.get('as_of') ?? officeToday() // the office's today, not UTC's

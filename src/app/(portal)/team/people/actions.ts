@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { validateStaffForm, designationForTitle, payFieldsForUpdate } from '@/lib/staff-form'
 import { validateSecondaryStaffBankAccount } from '@/lib/staff-bank-accounts'
 import { isMasked, sees } from '@/lib/sensitive'
@@ -37,7 +37,7 @@ const str = (formData: FormData, key: string): string | null =>
  * database derives correct on the first write.
  */
 export async function addStaff(formData: FormData) {
-  const user = await requireAction('team', 'create')
+  const user = await requireActionOn('/team/people/new', 'team', 'create')
   const supabase = await createClient()
 
   const form = validateStaffForm({
@@ -126,7 +126,7 @@ export async function addStaff(formData: FormData) {
 }
 
 export async function updateStaff(id: string, formData: FormData) {
-  const editor = await requireAction('team', 'edit')
+  const editor = await requireActionOn('/team/people/[id]/edit', 'team', 'edit')
   const supabase = await createClient()
 
   // The form writes pay, so it is an editor whose title ticks Salary amounts
@@ -279,7 +279,7 @@ export async function updateStaff(id: string, formData: FormData) {
  * until the next hard reload.
  */
 async function setEmployment(id: string, status: 'active' | 'inactive') {
-  await requireAction('team', 'edit')
+  await requireActionOn('/team/people/[id]/edit', 'team', 'edit')
   const supabase = await createClient()
 
   const { error } = await supabase.from('hr_staff_costs').update({ status }).eq('id', id)

@@ -15,6 +15,7 @@ import { ignoreErpAgent, matchErpSalesperson, replayHeldErpEvents, unignoreErpAg
 import type { ErpSyncPanelData } from '../../_lib/erp-sync-panel'
 import type { ErpLinkView } from '../../_lib/erp-link'
 import s from './CommCal.module.css'
+import { Select } from '@/components/hrv/select'
 
 // Comm Cal (2026-10-10, the HR revamp handoff): the status strip (ERP
 // receiving · Pays from … · Change · Data source ›), five cards, and the
@@ -494,7 +495,7 @@ function DataSourceDrawer({
                 </div>
                 {data.canEdit ? (
                   <div className={s.dsInline}>
-                    <select name="staff_id" required defaultValue={u.suggestedStaffId ?? ''} className={hv.select} style={{ flex: 1, minWidth: 0 }} aria-label={`Match ${u.agentName}`}>
+                    <Select name="staff_id" required defaultValue={u.suggestedStaffId ?? ''} style={{ flex: 1, minWidth: 0 }} aria-label={`Match ${u.agentName}`}>
                       <option value="">Pick a salesperson…</option>
                       {sync.staff.map(p => (
                         <option key={p.id} value={p.id}>
@@ -502,7 +503,7 @@ function DataSourceDrawer({
                           {p.code ? ` · ${p.code}` : ''}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                     <button type="submit" className={btn('primary')} disabled={pending} style={{ padding: '7px 12px', fontSize: 12.5 }}>
                       Match
                     </button>

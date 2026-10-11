@@ -129,6 +129,25 @@ export function canOpenPeople(u: PermissionHolder): boolean {
   return can(u, 'team', 'team_directory')
 }
 
+// HR revamp round 2 (2026-10-11): Documentation, Hiring, Meeting rooms and
+// the Guest link. A room is booked from every view; managing the rooms is
+// Meeting rooms · Edit's (`meeting_rooms_manage`).
+export function canAccessDocumentation(u: PermissionHolder): boolean {
+  return can(u, 'documentation')
+}
+
+export function canAccessHiring(u: PermissionHolder): boolean {
+  return can(u, 'hiring')
+}
+
+export function canAccessMeetingRooms(u: PermissionHolder): boolean {
+  return can(u, 'meeting_rooms', 'meeting_rooms_manage')
+}
+
+export function canAccessGuestLink(u: PermissionHolder): boolean {
+  return can(u, 'guest_link')
+}
+
 export function canAccessAuditLog(u: PermissionHolder): boolean {
   // The whole history, and Audit Log › Access (who read what).
   return can(u, 'audit_log')

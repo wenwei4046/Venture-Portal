@@ -85,9 +85,13 @@ export function Drawer({
   titleStyle,
   sub,
   head,
+  headStyle,
   children,
   footer,
   bodyStyle,
+  bare = false,
+  label,
+  headGrow = false,
 }: {
   open: boolean
   onClose: () => void
@@ -99,14 +103,44 @@ export function Drawer({
   sub?: ReactNode
   /** Replaces eyebrow / title / sub with a head of its own (the × stays). */
   head?: ReactNode
+  /** The head's box (round 2's drawers pad it 18px 22px). */
+  headStyle?: CSSProperties
   children: ReactNode
   footer?: ReactNode
   bodyStyle?: CSSProperties
+  /** The panel only — no head, body or foot of the kit's: the children draw their own (Documentation's preview). */
+  bare?: boolean
+  /** The dialog's name when `bare` (there is no title to name it). */
+  label?: string
+  /** A custom head that spans the row (its own buttons before the ×). */
+  headGrow?: boolean
 }) {
   const id = useId()
   useEscape(open, onClose)
   const panel = useFocusIn(open)
   if (!open) return null
+  if (bare) {
+    return (
+      <Portal>
+        {fixed => (
+          <>
+            <div className={`${s.scrim}${fixed ? ` ${s.scrimFixed}` : ''}`} onClick={onClose} aria-hidden="true" />
+            <div
+              ref={panel}
+              tabIndex={-1}
+              role="dialog"
+              aria-modal="true"
+              aria-label={label}
+              className={`${s.drawer}${fixed ? ` ${s.drawerFixed}` : ''}`}
+              style={{ width, outline: 'none' }}
+            >
+              {children}
+            </div>
+          </>
+        )}
+      </Portal>
+    )
+  }
   return (
     <Portal>
       {fixed => (
@@ -121,8 +155,8 @@ export function Drawer({
             className={`${s.drawer}${fixed ? ` ${s.drawerFixed}` : ''}`}
             style={{ width, outline: 'none' }}
           >
-            <div className={s.drawerHead}>
-              <div id={`${id}-title`}>
+            <div className={s.drawerHead} style={headStyle}>
+              <div id={`${id}-title`} style={headGrow ? { flex: 1, minWidth: 0 } : undefined}>
                 {head ?? (
                   <>
                     {eyebrow ? <div className={s.drawerEyebrow} style={eyebrowStyle}>{eyebrow}</div> : null}

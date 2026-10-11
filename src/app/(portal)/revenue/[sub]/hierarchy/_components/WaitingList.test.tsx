@@ -15,6 +15,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 const flash = vi.fn()
 vi.mock('@/components/hrv/toast', () => ({ flash: (m: string) => flash(m) }))
 const actions = vi.hoisted(() => ({
+  addToWaitingList: vi.fn(),
   failWaitingApplicant: vi.fn(),
   uploadWaitingFormTemplate: vi.fn(),
   saveWaitingForm: vi.fn(),
@@ -104,7 +105,8 @@ describe('an applicant’s drawer', () => {
     show()
     fireEvent.click(screen.getAllByRole('row')[1])
     const drawer = screen.getByRole('dialog')
-    expect(drawer).toHaveTextContent("#1 of 2 on Fair's waiting list")
+    // Round 2 (README 18.5): the head is the name and the request number only.
+    expect(drawer).not.toHaveTextContent(/of 2 on Fair/)
     expect(drawer).toHaveTextContent('Revenue · Fair')
     expect(drawer).toHaveTextContent('Accepted onto the waiting list')
     expect(drawer).toHaveTextContent('Only the employee details — NRIC, bank account — are left.')
@@ -159,6 +161,118 @@ describe('an applicant’s drawer', () => {
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Fail' }))
     })
     expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('Only somebody on the waiting list can be failed')
+  })
+})
+
+// "+" (2026-10-11, the user: "我点击「加」了过后，我可以直接加人进去这个 waiting
+// list 里面"): somebody straight onto the list, at the end. Submitted by is the
+// Revenue team, HR's own questions may stay blank, the signed form follows Form
+// settings.
+describe('"+" — straight onto the list', () => {
+  const SUB = '71709f7e-9f7c-4e28-80cf-ce21be336995'
+  const STANLEY = '61b4c495-6b7d-442d-a391-31fe4cbe2d6a'
+  const ALVIN = '1677f60d-9aad-4a97-a6bd-4bf8b805945f'
+  const submitters = [
+    { group: 'Fair', people: [{ id: STANLEY, name: 'STANLEY', title: 'Team Leader' }] },
+    { group: 'IR', people: [{ id: ALVIN, name: 'ALVIN', title: null }] },
+  ]
+  const V2: WaitingForm = {
+    ...V1,
+    version: 2,
+    fields: [...V1.fields, { id: 'ic', label: 'IC number', type: 'text', required: true }, { id: 'car', label: 'Has own transport', type: 'yesno', required: false }],
+  }
+  const WINDOW = "Add somebody to Fair's waiting list"
+  const plus = () => screen.getByRole('button', { name: WINDOW })
+  const fill = (win: HTMLElement, by = STANLEY) => {
+    fireEvent.change(within(win).getByLabelText('New member name'), { target: { value: 'Daniel Lee' } })
+    fireEvent.change(within(win).getByLabelText('Phone number'), { target: { value: '016-221 0457' } })
+    fireEvent.change(within(win).getByLabelText('Joining date'), { target: { value: '2026-11-02' } })
+    fireEvent.change(within(win).getByRole('combobox', { name: /Submitted by/ }), { target: { value: by } })
+  }
+  const sent = (n = 0) => actions.addToWaitingList.mock.calls[n][0] as FormData
+  const added = (n = 0) => JSON.parse(String(sent(n).get('input')))
+
+  it('stands first in the row, only for whoever may add', () => {
+    show({ canAdd: true, subDepartmentId: SUB, submitters })
+    const row = plus().parentElement!
+    expect(row.firstElementChild).toBe(plus())
+    expect(within(row).getByText('Form settings')).toBeInTheDocument()
+    cleanup()
+    show({ subDepartmentId: SUB, submitters })
+    expect(screen.queryByRole('button', { name: WINDOW })).toBeNull()
+  })
+
+  it('adds the basics and who brought them in; HR’s own questions may stay blank', async () => {
+    actions.addToWaitingList.mockResolvedValue({ ok: true, requestNo: 'RQ-2610-005' })
+    show({ canAdd: true, subDepartmentId: SUB, submitters, form: { ok: true, form: V2 } })
+    fireEvent.click(plus())
+    const win = screen.getByRole('dialog', { name: WINDOW })
+    // The Revenue team, this sub-department first.
+    const by = within(win).getByRole('combobox', { name: /Submitted by/ })
+    expect([...by.querySelectorAll('optgroup')].map(g => g.label)).toEqual(['Fair', 'IR'])
+    expect(within(win).getByText('Your questions · optional')).toBeInTheDocument()
+    expect(within(win).getByText('· optional')).toBeInTheDocument()
+    fill(win)
+    fireEvent.change(within(win).getByRole('combobox', { name: 'Has own transport' }), { target: { value: 'Yes' } })
+    await act(async () => {
+      fireEvent.click(within(win).getByRole('button', { name: 'Add to the list' }))
+    })
+    expect(added()).toEqual({ name: 'Daniel Lee', contact: '016-221 0457', start: '2026-11-02', submittedBy: STANLEY, answers: { car: 'Yes' }, subDepartmentId: SUB })
+    expect(sent().get('signedForm')).toBeNull()
+    expect(flash).toHaveBeenCalledWith("Daniel Lee is on Fair's waiting list · RQ-2610-005")
+    expect(screen.queryByRole('dialog', { name: WINDOW })).toBeNull()
+  })
+
+  it('says what is missing before sending anything, and keeps the window with the database’s refusal', async () => {
+    actions.addToWaitingList.mockResolvedValue({ ok: false, reason: 'This phone number is already on the waiting list, or waiting for review in Member services' })
+    show({ canAdd: true, subDepartmentId: SUB, submitters })
+    fireEvent.click(plus())
+    const win = screen.getByRole('dialog', { name: WINDOW })
+    fireEvent.click(within(win).getByRole('button', { name: 'Add to the list' }))
+    expect(within(win).getByRole('alert')).toHaveTextContent('Fill in new member name, phone number, joining date, submitted by.')
+    expect(actions.addToWaitingList).not.toHaveBeenCalled()
+    fill(win, ALVIN)
+    await act(async () => {
+      fireEvent.click(within(win).getByRole('button', { name: 'Add to the list' }))
+    })
+    expect(added().submittedBy).toBe(ALVIN)
+    expect(within(win).getByRole('alert')).toHaveTextContent('already on the waiting list')
+  })
+
+  it('asks for the signed form while Form settings does, and sends the one attached', async () => {
+    actions.addToWaitingList.mockResolvedValue({ ok: true, requestNo: 'RQ-2610-006' })
+    show({ canAdd: true, subDepartmentId: SUB, submitters, form: { ok: true, form: { ...V1, requireUpload: true } } })
+    fireEvent.click(plus())
+    const win = screen.getByRole('dialog', { name: WINDOW })
+    expect(within(win).getByText('· required by Form settings')).toBeInTheDocument()
+    fill(win)
+    fireEvent.click(within(win).getByRole('button', { name: 'Add to the list' }))
+    expect(within(win).getByRole('alert')).toHaveTextContent('Upload the signed application form — Form settings asks for it.')
+    expect(actions.addToWaitingList).not.toHaveBeenCalled()
+    const signed = new File(['%PDF-1.7'], 'Daniel signed.pdf', { type: 'application/pdf' })
+    fireEvent.change(within(win).getByLabelText('Attach the signed form'), { target: { files: [signed] } })
+    expect(within(win).getByText('Daniel signed.pdf')).toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(within(win).getByRole('button', { name: 'Add to the list' }))
+    })
+    expect(sent().get('signedForm')).toBeInstanceOf(File)
+    expect(flash).toHaveBeenCalledWith("Daniel Lee is on Fair's waiting list · RQ-2610-006")
+  })
+
+  it('opens a row HR added with who added it — never who signed', () => {
+    const mine = req({
+      id: 'added', requestNo: 'RQ-2610-005', newPerson: 'Daniel Lee', contact: '016-221 0457', submittedBy: 'STANLEY', start: '2026-11-02',
+      acceptedAt: '2026-10-11T07:00:00Z',
+      events: [{ to: 'waiting', at: '2026-10-11T07:00:00Z', note: 'Added on Sales Groups', by: 'Grace Lim' }],
+    })
+    show({ rows: [mine] })
+    fireEvent.click(screen.getAllByRole('row')[1])
+    const drawer = screen.getByRole('dialog')
+    expect(drawer).toHaveTextContent('Added byGrace Lim')
+    expect(drawer).toHaveTextContent('11 Oct 2026 · added here')
+    expect(drawer).toHaveTextContent('Added to the waiting list')
+    expect(drawer).not.toHaveTextContent('Signed by')
+    expect(drawer).not.toHaveTextContent('Member services')
   })
 })
 

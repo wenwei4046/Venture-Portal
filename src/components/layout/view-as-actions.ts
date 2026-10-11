@@ -3,7 +3,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { VIEW_AS_COOKIE, VIEW_AS_MIRROR_COOKIE, isViewAsRole } from '@/lib/view-as'
+import { VIEW_AS_COOKIE, VIEW_AS_MIRROR_COOKIE, VIEW_AS_PERSON_COOKIE, VIEW_AS_PERSON_MARK, isViewAsRole, viewAsPersonId } from '@/lib/view-as'
 
 // Switch the app-layer view to another role (or back to principal, which
 // clears the cookie). Allowed to an account holding `view_switch` — Ultimate
@@ -34,6 +34,9 @@ export async function setViewAs(formData: FormData) {
   if (target !== 'principal' && !isViewAsRole(target)) redirect('/dashboard')
 
   const store = await cookies()
+  // Picking a view ends viewing as a person (2026-10-11).
+  store.delete(VIEW_AS_PERSON_COOKIE)
+  store.delete(VIEW_AS_PERSON_MARK)
   if (isViewAsRole(target)) {
     store.set(VIEW_AS_COOKIE, target, {
       httpOnly: true,
@@ -60,5 +63,57 @@ export async function setViewAs(formData: FormData) {
     ['/member-admin', '/revenue', '/revenue/products'].includes(destination)) {
     redirect(destination)
   }
+  redirect('/dashboard')
+}
+
+// ── View as a person (2026-10-11, the user: "can set a function is view as a
+// user, same like in revenue app, i can view as a member") ────────────────────
+// The portal drawn as one named account sees it, read-only for the whole
+// browser while it is on (lib/supabase/read-only.ts). For an account that may
+// switch views — the database asks again (view_as_person / view_as_people).
+
+/** Somebody the portal may be viewed as. */
+export interface ViewablePerson {
+  id: string
+  name: string
+  email: string
+  title: string | null
+  department: string | null
+}
+
+/** Everybody who signs in to the portal, but the viewer — for the picker. */
+export async function listViewablePeople(): Promise<{ ok: true; people: ViewablePerson[] } | { ok: false; reason: string }> {
+  const supabase = await createClient()
+  const { data, error } = await (supabase as unknown as { rpc: (fn: string) => PromiseLike<{ data: unknown; error: { message: string } | null }> })
+    .rpc('view_as_people')
+  if (error) return { ok: false, reason: error.message }
+  return { ok: true, people: (Array.isArray(data) ? data : []) as ViewablePerson[] }
+}
+
+/** Start viewing as a person: the database checks the viewer may and the person is an active portal account. */
+export async function setViewAsPerson(formData: FormData): Promise<{ ok: false; reason: string } | void> {
+  const person = viewAsPersonId(String(formData.get('person') ?? ''))
+  if (!person) return { ok: false, reason: 'Pick somebody to view as.' }
+  const supabase = await createClient()
+  const { error } = await (supabase as unknown as { rpc: (fn: string, args: object) => PromiseLike<{ error: { message: string } | null }> })
+    .rpc('view_as_person', { p_user: person })
+  if (error) return { ok: false, reason: error.message }
+  const store = await cookies()
+  store.set(VIEW_AS_PERSON_COOKIE, person, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    secure: process.env.NODE_ENV === 'production',
+  })
+  // The readable mark beside it: the browser's own client reads only too.
+  store.set(VIEW_AS_PERSON_MARK, '1', { httpOnly: false, sameSite: 'lax', path: '/', secure: process.env.NODE_ENV === 'production' })
+  redirect('/dashboard')
+}
+
+/** Stop viewing as a person: back to the account's own portal. */
+export async function stopViewingAsPerson(): Promise<void> {
+  const store = await cookies()
+  store.delete(VIEW_AS_PERSON_COOKIE)
+  store.delete(VIEW_AS_PERSON_MARK)
   redirect('/dashboard')
 }

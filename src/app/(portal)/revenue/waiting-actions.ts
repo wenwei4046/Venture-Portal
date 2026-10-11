@@ -1,22 +1,24 @@
 'use server'
 
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
-import { requireAuth } from '@/lib/auth'
+import { requireActionOn, requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { signedFormKind, signedFormRefusal, waitingAddDetail, waitingAddInputFrom, waitingAddRefusal } from '@/lib/commission/waiting-add'
 import {
-  BUILT_FORM_NAME,
+  FORM_KINDS,
   cleanedFields,
   formFromRow,
   templateContentType,
   templateObjectPath,
   templateRefusal,
   waitingFormRefusal,
+  type MemberFormKind,
   type WaitingField,
   type WaitingForm,
 } from '@/lib/commission/waiting-form'
-import { loadWaitingForm } from './_lib/waiting-form'
+import { loadMemberForm } from './_lib/waiting-form'
 
 /**
  * Sales Groups › Waiting list's writes (2026-10-10, the HR revamp): the form
@@ -24,8 +26,15 @@ import { loadWaitingForm } from './_lib/waiting-form'
  * RPC (mig 20261010140000), which asks `member_is_manager` again — so the
  * gate here is the one Member services and Rules › Capacity ask.
  *
+ * The Replacement list has the same Form settings and Upload form since
+ * 2026-10-11 (round 2's README 18.5): its own versions, through
+ * `member_save_replacement_form` (mig 20261011130000), which asks the same.
+ *
  * Transfer is People Management's (`team/people/waiting-transfer-actions.ts`):
  * it files an employee.
+ *
+ * "+" (2026-10-11) puts somebody straight onto the list: `addToWaitingList`,
+ * the page's own action gate (Member services · Edit) and the same key.
  *
  * Refusals come back as `{ ok: false, reason }`: a thrown message never
  * reaches the browser in production.
@@ -36,6 +45,7 @@ export type WaitingOutcome = { ok: true } | { ok: false; reason: string }
 
 const BUCKET = 'member-forms'
 const NO_ACCESS = 'The waiting list needs HR request management access.'
+const NO_ACCESS_REPLACEMENT = 'The replacement list needs HR request management access.'
 
 async function manages(): Promise<boolean> {
   const user = await requireAuth()
@@ -47,8 +57,8 @@ async function client(): Promise<SupabaseClient> {
 }
 
 /** The database's refusal in words: its own sentence (22023), or what went wrong. */
-function refusal(error: PostgrestError, fallback: string): string {
-  if (error.code === '42501') return NO_ACCESS
+function refusal(error: PostgrestError, fallback: string, kind: MemberFormKind = 'waiting'): string {
+  if (error.code === '42501') return kind === 'replacement' ? NO_ACCESS_REPLACEMENT : NO_ACCESS
   if (error.code === '22023' || error.code === 'P0001') return error.message
   return fallback
 }
@@ -61,22 +71,47 @@ function revalidateWaiting() {
 
 async function saveVersion(
   supabase: SupabaseClient,
+  kind: MemberFormKind,
   fields: WaitingField[],
   requireUpload: boolean,
   templatePath: string | null,
   templateName: string,
 ): Promise<WaitingFormOutcome> {
-  const { data, error } = await supabase.rpc('member_save_waiting_form', {
+  const args = {
     p_fields: fields,
     p_require_upload: requireUpload,
     p_template_path: templatePath,
     p_template_name: templateName,
-  })
-  if (error) return { ok: false, reason: refusal(error, 'The form could not be saved. Please try again.') }
-  const form = formFromRow(data)
+  }
+  const { data, error } =
+    kind === 'replacement'
+      ? await supabase.rpc('member_save_replacement_form', args)
+      : await supabase.rpc('member_save_waiting_form', args)
+  if (error) return { ok: false, reason: refusal(error, 'The form could not be saved. Please try again.', kind) }
+  const form = formFromRow(data, kind)
   if (!form) return { ok: false, reason: 'The form was saved, but could not be read back. Reload the page.' }
   revalidateWaiting()
   return { ok: true, form }
+}
+
+type FormDraft = { fields: WaitingField[]; requireUpload: boolean; useBuiltForm: boolean }
+
+async function saveForm(kind: MemberFormKind, draft: FormDraft): Promise<WaitingFormOutcome> {
+  if (!(await manages())) return { ok: false, reason: kind === 'replacement' ? NO_ACCESS_REPLACEMENT : NO_ACCESS }
+  const fields = cleanedFields(draft.fields)
+  const refused = waitingFormRefusal(fields, kind)
+  if (refused) return { ok: false, reason: refused }
+  const current = await loadMemberForm(kind)
+  if (!current.ok) return current
+  const keep = !draft.useBuiltForm && current.form.templatePath !== null
+  return saveVersion(
+    await client(),
+    kind,
+    fields,
+    draft.requireUpload === true,
+    keep ? current.form.templatePath : null,
+    keep ? current.form.templateName : FORM_KINDS[kind].formName,
+  )
 }
 
 /**
@@ -84,25 +119,34 @@ async function saveVersion(
  * signed form". The application form goes with them as it is — HR's upload,
  * unless `useBuiltForm` drops it for the form built from the questions.
  */
-export async function saveWaitingForm(draft: {
-  fields: WaitingField[]
-  requireUpload: boolean
-  useBuiltForm: boolean
-}): Promise<WaitingFormOutcome> {
-  if (!(await manages())) return { ok: false, reason: NO_ACCESS }
-  const fields = cleanedFields(draft.fields)
-  const refused = waitingFormRefusal(fields)
+export async function saveWaitingForm(draft: FormDraft): Promise<WaitingFormOutcome> {
+  return saveForm('waiting', draft)
+}
+
+/** The Replacement list's Form settings — the same, its own versions. */
+export async function saveReplacementForm(draft: FormDraft): Promise<WaitingFormOutcome> {
+  return saveForm('replacement', draft)
+}
+
+async function uploadTemplate(kind: MemberFormKind, formData: FormData): Promise<WaitingFormOutcome> {
+  if (!(await manages())) return { ok: false, reason: kind === 'replacement' ? NO_ACCESS_REPLACEMENT : NO_ACCESS }
+  const file = formData.get('file')
+  if (!(file instanceof File)) return { ok: false, reason: 'Choose a file to upload.' }
+  const refused = templateRefusal(file)
   if (refused) return { ok: false, reason: refused }
-  const current = await loadWaitingForm()
+  const current = await loadMemberForm(kind)
   if (!current.ok) return current
-  const keep = !draft.useBuiltForm && current.form.templatePath !== null
-  return saveVersion(
-    await client(),
-    fields,
-    draft.requireUpload === true,
-    keep ? current.form.templatePath : null,
-    keep ? current.form.templateName : BUILT_FORM_NAME,
-  )
+
+  const supabase = await client()
+  const path = templateObjectPath(file.name, randomUUID())
+  const { error: upErr } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, Buffer.from(await file.arrayBuffer()), { contentType: templateContentType(file.name) ?? undefined, upsert: false })
+  if (upErr) return { ok: false, reason: `The form could not be uploaded: ${upErr.message}` }
+
+  const saved = await saveVersion(supabase, kind, current.form.fields, current.form.requireUpload, path, file.name.trim().slice(0, 160))
+  if (!saved.ok) await supabase.storage.from(BUCKET).remove([path]).then(() => undefined, () => undefined)
+  return saved
 }
 
 /**
@@ -113,30 +157,17 @@ export async function saveWaitingForm(draft: {
  * its own, so an older version still opens the file it was saved with.
  */
 export async function uploadWaitingFormTemplate(formData: FormData): Promise<WaitingFormOutcome> {
-  if (!(await manages())) return { ok: false, reason: NO_ACCESS }
-  const file = formData.get('file')
-  if (!(file instanceof File)) return { ok: false, reason: 'Choose a file to upload.' }
-  const refused = templateRefusal(file)
-  if (refused) return { ok: false, reason: refused }
-  const current = await loadWaitingForm()
-  if (!current.ok) return current
-
-  const supabase = await client()
-  const path = templateObjectPath(file.name, randomUUID())
-  const { error: upErr } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, Buffer.from(await file.arrayBuffer()), { contentType: templateContentType(file.name) ?? undefined, upsert: false })
-  if (upErr) return { ok: false, reason: `The form could not be uploaded: ${upErr.message}` }
-
-  const saved = await saveVersion(supabase, current.form.fields, current.form.requireUpload, path, file.name.trim().slice(0, 160))
-  if (!saved.ok) await supabase.storage.from(BUCKET).remove([path]).then(() => undefined, () => undefined)
-  return saved
+  return uploadTemplate('waiting', formData)
 }
 
-/** Download of HR's uploaded form: a link that works for a minute. */
-export async function waitingFormTemplateLink(): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
-  if (!(await manages())) return { ok: false, reason: NO_ACCESS }
-  const current = await loadWaitingForm()
+/** The Replacement list's Upload form — the same bucket, its own versions. */
+export async function uploadReplacementFormTemplate(formData: FormData): Promise<WaitingFormOutcome> {
+  return uploadTemplate('replacement', formData)
+}
+
+async function templateLink(kind: MemberFormKind): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
+  if (!(await manages())) return { ok: false, reason: kind === 'replacement' ? NO_ACCESS_REPLACEMENT : NO_ACCESS }
+  const current = await loadMemberForm(kind)
   if (!current.ok) return current
   if (!current.form.templatePath) return { ok: false, reason: 'No form has been uploaded — the built form is the one members download.' }
   const { data, error } = await (await client()).storage
@@ -144,6 +175,90 @@ export async function waitingFormTemplateLink(): Promise<{ ok: true; url: string
     .createSignedUrl(current.form.templatePath, 60, { download: current.form.templateName })
   if (error || !data) return { ok: false, reason: 'The form could not be opened. Please try again.' }
   return { ok: true, url: data.signedUrl }
+}
+
+/** Download of HR's uploaded form: a link that works for a minute. */
+export async function waitingFormTemplateLink(): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
+  return templateLink('waiting')
+}
+
+export async function replacementFormTemplateLink(): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
+  return templateLink('replacement')
+}
+
+export type WaitingAddOutcome = { ok: true; requestNo: string | null } | { ok: false; reason: string }
+
+/**
+ * "+" (2026-10-11, the user: "我点击「加」了过后，我可以直接加人进去这个 waiting list
+ * 里面"): somebody straight onto this sub-department's waiting list — at the
+ * end, as if accepted now — through `member_waiting_add` (mig 20261011230000),
+ * which asks Member services · Edit and `member_is_manager` again.
+ *
+ * `formData`: `input` (the window's fields as JSON) and, when attached,
+ * `signedForm`. A signed form is looked at byte by byte (the member app's
+ * rule) and goes where a member's does: the add keeps the request a draft,
+ * the file is uploaded into the adder's own folder of it under this session
+ * (the bucket's own policy), and `member_waiting_add_form` finds it there,
+ * attests it and puts the request on the list. Each press is its own add.
+ */
+export async function addToWaitingList(formData: FormData): Promise<WaitingAddOutcome> {
+  const user = await requireActionOn('/revenue/[sub]/hierarchy', 'member', 'manage')
+  if (!user.permissions.includes('member_requests_manage')) return { ok: false, reason: NO_ACCESS }
+
+  let raw: unknown = null
+  try {
+    raw = JSON.parse(String(formData.get('input') ?? ''))
+  } catch {
+    raw = null
+  }
+  const input = waitingAddInputFrom(raw)
+  if (!input) return { ok: false, reason: 'Reload the page and try again.' }
+
+  const file = formData.get('signedForm')
+  const attached = file instanceof File && file.size > 0
+  const form = await loadMemberForm('waiting')
+  if (!form.ok) return form
+  const refused = waitingAddRefusal(input, form.form, attached)
+  if (refused) return { ok: false, reason: refused }
+
+  let signed: { name: string; hash: string; bytes: Uint8Array; mime: string; extension: string } | null = null
+  if (attached) {
+    const tooBig = signedFormRefusal(file)
+    if (tooBig) return { ok: false, reason: tooBig }
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    const kind = signedFormKind(bytes, file.type)
+    if (!kind) return { ok: false, reason: 'The signed form must be a PDF, PNG or JPG file.' }
+    signed = { name: file.name.trim() || `Signed form.${kind.extension}`, hash: createHash('sha256').update(bytes).digest('hex'), bytes, ...kind }
+  }
+
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('member_waiting_add', {
+    p_sub: input.subDepartmentId,
+    p_staff: input.submittedBy,
+    p_detail: waitingAddDetail(input, form.form, signed),
+    p_idempotency: randomUUID(),
+    p_with_form: signed !== null,
+  })
+  if (error) return { ok: false, reason: refusal(error, 'They could not be added to the waiting list. Please try again.') }
+  const added = (data ?? {}) as { id?: unknown; requestNo?: unknown; status?: unknown; userId?: unknown }
+  if (typeof added.id !== 'string') return { ok: false, reason: 'They were added, but the answer could not be read. Reload the page.' }
+
+  let requestNo = typeof added.requestNo === 'string' ? added.requestNo : null
+  if (signed && added.status === 'draft') {
+    const path = `${typeof added.userId === 'string' ? added.userId : user.id}/${added.id}/${randomUUID()}.${signed.extension}`
+    const upload = await supabase.storage.from('member-invoices').upload(path, signed.bytes, { contentType: signed.mime, upsert: false })
+    if (upload.error) return { ok: false, reason: `The signed form could not be uploaded: ${upload.error.message}` }
+    const done = await supabase.rpc('member_waiting_add_form', { p_request: added.id, p_path: path })
+    if (done.error) {
+      await supabase.storage.from('member-invoices').remove([path]).then(() => undefined, () => undefined)
+      return { ok: false, reason: refusal(done.error, 'The signed form could not be kept. Please try again.') }
+    }
+    const finished = (done.data ?? {}) as { requestNo?: unknown }
+    requestNo = typeof finished.requestNo === 'string' ? finished.requestNo : null
+  }
+
+  revalidateWaiting()
+  return { ok: true, requestNo }
 }
 
 /** Fail: they didn't come when called — off the waiting list, and the next moves up. */

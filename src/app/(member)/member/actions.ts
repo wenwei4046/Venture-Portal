@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { pushSoon } from "@/lib/push/outbox";
 import type { MemberReadContext, QuoteInput } from "@/lib/member/types";
 export type { AdminMemberInput, AdminMemberData } from "@/lib/member/server";
 import {
@@ -18,6 +19,8 @@ import {
   loadMemberClaimRates,
   loadMemberWaitingForm,
   loadMemberWaitingFormLink,
+  loadMemberReplacementForm,
+  loadMemberReplacementFormLink,
   loadMemberWaitingQueue,
   loadPrincipalMemoReceipts,
   loadMemberIncome,
@@ -61,6 +64,8 @@ export async function submitMemberRequest(form: FormData) {
   if (result.ok) {
     revalidatePath("/member");
     revalidatePath("/claims");
+    // HR is told of a request sent or answered (mig 20261011180000).
+    pushSoon();
   }
   return result;
 }
@@ -97,6 +102,14 @@ export async function fetchMemberWaitingForm() {
 /** Download form: a fresh ten-minute link to HR's uploaded application form, or null for the built one. */
 export async function fetchMemberWaitingFormLink() {
   return loadMemberWaitingFormLink();
+}
+/** The replacement form HR set (Sales Groups › Replacement list › Form settings, 2026-10-11). */
+export async function fetchMemberReplacementForm() {
+  return loadMemberReplacementForm();
+}
+/** Download form on a replacement: HR's upload through a ten-minute link, or null for the built one. */
+export async function fetchMemberReplacementFormLink() {
+  return loadMemberReplacementFormLink();
 }
 /** Waiting list & replacements: the member's sub-departments' waiting lists (the viewed member's in View as). */
 export async function fetchMemberWaitingQueue(context?: Pick<MemberReadContext, "staffId">) {

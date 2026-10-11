@@ -36,6 +36,55 @@ self.addEventListener('activate', (event) => {
   )
 })
 
+/*
+ * Phone notifications (2026-10-11): the server sends one encrypted message per
+ * notice ({ title, body, url, tag }, lib/push/outbox.ts); the browser hands it
+ * here decrypted. Shown at once — a push must always show something — and a
+ * tap opens the app at its url, in a window already open if there is one.
+ *
+ * `badge` is the small icon in Android's status bar, which keeps only the
+ * image's alpha and paints it white: the mark's tile with its H cut out
+ * (badge-tile-96.png). The opaque tile there showed as a solid white square,
+ * and a bare H looked plain to the user.
+ */
+self.addEventListener('push', (event) => {
+  let msg = {}
+  try {
+    msg = event.data ? event.data.json() : {}
+  } catch {
+    msg = {}
+  }
+  const title = typeof msg.title === 'string' && msg.title ? msg.title : 'HOUZS Venture'
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: typeof msg.body === 'string' ? msg.body : '',
+      tag: typeof msg.tag === 'string' ? msg.tag : undefined,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/badge-tile-96.png',
+      data: { url: typeof msg.url === 'string' && msg.url.startsWith('/') ? msg.url : '/' },
+    }),
+  )
+})
+
+/*
+ * A tap opens the notice's place in the installed app (2026-10-11), always
+ * through openWindow: Chrome on Android hands a url inside an installed app's
+ * scope to that app and makes it go there even when it is already open
+ * (ServiceTabLauncher: findFirstWebApkPackage, forceNavigation = true); an
+ * iPhone opens it in the Home Screen app, the only place its pushes arrive.
+ *
+ * Twice the same day a tap went wrong by reusing an open window instead:
+ * loading the page before focusing it let the moment a tap allows for focusing
+ * pass (the tap seemed to do nothing), and focusing the most recently used
+ * window brought a Chrome TAB forward — clients.matchAll lists the browser's
+ * tabs of this site too, and nothing tells a tab from the installed app.
+ */
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href
+  event.waitUntil(self.clients.openWindow(url))
+})
+
 self.addEventListener('fetch', (event) => {
   // Only page loads. Server Actions, RSC payloads, Supabase calls and assets go
   // straight to the network exactly as they would without a worker.

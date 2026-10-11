@@ -22,6 +22,7 @@ import { monthFinishes, type HonourBoard } from "./honours";
 import { formFromRow, type WaitingForm } from "@/lib/commission/waiting-form";
 import { waitingAnswersFrom, type WaitingAnswer } from "./waiting-answers";
 import { queuesFrom, type WaitingQueue } from "./waiting-queue";
+import { SEND_REFUSED, appClosed, requestPageOf } from "./app-pages";
 import type { MemberArenaSnapshot } from "./arena";
 import type { ArenaHistorySnapshot } from "./arena-history";
 import type {
@@ -632,6 +633,9 @@ export async function loadMemberHonours(
   return outcome(async () => {
     const user = await getMemberUser();
     if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    // Its box unticked (People › Permissions › Revenue app, 2026-10-11): the finishes are read with the service
+    // role below, which has no tabs to ask, so this is the gate.
+    if (appClosed(user.closed).pages.includes("honours")) throw new Error("My honours is not open to your account.");
     insightWindow(subDepartmentId, from, until, context);
     const principal = principalReadContext(user, context);
     const client = await session("member_insight", principal);
@@ -789,6 +793,7 @@ export async function calculateMemberQuote(
     )
       throw new Error("Enter a valid amount with up to two decimal places.");
     const user = await getMemberUser();
+    if (appClosed(user?.closed).sends.includes("quote")) throw new Error(SEND_REFUSED.quote);
     const principalView = !!user && isPrincipalAccount(user);
     const build = quoteBuild(input.build);
     const client = await session("member_quote", principalView);
@@ -1047,6 +1052,7 @@ export async function submitMemberRequest(
     const kind = field(form, "kind");
     if (!["claim", "replacement", "waiting"].includes(kind))
       throw new Error("Select a request type.");
+    await mustSend(requestPageOf(kind));
     let subDepartmentId = field(form, "subDepartmentId");
     if (!subDepartmentId) {
       const data = await rpc<MemberData>(client, "member_data_snapshot");
@@ -1064,7 +1070,7 @@ export async function submitMemberRequest(
     uuid(subDepartmentId, "department");
     const detail: Record<string, string | number | boolean> = {};
     let verified: VerifiedInvoice | null = null;
-    // A waiting list: HR's own questions and its signed application form.
+    // A waiting list or a replacement: HR's own questions and its signed form.
     let answers: WaitingAnswer[] = [];
     let signedForm: VerifiedInvoice | null = null;
     const claimType = kind === "claim" ? field(form, "claimType") : "";
@@ -1179,26 +1185,6 @@ export async function submitMemberRequest(
             );
           detail.signatureImage = signatureImage;
         }
-        // HR's own questions and the signed application form (2026-10-10,
-        // the form Sales Groups › Form settings versions).
-        answers = waitingAnswersFrom(field(form, "answers", 40000));
-        const version = Number(field(form, "formVersion"));
-        if (Number.isInteger(version) && version > 0) detail.formVersion = version;
-        const signedFile = form.get("signedForm");
-        if (signedFile && typeof signedFile !== "string" && signedFile.size > 0) {
-          signedForm = await verifiedUpload(form, "signedForm", "signed application form");
-          detail.signedFormName = signedForm.name;
-          detail.signedFormHash = createHash("sha256").update(signedForm.bytes).digest("hex");
-        } else if (field(form, "requestId")) {
-          // A revision keeps the form it was sent with (member_submit_request
-          // still finds it attached to this request, by its hash).
-          const name = field(form, "signedFormName", 200);
-          const hash = field(form, "signedFormHash", 64);
-          if (name && /^[0-9a-f]{64}$/.test(hash)) {
-            detail.signedFormName = name;
-            detail.signedFormHash = hash;
-          }
-        }
       } else {
         const destination = field(form, "destination");
         Object.assign(detail, {
@@ -1228,6 +1214,27 @@ export async function submitMemberRequest(
             field(form, "targetDepartmentId") || field(form, "target"),
             "receiving department",
           );
+      }
+      // HR's own questions and the signed form — the waiting list's since
+      // 2026-10-10, the replacement's since 2026-10-11 (each list's Form
+      // settings on Sales Groups versions its own form).
+      answers = waitingAnswersFrom(field(form, "answers", 40000));
+      const version = Number(field(form, "formVersion"));
+      if (Number.isInteger(version) && version > 0) detail.formVersion = version;
+      const signedFile = form.get("signedForm");
+      if (signedFile && typeof signedFile !== "string" && signedFile.size > 0) {
+        signedForm = await verifiedUpload(form, "signedForm", kind === "waiting" ? "signed application form" : "signed replacement form");
+        detail.signedFormName = signedForm.name;
+        detail.signedFormHash = createHash("sha256").update(signedForm.bytes).digest("hex");
+      } else if (field(form, "requestId")) {
+        // A revision keeps the form it was sent with (member_submit_request
+        // still finds it attached to this request, by its hash).
+        const name = field(form, "signedFormName", 200);
+        const hash = field(form, "signedFormHash", 64);
+        if (name && /^[0-9a-f]{64}$/.test(hash)) {
+          detail.signedFormName = name;
+          detail.signedFormHash = hash;
+        }
       }
     }
     const revision = field(form, "requestId")
@@ -1262,7 +1269,7 @@ export async function submitMemberRequest(
     );
     if (kind === "claim" && prepared.status === "draft" && verified)
       await attachVerified(client, prepared, verified, String(detail.invoiceHash));
-    if (kind === "waiting" && prepared.status === "draft" && signedForm)
+    if ((kind === "waiting" || kind === "replacement") && prepared.status === "draft" && signedForm)
       await attachVerified(client, prepared, signedForm, String(detail.signedFormHash));
     return requestLabels(
       await rpc<MemberRequest>(client, "member_submit_request", {
@@ -1307,8 +1314,16 @@ export async function loadMemberRequestHistory(id: string): Promise<MemberOutcom
 export async function cancelMemberRequest(id: string): Promise<MemberOutcome<MemberRequest>> {
   return outcome(async () => {
     const client = await session("member_requests");
+    // Withdrawing is sending too: the request's own page's Create (RLS keeps the read to its owner).
+    const { data: sent } = await client.from("member_requests").select("kind").eq("id", uuid(id, "request")).maybeSingle();
+    if (sent) await mustSend(requestPageOf((sent as { kind: string }).kind));
     return requestLabels(await rpc<MemberRequest>(client, "member_cancel_request", { p_request: uuid(id, "request") }));
   });
+}
+
+/** Refuses a send whose page's Create box was unticked for the caller (lib/member/app-pages.ts). */
+async function mustSend(page: "requests" | "track"): Promise<void> {
+  if (appClosed((await getMemberUser())?.closed).sends.includes(page)) throw new Error(SEND_REFUSED[page]);
 }
 
 /**
@@ -1344,6 +1359,36 @@ export async function loadMemberWaitingForm(): Promise<MemberOutcome<MemberWaiti
     const form = formFromRow(await rpc<unknown>(client, "member_waiting_form"));
     if (!form) throw new Error("The waiting-list form could not be read. Pull to refresh.");
     return { form };
+  });
+}
+
+/**
+ * The replacement form the Revenue app draws (2026-10-11, round 2's README
+ * 18.5): Sales Groups › Replacement list's Form settings, read the waiting
+ * list's way — `member_replacement_form()` lets the Revenue team in, and the
+ * answer carries no link.
+ */
+export async function loadMemberReplacementForm(): Promise<MemberOutcome<MemberWaitingForm>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    const client = await session("member_requests", !!user && isPrincipalAccount(user));
+    const form = formFromRow(await rpc<unknown>(client, "member_replacement_form"), "replacement");
+    if (!form) throw new Error("The replacement form could not be read. Pull to refresh.");
+    return { form };
+  });
+}
+
+/** Download form on a replacement: HR's upload through a ten-minute link, or null when the app builds it. */
+export async function loadMemberReplacementFormLink(): Promise<MemberOutcome<{ url: string; name: string } | null>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    const client = await session("member_requests", !!user && isPrincipalAccount(user));
+    const form = formFromRow(await rpc<unknown>(client, "member_replacement_form"), "replacement");
+    if (!form) throw new Error("The replacement form could not be read. Pull to refresh.");
+    if (!form.templatePath) return null;
+    const signed = await client.storage.from("member-forms").createSignedUrl(form.templatePath, 600, { download: form.templateName });
+    if (signed.error || !signed.data?.signedUrl) throw new Error("HR's replacement form could not be downloaded. Try again.");
+    return { url: signed.data.signedUrl, name: form.templateName };
   });
 }
 

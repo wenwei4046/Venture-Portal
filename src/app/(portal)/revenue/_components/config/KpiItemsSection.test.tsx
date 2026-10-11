@@ -2,15 +2,18 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CommissionSettingsData, KpiItemRow, KpiSpecialRow, KpiThresholdRow, SchemeRow } from './types'
 
-const { saveKpiItems, searchKpiSkus, refresh, upsertKpiThreshold, deleteKpiThreshold } = vi.hoisted(() => ({
+const { saveKpiItems, searchSkuMaster, refresh, upsertKpiThreshold, deleteKpiThreshold } = vi.hoisted(() => ({
   saveKpiItems: vi.fn(),
-  searchKpiSkus: vi.fn(),
+  searchSkuMaster: vi.fn(),
   refresh: vi.fn(),
   upsertKpiThreshold: vi.fn(),
   deleteKpiThreshold: vi.fn(),
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
-vi.mock('../../kpi-actions', () => ({ saveKpiItems, searchKpiSkus }))
+// The SKU search reads in the browser (never a Server Action — 2026-10-11): the actions offer only the save.
+vi.mock('../../kpi-actions', () => ({ saveKpiItems }))
+vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ browser: true }) }))
+vi.mock('@/lib/commission/kpi-sku-search', () => ({ searchSkuMaster }))
 vi.mock('../../config-actions', () => ({ upsertKpiThreshold, deleteKpiThreshold }))
 
 import KpiItemsSection from './KpiItemsSection'
@@ -93,7 +96,7 @@ const amountBox = (name: string) => screen.getByRole('textbox', { name: `${name}
 
 beforeEach(() => {
   saveKpiItems.mockReset().mockResolvedValue({ ok: true, saved: 1 })
-  searchKpiSkus.mockReset().mockResolvedValue({ ok: true, hits: [], total: 0 })
+  searchSkuMaster.mockReset().mockResolvedValue({ ok: true, hits: [], total: 0 })
   refresh.mockReset()
 })
 afterEach(cleanup)
@@ -152,7 +155,7 @@ describe('Rules › KPI items', () => {
   })
 
   it('finds a SKU on the server, wants its amount, then saves it', async () => {
-    searchKpiSkus.mockResolvedValue({
+    searchSkuMaster.mockResolvedValue({
       ok: true,
       total: 34,
       hits: [
@@ -163,7 +166,7 @@ describe('Rules › KPI items', () => {
     renderSection()
     expect(screen.getByText('Type a SKU code or a word of its description.')).toBeInTheDocument()
     fireEvent.change(screen.getByRole('searchbox', { name: 'Find a SKU' }), { target: { value: 'c' } })
-    await waitFor(() => expect(searchKpiSkus).toHaveBeenCalledWith('c'))
+    await waitFor(() => expect(searchSkuMaster).toHaveBeenCalledWith({ browser: true }, 'c'))
     const picker = await screen.findByRole('list', { name: 'Items to add' })
     expect(within(picker).getByText('On the list')).toBeInTheDocument()
     expect(within(picker).getByText('Off in the ERP')).toBeInTheDocument()

@@ -7,6 +7,7 @@ import { MIN_PASSWORD_LENGTH, generatePassword } from '@/lib/invite'
 import type { TemplateRecord } from '../../_lib/permission-templates'
 import { inviteUser } from '../invite-actions'
 import s from './people.module.css'
+import { Select } from '@/components/hrv/select'
 
 /** Somebody Invite user may give a login to: active, on the roster, no login yet. */
 export interface InviteCandidate {
@@ -108,7 +109,7 @@ export default function InviteDialog({
             <span className={s.invLabel}>
               <span>Person *</span>
             </span>
-            <select className={s.invInput} value={staffId} onChange={e => setStaffId(e.target.value)} aria-label="Person">
+            <Select bare className={s.invInput} value={staffId} onChange={e => setStaffId(e.target.value)} aria-label="Person">
               <option value="">{candidates.length ? 'Pick somebody from the roster' : 'Everybody active already has a login'}</option>
               {groups.map(g => (
                 <optgroup key={g.dept} label={g.dept}>
@@ -119,7 +120,7 @@ export default function InviteDialog({
                   ))}
                 </optgroup>
               ))}
-            </select>
+            </Select>
           </label>
         )}
         <label className={s.invField}>

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { ERP_SYNC_SECRET_MIN_LENGTH } from '@/lib/erp-sync/auth'
 import { keyHint } from '@/lib/erp-sync/format'
 import { dropFeedKey, putFeedKey } from '@/lib/erp-sync/feed-key'
@@ -27,7 +27,7 @@ async function client(): Promise<SupabaseClient> {
 
 /** The link form: the key → Vault, and a row saying who pasted it. */
 export async function linkErpKey(fd: FormData): Promise<void> {
-  const user = await requireAction('revenue', 'manage')
+  const user = await requireActionOn('/revenue/[sub]', 'revenue', 'manage')
   const subDepartmentId = String(fd.get('sub_department_id') ?? '').trim()
   const key = String(fd.get('api_key') ?? '').trim()
   if (!subDepartmentId) throw new Error('No sub-department')
@@ -70,7 +70,7 @@ export async function linkErpKey(fd: FormData): Promise<void> {
  * erp_feed_settings postdates database.types.ts — untyped-client convention.
  */
 export async function setErpFeedWindow(fd: FormData): Promise<void> {
-  const user = await requireAction('revenue', 'manage')
+  const user = await requireActionOn('/revenue/[sub]', 'revenue', 'manage')
   const subDepartmentId = String(fd.get('sub_department_id') ?? '').trim()
   if (!subDepartmentId) throw new Error('No sub-department')
 
@@ -99,7 +99,7 @@ export async function setErpFeedWindow(fd: FormData): Promise<void> {
 
 /** Forget the key. The ERP's deliveries answer 401 from here on; nothing already received changes. */
 export async function unlinkErpKey(subDepartmentId: string): Promise<void> {
-  await requireAction('revenue', 'manage')
+  await requireActionOn('/revenue/[sub]', 'revenue', 'manage')
   const supabase = await client()
   await assertErpSubDepartment(supabase, subDepartmentId)
 

@@ -321,6 +321,23 @@
   --rv-frame-ring: #3A3634;
   --rv-android-ink: #1D1B1A;
   --rv-android-cam: #111111;
+  /* Book a room (2026-10-11, HR revamp round 2): the phone's timeline, the
+     meeting tones (own orange, the rest of HQ slate, the guest link's
+     subsidiaries light orange), the cancel button and the sheet's scrim */
+  --rv-hour: #A08C80;
+  --rv-grid-head: #FFF8F2;
+  --rv-grid-hour: #EFE3D9;
+  --rv-grid-half: #F8F0EA;
+  --rv-slate: #4E6574;
+  --rv-slate-bg: #E6EDF1;
+  --rv-guest-bg: #FFF4E7;
+  --rv-err: #B02822;
+  --rv-err-line: #F0C4BE;
+  --rv-err-bg: #FBE4E0;
+  --rv-ink-12: rgba(63,43,34,.12);
+  --rv-dim-sheet: rgba(43,31,23,.4);
+  /* Documentation: the "Opening …" note */
+  --rv-open-line: #F3D9C4;
 }
 /* The Revenue app refreshes on its own pull (2026-10-06): the browser's pull-to-reload would load the whole page again. */
 html:has([data-revenue-app]) { overscroll-behavior-y: none; }
@@ -768,7 +785,11 @@ h3.font-serif { font-size: 15px; font-weight: 500; font-style: normal; }
    browser's own inset off. */
 :root {
   --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-bottom-floor, 0px));
+  /* The phone’s tab bar as what sits on it sees it (2026-10-11): 54px, or nothing while a scroll down has
+     tucked it away (BottomTabBar, components/pwa/tuck.ts) — a bulk bar, a drawer, a toast come down with it. */
+  --tabbar-h: 54px;
 }
+:root[data-tabbar-tucked] { --tabbar-h: 0px; }
 .safe-bottom-probe {
   position: fixed;
   left: 0;
@@ -1024,10 +1045,13 @@ html[data-nav-pending] .route-surface {
   animation: pulse-once 1600ms ease-out;
 }
 
-/* ───────── Motion: input focus glow ───────── */
-input:not([type="checkbox"]):not([type="radio"]):focus:not(:where([data-revenue-app] *)),
-textarea:focus:not(:where([data-revenue-app] *)),
-select:focus:not(:where([data-revenue-app] *)) {
+/* ───────── Motion: input focus glow ─────────
+   Not on the phone surfaces drawn to their prototypes — the Revenue app, the HR
+   app, the guest page — nor in the soft dropdown's menu (portaled to <body>),
+   which keep their prototypes' own focus (2026-10-11). */
+input:not([type="checkbox"]):not([type="radio"]):focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-guest-page] *, [data-soft-menu] *)),
+textarea:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-guest-page] *, [data-soft-menu] *)),
+select:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-guest-page] *, [data-soft-menu] *)) {
   border-color: rgb(var(--accent));
   box-shadow: 0 0 0 3px rgb(var(--accent) / 0.12);
   outline: none;
@@ -1568,7 +1592,7 @@ tr:hover .icon-btn { opacity: 1; }
   text-transform: none;
   letter-spacing: 0.01em;
 }
-h1:not(.sr-only):not(:where([data-revenue-app] *)), .page-title {
+h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *)), .page-title {
   font-family: var(--font-display);
   font-weight: 400;
   font-style: normal;
@@ -1833,7 +1857,7 @@ table.ledger-table tr.lt-detail {
   .statement-amount, .num-hero { font-size: 23px; }
 }
 @media (max-width: 680px) {
-  h1:not(.sr-only):not(:where([data-revenue-app] *)), .page-title { font-size: 30px; }
+  h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *)), .page-title { font-size: 30px; }
   .statement-amount, .num-hero { font-size: 21px; }
 }
 
@@ -1864,20 +1888,20 @@ table.ledger-table tr.lt-detail {
   textarea {
     font-size: 16px !important;
   }
-  /* The Revenue app keeps the prototype's own control heights. */
-  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(:where([data-revenue-app] *)),
-  select:not(:where([data-revenue-app] *)),
-  textarea:not(:where([data-revenue-app] *)) {
+  /* The Revenue app, the HR phone app, the guest page and the soft dropdown's menu keep their prototypes' own control heights. */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(:where([data-revenue-app] *, [data-hr-app] *, [data-guest-page] *, [data-soft-menu] *)),
+  select:not(:where([data-revenue-app] *, [data-hr-app] *, [data-guest-page] *, [data-soft-menu] *)),
+  textarea:not(:where([data-revenue-app] *, [data-hr-app] *, [data-guest-page] *, [data-soft-menu] *)) {
     min-height: 44px;
   }
   /* Checkboxes stay small but get a bigger hit area via padding on the label
      in the markup; bump the box itself to the platform minimum. */
-  input[type='checkbox']:not(:where([data-revenue-app] *)),
-  input[type='radio']:not(:where([data-revenue-app] *)) {
+  input[type='checkbox']:not(:where([data-revenue-app] *, [data-hr-app] *)),
+  input[type='radio']:not(:where([data-revenue-app] *, [data-hr-app] *)) {
     width: 18px;
     height: 18px;
   }
-  textarea:not(:where([data-revenue-app] *)) {
+  textarea:not(:where([data-revenue-app] *, [data-hr-app] *, [data-guest-page] *, [data-soft-menu] *)) {
     min-height: 88px;
   }
   /* Money inputs inside a folded table panel are laid out by width utility
@@ -3822,6 +3846,26 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   --hv-oc-rule: 238 240 242;
   --hv-oc-hover: 247 249 251;
   --hv-rung-empty: 250 249 246;
+  /* Hiring (round 2, 2026-10-11): the clay of its highlighted tiles and tags,
+     the candidate cards' edge, the info pills, the listing's hover. */
+  --hv-clay: 163 78 37;
+  --hv-graphite: 74 64 58;
+  --hv-cand-edge: 236 233 228;
+  --hv-pill-wash: 246 244 241;
+  --hv-tick-edge: 190 180 168;
+  --hv-row-hover-soft: 250 248 245;
+  --hv-empty-text: 140 125 112;
+  --hv-dash: 160 150 140;
+  --hv-slate: 78 101 116;
+  --hv-mock-bar: 232 228 222;
+  --hv-ink-warm: 51 36 27;
+  --hv-olive: 88 98 68;
+  --hv-olive-bg: 238 240 226;
+  /* The sub-department switcher (round 2, portal-42): the rule inside the
+     button, the menu's edge and a row's hover. */
+  --hv-switch-rule: 229 222 212;
+  --hv-menu-edge: 236 229 219;
+  --hv-menu-hover: 247 244 239;
 }
 
 /* HR's view of the shell. The shell is drawn light, as the prototype draws
@@ -3880,8 +3924,12 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   scrollbar-color: rgb(229 228 223) transparent;
 }
 @media (max-width: 767px) {
-  /* Clears the phone's 54px tab bar and the home-indicator inset. */
-  .hrv-frame { padding-bottom: calc(54px + 10px + var(--safe-bottom)); }
+  /* Clears the phone's 54px tab bar and the home-indicator inset — and grows into the bar's place while a
+     scroll down has tucked it away (--tabbar-h), so the sheet's foot and the drawers on it stay together. */
+  .hrv-frame {
+    padding-bottom: calc(var(--tabbar-h) + 10px + var(--safe-bottom));
+    transition: padding-bottom 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
 }
 @media print {
   .hrv-frame { display: block; padding: 0; }
@@ -4287,9 +4335,10 @@ details.fin-fold .fin-fold-inner { padding: 4px 0 18px; }
   /* The arrow cell: the whole of it is the button, not the 15px chevron. */
   .fin-queue table.ledger-table td.lt-toggle { padding: 0; }
   .fin-queue table.ledger-table td.lt-toggle > button { width: 34px; height: auto; min-height: 44px; margin: 0; }
-  /* The bar sits on the tab bar, not under it. */
+  /* The bar sits on the tab bar, not under it — and comes down with it when it tucks away. */
   .fin-queue .bulk-bar {
-    bottom: calc(54px + 8px + var(--safe-bottom));
+    bottom: calc(var(--tabbar-h) + 8px + var(--safe-bottom));
+    transition: bottom 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
     padding: 10px 12px;
     gap: 8px 10px;
   }

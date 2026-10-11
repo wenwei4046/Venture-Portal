@@ -7,6 +7,7 @@ import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { resolveLiveApprovalAmounts, type ApprovalAmountRow } from '@/lib/approval-amounts'
 import { startRead } from '@/lib/start-read'
 import { decidesEverything, overviewFor, raisesForSignOff } from '@/lib/surfaces'
+import { lensOverview } from '@/lib/view-as'
 import { canDo } from '@/lib/permission-actions'
 import { bookWindow, loadRepaymentBook, type BookDeal } from '@/lib/repayment-book'
 import { fetchAllRows } from '@/lib/paginate'
@@ -148,7 +149,9 @@ export default async function DashboardPage() {
   // treasury, HR's for whoever reads payroll, a department's for whoever reads
   // their own department's pool (lib/surfaces.ts). App-layer, so the
   // Principal's view-as mask is honoured — the masked account's actions.
-  const overview = overviewFor(user)
+  // HR's and Finance's views are lenses over the account's own power (2026-10-11):
+  // the view picks the Overview, never the account's cells.
+  const overview = lensOverview(user) ?? overviewFor(user)
   const roleDashboard = overview !== 'treasury'
 
   // Inside the treasury Overview: the sign-off queue for whoever approves

@@ -1,6 +1,19 @@
 'use client'
 
-import { PERMISSION_TABS, TAB_ACTIONS, TAB_ACTION_LABEL, TAB_VIEWS, grantOf, hasBox, viewCount, type TabView } from '@/lib/permission-tabs'
+import {
+  TAB_ACTIONS,
+  TAB_ACTION_LABEL,
+  TAB_VIEWS,
+  columnTally,
+  grantOf,
+  hasBox,
+  tabsOfView,
+  viewCount,
+  viewTally,
+  type TabAction,
+  type TabView,
+  type Tally,
+} from '@/lib/permission-tabs'
 import s from './tab-matrix.module.css'
 
 /**
@@ -10,6 +23,11 @@ import s from './tab-matrix.module.css'
  * Edit · Approve and an "all". A box a tab does not have is drawn faint and
  * cannot be ticked. With `base` (a person over their title), a box that
  * differs from the title carries a red dot.
+ *
+ * For whoever may edit, a Select all row tops the table (the user, 2026-10-11):
+ * one box per column ticks it on every tab of the view, the last one every box
+ * of the view; "–" while only some are. A tab whose View is ticked but whose
+ * page would still not open says why under its name (`held`).
  */
 export default function TabMatrix({
   ticks,
@@ -18,6 +36,9 @@ export default function TabMatrix({
   onView,
   onToggle,
   onRow,
+  onColumn,
+  onAll,
+  held,
   canEdit,
   compact = false,
 }: {
@@ -26,14 +47,21 @@ export default function TabMatrix({
   base?: ReadonlySet<string>
   view: TabView
   onView: (view: TabView) => void
-  onToggle: (tabId: string, action: (typeof TAB_ACTIONS)[number]) => void
+  onToggle: (tabId: string, action: TabAction) => void
   onRow: (tabId: string) => void
+  /** Select all over one column of the open view. */
+  onColumn: (action: TabAction) => void
+  /** Select all over every box of the open view. */
+  onAll: () => void
+  /** Tab id → why its ticked View opens nothing yet. */
+  held?: ReadonlyMap<string, string>
   canEdit: boolean
   /** The person window's tighter rail. */
   compact?: boolean
 }) {
   const open = TAB_VIEWS.find(v => v.id === view) ?? TAB_VIEWS[0]
-  const tabs = PERMISSION_TABS.filter(t => t.view === open.id)
+  const tabs = tabsOfView(open.id)
+  const whole = viewTally(ticks, open.id)
   return (
     <div className={`${s.grid} ${compact ? s.gridCompact : ''}`}>
       <div className={s.rail} role="tablist" aria-label="Views">
@@ -55,12 +83,32 @@ export default function TabMatrix({
           {TAB_ACTIONS.map(a => <span key={a} className={s.headBox} role="columnheader">{TAB_ACTION_LABEL[a]}</span>)}
           <span className={s.headBox} role="columnheader">All</span>
         </div>
+        {canEdit ? (
+          <div className={`${s.row} ${s.allRow}`} role="row">
+            <span className={s.tabCell} role="rowheader">Select all</span>
+            {TAB_ACTIONS.map(a => {
+              const { tally, boxes } = columnTally(ticks, open.id, a)
+              return (
+                <span key={a} className={s.boxCell} role="cell">
+                  <TallyBox tally={tally} disabled={boxes === 0} label={`Select all · ${TAB_ACTION_LABEL[a]}`} onClick={() => onColumn(a)} />
+                </span>
+              )
+            })}
+            <span className={s.boxCell} role="cell">
+              <TallyBox tally={whole} label={`Select all · every box in ${open.label}`} onClick={onAll} />
+            </span>
+          </div>
+        ) : null}
         {tabs.map(t => {
           const boxes = TAB_ACTIONS.filter(a => hasBox(t, a))
           const allOn = boxes.every(a => ticks.has(grantOf(t.id, a)))
+          const why = held?.get(t.id)
           return (
             <div key={t.id} className={s.row} role="row">
-              <span className={s.tabCell} role="rowheader">{t.label}</span>
+              <span className={s.tabCell} role="rowheader">
+                {t.label}
+                {why ? <span className={s.held}>{why}</span> : null}
+              </span>
               {TAB_ACTIONS.map(a => {
                 const g = grantOf(t.id, a)
                 const exists = hasBox(t, a)
@@ -93,5 +141,22 @@ export default function TabMatrix({
         })}
       </div>
     </div>
+  )
+}
+
+/** A Select all box: ✓ when every box under it is ticked, – when some are. */
+function TallyBox({ tally, disabled = false, label, onClick }: { tally: Tally; disabled?: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={tally === 'all' ? true : tally === 'some' ? 'mixed' : false}
+      aria-label={label}
+      disabled={disabled}
+      className={`${s.box} ${tally === 'all' ? s.boxOn : ''} ${tally === 'some' ? s.boxSome : ''} ${disabled ? s.boxNone : ''}`}
+      onClick={onClick}
+    >
+      {tally === 'all' ? '✓' : tally === 'some' ? '–' : ''}
+    </button>
   )
 }

@@ -1,0 +1,121 @@
+/* The soft dropdown (2026-10-11, HR revamp round 2 — README 18.1,
+   `.design/hr-r2/handoff/design/dropdown.js`): the real <select> stays (its
+   value, onChange, keyboard); only the popup is drawn — a rounded menu, the
+   picked row peach with a ✓. Every value is dropdown.js's and the
+   prototype's global `select` rule. */
+
+/* The field: radius 10, our own chevron, room for it, a soft hover and an
+   orange ring on focus. `!important` as the prototype has it: a caller's
+   inline padding / radius / background cannot take the chevron away. */
+.field {
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 10px !important;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNCIgaGVpZ2h0PSIxNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM1YTRlNDQiIHN0cm9rZS13aWR0aD0iMi40IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik02IDlsNiA2IDYtNiIvPjwvc3ZnPg==") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 11px center !important;
+  background-size: 14px !important;
+  padding-right: 34px !important;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field:hover { border-color: rgb(214 202 188) !important; }
+/* The ring too is !important: the portal's focus glow (globals.css, 0,3,1)
+   would put its own .12 ring over the prototype's .18. */
+.field:focus { outline: none; border-color: rgb(233 154 83) !important; box-shadow: 0 0 0 3px rgb(233 154 83 / 0.18) !important; }
+.field:disabled { cursor: not-allowed; }
+/* The guest page's fields are a little rounder. */
+.round12 { border-radius: 12px !important; }
+
+/* The menu: fixed to the window, white, radius 14, its 6px padding, a soft
+   drop in .16s. Width = the field's, wider only when an option would be cut. */
+.menu {
+  position: fixed;
+  z-index: 2147483000;
+  background: rgb(255 255 255);
+  border: 1px solid rgb(236 229 219);
+  border-radius: 14px;
+  box-shadow: 0 14px 36px rgba(43, 31, 23, 0.18), 0 2px 6px rgba(43, 31, 23, 0.06);
+  padding: 6px;
+  box-sizing: border-box;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), system-ui, sans-serif;
+  color: rgb(43 31 23);
+  animation: hvddIn 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  line-height: normal;
+  text-align: left;
+}
+.list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+}
+.list:focus { outline: none; }
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 13.5px;
+  line-height: 1.3;
+  white-space: nowrap;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-weight: 400;
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+}
+.item:hover,
+.item[data-key='true'] { background: rgb(247 244 239); }
+.item[aria-selected='true'] { background: rgb(255 244 231); color: rgb(163 78 37); font-weight: 600; }
+.item[data-placeholder='true'] { color: rgb(150 138 126); }
+.item[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
+.item > span { flex: 1; }
+/* An <optgroup>'s label over its options (2026-10-11, Part 1 — dropdown.js
+   flattens groups; People's Invite picks a person by department): a quiet
+   caps line, not a row. */
+.group {
+  padding: 8px 12px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(117 100 86);
+  white-space: nowrap;
+}
+.tick { font-weight: 600; font-size: 12px; opacity: 0; }
+.item[aria-selected='true'] .tick { opacity: 1; }
+.search {
+  height: 34px;
+  border: 1px solid rgb(229 222 212);
+  border-radius: 9px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  margin-bottom: 2px;
+  /* An input's own box, as dropdown.js's: 34px of content, 36 with its border; the browser's black text. */
+  box-sizing: content-box;
+  background: rgb(255 255 255);
+  color: rgb(0 0 0);
+}
+.search::placeholder { color: rgb(117 117 117); }
+.search:focus { border-color: rgb(233 154 83); box-shadow: 0 0 0 3px rgb(233 154 83 / 0.15); }
+
+@keyframes hvddIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu { animation: none; }
+  .field { transition: none; }
+}

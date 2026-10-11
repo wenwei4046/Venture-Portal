@@ -3,10 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction, requirePermission } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { EditError } from '@/lib/catalogue/edits'
 import { validateKpiItems, type KpiItemsEdit } from '@/lib/catalogue/rule-edits'
-import { kpiSkuSearchFilter, SKU_SEARCH_LIMIT } from '@/lib/commission/kpi-items-edit'
 
 /**
  * Revenue → Rules › KPI items (2026-10-08). Which items count as KPI and what
@@ -47,7 +46,7 @@ function refusal(err: { message: string; code?: string }): string | null {
 
 /** One sub-department's KPI items: added, re-priced, taken off — all or nothing. */
 export async function saveKpiItems(schemeId: string, edit: KpiItemsEdit): Promise<SaveKpiItemsResult> {
-  await requireAction('revenue', 'manage')
+  await requireActionOn('/revenue/[sub]/rules', 'revenue', 'manage')
   if (typeof schemeId !== 'string' || !UUID.test(schemeId)) return { ok: false, reason: 'No sub-department chosen.' }
   let plan
   try {
@@ -71,49 +70,4 @@ export async function saveKpiItems(schemeId: string, edit: KpiItemsEdit): Promis
   // Rules itself, and every Comm Cal month, which reads the list when it is worked out.
   revalidatePath('/revenue', 'layout')
   return { ok: true, saved: Number(data ?? 0) }
-}
-
-/** A SKU as the picker lists it — no price: Rules never shows what a product costs. */
-export interface KpiSkuHit {
-  erpId: string
-  code: string
-  description: string | null
-  category: string | null
-  /** False while the ERP has it switched off — still a SKU, still pickable. */
-  active: boolean
-}
-
-export type SearchKpiSkusResult = { ok: true; hits: KpiSkuHit[]; total: number } | { ok: false; reason: string }
-
-/**
- * SKUs of the SKU Master whose code or description contains the text, for the
- * picker — at most twenty, and how many matched in all. A SKU the ERP removed
- * is left out: no new bill can carry it.
- */
-export async function searchKpiSkus(query: string): Promise<SearchKpiSkusResult> {
-  await requirePermission('revenue')
-  const filter = kpiSkuSearchFilter(typeof query === 'string' ? query : '')
-  if (!filter) return { ok: true, hits: [], total: 0 }
-  const sb = await client()
-  const { data, error, count } = await sb
-    .from('erp_products')
-    .select('erp_id, item_code, description, category, active', { count: 'exact' })
-    .is('removed_at', null)
-    .or(filter)
-    .order('item_code')
-    .order('erp_id')
-    .limit(SKU_SEARCH_LIMIT)
-  if (error) return { ok: false, reason: 'The SKU Master could not be searched just now. Try again.' }
-  const rows = (data ?? []) as Array<{ erp_id: string; item_code: string; description: string | null; category: string | null; active: boolean | null }>
-  return {
-    ok: true,
-    hits: rows.map(r => ({
-      erpId: String(r.erp_id),
-      code: String(r.item_code),
-      description: r.description ?? null,
-      category: r.category ?? null,
-      active: r.active !== false,
-    })),
-    total: count ?? rows.length,
-  }
 }

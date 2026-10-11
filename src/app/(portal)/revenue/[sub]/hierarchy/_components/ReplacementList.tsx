@@ -16,22 +16,38 @@ import {
   statusOf,
   type SubDeptRequest,
 } from '@/lib/commission/sales-group-requests'
+import type { WaitingForm } from '@/lib/commission/waiting-form'
+import MemberFormTools from './MemberFormTools'
 import s from './sales-groups.module.css'
 
 // Sales Groups › Replacement list (2026-10-10, the HR revamp): every
 // replacement of the sub-department and where it stands. A row opens its
 // drawer — the facts and the history — and Review opens it in Member
-// services, where replacements are approved.
+// services, where replacements are approved. Above it since round 2
+// (2026-10-11, README 18.5), the same Upload form and Form settings as the
+// waiting list's: the replacement form the Revenue team fills in.
 
 const COLS = 'minmax(0,1.6fr) minmax(0,1.3fr) minmax(0,1fr) 130px 170px 28px'
 
-export default function ReplacementList({ rows, subDeptName }: { rows: SubDeptRequest[]; subDeptName: string }) {
+export default function ReplacementList({
+  rows,
+  subDeptName,
+  form,
+  subOptions,
+}: {
+  rows: SubDeptRequest[]
+  subDeptName: string
+  /** The replacement form as saved, or why it could not be read. */
+  form: { ok: true; form: WaitingForm } | { ok: false; reason: string }
+  subOptions: string[]
+}) {
   const list = replacementList(rows)
   const [openId, setOpenId] = useState<string | null>(null)
   const open = list.find(r => r.id === openId) ?? null
 
   return (
     <section aria-label={`${subDeptName} replacement list`}>
+      <MemberFormTools kind="replacement" form={form} subName={subDeptName} subOptions={subOptions} />
       <GridTable label={`${subDeptName} replacement list`}>
         <GridHead cols={COLS} cells={['Replacement', 'Arrangement', 'Submitted by', 'Effective', 'Status', '']} />
         {list.map(r => {

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction, requirePermission } from '@/lib/auth'
+import { requireActionOn, requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { officeMonth, officeToday } from '@/lib/office-time'
@@ -20,7 +20,7 @@ import { remainingPeriods } from '@/lib/loan-monitor'
 // Only the fields the form sends are changed. The existing updateFundSource
 // path stays for pending_approval edits by Finance.
 export async function amendFundSource(formData: FormData): Promise<{ error: string } | undefined> {
-  await requireAction('treasury', 'approve')
+  await requireActionOn('/fund-in', 'treasury', 'approve')
   const supabase = await createClient()
 
   const id = (formData.get('fund_source_id') as string) ?? ''
@@ -65,7 +65,7 @@ export async function amendFundSource(formData: FormData): Promise<{ error: stri
 // one keep their old terms — the RPC files them into treasury_terms_history
 // and the record carries the new terms from that month (lib/treasury-terms).
 export async function amendFundSourceFrom(formData: FormData): Promise<{ error: string } | undefined> {
-  await requireAction('treasury', 'approve')
+  await requireActionOn('/fund-in', 'treasury', 'approve')
   const supabase = await createClient()
 
   const id = (formData.get('fund_source_id') as string) ?? ''
@@ -116,7 +116,7 @@ export async function revertTermsChange(
   kind: 'loan' | 'fund_source',
   id: string,
 ): Promise<{ error: string } | undefined> {
-  await requireAction('treasury', 'approve')
+  await requireActionOn(kind === 'loan' ? '/fund-out' : '/fund-in', 'treasury', 'approve')
   const supabase = await createClient()
   if (!id) return { error: 'Record id is required' }
   const { error } = await supabase.rpc('revert_terms_change', { p_record_kind: kind, p_record_id: id })
@@ -145,7 +145,7 @@ interface CreateFundSourceInput {
 const VALID_TYPES: FundSourceType[] = ['subsidiary', 'director_loan', 'department_pool', 'outsource']
 
 export async function createFundSource(formData: FormData) {
-  const user = await requireAction('treasury', 'create')
+  const user = await requireActionOn('/fund-in', 'treasury', 'create')
   const supabase = await createClient()
 
   const raw: CreateFundSourceInput = {
@@ -368,7 +368,7 @@ export async function createFundSource(formData: FormData) {
 export type FundSourceActionResult = { error: string } | undefined
 
 export async function updateFundSource(formData: FormData): Promise<FundSourceActionResult> {
-  await requireAction('treasury', 'edit')
+  await requireActionOn('/fund-in', 'treasury', 'edit')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -494,7 +494,7 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
 // approval card in one transaction — Finance's own RLS can't touch
 // approval_requests, so this must not be done with inline updates.
 export async function withdrawFundSource(id: string): Promise<{ error: string } | undefined> {
-  await requireAction('treasury', 'void')
+  await requireActionOn('/fund-in', 'treasury', 'void')
   const supabase = await createClient()
 
   if (!id) return { error: 'Fund source id is required' }
@@ -519,7 +519,7 @@ export async function setFundSourceRepaymentStart(
   id: string,
   month: string
 ): Promise<{ error: string } | undefined> {
-  await requireAction('treasury', 'edit')
+  await requireActionOn('/fund-in', 'treasury', 'edit')
   const supabase = await createClient()
 
   if (!id) return { error: 'Fund source id is required' }
@@ -545,7 +545,7 @@ export async function setFundSourceMinPayInterest(
   id: string,
   value: boolean
 ): Promise<{ error: string } | undefined> {
-  await requireAction('treasury', 'edit')
+  await requireActionOn('/fund-in', 'treasury', 'edit')
   const supabase = await createClient()
 
   if (!id) return { error: 'Fund source id is required' }
@@ -569,7 +569,7 @@ export async function setFundSourceNotes(
   id: string,
   notes: string
 ): Promise<{ error: string } | undefined> {
-  await requireAction('treasury', 'edit')
+  await requireActionOn('/fund-in', 'treasury', 'edit')
   const supabase = await createClient()
 
   if (!id) return { error: 'Fund source id is required' }
@@ -588,7 +588,7 @@ export async function setFundSourceNotes(
 // ─── Cancel Fund Source (requires Principal approval) ────────────────────────
 
 export async function cancelFundSource(formData: FormData) {
-  const user = await requireAction('treasury', 'void')
+  const user = await requireActionOn('/fund-in', 'treasury', 'void')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -629,7 +629,7 @@ export async function cancelFundSource(formData: FormData) {
 }
 
 export async function markFundSourceMatured(formData: FormData) {
-  const user = await requireAction('treasury', 'edit')
+  const user = await requireActionOn('/fund-in', 'treasury', 'edit')
   const supabase = await createClient()
 
   const id = formData.get('id') as string

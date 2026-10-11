@@ -4,13 +4,19 @@ import { ICON, Svg } from "../icons";
 import type { TodayBoard, TodayModel, TodayTodo } from "./today-model";
 import s from "./today.module.css";
 
+/**
+ * What Today's taps open. Insight's two and the Arena's two are absent when
+ * their holder's ticks close that page (2026-10-11): the figures then stay,
+ * opening nothing, and Your Arena is not shown. With My income closed the
+ * income stays hidden, so there is no eye to show it (`toggleHide` absent).
+ */
 export interface TodayActions {
-  toggleHide: () => void;
-  openMetric: (key: "sales" | "margin" | "kpi") => void;
+  toggleHide?: () => void;
+  openMetric?: (key: "sales" | "margin" | "kpi") => void;
   openTodo: (todo: TodayTodo) => void;
-  openOrders: () => void;
-  openArena: () => void;
-  openBoard: (board: TodayBoard["id"]) => void;
+  openOrders?: () => void;
+  openArena?: () => void;
+  openBoard?: (board: TodayBoard["id"]) => void;
 }
 
 const TONE = { memo: s.toneMemo, request: s.toneRequest, weeks: s.toneWeeks } as const;
@@ -18,6 +24,7 @@ const BOARD = { sales: s.board_sales, margin: s.board_margin, kpi: s.board_kpi, 
 
 /** Today — the command centre (`today-style="a"`). */
 export default function Today({ model, hidden, actions }: { model: TodayModel; hidden: boolean; actions: TodayActions }) {
+  const { openMetric, openOrders, openArena, openBoard } = actions;
   return (
     <div className={s.page}>
       <div>
@@ -28,31 +35,38 @@ export default function Today({ model, hidden, actions }: { model: TodayModel; h
       <section className={s.hero}>
         <div className={s.heroTop}>
           <span className={s.heroLabel}>{model.heroLabel}</span>
-          <button className={s.heroEye} onClick={actions.toggleHide} aria-label="Hide amounts">
-            <Svg d={hidden ? ICON.eyeOff : ICON.eye} size={18} sw={1.7} />
-          </button>
+          {actions.toggleHide && (
+            <button className={s.heroEye} onClick={actions.toggleHide} aria-label="Hide amounts">
+              <Svg d={hidden ? ICON.eyeOff : ICON.eye} size={18} sw={1.7} />
+            </button>
+          )}
         </div>
         {model.heroLoading
           ? <span className={`${s.skel} ${s.heroSkel}`} role="img" aria-label="Working out your income" />
           : <div className={s.heroAmount}>{model.heroAmount}</div>}
         <p className={s.heroSplit}>{model.heroSplit}</p>
         <div className={s.heroMetrics}>
-          {model.metrics.map(m => (
-            <button key={m.key} className={s.metric} onClick={() => actions.openMetric(m.key)} aria-busy={m.loading || undefined}>
-              <span className={s.metricLabel}>{m.label}</span>
-              {m.loading ? (
-                <>
-                  <span className={`${s.skel} ${s.metricSkel}`} />
-                  <span className={`${s.skel} ${s.metricTagSkel}`} />
-                </>
-              ) : (
-                <>
-                  <span className={s.metricValue}>{m.value}</span>
-                  <span className={`${s.metricTag} ${m.tagTone === "good" ? s.metricTagGood : s.metricTagSub}`}>{m.tag}</span>
-                </>
-              )}
-            </button>
-          ))}
+          {model.metrics.map(m => {
+            const body = (
+              <>
+                <span className={s.metricLabel}>{m.label}</span>
+                {m.loading ? (
+                  <>
+                    <span className={`${s.skel} ${s.metricSkel}`} />
+                    <span className={`${s.skel} ${s.metricTagSkel}`} />
+                  </>
+                ) : (
+                  <>
+                    <span className={s.metricValue}>{m.value}</span>
+                    <span className={`${s.metricTag} ${m.tagTone === "good" ? s.metricTagGood : s.metricTagSub}`}>{m.tag}</span>
+                  </>
+                )}
+              </>
+            );
+            return openMetric
+              ? <button key={m.key} className={s.metric} onClick={() => openMetric(m.key)} aria-busy={m.loading || undefined}>{body}</button>
+              : <div key={m.key} className={s.metric} aria-busy={m.loading || undefined}>{body}</div>;
+          })}
         </div>
       </section>
 
@@ -74,7 +88,7 @@ export default function Today({ model, hidden, actions }: { model: TodayModel; h
         <section>
           <div className={s.sectHead}>
             <h2 className={s.sectTitle}>This week</h2>
-            <button className={s.sectLink} onClick={actions.openOrders}>My orders<Svg d={ICON.chevronRight} size={15} sw={1.9} /></button>
+            {openOrders && <button className={s.sectLink} onClick={openOrders}>My orders<Svg d={ICON.chevronRight} size={15} sw={1.9} /></button>}
           </div>
           <div className={s.week}>
             <div className={s.weekTop}><span className={s.weekTitle}>{model.week.title}</span><span className={s.weekDates}>{model.week.dates}</span></div>
@@ -85,23 +99,25 @@ export default function Today({ model, hidden, actions }: { model: TodayModel; h
         </section>
       )}
 
-      <section>
-        <div className={s.sectHead}>
-          <h2 className={s.sectTitle}>Your Arena</h2>
-          <button className={s.sectLink} onClick={actions.openArena}>All boards<Svg d={ICON.chevronRight} size={15} sw={1.9} /></button>
-        </div>
-        <div className={s.boards}>
-          {model.boards.map(b => (
-            <button key={b.id} className={`${s.board} ${BOARD[b.id]}`} onClick={() => actions.openBoard(b.id)} aria-busy={b.state === "loading" || undefined}>
-              <span className={s.boardLabel}>{b.label}</span>
-              {b.state === "loading" ? <span className={`${s.skel} ${s.boardSkel}`} />
-                : b.state === "unranked" ? <span className={s.boardNone}>Not ranked yet</span>
-                : b.state === "off" ? <span className={s.boardNone}>Not counted</span>
-                : <span className={s.boardRank}><span className={s.boardNum}>{b.rankNum}</span><span className={s.boardSuf}>{b.rankSuf}</span></span>}
-            </button>
-          ))}
-        </div>
-      </section>
+      {openArena && openBoard && (
+        <section>
+          <div className={s.sectHead}>
+            <h2 className={s.sectTitle}>Your Arena</h2>
+            <button className={s.sectLink} onClick={openArena}>All boards<Svg d={ICON.chevronRight} size={15} sw={1.9} /></button>
+          </div>
+          <div className={s.boards}>
+            {model.boards.map(b => (
+              <button key={b.id} className={`${s.board} ${BOARD[b.id]}`} onClick={() => openBoard(b.id)} aria-busy={b.state === "loading" || undefined}>
+                <span className={s.boardLabel}>{b.label}</span>
+                {b.state === "loading" ? <span className={`${s.skel} ${s.boardSkel}`} />
+                  : b.state === "unranked" ? <span className={s.boardNone}>Not ranked yet</span>
+                  : b.state === "off" ? <span className={s.boardNone}>Not counted</span>
+                  : <span className={s.boardRank}><span className={s.boardNum}>{b.rankNum}</span><span className={s.boardSuf}>{b.rankSuf}</span></span>}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

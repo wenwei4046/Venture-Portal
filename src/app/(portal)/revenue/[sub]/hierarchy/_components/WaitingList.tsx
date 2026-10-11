@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Facts, GridHead, GridRow, GridTable, HistoryEvent, SecLabel, btn, hv } from '@/components/hrv/kit'
@@ -8,11 +8,13 @@ import { Drawer } from '@/components/hrv/overlay'
 import { Chevron } from '@/components/hrv/icons'
 import { flash } from '@/components/hrv/toast'
 import { revenuePath } from '@/lib/revenue'
-import { dayLabel, historyOf, shortDay, waitingList, type SubDeptRequest } from '@/lib/commission/sales-group-requests'
-import { TEMPLATE_ACCEPT, templateRefusal, type WaitingForm } from '@/lib/commission/waiting-form'
+import { addedHere, dayLabel, historyOf, shortDay, waitingList, type SubDeptRequest } from '@/lib/commission/sales-group-requests'
+import type { WaitingForm } from '@/lib/commission/waiting-form'
+import type { SubmitterGroup } from '@/lib/commission/waiting-add'
 import type { SubDepartmentCapacity } from '@/lib/commission/capacity'
-import { failWaitingApplicant, uploadWaitingFormTemplate } from '../../../waiting-actions'
-import WaitingFormSettings from './WaitingFormSettings'
+import { failWaitingApplicant } from '../../../waiting-actions'
+import MemberFormTools from './MemberFormTools'
+import AddToWaitingList from './AddToWaitingList'
 import s from './sales-groups.module.css'
 import w from './waiting.module.css'
 
@@ -23,6 +25,10 @@ import w from './waiting.module.css'
 // next: Transfer (People Management's employee form) or Fail (they didn't
 // come when called, and the next one moves up). No place is held for anybody
 // any more; the headcount limit is asked at Transfer.
+//
+// "+" (2026-10-11, the user) first in the row puts somebody straight onto the
+// list — at the end, as if accepted today. Such a row was never sent by a
+// member: its drawer says who added it instead of who signed.
 
 const COLS = '56px minmax(0,1.5fr) minmax(0,1fr) 140px 140px 28px'
 
@@ -34,6 +40,9 @@ export default function WaitingList({
   capacity,
   canTransfer,
   subOptions,
+  subDepartmentId = '',
+  submitters = [],
+  canAdd = false,
 }: {
   rows: SubDeptRequest[]
   subDeptName: string
@@ -46,25 +55,17 @@ export default function WaitingList({
   canTransfer: boolean
   /** The department's sub-departments, for the built-in "Preferred sub-department". */
   subOptions: string[]
+  /** This sub-department's id — the list "+" adds to. */
+  subDepartmentId?: string
+  /** "Submitted by": the Revenue team, this sub-department first. */
+  submitters?: SubmitterGroup[]
+  /** Member services · Edit: "+" is drawn. */
+  canAdd?: boolean
 }) {
   const router = useRouter()
   const list = waitingList(rows)
   const [openId, setOpenId] = useState<string | null>(null)
   const open = list.find(r => r.id === openId) ?? null
-
-  // The page's answer is the truth; a save here shows at once, until the
-  // page's next answer catches up.
-  const [seen, setSeen] = useState(initialForm)
-  const [form, setForm] = useState(initialForm.ok ? initialForm.form : null)
-  if (seen !== initialForm) {
-    setSeen(initialForm)
-    setForm(initialForm.ok ? initialForm.form : null)
-  }
-  const formMissing = initialForm.ok ? null : initialForm.reason
-
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
 
   const [confirmFail, setConfirmFail] = useState(false)
   const [failing, setFailing] = useState(false)
@@ -78,27 +79,6 @@ export default function WaitingList({
     setOpenId(id)
     setConfirmFail(false)
     setFailError(null)
-  }
-
-  async function upload(file: File | undefined) {
-    if (!file || uploading) return
-    const refused = templateRefusal(file)
-    if (refused) {
-      flash(refused)
-      return
-    }
-    setUploading(true)
-    const data = new FormData()
-    data.set('file', file)
-    const done = await uploadWaitingFormTemplate(data)
-    setUploading(false)
-    if (fileRef.current) fileRef.current.value = ''
-    if (!done.ok) {
-      flash(done.reason)
-      return
-    }
-    setForm(done.form)
-    flash(`Form uploaded — the waiting-list application is now ${done.form.templateName}`)
   }
 
   async function fail() {
@@ -115,30 +95,24 @@ export default function WaitingList({
     openRow(null)
   }
 
-  const uploaded = form?.templatePath ? form.templateName : null
-
   return (
     <section aria-label={`${subDeptName} waiting list`}>
-      <div className={w.toolbar}>
-        <label
-          className={w.upload}
-          data-uploaded={uploaded ? 'true' : undefined}
-          data-busy={uploading ? 'true' : undefined}
-          title={formMissing ?? (uploaded ? 'Click to replace — Revenue members download this file' : 'Upload the application form Revenue members download')}
-        >
-          {uploading ? 'Uploading…' : uploaded ? `Form: ${uploaded}` : 'Upload form'}
-          <input
-            ref={fileRef}
-            type="file"
-            accept={TEMPLATE_ACCEPT}
-            disabled={uploading || form === null}
-            onChange={e => void upload(e.target.files?.[0])}
-          />
-        </label>
-        <button type="button" className={w.settings} onClick={() => setSettingsOpen(true)} disabled={form === null} title={formMissing ?? undefined}>
-          Form settings
-        </button>
-      </div>
+      <MemberFormTools
+        kind="waiting"
+        form={initialForm}
+        subName={subDeptName}
+        subOptions={subOptions}
+        lead={
+          canAdd && subDepartmentId ? (
+            <AddToWaitingList
+              subDepartmentId={subDepartmentId}
+              subDeptName={subDeptName}
+              submitters={submitters}
+              form={initialForm.ok ? initialForm.form : null}
+            />
+          ) : null
+        }
+      />
 
       <GridTable label={`${subDeptName} waiting list`}>
         <GridHead cols={COLS} cells={['#', 'Applicant', 'Submitted by', 'Joining date', 'Accepted', '']} />
@@ -161,7 +135,7 @@ export default function WaitingList({
         ))}
         {list.length === 0 ? <div className={s.listEmpty}>Nobody is on {subDeptName}&apos;s waiting list.</div> : null}
       </GridTable>
-      <div className={s.hint}>Applicants accepted in Member services, in the order they were accepted.</div>
+      <div className={s.hint}>Applicants accepted in Member services or added here, in the order they joined the list.</div>
 
       <Drawer
         open={open !== null}
@@ -170,10 +144,10 @@ export default function WaitingList({
         head={
           open ? (
             <>
-              <div className={hv.drawerEyebrow} style={{ color: 'rgb(var(--hv-orange-text))' }}>
-                #{open.position} of {list.length} on {subDeptName}&apos;s waiting list
+              {/* Round 2 (README 18.5): no "#1 of 2 on Fair's waiting list" above the name. */}
+              <div className={hv.drawerTitle} style={{ marginTop: 0 }}>
+                {open.newPerson ?? '—'}
               </div>
-              <div className={hv.drawerTitle}>{open.newPerson ?? '—'}</div>
               {open.requestNo ? <div className={w.candNo}>{open.requestNo}</div> : null}
             </>
           ) : null
@@ -220,14 +194,25 @@ export default function WaitingList({
         {open ? (
           <>
             <Facts
-              rows={[
-                { l: 'Mobile number', v: open.contact ?? '—' },
-                { l: 'Joining date', v: dayLabel(open.start) },
-                { l: 'Department', v: `Revenue · ${subDeptName}` },
-                { l: 'Submitted by', v: open.submittedBy ?? '—' },
-                { l: 'Signed by', v: open.signature ?? '—' },
-                { l: 'Accepted', v: open.acceptedAt ? `${dayLabel(open.acceptedAt)} · Member services` : '—' },
-              ]}
+              rows={
+                addedHere(open)
+                  ? [
+                      { l: 'Mobile number', v: open.contact ?? '—' },
+                      { l: 'Joining date', v: dayLabel(open.start) },
+                      { l: 'Department', v: `Revenue · ${subDeptName}` },
+                      { l: 'Submitted by', v: open.submittedBy ?? '—' },
+                      { l: 'Added by', v: open.events.find(e => e.to === 'waiting')?.by ?? 'HR' },
+                      { l: 'Accepted', v: open.acceptedAt ? `${dayLabel(open.acceptedAt)} · added here` : '—' },
+                    ]
+                  : [
+                      { l: 'Mobile number', v: open.contact ?? '—' },
+                      { l: 'Joining date', v: dayLabel(open.start) },
+                      { l: 'Department', v: `Revenue · ${subDeptName}` },
+                      { l: 'Submitted by', v: open.submittedBy ?? '—' },
+                      { l: 'Signed by', v: open.signature ?? '—' },
+                      { l: 'Accepted', v: open.acceptedAt ? `${dayLabel(open.acceptedAt)} · Member services` : '—' },
+                    ]
+              }
             />
             <SecLabel style={{ margin: '22px 0 10px' }}>Action history</SecLabel>
             <div>
@@ -252,16 +237,6 @@ export default function WaitingList({
           </>
         ) : null}
       </Drawer>
-
-      {settingsOpen && form ? (
-        <WaitingFormSettings
-          form={form}
-          subName={subDeptName}
-          subOptions={subOptions}
-          onClose={() => setSettingsOpen(false)}
-          onSaved={setForm}
-        />
-      ) : null}
     </section>
   )
 }

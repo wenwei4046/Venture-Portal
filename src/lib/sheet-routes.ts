@@ -38,6 +38,8 @@ export const SHEET_ROUTE_PREFIXES = [
   // account's page, reached from the roster) live under /team.
   '/team',
   '/member-admin',
+  // Hiring (round 2, 2026-10-11): Requests, Insights, the Talent Bank.
+  '/hiring',
   // Finance's view (2026-10-07), in sidebar order.
   '/approvals',
   '/payments',
@@ -62,6 +64,9 @@ export const SHEET_ROUTE_PREFIXES = [
   '/reconciliation',
   '/audit-log',
   '/settings',
+  // Admin (2026-10-11, the HR revamp's second package): Meeting Rooms — every
+  // view books a room — and the Guest Link.
+  '/admin',
 ] as const
 
 function under(pathname: string, prefix: string): boolean {

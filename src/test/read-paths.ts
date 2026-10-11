@@ -198,8 +198,23 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_sub_department_requests',
   // Sales Groups › Waiting list's flow (mig 20261010140000): each asks member_is_manager (the form also lets in member_requests).
   'member_waiting_form', 'member_save_waiting_form', 'member_fail_waiting', 'member_waiting_transfer',
+  // …and the Replacement list's form (mig 20261011130000), the same gates.
+  'member_replacement_form', 'member_save_replacement_form',
+  // The waiting list's "+" (mig 20261011230000): member.manage and member_is_manager, both.
+  'member_waiting_add', 'member_waiting_add_form',
   // Member services' readers (mig 20261010160000): member_requests_manage / member_memos_manage.
   'member_admin_request_facts', 'member_memo_reads',
+  // People › Documentation (mig 20261011070000): each asks has_any_action for its Documentation cell; the
+  // member's two ask member_staff_id().
+  'hr_documentation', 'hr_documentation_file', 'hr_documentation_log', 'hr_document_add', 'hr_document_delete',
+  'hr_letter_type_add', 'hr_letter_type_set_compulsory', 'hr_letter_type_delete', 'hr_letter_file',
+  'hr_publish_type_add', 'hr_publish_type_delete', 'hr_publish', 'member_documents', 'member_document_open',
+  // Withdraw letter and files that really go (mig 20261011170000): each asks Documentation · Edit.
+  'hr_letter_withdraw', 'hr_documentation_leftovers', 'hr_documentation_files_removed',
+  // Withdraw a published memo (mig 20261011200000): Documentation · Edit.
+  'hr_memo_withdraw',
+  // The Revenue app's View as (mig 20261011110000): has_any_action(documentation.view).
+  'member_documents_of',
   // A replacement runs itself on its date (mig 20261010170000): HR's two ask member_is_manager; the
   // hourly sweep is the service role's (api/member-queue).
   'member_schedule_replacement', 'member_unschedule_replacement', 'member_run_due_replacements',
@@ -207,6 +222,28 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_waiting_queue',
   // People › Permissions by view and tab (migs 20261011010000, 20261011020000): each asks has_perm('permissions_manage').
   'permission_template_tabs_save', 'permission_user_tabs_set', 'permission_template_delete', 'permission_title_move',
+  // "+ New template"'s window (mig 20261011233200): has_any_action(accounts.manage), then the two above ask permissions_manage.
+  'permission_template_new',
+  // Hiring (migs 20261011080000, 20261011080100, 20261011160000, 20261011210000): each asks its Hiring cell itself (view / create / edit / approve).
+  'hiring_board', 'hiring_file_path', 'hiring_resume_downloaded', 'hiring_submit', 'hiring_acknowledge', 'hiring_request_info',
+  'hiring_decline', 'hiring_set_owner', 'hiring_set_assist', 'hiring_fill', 'hiring_cancel', 'hiring_reopen', 'hiring_candidate_add',
+  'hiring_candidate_edit', 'hiring_candidate_stage', 'hiring_save_form_fields', 'hiring_save_candidate_fields', 'hiring_source_add',
+  'hiring_source_set_active', 'hiring_source_remove', 'hiring_talent_save', 'hiring_talent_invite', 'hiring_talent_update',
+  'hiring_talent_remove', 'hiring_files_add', 'hiring_file_replace', 'hiring_file_remove', 'hiring_file_type_add', 'hiring_file_downloaded',
+  'hiring_orphan_files', 'hiring_file_type_rename', 'hiring_file_type_set_active',
+  // The hourly sweep's (api/member-queue, the service role — mig 20261011210000): Hiring's day-old leftovers.
+  'hiring_leftovers',
+  // View as a person (mig 20261011050000): each asks has_perm(view_switch).
+  'view_as_person', 'view_as_people',
+  // Admin › Meeting Rooms (mig 20261011090000): each asks has_any_action(rooms.*), a member's revenue_app.view:own.
+  'meeting_rooms_range', 'meeting_rooms_booking', 'meeting_rooms_rooms', 'meeting_rooms_people', 'meeting_rooms_book',
+  'meeting_rooms_cancel', 'meeting_rooms_save_room', 'meeting_rooms_delete_room',
+  // Admin › Guest Link (mig 20261011091000): each asks has_any_action(guest_link.* / rooms.view); the guest page's
+  // five (page, day, book, cancel, hire) are anon's by name and check the link's code instead.
+  'guest_link_admin', 'guest_link_set', 'guest_link_new_code', 'guest_link_room', 'guest_link_save_subsidiary',
+  'guest_link_remove_subsidiary', 'guest_link_legend', 'guest_link_page', 'guest_link_day', 'guest_link_book', 'guest_link_cancel', 'guest_link_hire',
+  // Notifications and phone push (mig 20261011180000): each asks a sign-in and answers only the caller’s own; the outbox asks the server’s secret.
+  'notifications_mine', 'notifications_read', 'notification_topics_sync', 'push_subscribe', 'push_unsubscribe', 'push_outbox_take', 'push_outbox_done',
   'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_cancel_topup',
   'payroll_close_month', 'payroll_complete_rows', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status',
   'payroll_open_topup', 'payroll_reopen_month', 'payroll_send_back_batch', 'payroll_submit_batch', 'payroll_uncomplete_rows',

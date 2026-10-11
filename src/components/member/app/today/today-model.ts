@@ -49,11 +49,17 @@ export interface TodayInput {
   requests: MemberRequest[];
   /** RQ-2609-004 style code of a request. */
   requestCode: (request: MemberRequest) => string;
+  /** False when their ticks close My brand weeks (2026-10-11): no reminder to save the weeks. Absent: open. */
+  brandWeeks?: boolean;
 }
 
 export type TodoTone = "memo" | "request" | "weeks";
 export type TodoTarget = "memos" | "requests" | "brandWeeks";
-export interface TodayTodo { key: string; tone: TodoTone; icon: string; title: string; sub: string; target: TodoTarget }
+export interface TodayTodo {
+  key: string; tone: TodoTone; icon: string; title: string; sub: string; target: TodoTarget;
+  /** A request's kind: where it is followed up depends on it (app-access.ts `requestPage`). */
+  requestKind?: MemberRequest["kind"];
+}
 export interface TodayMetric { key: "sales" | "margin" | "kpi"; label: string; value: string; tag: string; tagTone: "sub" | "good"; loading?: boolean }
 /**
  * `ranked` shows the place; `unranked` says so in words (nothing on that board yet); `loading` is a placeholder;
@@ -158,12 +164,12 @@ function todos(input: TodayInput): TodayTodo[] {
       title: `Acknowledge ${memos.length} memo${memos.length === 1 ? "" : "s"}`, sub: memos.map(m => m.title).join(" · ") });
   }
   for (const request of input.requests.filter(r => r.status === "needs_info")) {
-    out.push({ key: `rq-${request.id}`, tone: "request", icon: ICON.receipt, target: "requests",
+    out.push({ key: `rq-${request.id}`, tone: "request", icon: ICON.receipt, target: "requests", requestKind: request.kind,
       title: `${KIND[request.kind]} needs info`, sub: `${input.requestCode(request)} · HR returned it` });
   }
   const arena = input.arena;
   const period = input.today.slice(0, 7);
-  if (arena && arena.period === period && arena.weekLocks?.length) {
+  if (input.brandWeeks !== false && arena && arena.period === period && arena.weekLocks?.length) {
     const picks = arena.brandWeeks?.picks ?? {};
     const open = arena.weekLocks.filter(lock => !lock.locked && !picks[lock.week]).sort((a, b) => a.closesOn.localeCompare(b.closesOn));
     if (open.length) {
@@ -188,7 +194,8 @@ function thisWeek(input: TodayInput): TodayWeek | null {
   return {
     title: `Week ${index + 1} · ${brand ? `${brand} week` : "Brand week not picked"}`,
     dates: booth ? dayRange(booth.start, booth.end) : dayRange(friday, end),
-    venue: booth?.venue ?? (brand ? null : "Pick your brand in My brand weeks"),
+    // My brand weeks closed by their ticks: no pointer to a page they cannot open.
+    venue: booth?.venue ?? (brand || input.brandWeeks === false ? null : "Pick your brand in My brand weeks"),
     org: booth?.organizer ?? null,
   };
 }
@@ -218,6 +225,18 @@ const LOADING_METRICS: TodayMetric[] = [
   { key: "kpi", label: "KPI", value: "", tag: "", tagTone: "sub", loading: true },
 ];
 
+const HIDDEN_AMOUNT = "RM ••••••";
+const HIDDEN_SPLIT = "Amounts hidden";
+
+/**
+ * The income card as the eye hides it — and as My income closed keeps it
+ * (2026-10-11). The preview's figures are written out, not worked out, so it
+ * hides them through this too.
+ */
+export function hideIncome<T extends Pick<TodayModel, "heroAmount" | "heroLoading" | "heroSplit">>(model: T): T {
+  return { ...model, heroAmount: HIDDEN_AMOUNT, heroLoading: false, heroSplit: HIDDEN_SPLIT };
+}
+
 export function todayModel(input: TodayInput, championRank: number | null = null): TodayModel {
   const income = input.income;
   const commission = income?.total ?? null;
@@ -230,9 +249,9 @@ export function todayModel(input: TodayInput, championRank: number | null = null
     hello: `Hello, ${input.first}`,
     helloSub: [dayLabel(input.today), input.title, input.rank].filter(Boolean).join(" · "),
     heroLabel: dept ? `${month} · ${dept} commission` : `${month} · ${settled ? "Settled income" : "Estimated income"}`,
-    heroAmount: input.hidden ? "RM ••••••" : pending ? "RM —" : dept ? rm2(commission ?? 0) : commission === null ? rm2(fixed) : rm2(fixed + commission),
+    heroAmount: input.hidden ? HIDDEN_AMOUNT : pending ? "RM —" : dept ? rm2(commission ?? 0) : commission === null ? rm2(fixed) : rm2(fixed + commission),
     heroLoading: !input.hidden && pending === "loading",
-    heroSplit: input.hidden ? "Amounts hidden"
+    heroSplit: input.hidden ? HIDDEN_SPLIT
       : pending === "loading" ? `Working out ${month}'s commission…`
       : pending === "failed" ? `${month}'s commission is unavailable right now`
       : dept ? `Everybody in ${dept}, before salaries · View as a member for their own`

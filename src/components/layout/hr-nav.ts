@@ -19,10 +19,14 @@ import { revenuePath } from '@/lib/revenue'
 import {
   canAccessDirectorPool,
   canAccessDirectorSalary,
+  canAccessDocumentation,
   canAccessRevenue,
   canAccessTeam,
+  canAccessHiring,
   canOpenPeople,
   canSeeAuditChanges,
+  canAccessMeetingRooms,
+  canAccessGuestLink,
 } from '@/lib/roles'
 import type { NavIconName } from '@/components/hrv/icons'
 import type { NavViewer } from './nav-config'
@@ -112,12 +116,28 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
         { key: 'ppl', label: 'People Management', icon: 'staff', href: '/team/people', match: p => under(p, '/team/people') || under(p, '/team/accounts') || under(p, '/team/permissions'), visible: canOpenPeople },
         { key: 'hier', label: 'Hierarchy', icon: 'org', href: '/team/hierarchy', match: p => under(p, '/team/hierarchy') || under(p, '/team/roles'), visible: canOpenPeople },
         { key: 'mem', label: 'Member Services', icon: 'approve', href: '/member-admin', match: p => under(p, '/member-admin'), visible: seesMemberServices },
+        { key: 'docs', label: 'Documentation', icon: 'doc', href: '/team/documentation', match: p => under(p, '/team/documentation'), visible: canAccessDocumentation },
+      ],
+    },
+    // Round 2 (2026-10-11, README §3): V. HIRING, clay.
+    {
+      label: 'Hiring',
+      tone: 'clay',
+      items: [
+        { key: 'hire', label: 'Requests', icon: 'hire', href: '/hiring/requests', match: p => under(p, '/hiring/requests'), visible: canAccessHiring },
+        { key: 'hireIns', label: 'Insights', icon: 'report', href: '/hiring/insights', match: p => under(p, '/hiring/insights'), visible: canAccessHiring },
+        { key: 'talent', label: 'Talent Bank', icon: 'staff', href: '/hiring/talent', match: p => under(p, '/hiring/talent'), visible: canAccessHiring },
       ],
     },
     {
       label: 'Admin',
       tone: 'walnut',
-      items: [{ key: 'audit', label: 'Audit Log', icon: 'report', href: '/audit-log', match: p => under(p, '/audit-log'), visible: canSeeAuditChanges }],
+      items: [
+        // Round 2 (2026-10-11): every view books a room.
+        { key: 'rooms', label: 'Meeting Rooms', icon: 'room', href: '/admin/rooms', match: p => under(p, '/admin/rooms'), visible: canAccessMeetingRooms },
+        { key: 'guestlink', label: 'Guest Link', icon: 'link', href: '/admin/guest-link', match: p => under(p, '/admin/guest-link'), visible: canAccessGuestLink },
+        { key: 'audit', label: 'Audit Log', icon: 'report', href: '/audit-log', match: p => under(p, '/audit-log'), visible: canSeeAuditChanges },
+      ],
     },
   ]
 }

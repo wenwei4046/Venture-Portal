@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction, requirePermission } from '@/lib/auth'
+import { requireActionOn, requirePermission } from '@/lib/auth'
 import { verifyPin, isLockedOut, getLockoutUntil, hashPin, MAX_ATTEMPTS } from '@/lib/director-pin'
 
 const PIN_COOKIE = 'director_pin_verified'
@@ -71,7 +71,7 @@ export async function isDirectorPinVerified(): Promise<boolean> {
 }
 
 export async function setDirectorPin(formData: FormData): Promise<{ ok: boolean; error?: string }> {
-  await requireAction('settings', 'manage')
+  await requireActionOn('/settings', 'settings', 'manage')
   const supabase = await createClient()
 
   const pin = (formData.get('pin') as string) ?? ''

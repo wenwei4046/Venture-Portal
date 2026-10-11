@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { officeDate } from '@/lib/office-clock'
 import { isOwnerKind } from '@/lib/approval-domains'
@@ -19,7 +19,7 @@ const NOT_A_DECIDER = 'Pool claims are decided with Claims · Approve and Treasu
 const BENEFIT_ELSEWHERE = 'A benefit claim is decided in People › Member services'
 
 export async function submitClaim(formData: FormData) {
-  const user = await requireAction('claims', 'create', 'own')
+  const user = await requireActionOn('/claims', 'claims', 'create', 'own')
   const supabase = await createClient()
 
   const claimType = formData.get('claim_type') as 'project' | 'benefit'
@@ -44,7 +44,7 @@ export async function submitClaim(formData: FormData) {
 }
 
 export async function approveClaim(claimId: string) {
-  const user = await requireAction('claims', 'approve')
+  const user = await requireActionOn('/claims', 'claims', 'approve')
   const supabase = await createClient()
 
   const { data: claim } = await supabase
@@ -169,7 +169,7 @@ export async function approveClaim(claimId: string) {
 }
 
 export async function rejectClaim(claimId: string) {
-  const user = await requireAction('claims', 'approve')
+  const user = await requireActionOn('/claims', 'claims', 'approve')
   if (!decidesPoolClaims(user)) throw new Error(NOT_A_DECIDER)
   const supabase = await createClient()
 
@@ -188,7 +188,7 @@ export async function rejectClaim(claimId: string) {
 }
 
 export async function markClaimPaid(claimId: string) {
-  const user = await requireAction('claims', 'approve')
+  const user = await requireActionOn('/claims', 'claims', 'approve')
   const supabase = await createClient()
 
   const { data: claim } = await supabase

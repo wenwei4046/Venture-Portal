@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requireAction, requirePage } from '@/lib/auth'
+import { requireActionOn, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { Company } from '@/types'
 import type { AccountType } from '@/lib/coa'
@@ -8,7 +8,7 @@ import type { AccountOption } from '@/components/AccountPicker'
 
 export default async function NewFundInPage() {
   await requirePage('/fund-in/new')
-  await requireAction('treasury', 'create')
+  await requireActionOn('/fund-in/new', 'treasury', 'create')
   const supabase = await createClient()
 
   // Item 4: directors no longer needed — director_loan + outsource use free text.

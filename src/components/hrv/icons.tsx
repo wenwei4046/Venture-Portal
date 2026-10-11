@@ -84,6 +84,32 @@ const NAV = {
   ),
   chev: <path d="M6 9l6 6 6-6" />,
   chevR: <path d="M9 6l6 6-6 6" />,
+  // Round 2 (2026-10-11, README §3): Documentation, Hiring › Requests, Meeting Rooms, Guest Link.
+  doc: (
+    <>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" />
+      <path d="M14 3v5h5M9 13h6M9 17h4" />
+    </>
+  ),
+  hire: (
+    <>
+      <circle cx="10" cy="8" r="3.2" />
+      <path d="M4 20c0-3.6 2.7-6 6-6 1.2 0 2.3.3 3.2.8" />
+      <path d="M18 14v6M15 17h6" />
+    </>
+  ),
+  room: (
+    <>
+      <rect x="3.5" y="5" width="17" height="11" rx="1.5" />
+      <path d="M8 20h8M12 16v4" />
+    </>
+  ),
+  link: (
+    <>
+      <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+      <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>
 
 const CARD = {

@@ -7,11 +7,14 @@ import {
   boxesOf,
   cellMap,
   cellsOutOfStep,
+  heldTabs,
   sameTicks,
   templateTicks,
   ticksOfPerson,
   toggleBox,
+  toggleColumn,
   toggleRow,
+  toggleView,
   viewCount,
   TAB_VIEWS,
   type PersonBox,
@@ -92,6 +95,8 @@ function TemplateAccess({
   const changes = boxesOf(base, ticks).length
   const dirty = (draft !== null && !sameTicks(draft, saved)) || outOfStep
   const who = personName?.trim() || 'this person'
+  // Their title's sensitive fields and kind decide what a ticked tab opens, as for the template.
+  const held = useMemo(() => heldTabs(ticks, access.template.sensitive, access.template.baseRole, access.cellKeys), [ticks, access])
 
   function save(boxes: PersonBox[]) {
     if (pending) return
@@ -152,8 +157,11 @@ function TemplateAccess({
         onView={setView}
         canEdit={canEdit}
         compact
+        held={held}
         onToggle={(tabId, action) => setDraft(toggleBox(ticks, tabId, action))}
         onRow={tabId => setDraft(toggleRow(ticks, tabId))}
+        onColumn={action => setDraft(toggleColumn(ticks, view, action))}
+        onAll={() => setDraft(toggleView(ticks, view))}
       />
       {actions && footSlot ? createPortal(actions, footSlot) : actions ? <div className={s.inlineFoot}>{actions}</div> : null}
     </section>

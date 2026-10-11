@@ -1,13 +1,18 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useFormStatus } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { getRoleLabel } from '@/lib/roles'
 import { officeClock } from '@/lib/office-clock'
 import type { User, UserRole } from '@/types'
+import { Select } from '@/components/hrv/select'
 import { setViewAs } from './view-as-actions'
+import ViewAsPersonPicker from './ViewAsPersonPicker'
+
+/** The select's value while a person is viewed (2026-10-11). */
+const VIEWING = '__viewing'
 import s from './HrTopBar.module.css'
 
 // HR's greeting bar (2026-10-10, the HR revamp handoff): a white rounded panel
@@ -38,7 +43,7 @@ export default function HrTopBar({ user }: { user: User }) {
       </div>
       <div className={s.right}>
         {user.canSwitchView ? (
-          <ViewSwitch value={user.role} />
+          <ViewSwitch value={user.role} viewingAs={user.viewingAs?.name} />
         ) : (
           <div className={s.view}>
             <span className={s.dot} aria-hidden="true" />
@@ -58,32 +63,48 @@ export default function HrTopBar({ user }: { user: User }) {
   )
 }
 
-function ViewSelect({ value, submit }: { value: UserRole; submit: () => void }) {
+function ViewSelect({ value, viewingAs, submit, onPerson }: { value: UserRole; viewingAs?: string; submit: () => void; onPerson: () => void }) {
   const { pending } = useFormStatus()
+  const current = viewingAs ? VIEWING : value
+  // The prototype draws "HR view" as words, so the field stays words (plain);
+  // only the menu is the soft dropdown's (round 2's Part 1).
   return (
-    <select
-      key={value}
+    <Select
+      plain
+      key={current}
       name="role"
-      defaultValue={value}
-      onChange={submit}
+      defaultValue={current}
+      onChange={e => {
+        // "View as a person…" opens the picker; the select keeps what is drawn.
+        if (e.target.value === 'person') {
+          e.target.value = current
+          onPerson()
+        } else if (e.target.value !== VIEWING) submit()
+      }}
       disabled={pending}
       aria-label="View portal as role"
       className={s.select}
     >
+      {viewingAs ? <option value={VIEWING}>Viewing as {viewingAs}</option> : null}
       <option value="principal">Principal</option>
       <option value="finance">Finance view</option>
       <option value="hr">HR view</option>
       <option value="revenue_member">Revenue View</option>
-    </select>
+      <option value="person">View as a person…</option>
+    </Select>
   )
 }
 
-function ViewSwitch({ value }: { value: UserRole }) {
+function ViewSwitch({ value, viewingAs }: { value: UserRole; viewingAs?: string }) {
   const form = useRef<HTMLFormElement>(null)
+  const [picking, setPicking] = useState(false)
   return (
-    <form ref={form} action={setViewAs} className={s.view} title="Switch workspace view while staying signed in as Principal">
-      <span className={s.dot} aria-hidden="true" />
-      <ViewSelect value={value} submit={() => form.current?.requestSubmit()} />
-    </form>
+    <>
+      <form ref={form} action={setViewAs} className={s.view} title="Switch workspace view while staying signed in as Principal">
+        <span className={s.dot} aria-hidden="true" />
+        <ViewSelect value={value} viewingAs={viewingAs} submit={() => form.current?.requestSubmit()} onPerson={() => setPicking(true)} />
+      </form>
+      <ViewAsPersonPicker open={picking} onClose={() => setPicking(false)} />
+    </>
   )
 }

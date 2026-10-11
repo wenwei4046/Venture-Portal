@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { HvPage, Toggle } from '@/components/hrv/kit'
 import { Tabs } from '@/components/hrv/tabs'
 import { openReplacements, waitingList, type SubDeptRequest } from '@/lib/commission/sales-group-requests'
+import { submitterGroups } from '@/lib/commission/waiting-add'
 import OrgChart, { type OrgDepartment } from './OrgChart'
 import MembersGrid from './MembersGrid'
 import WaitingList from './WaitingList'
@@ -50,8 +51,10 @@ export default function SalesGroupsView({
   canEdit,
   requests,
   waitingForm = null,
+  replacementForm = null,
   capacity = null,
   canTransfer = false,
+  canAddToWaiting = false,
   head,
 }: {
   subDept: { name: string; slug: string; isHome: boolean }
@@ -68,10 +71,14 @@ export default function SalesGroupsView({
   requests: { ok: true; rows: SubDeptRequest[] } | { ok: false; reason: string } | null
   /** The waiting-list form (Form settings, Upload form) — read with the requests. */
   waitingForm?: WaitingFormRead | null
+  /** The replacement list's form (round 2, README 18.5) — read with the requests too. */
+  replacementForm?: WaitingFormRead | null
   /** This sub-department's places: Transfer waits while it is full. */
   capacity?: SubDepartmentCapacity | null
   /** People › Create: Transfer files an employee. */
   canTransfer?: boolean
+  /** Member services · Edit: the waiting list's "+" (2026-10-11). */
+  canAddToWaiting?: boolean
   head: ReactNode
 }) {
   const searchParams = useSearchParams()
@@ -142,9 +149,17 @@ export default function SalesGroupsView({
             capacity={capacity}
             canTransfer={canTransfer}
             subOptions={departments.map(d => d.name)}
+            subDepartmentId={team.subDepartmentId ?? ''}
+            submitters={submitterGroups(departments, subDept.name)}
+            canAdd={canAddToWaiting}
           />
         ) : (
-          <ReplacementList rows={rows} subDeptName={subDept.name} />
+          <ReplacementList
+            rows={rows}
+            subDeptName={subDept.name}
+            form={replacementForm ?? { ok: false, reason: 'The replacement form could not be read.' }}
+            subOptions={departments.map(d => d.name)}
+          />
         )
       ) : chartedPeople === 0 ? (
         <NobodyYet

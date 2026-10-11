@@ -9,7 +9,7 @@ import { openedKeys, type Action, type Scope } from './permission-matrix'
 import { TAB_BY_ID } from './permission-tabs'
 import { CELL_KEYS, PROD, cellsOf, grantsOf } from './permission-tabs.fixtures'
 import { PROD_LOGINS } from './page-tabs.fixtures'
-import { OPEN_PAGES, PAGE_TABS, hasTab, opensPage, opensPath, routeOf, userTabs, type PageRoute } from './page-tabs'
+import { OPEN_PAGES, PAGE_TABS, actionsOnPage, closedBoxes, hasTab, opensPage, opensPath, routeOf, userTabs, type PageRoute } from './page-tabs'
 
 const PORTAL = join(process.cwd(), 'src', 'app', '(portal)')
 
@@ -129,7 +129,7 @@ function openedToday(route: PageRoute, a: Account): boolean {
   if (route === '/audit-log') return canSeeAuditChanges(a)
   const src = FILES.get(route)!
   const rest = src.slice(src.indexOf(`requirePage('${route}')`) + 1)
-  const gate = /\b(requirePermission|requirePayrollPayouts|requireAction|requireAnyAction|requireApprovalQueue)\(([^)]*)\)/.exec(rest)
+  const gate = /\b(requirePermission|requirePayrollPayouts|requireActionOn|requireAnyActionOn|requireApprovalQueue)\(([^)]*)\)/.exec(rest)
   if (!gate) {
     // Gated inside the component the page draws: the keys its tabs open on.
     const keys = PAGE_TABS[route].flatMap(t => TAB_BY_ID.get(t)!.keys)
@@ -139,8 +139,8 @@ function openedToday(route: PageRoute, a: Account): boolean {
   if (fn === 'requirePermission') return can(a, ...keysOf(raw))
   if (fn === 'requirePayrollPayouts') return can(a, ...keysOf(raw)) && canSeePayrollPayouts(a)
   if (fn === 'requireApprovalQueue') return canSeeApprovals(a)
-  if (fn === 'requireAction') {
-    const [f, action, scope] = args(raw)
+  if (fn === 'requireActionOn') {
+    const [, f, action, scope] = args(raw)
     return canDo(a, f as FunctionKey, action as Action, (scope as Scope) ?? 'all')
   }
   return [...raw.matchAll(/\[([^\]]*)\]/g)].some(m => {
@@ -159,5 +159,75 @@ describe('nobody loses a page they open today', () => {
     const tabs = userTabs({ ticks: ['fin.payments.view', 'fin.overview.view'], boxes: [], cells: false }, {}, [])
     expect(opensPage(tabs, '/payments')).toBe(true)
     expect(opensPage(tabs, '/receipts')).toBe(false)
+  })
+})
+
+// ── Writes follow the tab boxes (2026-10-11, the user: "yes separate by tab") ──
+
+describe('a page’s writes follow its own tabs’ boxes', () => {
+  const actions = {
+    'treasury.view': 'all', 'treasury.export': 'all', 'treasury.create': 'all', 'treasury.edit': 'all',
+    'treasury.void': 'all', 'claims.create': 'own',
+  } as Record<string, Scope>
+  // A template saved on tabs: Payments may create and edit; Receipt is viewed only.
+  const closed = closedBoxes({ ticks: ['fin.payments.view', 'fin.payments.create', 'fin.payments.edit', 'fin.receipt.view'], boxes: [], cells: false })
+
+  it('Receipt’s own boxes decide on Receipt: Payments’ Create creates no receipt', () => {
+    const onReceipts = actionsOnPage(actions, closed, '/receipts')
+    expect(onReceipts['treasury.create']).toBeUndefined()
+    expect(onReceipts['treasury.edit']).toBeUndefined()
+    expect(onReceipts['treasury.void']).toBeUndefined()
+    // Viewing and exporting are never narrowed; a write no tab of the page stands for stays.
+    expect(onReceipts).toMatchObject({ 'treasury.view': 'all', 'treasury.export': 'all', 'claims.create': 'own' })
+  })
+
+  it('and on Payments, its own Create and Edit hold', () => {
+    const onPayments = actionsOnPage(actions, closed, '/payments')
+    expect(onPayments).toMatchObject({ 'treasury.create': 'all', 'treasury.edit': 'all' })
+    expect(onPayments['treasury.void']).toBeUndefined()
+  })
+
+  it('a page in several tabs keeps a write any of them still has open', () => {
+    const queue = actionsOnPage({ 'approvals.approve': 'all', 'treasury.approve': 'all' } as Record<string, Scope>,
+      closedBoxes({ ticks: ['fin.approvals.view', 'fin.approvals.approve'], boxes: [], cells: false }), '/approvals')
+    expect(queue).toEqual({ 'approvals.approve': 'all' })
+  })
+
+  it('ticks worked out from cells close nothing — Finance’s Void without Approve stays', () => {
+    const voids = { 'treasury.view': 'all', 'treasury.void': 'all' } as Record<string, Scope>
+    expect(closedBoxes(null)).toEqual([])
+    // Their own cells from before tabs, and no boxes yet: their ticks are worked out too.
+    expect(closedBoxes({ ticks: ['fin.payments.view'], boxes: [], cells: true })).toEqual([])
+    expect(actionsOnPage(voids, closedBoxes(null), '/payments')).toEqual(voids)
+  })
+})
+
+describe('the boxes somebody unticked', () => {
+  it('a template saved on tabs closes every box its ticks leave out', () => {
+    const closed = closedBoxes({ ticks: ['fin.payments.view', 'fin.payments.create', 'rev.today.view'], boxes: [], cells: false })
+    expect(closed).toEqual(expect.arrayContaining(['fin.payments.edit', 'fin.receipt.view', 'fin.receipt.create', 'rev.arena.view', 'rev.quote.create']))
+    expect(closed).not.toContain('fin.payments.view')
+    expect(closed).not.toContain('fin.payments.create')
+    expect(closed).not.toContain('rev.today.view')
+    // A box no tab has is never listed (Today has no Create).
+    expect(closed).not.toContain('rev.today.create')
+  })
+
+  it('their own boxes count over it: one raised is open, one held back is closed', () => {
+    const closed = closedBoxes({ ticks: ['rev.today.view', 'rev.arena.view'], boxes: [
+      { tab: 'rev.insight', action: 'view', granted: true },
+      { tab: 'rev.arena', action: 'view', granted: false },
+    ], cells: false })
+    expect(closed).not.toContain('rev.insight.view')
+    expect(closed).toContain('rev.arena.view')
+  })
+
+  it('over a template not saved on tabs, only what their own boxes hold back closes — a View with its whole tab', () => {
+    const closed = closedBoxes({ ticks: null, boxes: [
+      { tab: 'fin.receipt', action: 'create', granted: false },
+      { tab: 'rev.requests', action: 'view', granted: false },
+      { tab: 'fin.payments', action: 'approve', granted: true },
+    ], cells: true })
+    expect(closed.sort()).toEqual(['fin.receipt.create', 'rev.requests.create', 'rev.requests.view'])
   })
 })

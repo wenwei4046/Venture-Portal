@@ -11,14 +11,16 @@ import { flash } from '@/components/hrv/toast'
 import { newSubDepartment } from '../config-actions'
 import type { SwitcherData } from '../_lib/switcher'
 import s from './SubDeptSwitcher.module.css'
+import { Select } from '@/components/hrv/select'
 
-// The sub-department switcher (2026-10-10, the HR revamp handoff): top right
-// of every Revenue page's head — "SUB-DEPARTMENT" over the name, a chevron
-// that turns over while the menu is open; the menu lists each one with ✓ on
-// the open one, a rule, then "+ New sub-department · Copy Fair's rules, or
-// start blank". It replaced the sidebar's Fair | IR tree and the Rules page's
-// "Generate new sub-department" button. Picking one opens the same page for
-// it and remembers it, so the sidebar's links follow.
+// The sub-department switcher (2026-10-10, the HR revamp handoff; round 2's
+// one-line design 2026-10-11, portal-42): top right of every Revenue page's
+// head — "Sub-department | Fair" and a chevron that turns over while the menu
+// is open; the menu lists each one with ✓ on the open one, a rule, then
+// "+ New sub-department" (what it does is its tooltip now). It replaced the
+// sidebar's Fair | IR tree and the Rules page's "Generate new sub-department"
+// button. Picking one opens the same page for it and remembers it, so the
+// sidebar's links follow.
 
 export type RevenueView = 'cc' | 'sg' | 'rules'
 
@@ -74,16 +76,15 @@ export default function SubDeptSwitcher({ data, view }: { data: SwitcherData; vi
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <span className={s.text}>
-          <span className={s.label}>Sub-department</span>
-          <span className={s.name}>{data.current.name}</span>
-        </span>
+        <span className={s.label}>Sub-department</span>
+        <span className={s.rule} aria-hidden="true" />
+        <span className={s.name}>{data.current.name}</span>
         <span className={s.chev} aria-hidden="true">
           <Chevron />
         </span>
       </button>
       {open ? (
-        <div className={`${hv.menu} ${s.menu}`} role="menu">
+        <div className={s.menu} role="menu">
           {data.subs.map(o => {
             const on = o.slug === data.current.slug
             return (
@@ -93,7 +94,7 @@ export default function SubDeptSwitcher({ data, view }: { data: SwitcherData; vi
                 role="menuitemradio"
                 aria-checked={on}
                 aria-current={on ? 'true' : undefined}
-                className={hv.menuItem}
+                className={s.item}
                 onClick={() => pick(o.slug, o.name)}
               >
                 <span>{o.name}</span>
@@ -103,18 +104,18 @@ export default function SubDeptSwitcher({ data, view }: { data: SwitcherData; vi
           })}
           {data.canCreate ? (
             <>
-              <div className={hv.menuRule} />
+              <div className={s.menuRule} />
               <button
                 type="button"
                 role="menuitem"
-                className={`${hv.menuItem} ${s.newItem}`}
+                className={`${s.item} ${s.newItem}`}
+                title={`Copy ${data.current.name}'s rules, or start blank`}
                 onClick={() => {
                   setOpen(false)
                   setCreating(true)
                 }}
               >
                 + New sub-department
-                <span className={s.newSub}>Copy {data.current.name}&apos;s rules, or start blank</span>
               </button>
             </>
           ) : null}
@@ -177,11 +178,11 @@ function NewSubDepartmentWindow({ open, onClose, data, view }: { open: boolean; 
             <span className={s.fieldLabel}>
               <span>Department</span>
             </span>
-            <select name="department_id" defaultValue={data.current.departmentId} className={hv.select}>
+            <Select name="department_id" defaultValue={data.current.departmentId}>
               {data.departments.map(d => (
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
-            </select>
+            </Select>
           </label>
         ) : null}
         <div className={s.field}>

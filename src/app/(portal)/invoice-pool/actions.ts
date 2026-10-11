@@ -2,13 +2,13 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requirePayrollPayoutsAction } from '@/lib/auth'
+import { requirePayrollPayoutsActionOn } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 
 // ─── Request invoice pool release (Finance) ─────────────────────────────────
 
 export async function requestRelease(formData: FormData) {
-  const user = await requirePayrollPayoutsAction(['treasury', 'create'])
+  const user = await requirePayrollPayoutsActionOn('/invoice-pool', ['treasury', 'create'])
   const supabase = await createClient()
 
   const amountRaw = (formData.get('amount') as string) ?? '0'

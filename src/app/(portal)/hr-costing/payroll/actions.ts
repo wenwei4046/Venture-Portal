@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import {
   resolveCommissionWrite,
   type DerivedCommissionRow,
@@ -57,7 +57,7 @@ function revalidatePayroll(period: string) {
 
 /** Tick → Complete: the figures are checked and wait for the next batch. */
 export async function completePayrollRows(period: string, ids: string[]): Promise<{ completed: number; unchanged: number }> {
-  await requireAction('hr_costing', 'edit')
+  await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   assertPeriod(period)
   assertIds(ids, 'complete')
   const supabase = await createClient()
@@ -71,7 +71,7 @@ export async function completePayrollRows(period: string, ids: string[]): Promis
 
 /** Completed but not yet sent: back to an editable draft. */
 export async function unlockPayrollRows(period: string, ids: string[]): Promise<{ unlocked: number }> {
-  await requireAction('hr_costing', 'edit')
+  await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   assertPeriod(period)
   assertIds(ids, 'unlock')
   const supabase = await createClient()
@@ -97,7 +97,7 @@ export interface SubmittedBatch {
  * the payroll month — a top-up batch books only its difference.
  */
 export async function submitPayrollBatch(period: string, expectedPeople: number, expectedTotal: number): Promise<SubmittedBatch> {
-  const user = await requireAction('hr_costing', 'create')
+  const user = await requireActionOn('/hr-costing/payroll', 'hr_costing', 'create')
   assertPeriod(period)
   if (!Number.isInteger(expectedPeople) || expectedPeople < 1 || !Number.isFinite(expectedTotal)) {
     throw new Error('Refresh the page and try again — the batch preview did not come through.')
@@ -143,7 +143,7 @@ export async function submitPayrollBatch(period: string, expectedPeople: number,
 
 /** A batch whose accrual JVs failed to post: try again (idempotent). */
 export async function retryPayrollBatchAccruals(period: string, batchId: string): Promise<string[]> {
-  const user = await requireAction('hr_costing', 'edit')
+  const user = await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   assertPeriod(period)
   if (!UUID.test(batchId)) throw new Error('Which batch?')
   const supabase = await createClient()
@@ -165,7 +165,7 @@ export async function resubmitPayrollRow(
   rowId: string,
   kind: TopupKind = 'resubmit',
 ): Promise<void> {
-  await requireAction('hr_costing', 'create')
+  await requireActionOn('/hr-costing/payroll', 'hr_costing', 'create')
   assertPeriod(period)
   if ((scope !== 'staff' && scope !== 'directors') || !UUID.test(rowId)) throw new Error('Which person?')
   if (!isTopupKind(kind)) throw new Error('Resubmit or Second payroll?')
@@ -178,7 +178,7 @@ export async function resubmitPayrollRow(
 
 /** Put an unlocked row back as it was sent — only while nothing changed. */
 export async function cancelPayrollResubmit(period: string, scope: 'staff' | 'directors', rowId: string): Promise<void> {
-  await requireAction('hr_costing', 'edit')
+  await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   assertPeriod(period)
   if ((scope !== 'staff' && scope !== 'directors') || !UUID.test(rowId)) throw new Error('Which person?')
   const supabase = await createClient()
@@ -189,7 +189,7 @@ export async function cancelPayrollResubmit(period: string, scope: 'staff' | 'di
 
 /** Total Close: the month can no longer change. */
 export async function closePayrollMonth(period: string): Promise<void> {
-  await requireAction('hr_costing', 'edit')
+  await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   assertPeriod(period)
   const supabase = await createClient()
   const { error } = await supabase.rpc('payroll_close_month', { p_period: period })
@@ -199,7 +199,7 @@ export async function closePayrollMonth(period: string): Promise<void> {
 
 /** The Principal's way back into a closed month (audited, with a reason). */
 export async function reopenPayrollMonth(period: string, reason: string): Promise<void> {
-  await requireAction('hr_costing', 'edit')
+  await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   assertPeriod(period)
   const why = typeof reason === 'string' ? reason.trim() : ''
   if (!why) throw new Error('Say why the month is being reopened.')
@@ -211,7 +211,7 @@ export async function reopenPayrollMonth(period: string, reason: string): Promis
 
 /** A batch whose funding request was cancelled: file it again, for the same amount. */
 export async function refilePayrollBatchRequest(period: string, batchId: string): Promise<void> {
-  const user = await requireAction('hr_costing', 'create')
+  const user = await requireActionOn('/hr-costing/payroll', 'hr_costing', 'create')
   assertPeriod(period)
   if (!UUID.test(batchId)) throw new Error('Which batch?')
   const supabase = await createClient()
@@ -394,7 +394,7 @@ export async function updatePayrollRow(
   id: string,
   fields: PayrollRowUpdate,
 ): Promise<void> {
-  const user = await requireAction('hr_costing', 'edit')
+  const user = await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   const supabase = await createClient()
 
   const { failures } = await writePayrollRows(supabase, user.id, [{ id, fields }])
@@ -412,7 +412,7 @@ export async function updatePayrollRow(
 export async function updatePayrollRows(
   updates: { id: string; fields: PayrollRowUpdate }[],
 ): Promise<{ saved: number }> {
-  const user = await requireAction('hr_costing', 'edit')
+  const user = await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   if (updates.length === 0) return { saved: 0 }
 
   const supabase = await createClient()
@@ -445,7 +445,7 @@ export async function updateStaffStatutory(
   id: string,
   fields: StaffStatutoryUpdate,
 ): Promise<void> {
-  const user = await requireAction('hr_costing', 'edit')
+  const user = await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   const keys = Object.keys(fields ?? {})
   if (keys.length === 0) throw new Error('No statutory fields provided')
   const unknown = keys.find(k => !isStatutoryField(k))
@@ -460,7 +460,7 @@ export async function updateStaffStatutory(
 
 /** Reset to JADUAL: every typed statutory figure on the row goes; the lookup takes them back. */
 export async function resetStaffStatutoryToLookup(id: string): Promise<void> {
-  await requireAction('hr_costing', 'edit')
+  await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   const supabase = await createClient()
 
   await assertDraftRowsOpen(supabase, [id])
@@ -500,7 +500,7 @@ export async function deletePayrollRows(
   ids: string[],
   period: string,
 ): Promise<{ deleted: number }> {
-  await requireAction('hr_costing', 'edit')
+  await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   if (ids.length === 0) return { deleted: 0 }
 
   const supabase = await createClient()
@@ -531,7 +531,7 @@ export async function deletePayrollRows(
  * from then on rows leave one at a time, and only while still drafts.
  */
 export async function deletePayrollPeriod(period: string): Promise<{ deleted: number }> {
-  await requireAction('hr_costing', 'edit')
+  await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   const supabase = await createClient()
 
   await assertPeriodOpen(supabase, period)
@@ -574,7 +574,7 @@ export async function deletePayrollPeriod(period: string): Promise<{ deleted: nu
  * `seedPayrollRows` in lib/payroll-period.ts owns that rule.
  */
 export async function createPayrollPeriod(period: string): Promise<{ created: number }> {
-  await requireAction('hr_costing', 'create')
+  await requireActionOn('/hr-costing/payroll', 'hr_costing', 'create')
   const supabase = await createClient()
 
   await assertPeriodOpen(supabase, period)
@@ -618,7 +618,7 @@ export async function cancelPayrollPaymentRequest(
   requestId: string,
   reason: string,
 ): Promise<void> {
-  const user = await requireAction('hr_costing', 'edit')
+  const user = await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   const supabase = await createClient()
 
   const trimmed = reason.trim()
@@ -671,7 +671,7 @@ export async function cancelPayrollPaymentRequest(
  * Only affects existing draft rows for p_period — does not create new rows.
  */
 export async function copyFromLastMonth(period: string): Promise<{ copied: number }> {
-  await requireAction('hr_costing', 'edit')
+  await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   const supabase = await createClient()
   await assertPeriodOpen(supabase, period)
 

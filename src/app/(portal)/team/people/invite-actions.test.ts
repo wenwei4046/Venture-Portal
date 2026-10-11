@@ -1,18 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
+  viewingAs: false,
   requirePermission: vi.fn(),
   createClient: vi.fn(),
   createUser: vi.fn(),
   deleteUser: vi.fn(),
   revalidatePath: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission, requireActionOn: mocks.requirePermission, requireAnyActionOn: mocks.requirePermission, requirePayrollPayoutsActionOn: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/supabase/admin', () => ({
   adminClient: () => ({ auth: { admin: { createUser: mocks.createUser, deleteUser: mocks.deleteUser } } }),
 }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
+// Viewing as somebody writes nothing (2026-10-11); here nobody is.
+vi.mock('@/lib/view-as-person', () => ({ viewingAsSomebody: async () => mocks.viewingAs }))
 
 import { inviteUser } from './invite-actions'
 
@@ -73,7 +76,7 @@ describe('inviting somebody on the roster', () => {
 
   it('creates the login with the account kind their title’s template hands out, and attaches it', async () => {
     expect(await invite()).toEqual({ ok: true, name: 'ONG SIEW LAN', email: 'siew@houzs.com' })
-    expect(mocks.requirePermission).toHaveBeenCalledWith('accounts', 'create')
+    expect(mocks.requirePermission).toHaveBeenCalledWith(expect.any(String), 'accounts', 'create')
     expect(db.writes).toEqual([
       { table: 'users', row: { id: 'new-user', email: 'siew@houzs.com', name: 'ONG SIEW LAN', role: 'finance', department_id: 'finance' } },
       { table: 'hr_staff_costs', row: { user_id: 'new-user', email: 'siew@houzs.com' }, id: ONG },
@@ -122,6 +125,13 @@ describe('inviting somebody on the roster', () => {
     expect(mocks.revalidatePath).not.toHaveBeenCalled()
   })
 
+  // A login is minted with the service role, around the read-only session (2026-10-11).
+  it('mints nothing while viewing the portal as somebody', async () => {
+    mocks.viewingAs = true
+    expect(await invite()).toEqual({ ok: false, reason: 'Read-only while viewing as somebody — nothing is saved.' })
+    expect(mocks.createUser).not.toHaveBeenCalled()
+    mocks.viewingAs = false
+  })
   it('requires the invite permission before reading anything', async () => {
     mocks.requirePermission.mockRejectedValueOnce(new Error('NEXT_REDIRECT'))
     await expect(invite()).rejects.toThrow('NEXT_REDIRECT')

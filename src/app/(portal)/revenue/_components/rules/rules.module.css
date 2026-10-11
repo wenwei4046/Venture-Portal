@@ -174,20 +174,6 @@ select.paramValue { font-family: inherit; font-size: 13px; cursor: pointer; }
 }
 .defRow:last-child { border-bottom: 0; }
 .defName { font-weight: 500; }
-.divisor {
-  display: inline-block;
-  box-sizing: content-box;
-  width: 56px;
-  padding: 5px 8px;
-  border: 1px solid rgb(var(--hv-hairline));
-  border-radius: 4px;
-  font: inherit;
-  font-size: 13px;
-  line-height: normal;
-  background: rgb(255 255 255);
-  color: rgb(var(--hv-ink));
-}
-.quietNote { color: rgb(var(--hv-brown)); margin-left: 8px; }
 .modeSelect {
   appearance: none;
   -webkit-appearance: none;

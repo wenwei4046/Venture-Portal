@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { requirePayrollPayoutsAction } from '@/lib/auth'
+import { requirePayrollPayoutsActionOn } from '@/lib/auth'
 import { generateAllianceBankCsv } from '@/lib/bank-transfer/alliance-bank'
 import { salaryBankPayees, type SalaryBankLine } from '@/lib/bank-transfer/payroll-voucher-payees'
 import { readPayrollLineAccounts, withLineAccounts } from '@/lib/private-fields'
@@ -18,7 +18,7 @@ export async function GET(
   // Payroll payouts (2026-10-02) — and since 2026-10-09 (PR4, the user's
   // choice A) a title that ticks Bank accounts: the bank cannot pay ••••, so
   // without the tick there is no file rather than a masked one.
-  const user = await requirePayrollPayoutsAction(['hr_costing', 'export'], ['treasury', 'export'])
+  const user = await requirePayrollPayoutsActionOn('/hr-costing/payroll/[period]', ['hr_costing', 'export'], ['treasury', 'export'])
   if (!sees(user, 'bank')) {
     return NextResponse.json({ error: needsTick('bank', 'The payroll bank file') }, { status: 403 })
   }

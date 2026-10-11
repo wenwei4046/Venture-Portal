@@ -5,20 +5,21 @@ import { HvPage, PageHead } from '@/components/hrv/kit'
 import { Tabs } from '@/components/hrv/tabs'
 import type { AdminMemberData } from '@/app/(member)/member/actions'
 import type { ClaimRatesAdmin } from '@/lib/member/claim-rates-admin'
-import type { MemoReads, RequestFacts } from '@/lib/member/member-services'
+import type { RequestFacts } from '@/lib/member/member-services'
 import RequestReviews from './RequestReviews'
 import BrandWeeksPanel from './BrandWeeksPanel'
 import ClaimRatesPanel from './ClaimRatesPanel'
-import MemoPanel from './MemoPanel'
 
-type Tab = 'requests' | 'weeks' | 'claims' | 'memos'
+type Tab = 'requests' | 'weeks' | 'claims'
 
 /**
  * People › Member services (2026-10-10, the HR revamp handoff, variant A):
- * Request reviews · Brand weeks · Claim rates · Publish memo. The headcount
- * limit went to Revenue › Rules › Capacity (PR2) and Product options — only a
- * pointer to the Product List's Modular since 2026-09-24 — went with this
- * redraw.
+ * Request reviews · Brand weeks · Claim rates. The headcount limit went to
+ * Revenue › Rules › Capacity (PR2), Product options — only a pointer to the
+ * Product List's Modular since 2026-09-24 — went with this redraw, and
+ * Publish memo moved to People › Documentation › Publish (round 2,
+ * 2026-10-11: the handoff's README §6 — a memo now goes to people, by
+ * department, from any department).
  *
  * The tab is the page's own state, not the URL: Brand weeks reads its month
  * with a Server Action when it is opened, and a URL pushed while one is in
@@ -28,22 +29,17 @@ type Tab = 'requests' | 'weeks' | 'claims' | 'memos'
 export default function MemberServicesView({
   data,
   facts,
-  memoReads,
   claimRates,
   initialRequestId,
 }: {
   data: AdminMemberData
   facts: Record<string, RequestFacts> | null
-  memoReads: Record<string, MemoReads> | null
   claimRates: ClaimRatesAdmin | null
   initialRequestId: string | null
 }) {
-  const tabs: Array<{ key: Tab; label: string }> = [
-    ...(data.canManageRequests
-      ? ([{ key: 'requests', label: 'Request reviews' }, { key: 'weeks', label: 'Brand weeks' }, { key: 'claims', label: 'Claim rates' }] as const)
-      : []),
-    ...(data.canPublishMemos ? ([{ key: 'memos', label: 'Publish memo' }] as const) : []),
-  ]
+  const tabs: Array<{ key: Tab; label: string }> = data.canManageRequests
+    ? [{ key: 'requests', label: 'Request reviews' }, { key: 'weeks', label: 'Brand weeks' }, { key: 'claims', label: 'Claim rates' }]
+    : []
   const [tab, setTab] = useState<Tab>(tabs[0]?.key ?? 'requests')
   // A tab mounts when it is first opened and then stays, hidden, so what was
   // typed on it waits for the user's return — and Brand weeks reads once.
@@ -53,7 +49,7 @@ export default function MemberServicesView({
 
   return (
     <HvPage>
-      <PageHead eyebrow="People · Member services" title="Member services" subtitle="Manage HR requests, waiting lists, memos and the member catalogue." />
+      <PageHead eyebrow="People · Member services" title="Member services" subtitle="Manage HR requests, waiting lists and the member catalogue." />
       {tabs.length > 1 ? (
         <Tabs
           items={tabs}
@@ -82,12 +78,7 @@ export default function MemberServicesView({
           <ClaimRatesPanel initial={claimRates} />
         </div>
       ) : null}
-      {allowed('memos') && show('memos') ? (
-        <div hidden={tab !== 'memos'}>
-          <MemoPanel data={data} reads={memoReads} />
-        </div>
-      ) : null}
-      {tabs.length === 0 ? <p>Member services needs HR request management or memo publishing access.</p> : null}
+      {tabs.length === 0 ? <p>Member services needs HR request management access. Memos are published from People › Documentation.</p> : null}
     </HvPage>
   )
 }

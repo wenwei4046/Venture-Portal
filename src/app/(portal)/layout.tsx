@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { requireAuth } from '@/lib/auth'
 import PortalFrame from '@/components/layout/PortalFrame'
 import { emptyNavData, readsDeptStatements, type NavData } from '@/components/layout/nav-config'
@@ -8,6 +8,7 @@ import { statementDepts } from '@/lib/dept-statements'
 import { HR_NAV_COOKIE, REVENUE_SUB_COOKIE, isHrView } from '@/lib/hr-view'
 import { listSubDepartments } from './revenue/_lib/sub-departments'
 import { redirect } from 'next/navigation'
+import { isPhone, opensHrAppOnPhone } from '@/lib/one-app'
 
 export default async function PortalLayout({
   children,
@@ -16,6 +17,8 @@ export default async function PortalLayout({
 }) {
   const user = await requireAuth()
   if (user.role === 'revenue_member') redirect('/member')
+  // One app (2026-10-11, lib/one-app.ts): on a phone, HR's view IS the HR app — its other pages are the computer's.
+  if (opensHrAppOnPhone(user) && isPhone((await headers()).get('user-agent'))) redirect('/hr-app')
   const jar = await cookies()
 
   // Almost all of the nav is a constant, but the Revenue group lists the

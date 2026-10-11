@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { buildXlsxBuffer } from '@/lib/export/excel'
 import { exportXlsxResponse } from '@/lib/export/response'
@@ -38,8 +38,8 @@ function total(rows: DueRow[]): Cell[] {
 }
 
 export async function GET(req: Request): Promise<Response> {
-  await requireAction('treasury', 'view')
-  await requireAction('treasury', 'export')
+  await requireActionOn('/repayment-schedule', 'treasury', 'view')
+  await requireActionOn('/repayment-schedule', 'treasury', 'export')
   const supabase = await createClient()
   const s = await loadRepaymentSchedule(supabase, new URL(req.url).searchParams.get('month'))
 

@@ -32,6 +32,11 @@ export const FUNCTIONS: Record<string, { actions: Action[]; scopes: Scope[] }> =
   audit_log: { actions: ['view', 'export'], scopes: ['all'] },
   settings: { actions: ['view', 'manage'], scopes: ['all'] },
   view_switch: { actions: ['view'], scopes: ['all'] },
+  // HR revamp round 2 (mig 20261011060000).
+  documentation: { actions: ['view', 'create', 'edit'], scopes: ['all'] },
+  hiring: { actions: ['view', 'create', 'edit', 'approve'], scopes: ['all'] },
+  rooms: { actions: ['view', 'create', 'edit'], scopes: ['all'] },
+  guest_link: { actions: ['view', 'edit'], scopes: ['all'] },
 }
 
 // `permission_cell_keys` (as permission-matrix.test.ts holds it).
@@ -51,23 +56,29 @@ export const CELL_KEYS: CellKey[] = [
   K('revenue_app', 'view', 'member_memos', 'own'), K('revenue_app', 'view', 'member_insight', 'own'), K('revenue_app', 'create', 'member_quote', 'own'),
   K('revenue_app', 'create', 'member_requests', 'own'), K('crm', 'view', 'member_crm', 'own'), K('crm', 'manage', 'crm_manage', 'all'),
   K('view_switch', 'view', 'view_switch', 'all', 'principal'),
+  K('documentation', 'view', 'documentation', 'all'), K('hiring', 'view', 'hiring', 'all'), K('rooms', 'view', 'meeting_rooms', 'all'),
+  K('rooms', 'edit', 'meeting_rooms_manage', 'all'), K('guest_link', 'view', 'guest_link', 'all'),
 ]
 
-// The eleven templates exactly as production holds them on 2026-10-11 (permission_template_grants).
+// The eleven templates exactly as production holds them on 2026-10-11 (permission_template_grants) —
+// with round 2's cells (20261011060000): every portal template books a room; Ultimate, Full and HR
+// hold Documentation, Hiring, Meeting rooms and the Guest link whole.
+const ROOMS = ' rooms.create:all rooms.view:all'
+const ROUND2 = ' documentation.create:all documentation.edit:all documentation.view:all guest_link.edit:all guest_link.view:all hiring.approve:all hiring.create:all hiring.edit:all hiring.view:all rooms.create:all rooms.edit:all rooms.view:all'
 const everything = (withSwitch: boolean) => Object.entries(FUNCTIONS)
   .filter(([key]) => key !== 'revenue_app' && (withSwitch || key !== 'view_switch'))
   .flatMap(([key, f]) => f.actions.map(a => `${key}.${a}:${f.scopes[f.scopes.length - 1]}`)).join(' ')
 export const PROD: Record<string, { cells: string; sensitive: SensitiveField[]; baseRole: string }> = {
-  dept_head: { baseRole: 'dept_manager', sensitive: [], cells: 'claims.approve:dept claims.create:own claims.view:dept dashboard.view:all dept_pool.export:dept dept_pool.view:dept dept_reports.export:dept dept_reports.view:dept my_billing.create:dept my_billing.view:dept opex.view:dept team.view:dept' },
-  director: { baseRole: 'staff', sensitive: ['salary'], cells: 'approvals.approve:all approvals.view:all claims.create:own claims.view:own dashboard.view:all dept_reports.view:all director_pool.view:all director_salary.approve:all director_salary.view:all reports.export:all reports.view:all team.view:all treasury.approve:all treasury.create:all treasury.export:all treasury.view:all venture_pool.view:all' },
-  office: { baseRole: 'staff', sensitive: [], cells: 'approvals.view:all claims.create:own claims.view:own dashboard.view:all reports.view:all team.view:all' },
-  fin_checker: { baseRole: 'finance', sensitive: ['bank'], cells: 'billing.export:all billing.view:all categories.manage:all categories.view:all claims.approve:all claims.view:all dashboard.view:all dept_pool.view:all dept_reports.export:all dept_reports.view:all reconciliation.approve:all reconciliation.view:all reports.export:all reports.view:all treasury.approve:all treasury.export:all treasury.view:all venture_pool.export:all venture_pool.view:all' },
-  fin_maker: { baseRole: 'finance', sensitive: ['bank'], cells: 'billing.create:all billing.edit:all billing.view:all claims.create:own claims.view:own dashboard.view:all reconciliation.create:all reconciliation.edit:all reconciliation.view:all treasury.create:all treasury.edit:all treasury.view:all venture_pool.create:all venture_pool.view:all' },
+  dept_head: { baseRole: 'dept_manager', sensitive: [], cells: 'claims.approve:dept claims.create:own claims.view:dept dashboard.view:all dept_pool.export:dept dept_pool.view:dept dept_reports.export:dept dept_reports.view:dept my_billing.create:dept my_billing.view:dept opex.view:dept team.view:dept' + ROOMS },
+  director: { baseRole: 'staff', sensitive: ['salary'], cells: 'approvals.approve:all approvals.view:all claims.create:own claims.view:own dashboard.view:all dept_reports.view:all director_pool.view:all director_salary.approve:all director_salary.view:all reports.export:all reports.view:all team.view:all treasury.approve:all treasury.create:all treasury.export:all treasury.view:all venture_pool.view:all' + ROOMS },
+  office: { baseRole: 'staff', sensitive: [], cells: 'approvals.view:all claims.create:own claims.view:own dashboard.view:all reports.view:all team.view:all' + ROOMS },
+  fin_checker: { baseRole: 'finance', sensitive: ['bank'], cells: 'billing.export:all billing.view:all categories.manage:all categories.view:all claims.approve:all claims.view:all dashboard.view:all dept_pool.view:all dept_reports.export:all dept_reports.view:all reconciliation.approve:all reconciliation.view:all reports.export:all reports.view:all treasury.approve:all treasury.export:all treasury.view:all venture_pool.export:all venture_pool.view:all' + ROOMS },
+  fin_maker: { baseRole: 'finance', sensitive: ['bank'], cells: 'billing.create:all billing.edit:all billing.view:all claims.create:own claims.view:own dashboard.view:all reconciliation.create:all reconciliation.edit:all reconciliation.view:all treasury.create:all treasury.edit:all treasury.view:all venture_pool.create:all venture_pool.view:all' + ROOMS },
   full: { baseRole: 'principal', sensitive: ['salary', 'nric', 'bank'], cells: everything(false) },
-  hr: { baseRole: 'hr', sensitive: ['salary', 'nric', 'bank'], cells: 'accounts.view:all claims.create:own claims.view:own dashboard.view:all director_pool.view:all director_salary.edit:all director_salary.view:all hr_costing.create:all hr_costing.edit:all hr_costing.export:all hr_costing.view:all member.manage:all member.view:all revenue.create:all revenue.edit:all revenue.manage:all revenue.view:all team.create:all team.edit:all team.view:all' },
+  hr: { baseRole: 'hr', sensitive: ['salary', 'nric', 'bank'], cells: 'accounts.view:all claims.create:own claims.view:own dashboard.view:all director_pool.view:all director_salary.edit:all director_salary.view:all hr_costing.create:all hr_costing.edit:all hr_costing.export:all hr_costing.view:all member.manage:all member.view:all revenue.create:all revenue.edit:all revenue.manage:all revenue.view:all team.create:all team.edit:all team.view:all' + ROUND2 },
   revenue_director: { baseRole: 'revenue_member', sensitive: [], cells: 'crm.edit:all crm.manage:all crm.view:all revenue_app.create:own revenue_app.view:own' },
   revenue_team: { baseRole: 'revenue_member', sensitive: [], cells: 'crm.edit:own crm.view:own revenue_app.create:own revenue_app.view:own' },
-  staff: { baseRole: 'staff', sensitive: [], cells: 'claims.create:own claims.edit:own claims.view:own dashboard.view:all' },
+  staff: { baseRole: 'staff', sensitive: [], cells: 'claims.create:own claims.edit:own claims.view:own dashboard.view:all' + ROOMS },
   ultimate: { baseRole: 'principal', sensitive: ['salary', 'nric', 'bank'], cells: everything(true) },
 }
 export const cellsOf = (spec: string) => new Map(spec.split(' ').map(c => c.split(':') as [string, Scope]))

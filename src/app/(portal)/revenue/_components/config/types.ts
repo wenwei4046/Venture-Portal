@@ -33,8 +33,8 @@ export interface SchemeRow {
   direct_line_limit?: number | null
   deposit_threshold_pct: number | null
   default_rate_mode: 'fixed' | 'variable'
-  /** Revenue Team cost = unit cost ÷ this (Fair 0.7). 1 = cost as keyed. */
-  revenue_cost_divisor?: number | string | null
+  // No `revenue_cost_divisor`: the Revenue Team cost basis is Product List ›
+  // Costing Setting's alone (2026-10-11) — Rules neither shows nor writes it.
 }
 
 /**

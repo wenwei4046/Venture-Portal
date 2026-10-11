@@ -58,11 +58,12 @@
 .frameIos .screen { border-radius: 52px; }
 .frameAndroid .screen { border-radius: 36px; }
 .frameDesk .screen { border-radius: 14px; }
-/* live: the real status bar and home indicator are the phone's own */
+/* live: the real status bar and home indicator are the phone's own. The phone's own bar at the foot stays
+   white whatever the status colour: it shows there while the nav is tucked away (2026-10-11, pwa/tuck.ts). */
 .screenLive {
   height: 100dvh;
   padding-top: env(safe-area-inset-top, 0px);
-  background: var(--status-bg, var(--rv-white));
+  background: linear-gradient(var(--rv-white), var(--rv-white)) bottom / 100% var(--safe-bottom, 0px) no-repeat, var(--status-bg, var(--rv-white));
   transition: background-color 220ms ease;
 }
 

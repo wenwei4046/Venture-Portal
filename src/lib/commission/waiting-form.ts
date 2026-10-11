@@ -68,10 +68,71 @@ export const BUILTIN_FIELDS: readonly WaitingField[] = [
   { id: 'start', label: 'Preferred start date', type: 'date', required: true, builtin: true },
 ]
 
+// ── The replacement list's form (2026-10-11, round 2's README 18.5) ────────
+//
+// The same Form settings and Upload form, its own versions in
+// `member_replacement_forms` (mig 20261011130000). Its built-in questions are
+// the five `member_prepare_request` needs for a replacement — the handoff
+// lists Reason among HR's own, but the database refuses a replacement
+// without one, so it is built in here.
+
+/** Which list a form belongs to. */
+export type MemberFormKind = 'waiting' | 'replacement'
+
+export const REPLACEMENT_BUILTIN_TYPES: Readonly<Record<string, WaitingFieldType>> = {
+  original: 'dropdown',
+  destination: 'dropdown',
+  source: 'dropdown',
+  effective: 'date',
+  reason: 'text',
+}
+
+export const REPLACEMENT_FORM_NAME = 'HOUZS Revenue - Replacement form.html'
+
+/** The five as version 1 seeds them — the Revenue app draws each with its own controls. */
+export const REPLACEMENT_BUILTIN_FIELDS: readonly WaitingField[] = [
+  { id: 'original', label: 'Member leaving', type: 'dropdown', required: true, builtin: true, options: ['From the team list'] },
+  { id: 'destination', label: 'Arrangement', type: 'dropdown', required: true, builtin: true, options: ['Leave this department only', 'Leave the company', 'Transfer to another department'] },
+  { id: 'source', label: 'Replaced by', type: 'dropdown', required: true, builtin: true, options: ['New member joining', 'Existing member', 'Waiting list', 'Release the position'] },
+  { id: 'effective', label: 'Effective date', type: 'date', required: true, builtin: true },
+  { id: 'reason', label: 'Reason', type: 'text', required: true, builtin: true },
+]
+
+interface KindSpec {
+  builtinTypes: Readonly<Record<string, WaitingFieldType>>
+  builtinFields: readonly WaitingField[]
+  /** How the database counts them, in its own words. */
+  count: string
+  formName: string
+  /** The built form's heading. */
+  heading: string
+  /** Who signs the built form first. */
+  signer: string
+}
+
+export const FORM_KINDS: Readonly<Record<MemberFormKind, KindSpec>> = {
+  waiting: {
+    builtinTypes: BUILTIN_TYPES,
+    builtinFields: BUILTIN_FIELDS,
+    count: 'four',
+    formName: BUILT_FORM_NAME,
+    heading: 'Waiting list application',
+    signer: 'Applicant signature',
+  },
+  replacement: {
+    builtinTypes: REPLACEMENT_BUILTIN_TYPES,
+    builtinFields: REPLACEMENT_BUILTIN_FIELDS,
+    count: 'five',
+    formName: REPLACEMENT_FORM_NAME,
+    heading: 'Replacement form',
+    signer: 'Member leaving — signature',
+  },
+}
+
 const TYPE_KEYS = new Set<string>(FIELD_TYPES.map(t => t[0]))
 
-/** `member_waiting_form()`'s answer, or null when it is not one. */
-export function formFromRow(raw: unknown): WaitingForm | null {
+/** `member_waiting_form()`'s (or `member_replacement_form()`'s) answer, or null when it is not one. */
+export function formFromRow(raw: unknown, kind: MemberFormKind = 'waiting'): WaitingForm | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
   const version = Number(r.version)
@@ -96,7 +157,7 @@ export function formFromRow(raw: unknown): WaitingForm | null {
     fields,
     requireUpload: r.requireUpload === true,
     templatePath: typeof r.templatePath === 'string' && r.templatePath ? r.templatePath : null,
-    templateName: typeof r.templateName === 'string' && r.templateName ? r.templateName : BUILT_FORM_NAME,
+    templateName: typeof r.templateName === 'string' && r.templateName ? r.templateName : FORM_KINDS[kind].formName,
     createdAt: typeof r.createdAt === 'string' ? r.createdAt : null,
   }
 }
@@ -157,9 +218,11 @@ export function cleanedFields(fields: readonly WaitingField[]): WaitingField[] {
     }))
 }
 
-/** Why `member_save_waiting_form` would refuse these questions, in its words — or null. */
-export function waitingFormRefusal(fields: readonly WaitingField[]): string | null {
-  if (fields.length < 4 || fields.length > 40) return 'A form has from 4 to 40 questions'
+/** Why `member_save_waiting_form` (or `member_save_replacement_form`) would refuse these questions, in its words — or null. */
+export function waitingFormRefusal(fields: readonly WaitingField[], kind: MemberFormKind = 'waiting'): string | null {
+  const spec = FORM_KINDS[kind]
+  const least = Object.keys(spec.builtinTypes).length
+  if (fields.length < least || fields.length > 40) return `A form has from ${least} to 40 questions`
   const ids = new Set<string>()
   for (const f of fields) {
     if (!/^[A-Za-z][A-Za-z0-9_]{0,40}$/.test(f.id) || ids.has(f.id)) return 'Every question needs its own id'
@@ -167,11 +230,11 @@ export function waitingFormRefusal(fields: readonly WaitingField[]): string | nu
     const label = f.label.trim()
     if (label.length < 1 || label.length > 120) return 'Every question needs a label of at most 120 characters'
     if (!TYPE_KEYS.has(f.type)) return 'A question is Text, Dropdown, Date, Yes / No or Phone'
-    const builtin = BUILTIN_TYPES[f.id]
+    const builtin = spec.builtinTypes[f.id]
     if (builtin) {
       if (f.type !== builtin || !f.required || !f.builtin) return 'The built-in questions stay required and keep their kind'
     } else if (f.builtin) {
-      return 'Only the four built-in questions are built in'
+      return `Only the ${spec.count} built-in questions are built in`
     }
     if (f.type === 'dropdown' && !builtin) {
       const options = (f.options ?? []).map(o => o.trim())
@@ -181,7 +244,7 @@ export function waitingFormRefusal(fields: readonly WaitingField[]): string | nu
       }
     }
   }
-  if (!Object.keys(BUILTIN_TYPES).every(id => ids.has(id))) return 'The four built-in questions cannot be removed'
+  if (!Object.keys(spec.builtinTypes).every(id => ids.has(id))) return `The ${spec.count} built-in questions cannot be removed`
   return null
 }
 
@@ -242,18 +305,22 @@ function esc(s: string): string {
 /**
  * The black-and-white form members print, fill in by hand and sign — every
  * question in order, a line to write on, a box per option. The built-in
- * "Preferred sub-department" offers the department's sub-departments.
+ * "Preferred sub-department" offers the department's sub-departments; the
+ * replacement's "Member leaving" is a name, written on its line.
  */
 export function applicationFormHtml(
   form: Pick<WaitingForm, 'version' | 'fields' | 'templateName'>,
   subName: string | null,
   subOptions: readonly string[],
+  kind: MemberFormKind = 'waiting',
 ): string {
+  const spec = FORM_KINDS[kind]
   const rows = form.fields
     .map(f => {
       const options = f.id === 'target' && f.builtin ? subOptions : f.options ?? []
       let box = '<div class="line"></div>'
-      if (f.type === 'dropdown') box = '<div class="opts">' + options.map(o => '<span>&#9744; ' + esc(o) + '</span>').join('') + '</div>'
+      if (f.type === 'dropdown' && !(kind === 'replacement' && f.builtin && f.id === 'original'))
+        box = '<div class="opts">' + options.map(o => '<span>&#9744; ' + esc(o) + '</span>').join('') + '</div>'
       if (f.type === 'yesno') box = '<div class="opts"><span>&#9744; Yes</span><span>&#9744; No</span></div>'
       if (f.type === 'date') box = '<div class="line short">&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>'
       return '<div class="row"><div class="lab">' + esc(f.label) + (f.required ? ' *' : '') + '</div>' + box + '</div>'
@@ -266,9 +333,9 @@ export function applicationFormHtml(
     '.line{border-bottom:1px solid #000;height:22px}.line.short{width:180px;font-size:12px}.opts{display:flex;gap:22px;font-size:13px;flex-wrap:wrap}' +
     '.sig{display:flex;gap:40px;margin-top:40px}.sig div{flex:1}.foot{margin-top:36px;font-size:11px;border-top:1px solid #000;padding-top:10px}' +
     '@media print{body{margin:0}}</style></head><body>' +
-    '<h1>HOUZS Venture · Waiting list application</h1><p class="sub">Revenue Department' + (subName ? ' · ' + esc(subName) : '') + ' · Form v' + form.version + '</p>' +
+    '<h1>HOUZS Venture · ' + spec.heading + '</h1><p class="sub">Revenue Department' + (subName ? ' · ' + esc(subName) : '') + ' · Form v' + form.version + '</p>' +
     rows +
-    '<div class="sig"><div><div class="line"></div><div class="lab">Applicant signature</div></div><div><div class="line"></div><div class="lab">Date</div></div></div>' +
+    '<div class="sig"><div><div class="line"></div><div class="lab">' + spec.signer + '</div></div><div><div class="line"></div><div class="lab">Date</div></div></div>' +
     '<div class="sig"><div><div class="line"></div><div class="lab">Submitted by (member)</div></div><div><div class="line"></div><div class="lab">Upline</div></div></div>' +
     '<p class="foot">Print in black and white, fill in by hand, sign, then photograph or scan and upload it with the request. HR keeps it as the record.</p>' +
     '</body></html>'

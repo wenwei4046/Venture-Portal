@@ -33,13 +33,15 @@ export interface ProductSheetActions {
 }
 
 /** The product sheet — mattress, sofa, bed frame only, accessories only (1864–2038). */
-export default function ProductSheet({ sheet, catalog, memory, cart, build, readOnly, actions }: {
+export default function ProductSheet({ sheet, catalog, memory, cart, build, readOnly, readOnlyLabel = "Read-only while viewing as", actions }: {
   sheet: SheetState | null;
   catalog: QCatalog;
   memory: QuoteMemory;
   cart: CartLine[];
   build: SofaBuild;
   readOnly: boolean;
+  /** What the add button says while read-only: View as's words, or "View only" for an account whose ticks close the Quote's Create (2026-10-11). */
+  readOnlyLabel?: string;
   actions: ProductSheetActions;
 }) {
   if (!sheet) return null;
@@ -60,7 +62,7 @@ export default function ProductSheet({ sheet, catalog, memory, cart, build, read
   const setQty = (n: number) => (inF ? a.patchFrame({ qty: n }) : a.patch({ qty: n }));
   let addText: string;
   let addOn: boolean;
-  if (readOnly) { addText = "Read-only while viewing as"; addOn = false; }
+  if (readOnly) { addText = readOnlyLabel; addOn = false; }
   else if (inF && sheet.mode === "model" && sheet.fx) {
     addOn = !!sheet.fx.frame;
     addText = !sheet.fx.frame ? "No bed frame in this size" : sheet.fx.idx >= 0 ? "Save bed frame" : qty > 1 ? `Add ${qty} bed frames` : "Add bed frame";

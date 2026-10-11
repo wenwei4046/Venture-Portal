@@ -8,6 +8,7 @@ import { flash } from '@/components/hrv/toast'
 import { levelLabel, type RoleRung, type RoleTitle } from '@/lib/hierarchy-roles'
 import { createTitle, deleteTitle, updateTitle } from '../title-actions'
 import s from './hierarchy.module.css'
+import { Select } from '@/components/hrv/select'
 
 export interface DepartmentOption {
   id: string
@@ -102,25 +103,25 @@ export default function TitleWindow({
         </label>
         <label className={s.twField}>
           <span className={s.twLabel}>Department</span>
-          <select className={hv.select} value={departmentId} onChange={e => setDepartmentId(e.target.value)}>
+          <Select value={departmentId} onChange={e => setDepartmentId(e.target.value)}>
             <option value="">No department</option>
             {departments.map(d => (
               <option key={d.id} value={d.id}>
                 {d.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className={s.twField}>
           <span className={s.twLabel}>Level</span>
-          <select className={hv.select} value={levelId} onChange={e => setLevelId(e.target.value)}>
+          <Select value={levelId} onChange={e => setLevelId(e.target.value)}>
             <option value="">Not on the ladder</option>
             {ladder.map(r => (
               <option key={r.id} value={r.id}>
                 {levelLabel(r.rank)} · {r.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         {title ? (
           <label className={s.twCheck}>

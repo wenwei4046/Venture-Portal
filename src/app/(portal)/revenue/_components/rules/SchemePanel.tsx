@@ -8,6 +8,7 @@ import { saveSchemeRules } from '../../config-actions'
 import type { SchemeRow } from '../config/types'
 import { SectionTop } from './SectionTop'
 import s from './rules.module.css'
+import { Select } from '@/components/hrv/select'
 
 // Rules › Scheme rules (2026-10-10, the HR revamp): the eight components as
 // switches in the prototype's order, a dot on each one changed since the
@@ -15,8 +16,10 @@ import s from './rules.module.css'
 // besides its switch — Group incentive's three layer settings (the
 // prototype's), and the ones this scheme also keeps: how Open Bill pays,
 // whether the override base counts KPI revenue, the deposit gate's % — opens
-// under its row while it is on. Defaults: the Revenue Team cost basis and the
-// default rate mode.
+// under its row while it is on. Defaults: the default rate mode. The Revenue
+// Team cost basis is not here (2026-10-11, the user: one number, one place) —
+// Product List › Costing Setting is the only place it is set, and this Save
+// never writes it.
 
 type SwitchKey = 'product' | 'kpi' | 'open_bill' | 'override' | 'margin_penalty' | 'margin_incentive' | 'group' | 'deposit'
 
@@ -39,7 +42,6 @@ interface Form {
   basis: 'uplift_on_commission' | 'pct_of_revenue'
   overrideKpi: boolean
   depositPct: string
-  divisor: string
   rateMode: 'fixed' | 'variable'
 }
 
@@ -64,7 +66,6 @@ function formOf(scheme: SchemeRow): Form {
     basis: scheme.open_bill_basis,
     overrideKpi: scheme.override_includes_kpi,
     depositPct: pct(scheme.deposit_threshold_pct),
-    divisor: blank(scheme.revenue_cost_divisor === null || scheme.revenue_cost_divisor === undefined ? 1 : Number(scheme.revenue_cost_divisor)),
     rateMode: scheme.default_rate_mode,
   }
 }
@@ -89,7 +90,6 @@ function toFormData(scheme: SchemeRow, f: Form): FormData {
   fd.set('direct_line_limit', f.directLimit.trim())
   fd.set('open_bill_basis', f.basis)
   fd.set('deposit_threshold_pct', f.depositPct.trim())
-  fd.set('revenue_cost_divisor', f.divisor.trim())
   fd.set('default_rate_mode', f.rateMode)
   return fd
 }
@@ -213,7 +213,8 @@ export default function SchemePanel({ scheme, subName, canManage }: { scheme: Sc
                   {param(
                     'Paid as',
                     'the Open Bill rates tab sets each rank',
-                    <select
+                    <Select
+                      plain
                       className={s.paramValue}
                       value={f.basis}
                       onChange={e => setF(p => ({ ...p, basis: e.target.value as Form['basis'] }))}
@@ -222,7 +223,7 @@ export default function SchemePanel({ scheme, subName, canManage }: { scheme: Sc
                     >
                       <option value="uplift_on_commission">uplift on that bill’s commission</option>
                       <option value="pct_of_revenue">% of that bill’s revenue</option>
-                    </select>,
+                    </Select>,
                   )}
                 </div>
               ) : null}
@@ -258,26 +259,11 @@ export default function SchemePanel({ scheme, subName, canManage }: { scheme: Sc
       <div className={s.secLabel}>Defaults</div>
       <div className={s.box}>
         <div className={s.defRow}>
-          <span className={s.defName}>Revenue Team cost basis</span>
-          <span>
-            unit cost ÷{' '}
-            <input
-              className={s.divisor}
-              type="number"
-              step="0.01"
-              value={f.divisor}
-              onChange={e => setF(p => ({ ...p, divisor: e.target.value }))}
-              disabled={!canManage}
-              aria-label="Revenue cost divisor"
-            />
-            <span className={s.quietNote}>0.7 turns RM 1,000 into RM 1,428.57</span>
-          </span>
-        </div>
-        <div className={s.defRow}>
           <span className={s.defName}>Default rate mode</span>
           <span>
             <span className={s.modeWrap}>
-              <select
+              <Select
+                plain
                 className={s.modeSelect}
                 value={f.rateMode}
                 onChange={e => setF(p => ({ ...p, rateMode: e.target.value as Form['rateMode'] }))}
@@ -286,7 +272,7 @@ export default function SchemePanel({ scheme, subName, canManage }: { scheme: Sc
               >
                 <option value="variable">Scheme target — recomputed monthly</option>
                 <option value="fixed">Manual — whatever rank they are moved to</option>
-              </select>
+              </Select>
               <span className={s.modeCaret} aria-hidden="true">▾</span>
             </span>
           </span>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatMoneyBare } from '@/lib/utils'
 import { kpiItemKind, type KpiOptionPool } from '@/lib/commission/kpi'
 import { validateKpiItems } from '@/lib/catalogue/rule-edits'
@@ -23,7 +24,9 @@ import {
   type KpiListedItem,
   type KpiPickedItem,
 } from '@/lib/commission/kpi-items-edit'
-import { saveKpiItems, searchKpiSkus, type KpiSkuHit } from '../../kpi-actions'
+import { saveKpiItems } from '../../kpi-actions'
+import { createClient } from '@/lib/supabase/client'
+import { searchSkuMaster, type KpiSkuHit } from '@/lib/commission/kpi-sku-search'
 import { deleteKpiThreshold, upsertKpiThreshold } from '../../config-actions'
 import { ActionButton, Field, Hidden, Hint, RowForm, SaveButton, SectionHead, toPct } from '@/components/RowForm'
 import type { CommissionSettingsData, KpiItemRow, SchemeRow } from './types'
@@ -160,8 +163,11 @@ export default function KpiItemsSection({
     return () => window.removeEventListener('beforeunload', warn)
   }, [changes, saving])
 
-  // The SKU Master is searched on the server, a moment after typing stops;
-  // only the newest answer is shown.
+  // The SKU Master is searched a moment after typing stops — from the browser,
+  // under the reader's own session, never as a Server Action: one still running
+  // when a section is picked is dropped by Next and the page refreshed, and a
+  // Back during that refresh stuck on the skeleton (2026-10-11). Only the newest
+  // answer is shown.
   const searchSeq = useRef(0)
   useEffect(() => {
     if (source !== 'sku') return
@@ -173,7 +179,7 @@ export default function KpiItemsSection({
     }
     setSku(previous => ({ ...previous, pending: true, error: null }))
     const timer = window.setTimeout(() => {
-      searchKpiSkus(q)
+      searchSkuMaster(createClient() as unknown as SupabaseClient, q)
         .then(result => {
           if (seq !== searchSeq.current) return
           setSku(result.ok

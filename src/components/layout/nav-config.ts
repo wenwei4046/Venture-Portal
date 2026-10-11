@@ -21,6 +21,7 @@ import {
   canAccessDeptReports,
   canAccessDirectorPool,
   canAccessDirectorSalary,
+  canAccessDocumentation,
   canAccessMyBilling,
   canAccessOpex,
   canAccessReconciliation,
@@ -30,9 +31,12 @@ import {
   canAccessTeam,
   canAccessTreasury,
   canOpenPeople,
+  canAccessHiring,
   canAccessVenturePool,
   canApprove,
   canSeeAuditChanges,
+  canAccessMeetingRooms,
+  canAccessGuestLink,
 } from '@/lib/roles'
 
 /**
@@ -392,6 +396,11 @@ function navEntries(data: NavData): NavEntry[] {
     { href: '/team/people', label: 'People Management', section: 'People', visible: canOpenPeople },
     { href: '/member-admin', label: 'Member Services', section: 'People', visible: v => can(v, 'member_requests_manage') || can(v, 'member_memos_manage') },
     { href: '/team/hierarchy', label: 'Hierarchy', section: 'People', visible: canOpenPeople },
+    { href: '/team/documentation', label: 'Documentation', section: 'People', visible: canAccessDocumentation },
+    // Hiring (2026-10-11, HR revamp round 2): HR's requests, from submission to filled.
+    { href: '/hiring/requests', label: 'Hiring Requests', section: 'Hiring', visible: canAccessHiring },
+    { href: '/hiring/insights', label: 'Hiring Insights', section: 'Hiring', visible: canAccessHiring },
+    { href: '/hiring/talent', label: 'Talent Bank', section: 'Hiring', visible: canAccessHiring },
 
     // ── Reports & Admin ──
     { href: '/reports/ledger', label: 'General Ledger', section: 'Reports & Admin', visible: canAccessReports },
@@ -423,6 +432,10 @@ function navEntries(data: NavData): NavEntry[] {
     },
     { href: '/reconciliation', label: 'Reconciliation', section: 'Reports & Admin', notPaths: ['/reconciliation/journal-entries'], visible: canAccessTreasury },
     { href: '/reconciliation/journal-entries', label: 'Journal Entries', section: 'Reports & Admin', visible: canAccessTreasury },
+    // Meeting Rooms (2026-10-11, the HR revamp's second package): every view
+    // books a room — the user: "can add on at every view, hr principal, finance".
+    { href: '/admin/rooms', label: 'Meeting Rooms', section: 'Reports & Admin', visible: canAccessMeetingRooms },
+    { href: '/admin/guest-link', label: 'Guest Link', section: 'Reports & Admin', visible: canAccessGuestLink },
     // The app-wide history (2026-10-08): Changes for whoever's permissions
     // open some area of it — each reader sees only those areas — and Access
     // (who read what) for the Principal, as before.
@@ -575,13 +588,11 @@ const TABS_BY_ROLE: Record<UserRole, TabDef[]> = {
     { href: '/receipts', label: 'Receipts', icon: 'in' },
     { href: '/statements', label: 'Invoices', icon: 'invoice', exact: true },
   ],
-  // HR never touches the treasury ledgers; their loop is payroll → staff →
-  // director salary.
+  // HR's view on a phone is the HR app (2026-10-11 — one app, lib/one-app.ts;
+  // the user: Payroll, People, Director Salary "只在电脑用"). This bar is left
+  // only for an HR account the HR app has nothing for.
   hr: [
     { href: '/dashboard', label: '总览', icon: 'home' },
-    { href: '/hr-costing/payroll', label: '薪资', icon: 'payroll' },
-    { href: '/team/people', label: '员工', icon: 'staff' },
-    { href: '/director-salary', label: '董事', icon: 'director' },
   ],
   // Dept managers see one department. Billing and OPEX are the two pages they
   // live in; reports is their read-only rollup.

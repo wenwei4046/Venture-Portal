@@ -1,0 +1,66 @@
+/* Documentation — the HR revamp's second package (Revenue Member App.dc.html
+   lines 135–152, 2026-10-11). Sizes are the prototype's ÷ .92, so the
+   phone's --rv-type lands them exactly. */
+
+.page { padding: 10px 20px 32px; display: flex; flex-direction: column; gap: 20px; }
+.head { display: flex; flex-direction: column; gap: 8px; }
+.back {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  box-sizing: content-box;
+  height: 32px;
+  padding: 0;
+  margin-left: -6px;
+  border: 0;
+  background: transparent;
+  color: var(--rv-accent);
+  font-size: calc(14.5px * var(--rv-type));
+  font-weight: 600;
+}
+.title { margin: 0; font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
+.lede { margin: 0; font-size: calc(14.0217px * var(--rv-type)); color: var(--rv-sub); }
+
+.row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 16px;
+  gap: 12px;
+  align-items: center;
+  box-sizing: content-box;
+  width: 100%;
+  padding: 13px 0;
+  border: 0;
+  border-bottom: 1px solid var(--rv-rule);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  text-align: left;
+  white-space: normal;
+}
+.ext {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--rv-sand);
+  color: var(--rv-brown);
+  font-size: calc(10.8696px * var(--rv-type));
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+.text { min-width: 0; }
+.name { display: flex; align-items: center; gap: 8px; font-size: calc(15px * var(--rv-type)); font-weight: 650; }
+.new { font-size: calc(10.8696px * var(--rv-type)); font-weight: 700; color: var(--rv-white); background: var(--rv-accent); border-radius: 9px; padding: 1px 7px; }
+.meta { display: block; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); margin-top: 2px; }
+.empty { margin: 16px 0; text-align: center; font-size: calc(14.0217px * var(--rv-type)); color: var(--rv-sub); }
+.opening {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--rv-cream);
+  border: 1px solid var(--rv-open-line);
+  font-size: calc(13.5px * var(--rv-type));
+  color: var(--rv-brown);
+}

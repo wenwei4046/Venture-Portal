@@ -11,6 +11,7 @@ import {
   type SplitLock,
 } from '@/lib/staff-allocation'
 import { saveStaffAllocation } from '../actions'
+import { Select } from '@/components/hrv/select'
 
 export interface StaffAllocationData {
   staffId: string
@@ -212,7 +213,7 @@ function StaffCard({
                 : null)
             return (
               <div key={r.uid} className="flex items-center gap-2 flex-wrap">
-                <select
+                <Select bare
                   value={r.companyId}
                   onChange={(e) => patchRow(r.uid, { companyId: e.target.value })}
                   disabled={frozen}
@@ -228,7 +229,7 @@ function StaffCard({
                       {c.short_code} — {c.name}
                     </option>
                   ))}
-                </select>
+                </Select>
                 <div className="flex items-center gap-1">
                   <input
                     type="number"

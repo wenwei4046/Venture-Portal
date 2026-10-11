@@ -308,6 +308,127 @@ revoke; refuses to run without the readers) once the code is live.
 `tests/member-sql/validate-sensitive-fields.mjs`,
 `src/lib/private-columns.test.ts`.
 
+**WRITES FOLLOW THE TAB BOXES (2026-10-11, the user: "yes sepertae by tab").**
+Since 8b a page OPENS by its tabs' View; now what it lets you DO follows the
+same tabs' Create / Edit / Approve: `actionsOnPage(actions, closed, route)` keeps
+a write cell (create, edit, approve, void, manage) only while one of THIS
+page's tabs that stands for it still has that box open — Receipt · Create creates a
+receipt, Payments · Create does not, though both are treasury.create underneath.
+View and Export never narrow; a write none of the page's tabs stands for stays
+as held. `requirePage` narrows the request's account IN PLACE (getUser is cached
+per request, so every later canDo on the page — each button, a form page's
+requireAction — asks the narrowed actions); a Server Action has no requirePage,
+so `requireAction` / `requireAnyAction` / `requireApprover` narrow by the page
+it was sent from (`next-action` request with a Referer; no page to go by = as
+held). ONLY WHAT SOMEBODY UNTICKED CLOSES (`closedBoxes` → `User.closed`; it
+replaced the same day's `tabsExplicit`, which missed a person's own box over a
+template not saved on tabs): a template saved on tabs closes every box its
+ticks, with the person's own boxes over them, leave out; over a template not
+saved yet, only the boxes their own were unticked (a View with its whole tab);
+legacy own cells without boxes, and every untemplated account, close nothing —
+ticks worked out from cells can leave a cell unticked the account still holds
+(Finance's Void without Approve). The database still asks the function cell
+(point 6): per-tab writes are the app's, as per-tab pages are. The Revenue app
+follows the same list (`revenue/revenue-app.md` › THE APP FOLLOWS THE TICKS).
+
+**ROUND 2'S FOUR MODULES (2026-10-11, the HR revamp's second package; mig
+`20261011060000`).** Functions `documentation` (view · create · edit),
+`hiring` (view · create · edit · approve), `rooms` (view · create · edit) and
+`guest_link` (view · edit), every reach all; keys (scope `none`)
+`documentation`, `hiring`, `meeting_rooms` (book) + `meeting_rooms_manage`
+(the rooms; rooms.edit), `guest_link`; `lib/roles.ts` `canAccessDocumentation`
+/ `canAccessHiring` / `canAccessMeetingRooms` / `canAccessGuestLink`. Role
+defaults: principal + hr all five; finance + dept_manager `meeting_rooms`.
+Templates: Ultimate / Full / HR every new cell; every other portal template
+Meeting rooms · View + Create (the user: Meeting Rooms in every view); the two
+Revenue app templates none (members book from the app). Tabs: HR view
+Documentation · Hiring requests · Hiring insights · Talent Bank · Meeting Rooms
+· Guest Link (after Member Services), and Meeting Rooms in the Finance,
+Principal and Department views (`shared('meeting_rooms')`, reach all). **The
+modules' tables have RLS on and NO policy** — every read and write is one of
+the module's SECURITY DEFINER functions asking `has_any_action` for its cell
+(the guest link's ask the link's code instead and are granted to anon by name,
+no service role). Nothing anybody had moved: the five logins gained exactly
+those keys (dry-run per login, then applied; `page-tabs.fixtures.ts`).
+**Documentation's files (2026-10-11, mig `20261011070000`)** are the one
+place a storage policy asks a cell: the private bucket `hr-documents` takes an
+INSERT only under `documents/` · `letters/` · `publish/` from a session with
+Documentation · Create (the browser uploads — a file is bigger than a Server
+Action carries; the action then asks `hr_doc_file_present`), and a SELECT
+(signed links, made at the click) for Documentation · View or, for a member,
+`hr_file_readable_by_member(name)` — their department's documents and what
+was addressed to them. Its memos reach PEOPLE, not sub-departments
+(`member_memo_recipients`, read by `member_visible_memo`). The rules:
+`.claude/rules/hr/documentation.md`.
+**The Revenue app's Book a room and Documentation (2026-10-11)** are tabs of
+their own — Profile · Book a room (`rev.rooms`: View, Create) and Profile ·
+Documentation (`rev.documentation`: View) over the app's `revenue_app`
+cells; a member holds no `rooms` or `documentation` cell. The database lets
+*Revenue app · View (own)* read the schedule and book for THEMSELVES from the
+app (`p_source 'app'`), and a member reads their department's documents
+through `member_staff_id()`; the Principal's View as reads one member's list
+with `member_documents_of` (Documentation · View, mig `20261011110000`).
+The rules: `.claude/rules/revenue/revenue-app.md`.
+
+**THE GUEST LINK: WHAT THE PUBLISHABLE KEY MAY CALL (2026-10-11, mig
+`20261011091000`; the user: Guest link at launch OFF).** Besides the five row-policy helpers, six SECURITY DEFINER
+functions are granted to `anon` BY NAME — `guest_link_page`, `guest_link_day`,
+`guest_link_book`, `guest_link_cancel`, `guest_link_hire` and `guest_link_may_upload` (the
+storage policy `guest_link_uploads`'s question; mig `20261011092000`) — the public page `/g/<code>` calls them
+with the publishable key and no session (`lib/guest/client.ts`). None asks a
+permission: each asks the link instead (on, the CURRENT code — `hv-` + 8 of 32
+letters and digits — and the part open), touches only bookings made through
+the link, and answers a wrong or old code with "closed", nothing more. No
+service role. Everything else of Meeting Rooms and the Guest Link stays
+signed-in only (`guest_link.view` / `guest_link.edit`, `rooms.*`). A new
+function for the guest page is granted the same way, by name, and checks the
+code itself — `tests/member-sql/validate-guest-link.mjs` lists what anon may
+call. The rules of the page: `../hr/rooms.md`.
+
+**VIEW AS A PERSON, READ-ONLY (2026-10-11, the user: "can set a function is
+view as a user, same like in revenue app, i can view as a member").** Both view
+switchers end with *View as a person…*: a picker of everybody who signs in to
+the portal (`view_as_people()`, by department), and the portal is then drawn
+AS that account — their kind, department, keys, actions, tabs and sensitive
+fields, the database's own answers asked as them: `view_as_person(p_user)`
+(DEFINER, view_switch only, mig `20261011050000`) points `auth.uid()` at them
+(`request.jwt.claim.sub`, which auth.uid() reads first) for current_permissions
+/ actions / sensitive_fields / tabs and puts the caller back. `getUser` (portal
+surface only; the member app and `getAccountUser` never) returns that account
+with `viewingAs`, `actualRole` = the viewer's kind; it beats HR's / Finance's
+view; a lens is never drawn over it. A strip says "Viewing as X — read-only"
+with *Stop viewing*; picking any view also ends it. **Read-only for the whole
+browser while the cookie is set:** `createClient()` hands back
+`lib/supabase/read-only.ts` — tables read, `insert/update/upsert/delete`
+answer `{ error: 'Read-only while viewing as somebody — nothing is saved.' }`
+without running, an rpc runs only if it is on `READS_WHILE_VIEWING_AS` (the
+portal's STABLE functions, read off pg_proc — Postgres refuses a write in one —
+plus five VOLATILE ones read to write nothing, `view_as_person` and the access
+log), storage reads and signs but never uploads or removes. The BROWSER's
+client reads only too — a column layout, a table's shared default, an upload —
+by the readable mark `vp-viewing-as` set beside the httpOnly cookie
+(`lib/supabase/client.ts`; the mark only ever takes writes away). The two
+service-role writers go around the session and ask `refuseWhileViewingAs()`
+(Invite user, the ERP feed key). Signing in clears both cookies, so the next
+account on the shared office PC never inherits a read-only browser. Data rows are still read as the viewer (RLS
+answers auth.uid()), so a page that narrows rows only through RLS shows more
+than the person would. **A new function the portal reads goes on the list, or
+it fails while viewing as somebody.**
+
+**SWITCHING VIEW KEEPS YOUR POWER (2026-10-11, the user: "switch view is still
+can be edit, full access means = ultimate access").** HR's and Finance's views
+are LENSES, no longer masks: `getUser` keeps the account's own keys, actions,
+tabs and sensitive fields and only sets `role` to the view (`actualRole` = the
+account's), so every gate, button and Server Action answers as the account —
+the Principal in HR's view runs payroll, approves and sees salaries as in their
+own. What the view changes: the shell (HR's for `hr`, Finance's for `finance`),
+the Overview (`lensOverview` — HR's, the treasury's), and the menus, which list
+only that view's tabs (`lensNav` in PortalFrame: `hr.*` / `fin.*` — the user's
+point 5); a page from elsewhere still opens. The owner kind follows the account
+(`isOwnerKind`: `actualRole ?? role`), so the Principal self-approves in any
+view. Only the member app's Revenue View still masks (role defaults). Seeing the
+portal exactly as somebody else does is View as a person, read-only (next).
+
 **PAGES AND SIDEBARS FOLLOW THE TABS (2026-10-11, the HR revamp 8b — point 6:
 app gates per tab).** Every portal page asks `await requirePage('<its route>')`
 FIRST — its route as the folders spell it, `/fund-in/[id]/edit` — and
@@ -510,4 +631,26 @@ account with no mask at all; only the Product List asks it.
 
 ## The service role's callers — the whole paragraph (CLAUDE.md › Coding Conventions › Supabase client keeps the list)
 
-Supabase client — server-side (`lib/supabase/server.ts`) uses the anon key with RLS via SSR cookies. `admin.ts` is the service-role client and BYPASSES RLS entirely. It is `'server-only'` guarded and has exactly EIGHT callers: `app/api/whatsapp/v1/webhook/route.ts` (Meta, 2026-10-02 — calling `crm_ingest_whatsapp`, and logging a refused delivery to `crm_channel_events`), `app/api/messenger/v1/webhook/route.ts` (Meta again, 2026-10-03 — the same, with `crm_ingest_messenger`), `app/api/erp/v1/sales-orders/route.ts` and `app/api/erp/v1/products/route.ts` (each uses it for one thing — calling its ingest RPC; the second, since 2026-09-24 the items-only catalogue mirror, is the SAME machine path as the first, a second endpoint of one feed rather than a new kind of caller), `app/api/member-queue/route.ts` (the cron-secret queue sweep, `member_process_all_queues`), `lib/member/server.ts` (a member quote's PRICES — `member_catalogue(…, p_priced)`, service-role-only, read only after `member_quote_context` authorised the session — and, the same way, its cost ratios (`member_quote_cost_rules`, 2026-10-05: the context a member's own login can call no longer carries them), and the invoice attestation insert; since 2026-10-05 also the member's month through Comm Cal's engine, `loadMemberIncome`, read only after `member_income_context` authorised the session because the engine reads costs no member session may, and My honours' kept finishes, `member_honours`, written there so no browser can put a place in them), `team/people/invite-actions.ts`, and `lib/erp-sync/feed-key.ts` (2026-09-13: the key the ERP generated and somebody pasted on Comm Cal lives in Supabase Vault behind `erp_link_put/get/drop_secret` + `erp_feed_secret`, executable by the service role ONLY — because whatever an HR user's server action can read with their session, their browser can read too, and that key opens the receiver). Reach for it only when a machine path has no session to act under or a secret must stay out of every session's reach, never to dodge an RLS policy that is merely inconvenient.
+Supabase client — server-side (`lib/supabase/server.ts`) uses the anon key with RLS via SSR cookies. `admin.ts` is the service-role client and BYPASSES RLS entirely. It is `'server-only'` guarded and has exactly EIGHT callers: `app/api/whatsapp/v1/webhook/route.ts` (Meta, 2026-10-02 — calling `crm_ingest_whatsapp`, and logging a refused delivery to `crm_channel_events`), `app/api/messenger/v1/webhook/route.ts` (Meta again, 2026-10-03 — the same, with `crm_ingest_messenger`), `app/api/erp/v1/sales-orders/route.ts` and `app/api/erp/v1/products/route.ts` (each uses it for one thing — calling its ingest RPC; the second, since 2026-09-24 the items-only catalogue mirror, is the SAME machine path as the first, a second endpoint of one feed rather than a new kind of caller), `app/api/member-queue/route.ts` (the cron-secret queue sweep, `member_process_all_queues` and, since 2026-10-10, `member_run_due_replacements`; since 2026-10-11 also Hiring's leftovers — `hiring_leftovers`, the service role's alone, lists objects in `hiring-files` that no record names and that went in over a day ago, and the Storage API deletes at most 200 a run, counts only in the log: the user wants them gone every hour even when nobody touches Hiring, and an hourly job has no session to act under — `lib/hiring/leftovers.ts` is handed the cron's client and imports nothing from admin.ts), `lib/member/server.ts` (a member quote's PRICES — `member_catalogue(…, p_priced)`, service-role-only, read only after `member_quote_context` authorised the session — and, the same way, its cost ratios (`member_quote_cost_rules`, 2026-10-05: the context a member's own login can call no longer carries them), and the invoice attestation insert; since 2026-10-05 also the member's month through Comm Cal's engine, `loadMemberIncome`, read only after `member_income_context` authorised the session because the engine reads costs no member session may, and My honours' kept finishes, `member_honours`, written there so no browser can put a place in them), `team/people/invite-actions.ts`, and `lib/erp-sync/feed-key.ts` (2026-09-13: the key the ERP generated and somebody pasted on Comm Cal lives in Supabase Vault behind `erp_link_put/get/drop_secret` + `erp_feed_secret`, executable by the service role ONLY — because whatever an HR user's server action can read with their session, their browser can read too, and that key opens the receiver). Reach for it only when a machine path has no session to act under or a secret must stay out of every session's reach, never to dodge an RLS policy that is merely inconvenient.
+
+**A SURFACE THAT IS NO PORTAL PAGE NARROWS ITS OWN WRITES (2026-10-11, the HR phone app; security review M2).** `actingUser()` narrows a Server Action by the page its Referer names and acts "as held" when it names none — so `/hr-app` maps each of its parts to the portal page it stands for (`PART_PAGE` / `appAccess`, `lib/hr-app/server.ts`) and sends every write through `lib/hr-app/actions.ts`, which asks that page's open boxes before the module's own action runs. A new surface outside the portal's pages does the same. (Open for the user: whether `actingUser()` itself should fail CLOSED — narrow by every closed box — when an account has closed boxes and the Referer names no page; a hand-made request with no Referer acts as held today, since #272.) The rules: `../hr/hr-app.md`.
+
+**"FULL ACCESS" SAYS WHAT IT LACKS (2026-10-11).** The template `full` is "Ultimate full access" (`ultimate`, the CEO's) less one cell — `view_switch`, seeing the portal as HR, Finance or the Revenue team. No title pointed at it, and the two names read alike in a title's template picker. Asked whether to delete it, the user kept it: "Go with full access without switching view" — it is named **"Full access · no view switching"** since mig `20261011131000` (data only: key, cells and description unchanged). Nothing in the code read it by its name (checked 2026-10-11).
+
+**WRITES NAME THEIR PAGE (2026-10-11 — the user's answer C, "现在就做完整的"; plan `.design/hr-r2/PLAN-C.md`, app side).** The per-tab write split (#272) read the page a write belonged to off the request's Referer — which a hand-made request writes as it likes, so it could pick a page whose box was open. Every write gate now names its page(s) in code: `requireActionOn(pages, fn, action, scope?)`, `requireAnyActionOn(pages, …pairs)`, `requireApproverOn(pages)`, `requirePayrollPayoutsActionOn(pages, …pairs)` (lib/auth.ts); the account is narrowed to those pages' tabs' boxes and the request is never asked. **The pages are exactly the pages whose screens USE the action** — every page that imports it through its components (type-only imports carry no code): one page, or a list when its buttons are on several (`['/payments', '/payments/[id]', '/receipts']`) — then it counts while ANY of them keeps it (`actionsOnPages`), or a choice by what it writes (`kind === 'loan' ? '/fund-out' : '/fund-in'`). A gate naming too few closes a button that is there (Payments' detail page is HR Payment's too); one naming too many opens the write from a page with no such button (all of Revenue's actions once named `/revenue` — Comm Cal, Rules and Sales Groups together — and closed none of them). `src/lib/write-pages.test.ts` refuses an old gate, a page the tab registry does not know, and a gate whose pages are not its action's (`src/test/write-pages-scan.ts` walks the imports; pages compare by their tabs). The HR app is left out of that walk: its parts write as the portal page each stands for (`PART_PAGE`). Nothing changes for an account nobody unticked a box for — on 2026-10-11, every account. The database asks the same pages: THE DATABASE ASKS THE PAGES TOO, below.
+
+**EVERY TAB OF EVERY VIEW, SELECT ALL, AND A NEW TEMPLATE FROM A WINDOW (2026-10-11 — the user: "permission 的 tab，你帮我再 scan 多一次 … 确保它能 scan 到每一个 view 的每一个 tab。再加入全选的地方，可以打勾 … template 点 add 的时候，就跳出来一个 floating window，让我去填这个 template 的名字，然后去打勾它可以 view 哪一边"; and, from a side agent's note the user passed on, Salary amounts in that window and a reason on a box ticked but not open).**
+- **The scan, kept:** `src/lib/permission-tabs-coverage.test.ts` holds the matrix to every surface — each link of HR's sidebar opens from an HR view tab, each link of the portal's nav lands on a page the registry knows, each HR app part (`PART_PAGE`) is a page of an HR view tab, each Revenue app screen and Profile page has a box (`pageOfRoute` → `APP_PAGE_TABS`) or a written reason (`OPEN_IN_THE_APP`: Profile itself, the Product List, the CRM, Memos & notifications), and every row of the matrix stands for a page, an app page or one of `SOMEWHERE_ELSE` (the CRM's two, the Product List, the view switcher). The 2026-10-11 scan found the four portal views complete (round 2's tabs included) and the Revenue app four screens short: three got boxes, Memos stays open (`revenue/revenue-app.md` › THE REST OF PROFILE GETS ITS BOXES; mig `20261011233000` seeds the registry tables again, 225 boxes).
+- **Select all:** for whoever may edit, the first row of a view's table (template and person window alike) — one box per column ticks that action on every tab of the view that has it (View with it; unticking View takes each tab), the last box every box of the view; "–" while only some are (`toggleColumn` / `toggleView`, `columnTally` / `viewTally` in `lib/permission-tabs.ts`).
+- **Not open yet:** a tab whose View is ticked but whose page would still not open says why under its name (`heldTabs`): its key held back by its gate — pay pages want Salary amounts, the ledgers a treasury tab's View, the Principal's own pages a full-access template, a Revenue app account only its app (`keyHeldCode`, the one rule `openedKeys` / `heldCells` use) — or by a box not ticked (Member Services opens with its Edit, Permissions with People Management's View, HR's and Finance's Audit Log with whatever else is open). The CRM's Control panel opens with CRM · View at All, not a key (`cellGated`).
+- **"+ New template"** opens a window (`NewTemplateWindow`): the name, the views it can see, its sensitive fields, and — before it is made — which of those tabs would not open yet and why. It makes a BLANK template, View ticked on every tab of the views picked (`viewTicks`), in one transaction: `permission_template_new(name, tabs, grants, sensitive)` (mig `20261011233200`, asks `has_any_action(accounts.manage)`; `createTemplate` works the cells out from the ticks, as every save). Its kind comes from the ticks in the database, never from the browser: only Revenue app tabs → `revenue_member` (its holders sign in to the Revenue app), else `staff`; a Principal-kind template is never made this way (the user: the CEO's powers stay with the full-access templates — the table says so on such a box). The copy of the open template it replaced (`copyTemplate`) is gone.
+
+**THE DATABASE ASKS THE PAGES TOO (2026-10-11 — plan C, database side; migs `20261011220000_tabs_in_the_database`, `20261011220100_definer_writes_ask_their_pages`).** The app's gates narrow a write to its pages' boxes, but the database only asked the CELL: a cell several tabs stand for stays held while one of their boxes is open, so a request sent straight to the function (the publishable key and the person's own session) walked round a box closed on that page. Now:
+- **The tab registry is in the database.** `permission_page_tabs` (PAGE_TABS) and `permission_tab_cells` (every box's cells). Both are seeded WHOLE by a migration (`DELETE` then `INSERT`). Change PAGE_TABS or a box's `opens` → a new migration seeds both again; `src/lib/tab-write-guards.test.ts` refuses a seed that is not the registry, row for row. RLS on, no grants: only the guards read them.
+- **`tab_writes_open(sites)` / `tab_write_open(pages, wants)` answer what the app's gates answer** (`actionsOnPages`): a write a page's tabs stand for counts while one of those boxes is open; a page with no box for it keeps it as held; several pages, or several gates — open while any lets it through. True for an account nobody unticked a box for (every account on 2026-10-11 — one `current_tabs()` read and out), for a View, and when they hold none of the actions asked (the function's own check refuses that, as before). One table holds both answers: `tests/member-sql/tab-write-open.json` — `src/lib/tab-write-open.test.ts` asks the app, `validate-tab-writes.mjs` the SQL.
+- **80 DEFINER writes ask first:** `PERFORM public.tab_write_guard(<pages>, ARRAY[<their own check's actions>])` as the body's first statement, put there from PRODUCTION's body by `pg_temp.tab_guard` (nothing else in the body changes — checked on prod: 80 bodies equal but for that line, DEFINER, grants and settings kept). A write chosen by what it is about picks its pages in the guard (`CASE WHEN p_record_kind = 'loan' THEN ARRAY['/fund-out'] ELSE ARRAY['/fund-in'] END`; a talent's file is Talent Bank's, a candidate's Hiring's). A write reached through gates that ask different things names each gate, `'pages|actions'` (`tab_write_guard_sites`: the bank bumped by an approval, a repayment and a reversal). Refused: 42501 "Not open to you on this page — a box in your permissions is unticked".
+- **Only when it is the call itself.** One step inside another function (an approval carrying out what it approved, a payroll run reopened batch by batch) the outer function's own gate stood for it, so the guard stands aside (`PG_CONTEXT`: more than two functions on the stack). A DO block is nobody's caller.
+- **Which writes:** every DEFINER write whose gate NARROWS — a box for its cell on each of its pages, and another box for that cell elsewhere. A cell all of whose boxes are on the page (Hiring's Approve, Director Salary's) is taken away whole when they are all unticked, so the database already refused it. The test holds the list to the app both ways: each guard's pages are its callers' gates' pages (by tabs) and can close something; a DEFINER write behind a narrowing gate is guarded or named in `NOT_GUARDED` with why (reads; the invoice number minted for any of five pages).
+- **The Revenue app asks its pages too** (mig `20261011220200_member_sends_ask_their_tab`): `member_prepare_request` / `member_submit_request` / `member_cancel_request` ask `member_send_guard(kind)` first — `tab_box_closed('rev.requests' | 'rev.track', 'create')`, the twin of the app's `mustSend` (claim → Requests, waiting list / replacement → its own page), refusing in the app's words (`SEND_REFUSED`; `app-pages.test.ts` holds both). New md5s (change these from production's bodies): prepare 321a82c9…, submit 5a923a78…, cancel d3606cd4…. Book a room asks `rev.rooms` since mig 20261011150000; a quote is priced by the server after the app's own check (the service role has no tabs to ask).
+- **Limit:** a write made straight to a TABLE is asked by its row policies, cell by cell — a table knows no page, so it narrows only when the cell is closed everywhere (the Approvals queue's own updates, for one).
+- Checked on prod in a rolled-back run as Carrie (Accounts Executive, Treasury Create + Edit) with Fund OUT's Create unticked over her template: a new loan and a loan's change refused; a claim's voucher (Payments' Create ticked) through to the function's own checks; her box given back, through; finance@ (no template) unchanged.

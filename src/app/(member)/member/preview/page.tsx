@@ -15,6 +15,7 @@ import RevenueApp from "@/components/member/app/RevenueApp";
 import AppError from "@/components/member/app/shell/AppError";
 import AppLoading from "@/components/member/app/shell/AppLoading";
 import { protoData, protoFixture } from "@/components/member/app/fixtures/proto";
+import { APP_PAGE_TABS, type AppPage } from "@/lib/member/app-pages";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Revenue · Mobile & Desktop Preview" };
@@ -53,6 +54,12 @@ export default async function MemberPreview({
     charges?: string;
     /** `sample`: Waiting list & replacements on the handoff's sample requests (2026-10-10). */
     track?: string;
+    /**
+     * The app as somebody whose ticks close these pages / sends (2026-10-11, lib/member/app-pages.ts):
+     * `closed=arena,insight`, `sends=quote,requests,track`.
+     */
+    closed?: string;
+    sends?: string;
   }>;
 }) {
   if (process.env.NODE_ENV !== "development") {
@@ -65,7 +72,8 @@ export default async function MemberPreview({
   if (params.app === "proto") {
     const device = params.device === "android" || params.device === "desktop" ? params.device : "ios";
     const search = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => typeof e[1] === "string")).toString();
-    return <RevenueApp initialData={protoData({ principal: params.role === "principal" })} initialSearch={search ? `?${search}` : ""} device={device} today="2026-10-03" fixture={protoFixture({ brand: params.brand, sheet: params.sheet, charges: params.charges === "1", track: params.track === "sample" })} />;
+    return <RevenueApp initialData={protoData({ principal: params.role === "principal" })} initialSearch={search ? `?${search}` : ""} device={device} today="2026-10-03" fixture={protoFixture({ brand: params.brand, sheet: params.sheet, charges: params.charges === "1", track: params.track === "sample" })}
+      closed={{ pages: appPages(params.closed), sends: appPages(params.sends) }} />;
   }
   // What /member shows while it loads (loading.tsx) or when it cannot (error.tsx), held on
   // screen: `&page=` picks the tab.
@@ -268,4 +276,9 @@ export default async function MemberPreview({
     return <MemberAdmin initialData={admin} demo />;
   }
   return <MemberWorkspace initialData={data} />;
+}
+
+/** A comma-separated list of the app's pages, anything else dropped. */
+function appPages(list: string | undefined): AppPage[] {
+  return (list ?? "").split(",").filter((page): page is AppPage => Object.hasOwn(APP_PAGE_TABS, page));
 }

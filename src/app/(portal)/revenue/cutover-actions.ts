@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 
 /**
  * The first month the portal pays (2026-09-26, `comm_cutovers`).
@@ -21,7 +21,7 @@ async function client(): Promise<SupabaseClient> {
 }
 
 export async function setFirstPaidMonth(subDepartmentId: string, month: string, note?: string): Promise<void> {
-  await requireAction('revenue', 'manage')
+  await requireActionOn('/revenue/[sub]', 'revenue', 'manage')
   if (!/^\d{4}-\d{2}-01$/.test(month)) throw new Error('A month is its first day, e.g. 2026-09-01')
 
   const supabase = await client()
@@ -36,7 +36,7 @@ export async function setFirstPaidMonth(subDepartmentId: string, month: string, 
 }
 
 export async function clearFirstPaidMonth(subDepartmentId: string): Promise<void> {
-  await requireAction('revenue', 'manage')
+  await requireActionOn('/revenue/[sub]', 'revenue', 'manage')
   const supabase = await client()
   const { error } = await supabase.rpc('comm_clear_first_paid_month', { p_sub_department_id: subDepartmentId })
   if (error) throw new Error(`Could not clear the month: ${error.message}`)

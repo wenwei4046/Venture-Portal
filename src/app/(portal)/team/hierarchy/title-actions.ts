@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 
 /**
  * Titles.
@@ -64,7 +64,7 @@ function saveError(error: { code?: string; message: string }, verb: string): str
 }
 
 export async function createTitle(input: TitleInput): Promise<TitleOutcome> {
-  const user = await requireAction('team', 'manage')
+  const user = await requireActionOn('/team/hierarchy', 'team', 'manage')
   const refused = refusalOf(input)
   if (refused) return { ok: false, reason: refused }
   const supabase = await createClient()
@@ -83,7 +83,7 @@ export async function createTitle(input: TitleInput): Promise<TitleOutcome> {
 }
 
 export async function updateTitle(input: TitleInput): Promise<TitleOutcome> {
-  await requireAction('team', 'manage')
+  await requireActionOn('/team/hierarchy', 'team', 'manage')
   if (!input.id) return { ok: false, reason: 'Which title?' }
   const refused = refusalOf(input)
   if (refused) return { ok: false, reason: refused }
@@ -113,7 +113,7 @@ export async function updateTitle(input: TitleInput): Promise<TitleOutcome> {
  * that into a refusal that says who is in the way.
  */
 export async function deleteTitle(id: string): Promise<TitleOutcome> {
-  await requireAction('accounts', 'manage')
+  await requireActionOn('/team/hierarchy', 'accounts', 'manage')
   const supabase = await createClient()
 
   const { count } = await supabase

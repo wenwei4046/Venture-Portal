@@ -14,6 +14,8 @@ const SRC = path.resolve(__dirname, '..')
 const KIND_IS_THE_POINT: Record<string, string> = {
   'app/page.tsx': 'which app the account belongs to: the Revenue app or the portal',
   'app/(portal)/layout.tsx': 'which app the account belongs to: the Revenue app or the portal',
+  'lib/one-app.ts': "which face of the one app opens — the HR app is HR's VIEW on a phone (the kind, or the Principal's mask), as PortalFrame picks HR's shell",
+  'lib/hr-app/server.ts': "the HR app's view switch marks the view it is in (the Principal's mask) — presentation",
   'app/(portal)/approvals/page.tsx': "canSetDefault — the shared table layout, kept by kind in the database (table_layout_defaults_set)",
   'app/(portal)/payments/_components/VoucherLedger.tsx': "canSetDefault — the shared table layout, kept by kind in the database (table_layout_defaults_set)",
   'app/(portal)/hr-costing/payroll/[period]/page.tsx': "reopening a Total-Closed month — the Principal's own power (payroll_reopen_month)",

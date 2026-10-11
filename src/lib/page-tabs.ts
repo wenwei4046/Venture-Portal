@@ -14,7 +14,7 @@
  */
 
 import type { Scope } from '@/lib/permission-matrix'
-import { personTicks, tabsFromCells, type PersonBox } from '@/lib/permission-tabs'
+import { PERMISSION_TABS, TAB_ACTIONS, TAB_BY_ID, grantOf, hasBox, personTicks, tabsFromCells, type PersonBox } from '@/lib/permission-tabs'
 
 const HR_COSTING = ['hr.hr_costing'] as const
 const PAYROLL = ['hr.payroll'] as const
@@ -87,8 +87,20 @@ export const PAGE_TABS = {
   '/team/accounts/[id]': ['hr.permissions'],
   '/team/hierarchy': ['hr.hierarchy', 'dept.people'],
   '/member-admin': ['hr.member_services'],
+  // HR revamp round 2: People › Documentation.
+  '/team/documentation': ['hr.documentation'],
+  // Hiring (round 2, 2026-10-11): a request's own page opens from the same tab as the list.
+  '/hiring/requests': ['hr.hiring_requests'],
+  '/hiring/requests/[id]': ['hr.hiring_requests'],
+  '/hiring/insights': ['hr.hiring_insights'],
+  '/hiring/talent': ['hr.talent_bank'],
+  '/hiring/talent/[id]': ['hr.talent_bank'],
   // Changes: what it shows follows the reader's other boxes (each view's Audit Log).
   '/audit-log': ['hr.audit_log', 'fin.audit_log', 'pri.audit_log'],
+  // Admin › Meeting Rooms (2026-10-11): every view books a room.
+  '/admin/rooms': ['hr.meeting_rooms', 'fin.meeting_rooms', 'pri.meeting_rooms', 'dept.meeting_rooms'],
+  // Admin › Guest Link (2026-10-11): HR's.
+  '/admin/guest-link': ['hr.guest_link'],
   '/audit-log/access': ['pri.audit_log'],
 
   // ── Finance view ──
@@ -253,6 +265,67 @@ export function userTabs(stored: StoredTabs | null, actions: Record<string, Scop
   if (!stored || (stored.boxes.length === 0 && stored.cells)) return [...derived()].sort()
   const base = stored.ticks ? new Set(stored.ticks) : derived()
   return [...personTicks(base, stored.boxes)].sort()
+}
+
+/** Every box there is, `view.tab.action`: each tab's View and the actions it has. */
+const ALL_BOXES: readonly string[] = PERMISSION_TABS.flatMap(t => TAB_ACTIONS.filter(a => hasBox(t, a)).map(a => grantOf(t.id, a)))
+
+/**
+ * The boxes somebody unticked for them (2026-10-11) — what a page's writes
+ * (`actionsOnPage`) and the Revenue app's pages (`lib/member/app-pages.ts`)
+ * close by. A template saved on tabs closes every box its ticks, with their
+ * own boxes over them, leave out; over a template not saved on tabs yet, only
+ * the boxes their own were unticked (and the rest of a tab whose View was).
+ * Ticks worked out from cells close nothing: they can leave a box unticked
+ * whose cells the account still holds (Finance's Void, without Approve), and
+ * closing by them would take it away.
+ */
+export function closedBoxes(stored: StoredTabs | null): string[] {
+  if (!stored || (stored.boxes.length === 0 && stored.cells)) return []
+  if (stored.ticks) {
+    const ticked: ReadonlySet<string> = personTicks(new Set(stored.ticks), stored.boxes)
+    return ALL_BOXES.filter(b => !ticked.has(b))
+  }
+  const heldBack = new Set<string>(stored.boxes.filter(b => !b.granted).map(b => grantOf(b.tab, b.action)))
+  return ALL_BOXES.filter(b => heldBack.has(b) || heldBack.has(`${b.slice(0, b.lastIndexOf('.'))}.view`))
+}
+
+/** The actions a write asks for — what a tab's Create, Edit and Approve stand for. View and Export never narrow. */
+const WRITES = new Set(['create', 'edit', 'approve', 'void', 'manage'])
+
+/**
+ * What they may DO on one page (2026-10-11, the user: writes "separate by
+ * tab"): a write a tab of this page stands for counts only while one of those
+ * tabs' boxes for it is still open (`closedBoxes`) — Receipt's Create creates a
+ * receipt, Payments' does not. A write none of the page's tabs stands for, and
+ * every View and Export, stays as held. Only ever narrows.
+ */
+export function actionsOnPage(actions: Readonly<Record<string, Scope>>, closed: readonly string[], route: PageRoute): Record<string, Scope> {
+  const shut = new Set(closed)
+  const out: Record<string, Scope> = {}
+  for (const [cell, scope] of Object.entries(actions)) {
+    const action = cell.slice(cell.indexOf('.') + 1)
+    if (WRITES.has(action)) {
+      const boxes = PAGE_TABS[route].flatMap(id => {
+        const tab = TAB_BY_ID.get(id)
+        return tab ? TAB_ACTIONS.filter(a => (tab.opens[a] ?? []).includes(cell as never)).map(a => `${id}.${a}`) : []
+      })
+      if (boxes.length > 0 && boxes.every(b => shut.has(b))) continue
+    }
+    out[cell] = scope
+  }
+  return out
+}
+
+/**
+ * A write whose buttons are on several pages (2026-10-11, plan C — Payments' detail
+ * page is Finance's and HR's Payment tab's too): what it may do from ANY of them.
+ * Each page narrows on its own (`actionsOnPage`); a write one of them keeps counts.
+ */
+export function actionsOnPages(actions: Readonly<Record<string, Scope>>, closed: readonly string[], routes: readonly PageRoute[]): Record<string, Scope> {
+  const out: Record<string, Scope> = {}
+  for (const route of routes) Object.assign(out, actionsOnPage(actions, closed, route))
+  return out
 }
 
 /** `current_tabs()`'s answer, read defensively (it postdates database.types.ts). */

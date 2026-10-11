@@ -8,14 +8,18 @@ import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { ArenaWeekPicks, ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
 import {
-  acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberWaitingFormLink, submitMemberRequest,
-  type fetchDepartmentIncome, type fetchMemberCatalogue, type fetchMemberClaimRates, type fetchMemberWaitingForm, type fetchMemberWaitingQueue, type fetchMemberHonours, type fetchMemberIncome, type fetchMemberInsight,
+  acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberReplacementFormLink, fetchMemberWaitingFormLink, submitMemberRequest,
+  type fetchDepartmentIncome, type fetchMemberCatalogue, type fetchMemberClaimRates, type fetchMemberReplacementForm, type fetchMemberWaitingForm, type fetchMemberWaitingQueue, type fetchMemberHonours, type fetchMemberIncome, type fetchMemberInsight,
   type fetchMemberInsightRange, type fetchMemberOrderBook, type fetchMemberOrgMap, type fetchMemberRequestHistory, type fetchPrincipalMemoReceipts,
   type refreshMemberData,
 } from "@/app/(member)/member/actions";
 import { saveMemberArenaBrandWeeks, savePrincipalArenaBrandWeeks, type fetchMemberArena } from "@/app/(member)/member/arena-actions";
 import type { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
 import { readMemberBatch, type MemberRead } from "@/app/(member)/member/batch-actions";
+import { bookMemberRoom, cancelMemberBooking, type MemberBookInput, type fetchMemberRooms } from "@/app/(member)/member/rooms-actions";
+import type { MemberRoomsData } from "./profile/rooms-model";
+import { openMemberDoc, type fetchMemberDocuments } from "@/app/(member)/member/docs-actions";
+import type { MemberDocument } from "@/lib/documentation/member";
 import { createReadBatcher } from "./read-batch";
 import { createReadMemory, idbStore, readKey, type ReadStore } from "./read-memory";
 
@@ -59,9 +63,12 @@ export const ask = {
   memoReceipts: (staffId: string): MemberRead => ({ kind: "memoReceipts", staffId }),
   claimRates: (): MemberRead => ({ kind: "claimRates" }),
   waitingForm: (): MemberRead => ({ kind: "waitingForm" }),
+  replacementForm: (): MemberRead => ({ kind: "replacementForm" }),
   waitingQueue: (context?: Pick<MemberReadContext, "staffId">): MemberRead => ({ kind: "waitingQueue", context: context ? { staffId: context.staffId } : undefined }),
   requestHistory: (id: string): MemberRead => ({ kind: "requestHistory", id }),
   catalogue: (): MemberRead => ({ kind: "catalogue" }),
+  rooms: (from: string, to: string): MemberRead => ({ kind: "rooms", from, to }),
+  documents: (context?: { staffId: string }): MemberRead => (context ? { kind: "documents", staffId: context.staffId } : { kind: "documents" }),
 };
 
 /**
@@ -96,6 +103,10 @@ export interface RevenueSource {
   waitingForm?(): Promise<Outcome<MemberWaitingForm>>;
   /** Download form: a fresh link to HR's uploaded application form — null when the app builds it. Never kept. */
   waitingFormLink?(): Promise<Outcome<{ url: string; name: string } | null>>;
+  /** The replacement form HR set (2026-10-11, round 2's README 18.5). */
+  replacementForm?(): Promise<Outcome<MemberWaitingForm>>;
+  /** Download form on a replacement — the waiting list's way. Never kept. */
+  replacementFormLink?(): Promise<Outcome<{ url: string; name: string } | null>>;
   /** Waiting list & replacements: the member's sub-departments' waiting lists, in acceptance order. */
   waitingQueue?(context?: Pick<MemberReadContext, "staffId">): Promise<Outcome<WaitingQueue[]>>;
   /** My income: one month as Comm Cal works it out (live until the close), and the months paid. */
@@ -110,6 +121,16 @@ export interface RevenueSource {
   saveBrandWeeks(subDepartmentId: string, period: string, picks: ArenaWeekPicks, context?: MemberReadContext): Promise<Outcome<true>>;
   /** The Quote's catalogue (2026-10-08) — read when the Quote needs it, no longer with every open. */
   catalogue?(): Promise<Outcome<MemberCatalogue>>;
+  /** Book a room (2026-10-11): the rooms and their bookings from one day to another, and who may be picked. */
+  rooms?(from: string, to: string): Promise<Outcome<MemberRoomsData>>;
+  /** Book a room for yourself. */
+  bookRoom?(input: MemberBookInput): Promise<Outcome<{ id: string; ref: string }>>;
+  /** Cancel a meeting you booked. */
+  cancelBooking?(id: string): Promise<Outcome<true>>;
+  /** Documentation (2026-10-11): the files HR shares with the member's department — or, View as, with the viewed one's. */
+  documents?(context?: { staffId: string }): Promise<Outcome<MemberDocument[]>>;
+  /** A file's short link, made at the tap (never kept). */
+  openDocument?(id: string, context?: { staffId: string }): Promise<Outcome<{ url: string; fileName: string }>>;
   /**
    * What the phone kept from an earlier open (the live app only, 2026-10-08):
    * the last answer to a read (`ask.*`), shown while it is read again.
@@ -180,12 +201,19 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     },
     waitingForm: () => go<Answer<typeof fetchMemberWaitingForm>>(ask.waitingForm()),
     waitingFormLink: () => fetchMemberWaitingFormLink(),
+    replacementForm: () => go<Answer<typeof fetchMemberReplacementForm>>(ask.replacementForm()),
+    replacementFormLink: () => fetchMemberReplacementFormLink(),
     waitingQueue: context => go<Answer<typeof fetchMemberWaitingQueue>>(ask.waitingQueue(context)),
     memoReceipts: staffId => go<Answer<typeof fetchPrincipalMemoReceipts>>(ask.memoReceipts(staffId)),
     income: (subDepartmentId, period, context) => go<Answer<typeof fetchMemberIncome>>(ask.income(subDepartmentId, period, context)),
     departmentIncome: (subDepartmentId, period) => go<Answer<typeof fetchDepartmentIncome>>(ask.departmentIncome(subDepartmentId, period)),
     honours: (subDepartmentId, from, until, context) => go<Answer<typeof fetchMemberHonours>>(ask.honours(subDepartmentId, from, until, context)),
     catalogue: () => go<Answer<typeof fetchMemberCatalogue>>(ask.catalogue()),
+    rooms: (from, to) => go<Answer<typeof fetchMemberRooms>>(ask.rooms(from, to)),
+    bookRoom: input => bookMemberRoom(input),
+    cancelBooking: id => cancelMemberBooking(id),
+    documents: context => go<Answer<typeof fetchMemberDocuments>>(ask.documents(context)),
+    openDocument: (id, context) => openMemberDoc(id, context?.staffId),
     async saveBrandWeeks(subDepartmentId, period, picks, context) {
       const result = context
         ? await savePrincipalArenaBrandWeeks(subDepartmentId, period, picks, context)

@@ -2,6 +2,8 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import type { Database } from './database.types'
 import { primeDeptRegistryFromDb } from '@/lib/dept-registry'
+import { VIEW_AS_PERSON_COOKIE } from '@/lib/view-as'
+import { readOnly } from './read-only'
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions }
 
@@ -79,5 +81,9 @@ export async function createClient() {
   }
   if (!primedOnce && firstPrime) await firstPrime
 
-  return client
+  // Viewing as somebody (2026-10-11): this browser's session reads only, on
+  // every server path, until the view ends (lib/supabase/read-only.ts). The
+  // cookie alone decides: set by hand without view_switch it can only take
+  // writes away from its own session, never give any.
+  return cookieStore.getAll().some((c) => c.name === VIEW_AS_PERSON_COOKIE && c.value) ? readOnly(client) : client
 }

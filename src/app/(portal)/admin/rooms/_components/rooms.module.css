@@ -1,0 +1,795 @@
+/* Admin › Meeting Rooms (2026-10-11, the HR revamp's second package —
+   `.design/hr-r2/handoff/design/Revenue App.dc.html` lines 890–938, the book
+   drawer 1284–1313 and the booking drawer 1315–1332). Every value is the
+   prototype's. Boxes the prototype sizes with padding or a border are
+   content-box (Tailwind's preflight would make them border-box). */
+
+/* ── Schedule toolbar ── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.dateNav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+}
+.navBtn {
+  padding: 7px 11px;
+  cursor: pointer;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  color: inherit;
+}
+.navBtn:focus-visible { outline: 2px solid rgb(43 31 23); outline-offset: -2px; border-radius: 6px; }
+/* The label is a button since 2026-10-11 (the user): it opens the month to pick a day from. Its calendar mark
+   says so; it washes on hover and while the card is open. */
+.dateLabel {
+  box-sizing: content-box;
+  padding: 7px 10px;
+  min-width: 190px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  background: none;
+  /* The page's own font and line height, as the span it was: the pager keeps its height. */
+  font: inherit;
+  font-weight: 500;
+  text-align: center;
+  color: inherit;
+  cursor: pointer;
+}
+.dateLabel:hover, .dateLabel[aria-expanded='true'] { background: rgb(var(--hv-panel-3)); }
+.dateLabel:focus-visible { outline: 2px solid rgb(43 31 23); outline-offset: -2px; }
+.dateIcon { flex: none; color: rgb(var(--hv-brown)); }
+
+/* ── The day picker (2026-10-11): Hiring's month card, a month of days in it ── */
+.pickCatch { position: fixed; inset: 0; z-index: 40; }
+.pick {
+  box-sizing: content-box;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: -1px;
+  z-index: 41;
+  width: 264px;
+  padding: 12px;
+  background: rgb(255 255 255);
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(43, 31, 23, 0.16);
+  animation: roomsFade 0.15s ease;
+}
+.pickHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.pickMonth {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgb(var(--hv-ink-warm));
+}
+.pickNav {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  line-height: normal;
+  color: rgb(var(--hv-ink-warm));
+}
+.pickNav:hover { background: rgb(var(--hv-panel-3)); }
+.pickWeek, .pickDays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+.pickWeek {
+  margin-bottom: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  color: rgb(var(--hv-brown));
+}
+.pickDay {
+  height: 32px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--hv-ink-warm));
+}
+.pickDay[data-outside='true'] { color: rgb(var(--hv-quiet)); }
+.pickDay:hover { background: rgb(var(--hv-panel-3)); }
+.pickDay[aria-current='date'] { box-shadow: inset 0 0 0 1.5px rgb(var(--hv-accent)); font-weight: 600; }
+.pickDay[aria-pressed='true'] { background: rgb(var(--hv-dark)); color: rgb(var(--hv-cream)); font-weight: 500; }
+.pickDay:focus-visible { outline: 2px solid rgb(43 31 23); outline-offset: 1px; }
+@keyframes roomsFade { from { opacity: 0; } to { opacity: 1; } }
+.today {
+  padding: 7px 12px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  color: inherit;
+}
+.summary {
+  font-size: 12.5px;
+  color: rgb(90 78 68);
+}
+/* With the real list (every department, every subsidiary) the legend is long: its
+   codes wrap inside their own box (the rest of the row) and the button keeps its place. */
+.codes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  column-gap: 10px;
+  row-gap: 4px;
+  min-width: 0;
+  /* It takes the room left on the row, the codes pushed to its right end. */
+  flex: 1 1 0;
+}
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: rgb(74 64 58);
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+}
+.swatch {
+  box-sizing: content-box;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.bookBtn {
+  padding: 8px 18px;
+  background: rgb(233 154 83);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  color: rgb(0 0 0);
+}
+.bookBtn:hover { background: rgb(221 139 66); }
+.bookBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Schedule grid ── */
+.grid {
+  /* The prototype's box: 640px of schedule inside its border (642 in all). */
+  box-sizing: content-box;
+  border: 1px solid rgb(216 210 200);
+  border-radius: 10px;
+  overflow: auto;
+  max-height: 640px;
+}
+.gridHead {
+  display: grid;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgb(235 231 224);
+  border-bottom: 1px solid rgb(207 197 183);
+  min-width: max-content;
+}
+.colHead {
+  padding: 9px 12px;
+  border-left: 1px solid rgb(216 210 200);
+}
+.colName {
+  font-weight: 500;
+  font-size: 13px;
+}
+.colMeta {
+  font-size: 11px;
+  color: rgb(117 100 86);
+}
+.gridBody {
+  display: grid;
+  min-width: max-content;
+}
+.hours {
+  display: flex;
+  flex-direction: column;
+}
+.hour {
+  height: 52px;
+  box-sizing: border-box;
+  padding: 3px 8px 0 0;
+  text-align: right;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10.5px;
+  color: rgb(117 100 86);
+}
+.column {
+  position: relative;
+  height: 624px;
+  border-left: 1px solid rgb(229 228 223);
+  cursor: copy;
+  background: repeating-linear-gradient(to bottom, rgb(236 233 228) 0 1px, transparent 1px 26px, rgb(246 244 241) 26px 27px, transparent 27px 52px);
+}
+.column[data-readonly='true'] { cursor: default; }
+/* A free half hour (2026-10-11, the user: you can see which bar the pointer is on). It lights under the
+   pointer — the kit's row hover, the accent's 3px edge where a meeting's own edge would be, and the time it
+   books — and only on a device that points (a phone's tap would leave it lit). The press is the column's. */
+.slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+@media (hover: hover) {
+  .slot:hover {
+    background: rgb(var(--hv-row-hover));
+    box-shadow: inset 3px 0 0 rgb(var(--hv-accent));
+  }
+  .slot:hover::after {
+    content: attr(data-time);
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--font-mono), 'Chivo Mono', monospace;
+    font-size: 10.5px;
+    color: rgb(var(--hv-brown));
+    pointer-events: none;
+  }
+}
+.block {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  border-left: 3px solid;
+  border-radius: 5px;
+  padding: 4px 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(43, 31, 23, 0.08);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  line-height: normal;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  /* A <button> centres what it holds; the prototype's block starts at the top. */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+}
+.block:hover { box-shadow: 0 0 0 2px rgb(233 154 83); }
+.block:focus-visible { outline: 2px solid rgb(43 31 23); outline-offset: 1px; }
+.blockTitle {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.blockTime {
+  display: block;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10.5px;
+  color: rgb(74 64 58);
+}
+.blockWho {
+  display: block;
+  font-size: 11px;
+  color: rgb(90 78 68);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.noRooms {
+  padding: 40px 20px;
+  text-align: center;
+  color: rgb(117 100 86);
+  font-size: 13px;
+  background: rgb(250 250 249);
+}
+.note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: rgb(117 100 86);
+}
+
+/* ── Rooms tab ── */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.card {
+  border: 1px solid rgb(229 228 223);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: opacity 0.2s;
+}
+.cardTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nameInput {
+  box-sizing: content-box;
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  padding: 4px 6px;
+  margin-left: -6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  line-height: normal;
+}
+.nameInput:hover { border-color: rgb(229 228 223); }
+.nameInput:focus { border-color: rgb(233 154 83); }
+.remove {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: rgb(117 100 86);
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  padding: 0;
+  flex: none;
+}
+.remove:hover { background: rgb(251 239 237); color: rgb(176 40 34); }
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.fieldLabel {
+  font-size: 12px;
+  color: rgb(117 100 86);
+}
+.fieldInput {
+  box-sizing: content-box;
+  width: 150px;
+  padding: 6px 8px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  background: rgb(255 255 255);
+  color: inherit;
+  line-height: normal;
+}
+.fieldInput:focus-visible { border-color: rgb(233 154 83); }
+.seats {
+  width: 70px;
+  text-align: right;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+}
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgb(229 228 223);
+  padding-top: 10px;
+}
+.usage {
+  font-size: 12px;
+  color: rgb(90 78 68);
+}
+.bookable {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-size: 12px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  color: inherit;
+  line-height: normal;
+}
+.switch {
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgb(229 228 223);
+  position: relative;
+  transition: background 0.2s;
+  flex: none;
+}
+.switch[data-on='true'] { background: rgb(233 154 83); }
+.knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgb(255 255 255);
+  transition: left 0.2s;
+}
+.switch[data-on='true'] .knob { left: 14px; }
+.addCard {
+  box-sizing: content-box;
+  border: 1px dashed rgb(216 210 200);
+  border-radius: 12px;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: rgb(90 78 68);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+}
+.addCard:hover { border-color: rgb(233 154 83); background: rgb(255 250 244); }
+.addCard:disabled { cursor: progress; opacity: 0.6; }
+
+/* ── Book drawer ── */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.labelText {
+  font-size: 12px;
+  color: rgb(117 100 86);
+}
+.input {
+  box-sizing: content-box;
+  padding: 8px 10px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  background: rgb(255 255 255);
+  color: inherit;
+  line-height: normal;
+}
+.input::placeholder { color: rgb(117 117 117); }
+.dateInput { padding: 7px 10px; }
+.pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+.select {
+  padding: 7px 8px;
+  border: 1px solid rgb(229 228 223);
+  font: inherit;
+  font-size: 13px;
+  background: rgb(255 255 255);
+  color: inherit;
+  line-height: normal;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.person {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 5px 4px 10px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 999px;
+  font-size: 12.5px;
+}
+.personX {
+  padding: 0 5px;
+  cursor: pointer;
+  color: rgb(117 100 86);
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: normal;
+}
+.sugg {
+  padding: 4px 10px;
+  border: 1px dashed rgb(216 210 200);
+  border-radius: 999px;
+  font-size: 12.5px;
+  cursor: pointer;
+  background: none;
+  font-family: inherit;
+  color: inherit;
+  line-height: normal;
+}
+.sugg:hover { border-color: rgb(233 154 83); }
+.suggDept {
+  color: rgb(117 100 86);
+  font-size: 11px;
+  margin-left: 5px;
+}
+.guestRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 28px;
+  gap: 8px;
+  align-items: center;
+}
+.guestInput { padding: 7px 10px; box-sizing: border-box; width: 100%; }
+.guestX {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: rgb(117 100 86);
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  padding: 0;
+}
+.guestX:hover { background: rgb(251 239 237); }
+.addGuest {
+  align-self: flex-start;
+  font-size: 12.5px;
+  color: rgb(90 78 68);
+  cursor: pointer;
+  text-decoration: underline;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  line-height: normal;
+}
+.pax {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgb(229 228 223);
+  background: rgb(246 246 244);
+}
+.pax[data-over='true'] { background: rgb(251 239 237); border-color: rgb(236 190 184); }
+.paxText { flex: 1; min-width: 0; }
+.paxTitle { font-size: 13px; font-weight: 600; }
+.paxLine { font-size: 12px; color: rgb(117 100 86); margin-top: 2px; }
+.pax[data-over='true'] .paxLine { color: rgb(176 40 34); }
+.stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid rgb(222 214 203);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgb(255 255 255);
+}
+.step {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 17px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  color: inherit;
+  line-height: normal;
+}
+/* − is ink while it can go down, greyed at the named count (the prototype's downColor). */
+.stepDown { color: rgb(51 36 27); }
+.step:disabled { cursor: default; color: rgb(200 190 180); opacity: 1; }
+.count {
+  min-width: 40px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+}
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.err {
+  flex: 1;
+  color: rgb(176 40 34);
+  font-size: 12.5px;
+}
+.btn {
+  padding: 8px 14px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  color: inherit;
+}
+.primary {
+  padding: 8px 18px;
+  background: rgb(233 154 83);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  color: rgb(0 0 0);
+}
+.primary:hover { background: rgb(221 139 66); }
+.primary:disabled, .btn:disabled { opacity: 0.5; cursor: progress; }
+
+/* ── Booking drawer ── */
+.kicker {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(78 101 116);
+}
+.title {
+  font-size: 19px;
+  font-weight: 500;
+  margin-top: 6px;
+}
+.when {
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 11.5px;
+  color: rgb(90 78 68);
+  margin-top: 4px;
+}
+.facts {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 8px 14px;
+  font-size: 13px;
+}
+.factLabel { color: rgb(117 100 86); }
+.sec {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(117 100 86);
+}
+.attending {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgb(240 238 234);
+  font-size: 13px;
+}
+.attendingMeta { font-size: 12px; }
+.event {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 10px;
+}
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 5px;
+  background: rgb(205 184 162);
+}
+.event:last-child .dot { background: rgb(233 154 83); }
+.line {
+  flex: 1;
+  width: 1px;
+  background: rgb(229 228 223);
+  margin-top: 3px;
+}
+.event:last-child .line { background: transparent; }
+.eventBody { padding-bottom: 12px; }
+.eventTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+.eventWhat { font-weight: 500; }
+.eventWhen {
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 11px;
+  color: rgb(117 100 86);
+  white-space: nowrap;
+}
+.eventWho { font-size: 12px; color: rgb(117 100 86); }
+.eventNote { font-size: 12px; margin-top: 2px; }
+.cancel {
+  padding: 8px 14px;
+  border: 1px solid rgb(236 190 184);
+  background: rgb(255 255 255);
+  color: rgb(176 40 34);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+}
+.cancel[data-armed='true'] { background: rgb(250 228 224); }
+.only {
+  flex: 1;
+  font-size: 12px;
+  color: rgb(117 100 86);
+}
+
+@media (max-width: 767px) {
+  .dateLabel { min-width: 0; }
+  .pair { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .switch, .knob, .card { transition: none; }
+  .pick { animation: none; }
+}

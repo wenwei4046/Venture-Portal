@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { AUDIT_AREAS, type AuditTableLine, type ChangeFilters } from '@/lib/audit/changes'
+import { Select } from '@/components/hrv/select'
 
 // The Changes page's filters: a plain GET form, so a filtered view is a link
 // somebody can send. Only the areas and records the reader's permissions open
@@ -23,16 +24,16 @@ export default function ChangesFilters({
     <form method="get" action="/audit-log" className="sheet-toolbar items-end" role="search" aria-label="Filter the changes">
       <label className={field}>
         Area
-        <select name="area" defaultValue={filters.area ?? ''} key={`area:${filters.area ?? ''}`}>
+        <Select bare name="area" defaultValue={filters.area ?? ''} key={`area:${filters.area ?? ''}`}>
           <option value="">Every area</option>
           {areas.map(a => (
             <option key={a} value={a}>{a}</option>
           ))}
-        </select>
+        </Select>
       </label>
       <label className={field}>
         Record
-        <select name="table" defaultValue={filters.table ?? ''} key={`table:${filters.table ?? ''}`}>
+        <Select bare name="table" defaultValue={filters.table ?? ''} key={`table:${filters.table ?? ''}`}>
           <option value="">Every record</option>
           {areas.map(a => (
             <optgroup key={a} label={a}>
@@ -41,17 +42,17 @@ export default function ChangesFilters({
               ))}
             </optgroup>
           ))}
-        </select>
+        </Select>
       </label>
       <label className={field}>
         Who
-        <select name="who" defaultValue={filters.who ?? ''} key={`who:${filters.who ?? ''}`}>
+        <Select bare name="who" defaultValue={filters.who ?? ''} key={`who:${filters.who ?? ''}`}>
           <option value="">Anybody</option>
           <option value="system">System — ERP feed, server, migrations</option>
           {actors.map(a => (
             <option key={a.id} value={a.id}>{a.name}</option>
           ))}
-        </select>
+        </Select>
       </label>
       <label className={field}>
         From

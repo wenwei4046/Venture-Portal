@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.60 (the Revenue app's Profile on a phone gains *Switch view* for an account that may switch views — Principal · Finance · HR · Revenue team, rows as Your workspace's with the module menu's dots on a sand circle, the current one *You are here*) / v3.59 (a phone notification's status-bar icon is the mark's tile in white with the H cut out — `badge-tile-96.png`; Android paints it white, no colour reaches the status bar) / v3.58 (the soft dropdown on a touch screen: its search box waits for a tap — no keyboard on opening — and the keyboard or the address bar moves the menu with its field instead of closing it) / v3.57 (on a phone, entering a page or coming back to the app shows the bottom bar; the HR app's pages open at their top and Back returns to where a page was left; a tapped notice opens in the installed app) / v3.56 (a phone notification's status-bar icon: the H alone, white on transparent, 96px — `badge-96.png`; the app tile stays its large icon) / v3.55 (the phone's bottom bars — the HR app's tabs, the Revenue app's nav, the portal's tab bar — tuck away on a scroll down of 24px and are back on a scroll up, near a page's top or on another page; the page grows into the space but for `--safe-bottom`, and what stands on the bar comes down with it, `--tabbar-h` on the portal) / v3.54 (Sales Groups › Waiting list's "+": the accent square first in the row, its window — the basics, Submitted by from the Revenue team, HR's own questions optional, the signed form as Form settings asks — and a row added this way: Added by, never Signed by) / v3.53 (People › Permissions: a *Select all* row atop each view's table — a box per column and one for the whole view, "–" while only some are — an amber line under a ticked tab whose page would not open, and *+ New template* as a window: the name, the views with their tab counts, the sensitive fields, what would not open yet) / v3.52 (the first open's question in both phone apps: a 340px white card at radius 22 over a .45 walnut scrim — a 52px bell disc (`255 240 228` / `189 74 25`), *Turn on notifications?* 18/700, the body 13.5 in `108 92 80`, a 46px orange **Allow notifications** at radius 14 and a 42px plain **Not now**; a reason in `176 40 34` above the buttons) / v3.51 (Meeting Rooms: the day's label opens a month card to pick a day from; the free half hour under the pointer lights with its time, and 19:30 books 19:30–20:00) / v3.50 (ONE app: the HR app is HR's view of the one install on a phone — no install, name or icon of its own; *More* gains the view switch — Principal · Finance · HR · Revenue team, a 10px dot on the 40px tile, *You are here* on the current — for an account that may switch; the portal's HR phone bar keeps only *总览*) / v3.49 (Documentation › Publish: *Withdraw* on a published memo — asked twice, the armed pink — and *Show withdrawn (n)* at the list's foot, greyed at .55 with its mono red line) / v3.48 (Hiring › Form settings › File types: each type's files, ✎ to rename in place, On / Off as the sources' switch, Résumé *Built in*; a type turned off leaves the picker) / v3.47 (notifications: the HR app's bell — a white 40px tile on Home's head with the count in the accent — and its *Notifications* page, *New* / *Earlier* in Review-style rows; the Revenue app's bell gains UPDATES, slate *Meeting* and walnut *Manpower request*; *Phone notifications* rows with a 38×22 switch in both apps) / v3.46 (hiring files: several per candidate and per talent, each with a type picked or named — the résumé row they replace, the type picker, the files drawer's pills, the talent page's Files card) / v3.45 (the user's answers on round 2: a booking made for somebody else reads *Grace (for Chea Huan)* on every schedule — portal, both apps, the guest page; Profile › Your workspace rows as the HR revamp's handoffs draw them — 52px circle, `--rv-rule`, 81px, no gap, stroke 1.8; the HR app's claim **Approve** asks *Request payment* or *Add to payroll*) / v3.44 (Documentation after the user's answers: Withdraw on a letter of the record — asked twice, the armed pink — *Show withdrawn (n)* greyed at .55, a red *Withdrawn* status chip, the preview of a deleted or withdrawn file on its trail) / v3.43 (round 2's Part 1, C: the Replacement list's own Upload form and Form settings, and Submit replacement on HR's form) / v3.42 (round 2's Part 1, B: every select on HR's pages is the soft dropdown — `bare` / `plain`, optgroup labels in the menu, the .18 focus ring kept) / v3.41 (round 2's changes to round 1's pages, part A: the HR sidebar's brand block 20/12/26/14 with no rule, the one-line sub-department switcher of portal-42, the waiting drawer's head without its place line) / v3.40 (the phone parity pass: fields in the browser's black, the soft menu above the field when it does not fit below, the HR app's sheet 86% of the screen between its bars) / v3.39 (Documentation's preview draws an Excel or CSV file as the handoff's sheet) / v3.38 (the HR phone app: /hr-app — Home, Review, Hiring, Rooms, More, its sheets and its own install) / v3.37 (the guest link's Request manpower: five steps, pills for short choices, the file, Check and send, and its Preview) / v3.36 (the Revenue app's Book a room and Documentation: By room / Timeline at 64px an hour, the book sheet, the files HR shares) / v3.35 (the Guest link: Admin › Guest Link, and the public /g page — phone first, a Preview column on a computer) / v3.34 (Meeting Rooms: a day's rooms side by side, the Book and booking drawers, rooms as cards) / v3.33 (Hiring › Insights and the Talent Bank: six cards against the month before, the days each fill took, by source and department, every request sideways; the bank's tree, table, panel and a talent's own page) / v3.32 (Hiring › Requests: the review inbox, the Listing and its right-click menu, Form settings, a request's page with its candidates, the résumé drawer) / v3.31 (Documentation: Documents, Data center, Letters, Publish and the 640px preview) / v3.30 (the HR revamp, round 2: the soft dropdown and the drawers' motion) / v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -178,7 +178,9 @@ disagree, the file wins; every value is the prototype's.**
   the row's offsetTop); the open row's tile swaps light/deep and grows to 1.06,
   its label nudges 2px (.25s). The walnut **H** folds the rail (`width .28s`;
   the words fade `.2s` where they stand; a cookie, `vp-hr-nav`, so it draws
-  folded). The greeting bar is white (`HrTopBar`: 60px, 16px radius, 10px in);
+  folded). The brand block (H tile, HOUZS Venture, Internal ledger) has no rule
+  under it and pads `20px 12px 26px 14px` — round 2's air between it and
+  Overview (v3.41). The greeting bar is white (`HrTopBar`: 60px, 16px radius, 10px in);
   for an account that may switch views the "HR view" words ARE the switcher.
   The sheet is the `<main>` and scrolls inside a 10px frame (`.hrv-frame`,
   `data-hrv-overlay`) — so its rounded foot is always in view and drawers,
@@ -195,15 +197,26 @@ disagree, the file wins; every value is the prototype's.**
   183`), right drawers (400–600px on `rgb(43 31 23 / .18)`), centred windows
   (`.28` / `.22`), the toast (walnut, orange ●, bottom-centre, 2.2 s —
   `flash()` after a save), the 28×16 toggle (`left .15s`), the peach save bar,
-  history dots, label/value facts. Esc closes the overlay on top.
+  history dots, label/value facts. Esc closes the overlay on top. On a phone
+  (≤767px) the frame runs on under the 54px tab bar, so a drawer and its scrim
+  end where the sheet ends (`54px + 10px + var(--safe-bottom)`), a window
+  centres in the room above the bar (at most `100% − 94px − safe`) and the
+  toast stands `54px + 30px + safe` up (2026-10-11).
 - **Tailwind moves the prototype's boxes, so the kit puts them back:** a
   revamped page is `line-height: normal` (preflight's 1.5 makes every row
   taller), and a box the prototype sizes with padding or a border is
   `box-sizing: content-box` (the sidebar, menus, drawers, the small dialogs).
 - **Revenue's pages pick their sub-department on their own head**
-  (`SubDeptSwitcher`, top right: "SUB-DEPARTMENT" over the name, a chevron that
-  turns over; the menu lists each with ✓, then "+ New sub-department · Copy
-  Fair's rules, or start blank"). Fair | IR left every sidebar; Staff Hierarchy
+  (`SubDeptSwitcher`, top right — round 2's design, portal-42, v3.41: ONE line
+  36px tall like the orange button beside it, 10px radius, a `216 210 200`
+  rim, `0 10px 0 12px`: "Sub-department" 12px brown · a 1×16 `229 222 212`
+  rule · the name 13.5px/600 · a 14px chevron that turns over; `247 247 245`
+  on hover and while open. The menu is as wide as the button, never under
+  220px — 14px radius, a `236 229 219` rim, `0 14px 36px` shadow, 6px in, 2px
+  apart, fading in .15s; every row 38px, 9px radius, `247 244 239` on hover,
+  the open one peach / 500 with an orange ✓; a rule, then "+ New
+  sub-department" in clay `163 78 37`, what it does in its tooltip). Fair | IR
+  left every sidebar; Staff Hierarchy
   is **Sales Groups**. **Comm Cal**: a status strip (ERP receiving · last
   delivery · Pays from … · Change · **Data source ›**), five cards (the latest
   month's commission is amber *Not computed* with its link, never a walnut
@@ -220,7 +233,9 @@ disagree, the file wins; every value is the prototype's.**
   (44px toggle · 250px label · description; an off label in brown; a 6px
   orange dot on a switch changed since the save), what a component needs
   opened under its row in `250 250 249` cards (Group incentive's three layer
-  settings, mono 15px values), *Defaults* below, and Save at the title's right
+  settings, mono 15px values), *Defaults* below (the default rate mode — no
+  cost basis row since 2026-10-11: the Revenue Team cost basis is set on
+  Product List › Costing Setting only), and Save at the title's right
   (`242 241 238` / `152 142 130` "Saved" until something moves, then orange).
   **Ranks** = a grid table Rank · Product rate · Held by (shown), Edit in
   place on a peach strip. **Capacity** = four 12px-radius figure cards (24px
@@ -245,8 +260,25 @@ disagree, the file wins; every value is the prototype's.**
   above the list, right-aligned at 12.5px, an "Upload form" label-button (7px
   12px, frame rim, white — a `180 215 198` rim on `240 248 244` once HR
   uploaded, reading "Form: name") and a walnut "Form settings" (7px 14px,
-  cream type).
-  The applicant's 400px drawer ends on a grey 12px note box and the footer
+  cream type). **"+" stands first in that row** (v3.54, the user, 2026-10-11 —
+  `AddToWaitingList`, only for Member services · Edit): a 31px accent square,
+  radius 6, a black 15px plus. It opens the Add member window's shape (460px):
+  *Add to the waiting list* / *Straight onto Fair's list, at the end — as if
+  accepted today.*; New member name; Phone number · Joining date side by side
+  (one column on a phone); *Submitted by* — the soft dropdown in optgroups, this
+  sub-department first (`Name · title`); HR's own questions under a *YOUR
+  QUESTIONS · OPTIONAL* rule (10.5px 600 brown, .08em); *Signed application
+  form* with `· optional` or `· required by Form settings` (11.5px note) over
+  the Upload form button's look reading *Attach the signed form* (the file's
+  name once attached, a 26px × beside it); the first problem in red; Cancel ·
+  orange *Add to the list*. A row added this way opens on **Added by** (who
+  pressed it) and *Accepted · 11 Oct 2026 · added here* — never *Signed by* —
+  and its history step reads *Added to the waiting list*; the list's foot
+  reads *Applicants accepted in Member services or added here, in the order
+  they joined the list.*
+  The applicant's 400px drawer opens on the name (19px/500) and the request
+  number — round 2 took away the "#1 of 2 on Fair's waiting list" above them
+  (README 18.5, v3.41) — and ends on a grey 12px note box and the footer
   *Fail* (danger outline, pushed left; asks "Take X off the waiting list?" ·
   Keep · a solid red Fail) · Close · an orange *Transfer* (8px 18px), disabled
   with an amber note and a Rules › Capacity link while the place is full. Form
@@ -256,7 +288,17 @@ disagree, the file wins; every value is the prototype's.**
   kind chips (11.5px, walnut when picked) and option chips with a dashed 120px
   "New option"; a dashed "+ Add question"; the Application form card (a 40×50
   ruled-paper icon, Download, "Members must upload the signed form"); Cancel
-  · orange "Save as vN". The employee form: a `233 200 160` / `255 250 243`
+  · orange "Save as vN". **The Replacement list has the same two tools and
+  the same drawer since v3.43** (round 2's README 18.5, 2026-10-11;
+  `MemberFormTools`, `WaitingFormSettings kind="replacement"`): eyebrow
+  "Replacement list · vN", "What the Revenue team fills in when they submit a
+  replacement.", five built-ins — Member leaving, Arrangement, Replaced by,
+  Effective date and Reason (the handoff lists Reason among HR's own; the
+  database needs one, so it is built in) — each dropdown's options under it
+  without the waiting list's "(from the sub-departments)", then HR's own
+  (v1: "Handover done?"); its built form is "HOUZS Venture · Replacement form"
+  (the member leaving on a line, a box per arrangement and source, signed
+  "Member leaving — signature"). The employee form: a `233 200 160` / `255 250 243`
   banner with an orange dot, a 12px-radius Placement card (200px label column;
   Department chip, Joining title and Direct manager as `.choice` chips, a
   180px date, Pay basis), Identity / Contact / Bank cards (fields 8px 10px; the
@@ -282,8 +324,7 @@ disagree, the file wins; every value is the prototype's.**
   title with its Save (`242 241 238` "Saved" until something differs), the
   `2fr 3fr` Outstation / Airbnb boxes, the regions grid `1.6fr 150px 140px
   150px 100px` (zebra rows, a 14px box for Flown to) and the venues grid.
-  Publish memo: two cards — Title, Body, ☑ audience chips (peach when on),
-  orange Publish; Published rows with a mono date and "· read by N".
+  Publish memo moved to People › Documentation › Publish (v3.31).
 - **Replacement review** (v3.24, 2026-10-10; `RequestReviews`): under the
   step "Approve and choose the replacement", a 12px "Replaced by · from
   People Management" label over a wrapping row of choice chips (6px 11px on a
@@ -344,7 +385,11 @@ disagree, the file wins; every value is the prototype's.**
   missing), then "✓ name" 12.5px green. The signature pad is the handoff's
   canvas: 1px dashed `--rv-handle`, 12px radius, no ground, 112px (Clear
   kept); the sign tabs have no padding. The done screen adds "Signed form
-  attached · name". Measured against the prototype at 410 × 864
+  attached · name". **Submit replacement** draws its own form the same way
+  since v3.43 (2026-10-11): the five built-ins keep the sheet's own controls
+  (member pills, the two radio lists, the date, the reason), HR's own
+  questions sit where HR put them, as the waiting list's do, and the box above
+  the transfer note is titled "Replacement form". Measured against the prototype at 410 × 864
   (`.design/hr-revamp/tools/states-pr7a.json`; the tool takes a viewport per
   state now).
 - **Waiting list & replacements** (v3.28, 2026-10-10; the Revenue app's
@@ -374,15 +419,30 @@ disagree, the file wins; every value is the prototype's.**
   12px `--hv-brown`, a 260px select (8px 10px, 6px radius, `--hv-frame`),
   the count, then Delete (7px 12px, `--hv-danger-border` edge, danger text,
   no ground) and "+ New template" (7px 14px, `--hv-frame`, the accent edge on
-  hover); asking replaces them inline (Keep · Delete, or the name field, "copies
-  X", Cancel · Create). The lede 12.5px `--hv-body-2`, the name 500. The matrix:
+  hover); Delete asks inline (Keep · Delete). **"+ New template" opens a window**
+  (v3.53, `people/_components/NewTemplateWindow`: Invite user's window — 466px
+  with the rim, 22px in, 14px radius, the .22 scrim — and its title, sub, field
+  labels and foot): *Template name \**, *Views it can see \** and *Sensitive
+  fields* as hairline-framed lists of rows (8px 12px, 13px, a 15px checkbox in
+  the accent; a ticked row on peach; the view's tab count mono 11px
+  `--hv-brown` at the right, a field's note 11px under its name), then — once a
+  view is ticked — a `--hv-panel` note (12px, 10px 12px, 8px radius): where its
+  holders sign in, and each group of tabs that would not open yet with why, in
+  `--hv-alert` (the names 500). Cancel · *Create template*; a refusal in red
+  before them. The lede 12.5px `--hv-body-2`, the name 500. The matrix:
   a 200px rail (9px 12px rows, 8px radius; the open view peach with an inset
   3px accent bar, 500; "8/11" mono 11px `--hv-brown`) beside a 10px-radius
   `--hv-frame` table — head on `--hv-head` over `--hv-head-rule`, 10.5px /
   600 uppercase .04em, `minmax(0,1fr) repeat(4,76px) 60px`; rows hairline,
   the tab 8px 14px; 18px boxes (5px radius, `--hv-frame`; ticked accent with a
   white ✓ 11px; a box the tab lacks dashed at .4; read-only keeps its colour);
-  "all" / "none" 12px underlined. The person window: a 170px rail (8px 10px,
+  "all" / "none" 12px underlined. **Select all** (v3.53, for whoever may edit,
+  template and person window alike): the first row under the head on
+  `--hv-cream`, "Select all" 500, a box per column (a column with no box in
+  this view dashed at .4) and one under All for every box of the view — ✓ when
+  all are ticked, "–" 600 on `--hv-peach` inside the accent edge while only
+  some are. **Not open yet** (v3.53): a ticked tab whose page would still not
+  open carries why under its name, 11px `--hv-alert`, 2px above. The person window: a 170px rail (8px 10px,
   12.5px, counts 10.5px), `repeat(4,64px) 44px`, rows 12.5px at 7px 12px, a
   7px red dot (`--hv-danger`, white ring) on a changed box, Reset to title
   (7px 12px, hairline) and Save (7px 16px, accent) in the footer before Full
@@ -392,6 +452,621 @@ disagree, the file wins; every value is the prototype's.**
 - **Cross-check** with a measuring script that finds each element by its text
   on both and diffs computed font / colour / size / padding / border / radius
   / background (`.design/revenue-app/tools/measure-pl.mjs` is the pattern).
+
+### The HR revamp, round 2 — the kit's additions (v3.30, 2026-10-11)
+
+The handoff's second package (`.design/hr-r2/handoff`, README sections 10–18;
+the file wins over the README) adds Documentation, Hiring, Meeting Rooms, the
+Guest link and an HR phone app. Two things every page of it shares:
+
+- **The soft dropdown** (`components/hrv/select.tsx` `Select`, its own
+  `select.module.css`; README 18.1, the handoff's `dropdown.js`). The real
+  `<select>` stays — value, onChange, keyboard — and is drawn radius 10 (12 on
+  the guest page), a 14px chevron (stroke 2.4, `#5a4e44`) 11px from the right,
+  34px kept clear for it, hover border `214 202 188`, focus the accent border
+  and a `0 0 0 3px rgb(233 154 83 / .18)` ring. A pointer press opens the menu
+  instead of the browser's: fixed to the window, white, radius 14, a `236 229
+  219` edge, `0 14px 36px rgba(43,31,23,.18), 0 2px 6px rgba(43,31,23,.06)`,
+  6px padding; rows 9px 12px, radius 9, 13.5px / 1.3, hover `247 244 239`, the
+  picked one peach with `163 78 37` 600 and a ✓, the blank option grey `150 138
+  126`; as wide as the field, wider only when an option would be cut; a search
+  box (34px of content, 36 with its edge — an input's own box, as dropdown.js;
+  radius 9; the browser's black; its own orange ring on focus) over more than
+  eight options; below the field, 6px away — above it when the whole menu does
+  not fit below and there is more room above, its list sized to that side
+  (v3.40: dropdown.js opened below whenever 200px were free, and on a phone a
+  long list ran off the screen); `hvddIn .16s` (fade + 4px drop). The menu
+  carries `data-soft-menu`, so the portal's own field rules (the blue focus
+  glow, the phone's 44px floor) leave it as drawn, as they leave the Revenue
+  app, the HR app and the guest page (`data-guest-page`). It closes
+  on a pick, a press outside, Esc (the menu only — a drawer under it stays), a
+  resize or a scroll. Arrow keys and Enter work inside it. **On a touch screen**
+  (`pointer: coarse`, v3.58, the user — the Revenue app's book sheet would not
+  open Department or From / To): the search box waits for a tap instead of
+  taking the focus on opening (that raised the keyboard, whose resize closed
+  the menu at once — every list over eight), and a resize or a scroll moves
+  the menu with its field, inside what the keyboard leaves showing (the visual
+  viewport), closing only once the field has left the screen.
+  **Every select on HR's pages is one since v3.42** (round 2's Part 1,
+  2026-10-11): round 1's pages, HR Costing, the month's workbench, People,
+  Member services, Audit Log and the top bar's view switch —
+  `soft-select-coverage.test.ts` parses them and fails on a bare `<select>`.
+  `bare` keeps the page's own field box (the soft field's radius, chevron and
+  ring over it); `plain` keeps the field exactly as drawn and swaps only the
+  menu — for selects the prototype draws as something else (the Members
+  grid's 6px boxes with a ▾, Scheme rules' quiet values, Brand weeks' "Revenue
+  · Fair" chip, the top bar's "HR view" words). An `<optgroup>`'s label heads
+  its options in the menu (10.5px / 600 / .08em caps `117 100 86`, 8px 12px
+  4px — dropdown.js flattened them; People's Invite and Audit Log's Record pick
+  by group). The focus ring is `!important` too, so the portal's .12 glow does
+  not cover the prototype's .18. A popover that closes on a press or a scroll
+  outside itself asks `inSoftMenu(target)` first — the menu lives on `<body>`
+  (the bill menu's Share list).
+- **Motion** (README 18.2): every right drawer slides in 40px and fades
+  (`hvDrawerIn .34s cubic-bezier(.2,.8,.2,1)`), its scrim fades in `.25s`, a
+  centred window fades in `.2s` — the kit's `Drawer` / `Window` do it, so
+  round 1's drawers move the same way. Reduced motion turns them off.
+
+### Documentation (v3.31, 2026-10-11)
+
+People › Documentation, `/team/documentation` (README §10; the handoff's
+`Revenue App.dc.html` lines 703–900, the preview 1498–1552). The kit head
+(eyebrow *People · Documentation*), compact tabs Documents · Data center ·
+Letters · Publish with no counts (`margin: -4px 0 18px`). Values in
+`team/documentation/_components/documentation.module.css`; cards, the table and
+the quiet buttons have NO fill of their own — they sit on the white sheet.
+
+- **Documents**: `1fr 1.5fr`, gap 20. Cards: 1px hairline, radius 12, 18px
+  20px, a 15px / 500 title. Upload a document: Name (8px 10px, radius 6), a
+  dashed file box (*No file chosen* · *PDF, Excel, Word or image*, Upload →
+  Replace in a white 7px 14px button), department chips (6px 12px, radius 7,
+  gap 6 — the ☑/☐ its own item; peach with an orange rim when on), Save (the
+  accent, 8px 18px), the 12px note. The list: a row per file — a 38px olive
+  tile (`238 240 226` / `88 98 68`, mono 10px 500 extension), the name 500, a
+  12px brown `file · day · who` line, department pills (1px 8px, radius 999,
+  11px), View · Download (5px 10px, radius 6, unfilled, orange rim on hover)
+  and Delete (red, white; *Confirm delete* on `250 228 224`, under the
+  pointer too); *Show deleted
+  (n)*; a deleted row at .55 with a mono red *Deleted*.
+- **Data center**: `280px 1fr`. People: *Find a person*, a 9px-radius button
+  per person (name 13px 500, an 11px line, a 16px red "!" when a compulsory
+  letter is missing, a mono count; peach with an orange rim when open). The
+  record: name 18px 500, `title · code · dept · N letters on file`, the
+  orange Upload with its arrow; *On file*; a missing compulsory letter as a
+  `251 239 237` row with its own Upload; each letter a row with the page icon
+  (38×46, folded corner, two lines, the extension), the type 14.5px 600, View
+  (eye) and Download (arrow) — and, with Documentation · Edit, **Withdraw**
+  (v3.44: red on white as Delete; *Confirm withdraw* on `250 228 224`, under
+  the pointer too; on a phone the three buttons take their own line under the
+  letter). Below the letters, *Show withdrawn (n)* (the underlined 12px link of
+  *Show deleted*) opens the withdrawn ones at .55 with a mono red *Withdrawn ·
+  11 Oct* and View only. On a phone the list scrolls in its own 420px box
+  and picking a person brings the record into view.
+- **Upload a letter**: the kit Window, 460px, scrim .22 — Letter type (the
+  soft dropdown drawn as a full field; *+ Add a new letter type…* opens a name
+  field), a dashed drop (`+` or the extension in a tile, *Choose a file* · *PDF,
+  Word or a scan*, Browse → Replace), Cancel (unfilled) · Upload (the accent).
+- **Letters**: the "Letter type" switcher (8px 12px, radius 8, min 260px, the
+  chevron turning over in .2s; its menu 360px, radius 10, 6px — rows 7px 8px
+  7px 10px radius 6, a mono count, *Compulsory* with a 28×16 switch red when
+  on, ×; *New letter type* + *+ Add* at its foot), the red pill *Compulsory ·
+  N people missing*, the count line; the table (radius 10 in `216 210 200`,
+  head `10.5px` 600 uppercase): Person (underlined on hover — opens Data
+  center) · Letter · File · Filed (mono) · Status (mono 10.5px chips:
+  Delivered info, Opened alert, Acknowledged ledger) · View · Download. *Show
+  withdrawn (n)* after the count line adds the withdrawn letters at .55, their
+  chip *Withdrawn* (`250 228 224` / `236 190 184`, the danger red), View only;
+  the counts are of the letters still on file (v3.44).
+- **Publish**: `1.3fr 1fr`. Type switcher (min 220px, menu 300px; added types
+  have ×), for a Letter its letter type and *Saved under this type in Data
+  center*; Title, Body (5 rows), the attachment box; Audience — chips with a
+  mono count, then per department a box (*N of M selected*, *Select all* with
+  ✓ / – / empty) of person chips; the green summary; Publish (the accent, or
+  outlined when a file is attached, beside *Publish & save*). Published: a
+  kind chip (olive), the title, a mono short day, the audience, the file line,
+  a 4px green bar and *N of M acknowledged* — and, with Documentation · Edit,
+  **Withdraw** at the end of that line (v3.49: red on white as Delete;
+  *Confirm withdraw* on `250 228 224`, under the pointer too). *Show withdrawn
+  (n)* (the underlined 12px link of *Show deleted*) at the list's foot opens
+  the withdrawn memos at .55: kind, title, day, audience and file as before,
+  then a mono red line *Withdrawn 11 Oct by Grace Lim · Had reached 12 people ·
+  9 acknowledged · attachment deleted* in place of the bar; nothing to press.
+- **Preview** (the kit Drawer, `bare`, 640px — never wider than the frame): an
+  olive 10px kicker, a 19px title, the mono `file · ref` line, Download
+  (unfilled) and ×; tabs Preview · Audit trail (count) — peach with an inset
+  orange rule when on. Preview on `236 233 228`: a PDF in an iframe (min
+  640px), a picture as it is, an Excel or CSV file as the handoff's sheet
+  (v3.39 — read in the browser, the first sheet, at most 200 rows × 26
+  columns: a white page with a shadow, 12px; the column letters mono 10.5px
+  `117 100 86` on `242 240 236` over a `216 210 200` rule; a 36px row-number
+  column on the same grey; cells 6px 8px between `236 233 228` rules, the
+  first row 600 on `250 248 245`; a column of figures right-aligned in mono,
+  its header too; the handoff's proportions — the first column of words
+  2fr (160px at least), a column of figures 100px, the rest 1fr (96px at
+  least) — and a wider sheet scrolls sideways inside its page), else *No preview for .docx files. / Download it to open.*
+  (a Word file is a download there too). Audit trail: facts (`130px 1fr`), *Audit trail*, then the rail —
+  8px dots (`205 184 162`, the last orange), a 1px line, what 500 · when mono
+  11px · who 12px brown · a note. A deleted document or a withdrawn letter
+  (v3.44) opens on its Audit trail with no Download; its Preview says *Deleted
+  11 Oct 2026. Its file went with it; its trail stays.* / *Withdrawn … No
+  longer on X's record or in the Revenue app; its trail stays.* in the *No
+  preview* words' place — the file is never asked for.
+### Hiring › Requests (v3.32, 2026-10-11)
+
+Hiring › Requests, `/hiring/requests` (README §11; the handoff's `Revenue
+App.dc.html` lines 980–1144, the windows 1365–1497), HR's sidebar section
+**V. HIRING** in clay. Values in `hiring/_components/hiring.module.css`; the
+prototype's inputs are content-box, so ours are too (a width is the text's).
+The page head is *HIRING · REQUESTS* / *Hiring requests* / *Manpower requests
+from every department, from submission to filled.*; three compact tabs
+(`?tab=`): **Requests · Listing · Form settings** (the last only for Hiring ·
+Edit).
+
+- **Requests** — the review inbox, `340px | 1fr`, gap 20. The left card
+  (radius 12, 14px): *Incoming* 15px 500 and *+ New request* (7px 12px,
+  12.5px, hairline); the filters as pills (5px 11px, 12px; the picked one
+  peach with an accent edge) with a mono 11px count — Pending · Info
+  requested · Declined; rows radius 9, 10px 12px, the title 500 cut with an
+  ellipsis, the status chip (mono 10.5px), `Revenue · IR · Kar Jun · 9 Oct
+  2026` 11.5px brown; the picked row peach. The right card (20px 22px): the id
+  mono 11px, the position 20px 500, *From Kar Jun · Revenue · submitted 9 Oct
+  2026* 13px, the chip; tiles `repeat(auto-fill, minmax(160px, 1fr))` in 1px
+  hairline seams, radius 8 — Budget, Headcount and Expected start first in
+  peach with clay label and value 16px, then Company, Department and the rest
+  (11.5px brown label, 600 13.5px value in `51 36 27`); the long answers under
+  10.5px caps labels (14px / 1.65, 72ch); an attachment row (a 34px olive FILE
+  tile, Download). Under a hairline: **Owner** (`240px`; HR's own people) ·
+  **Note to requester**, then **Acknowledge** (accent, 8px 16px), **Request
+  more info**, **Decline** (danger edge) and, at the right, *Open full page*
+  underlined; the refusal in red 12.5px. *History*: one line a step — the date
+  mono 11px in 80px, the step (600 when it is a status), who, the note.
+- **Listing** — five stat cards (Total, Pending in alert, Acknowledged,
+  Filled in ledger, Cancelled in danger; 24px 500; a press filters, the
+  picked one peach). The table radius 10 in a `216 210 200` edge: columns
+  `80px 1.5fr 1fr×6 130px`, a `235 231 224` head (10.5px 600 caps .04em);
+  rows 13px, hover `250 248 245`, a cancelled one at .6; the id mono 11.5px,
+  the position 500 with *Hired: …* or the employment type under it, the owner
+  (*Unassigned* in alert 500), the budget mono 12px, candidates `2 · 1 appt ·
+  1 out`, the chip. A press opens the request's page; a right-press opens the
+  menu (white, radius 8, 4px, at 70% / 240px): Acknowledge, Mark filled…,
+  Cancel request (danger), Reopen, Open details (`90 78 68`).
+- **Form settings** — a card at most 980px: *What requesters fill in* +
+  *Preview form*; the columns `56px 1.4fr 140px 1.6fr 110px 34px` (↑↓,
+  the field's name, its answer type — Short text, Number, Long text, Choice,
+  Range (from – to) — the choices or a dash, a Required switch 28×16 `.2s`,
+  ×); Position and Department say *Core* instead of ×. *+ Add field* under
+  it. A second card, **Hiring sources**: cards `minmax(220px, 1fr)` with the
+  name, `2 hires` mono 11px, an On / Off switch and × (only while unused).
+  Every change saves itself.
+- **+ New request** — the 640px drawer (head 18px 22px, *New hiring request*
+  19px): *Request manpower* · *Fields come from Form settings*; Requested by
+  (`Grace Lim · HR`, at most 280px); Form settings' fields two to a row, a
+  long answer across both, a range as From *to* To (90px each), required ones
+  starred in red; **Submit to HR** (8px 18px) with the refusal beside it.
+- **A request's page** (`/hiring/requests/HR-203`): *‹ All requests*, the id
+  mono 11.5px, the title 24px (`Revenue Specialist × 2`), *Requested by …*,
+  an owner pill (peach / clay, or *No owner yet* in alert) and the chip; then
+  `1fr | 340px` (the right column sticky). Left: **Requirements** (tiles
+  `minmax(170px, 1fr)`, the three highlighted 17px, values 14px; a filled one
+  adds Hired through and Hiring cost), the long answers as their own cards
+  (14px / 1.7), **Candidates · N** with **+** (an accent 30px square: *＋ New
+  candidate*, *⇣ Pick from Talent Bank*) and **⋯** (Candidate fields). A
+  candidate is a card (radius 10, a 3px left edge in their stage's colour):
+  38px initials in the stage's tones, the name 600 and a stage chip (11px
+  500), `Applied · 016-221 0457`, their details as pills (`246 244 241`,
+  *Expected salary RM 3,000*), the note behind a 2px accent rule; at the
+  right *View résumé* and **⋯** — Edit details, Change status ▸ (the five
+  stages, the current one 600), Download résumé, Move to Talent Bank… / Open
+  in Talent Bank. Right: **Pipeline** (3×2: Candidates, Shortlisted, Done
+  appointment in alert, Offered, Hired in ledger, Not selected in danger;
+  20px 600), **Actions** while open (pending: Owner + Note + Acknowledge;
+  acknowledged: the owner in a peach row, *Helped by others* ticks open
+  *Assisted by…*, one *Hired* pick per headcount, Hired through · Cost (RM)
+  110px mono right-aligned, Note, **Mark filled**; always **Cancel request**
+  on white), a closed card (*Filled · Siti Aisyah · via Jobstreet · RM 450* /
+  *Cancelled*) with **Reopen**, and the **Audit trail** (All · Status only on a
+  `240 238 234` switch): a status is a 10px dot (clay; the newest accent)
+  with a STATUS tag, any other step a 7px ring; 1px rules between.
+- **Windows** (scrim .22, radius 16, fade .2s): *Add candidate* / *Edit
+  candidate* 560px (Name *, Phone, Status, the candidate fields, Reference /
+  special note, a dashed résumé row, *Change which fields appear here*);
+  *Candidate fields* 620px (Field · Type · Dropdown choices · ×, *+ Add
+  field*, Done — saved on close); *Pick from Talent Bank* 560px (name 500,
+  the position 12px, *Matches* in ledger, the first line of their notes, Add);
+  *Move to Talent Bank* 560px (Name *, Phone, Email, Department *, Good fit
+  for (position) *, Why keep them, the résumé).
+- **The résumé** — the 600px drawer: `HR-203 · REVENUE SPECIALIST · DONE
+  APPOINTMENT` (10px 600 .14em clay), the name 19px, the file mono, Download;
+  the file on `236 233 228` (a PDF framed, an image as it is, a Word document
+  on a white A4 sheet saying it opens in Word); the note at the foot.
+- **Phone width**: the inbox, the page and the new-request grid fall to one
+  column, the stats two to a row, the listing and Form settings scroll
+  sideways inside their cards, and a drawer is never wider than the frame.
+
+### Hiring › Insights and the Talent Bank (v3.33, 2026-10-11)
+
+The rest of **V. HIRING** (README §12–13; the handoff's `Revenue App.dc.html`
+lines 1145–1270, the drawers 1334–1364 and 1484–1497). Values in
+`hiring/_components/hiring.module.css`.
+
+- **Insights** (`/hiring/insights`, *How long each request takes, from
+  submitted to acknowledged to filled.*). The period bar: a white segmented
+  box (3px, radius 10) — **This month** · **All time** · a 1px rule ·
+  **Pick a month** (calendar and chevron; the picked one dark `43 31 23` on
+  cream, 500) — then the range in words (`1 Oct 2026 – 31 Oct 2026`, 12.5px).
+  Pick a month opens a 264px card (radius 12, 12px; on a phone leftwards from
+  the button's right edge, so every month is on screen): *LAST 12 MONTHS*, then a
+  4-column grid of months (`Oct` 13px 500 over `2026` 10px at .7). **Six
+  cards** in a row (gap 9, 146px tall, the kit's card look): Requests
+  submitted · People hired (a ledger bar) · Avg days to acknowledge · Avg days
+  to fill · Hiring cost · Cost per hire (alert bars); the figure 28px, 22px
+  past six characters; at the foot the change on the month before
+  (`▲ 12% vs Sep` — ledger when it is good news, danger when not, `0% vs Sep`
+  brown; none for all time) and the card's icon. **Days from submitted to
+  filled**: the period's fills two to a row (`170px | bar | 44px`), the bar
+  10px on `240 238 234` split into *To acknowledge* (`205 184 162`) and
+  *Acknowledged to filled* (accent), longest first, with its legend. **By
+  source** (people hired, `2 pax`, the cost) and **By department** (`1 open ·
+  3 hired`, `25 days to fill` / *No fills*) side by side, each a 6px slate bar
+  of its share. **Every request** scrolls sideways: 15 columns (`80px 230px
+  150px …`), the ID sticky, money and days mono and right-aligned, an open
+  request's *N d so far* in alert. A row opens the **440px panel**: `HR-202 ·
+  Revenue · Fair`, the title 19px, its chip and owner, a ledger *Hired: …*
+  band, its facts (`150px | 1fr`; budget, cost and start in clay 600), the
+  Audit trail, **Close** and **View full →**. A request is in the period when
+  it was submitted or filled in it.
+- **Talent Bank** (`/hiring/talent`, *Good candidates kept on file, ready to
+  invite when a role opens.*): `260px | 1fr`. The left card: *Search name or
+  notes*, **All talent** and each department with its count; a department
+  opens (its ▸ turns, `.2s`) to the positions under it, indented behind a
+  rule, in the tree's own 4px rhythm (an opened department with nobody in it
+  keeps its empty block); the picked row peach, 600 (a position's in clay). The right: the
+  heading (`Revenue Specialist`, `Revenue · 1 person`) and **+ Add talent**;
+  the table `1.2fr 1.1fr 1.8fr 110px 170px` — name 500 over *From HR-202* /
+  *Added directly*, what they fit over their department, the first line of
+  their notes cut with an ellipsis, the day saved (mono), *Interviewing ·
+  HR-203* (alert) or *Available* (ledger). A right-press: **Open**, **Remove
+  from Talent Bank** (danger). **+ Add talent** is a 520px drawer (*Add to
+  Talent Bank* · *Someone worth calling back when a role opens.*; name,
+  phone, email, what they fit, department, a résumé, why keep them; *Save
+  talent*). A row opens the **460px panel**: `T-103`, the name 19px, the
+  chip; their facts, *HR NOTES*, the résumé (a 36px olive tile, **View**),
+  *LATEST*; **Remove** (asks once more: *Confirm remove*), **Close**, **Full
+  page →**.
+- **A talent's page** (`/hiring/talent/[id]`): *‹ Talent Bank*, `T-104`, the
+  name 24px, *Good fit for … · saved 24 Sep 2026 by Grace Lim*, the chip;
+  `1fr | 340px`. **Profile** tiles (`minmax(170px, 1fr)`, values 500), **HR
+  notes** (a 14px / 1.7 textarea, saved as it is written), the résumé (a 38px
+  tile, **Open**, **Replace**); on the right **Invite to interview** (the open
+  requests, the one that fits picked first; or *No open hiring requests right
+  now.*) and **Remove from Talent Bank** (asked twice), then **History**
+  (8px dots, the newest in the accent).
+- On a request's page a candidate who is in the bank offers **★ Open in
+  Talent Bank** (ledger).
+
+### Hiring files (v3.46, 2026-10-11)
+
+The user's answers on round 2: a candidate and a Talent Bank person keep
+**several files, each with a file type** (mig `20261011160000`). No prototype
+draws it: a file is the résumé row it replaces. Values in
+`hiring/_components/hiring.module.css` (`.hf*`, `.cvPill`); the parts are
+`HiringFiles.tsx`.
+
+- **A file** is a row in a hairline box (radius 10, 12px; rows 8px apart):
+  the 36px olive extension tile (`PDF`, `JPG`), the name 500 (cut with an
+  ellipsis), its type 12px brown under it, then what may be done. Taken off in
+  a window it is struck through in grey, *IC · removed on Save*, with **Undo**.
+- **The type** — a 184px soft dropdown: *Choose type…*, Résumé, IC,
+  Certificate and the types HR named, then (Hiring · Edit) **+ Add a new file
+  type…**, which opens a name field (*e.g. Driving licence*) under it, its
+  right edge with the picker's. A file chosen while the record has no résumé
+  starts as Résumé; any other starts unpicked, and Save asks *Pick what kind of
+  file it is.*
+- **Add / Edit candidate** and **+ Add talent**: the files on record (Edit:
+  Remove / Undo, applied on Save), then each chosen file (*Uploads on Save*,
+  its type, ×), then the dashed box — *Upload résumé* while there is none,
+  else *Add another file* · *Choose file* (several at once). Save sends the
+  files up from the browser, then files the form.
+- **The files drawer** (the 600px résumé drawer): the head names the file shown
+  (`Résumé · Daniel_Lee_CV.pdf`, mono) and **Download** takes it; with more
+  than one file, a row of pills under the head (12px, 4px 10px, radius 999,
+  hairline; the one shown peach on an accent rim), the résumé first. The
+  candidate's button reads *View résumé* for one résumé and *View files*
+  otherwise; ⋯ *Download résumé* takes the newest résumé.
+- **Move to Talent Bank** lists them all in its row (*Résumé · CV.pdf, IC ·
+  ic.jpg*): they go with the candidate.
+- **The Talent Bank panel**: a hairline row per file with **View**; *No files*
+  beside a dash tile.
+- **A talent's page**: the **Files** card — *FILES* and **+ Add file** (Create
+  or Edit); rows on the card's own rules with a 38px tile, **Open**,
+  **Replace** and **Remove** (asked twice, in the armed pink). *+ Add file*
+  opens a row under a rule: the type, **Choose file** (filed as soon as it is
+  chosen), Cancel. *No files yet.* when there are none.
+- **Phone width**: a row wraps — its buttons, or the type and its ×, onto a
+  second line; nothing runs past the screen.
+- **Form settings › File types** (v3.48 — the user: rename and turn off): a
+  third card after *Hiring sources*, drawn as it is — *File types*, its lede,
+  cards `minmax(220px, 1fr)` (9px 12px, radius 8): the name 500 and `N files`
+  mono 11px, a 22px **✎** (a quiet `panel-2` hover — renaming is no danger)
+  that swaps the name for a field in its place (2px 8px, 13px; Enter or
+  leaving it keeps the name, Esc lets it be), and the sources' **On / Off**
+  switch; a type turned off is greyed (`quiet`). Résumé says *Built in* (11px
+  brown) — no ✎, no switch. Then *New type, e.g. Driving licence* and
+  **+ Add type**. A type turned off leaves the picker; the files filed under
+  it keep it.
+
+### Meeting Rooms (v3.34, 2026-10-11)
+
+Admin › Meeting Rooms, `/admin/rooms` (README §14; the handoff's `Revenue
+App.dc.html` lines 890–938, the drawers 1284–1332), in every view's sidebar —
+HR's Admin section above Audit Log, the old shell's Reports & Admin. Values in
+`admin/rooms/_components/rooms.module.css`.
+
+- **Schedule** (the first tab; the tabs show only to whoever may manage the
+  rooms). The toolbar: a date pager (‹ · `Sat, 10 Oct 2026 · today` 500 in a
+  190px label · ›) in one `229 228 223` box radius 6 — the label names the
+  asked day at once and nothing dims while its grid is read — **Today**, the day's
+  count in words (12.5px `90 78 68`), then the legend (10px swatches radius 3,
+  mono 11.5px 600 codes) and **+ Book a room** (the accent, black, 8px 18px).
+  **The label opens a month** (v3.51, the user): it is a button — a 13px
+  calendar mark in brown before the day, the `240 238 234` wash on hover and
+  while open — and drops a 264px card under the pager (radius 12, 12px in, the
+  Hiring month card's edge and shadow): ‹ `October 2026` (13px 600) › turn only
+  the card's month; `MO … SU` (10px 600 brown, .06em); six weeks, Monday first,
+  in 32px cells radius 7 (13px; the months either side `170 160 150`; today
+  ringed 1.5px in the accent; the asked day dark `43 31 23` on cream). A day
+  pressed goes there and closes the card — ‹ › on the pager still step one
+  day; Escape, a press outside, or the day shown close it; the arrow keys move
+  a day or a week.
+  The grid: radius 10 in a `216 210 200` edge, at most 640px tall inside it
+  (content-box, 642 in all) and scrolling; a 56px hour column (mono 10.5px) then one column per room
+  (`minmax(170px, 1fr)`) under a sticky `235 231 224` head (name 500 13px,
+  `8 seats · Level 3` 11px). **08:00–20:00, 52px an hour**, half-hour rules
+  drawn by one repeating gradient. A meeting is a block 4px in from each side,
+  1px down and 3px short, its department's light tone with a 3px deep-tone
+  left edge: title 500 12px, the time mono 10.5px, `RV · Chea Huan · 6 pax`
+  11px — hover rings it in the accent. **The free half hour under the pointer
+  lights** (v3.51, the user — you see which bar the pointer is on): the kit's
+  row hover `255 245 233`, the accent's 3px inset left edge where a meeting's
+  own edge would be, and `+ 09:30` (mono 10.5px brown, 10px in) — never under a
+  meeting, only on a device that points, only from today on and for whoever may
+  book. Pressing it opens Book at that half hour, an hour long but never past
+  20:00 (the lit 19:30 books 19:30–20:00; until v3.51 it opened 19:00). A day
+  already past neither lights nor opens Book — the database refuses it.
+- **Department tones** (`lib/rooms/model.ts` `departmentBadge`): Revenue RV
+  slate, HR clay, Finance FIN gold — the handoff's — then MKT walnut, IT slate,
+  DO, DIR, VO, and any other its first three letters in walnut. A guest-link
+  booking is olive under its subsidiary's code. The legend lists HQ first.
+- **Book a room** — the 520px drawer (eyebrow MEETING ROOM in slate, head and
+  body 18px 22px): Meeting title; Room · Date, From · To, Booked by · From
+  department in pairs (every select the kit's `Select`); Attending · internal
+  as chips (the row kept when nobody is listed, so the search sits 16px under
+  the label) with a type-a-name search and six suggestions; external guests as
+  name / company rows with *+ Add an external guest*; **Total pax** in a grey
+  box with a 38px − 1 + stepper that never goes under the named count (− greys
+  there) and says `· too many` in red past the room's seats. The footer's red
+  line says the first problem in words — a clash reads `Meeting Room 1 is
+  taken 09:00–10:00 by “Fair weekly sync”.` A guest-link booking opens without
+  the who-fields.
+- **A booking** — the 440px drawer: kicker `ROOM · DEPARTMENT` in slate, the
+  title 19px, the day and time mono; facts (Booked by, From department, Room,
+  Reference `BK-301`; a guest one Company and Department and `· guest link`);
+  ATTENDING · N with the booker marked and outside guests in `160 90 30`; the
+  audit trail (8px dots, the last in the accent). Whoever booked it sees
+  **Cancel meeting** (asks once more: *Confirm cancel*) and **Edit**; anyone
+  else reads *Only Chea Huan can cancel this meeting.*
+- **Booked for somebody else** (v3.45, the user 2026-10-11 — review L3): a
+  booking Grace made with *Booked by* Chea Huan reads **Grace Lim (for Chea
+  Huan)** wherever a booker is drawn — a block's last line (`RV · Grace Lim
+  (for Chea Huan) · 6 pax`), the drawer's *Booked by*, the Revenue app's and
+  the HR app's schedules, the guest page's window — and *Only Grace Lim or
+  Chea Huan can cancel this meeting.* (`bookerName` / `whoMayCancel`,
+  `lib/rooms/model.ts`).
+- **Rooms** — cards in `repeat(auto-fill, minmax(260px, 1fr))`, radius 12,
+  16px: the name edited in place (15px 500), × to remove (refused while it has
+  bookings ahead), Seats (70px mono) · Location · Facilities saved as you
+  leave the field, the bookings ahead and a **Bookable** switch (28×16, `.2s`;
+  a room switched off leaves the schedule and its card fades to .6); a dashed
+  **+ Add meeting room** card. Rooms start empty.
+
+### Guest link (v3.35, 2026-10-11)
+
+Admin › Guest Link, `/admin/guest-link` (README §15, portal-41; `Revenue
+App.dc.html` lines 940–977), HR's view only, and the public page it hands
+out, `/g/<code>` (README §16; `Guest Booking.dc.html`, measured against the
+canvas's 3a phone and 3c computer artboards). Values in
+`admin/guest-link/_components/guest-link.module.css` and
+`(guest)/g/[code]/_components/guest.module.css`.
+
+- **Admin › Guest Link** — two columns. Left: the link card (radius 12,
+  18px 20px): *Guest link* 15px 500 with **Link on / Link off** (12.5px 500,
+  green `21 110 78` when on) and a 30×18 switch (knob 14, `.2s`); the address
+  in a `250 248 245` row, mono 12.5px, dimmed to .45 while off, with **Copy**
+  and **New link** (7px 12px, radius 6); the parts — *Book a meeting room*,
+  *Request manpower* — each a row with its switch; *Guests can book up to
+  [14] days ahead* (56px mono input, 1–21). Under it *Rooms guests can book*:
+  every bookable room with a switch. Right: *Subsidiaries & departments* —
+  a card per company: a 54px mono 600 uppercase code box (up to three), the
+  name edited in place (13.5px 500), ×, then its departments as chips with ×
+  and a dashed *+ Department* box (Enter adds); **+ Add subsidiary**. Then
+  *Booked through the link* (N upcoming): title, `Room · Sat, 10 Oct 2026 ·
+  17:00–18:00 · 5 pax`, who, and **Open** — the Meeting Rooms booking drawer.
+- **The guest page** — warm paper `246 242 236`, Inter, black-brown ink; a
+  38px walnut **H** tile, *HOUZS Venture / Guest services · for subsidiary
+  staff*. Closed: one white card, *This link is closed / Ask the HOUZS admin
+  team for a current link.* Home: *What do you need?* 24px 600, cards (radius
+  18, min 150px, 52px tiles: slate for Book, olive for the schedule, clay for
+  manpower) with *Start →* in `163 78 37`.
+- **Book a meeting room** — three white cards (radius 16, 18px): *1 · Who is
+  booking* (Company → Department, Your name; 46px fields, the soft dropdown at
+  radius 12), *2 · Pick a room and time* (56×60 day chips, the picked one
+  dark; a card per room with its free hours and a 10px `222 240 232` bar of
+  the day, 08:00 · 12:00 · 16:00 · 20:00 under it; open, its half hours as
+  40px tiles — booked ones struck through, the picked stretch orange; the pick
+  read back in a peach line), *3 · Meeting* (title, a 46px − n + stepper:
+  *Meeting Room 1 seats 8*, red past the seats). The 52px orange **Book room**;
+  missing fields in one red line (*Add company, your name.*). Done: a ✓ card
+  with the reference (mono), the facts, *Cancel booking* (asks again: *Tap
+  again to cancel*) and the dark *Book another room*.
+- **The schedule** — the day chips over a white calendar: a 40px hour column
+  and a column per room (*Room 1*…), **64px an hour**, half-hour rules;
+  meetings 3px in, HQ blue (`230 237 241`, bar `78 101 116`), subsidiaries
+  orange (`255 244 231`, bar `233 154 83`); a title on 1, 3 or 5 lines by
+  length, then `09:00 RV`. A tap opens a centred window (radius 18, `.2s`
+  fade, sticky in the middle of the screen): Room, Company, Department (`HIN ·
+  Project`), Booked by, People — and for a meeting booked through the link,
+  **Cancel meeting** and **Edit**. HQ's meetings show no buttons (the user).
+  Changing or cancelling asks the guest's name in the same window.
+- **Desktop (≥900px)** — the page widens to 1100px; while booking, a 340px
+  **Preview** column (sticky, 35px down): *Your booking*, *n of 8 filled* with
+  a 4px orange bar, then Who / When / Meeting, *Not filled yet* in grey.
+### The Revenue app — Book a room and Documentation (v3.36, 2026-10-11)
+
+Profile › Your workspace (README 18.4, the handoff's `Revenue Member App.dc.html`
+lines 103–152 and the sheet at 189–211), in the handoff's order after *Waiting
+list & replacements*: **Book a room** — slate tile (`--rv-slate-bg` /
+`--rv-slate`), the handoff's calendar (a rounded 18×16 box, two posts, a rule) —
+and **Documentation** — sand tile, the handoff's doc — with the white-on-orange
+count of files not opened yet. Sizes below are the handoff's phone px; the CSS
+writes them ÷ .92 against `--rv-type`, like the rest of the app. Values in
+`components/member/app/profile/rooms.module.css` and `docs.module.css`.
+
+**Every workspace row, as both HR revamp handoffs draw it** (v3.45, the user
+2026-10-11 — the app had kept the first Revenue app design's 48px rows): an
+81px row — `52px minmax(0,1fr) 16px`, gap 14, 14px 0 — on its own 1px
+`--rv-rule` (`#F1E7DF`), rows touching (no gap), the 52px tone circle with the
+handoff's 22px icon at stroke 1.8, the title 14.7px 650, the sub-line 12px
+`--rv-sub` 2px under it, the 16px chevron; *Your workspace* 16.6px 650, 6px
+over the first row (`profile.module.css` `.work`, `.workRow`, `.workIcon`).
+
+- **Meeting rooms** (app-08 / 09) — the page 10px 20px 32px, gap 14: *‹ Profile*
+  (13.3px 600 accent, the handoff's 18px chevron at stroke 2), then the title
+  row 6px up: **Meeting rooms** 25.8px 700 −.03em and **+ Book** (a 38px accent
+  pill, 0 16px, 13.3px 650 white). *By room | Timeline* in a sand track (3px, radius
+  12; each 36px radius 9, 12.4px — the picked one white, black 650, a
+  `0 1px 3px rgba(63,43,34,.12)` lift). Seven day chips 52×58 radius 16 with a
+  1px line (11px weekday — *Today* first — over 17px 700 date), the picked one
+  filled with the accent, scrolling sideways edge to edge.
+- **By room** — a white card a room (radius 20, the line, 12px 16px): name 14.7px
+  650 · `8 seats` 12px; each meeting under a rule — the time mono 11.5px in 78px,
+  then a 3px bar and the title 13.3px 600 (one line, …) over `Chea Huan · 6 pax`
+  11.5px; a free day reads *Free all day · tap to book* 12.4px 600 green.
+- **Timeline** — one white card (radius 20, clipped): a `--rv-grid-head` head row
+  of short room names (*Room 1*, 11.5px 650, ruled), a 38px column of hours (mono
+  10px `--rv-hour`) and a column a room, **64px an hour**, 768px tall, its hour
+  and half-hour lines one repeating gradient (`--rv-grid-hour` / `--rv-grid-half`);
+  a meeting is a block 3px in, 1px down, 2px short, radius 8, its tone's fill
+  and 3px bar, title 10.5px 650 on 1 / 3 / 5 lines by length, time mono 9px. A
+  press on empty space books that half hour (never later than 19:30); the
+  cursor is `copy`. *Tap an empty slot to book it.* 12px under it.
+- **Tones** — the member's own meetings `--rv-accent` on `--rv-peach-bg`, the
+  rest of HQ `--rv-slate` on `--rv-slate-bg`, the guest link's subsidiaries
+  `--rv-accent-soft` on `--rv-guest-bg`.
+- **The sheets** — the app's `Sheet` (`dim="e"`: the handoff's `rgb(43 31 23 /
+  .4)`), max 88%, 8px 20px 26px, gap 12, a 40×5 grabber in the line colour,
+  the title 18.4px 700. **Book a room · Sat 10 Oct**: labels 12.4px 600 sub; a
+  text field 46px + its border (content-box, radius 12, 14px); every select the
+  soft dropdown with the canvas's soft field (radius 10, the chevron) — Department
+  (*Revenue · Fair*, *Revenue · IR*, then HQ's departments), Room
+  (`Meeting Room 1 · 8 seats`), From / To side by side (`—`, 08:00–20:00 by half
+  hours); *Attending* — peach chips 32px (12.9px 600 accent, a 22px ×) over
+  *Add a colleague — type a name* and its dashed suggestions; *Total pax* with
+  `1 named + 2 more` (11.5px `--rv-hour`) and a 44px − n + stepper in a radius-12
+  box; the red line (12.9px `--rv-err`); **Cancel** (flex 1, outlined, 650) and
+  **Book** (flex 2, the accent, 700), both 48px pills. A meeting opened: the
+  title, `Sat 10 Oct · 15:00–16:00` 13.3px sub 6px up, four facts (Room, Booked
+  by, From, People) 13.3px over rules, then **Cancel meeting** (48px, `--rv-err`
+  on white in an `--rv-err-line` ring; a first tap fills it `--rv-err-bg` and
+  reads *Tap again to cancel*) for the booker, else *Only Chea Huan can cancel
+  this meeting.* 12.4px sub. Viewing as somebody, the sheets' button reads
+  *Read-only while viewing as*.
+- **Documentation** (app-06) — the page 10px 20px 32px, gap 20: the back link,
+  **Documentation** 25.8px 700, *Shared with Revenue by HR.* 12.9px sub; rows
+  `44px minmax(0,1fr) 16px` gap 12, 13px 0 over a rule: a 44px sand tile radius
+  12 with the file's kind (`XLSX`, `PDF` — 10px 700 brown, .02em), the name
+  13.8px 650 with a white *New* on the accent (10px 700, radius 9, 1px 7px),
+  `Added 1 Oct 2026` 11.5px sub, the 16px chevron. *Nothing shared with you
+  yet.* when empty; under the list, once a file is tapped, *Opening
+  HV_Employee_Handbook_v3.2.pdf* in a cream note (12px 14px, radius 14,
+  `--rv-open-line`, 12.4px brown).
+
+### Guest link — Request manpower (v3.37, 2026-10-11)
+
+The guest page's third card (README §16, guest-phone-04, guest-desktop-03;
+`Guest Booking.dc.html`'s step-by-step form), measured against the canvas's 3b
+phone and 3c computer artboards. The fields are Hiring › Form settings'.
+
+- **Steps** — *About you* (Company, Your name) → *The role* → *Candidate
+  requirements* → *Job description* → *Check and send*. Over them the step's
+  name (12.5px 600) with *Step 1 of 5* in grey, and five 4px bars, orange up
+  to the step. Each step is one white card (radius 16, 18px): its title 15px
+  600 and a grey line under it, then the fields two to a row from 400px
+  (`minmax(200px, 1fr)`). A label is 12.5px 500 `90 78 68`, a red *
+  when required, a grey *· optional* when not.
+- **Fields** — text 46px; a number as a 46px − n + stepper (16px 600);
+  a range as two 46px number boxes with *to*; a choice of five or fewer as
+  pills (40px, radius 999, the picked one dark), more as the soft dropdown;
+  long text as a five-line box (14px / 1.55); the file as a dashed
+  `250 247 243` box with a 40px olive tile (`+`, then the file's kind),
+  *Upload a file / PDF, Word or a photo* and *Choose* (*Replace*).
+- **Buttons** — *Back* (white, 52px) and the orange *Next* twice as wide;
+  *Review* on the last step, *Send to HR* on Check and send, where each step
+  is a block of label / value rows with its *Edit*. Missing fields in one red
+  line: *Fill in Company, Your name.* Done: ✓ *Sent to HR*, the request's
+  number (mono) and *Send another request* (dark).
+- **Desktop** — the 340px Preview: *Your request / This is what HR will
+  see*, *n of 15 filled*, the four groups, the budget as *RM 2500 – 3000*.
+- A phone keeps the portal's 16px floor for what is typed (globals.css; iOS
+  zooms on anything smaller) — the text box is held to the prototype's five
+  14px lines all the same.
+### The HR phone app (v3.38, 2026-10-11)
+
+`/hr-app` (README §17, the handoff's `HR Mobile App.dc.html`, the canvas's
+artboard 4a) — HR's view of the ONE app on a phone (v3.50: no install of its
+own; the portal's HR pages are the computer's), not a portal page. *More* ends
+with the view switch for an account that may switch views: a second white card,
+one row per view (Principal, Finance — the portal; HR — this app; Revenue team —
+the Revenue app), a 10px dot in the view's colour on a `246 242 236` tile, the
+current row reading *You are here* at .6 with no chevron. Values in
+`components/hr-app/hr-app.module.css`, the handoff's own rgb values; the app
+runs on the browser's defaults (line-height normal, content-box) like the
+prototype, on the warm ground `246 242 236`, at most 560px wide and centred.
+
+- **Head** — 52px: a 40px walnut tile (Home) or a 36px clay back chevron, an
+  11px clay kicker over a 24px 700 title, and a walnut 36px action (*+ New*,
+  *+ Book*) on the right. Pages slide in (`mPush .22s`).
+- **Home** — the walnut hero (radius 20, 18px): *Good afternoon* 13px at .75,
+  the first name 20px 700, three stat tiles (22px 700 figures — *To review*,
+  *Open roles*, *Letters missing*); *Waiting for you* (40px tags HIRE / WAIT /
+  REPL / CLAIM, *See all*) and *Today's meetings* (mono 12px times, a 3px bar —
+  slate for HQ, orange for the guest link) as white radius-18 cards.
+- **Review** — the inbox: All · Hiring · Member services chips with counts;
+  hiring requests and member requests by their own numbers (`HR-205`,
+  `RQ-2610-004`); a member request opens its facts with **Accept** /
+  **Approve** and **Reject**. A claim's **Approve** (v3.45, the user
+  2026-10-11) opens a small sheet, *Approve claim*: one 12.5px line (*Add to
+  payroll pays it with the salary. Request payment sends it to Finance to pay
+  on its own.*) over two 48px pills side by side — **Request payment**
+  (white) and **Add to payroll** (orange) — Member services' two routes.
+- **Hiring** — Open · Pending · In progress · Filled · Closed; a request card
+  (its id mono, the status chip, the position, `dept · requester`, three pills:
+  candidates, at appointment or further, out); its page: the requirement tiles,
+  candidates with **Change status ▸**, *+ Add candidate*, the trail, and a bar
+  pinned above the tabs — Decline / Request more info / Acknowledge while
+  pending, Cancel / Mark filled once acknowledged.
+- **Rooms** — *By room* | *Timeline* (64px an hour) and the seven day chips,
+  as in the Revenue app; HQ slate, the guest link orange.
+- **More** — Insights (days to fill, cost, sources), the Talent Bank, the Data
+  center (everybody, a red `!` while a compulsory letter is missing; a
+  person's letters with **View**).
+- **Sheets** — rise from the bottom (`mSheet .28s`) over a walnut scrim;
+  fields 46px radius 12; every select the kit's soft dropdown with its soft
+  field (radius 10, the chevron — the canvas's global `select` rule); the
+  buttons 48px pills.
+- **Tab bar** — white, pinned, five tabs (Home · Review · Hiring · Rooms ·
+  More), the active one clay; it stands on `--safe-bottom`.
+- Not in the handoff: *No meeting rooms yet.* (Rooms) and *No meetings
+  today.* (Home) — its sample always has both.
 
 ### Product List — a page of the Revenue app (v3.13, 2026-10-08)
 
@@ -1342,6 +2017,8 @@ When it shows (`components/pwa/UpdatePrompt.tsx`, `lib/app-update.ts`): the app 
 Every bar that stands at the bottom of the screen — the Revenue app's Today · Insight · Quote · Arena · Profile, the portal's tab bar, and whatever pads itself clear of them (`PortalFrame`'s scroll area, `MoreSheet`, `.sheet-frame`, Finance's `.bulk-bar`, the login footer) — pads by **`var(--safe-bottom)`**, never by the bare `env(safe-area-inset-bottom)`. The installed app draws under the phone's own navigation bar (`viewport-fit=cover`), and after a reload (Update, a pull that met a new release, Try again) Chrome on a phone with three-button navigation can hand the new page an inset of 0 while still drawing it under those buttons: the Revenue app's bar sat behind them with only its top edge and the Quote circle showing. `--safe-bottom` (globals.css) is the larger of the browser's inset and the one the tab remembers from earlier in the session in the very same window (`lib/safe-area.ts`, `components/pwa/SafeAreaMemory.tsx`, set before the first paint by the root layout's head script); the moment the browser gives the page a non-zero inset it is believed again, a later 0 included (a keyboard is real). Nothing changes on a phone the browser reads right, on a desktop, or in a fresh launch. `src/lib/safe-area.test.ts` fails on a new bare inset outside the previews.
 
 **Sheets, and the pages that slide over the screen (2026-10-10)** — every bottom sheet (`Sheet.tsx`'s `.panel`), *Add to quote* (`.psPanel`) and its bed-frame picker, Notifications and View as reach the screen's bottom edge, so on a phone with three buttons their last ~48px — *Start a quote*'s last brand, *Add to cart* — sat behind those buttons, reload or not. Each now carries a transparent bottom border of `--sheet-safe` (shell.module.css `.screen`): the sheet's own white runs on under the phone's bar and its contents stay above it. It adds only what the sheet's drawn bottom padding (24–34px, for an iPhone's translucent home indicator) does not already cover: on an iPhone `--safe-bottom − 30px` (34 → 4px, so it looks as drawn); on Android `--safe-bottom − 6px` (three buttons, 48 → 42px, every sheet clear of them by 12–28px, including the four the prototype drew tighter for Android: Start a quote, the cart, Add to quote, the customer quote). A sheet keeps the height it was drawn to — the border comes out of `.panel`'s border-box height, and out of *Add to quote*'s `max-height` and the picker's `height`.
+
+**Tucked away while reading on (2026-10-11 — the user: "滑上去的时候，它是会收下来的 … 等这个爬升来的时候，它才可以又再跑起来")** — the three bottom bars (the HR app's tabs, the Revenue app's nav, the portal's tab bar) slide out of sight once a page is scrolled down by more than 24px, and come back on a scroll up of 24px, near the top of a page (under 48px) or on another page — 0.26s `cubic-bezier(0.2, 0.8, 0.2, 1)`, none under reduced motion. On entering a page, or coming back to the app, the bar is there (v3.57 — "点进去的时候理应能看到下面的 bar"); and in the HR app every page entered opens at its top while Back returns to where its page was left ("每次点进去都从最上面开始"), as the Revenue app's screens and the portal's pages already did. Never while the portal's More sheet is open; a scroll inside a sheet, a drawer or a page sliding over moves nothing. A tucked bar is `inert`. An in-flow bar gives its height back but for `--safe-bottom`: the page grows into the space and still ends above the home indicator or Android's buttons, and what sat on the bar — the Quote and Set-price docks, the HR app's Acknowledge bar — comes down onto that strip (white in the Revenue app, whatever the status colour). On the portal, what stands on the tab bar comes down with it through `--tabbar-h` (54px; 0 under `html[data-tabbar-tucked]`): Finance's `.bulk-bar` (sliding), the HR view's frame — its sheet, which scrolls inside itself, grows into the bar's place — and that frame's drawers, scrims, windows and toasts. A page whose content simply runs on (`PortalFrame`, `.sheet-frame`) keeps its 54px of bottom padding: that is only the end of its content. A page too short to scroll back up once the bar is gone never tucks it. `components/pwa/tuck.ts`, `tuck.module.css`.
 
 ### `.page-head` example (mandatory shape)
 
@@ -2935,6 +3612,14 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-11 v3.60 (Switch view in the Revenue app on a phone)** — the user had no way out of the Revenue view on a phone ("do a switch button for me to switch to hr and other view"). Profile, below *View as a team member*, lists the views for an account that may switch them: Principal and Finance (*The portal*), HR (*The HR app*), Revenue team (*You are here*) — 81px rows on the workspace's rules, a 12px dot in the module menu's colour on a 52px sand circle; a row switches as the desktop's module menu does. Not while viewing a member; the desktop keeps the sidebar's menu.
+- **2026-10-11 v3.59 (the status-bar icon gets its tile)** — the user found the bare H plain ("got background colour, dont want just plain h"). Android draws a notification's status-bar icon from its alpha alone and paints it white, so no colour can reach it; the badge is now the mark's own tile (rx 4 on 28/32) in white with the H cut out (stroke 3), so it reads as a small app tile. `public/icons/badge-tile-96.png` replaces `badge-96.png`; the coloured tile stays the notification's large icon.
+- **2026-10-11 v3.57 (entering a page on a phone)** — the user's three notes after the second test push: the bottom bar is there on entering a page or coming back to the app (a scroll run carried over from the page before tucked it at once, and a resumed app kept it tucked); the HR app's pages, which share one scroller, each open at their top, and Back returns to where its page was left; a tapped notice opens in the installed app, never a Chrome tab of the site. See "The phone's own navigation bar" › *Tucked away while reading on*.
+- **2026-10-11 v3.56 (a phone notification's status-bar icon)** — Android draws a notification's small status-bar icon from the badge's alpha alone, so the app tile showed as a solid white square on the first test push. The badge is now the H alone, white on transparent, 96px (`public/icons/badge-96.png`, made by `tools/generate-pwa-icons.mjs` with the H grown ×1.45 and a 3-unit stroke so it reads at 24dp); the tile stays the notification's large icon.
+- **2026-10-11 v3.55 (the phone's bottom bars tuck away on a scroll down)** — the HR app's tabs, the Revenue app's nav and the portal's tab bar slide away once a page is scrolled down by more than 24px and are back on a scroll up, near a page's top or on another page; the page grows into the space but still ends above the phone's own bar, and what stands on the bar (docks, Finance's bulk bar, the HR view's drawers and toasts) comes down with it. See "The phone's own navigation bar" › *Tucked away while reading on*.
+- **2026-10-11 v3.53 (People › Permissions: Select all, not open yet, the New template window)** — Each view's table gains a *Select all* row for whoever may edit (a box per column, one for the whole view, "–" while only some are), a ticked tab whose page would not open says why under its name in amber, and *+ New template* opens a window — the name, the views it can see (with their tab counts) and the sensitive fields, and what would not open yet — that makes a blank template with View on every tab of those views. The Revenue app's rail counts 16 (My honours, My brand weeks, Commission scheme). See *Permissions by view and tab*.
+- **2026-10-11 v3.33 (Hiring › Insights and the Talent Bank)** — V. HIRING gains **Insights** (this month, a month of the last twelve or all time: six cards with their change on the month before, the days each fill took, hires by source, requests by department, every request in a sideways table that opens a 440px panel) and the **Talent Bank** (departments and positions in a tree, the people as a table with a right-click to remove, + Add talent, a 460px panel and a talent's own page: notes saved as they are written, the résumé replaced, Invite to interview on an open request). A request's candidate in the bank opens there. See *Hiring › Insights and the Talent Bank*.
+- **2026-10-11 v3.32 (Hiring › Requests)** — HR's sidebar gains **V. HIRING** (clay) with Requests: a review inbox (Pending · Info requested · Declined; Acknowledge with an owner from HR, Request more info, Decline with a note; a declined request may be reconsidered), the Listing (five counts that filter, a right-click menu) and Form settings (the requester form's fields and the hiring sources, saved as you go); *+ New request* is a 640px drawer; a request's own page holds its requirements, candidates (résumés, stages, the Talent Bank both ways), pipeline, actions and audit trail. Drawers are never wider than the frame on a phone. See *Hiring › Requests*.
 - **2026-10-10 (Sheets · above the phone's buttons)** — on a phone with three-button navigation the Revenue app's sheets no longer end behind the phone's buttons: *Start a quote*'s last brand, *Add to cart* and its quantity, the end of *All models*, Notifications and View as all stand clear of them (12–28px), the sheet's white running on underneath. An iPhone gains 4px, so it looks as drawn (a review note the user passed on: adding the whole inset would have grown every iPhone sheet's foot from ~30 to ~64px). See "The phone's own navigation bar".
 - **2026-10-10 (Bottom bars · after a reload)** — the Revenue app's bottom bar no longer slides under the phone's own buttons after Update, a pull that met a new release, or Try again (user's screenshot: only its top edge and the Quote circle showed). Every bottom bar and what clears it pads by `--safe-bottom`, the browser's navigation-bar inset or, when a reload comes back with 0 in the same window, the one the tab remembers. Nothing moves where the browser reads right. See "The phone's own navigation bar".
 - **2026-10-09 v3.18 (Salary, NRIC and bank accounts show only where ticked)** — a value whose Sensitive field the viewer's title does not tick reads `••••` on every page it appears (People, a person's card and page, the PV page and its print, HR › Payment); blank stays `—`. An edit form shows an unticked field as a read-only box and never sends it; editing a person is offered only with Salary amounts ticked (the form saves pay). The payroll bank CSV is offered only with Bank accounts, the statutory files only with NRIC / IC, salary-PV generation only with Bank. See "Permission matrix › A hidden value".

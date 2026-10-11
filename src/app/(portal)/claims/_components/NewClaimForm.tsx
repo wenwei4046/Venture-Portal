@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { submitClaim } from '../actions'
+import { Select } from '@/components/hrv/select'
 
 export default function NewClaimForm() {
   const [isPending, startTransition] = useTransition()
@@ -90,7 +91,7 @@ export default function NewClaimForm() {
             Source pool
             <span className="text-xs ml-1 font-normal">(which pool to deduct from)</span>
           </label>
-          <select
+          <Select bare
             name="source_pool"
             defaultValue="venture_pool"
             required
@@ -102,7 +103,7 @@ export default function NewClaimForm() {
             <option value="dept_pool_marketing">Marketing Dept Pool</option>
             <option value="dept_pool_finance">Finance Dept Pool</option>
             <option value="dept_pool_hr">HR Dept Pool</option>
-          </select>
+          </Select>
         </div>
       </div>
       {error && (

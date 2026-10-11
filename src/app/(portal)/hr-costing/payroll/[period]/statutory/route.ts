@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { generateKwspFormA } from '@/lib/statutory/kwsp-form-a'
 import { generatePerkesoSocso } from '@/lib/statutory/perkeso-socso'
 import { generatePerkesoEis } from '@/lib/statutory/perkeso-eis'
@@ -24,7 +24,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ period: string }> },
 ) {
-  const user = await requireAction('hr_costing', 'export')
+  const user = await requireActionOn('/hr-costing/payroll/[period]', 'hr_costing', 'export')
   // EPF, SOCSO, EIS and LHDN file every person under their NRIC (2026-10-09,
   // PR4, the user's choice A): without NRIC / IC ticked there is no file.
   if (!sees(user, 'nric')) {

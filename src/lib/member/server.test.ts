@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@/types'
 import type { MemberBand, MemberData, QuoteInput } from './types'
-import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, loadMemberWaitingForm, loadMemberWaitingFormLink, loadMemberWaitingQueue, submitMemberRequest } from './server'
+import { acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, loadMemberReplacementForm, loadMemberReplacementFormLink, loadMemberWaitingForm, loadMemberWaitingFormLink, loadMemberWaitingQueue, submitMemberRequest } from './server'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), createClient: vi.fn(), adminClient: vi.fn(), rpc: vi.fn(), adminRpc: vi.fn(),
@@ -437,6 +437,84 @@ describe('a member sends a request', () => {
       expect(upload).not.toHaveBeenCalled()
     })
   })
+
+  // Round 2's README 18.5 (2026-10-11): a replacement is sent on the Replacement list's own form.
+  describe('a replacement on HR’s form', () => {
+    const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37])
+    const replacementForm = (fields: Record<string, string> = {}) => form({
+      kind: 'replacement', subDepartmentId: fair, idempotencyKey: key, originalStaffId: yuny, destination: 'department_exit',
+      replacementSource: 'new', newPerson: 'Amelia Tan', effective: '2026-11-01', reason: 'Moving to Penang', ...fields,
+    })
+    const upload = vi.fn(async () => ({ error: null }))
+    const insert = vi.fn(async () => ({ error: null }))
+    beforeEach(() => {
+      upload.mockClear()
+      insert.mockClear()
+      const tables = (name: string) => name === 'member_requests'
+        ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { idempotency_key: key }, error: null }) }) }) }
+        : { select: () => ({ eq: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }) }) }
+      mocks.createClient.mockResolvedValue({ rpc: mocks.rpc, from: tables, storage: { from: () => ({ upload, remove: vi.fn() }) } })
+      mocks.adminClient.mockReturnValue({ from: () => ({ insert }) })
+    })
+
+    it('sends HR’s answers with the form’s version, and attests the signed form before it is sent', async () => {
+      const data = replacementForm({ formVersion: '2', answers: JSON.stringify([{ id: 'q_handover', label: 'Handover done?', value: ' Yes ' }]) })
+      data.set('signedForm', new File([pdf], 'handover.pdf', { type: 'application/pdf' }))
+      expect((await submitMemberRequest(data)).ok).toBe(true)
+      const prepared = mocks.rpc.mock.calls[0][1] as { p_kind: string; p_detail: Record<string, unknown> }
+      expect(prepared.p_kind).toBe('replacement')
+      expect(prepared.p_detail).toMatchObject({
+        destination: 'member_exit', reason: 'Moving to Penang', formVersion: 2, signedFormName: 'handover.pdf',
+        answers: [{ id: 'q_handover', label: 'Handover done?', value: 'Yes' }],
+      })
+      expect(prepared.p_detail.signedFormHash).toMatch(/^[0-9a-f]{64}$/)
+      expect(upload).toHaveBeenCalledTimes(1)
+      expect(insert).toHaveBeenCalledWith(expect.objectContaining({ request_id: requestId, mime_type: 'application/pdf', content_sha256: prepared.p_detail.signedFormHash }))
+      expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
+    })
+
+    it('refuses a signed form that is not a JPG, PNG or PDF, in the replacement’s words', async () => {
+      const data = replacementForm()
+      data.set('signedForm', new File(['GIF89a'], 'form.gif', { type: 'image/gif' }))
+      expect(await submitMemberRequest(data)).toEqual({ ok: false, error: 'The signed replacement form must be a valid JPG, PNG or PDF file.' })
+      mocks.rpc.mockReset()
+    })
+
+    it('an update keeps the signed form it was sent with', async () => {
+      const hash = 'd'.repeat(64)
+      expect((await submitMemberRequest(replacementForm({ requestId, signedFormName: 'old.pdf', signedFormHash: hash }))).ok).toBe(true)
+      expect(mocks.rpc).toHaveBeenNthCalledWith(1, 'member_prepare_request', expect.objectContaining({
+        p_revision: requestId, p_detail: expect.objectContaining({ signedFormName: 'old.pdf', signedFormHash: hash }),
+      }))
+      expect(upload).not.toHaveBeenCalled()
+    })
+  })
+})
+
+describe('the replacement form the Revenue app draws (2026-10-11)', () => {
+  const row = { version: 2, requireUpload: false, templatePath: 'templates/abc/Replacement.pdf', templateName: 'Replacement.pdf', createdAt: null,
+    fields: [{ id: 'reason', label: 'Reason', type: 'text', required: true, builtin: true }, { id: 'q_handover', label: 'Handover done?', type: 'yesno', required: false }] }
+  const createSignedUrl = vi.fn(async () => ({ data: { signedUrl: 'https://files.example/Replacement.pdf?token=1' }, error: null }))
+  beforeEach(() => {
+    createSignedUrl.mockClear()
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal', 'member_requests'] }))
+    mocks.createClient.mockResolvedValue({ rpc: mocks.rpc, storage: { from: () => ({ createSignedUrl }) } })
+  })
+
+  it('is read from member_replacement_form(), with no link in it', async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: row, error: null })
+    expect(await loadMemberReplacementForm()).toEqual({ ok: true, data: { form: expect.objectContaining({ version: 2, templateName: 'Replacement.pdf' }) } })
+    expect(mocks.rpc).toHaveBeenCalledWith('member_replacement_form', undefined)
+    expect(createSignedUrl).not.toHaveBeenCalled()
+  })
+
+  it('Download form asks for a fresh link to HR’s own replacement form, or null for the built one', async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: row, error: null })
+    expect(await loadMemberReplacementFormLink()).toEqual({ ok: true, data: { url: 'https://files.example/Replacement.pdf?token=1', name: 'Replacement.pdf' } })
+    expect(createSignedUrl).toHaveBeenCalledWith('templates/abc/Replacement.pdf', 600, { download: 'Replacement.pdf' })
+    mocks.rpc.mockResolvedValueOnce({ data: { ...row, templatePath: null }, error: null })
+    expect(await loadMemberReplacementFormLink()).toEqual({ ok: true, data: null })
+  })
 })
 
 // HR revamp 7b (2026-10-10): Waiting list & replacements reads the member's waiting lists.
@@ -696,5 +774,49 @@ describe('the catalogue behind the member calculator', () => {
     const result = await calculateMemberQuote(sofaQuote({ height: '30', tier: 'PRICE_2', specials: ['<script>'] }))
     expect(result.ok).toBe(false)
     expect(mocks.adminClient).not.toHaveBeenCalled()
+  })
+})
+
+// The Revenue app's sends follow their page's Create box (2026-10-11): the button is not drawn,
+// and a stale page or a hand-made request is refused before anything is asked.
+describe('a send whose page’s Create was unticked', () => {
+  const requestId = '10000000-0000-4000-8000-000000000041'
+  const member = (closed: string[]) => user({ role: 'revenue_member', permissions: ['member_portal', 'member_quote', 'member_requests'], closed })
+  const kindForm = (kind: string) => { const data = new FormData(); data.set('kind', kind); return data }
+  const stored = (kind: string) => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { kind }, error: null }) }) }) })
+
+  it('prices no quote once the Quote’s Create is closed', async () => {
+    mocks.getUser.mockResolvedValue(member(['rev.quote.create']))
+    expect(await calculateMemberQuote(quote)).toEqual({ ok: false, error: 'Pricing a quote is not open to your account.' })
+    expect(mocks.rpc).not.toHaveBeenCalled()
+    expect(mocks.adminClient).not.toHaveBeenCalled()
+  })
+
+  it('sends no claim once Requests’ Create is closed — a waiting list is not that box’s', async () => {
+    mocks.getUser.mockResolvedValue(member(['rev.requests.create']))
+    expect(await submitMemberRequest(kindForm('claim'))).toEqual({ ok: false, error: 'Sending a claim is not open to your account.' })
+    expect(mocks.rpc).not.toHaveBeenCalled()
+    const waiting = await submitMemberRequest(kindForm('waiting'))
+    expect(waiting.ok ? '' : waiting.error).not.toMatch(/not open to your account/)
+  })
+
+  it('sends and withdraws no waiting list or replacement once their page’s Create is closed', async () => {
+    mocks.getUser.mockResolvedValue(member(['rev.track.create']))
+    const refused = { ok: false, error: 'Sending a waiting list or a replacement is not open to your account.' }
+    expect(await submitMemberRequest(kindForm('replacement'))).toEqual(refused)
+    mocks.createClient.mockResolvedValue({ rpc: mocks.rpc, from: () => stored('waiting') })
+    expect(await cancelMemberRequest(requestId)).toEqual(refused)
+    expect(mocks.rpc).not.toHaveBeenCalled()
+    // A claim of theirs still withdraws.
+    mocks.createClient.mockResolvedValue({ rpc: mocks.rpc, from: () => stored('claim') })
+    mocks.rpc.mockResolvedValue({ data: { id: requestId, kind: 'claim', title: 'Outstation claim', status: 'withdrawn', createdAt: '', detail: {} }, error: null })
+    expect((await cancelMemberRequest(requestId)).ok).toBe(true)
+    expect(mocks.rpc).toHaveBeenCalledWith('member_cancel_request', { p_request: requestId })
+  })
+
+  it('nothing is refused for an account nobody unticked a box for', async () => {
+    mocks.getUser.mockResolvedValue(member([]))
+    mocks.rpc.mockResolvedValue({ data: { bands: [band] }, error: null })
+    expect((await calculateMemberQuote(quote)).ok).toBe(true)
   })
 })

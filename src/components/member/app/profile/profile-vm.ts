@@ -13,7 +13,7 @@ import type { EditField } from "@/lib/member/request-edit";
 export type Tone = "good" | "neutral" | "warn" | "bad" | "none" | "pending" | "accepted";
 
 // ── Profile ──
-export type WorkKey = "income" | "honours" | "team" | "requests" | "track" | "crm" | "memos";
+export type WorkKey = "income" | "honours" | "team" | "requests" | "track" | "rooms" | "docs" | "crm" | "memos";
 export interface ProfileMainVM {
   name: string;
   ini: string;
@@ -315,4 +315,6 @@ export interface FormOptions {
   initial?: { member?: string; male?: number; female?: number; department?: string };
   /** The waiting-list form HR set (2026-10-10) — its own questions and whether the signed form must come with it. */
   waitingForm?: MemberWaitingForm | null;
+  /** The replacement form HR set (2026-10-11, round 2's README 18.5) — the same, for a replacement. */
+  replacementForm?: MemberWaitingForm | null;
 }

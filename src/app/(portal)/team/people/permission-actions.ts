@@ -3,20 +3,23 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction, requireAuth } from '@/lib/auth'
+import { requireActionOn, requireAuth } from '@/lib/auth'
 import { can } from '@/lib/permissions'
 import { cellKeysFromRows, grantsFromRows, isSensitiveField, personCellsFromRows, type CellKey, type PersonCells, type Scope } from '@/lib/permission-matrix'
 import {
+  TAB_VIEWS,
   boxesOf,
   cellMap,
   cellRows,
   cellsFromTabs,
+  isTabView,
   parseGrant,
   personCellRows,
   personTicks,
   reapplied,
   templateTicks,
   ticksOfPerson,
+  viewTicks,
   type PersonBox,
   type TabAction,
 } from '@/lib/permission-tabs'
@@ -51,7 +54,7 @@ async function db(): Promise<SupabaseClient> {
 
 /** A person's old per-key exceptions, cleared so their template and their cells decide. */
 export async function clearLegacyExceptions(userId: string): Promise<Result<{ cleared: number }>> {
-  await requireAction('accounts', 'manage')
+  await requireActionOn('/team/people', 'accounts', 'manage')
   if (!UUID.test(userId)) return { ok: false, reason: 'Reload the page and try again.' }
   const supabase = await db()
   const { data, error } = await supabase.rpc('permission_user_clear_legacy', { p_user: userId })
@@ -100,7 +103,7 @@ export async function loadPermissionHistory(): Promise<Result<{ entries: History
  * denial; null removes the exception.
  */
 export async function setUserPermission(userId: string, key: string, granted: boolean | null): Promise<void> {
-  await requireAction('accounts', 'manage')
+  await requireActionOn('/team/people', 'accounts', 'manage')
   if (!userId || !key) throw new Error('Which person, and which permission?')
 
   const supabase = await createClient()
@@ -198,7 +201,7 @@ export async function saveTemplateTabs(input: {
   tabs: string[]
   sensitive: string[]
 }): Promise<Result<{ version: number; titles: number }>> {
-  await requireAction('accounts', 'manage')
+  await requireActionOn('/team/people', 'accounts', 'manage')
   if (
     !input ||
     !UUID.test(input.templateId) ||
@@ -235,7 +238,7 @@ export async function saveTemplateTabs(input: {
  * has boxes of their own keeps them, over the new template's ticks.
  */
 export async function setTitleTemplate(titleId: string, templateId: string | null): Promise<Result> {
-  await requireAction('accounts', 'manage')
+  await requireActionOn('/team/people', 'accounts', 'manage')
   if (!UUID.test(titleId) || (templateId !== null && !UUID.test(templateId))) {
     return { ok: false, reason: 'Reload the page and try again.' }
   }
@@ -258,7 +261,7 @@ export async function setTitleTemplate(titleId: string, templateId: string | nul
 
 /** One person's boxes over their title's template — the whole set ([] = back to the title). */
 export async function setPersonTabs(input: { userId: string; templateId: string; boxes: PersonBox[] }): Promise<Result> {
-  await requireAction('accounts', 'manage')
+  await requireActionOn('/team/people', 'accounts', 'manage')
   if (
     !input ||
     !UUID.test(input.userId) ||
@@ -285,7 +288,7 @@ export async function setPersonTabs(input: { userId: string; templateId: string;
 
 /** The handoff's Delete: a template no title points at. */
 export async function deleteTemplate(input: { templateId: string; version: number }): Promise<Result> {
-  await requireAction('accounts', 'manage')
+  await requireActionOn('/team/people', 'accounts', 'manage')
   if (!input || !UUID.test(input.templateId) || !Number.isInteger(input.version)) {
     return { ok: false, reason: 'Reload the page and try again.' }
   }
@@ -296,29 +299,33 @@ export async function deleteTemplate(input: { templateId: string; version: numbe
   return { ok: true }
 }
 
-/** "+ New template": a copy of the one open — its cells, fields and, once it has them, its ticks. */
-export async function copyTemplate(input: { name: string; from: string }): Promise<Result<{ id: string }>> {
-  await requireAction('accounts', 'manage')
+/**
+ * "+ New template" (the user, 2026-10-11 — a window asking its name and which
+ * views it can see): a blank template with View ticked on every tab of those
+ * views, the cells they stand for and its sensitive fields, made in one
+ * transaction (`permission_template_new`). Only the Revenue app picked, its
+ * holders are Revenue app accounts — the database works that out from the
+ * ticks; nobody picks a kind.
+ */
+export async function createTemplate(input: { name: string; views: string[]; sensitive: string[] }): Promise<Result<{ id: string }>> {
+  await requireActionOn('/team/people', 'accounts', 'manage')
   const name = (input?.name ?? '').trim()
   if (!name || name.length > 80) return { ok: false, reason: 'Give the template a name, up to 80 characters.' }
-  if (!UUID.test(input.from)) return { ok: false, reason: 'Reload the page and try again.' }
-  const supabase = await db()
-  const { data, error } = await supabase.rpc('permission_template_create', { p_name: name, p_description: null, p_copy_from: input.from })
-  if (error) return { ok: false, reason: error.message }
-  const id = data as string
-  const source = await ticksOf(supabase, input.from)
-  if (source?.record.tabs) {
-    // A new template: no title points at it yet, so nobody's own boxes lie over it.
-    const saved = await supabase.rpc('permission_template_tabs_save', {
-      p_template: id,
-      p_version: 1,
-      p_tabs: source.record.tabs,
-      p_grants: cellRows(source.record.tabs),
-      p_sensitive: source.record.sensitive,
-      p_people: [],
-    })
-    if (saved.error) return { ok: false, reason: saved.error.message }
+  if (!Array.isArray(input.views) || input.views.length === 0 || input.views.length > TAB_VIEWS.length || !input.views.every(isTabView)) {
+    return { ok: false, reason: 'Pick at least one view it can see.' }
   }
+  if (!Array.isArray(input.sensitive) || input.sensitive.length > 3 || !input.sensitive.every(isSensitiveField)) {
+    return { ok: false, reason: 'Reload the page and try again.' }
+  }
+  const tabs = [...viewTicks(input.views)]
+  const supabase = await db()
+  const { data, error } = await supabase.rpc('permission_template_new', {
+    p_name: name,
+    p_tabs: tabs,
+    p_grants: cellRows(tabs),
+    p_sensitive: [...new Set(input.sensitive)],
+  })
+  if (error) return { ok: false, reason: error.message }
   refresh()
-  return { ok: true, id }
+  return { ok: true, id: data as string }
 }

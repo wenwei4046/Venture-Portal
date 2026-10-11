@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // 2026-10-09 — the Monthly P&L's Excel / PDF follow the page's From – To (the
 // Finance revamp handoff): the months from From, Accumulated over them.
 
-const mocks = vi.hoisted(() => ({ requireAction: vi.fn(), exportXlsxResponse: vi.fn(), buildMatrixXlsx: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireAction: mocks.requireAction }))
+const mocks = vi.hoisted(() => ({ requireActionOn: vi.fn(), exportXlsxResponse: vi.fn(), buildMatrixXlsx: vi.fn() }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireActionOn: mocks.requireActionOn }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({}) }))
 vi.mock('@/lib/gl-reports', () => ({ fetchAllJournalLines: async () => [], fetchCoaAccounts: async () => [] }))
 vi.mock('@/lib/consolidation', () => ({ fetchInterBillingElimination: async () => null, eliminateInterBilling: (l: unknown) => l }))
@@ -31,7 +31,7 @@ import { GET } from './route'
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requireAction.mockResolvedValue({ role: 'finance', permissions: ['reports', 'dept_reports'], actions: { 'reports.view': 'all' } })
+  mocks.requireActionOn.mockResolvedValue({ role: 'finance', permissions: ['reports', 'dept_reports'], actions: { 'reports.view': 'all' } })
   mocks.exportXlsxResponse.mockReturnValue(new Response('xlsx'))
   mocks.buildMatrixXlsx.mockReturnValue(Buffer.from(''))
 })

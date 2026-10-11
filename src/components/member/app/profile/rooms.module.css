@@ -1,0 +1,287 @@
+/* Book a room — the HR revamp's second package (Revenue Member App.dc.html
+   lines 103–131 and the sheet at 189–211, 2026-10-11). Sizes are the
+   prototype's ÷ .92, so the phone's --rv-type lands them exactly. The
+   prototype's spans are content-box, and so are these: a bordered box keeps
+   the prototype's own height and grows by its border, as it does there. */
+
+.page { padding: 10px 20px 32px; display: flex; flex-direction: column; gap: 14px; }
+
+.back {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  box-sizing: content-box;
+  height: 32px;
+  padding: 0;
+  margin-left: -6px;
+  border: 0;
+  background: transparent;
+  color: var(--rv-accent);
+  font-size: calc(14.5px * var(--rv-type));
+  font-weight: 600;
+}
+
+.headRow { display: flex; align-items: center; gap: 10px; margin-top: -6px; }
+.title { flex: 1; margin: 0; font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
+.book {
+  box-sizing: content-box;
+  height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 19px;
+  background: var(--rv-accent);
+  color: var(--rv-white);
+  display: flex;
+  align-items: center;
+  font-size: calc(14.5px * var(--rv-type));
+  font-weight: 650;
+}
+.book:disabled { opacity: .5; cursor: default; }
+
+/* By room | Timeline */
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 12px; background: var(--rv-sand); }
+.mode {
+  box-sizing: content-box;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--rv-sub);
+  font-size: calc(13.5px * var(--rv-type));
+  font-weight: 500;
+  box-shadow: none;
+}
+.modeOn { background: var(--rv-white); color: var(--rv-black); font-weight: 650; box-shadow: 0 1px 3px var(--rv-ink-12); }
+
+/* The seven days from today */
+.days { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -20px; padding: 0 20px; flex: none; }
+.days::-webkit-scrollbar { display: none; }
+.day {
+  flex: none;
+  box-sizing: content-box;
+  width: 52px;
+  height: 58px;
+  padding: 0;
+  border-radius: 16px;
+  border: 1px solid var(--rv-line);
+  background: var(--rv-white);
+  color: var(--rv-black);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.dayOn { border-color: var(--rv-accent); background: var(--rv-accent); color: var(--rv-white); }
+.dayWd { font-size: calc(11.9565px * var(--rv-type)); font-weight: 400; }
+.dayN { font-size: calc(18.4783px * var(--rv-type)); font-weight: 700; }
+
+/* By room: a card a room */
+.card { background: var(--rv-white); border: 1px solid var(--rv-line); border-radius: 20px; padding: 12px 16px; flex: none; }
+.cardHead { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.cardName { flex: 1; font-size: calc(16px * var(--rv-type)); font-weight: 650; }
+.cardMeta { font-size: calc(13.0435px * var(--rv-type)); color: var(--rv-sub); }
+.item {
+  display: flex;
+  gap: 10px;
+  box-sizing: content-box;
+  width: 100%;
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--rv-rule);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  text-align: left;
+  white-space: normal;
+}
+.itemTime { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: calc(12.5px * var(--rv-type)); width: 78px; flex: none; color: var(--rv-sub); }
+.itemText { flex: 1; min-width: 0; border-left: 3px solid var(--rv-slate); padding-left: 9px; }
+.itemTitle { display: block; font-weight: 600; font-size: calc(14.5px * var(--rv-type)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.itemWho { display: block; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); }
+.free {
+  display: block;
+  box-sizing: content-box;
+  width: 100%;
+  padding: 10px 0 4px;
+  border: 0;
+  border-top: 1px solid var(--rv-rule);
+  border-radius: 0;
+  background: transparent;
+  font-size: calc(13.5px * var(--rv-type));
+  color: var(--rv-green);
+  font-weight: 600;
+  text-align: left;
+  white-space: normal;
+}
+
+/* Timeline: a column a room, 64px an hour */
+.tl { background: var(--rv-white); border: 1px solid var(--rv-line); border-radius: 20px; overflow: hidden; flex: none; }
+.tlHead { display: grid; border-bottom: 1px solid var(--rv-rule); background: var(--rv-grid-head); }
+.tlRoom { padding: 9px 4px; font-size: calc(12.5px * var(--rv-type)); font-weight: 650; text-align: center; border-left: 1px solid var(--rv-rule); }
+.tlBody { display: grid; }
+.tlHours { display: flex; flex-direction: column; }
+.tlHour {
+  height: 64px;
+  box-sizing: border-box;
+  padding: 2px 6px 0 0;
+  text-align: right;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: calc(10.8696px * var(--rv-type));
+  color: var(--rv-hour);
+}
+.tlCol {
+  position: relative;
+  height: 768px;
+  border-left: 1px solid var(--rv-rule);
+  background: repeating-linear-gradient(to bottom, var(--rv-grid-hour) 0 1px, transparent 1px 32px, var(--rv-grid-half) 32px 33px, transparent 33px 64px);
+}
+.tlColBook { cursor: copy; }
+.block {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  border-radius: 8px;
+  border-left: 3px solid var(--rv-slate);
+  padding: 2px 4px;
+  box-sizing: border-box;
+  overflow: hidden;
+  cursor: pointer;
+}
+.blockTitle {
+  font-size: calc(11.413px * var(--rv-type));
+  font-weight: 650;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.blockTime { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: calc(9.7826px * var(--rv-type)); color: var(--rv-sub); }
+.hint { font-size: calc(13.0435px * var(--rv-type)); color: var(--rv-sub); text-align: center; }
+.empty { margin: 12px 0; text-align: center; font-size: calc(14.0217px * var(--rv-type)); color: var(--rv-sub); }
+
+/* The sheets (the app's Sheet; the prototype's panel) */
+.sheet { padding: 8px 20px 26px; display: flex; flex-direction: column; gap: 12px; }
+.grab { align-self: center; width: 40px; height: 5px; border-radius: 3px; background: var(--rv-line); flex: none; }
+.sheetTitle { font-size: calc(20px * var(--rv-type)); font-weight: 700; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.label { display: block; font-size: calc(13.5px * var(--rv-type)); color: var(--rv-sub); font-weight: 600; }
+.input,
+.select {
+  height: 46px;
+  padding: 0 12px;
+  border: 1px solid var(--rv-line);
+  border-radius: 12px;
+  font: inherit;
+  font-size: calc(15.2174px * var(--rv-type));
+  /* The browser's own black, as on the prototype. */
+  color: rgb(0 0 0);
+  outline: none;
+  background: var(--rv-white);
+}
+/* The browser's own boxes: a text field is content-box (48px with its border), a select border-box (46). */
+.input { box-sizing: content-box; }
+.select { box-sizing: border-box; width: 100%; }
+.input::placeholder { color: var(--rv-placeholder); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.att { display: flex; flex-direction: column; gap: 8px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 6px 0 12px;
+  border-radius: 16px;
+  background: var(--rv-peach-bg);
+  color: var(--rv-accent);
+  font-size: calc(14.0217px * var(--rv-type));
+  font-weight: 600;
+}
+.chipX {
+  box-sizing: content-box;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: grid;
+  place-items: center;
+  font-size: inherit;
+  font-weight: inherit;
+}
+.sugg {
+  box-sizing: content-box;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  border: 1px dashed var(--rv-line);
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  font-size: calc(14.0217px * var(--rv-type));
+}
+.pax { display: flex; align-items: center; gap: 12px; }
+.paxText { flex: 1; }
+.paxNote { display: block; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-hour); margin-top: 2px; }
+.stepper { display: flex; align-items: center; border: 1px solid var(--rv-line); border-radius: 12px; overflow: hidden; }
+.step {
+  box-sizing: content-box;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  display: grid;
+  place-items: center;
+  font-size: calc(19.5652px * var(--rv-type));
+}
+.stepVal { min-width: 40px; text-align: center; font-size: calc(17.3913px * var(--rv-type)); font-weight: 700; }
+.err { font-size: calc(14.0217px * var(--rv-type)); color: var(--rv-err); }
+.actions { display: flex; gap: 8px; }
+.cancel,
+.go {
+  box-sizing: content-box;
+  height: 48px;
+  padding: 0;
+  border-radius: 24px;
+  display: grid;
+  place-items: center;
+  font-size: calc(16px * var(--rv-type));
+}
+.cancel { flex: 1; border: 1px solid var(--rv-line); background: transparent; color: inherit; font-weight: 650; }
+.go { flex: 2; border: 0; background: var(--rv-accent); color: var(--rv-white); font-weight: 700; }
+.go:disabled { opacity: .55; cursor: default; }
+
+/* A booking, opened */
+.when { font-size: calc(14.5px * var(--rv-type)); color: var(--rv-sub); margin-top: -6px; }
+.facts { display: flex; flex-direction: column; }
+.fact { display: flex; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid var(--rv-rule); font-size: calc(14.5px * var(--rv-type)); }
+.factL { color: var(--rv-sub); }
+.factV { font-weight: 600; }
+.cancelMeeting {
+  box-sizing: content-box;
+  height: 48px;
+  padding: 0;
+  border-radius: 24px;
+  border: 1px solid var(--rv-err-line);
+  color: var(--rv-err);
+  background: var(--rv-white);
+  display: grid;
+  place-items: center;
+  font-size: calc(16px * var(--rv-type));
+  font-weight: 700;
+}
+.armed { background: var(--rv-err-bg); }
+.cancelMeeting:disabled { opacity: .55; cursor: default; }
+.only { font-size: calc(13.5px * var(--rv-type)); color: var(--rv-sub); }
