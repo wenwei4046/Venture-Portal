@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { PUSH_WORDS, pushState, turnPushOff, turnPushOn, type PushState } from "@/components/pwa/push-client";
-import { removePushSubscription, savePushSubscription } from "@/lib/push/actions";
+import { removePushSubscription, reportPushTrouble, savePushSubscription } from "@/lib/push/actions";
 import { ICON, Svg } from "../icons";
 import s from "./profile.module.css";
 
@@ -23,7 +23,7 @@ export default function PushRow() {
   if (state === null || state === "unsupported") return null;
   const press = () =>
     start(async () => {
-      const res = state === "on" ? await turnPushOff(removePushSubscription) : await turnPushOn("revenue", savePushSubscription);
+      const res = state === "on" ? await turnPushOff(removePushSubscription) : await turnPushOn("revenue", savePushSubscription, reportPushTrouble);
       setState(res.state);
       setReason(res.reason ?? "");
     });

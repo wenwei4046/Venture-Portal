@@ -3,7 +3,8 @@
 import { Fragment, useEffect, useMemo, useState, useTransition, type ReactNode } from 'react'
 import { officeTime } from '@/lib/office-time'
 import { openTarget, type Notice, type NoticeRef } from '@/lib/push/notices'
-import { PUSH_WORDS, pushState, turnPushOff, turnPushOn, type PushState } from '@/components/pwa/push-client'
+import { PUSH_WORDS, pushState, turnPushOff, turnPushOn, type PushState, type PushTrouble } from '@/components/pwa/push-client'
+import PushAsk from '@/components/pwa/PushAsk'
 import { Select } from '@/components/hrv/select'
 import ViewingAsBanner from '@/components/layout/ViewingAsBanner'
 import {
@@ -41,6 +42,8 @@ export interface HrAppActions {
   /** This phone's pushes on / off. */
   pushSave(s: { endpoint: string; p256dh: string; auth: string; app: 'hr' | 'revenue' }): Promise<ActResult>
   pushRemove(endpoint: string): Promise<ActResult>
+  /** What went wrong turning them on, told to the server's log. */
+  pushTrouble: PushTrouble
   /** Another view of the one app (setViewAs): it opens where that view lives. */
   switchView(view: HrAppView): void
   /** After a write: read the app's data again. */
@@ -170,7 +173,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
   }, [])
   const togglePush = () => {
     startBusy(async () => {
-      const res = pushNow === 'on' ? await turnPushOff(actions.pushRemove) : await turnPushOn('hr', actions.pushSave)
+      const res = pushNow === 'on' ? await turnPushOff(actions.pushRemove) : await turnPushOn('hr', actions.pushSave, actions.pushTrouble)
       setPushNow(res.state)
       setError(res.reason ?? '')
     })
@@ -215,6 +218,8 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
   return (
     <div className={s.app} data-hr-app="">
       {d.viewingAs ? <ViewingAsBanner name={d.viewingAs} /> : null}
+      {/* The first open asks once whether this phone gets notifications (2026-10-11, the user). */}
+      {!d.viewingAs ? <PushAsk app="hr" save={actions.pushSave} trouble={actions.pushTrouble} onState={setPushNow} /> : null}
       <div className={s.scroller}>
         <header className={s.head}>
           {stack.length > 0 ? (

@@ -39,7 +39,7 @@ const actions = {
   hireAck: done, hireInfo: done, hireDecline: done, hireCancel: done, hireFill: done, candStage: done, candAdd: done,
   requestDecide: done, book: done, bookCancel: done, talentNotes: done, talentRemove: done,
   letterLink: vi.fn(async () => ({ ok: false as const, reason: 'none' })),
-  noticesRead: done, pushSave: done, pushRemove: done,
+  noticesRead: done, pushSave: done, pushRemove: done, pushTrouble: vi.fn(),
   switchView: vi.fn(),
   refresh: vi.fn(),
 } as unknown as HrAppActions
