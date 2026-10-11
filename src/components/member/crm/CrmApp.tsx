@@ -39,6 +39,8 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
   const [panelUi, setPanelUi] = useState<PanelUi>(initialPanelUi);
   // Team (the Control panel) or Mine (one's own CRM): null until chosen — the Director opens on Team, a leader on Mine.
   const [hodMode, setHodMode] = useState<"panel" | "crm" | null>(null);
+  // View as somebody who leads: their Team side (the Control panel as they see it), or null for their CRM.
+  const [teamAs, setTeamAs] = useState<string | null>(null);
   const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});
   const refs = useRef<SalesRefs>({}).current;
   const dataRef = useRef<CrmData | null>(data);
@@ -133,17 +135,27 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
   const mode = hodMode ?? (full ? "panel" : "crm");
   const nameOf = (id: string | null | undefined) => personOf(id, data.people)?.name ?? "—";
   const openCrmOf = (staffId: string, customerId?: string) => {
+    setTeamAs(null);
     if (staffId === me.id && sells) { setViewing(null); setHodMode("crm"); } else setViewing(staffId);
     setUi(u => ({ ...initialSalesUi(), toast: u.toast, chat: customerId ?? null }));
   };
-  if ((full || leads) && !viewing && (!sells || mode === "panel")) {
-    const mine = new Set([me.id, ...downlineOf(me.id, data.people)]);
-    const teams = full ? teamsOf(data) : teamsOf(data).filter(t => mine.has(t.id) || t.people.some(p => p.id === me.id));
+  // Who has a Team side: the Director, and anyone with somebody below them (rev 1011).
+  const hasTeamSide = (p: { id: string; role: string }) => p.role === "hod" || data.people.some(q => q.uplineId === p.id);
+  const viewed = viewing ? personOf(viewing, data.people) : undefined;
+  const panelFor = viewed && teamAs === viewed.id ? viewed : !viewing && (full || leads) && (!sells || mode === "panel") ? me : undefined;
+  if (panelFor) {
+    // Their own view: the Director (or whoever holds View at All) every team; a leader their own line.
+    const wide = panelFor.id === me.id ? full : panelFor.role === "hod";
+    const mine = new Set([panelFor.id, ...downlineOf(panelFor.id, data.people)]);
+    const teams = wide ? teamsOf(data) : teamsOf(data).filter(t => mine.has(t.id) || t.people.some(p => p.id === panelFor.id));
     const pctx: PanelCtx = {
-      data, me, now, live, ui: panelUi, set: setPanelUi, patch: p => setPanelUi(u => ({ ...u, ...p })), act: panelAct, nameOf, teams,
-      directors: full ? data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) : [],
+      data, me: panelFor, now, live, ui: panelUi, set: setPanelUi, patch: p => setPanelUi(u => ({ ...u, ...p })), act: panelAct, nameOf, teams,
+      directors: wide ? data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) : [],
       teamOfStaff: id => { const tl = id ? teams.find(t => t.id === id || t.people.some(p => p.id === id)) : undefined; return tl; },
-      openCrmOf, toMyCrm: sells ? () => openCrmOf(me.id) : undefined, exitApp: onExit, slotCounts,
+      openCrmOf,
+      // Mine: one's own CRM — or, viewing somebody, back to theirs.
+      toMyCrm: panelFor.id !== me.id ? () => setTeamAs(null) : sells ? () => openCrmOf(me.id) : undefined,
+      exitApp: onExit, slotCounts,
     };
     return shell(<>
       {problem && <p className={H.problem}>{problem}</p>}
@@ -167,7 +179,9 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
       rdMode: full && sells,
       toPanel: () => { setHodMode("panel"); setViewing(null); },
       // Team | Mine (rev 1010 §7.3): the Director to the Control panel.
-      toTeam: (full && sells) || leads ? () => { setHodMode("panel"); setViewing(null); } : undefined,
+      // Viewing somebody who leads: their Team, as they see it (user 2026-10-11).
+      toTeam: owner.id !== me.id ? (hasTeamSide(owner) ? () => { setTeamAs(owner.id); setPanelUi(initialPanelUi()); } : undefined)
+        : (full && sells) || leads ? () => { setHodMode("panel"); setViewing(null); } : undefined,
       switchList: byTeam(below.map(id => personOf(id, data.people)!).filter(Boolean), data.people),
       // Assign to somebody: assignment is CRM · Manage's.
       assignTo: data.can.manage ? (customerId, staffId) => panelAct.sendTo(customerId, staffId) : undefined,

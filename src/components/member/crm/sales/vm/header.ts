@@ -5,11 +5,12 @@ import { teamName, teamOf, titleOf } from "../../shared/people";
 import type { SalesTab } from "../ui";
 
 export function headerVM(ctx: SalesCtx, onExit: () => void) {
-  const { ui, set, data, embedded, viewingOther } = ctx;
+  const { ui, set, data, embedded } = ctx;
   const unread = unreadNotifs(salesNotifs(ctx), data);
-  // Team | Mine (rev 1010 §7.3): the Director and anyone with a downline, in their own CRM; Mine is this CRM, Team the
-  // Control panel scoped to them. Never inside a chat (the top bar is not drawn there) or while viewing somebody else.
-  const toTeam = !viewingOther ? embedded?.toTeam : undefined;
+  // Team | Mine (rev 1010 §7.3): the Director and anyone with a downline; Mine is this CRM, Team the Control panel scoped
+  // to them. Viewing somebody (View as) shows it as THEY would see it — CrmApp hands their Team (user 2026-10-11). Never
+  // inside a chat (the top bar is not drawn there).
+  const toTeam = embedded?.toTeam;
   return {
     hasTM: !!toTeam,
     tmTabs: ([["Team", false], ["Mine", true]] as const).map(([label, on]) => ({ label, bg: on ? "#fff" : "transparent", fg: on ? "#3F2B22" : "#806B60", sh: on ? "0 1px 3px rgba(63,43,34,.14)" : "none",

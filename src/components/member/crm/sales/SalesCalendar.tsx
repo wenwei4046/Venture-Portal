@@ -281,7 +281,7 @@ export default function SalesCalendar({ v }: { v: CalendarVM }) {
                 </path>
               </svg>Edit</span>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", borderRadius: "14px", border: "1px solid #EBDDD2" }}>
+          <div style={{ flex: "none", display: "flex", flexDirection: "column", borderRadius: "14px", border: "1px solid #EBDDD2" }}>
             {(v.ctRows).map((r, r_i) => (<Fragment key={r_i}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "12px 14px", borderTop: r.rule, fontSize: "14px" }}>
                 <span style={{ flex: "none", color: "#806B60" }}>{r.k}</span>
@@ -289,7 +289,7 @@ export default function SalesCalendar({ v }: { v: CalendarVM }) {
               </div>
             </Fragment>))}
           </div>
-          <span onClick={v.ctChat} style={{ height: "50px", borderRadius: "25px", display: "grid", placeItems: "center", background: "#BD4A19", color: "#fff", fontSize: "16px", fontWeight: "650", cursor: "pointer" }}>Open chat</span>
+          <span onClick={v.ctChat} style={{ flex: "none", height: "50px", borderRadius: "25px", display: "grid", placeItems: "center", background: "#BD4A19", color: "#fff", fontSize: "16px", fontWeight: "650", cursor: "pointer" }}>Open chat</span>
         </div>
       </div>
     </>)}
