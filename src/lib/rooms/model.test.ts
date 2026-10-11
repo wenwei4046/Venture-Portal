@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  blockBox, blockWho, bookerName, bookingBadge, bookingFromRow, clashLine, clashOf, dayChip, dayHref, dayLabel, dayOfSearch, departmentBadge, eventDate, guestBadge, halfHours,
-  hm, hourLabels, isDay, meetingCount, paxSummary, peopleFromRow, rangeFromRow, shiftDay, shortDayLabel, slotAt, upcomingLine, whoMayCancel, withFrom,
+  blockBox, blockWho, bookerName, bookingBadge, bookingFromRow, clashLine, clashOf, dayChip, dayHref, dayLabel, dayOfSearch, departmentBadge, eventDate, freeHalfHours,
+  guestBadge, halfHours, hm, hourLabels, isDay, meetingCount, monthLabel, monthOf, monthWeeks, paxSummary, peopleFromRow, rangeFromRow, shiftDay, shiftMonth,
+  shortDayLabel, slotAt, upcomingLine, whoMayCancel, withFrom,
   type Booking,
 } from './model'
 
@@ -59,12 +60,31 @@ describe('the day’s half hours', () => {
     expect(hourLabels()).toEqual(['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00'])
   })
 
-  it('books the half hour under the pointer, never later than an hour before closing', () => {
+  it('books the half hour under the pointer — the one it lights, 19:30 the last (2026-10-11)', () => {
     expect(slotAt(0, 624)).toBe(480)
+    expect(slotAt(-4, 624)).toBe(480)
     expect(slotAt(52, 624)).toBe(540)
     expect(slotAt(77, 624)).toBe(540)
     expect(slotAt(78, 624)).toBe(570)
-    expect(slotAt(620, 624)).toBe(1140)
+    expect(slotAt(597, 624)).toBe(1140)
+    expect(slotAt(620, 624)).toBe(1170)
+    expect(slotAt(624, 624)).toBe(1170)
+  })
+
+  it('finds the half hours of a room’s day no live meeting takes', () => {
+    const list = [
+      booking(),
+      booking({ id: 'b2', from: 600, to: 690 }),
+      booking({ id: 'b3', from: 720, to: 780, cancelled: true }),
+      booking({ id: 'b4', room: 'r2', from: 480, to: 1200 }),
+      booking({ id: 'b5', day: '2026-10-13', from: 480, to: 1200 }),
+    ]
+    const free = freeHalfHours(list, 'r1', '2026-10-12')
+    expect(free).toHaveLength(24 - 5)
+    for (const m of [540, 570, 600, 630, 660]) expect(free).not.toContain(m)
+    expect(free).toEqual(expect.arrayContaining([480, 510, 690, 720, 750, 1170]))
+    expect(freeHalfHours([], 'r1', '2026-10-12')).toEqual(halfHours().slice(0, -1).map(t => t.value))
+    expect(freeHalfHours(list, 'r2', '2026-10-12')).toEqual([])
   })
 
   it('places a block 52px an hour, 1px in and 3px short', () => {
@@ -94,6 +114,21 @@ describe('days', () => {
     expect(dayOfSearch('', '2026-10-11')).toBe('2026-10-11')
     expect(dayHref('/admin/rooms', '?tab=rooms', '2026-10-12', '2026-10-11')).toBe('/admin/rooms?tab=rooms&day=2026-10-12')
     expect(dayHref('/admin/rooms', '?day=2026-10-12', '2026-10-11', '2026-10-11')).toBe('/admin/rooms')
+  })
+
+  it('turns and names the picker’s month, six weeks from the Monday on or before the 1st', () => {
+    expect(monthOf('2026-10-11')).toBe('2026-10')
+    expect([shiftMonth('2026-10', 1), shiftMonth('2026-12', 1), shiftMonth('2026-01', -1), shiftMonth('2026-10', 0)]).toEqual([
+      '2026-11', '2027-01', '2025-12', '2026-10',
+    ])
+    expect([monthLabel('2026-10'), monthLabel('2026-09'), monthLabel('2027-01')]).toEqual(['October 2026', 'September 2026', 'January 2027'])
+    const oct = monthWeeks('2026-10')
+    expect(oct).toHaveLength(42)
+    expect([oct[0], oct[3], oct[41]]).toEqual(['2026-09-28', '2026-10-01', '2026-11-08'])
+    // A month that starts on a Monday starts the card; one that starts on a Sunday is the first week's last day.
+    expect(monthWeeks('2026-06')[0]).toBe('2026-06-01')
+    expect(monthWeeks('2026-02').slice(0, 7)).toEqual(['2026-01-26', '2026-01-27', '2026-01-28', '2026-01-29', '2026-01-30', '2026-01-31', '2026-02-01'])
+    expect(monthWeeks('2026-02').every((d, i, all) => i === 0 || d === shiftDay(all[i - 1], 1))).toBe(true)
   })
 
   it('labels them as the prototype does, months in three letters', () => {

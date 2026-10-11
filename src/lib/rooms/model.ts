@@ -290,13 +290,28 @@ export function hourLabels(): string[] {
 }
 
 /**
- * Where a press on an empty column lands: the half hour under the pointer,
- * never later than an hour before closing (the prototype's `Math.min(m, H1·60 − 60)`).
+ * Where a press on an empty column lands: the half hour under the pointer —
+ * the one the pointer lights (2026-10-11), so 19:30 is the last, as the HR
+ * app's. It used to stop at 19:00 (the prototype's `Math.min(m, H1·60 − 60)`),
+ * which opened 19:00 under a lit 19:30.
  */
 export function slotAt(offsetY: number, columnHeight: number): number {
   const span = DAY_END - DAY_START
   const raw = DAY_START + Math.floor((((offsetY / Math.max(1, columnHeight)) * span) / SLOT)) * SLOT
-  return Math.max(DAY_START, Math.min(raw, DAY_END - 60))
+  return Math.max(DAY_START, Math.min(raw, DAY_END - SLOT))
+}
+
+/**
+ * The half hours of a room's day no live meeting takes — where pointing lights
+ * a slot and pressing opens Book. Meetings run in whole half hours.
+ */
+export function freeHalfHours(bookings: readonly Booking[], room: string, day: string): number[] {
+  const taken = bookings.filter(b => !b.cancelled && b.room === room && b.day === day)
+  const out: number[] = []
+  for (let m = DAY_START; m < DAY_END; m += SLOT) {
+    if (!taken.some(b => b.from < m + SLOT && m < b.to)) out.push(m)
+  }
+  return out
 }
 
 /** A booking's box on the portal grid (1px in from the line above, 3px short of the next). */
@@ -358,6 +373,38 @@ export function dayLabel(day: string): string {
 export function shortDayLabel(day: string): string {
   const { m, d, dow } = parts(day)
   return `${WEEKDAYS[dow]}, ${d} ${MONTHS[m - 1]}`
+}
+
+// ── The day picker's month ────────────────────────────────────────────────
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+/** "2026-10-11" → "2026-10". */
+export function monthOf(day: string): string {
+  return day.slice(0, 7)
+}
+
+/** "2026-12" + 1 → "2027-01". */
+export function shiftMonth(month: string, n: number): string {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7)
+}
+
+/** "October 2026" — a period, written in full (DESIGN.md › Date format). */
+export function monthLabel(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  return `${MONTH_NAMES[m - 1]} ${y}`
+}
+
+/**
+ * The picker's six weeks, Monday first (as the portal's other month calendar,
+ * Repayment Schedule's): the 42 days from the Monday on or before the 1st, so
+ * the card keeps its height from month to month.
+ */
+export function monthWeeks(month: string): string[] {
+  const first = `${month}-01`
+  const start = shiftDay(first, -((parts(first).dow + 6) % 7))
+  return Array.from({ length: 42 }, (_, i) => shiftDay(start, i))
 }
 
 /** "Sat" and "10" for a day chip. */

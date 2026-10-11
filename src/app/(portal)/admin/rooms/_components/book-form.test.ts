@@ -23,9 +23,12 @@ describe('a new booking', () => {
     expect(blankForm(range, people)).toMatchObject({ id: null, room: 'r1', day: '2026-10-12', from: 540, to: 600, bookedBy: 'grace', department: 'hr', internal: ['grace'] })
   })
 
-  it('starts at the half hour pressed, in that room, never later than an hour before closing', () => {
+  it('starts at the half hour pressed, in that room, an hour long but never past 20:00 (the lit 19:30 books 19:30–20:00)', () => {
     expect(blankForm(range, people, 'r9', 870)).toMatchObject({ room: 'r9', from: 870, to: 930 })
-    expect(blankForm(range, people, 'r1', 1200)).toMatchObject({ from: 1140, to: 1200 })
+    expect(blankForm(range, people, 'r1', 1140)).toMatchObject({ from: 1140, to: 1200 })
+    expect(blankForm(range, people, 'r1', 1170)).toMatchObject({ from: 1170, to: 1200 })
+    expect(blankForm(range, people, 'r1', 1200)).toMatchObject({ from: 1170, to: 1200 })
+    expect(blankForm(range, people, 'r1', 400)).toMatchObject({ from: 480, to: 540 })
   })
 
   it('an account with no staff record books as itself, with nobody attending yet', () => {

@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Room, RoomsPeople, RoomsRange } from '@/lib/rooms/model'
+import type { Booking, Room, RoomsPeople, RoomsRange } from '@/lib/rooms/model'
 
 const actions = vi.hoisted(() => ({ readRoomsDay: vi.fn(), bookRoom: vi.fn(), cancelBooking: vi.fn(), saveRoom: vi.fn(), deleteRoom: vi.fn() }))
 vi.mock('@/lib/rooms/actions', () => actions)
@@ -85,6 +85,136 @@ describe('Meeting Rooms › the day', () => {
       fireEvent.click(screen.getByRole('button', { name: 'The day after' }))
     })
     expect(screen.getByText('Sat, 10 Oct 2026 · today')).toBeInTheDocument()
+  })
+})
+
+// The user, 2026-10-11: the day's label opens the month and a day is picked
+// straight from it; ‹ › still step a day at a time.
+describe('Meeting Rooms › the day picker', () => {
+  const picker = () => screen.getByRole('dialog', { name: 'Pick a day' })
+  const label = () => screen.getByRole('button', { name: /^Sat, 10 Oct 2026/, expanded: false })
+
+  it('opens the month of the day shown and goes to the day picked there, across months too', async () => {
+    actions.readRoomsDay.mockImplementation(async (day: string) => ({ ok: true, range: range(day) }))
+    view()
+    fireEvent.click(label())
+    const card = picker()
+    expect(within(card).getByText('October 2026')).toBeInTheDocument()
+    const ten = within(card).getByRole('button', { name: 'Sat, 10 Oct 2026 · today' })
+    expect(ten).toHaveAttribute('aria-pressed', 'true')
+    expect(ten).toHaveAttribute('aria-current', 'date')
+    // Six weeks, Monday first: 28 Sep to 8 Nov.
+    const days = within(within(card).getByRole('group', { name: 'October 2026' })).getAllByRole('button')
+    expect(days).toHaveLength(42)
+    expect([days[0].getAttribute('aria-label'), days[41].getAttribute('aria-label')]).toEqual(['Mon, 28 Sep 2026', 'Sun, 8 Nov 2026'])
+
+    // The card's ‹ › turn only its month.
+    fireEvent.click(within(card).getByRole('button', { name: 'The month after' }))
+    expect(within(card).getByText('November 2026')).toBeInTheDocument()
+    expect(actions.readRoomsDay).not.toHaveBeenCalled()
+
+    await act(async () => {
+      fireEvent.click(within(card).getByRole('button', { name: 'Tue, 3 Nov 2026' }))
+    })
+    expect(screen.queryByRole('dialog', { name: 'Pick a day' })).toBeNull()
+    expect(actions.readRoomsDay.mock.calls.map(c => c[0])).toEqual(['2026-11-03'])
+    expect(screen.getByText('Tue, 3 Nov 2026')).toBeInTheDocument()
+    expect(window.location.search).toBe('?day=2026-11-03')
+    // ‹ › still step one day from there.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'The day after' }))
+    })
+    expect(actions.readRoomsDay.mock.calls.map(c => c[0])).toEqual(['2026-11-03', '2026-11-04'])
+  })
+
+  it('closes without reading when the day shown is picked, on Escape and on a press outside — the label keeps the focus', () => {
+    view()
+    fireEvent.click(label())
+    fireEvent.click(within(picker()).getByRole('button', { name: 'Sat, 10 Oct 2026 · today' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(actions.readRoomsDay).not.toHaveBeenCalled()
+    expect(label()).toHaveFocus()
+
+    fireEvent.click(label())
+    fireEvent.keyDown(within(picker()).getByRole('button', { name: 'The month after' }), { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(label()).toHaveFocus()
+
+    fireEvent.click(label())
+    fireEvent.click(document.querySelector('[class*="pickCatch"]')!)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('moves a day or a week with the arrow keys, turning the month when the keys leave it', () => {
+    view()
+    fireEvent.click(label())
+    const ten = within(picker()).getByRole('button', { name: 'Sat, 10 Oct 2026 · today' })
+    expect(ten).toHaveFocus()
+    fireEvent.keyDown(ten, { key: 'ArrowRight' })
+    expect(within(picker()).getByRole('button', { name: 'Sun, 11 Oct 2026' })).toHaveFocus()
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    expect(document.activeElement).toHaveAttribute('aria-label', 'Sun, 1 Nov 2026')
+    expect(within(picker()).getByText('November 2026')).toBeInTheDocument()
+  })
+})
+
+// The user, 2026-10-11: the half hour under the pointer lights up, so you see
+// which bar the pointer is on — free ones only, from today on, for whoever books.
+describe('Meeting Rooms › the half hour under the pointer', () => {
+  const meeting = (over: Partial<Booking> = {}): Booking => ({
+    id: 'b1', ref: 'BK-301', room: 'r1', roomName: 'Meeting Room 1', day: '2026-10-10', from: 540, to: 600, title: 'Fair weekly sync',
+    source: 'portal', departmentId: 'd-hr', department: 'HR', subDepartment: null, bookedBy: 'Grace Lim', bookedByStaff: 'grace',
+    onBehalfBy: null, mine: true, canChange: true, internal: [], guests: [], pax: 4, guestCompany: null, guestDepartment: null, guestCode: null,
+    cancelled: false, events: [], ...over,
+  })
+  const ROOM2: Room = { ...ROOM, id: 'r2', name: 'Meeting Room 2' }
+  const show = (day: string, canBook = true) =>
+    render(
+      <MeetingRoomsView
+        initial={{ ...range(day, [ROOM, ROOM2]), bookings: [meeting({ day }), meeting({ id: 'b2', day, from: 600, to: 660, cancelled: true })] }}
+        people={people}
+        rooms={[ROOM, ROOM2]}
+        canBook={canBook}
+        canManage
+      />,
+    )
+  const slots = (column: HTMLElement) => Array.from(column.querySelectorAll('[data-time]')).map(el => el.getAttribute('data-time'))
+
+  it('draws every free half hour of each room with its time, none under a live meeting', () => {
+    show('2026-10-10')
+    const [one, two] = screen.getAllByRole('gridcell')
+    expect(slots(one)).toHaveLength(22)
+    expect(slots(one)).not.toContain('+ 09:00')
+    expect(slots(one)).not.toContain('+ 09:30')
+    // The cancelled meeting leaves its half hours free.
+    expect(slots(one)).toEqual(expect.arrayContaining(['+ 08:00', '+ 08:30', '+ 10:00', '+ 10:30', '+ 19:30']))
+    expect(slots(two)).toHaveLength(24)
+    expect(one.querySelector('[data-time="+ 10:00"]')).toHaveStyle({ top: '104px', height: '26px' })
+  })
+
+  it('lights nothing on a day already past, nor for an account that cannot book — and a press opens nothing there', () => {
+    show('2026-10-09')
+    const past = screen.getAllByRole('gridcell')[0]
+    expect(slots(past)).toEqual([])
+    expect(past).toHaveAttribute('data-readonly', 'true')
+    fireEvent.click(past)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    cleanup()
+    show('2026-10-10', false)
+    expect(slots(screen.getAllByRole('gridcell')[0])).toEqual([])
+  })
+
+  it('opens Book at the half hour pressed — the lit 19:30 books 19:30 to 20:00', () => {
+    show('2026-10-10')
+    const column = screen.getAllByRole('gridcell')[1]
+    vi.spyOn(column, 'getBoundingClientRect').mockReturnValue({ top: 0, height: 624, left: 0, right: 0, bottom: 624, width: 200, x: 0, y: 0, toJSON: () => ({}) })
+    fireEvent.click(column, { clientY: 610 })
+    const drawer = screen.getByRole('dialog')
+    expect((within(drawer).getByLabelText('Room') as HTMLSelectElement).value).toBe('r2')
+    expect((within(drawer).getByLabelText('From') as HTMLSelectElement).value).toBe('1170')
+    expect((within(drawer).getByLabelText('To') as HTMLSelectElement).value).toBe('1200')
   })
 })
 
