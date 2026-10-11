@@ -480,7 +480,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                   <span style={{ alignSelf: "center", margin: "4px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "#FFFFFF", boxShadow: "0 1px 1px rgba(63,43,34,.10)", color: "#4E2F20", fontSize: "12px", fontWeight: "600" }}>{m.sep}</span>
                 </>)}
                 <div style={{ alignSelf: m.align, maxWidth: "80%", padding: "10px 13px", boxSizing: "border-box", borderRadius: m.radius, boxShadow: "0 1px 1px rgba(63,43,34,.10)", background: m.bg, border: `1px solid ${m.bd}`, color: "#3F2B22" }}>
-                  <p style={{ margin: "0", fontSize: "14px", lineHeight: "1.45" }}>{m.text}</p>
+                  <p style={{ margin: "0", whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "14px", lineHeight: "1.45" }}>{m.text}</p>
                   <span style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "3px", marginTop: "4px", fontSize: "11px", color: "#806B60" }}>{!!(m.hasBy) && (<>
                       <em style={{ fontStyle: "italic" }}>{m.by} · </em>
                     </>)}{m.time}{!!(m.mine) && (<>
@@ -529,7 +529,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
           {!!(v.ld.lx.viewOnly) && (<>
             <div data-chat-list="1" style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
               {(v.ld.ld.msgs).map((m, m_i) => (<Fragment key={m_i}>
-                <div style={{ alignSelf: m.align, maxWidth: "80%", padding: "10px 13px", boxSizing: "border-box", borderRadius: m.radius, background: m.bg, border: `1px solid ${m.bd}`, fontSize: "14px", lineHeight: "1.45" }}>{m.text}<span style={{ display: "block", marginTop: "4px", fontSize: "11px", color: "#806B60", textAlign: "right" }}>{!!(m.hasBy) && (<>
+                <div style={{ alignSelf: m.align, maxWidth: "80%", padding: "10px 13px", boxSizing: "border-box", borderRadius: m.radius, background: m.bg, border: `1px solid ${m.bd}`, fontSize: "14px", lineHeight: "1.45", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{m.text}<span style={{ display: "block", marginTop: "4px", fontSize: "11px", color: "#806B60", textAlign: "right" }}>{!!(m.hasBy) && (<>
                       <em style={{ fontStyle: "italic" }}>{m.by} · </em>
                     </>)}{m.at}</span></div>
               </Fragment>))}
@@ -1345,7 +1345,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                   <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) repeat(7, 30px)", alignItems: "center", gap: "4px", padding: "10px 12px", borderTop: "1px solid #F3E9E1" }}>
                     <span style={{ minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
                       <strong style={{ fontSize: "14px", lineHeight: "18px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</strong>
-                      <small style={{ fontSize: "11px", lineHeight: "14px", color: "#806B60", whiteSpace: "nowrap" }}>{p.sub}</small>
+                      <small style={{ fontSize: "11px", lineHeight: "14px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.sub}</small>
                     </span>
                     {(p.days).map((d, d_i) => (<Fragment key={d_i}>
                       <span onClick={d.toggle} title={d.title} style={{ width: "30px", height: "30px", boxSizing: "border-box", borderRadius: "9px", border: `1.5px solid ${d.bd}`, background: d.bg, color: d.fg, display: "grid", placeItems: "center", cursor: "pointer" }}>
