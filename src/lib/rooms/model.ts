@@ -64,6 +64,8 @@ export interface Booking {
   subDepartment: string | null
   bookedBy: string
   bookedByStaff: string | null
+  /** Who made it, when it is for somebody else (Booked by) — drawn "Grace (for Chea Huan)" (mig 20261011150000). */
+  onBehalfBy: string | null
   /** The account that placed it, or the person it is for, is the reader. */
   mine: boolean
   /** The reader may change or cancel it: theirs, or a guest-link booking for Meeting rooms · Edit. */
@@ -148,6 +150,7 @@ export function bookingFromRow(v: unknown): Booking | null {
     subDepartment: strOrNull(v.subDepartment),
     bookedBy: str(v.bookedBy),
     bookedByStaff: strOrNull(v.bookedByStaff),
+    onBehalfBy: strOrNull(v.onBehalfBy),
     mine: v.mine === true,
     canChange: v.canChange === true,
     internal: list(v.internal).filter(isObj).map(a => ({ id: str(a.id), name: str(a.name), department: strOrNull(a.department) })),
@@ -396,10 +399,23 @@ export function paxSummary(named: number, set: number | null, room: Pick<Room, '
   return { total, line: `${named} named${more}${cap}`, over }
 }
 
+/**
+ * Who booked it, as every schedule draws it (the user, 2026-10-11 — review L3):
+ * "Chea Huan", or "Grace (for Chea Huan)" when Grace made it for him.
+ */
+export function bookerName(b: Pick<Booking, 'bookedBy' | 'onBehalfBy'>): string {
+  return b.onBehalfBy ? `${b.onBehalfBy} (for ${b.bookedBy})` : b.bookedBy
+}
+
+/** Who may cancel it, by name: the person it is for, and whoever made it for them. */
+export function whoMayCancel(b: Pick<Booking, 'bookedBy' | 'onBehalfBy'>): string {
+  return b.onBehalfBy ? `${b.onBehalfBy} or ${b.bookedBy}` : b.bookedBy
+}
+
 /** "RV · Chea Huan · 6 pax" — a block's last line. */
 export function blockWho(b: Booking): string {
   const { code } = bookingBadge(b)
-  return `${code === '—' ? '' : `${code} · `}${b.bookedBy} · ${b.pax} pax`
+  return `${code === '—' ? '' : `${code} · `}${bookerName(b)} · ${b.pax} pax`
 }
 
 /** The live booking of this room that this slot runs into, if any. */

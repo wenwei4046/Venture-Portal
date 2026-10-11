@@ -1,4 +1,4 @@
-import { DAY_END, DAY_START, SLOT, departmentBadge, departmentRank, hm, shiftDay, type Booking, type RoomsPeople, type RoomsRange } from "@/lib/rooms/model";
+import { DAY_END, DAY_START, SLOT, bookerName, departmentBadge, departmentRank, hm, shiftDay, type Booking, type RoomsPeople, type RoomsRange } from "@/lib/rooms/model";
 
 /**
  * Book a room in the Revenue app (2026-10-11, HR revamp round 2 — README
@@ -74,8 +74,8 @@ export const toneOf = (b: Pick<Booking, "source" | "mine">): RoomTone => (b.sour
 export const shortRoom = (name: string): string => name.replace("Meeting Room", "Room");
 
 /** A booking's line under its title: who it is for (the subsidiary, for a guest booking) and the headcount. */
-export const whoLine = (b: Pick<Booking, "source" | "guestCompany" | "bookedBy" | "pax">): string =>
-  `${b.source === "guest" ? b.guestCompany ?? "Guest" : b.bookedBy} · ${b.pax} pax`;
+export const whoLine = (b: Pick<Booking, "source" | "guestCompany" | "bookedBy" | "onBehalfBy" | "pax">): string =>
+  `${b.source === "guest" ? b.guestCompany ?? "Guest" : bookerName(b)} · ${b.pax} pax`;
 
 /** The lines a timeline block shows its title on: one for half an hour, three for an hour, five beyond. */
 export const clampOf = (from: number, to: number): number => (to - from <= 30 ? 1 : to - from <= 60 ? 3 : 5);
@@ -190,7 +190,7 @@ export function bookingFacts(b: Booking, roomName: string): { when: string; fact
     when: `${sheetDay(b.day)} · ${hm(b.from)}–${hm(b.to)}`,
     facts: [
       { l: "Room", v: roomName },
-      { l: "Booked by", v: b.bookedBy },
+      { l: "Booked by", v: bookerName(b) },
       { l: "From", v: b.source === "guest" ? b.guestCompany ?? "Guest" : departmentBadge(b.department).label },
       { l: "People", v: `${b.pax} pax` },
     ],

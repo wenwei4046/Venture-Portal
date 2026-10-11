@@ -61,6 +61,8 @@ export interface GuestTaken {
   department: string | null
   subDepartment: string | null
   by: string
+  /** Who made an HQ meeting booked for somebody else (`by`) — "Grace (for Chea Huan)" (mig 20261011150100). */
+  onBehalfBy: string | null
   pax: number
 }
 
@@ -142,6 +144,7 @@ export function takenFromRows(v: unknown): GuestTaken[] {
       department: strOrNull(b.department),
       subDepartment: strOrNull(b.subDepartment),
       by: str(b.by),
+      onBehalfBy: strOrNull(b.onBehalfBy),
       pax: num(b.pax),
     }
   })
@@ -342,7 +345,7 @@ export function takenFacts(b: GuestTaken, roomName: string): Array<{ l: string; 
     { l: 'Room', v: roomName },
     { l: 'Company', v: b.company || 'HOUZS Venture' },
     { l: 'Department', v: takenDepartment(b) },
-    { l: 'Booked by', v: b.by || '—' },
+    { l: 'Booked by', v: b.by ? (b.onBehalfBy ? `${b.onBehalfBy} (for ${b.by})` : b.by) : '—' },
     { l: 'People', v: `${b.pax || 0} pax` },
   ]
 }

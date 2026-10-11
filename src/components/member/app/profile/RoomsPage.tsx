@@ -1,7 +1,7 @@
 "use client";
 
 import { Select } from "@/components/hrv/select";
-import { hm, type Booking } from "@/lib/rooms/model";
+import { hm, whoMayCancel, type Booking } from "@/lib/rooms/model";
 import Sheet from "../Sheet";
 import { Svg } from "../icons";
 import {
@@ -238,7 +238,7 @@ export function RoomViewSheet({ open, booking, roomName, armed, busy, error, rea
               {readOnly ? "Read-only while viewing as" : busy ? "Cancelling…" : armed ? "Tap again to cancel" : "Cancel meeting"}
             </button>
           ) : (
-            <div className={r.only}>Only {booking.bookedBy} can cancel this meeting.</div>
+            <div className={r.only}>Only {whoMayCancel(booking)} can cancel this meeting.</div>
           )}
           {error && <span className={r.err} role="alert">{error}</span>}
         </>

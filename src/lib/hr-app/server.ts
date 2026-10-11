@@ -10,7 +10,7 @@ import { deptLabel, liveLetters, type Documentation } from '@/lib/documentation/
 import { loadHiringBoard } from '@/lib/hiring/board'
 import { dayLabel as hiringDay, hrOwners } from '@/lib/hiring/view'
 import type { HiringBoard, HiringRequest, HiringTalent } from '@/lib/hiring/types'
-import type { Booking } from '@/lib/rooms/model'
+import { bookerName, type Booking } from '@/lib/rooms/model'
 import { officeToday } from '@/lib/office-time'
 import { canDo } from '@/lib/permission-actions'
 import { actionsOnPage, opensPage, type PageRoute } from '@/lib/page-tabs'
@@ -78,7 +78,7 @@ export function bookingOf(b: Booking): HrBooking {
     to: b.to,
     title: b.title,
     dept: b.department ?? b.subDepartment ?? '',
-    byName: b.bookedBy,
+    byName: bookerName(b),
     mine: b.canChange,
     guest: b.source === 'guest',
     company: b.guestCompany,

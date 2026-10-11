@@ -81,13 +81,17 @@ export async function hrAppRemoveTalent(talent: string): Promise<Act> {
   return (await may('talentEdit')) ? done(await removeHiringTalent(talent)) : { ok: false, reason: SHUT }
 }
 
-// ── Member services: Accept onto the waiting list, a claim approved into the payroll, Reject ──
+// ── Member services: Accept onto the waiting list, a claim approved (into the payroll, or a payment request to Finance), Reject ──
 
-export async function hrAppDecide(id: string, decision: 'accept' | 'approve' | 'reject', note: string): Promise<Act> {
+/** Where an approved claim's money goes — Member services' two buttons (the user, 2026-10-11: the phone asks both too). */
+export type ClaimRoute = 'payroll' | 'payment'
+
+export async function hrAppDecide(id: string, decision: 'accept' | 'approve' | 'reject', note: string, route: ClaimRoute = 'payroll'): Promise<Act> {
   if (!(await may('decide'))) return { ok: false, reason: SHUT }
+  if (route !== 'payroll' && route !== 'payment') return { ok: false, reason: 'Pick where the claim is paid from.' }
   const res = await adminMemberAction(
     decision === 'accept' ? { action: 'qualify', requestId: id, note: note.trim() || ACCEPT_NOTE }
-      : decision === 'approve' ? { action: 'approve', route: 'payroll', requestId: id, note }
+      : decision === 'approve' ? { action: 'approve', route, requestId: id, note }
         : { action: 'reject', requestId: id, note },
   )
   return res.ok ? { ok: true } : { ok: false, reason: res.error || 'The request could not be decided. Please try again.' }
