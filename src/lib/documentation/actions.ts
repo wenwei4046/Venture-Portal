@@ -202,7 +202,7 @@ export type MemoWithdrawOutcome = { ok: true; title: string; reached: number } |
  * had reached (`hr_memo_withdraw`, mig 20261011200000).
  */
 export async function withdrawMemo(id: string): Promise<MemoWithdrawOutcome> {
-  await requireAction('documentation', 'edit')
+  await requireActionOn('/team/documentation', 'documentation', 'edit')
   const supabase = await client()
   const { data, error } = await supabase.rpc('hr_memo_withdraw', { p_id: id })
   if (error) return { ok: false, reason: refusal(error, 'It could not be withdrawn. Please try again.') }

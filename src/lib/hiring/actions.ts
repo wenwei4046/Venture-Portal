@@ -335,14 +335,14 @@ export async function addHiringFileType(name: string): Promise<HiringIdOutcome> 
 
 /** Form settings › File types: a new name; the files under it read it at once. Résumé keeps its own (Edit). */
 export async function renameHiringFileType(type: string, name: string): Promise<HiringOutcome> {
-  await requireAction('hiring', 'edit')
+  await requireActionOn('/hiring/requests', 'hiring', 'edit')
   if (!name.trim()) return { ok: false, reason: 'Name the file type.' }
   return call('hiring_file_type_rename', { p_type: type, p_name: name }, 'The file type could not be renamed. Please try again.')
 }
 
 /** Form settings › File types › On / Off: off leaves the picker, the files filed under it keep it. Résumé stays on (Edit). */
 export async function setHiringFileTypeActive(type: string, active: boolean): Promise<HiringOutcome> {
-  await requireAction('hiring', 'edit')
+  await requireActionOn('/hiring/requests', 'hiring', 'edit')
   return call('hiring_file_type_set_active', { p_type: type, p_active: active }, 'The file type could not be changed. Please try again.')
 }
 
