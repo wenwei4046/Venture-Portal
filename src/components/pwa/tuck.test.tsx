@@ -172,6 +172,35 @@ describe('the bar steps out of the way while reading on', () => {
     expect(tucked()).toBe(false)
   })
 
+  // The user: "点进去的时候理应能看到下面的 bar，只有滑下去的时候才看不到".
+  it('another page starts the count afresh — a run from the page before does not tuck it at the first pixel', () => {
+    const { rerender } = render(<Harness page="hiring" />)
+    const page = scroller(screen.getByTestId('page'))
+    page.to(100)
+    page.to(120)
+    expect(tucked()).toBe(false)
+    rerender(<Harness page="hiring/hire:HR-205" />)
+    page.to(125)
+    page.to(135)
+    expect(tucked()).toBe(false)
+  })
+
+  it('coming back to the app (home screen, another app, the lock screen) shows it', () => {
+    render(<Harness />)
+    const page = scroller(screen.getByTestId('page'))
+    page.to(0)
+    page.to(400)
+    expect(tucked()).toBe(true)
+    let state: DocumentVisibilityState = 'hidden'
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => state)
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(tucked()).toBe(true)
+    state = 'visible'
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(tucked()).toBe(false)
+    visibility.mockRestore()
+  })
+
   it('switched off (the More sheet open), it stays', () => {
     render(<Harness enabled={false} />)
     const page = scroller(screen.getByTestId('page'))

@@ -63,8 +63,10 @@ const NAV: { id: Exclude<Screen, "quote" | "calc">; label: string; d: string }[]
 const NONE: readonly Screen[] = [];
 
 /** The bottom bar: Today · Insight · Quote (raised) · Arena · Profile — less any their ticks close (2026-10-11). */
-export function BottomNav({ active, android, live, hidden = NONE, onGo, onQuote }: {
+export function BottomNav({ active, page, android, live, hidden = NONE, onGo, onQuote }: {
   active: Screen;
+  /** The page shown, a Profile page or a board included: another one brings the bar back (2026-10-11). */
+  page?: string;
   android: boolean;
   live: boolean;
   /** Screens their ticks close: not in the bar (Profile never is). */
@@ -79,7 +81,7 @@ export function BottomNav({ active, android, live, hidden = NONE, onGo, onQuote 
   const columns = left.length + right.length + (quote ? 1 : 0);
   // The bar steps out of the way while reading on, back on scrolling up or on another page (2026-10-11) — the live app only.
   const navRef = useRef<HTMLElement>(null);
-  const tucked = useTuckOnScroll(navRef, live, active);
+  const tucked = useTuckOnScroll(navRef, live, page ?? active);
   const item = (n: (typeof NAV)[number]) => {
     const on = tab === n.id;
     return (

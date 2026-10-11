@@ -6,11 +6,12 @@ import { describe, expect, it, vi } from 'vitest'
 // Phone notifications in the service worker (2026-10-11). The first test push reached the user's phone, but its
 // status-bar icon was a solid white square (Android keeps only a badge's alpha, and the badge was the opaque
 // app tile), and a tap did not bring the app forward (the page was loaded before the window was focused, and the
-// moment a tap allows for that had passed). public/sw.js runs here in a sandbox with a fake `self`.
+// moment a tap allows for that had passed). The second focused the most recently used window first — a Chrome
+// tab of the site, not the installed app. public/sw.js runs here in a sandbox with a fake `self`.
 
 const ROOT = resolve(__dirname, '../../..')
 const SW = readFileSync(resolve(ROOT, 'public/sw.js'), 'utf8')
-const ORIGIN = 'https://erp.houzs.my'
+const ORIGIN = 'https://erp.houzsventure.com'
 
 type Listener = (event: unknown) => void
 type Win = { url: string; focus: () => Promise<Win>; navigate: (url: string) => Promise<Win> }
@@ -30,16 +31,11 @@ function worker(open: Win[] = []) {
   return { listeners, showNotification, clients }
 }
 
-function win(url: string, order: string[], name: string, opts: { refuseFocus?: boolean } = {}): Win {
+function win(url: string): Win {
   const w: Win = {
     url,
-    focus: vi.fn(async () => {
-      order.push(`${name}.focus`)
-      if (opts.refuseFocus) throw new Error('Not allowed to focus a window.')
-      return w
-    }),
+    focus: vi.fn(async () => w),
     navigate: vi.fn(async (to: string) => {
-      order.push(`${name}.navigate`)
       w.url = to
       return w
     }),
@@ -80,47 +76,32 @@ describe('a push on the phone', () => {
   })
 })
 
-describe('a tap on it', () => {
-  it('brings the open app forward first, and only then takes it to the notice', async () => {
-    const order: string[] = []
-    const app = win(`${ORIGIN}/hr-app`, order, 'app')
-    const { listeners, clients } = worker([app])
+describe('a tap on it opens the notice in the installed app', () => {
+  it('through openWindow, which Android hands to the installed app — never by reusing an open window', async () => {
+    // A Chrome tab of the site, used last, and the installed app: nothing tells them apart.
+    const chromeTab = win(`${ORIGIN}/hr-app`)
+    const app = win(`${ORIGIN}/hr-app`)
+    const { listeners, clients } = worker([chromeTab, app])
     const close = await tap(listeners, NOTICE)
     expect(close).toHaveBeenCalled()
-    expect(order).toEqual(['app.focus', 'app.navigate'])
-    expect(app.navigate).toHaveBeenCalledWith(`${ORIGIN}${NOTICE}`)
-    expect(clients.openWindow).not.toHaveBeenCalled()
+    expect(clients.openWindow).toHaveBeenCalledWith(`${ORIGIN}${NOTICE}`)
+    for (const w of [chromeTab, app]) {
+      expect(w.focus).not.toHaveBeenCalled()
+      expect(w.navigate).not.toHaveBeenCalled()
+    }
   })
 
-  it('the window used most recently comes forward, whichever face it shows — it is one app', async () => {
-    const order: string[] = []
-    const revenue = win(`${ORIGIN}/member`, order, 'revenue')
-    const portal = win(`${ORIGIN}/dashboard`, order, 'portal')
-    const { listeners } = worker([revenue, portal])
-    await tap(listeners, NOTICE)
-    expect(order).toEqual(['revenue.focus', 'revenue.navigate'])
-  })
-
-  it('already at the notice, it only comes forward', async () => {
-    const order: string[] = []
-    const app = win(`${ORIGIN}${NOTICE}`, order, 'app')
-    const { listeners } = worker([app])
-    await tap(listeners, NOTICE)
-    expect(order).toEqual(['app.focus'])
-  })
-
-  it('with no window open, the app opens at the notice', async () => {
+  it('with nothing open, the same', async () => {
     const { listeners, clients } = worker([])
     await tap(listeners, NOTICE)
     expect(clients.openWindow).toHaveBeenCalledWith(`${ORIGIN}${NOTICE}`)
   })
 
-  it('a window that may not come forward: the app opens at the notice instead', async () => {
-    const order: string[] = []
-    const app = win(`${ORIGIN}/hr-app`, order, 'app', { refuseFocus: true })
-    const { listeners, clients } = worker([app])
-    await tap(listeners, NOTICE)
-    expect(app.navigate).not.toHaveBeenCalled()
-    expect(clients.openWindow).toHaveBeenCalledWith(`${ORIGIN}${NOTICE}`)
+  it('a notice with no place of its own opens the app at its start', async () => {
+    const { listeners, clients } = worker([])
+    let work: Promise<unknown> = Promise.resolve()
+    listeners.notificationclick({ notification: { close: vi.fn(), data: {} }, waitUntil: (p: Promise<unknown>) => { work = p } })
+    await work
+    expect(clients.openWindow).toHaveBeenCalledWith(`${ORIGIN}/`)
   })
 })
