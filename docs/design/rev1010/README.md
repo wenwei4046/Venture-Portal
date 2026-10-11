@@ -1,5 +1,9 @@
 # rev 1010 · Sales CRM (RS template) handoff
 
+> Sent together with rev 1011 — use the combined prompt in `../README.md`.
+
+> **Must-do:** avoid the iPhone camera / Dynamic Island, status bar and home indicator on every CRM screen (safe areas). See the top of `RS rev 1010 dev changes.md`.
+
 Put this folder in the repo at `docs/design/rev1010/`, then open Claude Code in Venture-Portal and paste the prompt below.
 
 ## Contents
@@ -24,5 +28,5 @@ Apply docs/design/rev1010/RS rev 1010 dev changes.md to the Sales CRM in src/com
 2. Principal in own chat: ⋮ shows Share · Customer info · Appointment (no Move). After Switch to: Move is back.
 3. Calendar: any visit → Customer info → Open chat.
 4. Customer info: First contact and Last chat both `dd/mm/yyyy, h:mm am`.
-5. Insight: Leads / Appointments / Upcoming lists (fixed height, End of list), back from info to list; Team | Me only with downlines, default Me.
+5. Insight: Leads / Appointments / Upcoming lists (fixed height, End of list), back from info to list. No Team | Me (replaced by Team | Mine, section 7.3).
 6. Notifications: Unread | Read, Mark all as read, badges follow the unread count.

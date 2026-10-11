@@ -1,5 +1,7 @@
 # RS (Sales template) · rev 1010 · Developer change list
 
+> **Must-do before release:** iPhone safe areas. The CRM root `.app` (`crm/crm.module.css`, `position: fixed; inset: 0`, page `viewportFit: "cover"`) has no safe-area padding, so content can sit under the camera / Dynamic Island, status bar and home indicator. Add `env(safe-area-inset-*)` padding to `.app` and to every bottom sheet / full-screen overlay. Full spec and acceptance in `Control Panel rev 1011 dev changes.md` › "MUST · iPhone safe areas". Test on a real iPhone (Safari + Home-screen app, portrait + landscape).
+
 Applies to everyone who sells: RS, TA, TL, STL, HOD, Director, Principal.
 Code: `src/components/member/crm/sales/` (paths below relative to it).
 Design reference: `rev 1010.dc.html` (frames 1–6.3, plus 2.1 and 5.1).
@@ -80,6 +82,8 @@ Design reference: `rev 1010.dc.html` (frames 1–6.3, plus 2.1 and 5.1).
   - every line truncates with an ellipsis, no wrapping
 - Tap a row → Customer info sheet (auto height, max 92%) with a **‹ back** button left of the avatar → back to the list. Tap the backdrop → close both, back to Insight. Open chat at the bottom.
 
+> **5.2 is replaced by 7.3 (rev 1011 round): do not build the Team | Me switch.** Kept below for history only.
+
 **5.2 Team | Me switch**
 - Segmented control under the title, above Month · Week · Day. Order: **Team** (left), **Me** (right). Default **Me** on every open.
 - Shown only when the user has at least one direct downline (`hasDownlines`, same rule as Profile › View my team). No downline → the switch isn't rendered at all. It updates automatically from People › Hierarchy (`reports_to`).
@@ -100,3 +104,22 @@ Design reference: `rev 1010.dc.html` (frames 1–6.3, plus 2.1 and 5.1).
 - Empty: "You're all caught up." (Unread) / "Nothing read yet." (Read).
 - The Notifications badge on Profile and the Profile badge in the bottom bar = unread count.
 - Storage: today's read state is "last opened" (`notifRead`). Per-item read needs a stored list of read ids per user.
+
+
+---
+
+## 7 · Added during the Control panel round (rev 1011) — RS needs these too
+
+**7.1 Book visit: slots show how many are left** (`SalesChat.tsx`, `vm/chat.ts`; same as `PanelLead.tsx`)
+- Each time slot becomes two lines, 46 px high: time (14px) and under it `N left` / `Full` / `Passed` (10px / 600, opacity .8). `N = room.cap − booked at that start` (not counting the visit being changed). Slots the showroom doesn't offer that day read `Closed`.
+
+**7.2 Chat top spacing** (`SalesChat.tsx`)
+- Outer `<main>` top padding `6px` → `padding-top: max(16px, env(safe-area-inset-top))`.
+
+**7.3 Team | Mine replaces Insight's Team | Me** (replaces 5.2)
+- **RS with no downline: no switch anywhere.** They only have their own CRM.
+- **Director, and STL / TL / TA with at least one downline**: a "Team | Mine" segmented switch in the **top bar of every RS page** (Inbox, Contacts, Calendar, Insight, Profile), Team on the left. Mine = this CRM (selected). Team = the Control panel scoped to them (see `Control Panel rev 1011 dev changes.md` › Director and Leaders items). Hidden inside a chat.
+- **Remove** RS Insight's Team | Me switch and RS Profile › View my team (team views now live on the Team side; View as there lists only their downline).
+- Acceptance: as Daniel Tan (RS) → no switch; as Kelvin Lee (TL) → "Team | Mine" on every RS page, Insight has no Team | Me; tap Team → Control panel showing only Team Kelvin.
+
+**7.4 iPhone safe areas** — see the Must-do at the top of this file. Applies to every RS screen, sheet and overlay.
