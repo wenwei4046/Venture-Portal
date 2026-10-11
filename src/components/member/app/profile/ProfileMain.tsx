@@ -24,7 +24,8 @@ export interface ProfileMainActions {
   open: (key: WorkKey) => void;
   scheme: () => void;
   brandWeeks: () => void;
-  toggleHide: () => void;
+  /** Absent while My income is closed (2026-10-11): the income stays hidden, so Privacy has nothing to show. */
+  toggleHide?: () => void;
   signOut: () => void;
   /** A Principal not viewing anybody yet: the way into View as. */
   viewAs?: () => void;
@@ -91,12 +92,14 @@ export default function ProfileMain({ vm, hidden, actions, crm = true, closedRow
           ))}
           <InstallRow />
         </section>
-        <section className={s.privacy}>
-          <h2 className={s.h2}>Privacy</h2>
-          <button className={s.hideBtn} onClick={actions.toggleHide}>
-            {hidden ? "Show income amounts" : "Hide income amounts"}<Svg d={hidden ? ICON.eyeOff : ICON.eye} size={20} sw={1.7} />
-          </button>
-        </section>
+        {actions.toggleHide ? (
+          <section className={s.privacy}>
+            <h2 className={s.h2}>Privacy</h2>
+            <button className={s.hideBtn} onClick={actions.toggleHide}>
+              {hidden ? "Show income amounts" : "Hide income amounts"}<Svg d={hidden ? ICON.eyeOff : ICON.eye} size={20} sw={1.7} />
+            </button>
+          </section>
+        ) : null}
         <button className={s.signOut} onClick={actions.signOut}>Sign out</button>
       </div>
     </div>

@@ -34,7 +34,7 @@ function memberData(requests: MemberRequest[] = []): MemberData {
 }
 
 function book(from: string, through: string): MemberOrderBook {
-  return { from, through, asOf: "2026-10-05T04:00:00Z", paysFrom: "2026-09", closedMonths: [], costDivisor: 0.7, brandWeeks: {}, orders: [] };
+  return { from, through, asOf: "2026-10-05T04:00:00Z", paysFrom: "2026-09", closedMonths: [], brandWeeks: {}, orders: [] };
 }
 
 function arena(membershipId: string, period: string): MemberArenaSnapshot {
@@ -119,6 +119,26 @@ describe("a page their ticks close is neither shown nor reachable", () => {
     expect(screen.queryByRole("button", { name: /Team & capacity/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Requests/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /My honours/ })).toBeInTheDocument();
+  });
+
+  // The user, 2026-10-11: "go with your recommendations for hidden amount".
+  it("My income closed: Today's income stays hidden — no eye shows it, nor Profile's Privacy", async () => {
+    await open("?department=fair");
+    expect(screen.getByRole("button", { name: "Hide amounts" })).toBeInTheDocument();
+    expect(screen.queryByText("RM ••••••")).not.toBeInTheDocument();
+    cleanup();
+    await open("?department=fair", { pages: ["income"], sends: [] });
+    expect(screen.getByText("RM ••••••")).toBeInTheDocument();
+    expect(screen.getByText("Amounts hidden")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hide amounts" })).not.toBeInTheDocument();
+    // Sales, Margin and KPI are not income: they stay.
+    expect(screen.getAllByText("Sales").length).toBeGreaterThan(0);
+    cleanup();
+    await open("?page=account&department=fair", { pages: ["income"], sends: [] });
+    expect(screen.queryByRole("button", { name: /income amounts/ })).not.toBeInTheDocument();
+    cleanup();
+    await open("?page=account&department=fair");
+    expect(screen.getByRole("button", { name: /Hide income amounts/ })).toBeInTheDocument();
   });
 
   it("a returned claim with Requests closed is not on Today’s to-dos, nor in the bell", async () => {

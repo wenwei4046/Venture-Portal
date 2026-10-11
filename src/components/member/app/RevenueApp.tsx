@@ -196,6 +196,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const home = landing(closed);
   const hiddenScreens = useMemo<Screen[]>(() => (["today", "insight", "quote", "arena"] as const).filter(page => !shows(closed, page)), [closed]);
   const closedRows = useMemo<WorkKey[]>(() => (["income", "requests", "track", "team", "rooms", "docs"] as const).filter(page => !shows(closed, page)), [closed]);
+  // My income closed (the user, 2026-10-11: "go with your recommendations for hidden amount"): Today's income card
+  // keeps its place with the amount hidden, as the eye hides it — and no eye, nor Profile's Privacy, can show it.
+  const incomeShut = !shows(closed, "income");
   const requestKinds = useMemo(() => (["claim", "replacement", "waiting"] as const).filter(kind => sends(closed, requestPageOf(kind))), [closed]);
   const quoteSends = sends(closed, "quote");
   useEffect(() => {
@@ -561,11 +564,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   }, [arenaToday, kpiRule, selfId]);
 
   const model = useMemo(() => todayModel({
-    today, first: me.first, title: me.title, rank: me.rank, income, incomeStatus, salary: todaySalary, hidden,
+    today, first: me.first, title: me.title, rank: me.rank, income, incomeStatus, salary: todaySalary, hidden: hidden || incomeShut,
     department: principal && !viewed && !fixture ? membership?.name ?? "the department" : undefined,
     insight: now.block ?? undefined, kpi: now.kpi, arena: arenaToday, book: now.book, bands: data.bands, memos, requests, requestCode,
     metricsLoading: now.loading && !now.block && !data.demo, arenaLoading: arenaCur.loading && !data.demo,
-  }, champRank), [today, me, income, incomeStatus, todaySalary, hidden, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book,
+  }, champRank), [today, me, income, incomeStatus, todaySalary, hidden, incomeShut, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book,
     now.loading, arenaCur.loading, data.demo, data.bands, memos, requests, champRank]);
 
   // ── Insight: Month / Quarter / Year, opening on the current month ──
@@ -1068,8 +1071,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     };
     // A page their ticks close is not opened from here: its figures stay, Your Arena goes (2026-10-11).
     const insightOpen = shows(closed, "insight"), arenaOpen = shows(closed, "arena");
-    page = <Today model={todayVM} hidden={hidden} actions={{
-      toggleHide: () => setHidden(!hidden),
+    page = <Today model={todayVM} hidden={hidden || incomeShut} actions={{
+      toggleHide: incomeShut ? undefined : () => setHidden(!hidden),
       openMetric: insightOpen ? key => insightThisMonth(key === "sales" ? "bills" : key === "margin" ? "brand" : "kpi") : undefined,
       openTodo: todo,
       openOrders: insightOpen ? () => insightThisMonth("bills") : undefined,
@@ -1168,7 +1171,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         open: (key: WorkKey) => goScreen("account", { pf: key }),
         scheme: () => setSchemeOpen(true),
         brandWeeks: () => goScreen("account", { pf: "brandWeeks" }),
-        toggleHide: () => setHidden(!hidden),
+        toggleHide: incomeShut ? undefined : () => setHidden(!hidden),
         signOut,
         viewAs: principal && !viewed ? () => setVaOpen(true) : undefined,
       }} />;
