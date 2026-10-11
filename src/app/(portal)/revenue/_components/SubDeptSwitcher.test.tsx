@@ -51,7 +51,19 @@ describe('SubDeptSwitcher', () => {
     unmount()
     render(<SubDeptSwitcher data={data(true)} view="sg" />)
     fireEvent.click(screen.getByRole('button', { name: /Sub-department/ }))
-    expect(screen.getByText(/Copy Fair's rules, or start blank/)).toBeInTheDocument()
+    // Round 2 (portal-42): one 38px row; what it does moved to its tooltip.
+    const row = screen.getByRole('menuitem', { name: '+ New sub-department' })
+    expect(row).toHaveAttribute('title', "Copy Fair's rules, or start blank")
+  })
+
+  it('draws round 2’s one-line button: the words, a rule, the name, the chevron', () => {
+    render(<SubDeptSwitcher data={data()} view="cc" />)
+    const button = screen.getByRole('button', { name: /Sub-department/ })
+    expect([...button.children].map(c => c.textContent)).toEqual(['Sub-department', '', 'Fair', ''])
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(button)
+    expect(button).toHaveAttribute('aria-expanded', 'true')
+    expect(button).toHaveAttribute('data-open', 'true')
   })
 
   it('creates one as a copy of the open one’s rules and opens it', async () => {

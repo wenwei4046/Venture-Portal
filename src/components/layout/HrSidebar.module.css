@@ -18,8 +18,10 @@
 }
 .aside[data-collapsed='true'] { width: 64px; }
 
+/* Round 2 (README 3): no rule under the brand, and more air between it and
+   Overview. */
 .brand {
-  padding: 16px 12px 14px 14px;
+  padding: 20px 12px 26px 14px;
   display: flex;
   align-items: center;
   gap: 10px;
