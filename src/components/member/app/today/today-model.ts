@@ -49,6 +49,8 @@ export interface TodayInput {
   requests: MemberRequest[];
   /** RQ-2609-004 style code of a request. */
   requestCode: (request: MemberRequest) => string;
+  /** False when their ticks close My brand weeks (2026-10-11): no reminder to save the weeks. Absent: open. */
+  brandWeeks?: boolean;
 }
 
 export type TodoTone = "memo" | "request" | "weeks";
@@ -167,7 +169,7 @@ function todos(input: TodayInput): TodayTodo[] {
   }
   const arena = input.arena;
   const period = input.today.slice(0, 7);
-  if (arena && arena.period === period && arena.weekLocks?.length) {
+  if (input.brandWeeks !== false && arena && arena.period === period && arena.weekLocks?.length) {
     const picks = arena.brandWeeks?.picks ?? {};
     const open = arena.weekLocks.filter(lock => !lock.locked && !picks[lock.week]).sort((a, b) => a.closesOn.localeCompare(b.closesOn));
     if (open.length) {
@@ -192,7 +194,8 @@ function thisWeek(input: TodayInput): TodayWeek | null {
   return {
     title: `Week ${index + 1} · ${brand ? `${brand} week` : "Brand week not picked"}`,
     dates: booth ? dayRange(booth.start, booth.end) : dayRange(friday, end),
-    venue: booth?.venue ?? (brand ? null : "Pick your brand in My brand weeks"),
+    // My brand weeks closed by their ticks: no pointer to a page they cannot open.
+    venue: booth?.venue ?? (brand || input.brandWeeks === false ? null : "Pick your brand in My brand weeks"),
     org: booth?.organizer ?? null,
   };
 }

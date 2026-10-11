@@ -223,6 +223,45 @@ try {
   await as({ 'revenue_app.create': 'own' }, null)
   check(await one(`SELECT public.member_cancel_request($1)`, [CLAIM]), 'withdrawn claim', 'nobody unticked anything for them: as before')
 
+  // ── The rest of Profile gets its boxes (mig 20261011233000): the registry seeded again ──
+  const profileSql = (await readFile(new URL('20261011233000_revenue_app_profile_tabs.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(profileSql)
+  await db.exec(profileSql)
+  check(await q(`SELECT tab_id, action, cell FROM public.permission_tab_cells WHERE tab_id IN ('rev.honours', 'rev.brand_weeks', 'rev.scheme') ORDER BY tab_id`), [
+    { tab_id: 'rev.brand_weeks', action: 'view', cell: 'revenue_app.view' },
+    { tab_id: 'rev.honours', action: 'view', cell: 'revenue_app.view' },
+    { tab_id: 'rev.scheme', action: 'view', cell: 'revenue_app.view' },
+  ], 'My honours, My brand weeks and Commission scheme are boxes over the app’s own View — run twice, seeded once')
+  check(Number(await one(`SELECT count(*) FROM public.permission_tab_cells WHERE cell = 'treasury.create'`)), 9, 'every other box is as it was')
+
+  // ── My brand weeks asks its page's View box (mig 20261011233100) ──
+  await db.exec(`
+    CREATE TABLE public.bw_saves(period text);
+    CREATE FUNCTION public.member_arena_save_brand_week_picks(p_sub_department uuid, p_period text, p_picks jsonb)
+    RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+    DECLARE
+      v_staff uuid := NULL;
+    BEGIN
+      INSERT INTO public.bw_saves VALUES (p_period);
+    END $$;
+  `)
+  const weeksSql = (await readFile(new URL('20261011233100_brand_weeks_ask_their_tab.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(weeksSql)
+  await db.exec(weeksSql)
+  const weeksBody = await one(`SELECT prosrc FROM pg_proc WHERE proname = 'member_arena_save_brand_week_picks'`)
+  check(weeksBody.split("tab_box_closed('rev.brand_weeks', 'view')").length - 1, 1, 'the save asks its box once — run twice')
+  check(weeksBody.indexOf('tab_box_closed') < weeksBody.indexOf('INSERT INTO public.bw_saves'), true, 'first, before anything is written')
+  const saveWeeks = `SELECT public.member_arena_save_brand_week_picks(NULL, '2026-10', '{}'::jsonb)`
+  await as({ 'revenue_app.view': 'own' }, { ticks: ['rev.today.view', 'rev.honours.view'], boxes: [], cells: false })
+  await reject(saveWeeks, [], /My brand weeks is not open to your account\./, 'a template saved on tabs without My brand weeks: nothing is saved')
+  await as({ 'revenue_app.view': 'own' }, { ticks: null, boxes: [{ tab: 'rev.brand_weeks', action: 'view', granted: false }], cells: false })
+  await reject(saveWeeks, [], /My brand weeks is not open to your account\./, 'held back for them alone over a template not saved on tabs: refused too')
+  await as({ 'revenue_app.view': 'own' }, { ticks: ['rev.today.view', 'rev.brand_weeks.view'], boxes: [], cells: false })
+  await q(saveWeeks)
+  await as({ 'revenue_app.view': 'own' }, null)
+  await q(saveWeeks)
+  check(Number(await one(`SELECT count(*) FROM public.bw_saves`)), 2, 'ticked, or nobody unticked anything for them: saved as before')
+
   console.log(`tab writes: ${checks} checks passed`)
 } finally {
   await db.close()

@@ -7,14 +7,18 @@ import type { Route, Screen } from "./route";
  * opens instead, and which page a request is followed up on.
  */
 
-/** The tabbed page a route is on; null for what no tab stands for (Profile itself, honours, memos, brand weeks, the CRM, the Product List). */
+/**
+ * The tabbed page a route is on; null for what no tab stands for — Profile itself, Memos & notifications
+ * (open to every member: HR's memos must be acknowledged), the CRM and the Product List (their own cells).
+ */
 export function pageOfRoute(route: Pick<Route, "screen" | "pf">): AppPage | null {
   switch (route.screen) {
     case "today": case "insight": case "arena": return route.screen;
     case "quote": case "calc": return "quote";
     case "account":
       if (route.pf === "income" || route.pf === "incOrders") return "income";
-      return route.pf === "requests" || route.pf === "track" || route.pf === "team" || route.pf === "rooms" || route.pf === "docs" ? route.pf : null;
+      return route.pf === "requests" || route.pf === "track" || route.pf === "team" || route.pf === "rooms" || route.pf === "docs"
+        || route.pf === "honours" || route.pf === "brandWeeks" ? route.pf : null;
     default: return null;
   }
 }

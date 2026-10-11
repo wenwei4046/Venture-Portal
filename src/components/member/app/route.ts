@@ -34,8 +34,10 @@ export interface Route {
   staff: string;
 }
 
-const SCREENS: Screen[] = ["today", "quote", "calc", "insight", "arena", "account"];
-const PF: ProfileView[] = ["income", "incOrders", "honours", "team", "requests", "track", "rooms", "docs", "crm", "memos", "brandWeeks"];
+/** The app's screens an address can name, and Profile's pages — every one has a box in People › Permissions or a reason not to (permission-tabs-coverage.test). */
+export const SCREENS: Screen[] = ["today", "quote", "calc", "insight", "arena", "account"];
+export const PROFILE_VIEWS: ProfileView[] = ["income", "incOrders", "honours", "team", "requests", "track", "rooms", "docs", "crm", "memos", "brandWeeks"];
+const PF = PROFILE_VIEWS;
 const INS: InsightView[] = ["bills", "kpi", "brand"];
 const BOARDS: Board[] = ["sales", "margin", "kpi", "champ"];
 /** The old app's pages, so a bookmark or a memo link still lands. */

@@ -122,6 +122,28 @@ describe("a page their ticks close is neither shown nor reachable", () => {
     expect(screen.getByRole("button", { name: /My honours/ })).toBeInTheDocument();
   });
 
+  // The rest of Profile has boxes since 2026-10-11 (the user: every page of every view); Memos stays open to all.
+  it("My honours, My brand weeks and Commission scheme closed: no row, no chip, and their addresses land elsewhere", async () => {
+    await open("?page=account&department=fair");
+    expect(screen.getByRole("button", { name: /My honours/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Commission scheme" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "My brand weeks" })).toBeInTheDocument();
+    cleanup();
+    await open("?page=account&department=fair", { pages: ["honours", "brandWeeks", "scheme"], sends: [] });
+    expect(screen.queryByRole("button", { name: /My honours/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Commission scheme" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "My brand weeks" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Memos & notifications/ })).toBeInTheDocument();
+    cleanup();
+    // One chip left takes the row.
+    await open("?page=account&department=fair", { pages: ["scheme"], sends: [] });
+    expect(screen.getByRole("button", { name: "My brand weeks" }).parentElement?.className).toMatch(/chipsOne/);
+    cleanup();
+    await open("?page=account&view=brandWeeks&department=fair", { pages: ["brandWeeks"], sends: [] });
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get("view")).toBeNull());
+    expect(screen.queryByRole("heading", { name: "My brand weeks" })).not.toBeInTheDocument();
+  });
+
   // The user, 2026-10-11: "go with your recommendations for hidden amount".
   it("My income closed: Today's income stays hidden — no eye shows it, nor Profile's Privacy", async () => {
     await open("?department=fair");

@@ -75,6 +75,8 @@
 .factLabel { display: block; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); }
 .factValue { display: block; font-size: calc(15px * var(--rv-type)); font-weight: 650; margin-top: 2px; }
 .chips { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border-top: 1px solid var(--rv-line); }
+/* One chip left (the other's page closed by their ticks, 2026-10-11): it takes the row. */
+.chipsOne { grid-template-columns: minmax(0, 1fr); }
 .chip {
   display: flex;
   align-items: center;

@@ -29,6 +29,11 @@ export const APP_PAGE_TABS = {
   // The HR revamp's second package (2026-10-11): Book a room and Documentation.
   rooms: 'rev.rooms',
   docs: 'rev.documentation',
+  // The rest of Profile (2026-10-11, the user: every page of every view has its row) — Memos &
+  // notifications has none: every member must read and acknowledge HR's memos.
+  honours: 'rev.honours',
+  brandWeeks: 'rev.brand_weeks',
+  scheme: 'rev.scheme',
 } as const
 
 export type AppPage = keyof typeof APP_PAGE_TABS

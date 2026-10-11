@@ -359,7 +359,8 @@ export interface CellKey {
   gate: CellGate | null
 }
 
-const MEMBER_APP_KEYS = ['member_portal', 'member_quote', 'member_requests', 'member_memos', 'member_insight', 'member_crm', 'crm_manage']
+/** The Revenue app's keys — all a Revenue app account ever holds. */
+export const MEMBER_APP_KEYS: readonly string[] = ['member_portal', 'member_quote', 'member_requests', 'member_memos', 'member_insight', 'member_crm', 'crm_manage']
 
 /**
  * The module keys these cells open while the gates still read module keys —
@@ -389,22 +390,43 @@ export function openedKeys(
   return (baseRole === 'revenue_member' ? keys.filter(k => MEMBER_APP_KEYS.includes(k)) : keys).sort()
 }
 
-/** Why a granted cell does not open its key yet, or null when it does. */
-function heldBecause(grants: Grants, seesSalary: boolean, baseRole: string, k: CellKey): string | null {
+/**
+ * What holds a granted cell back from opening its key — its reach is narrower
+ * than the key opens at, Salary amounts are not ticked, the treasury's View is
+ * not held, the template is not the Principal's, or it is a Revenue app
+ * account's — or null when it opens (or the cell is not granted). The one rule
+ * behind `openedKeys`, `heldCells` and the tab matrix's notes (permission-tabs
+ * `heldTabs`).
+ */
+export type HeldCode = 'scope' | 'salary' | 'treasury' | 'principal' | 'member'
+
+export function keyHeldCode(grants: Grants, seesSalary: boolean, baseRole: string, k: CellKey): HeldCode | null {
   const cell = cellOf(grants, k.functionKey, k.action)
   if (cell === 'none') return null
-  if (CELL_RANK[cell] < CELL_RANK[k.minScope]) {
-    return `${CELL_LABEL[cell]} is not enforced on this yet, so it stays closed until it is — All opens it now`
-  }
-  if (k.gate === 'salary' && !seesSalary) return 'It shows what people are paid — tick Salary amounts to open it'
-  if (k.gate === 'treasury' && cellOf(grants, 'treasury', 'view') === 'none') return 'It opens the treasury ledgers — needs Treasury · View too'
-  if (k.gate === 'principal' && baseRole !== 'principal') {
-    return 'It opens the Principal’s own powers — only a full-access template opens it for now'
-  }
-  if (baseRole === 'revenue_member' && !MEMBER_APP_KEYS.includes(k.legacyKey)) {
-    return 'A Revenue app account opens only the Revenue app'
-  }
+  if (CELL_RANK[cell] < CELL_RANK[k.minScope]) return 'scope'
+  if (k.gate === 'salary' && !seesSalary) return 'salary'
+  if (k.gate === 'treasury' && cellOf(grants, 'treasury', 'view') === 'none') return 'treasury'
+  if (k.gate === 'principal' && baseRole !== 'principal') return 'principal'
+  if (baseRole === 'revenue_member' && !MEMBER_APP_KEYS.includes(k.legacyKey)) return 'member'
   return null
+}
+
+/** Why a granted cell does not open its key yet, or null when it does. */
+function heldBecause(grants: Grants, seesSalary: boolean, baseRole: string, k: CellKey): string | null {
+  switch (keyHeldCode(grants, seesSalary, baseRole, k)) {
+    case 'scope':
+      return `${CELL_LABEL[cellOf(grants, k.functionKey, k.action)]} is not enforced on this yet, so it stays closed until it is — All opens it now`
+    case 'salary':
+      return 'It shows what people are paid — tick Salary amounts to open it'
+    case 'treasury':
+      return 'It opens the treasury ledgers — needs Treasury · View too'
+    case 'principal':
+      return 'It opens the Principal’s own powers — only a full-access template opens it for now'
+    case 'member':
+      return 'A Revenue app account opens only the Revenue app'
+    default:
+      return null
+  }
 }
 
 /**

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { PersonCells, Scope } from './permission-matrix'
+import type { PersonCells, Scope, SensitiveField } from './permission-matrix'
 import { CELL_KEYS, FUNCTIONS, PROD, cellsOf, grantsOf, keysOf } from './permission-tabs.fixtures'
 import { viewKeysOf, type FunctionKey } from './permission-actions'
 import {
-  PERMISSION_TABS, TAB_VIEWS, boxesOf, cellRows, cellsFromTabs, cellsOutOfStep, gainsOf, grantOf, hasBox, lossesOf, parseGrant, personCellRows,
-  personTicks, reapplied, sameTicks, tabsFromCells, templateTicks, ticksOfPerson, toggleBox, toggleRow, viewCount,
+  PERMISSION_TABS, TAB_VIEWS, appOnly, boxesOf, cellRows, cellsFromTabs, cellsOutOfStep, columnTally, gainsOf, grantOf, hasBox, heldTabs, isTabView,
+  lossesOf, parseGrant, personCellRows, personTicks, reapplied, sameTicks, tabsFromCells, tabsOfView, templateTicks, ticksOfPerson, toggleBox,
+  toggleColumn, toggleRow, toggleView, viewCount, viewTally, viewTicks,
 } from './permission-tabs'
 
 const moved = (key: string) => tabsFromCells(cellsOf(PROD[key].cells), keysOf(key))
@@ -105,7 +106,8 @@ describe('moving the eleven templates onto tabs loses nothing', () => {
 })
 
 it('counts a view the way the rail does', () => {
-  expect(viewCount('rev', new Set([grantOf('rev.today', 'view'), grantOf('rev.quote', 'create')]))).toEqual({ seen: 1, of: 13 })
+  // Sixteen Revenue app tabs since 2026-10-11 (the rest of Profile: My honours, My brand weeks, Commission scheme).
+  expect(viewCount('rev', new Set([grantOf('rev.today', 'view'), grantOf('rev.quote', 'create')]))).toEqual({ seen: 1, of: 16 })
 })
 
 describe('what the Permissions tab and a person’s window work with', () => {
@@ -229,5 +231,88 @@ describe('a person’s own boxes follow their template', () => {
     expect(cellsOutOfStep(cellsOf(PROD.staff.cells), mine, { 'claims.edit': 'none' })).toBe(false)
     expect(cellsOutOfStep(cellsOf(PROD.staff.cells), mine, {})).toBe(true)
     expect(cellsOutOfStep(cellsOf(PROD.staff.cells), mine, { 'claims.edit': 'own' })).toBe(true)
+  })
+})
+
+// 2026-10-11 — the user: a Select all to tick, "+ New template" as a window (a name and the views it
+// can see), and — a note they passed on — a ticked tab whose page would not open says why.
+describe('Select all, the New template window and the boxes that open nothing yet', () => {
+  const rev = (ids: string[]) => new Set(ids.map(id => `rev.${id}`))
+
+  it('Select all over a column ticks that box on every tab that has it, View with it — again, none', () => {
+    const none = new Set<string>()
+    expect(columnTally(none, 'rev', 'create')).toEqual({ tally: 'none', boxes: 4 })
+    const creates = toggleColumn(none, 'rev', 'create')
+    expect([...creates].sort()).toEqual([...rev(['quote.create', 'quote.view', 'requests.create', 'requests.view', 'rooms.create', 'rooms.view', 'track.create', 'track.view'])].sort())
+    expect(columnTally(creates, 'rev', 'create').tally).toBe('all')
+    expect(columnTally(creates, 'rev', 'view').tally).toBe('some')
+    // All ticked: the click unticks the column, and only it.
+    expect([...toggleColumn(creates, 'rev', 'create')].sort()).toEqual([...rev(['quote.view', 'requests.view', 'rooms.view', 'track.view'])].sort())
+    // Unticking View takes each tab with it.
+    expect(toggleColumn(toggleColumn(creates, 'rev', 'view'), 'rev', 'view').size).toBe(0)
+    // The Revenue app has no Approve box at all.
+    expect(columnTally(none, 'rev', 'approve')).toEqual({ tally: 'none', boxes: 0 })
+    expect(toggleColumn(none, 'rev', 'approve').size).toBe(0)
+  })
+
+  it('Select all over the view ticks every box it has — again, none — and leaves the other views alone', () => {
+    const other = new Set(['hr.payroll.view'])
+    const every = toggleView(other, 'dept')
+    expect(viewTally(every, 'dept')).toBe('all')
+    expect(viewCount('dept', every)).toEqual({ seen: 9, of: 9 })
+    expect(every.has('dept.my_claims.edit')).toBe(true)
+    expect(every.has('hr.payroll.view')).toBe(true)
+    expect([...toggleView(every, 'dept')]).toEqual(['hr.payroll.view'])
+    expect(viewTally(new Set(['dept.opex.view']), 'dept')).toBe('some')
+  })
+
+  it('a new template’s ticks: View on every tab of the views picked, nothing else', () => {
+    const ticks = viewTicks(['dept', 'rev'])
+    expect(ticks.size).toBe(tabsOfView('dept').length + tabsOfView('rev').length)
+    expect([...ticks].every(g => g.endsWith('.view'))).toBe(true)
+    expect(viewCount('hr', ticks).seen).toBe(0)
+    expect(appOnly(['rev'])).toBe(true)
+    expect(appOnly(['rev', 'dept'])).toBe(false)
+    expect(appOnly([])).toBe(false)
+    expect(isTabView('fin')).toBe(true)
+    expect(isTabView('nope')).toBe(false)
+  })
+
+  it('says why a ticked tab would not open — or nothing, when it does', () => {
+    const held = (ticks: string[], sensitive: SensitiveField[], baseRole = 'staff') =>
+      Object.fromEntries(heldTabs(new Set(ticks), sensitive, baseRole, CELL_KEYS))
+    // Pay pages want Salary amounts.
+    expect(held(['hr.payroll.view'], [])).toEqual({ 'hr.payroll': 'Not open yet — it shows pay: tick Salary amounts' })
+    expect(held(['hr.payroll.view'], ['salary'])).toEqual({})
+    // The ledgers want a treasury tab's View.
+    expect(held(['fin.invoice.view'], [])).toEqual({ 'fin.invoice': 'Not open yet — it needs the View of a treasury tab too (Payments, Receipt, Fund IN …)' })
+    expect(held(['fin.invoice.view', 'fin.payments.view'], [])).toEqual({})
+    // The Principal's own pages want a full-access template.
+    expect(held(['pri.settings.view'], [])).toEqual({ 'pri.settings': 'Does not open — only a full-access template opens it' })
+    expect(held(['pri.settings.view'], [], 'principal')).toEqual({})
+    // A Revenue app account opens no portal page — said before the salary, which would not help.
+    expect(held(['hr.payroll.view', 'rev.today.view'], [], 'revenue_member')).toEqual({ 'hr.payroll': 'Does not open — a Revenue app account opens only the Revenue app' })
+    // A box that is not ticked: Member Services opens with its Edit, Permissions with People Management's View.
+    expect(held(['hr.member_services.view'], [])).toEqual({ 'hr.member_services': 'Not open yet — its page opens with its Edit box ticked too' })
+    expect(held(['hr.member_services.view', 'hr.member_services.edit'], [])).toEqual({})
+    expect(held(['hr.permissions.view'], ['salary'])).toEqual({ 'hr.permissions': 'Not open yet — its page opens with People Management · View ticked too' })
+    // The Quote's catalogue is read with the key its Create gives.
+    expect(held(['rev.quote.view'], [], 'revenue_member')).toEqual({ 'rev.quote': 'Not open yet — its page opens with its Create box ticked too' })
+    expect(held(['rev.quote.view', 'rev.requests.view', 'rev.requests.create'], [], 'revenue_member')).toEqual({})
+    // …but the Principal opens the Revenue app as the Principal, with no member keys.
+    expect(held(['rev.quote.view'], [], 'principal')).toEqual({})
+    // HR's Audit Log shows the changes of what else is open.
+    expect(held(['hr.audit_log.view'], [])).toEqual({ 'hr.audit_log': 'Not open yet — it shows the changes of what its other boxes open, and none of them is ticked' })
+    expect(held(['hr.audit_log.view', 'hr.documentation.view'], [])).toEqual({})
+    // The CRM's Control panel opens with CRM · View at All, not a key; the Overview with nothing.
+    expect(held(['rev.crm_team.view', 'dept.overview.view'], [], 'revenue_member')).toEqual({})
+    // People Management opens through the directory without the Salary tick.
+    expect(held(['hr.people.view', 'hr.hierarchy.view'], [])).toEqual({})
+  })
+
+  it('every template as production holds it opens every tab its ticks show (worked out from its cells)', () => {
+    for (const key of Object.keys(PROD)) {
+      expect(Object.fromEntries(heldTabs(moved(key), PROD[key].sensitive, PROD[key].baseRole, CELL_KEYS)), key).toEqual({})
+    }
   })
 })

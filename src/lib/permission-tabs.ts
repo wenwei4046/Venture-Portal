@@ -21,7 +21,19 @@
  */
 
 import type { FunctionKey } from '@/lib/permission-actions'
-import { effectiveGrants, openedKeys, type Action, type CellKey, type Grants, type PersonCells, type Scope, type SensitiveField } from '@/lib/permission-matrix'
+import {
+  MEMBER_APP_KEYS,
+  effectiveGrants,
+  keyHeldCode,
+  openedKeys,
+  type Action,
+  type CellKey,
+  type Grants,
+  type HeldCode,
+  type PersonCells,
+  type Scope,
+  type SensitiveField,
+} from '@/lib/permission-matrix'
 
 export type TabView = 'hr' | 'fin' | 'pri' | 'dept' | 'rev'
 export type TabAction = 'view' | 'create' | 'edit' | 'approve'
@@ -52,6 +64,8 @@ export interface PermissionTab {
   opens: Readonly<Partial<Record<TabAction, readonly FnAction[]>>>
   /** One page listed in several views (Approvals, Reports …): a template is put in the views it lives in, not all of them. */
   page?: string
+  /** Its page opens with its own View cell, not a module key (the CRM's Control panel: CRM · View at All) — never "not open yet". */
+  cellGated?: boolean
 }
 
 type Opens = PermissionTab['opens']
@@ -190,9 +204,16 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('rev', 'rooms', 'Profile · Book a room', ['member_portal'], REVENUE_APP_SENDS),
   // …and the files HR shares with the member's department (People › Documentation).
   tab('rev', 'documentation', 'Profile · Documentation', ['member_portal'], REVENUE_APP),
+  // The rest of Profile (2026-10-11, the user: every page of every view has its row): the medals and Fair
+  // records, the brand worked each fair weekend (read with the Arena's key), and the commission scheme's
+  // sheet. Memos & notifications has none on purpose — HR counts every member as needing to acknowledge
+  // a memo, so it stays open to all (the user's choice).
+  tab('rev', 'honours', 'Profile · My honours', ['member_insight'], REVENUE_APP),
+  tab('rev', 'brand_weeks', 'Profile · My brand weeks', ['member_insight'], REVENUE_APP),
+  tab('rev', 'scheme', 'Profile · Commission scheme', ['member_portal'], REVENUE_APP),
   tab('rev', 'leads', 'Profile · My leads & appointments', ['member_crm', 'crm_manage'], { view: ['crm.view'], edit: ['crm.edit'] }),
-  // The Director and the CEO run the CRM for the whole team (PR #253).
-  tab('rev', 'crm_team', 'CRM · Team', ['crm_manage'], { view: ['crm.view'], edit: ['crm.edit', 'crm.manage'] }, 'all'),
+  // The Director and the CEO run the CRM for the whole team (PR #253); its Control panel opens with CRM · View at All.
+  { ...tab('rev', 'crm_team', 'CRM · Team', ['crm_manage'], { view: ['crm.view'], edit: ['crm.edit', 'crm.manage'] }, 'all'), cellGated: true },
   tab('rev', 'product_list', 'Product List', ['product_list'], { view: ['product_list.view'], edit: ['product_list.edit'] }, 'all'),
 ]
 
@@ -471,4 +492,148 @@ export function toggleRow(ticks: ReadonlySet<string>, tabId: string): Set<TabGra
 /** Two sets of ticks hold the same boxes. */
 export function sameTicks(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
   return a.size === b.size && [...a].every(g => b.has(g))
+}
+
+// ── Select all, the New template window, and the boxes that open nothing yet (2026-10-11) ──
+
+/** One view's tabs, in its rail's order. */
+export function tabsOfView(view: TabView): PermissionTab[] {
+  return PERMISSION_TABS.filter(t => t.view === view)
+}
+
+/** A column of one view's table, or the whole view: every box ticked, some, or none. */
+export type Tally = 'all' | 'some' | 'none'
+
+const tally = (boxes: readonly string[], ticks: ReadonlySet<string>): Tally => {
+  const on = boxes.filter(g => ticks.has(g)).length
+  return on === 0 ? 'none' : on === boxes.length ? 'all' : 'some'
+}
+
+/** The boxes one action has across a view's tabs (a tab without that box is left out). */
+function columnBoxes(view: TabView, action: TabAction): TabGrant[] {
+  return tabsOfView(view).filter(t => hasBox(t, action)).map(t => grantOf(t.id, action))
+}
+
+/** Every box of every tab of a view. */
+function viewBoxes(view: TabView): TabGrant[] {
+  return tabsOfView(view).flatMap(t => TAB_ACTIONS.filter(a => hasBox(t, a)).map(a => grantOf(t.id, a)))
+}
+
+/** The Select all row's box over one column: how many of its boxes are ticked, and how many there are. */
+export function columnTally(ticks: ReadonlySet<string>, view: TabView, action: TabAction): { tally: Tally; boxes: number } {
+  const boxes = columnBoxes(view, action)
+  return { tally: tally(boxes, ticks), boxes: boxes.length }
+}
+
+/** The Select all row's "All": every box of the view. */
+export function viewTally(ticks: ReadonlySet<string>, view: TabView): Tally {
+  return tally(viewBoxes(view), ticks)
+}
+
+/**
+ * Select all over one column (the user, 2026-10-11 — a row of boxes at the top
+ * of each view's table): that box ticked on every tab of the view that has it,
+ * each tab's View with it — or, when every one is already ticked, unticked on
+ * them all; unticking View takes each tab, as a row's own View does.
+ */
+export function toggleColumn(ticks: ReadonlySet<string>, view: TabView, action: TabAction): Set<TabGrant> {
+  const out = new Set(ticks as ReadonlySet<TabGrant>)
+  const tabs = tabsOfView(view).filter(t => hasBox(t, action))
+  const every = tabs.length > 0 && tabs.every(t => out.has(grantOf(t.id, action)))
+  for (const t of tabs) {
+    if (every) {
+      out.delete(grantOf(t.id, action))
+      if (action === 'view') for (const a of TAB_ACTIONS) out.delete(grantOf(t.id, a))
+    } else {
+      out.add(grantOf(t.id, action))
+      out.add(grantOf(t.id, 'view'))
+    }
+  }
+  return out
+}
+
+/** Select all's "All": every box of every tab in the view — or, all of them ticked, none. */
+export function toggleView(ticks: ReadonlySet<string>, view: TabView): Set<TabGrant> {
+  const out = new Set(ticks as ReadonlySet<TabGrant>)
+  const boxes = viewBoxes(view)
+  const every = boxes.every(g => out.has(g))
+  for (const g of boxes) {
+    if (every) out.delete(g)
+    else out.add(g)
+  }
+  return out
+}
+
+/**
+ * A new template's ticks (the user, 2026-10-11 — "+ New template" asks a name
+ * and which views it can see): View on every tab of the views picked, nothing
+ * else; Create, Edit and Approve are ticked afterwards in the table.
+ */
+export function viewTicks(views: Iterable<string>): Set<TabGrant> {
+  const picked = new Set(views)
+  return new Set(PERMISSION_TABS.filter(t => picked.has(t.view)).map(t => grantOf(t.id, 'view')))
+}
+
+export const isTabView = (value: unknown): value is TabView => TAB_VIEWS.some(v => v.id === value)
+
+/** Only the Revenue app among the views: its holders are Revenue app accounts (the database decides it from the ticks the same way). */
+export const appOnly = (views: Iterable<string>): boolean => {
+  const picked = [...new Set(views)]
+  return picked.length > 0 && picked.every(v => v === 'rev')
+}
+
+const HELD_SAYS: Readonly<Record<HeldCode, string>> = {
+  scope: 'Not open yet — its page opens only company-wide for now',
+  salary: 'Not open yet — it shows pay: tick Salary amounts',
+  treasury: 'Not open yet — it needs the View of a treasury tab too (Payments, Receipt, Fund IN …)',
+  principal: 'Does not open — only a full-access template opens it',
+  member: 'Does not open — a Revenue app account opens only the Revenue app',
+}
+
+/**
+ * The tabs whose View is ticked but whose page still would not open (2026-10-11
+ * — a note the user passed on: a template could show a tab ticked that its
+ * holders cannot reach). A View opens its page through the module keys the
+ * gates read, and a key stays shut while its gate holds it back — pay pages
+ * want Salary amounts, the ledgers a treasury tab's View, the Principal's own
+ * pages a full-access template, a Revenue app account only its app — or while
+ * the box that opens it is not ticked (Member Services opens with its Edit,
+ * Permissions with People Management's View). Each with what to do about it.
+ */
+export function heldTabs(
+  ticks: ReadonlySet<string>,
+  sensitive: readonly SensitiveField[],
+  baseRole: string,
+  cellKeys: readonly CellKey[],
+): Map<string, string> {
+  const grants = grantsOfTicks(ticks)
+  const opened = new Set(openedKeys(grants, sensitive, baseRole, cellKeys))
+  const seesSalary = sensitive.includes('salary')
+  const out = new Map<string, string>()
+  for (const t of PERMISSION_TABS) {
+    if (t.keys.length === 0 || t.cellGated || !ticks.has(grantOf(t.id, 'view')) || t.keys.some(k => opened.has(k))) continue
+    // A Principal-kind account opens the Revenue app as the Principal, with no member keys (lib/member/server.ts › session).
+    if (baseRole === 'principal' && t.keys.every(k => MEMBER_APP_KEYS.includes(k))) continue
+    // A Revenue app account opens no portal page whatever else is ticked — say that first.
+    if (baseRole === 'revenue_member' && t.view !== 'rev') {
+      out.set(t.id, HELD_SAYS.member)
+      continue
+    }
+    const rows = cellKeys.filter(k => t.keys.includes(k.legacyKey))
+    const code = rows.map(k => keyHeldCode(grants, seesSalary, baseRole, k)).find((c): c is HeldCode => c !== null)
+    out.set(t.id, code ? HELD_SAYS[code] : needsAnotherBox(t, rows))
+  }
+  return out
+}
+
+/** Nothing ticked grants a cell that opens the page: the box that would, on this tab first. */
+function needsAnotherBox(t: PermissionTab, rows: readonly CellKey[]): string {
+  // HR's and Finance's Audit Log show the changes of whatever else the template opens.
+  if (Object.keys(t.opens).length === 0) return 'Not open yet — it shows the changes of what its other boxes open, and none of them is ticked'
+  const cells = new Set(rows.map(k => `${k.functionKey}.${k.action}`))
+  const boxOf = (tab: PermissionTab) => TAB_ACTIONS.find(a => (tab.opens[a] ?? []).some(c => cells.has(c)))
+  const own = boxOf(t)
+  if (own) return `Not open yet — its page opens with its ${TAB_ACTION_LABEL[own]} box ticked too`
+  const other = PERMISSION_TABS.find(x => x.view === t.view && boxOf(x)) ?? PERMISSION_TABS.find(x => boxOf(x))
+  return other ? `Not open yet — its page opens with ${other.label} · ${TAB_ACTION_LABEL[boxOf(other)!]} ticked too` : 'Not open yet'
 }

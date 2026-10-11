@@ -203,10 +203,12 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     [onProducts, baseRoute, closed]);
   const home = landing(closed);
   const hiddenScreens = useMemo<Screen[]>(() => (["today", "insight", "quote", "arena"] as const).filter(page => !shows(closed, page)), [closed]);
-  const closedRows = useMemo<WorkKey[]>(() => (["income", "requests", "track", "team", "rooms", "docs"] as const).filter(page => !shows(closed, page)), [closed]);
+  const closedRows = useMemo<WorkKey[]>(() => (["income", "honours", "requests", "track", "team", "rooms", "docs"] as const).filter(page => !shows(closed, page)), [closed]);
   // My income closed (the user, 2026-10-11: "go with your recommendations for hidden amount"): Today's income card
   // keeps its place with the amount hidden, as the eye hides it — and no eye, nor Profile's Privacy, can show it.
   const incomeShut = !shows(closed, "income");
+  // My brand weeks closed: no chip, no page, and Today does not remind them to save the weeks.
+  const weeksOpen = shows(closed, "brandWeeks");
   const requestKinds = useMemo(() => (["claim", "replacement", "waiting"] as const).filter(kind => sends(closed, requestPageOf(kind))), [closed]);
   const quoteSends = sends(closed, "quote");
   useEffect(() => {
@@ -597,9 +599,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     today, first: me.first, title: me.title, rank: me.rank, income, incomeStatus, salary: todaySalary, hidden: hidden || incomeShut,
     department: principal && !viewed && !fixture ? membership?.name ?? "the department" : undefined,
     insight: now.block ?? undefined, kpi: now.kpi, arena: arenaToday, book: now.book, bands: data.bands, memos, requests, requestCode,
-    metricsLoading: now.loading && !now.block && !data.demo, arenaLoading: arenaCur.loading && !data.demo,
+    metricsLoading: now.loading && !now.block && !data.demo, arenaLoading: arenaCur.loading && !data.demo, brandWeeks: weeksOpen,
   }, champRank), [today, me, income, incomeStatus, todaySalary, hidden, incomeShut, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book,
-    now.loading, arenaCur.loading, data.demo, data.bands, memos, requests, champRank]);
+    now.loading, arenaCur.loading, data.demo, data.bands, memos, requests, champRank, weeksOpen]);
 
   // ── Insight: Month / Quarter / Year, opening on the current month ──
   const [insKind, setInsKind] = useState<PeriodKind>("monthly");
@@ -1200,8 +1202,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else {
       page = <ProfileMain vm={docs.unseen ? { ...profileVM, badges: { ...profileVM.badges, docs: String(docs.unseen) } } : profileVM} hidden={hidden} crm={crm} closedRows={closedRows} push={!principal && !data.demo} actions={{
         open: (key: WorkKey) => goScreen("account", { pf: key }),
-        scheme: () => setSchemeOpen(true),
-        brandWeeks: () => goScreen("account", { pf: "brandWeeks" }),
+        scheme: shows(closed, "scheme") ? () => setSchemeOpen(true) : undefined,
+        brandWeeks: shows(closed, "brandWeeks") ? () => goScreen("account", { pf: "brandWeeks" }) : undefined,
         toggleHide: incomeShut ? undefined : () => setHidden(!hidden),
         signOut,
         viewAs: principal && !viewed ? () => setVaOpen(true) : undefined,
@@ -1311,7 +1313,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
             </>
           )}
           {route.pf === "memos" && <MemoSheet open={memoPick !== null} memo={memoPickVM} busy={memoBusy} readOnly={readOnlyView} error={memoError} onAck={() => void ackMemo()} onClose={() => setMemoPick(null)} />}
-          {!route.pf && <SchemeSheet open={schemeOpen} vm={schemeView} onClose={() => setSchemeOpen(false)} />}
+          {!route.pf && shows(closed, "scheme") && <SchemeSheet open={schemeOpen} vm={schemeView} onClose={() => setSchemeOpen(false)} />}
         </>
       )}
       {principal && <ViewAsPage open={vaOpen} query={vaQuery} groups={vaGroups} onQuery={setVaQuery} onPick={pickVa} onClose={() => setVaOpen(false)} />}
