@@ -346,11 +346,12 @@ export function chatVM(ctx: SalesCtx) {
   const tpls = ui.templates;
   const tplList = c.channel === "messenger"
     ? [{ name: "Messenger has no templates", text: "After 7 days Messenger allows no message from the Page. Call the customer instead.", send: () => patch({ tpl: false }) }]
-    : tpls == null ? [{ name: "Loading…", text: "Reading the approved templates from WhatsApp.", send: () => {} }]
-      : !tpls.length ? [{ name: "No approved templates yet", text: "Create one in WhatsApp Manager › Message templates. It shows here once Meta approves it.", send: () => patch({ tpl: false }) }]
+    : tpls == null ? [{ name: "Loading…", text: "Reading the templates you may send.", send: () => {} }]
+      // rev 1011: the Principal or Director switches templates on in the Control panel (Profile › Cold lead templates).
+      : !tpls.length ? [{ name: "No templates switched on", text: "Your Principal or Director switches approved templates on for salespeople. They show here once they do.", send: () => patch({ tpl: false }) }]
         : tpls.map(t => {
           const params = Array.from({ length: t.params }, (_, i) => (i === 0 ? first : ""));
-          return { name: t.name.replace(/_/g, " ").replace(/^\w/, x => x.toUpperCase()), text: t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] || "…"),
+          return { name: t.label ?? t.name.replace(/_/g, " ").replace(/^\w/, x => x.toUpperCase()), text: t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] || "…"),
             send: async () => { if (await oneAtATime(`send:${c.id}`, () => act.sendTemplate(c.id, t, params))) { patch({ tpl: false }); scrollDown(); } } };
         });
   const sendDraft = async () => {

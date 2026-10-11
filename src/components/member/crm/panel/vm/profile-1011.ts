@@ -4,14 +4,14 @@
  * the prototype (`fts`, `tp`).
  *
  * The full-time switch saves through crm_set_full_time, which also clears a part-timer's ticked days (proposal D,
- * mig 20261011130000). WAITING FOR THE DATABASE (proposal E): the templates need their own table and Meta's review;
- * until then every template write says so instead of pretending to save.
+ * mig 20261011130000). Templates live in crm_templates (proposal E, mig 20261011140000): a WhatsApp one goes to Meta's
+ * review (submitCrmTemplate) and comes back Approved / Rejected (refreshCrmTemplates, on opening the page); Messenger
+ * ones stay drafts — not connected.
  */
 import type { ChangeEvent, MouseEvent } from "react";
 import { jobTitle } from "../../shared/people";
 import { ini, stop, type PanelCtx } from "./common";
 
-const NOT_YET = "Not connected yet — waiting for the database change";
 
 export function memberWorkTypeVM(ctx: PanelCtx) {
   const { ui, patch, teams } = ctx;
@@ -30,37 +30,42 @@ export function memberWorkTypeVM(ctx: PanelCtx) {
   };
 }
 
-type Tpl = { id: string; name: string; ch: "whatsapp" | "messenger"; st: "approved" | "review" | "rejected" | "draft"; body: string; on?: boolean };
 const ST = { approved: ["Approved", "#E4F1E8", "#387557"], review: ["In review", "#FFF3D6", "#A46312"], rejected: ["Rejected", "#FBE4DE", "#A3371A"], draft: ["Draft", "#F2EDE9", "#806B60"] } as const;
 
 export function templatesVM(ctx: PanelCtx) {
-  const { ui, patch } = ctx;
-  const tpls: Tpl[] = [];
+  const { ui, patch, act } = ctx;
+  const tpls = ctx.data.templates ?? [];
   const ed = ui.tplEd, putE = (p: Partial<NonNullable<typeof ed>>) => { if (ed) patch({ tplEd: { ...ed, ...p } }); };
   const okE = !!ed && !!ed.name.trim() && !!ed.body.trim();
-  const nApp = tpls.filter(t => t.st === "approved" && t.on !== false).length, tplOn = nApp > 0;
+  // Save draft / Submit for review: saved first; the toast once it is.
+  const saveE = (submit: boolean) => {
+    if (!ed || !okE) return;
+    void act.saveTemplate({ id: ed.id, name: ed.name, ch: ed.ch, body: ed.body }, submit).then(t => {
+      if (t) patch({ tplEd: null, toast: submit ? t.name + " sent for review" : t.name + " saved as draft" });
+    });
+  };
   return {
-    open: !!ui.tplOpen && ui.tab === "profile", openPage: () => patch({ tplOpen: true }), close: () => patch({ tplOpen: false, tplEd: null }), stop,
-    rowSub: tplOn ? "On · " + nApp + " approved" : "Off for salespeople", rowFg: tplOn ? "#387557" : "#806B60",
-    toggle: () => patch({ toast: NOT_YET }),
-    swBg: tplOn ? "#387557" : "#D9C7BA", swX: tplOn ? "21px" : "3px", swBd: tplOn ? "#B9D8C4" : "#EBDDD2",
-    swSub: tplOn ? "On. Salespeople see the approved templates in a cold lead's chat." : "Off. Set up and approve templates now; turn this on when you're ready.",
+    // Opening the page brings in Meta's review of what was submitted (it arrives with the next read).
+    open: !!ui.tplOpen && ui.tab === "profile", openPage: () => { patch({ tplOpen: true }); void act.refreshTemplates(); }, close: () => patch({ tplOpen: false, tplEd: null }), stop,
     add: () => patch({ tplEd: { id: null, name: "", ch: "whatsapp", body: "" } }),
     list: tpls.map(t => {
-      const app = t.st === "approved", on = app && t.on !== false;
+      const app = t.st === "approved", on = app && t.on;
       return { swBg: on ? "#387557" : "#D9C7BA", swX: on ? "19px" : "3px", swOp: app ? 1 : 0.45, swCur: app ? "pointer" : "not-allowed",
         swTitle: app ? (on ? "Turn off" : "Turn on") : "Can be turned on once approved",
-        toggle: (e: MouseEvent<HTMLElement>) => { e.stopPropagation(); if (app) patch({ toast: NOT_YET }); },
+        toggle: (e: MouseEvent<HTMLElement>) => {
+          e.stopPropagation();
+          if (app) void act.templateOn(t.id, !on).then(ok => { if (ok) patch({ toast: t.name + (on ? " off" : " on") + " for salespeople" }); });
+        },
         name: t.name, body: t.body, channel: t.ch === "messenger" ? "Messenger" : "WhatsApp", chFg: t.ch === "messenger" ? "#2F6FB5" : "#1F7A4D",
         status: ST[t.st][0], stBg: ST[t.st][1], stFg: ST[t.st][2], edit: () => patch({ tplEd: { id: t.id, name: t.name, ch: t.ch, body: t.body } }) };
     }),
     edOpen: !!ed, edClose: () => patch({ tplEd: null }), edTitle: ed?.id ? "Edit template" : "New template", edCanDel: !!ed?.id,
-    edDel: () => patch({ toast: NOT_YET }),
+    edDel: () => { if (ed?.id) void act.deleteTemplate(ed.id).then(ok => { if (ok) patch({ tplEd: null }); }); },
     edName: ed?.name ?? "", edSetName: (e: ChangeEvent<HTMLInputElement>) => putE({ name: e.target.value }),
     edBody: ed?.body ?? "", edSetBody: (e: ChangeEvent<HTMLTextAreaElement>) => putE({ body: e.target.value }), edPh: "Hi {name}, …",
     edInsName: () => { const b = ed?.body ?? ""; putE({ body: b + (b && !/\s$/.test(b) ? " " : "") + "{name}" }); },
     edChs: ([["whatsapp", "WhatsApp"], ["messenger", "Messenger"]] as const).map(([k, label]) => ({ label, pick: () => putE({ ch: k }),
       bg: ed?.ch === k ? "#fff" : "transparent", fg: ed?.ch === k ? "#3F2B22" : "#806B60", w: ed?.ch === k ? 650 : 500, sh: ed?.ch === k ? "0 1px 3px rgba(63,43,34,.12)" : "none" })),
-    edOkBg: okE ? "#BD4A19" : "#D9C7BA", edDraft: () => { if (okE) patch({ toast: NOT_YET }); }, edSubmit: () => { if (okE) patch({ toast: NOT_YET }); },
+    edOkBg: okE ? "#BD4A19" : "#D9C7BA", edDraft: () => saveE(false), edSubmit: () => saveE(true),
   };
 }

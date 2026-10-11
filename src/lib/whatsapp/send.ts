@@ -153,7 +153,8 @@ export async function uploadWhatsAppMedia(
   return id ? { ok: true, id } : { ok: false, error: "WhatsApp did not take the file. Try again." };
 }
 
-export interface WaTemplate { name: string; language: string; category: string; text: string; params: number }
+/** `name` is Meta's; `label` the CRM's own name for it (rev 1011's templates), shown instead when there is one. */
+export interface WaTemplate { name: string; label?: string; language: string; category: string; text: string; params: number }
 
 /** The approved templates of the WhatsApp Business Account, with their body text. */
 export async function fetchWhatsAppTemplates(
@@ -184,3 +185,70 @@ export function templatesFrom(rows: { name: string; language: string; status: st
 
 /** A template's body with its variables filled — what the customer reads, kept in the chat. */
 export const fillTemplate = (text: string, params: string[]) => text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] ?? "");
+
+/* ── Cold lead templates (rev 1011): the CRM writes them, Meta reviews them ── */
+
+/** A CRM template's words for Meta: the customer's first name, written {name}, is the body's one variable {{1}}. */
+export const metaTemplateBody = (body: string) => body.trim().replace(/\{name\}/g, "{{1}}");
+
+/**
+ * The name Meta keeps a CRM template by: lowercase letters, digits and underscores, unique in the account — the CRM's
+ * name and a short tag, so a re-worded template goes to Meta as a new one (a name Meta has reviewed cannot be reused).
+ */
+export function metaTemplateName(name: string, tag: string): string {
+  const slug = name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "template";
+  return `crm_${slug}_${tag.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8)}`;
+}
+
+/** The request that submits a template for review (WhatsApp Business template API); a {{1}} carries an example. */
+export function templateSubmitRequest(opts: { name: string; language: string; category: string; body: string }) {
+  const text = metaTemplateBody(opts.body);
+  return {
+    name: opts.name, language: opts.language, category: opts.category,
+    components: [{ type: "BODY", text, ...(text.includes("{{1}}") ? { example: { body_text: [["Sarah"]] } } : {}) }],
+  };
+}
+
+export type TemplateStatus = "review" | "approved" | "rejected";
+export const templateStatusOf = (meta: string | undefined): TemplateStatus =>
+  meta === "APPROVED" ? "approved" : meta === "REJECTED" || meta === "DISABLED" ? "rejected" : "review";
+
+/** Submit a template for Meta's review; answers Meta's id and its first status (Meta may approve at once). */
+export async function submitWhatsAppTemplate(
+  opts: { wabaId: string; token: string; name: string; language: string; category: string; body: string },
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ ok: true; id: string; status: TemplateStatus } | { ok: false; error: string }> {
+  let response: Response;
+  try {
+    response = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(opts.wabaId)}/message_templates`, {
+      method: "POST", headers: { Authorization: `Bearer ${opts.token}`, "Content-Type": "application/json" }, cache: "no-store",
+      body: JSON.stringify(templateSubmitRequest(opts)),
+    });
+  } catch {
+    return { ok: false, error: "Could not reach WhatsApp to submit the template." };
+  }
+  const payload = (await response.json().catch(() => null)) as { id?: string; status?: string; error?: { message?: string; error_user_msg?: string } } | null;
+  if (!response.ok || !payload?.id) {
+    const said = payload?.error?.error_user_msg?.trim();
+    return { ok: false, error: said ? `WhatsApp refused the template: ${said.slice(0, 200)}` : sendError(response.status, payload).replace("the message", "the template") };
+  }
+  return { ok: true, id: payload.id, status: templateStatusOf(payload.status) };
+}
+
+/** Every template of the account with its review status — what refreshes the CRM's copies (by Meta's name). */
+export async function fetchWhatsAppTemplateStatuses(
+  opts: { wabaId: string; token: string },
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ ok: true; rows: { name: string; status: string; reason: string | null }[] } | { ok: false; error: string }> {
+  let response: Response;
+  try {
+    response = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(opts.wabaId)}/message_templates?fields=name,status,rejected_reason&limit=200`, {
+      headers: { Authorization: `Bearer ${opts.token}` }, cache: "no-store",
+    });
+  } catch {
+    return { ok: false, error: "Could not reach WhatsApp for the templates." };
+  }
+  const payload = (await response.json().catch(() => null)) as { data?: { name: string; status: string; rejected_reason?: string }[] } | null;
+  if (!response.ok) return { ok: false, error: sendError(response.status, payload) };
+  return { ok: true, rows: (payload?.data ?? []).map(t => ({ name: t.name, status: t.status, reason: t.rejected_reason && t.rejected_reason !== "NONE" ? t.rejected_reason : null })) };
+}

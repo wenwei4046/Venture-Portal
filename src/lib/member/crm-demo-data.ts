@@ -29,5 +29,11 @@ export function crmDemoData(you = "You", viewer = "a1"): CrmData {
     rooms: demoShowrooms.map((r, i) => ({ id: r.id, name: r.name, active: true, address: i === 0 ? "Jalan Ampang, Kuala Lumpur" : "", slots: ["11:00", "13:00", "15:00", "17:00", "19:00"], cap: 2, weekly: [], blocks: [] })),
     prefs: {}, hiddenMessages: [], labels: [], customerLabels: {}, quickReplies: [], autoReplies: DEFAULT_AUTO_REPLY_SET,
     invites: [], shares: [], events: [], notifsSeenAt: null, notifRead: [], adRules: [], ftRules: [],
+    // The rev 1011 prototype's three, all Off (the default).
+    templates: [
+      { id: "w1", name: "Follow up visit", ch: "whatsapp", st: "approved", body: "Hi {name}, this is HOUZS. Would you like to book a showroom visit this week? Reply here and we'll find a time.", on: false, metaName: "crm_follow_up_visit_w1", language: "en", reason: null },
+      { id: "w2", name: "October Fair reminder", ch: "whatsapp", st: "review", body: "Hi {name}, our October Fair ends this Sunday with up to 30% off mattresses. Want us to hold a slot for you?", on: false, metaName: "crm_october_fair_reminder_w2", language: "en", reason: null },
+      { id: "m1", name: "Still interested?", ch: "messenger", st: "draft", body: "Hi {name}, just checking if you're still looking for furniture. We're happy to help.", on: false, metaName: null, language: "en", reason: null },
+    ],
   };
 }
