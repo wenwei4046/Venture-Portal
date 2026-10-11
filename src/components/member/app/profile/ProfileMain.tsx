@@ -1,6 +1,7 @@
 "use client";
 
 import { ICON, Svg } from "../icons";
+import { MODULES, type ModuleId } from "../shell/Chrome";
 import InstallRow from "./InstallRow";
 import PushRow from "./PushRow";
 import type { ProfileMainVM, WorkKey } from "./profile-vm";
@@ -35,14 +36,28 @@ export interface ProfileMainActions {
 
 const NO_ROWS: readonly WorkKey[] = [];
 
+/** Switch view's rows (2026-10-11, one app): where each view opens on a phone, in the HR app's More's order. */
+const VIEWS: { id: ModuleId; where: string }[] = [
+  { id: "principal", where: "The portal" },
+  { id: "finance", where: "The portal" },
+  { id: "hr", where: "The HR app" },
+  { id: "revenue", where: "The Revenue app" },
+];
+
 /**
  * Profile — the peach card, Your workspace, Privacy and Sign out (lines 1132–1187).
  * `closedRows`: the workspace's pages their ticks close (2026-10-11) — not listed.
  */
-export default function ProfileMain({ vm, hidden, actions, crm = true, closedRows = NO_ROWS, push = false }: {
+export default function ProfileMain({ vm, hidden, actions, crm = true, closedRows = NO_ROWS, push = false, views = null }: {
   vm: ProfileMainVM; hidden: boolean; actions: ProfileMainActions; crm?: boolean; closedRows?: readonly WorkKey[];
   /** This phone's notifications row (2026-10-11): their own app only — never while the Principal views a member. */
   push?: boolean;
+  /**
+   * Switch view (2026-10-11 — the user: "do a switch button for me to switch to hr and other view, in revenue view
+   * don't have that button"): the app's other views for an account that may switch them, on a phone — the desktop
+   * has the sidebar's module menu. Not while viewing a member.
+   */
+  views?: { current: ModuleId; pick: (id: ModuleId) => void } | null;
 }) {
   return (
     <div className={s.main}>
@@ -83,6 +98,29 @@ export default function ProfileMain({ vm, hidden, actions, crm = true, closedRow
         </div>
       )}
       <div className={s.body}>
+        {views ? (
+          <section className={s.views} aria-label="Switch view">
+            <h2 className={s.h2}>Switch view</h2>
+            {VIEWS.map(({ id, where }) => {
+              const m = MODULES.find(x => x.id === id);
+              if (!m) return null;
+              const here = id === views.current;
+              const face = (
+                <>
+                  <span className={`${s.workIcon} ${s.toneView}`}><span className={`${s.viewDot} ${m.dot}`} /></span>
+                  <span className={s.workText}>
+                    <span className={s.workLabel}>{m.label}</span>
+                    <span className={s.workSub}>{here ? "You are here" : where}</span>
+                  </span>
+                  {here ? <span /> : <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />}
+                </>
+              );
+              return here
+                ? <div key={id} className={s.workRow} aria-current="true">{face}</div>
+                : <button key={id} className={s.workRow} onClick={() => views.pick(id)}>{face}</button>;
+            })}
+          </section>
+        ) : null}
         <section className={s.work}>
           <h2 className={s.h2}>Your workspace</h2>
           {/* My leads & appointments: only for an account the CRM is open to (CRM · View, 2026-10-10). */}

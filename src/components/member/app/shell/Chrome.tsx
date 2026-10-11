@@ -118,9 +118,9 @@ const DESK_NAV: { id: Screen; label: string; d: string }[] = [
   { id: "account", label: "Profile", d: ICON.user },
 ];
 
-/** The portal's modules, in the switcher's order, and the dot each wears. */
+/** The portal's modules, in the switcher's order, and the dot each wears (Profile's Switch view on a phone reads them too). */
 export type ModuleId = "finance" | "principal" | "hr" | "revenue";
-const MODULES: { id: ModuleId; label: string; dot: string }[] = [
+export const MODULES: { id: ModuleId; label: string; dot: string }[] = [
   { id: "finance", label: "Finance", dot: s.moduleDotFinance },
   { id: "principal", label: "Principal", dot: s.moduleDotPrincipal },
   { id: "hr", label: "HR", dot: s.moduleDotHr },

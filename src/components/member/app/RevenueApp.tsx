@@ -1207,7 +1207,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         toggleHide: incomeShut ? undefined : () => setHidden(!hidden),
         signOut,
         viewAs: principal && !viewed ? () => setVaOpen(true) : undefined,
-      }} />;
+      }} views={live && !desk && principal && !viewed ? { current: "revenue", pick: pickModule } : null} />;
     }
   } else {
     page = <Pending screen={route.screen} />;
