@@ -10,7 +10,7 @@ import type { ChangeEvent, FocusEvent } from "react";
 import type { CrmAdRule } from "@/lib/member/crm-data";
 import type { AdDraft, FtDraft } from "../ui";
 import { waitingByLevel } from "./overlays";
-import { first, ini, periodRange, inRange, type PanelCtx, type Team } from "./common";
+import { evenShare, first, ini, periodRange, inRange, type PanelCtx, type Team } from "./common";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], ALL7 = [0, 1, 2, 3, 4, 5, 6];
 const ROLE: Record<string, string> = { stl: "Senior TL", tl: "Team Lead", ta: "Team Assistant", rs: "Revenue Specialist", hod: "HOD" };
@@ -124,7 +124,17 @@ export function assignVM(ctx: PanelCtx) {
       mode: r?.mode ?? "unset", split: r && Object.keys(r.split).length ? { ...r.split } : even, pm: r?.pm ?? "cnt", pp: { ...(r?.pp ?? {}) }, lockT: [], lockP: [] };
   };
   const ads = adIds.map(draftOf).sort((a, b) => b.leads - a.leads || a.label.localeCompare(b.label));
-  const saveAd = (d: AdDraft) => act.saveAdRule(d.id, d.label, { mode: d.mode === "unset" ? null : d.mode, split: d.split, pm: d.pm, pp: d.pp });
+  // By team from the card (rev 1011 §6.6): each team keeps its inside mode; a team never set is By % with an even split.
+  const saveAd = (d: AdDraft) => {
+    if (d.mode !== "split" && d.mode !== "people") return act.saveAdRule(d.id, d.label, { mode: d.mode === "unset" ? null : d.mode, split: d.split, pm: d.pm, pp: d.pp });
+    const tm = { ...(ruleOf(d.id)?.tm ?? {}) }, pp = { ...d.pp };
+    teams.forEach(t => {
+      if (!((d.split[t.id] ?? 0) > 0)) return;
+      const m = (tm[t.id] ??= "pct");
+      if (m === "pct" && t.people.reduce((s, p) => s + (pp[p.id] ?? 0), 0) !== 100) { const es = evenShare(t.people.length || 1); t.people.forEach((p, k) => { pp[p.id] = es(k); }); }
+    });
+    return act.saveAdRule(d.id, d.label, { mode: "split", split: d.split, pm: "pct", pp, tm });
+  };
   const adRows = ads.map(a => ({
     ...mkRow(teams, a, p => void saveAd({ ...a, ...p })),
     edit: () => patch({ adEd: { ...a, split: { ...a.split }, pp: { ...a.pp } } }),

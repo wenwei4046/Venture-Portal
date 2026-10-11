@@ -12,8 +12,11 @@ import type { Dispatch, SetStateAction } from "react";
 
 export interface PanelActions extends SalesActions {
   sendTo(customerId: string, staffId: string | null): Promise<boolean>;
-  saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | "people" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<boolean>;
+  /** Saved: how many leads waiting Over the limit for this ad the database dealt at once (rev 1011 §6.6); false: not saved. */
+  saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { dealt: number }>;
   saveFtRule(tlId: string, mode: "cnt" | "pct" | "turns", days: number[], vals: Record<string, Record<string, number>>): Promise<boolean>;
+  /** Member work type (rev 1011): full time or part time; part time clears their ticked Full time days. */
+  setFullTime(staffId: string, on: boolean): Promise<boolean>;
   readNotifs(keys: string[], all?: boolean): void;
   saveRoom(room: Omit<CrmRoom, "id"> & { id: string | null }): Promise<boolean>;
   removeRoom(id: string): Promise<boolean>;
@@ -35,17 +38,30 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       return true;
     },
     async saveAdRule(ad, label, rule) {
-      if (!(await write("crm_save_ad_assign", { p_ad: ad, p_label: label, p_mode: rule.mode, p_team_split: rule.split, p_people_mode: rule.pm, p_people: rule.pp }))) return false;
+      const tm = rule.mode === "split" ? rule.tm ?? {} : {};
+      const r = await write("crm_save_ad_assign", { p_ad: ad, p_label: label, p_mode: rule.mode, p_team_split: rule.split, p_people_mode: rule.pm, p_people: rule.pp, p_team_modes: tm });
+      if (!r) return false;
       setData(d => ({
         ...d,
         adRules: [...d.adRules.filter(r => r.adId !== ad),
-          ...(rule.mode ? [{ adId: ad, label, mode: rule.mode, split: rule.split, pm: rule.pm, pp: rule.pp, startedAt: d.adRules.find(r => r.adId === ad)?.startedAt ?? new Date().toISOString() }] : [])],
+          ...(rule.mode ? [{ adId: ad, label, mode: rule.mode, split: rule.split, pm: rule.pm, pp: rule.pp, tm, startedAt: d.adRules.find(r => r.adId === ad)?.startedAt ?? new Date().toISOString() }] : [])],
       }));
-      return true;
+      // The leads it dealt arrive with the next read (every 5 s); the toast says how many.
+      return { dealt: Number((r.data as { dealt?: number } | null)?.dealt ?? 0) };
     },
     async saveFtRule(tlId, mode, days, vals) {
       if (!(await write("crm_save_fulltime", { p_tl: tlId, p_mode: mode, p_days: days, p_vals: vals }))) return false;
       setData(d => ({ ...d, ftRules: [...d.ftRules.filter(r => r.tlId !== tlId), { tlId, mode, days, vals }] }));
+      return true;
+    },
+    async setFullTime(staffId, on) {
+      if (!(await write("crm_set_full_time", { p_staff: staffId, p_full_time: on }))) return false;
+      setData(d => ({
+        ...d,
+        people: d.people.map(p => (p.id === staffId ? { ...p, fullTime: on } : p)),
+        // Part time leaves Full time lead allocation: the database cleared their ticked days; so does the screen.
+        ftRules: on ? d.ftRules : d.ftRules.map(r => { const { [staffId]: _gone, ...vals } = r.vals; return { ...r, vals }; }),
+      }));
       return true;
     },
     readNotifs(keys, all = false) {

@@ -3,7 +3,7 @@ import type { CrmAppointment, CrmLead, CrmMessage } from "./crm";
 import {
   allDownlines, assignEnquiry, canEditTeamRules, leadsBetween, leadsPeople, periodRange, withoutTeam, canReassign, canReply, durationLabel, emptyCounts, firstReplyMinutes, isUnassigned, isWeekendEnquiry, leadsHeld, pickInTeam,
   memberStats, overLimit, pickByShare, pickTeam, setsFullTime, teamHandlers, teamOf, visibleLeads, visibleMembers, visibleTeams,
-  type CrmAssignConfig, type CrmMember,
+  dealEnquiry, afterDeal, officeWeekday, type CrmAssignConfig, type CrmDealCounts, type CrmDealFullTime, type CrmDealRule, type CrmMember,
 } from "./crm-team";
 
 // Boss → HOD → (Senior TL vacant) → TL A / TL B → TA → RS
@@ -309,5 +309,70 @@ describe("the CRM adapts to the company chart, never the other way (user 2026-10
 
   it("names the TAs and RS no TL leads, so the Boss and HOD can fix the chart", () => {
     expect(names(withoutTeam(chart))).toEqual(["loneTa", "loneRs"]);
+  });
+});
+
+// rev 1011's dealer — the same cases as tests/member-sql/validate-crm-control.mjs (Team A: tla taa a1 a2 a3; Team B: tlb tab b1).
+describe("the dealer, rev 1011 (twin of crm_assign_contact)", () => {
+  const zero = (): CrmDealCounts => ({ given: {}, team: {}, held: {}, lastAt: {} });
+  const deal = (n: number, ad: string | null, rule: CrmDealRule | undefined, ft: Record<string, CrmDealFullTime> = {}, start = zero()) => {
+    let counts = start;
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const at = new Date(Date.UTC(2026, 9, 6, 3, i)); // Tue 6 Oct 2026, 11:0i in Kuala Lumpur
+      const d = dealEnquiry(ad, at, rule, ft, counts, members);
+      counts = afterDeal(counts, d, at);
+      out.push(d);
+    }
+    return { out, counts };
+  };
+
+  it("counts the weekday in Kuala Lumpur, Monday first", () => {
+    expect(officeWeekday(new Date(Date.UTC(2026, 9, 5, 16, 30)))).toBe(1); // Mon 16:30 UTC is Tue 00:30 in Kuala Lumpur
+  });
+
+  it("an enquiry from no ad waits in Organic Leads; an ad nobody set goes evenly across the teams", () => {
+    expect(dealEnquiry(null, tuesday, undefined, {}, zero(), members)).toEqual({ teamId: null, memberId: null, by: "organic" });
+    const { out } = deal(4, "AD-NONE", undefined);
+    expect(out.map(d => d.teamId)).toEqual(["tla", "tlb", "tla", "tlb"]);
+    expect(out.every(d => d.memberId && d.by === "default_even")).toBe(true);
+  });
+
+  it("Evenly: everybody in the teams in turn", () => {
+    const { out } = deal(8, "AD-E", { mode: "even", split: {}, people: {} });
+    expect(out.map(d => d.memberId).sort()).toEqual(["a1", "a2", "a3", "b1", "taa", "tab", "tla", "tlb"]);
+  });
+
+  it("By team 50/50 with Evenly inside: two each", () => {
+    const { out } = deal(4, "AD-S", { mode: "split", split: { tla: 50, tlb: 50 }, people: {}, teamModes: { tla: "even", tlb: "even" } });
+    expect(out.map(d => d.teamId).sort()).toEqual(["tla", "tla", "tlb", "tlb"]);
+  });
+
+  it("By max: a full team holds the lead in that team, never another", () => {
+    const rule: CrmDealRule = { mode: "split", split: { tla: 50, tlb: 50 }, people: { a1: 1, b1: 1 }, teamModes: { tla: "cnt", tlb: "cnt" } };
+    const { out, counts } = deal(4, "AD-P", rule);
+    expect(out.map(d => [d.memberId, d.teamId, !!d.held])).toEqual([["a1", "tla", false], ["b1", "tlb", false], [null, "tla", true], [null, "tlb", true]]);
+    expect(counts.held).toEqual({ tla: 1, tlb: 1 });
+  });
+
+  it("By % inside a team: 75 / 25", () => {
+    const { out } = deal(4, "AD-Q", { mode: "split", split: { tla: 100 }, people: { a2: 75, a1: 25 }, teamModes: { tla: "pct" } });
+    expect(out.filter(d => d.memberId === "a2")).toHaveLength(3);
+  });
+
+  it("By % with nobody given a value starts even", () => {
+    const { out } = deal(5, "AD-Q0", { mode: "split", split: { tla: 100 }, people: {} });
+    expect(out.map(d => d.memberId).sort()).toEqual(["a1", "a2", "a3", "taa", "tla"]);
+  });
+
+  it("Full time days: the ticked full-time people take turns, past a By max, nothing held", () => {
+    const day = officeWeekday(tuesday);
+    const ft = { tla: { days: [day], ticked: { a1: { [day]: 1 }, a3: { [day]: 1 }, a2: { [day]: 1 } } } }; // a2 is not full time
+    const { out } = deal(4, "AD-F", { mode: "split", split: { tla: 100 }, people: { tla: 1 }, teamModes: { tla: "cnt" } }, ft);
+    expect(out.map(d => d.memberId)).toEqual(["a1", "a3", "a1", "a3"]);
+    expect(out.every(d => d.by === "full_time" && !d.held)).toBe(true);
+    // Not a chosen day: the team's own rule.
+    expect(dealEnquiry("AD-F", tuesday, { mode: "split", split: { tla: 100 }, people: { tla: 1 }, teamModes: { tla: "cnt" } },
+      { tla: { days: [(day + 1) % 7], ticked: { a1: { [(day + 1) % 7]: 1 } } } }, zero(), members).memberId).toBe("tla");
   });
 });

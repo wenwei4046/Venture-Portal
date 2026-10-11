@@ -72,48 +72,79 @@ const as = async (who, sql, params = []) => {
 const refused = async (who, sql, params, pattern, what) => { await assert.rejects(() => as(who, sql, params), pattern, what); checks++ }
 const name = staff => ({ [S('ann')]: 'ann', [S('amir')]: 'amir', [S('ben')]: 'ben', [S('tla')]: 'tla', [S('tlb')]: 'tlb', [S('hod')]: 'hod' })[staff] ?? staff
 
-// 1. No rule → Organic Leads.
-check(await arrive('AD-NONE'), { assigned_to: null, team_id: null }, 'an ad nobody set waits in Organic Leads')
-check(await arrive(null), { assigned_to: null, team_id: null }, 'an enquiry from no ad waits in Organic Leads')
+// 1. rev 1011 §6.4: an ad nobody set is dealt evenly across the teams; only an enquiry from no ad waits in Organic Leads.
+{
+  const a = await arrive('AD-NONE'), b = await arrive('AD-NONE')
+  check([name(a.team_id), name(b.team_id)].sort(), ['tla', 'tlb'], 'an ad nobody set: one enquiry to each team')
+  check(!!a.assigned_to && !!b.assigned_to, true, '…each given to somebody in it')
+  check(await arrive(null), { assigned_to: null, team_id: null }, 'an enquiry from no ad waits in Organic Leads')
+}
 
 // 2. Evenly: everyone in the teams in turn.
-await refused('ann', `select public.crm_save_ad_assign('AD-E', 'Even ad', 'even', '{}', 'cnt', '{}')`, [], /may not/, 'a salesperson may not assign ads')
-await as('boss', `select public.crm_save_ad_assign('AD-E', 'Even ad', 'even', '{}', 'cnt', '{}')`)
+await refused('ann', `select public.crm_save_ad_assign('AD-E', 'Even ad', 'even', '{}', 'cnt', '{}', '{}')`, [], /may not/, 'a salesperson may not assign ads')
+await refused('boss', `select public.crm_save_ad_assign('AD-E', 'Even ad', 'even', '{}', 'cnt', '{}')`, [], /permission denied/, 'the old six-argument writer is nobody’s')
+await as('boss', `select public.crm_save_ad_assign('AD-E', 'Even ad', 'even', '{}', 'cnt', '{}', '{}')`)
 const even = []
 for (let i = 0; i < 5; i++) even.push(name((await arrive('AD-E')).assigned_to))
 check([...even].sort(), ['amir', 'ann', 'ben', 'tla', 'tlb'], 'Evenly: five leads, one each to the five people in the teams')
+await refused('boss', `select public.crm_save_ad_assign('AD-X', 'People', 'people', '{}', 'cnt', '{}', '{}')`, [], /Unknown assignment/, 'By people is merged into By team')
 
-// 3. By team %: 100% to Team B; inside it, everyone in turn.
-await refused('boss', `select public.crm_save_ad_assign('AD-S', 'Split', 'split', $1, 'cnt', '{}')`, [JSON.stringify({ [S('tla')]: 60, [S('tlb')]: 30 })], /add up to 100/, 'team % must add up to 100')
-await as('boss', `select public.crm_save_ad_assign('AD-S', 'Split', 'split', $1, 'cnt', '{}')`, [JSON.stringify({ [S('tla')]: 50, [S('tlb')]: 50 })])
+// 3. By team %: 50 / 50; inside each, Evenly.
+const half = JSON.stringify({ [S('tla')]: 50, [S('tlb')]: 50 }), evenIn = JSON.stringify({ [S('tla')]: 'even', [S('tlb')]: 'even' })
+await refused('boss', `select public.crm_save_ad_assign('AD-S', 'Split', 'split', $1, 'cnt', '{}', $2)`, [JSON.stringify({ [S('tla')]: 60, [S('tlb')]: 30 }), evenIn], /add up to 100/, 'team % must add up to 100')
+await refused('boss', `select public.crm_save_ad_assign('AD-S', 'Split', 'split', $1, 'cnt', '{}', '{}')`, [half], /By % team must add up/, 'inside a team By % is the default, and must add up to 100')
+await as('boss', `select public.crm_save_ad_assign('AD-S', 'Split', 'split', $1, 'cnt', '{}', $2)`, [half, evenIn])
 const split = []
 for (let i = 0; i < 4; i++) split.push(name((await arrive('AD-S')).team_id))
 check(split.sort(), ['tla', 'tla', 'tlb', 'tlb'], 'By team 50/50: two leads each')
 
-// 4. By people, maximum: Ann 1, Ben 2 — then Organic Leads.
-await as('hod', `select public.crm_save_ad_assign('AD-P', 'People', 'people', '{}', 'cnt', $1)`, [JSON.stringify({ [S('ann')]: 1, [S('ben')]: 2 })])
+// 4. By max inside each team: Ann 1 in Team A, Ben 1 in Team B. A full team HOLDS the lead (Over the limit) — never another team.
+const maxIn = JSON.stringify({ [S('tla')]: 'cnt', [S('tlb')]: 'cnt' })
+await refused('hod', `select public.crm_save_ad_assign('AD-P', 'Max', 'split', $1, 'cnt', '{}', $2)`, [half, maxIn], /maximum in every By max team/, 'a By max team needs somebody’s maximum')
+await as('hod', `select public.crm_save_ad_assign('AD-P', 'Max', 'split', $1, 'cnt', $2, $3)`, [half, JSON.stringify({ [S('ann')]: 1, [S('ben')]: 1 }), maxIn])
 const ppl = []
-for (let i = 0; i < 4; i++) ppl.push(name((await arrive('AD-P')).assigned_to))
-check(ppl, ['ann', 'ben', 'ben', null], 'By people, max: Ann 1, Ben 2, then Organic Leads')
+for (let i = 0; i < 4; i++) { const r = await arrive('AD-P'); ppl.push([name(r.assigned_to), name(r.team_id)]) }
+check(ppl, [['ann', 'tla'], ['ben', 'tlb'], [null, 'tla'], [null, 'tlb']], 'By max: Ann 1, Ben 1, then each team holds its next lead')
+check((await q(`select count(*)::int as n from crm_contacts where ad_source_id = 'AD-P' and held_reason = 'limit'`))[0].n, 2, 'two leads wait Over the limit')
+// Raising Ann's limit deals Team A's held lead to her at once; Team B's waits for Ben.
+const saved = (await as('hod', `select public.crm_save_ad_assign('AD-P', 'Max', 'split', $1, 'cnt', $2, $3) as r`, [half, JSON.stringify({ [S('ann')]: 2, [S('ben')]: 1 }), maxIn]))[0].r
+check(saved.dealt, 1, 'saving deals the one held lead that now fits')
+check((await q(`select assigned_to, held_reason from crm_contacts where ad_source_id = 'AD-P' and team_id = $1 order by created_at, id`, [S('tla')])).map(r => [name(r.assigned_to), r.held_reason]),
+  [['ann', null], ['ann', null]], 'Team A’s held lead went to Ann and is no longer Over the limit')
+check((await q(`select held_reason from crm_contacts where ad_source_id = 'AD-P' and team_id = $1 and assigned_to is null`, [S('tlb')])).map(r => r.held_reason), ['limit'], 'Team B’s still waits')
+{ // Anybody given a held lead by hand takes it off the limit list.
+  const held = (await q(`select id from crm_contacts where ad_source_id = 'AD-P' and held_reason = 'limit'`))[0].id
+  await as('boss', `select public.crm_send_to($1, $2)`, [held, S('tlb')])
+  check((await q(`select held_reason from crm_contacts where id = $1`, [held]))[0].held_reason, null, 'sent by hand: no longer Over the limit')
+}
 
-// 5. By people, %: 75 / 25 over four leads.
-await as('hod', `select public.crm_save_ad_assign('AD-Q', 'Pct', 'people', '{}', 'pct', $1)`, [JSON.stringify({ [S('amir')]: 75, [S('ben')]: 25 })])
+// 5. By % inside a team: Amir 75 / Ann 25 over four leads.
+await as('hod', `select public.crm_save_ad_assign('AD-Q', 'Pct', 'split', $1, 'cnt', $2, $3)`,
+  [JSON.stringify({ [S('tla')]: 100 }), JSON.stringify({ [S('amir')]: 75, [S('ann')]: 25 }), JSON.stringify({ [S('tla')]: 'pct' })])
 const pct = []
 for (let i = 0; i < 4; i++) pct.push(name((await arrive('AD-Q')).assigned_to))
 check(pct.filter(x => x === 'amir').length, 3, 'By %: Amir takes three of four at 75%')
 
-// 6. Full time first on the chosen days.
-await q(`insert into crm_staff (staff_id, full_time) values ($1, true)`, [S('amir')])
+// 6. Full time = days per person, in turn; it overrides every inside mode (By max included — nothing is held for it).
+await refused('tla', `select public.crm_set_full_time($1, true)`, [S('amir')], /may not/, 'a TL may not set who is full time')
+for (const who of ['amir', 'ann', 'tla']) await as('boss', `select public.crm_set_full_time($1, true)`, [S(who)])
+check((await q(`select count(*)::int as n from crm_staff where full_time and staff_id = $1`, [S('tla')]))[0].n, 1, 'a TL may be full time (rev 1011)')
+await refused('boss', `select public.crm_set_full_time($1, true)`, [S('hod')], /team member/, 'the Director is not a team member')
 const today = (Number((await q(`select extract(isodow from now() at time zone 'Asia/Kuala_Lumpur')::int as d`))[0].d) + 6) % 7
-await as('hod', `select public.crm_save_fulltime($1, 'cnt', $2, $3)`, [S('tla'), `{${today}}`, JSON.stringify({ [S('amir')]: { [today]: 2 } })])
-await as('boss', `select public.crm_save_ad_assign('AD-F', 'Full', 'split', $1, 'cnt', '{}')`, [JSON.stringify({ [S('tla')]: 100 })])
+await as('hod', `select public.crm_save_fulltime($1, 'turns', $2, $3)`, [S('tla'), `{${today}}`, JSON.stringify({ [S('amir')]: { [today]: 1 }, [S('ann')]: { [today]: 1 } })])
+await as('boss', `select public.crm_save_ad_assign('AD-F', 'Full', 'split', $1, 'cnt', $2, $3)`,
+  [JSON.stringify({ [S('tla')]: 100 }), JSON.stringify({ [S('tla')]: 1 }), JSON.stringify({ [S('tla')]: 'cnt' })])
 const ft = []
 for (let i = 0; i < 4; i++) ft.push(name((await arrive('AD-F')).assigned_to))
-check(ft.slice(0, 1), ['amir'], 'on a full-time day Amir (full time, max 2 today) takes the first lead')
-check(ft.filter(x => x === 'amir').length >= 2, true, 'Amir takes his two')
+check([...ft].sort(), ['amir', 'amir', 'ann', 'ann'], 'on a full-time day Amir and Ann take turns — past the TL’s By max of 1, nothing held')
+check(ft[0] !== ft[1] && ft[1] !== ft[2], true, '…one after the other')
+// Part time leaves the allocation: Ann's ticked days go, and Amir takes them all.
+await as('boss', `select public.crm_set_full_time($1, false)`, [S('ann')])
+check(Object.keys((await q(`select vals from crm_fulltime_rules where tl_id = $1`, [S('tla')]))[0].vals).map(name), ['amir'], 'switching Ann off clears her ticked days')
+check(name((await arrive('AD-F')).assigned_to), 'amir', 'the next full-time lead is Amir’s')
 
 // 7. The Principal sends an Organic Lead, and undoes it.
-const organic = (await q(`select id from crm_contacts where ad_source_id = 'AD-NONE'`))[0].id
+const organic = (await q(`select id from crm_contacts where ad_source_id is null`))[0].id
 await refused('tla', `select public.crm_send_to($1, $2)`, [organic, S('ann')], /may not/, 'a TL may not send an Organic Lead')
 await as('boss', `select public.crm_send_to($1, $2)`, [organic, S('ann')])
 check(name((await q(`select assigned_to from crm_contacts where id = $1`, [organic]))[0].assigned_to), 'ann', 'sent to Ann')
@@ -176,5 +207,20 @@ check(await as('boss', `select notif_read, notifs_seen_at is not null as seen fr
 const crmPpl = (await as('boss', `select public.crm_people() as p`))[0].p.people
 check(crmPpl.every(p => typeof p.title === 'string' && p.title.length > 0), true, 'every person comes with their People title')
 check(crmPpl.find(p => p.id === S('ann')).title, (await q(`select t.name from titles t join hr_staff_costs s on s.title_id = t.id where s.id = $1`, [S('ann')]))[0].name, 'the title is the one People holds')
+
+// 11. rev 1011's migration over rules saved before it: By people → By team (the people's teams, an even split, the old
+// max / % inside), a Max / % full-time row → turns (any value on a chosen day = ticked). Running it again is harmless.
+{
+  await q(`insert into crm_ad_assign (ad_source_id, mode, people_mode, people) values ('AD-OLD', 'people', 'cnt', $1)`,
+    [JSON.stringify({ [S('ann')]: 2, [S('ben')]: 1, [S('amir')]: 0 })])
+  await q(`insert into crm_fulltime_rules (tl_id, mode, days, vals) values ($1, 'cnt', '{0,2}', $2)`,
+    [S('tlb'), JSON.stringify({ [S('ben')]: { 0: 3, 1: 5, 2: 0 } })])
+  await db.exec((await readFile(new URL('20261011130000_crm_dealer_rev1011.sql', dir), 'utf8')).replace(/\r\n/g, '\n'))
+  const r = (await q(`select mode, team_split, team_modes from crm_ad_assign where ad_source_id = 'AD-OLD'`))[0]
+  check([r.mode, Object.values(r.team_split).reduce((a, b) => a + b, 0), Object.keys(r.team_split).map(name).sort()], ['split', 100, ['tla', 'tlb']], 'By people became By team over the people’s teams, adding to 100')
+  check(Object.values(r.team_modes), ['cnt', 'cnt'], '…each team By max, as the old maximums were')
+  const f = (await q(`select mode, vals from crm_fulltime_rules where tl_id = $1`, [S('tlb')]))[0]
+  check([f.mode, f.vals[S('ben')]['0'], f.vals[S('ben')]['1'], f.vals[S('ben')]['2']], ['turns', 1, 0, 0], 'Max full time became turns: ticked only on a chosen day with a value')
+}
 
 console.log(`crm control panel: ${checks} checks passed`)

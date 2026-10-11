@@ -3,9 +3,9 @@
  * allocation) and Cold lead templates (per-template switch; only Approved can be on). Both CRM · Manage only. Ported from
  * the prototype (`fts`, `tp`).
  *
- * WAITING FOR THE DATABASE (proposals D and E, 2026-10-11): neither writes yet. The full-time switch will go through
- * crm_set_full_time (and clear that person's ticked days); the templates need their own table and Meta's review. Until
- * then the pages draw what the data holds and every write says so instead of pretending to save.
+ * The full-time switch saves through crm_set_full_time, which also clears a part-timer's ticked days (proposal D,
+ * mig 20261011130000). WAITING FOR THE DATABASE (proposal E): the templates need their own table and Meta's review;
+ * until then every template write says so instead of pretending to save.
  */
 import type { ChangeEvent, MouseEvent } from "react";
 import { jobTitle } from "../../shared/people";
@@ -24,7 +24,7 @@ export function memberWorkTypeVM(ctx: PanelCtx) {
       people: t.people.map((p, k) => ({
         name: p.name, ini: ini(p.name), title: jobTitle(p), rule: k ? "1px solid #F3E9E1" : "0",
         swBg: p.fullTime ? "#387557" : "#D9C7BA", swX: p.fullTime ? "21px" : "3px",
-        toggle: () => patch({ toast: NOT_YET }),
+        toggle: () => { const on = !p.fullTime; void ctx.act.setFullTime(p.id, on).then(ok => { if (ok) patch({ toast: p.name + (on ? " is now full time" : " is now part time") }); }); },
       })),
     })),
   };

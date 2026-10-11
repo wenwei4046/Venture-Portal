@@ -7,14 +7,11 @@
 import type { ChangeEvent, FocusEvent, MouseEvent } from "react";
 import type { CrmAdRule, CrmCustomer } from "@/lib/member/crm-data";
 import { jobTitle } from "../../shared/people";
-import { ini, stop, type PanelCtx, type Team } from "./common";
+import { evenShare, ini, stop, type PanelCtx, type Team } from "./common";
 import type { assignVM } from "./assign";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], A7 = [0, 1, 2, 3, 4, 5, 6];
 type Mode = "even" | "pct" | "cnt";
-
-/** n ways, as even as whole numbers go (the remainder to the first ones). */
-const evenShare = (n: number) => { const b = Math.floor(100 / n), r = 100 - b * n; return (k: number) => b + (k < r ? 1 : 0); };
 const dig = (e: ChangeEvent<HTMLInputElement>) => parseInt(String(e.target.value).replace(/\D/g, "")) || 0;
 
 /** Who is ticked on which weekday in a team's Full time days (any old Max / By % value above 0 counts as ticked). */
@@ -155,7 +152,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
       });
       // Saving deals any lead waiting for this ad first, oldest first, inside the team it waits for (the database does it).
       void act.saveAdRule(E.id, E.label, { mode: "split", split, pm: "pct", pp: pv, tm }).then(ok => {
-        if (ok) patch({ adEd: null, bp: null, toast: E.label + " saved" });
+        if (ok) patch({ adEd: null, bp: null, toast: E.label + " saved" + (ok.dealt ? " · " + ok.dealt + " waiting lead" + (ok.dealt === 1 ? "" : "s") + " dealt" : "") });
       });
     } : undefined };
   }

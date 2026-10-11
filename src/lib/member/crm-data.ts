@@ -228,6 +228,8 @@ export interface CrmContactRowX extends CrmContactRow {
   details_at?: string | null;
   assigned_at?: string | null;
   assigned_by?: string | null;
+  /** rev 1011: "limit" while it waits Over the limit in its team (mig 20261011130000). */
+  held_reason?: string | null;
 }
 export interface CrmMessageRowX extends CrmMessageRow {
   reply_to?: string | null;
@@ -265,8 +267,8 @@ export interface CrmDataRows {
   shares: { contact_id: string; staff_id: string; invited_by: string | null; joined_at: string }[];
   events: CrmEventRow[];
   staffPrefs: { notifs_seen_at: string | null; notif_read?: string[] | null }[];
-  adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string }[];
-  ftRules: { tl_id: string; mode: "cnt" | "pct"; days: number[] | null; vals: Record<string, Record<string, number>> | null }[];
+  adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string; team_modes?: Record<string, "even" | "pct" | "cnt"> | null }[];
+  ftRules: { tl_id: string; mode: CrmFtRule["mode"]; days: number[] | null; vals: Record<string, Record<string, number>> | null }[];
   /** crm_my_can()'s answer; null when the database did not give one. */
   can?: unknown;
 }
@@ -320,6 +322,7 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
     assignedTo: row.assigned_to,
     assignedAt: row.assigned_at ?? null,
     assignedBy: row.assigned_by ?? null,
+    ...(row.held_reason === "limit" ? { held: true, heldTeam: row.team_id } : {}),
     teamId: row.team_id,
     lastCustomerAt: row.last_customer_at ?? null,
     createdAt: row.created_at,
@@ -376,7 +379,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     events: rows.events.map(e => ({ id: e.id, kind: e.kind, customerId: e.contact_id, actor: e.actor, owner: e.owner, data: e.data ?? {}, at: e.at })),
     notifsSeenAt: rows.staffPrefs[0]?.notifs_seen_at ?? null,
     notifRead: rows.staffPrefs[0]?.notif_read ?? [],
-    adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at })),
+    adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at, ...(r.team_modes ? { tm: r.team_modes } : {}) })),
     ftRules: rows.ftRules.map(r => ({ tlId: r.tl_id, mode: r.mode, days: r.days ?? [], vals: r.vals ?? {} })),
   };
 }

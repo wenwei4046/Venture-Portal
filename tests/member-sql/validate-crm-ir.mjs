@@ -143,7 +143,7 @@ check((await people('kris')).people, [], 'KRIS sees nobody')
 check((await people('faironly')).people, [], 'a Fair-only salesperson sees nobody')
 
 // 5. Dealing: an ad set Evenly goes to IR's people only.
-await as('boss', `select public.crm_save_ad_assign('AD-E', 'Even', 'even', '{}', 'cnt', '{}')`)
+await as('boss', `select public.crm_save_ad_assign('AD-E', 'Even', 'even', '{}', 'cnt', '{}', '{}')`)
 const dealt = []
 for (let k = 0; k < 4; k++) {
   const c = (await q(`insert into crm_contacts (channel, account_id, external_id, name, ad_source_id) values ('whatsapp', 'PN1', $1, $1, 'AD-E') returning id`, [`e${k}`]))[0].id

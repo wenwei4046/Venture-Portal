@@ -16,6 +16,8 @@ export const day0 = (d: Date | number) => { const x = new Date(d); return new Da
 export const gb = (d: Date | number, o: Intl.DateTimeFormatOptions) => formatIntlDate(new Date(d), o, "en-GB");
 export const ini = (n: string) => n.trim().split(/\s+/).map(w => w[0] ?? "").slice(0, 2).join("").toUpperCase() || "?";
 export const first = (n: string) => n.trim().split(/\s+/)[0] ?? n;
+/** n ways, as even as whole numbers go (the remainder to the first ones). */
+export const evenShare = (n: number) => { const b = Math.floor(100 / n), r = 100 - b * n; return (k: number) => b + (k < r ? 1 : 0); };
 export const stop = (e: SyntheticEvent) => e.stopPropagation();
 export const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "—");
 export const fShort = (t: number) => gb(t, { day: "numeric", month: "short" });
