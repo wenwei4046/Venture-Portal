@@ -205,6 +205,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'hr_documentation', 'hr_documentation_file', 'hr_documentation_log', 'hr_document_add', 'hr_document_delete',
   'hr_letter_type_add', 'hr_letter_type_set_compulsory', 'hr_letter_type_delete', 'hr_letter_file',
   'hr_publish_type_add', 'hr_publish_type_delete', 'hr_publish', 'member_documents', 'member_document_open',
+  // Withdraw letter and files that really go (mig 20261011170000): each asks Documentation · Edit.
+  'hr_letter_withdraw', 'hr_documentation_leftovers', 'hr_documentation_files_removed',
   // The Revenue app's View as (mig 20261011110000): has_any_action(documentation.view).
   'member_documents_of',
   // A replacement runs itself on its date (mig 20261010170000): HR's two ask member_is_manager; the

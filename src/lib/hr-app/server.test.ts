@@ -92,14 +92,15 @@ describe('a hiring request, as the app draws it', () => {
 })
 
 describe('the Data center', () => {
-  it('lists everybody with their department’s short name, the letter types, and every letter — a memo saved there by its own name', () => {
+  it('lists everybody with their department’s short name, the letter types, and every letter on file — a memo saved there by its own name, a withdrawn one not at all', () => {
     const center = dataCenterOf({
       departments: [{ id: 'rev', name: 'Revenue Department', people: 1 }, { id: 'hr', name: 'HR', people: 1 }],
       people: [{ id: 'kj', name: 'Kar Jun', code: null, title: 'Team Assistant', departmentId: 'rev' }, { id: 'x', name: 'Nobody', code: null, title: null, departmentId: null }],
       letterTypes: [{ id: 'offer', name: 'Offer letter', compulsory: true, count: 1 }],
       letters: [
-        { id: 'L1', ref: 'D-101', staffId: 'kj', staffName: 'Kar Jun', typeId: 'offer', typeName: 'Offer letter', fileName: 'Offer_kj.pdf', contentType: null, size: null, filedAt: '', filedBy: '', source: 'upload', readAt: null, acknowledgedAt: null, events: [] },
-        { id: 'L2', ref: 'D-102', staffId: 'kj', staffName: 'Kar Jun', typeId: null, typeName: 'Memo', fileName: 'Rules.pdf', contentType: null, size: null, filedAt: '', filedBy: '', source: 'publish', readAt: null, acknowledgedAt: null, events: [] },
+        { id: 'L1', ref: 'D-101', staffId: 'kj', staffName: 'Kar Jun', typeId: 'offer', typeName: 'Offer letter', fileName: 'Offer_kj.pdf', contentType: null, size: null, filedAt: '', filedBy: '', source: 'upload', readAt: null, acknowledgedAt: null, withdrawnAt: null, events: [] },
+        { id: 'L2', ref: 'D-102', staffId: 'kj', staffName: 'Kar Jun', typeId: null, typeName: 'Memo', fileName: 'Rules.pdf', contentType: null, size: null, filedAt: '', filedBy: '', source: 'publish', readAt: null, acknowledgedAt: null, withdrawnAt: null, events: [] },
+        { id: 'L3', ref: 'D-103', staffId: 'x', staffName: 'Nobody', typeId: 'offer', typeName: 'Offer letter', fileName: 'Wrong.pdf', contentType: null, size: null, filedAt: '', filedBy: '', source: 'upload', readAt: null, acknowledgedAt: null, withdrawnAt: '2026-10-11T03:00:00Z', events: [] },
       ],
     })
     expect(center.staff).toEqual([{ id: 'kj', name: 'Kar Jun', title: 'Team Assistant', dept: 'Revenue' }, { id: 'x', name: 'Nobody', title: '', dept: '' }])

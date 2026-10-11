@@ -6,7 +6,7 @@ import { requestFactsFromRow, type RequestFacts } from '@/lib/member/member-serv
 import type { MemberRequest } from '@/lib/member/types'
 import { readRoomsPeople, readRoomsRange } from '@/lib/rooms/read'
 import { loadDocumentation } from '@/lib/documentation/server'
-import { deptLabel, type Documentation } from '@/lib/documentation/model'
+import { deptLabel, liveLetters, type Documentation } from '@/lib/documentation/model'
 import { loadHiringBoard } from '@/lib/hiring/board'
 import { dayLabel as hiringDay, hrOwners } from '@/lib/hiring/view'
 import type { HiringBoard, HiringRequest, HiringTalent } from '@/lib/hiring/types'
@@ -128,13 +128,13 @@ export function talentOf(t: HiringTalent): HrTalent {
   }
 }
 
-/** People › Documentation's Data center as the app draws it: everybody, the letter types, the letters on file. */
+/** People › Documentation's Data center as the app draws it: everybody, the letter types, the letters on file (a withdrawn one is not). */
 export function dataCenterOf(doc: Pick<Documentation, 'people' | 'departments' | 'letterTypes' | 'letters'>): Pick<HrAppData, 'staff' | 'docTypes' | 'letters'> {
   const dept = new Map(doc.departments.map(d => [d.id, deptLabel(d.name)]))
   return {
     staff: doc.people.map(p => ({ id: p.id, name: p.name, title: p.title ?? '', dept: (p.departmentId && dept.get(p.departmentId)) || '' })),
     docTypes: doc.letterTypes.map(t => ({ id: t.id, name: t.name, compulsory: t.compulsory })),
-    letters: doc.letters.map(l => ({ id: l.id, staffId: l.staffId, typeId: l.typeId ?? '', typeName: l.typeName, file: l.fileName })),
+    letters: liveLetters(doc.letters).map(l => ({ id: l.id, staffId: l.staffId, typeId: l.typeId ?? '', typeName: l.typeName, file: l.fileName })),
   }
 }
 

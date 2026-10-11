@@ -21,6 +21,8 @@ interface Shown {
   fileName: string
   contentType: string | null
   canDownload: boolean
+  /** A deleted document or a withdrawn letter: its file is not opened, only its trail. */
+  gone: string | null
   facts: Array<{ l: string; v: string }>
   events: DocEvent[]
 }
@@ -37,6 +39,7 @@ function shownOf(data: Documentation, t: PreviewTarget): Shown | null {
       fileName: d.fileName,
       contentType: d.contentType,
       canDownload: !d.deletedAt,
+      gone: d.deletedAt ? `Deleted ${docDay(d.deletedAt)}. Its file went with it; its trail stays.` : null,
       facts: [
         { l: 'Shared with', v: depts },
         { l: 'Uploaded', v: `${docDay(d.uploadedAt)} by ${d.uploadedBy}` },
@@ -54,7 +57,8 @@ function shownOf(data: Documentation, t: PreviewTarget): Shown | null {
     file: `${l.fileName} · ${l.ref}`,
     fileName: l.fileName,
     contentType: l.contentType,
-    canDownload: true,
+    canDownload: !l.withdrawnAt,
+    gone: l.withdrawnAt ? `Withdrawn ${docDay(l.withdrawnAt)}. No longer on ${l.staffName}'s record or in the Revenue app; its trail stays.` : null,
     facts: [
       { l: 'Person', v: person?.title ? `${l.staffName} · ${person.title}` : l.staffName },
       { l: 'Letter', v: l.typeName },
@@ -82,16 +86,19 @@ export default function PreviewDrawer({ data, target, onClose }: { data: Documen
   const shown = target ? shownOf(data, target) : null
   const kind = shown ? previewKind(shown.fileName, shown.contentType) : 'none'
   const key = target ? `${target.kind}:${target.id}` : ''
+  const gone = shown?.gone ?? null
 
   useEffect(() => {
     if (!target) return
     let live = true
     const stop = new AbortController()
-    setTab('preview')
+    setTab(gone ? 'audit' : 'preview')
     setUrl(null)
     setFailed('')
     setSheet(null)
     setSheetFailed(false)
+    // Deleted or withdrawn: there is no file to open (and no "Viewed" to write), only the trail.
+    if (gone) return
     void openDocumentationFile(target.kind, target.id, 'view').then(async link => {
       if (!live) return
       if (!link.ok) { setFailed(link.reason); return }
@@ -149,7 +156,9 @@ export default function PreviewDrawer({ data, target, onClose }: { data: Documen
           </div>
           {tab === 'preview' ? (
             <div className={s.vwPreview}>
-              {failed ? (
+              {gone ? (
+                <div className={s.vwNone}>{gone}</div>
+              ) : failed ? (
                 <div className={s.vwNone}>{failed}</div>
               ) : kind === 'pdf' && url ? (
                 <iframe src={url} title="Preview" className={s.vwFrame} />

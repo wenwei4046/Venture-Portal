@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ackLine, audienceGroups, audienceLabel, contentTypeOf, dataCenterPeople, deptLabel, documentationFromRow, fileExt, fileRefusal,
-  letterStatus, letterTrail, missingCount, missingFor, nameFromFile, objectPath, previewKind, publishRefusal, publishSummary,
+  LETTER_STATUS, letterStatus, letterTrail, liveLetters, missingCount, missingFor, nameFromFile, objectPath, previewKind, publishRefusal, publishSummary,
   publishedAudience, safeFileName, type DocPerson, type LetterType, type PersonLetter,
 } from './model'
 
@@ -21,7 +21,7 @@ const types: LetterType[] = [
 const letter = (over: Partial<PersonLetter>): PersonLetter => ({
   id: 'l1', ref: 'D-101', staffId: 'zack', staffName: 'Zack', typeId: 'offer', typeName: 'Offer letter', fileName: 'Offer_zack.pdf',
   contentType: 'application/pdf', size: 1, filedAt: '2026-10-01T02:00:00Z', filedBy: 'HR Manager', source: 'upload',
-  readAt: null, acknowledgedAt: null, events: [], ...over,
+  readAt: null, acknowledgedAt: null, withdrawnAt: null, events: [], ...over,
 })
 
 describe('documentationFromRow', () => {
@@ -31,13 +31,14 @@ describe('documentationFromRow', () => {
       people: [{ id: 'zack', name: 'Zack', code: 'HV010', title: null, departmentId: REV }],
       documents: [{ id: 'x', ref: 'L-101', name: 'Price list', fileName: 'Price.xlsx', departmentIds: [REV], departments: ['Revenue Department'], uploadedAt: '2026-10-01', uploadedBy: 'HR', deletedAt: null, events: [{ what: 'Uploaded', at: '2026-10-01', who: 'HR', note: 'Shared with Revenue Department' }] }],
       letterTypes: [{ id: 'offer', name: 'Offer letter', compulsory: true, count: '2' }],
-      letters: [],
+      letters: [{ id: 'l1', staffId: 'zack', typeId: 'offer', withdrawnAt: '2026-10-11T03:00:00Z' }, { id: 'l2', staffId: 'zack', typeId: 'offer' }],
       publishTypes: [{ id: 'm', name: 'Memo', builtin: true }],
       published: [{ id: 'p', kind: 'Memo', title: 'Hi', publishedAt: '2026-10-06', audience: 'Revenue · everyone', recipients: 12, acknowledged: 9 }],
     })
     expect(doc?.departments[0].people).toBe(32)
     expect(doc?.documents[0].events[0].note).toBe('Shared with Revenue Department')
     expect(doc?.letterTypes[0].count).toBe(2)
+    expect(doc?.letters.map(l => l.withdrawnAt)).toEqual(['2026-10-11T03:00:00Z', null])
     expect(doc?.published[0].subDepartments).toEqual([])
     expect(documentationFromRow(null)).toBeNull()
     expect(documentationFromRow([])).toBeNull()
@@ -69,6 +70,11 @@ describe('letters', () => {
     expect(letterStatus(letter({ readAt: '2026-10-02', acknowledgedAt: '2026-10-03' }))).toBe('ack')
   })
 
+  it('a withdrawn letter says so, whatever its person had done with it', () => {
+    expect(letterStatus(letter({ readAt: '2026-10-02', acknowledgedAt: '2026-10-03', withdrawnAt: '2026-10-11' }))).toBe('withdrawn')
+    expect(LETTER_STATUS.withdrawn).toEqual({ label: 'Withdrawn', tone: 'gone' })
+  })
+
   it('tells the whole trail in time order, the person’s own steps included', () => {
     const l = letter({
       events: [
@@ -90,6 +96,20 @@ describe('letters', () => {
     expect(missingFor('chea', letters, types).map(t => t.name)).toEqual(['Offer letter'])
     expect(missingCount(types[0], people, letters)).toBe(2)
     expect(missingCount(types[1], people, letters)).toBe(0)
+  })
+
+  it('counts a withdrawn letter for nothing: its person is missing it again', () => {
+    const letters = [letter({ withdrawnAt: '2026-10-11T03:00:00Z' }), letter({ id: 'l2', staffId: 'chea', staffName: 'Chea Huan' })]
+    expect(liveLetters(letters).map(l => l.id)).toEqual(['l2'])
+    expect(missingFor('zack', letters, types).map(t => t.name)).toEqual(['Offer letter'])
+    expect(missingFor('chea', letters, types)).toEqual([])
+    expect(missingCount(types[0], people, letters)).toBe(2)
+    const rows = dataCenterPeople({ people, letters, letterTypes: types, departments: [] })
+    expect(rows.map(r => [r.name, r.letters, r.missing])).toEqual([
+      ['Chea Huan', 1, ''],
+      ['Zack', 0, 'Offer letter missing'],
+      ['Grace Lim', 0, 'Offer letter missing'],
+    ])
   })
 
   it('lists Data center’s people with their line, letter count and what is missing', () => {
