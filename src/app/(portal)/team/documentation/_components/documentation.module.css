@@ -769,6 +769,8 @@ textarea.input { resize: vertical; }
 .ackFill { display: block; height: 100%; background: rgb(21 110 78); }
 .ackLine { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; color: rgb(var(--hv-body-2)); white-space: nowrap; }
 .pubEmpty { color: rgb(var(--hv-brown)); padding: 6px 0; }
+/* A withdrawn memo (2026-10-11): greyed under "Show withdrawn", its line in the mono red of "Deleted". */
+.pubRow[data-gone='true'] { opacity: 0.55; }
 
 /* ── The preview drawer (640px) ── */
 .vwHead { display: flex; align-items: flex-start; gap: 12px; padding: 18px 22px 0; }

@@ -94,6 +94,13 @@ export interface Published {
   saved: boolean
   recipients: number
   acknowledged: number
+  /** Withdrawn from everyone it reached (2026-10-11) — it stays on the list as HR's record. */
+  withdrawnAt: string | null
+  withdrawnBy: string | null
+  /** What it had reached when it was withdrawn: "Had reached 12 people · 9 acknowledged". */
+  withdrawnNote: string | null
+  /** When its attachment was deleted from the bucket. */
+  attachmentDeletedAt: string | null
 }
 
 export interface Documentation {
@@ -193,6 +200,10 @@ export function documentationFromRow(raw: unknown): Documentation | null {
         saved: x.saved === true,
         recipients: num(x.recipients),
         acknowledged: num(x.acknowledged),
+        withdrawnAt: strOrNull(x.withdrawnAt),
+        withdrawnBy: strOrNull(x.withdrawnBy),
+        withdrawnNote: strOrNull(x.withdrawnNote),
+        attachmentDeletedAt: strOrNull(x.attachmentDeletedAt),
       }
     }),
   }
@@ -354,6 +365,16 @@ export function ackLine(m: Published): { line: string; pct: number } {
 /** The Published list's audience line. */
 export function publishedAudience(m: Published): string {
   return m.audience ?? (m.subDepartments.length ? m.subDepartments.join(', ') : '—')
+}
+
+/** A withdrawn memo's line on the Published list: "Withdrawn 11 Oct by Grace Lim · Had reached 12 people · 9 acknowledged · attachment deleted". */
+export function withdrawnLine(m: Pick<Published, 'withdrawnAt' | 'withdrawnBy' | 'withdrawnNote' | 'attachmentDeletedAt'>): string {
+  if (!m.withdrawnAt) return ''
+  return [
+    `Withdrawn ${shortDay(m.withdrawnAt)}${m.withdrawnBy ? ` by ${m.withdrawnBy}` : ''}`,
+    m.withdrawnNote,
+    m.attachmentDeletedAt ? 'attachment deleted' : null,
+  ].filter(Boolean).join(' · ')
 }
 
 // ── Uploads ─────────────────────────────────────────────────────────────────

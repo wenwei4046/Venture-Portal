@@ -3,10 +3,10 @@
 import { useMemo, useState } from 'react'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
-import { addPublishType, deletePublishType, publishDocumentation } from '@/lib/documentation/actions'
+import { addPublishType, deletePublishType, publishDocumentation, withdrawMemo } from '@/lib/documentation/actions'
 import {
   DOC_ACCEPT, ackLine, audienceGroups, audienceLabel, deptLabel, docShortDay, plural, publishRefusal, publishSummary,
-  publishedAudience, type Documentation,
+  publishedAudience, withdrawnLine, type Documentation,
 } from '@/lib/documentation/model'
 import { uploadDocumentationFile } from '@/lib/documentation/upload'
 import { firstDepartment } from './DocumentsTab'
@@ -19,7 +19,10 @@ import s from './documentation.module.css'
  * title, a body, an attachment; the departments it goes to, each opening its
  * people, all ticked — untick who it should not reach. Everyone it reaches
  * must Acknowledge. With a file, Publish goes outlined and "Publish & save"
- * also files the attachment into every recipient's Data center.
+ * also files the attachment into every recipient's Data center. With
+ * Documentation · Edit a published memo can be withdrawn from everyone it
+ * reached (2026-10-11 — asks once more, as Delete does); withdrawn ones wait
+ * greyed under "Show withdrawn" with what they had reached.
  */
 export default function PublishTab({ data, can }: { data: Documentation; can: { create: boolean; edit: boolean } }) {
   const [kind, setKind] = useState('Memo')
@@ -33,6 +36,10 @@ export default function PublishTab({ data, can }: { data: Documentation; can: { 
   const [busy, setBusy] = useState(false)
   // A type just added shows, picked, at once — until the page's next read brings it.
   const [justAdded, setJustAdded] = useState<{ name: string; before: Documentation['publishTypes'] } | null>(null)
+  const [armed, setArmed] = useState<string | null>(null)
+  const [showGone, setShowGone] = useState(false)
+  const live = data.published.filter(m => !m.withdrawnAt)
+  const gone = data.published.filter(m => m.withdrawnAt)
 
   const groups = useMemo(() => audienceGroups(data.departments, data.people, depts, unticked), [data.departments, data.people, depts, unticked])
   const isLetter = kind === 'Letter'
@@ -140,6 +147,15 @@ export default function PublishTab({ data, can }: { data: Documentation; can: { 
     const res = await deletePublishType(id)
     if (res.ok && kind === name) setKind('Memo')
     flash(res.ok ? `${name} removed` : res.reason)
+  }
+
+  async function withdraw(id: string) {
+    if (armed !== id) return setArmed(id)
+    setArmed(null)
+    const res = await withdrawMemo(id)
+    if (!res.ok) return flash(res.reason)
+    const who = res.reached === 1 ? '1 person no longer sees it' : res.reached > 1 ? `${res.reached} people no longer see it` : 'nobody sees it any more'
+    flash(`${res.title} withdrawn · ${who}`)
   }
 
   return (
@@ -317,7 +333,7 @@ export default function PublishTab({ data, can }: { data: Documentation; can: { 
 
       <section className={`${s.card} ${s.published}`} aria-labelledby="pub-list" style={can.create ? undefined : { gridColumn: '1 / -1' }}>
         <div id="pub-list" className={s.publishedTitle}>Published</div>
-        {data.published.map(m => {
+        {live.map(m => {
           const ack = ackLine(m)
           return (
             <div key={m.id} className={s.pubRow}>
@@ -340,11 +356,43 @@ export default function PublishTab({ data, can }: { data: Documentation; can: { 
                   <span className={s.ackFill} style={{ width: `${ack.pct}%` }} />
                 </span>
                 <span className={s.ackLine}>{ack.line}</span>
+                {can.edit ? (
+                  <button
+                    type="button"
+                    className={`${s.smallBtn} ${s.deleteBtn}`}
+                    data-armed={armed === m.id ? 'true' : undefined}
+                    aria-label={armed === m.id ? `Confirm withdrawing ${m.title}` : `Withdraw ${m.title}`}
+                    onClick={() => void withdraw(m.id)}
+                  >
+                    {armed === m.id ? 'Confirm withdraw' : 'Withdraw'}
+                  </button>
+                ) : null}
               </div>
             </div>
           )
         })}
-        {data.published.length === 0 ? <div className={s.pubEmpty}>Nothing published yet.</div> : null}
+        {live.length === 0 ? <div className={s.pubEmpty}>Nothing published yet.</div> : null}
+        {showGone
+          ? gone.map(m => (
+              <div key={m.id} className={s.pubRow} data-gone="true">
+                <div className={s.pubTop}>
+                  <span className={s.pubTopLeft}>
+                    <span className={s.kind}>{m.kind}</span>
+                    <span className={s.pubName}>{m.title}</span>
+                  </span>
+                  <span className={s.pubWhen}>{docShortDay(m.publishedAt)}</span>
+                </div>
+                <div className={s.pubAud}>{publishedAudience(m)}</div>
+                {m.attachmentName ? <div className={s.pubFile}>{m.attachmentName}</div> : null}
+                <div className={s.deletedMark}>{withdrawnLine(m)}</div>
+              </div>
+            ))
+          : null}
+        {gone.length > 0 ? (
+          <button type="button" className={`${s.showDeleted} ${s.goneToggle}`} onClick={() => setShowGone(v => !v)}>
+            {showGone ? 'Hide' : 'Show'} withdrawn ({gone.length})
+          </button>
+        ) : null}
       </section>
     </div>
   )
