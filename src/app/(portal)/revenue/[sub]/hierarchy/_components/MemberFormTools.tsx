@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { flash } from '@/components/hrv/toast'
 import { TEMPLATE_ACCEPT, templateRefusal, type MemberFormKind, type WaitingForm } from '@/lib/commission/waiting-form'
 import { uploadReplacementFormTemplate, uploadWaitingFormTemplate } from '../../../waiting-actions'
@@ -28,6 +28,7 @@ export default function MemberFormTools({
   form: initialForm,
   subName,
   subOptions,
+  lead,
 }: {
   kind: MemberFormKind
   /** The form as saved, or why it could not be read. */
@@ -35,6 +36,8 @@ export default function MemberFormTools({
   subName: string
   /** The department's sub-departments, for the waiting list's built-in "Preferred sub-department". */
   subOptions: string[]
+  /** What stands first in the row — the waiting list's "+" (2026-10-11). */
+  lead?: ReactNode
 }) {
   // The page's answer is the truth; a save here shows at once, until the
   // page's next answer catches up.
@@ -76,6 +79,7 @@ export default function MemberFormTools({
   return (
     <>
       <div className={w.toolbar}>
+        {lead}
         <label
           className={w.upload}
           data-uploaded={uploaded ? 'true' : undefined}

@@ -1,10 +1,11 @@
 'use server'
 
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
-import { requireAuth } from '@/lib/auth'
+import { requireActionOn, requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { signedFormKind, signedFormRefusal, waitingAddDetail, waitingAddInputFrom, waitingAddRefusal } from '@/lib/commission/waiting-add'
 import {
   FORM_KINDS,
   cleanedFields,
@@ -31,6 +32,9 @@ import { loadMemberForm } from './_lib/waiting-form'
  *
  * Transfer is People Management's (`team/people/waiting-transfer-actions.ts`):
  * it files an employee.
+ *
+ * "+" (2026-10-11) puts somebody straight onto the list: `addToWaitingList`,
+ * the page's own action gate (Member services · Edit) and the same key.
  *
  * Refusals come back as `{ ok: false, reason }`: a thrown message never
  * reaches the browser in production.
@@ -180,6 +184,81 @@ export async function waitingFormTemplateLink(): Promise<{ ok: true; url: string
 
 export async function replacementFormTemplateLink(): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
   return templateLink('replacement')
+}
+
+export type WaitingAddOutcome = { ok: true; requestNo: string | null } | { ok: false; reason: string }
+
+/**
+ * "+" (2026-10-11, the user: "我点击「加」了过后，我可以直接加人进去这个 waiting list
+ * 里面"): somebody straight onto this sub-department's waiting list — at the
+ * end, as if accepted now — through `member_waiting_add` (mig 20261011230000),
+ * which asks Member services · Edit and `member_is_manager` again.
+ *
+ * `formData`: `input` (the window's fields as JSON) and, when attached,
+ * `signedForm`. A signed form is looked at byte by byte (the member app's
+ * rule) and goes where a member's does: the add keeps the request a draft,
+ * the file is uploaded into the adder's own folder of it under this session
+ * (the bucket's own policy), and `member_waiting_add_form` finds it there,
+ * attests it and puts the request on the list. Each press is its own add.
+ */
+export async function addToWaitingList(formData: FormData): Promise<WaitingAddOutcome> {
+  const user = await requireActionOn('/revenue/[sub]/hierarchy', 'member', 'manage')
+  if (!user.permissions.includes('member_requests_manage')) return { ok: false, reason: NO_ACCESS }
+
+  let raw: unknown = null
+  try {
+    raw = JSON.parse(String(formData.get('input') ?? ''))
+  } catch {
+    raw = null
+  }
+  const input = waitingAddInputFrom(raw)
+  if (!input) return { ok: false, reason: 'Reload the page and try again.' }
+
+  const file = formData.get('signedForm')
+  const attached = file instanceof File && file.size > 0
+  const form = await loadMemberForm('waiting')
+  if (!form.ok) return form
+  const refused = waitingAddRefusal(input, form.form, attached)
+  if (refused) return { ok: false, reason: refused }
+
+  let signed: { name: string; hash: string; bytes: Uint8Array; mime: string; extension: string } | null = null
+  if (attached) {
+    const tooBig = signedFormRefusal(file)
+    if (tooBig) return { ok: false, reason: tooBig }
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    const kind = signedFormKind(bytes, file.type)
+    if (!kind) return { ok: false, reason: 'The signed form must be a PDF, PNG or JPG file.' }
+    signed = { name: file.name.trim() || `Signed form.${kind.extension}`, hash: createHash('sha256').update(bytes).digest('hex'), bytes, ...kind }
+  }
+
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('member_waiting_add', {
+    p_sub: input.subDepartmentId,
+    p_staff: input.submittedBy,
+    p_detail: waitingAddDetail(input, form.form, signed),
+    p_idempotency: randomUUID(),
+    p_with_form: signed !== null,
+  })
+  if (error) return { ok: false, reason: refusal(error, 'They could not be added to the waiting list. Please try again.') }
+  const added = (data ?? {}) as { id?: unknown; requestNo?: unknown; status?: unknown; userId?: unknown }
+  if (typeof added.id !== 'string') return { ok: false, reason: 'They were added, but the answer could not be read. Reload the page.' }
+
+  let requestNo = typeof added.requestNo === 'string' ? added.requestNo : null
+  if (signed && added.status === 'draft') {
+    const path = `${typeof added.userId === 'string' ? added.userId : user.id}/${added.id}/${randomUUID()}.${signed.extension}`
+    const upload = await supabase.storage.from('member-invoices').upload(path, signed.bytes, { contentType: signed.mime, upsert: false })
+    if (upload.error) return { ok: false, reason: `The signed form could not be uploaded: ${upload.error.message}` }
+    const done = await supabase.rpc('member_waiting_add_form', { p_request: added.id, p_path: path })
+    if (done.error) {
+      await supabase.storage.from('member-invoices').remove([path]).then(() => undefined, () => undefined)
+      return { ok: false, reason: refusal(done.error, 'The signed form could not be kept. Please try again.') }
+    }
+    const finished = (done.data ?? {}) as { requestNo?: unknown }
+    requestNo = typeof finished.requestNo === 'string' ? finished.requestNo : null
+  }
+
+  revalidateWaiting()
+  return { ok: true, requestNo }
 }
 
 /** Fail: they didn't come when called — off the waiting list, and the next moves up. */

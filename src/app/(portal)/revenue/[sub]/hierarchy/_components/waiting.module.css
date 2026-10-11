@@ -47,6 +47,59 @@
 }
 .settings:focus-visible { outline: 2px solid rgb(var(--hv-ink)); outline-offset: 2px; }
 
+/* ── "+" (2026-10-11, the user): somebody straight onto the list — the accent square, as tall as the
+   two beside it, first in the row ── */
+.add {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(var(--hv-accent));
+  color: rgb(0 0 0);
+  cursor: pointer;
+  flex: none;
+}
+.add:hover { background: rgb(var(--hv-accent-hover)); }
+.add:focus-visible { outline: 2px solid rgb(var(--hv-ink)); outline-offset: 2px; }
+/* Its window: the Add member window's head, body and foot (sales-groups.module.css), scrolling when
+   HR's own questions make it long. */
+.addBody { max-height: min(62vh, 560px); overflow-y: auto; }
+.addInput { width: 100%; }
+.addPair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.addSec {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid rgb(var(--hv-hairline));
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--hv-brown));
+}
+.addHint { font-size: 11.5px; color: rgb(var(--hv-note)); }
+.addFile { display: flex; align-items: center; gap: 6px; color: rgb(var(--hv-ink)); font-size: 12.5px; }
+.addFileX {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  line-height: normal;
+  color: rgb(var(--hv-brown));
+}
+.addFileX:hover { background: rgb(var(--hv-danger-bg)); color: rgb(var(--hv-danger)); }
+@media (max-width: 767px) {
+  .addPair { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ── The applicant's drawer ── */
 .candNo { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; color: rgb(var(--hv-brown)); margin-top: 4px; }
 .transferNote {

@@ -198,6 +198,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_waiting_form', 'member_save_waiting_form', 'member_fail_waiting', 'member_waiting_transfer',
   // …and the Replacement list's form (mig 20261011130000), the same gates.
   'member_replacement_form', 'member_save_replacement_form',
+  // The waiting list's "+" (mig 20261011230000): member.manage and member_is_manager, both.
+  'member_waiting_add', 'member_waiting_add_form',
   // Member services' readers (mig 20261010160000): member_requests_manage / member_memos_manage.
   'member_admin_request_facts', 'member_memo_reads',
   // People › Documentation (mig 20261011070000): each asks has_any_action for its Documentation cell; the
