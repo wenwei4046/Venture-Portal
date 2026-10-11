@@ -66,7 +66,7 @@ export function panelAppVM(ctx: PanelCtx) {
     rm: roomsVM(ctx), ol: overlaysVM(ctx), nv: navVM(ctx),
     // In the prototype the chat keeps a toast of its own (ld.toast); here both read ui.toast, so with a chat open only the
     // chat's shows — not the same words twice (user 2026-10-11).
-    toast: ld.onLead ? "" : ui.toast, toastBottom: lead ? "92px" : "78px",
+    toast: show.ld && ld?.onLead ? "" : ui.toast, toastBottom: lead ? "92px" : "78px",
   };
 }
 export type PanelAppVM = ReturnType<typeof panelAppVM>;
