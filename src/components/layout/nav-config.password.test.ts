@@ -7,8 +7,10 @@ import { activeHrNavKey, hrNavSections, visibleHrNav } from './hr-nav'
 // personal acc"): the last link of Admin in both sidebars (and so in the phone's More sheet), for a
 // login a People record names — never a shared one, never while viewing the portal as somebody.
 
-const leaves = (entries: NavEntry[], v: NavViewer): Array<{ href: string; label: string; section?: string }> =>
-  entries.filter(e => e.visible(v)).flatMap(e => (isGroup(e) ? leaves(e.children, v).map(c => ({ ...c, section: e.section })) : [e]))
+type Leaf = { href: string; label: string; section?: string }
+const leaves = (entries: NavEntry[], v: NavViewer): Leaf[] =>
+  entries.filter(e => e.visible(v)).flatMap((e): Leaf[] =>
+    isGroup(e) ? leaves(e.children, v).map(c => ({ ...c, section: e.section })) : [{ href: e.href, label: e.label, section: e.section }])
 
 const finance = withActions({ id: 'carrie', role: 'finance', permissions: ['treasury', 'reports', 'audit_log'] }) as unknown as NavViewer
 const staff = withActions({ id: 'new', role: 'staff', permissions: [] }) as unknown as NavViewer
