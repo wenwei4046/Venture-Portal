@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireAction, requireAnyAction } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { documentationFileLink, type FileLink } from './server'
+import { DOC_BUCKET, documentationFileLink, type FileLink } from './server'
 
 /**
  * Documentation's writes (2026-10-11, HR revamp round 2 — README §10). Each is
@@ -63,10 +63,29 @@ export async function saveDocument(input: {
 
 export async function deleteDocument(id: string): Promise<DocOutcome> {
   await requireAction('documentation', 'edit')
-  const { error } = await (await client()).rpc('hr_document_delete', { p_id: id })
+  const supabase = await client()
+  const { error } = await supabase.rpc('hr_document_delete', { p_id: id })
   if (error) return { ok: false, reason: refusal(error, 'The document could not be deleted. Please try again.') }
+  await removeLeftoverFiles(supabase)
   revalidateDocs()
   return { ok: true }
+}
+
+/**
+ * The files no live record holds any more go from the bucket (2026-10-11, the
+ * user's answer E): a deleted document's, a withdrawn letter's, an upload
+ * nobody saved a day ago. The database lists them (`hr_documentation_leftovers`)
+ * and its delete policy lets Documentation · Edit remove only those, through
+ * the Storage API under the user's own session; then each trail whose file is
+ * really gone says "File deleted". A file that would not go is listed again
+ * the next time anybody deletes or withdraws — it never holds up the answer.
+ */
+async function removeLeftoverFiles(supabase: SupabaseClient): Promise<void> {
+  const listed = await supabase.rpc('hr_documentation_leftovers')
+  const paths = Array.isArray(listed.data) ? listed.data.filter((p): p is string => typeof p === 'string' && p !== '') : []
+  if (listed.error || paths.length === 0) return
+  await supabase.storage.from(DOC_BUCKET).remove(paths)
+  await supabase.rpc('hr_documentation_files_removed', { p_paths: paths })
 }
 
 /**
@@ -131,6 +150,26 @@ export async function fileLetter(input: {
   if (error) return { ok: false, reason: refusal(error, 'The letter could not be filed. Please try again.') }
   revalidateDocs()
   return { ok: true, id: String(data) }
+}
+
+export type WithdrawOutcome = { ok: true; person: string; type: string } | { ok: false; reason: string }
+
+/**
+ * Withdraw a letter filed to somebody's record (2026-10-11, the user's answer
+ * E): its person stops receiving it (the Revenue app, View as included), it
+ * stays on file as Withdrawn with its trail and counts for nothing — a
+ * compulsory type flags its person again — and its file goes once no live
+ * record holds it (`hr_letter_withdraw`, mig 20261011170000).
+ */
+export async function withdrawLetter(id: string): Promise<WithdrawOutcome> {
+  await requireAction('documentation', 'edit')
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('hr_letter_withdraw', { p_id: id })
+  if (error) return { ok: false, reason: refusal(error, 'The letter could not be withdrawn. Please try again.') }
+  await removeLeftoverFiles(supabase)
+  revalidateDocs()
+  const said = (data ?? {}) as { person?: unknown; type?: unknown }
+  return { ok: true, person: typeof said.person === 'string' ? said.person : '', type: typeof said.type === 'string' ? said.type : 'The letter' }
 }
 
 // ── Publish ─────────────────────────────────────────────────────────────────

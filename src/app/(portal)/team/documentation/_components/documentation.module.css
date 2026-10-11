@@ -342,6 +342,9 @@ textarea.input { resize: vertical; }
 }
 .iconBtn:hover { border-color: rgb(var(--hv-accent)); }
 .recordEmpty { padding: 18px 0; color: rgb(var(--hv-brown)); }
+/* A withdrawn letter (2026-10-11): greyed under "Show withdrawn", as a deleted document is under "Show deleted". */
+.letterRow[data-gone='true'] { opacity: 0.55; }
+.goneToggle { align-self: flex-start; margin-top: 10px; }
 
 /* ── Upload a letter (the 460px window) ── */
 .winHead { display: flex; align-items: flex-start; gap: 12px; padding: 18px 22px; border-bottom: 1px solid rgb(var(--hv-hairline)); }
@@ -630,6 +633,8 @@ textarea.input { resize: vertical; }
 .status[data-tone='info'] { background: rgb(238 235 231); border-color: rgb(222 218 212); color: rgb(108 104 98); }
 .status[data-tone='alert'] { background: rgb(249 238 214); border-color: rgb(232 206 150); color: rgb(150 100 12); }
 .status[data-tone='ledger'] { background: rgb(222 240 232); border-color: rgb(180 215 198); color: rgb(21 110 78); }
+.status[data-tone='gone'] { background: rgb(250 228 224); border-color: rgb(236 190 184); color: rgb(var(--hv-danger)); }
+.tableRow[data-gone='true'] { opacity: 0.55; }
 .tableEmpty { padding: 22px; text-align: center; color: rgb(var(--hv-brown)); }
 
 /* ── Publish ── */
@@ -868,4 +873,7 @@ textarea.input { resize: vertical; }
   .people { max-height: 420px; overflow-y: auto; }
   .find { position: sticky; top: 0; z-index: 1; }
   .missingWhy { display: block; margin-left: 0; margin-top: 2px; }
+  /* With Withdraw there are three buttons: on a phone they take a line of their own under the letter. */
+  .letterRow[data-edit='true'] { flex-wrap: wrap; row-gap: 10px; }
+  .letterRow[data-edit='true'] .letterType { flex-basis: calc(100% - 52px); }
 }

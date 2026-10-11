@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { flash } from '@/components/hrv/toast'
 import { addLetterType, deleteLetterType, setLetterTypeCompulsory } from '@/lib/documentation/actions'
-import { LETTER_STATUS, docDay, letterStatus, missingCount, plural, type Documentation, type LetterType } from '@/lib/documentation/model'
+import { LETTER_STATUS, docDay, letterStatus, liveLetters, missingCount, plural, type Documentation, type LetterType } from '@/lib/documentation/model'
 import { downloadFile } from './DocumentsTab'
 import SwitchMenu from './SwitchMenu'
 import s from './documentation.module.css'
@@ -14,7 +14,9 @@ const ALL = 'all'
  * Documentation › Letters (README §10, portal-27): every letter on file, of
  * one type or all — the type switcher holds the types themselves (count,
  * Compulsory, × and a new one at its foot); a compulsory type says how many
- * people still have none. A name opens their record in Data center.
+ * people still have none. A name opens their record in Data center, where a
+ * letter is withdrawn (2026-10-11); withdrawn ones show here under "Show
+ * withdrawn", greyed, View only — the table keeps the handoff's columns.
  */
 export default function LettersTab({
   data,
@@ -28,12 +30,16 @@ export default function LettersTab({
   onPerson: (staffId: string) => void
 }) {
   const [sel, setSel] = useState<string>(ALL)
+  const [showGone, setShowGone] = useState(false)
   // A type just added shows, picked, at once — until the page's next read brings it.
   const [justAdded, setJustAdded] = useState<{ type: LetterType; before: readonly LetterType[] } | null>(null)
   const pending = justAdded && justAdded.before === data.letterTypes && !data.letterTypes.some(t => t.id === justAdded.type.id) ? justAdded.type : null
   const types = pending ? [...data.letterTypes, pending] : data.letterTypes
   const cur = types.find(t => t.id === sel) ?? null
-  const list = cur ? data.letters.filter(l => l.typeId === cur.id) : data.letters
+  const ofType = cur ? data.letters.filter(l => l.typeId === cur.id) : data.letters
+  const live = liveLetters(ofType)
+  const gone = ofType.filter(l => l.withdrawnAt)
+  const list = showGone ? [...live, ...gone] : live
   const missing = cur ? missingCount(cur, data.people, data.letters) : 0
 
   async function toggleCompulsory(id: string, name: string, on: boolean) {
@@ -69,7 +75,7 @@ export default function LettersTab({
     flash(refused ?? `Downloads ${fileName}`)
   }
 
-  const rows = [{ id: ALL, name: 'All letters', count: data.letters.length, compulsory: false }, ...types]
+  const rows = [{ id: ALL, name: 'All letters', count: liveLetters(data.letters).length, compulsory: false }, ...types]
 
   return (
     <div>
@@ -129,9 +135,14 @@ export default function LettersTab({
           <span className={s.reqPill}>Compulsory · {missing ? `${plural(missing, 'person', 'people')} missing` : 'everyone has one'}</span>
         ) : null}
         <span className={s.countLine}>
-          {plural(list.length, 'letter')}
+          {plural(live.length, 'letter')}
           {cur ? '' : ` across ${plural(types.length, 'type')}`}
         </span>
+        {gone.length > 0 ? (
+          <button type="button" className={s.showDeleted} onClick={() => setShowGone(v => !v)}>
+            {showGone ? 'Hide' : 'Show'} withdrawn ({gone.length})
+          </button>
+        ) : null}
       </div>
 
       <div className={s.tableScroll}>
@@ -146,8 +157,9 @@ export default function LettersTab({
           </div>
           {list.map(l => {
             const st = LETTER_STATUS[letterStatus(l)]
+            const withdrawn = !!l.withdrawnAt
             return (
-              <div key={l.id} className={s.tableRow} role="row">
+              <div key={l.id} className={s.tableRow} role="row" data-gone={withdrawn ? 'true' : undefined}>
                 <button type="button" className={s.cellName} onClick={() => onPerson(l.staffId)}>{l.staffName}</button>
                 <span className={s.cell}>{l.typeName}</span>
                 <span className={s.cellFile}>{l.fileName}</span>
@@ -160,7 +172,9 @@ export default function LettersTab({
                 </span>
                 <span className={s.cellActions}>
                   <button type="button" className={s.smallBtn} onClick={() => onView(l.id)}>View</button>
-                  <button type="button" className={s.smallBtn} onClick={() => void download(l.id, l.fileName)}>Download</button>
+                  {withdrawn ? null : (
+                    <button type="button" className={s.smallBtn} onClick={() => void download(l.id, l.fileName)}>Download</button>
+                  )}
                 </span>
               </div>
             )

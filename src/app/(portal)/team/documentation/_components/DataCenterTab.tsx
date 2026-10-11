@@ -2,8 +2,8 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { flash } from '@/components/hrv/toast'
-import { fileLetter } from '@/lib/documentation/actions'
-import { DOC_ACCEPT, dataCenterPeople, deptLabel, fileExt, missingFor, plural, type Documentation } from '@/lib/documentation/model'
+import { fileLetter, withdrawLetter } from '@/lib/documentation/actions'
+import { DOC_ACCEPT, dataCenterPeople, deptLabel, docShortDay, fileExt, liveLetters, missingFor, plural, type Documentation } from '@/lib/documentation/model'
 import { uploadDocumentationFile } from '@/lib/documentation/upload'
 import { downloadFile } from './DocumentsTab'
 import UploadLetterWindow from './UploadLetterWindow'
@@ -31,6 +31,9 @@ const DownIcon = () => (
  * payroll, a red "!" where a compulsory letter is missing; on the right their
  * record — Upload (the 460px window), each missing compulsory letter as a red
  * row with its own Upload, and the letters on file with View and Download.
+ * With Documentation · Edit a letter can be withdrawn (2026-10-11, the user's
+ * answer E — asks once more, as Delete does); withdrawn ones wait greyed under
+ * "Show withdrawn", their trail a View away.
  */
 export default function DataCenterTab({
   data,
@@ -47,12 +50,16 @@ export default function DataCenterTab({
 }) {
   const [find, setFind] = useState('')
   const [upload, setUpload] = useState(false)
+  const [armed, setArmed] = useState<string | null>(null)
+  const [showGone, setShowGone] = useState(false)
   const recordRef = useRef<HTMLElement>(null)
   const people = useMemo(() => dataCenterPeople(data), [data])
   const q = find.trim().toLowerCase()
   const shown = q ? people.filter(p => p.name.toLowerCase().includes(q)) : people
   const me = people.find(p => p.id === person) ?? people[0] ?? null
-  const mine = me ? data.letters.filter(l => l.staffId === me.id) : []
+  const all = me ? data.letters.filter(l => l.staffId === me.id) : []
+  const mine = liveLetters(all)
+  const gone = all.filter(l => l.withdrawnAt)
   const missing = me ? missingFor(me.id, data.letters, data.letterTypes) : []
   const deptName = me?.departmentId ? deptLabel(data.departments.find(d => d.id === me.departmentId)?.name ?? '') : ''
 
@@ -67,6 +74,8 @@ export default function DataCenterTab({
   // On a phone the record sits under the list: bring it into view.
   function pick(id: string) {
     onPerson(id)
+    setArmed(null)
+    setShowGone(false)
     if (window.matchMedia('(max-width: 767px)').matches) {
       requestAnimationFrame(() => recordRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
     }
@@ -75,6 +84,13 @@ export default function DataCenterTab({
   async function download(id: string, fileName: string) {
     const refused = await downloadFile('letter', id)
     flash(refused ?? `Downloads ${fileName}`)
+  }
+
+  async function withdraw(id: string) {
+    if (armed !== id) return setArmed(id)
+    setArmed(null)
+    const res = await withdrawLetter(id)
+    flash(res.ok ? `${res.type} withdrawn · ${res.person || 'its person'} no longer sees it` : res.reason)
   }
 
   return (
@@ -140,7 +156,7 @@ export default function DataCenterTab({
               </div>
             ))}
             {mine.map(l => (
-              <div key={l.id} className={s.letterRow}>
+              <div key={l.id} className={s.letterRow} data-edit={can.edit ? 'true' : undefined}>
                 <span className={s.page} aria-hidden="true">
                   <span className={s.pageFold} />
                   <span className={s.pageLine1} />
@@ -156,9 +172,43 @@ export default function DataCenterTab({
                   <DownIcon />
                   Download
                 </button>
+                {can.edit ? (
+                  <button
+                    type="button"
+                    className={`${s.iconBtn} ${s.deleteBtn}`}
+                    data-armed={armed === l.id ? 'true' : undefined}
+                    aria-label={armed === l.id ? `Confirm withdrawing ${l.typeName}` : `Withdraw ${l.typeName}`}
+                    onClick={() => void withdraw(l.id)}
+                  >
+                    {armed === l.id ? 'Confirm withdraw' : 'Withdraw'}
+                  </button>
+                ) : null}
               </div>
             ))}
             {mine.length === 0 ? <div className={s.recordEmpty}>No letters on file yet.</div> : null}
+            {showGone
+              ? gone.map(l => (
+                  <div key={l.id} className={s.letterRow} data-gone="true">
+                    <span className={s.page} aria-hidden="true">
+                      <span className={s.pageFold} />
+                      <span className={s.pageLine1} />
+                      <span className={s.pageLine2} />
+                      <span className={s.pageExt}>{fileExt(l.fileName) || 'PDF'}</span>
+                    </span>
+                    <span className={s.letterType}>{l.typeName}</span>
+                    <span className={s.deletedMark}>Withdrawn · {docShortDay(l.withdrawnAt ?? '')}</span>
+                    <button type="button" className={s.iconBtn} onClick={() => onView(l.id)}>
+                      <EyeIcon />
+                      View
+                    </button>
+                  </div>
+                ))
+              : null}
+            {gone.length > 0 ? (
+              <button type="button" className={`${s.showDeleted} ${s.goneToggle}`} onClick={() => setShowGone(v => !v)}>
+                {showGone ? 'Hide' : 'Show'} withdrawn ({gone.length})
+              </button>
+            ) : null}
           </div>
         </section>
       ) : (

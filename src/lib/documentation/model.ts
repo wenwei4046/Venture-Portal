@@ -71,6 +71,8 @@ export interface PersonLetter {
   source: 'upload' | 'publish'
   readAt: string | null
   acknowledgedAt: string | null
+  /** Withdrawn (2026-10-11): off its person's record and out of the Revenue app, its file deleted; kept with its trail. */
+  withdrawnAt: string | null
   events: DocEvent[]
 }
 
@@ -170,6 +172,7 @@ export function documentationFromRow(raw: unknown): Documentation | null {
         source: x.source === 'publish' ? 'publish' : 'upload',
         readAt: strOrNull(x.readAt),
         acknowledgedAt: strOrNull(x.acknowledgedAt),
+        withdrawnAt: strOrNull(x.withdrawnAt),
         events: eventsOf(x.events),
       }
     }),
@@ -222,19 +225,26 @@ export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n ==
 
 // ── Letters ─────────────────────────────────────────────────────────────────
 
-export type LetterStatus = 'delivered' | 'opened' | 'ack'
+export type LetterStatus = 'delivered' | 'opened' | 'ack' | 'withdrawn'
 
-/** Delivered → Opened → Acknowledged: the memo the letter travelled as, as its person answered it. */
-export function letterStatus(l: Pick<PersonLetter, 'readAt' | 'acknowledgedAt'>): LetterStatus {
+/** Delivered → Opened → Acknowledged: the memo the letter travelled as, as its person answered it — or Withdrawn. */
+export function letterStatus(l: Pick<PersonLetter, 'readAt' | 'acknowledgedAt' | 'withdrawnAt'>): LetterStatus {
+  if (l.withdrawnAt) return 'withdrawn'
   if (l.acknowledgedAt) return 'ack'
   if (l.readAt) return 'opened'
   return 'delivered'
 }
 
-export const LETTER_STATUS: Readonly<Record<LetterStatus, { label: string; tone: 'info' | 'alert' | 'ledger' }>> = {
+export const LETTER_STATUS: Readonly<Record<LetterStatus, { label: string; tone: 'info' | 'alert' | 'ledger' | 'gone' }>> = {
   delivered: { label: 'Delivered', tone: 'info' },
   opened: { label: 'Opened', tone: 'alert' },
   ack: { label: 'Acknowledged', tone: 'ledger' },
+  withdrawn: { label: 'Withdrawn', tone: 'gone' },
+}
+
+/** The letters still on file — a withdrawn one counts for nothing anywhere (2026-10-11). */
+export function liveLetters<T extends Pick<PersonLetter, 'withdrawnAt'>>(letters: readonly T[]): T[] {
+  return letters.filter(l => !l.withdrawnAt)
 }
 
 /** A letter's whole trail: what was done to it here, and what its person did in the Revenue app. */
@@ -248,16 +258,16 @@ export function letterTrail(l: PersonLetter): DocEvent[] {
     .map(x => x.e)
 }
 
-/** The compulsory types this person has no letter of. */
+/** The compulsory types this person has no letter of (a withdrawn one is none). */
 export function missingFor(personId: string, letters: readonly PersonLetter[], types: readonly LetterType[]): LetterType[] {
-  const held = new Set(letters.filter(l => l.staffId === personId && l.typeId).map(l => l.typeId))
+  const held = new Set(liveLetters(letters).filter(l => l.staffId === personId && l.typeId).map(l => l.typeId))
   return types.filter(t => t.compulsory && !held.has(t.id))
 }
 
 /** Everybody who has none of a compulsory type. */
 export function missingCount(type: LetterType, people: readonly DocPerson[], letters: readonly PersonLetter[]): number {
   if (!type.compulsory) return 0
-  const held = new Set(letters.filter(l => l.typeId === type.id).map(l => l.staffId))
+  const held = new Set(liveLetters(letters).filter(l => l.typeId === type.id).map(l => l.staffId))
   return people.filter(p => !held.has(p.id)).length
 }
 
@@ -273,7 +283,7 @@ export interface DataCenterPerson extends DocPerson {
 export function dataCenterPeople(doc: Pick<Documentation, 'people' | 'letters' | 'letterTypes' | 'departments'>): DataCenterPerson[] {
   const deptName = new Map(doc.departments.map(d => [d.id, deptLabel(d.name)]))
   const count = new Map<string, number>()
-  for (const l of doc.letters) count.set(l.staffId, (count.get(l.staffId) ?? 0) + 1)
+  for (const l of liveLetters(doc.letters)) count.set(l.staffId, (count.get(l.staffId) ?? 0) + 1)
   return doc.people.map(p => ({
     ...p,
     line: [p.title, p.departmentId ? deptName.get(p.departmentId) : null].filter(Boolean).join(' · '),
