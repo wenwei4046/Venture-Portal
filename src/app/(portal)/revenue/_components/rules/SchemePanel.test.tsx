@@ -34,7 +34,6 @@ const ir: SchemeRow = {
   direct_line_limit: null,
   deposit_threshold_pct: 0.3,
   default_rate_mode: 'variable',
-  revenue_cost_divisor: 0.7,
 }
 
 const sw = (name: string) => screen.getByRole('switch', { name })
@@ -103,7 +102,7 @@ describe('SchemePanel', () => {
     expect(fd.get('enable_kpi')).toBeNull()
     expect(fd.get('deposit_gate_on')).toBe('on')
     expect(fd.get('deposit_threshold_pct')).toBe('30')
-    expect(fd.get('revenue_cost_divisor')).toBe('0.7')
+    expect(fd.has('revenue_cost_divisor')).toBe(false)
     expect(fd.get('default_rate_mode')).toBe('variable')
     await waitFor(() => expect(nav.refresh).toHaveBeenCalled())
     expect(toast.flash).toHaveBeenCalledWith('Scheme rules saved — the tab list follows the switches')
@@ -117,6 +116,17 @@ describe('SchemePanel', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Give the deposit gate a threshold, or switch it off')
     expect(sw('Open Bill bonus')).toHaveAttribute('aria-checked', 'true')
     expect(nav.refresh).not.toHaveBeenCalled()
+  })
+
+  // 2026-10-11, the user: the cost basis is set on Product List › Costing
+  // Setting only — two places for one number left nobody sure which counted.
+  it('keeps the default rate mode and leaves the Revenue Team cost basis to the Product List', () => {
+    render(<SchemePanel scheme={ir} subName="IR" canManage />)
+    expect(screen.getByText('Default rate mode')).toBeInTheDocument()
+    expect(screen.getByLabelText('Default rate mode')).toHaveValue('variable')
+    expect(screen.queryByText(/cost basis/i)).toBeNull()
+    expect(screen.queryByLabelText(/divisor/i)).toBeNull()
+    expect(screen.queryByText(/unit cost/i)).toBeNull()
   })
 
   it('is read-only for whoever may not manage the rules', () => {

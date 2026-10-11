@@ -53,7 +53,6 @@ const scheme = (on: boolean): SchemeRow => ({
   direct_line_limit: null,
   deposit_threshold_pct: null,
   default_rate_mode: 'variable',
-  revenue_cost_divisor: 1,
 })
 
 function dataWith(on: boolean, over: Partial<CommissionSettingsData> = {}): CommissionSettingsData {
