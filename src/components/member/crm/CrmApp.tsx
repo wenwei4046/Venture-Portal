@@ -16,15 +16,19 @@ import H from "./crm.module.css";
 import { KEYFRAMES } from "./keyframes";
 import { personOf } from "./shared/people";
 import { makeSalesActions } from "./sales/actions";
-import { initialSalesUi, type SalesRefs, type SalesUi } from "./sales/ui";
+import { initialSalesUi, type SalesRefs, type SalesTab, type SalesUi } from "./sales/ui";
 import { type SalesCtx } from "./sales/vm/common";
 import { lastAt } from "./sales/vm/inbox";
 import SalesScreens from "./sales/SalesScreens";
 import { byTeam, downlineOf } from "./shared/people";
 import PanelScreens from "./panel/PanelScreens";
 import { makePanelActions } from "./panel/actions";
-import { initialPanelUi, type PanelUi } from "./panel/ui";
+import { initialPanelUi, type PanelTab, type PanelUi } from "./panel/ui";
 import { teamsOf, type PanelCtx } from "./panel/vm/common";
+
+/** Team | Mine keeps the page: one's CRM page → the Control panel's (it has no Contacts: its Inbox lists everybody's). */
+const TEAM_TAB: Record<SalesTab, PanelTab> = { inbox: "inbox", contacts: "inbox", calendar: "calendar", insight: "overview", profile: "profile" };
+const MINE_TAB: Record<PanelTab, SalesTab> = { overview: "insight", inbox: "inbox", calendar: "calendar", profile: "profile", assign: "inbox", ads: "insight" };
 
 /** On demo data (/member/preview) the Control panel is looked at with ?crmAs=boss or ?crmAs=hod. */
 const demoViewer = () => (typeof window === "undefined" ? undefined : new URLSearchParams(window.location.search).get("crmAs") ?? undefined);
@@ -162,7 +166,9 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
       teamOfStaff: id => { const tl = id ? teams.find(t => t.id === id || t.people.some(p => p.id === id)) : undefined; return tl; },
       openCrmOf,
       // Mine: one's own CRM — or, viewing somebody, back to theirs.
-      toMyCrm: panelFor.id !== me.id ? () => setTeamAs(null) : sells ? () => openCrmOf(me.id) : undefined,
+      // …and Mine comes back to the same page.
+      toMyCrm: panelFor.id !== me.id ? () => { setTeamAs(null); setUi(u => ({ ...u, tab: MINE_TAB[panelUi.tab], chat: null, profSub: null })); }
+        : sells ? () => { openCrmOf(me.id); setUi(u => ({ ...u, tab: MINE_TAB[panelUi.tab] })); } : undefined,
       exitApp: onExit, slotCounts,
     };
     return shell(<>
@@ -188,8 +194,9 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
       toPanel: () => { setHodMode("panel"); setViewing(null); },
       // Team | Mine (rev 1010 §7.3): the Director to the Control panel.
       // Viewing somebody who leads: their Team, as they see it (user 2026-10-11).
-      toTeam: owner.id !== me.id ? (hasTeamSide(owner) ? () => { setTeamAs(owner.id); setPanelUi(initialPanelUi()); } : undefined)
-        : (full && sells) || leads ? () => { setHodMode("panel"); setViewing(null); } : undefined,
+      // Team opens on the same page, team-wide (user 2026-10-11: from Inbox / Calendar / Contacts it landed on Insight).
+      toTeam: owner.id !== me.id ? (hasTeamSide(owner) ? from => { setTeamAs(owner.id); setPanelUi({ ...initialPanelUi(), tab: TEAM_TAB[from] }); } : undefined)
+        : (full && sells) || leads ? from => { setHodMode("panel"); setViewing(null); setPanelUi(u => ({ ...u, tab: TEAM_TAB[from], lead: null })); } : undefined,
       switchList: byTeam(below.map(id => personOf(id, data.people)!).filter(Boolean), data.people),
       // Assign to somebody: assignment is CRM · Manage's.
       assignTo: data.can.manage ? (customerId, staffId) => panelAct.sendTo(customerId, staffId) : undefined,

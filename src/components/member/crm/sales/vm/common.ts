@@ -8,7 +8,7 @@ import { replyUrgency, type CrmStatus } from "@/lib/member/crm";
 import { asLead, type CrmChatMessage, type CrmCustomer, type CrmData, type CrmPerson } from "@/lib/member/crm-data";
 import { windowOpen } from "@/lib/whatsapp/send";
 import { messengerWindow } from "@/lib/messenger/send";
-import type { SalesRefs, SalesUi } from "../ui";
+import type { SalesRefs, SalesTab, SalesUi } from "../ui";
 import { formatIntlDate } from "@/lib/utils";
 
 /** A date in the design's words, months always three letters (DESIGN.md › Date format). */
@@ -105,7 +105,7 @@ export interface SalesCtx {
   slotCounts: Record<string, number>;
   embedded: { rdMode: boolean; toPanel?: () => void; exitAs?: () => void; switchList?: CrmPerson[]; onSwitch?: (id: string) => void;
     /** Team | Mine: to the Control panel scoped to this person (the Director; leaders with a downline). */
-    toTeam?: () => void;
+    toTeam?: (from: SalesTab) => void;
     /** The Principal / Director give a customer to anyone (crm_send_to) — their chat menu's Assign to. */
     assignTo?: (customerId: string, staffId: string) => Promise<boolean> } | null;
 }

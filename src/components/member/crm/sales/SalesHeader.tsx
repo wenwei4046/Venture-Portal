@@ -11,14 +11,14 @@ export default function SalesHeader({ v }: { v: HeaderVM }) {
   return (<>
             
     <header style={{ flex: "0 0 auto", display: "flex", alignItems: "center", padding: "4px 20px 0", background: "#fff" }}>
-      <span onClick={v.crmBack} title="Back to Revenue app" style={{ visibility: v.backVis, display: "flex", alignItems: "center", gap: "4px", height: "44px", color: "#BD4A19", fontSize: "14px", fontWeight: "600", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <span onClick={v.crmBack} title="Back to Revenue app" style={{ visibility: v.backVis, display: "flex", alignItems: "center", gap: "4px", height: "44px", color: "#BD4A19", fontSize: "14px", fontWeight: "600", whiteSpace: "nowrap", flex: "none", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="m15 6-6 6 6 6">
           </path>
         </svg>{v.backLabel}</span>
       {!!(v.hasTM) && (<>
         <div style={{ flex: "none", alignSelf: "center", marginLeft: "auto", display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "#F0E6DE" }}>
           {(v.tmTabs).map((d, d_i) => (<Fragment key={d_i}>
-            <span onClick={d.pick} style={{ height: "28px", padding: "0 14px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: d.bg, color: d.fg, boxShadow: d.sh, cursor: "pointer" }}>{d.label}</span>
+            <span onClick={d.pick} style={{ height: "28px", padding: "0 12px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: d.bg, color: d.fg, boxShadow: d.sh, cursor: "pointer" }}>{d.label}</span>
           </Fragment>))}
         </div>
       </>)}

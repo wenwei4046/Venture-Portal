@@ -19,10 +19,10 @@ describe("the way to the showroom on a visit card", () => {
     expect(withoutMapLinks(text)).toBe(words);
   });
 
-  it("WhatsApp: bold heading and labels, the office's day and time, one Google Maps button, no Waze", () => {
+  it("WhatsApp: bold heading and labels, the office's day and time, one Waze button", () => {
     const m = whatsappVisitMessage("60166199278", card);
     expect(m.interactive.type).toBe("cta_url");
-    expect(m.interactive.action.parameters).toEqual({ display_text: "Google Maps", url: mapLinks(card.addr).google });
+    expect(m.interactive.action.parameters).toEqual({ display_text: "Waze", url: mapLinks(card.addr).waze });
     expect(m.interactive.body.text).toBe([
       "*Your showroom visit is changed to*", "",
       "🗓️ *Date:* 9 Oct 2026 (Fri)", "⏰ *Time:* 1:00 pm", "📍 *Location:* HQ", "",

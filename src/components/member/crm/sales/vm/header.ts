@@ -15,7 +15,7 @@ export function teamMineVM(ctx: SalesCtx) {
   return {
     hasTM: !!toTeam,
     tmTabs: ([["Team", false], ["Mine", true]] as const).map(([label, on]) => ({ label, bg: on ? "#fff" : "transparent", fg: on ? "#3F2B22" : "#806B60", sh: on ? "0 1px 3px rgba(63,43,34,.14)" : "none",
-      pick: on ? undefined : () => toTeam?.() })),
+      pick: on ? undefined : () => toTeam?.(ctx.ui.tab) })),
   };
 }
 

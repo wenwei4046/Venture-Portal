@@ -2,7 +2,7 @@
  * The way to the showroom, for a visit card the customer receives (design
  * handoff: a showroom's address is for Waze / Google Maps; user 2026-10-09).
  * Both channels send the same layout (`visitCardText`) — bold on WhatsApp,
- * plain on Messenger, which has no bold. WhatsApp adds Google Maps as its one
+ * plain on Messenger, which has no bold. WhatsApp adds Waze as its one
  * link button; Messenger adds Google Maps · Waze as two buttons that open
  * `/nav.html`, which hands the address to the app itself: Messenger opens a
  * link in its own browser, where Google Maps and Waze offered to be
@@ -67,7 +67,7 @@ export const whatsappCardText = (card: CrmCard) => visitCardText(card, true).sli
 /**
  * WhatsApp's reply with one link button (cta_url — no template, no review,
  * free inside the 24-hour window; one button only): the card's words and
- * Google Maps as the button (user 2026-10-09: no Waze link on WhatsApp).
+ * Waze as the button (user 2026-10-11: WhatsApp links Waze; it was Google Maps since 2026-10-09).
  */
 export function whatsappVisitMessage(to: string, card: CrmCard) {
   return {
@@ -75,7 +75,7 @@ export function whatsappVisitMessage(to: string, card: CrmCard) {
     interactive: {
       type: "cta_url",
       body: { text: whatsappCardText(card) },
-      action: { name: "cta_url", parameters: { display_text: "Google Maps", url: mapLinks(card.addr).google } },
+      action: { name: "cta_url", parameters: { display_text: "Waze", url: mapLinks(card.addr).waze } },
     },
   };
 }

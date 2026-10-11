@@ -16,7 +16,7 @@ export default function SalesInbox({ v }: { v: InboxVM }) {
         {!!(v.hasTM) && (<>
         <div style={{ flex: "none", alignSelf: "center", marginLeft: "auto", display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "#F0E6DE" }}>
           {(v.tmTabs).map((d, d_i) => (<Fragment key={d_i}>
-            <span onClick={d.pick} style={{ height: "28px", padding: "0 14px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: d.bg, color: d.fg, boxShadow: d.sh, cursor: "pointer" }}>{d.label}</span>
+            <span onClick={d.pick} style={{ height: "28px", padding: "0 12px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: d.bg, color: d.fg, boxShadow: d.sh, cursor: "pointer" }}>{d.label}</span>
           </Fragment>))}
         </div>
       </>)}

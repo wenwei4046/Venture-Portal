@@ -131,6 +131,13 @@ PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []), ["<span onClick={v.openAd} 
   '          {(v.tmTabs).map((d, d_i) => (<Fragment key={d_i}>\n' +
   '            <span onClick={d.pick} style={{ height: "28px", padding: "0 14px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: d.bg, color: d.fg, boxShadow: d.sh, cursor: "pointer" }}>{d.label}</span>\n' +
   '          </Fragment>))}\n        </div>\n      </>)}\n        <span onClick={v.openAd} style']];
+// Top bar with Team | Mine: "‹ Back to Revenue app", the pill and the bell filled the 335 px to the pixel, so the link
+// broke onto two lines (user 2026-10-11). The link stays on one line; the pill's tabs take 12 px a side, not 14 (here and
+// beside All ads), which leaves room.
+PATCHES.SalesHeader = [...(PATCHES.SalesHeader ?? []),
+  ['fontSize: "14px", fontWeight: "600", cursor: "pointer" }}><svg width="20"', 'fontSize: "14px", fontWeight: "600", whiteSpace: "nowrap", flex: "none", cursor: "pointer" }}><svg width="20"'],
+  ['padding: "0 14px", borderRadius: "9px"', 'padding: "0 12px", borderRadius: "9px"']];
+PATCHES.SalesInbox[PATCHES.SalesInbox.length - 1][1] = PATCHES.SalesInbox[PATCHES.SalesInbox.length - 1][1].replace('padding: "0 14px", borderRadius: "9px"', 'padding: "0 12px", borderRadius: "9px"');
 for (const [name, vm, frag, doc, vmOverride] of parts) {
   let body = convert(frag);
   for (const [a, b] of PATCHES[name] ?? []) {
