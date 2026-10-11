@@ -1,15 +1,18 @@
 import type { MemberIncome, MemberMemo, MemberRequest, RequestKind } from "@/lib/member/types";
+import type { Notice } from "@/lib/push/notices";
 import { monthName, rm2, shortDay } from "../format";
 import { ICON } from "../icons";
 
 /** The bell: built from what already exists — memos, requests and the settled month. */
-export type NotifTab = "all" | "requests" | "memos" | "results";
-export type NotifKind = "memo" | "res" | "pay" | "req";
+export type NotifTab = "all" | "requests" | "memos" | "results" | "updates";
+export type NotifKind = "memo" | "res" | "pay" | "req" | "room" | "hire";
 export type NotifGo =
   | { to: "memo"; memoId: string }
   | { to: "requests"; requestId?: string; kind?: RequestKind }
   | { to: "income" }
-  | { to: "arena" };
+  | { to: "arena" }
+  | { to: "rooms" }
+  | { to: "none" };
 
 export interface NotifItem {
   id: string;
@@ -50,6 +53,11 @@ export interface NotifyInput {
   requestCode: (request: MemberRequest) => string;
   /** Where the app may take them (2026-10-11): news about a page their ticks close is not shown. */
   opens?: (go: NotifGo) => boolean;
+  /**
+   * What the database told them (2026-10-11, mig 20261011180000): a meeting booked for them, added,
+   * changed or cancelled; their manpower request's step. Shown under All, as UPDATES.
+   */
+  notices?: readonly Notice[];
 }
 
 const STATUS: Record<string, { text: string; tone: NonNullable<NotifItem["done"]>["tone"] }> = {
@@ -133,6 +141,14 @@ export function notifications(input: NotifyInput): { items: NotifItem[]; count: 
       open: false, unread: !input.readAll, big: null, link: "Open My income", done: null, go: { to: "income" },
     });
   }
+  for (const n of input.notices ?? []) {
+    const room = n.refKind === "booking";
+    items.push({
+      id: `nt-${n.id}`, kind: room ? "room" : "hire", tab: "updates", icon: room ? ICON.calendar : ICON.queue, time: ago(n.at, input.now),
+      title: n.title, sub: n.body, open: false, unread: !n.read, big: null, link: room ? "Open Book a room" : null, done: null,
+      go: room ? { to: "rooms" } : { to: "none" },
+    });
+  }
   const shown = input.opens ? items.filter(n => input.opens!(n.go)) : items;
   return { items: shown, count: shown.filter(n => n.open).length };
 }
@@ -142,9 +158,11 @@ export function notifGroups(items: NotifItem[], tab: NotifTab, settledMonth: str
   const need = visible.filter(n => n.open);
   const res = visible.filter(n => n.kind === "res" || n.kind === "pay");
   const upd = visible.filter(n => n.kind === "req" && !n.open);
-  const rest = visible.filter(n => !need.includes(n) && !res.includes(n) && !upd.includes(n));
+  const news = visible.filter(n => n.kind === "room" || n.kind === "hire");
+  const rest = visible.filter(n => !need.includes(n) && !res.includes(n) && !upd.includes(n) && !news.includes(n));
   const groups: [string, NotifItem[]][] = [
     ["NEEDS YOU", need],
+    ["UPDATES", news],
     [`${(settledMonth ?? "").toUpperCase()} RESULTS`, res],
     ["REQUEST UPDATES", upd],
     ["EARLIER", rest],

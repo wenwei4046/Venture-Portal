@@ -1,6 +1,7 @@
 'use server'
 
 import { isDay } from '@/lib/rooms/model'
+import { pushSoon } from '@/lib/push/outbox'
 import { guestClient } from './client'
 import { bookedFromRow, guestRefusal, isGuestCode, takenFromRows, type GuestBooked, type GuestTaken } from './model'
 
@@ -66,6 +67,8 @@ export async function guestBook(input: GuestBookInput): Promise<GuestDone<{ book
   })
   if (error) return { ok: false, reason: guestRefusal(error, 'The room could not be booked. Please try again.') }
   const booked = bookedFromRow(data)
+  // HR's rooms people are told of a guest booking (mig 20261011180000).
+  pushSoon()
   return booked ? { ok: true, booked } : { ok: false, reason: 'The room could not be booked. Please try again.' }
 }
 
@@ -98,6 +101,7 @@ export async function guestHire(input: GuestHireInput): Promise<GuestDone<{ id: 
   })
   if (error) return { ok: false, reason: guestRefusal(error, 'The request could not be sent. Please try again.') }
   const r = (data ?? {}) as { id?: string; position?: string }
+  pushSoon()
   return { ok: true, id: String(r.id ?? ''), position: String(r.position ?? 'the role') }
 }
 
@@ -107,5 +111,6 @@ export async function guestCancel(code: string, id: string, actor: string): Prom
   if (!isId(id)) return { ok: false, reason: 'This booking is no longer there.' }
   const { data, error } = await guestClient().rpc('guest_link_cancel', { p_code: code, p_id: id, p_actor: text(actor, 120) })
   if (error) return { ok: false, reason: guestRefusal(error, 'The meeting could not be cancelled. Please try again.') }
+  pushSoon()
   return { ok: true, title: String((data as { title?: string } | null)?.title ?? '') }
 }

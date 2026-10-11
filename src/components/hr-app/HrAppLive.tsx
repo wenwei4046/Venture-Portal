@@ -7,6 +7,7 @@ import {
   hrAppFill, hrAppLetterLink, hrAppRemoveTalent, hrAppRequestInfo, hrAppTalentNotes,
 } from '@/lib/hr-app/actions'
 import type { HrAppData } from '@/lib/hr-app/model'
+import { readNotices, removePushSubscription, savePushSubscription } from '@/lib/push/actions'
 import HrApp, { type HrAppActions } from './HrApp'
 
 // The HR app on the portal's own Server Actions (2026-10-11): each write goes
@@ -27,6 +28,9 @@ export default function HrAppLive({ data }: { data: HrAppData }) {
     talentNotes: hrAppTalentNotes,
     talentRemove: hrAppRemoveTalent,
     letterLink: hrAppLetterLink,
+    noticesRead: readNotices,
+    pushSave: savePushSubscription,
+    pushRemove: removePushSubscription,
     requestDecide: hrAppDecide,
     book: hrAppBook,
     bookCancel: hrAppCancelBooking,

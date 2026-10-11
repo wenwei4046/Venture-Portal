@@ -81,6 +81,8 @@ import type { ClaimRates } from "@/lib/member/claim-rules";
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
 import CrmApp from "../crm/CrmApp";
+import type { Notices } from "@/lib/push/notices";
+import { readNotices } from "@/lib/push/actions";
 
 export type Device = "live" | "ios" | "android" | "desktop";
 
@@ -102,6 +104,8 @@ export interface RevenueAppProps {
    * neither shown nor reachable, a closed send leaves its page sending nothing. Previews close none.
    */
   closed?: AppClosed;
+  /** What the database told them (2026-10-11, mig 20261011180000) — the bell's UPDATES. None for the Principal. */
+  notices?: Notices;
   /** A preview draws the prototype's device around the app. */
   device?: Device;
   /** Fixtures: a fixed "today" and the source the preview reads. */
@@ -164,7 +168,9 @@ function useDesk(ref: RefObject<HTMLDivElement | null>): boolean {
   return desk;
 }
 
-export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
+const NO_NOTICES: Notices = { unread: 0, items: [] };
+
+export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
   // The live app keeps its answers on the phone, per account (2026-10-08, read-memory.ts): the next open shows them
   // at once and reads everything again behind them.
   const account = initialData.demo ? "" : initialData.profile.userId;
@@ -403,8 +409,18 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const nf = useMemo(() => notifications({ now: new Date(), memos: principal && !viewed ? [] : memos, requests: principal && !viewed ? [] : requests,
     settled, salary: data.profile.salary, results, readAll, requestCode,
     // News about a page their ticks close is not shown (2026-10-11).
-    opens: go => go.to === "memo" || (go.to === "requests" ? requestPage(closed, go.kind ?? "claim") !== null : shows(closed, go.to)),
-  }), [memos, requests, settled, data.profile.salary, results, readAll, principal, viewed, closed]);
+    opens: go => go.to === "memo" || go.to === "none" || (go.to === "requests" ? requestPage(closed, go.kind ?? "claim") !== null : shows(closed, go.to)),
+    notices: principal ? [] : notices.items,
+  }), [memos, requests, settled, data.profile.salary, results, readAll, principal, viewed, closed, notices.items]);
+  // The bell's dot counts what the database told them until they open it; opening it reads them (they stay marked new in the list until the next open).
+  const [noticesSeen, setNoticesSeen] = useState(false);
+  const unseenNotices = principal || noticesSeen ? 0 : notices.unread;
+  const seeNotices = useCallback(() => {
+    if (unseenNotices > 0) {
+      setNoticesSeen(true);
+      void readNotices(null);
+    }
+  }, [unseenNotices]);
   const settledMonth = settled ? monthName(settled.period) : null;
 
   // ── the Quote's catalogue (2026-10-08): no longer in the snapshot every open waited for ──
@@ -530,8 +546,18 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     setArKind("monthly"); setArFrom(month); setArSub("total");
     goScreen("arena", { arena: "board", board });
   }, [goScreen]);
-  const openNotif = useCallback(() => { setSheet(null); setNfOpen(true); }, []);
-  const toggleNotif = useCallback(() => { setSheet(null); setNfOpen(open => !open); }, []);
+  const openNotif = useCallback(() => { setSheet(null); setNfOpen(true); seeNotices(); }, [seeNotices]);
+  const toggleNotif = useCallback(() => { setSheet(null); setNfOpen(open => !open); seeNotices(); }, [seeNotices]);
+  // A tapped push about a manpower request opens the app at `?bell=1` (lib/push/notices noticeUrl): the bell, once.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("bell") !== "1") return;
+    q.delete("bell");
+    window.history.replaceState(null, "", window.location.pathname + (q.toString() ? `?${q}` : ""));
+    openNotif();
+    // Only on opening.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const openSheet = useCallback((next: Sheet) => { setNfOpen(false); setSheet(next); }, []);
 
   const todo = (t: TodayTodo) => {
@@ -545,6 +571,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     else if (n.go.to === "requests") goScreen("account", { pf: requestPage(closed, n.go.kind ?? "claim") ?? "requests" });
     // A settled month's news opens on that month: the app itself opens on the current one.
     else if (n.go.to === "income") { setIncPeriod(settled?.period ?? null); goScreen("account", { pf: "income" }); }
+    else if (n.go.to === "rooms") goScreen("account", { pf: "rooms" });
+    else if (n.go.to === "none") return;
     else openBoard("sales", settled?.period ?? null);
   };
 
@@ -661,7 +689,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     const todo = vm.todo.filter(t => t.target !== "requests" || requestPage(closed, t.requestKind ?? "claim") !== null);
     return todo.length === vm.todo.length ? vm : { ...vm, todo };
   }, [fixture, model, closed, hidden, incomeShut]);
-  const nfCount = fixture?.notifications.count ?? nf.count;
+  const nfCount = fixture?.notifications.count ?? nf.count + unseenNotices;
   const nfGroupsVM = fixture?.notifications.groups ?? notifGroups(nf.items, nfTab, settledMonth);
   const nfSummaryVM = fixture?.notifications.summary ?? notifSummary(nf.count, settledMonth);
 
@@ -1168,7 +1196,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       page = <BrandWeeksPage months={bwMonths} backOffice={backOffice} busy={bwBusy} error={bwError} saved={bwSaved}
         onPick={pickBrandWeek} onSave={() => void saveBrandWeeks()} onBack={back} />;
     } else {
-      page = <ProfileMain vm={docs.unseen ? { ...profileVM, badges: { ...profileVM.badges, docs: String(docs.unseen) } } : profileVM} hidden={hidden} crm={crm} closedRows={closedRows} actions={{
+      page = <ProfileMain vm={docs.unseen ? { ...profileVM, badges: { ...profileVM.badges, docs: String(docs.unseen) } } : profileVM} hidden={hidden} crm={crm} closedRows={closedRows} push={!principal && !data.demo} actions={{
         open: (key: WorkKey) => goScreen("account", { pf: key }),
         scheme: () => setSchemeOpen(true),
         brandWeeks: () => goScreen("account", { pf: "brandWeeks" }),

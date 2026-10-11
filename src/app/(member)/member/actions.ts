@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { pushSoon } from "@/lib/push/outbox";
 import type { MemberReadContext, QuoteInput } from "@/lib/member/types";
 export type { AdminMemberInput, AdminMemberData } from "@/lib/member/server";
 import {
@@ -63,6 +64,8 @@ export async function submitMemberRequest(form: FormData) {
   if (result.ok) {
     revalidatePath("/member");
     revalidatePath("/claims");
+    // HR is told of a request sent or answered (mig 20261011180000).
+    pushSoon();
   }
   return result;
 }

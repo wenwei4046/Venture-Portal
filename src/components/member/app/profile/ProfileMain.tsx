@@ -2,6 +2,7 @@
 
 import { ICON, Svg } from "../icons";
 import InstallRow from "./InstallRow";
+import PushRow from "./PushRow";
 import type { ProfileMainVM, WorkKey } from "./profile-vm";
 import s from "./profile.module.css";
 
@@ -37,8 +38,10 @@ const NO_ROWS: readonly WorkKey[] = [];
  * Profile — the peach card, Your workspace, Privacy and Sign out (lines 1132–1187).
  * `closedRows`: the workspace's pages their ticks close (2026-10-11) — not listed.
  */
-export default function ProfileMain({ vm, hidden, actions, crm = true, closedRows = NO_ROWS }: {
+export default function ProfileMain({ vm, hidden, actions, crm = true, closedRows = NO_ROWS, push = false }: {
   vm: ProfileMainVM; hidden: boolean; actions: ProfileMainActions; crm?: boolean; closedRows?: readonly WorkKey[];
+  /** This phone's notifications row (2026-10-11): their own app only — never while the Principal views a member. */
+  push?: boolean;
 }) {
   return (
     <div className={s.main}>
@@ -91,6 +94,7 @@ export default function ProfileMain({ vm, hidden, actions, crm = true, closedRow
             </button>
           ))}
           <InstallRow />
+          {push ? <PushRow /> : null}
         </section>
         {actions.toggleHide ? (
           <section className={s.privacy}>

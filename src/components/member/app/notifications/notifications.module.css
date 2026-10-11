@@ -85,3 +85,9 @@
 @container rv (min-width: 1024px) {
   .page { left: calc(100% - 400px); top: 60px; border-left-color: var(--rv-line); }
 }
+
+/* The database's news (2026-10-11): a meeting, a manpower request. */
+.k_room { background: var(--rv-slate-bg); color: var(--rv-slate); }
+.k_hire { background: var(--rv-sand); color: var(--rv-brown); }
+.kk_room { color: var(--rv-slate); }
+.kk_hire { color: var(--rv-brown); }

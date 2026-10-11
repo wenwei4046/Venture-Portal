@@ -252,3 +252,12 @@
 @media (prefers-reduced-motion: reduce) {
   .body, .scrim, .sheet { animation: none; }
 }
+
+/* The bell and the phone's notifications (2026-10-11, not in the handoff): the Home head's right, a white 40px tile with the count in the accent. */
+.bell { width: 40px; height: 40px; border-radius: 12px; background: rgb(255 255 255); color: rgb(43 31 23); display: grid; place-items: center; position: relative; flex: none; }
+.bellDot { position: absolute; top: 3px; right: 3px; min-width: 17px; height: 17px; padding: 0 4px; box-sizing: border-box; border-radius: 9px; background: rgb(189 74 25); color: rgb(255 255 255); font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+.moreRow:disabled { opacity: .6; }
+.pushSwitch { width: 38px; height: 22px; border-radius: 11px; background: rgb(222 214 203); position: relative; flex: none; transition: background .2s; }
+.pushSwitch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: rgb(255 255 255); transition: left .2s; }
+.pushSwitch[data-on] { background: rgb(233 154 83); }
+.pushSwitch[data-on]::after { left: 19px; }

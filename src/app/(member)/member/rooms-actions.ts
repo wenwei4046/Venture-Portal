@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
+import { pushSoon } from "@/lib/push/outbox";
 import { getMemberUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isPrincipalAccount } from "@/lib/view-as";
@@ -100,6 +101,7 @@ export async function bookMemberRoom(input: MemberBookInput): Promise<Outcome<{ 
     });
     if (error) return { ok: false, error: words(error, "The room could not be booked. Please try again.") };
     revalidatePath("/admin/rooms");
+    pushSoon();
     const r = (data ?? {}) as { id?: string; ref?: string };
     return { ok: true, data: { id: String(r.id ?? ""), ref: String(r.ref ?? "") } };
   } catch (error) {
@@ -115,6 +117,7 @@ export async function cancelMemberBooking(id: string): Promise<Outcome<true>> {
     const { error } = await client.rpc("meeting_rooms_cancel", { p_id: id });
     if (error) return { ok: false, error: words(error, "The meeting could not be cancelled. Please try again.") };
     revalidatePath("/admin/rooms");
+    pushSoon();
     return { ok: true, data: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "The meeting could not be cancelled." };

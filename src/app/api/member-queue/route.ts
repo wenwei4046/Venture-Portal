@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { adminClient } from '@/lib/supabase/admin'
+import { flushPush } from '@/lib/push/outbox'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -30,6 +31,8 @@ export async function GET(request: Request) {
     // itself failing is this sweep's failure.
     const due = await db.rpc('member_run_due_replacements')
     if (due.error) console.error('Member replacement sweep failed', due.error.code ?? 'unknown')
+    // Phone notifications a write left unsent (mig 20261011180000) — through the outbox's own secret, not the service role.
+    await flushPush()
     if (error || !data || !['complete', 'partial', 'skipped'].includes(data.status)) {
       // Log codes only. Never echo SQL errors, credentials or private rows.
       console.error('Member queue worker failed', error?.code ?? 'invalid_result')

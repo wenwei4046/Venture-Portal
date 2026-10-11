@@ -1,13 +1,15 @@
 'use client'
 
-import { Fragment, useMemo, useState, useTransition, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, useTransition, type ReactNode } from 'react'
 import { officeTime } from '@/lib/office-time'
+import { openTarget, type Notice, type NoticeRef } from '@/lib/push/notices'
+import { PUSH_WORDS, pushState, turnPushOff, turnPushOn, type PushState } from '@/components/pwa/push-client'
 import { Select } from '@/components/hrv/select'
 import ViewingAsBanner from '@/components/layout/ViewingAsBanner'
 import {
   CAND_STAGE, CHIP, HIRE_FILTERS, MAJOR_EVENTS, MEMBER_KIND, ORANGE, SLATE,
   bookingTimes, budgetLabel, candChip, clashOf, dayLabel, daysToFill, hireChip, hm, hourFrom, initials, isPendingHire,
-  isPendingRequest, missingFor, pipeline, positionLabel, requestStatusLabel, requestTitle, reviewItems, shiftDay, slotAt,
+  isPendingRequest, missingFor, noticeAgo, noticeTag, pipeline, positionLabel, requestStatusLabel, requestTitle, reviewItems, shiftDay, slotAt,
   type CandStage, type HrAppData, type HrBooking, type HrHire,
 } from '@/lib/hr-app/model'
 import s from './hr-app.module.css'
@@ -34,6 +36,11 @@ export interface HrAppActions {
   talentNotes(id: string, notes: string): Promise<ActResult>
   talentRemove(id: string): Promise<ActResult>
   letterLink(letterId: string): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
+  /** Their notifications read: these, or all (2026-10-11). */
+  noticesRead(ids?: string[] | null): Promise<ActResult>
+  /** This phone's pushes on / off. */
+  pushSave(s: { endpoint: string; p256dh: string; auth: string; app: 'hr' | 'revenue' }): Promise<ActResult>
+  pushRemove(endpoint: string): Promise<ActResult>
   /** After a write: read the app's data again. */
   refresh(): void
 }
@@ -47,6 +54,7 @@ type Page =
   | { k: 'talent'; id: string }
   | { k: 'docs' }
   | { k: 'person'; id: string }
+  | { k: 'notices' }
 type Sheet =
   | { k: 'stage'; cid: string; name: string; cur: CandStage }
   | { k: 'ack' }
@@ -71,6 +79,7 @@ const TABS: Array<[Tab, string]> = [['home', 'Home'], ['review', 'Review'], ['hi
 const TITLES: Record<string, [string, string]> = {
   home: ['', 'Human Resource'], review: ['Inbox', 'Review'], hiring: ['Hiring', 'Requests'], rooms: ['Admin', 'Meeting rooms'],
   more: ['HR', 'More'], insights: ['Hiring', 'Insights'], talents: ['Hiring', 'Talent Bank'], docs: ['Documentation', 'Data center'],
+  notices: ['HR', 'Notifications'],
 }
 
 /** The book sheet opens on HR, as the prototype's does — or the first department there is. */
@@ -120,6 +129,49 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
     setTab(t)
     setStack([])
     setSheet(null)
+  }
+
+  // ── Notifications (2026-10-11): a notice opens what it is about, or its tab when it has left the lists. ──
+  const openRef = (kind: NoticeRef, id: string) => {
+    setSheet(null)
+    if (kind === 'hiring_request') {
+      setTab('hiring')
+      setStack(d.hires.some(h => h.id === id) ? [{ k: 'hire', id }] : [])
+    } else if (kind === 'member_request') {
+      setTab('review')
+      setStack(d.requests.some(r => r.id === id) ? [{ k: 'req', id }] : [])
+    } else {
+      setTab('rooms')
+      setStack([])
+      if (live.some(b => b.id === id)) openSheet({ k: 'booking', id })
+    }
+  }
+  // Which were new when the bell was opened: still marked on its page after the dot goes.
+  const [fresh] = useState(() => new Set(d.notices.items.filter(n => !n.read).map(n => n.id)))
+  const openNotices = () => {
+    push({ k: 'notices' })
+    if (d.notices.unread > 0) void actions.noticesRead(null).then(r => { if (r.ok) actions.refresh() })
+  }
+  // A tapped push opens the app at `?open=hire:HR-205` (lib/push/notices noticeUrl): go there once, then forget it.
+  useEffect(() => {
+    const target = openTarget(new URLSearchParams(window.location.search).get('open'))
+    if (!target) return
+    window.history.replaceState(null, '', window.location.pathname)
+    openRef(target.k === 'hire' ? 'hiring_request' : target.k === 'req' ? 'member_request' : 'booking', target.id)
+    // Only on opening.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  // This phone's pushes: asked of the browser once the app is open; the permission only when the row is pressed.
+  const [pushNow, setPushNow] = useState<PushState | null>(null)
+  useEffect(() => {
+    void pushState().then(setPushNow).catch(() => setPushNow('unsupported'))
+  }, [])
+  const togglePush = () => {
+    startBusy(async () => {
+      const res = pushNow === 'on' ? await turnPushOff(actions.pushRemove) : await turnPushOn('hr', actions.pushSave)
+      setPushNow(res.state)
+      setError(res.reason ?? '')
+    })
   }
   const openSheet = (sh: Sheet, f: Form = {}) => {
     setSheet(sh)
@@ -178,6 +230,12 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
             {/* A div, as the prototype's: the portal's global h1 rule would set it in Georgia. */}
             <div className={s.title} role="heading" aria-level={1}>{title}</div>
           </div>
+          {view === 'home' && !d.viewingAs ? (
+            <button type="button" className={s.bell} onClick={openNotices} aria-label={d.notices.unread ? `Notifications, ${d.notices.unread} new` : 'Notifications'}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" /><path d="M10 20.5a2.2 2.2 0 0 0 4 0" /></svg>
+              {d.notices.unread ? <span className={s.bellDot}>{d.notices.unread > 9 ? '9+' : d.notices.unread}</span> : null}
+            </button>
+          ) : null}
           {view === 'rooms' && d.may.book ? (
             // With no room yet there is nothing to book: the portal's "+ Book a room" greys out too.
             <button type="button" className={s.headAction} disabled={!d.rooms.length} onClick={() => openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: defaultDept(d) })}>
@@ -315,8 +373,18 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
                   <Chevron />
                 </button>
               ))}
+              {/* Not in the handoff (2026-10-11): this phone's notifications — asked for only when pressed. */}
+              {!d.viewingAs ? (
+                <button type="button" className={s.moreRow} disabled={busy || pushNow === null || pushNow === 'unsupported' || pushNow === 'denied' || pushNow === 'install'} onClick={togglePush}>
+                  <span className={s.moreIcon} style={{ background: 'rgb(255 240 228)', color: 'rgb(189 74 25)' }}>●</span>
+                  <span className={s.grow}><span className={s.moreTitle}>Phone notifications</span><span className={s.moreSub}>{pushNow ? PUSH_WORDS[pushNow] : '…'}</span></span>
+                  <span className={s.pushSwitch} data-on={pushNow === 'on' ? '1' : undefined} aria-hidden="true" />
+                </button>
+              ) : null}
             </section>
           ) : null}
+
+          {view === 'notices' ? <NoticesScreen items={d.notices.items} fresh={fresh} open={(n: Notice) => openRef(n.refKind, n.refId)} /> : null}
 
           {view === 'insights' ? <InsightsScreen d={data} /> : null}
 
@@ -453,6 +521,37 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
         />
       ) : null}
     </div>
+  )
+}
+
+/** The bell's page (2026-10-11): what was new when it opened, then the rest; a tap opens what it is about. */
+function NoticesScreen({ items, fresh, open }: { items: Notice[]; fresh: ReadonlySet<string>; open: (n: Notice) => void }) {
+  const now = new Date()
+  if (!items.length) return <div className={s.emptyCard}>No notifications yet.</div>
+  const groups: Array<[string, Notice[]]> = [['New', items.filter(n => fresh.has(n.id))], ['Earlier', items.filter(n => !fresh.has(n.id))]]
+  return (
+    <>
+      {groups.filter(([, list]) => list.length > 0).map(([label, list]) => (
+        <section key={label} className={s.card18}>
+          <div className={s.cardHead}>
+            <span className={s.cardTitle}>{label}</span>
+          </div>
+          {list.map(n => {
+            const t = noticeTag(n)
+            return (
+              <button key={n.id} type="button" className={s.todo} onClick={() => open(n)}>
+                <span className={s.todoTag} style={{ background: t.bg, color: t.fg }}>{t.tag}</span>
+                <span className={s.grow}>
+                  <span className={s.line}>{n.title}</span>
+                  <span className={s.meta12}>{[n.body, noticeAgo(n.at, now)].filter(Boolean).join(' · ')}</span>
+                </span>
+                <Chevron />
+              </button>
+            )
+          })}
+        </section>
+      ))}
+    </>
   )
 }
 
