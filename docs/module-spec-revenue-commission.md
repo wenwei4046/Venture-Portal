@@ -880,7 +880,8 @@ department team cost"). RM 1,000 of supplier cost is judged as RM 1,428.57.
 The member calculator (`lib/member/calculator.ts`), the members' order
 margins in the snapshot RPCs and the engine (`marginBase`) all divide by the
 same figure, so a salesperson's "36% margin" at the fair is the 36% the run
-pays on. Set on Rules › Scheme rules; 1 keeps the cost as keyed. A hand-keyed
+pays on. Set on Product List › Costing Setting (Rules › Scheme rules
+carried it too until 2026-10-11 — see below); 1 keeps the cost as keyed. A hand-keyed
 `manual_margin_pct` is already a team-basis margin and is not divided again.
 
 **A SKU's own ratio (2026-09-27).** "部分 SKU 它的除法 rate 不一样，比如可能是除以
@@ -888,9 +889,16 @@ pays on. Set on Rules › Scheme rules; 1 keeps the cost as keyed. A hand-keyed
 code, which the row keeps beside the SKU id) divides that SKU's lines by its
 own ratio instead — in the engine (`costDivisorFor`, per line), the month page,
 the member facts and the calculator alike. Both figures are set on Product
-List › Costing Setting, per sub-department (the scheme's also on Rules ›
-Scheme rules); saving a SKU the ERP renamed follows it to its new code. A new
-sub-department that follows another copies its ratio and its SKUs' ratios.
+List › Costing Setting, per sub-department, and nowhere else; saving a SKU
+the ERP renamed follows it to its new code. A new sub-department that follows
+another copies its ratio and its SKUs' ratios.
+
+**One place for the cost basis (2026-10-11).** Rules › Scheme rules showed
+the scheme's ratio as well (*Revenue Team cost basis* under Defaults), and
+its Save wrote back whatever its form had loaded — 1 when blank — over what
+Costing Setting had set. The user: "如果这边再有的话系统会乱掉，不知道要跟哪个".
+The row is gone and `updateScheme` never writes `revenue_cost_divisor`;
+Costing Setting is its one editor.
 
 The price that reaches a threshold *t* is **cost ÷ (1 − t)**, never
 cost × (1 + t): 33% on RM 1,000 of team cost is RM 1,492.54, 67% is
@@ -1820,8 +1828,9 @@ changed since the last save, Save / Saved at the section's top, and what a
 component needs besides its switch opened under its row while it is on —
 Group incentive's three layer settings (2 · 2 · 3 when it is switched on),
 how Open Bill pays, whether the override base counts KPI revenue, the
-deposit gate's %. The Revenue Team cost basis and the default rate mode
-sit under *Defaults*. The on-first ordering and `scheme-rule-order.ts` went
+deposit gate's %. The default rate mode sits under *Defaults* (the
+Revenue Team cost basis sat there too until 2026-10-11 — Product List ›
+Costing Setting is its only place now). The on-first ordering and `scheme-rule-order.ts` went
 with the table (`_components/rules/SchemePanel.tsx`).
 
 **II. Title ladder** — `comm_ranks`. One rung per title. The **title is

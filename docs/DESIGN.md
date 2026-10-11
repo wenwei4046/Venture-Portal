@@ -233,7 +233,9 @@ disagree, the file wins; every value is the prototype's.**
   (44px toggle · 250px label · description; an off label in brown; a 6px
   orange dot on a switch changed since the save), what a component needs
   opened under its row in `250 250 249` cards (Group incentive's three layer
-  settings, mono 15px values), *Defaults* below, and Save at the title's right
+  settings, mono 15px values), *Defaults* below (the default rate mode — no
+  cost basis row since 2026-10-11: the Revenue Team cost basis is set on
+  Product List › Costing Setting only), and Save at the title's right
   (`242 241 238` / `152 142 130` "Saved" until something moves, then orange).
   **Ranks** = a grid table Rank · Product rate · Held by (shown), Edit in
   place on a peach strip. **Capacity** = four 12px-radius figure cards (24px

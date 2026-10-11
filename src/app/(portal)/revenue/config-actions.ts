@@ -306,12 +306,11 @@ export async function updateScheme(formData: FormData) {
     throw new Error('Give the deposit gate a threshold, or switch it off')
   }
 
-  // Revenue Team cost = unit cost ÷ divisor (user 2026-09-12: Fair 0.7). Both
-  // the member calculator and the monthly run judge margin on that cost.
-  const costDivisor = num(formData, 'revenue_cost_divisor')
-  if (costDivisor !== null && (!(costDivisor > 0) || costDivisor > 10)) {
-    throw new Error('The cost divisor must be above 0 and at most 10 (1 keeps the cost as keyed)')
-  }
+  // The Revenue Team cost basis (`revenue_cost_divisor`, Fair 0.7) is NOT
+  // written here (2026-10-11, the user): Product List › Costing Setting is its
+  // one editor. Two editors of one number left nobody sure which one counted,
+  // and this Save wrote back what its form had loaded — 1 when blank — over
+  // whatever Costing Setting had set since.
 
   const basis = text(formData, 'open_bill_basis')
   if (basis && !['uplift_on_commission', 'pct_of_revenue'].includes(basis)) {
@@ -341,7 +340,6 @@ export async function updateScheme(formData: FormData) {
           open_bill_basis: basis || 'uplift_on_commission',
           default_rate_mode: rateMode || 'variable',
           deposit_threshold_pct: depositOn ? depositPct : null,
-          revenue_cost_divisor: costDivisor ?? 1,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
