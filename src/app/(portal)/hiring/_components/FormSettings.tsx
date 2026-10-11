@@ -240,7 +240,7 @@ export default function FormSettings({ board, onPreview }: { board: HiringBoard;
               if (e.key === 'Enter') addSource()
             }}
           />
-          <button type="button" className={`${s.btnGhost}`} style={{ fontSize: 13 }} onClick={addSource}>
+          <button type="button" className={`${s.btnGhost} ${s.addBtn}`} onClick={addSource}>
             + Add source
           </button>
         </div>

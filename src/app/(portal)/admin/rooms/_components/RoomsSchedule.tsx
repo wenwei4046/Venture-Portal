@@ -16,8 +16,10 @@ import s from './rooms.module.css'
  */
 export function RoomsSchedule({
   range,
+  day: want,
   people,
   canBook,
+  canManage,
   busy,
   onDay,
   onBook,
@@ -25,8 +27,13 @@ export function RoomsSchedule({
   legend,
 }: {
   range: RoomsRange
+  /** The day asked for: the toolbar names it and steps from it at once, while the grid still shows `range`. */
+  day: string
   people: RoomsPeople
   canBook: boolean
+  /** Who manages the rooms has the Rooms tab, where they are added. */
+  canManage: boolean
+  /** A day's read is on its way: the grid says so (aria-busy); the buttons stay as they are, as the prototype's. */
   busy: boolean
   onDay: (day: string) => void
   onBook: (roomId: string | null, from: number | null) => void
@@ -55,18 +62,18 @@ export function RoomsSchedule({
     <>
       <div className={s.toolbar}>
         <span className={s.dateNav}>
-          <button type="button" className={s.navBtn} onClick={() => onDay(shiftDay(day, -1))} aria-label="The day before" disabled={busy}>
+          <button type="button" className={s.navBtn} onClick={() => onDay(shiftDay(want, -1))} aria-label="The day before">
             ‹
           </button>
           <span className={s.dateLabel} aria-live="polite">
-            {dayLabel(day)}
-            {day === range.today ? ' · today' : ''}
+            {dayLabel(want)}
+            {want === range.today ? ' · today' : ''}
           </span>
-          <button type="button" className={s.navBtn} onClick={() => onDay(shiftDay(day, 1))} aria-label="The day after" disabled={busy}>
+          <button type="button" className={s.navBtn} onClick={() => onDay(shiftDay(want, 1))} aria-label="The day after">
             ›
           </button>
         </span>
-        <button type="button" className={s.today} onClick={() => onDay(range.today)} disabled={busy}>
+        <button type="button" className={s.today} onClick={() => onDay(range.today)}>
           Today
         </button>
         <span className={s.summary}>{meetingCount(bookings.length)}</span>
@@ -95,7 +102,7 @@ export function RoomsSchedule({
           ))}
         </div>
         {rooms.length === 0 ? (
-          <div className={s.noRooms}>No meeting rooms yet. They are added on the Rooms tab.</div>
+          <div className={s.noRooms}>{canManage ? 'No meeting rooms yet. They are added on the Rooms tab.' : 'No meeting rooms yet. HR adds them.'}</div>
         ) : (
           <div className={s.gridBody} style={{ gridTemplateColumns: cols }} role="row">
             <div className={s.hours}>

@@ -175,18 +175,17 @@ export function BookDrawer({
             <>
               <div className={s.stack}>
                 <span className={s.labelText}>Attending · internal</span>
-                {f.internal.length ? (
-                  <div className={s.chips}>
-                    {f.internal.map(id => (
-                      <span key={id} className={s.person}>
-                        {byId.get(id)?.name ?? 'Someone'}
-                        <button type="button" className={s.personX} aria-label={`Remove ${byId.get(id)?.name ?? 'them'}`} onClick={() => set({ internal: f.internal.filter(x => x !== id) })}>
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
+                {/* Drawn when empty too, as the prototype's: the colleague box keeps its place under the label. */}
+                <div className={s.chips}>
+                  {f.internal.map(id => (
+                    <span key={id} className={s.person}>
+                      {byId.get(id)?.name ?? 'Someone'}
+                      <button type="button" className={s.personX} aria-label={`Remove ${byId.get(id)?.name ?? 'them'}`} onClick={() => set({ internal: f.internal.filter(x => x !== id) })}>
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
                 <input className={s.input} value={f.q} onChange={e => set({ q: e.target.value })} placeholder="Add a colleague — type a name" />
                 {q ? (
                   <div className={s.chips}>

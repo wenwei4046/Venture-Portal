@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState, useTransition } from 'react'
+import { Fragment, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Chip, HvPage, PageHead, SecLabel } from '@/components/hrv/kit'
 import { Drawer } from '@/components/hrv/overlay'
@@ -73,8 +73,10 @@ export default function TalentBankView({ board, can }: { board: HiringBoard; can
             const mine = board.talents.filter(t => t.department === d && qOk(t))
             const open = !!openDepts[d] || nav.dept === d
             const positions = [...new Set(mine.map(t => t.position))]
+            // A Fragment, not a div: the department row and its positions sit in the tree's own 4px rhythm, as the
+            // prototype's do — and an opened department with nobody in it still draws its (empty) block.
             return (
-              <div key={d}>
+              <Fragment key={d}>
                 <button
                   type="button"
                   className={s.treeRow}
@@ -91,7 +93,7 @@ export default function TalentBankView({ board, can }: { board: HiringBoard; can
                   <span className={s.treeName}>{d}</span>
                   <span className={s.treeN}>{mine.length}</span>
                 </button>
-                {open && positions.length ? (
+                {open ? (
                   <div className={s.treeKids}>
                     {positions.map(p => (
                       <button key={p} type="button" className={s.treeKid} aria-current={nav.dept === d && nav.pos === p} onClick={() => setNav({ dept: d, pos: p })}>
@@ -101,7 +103,7 @@ export default function TalentBankView({ board, can }: { board: HiringBoard; can
                     ))}
                   </div>
                 ) : null}
-              </div>
+              </Fragment>
             )
           })}
         </section>

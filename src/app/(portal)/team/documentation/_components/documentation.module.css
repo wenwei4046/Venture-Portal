@@ -158,7 +158,9 @@ textarea.input { resize: vertical; }
 }
 .deleteBtn { color: rgb(var(--hv-danger)); background: rgb(255 255 255); }
 .deleteBtn:hover:not(:disabled) { border-color: rgb(var(--hv-hairline)); }
-.deleteBtn[data-armed='true'] { border-color: rgb(236 190 184); background: rgb(250 228 224); }
+/* "Confirm delete" stays pink under the pointer too — which is where it always is after the first press. */
+.deleteBtn[data-armed='true'],
+.deleteBtn[data-armed='true']:hover:not(:disabled) { border-color: rgb(236 190 184); background: rgb(250 228 224); }
 .deletedMark { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; color: rgb(var(--hv-danger)); }
 .empty { padding: 22px 0; text-align: center; color: rgb(var(--hv-brown)); }
 
@@ -413,8 +415,10 @@ textarea.input { resize: vertical; }
   background: transparent;
   color: rgb(var(--hv-ink));
 }
+/* 10px under the label: the footer row is 34px (Cancel's border), and the prototype's span keeps its text 8px from
+   the top where a button would centre it (9px). */
 .go {
-  padding: 8px 18px;
+  padding: 8px 18px 10px;
   background: rgb(var(--hv-accent));
   border: 0;
   border-radius: 8px;
