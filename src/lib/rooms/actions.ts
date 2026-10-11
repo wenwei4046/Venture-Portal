@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
+import { pushSoon } from '@/lib/push/outbox'
 import { createClient } from '@/lib/supabase/server'
 import { requireAction, requireAnyAction, requirePermission } from '@/lib/auth'
 import { DAY_END, DAY_START, SLOT, isDay, rangeFromRow, roomFromRow, type Room, type RoomsRange } from './model'
@@ -29,6 +30,8 @@ async function client(): Promise<SupabaseClient> {
 function freshen() {
   revalidatePath('/admin/rooms')
   revalidatePath('/admin/guest-link')
+  // The people in a meeting are told (mig 20261011180000): their phones hear it once the answer has gone.
+  pushSoon()
 }
 
 const words = (error: { message?: string } | null, fallback: string) => (error?.message?.trim() ? error.message.trim() : fallback)

@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { pushSoon } from '@/lib/push/outbox'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireAction, requireAnyAction } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -49,6 +50,8 @@ function refusal(error: PostgrestError, fallback: string): string {
 function refresh() {
   revalidatePath('/hiring', 'layout')
   revalidatePath('/hr-app', 'layout')
+  // A request's step tells whoever asked (mig 20261011180000): their phone hears it once the answer has gone.
+  pushSoon()
 }
 
 async function call(fn: string, args: Record<string, unknown>, fallback: string): Promise<HiringOutcome> {

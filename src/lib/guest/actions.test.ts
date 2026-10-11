@@ -4,8 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // review's N3): the database's refusals pass on in its words, a clash in the
 // page's, and anything else — the database's own text — never.
 
-const mocks = vi.hoisted(() => ({ rpc: vi.fn() }))
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), pushSoon: vi.fn() }))
 vi.mock('./client', () => ({ guestClient: () => ({ rpc: mocks.rpc }) }))
+// A guest's booking or request tells HR (mig 20261011180000): the push goes after the answer.
+vi.mock('@/lib/push/outbox', () => ({ pushSoon: mocks.pushSoon }))
 
 import { guestBook, guestCancel, guestDay, guestHire } from './actions'
 

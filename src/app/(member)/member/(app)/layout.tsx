@@ -7,6 +7,8 @@ import { loadMemberData } from "@/lib/member/server";
 import { productListAccess } from "@/lib/member/product-access";
 import { appClosed } from "@/lib/member/app-pages";
 import RevenueApp from "@/components/member/app/RevenueApp";
+import { isPrincipalAccount } from "@/lib/view-as";
+import { loadMyNotices } from "@/lib/push/notices-server";
 
 export const dynamic = "force-dynamic";
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#ffffff" };
@@ -26,8 +28,10 @@ export default async function MemberAppLayout({ children }: { children: ReactNod
   // The first screen's snapshot: no Quote catalogue (2026-10-08) — the app reads that when the Quote opens.
   // The CRM's row under Profile: the ACCOUNT's CRM · View (2026-10-10, the permission matrix) — the CRM
   // is the signed-in account's own whatever view the portal was left in, as crm-actions.ts asks.
-  const [data, products, account] = await Promise.all([loadMemberData({ lite: true }), productListAccess(user), getAccountUser()]);
+  // Their notifications (2026-10-11): the Principal, who opens the app to view members, gets none here.
+  const [data, products, account, notices] = await Promise.all([loadMemberData({ lite: true }), productListAccess(user), getAccountUser(),
+    isPrincipalAccount(user) ? Promise.resolve(undefined) : loadMyNotices()]);
   const crm = canDo(account, "crm", "view", "own");
   // The pages and sends their ticks close (2026-10-11): only what somebody unticked for them.
-  return <RevenueApp initialData={data} productList={products} crm={crm} closed={appClosed(user.closed)}>{children}</RevenueApp>;
+  return <RevenueApp initialData={data} productList={products} crm={crm} closed={appClosed(user.closed)} notices={notices}>{children}</RevenueApp>;
 }

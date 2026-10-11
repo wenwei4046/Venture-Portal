@@ -10,6 +10,7 @@ import { deptLabel, liveLetters, type Documentation } from '@/lib/documentation/
 import { loadHiringBoard } from '@/lib/hiring/board'
 import { dayLabel as hiringDay, hrOwners } from '@/lib/hiring/view'
 import type { HiringBoard, HiringRequest, HiringTalent } from '@/lib/hiring/types'
+import { noticesFromRow } from '@/lib/push/notices'
 import { bookerName, type Booking } from '@/lib/rooms/model'
 import { officeToday } from '@/lib/office-time'
 import { canDo } from '@/lib/permission-actions'
@@ -184,17 +185,39 @@ export function appAccess(user: User): Pick<HrAppData, 'parts' | 'may'> {
   }
 }
 
+/**
+ * What HR's new work they are told of (2026-10-11, mig 20261011180000): the parts the app shows them and may act
+ * in. The database keeps only those their own actions hold (`notification_topics_sync`).
+ */
+export function hrTopics(user: User): string[] {
+  const { parts, may } = appAccess(user)
+  return [
+    ...(may.hireApprove ? ['hiring.guest'] : []),
+    ...(parts.rooms && canDo(onPage(user, PART_PAGE.rooms), 'rooms', 'edit') ? ['rooms.guest'] : []),
+    ...(may.decide ? ['member.requests'] : []),
+  ]
+}
+
 export async function loadHrAppData(user: User): Promise<HrAppData> {
   const today = officeToday()
   const { parts, may } = appAccess(user)
   const readsHiring = parts.hiring || parts.insights || parts.talent
-  const [members, factsRead, range, people, docs, hiring] = await Promise.all([
+  const [members, factsRead, range, people, docs, hiring, notices] = await Promise.all([
     parts.requests ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
     parts.requests ? (async () => (await client()).rpc('member_admin_request_facts'))() : Promise.resolve(null),
     parts.rooms ? readRoomsRange(today, shiftDay(today, 6)) : Promise.resolve(null),
     parts.rooms ? readRoomsPeople() : Promise.resolve(null),
     parts.docs ? loadDocumentation() : Promise.resolve(null),
     readsHiring ? loadHiringBoard() : Promise.resolve(null),
+    // Their notifications, and what HR work they are told of — never while viewing as somebody (read-only, and not theirs).
+    user.viewingAs
+      ? Promise.resolve(null)
+      : (async () => {
+          const db = await client()
+          const sync = await db.rpc('notification_topics_sync', { p_topics: hrTopics(user) })
+          if (sync.error) console.error('HR app topics could not be kept', sync.error.code ?? 'unknown')
+          return db.rpc('notifications_mine', { p_limit: 50 })
+        })(),
   ])
   const board = hiring?.ok ? hiring.board : null
 
@@ -234,5 +257,6 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     bookDepts: (who?.departments ?? []).map(d => ({ id: d.id, name: d.name })),
     parts,
     may,
+    notices: notices && !notices.error ? noticesFromRow(notices.data) : { unread: 0, items: [] },
   }
 }

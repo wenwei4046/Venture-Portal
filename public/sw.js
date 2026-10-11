@@ -36,6 +36,47 @@ self.addEventListener('activate', (event) => {
   )
 })
 
+/*
+ * Phone notifications (2026-10-11): the server sends one encrypted message per
+ * notice ({ title, body, url, tag }, lib/push/outbox.ts); the browser hands it
+ * here decrypted. Shown at once — a push must always show something — and a
+ * tap opens the app at its url, in a window already open if there is one.
+ */
+self.addEventListener('push', (event) => {
+  let msg = {}
+  try {
+    msg = event.data ? event.data.json() : {}
+  } catch {
+    msg = {}
+  }
+  const title = typeof msg.title === 'string' && msg.title ? msg.title : 'HOUZS Venture'
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: typeof msg.body === 'string' ? msg.body : '',
+      tag: typeof msg.tag === 'string' ? msg.tag : undefined,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      data: { url: typeof msg.url === 'string' && msg.url.startsWith('/') ? msg.url : '/' },
+    }),
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href
+  event.waitUntil(
+    (async () => {
+      const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      const same = open.find((c) => new URL(c.url).pathname.split('/')[1] === new URL(url).pathname.split('/')[1])
+      if (same) {
+        await same.navigate(url).catch(() => undefined)
+        return same.focus()
+      }
+      return self.clients.openWindow(url)
+    })(),
+  )
+})
+
 self.addEventListener('fetch', (event) => {
   // Only page loads. Server Actions, RSC payloads, Supabase calls and assets go
   // straight to the network exactly as they would without a worker.

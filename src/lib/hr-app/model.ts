@@ -6,6 +6,7 @@
  */
 
 import { formatIntlDate } from '@/lib/utils'
+import type { Notice, Notices } from '@/lib/push/notices'
 
 export type HireStatus = 'submitted' | 'needs_info' | 'acknowledged' | 'filled' | 'cancelled' | 'declined'
 export type CandStage = 'shortlisted' | 'appointment' | 'offered' | 'hired' | 'rejected'
@@ -159,6 +160,8 @@ export interface HrAppData {
   parts: { requests: boolean; hiring: boolean; insights: boolean; talent: boolean; docs: boolean; rooms: boolean }
   /** The writes behind its buttons, by their page's boxes and the cells: a button they may not use is not drawn. */
   may: { decide: boolean; hireApprove: boolean; hireEdit: boolean; hireCreate: boolean; talentEdit: boolean; book: boolean }
+  /** Their notifications (mig 20261011180000): none while viewing as somebody. */
+  notices: Notices
 }
 
 export const CHIP: Readonly<Record<ChipTone, [string, string]>> = {
@@ -340,4 +343,28 @@ export function hourFrom(from: number): number {
 /** A booking that overlaps the asked slot in the same room on the same day. */
 export function clashOf(bookings: readonly HrBooking[], roomId: string, date: string, from: number, to: number): HrBooking | null {
   return bookings.find(b => b.roomId === roomId && b.date === date && b.from < to && from < b.to) ?? null
+}
+
+// ── Notifications (2026-10-11, mig 20261011180000) ──
+
+/** A notice's tag, in the Review list's own colours: HIRE (a hiring request), ROOM (a meeting), REQ (a member's request). */
+export function noticeTag(n: Pick<Notice, 'refKind'>): { tag: string; bg: string; fg: string } {
+  if (n.refKind === 'hiring_request') return { tag: 'HIRE', bg: 'rgb(255 244 231)', fg: 'rgb(163 78 37)' }
+  if (n.refKind === 'booking') return { tag: 'ROOM', bg: 'rgb(230 237 241)', fg: 'rgb(78 101 116)' }
+  return { tag: 'REQ', bg: 'rgb(240 236 230)', fg: 'rgb(78 52 38)' }
+}
+
+/** `5 min`, `3 h`, then the day — how long ago, as the Revenue app's bell says it. */
+export function noticeAgo(iso: string, now: Date): string {
+  const t = Date.parse(iso)
+  if (!Number.isFinite(t)) return ''
+  const minutes = Math.max(0, Math.round((now.getTime() - t) / 60_000))
+  if (minutes < 60) return `${Math.max(1, minutes)} min`
+  if (minutes < 24 * 60) return `${Math.round(minutes / 60)} h`
+  return formatIntlDate(new Date(t), { day: 'numeric', month: 'short', timeZone: 'Asia/Kuala_Lumpur' })
+}
+
+/** New first, then the rest — the bell's two cards. */
+export function noticeGroups(n: Notices): { fresh: Notice[]; earlier: Notice[] } {
+  return { fresh: n.items.filter(x => !x.read), earlier: n.items.filter(x => x.read) }
 }

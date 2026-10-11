@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { HrAppData } from '@/lib/hr-app/model'
 vi.mock('@/components/layout/view-as-actions', () => ({ stopViewingAsPerson: vi.fn() }))
@@ -31,6 +31,7 @@ const data: HrAppData = {
   bookDepts: [{ id: 'd1', name: 'HR' }],
   parts: { requests: false, hiring: false, insights: false, talent: false, docs: false, rooms: true },
   may: { decide: false, hireApprove: false, hireEdit: false, hireCreate: false, talentEdit: false, book: true },
+  notices: { unread: 0, items: [] },
 }
 
 const done = vi.fn(async () => ({ ok: true as const }))
@@ -38,6 +39,7 @@ const actions = {
   hireAck: done, hireInfo: done, hireDecline: done, hireCancel: done, hireFill: done, candStage: done, candAdd: done,
   requestDecide: done, book: done, bookCancel: done, talentNotes: done, talentRemove: done,
   letterLink: vi.fn(async () => ({ ok: false as const, reason: 'none' })),
+  noticesRead: done, pushSave: done, pushRemove: done,
   refresh: vi.fn(),
 } as unknown as HrAppActions
 
@@ -122,6 +124,57 @@ describe('the HR app approving a claim', () => {
     const decide = openClaim()
     fireEvent.click(screen.getByRole('button', { name: 'Add to payroll' }))
     expect(decide).toHaveBeenCalledWith('q1', 'approve', 'Receipts checked', 'payroll')
+  })
+})
+
+describe('the HR app’s bell (2026-10-11)', () => {
+  const notices = {
+    unread: 2,
+    items: [
+      { id: 'n3', kind: 'review' as const, title: 'New guest booking · HOUZS Interior', body: 'Showroom kickoff · Meeting Room 1', refKind: 'booking' as const, refId: 'b9', at: new Date().toISOString(), read: false },
+      { id: 'n2', kind: 'review' as const, title: 'New claim · Kar Jun', body: 'Travel', refKind: 'member_request' as const, refId: 'gone', at: new Date().toISOString(), read: false },
+      { id: 'n1', kind: 'rooms' as const, title: 'Grace Lim added you to a meeting', body: 'Interview', refKind: 'booking' as const, refId: 'b1', at: '2026-10-01T02:00:00Z', read: true },
+    ],
+  }
+
+  it('counts what is new, opens the list, and marks them read', () => {
+    const read = vi.fn(async () => ({ ok: true as const }))
+    render(<HrApp data={{ ...data, notices }} actions={{ ...actions, noticesRead: read }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 2 new' }))
+    expect(read).toHaveBeenCalledWith(null)
+    expect(screen.getByText('New')).toBeInTheDocument()
+    expect(screen.getByText('Earlier')).toBeInTheDocument()
+    expect(screen.getByText('New guest booking · HOUZS Interior')).toBeInTheDocument()
+    expect(screen.getByText('Grace Lim added you to a meeting')).toBeInTheDocument()
+  })
+
+  it('opens what a notice is about — its tab, when it has left the lists', () => {
+    render(<HrApp data={{ ...data, notices, parts: { ...data.parts, requests: true } }} actions={actions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 2 new' }))
+    fireEvent.click(screen.getByText('New claim · Kar Jun'))
+    expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument()
+  })
+
+  it('has no bell while viewing as somebody', () => {
+    render(<HrApp data={{ ...data, notices, viewingAs: 'Nurul Huda' }} actions={actions} />)
+    expect(screen.queryByRole('button', { name: /Notifications/ })).toBeNull()
+  })
+
+  it('opens a tapped push’s place once (?open=…), then forgets the address', () => {
+    const hire = { id: 'HR-205', status: 'acknowledged', position: 'Revenue Specialist', headcount: 1, dept: 'Revenue · Fair', budget: '', start: '', ownerName: null,
+      requester: 'Kar Jun', when: '9 Oct 2026', candidates: [], events: [] } as unknown as HrAppData['hires'][number]
+    window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
+    render(<HrApp data={{ ...data, hires: [hire], parts: { ...data.parts, hiring: true } }} actions={actions} />)
+    expect(screen.getByRole('heading', { name: 'Revenue Specialist' })).toBeInTheDocument()
+    expect(window.location.search).toBe('')
+  })
+
+  it('says when this browser cannot show phone notifications', async () => {
+    render(<HrApp data={data} actions={actions} />)
+    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'More' }))
+    const row = await screen.findByRole('button', { name: /Phone notifications/ })
+    await waitFor(() => expect(row).toHaveTextContent('This browser cannot show them'))
+    expect(row).toBeDisabled()
   })
 })
 
