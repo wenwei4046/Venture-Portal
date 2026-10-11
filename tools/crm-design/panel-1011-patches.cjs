@@ -41,6 +41,22 @@ module.exports = [
   // (user 2026-10-11) — on a phone the name column is ~100 px.
   ['<small style={{ fontSize: "11px", lineHeight: "14px", color: "#806B60", whiteSpace: "nowrap" }}>{p.sub}</small>',
     '<small style={{ fontSize: "11px", lineHeight: "14px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.sub}</small>'],
+  // Team | Mine (user 2026-10-11): the top bar's "‹ Back to Revenue app" stays on one line, and the pill's tabs take
+  // 12 px a side, not 14, so link, pill and bell fit a phone; on Inbox the pill sits in the title row, left of Contacts.
+  ['<span onClick={v.hd.back} style={{ display: "flex", alignItems: "center", gap: "4px", height: "44px", color: "#BD4A19", fontSize: "14px", fontWeight: "600", cursor: "pointer" }}>',
+    '<span onClick={v.hd.back} style={{ display: "flex", alignItems: "center", gap: "4px", height: "44px", color: "#BD4A19", fontSize: "14px", fontWeight: "600", whiteSpace: "nowrap", flex: "none", cursor: "pointer" }}>'],
+  [/(<span style=\{\{ height: "28px", padding: )"0 14px"(, borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: "#fff", color: "#3F2B22", boxShadow: "0 1px 3px rgba\(63,43,34,\.14\)" \}\}>Team<\/span>)/, '$1"0 12px"$2'],
+  [/(<span onClick=\{v\.dirMine\} style=\{\{ height: "28px", padding: )"0 14px"/, '$1"0 12px"'],
+  ['<span onClick={v.ib.openPc} style={{',
+    '{!!(v.ibTM) && (<>\n              <div style={{ flex: "none", marginLeft: "auto", display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "#F0E6DE" }}>\n' +
+    '                <span style={{ height: "28px", padding: "0 12px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: "#fff", color: "#3F2B22", boxShadow: "0 1px 3px rgba(63,43,34,.14)" }}>Team</span>\n' +
+    '                <span onClick={v.dirMine} style={{ height: "28px", padding: "0 12px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", color: "#806B60", cursor: "pointer" }}>Mine</span>\n' +
+    '              </div>\n            </>)}\n            <span onClick={v.ib.openPc} style={{'],
+  // …and with the pill there the row is Inbox · pill · Contacts; the summary goes on its own line under it (still 2 px
+  // below the title), else it was squeezed onto three lines.
+  [/\s*<span style=\{\{ fontSize: "13px", color: "#806B60" \}\}>\{v\.ib\.inbSummary\}<\/span>/, ""],
+  [/(<\/svg>Contacts<\/span>\s*<\/div>)/,
+    '$1\n          <span style={{ marginTop: "-12px", fontSize: "13px", color: "#806B60" }}>{v.ib.inbSummary}</span>'],
   // Customer info: the rows and Open chat keep their size; the sheet scrolls instead (user 2026-10-11, as the RS sheets).
   [/<div style=\{\{ display: "flex", flexDirection: "column", borderRadius: "14px", border: "1px solid #EBDDD2" \}\}>(\s*\{\(v\.ci\.Rows\))/,
     "<div style={{ flex: \"none\", display: \"flex\", flexDirection: \"column\", borderRadius: \"14px\", border: \"1px solid #EBDDD2\" }}>$1"],
