@@ -15,6 +15,7 @@ import {
   type TitleOption,
 } from '@/lib/staff-form'
 import { BANK_NAMES } from '@/lib/banks'
+import { Select } from '@/components/hrv/select'
 
 export interface AddStaffDepartment {
   id: string
@@ -220,7 +221,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
           <label htmlFor="staff-department" className={labelBase}>
             Department
           </label>
-          <select
+          <Select bare
             id="staff-department"
             name="department_id"
             required
@@ -234,13 +235,13 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
                 {d.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
           <label htmlFor="staff-sub-department" className={labelBase}>
             Sub-department <span className={hintBase}>(where they are based)</span>
           </label>
-          <select
+          <Select bare
             id="staff-sub-department"
             name="home_sub_department_id"
             value={homeSubDepartmentId}
@@ -260,7 +261,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
                 </option>
               )
             })}
-          </select>
+          </Select>
           <p id="staff-sub-department-hint" className={helpText}>
             {departmentId === ''
               ? 'Pick a department first.'
@@ -273,7 +274,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
           <label htmlFor="staff-upline" className={labelBase}>
             Reporting upline <span className={hintBase}>(optional)</span>
           </label>
-          <select
+          <Select bare
             id="staff-upline"
             name="reports_to"
             value={reportsTo}
@@ -291,7 +292,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
                   : ''}
               </option>
             ))}
-          </select>
+          </Select>
           <p id="staff-upline-hint" className={helpText}>
             {departmentId === ''
               ? 'Pick a department first.'
@@ -305,7 +306,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
             Designation{' '}
             <span className={hintBase}>(optional · a title from Role &amp; Permission)</span>
           </label>
-          <select
+          <Select bare
             id="staff-title"
             name="title_id"
             value={titleId}
@@ -318,7 +319,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
                 {t.name}
               </option>
             ))}
-          </select>
+          </Select>
           {departmentId === '' ? (
             <p className={helpText}>
               Pick a department first — titles belong to one.

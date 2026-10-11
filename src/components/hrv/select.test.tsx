@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { useState } from 'react'
 import { Select } from './select'
 
@@ -139,5 +139,41 @@ describe('Select', () => {
     )
     open()
     expect(screen.queryByRole('listbox')).toBeNull()
+  })
+
+  // Part 1 (2026-10-11): round 1's selects move over.
+  it('plain keeps the caller’s field as drawn and still opens our menu', () => {
+    render(
+      <Select aria-label="Type" plain className="mine" defaultValue="a">
+        <option value="a">A</option>
+        <option value="b">B</option>
+      </Select>,
+    )
+    expect(screen.getByRole('combobox', { name: 'Type' }).className).toBe('mine')
+    open()
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+  })
+
+  it('an option group’s label heads its options, and a search drops a group with none left', () => {
+    render(
+      <Select aria-label="Type" defaultValue="">
+        <option value="">Pick somebody</option>
+        <optgroup label="Revenue">
+          {['Amelia', 'Ben', 'Chong', 'Dina', 'Elle'].map(n => <option key={n} value={n}>{n}</option>)}
+        </optgroup>
+        <optgroup label="Finance">
+          {['Farah', 'Grace', 'Hui'].map(n => <option key={n} value={n}>{n}</option>)}
+        </optgroup>
+      </Select>,
+    )
+    open()
+    const list = screen.getByRole('listbox')
+    expect([...list.children].map(c => c.textContent)).toEqual([
+      'Pick somebody✓', 'Revenue', 'Amelia✓', 'Ben✓', 'Chong✓', 'Dina✓', 'Elle✓', 'Finance', 'Farah✓', 'Grace✓', 'Hui✓',
+    ])
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search the options' }), { target: { value: 'gr' } })
+    expect([...list.children].map(c => c.textContent)).toEqual(['Finance', 'Grace✓'])
+    fireEvent.mouseDown(within(list).getByRole('option', { name: /Grace/ }))
+    expect(screen.getByRole('combobox', { name: 'Type' })).toHaveValue('Grace')
   })
 })

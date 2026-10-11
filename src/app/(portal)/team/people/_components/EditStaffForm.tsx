@@ -9,6 +9,7 @@ import {
   titlesForDepartment,
   type TitleRow,
 } from '@/lib/staff-form'
+import { Select } from '@/components/hrv/select'
 
 export interface StaffRow {
   id: string
@@ -175,7 +176,7 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
               (a title from Role &amp; Permission)
             </span>
           </label>
-          <select
+          <Select bare
             name="title_id"
             defaultValue={staff.title_id ?? ''}
             className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
@@ -187,7 +188,7 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
                 {t.is_active ? '' : ' (inactive)'}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
           <label className="block text-sm font-medium mb-1.5">
@@ -243,14 +244,14 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
         {staff.commission_dept || staff.director_dept ? null : (
           <div>
             <label className="block text-sm font-medium mb-1.5">Employment Type</label>
-            <select
+            <Select bare
               name="employment_type"
               defaultValue={staff.employment_type}
               className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
             >
               <option value="salaried">Salaried (fixed basic)</option>
               <option value="commission_eligible">Commission-eligible (basic + commission rules)</option>
-            </select>
+            </Select>
           </div>
         )}
         <div>
@@ -389,7 +390,7 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
           <label className="block text-sm font-medium mb-1.5">EPF Category</label>
-          <select
+          <Select bare
             name="epf_category"
             defaultValue={staff.epf_category}
             className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
@@ -398,7 +399,7 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             <option value="C">Part C (MYR citizen, 60+)</option>
             <option value="E">Part E (Non-citizen, under 60)</option>
             <option value="F">Part F (Non-citizen, 60+)</option>
-          </select>
+          </Select>
         </div>
         <div className="flex items-center pt-6">
           <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -414,19 +415,19 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
         </div>
         <div>
           <label className="block text-sm font-medium mb-1.5">SOCSO Category</label>
-          <select
+          <Select bare
             name="socso_category"
             defaultValue={staff.socso_category}
             className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           >
             <option value="first">First (under 60, citizen/PR)</option>
             <option value="second">Second (60+ or non-citizen)</option>
-          </select>
+          </Select>
         </div>
         <div>{/* spacer */}</div>
         <div>
           <label className="block text-sm font-medium mb-1.5">PCB Category</label>
-          <select
+          <Select bare
             name="pcb_category"
             defaultValue={staff.pcb_category}
             className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
@@ -434,7 +435,7 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             <option value="KA1">KA1 (Single / unmarried)</option>
             <option value="KA2">KA2 (Married, spouse not working)</option>
             <option value="KA3">KA3 (Married, spouse working)</option>
-          </select>
+          </Select>
         </div>
         <div>
           <label className="block text-sm font-medium mb-1.5">

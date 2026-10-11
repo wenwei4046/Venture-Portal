@@ -28,6 +28,7 @@ import type { PermissionsData, TemplateLogin, TemplateRecord, TemplateTitle } fr
 import TabMatrix from '../../_components/TabMatrix'
 import { copyTemplate, deleteTemplate, loadPermissionHistory, saveTemplateTabs, setTitleTemplate } from '../permission-actions'
 import p from './permissions.module.css'
+import { Select } from '@/components/hrv/select'
 
 interface Props {
   data: PermissionsData
@@ -164,11 +165,11 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
       {error ? <div className={p.error} role="alert">{error}</div> : null}
       <div className={p.top}>
         <span className={p.topLabel}>Title template</span>
-        <select className={p.select} value={template.id} onChange={e => pick(e.target.value)} aria-label="Title template">
+        <Select bare className={p.select} value={template.id} onChange={e => pick(e.target.value)} aria-label="Title template">
           {templates.map(t => (
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
-        </select>
+        </Select>
         <span className={p.topLabel}>{templates.length} templates</span>
         <span className={p.spacer} />
         {canManage && mode === 'adding' ? (
@@ -330,7 +331,7 @@ function TitlesTable({
                     <td className="num">{t.people}</td>
                     <td className="font-mono text-[11px]">{own.length > 0 ? own.join(', ') : '—'}</td>
                     <td>
-                      <select
+                      <Select bare
                         key={t.templateId ?? 'none'}
                         defaultValue={t.templateId ?? ''}
                         disabled={!canManage || pending}
@@ -342,7 +343,7 @@ function TitlesTable({
                         {templates.map(o => (
                           <option key={o.id} value={o.id}>{o.name}</option>
                         ))}
-                      </select>
+                      </Select>
                     </td>
                   </tr>
                 )

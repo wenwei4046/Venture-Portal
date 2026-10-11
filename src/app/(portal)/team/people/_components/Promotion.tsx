@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { promoteStaff } from '../promote-actions'
 import type { CardLadder } from '../card-actions'
+import { Select } from '@/components/hrv/select'
 
 /**
  * The Promote control on a person's card.
@@ -75,7 +76,7 @@ export default function Promotion({
           ) : (
             <label className="flex flex-wrap items-center gap-2">
               <span>Next up ({next.level}):</span>
-              <select
+              <Select bare
                 value={target?.id ?? ''}
                 onChange={e => setChoice(e.target.value)}
                 disabled={pending}
@@ -87,7 +88,7 @@ export default function Promotion({
                     {t.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           )}
         </div>

@@ -15,6 +15,7 @@ import {
   type Granularity,
 } from '@/lib/payment-cycle'
 import PayWindow from './PayWindow'
+import { Select } from '@/components/hrv/select'
 
 interface Props {
   group: DeptGroup
@@ -289,7 +290,7 @@ export default function DeptWindow({
                       <span className="text-muted">Bank details not recorded</span>
                     ) : showGeneration && eligible && onAccount ? (
                       <>
-                        <select aria-label={`${p.name} — ${label} bank account`} value={payment.account} disabled={locked}
+                        <Select bare aria-label={`${p.name} — ${label} bank account`} value={payment.account} disabled={locked}
                           className="pay-date max-w-full" onChange={e => onAccount(payment.key, e.target.value as BankAccountSelection)}>
                           {(['account_1', 'account_2'] as const).map(account => {
                             const choice = accountsAvailable.find(a => a.selection === account)
@@ -297,7 +298,7 @@ export default function DeptWindow({
                               {account === 'account_1' ? 'Account 1' : 'Account 2'}{choice ? ` · ${choice.bankName} ···${choice.accountNo.slice(-4)}` : ' · not configured'}
                             </option>
                           })}
-                        </select>
+                        </Select>
                         {issue && p.staff_id ? <Link href={`/team/people/${p.staff_id}`} className="block text-xs text-danger hover:underline">Complete receiving account →</Link> : null}
                       </>
                     ) : issue ? (

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getRoleLabel } from '@/lib/roles'
 import { officeClock } from '@/lib/office-clock'
 import type { User, UserRole } from '@/types'
+import { Select } from '@/components/hrv/select'
 import { setViewAs } from './view-as-actions'
 import ViewAsPersonPicker from './ViewAsPersonPicker'
 
@@ -65,8 +66,11 @@ export default function HrTopBar({ user }: { user: User }) {
 function ViewSelect({ value, viewingAs, submit, onPerson }: { value: UserRole; viewingAs?: string; submit: () => void; onPerson: () => void }) {
   const { pending } = useFormStatus()
   const current = viewingAs ? VIEWING : value
+  // The prototype draws "HR view" as words, so the field stays words (plain);
+  // only the menu is the soft dropdown's (round 2's Part 1).
   return (
-    <select
+    <Select
+      plain
       key={current}
       name="role"
       defaultValue={current}
@@ -87,7 +91,7 @@ function ViewSelect({ value, viewingAs, submit, onPerson }: { value: UserRole; v
       <option value="hr">HR view</option>
       <option value="revenue_member">Revenue View</option>
       <option value="person">View as a person…</option>
-    </select>
+    </Select>
   )
 }
 

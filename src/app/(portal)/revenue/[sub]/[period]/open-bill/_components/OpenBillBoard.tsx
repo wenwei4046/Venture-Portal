@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { setOpenBillRank } from '../../../../run-actions'
+import { Select } from '@/components/hrv/select'
 
 export interface BoardOrder {
   id: string
@@ -142,14 +143,14 @@ export default function OpenBillBoard({ orders, rates, readOnly }: Props) {
           />
           Only days still on a suggestion
         </label>
-        <select value={person} onChange={e => setPerson(e.target.value)}>
+        <Select bare value={person} onChange={e => setPerson(e.target.value)}>
           <option value="">Everyone</option>
           {people.map(p => (
             <option key={p} value={p}>
               {p}
             </option>
           ))}
-        </select>
+        </Select>
         <span className="ml-auto font-mono text-[10.5px] uppercase tracking-wide">
           {shown.length} of {groups.length} shown
         </span>

@@ -3,6 +3,7 @@
 import { createSubDepartment } from '../../config-actions'
 import { ActionForm, Field, SaveButton } from '@/components/RowForm'
 import type { CommissionSettingsData } from './types'
+import { Select } from '@/components/hrv/select'
 
 /**
  * "Generate New Sub-Department".
@@ -32,7 +33,7 @@ export default function NewSubDepartmentForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-xs">
               <span className="block mb-1 font-medium">Department</span>
-              <select
+              <Select bare
                 name="department_id"
                 required
                 className="w-full px-3 py-2 bg-paper border border-hairline rounded-control text-sm text-ink"
@@ -40,7 +41,7 @@ export default function NewSubDepartmentForm({
                 {data.commissionDepartments.map(d => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label className="text-xs">
               <span className="block mb-1 font-medium">Name</span>
@@ -52,7 +53,7 @@ export default function NewSubDepartmentForm({
             </label>
             <label className="text-xs">
               <span className="block mb-1 font-medium">Follow an existing ruleset</span>
-              <select
+              <Select bare
                 name="clone_from_scheme_id"
                 className="w-full px-3 py-2 bg-paper border border-hairline rounded-control text-sm text-ink"
               >
@@ -65,7 +66,7 @@ export default function NewSubDepartmentForm({
                     </option>
                   )
                 })}
-              </select>
+              </Select>
             </label>
           </div>
           <p className="text-xs mt-3 mb-4">

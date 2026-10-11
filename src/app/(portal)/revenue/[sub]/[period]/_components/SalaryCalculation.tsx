@@ -25,6 +25,7 @@ import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench
 import { savePayLines } from '../../../pay-line-actions'
 import s from './commission-workbench.module.css'
 import x from './salary-calculation.module.css'
+import { Select } from '@/components/hrv/select'
 
 const money = formatMoney
 
@@ -196,11 +197,11 @@ export default function SalaryCalculation({ staffName, period, commission, sourc
           {drafts.length === 0 && <p className={x.empty}>No lines. Save to clear the month, or add one.</p>}
           <ul className={x.lines}>
             {drafts.map((draft, index) => <li key={draft.key} className={x.line} data-problem={problem?.key === draft.key ? 'true' : undefined}>
-              <select aria-label={`Line ${index + 1} type`} value={draft.kind} disabled={saving}
+              <Select bare aria-label={`Line ${index + 1} type`} value={draft.kind} disabled={saving}
                 ref={el => { if (el) kindFields.current.set(draft.key, el); else kindFields.current.delete(draft.key) }}
                 onChange={e => update(draft.key, { kind: e.target.value as PayLineKind })}>
                 {PAY_LINE_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
-              </select>
+              </Select>
               <input aria-label={`Line ${index + 1} description`} placeholder="Description (optional)" value={draft.description}
                 maxLength={MAX_DESCRIPTION} disabled={saving} onChange={e => update(draft.key, { description: e.target.value })} />
               <label className={x.amount}>

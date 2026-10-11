@@ -208,6 +208,27 @@ describe('BillContextMenu — Share this bill…', () => {
     expect(onShareDone.mock.calls[0][0]).toMatchObject({ orderId: 'order-1', orderNo: 'HC-SO-013493', result })
   })
 
+  // Part 1 (2026-10-11): Share with is the soft dropdown, its menu on <body> —
+  // outside the bill menu, which closes on a press or a scroll outside itself.
+  it('picks from the soft menu without the bill menu closing under it', () => {
+    const { root, onClose } = shareMenu()
+    fireEvent.click(within(root).getByRole('menuitem', { name: /Share this bill/ }))
+    const panel = screen.getByRole('dialog', { name: 'Share HC-SO-013493' })
+    const who = within(panel).getByLabelText(/Share with/)
+    fireEvent.mouseDown(who, { button: 0 })
+    const list = screen.getByRole('listbox')
+    const anthony = within(list).getByRole('option', { name: /ANTHONY/ })
+    fireEvent.pointerDown(anthony)
+    fireEvent.scroll(list)
+    expect(onClose).not.toHaveBeenCalled()
+    fireEvent.mouseDown(anthony)
+    expect(who).toHaveValue('anthony')
+    expect(panel).toHaveTextContent('ADRIAN 50% · ANTHONY 50%')
+    // A press anywhere else still closes it.
+    fireEvent.pointerDown(document.body)
+    expect(onClose).toHaveBeenCalled()
+  })
+
   it('takes another part, and saves from the keyboard with Enter', async () => {
     mocks.shareOrder.mockResolvedValue({ ok: true, result: { ...result, after: 0.3, parts: [{ ...halves[0], pct: 0.7 }, { ...halves[1], pct: 0.3 }] } })
     const { root, onShareDone } = shareMenu()
