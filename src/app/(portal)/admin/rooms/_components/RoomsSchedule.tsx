@@ -1,10 +1,11 @@
 'use client'
 
-import type { CSSProperties } from 'react'
+import { useRef, useState, type CSSProperties } from 'react'
 import {
-  DAY_END, DAY_START, TONES, blockBox, blockWho, bookingBadge, dayLabel, departmentBadge, departmentRank, guestBadge, hm, hourLabels, meetingCount,
-  shiftDay, slotAt, type RoomsPeople, type RoomsRange,
+  DAY_END, DAY_START, HOUR_PX, TONES, blockBox, blockWho, bookingBadge, dayLabel, departmentBadge, departmentRank, freeHalfHours, guestBadge, hm, hourLabels,
+  meetingCount, shiftDay, slotAt, type RoomsPeople, type RoomsRange,
 } from '@/lib/rooms/model'
+import { DayPicker } from './DayPicker'
 import s from './rooms.module.css'
 
 /**
@@ -13,6 +14,11 @@ import s from './rooms.module.css'
  * and a column per room (170px at least), 52px an hour with half-hour lines,
  * each booking a block in its department's tone. A press on an empty column
  * books that half hour.
+ *
+ * 2026-10-11, the user: the day's label opens a month to pick a day from
+ * (‹ › still step one day), and the free half hour under the pointer lights
+ * up with its time — from today on, for whoever may book (the database
+ * refuses a day already past, so such a day neither lights nor opens Book).
  */
 export function RoomsSchedule({
   range,
@@ -57,22 +63,55 @@ export function RoomsSchedule({
   ]
   const me = people.me ? `${people.me.name}${people.me.department ? ` (${departmentBadge(people.me.department).label})` : ''}` : people.account
   const hours = (DAY_END - DAY_START) / 60
+  // A day already past is only read: the database refuses a booking on it ("Pick today or a day after it.").
+  const bookable = canBook && day >= range.today
+  const [picking, setPicking] = useState(false)
+  const labelRef = useRef<HTMLButtonElement>(null)
+  const closePicker = () => {
+    setPicking(false)
+    labelRef.current?.focus()
+  }
 
   return (
     <>
       <div className={s.toolbar}>
-        <span className={s.dateNav}>
+        <div className={s.dateNav}>
           <button type="button" className={s.navBtn} onClick={() => onDay(shiftDay(want, -1))} aria-label="The day before">
             ‹
           </button>
-          <span className={s.dateLabel} aria-live="polite">
-            {dayLabel(want)}
-            {want === range.today ? ' · today' : ''}
-          </span>
+          <button
+            ref={labelRef}
+            type="button"
+            className={s.dateLabel}
+            onClick={() => setPicking(open => !open)}
+            aria-haspopup="dialog"
+            aria-expanded={picking}
+            title="Pick a day"
+          >
+            <svg className={s.dateIcon} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+              <rect x="3.5" y="5" width="17" height="15" rx="2" />
+              <path d="M8 3v4M16 3v4M3.5 10h17" />
+            </svg>
+            <span aria-live="polite">
+              {dayLabel(want)}
+              {want === range.today ? ' · today' : ''}
+            </span>
+          </button>
           <button type="button" className={s.navBtn} onClick={() => onDay(shiftDay(want, 1))} aria-label="The day after">
             ›
           </button>
-        </span>
+          {picking ? (
+            <DayPicker
+              day={want}
+              today={range.today}
+              onClose={closePicker}
+              onPick={picked => {
+                closePicker()
+                if (picked !== want) onDay(picked)
+              }}
+            />
+          ) : null}
+        </div>
         <button type="button" className={s.today} onClick={() => onDay(range.today)}>
           Today
         </button>
@@ -116,12 +155,12 @@ export function RoomsSchedule({
               <div
                 key={r.id}
                 className={s.column}
-                style={{ height: hours * 52 }}
-                data-readonly={canBook ? undefined : 'true'}
-                title={canBook ? 'Click an empty slot to book' : undefined}
+                style={{ height: hours * HOUR_PX }}
+                data-readonly={bookable ? undefined : 'true'}
+                title={bookable ? 'Click an empty slot to book' : undefined}
                 role="gridcell"
                 onClick={
-                  canBook
+                  bookable
                     ? e => {
                         const box = e.currentTarget.getBoundingClientRect()
                         onBook(r.id, slotAt(e.clientY - box.top, box.height))
@@ -129,6 +168,18 @@ export function RoomsSchedule({
                     : undefined
                 }
               >
+                {/* The free half hours, drawn only to light under the pointer (the press is the column's). */}
+                {bookable
+                  ? freeHalfHours(bookings, r.id, day).map(m => (
+                      <span
+                        key={m}
+                        className={s.slot}
+                        style={{ top: ((m - DAY_START) / 60) * HOUR_PX, height: HOUR_PX / 2 }}
+                        data-time={`+ ${hm(m)}`}
+                        aria-hidden="true"
+                      />
+                    ))
+                  : null}
                 {bookings
                   .filter(b => b.room === r.id)
                   .map(b => {

@@ -1,10 +1,11 @@
-import { DAY_END, DAY_START, namedCount, type Booking, type RoomsPeople, type RoomsRange } from '@/lib/rooms/model'
+import { DAY_END, DAY_START, SLOT, namedCount, type Booking, type RoomsPeople, type RoomsRange } from '@/lib/rooms/model'
 
 /**
  * The Book a room drawer's form (2026-10-11 — the prototype's `bkForm`): a new
  * booking starts on the day shown, the room and half hour pressed (09:00–10:00
  * from the button), booked by whoever is booking, from their department, with
- * them attending.
+ * them attending. An hour long, but never past 20:00: the lit 19:30 opens
+ * 19:30–20:00.
  */
 export interface BookForm {
   /** The booking being changed; null = a new one. */
@@ -29,7 +30,7 @@ export interface BookForm {
 }
 
 export function blankForm(range: Pick<RoomsRange, 'from' | 'rooms'>, people: Pick<RoomsPeople, 'me'>, room?: string | null, from?: number | null): BookForm {
-  const start = from == null ? 540 : Math.max(DAY_START, Math.min(from, DAY_END - 60))
+  const start = from == null ? 540 : Math.max(DAY_START, Math.min(from, DAY_END - SLOT))
   return {
     id: null,
     guest: false,
@@ -37,7 +38,7 @@ export function blankForm(range: Pick<RoomsRange, 'from' | 'rooms'>, people: Pic
     room: room ?? range.rooms[0]?.id ?? '',
     day: range.from,
     from: start,
-    to: start + 60,
+    to: Math.min(start + 60, DAY_END),
     bookedBy: people.me?.staffId ?? '',
     department: people.me?.departmentId ?? '',
     internal: people.me ? [people.me.staffId] : [],
