@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  blockBox, blockWho, bookingBadge, bookingFromRow, clashLine, clashOf, dayChip, dayHref, dayLabel, dayOfSearch, departmentBadge, eventDate, guestBadge, halfHours,
-  hm, hourLabels, isDay, meetingCount, paxSummary, peopleFromRow, rangeFromRow, shiftDay, shortDayLabel, slotAt, upcomingLine, withFrom,
+  blockBox, blockWho, bookerName, bookingBadge, bookingFromRow, clashLine, clashOf, dayChip, dayHref, dayLabel, dayOfSearch, departmentBadge, eventDate, guestBadge, halfHours,
+  hm, hourLabels, isDay, meetingCount, paxSummary, peopleFromRow, rangeFromRow, shiftDay, shortDayLabel, slotAt, upcomingLine, whoMayCancel, withFrom,
   type Booking,
 } from './model'
 
@@ -10,7 +10,7 @@ import {
 const booking = (over: Partial<Booking> = {}): Booking => ({
   id: 'b1', ref: 'BK-301', room: 'r1', roomName: 'Meeting Room 1', day: '2026-10-12', from: 540, to: 600, title: 'Fair weekly sync',
   source: 'portal', departmentId: 'd1', department: 'Revenue Department', subDepartment: null, bookedBy: 'Chea Huan', bookedByStaff: 's1',
-  mine: false, canChange: false, internal: [], guests: [], pax: 6, guestCompany: null, guestDepartment: null, guestCode: null,
+  onBehalfBy: null, mine: false, canChange: false, internal: [], guests: [], pax: 6, guestCompany: null, guestDepartment: null, guestCode: null,
   cancelled: false, events: [], ...over,
 })
 
@@ -38,6 +38,14 @@ describe('departments and subsidiaries', () => {
   it('writes a block’s last line the prototype’s way', () => {
     expect(blockWho(booking())).toBe('RV · Chea Huan · 6 pax')
     expect(blockWho(booking({ department: null, bookedBy: 'Principal', pax: 3 }))).toBe('Principal · 3 pax')
+  })
+
+  it('says who made a booking made for somebody else (the user, 2026-10-11 — review L3)', () => {
+    const forHim = booking({ onBehalfBy: 'Grace Lim' })
+    expect(bookerName(forHim)).toBe('Grace Lim (for Chea Huan)')
+    expect(blockWho(forHim)).toBe('RV · Grace Lim (for Chea Huan) · 6 pax')
+    expect(whoMayCancel(forHim)).toBe('Grace Lim or Chea Huan')
+    expect([bookerName(booking()), whoMayCancel(booking())]).toEqual(['Chea Huan', 'Chea Huan'])
   })
 })
 
@@ -130,7 +138,8 @@ describe('reading the database’s answer', () => {
     })!
     expect(range.rooms.map(r => r.name)).toEqual(['Meeting Room 1'])
     expect(range.bookings).toHaveLength(1)
-    expect(range.bookings[0]).toMatchObject({ source: 'portal', mine: false, canChange: false, internal: [{ name: 'Grace' }], guests: [{ name: 'Aaron', company: 'MVEC' }] })
+    expect(range.bookings[0]).toMatchObject({ source: 'portal', mine: false, canChange: false, onBehalfBy: null, internal: [{ name: 'Grace' }], guests: [{ name: 'Aaron', company: 'MVEC' }] })
+    expect(bookingFromRow({ id: 'b2', ref: 'BK-302', room: 'r1', day: '2026-10-12', bookedBy: 'Chea Huan', onBehalfBy: 'Grace Lim' })?.onBehalfBy).toBe('Grace Lim')
     expect(bookingFromRow(null)).toBeNull()
   })
 

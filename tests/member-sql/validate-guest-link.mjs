@@ -382,6 +382,25 @@ try {
   check(await Promise.all(['public.guest_link_hire(text, uuid, text, jsonb, text, text)', 'public.guest_link_may_upload(text)'].map(anonMay)), [true, true],
     'the request and the upload question are the link’s too')
 
+  // ── 20261011150000 + 150100: an HQ meeting booked for somebody else says who made it, on the guest page too ──
+  await db.exec(`CREATE FUNCTION public.current_tabs() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT NULL::jsonb $$`)
+  for (const f of ['20261011150000_rooms_on_behalf_and_app_ticks.sql', '20261011150100_guest_day_on_behalf.sql']) {
+    await db.exec((await readFile(new URL(f, migrations), 'utf8')).replace(/\r\n/g, '\n'))
+  }
+  const DAY_SWAP = (await readFile(new URL('20261011150100_guest_day_on_behalf.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  const dayBody = () => one(`SELECT md5(prosrc) FROM pg_proc WHERE proname = 'guest_link_day'`)
+  const swappedDay = await dayBody()
+  await db.exec(DAY_SWAP)
+  check(await dayBody(), swappedDay, 'the guest day is swapped once, however often it runs')
+  await q(`INSERT INTO hr_staff_costs(id, employee_name, department_id) VALUES ($1, 'Chea Huan', $2)`, [id(77), HR])
+  await as(ADMIN, ['rooms.view', 'rooms.create'])
+  const forHim = (await q(`SELECT public.meeting_rooms_book(NULL, $1, $2::date, 1020, 1080, 'Interview', $3, $4, ARRAY[$4]::uuid[], '[]'::jsonb, 2) AS r`,
+    [r1.id, D13, HR, id(77)]))[0].r
+  await asAnon()
+  check((await q(`SELECT public.guest_link_day($1, $2::date) AS r`, [fresh, D13]))[0].r.filter(b => b.id === forHim.id).map(b => [b.title, b.by, b.onBehalfBy]),
+    [['Interview', 'Chea Huan', 'Grace Lim']], 'the guest sees Grace booked it for Chea Huan')
+  check(await anonMay('public.guest_link_day(text, date)'), true, 'and the day stays the link’s')
+
   console.log(`guest link: ${checks} checks passed`)
 } finally {
   await db.close()

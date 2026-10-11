@@ -146,6 +146,7 @@ function previewBooking(input: ReturnType<typeof bookingOfForm>, d: MemberRoomsD
     subDepartment: sub?.name ?? null,
     bookedBy: d.people.me?.name ?? d.people.account,
     bookedByStaff: null,
+    onBehalfBy: null,
     mine: true,
     canChange: true,
     internal: input.internal.map(id => ({ id, name: name(id), department: null })),

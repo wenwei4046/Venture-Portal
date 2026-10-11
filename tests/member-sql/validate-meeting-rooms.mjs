@@ -197,6 +197,74 @@ try {
     'the row builder is not a door')
   check(await one(`SELECT has_table_privilege('authenticated', 'public.meeting_room_bookings', 'SELECT')`), false, 'the table is not read straight')
 
+  // ── 20261011150000: who made a booking for somebody else (A), the app's own ticks (B) ──
+  // The caller's stored tabs, as current_tabs() hands them back (NULL: no template).
+  await db.exec(`CREATE FUNCTION public.current_tabs() RETURNS jsonb LANGUAGE sql STABLE AS
+    $$ SELECT nullif(current_setting('test.tabs', true), '')::jsonb $$`)
+  const tabs = v => db.exec(`SELECT set_config('test.tabs', '${v === null ? '' : JSON.stringify(v)}', false)`)
+  const ANSWERS = (await readFile(new URL('20261011150000_rooms_on_behalf_and_app_ticks.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(ANSWERS)
+  const bodies = () => q(`SELECT proname, md5(prosrc) AS h FROM pg_proc WHERE proname LIKE 'meeting_rooms_%' ORDER BY proname`)
+  const swapped = await bodies()
+  await db.exec(ANSWERS)
+  check(await bodies(), swapped, 'run twice, each statement is swapped once')
+
+  // A. Booked for somebody else: who made it is kept, and read back.
+  await tabs(null)
+  await as(USER_A, ['rooms.view', 'rooms.create', 'rooms.edit'])
+  const behalf = await book({ room: r2.id, day: D2, from: 780, to: 840, title: 'Interview', by: STAFF_X, internal: [STAFF_X], dept: HR })
+  const self = await book({ room: r2.id, day: D2, from: 840, to: 900, title: 'Own call', by: STAFF_A, internal: [STAFF_A] })
+  const nobody = await book({ room: r2.id, day: D2, from: 900, to: 960, title: 'No one picked', internal: [STAFF_A] })
+  const readD2 = async () => (await q(`SELECT public.meeting_rooms_range($1::date, $1::date) AS r`, [D2]))[0].r.bookings
+  check((await readD2()).filter(b => [behalf.id, self.id, nobody.id].includes(b.id)).map(b => [b.title, b.bookedBy, b.onBehalfBy]),
+    [['Interview', 'Chea Huan', 'Grace Lim'], ['Own call', 'Grace Lim', null], ['No one picked', 'Grace Lim', null]],
+    'for somebody else it says who made it; for oneself, nobody')
+  const onBehalf = () => one(`SELECT on_behalf_by FROM meeting_room_bookings WHERE id = $1`, [behalf.id])
+  await book({ id: behalf.id, room: r2.id, day: D2, from: 780, to: 840, title: 'Interview, moved', by: STAFF_X, internal: [STAFF_X], dept: HR })
+  check(await onBehalf(), 'Grace Lim', 'a change that keeps the person keeps who made it')
+  await book({ id: behalf.id, room: r2.id, day: D2, from: 780, to: 840, title: 'Interview, moved', by: STAFF_A, internal: [STAFF_X], dept: HR })
+  check(await onBehalf(), null, 'naming herself: hers, nobody on her behalf')
+  await book({ id: behalf.id, room: r2.id, day: D2, from: 780, to: 840, title: 'Interview, moved', by: STAFF_B, internal: [STAFF_X], dept: HR })
+  check(await onBehalf(), 'Grace Lim', 'naming Jason: Grace made it for him')
+  await as(USER_B, ['rooms.view', 'rooms.create'])
+  await book({ id: behalf.id, room: r2.id, day: D2, from: 720, to: 780, title: 'Interview, moved', by: STAFF_B, internal: [STAFF_X], dept: HR })
+  check(await onBehalf(), 'Grace Lim', 'Jason, the person it is for, moves it: who made it stays')
+  check((await q(`SELECT public.meeting_rooms_booking($1) AS r`, [behalf.id]))[0].r.onBehalfBy, 'Grace Lim', 'one booking reads it too')
+  await as(USER_A, ['rooms.view', 'rooms.create', 'rooms.edit'])
+  for (const b of [behalf, self, nobody]) await q(`SELECT public.meeting_rooms_cancel($1)`, [b.id])
+
+  // B. The Revenue app's own ticks (Profile · Book a room) bind in the database — the same table closedBoxes is held to.
+  const fixtures = JSON.parse(await readFile(new URL('./tab-box-closed.json', import.meta.url), 'utf8'))
+  await as(USER_M, ['revenue_app.view'])
+  for (const f of fixtures) {
+    await tabs(f.stored)
+    check(await q(`SELECT public.tab_box_closed('rev.rooms', 'view') AS view, public.tab_box_closed('rev.rooms', 'create') AS create`),
+      [{ view: f.view, create: f.create }], `tab_box_closed — ${f.what}`)
+  }
+  const RANGE = `SELECT public.meeting_rooms_range($1::date, $1::date) AS r`
+  await tabs({ ticks: ['rev.rooms.view'], boxes: [], cells: false })
+  check((await q(RANGE, [D2]))[0].r.rooms.length, 2, 'Create left out: the member still reads the schedule')
+  await reject(BOOK, [null, r2.id, D2, 540, 600, 'Booth', null, STAFF_M, [STAFF_M], '[]', null, 'app', FAIR], /Meeting rooms · Create/,
+    'but books nothing')
+  await tabs(null)
+  const theirs = await book({ room: r2.id, day: D2, from: 540, to: 600, title: 'Booth', by: STAFF_M, internal: [STAFF_M], source: 'app', sub: FAIR })
+  await tabs({ ticks: ['rev.rooms.view'], boxes: [], cells: false })
+  await reject(`SELECT public.meeting_rooms_cancel($1)`, [theirs.id], /Cancelling a meeting needs/, 'and cancels nothing, not even their own')
+  await tabs({ ticks: null, boxes: [{ tab: 'rev.rooms', action: 'view', granted: false }], cells: false })
+  await reject(RANGE, [D2], /Meeting rooms · View/, 'View held back: nothing is read')
+  await reject(`SELECT public.meeting_rooms_people()`, [], /Meeting rooms · View/, 'not even who may be picked')
+  await reject(`SELECT public.meeting_rooms_booking($1)`, [theirs.id], /Meeting rooms · View/, 'nor one booking')
+  await tabs({ ticks: [], boxes: [{ tab: 'rev.rooms', action: 'view', granted: true }, { tab: 'rev.rooms', action: 'create', granted: true }], cells: false })
+  check((await q(`SELECT public.meeting_rooms_cancel($1) AS r`, [theirs.id]))[0].r.title, 'Booth', 'boxes given back: they cancel again')
+  // Meeting rooms · View and Create (the portal, the HR app) are not asked about the app's boxes.
+  await as(USER_A, ['rooms.view', 'rooms.create'])
+  await tabs({ ticks: [], boxes: [], cells: false })
+  check((await q(RANGE, [D2]))[0].r.rooms.length, 2, 'the portal reads with Meeting rooms · View whatever the app’s boxes say')
+  await tabs(null)
+  check(await Promise.all(['public.tab_box_closed(text, text)', 'public.meeting_rooms_member_open(text)'].map(f =>
+    one(`SELECT has_function_privilege('authenticated', '${f}', 'EXECUTE') OR has_function_privilege('anon', '${f}', 'EXECUTE')`))),
+    [false, false], 'the two helpers are no door of their own')
+
   console.log(`meeting rooms: ${checks} checks passed`)
 } finally {
   await db.close()

@@ -29,7 +29,7 @@ const hm = (h: number, m = 0) => h * 60 + m;
 function booking(id: string, room: string, day: string, from: number, to: number, title: string, dept: typeof REVENUE, by: string, internal: string[], guests: number): Booking {
   return {
     id, ref: id, room, roomName: ROOM_NAME[room], day, from, to, title, source: "portal" as RoomsSource,
-    departmentId: dept.id, department: dept.name, subDepartment: null, bookedBy: NAME[by], bookedByStaff: by,
+    departmentId: dept.id, department: dept.name, subDepartment: null, bookedBy: NAME[by], bookedByStaff: by, onBehalfBy: null,
     mine: by === ME, canChange: by === ME,
     internal: internal.map(p => ({ id: p, name: NAME[p] ?? p, department: null })),
     guests: Array.from({ length: guests }, (_, i) => ({ name: `Guest ${i + 1}`, company: "" })),
@@ -60,7 +60,7 @@ export function protoRooms(): MemberRoomsData {
         booking("BK-307", "r3", "2026-10-12", hm(9, 30), hm(11), "Q4 brand plan", REVENUE, "anthony", ["anthony", "chea", "lawrence", "stanley"], 0),
         {
           id: "BK-G214", ref: "BK-G214", room: "r3", roomName: "Meeting Room 3", day, from: hm(17), to: hm(18), title: "Showroom project kickoff", source: "guest",
-          departmentId: null, department: null, subDepartment: null, bookedBy: "Wong Mei Yee", bookedByStaff: null, mine: false, canChange: false,
+          departmentId: null, department: null, subDepartment: null, bookedBy: "Wong Mei Yee", bookedByStaff: null, onBehalfBy: null, mine: false, canChange: false,
           internal: [], guests: [], pax: 5, guestCompany: "HOUZS Interior Sdn Bhd", guestDepartment: "Project", guestCode: "HIN", cancelled: false, events: [],
         },
       ],

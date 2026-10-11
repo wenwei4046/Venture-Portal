@@ -28,7 +28,7 @@ export interface HrAppActions {
   hireFill(id: string, hired: string, source: string, cost: string): Promise<ActResult>
   candStage(hireId: string, candId: string, stage: CandStage): Promise<ActResult>
   candAdd(hireId: string, cand: { name: string; phone: string; note: string }): Promise<ActResult>
-  requestDecide(id: string, decision: 'accept' | 'approve' | 'reject', note: string): Promise<ActResult>
+  requestDecide(id: string, decision: 'accept' | 'approve' | 'reject', note: string, route?: 'payroll' | 'payment'): Promise<ActResult>
   book(b: { title: string; dept: string; roomId: string; date: string; from: number; to: number; attendees: string[]; pax: number }): Promise<ActResult>
   bookCancel(id: string): Promise<ActResult>
   talentNotes(id: string, notes: string): Promise<ActResult>
@@ -55,6 +55,7 @@ type Sheet =
   | { k: 'cand' }
   | { k: 'book' }
   | { k: 'booking'; id: string }
+  | { k: 'approve'; id: string }
 
 type Form = Record<string, string | string[] | number | undefined>
 
@@ -279,7 +280,12 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
               {isPendingRequest(rr) && rr.kind !== 'replacement' && d.may.decide ? (
                 <div className={s.btnRow}>
                   <button type="button" className={s.rejectBtn} disabled={busy} onClick={() => run(() => actions.requestDecide(rr.id, 'reject', note), pop, false)}>Reject</button>
-                  <button type="button" className={s.approveBtn} disabled={busy} onClick={() => run(() => actions.requestDecide(rr.id, rr.kind === 'waiting' ? 'accept' : 'approve', note), pop, false)}>
+                  <button
+                    type="button"
+                    className={s.approveBtn}
+                    disabled={busy}
+                    onClick={() => (rr.kind === 'claim' ? openSheet({ k: 'approve', id: rr.id }, { note }) : run(() => actions.requestDecide(rr.id, rr.kind === 'waiting' ? 'accept' : 'approve', note), pop, false))}
+                  >
                     {rr.kind === 'waiting' ? 'Accept to waiting list' : 'Approve'}
                   </button>
                 </div>
@@ -443,7 +449,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
       {sheet ? (
         <SheetView
           d={d} sheet={sheet} hr={hr} day={day} form={form} setForm={setForm} formErr={formErr} setFormErr={setFormErr}
-          busy={busy} arm={arm} setArm={setArm} close={() => setSheet(null)} run={run} actions={actions} live={live}
+          busy={busy} arm={arm} setArm={setArm} close={() => setSheet(null)} pop={pop} run={run} actions={actions} live={live}
         />
       ) : null}
     </div>
@@ -785,11 +791,13 @@ function SheetView(p: {
   arm: boolean
   setArm: (a: boolean) => void
   close: () => void
+  /** Back out of the screen under the sheet (a request decided leaves its page). */
+  pop: () => void
   run: (fn: () => Promise<ActResult>, after?: () => void, inSheet?: boolean) => void
   actions: HrAppActions
   live: HrBooking[]
 }) {
-  const { d, sheet: sh, hr, day, form: F, setForm, formErr, setFormErr, busy, arm, setArm, close, run, actions, live } = p
+  const { d, sheet: sh, hr, day, form: F, setForm, formErr, setFormErr, busy, arm, setArm, close, pop, run, actions, live } = p
   const set = (k: string) => (v: string) => { setForm({ ...F, [k]: v }); setFormErr('') }
   const str = (k: string) => (F[k] == null ? '' : String(F[k]))
   const outline = { borderColor: 'rgb(222 214 203)', background: 'rgb(255 255 255)', color: 'rgb(43 31 23)' }
@@ -825,6 +833,22 @@ function SheetView(p: {
 
   // A select's value and its setter, by the form's key.
   const pick = (k: string) => ({ value: str(k), onChange: set(k) })
+
+  // A claim approved: where its money goes, as Member services asks it on the desktop.
+  if (sh.k === 'approve') {
+    const decide = (route: 'payroll' | 'payment') => run(() => actions.requestDecide(sh.id, 'approve', str('note'), route), () => { close(); pop() })
+    title = 'Approve claim'
+    body = (
+      <>
+        <p className={s.replNote}>Add to payroll pays it with the salary. Request payment sends it to Finance to pay on its own.</p>
+        {formErr ? <span className={s.formErr}>{formErr}</span> : null}
+        <div className={s.btnRow}>
+          <button type="button" className={s.formBtn} style={{ ...outline, flex: 1 }} disabled={busy} onClick={() => decide('payment')}>Request payment</button>
+          <button type="button" className={s.formBtn} style={{ ...go, flex: 1 }} disabled={busy} onClick={() => decide('payroll')}>Add to payroll</button>
+        </div>
+      </>
+    )
+  }
 
   if (sh.k === 'ack' && hr) {
     title = `Acknowledge ${hr.id}`

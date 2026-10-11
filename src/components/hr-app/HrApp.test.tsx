@@ -95,6 +95,36 @@ describe('the HR app viewed as somebody', () => {
   })
 })
 
+describe('the HR app approving a claim', () => {
+  // The user, 2026-10-11: the phone asks where the money goes, as Member services does on the desktop.
+  const claim = { id: 'q1', code: 'RQ-2610-004', kind: 'claim' as const, status: 'submitted', sub: 'Fair', byName: 'Kar Jun', category: 'Travel', location: 'Penang', amount: '120.00' }
+  const withClaim: HrAppData = { ...data, requests: [claim], parts: { ...data.parts, requests: true }, may: { ...data.may, decide: true } }
+
+  function openClaim() {
+    const decide = vi.fn(async () => ({ ok: true as const }))
+    render(<HrApp data={withClaim} actions={{ ...actions, requestDecide: decide }} />)
+    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: /Review/ }))
+    fireEvent.click(screen.getByText('Kar Jun', { exact: false }))
+    fireEvent.change(screen.getByPlaceholderText('Note (optional)'), { target: { value: 'Receipts checked' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    return decide
+  }
+
+  it('asks payroll or payment, and sends the one pressed with the note', () => {
+    const decide = openClaim()
+    expect(screen.getByText('Approve claim')).toBeInTheDocument()
+    expect(decide).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Request payment' }))
+    expect(decide).toHaveBeenCalledWith('q1', 'approve', 'Receipts checked', 'payment')
+  })
+
+  it('adds it to the payroll', () => {
+    const decide = openClaim()
+    fireEvent.click(screen.getByRole('button', { name: 'Add to payroll' }))
+    expect(decide).toHaveBeenCalledWith('q1', 'approve', 'Receipts checked', 'payroll')
+  })
+})
+
 describe('the HR app with no meeting room yet', () => {
   it('greys out + Book: there is nothing to book', () => {
     render(<HrApp data={{ ...data, rooms: [] }} actions={actions} />)

@@ -24,9 +24,9 @@ const data: GuestData = {
 }
 const taken: GuestTaken[] = [
   { id: 'hq1', ref: null, room: 'r1', day: '2026-10-10', from: 540, to: 600, title: 'Fair weekly sync', guest: false, code: '', company: null, subsidiary: null,
-    department: 'Revenue Department', subDepartment: null, by: 'Chea Huan', pax: 6 },
+    department: 'Revenue Department', subDepartment: null, by: 'Chea Huan', onBehalfBy: null, pax: 6 },
   { id: '22222222-2222-4222-8222-222222222222', ref: 'BK-G302', room: 'r1', day: '2026-10-10', from: 1020, to: 1080, title: 'Showroom kickoff', guest: true,
-    code: 'HIN', company: 'HOUZS Interior', subsidiary: '11111111-1111-4111-8111-111111111111', department: 'Project', subDepartment: null, by: 'Wong Mei Yee', pax: 5 },
+    code: 'HIN', company: 'HOUZS Interior', subsidiary: '11111111-1111-4111-8111-111111111111', department: 'Project', subDepartment: null, by: 'Wong Mei Yee', onBehalfBy: null, pax: 5 },
 ]
 
 beforeEach(() => {

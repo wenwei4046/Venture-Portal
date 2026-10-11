@@ -1,0 +1,13 @@
+[
+  { "what": "no template", "stored": null, "view": false, "create": false },
+  { "what": "tabs worked out from their own cells", "stored": { "ticks": ["rev.today.view"], "boxes": [], "cells": true }, "view": false, "create": false },
+  { "what": "a template that ticks the View only", "stored": { "ticks": ["rev.rooms.view"], "boxes": [], "cells": false }, "view": false, "create": true },
+  { "what": "a template that ticks both", "stored": { "ticks": ["rev.rooms.view", "rev.rooms.create"], "boxes": [], "cells": false }, "view": false, "create": false },
+  { "what": "a Create with no View", "stored": { "ticks": ["rev.rooms.create"], "boxes": [], "cells": false }, "view": true, "create": true },
+  { "what": "their own boxes give both back over empty ticks", "stored": { "ticks": [], "boxes": [{ "tab": "rev.rooms", "action": "view", "granted": true }, { "tab": "rev.rooms", "action": "create", "granted": true }], "cells": false }, "view": false, "create": false },
+  { "what": "their own box holds the View back over the template's ticks", "stored": { "ticks": ["rev.rooms.view", "rev.rooms.create"], "boxes": [{ "tab": "rev.rooms", "action": "view", "granted": false }], "cells": false }, "view": true, "create": true },
+  { "what": "a template not saved on tabs, the View held back", "stored": { "ticks": null, "boxes": [{ "tab": "rev.rooms", "action": "view", "granted": false }], "cells": false }, "view": true, "create": true },
+  { "what": "a template not saved on tabs, the Create held back", "stored": { "ticks": null, "boxes": [{ "tab": "rev.rooms", "action": "create", "granted": false }], "cells": false }, "view": false, "create": true },
+  { "what": "another tab's box held back", "stored": { "ticks": null, "boxes": [{ "tab": "rev.today", "action": "view", "granted": false }], "cells": false }, "view": false, "create": false },
+  { "what": "own cells AND a box held back: the boxes count", "stored": { "ticks": null, "boxes": [{ "tab": "rev.rooms", "action": "create", "granted": false }], "cells": true }, "view": false, "create": true }
+]

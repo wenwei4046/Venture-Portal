@@ -23,7 +23,7 @@ export default function InstallRow() {
     <>
       <button className={s.workRow} aria-expanded={path === "prompt" ? undefined : steps}
         onClick={() => (path === "prompt" ? void app.install() : setSteps(v => !v))}>
-        <span className={`${s.workIcon} ${s.toneRequests}`}><Svg d={ICON.install} size={22} sw={1.7} /></span>
+        <span className={`${s.workIcon} ${s.toneRequests}`}><Svg d={ICON.install} size={22} sw={1.8} /></span>
         <span className={s.workText}>
           <span className={s.workLabel}>Install the app</span>
           <span className={s.workSub}>{SUB[path]}</span>

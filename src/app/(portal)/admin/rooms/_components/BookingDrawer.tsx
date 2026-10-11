@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Drawer } from '@/components/hrv/overlay'
 import { cancelBooking } from '@/lib/rooms/actions'
-import { bookingBadge, dayLabel, departmentBadge, eventDate, hm, type Booking } from '@/lib/rooms/model'
+import { bookerName, bookingBadge, dayLabel, departmentBadge, eventDate, hm, whoMayCancel, type Booking } from '@/lib/rooms/model'
 import s from './rooms.module.css'
 
 /**
@@ -47,7 +47,7 @@ export function BookingDrawer({
           { l: 'Reference', v: `${b.ref} · guest link` },
         ]
       : [
-          { l: 'Booked by', v: b.bookedBy },
+          { l: 'Booked by', v: bookerName(b) },
           { l: 'From department', v: b.subDepartment ? `${departmentBadge(b.department).label} · ${b.subDepartment}` : departmentBadge(b.department).label },
           { l: 'Room', v: b.roomName },
           { l: 'Reference', v: b.ref },
@@ -116,7 +116,7 @@ export function BookingDrawer({
                 </button>
               </>
             ) : (
-              <span className={s.only}>Only {b.bookedBy} can cancel this meeting.</span>
+              <span className={s.only}>Only {whoMayCancel(b)} can cancel this meeting.</span>
             )}
             <button type="button" className={s.btn} onClick={onClose}>
               Close

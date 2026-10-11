@@ -23,7 +23,7 @@ const PEOPLE: RoomsPeople = {
 function booking(over: Partial<Booking>): Booking {
   return {
     id: "b1", ref: "BK-1", room: "r1", roomName: "Meeting Room 1", day: "2026-10-10", from: 540, to: 600, title: "Fair weekly sync", source: "portal",
-    departmentId: "rev", department: "Revenue", subDepartment: "Fair", bookedBy: "Chea Huan", bookedByStaff: "ch", mine: false, canChange: false,
+    departmentId: "rev", department: "Revenue", subDepartment: "Fair", bookedBy: "Chea Huan", bookedByStaff: "ch", onBehalfBy: null, mine: false, canChange: false,
     internal: [], guests: [], pax: 6, guestCompany: null, guestDepartment: null, guestCode: null, cancelled: false, events: [], ...over,
   };
 }
@@ -52,6 +52,8 @@ describe("the page", () => {
   it("says who a meeting is for and how many: the subsidiary for a guest booking", () => {
     expect(whoLine(booking({}))).toBe("Chea Huan · 6 pax");
     expect(whoLine(booking({ source: "guest", guestCompany: "HOUZS Interior Sdn Bhd", bookedBy: "Wong Mei Yee", pax: 5 }))).toBe("HOUZS Interior Sdn Bhd · 5 pax");
+    expect(whoLine(booking({ onBehalfBy: "Grace Lim" }))).toBe("Grace Lim (for Chea Huan) · 6 pax");
+    expect(bookingFacts(booking({ onBehalfBy: "Grace Lim" }), "Meeting Room 1").facts[1]).toEqual({ l: "Booked by", v: "Grace Lim (for Chea Huan)" });
   });
 
   it("lists a room's meetings of the day, earliest first, a cancelled one gone", () => {

@@ -10,7 +10,7 @@ import {
 
 const meeting = (over: Partial<GuestTaken> = {}): GuestTaken => ({
   id: 'b1', ref: null, room: 'r1', day: '2026-10-10', from: 540, to: 600, title: 'Fair weekly sync', guest: false, code: '', company: null,
-  subsidiary: null, department: 'Revenue Department', subDepartment: null, by: 'Chea Huan', pax: 6, ...over,
+  subsidiary: null, department: 'Revenue Department', subDepartment: null, by: 'Chea Huan', onBehalfBy: null, pax: 6, ...over,
 })
 const room = { id: 'r1', name: 'Meeting Room 1', seats: 8, location: 'Level 3', facilities: 'TV, whiteboard' }
 
@@ -131,6 +131,8 @@ describe('the schedule', () => {
       { l: 'Room', v: 'Meeting Room 1' }, { l: 'Company', v: 'HOUZS Venture' }, { l: 'Department', v: 'RV · Revenue' },
       { l: 'Booked by', v: 'Chea Huan' }, { l: 'People', v: '6 pax' },
     ])
+    expect(takenFacts(meeting({ onBehalfBy: 'Grace Lim' }), 'Meeting Room 1')[3]).toEqual({ l: 'Booked by', v: 'Grace Lim (for Chea Huan)' })
+    expect(takenFromRows([{ id: 'b1', room: 'r1', day: '2026-10-10', by: 'Chea Huan', onBehalfBy: 'Grace Lim' }])[0].onBehalfBy).toBe('Grace Lim')
   })
 
   it('reads a finished booking back', () => {

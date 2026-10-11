@@ -30,7 +30,7 @@ const R2 = "22222222-2222-4222-8222-222222222222";
 function booking(over: Partial<Booking>): Booking {
   return {
     id: "b-sync", ref: "BK-1", room: R1, roomName: "Meeting Room 1", day: "2026-10-05", from: 540, to: 600, title: "Fair weekly sync", source: "portal",
-    departmentId: "rev", department: "Revenue", subDepartment: null, bookedBy: "Chea Huan", bookedByStaff: "ch", mine: false, canChange: false,
+    departmentId: "rev", department: "Revenue", subDepartment: null, bookedBy: "Chea Huan", bookedByStaff: "ch", onBehalfBy: null, mine: false, canChange: false,
     internal: [], guests: [], pax: 6, guestCompany: null, guestDepartment: null, guestCode: null, cancelled: false, events: [], ...over,
   };
 }
