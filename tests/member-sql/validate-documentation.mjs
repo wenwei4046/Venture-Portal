@@ -282,6 +282,44 @@ try {
   check(await removeAs(old), 0, 'without Edit the bucket deletes nothing')
   await db.exec('RESET ROLE')
 
+  // ── 20261011190000: the Revenue app's Profile · Documentation box binds in the database (review L6) ──
+  await db.exec(`CREATE OR REPLACE FUNCTION public.member_staff_id() RETURNS uuid LANGUAGE sql STABLE AS
+    $$ SELECT s.id FROM hr_staff_costs s WHERE s.user_id = auth.uid() LIMIT 1 $$`)
+  await db.exec(`CREATE OR REPLACE FUNCTION public.current_tabs() RETURNS jsonb LANGUAGE sql STABLE AS
+    $$ SELECT nullif(current_setting('test.tabs', true), '')::jsonb $$`)
+  const roomsTicks = (await readFile(new URL('20261011150000_rooms_on_behalf_and_app_ticks.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(roomsTicks.match(/CREATE OR REPLACE FUNCTION public\.tab_box_closed[\s\S]*?\$fn\$;/)[0])
+  const DOC_TICKS = (await readFile(new URL('20261011190000_documentation_app_ticks.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(DOC_TICKS)
+  const docBodies = () => q(`SELECT proname, md5(prosrc) AS h FROM pg_proc WHERE proname IN ('member_documents', 'member_document_open', 'hr_file_readable_by_member') ORDER BY proname`)
+  const docSwapped = await docBodies()
+  await db.exec(DOC_TICKS)
+  check(await docBodies(), docSwapped, 'run twice, each statement is swapped once')
+  const tabs = v => q(`SELECT set_config('test.tabs', $1, false)`, [v === null ? '' : JSON.stringify(v)])
+
+  await asGrace()
+  const shared = `documents/${id(107)}/Handbook.pdf`
+  await put(shared)
+  const D2 = await one(`SELECT public.hr_document_add('Handbook', $1, 'Handbook.pdf', 'application/pdf', 10, $2)`, [shared, [REV]])
+  await tabs(null)
+  await as(KJ_USER, [], 'authenticated')
+  check((await one(`SELECT public.member_documents()`)).map(d => d.name), ['Handbook'], 'nothing closed: Kar Jun lists his department’s documents')
+  await db.exec('RESET ROLE')
+  check(await readable(KJ_USER, shared), true, 'and opens the file')
+  await tabs({ ticks: ['rev.today.view'], boxes: [], cells: false })
+  await as(KJ_USER, [], 'authenticated')
+  await reject(`SELECT public.member_documents()`, [], /Documentation is not open to your account/, 'Documentation’s View left out: no list')
+  await reject(`SELECT public.member_document_open($1)`, [D2], /Documentation is not open to your account/, 'no open')
+  await db.exec('RESET ROLE')
+  check(await readable(KJ_USER, shared), false, 'and no file of a department’s document')
+  await tabs({ ticks: null, boxes: [{ tab: 'rev.documentation', action: 'view', granted: false }], cells: false })
+  check(await readable(KJ_USER, shared), false, 'the same when only his own box holds it back')
+  await tabs({ ticks: ['rev.documentation.view'], boxes: [], cells: false })
+  await as(KJ_USER, [], 'authenticated')
+  check(((await one(`SELECT public.member_document_open($1)`, [D2])) ?? {}).fileName, 'Handbook.pdf', 'ticked: it opens again')
+  await db.exec('RESET ROLE')
+  await tabs(null)
+
   console.log(`validate-documentation: ${checks} checks passed`)
 } finally {
   await db.close()
