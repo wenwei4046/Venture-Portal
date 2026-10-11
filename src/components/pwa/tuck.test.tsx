@@ -17,6 +17,12 @@ function Harness({ enabled = true, page = 'today' }: { enabled?: boolean; page?:
       <div role="dialog">
         <div data-testid="in-sheet" />
       </div>
+      <div aria-hidden="true">
+        <div data-testid="closed-page" />
+      </div>
+      <div inert>
+        <div data-testid="inert-page" />
+      </div>
       <nav ref={bar} data-testid="bar" data-tucked={tucked ? '' : undefined} />
     </>
   )
@@ -129,6 +135,16 @@ describe('the bar steps out of the way while reading on', () => {
     act(() => { row.dispatchEvent(new Event('scroll')) })
     act(() => { row.dispatchEvent(new Event('scroll')) })
     expect(tucked()).toBe(false)
+  })
+
+  it('a scroller nobody can see moves nothing — the Revenue app keeps its closed pages mounted', () => {
+    render(<Harness />)
+    for (const id of ['closed-page', 'inert-page']) {
+      const hidden = scroller(screen.getByTestId(id))
+      hidden.to(0)
+      hidden.to(500)
+      expect(tucked()).toBe(false)
+    }
   })
 
   it('the window counts too', () => {

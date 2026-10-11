@@ -20,7 +20,7 @@ export default function ViewAsPage({ open, query, groups, onQuery, onPick, onClo
   onClose: () => void;
 }) {
   return (
-    <div className={`${s.va} ${open ? s.vaOpen : ""}`} aria-hidden={!open} inert={!open}>
+    <div className={`${s.va} ${open ? s.vaOpen : ""}`} aria-hidden={!open} inert={!open} role="dialog" aria-label="View as">
       <div className={s.vaTop}>
         <button className={s.vaBack} onClick={onClose}><Svg d={ICON.chevronLeft} size={22} sw={2} />Profile</button>
       </div>

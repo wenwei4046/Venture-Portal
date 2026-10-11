@@ -12,8 +12,10 @@ import { useEffect, useState, type RefObject } from 'react'
  * - Any vertical scroller counts — the app's own frame, a page's list, the
  *   window — read in the capture phase, since a scroll event does not bubble.
  *   One inside a dialog (a sheet, a drawer, a page sliding over) does not: the
- *   bar is under it. A sideways scroller (a chip row, a wide table) moves
- *   nothing, and neither does a jitter under 24px one way.
+ *   bar is under it; nor one nobody can see (`inert` / `aria-hidden`: the
+ *   Revenue app keeps its closed pages mounted). A sideways scroller (a chip
+ *   row, a wide table) moves nothing, and neither does a jitter under 24px one
+ *   way.
  * - A bar in its frame's flow (the HR app's tabs, the Revenue app's nav) gives
  *   its height back when tucked, so the page grows into the space. A page
  *   standing at its foot is then pulled back by the browser — that is not
@@ -27,13 +29,13 @@ export const ALWAYS_NEAR_TOP = 48
 
 type Box = { key: object; top: number; max: number }
 
-/** Where a scroller stands and how far it can go — or null for one in a dialog. */
+/** Where a scroller stands and how far it can go — or null for one in a dialog, or out of sight. */
 function scrollBox(target: EventTarget | null): Box | null {
   if (!target || target === document || target === window || target === document.documentElement || target === document.body) {
     const root = document.scrollingElement ?? document.documentElement
     return { key: document, top: window.scrollY, max: root.scrollHeight - root.clientHeight }
   }
-  if (!(target instanceof Element) || target.closest('[role="dialog"]')) return null
+  if (!(target instanceof Element) || target.closest('[role="dialog"], [inert], [aria-hidden="true"]')) return null
   return { key: target, top: target.scrollTop, max: target.scrollHeight - target.clientHeight }
 }
 
