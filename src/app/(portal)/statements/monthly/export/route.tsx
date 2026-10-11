@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildStatementsXlsx } from './_format/xlsx'
 import { StatementsPdf } from './_format/pdf'
@@ -17,7 +17,7 @@ interface StatementRow {
 }
 
 export async function GET(req: Request) {
-  await requireAction('treasury', 'export')
+  await requireActionOn('/statements/monthly', 'treasury', 'export')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const period = url.searchParams.get('period')

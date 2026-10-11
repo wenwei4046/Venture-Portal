@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { officeToday } from '@/lib/office-time'
 
@@ -21,7 +21,7 @@ import { officeToday } from '@/lib/office-time'
 // is_overdue=true.
 
 export async function detectOverdue() {
-  const user = await requireAction('treasury', 'create')
+  const user = await requireActionOn('/overdue', 'treasury', 'create')
   const supabase = await createClient()
 
   // Today on the office's calendar, as a plain date like the loans' own. The
@@ -121,7 +121,7 @@ export async function detectOverdue() {
 // ─── Submit escalation (Finance → Principal approval) ────────────────────────
 
 export async function submitEscalation(formData: FormData) {
-  const user = await requireAction('treasury', 'create')
+  const user = await requireActionOn('/overdue', 'treasury', 'create')
   const supabase = await createClient()
 
   const overdueId = (formData.get('overdue_id') as string) ?? ''
@@ -182,7 +182,7 @@ export async function submitEscalation(formData: FormData) {
 // ─── Mark overdue as paid (Finance — after payment received) ─────────────────
 
 export async function markOverduePaid(formData: FormData) {
-  const user = await requireAction('treasury', 'edit')
+  const user = await requireActionOn('/overdue', 'treasury', 'edit')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''

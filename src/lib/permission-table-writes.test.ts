@@ -245,12 +245,13 @@ function scanApp(): Site[] {
         const text = n.getText(sf).replace(/\s+/g, ' ')
         if (ts.isIdentifier(callee)) {
           const g = callee.text
-          if (g === 'requireAction') {
-            const [fn, action, scope] = n.arguments.map(a => literal(a))
+          // Each write gate names its page first (2026-10-11, plan C): the action is after it.
+          if (g === 'requireActionOn') {
+            const [, fn, action, scope] = n.arguments.map(a => literal(a))
             if (fn && action) here?.gates.push({ wants: [want(fn, action, scope)], text })
-          } else if (g === 'requireAnyAction' || g === 'requirePayrollPayoutsAction') {
-            here?.gates.push({ wants: pairs(n.arguments), text })
-          } else if (g === 'requireApprover') {
+          } else if (g === 'requireAnyActionOn' || g === 'requirePayrollPayoutsActionOn') {
+            here?.gates.push({ wants: pairs(n.arguments.slice(1)), text })
+          } else if (g === 'requireApproverOn') {
             here?.gates.push({ wants: [], approver: true, text })
           } else if (g === 'requireProductListEdit') {
             here?.gates.push({ wants: ['product_list.edit'], text })

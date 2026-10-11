@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import { pushSoon } from '@/lib/push/outbox'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction, requireAnyAction, requirePermission } from '@/lib/auth'
+import { requireActionOn, requireAnyActionOn, requirePermission } from '@/lib/auth'
 import { DAY_END, DAY_START, SLOT, isDay, rangeFromRow, roomFromRow, type Room, type RoomsRange } from './model'
 
 /**
@@ -65,7 +65,7 @@ export interface BookInput {
 
 /** Book a room, or change a booking you may change. */
 export async function bookRoom(input: BookInput): Promise<Done<{ id: string; ref: string; room: string; time: string; pax: number }>> {
-  await requireAction('rooms', 'create')
+  await requireActionOn(['/admin/guest-link', '/admin/rooms'], 'rooms', 'create')
   const source = input.source === 'hr_app' ? 'hr_app' : 'portal'
   if (input.id != null && !isId(input.id)) return { ok: false, reason: 'That booking is not there.' }
   if (!isId(input.room)) return { ok: false, reason: 'Pick a room.' }
@@ -104,7 +104,7 @@ export async function bookRoom(input: BookInput): Promise<Done<{ id: string; ref
 
 /** Cancel a booking you may change. */
 export async function cancelBooking(id: string): Promise<Done<{ title: string; room: string }>> {
-  await requireAnyAction(['rooms', 'create'], ['rooms', 'edit'])
+  await requireAnyActionOn(['/admin/guest-link', '/admin/rooms'], ['rooms', 'create'], ['rooms', 'edit'])
   if (!isId(id)) return { ok: false, reason: 'That booking is not there.' }
   const { data, error } = await (await client()).rpc('meeting_rooms_cancel', { p_id: id })
   if (error) return { ok: false, reason: words(error, 'The meeting could not be cancelled. Please try again.') }
@@ -124,7 +124,7 @@ export interface RoomInput {
 
 /** Add a room, or change one (the Rooms tab). */
 export async function saveRoom(input: RoomInput): Promise<Done<{ room: Room }>> {
-  await requireAction('rooms', 'edit')
+  await requireActionOn('/admin/rooms', 'rooms', 'edit')
   if (input.id != null && !isId(input.id)) return { ok: false, reason: 'That room is not there.' }
   const seats = Math.round(Number(input.seats))
   const { data, error } = await (await client()).rpc('meeting_rooms_save_room', {
@@ -144,7 +144,7 @@ export async function saveRoom(input: RoomInput): Promise<Done<{ room: Room }>> 
 
 /** Remove a room (never while it has a live booking ahead). */
 export async function deleteRoom(id: string): Promise<Done<{ name: string }>> {
-  await requireAction('rooms', 'edit')
+  await requireActionOn('/admin/rooms', 'rooms', 'edit')
   if (!isId(id)) return { ok: false, reason: 'That room is not there.' }
   const { data, error } = await (await client()).rpc('meeting_rooms_delete_room', { p_id: id })
   if (error) return { ok: false, reason: words(error, 'The room could not be removed. Please try again.') }

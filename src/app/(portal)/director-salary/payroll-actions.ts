@@ -7,7 +7,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction, requirePermission } from '@/lib/auth'
+import { requireActionOn, requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import type { InfotechRow } from '@/lib/import/infotech-payroll'
 import { matchDirector, normaliseName } from '@/lib/import/director-payroll-match'
@@ -80,7 +80,7 @@ export async function applyDirectorPayrollImport(
   rows: InfotechRow[],
   period: string,
 ): Promise<{ created: number; updated: number; skipped: number; failed: number }> {
-  const user = await requireAction('director_salary', 'edit')
+  const user = await requireActionOn('/director-salary', 'director_salary', 'edit')
   const supabase = await createClient()
   const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
 
@@ -176,7 +176,7 @@ export type DirectorPayrollUpdate = Partial<Record<EditableField, number>>
  * so the grid can show it diverged from the file.
  */
 export async function updateDirectorPayrollRow(id: string, fields: DirectorPayrollUpdate) {
-  await requireAction('director_salary', 'edit')
+  await requireActionOn('/director-salary', 'director_salary', 'edit')
   const supabase = await createClient()
 
   const writes: Record<string, number> = {}
@@ -209,7 +209,7 @@ export async function updateDirectorPayrollRow(id: string, fields: DirectorPayro
 }
 
 export async function deleteDirectorPayrollRows(ids: string[], period: string) {
-  await requireAction('director_salary', 'edit')
+  await requireActionOn('/director-salary', 'director_salary', 'edit')
   const supabase = await createClient()
   if (ids.length === 0) throw new Error('No rows selected')
 

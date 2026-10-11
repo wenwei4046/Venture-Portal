@@ -3,7 +3,7 @@
  * Management revamp: the database asks for the action too).
  *
  * Since PR2 every write in the app asks for the action it is
- * (`requireAction('treasury', 'create')`, lib/permission-actions.ts). The
+ * (`requireActionOn('/payments', 'treasury', 'create')`, lib/auth.ts). The
  * database did not: a table's row policies still opened it to whoever held ANY
  * key of its domain (`has_scope(ARRAY['treasury'])`), and a key is opened by a
  * View cell. So somebody whose template only READS Treasury could still raise

@@ -98,7 +98,7 @@ function byServiceRole(e: ts.Expression, adminIds: ReadonlySet<string>): boolean
   return ts.isIdentifier(e) && adminIds.has(e.text)
 }
 
-/** The approve actions — any of them opens requireApprover(). */
+/** The approve actions — any of them opens the approver gate (requireApproverOn). */
 export const APPROVE: readonly Want[] = ['treasury.approve', 'approvals.approve', 'hr_costing.approve', 'director_salary.approve']
 
 /**
@@ -228,12 +228,13 @@ export function scanReads(
         const text = n.getText(sf).replace(/\s+/g, ' ').slice(0, 160)
         if (ts.isIdentifier(callee)) {
           const g = callee.text
-          if (g === 'requireAction') {
-            const [fn, action, scope] = n.arguments.map(a => literal(a))
+          // Each write gate names its page first (2026-10-11, plan C): the action is after it.
+          if (g === 'requireActionOn') {
+            const [, fn, action, scope] = n.arguments.map(a => literal(a))
             if (fn && action) here?.gates.push({ wants: [want(fn, action, scope)], text })
-          } else if (g === 'requireAnyAction' || g === 'requirePayrollPayoutsAction') {
-            here?.gates.push({ wants: pairs(n.arguments), text })
-          } else if (g === 'requireApprover') {
+          } else if (g === 'requireAnyActionOn' || g === 'requirePayrollPayoutsActionOn') {
+            here?.gates.push({ wants: pairs(n.arguments.slice(1)), text })
+          } else if (g === 'requireApproverOn') {
             here?.gates.push({ wants: [...APPROVE], text })
           } else if (g === 'requireApprovalQueue') {
             here?.gates.push({ wants: ['approvals.view', ...APPROVE], text })

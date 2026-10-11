@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 
 /**
@@ -35,7 +35,7 @@ export interface MatchOutcome {
 
 /** Row form on the Comm Cal page: agent_key + erp_salesperson_id → staff_id. */
 export async function matchErpSalesperson(fd: FormData): Promise<MatchOutcome> {
-  await requireAction('revenue', 'edit')
+  await requireActionOn('/revenue/[sub]', 'revenue', 'edit')
   const subDepartmentId = String(fd.get('sub_department_id') ?? '').trim()
   const agentKey = String(fd.get('agent_key') ?? '').trim()
   const erpSalespersonId = String(fd.get('erp_salesperson_id') ?? '').trim()
@@ -79,7 +79,7 @@ export async function ignoreErpAgent(
   subDepartmentId: string,
   note?: string,
 ): Promise<IgnoreOutcome> {
-  await requireAction('revenue', 'edit')
+  await requireActionOn('/revenue/[sub]', 'revenue', 'edit')
   if (!agentKey && !erpSalespersonId) throw new Error('Nothing to ignore')
 
   const supabase = await client()
@@ -98,7 +98,7 @@ export async function ignoreErpAgent(
 
 /** Undo an ignore: the bills go back to what the ERP says about them. */
 export async function unignoreErpAgent(agentKey: string, subDepartmentId: string): Promise<number> {
-  await requireAction('revenue', 'edit')
+  await requireActionOn('/revenue/[sub]', 'revenue', 'edit')
   if (!agentKey) throw new Error('Nothing to restore')
 
   const supabase = await client()
@@ -130,7 +130,7 @@ interface HeldEventRow {
  * the month still refuses stays held, and says so.
  */
 export async function replayHeldErpEvents(period: string, subDepartmentId: string): Promise<ReplayResult> {
-  await requireAction('revenue', 'edit')
+  await requireActionOn('/revenue/[sub]', 'revenue', 'edit')
   if (!/^\d{4}-\d{2}-01$/.test(period)) throw new Error('Period must be the first of a month')
 
   const supabase = await client()
@@ -205,7 +205,7 @@ export interface ClosedMonth {
  * by hand while every other month keeps syncing.
  */
 export async function closeErpMonth(period: string, subDepartmentId: string, note?: string): Promise<ClosedMonth> {
-  await requireAction('revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   if (!/^\d{4}-\d{2}-01$/.test(period)) throw new Error('Period must be the first of a month')
 
   const supabase = await client()
@@ -239,7 +239,7 @@ export interface ReopenResult {
  * ends up exactly as if it had never been closed.
  */
 export async function reopenErpMonth(period: string, subDepartmentId: string): Promise<ReopenResult> {
-  await requireAction('revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   if (!/^\d{4}-\d{2}-01$/.test(period)) throw new Error('Period must be the first of a month')
 
   const supabase = await client()

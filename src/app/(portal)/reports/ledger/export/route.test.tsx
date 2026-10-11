@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // in the period (all with ?showZero=1), each account's block in turn.
 
 const mocks = vi.hoisted(() => ({
-  requireAction: vi.fn(),
+  requireActionOn: vi.fn(),
   createClient: vi.fn(),
   fetchLedger: vi.fn(),
   fetchLedgers: vi.fn(),
@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   exportPdfResponse: vi.fn(),
   buildXlsxBuffer: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireAction: mocks.requireAction }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireActionOn: mocks.requireActionOn }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/cfo-reports', () => ({ fetchLedger: mocks.fetchLedger, fetchLedgers: mocks.fetchLedgers }))
 vi.mock('@/lib/export/response', () => ({ exportXlsxResponse: mocks.exportXlsxResponse, exportPdfResponse: mocks.exportPdfResponse }))

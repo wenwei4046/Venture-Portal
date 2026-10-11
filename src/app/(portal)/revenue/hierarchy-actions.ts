@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { promotesTo, type LadderRung } from '@/lib/commission/titles'
 import {
   assignDirector,
@@ -146,7 +146,7 @@ export async function moveOnChart(
   staffId: string,
   uplineStaffId: string | null,
 ): Promise<LineResult | { ok: true } | { ok: false; reason: string }> {
-  const user = await requireAction('revenue', 'edit')
+  const user = await requireActionOn('/revenue/[sub]/hierarchy', 'revenue', 'edit')
   const supabase = await client()
   const sub = await subDepartmentOf(schemeId?.trim() ?? '')
   if (!sub) return { ok: false, reason: 'That sub-department has no active scheme.' }
@@ -181,7 +181,7 @@ export interface RankOutcome {
  * production, and the reason is the whole point of one.
  */
 export async function setStaffRank(formData: FormData): Promise<RankOutcome> {
-  const user = await requireAction('revenue', 'edit')
+  const user = await requireActionOn('/revenue/[sub]/hierarchy', 'revenue', 'edit')
   const supabase = await client()
 
   const staffId = ((formData.get('staff_id') as string) ?? '').trim()
@@ -282,7 +282,7 @@ function membershipFields(formData: FormData) {
  * carrying an upline or rate-mode override over from another sub-department.
  */
 export async function addMember(formData: FormData): Promise<RankOutcome> {
-  const user = await requireAction('revenue', 'edit')
+  const user = await requireActionOn('/revenue/[sub]/hierarchy', 'revenue', 'edit')
   const { staffId, schemeId, titleId } = membershipFields(formData)
   if (!staffId || !schemeId || !titleId) return { ok: false, note: 'Pick a person and the title they hold here.' }
 
@@ -312,7 +312,7 @@ export async function addMember(formData: FormData): Promise<RankOutcome> {
 
 /** Change only the title held on the selected non-home sub-department card. */
 export async function changeMemberTitle(formData: FormData): Promise<RankOutcome> {
-  const user = await requireAction('revenue', 'edit')
+  const user = await requireActionOn('/revenue/[sub]/hierarchy', 'revenue', 'edit')
   const { staffId, schemeId, titleId } = membershipFields(formData)
   if (!staffId || !schemeId || !titleId) return { ok: false, note: 'Pick a person and the title they hold here.' }
 
@@ -356,7 +356,7 @@ export async function changeMemberTitle(formData: FormData): Promise<RankOutcome
 
 /** Take somebody out of a non-home sub-department. */
 export async function removeMember(formData: FormData): Promise<RankOutcome> {
-  await requireAction('revenue', 'edit')
+  await requireActionOn('/revenue', 'revenue', 'edit')
   const supabase = await client()
 
   const staffId = ((formData.get('staff_id') as string) ?? '').trim()
@@ -385,7 +385,7 @@ export async function removeMember(formData: FormData): Promise<RankOutcome> {
  * department (23DIR); the reason comes back as the note.
  */
 export async function addDirector(formData: FormData): Promise<RankOutcome> {
-  const user = await requireAction('revenue', 'edit')
+  const user = await requireActionOn('/revenue/[sub]/hierarchy', 'revenue', 'edit')
   const supabase = await client()
 
   const subDepartmentId = ((formData.get('sub_department_id') as string) ?? '').trim()
@@ -403,7 +403,7 @@ export async function addDirector(formData: FormData): Promise<RankOutcome> {
 
 /** A sub-department stops reporting to one of its directors. Nobody else moves. */
 export async function removeDirector(formData: FormData): Promise<RankOutcome> {
-  await requireAction('revenue', 'edit')
+  await requireActionOn('/revenue/[sub]/hierarchy', 'revenue', 'edit')
   const supabase = await client()
 
   const subDepartmentId = ((formData.get('sub_department_id') as string) ?? '').trim()
@@ -422,7 +422,7 @@ export async function removeDirector(formData: FormData): Promise<RankOutcome> {
  * commission rule — a person could move sub-department and keep it.
  */
 export async function updateStaffTax(formData: FormData): Promise<void> {
-  await requireAction('revenue', 'edit')
+  await requireActionOn('/revenue', 'revenue', 'edit')
   const supabase = await client()
 
   const staffId = ((formData.get('staff_id') as string) ?? '').trim()

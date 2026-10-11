@@ -317,6 +317,17 @@ export function actionsOnPage(actions: Readonly<Record<string, Scope>>, closed: 
   return out
 }
 
+/**
+ * A write whose buttons are on several pages (2026-10-11, plan C — Payments' detail
+ * page is Finance's and HR's Payment tab's too): what it may do from ANY of them.
+ * Each page narrows on its own (`actionsOnPage`); a write one of them keeps counts.
+ */
+export function actionsOnPages(actions: Readonly<Record<string, Scope>>, closed: readonly string[], routes: readonly PageRoute[]): Record<string, Scope> {
+  const out: Record<string, Scope> = {}
+  for (const route of routes) Object.assign(out, actionsOnPage(actions, closed, route))
+  return out
+}
+
 /** `current_tabs()`'s answer, read defensively (it postdates database.types.ts). */
 export function storedTabsFrom(raw: unknown): StoredTabs | null {
   if (!raw || typeof raw !== 'object') return null

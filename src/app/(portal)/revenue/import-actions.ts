@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction, requirePermission } from '@/lib/auth'
+import { requireActionOn, requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 
 /**
@@ -95,7 +95,7 @@ function norm(code: string): string {
 }
 
 export async function commitSalesImport(input: CommitInput): Promise<CommitResult> {
-  const user = await requireAction('revenue', 'create')
+  const user = await requireActionOn('/revenue/[sub]/[period]/import', 'revenue', 'create')
   const supabase = await client()
 
   if (!/^\d{4}-\d{2}-01$/.test(input.periodMonth)) {

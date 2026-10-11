@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import { officeToday } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoneyBare } from '@/lib/utils'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
@@ -67,7 +67,7 @@ const m = (v: number) => (v ? formatMoneyBare(v) : '—')
 
 export async function GET(req: Request) {
   // dept_manager may export their own segment's aging (RLS scopes invoices).
-  const user = await requireAction('dept_reports', 'export', 'dept')
+  const user = await requireActionOn('/reports/debtor-aging', 'dept_reports', 'export', 'dept')
   const params = new URL(req.url).searchParams
   const format = params.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   // view: 'detail' (one row per invoice) or 'summary' (aging matrix by customer).

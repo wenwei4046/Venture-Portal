@@ -15,7 +15,7 @@ import React from 'react'
 import { officeTime } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { fetchCounterpartyStatement } from '@/lib/counterparty-statement-data'
 import type { PositionRow } from '@/lib/counterparty-statement'
 import { buildXlsxBuffer, type XlsxSectionBreak } from '@/lib/export/excel'
@@ -54,7 +54,7 @@ function payoffLabel(item: PositionRow): string {
 }
 
 export async function GET(request: Request) {
-  await requireAction('reports', 'export')
+  await requireActionOn('/reports/company-statement', 'reports', 'export')
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { rows: allRows } = await fetchCounterpartyStatement(supabase)
 

@@ -129,7 +129,7 @@ function openedToday(route: PageRoute, a: Account): boolean {
   if (route === '/audit-log') return canSeeAuditChanges(a)
   const src = FILES.get(route)!
   const rest = src.slice(src.indexOf(`requirePage('${route}')`) + 1)
-  const gate = /\b(requirePermission|requirePayrollPayouts|requireAction|requireAnyAction|requireApprovalQueue)\(([^)]*)\)/.exec(rest)
+  const gate = /\b(requirePermission|requirePayrollPayouts|requireActionOn|requireAnyActionOn|requireApprovalQueue)\(([^)]*)\)/.exec(rest)
   if (!gate) {
     // Gated inside the component the page draws: the keys its tabs open on.
     const keys = PAGE_TABS[route].flatMap(t => TAB_BY_ID.get(t)!.keys)
@@ -139,8 +139,8 @@ function openedToday(route: PageRoute, a: Account): boolean {
   if (fn === 'requirePermission') return can(a, ...keysOf(raw))
   if (fn === 'requirePayrollPayouts') return can(a, ...keysOf(raw)) && canSeePayrollPayouts(a)
   if (fn === 'requireApprovalQueue') return canSeeApprovals(a)
-  if (fn === 'requireAction') {
-    const [f, action, scope] = args(raw)
+  if (fn === 'requireActionOn') {
+    const [, f, action, scope] = args(raw)
     return canDo(a, f as FunctionKey, action as Action, (scope as Scope) ?? 'all')
   }
   return [...raw.matchAll(/\[([^\]]*)\]/g)].some(m => {

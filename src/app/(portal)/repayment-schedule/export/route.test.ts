@@ -7,13 +7,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // short: in brackets, "clear" when nothing is), each side closed by its Total.
 
 const mocks = vi.hoisted(() => ({
-  requireAction: vi.fn(),
+  requireActionOn: vi.fn(),
   createClient: vi.fn(),
   load: vi.fn(),
   exportXlsxResponse: vi.fn(),
   buildXlsxBuffer: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireAction: mocks.requireAction }))
+vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireActionOn: mocks.requireActionOn }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('../_lib/schedule-data', () => ({ loadRepaymentSchedule: mocks.load }))
 vi.mock('@/lib/export/response', () => ({ exportXlsxResponse: mocks.exportXlsxResponse }))
@@ -45,7 +45,7 @@ const req = (qs = '') => new Request(`http://localhost/repayment-schedule/export
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requireAction.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+  mocks.requireActionOn.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
   mocks.createClient.mockResolvedValue({})
   mocks.load.mockResolvedValue(SCHEDULE)
   mocks.buildXlsxBuffer.mockImplementation((args: unknown) => args)
@@ -56,8 +56,8 @@ describe('the Repayment Schedule export', () => {
   it('is for whoever may read and export the treasury, for the month asked', async () => {
     await GET(req('?month=2026-09'))
     // Export, as every treasury export; View, which the deals' terms history asks.
-    expect(mocks.requireAction).toHaveBeenCalledWith('treasury', 'view')
-    expect(mocks.requireAction).toHaveBeenCalledWith('treasury', 'export')
+    expect(mocks.requireActionOn).toHaveBeenCalledWith(expect.any(String), 'treasury', 'view')
+    expect(mocks.requireActionOn).toHaveBeenCalledWith(expect.any(String), 'treasury', 'export')
     expect(mocks.load.mock.calls[0][1]).toBe('2026-09')
   })
 

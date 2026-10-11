@@ -3,7 +3,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { roomFromRow, type Room } from '@/lib/rooms/model'
 import { subsFromRows, type GuestSub } from './model'
 
@@ -43,7 +43,7 @@ const settingsOf = (v: unknown): LinkSettings => {
 
 /** Link on / off, a part on / off, the days ahead — what is not given is kept. */
 export async function setGuestLink(patch: { on?: boolean; booking?: boolean; hiring?: boolean; days?: number }): Promise<Done<{ link: LinkSettings }>> {
-  await requireAction('guest_link', 'edit')
+  await requireActionOn('/admin/guest-link', 'guest_link', 'edit')
   const days = patch.days == null ? null : Math.round(Number(patch.days))
   if (days != null && (!Number.isFinite(days) || days < 1 || days > 21)) return { ok: false, reason: 'Guests can book 1 to 21 days ahead.' }
   const { data, error } = await (await client()).rpc('guest_link_set', {
@@ -59,7 +59,7 @@ export async function setGuestLink(patch: { on?: boolean; booking?: boolean; hir
 
 /** New link: a new code — the old one stops working at once. */
 export async function newGuestCode(): Promise<Done<{ code: string }>> {
-  await requireAction('guest_link', 'edit')
+  await requireActionOn('/admin/guest-link', 'guest_link', 'edit')
   const { data, error } = await (await client()).rpc('guest_link_new_code')
   if (error) return { ok: false, reason: words(error, 'A new link could not be made. Please try again.') }
   freshen()
@@ -68,7 +68,7 @@ export async function newGuestCode(): Promise<Done<{ code: string }>> {
 
 /** Rooms guests can book: one switch. */
 export async function setGuestRoom(room: string, on: boolean): Promise<Done<{ room: Room }>> {
-  await requireAction('guest_link', 'edit')
+  await requireActionOn('/admin/guest-link', 'guest_link', 'edit')
   if (!isId(room)) return { ok: false, reason: 'That room is no longer open for booking.' }
   const { data, error } = await (await client()).rpc('guest_link_room', { p_room: room, p_on: on === true })
   if (error) return { ok: false, reason: words(error, 'The room could not be saved. Please try again.') }
@@ -80,7 +80,7 @@ export async function setGuestRoom(room: string, on: boolean): Promise<Done<{ ro
 
 /** Add a subsidiary (id null) or change one — its code, name and departments. */
 export async function saveGuestSubsidiary(input: { id: string | null; code: string; name: string | null; departments: string[] }): Promise<Done<{ sub: GuestSub }>> {
-  await requireAction('guest_link', 'edit')
+  await requireActionOn('/admin/guest-link', 'guest_link', 'edit')
   if (input.id != null && !isId(input.id)) return { ok: false, reason: 'That subsidiary is no longer there.' }
   const { data, error } = await (await client()).rpc('guest_link_save_subsidiary', {
     p_id: input.id,
@@ -97,7 +97,7 @@ export async function saveGuestSubsidiary(input: { id: string | null; code: stri
 
 /** Take a subsidiary off the list (its bookings keep their company). */
 export async function removeGuestSubsidiary(id: string): Promise<Done<{ name: string }>> {
-  await requireAction('guest_link', 'edit')
+  await requireActionOn('/admin/guest-link', 'guest_link', 'edit')
   if (!isId(id)) return { ok: false, reason: 'That subsidiary is no longer there.' }
   const { data, error } = await (await client()).rpc('guest_link_remove_subsidiary', { p_id: id })
   if (error) return { ok: false, reason: words(error, 'The subsidiary could not be removed. Please try again.') }

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { ladderAllows, ladderRefusal, nextRung, type LadderTitle, type Rung } from '@/lib/ladder'
 
 /**
@@ -23,7 +23,7 @@ export async function promoteStaff(
   staffId: string,
   toTitleId: string,
 ): Promise<{ title: string; level: string }> {
-  await requireAction('team', 'edit')
+  await requireActionOn('/team/people', 'team', 'edit')
   if (!staffId || !toTitleId) throw new Error('Which person, and to which title?')
 
   const supabase = await createClient()

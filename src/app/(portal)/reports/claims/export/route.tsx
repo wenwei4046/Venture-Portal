@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireActionOn } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildClaimsXlsx } from './_format/xlsx'
@@ -7,7 +7,7 @@ import { ClaimsPdf } from './_format/pdf'
 import { officeTime } from '@/lib/office-time'
 
 export async function GET(req: Request) {
-  await requireAction('reports', 'export')
+  await requireActionOn('/reports/claims', 'reports', 'export')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
 
