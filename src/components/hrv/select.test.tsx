@@ -131,6 +131,102 @@ describe('Select', () => {
     }
   })
 
+  // The user, 2026-10-11 (the Revenue app's book sheet): Department and From / To — lists longer than eight —
+  // would not open on a phone. Focusing the search box raised the keyboard, the keyboard resized the window,
+  // and the resize closed the menu at once.
+  describe('on a touch screen', () => {
+    const many = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00']
+    const pointer = (coarse: boolean) =>
+      vi.spyOn(window, 'matchMedia').mockImplementation(
+        (q: string) => ({ matches: coarse && q.includes('coarse'), media: q, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList,
+      )
+    const settle = () => act(async () => new Promise(r => setTimeout(r, 5)))
+
+    it('opens a long list without raising the keyboard — the search box waits for a tap', async () => {
+      const spy = pointer(true)
+      try {
+        render(<Picker options={many} />)
+        open()
+        await settle()
+        const search = screen.getByRole('textbox', { name: 'Search the options' })
+        expect(document.activeElement).not.toBe(search)
+        expect(screen.getByRole('listbox')).toBeInTheDocument()
+      } finally {
+        spy.mockRestore()
+      }
+    })
+
+    it('keeps the menu open when the keyboard or the address bar resizes the window, and follows its field', async () => {
+      const spy = pointer(true)
+      // The field on screen; it moves up 100px when the keyboard comes (the sheet scrolls it into view).
+      let fieldTop = 400
+      const box = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        const [top, height] = this.tagName === 'SELECT' ? [fieldTop, 46] : this.hasAttribute('data-soft-menu') ? [0, 200] : [0, 0]
+        return { top, bottom: top + height, left: 16, right: 374, width: 358, height, x: 16, y: top, toJSON: () => ({}) } as DOMRect
+      })
+      try {
+        render(<Picker options={many} />)
+        open()
+        await settle()
+        const menu = document.querySelector<HTMLElement>('[data-soft-menu]')!
+        expect(menu.style.top).toBe('452px')
+        fieldTop = 300
+        act(() => {
+          window.dispatchEvent(new Event('resize'))
+          document.dispatchEvent(new Event('scroll'))
+        })
+        expect(screen.getByRole('listbox')).toBeInTheDocument()
+        expect(menu.style.top).toBe('352px')
+        // A pick still lands.
+        fireEvent.mouseDown(screen.getAllByRole('option').find(o => o.tagName === 'DIV' && o.textContent?.startsWith('09:30'))!)
+        expect(screen.getByRole('combobox', { name: 'Type' })).toHaveValue('09:30')
+      } finally {
+        box.mockRestore()
+        spy.mockRestore()
+      }
+    })
+
+    it('closes once its field has left the screen', async () => {
+      const spy = pointer(true)
+      const box = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        const top = this.tagName === 'SELECT' ? -200 : 0
+        return { top, bottom: top + 46, left: 16, right: 374, width: 358, height: 46, x: 16, y: top, toJSON: () => ({}) } as DOMRect
+      })
+      try {
+        render(<Picker options={many} />)
+        open()
+        act(() => {
+          document.dispatchEvent(new Event('scroll'))
+        })
+        expect(screen.queryByRole('listbox')).toBeNull()
+      } finally {
+        box.mockRestore()
+        spy.mockRestore()
+      }
+    })
+
+    it('with a mouse: the search box takes the keys at once, and a resize or a scroll still closes the menu', async () => {
+      const spy = pointer(false)
+      try {
+        render(<Picker options={many} />)
+        open()
+        await settle()
+        expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Search the options' }))
+        act(() => {
+          window.dispatchEvent(new Event('resize'))
+        })
+        expect(screen.queryByRole('listbox')).toBeNull()
+        open()
+        act(() => {
+          document.dispatchEvent(new Event('scroll'))
+        })
+        expect(screen.queryByRole('listbox')).toBeNull()
+      } finally {
+        spy.mockRestore()
+      }
+    })
+  })
+
   it('stays shut while disabled', () => {
     render(
       <Select aria-label="Type" disabled defaultValue="">
