@@ -9,6 +9,8 @@ import { appClosed } from "@/lib/member/app-pages";
 import RevenueApp from "@/components/member/app/RevenueApp";
 import { isPrincipalAccount } from "@/lib/view-as";
 import { loadMyNotices } from "@/lib/push/notices-server";
+import { loginIsPersonal } from "@/lib/account/personal-login";
+import { changeMyPassword } from "@/lib/account/actions";
 
 export const dynamic = "force-dynamic";
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#ffffff" };
@@ -29,9 +31,11 @@ export default async function MemberAppLayout({ children }: { children: ReactNod
   // The CRM's row under Profile: the ACCOUNT's CRM · View (2026-10-10, the permission matrix) — the CRM
   // is the signed-in account's own whatever view the portal was left in, as crm-actions.ts asks.
   // Their notifications (2026-10-11): the Principal, who opens the app to view members, gets none here.
-  const [data, products, account, notices] = await Promise.all([loadMemberData({ lite: true }), productListAccess(user), getAccountUser(),
-    isPrincipalAccount(user) ? Promise.resolve(undefined) : loadMyNotices()]);
+  // Profile › Change password (2026-10-12): a login of their own, never a shared one.
+  const [data, products, account, notices, password] = await Promise.all([loadMemberData({ lite: true }), productListAccess(user), getAccountUser(),
+    isPrincipalAccount(user) ? Promise.resolve(undefined) : loadMyNotices(), loginIsPersonal()]);
   const crm = canDo(account, "crm", "view", "own");
   // The pages and sends their ticks close (2026-10-11): only what somebody unticked for them.
-  return <RevenueApp initialData={data} productList={products} crm={crm} closed={appClosed(user.closed)} notices={notices}>{children}</RevenueApp>;
+  return <RevenueApp initialData={data} productList={products} crm={crm} closed={appClosed(user.closed)} notices={notices}
+    changePassword={password ? changeMyPassword : undefined}>{children}</RevenueApp>;
 }

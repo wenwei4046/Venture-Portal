@@ -6,7 +6,7 @@
 //   II.  DIRECTORS      Director Salary · Director Pool
 //   III. REVENUE        Comm Cal · Sales Groups · Rules
 //   IV.  PEOPLE         People Management · Hierarchy · Member Services
-//   V.   ADMIN          Audit Log
+//   V.   ADMIN          Audit Log  (since: Meeting Rooms, Guest Link; Change password — a personal login's)
 //
 // Claims and the Revenue Department page left HR's sidebar (their pages are
 // still there), and Fair | IR left it altogether: a Revenue page picks its
@@ -27,6 +27,7 @@ import {
   canSeeAuditChanges,
   canAccessMeetingRooms,
   canAccessGuestLink,
+  canChangePassword,
 } from '@/lib/roles'
 import type { NavIconName } from '@/components/hrv/icons'
 import type { NavViewer } from './nav-config'
@@ -137,6 +138,8 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
         { key: 'rooms', label: 'Meeting Rooms', icon: 'room', href: '/admin/rooms', match: p => under(p, '/admin/rooms'), visible: canAccessMeetingRooms },
         { key: 'guestlink', label: 'Guest Link', icon: 'link', href: '/admin/guest-link', match: p => under(p, '/admin/guest-link'), visible: canAccessGuestLink },
         { key: 'audit', label: 'Audit Log', icon: 'report', href: '/audit-log', match: p => under(p, '/audit-log'), visible: canSeeAuditChanges },
+        // Change password (2026-10-12): a person's own login only — never a shared one (principal@, hr@ …).
+        { key: 'password', label: 'Change password', icon: 'lock', href: '/admin/password', match: p => under(p, '/admin/password'), visible: canChangePassword },
       ],
     },
   ]
