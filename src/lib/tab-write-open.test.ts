@@ -31,7 +31,7 @@ function appAnswer(f: Fixture): boolean {
 }
 
 describe('tab_writes_open and the app agree, case by case', () => {
-  for (const f of fixtures as Fixture[]) {
+  for (const f of fixtures as unknown as Fixture[]) {
     it(f.what, () => {
       expect(appAnswer(f)).toBe(f.open)
     })

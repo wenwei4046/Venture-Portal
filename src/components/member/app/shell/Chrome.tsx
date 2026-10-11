@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useTuckOnScroll } from "@/components/pwa/tuck";
+import tuck from "@/components/pwa/tuck.module.css";
 import { ICON, Svg } from "../icons";
 import type { Screen } from "../route";
 import s from "../shell.module.css";
@@ -75,6 +77,9 @@ export function BottomNav({ active, android, live, hidden = NONE, onGo, onQuote 
   const right = NAV.slice(2).filter(n => !hidden.includes(n.id));
   const quote = !hidden.includes("quote");
   const columns = left.length + right.length + (quote ? 1 : 0);
+  // The bar steps out of the way while reading on, back on scrolling up or on another page (2026-10-11) — the live app only.
+  const navRef = useRef<HTMLElement>(null);
+  const tucked = useTuckOnScroll(navRef, live, active);
   const item = (n: (typeof NAV)[number]) => {
     const on = tab === n.id;
     return (
@@ -85,7 +90,7 @@ export function BottomNav({ active, android, live, hidden = NONE, onGo, onQuote 
     );
   };
   return (
-    <nav className={`${s.nav} ${live ? s.navLive : ""}`}>
+    <nav ref={navRef} className={`${s.nav} ${live ? s.navLive : ""} ${tuck.tuckable}`} data-tucked={tucked ? "" : undefined} inert={tucked || undefined}>
       <div className={s.navGrid} style={columns === 5 ? undefined : { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
         {left.map(item)}
         {quote && (
