@@ -37,7 +37,8 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
   const [viewing, setViewing] = useState<string | null>(null);
   // The Principal and the Director: the Control panel, or (the Director) their own CRM.
   const [panelUi, setPanelUi] = useState<PanelUi>(initialPanelUi);
-  const [hodMode, setHodMode] = useState<"panel" | "crm">("panel");
+  // Team (the Control panel) or Mine (one's own CRM): null until chosen — the Director opens on Team, a leader on Mine.
+  const [hodMode, setHodMode] = useState<"panel" | "crm" | null>(null);
   const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});
   const refs = useRef<SalesRefs>({}).current;
   const dataRef = useRef<CrmData | null>(data);
@@ -126,16 +127,21 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
   const full = data.can.viewAll;
   // Everybody in the CRM sells but the Boss: somebody with the Control panel who sells has My CRM beside it.
   const sells = me.role !== "boss";
+  // A leader (STL / TL / TA with a downline, rev 1011): the Control panel scoped to their whole downline — the database
+  // already gives them only their line — beside their own CRM.
+  const leads = !full && data.people.some(p => p.uplineId === me.id);
+  const mode = hodMode ?? (full ? "panel" : "crm");
   const nameOf = (id: string | null | undefined) => personOf(id, data.people)?.name ?? "—";
   const openCrmOf = (staffId: string, customerId?: string) => {
     if (staffId === me.id && sells) { setViewing(null); setHodMode("crm"); } else setViewing(staffId);
     setUi(u => ({ ...initialSalesUi(), toast: u.toast, chat: customerId ?? null }));
   };
-  if (full && !viewing && (!sells || hodMode === "panel")) {
-    const teams = teamsOf(data);
+  if ((full || leads) && !viewing && (!sells || mode === "panel")) {
+    const mine = new Set([me.id, ...downlineOf(me.id, data.people)]);
+    const teams = full ? teamsOf(data) : teamsOf(data).filter(t => mine.has(t.id) || t.people.some(p => p.id === me.id));
     const pctx: PanelCtx = {
       data, me, now, live, ui: panelUi, set: setPanelUi, patch: p => setPanelUi(u => ({ ...u, ...p })), act: panelAct, nameOf, teams,
-      directors: data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)),
+      directors: full ? data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) : [],
       teamOfStaff: id => { const tl = id ? teams.find(t => t.id === id || t.people.some(p => p.id === id)) : undefined; return tl; },
       openCrmOf, toMyCrm: sells ? () => openCrmOf(me.id) : undefined, exitApp: onExit, slotCounts,
     };
@@ -161,7 +167,7 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
       rdMode: full && sells,
       toPanel: () => { setHodMode("panel"); setViewing(null); },
       // Team | Mine (rev 1010 §7.3): the Director to the Control panel.
-      toTeam: full && sells ? () => { setHodMode("panel"); setViewing(null); } : undefined,
+      toTeam: (full && sells) || leads ? () => { setHodMode("panel"); setViewing(null); } : undefined,
       switchList: byTeam(below.map(id => personOf(id, data.people)!).filter(Boolean), data.people),
       // Assign to somebody: assignment is CRM · Manage's.
       assignTo: data.can.manage ? (customerId, staffId) => panelAct.sendTo(customerId, staffId) : undefined,
