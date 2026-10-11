@@ -71,8 +71,9 @@ export default function ChangePasswordForm({ email, change }: { email: string; c
         </div>
       ) : null}
       <div className={s.foot}>
-        <button type="submit" className={`${btn('primary')} ${s.send}`} disabled={f.busy}>
-          {f.busy ? 'Changing…' : 'Change password'}
+        {/* Once it has changed, the button is itself again — the page refreshes behind it (the new session's cookies). */}
+        <button type="submit" className={`${btn('primary')} ${s.send}`} disabled={f.busy && !f.done}>
+          {f.busy && !f.done ? 'Changing…' : 'Change password'}
         </button>
       </div>
     </form>
