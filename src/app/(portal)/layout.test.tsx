@@ -23,16 +23,33 @@ vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 // The fold of HR's sidebar and the Revenue sub-department last picked are cookies (2026-10-10).
 const jar = vi.hoisted(() => ({ values: {} as Record<string, string> }))
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: (k: string) => (k in jar.values ? { value: jar.values[k] } : undefined) }) }))
+// Whether the login is a person's own (2026-10-12): the database's answer, read beside the nav.
+const login = vi.hoisted(() => ({ personal: false }))
+vi.mock('@/lib/account/personal-login', () => ({ loginIsPersonal: async () => login.personal }))
 
 import PortalLayout from './layout'
 
-type FrameProps = { navData: { revenueSubDepts: unknown[]; revenueSub?: string | null; deptPoolDepts?: Array<{ label: string }> }; hrNavCollapsed?: boolean }
+type FrameProps = {
+  user: { id: string; personalLogin?: boolean }
+  navData: { revenueSubDepts: unknown[]; revenueSub?: string | null; deptPoolDepts?: Array<{ label: string }> }
+  hrNavCollapsed?: boolean
+}
 const frameFor = async () => ((await PortalLayout({ children: null })) as ReactElement<FrameProps>).props
 const navDataFor = async () => ((await PortalLayout({ children: null })) as ReactElement<FrameProps>).props.navData
 
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.listSubDepartments.mockResolvedValue([{ slug: 'fair', name: 'Fair' }])
+  login.personal = false
+})
+
+describe('the account the shell is drawn for', () => {
+  it('marks a personal login, so Admin lists Change password; a shared one stays unmarked (2026-10-12)', async () => {
+    mocks.requireAuth.mockResolvedValue(withActions({ id: 'carrie', role: 'finance', permissions: ['treasury'] }))
+    expect((await frameFor()).user.personalLogin).toBeUndefined()
+    login.personal = true
+    expect((await frameFor()).user).toMatchObject({ id: 'carrie', personalLogin: true })
+  })
 })
 
 describe('the sidebar’s data', () => {

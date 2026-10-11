@@ -37,6 +37,7 @@ import {
   canSeeAuditChanges,
   canAccessMeetingRooms,
   canAccessGuestLink,
+  canChangePassword,
 } from '@/lib/roles'
 
 /**
@@ -52,6 +53,10 @@ export type NavViewer = PermissionHolder & {
   actions?: Readonly<Record<string, 'own' | 'dept' | 'all'>>
   /** The tabs they hold (2026-10-11, 8b) — a link shows only where its page would open. */
   tabs?: readonly string[]
+  /** A person's own login, not a shared account (2026-10-12): Change password shows only for it. */
+  personalLogin?: boolean
+  /** Set while the portal is viewed as somebody — their screen, read-only. */
+  viewingAs?: { id: string; name: string }
 }
 
 export interface NavItem {
@@ -470,6 +475,9 @@ function navEntries(data: NavData): NavEntry[] {
         { href: '/settings?tab=simulator', label: 'Simulator', tab: 'simulator', permissionTabs: ['pri.settings'], visible: canAccessSettings },
       ],
     },
+    // Change password (2026-10-12 — the user: in their profile "or admin category", "just for that
+    // personal acc"): a login of their own, never a shared one; no tab closes it (OPEN_PAGES).
+    { href: '/admin/password', label: 'Change password', section: 'Reports & Admin', visible: canChangePassword },
   ]
 }
 

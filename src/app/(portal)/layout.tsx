@@ -9,6 +9,8 @@ import { HR_NAV_COOKIE, REVENUE_SUB_COOKIE, isHrView } from '@/lib/hr-view'
 import { listSubDepartments } from './revenue/_lib/sub-departments'
 import { redirect } from 'next/navigation'
 import { isPhone, opensHrAppOnPhone } from '@/lib/one-app'
+import { loginIsPersonal } from '@/lib/account/personal-login'
+import { startRead } from '@/lib/start-read'
 
 export default async function PortalLayout({
   children,
@@ -20,6 +22,8 @@ export default async function PortalLayout({
   // One app (2026-10-11, lib/one-app.ts): on a phone, HR's view IS the HR app — its other pages are the computer's.
   if (opensHrAppOnPhone(user) && isPhone((await headers()).get('user-agent'))) redirect('/hr-app')
   const jar = await cookies()
+  // Admin › Change password is a personal login's own (2026-10-12): asked beside the nav's rows.
+  const personal = startRead(loginIsPersonal())
 
   // Almost all of the nav is a constant, but the Revenue group lists the
   // Revenue Department's sub-departments — Fair today, more when they are
@@ -42,10 +46,11 @@ export default async function PortalLayout({
   if (readsDeptStatements(user)) {
     navData = { ...navData, deptPoolDepts: statementDepts(primedRegistryRows()) }
   }
+  const personalLogin = await personal
 
   return (
     <PortalFrame
-      user={user}
+      user={personalLogin ? { ...user, personalLogin } : user}
       navData={navData}
       hrNavCollapsed={isHrView(user.role) && jar.get(HR_NAV_COOKIE)?.value === 'collapsed'}
     >

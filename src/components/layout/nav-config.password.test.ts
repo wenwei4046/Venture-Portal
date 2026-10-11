@@ -1,0 +1,53 @@
+import { describe, expect, it } from 'vitest'
+import { withActions } from '@/test/with-actions'
+import { buildNavEntries, emptyNavData, isGroup, navLabelByPath, type NavEntry, type NavViewer } from './nav-config'
+import { activeHrNavKey, hrNavSections, visibleHrNav } from './hr-nav'
+
+// Change password (2026-10-12 — the user: in their profile "or admin category"; "just for that
+// personal acc"): the last link of Admin in both sidebars (and so in the phone's More sheet), for a
+// login a People record names — never a shared one, never while viewing the portal as somebody.
+
+const leaves = (entries: NavEntry[], v: NavViewer): Array<{ href: string; label: string; section?: string }> =>
+  entries.filter(e => e.visible(v)).flatMap(e => (isGroup(e) ? leaves(e.children, v).map(c => ({ ...c, section: e.section })) : [e]))
+
+const finance = withActions({ id: 'carrie', role: 'finance', permissions: ['treasury', 'reports', 'audit_log'] }) as unknown as NavViewer
+const staff = withActions({ id: 'new', role: 'staff', permissions: [] }) as unknown as NavViewer
+const hr = withActions({ id: 'h', role: 'hr', permissions: ['team', 'audit_log'] }) as unknown as NavViewer
+
+describe('Change password in the portal’s sidebar', () => {
+  it('ends Reports & Admin for a personal login', () => {
+    const links = leaves(buildNavEntries(emptyNavData), { ...finance, personalLogin: true })
+    const admin = links.filter(l => l.section === 'Reports & Admin')
+    expect(admin[admin.length - 1]).toMatchObject({ href: '/admin/password', label: 'Change password' })
+  })
+
+  it('is there for a login that opens nothing else (Overview, and Admin › Change password)', () => {
+    expect(leaves(buildNavEntries(emptyNavData), { ...staff, personalLogin: true }).map(l => l.label)).toEqual(['Overview', 'Change password'])
+  })
+
+  it('is not there for a shared login, nor while the portal is viewed as somebody', () => {
+    const shared = leaves(buildNavEntries(emptyNavData), finance).map(l => l.href)
+    expect(shared).not.toContain('/admin/password')
+    const viewing = leaves(buildNavEntries(emptyNavData), { ...finance, personalLogin: true, viewingAs: { id: 'x', name: 'X' } }).map(l => l.href)
+    expect(viewing).not.toContain('/admin/password')
+  })
+
+  it('names the page for the activity log', () => {
+    expect(navLabelByPath(emptyNavData).get('/admin/password')).toBe('Change password')
+  })
+})
+
+describe('Change password in HR’s sidebar', () => {
+  it('ends Admin for a personal login, and lights there', () => {
+    const admin = visibleHrNav(hrNavSections('fair'), { ...hr, personalLogin: true }).find(s => s.label === 'Admin')
+    expect(admin?.items.map(i => i.label)).toEqual(['Audit Log', 'Change password'])
+    expect(admin?.items.at(-1)).toMatchObject({ href: '/admin/password', icon: 'lock' })
+    expect(activeHrNavKey(hrNavSections('fair'), '/admin/password')).toBe('password')
+  })
+
+  it('is not there for hr@ (shared), nor while viewing as somebody', () => {
+    expect(visibleHrNav(hrNavSections('fair'), hr).find(s => s.label === 'Admin')?.items.map(i => i.label)).toEqual(['Audit Log'])
+    const viewing = visibleHrNav(hrNavSections('fair'), { ...hr, personalLogin: true, viewingAs: { id: 'x', name: 'X' } })
+    expect(viewing.find(s => s.label === 'Admin')?.items.map(i => i.label)).toEqual(['Audit Log'])
+  })
+})

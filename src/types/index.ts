@@ -51,6 +51,11 @@ export interface User {
   // (2026-10-11): everything above is theirs, `actualRole` the viewer's kind,
   // and the session reads only (lib/supabase/read-only.ts).
   viewingAs?: { id: string; name: string }
+  // The login is a person's own — a People record names it — not a shared
+  // account (2026-10-12): Change password is offered only then. Set by the
+  // portal layout for its menus (lib/account/personal-login.ts), not by
+  // getUser; absent reads as shared.
+  personalLogin?: boolean
 }
 
 export interface Company {
