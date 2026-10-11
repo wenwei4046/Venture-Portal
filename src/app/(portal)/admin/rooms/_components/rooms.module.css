@@ -98,6 +98,8 @@
 
 /* ── Schedule grid ── */
 .grid {
+  /* The prototype's box: 640px of schedule inside its border (642 in all). */
+  box-sizing: content-box;
   border: 1px solid rgb(216 210 200);
   border-radius: 10px;
   overflow: auto;

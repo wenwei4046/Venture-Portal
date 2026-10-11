@@ -167,7 +167,7 @@ export function MoveToTalentWindow({
         <button type="button" className={s.btnPlain} onClick={onClose}>
           Cancel
         </button>
-        <button type="button" className={s.btnOrange} style={{ padding: '8px 18px' }} onClick={save} disabled={pending}>
+        <button type="button" className={s.btnOrange} style={{ padding: '8px 18px 10px' }} onClick={save} disabled={pending}>
           Save to Talent Bank
         </button>
       </div>

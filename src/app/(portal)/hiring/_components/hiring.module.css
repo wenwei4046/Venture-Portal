@@ -429,7 +429,9 @@
 .core { font-size: 10.5px; color: rgb(var(--hv-brown)); }
 .addRow { display: flex; gap: 8px; margin-top: 12px; }
 .addInput { width: 240px; }
-.addBtn { padding: 7px 12px; font-size: 13px; }
+/* 9px under the label: the row is the input's 34px, and the prototype's span keeps its text 8px from the top (a
+   button would centre it at 9). */
+.addBtn { padding: 7px 12px 9px; font-size: 13px; }
 .sources { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
 .source {
   display: flex;
@@ -1158,6 +1160,9 @@
   .facts { grid-template-columns: 120px minmax(0, 1fr); }
   .talTable { overflow-x: auto; }
   .talCols { min-width: 720px; }
+  /* The month picker opens leftwards from its button's right edge: pinned to the left it ran off a phone's
+     screen and six months could not be picked (the parity audit, 2026-10-11). */
+  .monthPop { left: auto; right: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

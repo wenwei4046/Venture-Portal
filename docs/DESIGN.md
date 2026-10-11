@@ -195,7 +195,11 @@ disagree, the file wins; every value is the prototype's.**
   183`), right drawers (400–600px on `rgb(43 31 23 / .18)`), centred windows
   (`.28` / `.22`), the toast (walnut, orange ●, bottom-centre, 2.2 s —
   `flash()` after a save), the 28×16 toggle (`left .15s`), the peach save bar,
-  history dots, label/value facts. Esc closes the overlay on top.
+  history dots, label/value facts. Esc closes the overlay on top. On a phone
+  (≤767px) the frame runs on under the 54px tab bar, so a drawer and its scrim
+  end where the sheet ends (`54px + 10px + var(--safe-bottom)`), a window
+  centres in the room above the bar (at most `100% − 94px − safe`) and the
+  toast stands `54px + 30px + safe` up (2026-10-11).
 - **Tailwind moves the prototype's boxes, so the kit puts them back:** a
   revamped page is `line-height: normal` (preflight's 1.5 makes every row
   taller), and a box the prototype sizes with padding or a border is
@@ -443,7 +447,8 @@ the quiet buttons have NO fill of their own — they sit on the white sheet.
   tile (`238 240 226` / `88 98 68`, mono 10px 500 extension), the name 500, a
   12px brown `file · day · who` line, department pills (1px 8px, radius 999,
   11px), View · Download (5px 10px, radius 6, unfilled, orange rim on hover)
-  and Delete (red, white; *Confirm delete* on `250 228 224`); *Show deleted
+  and Delete (red, white; *Confirm delete* on `250 228 224`, under the
+  pointer too); *Show deleted
   (n)*; a deleted row at .55 with a mono red *Deleted*.
 - **Data center**: `280px 1fr`. People: *Find a person*, a 9px-radius button
   per person (name 13px 500, an 11px line, a 16px red "!" when a compulsory
@@ -593,7 +598,8 @@ lines 1145–1270, the drawers 1334–1364 and 1484–1497). Values in
   box (3px, radius 10) — **This month** · **All time** · a 1px rule ·
   **Pick a month** (calendar and chevron; the picked one dark `43 31 23` on
   cream, 500) — then the range in words (`1 Oct 2026 – 31 Oct 2026`, 12.5px).
-  Pick a month opens a 264px card (radius 12, 12px): *LAST 12 MONTHS*, then a
+  Pick a month opens a 264px card (radius 12, 12px; on a phone leftwards from
+  the button's right edge, so every month is on screen): *LAST 12 MONTHS*, then a
   4-column grid of months (`Oct` 13px 500 over `2026` 10px at .7). **Six
   cards** in a row (gap 9, 146px tall, the kit's card look): Requests
   submitted · People hired (a ledger bar) · Avg days to acknowledge · Avg days
@@ -617,7 +623,8 @@ lines 1145–1270, the drawers 1334–1364 and 1484–1497). Values in
   invite when a role opens.*): `260px | 1fr`. The left card: *Search name or
   notes*, **All talent** and each department with its count; a department
   opens (its ▸ turns, `.2s`) to the positions under it, indented behind a
-  rule; the picked row peach, 600 (a position's in clay). The right: the
+  rule, in the tree's own 4px rhythm (an opened department with nobody in it
+  keeps its empty block); the picked row peach, 600 (a position's in clay). The right: the
   heading (`Revenue Specialist`, `Revenue · 1 person`) and **+ Add talent**;
   the table `1.2fr 1.1fr 1.8fr 110px 170px` — name 500 over *From HR-202* /
   *Added directly*, what they fit over their department, the first line of
@@ -650,11 +657,12 @@ HR's Admin section above Audit Log, the old shell's Reports & Admin. Values in
 
 - **Schedule** (the first tab; the tabs show only to whoever may manage the
   rooms). The toolbar: a date pager (‹ · `Sat, 10 Oct 2026 · today` 500 in a
-  190px label · ›) in one `229 228 223` box radius 6, **Today**, the day's
+  190px label · ›) in one `229 228 223` box radius 6 — the label names the
+  asked day at once and nothing dims while its grid is read — **Today**, the day's
   count in words (12.5px `90 78 68`), then the legend (10px swatches radius 3,
   mono 11.5px 600 codes) and **+ Book a room** (the accent, black, 8px 18px).
-  The grid: radius 10 in a `216 210 200` edge, at most 640px tall and
-  scrolling; a 56px hour column (mono 10.5px) then one column per room
+  The grid: radius 10 in a `216 210 200` edge, at most 640px tall inside it
+  (content-box, 642 in all) and scrolling; a 56px hour column (mono 10.5px) then one column per room
   (`minmax(170px, 1fr)`) under a sticky `235 231 224` head (name 500 13px,
   `8 seats · Level 3` 11px). **08:00–20:00, 52px an hour**, half-hour rules
   drawn by one repeating gradient. A meeting is a block 4px in from each side,
@@ -669,7 +677,8 @@ HR's Admin section above Audit Log, the old shell's Reports & Admin. Values in
 - **Book a room** — the 520px drawer (eyebrow MEETING ROOM in slate, head and
   body 18px 22px): Meeting title; Room · Date, From · To, Booked by · From
   department in pairs (every select the kit's `Select`); Attending · internal
-  as chips with a type-a-name search and six suggestions; external guests as
+  as chips (the row kept when nobody is listed, so the search sits 16px under
+  the label) with a type-a-name search and six suggestions; external guests as
   name / company rows with *+ Add an external guest*; **Total pax** in a grey
   box with a 38px − 1 + stepper that never goes under the named count (− greys
   there) and says `· too many` in red past the room's seats. The footer's red

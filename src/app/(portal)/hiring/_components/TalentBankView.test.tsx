@@ -86,4 +86,21 @@ describe('Hiring › Talent Bank', () => {
     fireEvent.contextMenu(screen.getByText('Joyce Tan').closest('[role="row"]')!)
     expect(screen.getAllByRole('menuitem').map(b => b.textContent)).toEqual(['Open'])
   })
+
+  // The parity audit (2026-10-11): a department's positions sat 4px high (a wrapper swallowed the tree's gap), and
+  // an opened department with nobody in it drew nothing where the prototype draws its (empty) block.
+  it('a department and its positions stand in the tree itself; an opened empty department keeps its block', () => {
+    view()
+    const region = screen.getByRole('region', { name: 'Departments' })
+    const revenue = within(region).getByRole('button', { name: /^Revenue/ })
+    expect(revenue.parentElement).toBe(region)
+    fireEvent.click(revenue)
+    const kids = revenue.nextElementSibling as HTMLElement
+    expect(kids.parentElement).toBe(region)
+    expect(within(kids).getAllByRole('button').map(b => b.textContent)).toEqual(['Revenue Specialist1', 'Senior Revenue Specialist1'])
+    fireEvent.change(screen.getByPlaceholderText('Search name or notes'), { target: { value: 'zzz' } })
+    const empty = revenue.nextElementSibling as HTMLElement
+    expect(empty.tagName).toBe('DIV')
+    expect(empty.childElementCount).toBe(0)
+  })
 })

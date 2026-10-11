@@ -48,10 +48,14 @@ export default function MeetingRoomsView({
   // The day wanted (moved at once by ‹ ›), and the day on screen with its today.
   const dayRef = useRef(initial.from)
   const shownRef = useRef(initial)
+  // The day the toolbar names: the one asked for, at once, as the prototype's (its grid follows when the read
+  // arrives; a read for a day already left is dropped) — 2026-10-11.
+  const [want, setWant] = useState(initial.from)
 
   const show = useCallback((next: RoomsRange) => {
     shownRef.current = next
     dayRef.current = next.from
+    setWant(next.from)
     setRange(next)
     setLoadingDay(false)
   }, [])
@@ -76,6 +80,7 @@ export default function MeetingRoomsView({
 
   const goDay = useCallback(async (day: string) => {
     dayRef.current = day
+    setWant(day)
     writeDay(day)
     setLoadingDay(true)
     const res = await readRoomsDay(day)
@@ -113,8 +118,10 @@ export default function MeetingRoomsView({
       {shown === 'schedule' ? (
         <RoomsSchedule
           range={range}
+          day={want}
           people={people}
           canBook={canBook}
+          canManage={canManage}
           busy={loadingDay}
           legend={legend}
           onDay={goDay}
