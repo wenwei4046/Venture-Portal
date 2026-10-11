@@ -16,14 +16,8 @@ const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct
 
 export function insightVM(ctx: SalesCtx) {
   const { ui, set, patch, data, now, refs, owner, me, nameOf, act } = ctx;
-  // Team | Me (rev 1010 §5.2): only for somebody with a direct downline (People › Hierarchy), Me on every open.
-  // Team = them + their WHOLE downline, every level down — never upline or sideways.
-  const canTeam = data.people.some(p => p.uplineId === owner.id);
-  const scope = canTeam ? ui.insScope : "me";
-  const teamIds = new Set([owner.id, ...downlineOf(owner.id, data.people)]);
-  const mine: CrmCustomer[] = scope === "team"
-    ? [...ctx.mine, ...data.customers.filter(c => c.assignedTo && teamIds.has(c.assignedTo) && !ctx.mine.some(x => x.id === c.id))]
-    : ctx.mine;
+  // No Team | Me (rev 1010 §5.2 replaced by §7.3: team views live on the Team side).
+  const mine = ctx.mine;
   const T = day0(now), wk0 = T - ((now.getDay() + 6) % 7) * DAY;
   const per = ui.insPeriod === "range" && !ui.insRange ? "month" : ui.insPeriod;
   const [R0, R1] = per === "day" ? [T, T] : per === "week" ? [wk0, wk0 + 6 * DAY]
@@ -107,7 +101,6 @@ export function insightVM(ctx: SalesCtx) {
   // Leads / Appointments / Upcoming → a list → Customer info → chat (rev 1010 §5.1).
   const p2 = (n: number) => String(n).padStart(2, "0"), dOnly = (d: Date) => `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}`;
   const lastAt = (c: CrmCustomer) => lastReal(c)?.at ?? c.createdAt;
-  const ownerOf = (c: CrmCustomer) => scope === "team" ? (c.assignedTo === me.id ? "You" : nameOf(c.assignedTo)) : "";
   // The sheet's top sits ~10 px under the Leads · Appointments · Upcoming row (measured on open); else 72%.
   const openList = (kind: "leads" | "appts" | "up") => (e: MouseEvent<HTMLElement>) => {
     let h: number | null = null;
@@ -121,7 +114,7 @@ export function insightVM(ctx: SalesCtx) {
   const vList = (kind === "up" ? visits.filter(v => v.state === "booked" && new Date(v.start) > now) : visits).slice()
     .sort((a, b) => kind === "up" ? a.start.localeCompare(b.start) : b.start.localeCompare(a.start));
   const byId = new Map(mine.map(c => [c.id, c]));
-  const row = (c: CrmCustomer, at: Date, n: number) => ({ name: c.name, ini: ini(c.name), phone: phoneLabel(c.phone) || "—", owner: ownerOf(c), date: dOnly(at), time: timeLabel(at),
+  const row = (c: CrmCustomer, at: Date, n: number) => ({ name: c.name, ini: ini(c.name), phone: phoneLabel(c.phone) || "—", owner: "", date: dOnly(at), time: timeLabel(at),
     rule: n ? "1px solid #EBDDD2" : "0", open: () => patch({ insInfo: c.id }) });
   const lsRows = kind === "leads"
     ? [...leads].sort((a, b) => lastAt(b).localeCompare(lastAt(a))).map((c, n) => row(c, new Date(lastAt(c)), n))
@@ -129,12 +122,6 @@ export function insightVM(ctx: SalesCtx) {
   const lsN = kind === "leads" ? leads.length : vList.length;
   const ci = ui.insInfo ? data.customers.find(c => c.id === ui.insInfo) : undefined;
   const list = {
-    canTeam,
-    scopes: ([["team", "Team", "M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M16 4a4 4 0 0 1 0 8m6 9v-2a4 4 0 0 0-3-3.87M12 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"], ["me", "Me", "M20 21a8 8 0 0 0-16 0M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"]] as const).map(([k, label, icon]) => {
-      const on = scope === k;
-      // Switching closes any open list or info sheet.
-      return { label, icon, pick: () => patch({ insScope: k, insList: null, insInfo: null }), title: "", bg: on ? "#BD4A19" : "transparent", fg: on ? "#fff" : "#3F2B22", weight: on ? 650 : 500, cur: "pointer" };
-    }),
     openLeads: openList("leads"), openAppts: openList("appts"), openUp: openList("up"),
     lsOpen: !!ui.insList, lsH: ui.insList?.h ?? "72%", lsClose: () => patch({ insList: null }),
     lsTitle: (kind === "leads" ? "Leads" : kind === "appts" ? "Appointments" : "Upcoming") + " · " + (per === "month" ? now.toLocaleDateString("en-GB", { month: "long" }) : per === "week" ? "This week" : per === "day" ? "Today" : (R0 === R1 ? f(new Date(R0)) : f(new Date(R0)) + " – " + f(new Date(R1)))),

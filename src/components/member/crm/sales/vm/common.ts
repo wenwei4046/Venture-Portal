@@ -104,6 +104,8 @@ export interface SalesCtx {
   /** Booked counts per slot start (ISO) for the showroom being booked — Book visit greys a full slot. */
   slotCounts: Record<string, number>;
   embedded: { rdMode: boolean; toPanel?: () => void; exitAs?: () => void; switchList?: CrmPerson[]; onSwitch?: (id: string) => void;
+    /** Team | Mine: to the Control panel scoped to this person (the Director; leaders with a downline). */
+    toTeam?: () => void;
     /** The Principal / Director give a customer to anyone (crm_send_to) — their chat menu's Assign to. */
     assignTo?: (customerId: string, staffId: string) => Promise<boolean> } | null;
 }

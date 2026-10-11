@@ -12,7 +12,7 @@ import type { ChatVM } from "./vm/chat";
 export default function SalesChat({ v }: { v: ChatVM }) {
   return (<>
             
-    <main style={{ position: "relative", flex: "1 1 auto", minHeight: "0", boxSizing: "border-box", padding: "6px 20px 8px", display: "flex", flexDirection: "column", gap: "12px" }}>
+    <main style={{ position: "relative", flex: "1 1 auto", minHeight: "0", boxSizing: "border-box", padding: "16px 20px 8px", display: "flex", flexDirection: "column", gap: "12px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", paddingBottom: "12px", borderBottom: "1px solid rgb(235 221 210)" }}>
         <span onClick={v.closeChat} style={{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid rgb(235 221 210)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
@@ -623,7 +623,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
               <span style={{ fontSize: "13px", fontWeight: "600", color: "#3F2B22" }}>Time</span>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" }}>
                 {(v.slots).map((s, s_i) => (<Fragment key={s_i}>
-                  <span onClick={s.pick} style={{ height: "40px", borderRadius: "12px", border: `1px solid ${s.border}`, background: s.bg, color: s.fg, display: "grid", placeItems: "center", fontSize: "14px", fontWeight: s.weight, textDecoration: s.deco, cursor: s.cursor }}>{s.t}</span>
+                  <span onClick={s.pick} style={{ height: "46px", borderRadius: "12px", border: `1px solid ${s.border}`, background: s.bg, color: s.fg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px", cursor: s.cursor }}><span style={{ fontSize: "14px", fontWeight: s.weight, textDecoration: s.deco }}>{s.t}</span><small style={{ fontSize: "10px", fontWeight: "600", opacity: ".8" }}>{s.left}</small></span>
                 </Fragment>))}
               </div>
             </div>

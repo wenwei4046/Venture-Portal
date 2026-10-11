@@ -160,6 +160,8 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
       // The Director's own CRM carries Control panel | My CRM.
       rdMode: full && sells,
       toPanel: () => { setHodMode("panel"); setViewing(null); },
+      // Team | Mine (rev 1010 §7.3): the Director to the Control panel.
+      toTeam: full && sells ? () => { setHodMode("panel"); setViewing(null); } : undefined,
       switchList: byTeam(below.map(id => personOf(id, data.people)!).filter(Boolean), data.people),
       // Assign to somebody: assignment is CRM · Manage's.
       assignTo: data.can.manage ? (customerId, staffId) => panelAct.sendTo(customerId, staffId) : undefined,

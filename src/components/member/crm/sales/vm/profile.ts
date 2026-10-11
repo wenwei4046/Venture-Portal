@@ -45,7 +45,8 @@ export function profileVM(ctx: SalesCtx) {
     profMain: !ui.profSub, profNotif: ui.profSub === "notif", profAuto: ui.profSub === "auto", profQuick: ui.profSub === "quick",
     meNameX: owner.name, meTitleX: jobTitle(owner), meIniX: ini(owner.name),
     meRankX: owner.role === "rs" ? (owner.fullTime ? "Full time" : "Part time") : "—",
-    hasTeam: team.length > 0, teamSub: team.map(p => firstName(p.name)).join(", "),
+    // No View my team (rev 1010 §7.3): team views live on the Team side.
+    hasTeam: false, teamSub: team.map(p => firstName(p.name)).join(", "),
     teamOpen: ui.teamOpen, openTeam: () => patch({ teamOpen: true }), closeTeam: () => patch({ teamOpen: false }),
     teamList: team.map(p => ({ name: p.name, title: titleOf(p), ini: ini(p.name), go: () => { set(u => ({ ...u, teamOpen: false, chat: null, tab: "inbox", filter: null })); embedded?.onSwitch?.(p.id); } })),
     hasNotifBadge: unread > 0, notifBadge: unread ? String(unread) : "",

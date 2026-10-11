@@ -238,14 +238,23 @@ export function chatVM(ctx: SalesCtx) {
     // Every time any showroom offers, sorted; the ones this room does not offer that day are struck through.
     const SLOTS = [...new Set(rooms.flatMap(r => r.slots.map(s => s.split("@")[0])))].sort().map(t12);
     const blocked = (day: number) => roomClosed(room, day);
+    // Booked at a start, not counting the visit being changed (it does not hold its own slot against itself).
+    const bookedAt = (at: Date) => {
+      const n = ctx.slotCounts[at.toISOString()] ?? 0;
+      const own = b.visitId && data.visits.find(v => v.id === b.visitId && new Date(v.start).getTime() === at.getTime() && v.showroomId === room?.id) ? 1 : 0;
+      return n - own;
+    };
     const taken = (day: number, label: string) => {
       if (blocked(day) || !roomSlots(room, day).includes(label)) return true;
       const at = slotAt(day, label);
       if (at <= now) return true;
-      const n = ctx.slotCounts[at.toISOString()] ?? 0;
-      // The visit being changed does not hold its own slot against itself.
-      const own = b.visitId && data.visits.find(v => v.id === b.visitId && new Date(v.start).getTime() === at.getTime() && v.showroomId === room?.id) ? 1 : 0;
-      return n - own >= (room?.cap ?? 2);
+      return bookedAt(at) >= (room?.cap ?? 2);
+    };
+    // Under each time (rev 1010 §7.1): N left · Full · Passed, or Closed where the showroom does not offer it that day.
+    const leftOf = (day: number, label: string) => {
+      if (blocked(day) || !roomSlots(room, day).includes(label)) return "Closed";
+      const at = slotAt(day, label), cap = room?.cap ?? 2, n = bookedAt(at);
+      return at <= now ? "Passed" : n >= cap ? "Full" : `${cap - n} left`;
     };
     const dd = new Date(b.day), dLabel = dayLabel(dd);
     const ready = b.slot != null && !taken(b.day, b.slot);
@@ -289,7 +298,7 @@ export function chatVM(ctx: SalesCtx) {
       ],
       slots: SLOTS.map(t => {
         const off = taken(b.day, t), on = b.slot === t && !off;
-        return { t, pick: off ? undefined : () => put({ slot: t }), cursor: off ? "not-allowed" : "pointer", deco: off ? "line-through" : "none",
+        return { t, left: leftOf(b.day, t), pick: off ? undefined : () => put({ slot: t }), cursor: off ? "not-allowed" : "pointer", deco: off ? "line-through" : "none",
           bg: on ? RUST : off ? "#FBF6F2" : "#fff", fg: on ? "#fff" : off ? "#B5A398" : INK, border: on ? RUST : off ? "#FBF6F2" : BD, weight: on ? 650 : 500 };
       }),
       confirmLabel: ready ? `${b.visitId ? "Change to" : "Book"} ${dLabel}, ${b.slot}` : "Pick a time",

@@ -25,18 +25,6 @@ export default function SalesInsight({ v }: { v: InsightVM }) {
             </path>
           </svg></span>
       </div>
-      {!!(v.canTeam) && (<>
-        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-          <div style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "12px", border: "1px solid #EBDDD2", background: "#fff" }}>
-            {(v.scopes).map((sc, sc_i) => (<Fragment key={sc_i}>
-              <span onClick={sc.pick} title={sc.title} style={{ flex: "1", height: "34px", borderRadius: "9px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "13px", fontWeight: sc.weight, background: sc.bg, color: sc.fg, cursor: sc.cur }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                  <path d={sc.icon}>
-                  </path>
-                </svg>{sc.label}</span>
-            </Fragment>))}
-          </div>
-        </div>
-      </>)}
       <div style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "12px", background: "#F5EBE3" }}>
         {(v.pPeriods).map((vi, vi_i) => (<Fragment key={vi_i}>
           <span onClick={vi.pick} style={{ flex: "1", height: "32px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: vi.weight, background: vi.bg, color: vi.fg, boxShadow: vi.shadow, cursor: "pointer" }}>{vi.label}</span>

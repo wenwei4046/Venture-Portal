@@ -29,11 +29,10 @@ function balanced(s, start, tag, what) {
   throw new Error(what + ": unbalanced " + start.slice(0, 60));
 }
 const once = (text, from, to) => { if (text.split(from).length !== 2) throw new Error("not exactly once: " + from.slice(0, 60)); return text.replace(from, to); };
-// rev 1010 §5 Insight: Team | Me under the title, the three hero figures open lists, the list sheet and Customer info with ‹ back.
+// rev 1010 §5 Insight: the three hero figures open lists, the list sheet and Customer info with ‹ back.
 const insightFrag = (() => {
   let f = lines(432, 491);
-  const periods = '<div style="display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: #F5EBE3;">';
-  f = once(f, periods, protoNode("RS Insight", "{{ canTeam }}") + periods);
+  // No Team | Me (rev 1010 §5.2 is replaced by §7.3, Team | Mine in the top bar).
   f = once(f, 'onClick="{{ goInbox }}" title="Open Inbox"', 'onClick="{{ openLeads }}" title="See leads"');
   f = f.replace('onClick="{{ goCal }}" title="Open Calendar"', 'onClick="{{ openAppts }}" title="See appointments"');
   f = once(f, 'onClick="{{ goCal }}" title="Open Calendar"', 'onClick="{{ openUp }}" title="See upcoming"');
@@ -51,12 +50,20 @@ const profileFrag = (() => {
   return f;
 })();
 
+// rev 1010 §7.3 Team | Mine in the top bar of every RS page, between the back link and the bell — the prototype's
+// Director pill (RS Insight's isDir / dirTabs), centred in the bar; shown to the Director and to anyone with a downline.
+const headerFrag = (() => {
+  const pill = protoNode("RS Insight", "{{ isDir }}").replace("{{ isDir }}", "{{ hasTM }}").replace("{{ dirTabs }}", "{{ tmTabs }}")
+    .replace("align-self: flex-start;", "align-self: center; margin-left: auto;");
+  return once(lines(36, 39), '<span onClick="{{ openNotifTop }}"', pill + '<span onClick="{{ openNotifTop }}"');
+})();
+
 const line34 = src[33];
 const shellPart = line34.slice(line34.indexOf('<sc-if value="{{ rdX }}"'));
 
 const parts = [
   ["SalesShellBanners", "ShellVM", shellPart, "The Revenue Director's Control panel | My CRM toggle, the Viewing-someone banner and the Switch sheet."],
-  ["SalesHeader", "HeaderVM", lines(36, 39), "Top bar: back to the Revenue app, and the bell."],
+  ["SalesHeader", "HeaderVM", headerFrag, "Top bar: back to the Revenue app, Team | Mine (leaders and the Director), and the bell."],
   ["SalesInbox", "InboxVM", lines(41, 118), "Inbox: search, filter chips, rows (swipe for More), the More / Label sheets and the ad filter."],
   ["SalesContacts", "ContactsVM", lines(121, 180), "Contacts: A–Z, swipe to edit or delete, customer details and info sheets."],
   // rev 1010 §3: a visit opens Contacts' Customer info sheet (lines 145–150) and its form (127–144) on the Calendar too.
@@ -93,6 +100,13 @@ const PATCHES = {
      "<div data-chat-list=\"1\" style={{ flex: \"1\", minHeight: \"0\", overflowY: \"auto\", scrollbarWidth: \"none\", display: \"flex\", flexDirection: \"column\", gap: \"10px\", margin: \"0 -20px\", padding: \"10px 20px\", backgroundColor: v.wallBg, backgroundImage: v.wallImg, backgroundSize: v.wallSize }}>"],
     ["padding: \"5px 12px\", borderRadius: \"9px\", background: \"#F5EBE3\", color: \"#4E2F20\", fontSize: \"12px\", fontWeight: \"600\" }}>{m.sep}</span>",
      "padding: \"5px 12px\", borderRadius: \"9px\", background: \"#FFFFFF\", boxShadow: \"0 1px 1px rgba(63,43,34,.10)\", color: \"#4E2F20\", fontSize: \"12px\", fontWeight: \"600\" }}>{m.sep}</span>"],
+    // 7.1 Book visit: each slot two lines, 46 px — the time, and under it N left / Full / Passed / Closed (prototype markup).
+    ["<span onClick={s.pick} style={{ height: \"40px\", borderRadius: \"12px\", border: `1px solid ${s.border}`, background: s.bg, color: s.fg, display: \"grid\", placeItems: \"center\", fontSize: \"14px\", fontWeight: s.weight, textDecoration: s.deco, cursor: s.cursor }}>{s.t}</span>",
+     "<span onClick={s.pick} style={{ height: \"46px\", borderRadius: \"12px\", border: `1px solid ${s.border}`, background: s.bg, color: s.fg, display: \"flex\", flexDirection: \"column\", alignItems: \"center\", justifyContent: \"center\", gap: \"1px\", cursor: s.cursor }}><span style={{ fontSize: \"14px\", fontWeight: s.weight, textDecoration: s.deco }}>{s.t}</span><small style={{ fontSize: \"10px\", fontWeight: \"600\", opacity: \".8\" }}>{s.left}</small></span>"],
+    // 7.2 Chat top spacing 6 → 16 px. The list's max(16px, env(safe-area-inset-top)) is NOT repeated here: .app already pads
+    // by the inset (crm.module.css, the safe-areas MUST), so 16 px is what max() gives inside it — and on an iPhone the
+    // inset is not added twice.
+    [/(<main style=\{\{ position: "relative", flex: "1 1 auto", minHeight: "0", boxSizing: "border-box", padding: )"6px 20px 8px"/, "$1\"16px 20px 8px\""],
     // 1.2 Every bubble lifts a little off the wallpaper.
     ["boxSizing: \"border-box\", borderRadius: m.radius, background: m.bg,", "boxSizing: \"border-box\", borderRadius: m.radius, boxShadow: \"0 1px 1px rgba(63,43,34,.10)\", background: m.bg,"]],
   // Switch to: a whole department's list scrolls inside the sheet instead of running off the screen (user 2026-10-09).
