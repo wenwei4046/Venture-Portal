@@ -315,4 +315,6 @@ export interface FormOptions {
   initial?: { member?: string; male?: number; female?: number; department?: string };
   /** The waiting-list form HR set (2026-10-10) — its own questions and whether the signed form must come with it. */
   waitingForm?: MemberWaitingForm | null;
+  /** The replacement form HR set (2026-10-11, round 2's README 18.5) — the same, for a replacement. */
+  replacementForm?: MemberWaitingForm | null;
 }

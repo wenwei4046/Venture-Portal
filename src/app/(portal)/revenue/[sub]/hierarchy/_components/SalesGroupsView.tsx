@@ -50,6 +50,7 @@ export default function SalesGroupsView({
   canEdit,
   requests,
   waitingForm = null,
+  replacementForm = null,
   capacity = null,
   canTransfer = false,
   head,
@@ -68,6 +69,8 @@ export default function SalesGroupsView({
   requests: { ok: true; rows: SubDeptRequest[] } | { ok: false; reason: string } | null
   /** The waiting-list form (Form settings, Upload form) — read with the requests. */
   waitingForm?: WaitingFormRead | null
+  /** The replacement list's form (round 2, README 18.5) — read with the requests too. */
+  replacementForm?: WaitingFormRead | null
   /** This sub-department's places: Transfer waits while it is full. */
   capacity?: SubDepartmentCapacity | null
   /** People › Create: Transfer files an employee. */
@@ -144,7 +147,12 @@ export default function SalesGroupsView({
             subOptions={departments.map(d => d.name)}
           />
         ) : (
-          <ReplacementList rows={rows} subDeptName={subDept.name} />
+          <ReplacementList
+            rows={rows}
+            subDeptName={subDept.name}
+            form={replacementForm ?? { ok: false, reason: 'The replacement form could not be read.' }}
+            subOptions={departments.map(d => d.name)}
+          />
         )
       ) : chartedPeople === 0 ? (
         <NobodyYet

@@ -5,6 +5,7 @@ import type { AppClosed } from "@/lib/member/app-pages";
 import type { MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import type { MemberData, MemberRequest } from "@/lib/member/types";
+import { BUILTIN_FIELDS, REPLACEMENT_BUILTIN_FIELDS, type WaitingForm } from "@/lib/commission/waiting-form";
 import type { RevenueSource } from "./source";
 import RevenueApp from "./RevenueApp";
 
@@ -45,9 +46,10 @@ function arena(membershipId: string, period: string): MemberArenaSnapshot {
   };
 }
 
-function source(make: () => MemberData) {
+function source(make: () => MemberData, extra: Partial<RevenueSource> = {}) {
   const none = vi.fn(async () => ({ ok: false as const, error: "not in this test" }));
   return {
+    ...extra,
     refresh: vi.fn(async () => ({ ok: true as const, data: make() })),
     insight: none, kpi: none, orgMap: none, insightRange: none, quote: none, memo: none, requestHistory: none,
     cancelRequest: none, income: none, departmentIncome: none, honours: none, saveBrandWeeks: none, claimRates: none,
@@ -61,9 +63,9 @@ function source(make: () => MemberData) {
 beforeEach(() => { vi.stubGlobal("ResizeObserver", NoResize); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-async function open(search: string, closed?: AppClosed, make: () => MemberData = memberData) {
+async function open(search: string, closed?: AppClosed, make: () => MemberData = memberData, extra: Partial<RevenueSource> = {}) {
   window.history.replaceState({}, "", `/member${search}`);
-  const live = source(make);
+  const live = source(make, extra);
   render(<RevenueApp initialData={make()} initialSearch={search} today="2026-10-05" source={live} closed={closed} />);
   await act(async () => {});
   return live;
@@ -141,6 +143,20 @@ describe("a page whose Create their ticks close sends nothing", () => {
     await open("?page=account&view=requests&department=fair", { pages: [], sends: ["requests"] });
     expect(screen.queryByRole("button", { name: /Submit claim/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Submit waiting list/ })).toBeInTheDocument();
+  });
+
+  // 2026-10-11: the forms HR set were read on Requests only, so a form opened from here drew the
+  // built-ins alone — and a waiting list whose form required the signed form was refused by the database.
+  it("with Requests closed, the form opened from Waiting list & replacements is HR's — both forms are read there", async () => {
+    const hrForm = (fields: WaitingForm["fields"], over: Partial<WaitingForm> = {}) => ({ ok: true as const, data: { form: { version: 4, requireUpload: false, templatePath: null, templateName: "form.html", createdAt: null, fields, ...over } } });
+    const waitingForm = vi.fn(async () => hrForm([...BUILTIN_FIELDS, { id: "ic", label: "IC number", type: "text", required: true }]));
+    const replacementForm = vi.fn(async () => hrForm([...REPLACEMENT_BUILTIN_FIELDS, { id: "q_handover", label: "Handover done?", type: "yesno", required: false }]));
+    await open("?page=account&view=track&department=fair", { pages: ["requests"], sends: ["requests"] }, memberData, { waitingForm, replacementForm });
+    await waitFor(() => expect(waitingForm).toHaveBeenCalled());
+    expect(replacementForm).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Submit a new request/ }));
+    expect(screen.getByRole("dialog", { name: "Submit waiting list" })).toBeInTheDocument();
+    expect(await screen.findByText("IC number")).toBeInTheDocument();
   });
 
   it("Waiting list & replacements: no new one when its Create is closed; with Requests closed, the form opens at once", async () => {

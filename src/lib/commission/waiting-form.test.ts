@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   BUILT_FORM_NAME,
+  REPLACEMENT_BUILTIN_FIELDS,
+  REPLACEMENT_FORM_NAME,
   addQuestion,
   applicationFormHtml,
   cleanedFields,
@@ -129,6 +131,39 @@ describe('Upload form', () => {
   it('files each upload in a folder of its own under templates/', () => {
     expect(templateObjectPath('HOUZS Waiting list (v2).pdf', 'abc')).toBe('templates/abc/HOUZS Waiting list -v2-.pdf')
     expect(templateObjectPath('../../etc', 'abc')).toBe('templates/abc/etc')
+  })
+})
+
+// Round 2's README 18.5 (2026-10-11): the Replacement list's own form — member_save_replacement_form's checks.
+describe('the replacement form', () => {
+  const R = [...REPLACEMENT_BUILTIN_FIELDS]
+
+  it('lets v1 — the five built-ins and HR’s Handover done? — through', () => {
+    expect(waitingFormRefusal([...R, { id: 'q_handover', label: 'Handover done?', type: 'yesno', required: false }], 'replacement')).toBeNull()
+  })
+
+  it('keeps the five built-ins — Reason too — required, of their kind', () => {
+    expect(waitingFormRefusal(R.filter(f => f.id !== 'reason').concat({ id: 'q1', label: 'x', type: 'text', required: false }), 'replacement'))
+      .toBe('The five built-in questions cannot be removed')
+    expect(waitingFormRefusal(R.map(f => (f.id === 'reason' ? { ...f, required: false } : f)), 'replacement')).toBe('The built-in questions stay required and keep their kind')
+    expect(waitingFormRefusal([...R, { id: 'q1', label: 'x', type: 'text', required: false, builtin: true }], 'replacement')).toBe('Only the five built-in questions are built in')
+    expect(waitingFormRefusal(R.slice(0, 4), 'replacement')).toBe('A form has from 5 to 40 questions')
+    // The waiting list's built-ins are not the replacement's.
+    expect(waitingFormRefusal(BUILT_IN, 'replacement')).toBe('A form has from 5 to 40 questions')
+  })
+
+  it('reads member_replacement_form(), named after the replacement form when nothing was uploaded', () => {
+    expect(formFromRow({ version: 1, fields: R, requireUpload: false, templatePath: null, templateName: '' }, 'replacement')?.templateName).toBe(REPLACEMENT_FORM_NAME)
+  })
+
+  it('builds its own black-and-white form: a line for the member leaving, boxes for the arrangement', () => {
+    const html = applicationFormHtml({ version: 2, fields: R, templateName: REPLACEMENT_FORM_NAME }, 'Fair', ['Fair', 'IR'], 'replacement')
+    expect(html).toContain('<h1>HOUZS Venture · Replacement form</h1>')
+    expect(html).toContain('Member leaving *</div><div class="line"></div>')
+    expect(html).toContain('<span>&#9744; Leave the company</span>')
+    expect(html).toContain('<span>&#9744; Release the position</span>')
+    expect(html).toContain('Member leaving — signature')
+    expect(html).not.toContain('&#9744; Fair')
   })
 })
 

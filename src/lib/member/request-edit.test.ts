@@ -70,4 +70,15 @@ describe("Edit request → Update (HR revamp 7b)", () => {
       replacementSource: "waiting", waitingRequestId: "w9", newPerson: "Siti Aisyah", effective: "2026-11-08", reason: "Moving to IR in November",
     });
   });
+
+  // Round 2's README 18.5 (2026-10-11): a replacement sent on HR's form keeps what came with it, or
+  // member_prepare_request would refuse the update for a required answer it no longer carries.
+  it("sends a replacement on HR's form again with its answers and signed form", () => {
+    const sentOnForm = replacement({ detail: { ...replacement().detail, formVersion: 2, answers: [{ id: "q_handover", label: "Handover done?", value: "Yes" }],
+      signedFormName: "handover.pdf", signedFormHash: HASH } });
+    expect(Object.fromEntries(revisionForm(sentOnForm, {}).entries())).toMatchObject({
+      kind: "replacement", formVersion: "2", answers: JSON.stringify([{ id: "q_handover", label: "Handover done?", value: "Yes" }]),
+      signedFormName: "handover.pdf", signedFormHash: HASH,
+    });
+  });
 });

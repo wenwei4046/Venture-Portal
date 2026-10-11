@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Facts, GridHead, GridRow, GridTable, HistoryEvent, SecLabel, btn, hv } from '@/components/hrv/kit'
@@ -9,10 +9,10 @@ import { Chevron } from '@/components/hrv/icons'
 import { flash } from '@/components/hrv/toast'
 import { revenuePath } from '@/lib/revenue'
 import { dayLabel, historyOf, shortDay, waitingList, type SubDeptRequest } from '@/lib/commission/sales-group-requests'
-import { TEMPLATE_ACCEPT, templateRefusal, type WaitingForm } from '@/lib/commission/waiting-form'
+import type { WaitingForm } from '@/lib/commission/waiting-form'
 import type { SubDepartmentCapacity } from '@/lib/commission/capacity'
-import { failWaitingApplicant, uploadWaitingFormTemplate } from '../../../waiting-actions'
-import WaitingFormSettings from './WaitingFormSettings'
+import { failWaitingApplicant } from '../../../waiting-actions'
+import MemberFormTools from './MemberFormTools'
 import s from './sales-groups.module.css'
 import w from './waiting.module.css'
 
@@ -52,20 +52,6 @@ export default function WaitingList({
   const [openId, setOpenId] = useState<string | null>(null)
   const open = list.find(r => r.id === openId) ?? null
 
-  // The page's answer is the truth; a save here shows at once, until the
-  // page's next answer catches up.
-  const [seen, setSeen] = useState(initialForm)
-  const [form, setForm] = useState(initialForm.ok ? initialForm.form : null)
-  if (seen !== initialForm) {
-    setSeen(initialForm)
-    setForm(initialForm.ok ? initialForm.form : null)
-  }
-  const formMissing = initialForm.ok ? null : initialForm.reason
-
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-
   const [confirmFail, setConfirmFail] = useState(false)
   const [failing, setFailing] = useState(false)
   const [failError, setFailError] = useState<string | null>(null)
@@ -78,27 +64,6 @@ export default function WaitingList({
     setOpenId(id)
     setConfirmFail(false)
     setFailError(null)
-  }
-
-  async function upload(file: File | undefined) {
-    if (!file || uploading) return
-    const refused = templateRefusal(file)
-    if (refused) {
-      flash(refused)
-      return
-    }
-    setUploading(true)
-    const data = new FormData()
-    data.set('file', file)
-    const done = await uploadWaitingFormTemplate(data)
-    setUploading(false)
-    if (fileRef.current) fileRef.current.value = ''
-    if (!done.ok) {
-      flash(done.reason)
-      return
-    }
-    setForm(done.form)
-    flash(`Form uploaded — the waiting-list application is now ${done.form.templateName}`)
   }
 
   async function fail() {
@@ -115,30 +80,9 @@ export default function WaitingList({
     openRow(null)
   }
 
-  const uploaded = form?.templatePath ? form.templateName : null
-
   return (
     <section aria-label={`${subDeptName} waiting list`}>
-      <div className={w.toolbar}>
-        <label
-          className={w.upload}
-          data-uploaded={uploaded ? 'true' : undefined}
-          data-busy={uploading ? 'true' : undefined}
-          title={formMissing ?? (uploaded ? 'Click to replace — Revenue members download this file' : 'Upload the application form Revenue members download')}
-        >
-          {uploading ? 'Uploading…' : uploaded ? `Form: ${uploaded}` : 'Upload form'}
-          <input
-            ref={fileRef}
-            type="file"
-            accept={TEMPLATE_ACCEPT}
-            disabled={uploading || form === null}
-            onChange={e => void upload(e.target.files?.[0])}
-          />
-        </label>
-        <button type="button" className={w.settings} onClick={() => setSettingsOpen(true)} disabled={form === null} title={formMissing ?? undefined}>
-          Form settings
-        </button>
-      </div>
+      <MemberFormTools kind="waiting" form={initialForm} subName={subDeptName} subOptions={subOptions} />
 
       <GridTable label={`${subDeptName} waiting list`}>
         <GridHead cols={COLS} cells={['#', 'Applicant', 'Submitted by', 'Joining date', 'Accepted', '']} />
@@ -252,16 +196,6 @@ export default function WaitingList({
           </>
         ) : null}
       </Drawer>
-
-      {settingsOpen && form ? (
-        <WaitingFormSettings
-          form={form}
-          subName={subDeptName}
-          subOptions={subOptions}
-          onClose={() => setSettingsOpen(false)}
-          onSaved={setForm}
-        />
-      ) : null}
     </section>
   )
 }

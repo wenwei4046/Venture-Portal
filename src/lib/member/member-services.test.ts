@@ -86,6 +86,24 @@ describe('Request reviews · words and facts', () => {
     expect(requestHistory(facts, 'waiting', { signedFormName: '' }).map(e => e.note)).toEqual([null, 'Which IC?', null])
   })
 
+  // Round 2's README 18.5 (2026-10-11): a replacement sent on the Replacement list's own form.
+  it('lists what the replacement form asked, the signed form it came with and its version — and opens it', () => {
+    const hash = 'e'.repeat(64)
+    const r = req({ kind: 'replacement', detail: { subDepartmentId: FAIR, destination: 'member_exit', replacementSource: 'new', newPerson: 'Ryan Tan',
+      effective: '2026-10-31', reason: 'Moving to Penang', formVersion: 2, answers: [{ id: 'q_handover', label: 'Handover done?', value: 'Yes' }],
+      signedFormName: 'handover.pdf', signedFormHash: hash } })
+    expect(requestFacts(r, undefined, { departments }).map(f => `${f.l}: ${f.v}`).slice(-3)).toEqual([
+      'Handover done?: Yes', 'Signed form: handover.pdf · black & white record', 'Form version: v2',
+    ])
+    expect(hasSignedForm(r)).toBe(true)
+    const facts = requestFactsFromRow({ r1: { submittedBy: 'KAR JUN', events: [{ to: 'submitted', at: '2026-10-09T01:00:00Z', by: 'KAR JUN' }] } }).r1
+    expect(requestHistory(facts, 'replacement', r.detail).map(e => e.note)).toEqual(['Signed form attached: handover.pdf'])
+    // One sent before the form, or with no file: no form rows, nothing to open.
+    const before = req({ kind: 'replacement', detail: { subDepartmentId: FAIR, destination: 'member_exit', replacementSource: 'vacancy', effective: '2026-10-31', reason: 'Leaving' } })
+    expect(requestFacts(before, undefined, { departments }).map(f => f.l)).not.toContain('Signed form')
+    expect(hasSignedForm(before)).toBe(false)
+  })
+
   it('words a replacement’s arrangement and a claim’s money', () => {
     const repl = requestFacts(req({ kind: 'replacement', detail: { subDepartmentId: FAIR, destination: 'member_exit', replacementSource: 'vacancy', effective: '2026-10-31', reason: 'Leaving' } }),
       { submittedBy: 'KAR JUN', original: 'LOUIS', successor: null, target: null, acceptedAt: null, events: [] }, { departments })

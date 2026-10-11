@@ -917,11 +917,18 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const ratesRead = useKeyedRead<ClaimRates>("rates", !fxp && route.screen === "account" && route.pf === "requests" && !(principal && !viewed) && memoryReady, gen,
     () => source.claimRates(), track, () => source.peek?.<ClaimRates>(ask.claimRates()));
   const claimRates = ratesRead.value;
-  // The waiting-list form HR set (2026-10-10): its own questions, the signed form it asks for.
-  const waitFormRead = useKeyedRead<MemberWaitingForm>("waitForm", !fxp && route.screen === "account" && route.pf === "requests" && !(principal && !viewed) && memoryReady, gen,
+  // The waiting-list form HR set (2026-10-10): its own questions, the signed form it asks for —
+  // and the replacement form (2026-10-11, round 2's README 18.5). Read wherever the request form
+  // opens: Requests, or Waiting list & replacements when Requests is closed (the app follows the ticks).
+  const formsWanted = !fxp && route.screen === "account" && (route.pf === "requests" || route.pf === "track") && !(principal && !viewed) && memoryReady;
+  const waitFormRead = useKeyedRead<MemberWaitingForm>("waitForm", formsWanted, gen,
     () => (source.waitingForm ? source.waitingForm() : Promise.resolve({ ok: false as const, error: "Preview data only." })), track,
     () => source.peek?.<MemberWaitingForm>(ask.waitingForm()));
   const waitingForm = waitFormRead.value;
+  const replFormRead = useKeyedRead<MemberWaitingForm>("replForm", formsWanted, gen,
+    () => (source.replacementForm ? source.replacementForm() : Promise.resolve({ ok: false as const, error: "Preview data only." })), track,
+    () => source.peek?.<MemberWaitingForm>(ask.replacementForm()));
+  const replacementForm = replFormRead.value;
   const formOptions: FormOptions = useMemo(() => {
     if (fxp) return fxp.form;
     return {
@@ -933,8 +940,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       departmentId: membership?.id ?? "",
       waitingList: waitingChoices(myRequests),
       waitingForm: waitingForm ?? null,
+      replacementForm: replacementForm ?? null,
     };
-  }, [fxp, membership, arena, arenaNow, today, claimRates, team, data.departments, myRequests, waitingForm]);
+  }, [fxp, membership, arena, arenaNow, today, claimRates, team, data.departments, myRequests, waitingForm, replacementForm]);
 
   // ── pull to refresh: the end of it ──
   // Every read above has started for this pull by now (effects run in order), so everybody's snapshot — the slowest
@@ -1256,7 +1264,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
               <RequestInfoSheet open={reqPick !== null && reqKind !== null && reqKind !== "claim"} vm={reqKind !== "claim" ? reqDetail : null} busy={reqBusy} error={reqError}
                 onSave={editRequest} onCancel={() => void cancelRequest()} onClose={() => { setReqPick(null); setReqError(null); }} />
               <RequestForm kind={reqForm} options={formOptions} revising={revising} readOnly={readOnlyView} onSubmit={submitRequest}
-                formLink={fxp ? undefined : source.waitingFormLink} onClose={() => { setReqForm(null); setRevising(null); }} />
+                formLink={fxp ? undefined : source.waitingFormLink} replFormLink={fxp ? undefined : source.replacementFormLink}
+                onClose={() => { setReqForm(null); setRevising(null); }} />
             </>
           )}
           {route.pf === "rooms" && (

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BUILT_FORM_NAME, BUILTIN_FIELDS, type WaitingForm } from "@/lib/commission/waiting-form";
+import { BUILT_FORM_NAME, BUILTIN_FIELDS, REPLACEMENT_BUILTIN_FIELDS, REPLACEMENT_FORM_NAME, type WaitingForm } from "@/lib/commission/waiting-form";
 import RequestForm, { type ClaimWeek, type FormLink, type FormOptions } from "./RequestForm";
 import RequestsPage from "./RequestsPage";
 
@@ -410,6 +410,144 @@ describe("a waiting list, on HR's form", () => {
       fireEvent.click(screen.getByRole("button", { name: "Download form" }));
       expect(await screen.findByRole("alert")).toHaveTextContent("HR's application form could not be downloaded. Try again.");
       expect(saved).toEqual([]);
+    });
+  });
+});
+
+// Round 2's README 18.5 (2026-10-11): a replacement is sent on the form Sales Groups › Replacement list ›
+// Form settings versions — its five built-ins with this form's own controls, HR's own questions where HR
+// put them, and the replacement form to download and upload.
+describe("a replacement, on HR's form", () => {
+  const form = (over: Partial<WaitingForm> = {}): WaitingForm => ({
+    version: 2, requireUpload: true, templatePath: null, templateName: REPLACEMENT_FORM_NAME, createdAt: null,
+    fields: [
+      ...REPLACEMENT_BUILTIN_FIELDS,
+      { id: "q_handover", label: "Handover done?", type: "yesno", required: true },
+      { id: "q_notes", label: "Notes for HR", type: "text", required: false },
+    ],
+    ...over,
+  });
+  const replacement = (onSubmit = vi.fn(), over: Partial<WaitingForm> | null = {}, extra: { revising?: { id: string; detail: Record<string, unknown> }; replFormLink?: FormLink } = {}) =>
+    render(<RequestForm kind="replacement" options={over === null ? options : { ...options, replacementForm: { form: form(over) } }} revising={extra.revising ?? null}
+      readOnly={false} onSubmit={onSubmit} onClose={() => {}} formLink={vi.fn()} replFormLink={extra.replFormLink} />);
+  const fillBuiltIns = () => {
+    fireEvent.click(screen.getByRole("button", { name: "YUNY" }));
+    fireEvent.change(screen.getByPlaceholderText("Optional if no replacement"), { target: { value: "Ryan Tan" } });
+    fireEvent.change(screen.getByLabelText("Planned effective date"), { target: { value: "2026-11-01" } });
+    fireEvent.change(screen.getByPlaceholderText("Why, and how the handover works"), { target: { value: "Moving to Penang" } });
+  };
+  const upload = (container: HTMLElement, name = "form.pdf") =>
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [new File(["%PDF-1.7"], name, { type: "application/pdf" })] } });
+  const labels = () => [...document.querySelectorAll("[class*=fieldLabel]")].map(e => e.firstChild?.textContent ?? "");
+
+  it("asks HR's own questions after the built-ins, and offers the replacement form", () => {
+    replacement();
+    expect(screen.getByRole("group", { name: "Handover done?" })).toHaveTextContent("YesNo");
+    expect(screen.getByText("Notes for HR (optional)")).toBeInTheDocument();
+    expect(screen.getByText("Replacement form")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Upload signed form" })).toBeInTheDocument();
+    expect(labels().slice(-2)).toEqual(["Handover done?", "Notes for HR (optional)"]);
+  });
+
+  it("draws HR's own question where HR put it", () => {
+    replacement(vi.fn(), { fields: [REPLACEMENT_BUILTIN_FIELDS[0], { id: "q_seat", label: "Seat number", type: "text", required: false }, ...REPLACEMENT_BUILTIN_FIELDS.slice(1)] });
+    const all = labels();
+    expect(all.indexOf("Seat number (optional)")).toBe(all.indexOf("Original member") + 1);
+  });
+
+  it("wants HR's required answers after the built-ins, then the signed form", () => {
+    const onSubmit = vi.fn();
+    replacement(onSubmit);
+    fillBuiltIns();
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Fill in handover done?.");
+    expect(screen.getAllByText("Required")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit" }));
+    expect(screen.queryAllByText("Required")).toHaveLength(0);
+    expect(screen.getByRole("alert")).toHaveTextContent("Upload the signed replacement form.");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("sends the built-ins as before, HR's answers with the form's version, and the signed form", async () => {
+    const onSubmit = vi.fn(async (data: FormData) => { void data; return { ok: true as const, code: "RQ-2610-020" }; });
+    const { container } = replacement(onSubmit);
+    fillBuiltIns();
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+    upload(container);
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit" }));
+    expect(await screen.findByText("RQ-2610-020")).toBeInTheDocument();
+    expect(screen.getByText("Signed form attached · form.pdf")).toBeInTheDocument();
+    const { signedForm, answers, ...fields } = sent(onSubmit);
+    expect((signedForm as File).name).toBe("form.pdf");
+    expect(JSON.parse(String(answers))).toEqual([
+      { id: "q_handover", label: "Handover done?", value: "Yes" },
+      { id: "q_notes", label: "Notes for HR", value: "" },
+    ]);
+    expect(fields).toEqual({ kind: "replacement", subDepartmentId: "fair", originalStaffId: "yuny", destination: "department_exit",
+      replacementSource: "new", newPerson: "Ryan Tan", effective: "2026-11-01", reason: "Moving to Penang", formVersion: "2" });
+  });
+
+  it("goes without a signed form when HR does not ask for one", async () => {
+    const onSubmit = vi.fn(async (data: FormData) => { void data; return { ok: true as const, code: "RQ-2610-021" }; });
+    replacement(onSubmit, { requireUpload: false });
+    expect(screen.getByText("Replacement form (optional)")).toBeInTheDocument();
+    fillBuiltIns();
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit" }));
+    expect(await screen.findByText("RQ-2610-021")).toBeInTheDocument();
+    expect(sent(onSubmit)).not.toHaveProperty("signedForm");
+  });
+
+  it("an update keeps the answers and the signed form it was sent with", async () => {
+    const onSubmit = vi.fn(async (data: FormData) => { void data; return { ok: true as const, code: "RQ-2610-022" }; });
+    const hash = "b".repeat(64);
+    replacement(onSubmit, {}, { revising: { id: "r2", detail: { originalStaffId: "yuny", destination: "member_exit", replacementSource: "new", newPerson: "Ryan Tan",
+      effective: "2026-11-01", reason: "Moving to Penang", answers: [{ id: "q_handover", label: "Handover done?", value: "No" }],
+      signedFormName: "signed.jpg", signedFormHash: hash } } });
+    expect(screen.getByRole("button", { name: "No" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("✓ signed.jpg")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Send the update" }));
+    expect(await screen.findByText("RQ-2610-022")).toBeInTheDocument();
+    expect(sent(onSubmit)).toMatchObject({ requestId: "r2", signedFormName: "signed.jpg", signedFormHash: hash, formVersion: "2" });
+    expect(sent(onSubmit)).not.toHaveProperty("signedForm");
+  });
+
+  it("until HR's form arrives, asks the five built-ins and offers the built form", () => {
+    replacement(vi.fn(), null);
+    expect(screen.queryByRole("group", { name: "Handover done?" })).not.toBeInTheDocument();
+    expect(screen.getByText("Replacement form (optional)")).toBeInTheDocument();
+  });
+
+  describe("Download form", () => {
+    const saved: { name: string; href: string }[] = [];
+    beforeEach(() => {
+      saved.length = 0;
+      URL.createObjectURL = vi.fn(() => "blob:form");
+      URL.revokeObjectURL = vi.fn();
+      vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) { saved.push({ name: this.download, href: this.href }); });
+    });
+    afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+    it("builds the black-and-white replacement form when HR uploaded none", async () => {
+      const replFormLink = vi.fn();
+      replacement(vi.fn(), {}, { replFormLink });
+      fireEvent.click(screen.getByRole("button", { name: "Download form" }));
+      await waitFor(() => expect(saved).toEqual([{ name: REPLACEMENT_FORM_NAME, href: "blob:form" }]));
+      expect(replFormLink).not.toHaveBeenCalled();
+      const html = await (vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob).text();
+      expect(html).toContain("HOUZS Venture · Replacement form");
+      expect(html).toContain("Revenue Department · Fair · Form v2");
+      expect(html).toContain("Handover done? *");
+    });
+
+    it("hands over HR's own replacement form through its own link, not the waiting list's", async () => {
+      const replFormLink = vi.fn(async () => ({ ok: true as const, data: { url: "https://files.example/r.pdf?token=1", name: "HR replacement.pdf" } }));
+      vi.stubGlobal("fetch", vi.fn(async () => new Response(new Blob(["%PDF-1.7"]), { status: 200 })));
+      replacement(vi.fn(), { templatePath: "templates/x/HR replacement.pdf", templateName: "HR replacement.pdf" }, { replFormLink });
+      fireEvent.click(screen.getByRole("button", { name: "Download form" }));
+      await waitFor(() => expect(saved).toEqual([{ name: "HR replacement.pdf", href: "blob:form" }]));
+      expect(replFormLink).toHaveBeenCalledTimes(1);
     });
   });
 });

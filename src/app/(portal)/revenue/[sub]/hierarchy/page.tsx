@@ -8,7 +8,7 @@ import { rankLabelOf, rankPayLabelOf } from '@/lib/commission/ranks'
 import SalesGroupsView from './_components/SalesGroupsView'
 import { canDo } from '@/lib/permission-actions'
 import { loadSubDepartmentRequests } from '../../_lib/sub-department-requests'
-import { loadWaitingForm } from '../../_lib/waiting-form'
+import { loadReplacementForm, loadWaitingForm } from '../../_lib/waiting-form'
 import { loadSubDepartmentCapacity } from '../../_lib/capacity'
 import { PageHead } from '@/components/hrv/kit'
 import SubDeptSwitcher from '../../_components/SubDeptSwitcher'
@@ -77,7 +77,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
   // waiting list's form and the places left (Transfer waits while it is full)
   // with them.
   const seesRequests = can(user, 'member_requests_manage')
-  const [team, departments, membershipDestinations, employeeDepartments, requests, waitingForm, capacity] = await Promise.all([
+  const [team, departments, membershipDestinations, employeeDepartments, requests, waitingForm, replacementForm, capacity] = await Promise.all([
     currentTeam,
     Promise.all(siblings.map(async (department): Promise<OrgDepartment> => {
       const membership = department.id === subDept.id
@@ -96,6 +96,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
     canManageEmployment ? loadEmployeeDepartmentDestinations() : Promise.resolve([]),
     seesRequests ? loadSubDepartmentRequests(subDept.id) : Promise.resolve(null),
     seesRequests ? loadWaitingForm() : Promise.resolve(null),
+    seesRequests ? loadReplacementForm() : Promise.resolve(null),
     seesRequests ? loadSubDepartmentCapacity(subDept.id) : Promise.resolve(null),
   ])
 
@@ -112,6 +113,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       canEdit={canDo(user, 'revenue', 'edit')}
       requests={requests}
       waitingForm={waitingForm}
+      replacementForm={replacementForm}
       capacity={capacity?.ok ? capacity.data : null}
       canTransfer={canDo(user, 'team', 'create')}
       head={head}
