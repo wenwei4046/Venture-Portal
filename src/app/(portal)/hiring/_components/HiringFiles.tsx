@@ -28,7 +28,11 @@ export interface Waiting {
   newName: string
 }
 
-/** The type picker: the types, then "+ Add a new file type…" (Edit), which names one in a field beside it. */
+/**
+ * The type picker: the types that are on (Form settings turns one off — it
+ * leaves the picker, the files filed under it keep it), then "+ Add a new file
+ * type…" (Edit), which names one in a field beside it.
+ */
 export function FileTypePick({
   types,
   value,
@@ -50,7 +54,7 @@ export function FileTypePick({
     <>
       <Select bare className={`${s.select} ${s.hfType}`} value={value} aria-label={label} onChange={e => onChange(e.target.value)}>
         <option value="">Choose type…</option>
-        {types.map(t => (
+        {types.filter(t => t.active).map(t => (
           <option key={t.id} value={t.id}>
             {t.name}
           </option>
@@ -157,9 +161,10 @@ export function waitingProblem(waiting: readonly Waiting[]): string | null {
 
 /**
  * The waiting files sent up: a new type named first (once per name — one the
- * list already has is that one), then each file straight into the bucket from
- * the browser. What the form then files, or why not. An upload a failure
- * leaves behind is cleared a day later.
+ * list already has on is that one; one that was turned off comes back on
+ * through the database), then each file straight into the bucket from the
+ * browser. What the form then files, or why not. An upload a failure leaves
+ * behind is cleared within the hour once a day old.
  */
 export async function sendWaiting(
   waiting: readonly Waiting[],
@@ -172,7 +177,7 @@ export async function sendWaiting(
     if (typeId === NEW_TYPE) {
       const name = w.newName.trim()
       const key = name.toLowerCase()
-      const known = types.find(t => t.name.trim().toLowerCase() === key)?.id ?? named.get(key)
+      const known = types.find(t => t.active && t.name.trim().toLowerCase() === key)?.id ?? named.get(key)
       if (known) typeId = known
       else {
         const added = await addHiringFileType(name)

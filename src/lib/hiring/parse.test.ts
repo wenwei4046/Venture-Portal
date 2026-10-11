@@ -37,8 +37,9 @@ describe('boardFromJson', () => {
   it('the file types, in their order; only Résumé is built in', () => {
     const b = boardFromJson({ fileTypes: [{ id: 'a', name: 'Résumé', builtin: 'resume' }, { id: 'b', name: 'IC', builtin: 'other' }, { id: '', name: 'Blank' }],
       talents: [{ id: 't', files: [{ id: 'f', type: 'IC', name: 'x.png' }] }] })
-    expect(b.fileTypes).toEqual([{ id: 'a', name: 'Résumé', builtin: 'resume' }, { id: 'b', name: 'IC', builtin: null }])
+    expect(b.fileTypes).toEqual([{ id: 'a', name: 'Résumé', builtin: 'resume', active: true, used: 0 }, { id: 'b', name: 'IC', builtin: null, active: true, used: 0 }])
     expect(b.talents[0].files.map(f => [f.type, f.name, f.resume])).toEqual([['IC', 'x.png', false]])
+    expect(boardFromJson({ fileTypes: [{ id: 'c', name: 'Old', active: false, used: '4' }] }).fileTypes).toEqual([{ id: 'c', name: 'Old', builtin: null, active: false, used: 4 }])
   })
 
   it('an unknown status is Pending, an unknown field type is short text', () => {

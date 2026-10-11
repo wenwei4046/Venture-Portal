@@ -41,7 +41,7 @@ describe('hiring files', () => {
 
   // Several files each, each with a type (mig 20261011160000).
   const file = (id: string, resume: boolean, addedAt: string): HiringFile => ({ id, typeId: resume ? 'r' : 'ic', type: resume ? 'Résumé' : 'IC', resume, name: id + '.pdf', addedAt, addedBy: 'Grace Lim' })
-  const TYPES = [{ id: 'r', name: 'Résumé', builtin: 'resume' as const }, { id: 'ic', name: 'IC', builtin: null }]
+  const TYPES = [{ id: 'r', name: 'Résumé', builtin: 'resume' as const, active: true, used: 0 }, { id: 'ic', name: 'IC', builtin: null, active: true, used: 0 }]
 
   it('the résumé is the newest file of the Résumé type', () => {
     expect(resumeOf([file('ic', false, '2026-10-12T00:00:00Z'), file('old', true, '2026-10-01T00:00:00Z'), file('new', true, '2026-10-10T00:00:00Z')])?.id).toBe('new')
@@ -53,6 +53,6 @@ describe('hiring files', () => {
     expect(startingType(TYPES, [file('cv', true, '')], [])).toBe('')
     expect(startingType(TYPES, [file('ic', false, '')], [{ typeId: 'r' }])).toBe('')
     expect(startingType(TYPES, [file('ic', false, '')], [{ typeId: 'ic' }])).toBe('r')
-    expect(startingType([{ id: 'ic', name: 'IC', builtin: null }], [], [])).toBe('')
+    expect(startingType([{ id: 'ic', name: 'IC', builtin: null, active: true, used: 0 }], [], [])).toBe('')
   })
 })

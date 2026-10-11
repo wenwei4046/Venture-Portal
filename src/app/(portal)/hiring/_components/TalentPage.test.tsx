@@ -158,6 +158,18 @@ describe('Hiring › Talent Bank › a talent’s files', () => {
     expect(files().getByRole('button', { name: 'Open' })).toBeInTheDocument()
   })
 
+  it('a type turned off leaves the picker; named again, the database turns it back on (mig 20261011210000)', async () => {
+    const withOff = { ...HIRING_BOARD, fileTypes: [...HIRING_BOARD.fileTypes, { id: 'ft-old', name: 'Old passport', builtin: null, active: false, used: 2 }] }
+    render(<TalentPage board={withOff} talent={talent('T-102')} can={{ create: true, edit: true }} />)
+    fireEvent.click(files().getByRole('button', { name: '+ Add file' }))
+    const type = files().getByLabelText('What the file is') as HTMLSelectElement
+    expect([...type.options].map(o => o.text)).not.toContain('Old passport')
+    fireEvent.change(type, { target: { value: '__new' } })
+    fireEvent.change(files().getByLabelText('New file type'), { target: { value: 'old passport' } })
+    pick(files().getByLabelText('Choose the file'), pdf('passport.pdf'))
+    await waitFor(() => expect(actions.addHiringFileType).toHaveBeenCalledWith('old passport'))
+  })
+
   it('no file yet says so', () => {
     render(<TalentPage board={HIRING_BOARD} talent={{ ...talent('T-101'), files: [] }} can={{ create: true, edit: true }} />)
     expect(files().getByText('No files yet.')).toBeInTheDocument()

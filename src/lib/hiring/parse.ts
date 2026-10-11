@@ -151,7 +151,7 @@ export function boardFromJson(v: unknown): HiringBoard {
     fileTypes: arr(o.fileTypes)
       .map((t): HiringFileType => {
         const x = obj(t)
-        return { id: str(x.id), name: str(x.name), builtin: x.builtin === 'resume' ? 'resume' : null }
+        return { id: str(x.id), name: str(x.name), builtin: x.builtin === 'resume' ? 'resume' : null, active: x.active !== false, used: num(x.used) ?? 0 }
       })
       .filter(t => t.id && t.name),
     people: arr(o.people).map((p): HiringPerson => {

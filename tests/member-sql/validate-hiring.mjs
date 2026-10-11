@@ -92,7 +92,7 @@ try {
     ($5, 'Old Hand', $6, 'inactive', NULL, 'HR Executive')`, [GRACE, NURUL, KARJUN, CHEA, LEFT, HR, GRACE_USER, REV])
 
   for (const f of ['20261011080000_hiring.sql', '20261011080100_hiring_file_reads.sql', '20261011080200_hiring_reconsider_declined.sql',
-    '20261011160000_hiring_files.sql']) {
+    '20261011160000_hiring_files.sql', '20261011210000_hiring_file_types_manage.sql']) {
     await db.exec(await readFile(new URL(f, migrations), 'utf8'))
   }
   /** An object in the bucket, put there `days` ago — what the browser's upload leaves. */
@@ -350,6 +350,42 @@ try {
   check(/'files'/.test((await policy('hiring_files_write'))[0].with_check), true, 'new files go under files/')
   check(await one(`SELECT public.hiring_file_in_use($1)`, [DANIEL_CV2]), true, 'a file on a record is in use')
   check(await one(`SELECT public.hiring_file_in_use($1)`, [STALE]), false, 'a leftover is not')
+
+  // ── File types renamed and turned off; the leftovers' one list (210000) ──
+  const typeOf = async name => (await board()).fileTypes.find(t => t.name === name)
+  const AISYAH_IC = `files/${id(909)}/Aisyah_IC.jpg`
+  await put(AISYAH_IC)
+  await addFiles('candidate', aisyahC, [{ path: AISYAH_IC, name: 'Aisyah_IC.jpg', type: IC }])
+  check([(await typeOf('IC')).active, (await typeOf('IC')).used, (await typeOf('Résumé')).used], [true, 1, 2], 'each type says it is on, and how many files it has (two résumés: Daniel’s and the talent Aisyah’s)')
+  await as(GRACE_USER, ['hiring.view', 'hiring.create'])
+  await reject(`SELECT public.hiring_file_type_rename($1, 'NRIC')`, [IC], /Hiring · Edit is required/, 'renaming asks Edit')
+  await reject(`SELECT public.hiring_file_type_set_active($1, false)`, [IC], /Hiring · Edit is required/, 'turning off asks Edit')
+  await as(GRACE_USER, ALL)
+  await reject(`SELECT public.hiring_file_type_rename($1, 'CV')`, [RESUME], /Résumé is built in — it keeps its name\./, 'Résumé keeps its name')
+  await reject(`SELECT public.hiring_file_type_set_active($1, false)`, [RESUME], /Résumé is built in — it stays on\./, 'Résumé stays on')
+  await reject(`SELECT public.hiring_file_type_rename($1, ' certificate ')`, [IC], /That type is already there\./, 'one type of a name')
+  await reject(`SELECT public.hiring_file_type_rename($1, '  ')`, [IC], /Name the file type\./, 'a type has a name')
+  await q(`SELECT public.hiring_file_type_rename($1, 'NRIC')`, [IC])
+  check((await fileOf(r2, aisyahC)).find(f => f.name === 'Aisyah_IC.jpg').type, 'NRIC', 'a renamed type is renamed on its files too')
+  await q(`SELECT public.hiring_file_type_set_active($1, false)`, [IC])
+  check((await typeOf('NRIC')).active, false, 'turned off')
+  check((await fileOf(r2, aisyahC)).find(f => f.name === 'Aisyah_IC.jpg').type, 'NRIC', 'a file filed under it keeps it')
+  const LATER_IC = `files/${id(910)}/Later_IC.jpg`
+  await put(LATER_IC)
+  await assert.rejects(() => addFiles('candidate', aisyahC, [{ path: LATER_IC, name: 'Later_IC.jpg', type: IC }]), /NRIC is turned off — pick another type\./, 'nothing new is filed under a type turned off'); checks++
+  check(await one(`SELECT public.hiring_file_type_add('nric')`), IC, 'naming it again is the same type…')
+  check((await typeOf('NRIC')).active, true, '…turned back on')
+  await addFiles('candidate', aisyahC, [{ path: LATER_IC, name: 'Later_IC.jpg', type: IC }])
+  check((await fileOf(r2, aisyahC)).filter(f => f.type === 'NRIC').length, 2, 'filed under it again')
+  check(await one(`SELECT has_function_privilege('authenticated', 'public.hiring_leftovers(integer)', 'EXECUTE')`), false, 'the leftovers list is not a signed-in user’s…')
+  check(await one(`SELECT has_function_privilege('anon', 'public.hiring_leftovers(integer)', 'EXECUTE')`), false, '…nor the publishable key’s')
+  check(await one(`SELECT has_function_privilege('service_role', 'public.hiring_leftovers(integer)', 'EXECUTE')`), true, '…it is the hourly sweep’s (the service role)')
+  check(await one(`SELECT public.hiring_leftovers(50)`), await one(`SELECT public.hiring_orphan_files(50)`), 'HR’s list and the sweep’s are one list')
+  check((await one(`SELECT public.hiring_leftovers(1)`)).length, 1, 'a bounded batch')
+  for (const fn of ['public.hiring_file_type_rename(uuid, text)', 'public.hiring_file_type_set_active(uuid, boolean)']) {
+    check(await one(`SELECT has_function_privilege('authenticated', $1, 'EXECUTE')`, [fn]), true, `${fn} is a signed-in user's`)
+    check(await one(`SELECT has_function_privilege('anon', $1, 'EXECUTE')`, [fn]), false, `${fn} is not the publishable key's`)
+  }
 
   // ── The guest link's door ─────────────────────────────────────────────────
   for (const fn of ['public.hiring_guest_form()', 'public.hiring_file_guest_request(text, text, text, text, jsonb, text, text)']) {

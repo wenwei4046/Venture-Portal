@@ -24,9 +24,9 @@ const STAFF = [...PEOPLE, ...OTHER]
 
 /** The file types the database starts with (mig 20261011160000). */
 export const FILE_TYPES: HiringFileType[] = [
-  { id: 'ft-resume', name: 'Résumé', builtin: 'resume' },
-  { id: 'ft-ic', name: 'IC', builtin: null },
-  { id: 'ft-cert', name: 'Certificate', builtin: null },
+  { id: 'ft-resume', name: 'Résumé', builtin: 'resume', active: true, used: 9 },
+  { id: 'ft-ic', name: 'IC', builtin: null, active: true, used: 0 },
+  { id: 'ft-cert', name: 'Certificate', builtin: null, active: true, used: 0 },
 ]
 /** The prototype's one résumé file, as a Résumé on record. */
 const resumeFile = (id: string, name: string | undefined, at: string, by: string): HiringFile[] =>
