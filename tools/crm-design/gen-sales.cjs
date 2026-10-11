@@ -124,6 +124,13 @@ const INFO_SHEET = [
   ["<span onClick={v.ctChat} style={{ height: \"50px\",", "<span onClick={v.ctChat} style={{ flex: \"none\", height: \"50px\","],
 ];
 for (const n of ["SalesContacts", "SalesCalendar", "SalesInsight"]) PATCHES[n] = [...(PATCHES[n] ?? []), ...INFO_SHEET];
+// Inbox: Team | Mine moves from the top bar into the title row, just left of All ads (user 2026-10-11) — the top bar's
+// own pill markup; margin-left auto keeps it beside All ads.
+PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []), ["<span onClick={v.openAd} style",
+  '{!!(v.hasTM) && (<>\n        <div style={{ flex: "none", alignSelf: "center", marginLeft: "auto", display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "#F0E6DE" }}>\n' +
+  '          {(v.tmTabs).map((d, d_i) => (<Fragment key={d_i}>\n' +
+  '            <span onClick={d.pick} style={{ height: "28px", padding: "0 14px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: d.bg, color: d.fg, boxShadow: d.sh, cursor: "pointer" }}>{d.label}</span>\n' +
+  '          </Fragment>))}\n        </div>\n      </>)}\n        <span onClick={v.openAd} style']];
 for (const [name, vm, frag, doc, vmOverride] of parts) {
   let body = convert(frag);
   for (const [a, b] of PATCHES[name] ?? []) {

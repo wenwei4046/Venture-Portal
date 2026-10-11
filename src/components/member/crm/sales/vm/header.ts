@@ -4,17 +4,27 @@ import { salesNotifs, unreadNotifs } from "./notifs";
 import { teamName, teamOf, titleOf } from "../../shared/people";
 import type { SalesTab } from "../ui";
 
-export function headerVM(ctx: SalesCtx, onExit: () => void) {
-  const { ui, set, data, embedded } = ctx;
-  const unread = unreadNotifs(salesNotifs(ctx), data);
-  // Team | Mine (rev 1010 §7.3): the Director and anyone with a downline; Mine is this CRM, Team the Control panel scoped
-  // to them. Viewing somebody (View as) shows it as THEY would see it — CrmApp hands their Team (user 2026-10-11). Never
-  // inside a chat (the top bar is not drawn there).
-  const toTeam = embedded?.toTeam;
+/**
+ * Team | Mine (rev 1010 §7.3): the Director and anyone with a downline; Mine is this CRM, Team the Control panel scoped
+ * to them. Viewing somebody (View as) shows it as THEY would see it — CrmApp hands their Team (user 2026-10-11). On
+ * Inbox it sits in the title row, left of All ads (user 2026-10-11); on the other pages in the top bar. Never inside a
+ * chat (neither is drawn there).
+ */
+export function teamMineVM(ctx: SalesCtx) {
+  const toTeam = ctx.embedded?.toTeam;
   return {
     hasTM: !!toTeam,
     tmTabs: ([["Team", false], ["Mine", true]] as const).map(([label, on]) => ({ label, bg: on ? "#fff" : "transparent", fg: on ? "#3F2B22" : "#806B60", sh: on ? "0 1px 3px rgba(63,43,34,.14)" : "none",
       pick: on ? undefined : () => toTeam?.() })),
+  };
+}
+
+export function headerVM(ctx: SalesCtx, onExit: () => void) {
+  const { ui, set, data } = ctx;
+  const unread = unreadNotifs(salesNotifs(ctx), data);
+  const tm = teamMineVM(ctx);
+  return {
+    hasTM: tm.hasTM && ui.tab !== "inbox", tmTabs: tm.tmTabs,
     backLabel: "Back to Revenue app", backVis: "visible" as const,
     crmBack: () => { if (ui.profSub) { set(u => ({ ...u, profSub: null })); return; } onExit(); },
     // Opening Notifications reads nothing by itself any more: each update is read when tapped (rev 1010 §6).
