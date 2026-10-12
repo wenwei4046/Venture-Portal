@@ -73,10 +73,11 @@ const payable = (id: string, label: string, original_amount: number, cost_rate: 
   remaining_periods: 0, settled_in_month: false, terms_from: null, ...over,
 })
 
-function database() {
+function database(over: Record<string, unknown[]> = {}) {
+  const tables = { ...TABLES, ...over }
   mocks.createClient.mockResolvedValue({
     from: (table: string) => {
-      const result = { data: TABLES[table] ?? [], error: null }
+      const result = { data: tables[table] ?? [], error: null }
       const q: Record<string, unknown> = {}
       for (const m of ['select', 'eq', 'neq', 'in', 'not', 'gte', 'lte', 'lt', 'order', 'range', 'limit']) q[m] = () => q
       q.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve(result).then(res, rej)
@@ -101,6 +102,30 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
   database()
+})
+
+// 2026-10-12 (user: 把0.00拿掉，director显示名字): the calendar draws no entry for
+// a month with nothing to pay (an interest-free deal with no fixed term), and a
+// director's fund source goes by the director's name, not "Fund source".
+describe('the Repayment Schedule’s calendar', () => {
+  const director = (id: string, from_director_id: string, amount: number, cost_rate: number, effective_date: string) => ({
+    id, status: 'active', from_company_id: null, from_department_id: null, from_freetext_name: null, from_director_id,
+    compound_interest: false, effective_date, min_pay_interest: false, repayment_start_month: null, amount, cost_rate, lock_in_months: null, terms_effective_from: null,
+  })
+
+  it('leaves out 0.00 and names a director', async () => {
+    database({
+      fund_sources: [...TABLES.fund_sources, director('f3', 'd1', 9000, 0, '2026-02-26'), director('f4', 'd2', 10000, 0.01, '2026-03-26')],
+      directors: [{ id: 'd1', name: 'Chai Meng Keat' }, { id: 'd2', name: 'Loo Wen Wei' }],
+    })
+    await page()
+    // Loo Wen Wei's 1% on 10,000: 100.00 on the 26th.
+    expect(screen.getAllByText('Loo Wen Wei').length).toBeGreaterThan(0)
+    // Chai Meng Keat's is interest-free: nothing to pay, no entry.
+    expect(screen.queryByText('Chai Meng Keat')).toBeNull()
+    expect(screen.queryByText('Fund source')).toBeNull()
+    expect(screen.queryByText('0.00')).toBeNull()
+  })
 })
 
 describe('the Repayment Schedule’s cards', () => {

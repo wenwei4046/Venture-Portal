@@ -99,6 +99,19 @@ describe('loading one side of the book', () => {
     expect(read).not.toContain('repayments')
   })
 
+  it('names a director’s fund source by the director (2026-10-12)', async () => {
+    const saved = TABLES.fund_sources
+    TABLES.fund_sources = [{ ...saved[0], from_company_id: null, from_director_id: 'd1' }]
+    TABLES.directors = [{ id: 'd1', name: 'Chai Meng Keat' }]
+    try {
+      const deals = await loadRepaymentBook(client([]) as never, '2026-10-09', { only: 'pay' })
+      expect(deals.map((d) => [d.name, d.companyId])).toEqual([['Chai Meng Keat', null]])
+    } finally {
+      TABLES.fund_sources = saved
+      delete TABLES.directors
+    }
+  })
+
   it('reads both sides when asked for neither', async () => {
     const deals = await loadRepaymentBook(client([]) as never, '2026-10-09')
     expect(deals.map((d) => d.kind)).toEqual(['collect', 'pay'])

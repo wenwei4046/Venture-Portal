@@ -47,6 +47,7 @@ type SourceRow = {
   terms_effective_from: string | null
   from_company_id: string | null
   from_department_id: string | null
+  from_director_id?: string | null
   from_freetext_name: string | null
 }
 
@@ -77,7 +78,7 @@ export default async function OverduePage({ searchParams }: Props) {
   const logSince = dayjs(today).subtract(29, 'day').format('YYYY-MM-DD')
   const monthStart = `${month}-01`
 
-  const [loanBook, { data: loans }, { data: companies }, { data: loanMoveRows }, { data: sources }, { data: departments }, sourceReps] =
+  const [loanBook, { data: loans }, { data: companies }, { data: loanMoveRows }, { data: sources }, { data: departments }, sourceReps, { data: directors }] =
     await Promise.all([
       // Fund OUT (2026-10-12): every active loan's repayment plan.
       loadRepaymentBook(supabase, today, { only: 'collect' }),
@@ -93,7 +94,7 @@ export default async function OverduePage({ searchParams }: Props) {
         .gte('payment_date', logSince < monthStart ? logSince : monthStart),
       supabase
         .from('fund_sources')
-        .select('id, status, amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, terms_effective_from, from_company_id, from_department_id, from_freetext_name')
+        .select('id, status, amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, terms_effective_from, from_company_id, from_department_id, from_director_id, from_freetext_name')
         .in('status', ['active', 'matured']),
       supabase.from('departments').select('id, name'),
       fetchAllRows((lo, hi) =>
@@ -103,11 +104,14 @@ export default async function OverduePage({ searchParams }: Props) {
           .order('id', { ascending: true })
           .range(lo, hi),
       ).catch(() => [] as Array<{ id: string; fund_source_id: string; amount: number; payment_date: string; payment_type: string }>),
+      // A director's fund source goes by the director's name (2026-10-12).
+      supabase.from('directors').select('id, name'),
     ])
 
   const loanMap = new Map((loans ?? []).map((l) => [l.id, l]))
   const companyMap = new Map((companies ?? []).map((c) => [c.id, { name: c.name, code: c.short_code }]))
   const deptName = new Map(((departments ?? []) as Array<{ id: string; name: string }>).map((d) => [d.id, d.name]))
+  const directorName = new Map(((directors ?? []) as Array<{ id: string; name: string }>).map((d) => [d.id, d.name]))
 
   // ── Fund OUT: a loan's installments passed unpaid, longest first ──
   const outOwed = loanBook
@@ -146,10 +150,11 @@ export default async function OverduePage({ searchParams }: Props) {
 
   // ── Fund IN: a fund source's installments passed unpaid ──
   const sourceList = (sources ?? []) as SourceRow[]
-  type Named = Pick<SourceRow, 'id' | 'from_company_id' | 'from_freetext_name' | 'from_department_id'>
+  type Named = Pick<SourceRow, 'id' | 'from_company_id' | 'from_freetext_name' | 'from_director_id' | 'from_department_id'>
   const sourceName = (s: Named) =>
     ((s.from_company_id ? companyMap.get(s.from_company_id)?.name : null) ??
       s.from_freetext_name ??
+      (s.from_director_id ? directorName.get(s.from_director_id) : null) ??
       (s.from_department_id ? deptName.get(s.from_department_id) : null) ??
       'Fund source') as string
   const fsMoves = sourceReps as Array<Move & { fund_source_id: string }>
@@ -160,7 +165,7 @@ export default async function OverduePage({ searchParams }: Props) {
   const unnamed = Array.from(new Set(fsLogMoves.map((r) => r.fund_source_id).filter((id) => !named.has(id))))
   const [history, gone] = await Promise.all([
     sourceList.length ? fetchTermsHistory(supabase, 'fund_source', sourceList.map((s) => s.id)) : Promise.resolve(new Map()),
-    fetchByKeys(unnamed, (chunk) => supabase.from('fund_sources').select('id, from_company_id, from_department_id, from_freetext_name').in('id', chunk)),
+    fetchByKeys(unnamed, (chunk) => supabase.from('fund_sources').select('id, from_company_id, from_department_id, from_director_id, from_freetext_name').in('id', chunk)),
   ])
   for (const s of gone as Named[]) named.set(s.id, s)
   const fsNetted = fsMoves.filter((r) => r.payment_type === 'netting' && inMonth(r))

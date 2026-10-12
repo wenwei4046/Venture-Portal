@@ -66,7 +66,7 @@ export async function loadRepaymentBook(supabase: SupabaseClient, today: string,
   const loansToo = opts.only !== 'pay'
   const sourcesToo = opts.only !== 'collect'
   const none = Promise.resolve({ data: [] as Row[] })
-  const [{ data: loans }, { data: sources }, { data: companies }, { data: departments }, loanReps, sourceReps] = await Promise.all([
+  const [{ data: loans }, { data: sources }, { data: companies }, { data: departments }, loanReps, sourceReps, { data: directors }] = await Promise.all([
     loansToo
       ? supabase
           .from('loans')
@@ -76,7 +76,7 @@ export async function loadRepaymentBook(supabase: SupabaseClient, today: string,
     sourcesToo
       ? supabase
           .from('fund_sources')
-          .select('id, status, amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, terms_effective_from, from_company_id, from_department_id, from_freetext_name')
+          .select('id, status, amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, terms_effective_from, from_company_id, from_department_id, from_director_id, from_freetext_name')
           .in('status', ['active', 'matured'])
       : none,
     supabase.from('companies').select('id, name, short_code'),
@@ -89,6 +89,8 @@ export async function loadRepaymentBook(supabase: SupabaseClient, today: string,
           supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi),
         )
       : Promise.resolve([] as Row[]),
+    // A director's fund source goes by the director's name (2026-10-12).
+    sourcesToo ? supabase.from('directors').select('id, name') : none,
   ])
   const loanList = (loans ?? []) as Row[]
   const sourceList = (sources ?? []) as Row[]
@@ -98,6 +100,7 @@ export async function loadRepaymentBook(supabase: SupabaseClient, today: string,
   ])
   const companyOf = new Map(((companies ?? []) as Row[]).map((c) => [c.id as string, c]))
   const deptName = new Map(((departments ?? []) as Row[]).map((d) => [d.id as string, d.name as string]))
+  const directorName = new Map(((directors ?? []) as Row[]).map((d) => [d.id as string, d.name as string]))
   const grouped = (rows: Row[], key: string) => {
     const by = new Map<string, PlanPayment[]>()
     for (const r of rows) {
@@ -137,7 +140,11 @@ export async function loadRepaymentBook(supabase: SupabaseClient, today: string,
     deals.push({
       kind: 'pay',
       id,
-      name: ((co?.name as string | undefined) ?? (s.from_freetext_name as string | null) ?? (s.from_department_id ? deptName.get(s.from_department_id as string) : null) ?? 'Fund source') as string,
+      name: ((co?.name as string | undefined) ??
+        (s.from_freetext_name as string | null) ??
+        (s.from_director_id ? directorName.get(s.from_director_id as string) : null) ??
+        (s.from_department_id ? deptName.get(s.from_department_id as string) : null) ??
+        'Fund source') as string,
       href: `/fund-in/${id}`,
       companyId: (s.from_company_id as string | null) ?? null,
       plan: buildRepaymentPlan({

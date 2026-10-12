@@ -234,9 +234,9 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   collectCompound.sort((a, b) => b.balance - a.balance)
 
   // ── 应付 (fund sources) + repayment history + compounding meta + pending PVs ──
-  const [payable, { data: fsMetaRows }, { data: fsReps }, { data: pendingPvs }, { data: fsDepts }] = await Promise.all([
+  const [payable, { data: fsMetaRows }, { data: fsReps }, { data: pendingPvs }, { data: fsDepts }, { data: fsDirectors }] = await Promise.all([
     listPayableFundSources({ includeSettledInMonth: currentYM }),
-    supabase.from('fund_sources').select('id, status, from_company_id, from_department_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, repayment_start_month, amount, cost_rate, lock_in_months, terms_effective_from'),
+    supabase.from('fund_sources').select('id, status, from_company_id, from_department_id, from_director_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, repayment_start_month, amount, cost_rate, lock_in_months, terms_effective_from'),
     fetchAllRows((lo, hi) => supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
     supabase
       .from('payment_vouchers')
@@ -245,6 +245,8 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
       .not('repayment_breakdown', 'is', null)
       .in('status', ['draft', 'pending_approval', 'approved']),
     supabase.from('departments').select('id, name'),
+    // A director's fund source goes by the director's name (2026-10-12).
+    supabase.from('directors').select('id, name'),
   ])
   const fsMeta = new Map((fsMetaRows ?? []).map((m) => [m.id as string, m as { compound_interest?: boolean; effective_date?: string | null; min_pay_interest?: boolean; repayment_start_month?: string | null; amount?: number | string; cost_rate?: number | string; lock_in_months?: number | null; terms_effective_from?: string | null }]))
   const fsHist = await fetchTermsHistory(supabase, 'fund_source', (fsMetaRows ?? []).map((m) => m.id as string))
@@ -454,11 +456,17 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     )
   }
   const fsDeptName = new Map(((fsDepts ?? []) as Array<{ id: string; name: string }>).map((d) => [d.id, d.name]))
+  const fsDirectorName = new Map(((fsDirectors ?? []) as Array<{ id: string; name: string }>).map((d) => [d.id, d.name]))
   for (const m of (fsMetaRows ?? []) as Array<Record<string, unknown>>) {
     if (!['active', 'matured', 'repaid'].includes(m.status as string)) continue
     const id = m.id as string
     const co = m.from_company_id ? coById.get(m.from_company_id as string) : null
-    const name = (co?.short_code ?? co?.name ?? (m.from_freetext_name as string | null) ?? (m.from_department_id ? fsDeptName.get(m.from_department_id as string) : null) ?? 'Fund source') as string
+    const name = (co?.short_code ??
+      co?.name ??
+      (m.from_freetext_name as string | null) ??
+      (m.from_director_id ? fsDirectorName.get(m.from_director_id as string) : null) ??
+      (m.from_department_id ? fsDeptName.get(m.from_department_id as string) : null) ??
+      'Fund source') as string
     const plan = buildRepaymentPlan({
       terms: termsForFundSource(
         {

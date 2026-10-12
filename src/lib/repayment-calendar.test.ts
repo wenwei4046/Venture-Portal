@@ -36,6 +36,13 @@ describe('monthEvents', () => {
   it('has nothing for a month the plan does not reach', () => {
     expect(monthEvents(plan([row(1, '2026-09-02', 100, 0)]), deal, '2026-11', '2026-10-09')).toEqual([])
   })
+
+  // 2026-10-12 (user: 把0.00拿掉): an interest-free deal with no fixed term
+  // owes nothing in a month — no entry for it.
+  it('leaves out a month with nothing to pay', () => {
+    const p = plan([row(1, '2026-10-26', 0, 0), row(2, '2026-10-30', 100, 100)], null)
+    expect(monthEvents(p, deal, '2026-10', '2026-10-09').map((e) => [e.date, e.amount])).toEqual([['2026-10-30', 100]])
+  })
 })
 
 describe('overdueOf', () => {

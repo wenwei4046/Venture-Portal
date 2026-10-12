@@ -1,5 +1,19 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-12 u (SHIPPED) — the calendar without 0.00; a director's fund source by name
+
+User: "这个calender 0.00 是什么？先确定，别做" → explained (0% deals with no fixed term get a
+0-interest row every month) → "把0.00拿掉，director显示名字".
+
+- `lib/repayment-calendar` `monthEvents` skips a row whose installment is 0 (only the Repayment
+  Schedule calendar uses it; sums unchanged).
+- A fund source from a director (`from_director_id` → `directors.name`, readable on
+  treasury.view) is named by the director — order company → free text → director →
+  department → "Fund source" — in the Repayment Schedule calendar (`_lib/schedule-data`), the
+  Overdue page's Fund IN (`sourceName`, the repaid-since name read too) and
+  `loadRepaymentBook` (the Overview's instalment tables). Fund IN's own pages already named
+  directors (listPayableFundSources).
+
 ## CHECKPOINT 2026-10-12 t (SHIPPED) — Fund OUT's overdue read live, no Detect overdue
 
 The user: "我不想要自己按detect over due, 就打开时就最新不行吗？" → sample (scratchpad

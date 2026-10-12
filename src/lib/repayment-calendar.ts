@@ -25,7 +25,9 @@ export interface CalendarEntry extends CalendarDeal {
 
 export function monthEvents(plan: RepaymentPlan, deal: CalendarDeal, month: string, today: string): CalendarEntry[] {
   return plan.rows
-    .filter((r) => r.ym === month)
+    // A month with nothing to pay — an interest-free deal with no fixed term —
+    // is no entry (2026-10-12, user: 把0.00拿掉).
+    .filter((r) => r.ym === month && r.installment > 0.005)
     .map((r) => ({
       ...deal,
       date: r.due,

@@ -116,6 +116,22 @@ describe('Overdue & Netting on the sheet', () => {
     expect(within(month('July 2026')).queryByText('HOUZS Bedding')).toBeNull()
   })
 
+  it('names a director’s fund source by the director (2026-10-12)', async () => {
+    database({
+      fund_sources: [
+        {
+          id: 'fs5', status: 'active', amount: 10000, cost_rate: 0.01, lock_in_months: 3, compound_interest: false, effective_date: '2026-07-15',
+          repayment_start_month: null, terms_effective_from: null, from_company_id: null, from_department_id: null, from_freetext_name: null, from_director_id: 'd2',
+        },
+      ],
+      fund_source_repayments: [],
+      directors: [{ id: 'd2', name: 'Loo Wen Wei' }],
+    })
+    render(await page('in'))
+    expect(screen.getByRole('link', { name: 'Loo Wen Wei' })).toHaveAttribute('href', '/fund-in/fs5')
+    expect(screen.queryByRole('link', { name: 'Fund source' })).toBeNull()
+  })
+
   it('shows what we owe: a fund source’s installments passed unpaid', async () => {
     render(await page('in'))
     expect(card('Overdue outstanding')).toHaveTextContent('RM 4,120.00') // the September installment: 4,000 + 120

@@ -43,9 +43,10 @@ export const BRANCHES: Readonly<Record<string, Readonly<Record<Want, readonly st
   'src/app/(portal)/dashboard/page.tsx#DashboardPage': {
     // overviewFor → 'treasury': the summary, the bank accounts, the queues and their live amounts,
     // and (2026-10-09) every live deal's repayment plan — its terms over time — for the
-    // Overdue instalments and Coming up sections (lib/repayment-book).
+    // Overdue instalments and Coming up sections (lib/repayment-book) — a
+    // director's fund source by the director's name (2026-10-12).
     'treasury.view': [
-      'approval_requests', 'bank_accounts', 'base_rate_history', 'dept_pools', 'fund_source_repayments', 'fund_sources',
+      'approval_requests', 'bank_accounts', 'base_rate_history', 'dept_pools', 'directors', 'fund_source_repayments', 'fund_sources',
       'invoice_payout_pool', 'invoices', 'journal_entries', 'journal_lines', 'loans', 'overdue_records', 'payment_vouchers',
       'repayments', 'treasury_terms_history', 'venture_pool',
     ],
