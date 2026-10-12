@@ -350,7 +350,13 @@ describe('a member sends a request', () => {
       expect(prepared.p_detail).not.toHaveProperty('amount')
     })
 
-    it('a bigger group sends no total', async () => {
+    // User 2026-10-12: the rate a person a night is a limit too, so a bigger group types its total as well.
+    it('a bigger group passes its total on too', async () => {
+      expect((await submitMemberRequest(airbnb({ male: '2', female: '2', amount: '480' }))).ok).toBe(true)
+      expect((mocks.rpc.mock.calls[0][1] as { p_detail: Record<string, unknown> }).p_detail).toMatchObject({ male: 2, female: 2, invoiceAmount: 480 })
+    })
+
+    it('makes up no total that was not typed — the database asks for it', async () => {
       expect((await submitMemberRequest(airbnb({ male: '2', female: '2' }))).ok).toBe(true)
       expect((mocks.rpc.mock.calls[0][1] as { p_detail: Record<string, unknown> }).p_detail).not.toHaveProperty('invoiceAmount')
     })

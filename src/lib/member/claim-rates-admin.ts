@@ -1,10 +1,9 @@
 /**
  * People › Member services › Claim rates (2026-10-05): HR's side of the fair
  * claim. Outstation pays the route's spots × the rate per spot, counted from
- * the base; Airbnb pays the rate × people × nights (user: 每人每晚). The
- * member's form only shows these — the amount is worked out in the database
- * when the claim is sent (`member_claim_detail_for`), so a claim already sent
- * keeps what it was worked out at. The rules here mirror
+ * the base. The member's form only shows these — the amount is worked out in
+ * the database when the claim is sent (`member_claim_detail_for`), so a claim
+ * already sent keeps what it was worked out at. The rules here mirror
  * `member_admin_save_claim_settings`, which checks them again.
  *
  * 2026-10-06 (user): a region may be flown to (Sabah, Sarawak) — the claim is
@@ -12,8 +11,13 @@
  * fairs name is listed here to be given its region, because an outstation
  * claim's region is its fair's venue's, never the member's pick. Airbnb has a
  * small group — up to `groupMaxPax` people (3 to start) claim their invoice's
- * total, up to `groupCapPerNight` a night; more people are paid per person.
- * HR sets both (user: 我可以改人数，同时也可以改那个上限).
+ * total, up to `groupCapPerNight` a night. HR sets both (user: 我可以改人数，
+ * 同时也可以改那个上限).
+ *
+ * 2026-10-12 (user): `perPaxNight` is a CAP too — "per pax max cap is this
+ * amount, not like per pax fix this amount". More people than the small group
+ * key their invoice's total as well, and are paid it up to the rate × people ×
+ * nights; unlike Outstation's spots, nothing about Airbnb is worked out for them.
  */
 
 import { formatMoney } from "@/lib/utils";
@@ -111,7 +115,7 @@ export function claimRatesProblems(d: ClaimRatesDraft): string[] {
   const out: string[] = [];
   const base = d.base.trim();
   if (!base || base.length > 60) out.push("Name the base every route starts from (up to 60 letters).");
-  for (const p of [rate(d.perSpot, "The rate per spot").problem, rate(d.perPaxNight, "The Airbnb rate").problem,
+  for (const p of [rate(d.perSpot, "The rate per spot").problem, rate(d.perPaxNight, "The Airbnb limit per person a night").problem,
     rate(d.groupCapPerNight, "The small group's limit a night").problem]) if (p) out.push(p);
   if (!/^\d{1,2}$/.test(d.groupMaxPax.trim()) || Number(d.groupMaxPax) < 1 || Number(d.groupMaxPax) > MAX_GROUP)
     out.push(`A small group is a whole number of people from 1 to ${MAX_GROUP}.`);
@@ -146,11 +150,12 @@ export function airbnbExample(d: ClaimRatesDraft): string | null {
   const per = rate(d.perPaxNight, "").value;
   const cap = rate(d.groupCapPerNight, "").value;
   const n = /^\d{1,2}$/.test(d.groupMaxPax.trim()) && Number(d.groupMaxPax) >= 1 && Number(d.groupMaxPax) <= MAX_GROUP ? Number(d.groupMaxPax) : 0;
-  const bigger = per ? `${n + 1} people claim ${formatMoney((n + 1) * per * 2)} (${n + 1} × ${formatMoney(per)} × 2), nothing to type` : null;
+  // Every group claims its invoice's total; only the most it is paid differs (2026-10-12).
+  const bigger = per ? `${n + 1} people claim it up to ${formatMoney((n + 1) * per * 2)} (${n + 1} × ${formatMoney(per)} × 2)` : null;
   if (cap && n) {
     return `Two nights, for example: up to ${n} ${n === 1 ? "person claims" : "people claim"} the invoice's total, up to ${formatMoney(cap * 2)} (${formatMoney(cap)} a night × 2)${bigger ? `; ${bigger}` : ""}.`;
   }
-  return per ? `Two nights, for example: 3 people claim ${formatMoney(3 * per * 2)} (3 × ${formatMoney(per)} × 2). No small-group limit is set, so every stay is paid per person.` : null;
+  return per ? `Two nights, for example: 3 people claim the invoice's total, up to ${formatMoney(3 * per * 2)} (3 × ${formatMoney(per)} × 2). No small-group limit is set, so every stay is limited per person.` : null;
 }
 
 /** Anything typed that the saved settings do not already say. */

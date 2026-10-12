@@ -24,7 +24,8 @@ const savedOn = (at: string) => formatIntlDate(new Date(at), { day: 'numeric', m
 /**
  * Member services › Claim rates (2026-10-10, the HR revamp; the rules since
  * 2026-10-05/06): what a member's fair claim is worked out from — Outstation's
- * base and rate per spot, Airbnb's rate a person a night and its small group,
+ * base and rate per spot, Airbnb's limits (a person a night — a limit, not a
+ * fixed amount, since 2026-10-12 — and its small group's),
  * the regions (spots from the base, or flown to) and every venue the ERP's
  * fairs name with its region. One Save, at the top, lit while anything
  * differs from what is stored; `member_admin_save_claim_settings` checks it
@@ -111,9 +112,9 @@ export default function ClaimRatesPanel({ initial }: { initial: ClaimRatesAdmin 
           <span className={s.crBoxTitle}>Airbnb</span>
           <div className={s.crAir}>
             {([
-              ['perPaxNight', 'Per person a night', 'RM', '× people × nights, for a group bigger than the small one', 'decimal'],
-              ['groupMaxPax', 'Small group up to', 'pax', "Up to this many claim their invoice's total, whoever they are", 'numeric'],
-              ['groupCapPerNight', 'Small group, a night', 'RM', 'The invoice is paid up to this × nights; blank = every group per person', 'decimal'],
+              ['perPaxNight', 'Limit per person a night', 'RM', "A limit, not a fixed amount: a group bigger than the small one is paid its invoice's total, up to this × people × nights", 'decimal'],
+              ['groupMaxPax', 'Small group up to', 'pax', "Up to this many share the small group's limit, whoever they are", 'numeric'],
+              ['groupCapPerNight', "Small group's limit a night", 'RM', "The invoice's total is paid up to this × nights; blank = every group is limited per person", 'decimal'],
             ] as const).map(([key, label, unit, hint, mode]) => (
               <label key={key} className={s.crAirField} title={hint}>
                 <span className={s.crAirLabel}>{label}</span>

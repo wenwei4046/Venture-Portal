@@ -158,12 +158,30 @@ export function requestFacts(r: MemberRequest, facts: RequestFacts | undefined, 
           ]
         : [
             ["Claim category", CATEGORY[str(d.category)] ?? str(d.category)],
-            ["Claim amount", d.amount !== null && d.amount !== undefined && d.amount !== "" && Number.isFinite(Number(d.amount)) ? formatMoney(Number(d.amount)) : ""],
+            ["Claim amount", money(d.amount)],
+            // An Airbnb stay is its invoice's total up to a limit by head count (2026-10-12): both, to check against the invoice.
+            ["Invoice total", str(d.claimType) === "airbnb" ? money(d.invoiceAmount) : ""],
+            ["Most for the stay", str(d.claimType) === "airbnb" ? airbnbLimit(d) : ""],
             ["Location", str(d.location)],
             ["Stay", str(d.start) && str(d.end) ? `${dayLabel(str(d.start))} — ${dayLabel(str(d.end))}` : ""],
             ["Submitted by", facts?.submittedBy ?? ""],
           ];
   return rows.filter(([, v]) => v !== "").map(([l, v]) => ({ l, v }));
+}
+
+const number = (v: unknown): number | null =>
+  v !== null && v !== undefined && v !== "" && Number.isFinite(Number(v)) ? Number(v) : null;
+const money = (v: unknown) => (number(v) === null ? "" : formatMoney(number(v)!));
+
+/**
+ * The most an Airbnb claim could be paid and how: `RM 520.00 · 4 pax × RM 65.00 × 2 nights`, or a
+ * small group's `RM 440.00 · RM 220.00 a night × 2 nights`; blank for a claim stored without it.
+ */
+function airbnbLimit(d: Record<string, unknown>): string {
+  const [cap, rate, pax, nights] = [number(d.cap), number(d.rate), number(d.pax), number(d.nights)];
+  if (cap === null || rate === null || nights === null) return "";
+  const n = `${nights} night${nights === 1 ? "" : "s"}`;
+  return d.group === true ? `${formatMoney(cap)} · ${formatMoney(rate)} a night × ${n}` : `${formatMoney(cap)} · ${pax ?? "?"} pax × ${formatMoney(rate)} × ${n}`;
 }
 
 /** A waiting list's answers to HR's own questions, as `detail.answers` keeps them. */

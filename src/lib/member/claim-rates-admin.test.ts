@@ -47,7 +47,7 @@ describe("claim rates in the back office", () => {
     const region = (name: string, spots: string) => ({ key: "n", id: null, name, spots, planeTicket: false });
     expect(claimRatesProblems({ ...draft, base: " " })[0]).toMatch(/Name the base/);
     expect(claimRatesProblems({ ...draft, perSpot: "12.345" })[0]).toMatch(/rate per spot/);
-    expect(claimRatesProblems({ ...draft, perPaxNight: "100001" })[0]).toMatch(/Airbnb rate/);
+    expect(claimRatesProblems({ ...draft, perPaxNight: "100001" })[0]).toMatch(/Airbnb limit per person a night/);
     expect(claimRatesProblems({ ...draft, groupCapPerNight: "two hundred" })[0]).toMatch(/small group's limit a night/);
     for (const n of ["", "0", "41", "2.5", "three"]) expect(claimRatesProblems({ ...draft, groupMaxPax: n })[0]).toMatch(/small group is a whole number of people from 1 to 40/);
     expect(claimRatesProblems({ ...draft, regions: [...draft.regions, region("penang", "3")] })).toEqual(["Two regions are called penang."]);
@@ -74,15 +74,17 @@ describe("claim rates in the back office", () => {
 describe("the Airbnb small group", () => {
   const draft = { ...claimRatesDraft(readClaimRatesAdmin(raw)!), groupCapPerNight: "220" };
 
-  it("spells out two nights in ringgit", () => {
+  // User 2026-10-12: the rate a person a night is a limit too — four people key their invoice and are
+  // paid it up to RM 65 × 4 × 2, not RM 520 whatever it says.
+  it("spells out two nights in ringgit, every group up to its limit", () => {
     expect(airbnbExample(draft)).toBe(
-      "Two nights, for example: up to 3 people claim the invoice's total, up to RM 440.00 (RM 220.00 a night × 2); 4 people claim RM 520.00 (4 × RM 65.00 × 2), nothing to type.");
+      "Two nights, for example: up to 3 people claim the invoice's total, up to RM 440.00 (RM 220.00 a night × 2); 4 people claim it up to RM 520.00 (4 × RM 65.00 × 2).");
     expect(airbnbExample({ ...draft, groupMaxPax: "1" })).toMatch(/^Two nights, for example: up to 1 person claims the invoice's total/);
   });
 
-  it("says so when there is no cap, and nothing while there is no rate", () => {
+  it("says so when there is no small-group limit, and nothing while there is no rate", () => {
     expect(airbnbExample({ ...draft, groupCapPerNight: "" })).toBe(
-      "Two nights, for example: 3 people claim RM 390.00 (3 × RM 65.00 × 2). No small-group limit is set, so every stay is paid per person.");
+      "Two nights, for example: 3 people claim the invoice's total, up to RM 390.00 (3 × RM 65.00 × 2). No small-group limit is set, so every stay is limited per person.");
     expect(airbnbExample({ ...draft, groupCapPerNight: "", perPaxNight: "" })).toBeNull();
   });
 

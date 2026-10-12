@@ -110,6 +110,16 @@ describe('Request reviews · words and facts', () => {
     expect(repl[2].v).toBe('Release the position without a replacement')
     const claim = requestFacts(req({ kind: 'claim', detail: { category: 'Outstation 住宿', amount: 480, location: 'Kuantan', start: '2026-10-02', end: '2026-10-05' } }), undefined, { departments })
     expect(claim.map(r => `${r.l}: ${r.v}`)).toEqual(['Claim category: Outstation accommodation', 'Claim amount: RM 480.00', 'Location: Kuantan', 'Stay: 2 Oct 2026 — 5 Oct 2026'])
+    // User 2026-10-12: an Airbnb stay is its invoice up to a limit by head count — HR reads both.
+    const airbnb = (detail: Record<string, unknown>) => requestFacts(req({ kind: 'claim', detail: {
+      claimType: 'airbnb', category: 'Airbnb accommodation', location: 'PENANG WATERFRONT', start: '2026-09-24', end: '2026-09-26', nights: 2, ...detail,
+    } }), undefined, { departments }).map(r => `${r.l}: ${r.v}`).slice(1, 4)
+    expect(airbnb({ pax: 4, group: false, rate: 65, cap: 520, invoiceAmount: 600, amount: 520 }))
+      .toEqual(['Claim amount: RM 520.00', 'Invoice total: RM 600.00', 'Most for the stay: RM 520.00 · 4 pax × RM 65.00 × 2 nights'])
+    expect(airbnb({ pax: 2, group: true, rate: 220, cap: 440, invoiceAmount: 380.5, amount: 380.5 }))
+      .toEqual(['Claim amount: RM 380.50', 'Invoice total: RM 380.50', 'Most for the stay: RM 440.00 · RM 220.00 a night × 2 nights'])
+    // One stored before the limit (a fixed RM 65 × people × nights) has neither.
+    expect(airbnb({ pax: 4, group: false, rate: 65, amount: 520 })).toEqual(['Claim amount: RM 520.00', 'Location: PENANG WATERFRONT', 'Stay: 24 Sep 2026 — 26 Sep 2026'])
   })
 
   it('says what HR does next', () => {
