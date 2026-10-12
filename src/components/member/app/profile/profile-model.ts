@@ -3,6 +3,7 @@ import { arenaMonthFridays, arenaWeekendLabel, type ArenaPerson, type MemberAren
 import { claimPayoutLine, readClaimPayout } from "@/lib/member/claim-payout";
 import { canEditRequest, EDIT_FIELDS, editValues, lockedNote } from "@/lib/member/request-edit";
 import { placeOf, type WaitingQueue } from "@/lib/member/waiting-queue";
+import { memoFileExt } from "@/lib/memos/model";
 import { MONTHS_SHORT, dayRange, initials, klDate, klDayTime, klLongTime, monthShort, rm, rm2, shortDay } from "../format";
 import type {
   ClaimWeek, MemoCat, MemoVM, PersonSheetVM, ProfileMainVM, RequestDetailVM, RequestEventVM, RequestKindVM, RequestRowVM,
@@ -321,6 +322,7 @@ export function memoVM(m: MemberMemo, local: { read: ReadonlySet<string>; acked:
     needsAck: m.requiresAck,
     acked: !!ackedAt,
     ackedText: `You acknowledged this memo · ${ackedAt && local.acked.has(m.id) && !m.acknowledgedAt ? "just now" : ackedAt ? klDayTime(ackedAt) : "just now"}`,
+    file: m.attachmentName ? { name: m.attachmentName, ext: memoFileExt(m.attachmentName) } : null,
   };
 }
 

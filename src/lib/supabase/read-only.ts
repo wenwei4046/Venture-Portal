@@ -46,6 +46,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'hr_documentation', 'hr_documentation_file', 'member_documents',
   // …and the Data center's own folders and files, and one's path (mig 20261012220000).
   'hr_drive', 'hr_drive_file',
+  // …Publish › Preview and a memo's file (mig 20261012210000): both STABLE, reading only.
+  'hr_memo_preview', 'memo_attachment',
   // …and, the Revenue app's View as, one member's (mig 20261011110000).
   'member_documents_of',
   // Hiring (round 2): the board and where a file is.

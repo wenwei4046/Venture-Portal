@@ -35,6 +35,8 @@ export const ICON = {
   arrowLeft: "M19 12H5m6-6-6 6 6 6",
   arrowRight: "M5 12h14m-6-6 6 6-6 6",
   tick: "m5 12 5 5 9-10",
+  /** A memo's file, downloaded (2026-10-12). */
+  download: "M12 4v11m-5-5 5 5 5-5M5 20h14",
   quote: "M5 3h14v18H5V3Zm3 4h8M8 11h1m3 0h1m3 0h.1M8 15h1m3 0h1m3 0h.1M8 18h1m3 0h1m3 0h.1",
   quoteDesk: "M7 3h10a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM9 7h6M9 11h1M12 11h1M15 11h0M9 15h1M12 15h1M9 18h1M12 18h1M15 15v3",
   viewing: "M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",

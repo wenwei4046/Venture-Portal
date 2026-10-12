@@ -209,6 +209,11 @@ export interface MemberMemo {
   readAt: string | null;
   acknowledgedAt: string | null;
   departments: string[];
+  /** "Memo", "Letter", or a type of HR's own (mig 20261012210000). */
+  kind?: string;
+  /** The file sent with it (2026-10-12): its name and type — null when there is none, or it was taken back. */
+  attachmentName?: string | null;
+  attachmentType?: string | null;
   /**
    * A memo addressed to PEOPLE (People › Documentation's Publish, a letter in its Data center — 2026-10-11) has no
    * sub-department: the Principal's snapshot names them, by staff id, so View as shows it only for one of them.

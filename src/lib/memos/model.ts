@@ -77,6 +77,18 @@ export function myMemosFromRow(raw: unknown): MyMemos {
   return { staffId: strOrNull(x.staffId), memos }
 }
 
+/** The Revenue app's own memo shape (lib/member/types.ts `MemberMemo`) — the Principal's own memos shown there. */
+export function toMemberMemo(m: MyMemo): {
+  id: string; title: string; body: string; sender: string; publishedAt: string; effectiveAt: string; version: number; requiresAck: boolean
+  readAt: string | null; acknowledgedAt: string | null; departments: string[]; kind: string; attachmentName: string | null; attachmentType: string | null
+} {
+  return {
+    id: m.id, title: m.title, body: m.body, sender: m.sender, publishedAt: m.publishedAt, effectiveAt: m.publishedAt.slice(0, 10),
+    version: m.version, requiresAck: m.requiresAck, readAt: m.readAt, acknowledgedAt: m.acknowledgedAt, departments: [],
+    kind: m.kind, attachmentName: m.attachment?.name ?? null, attachmentType: m.attachment?.type ?? null,
+  }
+}
+
 /** Still waiting for this person's Acknowledge. */
 export const memoWaiting = (m: Pick<MyMemo, 'requiresAck' | 'acknowledgedAt'>): boolean => m.requiresAck && !m.acknowledgedAt
 

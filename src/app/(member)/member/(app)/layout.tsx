@@ -11,6 +11,8 @@ import { isPrincipalAccount } from "@/lib/view-as";
 import { loadMyNotices } from "@/lib/push/notices-server";
 import { loginIsPersonal } from "@/lib/account/personal-login";
 import { changeMyPassword } from "@/lib/account/actions";
+import { loadMyMemos } from "@/lib/memos/server";
+import { toMemberMemo } from "@/lib/memos/model";
 
 export const dynamic = "force-dynamic";
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#ffffff" };
@@ -32,10 +34,13 @@ export default async function MemberAppLayout({ children }: { children: ReactNod
   // is the signed-in account's own whatever view the portal was left in, as crm-actions.ts asks.
   // Their notifications (2026-10-11): the Principal, who opens the app to view members, gets none here.
   // Profile › Change password (2026-10-12): a login of their own, never a shared one.
-  const [data, products, account, notices, password] = await Promise.all([loadMemberData({ lite: true }), productListAccess(user), getAccountUser(),
-    isPrincipalAccount(user) ? Promise.resolve(undefined) : loadMyNotices(), loginIsPersonal()]);
+  // The Principal's own memos (2026-10-12): their People record's, read and acknowledged here as in every view.
+  const [data, products, account, notices, password, own] = await Promise.all([loadMemberData({ lite: true }), productListAccess(user), getAccountUser(),
+    isPrincipalAccount(user) ? Promise.resolve(undefined) : loadMyNotices(), loginIsPersonal(),
+    isPrincipalAccount(user) && !user.viewingAs ? loadMyMemos() : Promise.resolve(null)]);
   const crm = canDo(account, "crm", "view", "own");
   // The pages and sends their ticks close (2026-10-11): only what somebody unticked for them.
   return <RevenueApp initialData={data} productList={products} crm={crm} closed={appClosed(user.closed)} notices={notices}
-    changePassword={password ? changeMyPassword : undefined}>{children}</RevenueApp>;
+    changePassword={password ? changeMyPassword : undefined}
+    own={own?.staffId ? { memos: own.memos.map(toMemberMemo) } : undefined}>{children}</RevenueApp>;
 }

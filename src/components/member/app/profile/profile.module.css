@@ -981,6 +981,11 @@
 .mdTitle { margin: 0; font-size: calc(22px * var(--rv-type)); font-weight: 750; letter-spacing: -.02em; line-height: 1.25; }
 .mdPara { margin: 0; font-size: calc(15px * var(--rv-type)); line-height: 1.6; color: var(--rv-ink); text-wrap: pretty; white-space: pre-line; }
 .mdAcked { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--rv-green-bg); color: var(--rv-kpi-ink); font-size: calc(13.5px * var(--rv-type)); font-weight: 650; }
+/* The file sent with a memo (2026-10-12): Documentation’s tile, its name, View and a download. */
+.mdFile { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--rv-rule); border-radius: 14px; }
+.mdFileExt { flex: 0 0 44px; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--rv-sand); color: var(--rv-brown); font-size: calc(10.8696px * var(--rv-type)); font-weight: 700; letter-spacing: .02em; }
+.mdFileName { flex: 1; min-width: 0; font-size: calc(14px * var(--rv-type)); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mdFileBtn { flex: none; height: 36px; min-width: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--rv-rule); background: var(--rv-white); color: var(--rv-ink); font-size: calc(13px * var(--rv-type)); font-weight: 600; display: grid; place-items: center; }
 .mdFoot { flex: 0 0 auto; padding: 12px 20px 26px; border-top: 1px solid var(--rv-rule); display: flex; flex-direction: column; gap: 8px; }
 .mdAckNote { text-align: center; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); }
 

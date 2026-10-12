@@ -8,7 +8,7 @@ import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
 import {
-  acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberReplacementFormLink, fetchMemberWaitingFormLink, submitMemberRequest,
+  acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberReplacementFormLink, fetchMemberWaitingFormLink, openMemberMemoFile, submitMemberRequest,
   type fetchDepartmentIncome, type fetchMemberCatalogue, type fetchMemberClaimRates, type fetchMemberReplacementForm, type fetchMemberWaitingForm, type fetchMemberWaitingQueue, type fetchMemberHonours, type fetchMemberIncome, type fetchMemberInsight,
   type fetchMemberInsightRange, type fetchMemberOrderBook, type fetchMemberOrgMap, type fetchMemberRequestHistory, type fetchPrincipalMemoReceipts,
   type refreshMemberData,
@@ -92,6 +92,8 @@ export interface RevenueSource {
   quote(input: QuoteInput): Promise<Outcome<QuoteResult>>;
   /** Mark a memo read (`ack` false) or acknowledge it — the member's own receipt. */
   memo(id: string, ack: boolean): Promise<Outcome<{ acknowledgedAt: string | null }>>;
+  /** A memo's file (2026-10-12): a short link made at the tap (never kept). */
+  memoFile?(id: string, mode: "view" | "download"): Promise<Outcome<{ url: string; fileName: string }>>;
   /** Who moved a request, when, and why. */
   requestHistory(id: string): Promise<Outcome<RequestEvent[]>>;
   submitRequest(form: FormData): Promise<Outcome<MemberRequest>>;
@@ -189,6 +191,7 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
       const result = await acknowledgeMemberMemo(id, ack);
       return result.ok ? { ok: true, data: { acknowledgedAt: result.data.acknowledgedAt } } : result;
     },
+    memoFile: (id, mode) => openMemberMemoFile(id, mode),
     requestHistory: id => go<Answer<typeof fetchMemberRequestHistory>>(ask.requestHistory(id)),
     submitRequest: form => submitMemberRequest(form),
     cancelRequest: id => cancelMemberRequest(id),
