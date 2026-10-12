@@ -924,7 +924,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // My brand weeks (read only since 2026-10-12): this month's weekends first, then the month still being
   // worked — where the ERP's Sales Attending puts the person read, else the booth with the most of their bills.
   const bwSnaps = useMemo(() => [arenaNow ?? arena, arenaNow ? arena : null].filter((x): x is MemberArenaSnapshot => !!x), [arena, arenaNow]);
-  const bwMonths = useMemo(() => (bwSnaps.length ? bwSnaps.map(snap => brandMonthVM(snap, klToday(), snap.selfId || null)) : null), [bwSnaps]);
+  const bwMonths = useMemo(() => (bwSnaps.length ? bwSnaps.map(snap => brandMonthVM(snap, klToday(), snap.selfId || null, !!context)) : null), [bwSnaps, context]);
 
   // The claim form's choices: the member's fair weekends, HR's rates, their team, the departments.
   // View as reads them too — the forms open on the viewed person's choices (and send nothing).

@@ -56,6 +56,13 @@ describe("brandMonthVM — where the ERP puts the member each fair weekend", () 
     ]);
   });
 
+  it("says them / their when the Principal views a member", () => {
+    expect(brandMonthVM(sep, "2026-10-12", "me", true).weeks[0].note)
+      .toBe("Auto-located · the ERP lists them at no booth, so the booth with the most of their bills counts");
+    expect(brandMonthVM(oct, "2026-10-12", "me", true).weeks[1].note)
+      .toBe("From the ERP's Sales Attending · listed at 2 booths — the one with the most of their bills counts");
+  });
+
   it("is only the person read's, and reads a snapshot without brand weeks as none", () => {
     expect(brandMonthVM(oct, "2026-10-12", "other").weeks.map(w => w.brand)).toEqual([null, null, "DUNLOP", null, null]);
     const bare = { period: "2026-10", selfId: "me" } as unknown as MemberArenaSnapshot;

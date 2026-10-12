@@ -166,7 +166,8 @@ export default function BrandWeeksPanel({ departments }: { departments: Array<{ 
                       <span className={s.bwDot} aria-hidden="true" />
                       {label}
                     </span>
-                    {where ? <span className={s.bwWhere}>{where}{cell.soldElsewhere ? ' · no bills there' : ''}</span> : null}
+                    {/* "No bills" first, so a narrow column cuts the venue, never the warning. */}
+                    {where ? <span className={s.bwWhere}>{cell.soldElsewhere ? 'No bills · ' : ''}{where}</span> : null}
                   </span>
                 )
               })}

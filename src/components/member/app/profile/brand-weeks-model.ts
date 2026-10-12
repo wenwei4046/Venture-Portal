@@ -47,9 +47,12 @@ const nameOf = (code: string | null) => (code ? NAME.get(code) ?? code : null);
  * One month of the person's brand weeks. `history.weeks` carries only the
  * person read (the member, or whom the Principal views); `staffId` narrows it
  * again when known. `today` (YYYY-MM-DD, the office's) tells a weekend still
- * to come — not listed yet — from one that has passed with no fair.
+ * to come — not listed yet — from one that has passed with no fair. `viewing`:
+ * the Principal reads somebody else, so the notes say "them", not "you".
  */
-export function brandMonthVM(snap: MemberArenaSnapshot, today: string, staffId?: string | null): BrandMonthVM {
+export function brandMonthVM(snap: MemberArenaSnapshot, today: string, staffId?: string | null, viewing = false): BrandMonthVM {
+  const them = viewing ? "them" : "you";
+  const their = viewing ? "their" : "your";
   const mine = new Map<string, ArenaBrandWeek>(
     (snap.history?.weeks ?? []).filter(w => !staffId || w.staffId === staffId).map(w => [w.week, w]),
   );
@@ -67,9 +70,9 @@ export function brandMonthVM(snap: MemberArenaSnapshot, today: string, staffId?:
     const where = [found.venue, found.organizer].filter(Boolean).join(" · ") || null;
     const note = found.source === "erp"
       ? (found.booths ?? 1) > 1
-        ? `From the ERP's Sales Attending · listed at ${found.booths} booths — the one with the most of your bills counts`
+        ? `From the ERP's Sales Attending · listed at ${found.booths} booths — the one with the most of ${their} bills counts`
         : "From the ERP's Sales Attending"
-      : "Auto-located · the ERP lists you at no booth, so the booth with the most of your bills counts";
+      : `Auto-located · the ERP lists ${them} at no booth, so the booth with the most of ${their} bills counts`;
     return {
       key: friday, title,
       when: found.start && found.end ? dayRange(found.start, found.end) : arenaWeekendLabel(friday),

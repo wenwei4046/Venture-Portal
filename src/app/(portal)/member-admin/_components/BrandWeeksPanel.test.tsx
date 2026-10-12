@@ -65,7 +65,7 @@ describe('BrandWeeksPanel', () => {
     expect(james.title).toContain('Akemi · PENANG WATERFRONT CONVENTION CENTRE — 5 bills, RM 30,000.00 · earns the points')
     // Listed at a booth none of their bills is at: says so.
     expect(chip('KAR JUN', '2026-09-25').title).toContain('None of their bills is at that booth')
-    expect(screen.getByText('SUNWAY CARNIVAL · no bills there')).toBeInTheDocument()
+    expect(screen.getByText('No bills · SUNWAY CARNIVAL')).toBeInTheDocument()
     // Nobody listed: auto-located, dashed.
     const auto = chip('LAWRENCE', '2026-09-04')
     expect(auto).toHaveTextContent('Akemi')
