@@ -832,11 +832,8 @@ function ErpTrailSection({ changes, answers }: { changes: ErpChange[]; answers: 
         <span className="rule" aria-hidden />
         <span className="count">{changes.length} {changes.length === 1 ? 'SAVE' : 'SAVES'}</span>
       </div>
-      <p className="text-sm mb-4 max-w-3xl">
-        Every time the ERP saved this bill and something changed, newest first — kept by the portal, because the
-        ERP keeps no audit trail of an order changed before its processing date. An upsell, a drop or a
-        cancellation is measured on what earns; transport never counts. {note}
-      </p>
+      {/* How far back the trail reaches — its state, not a description of it (2026-10-12). */}
+      <p className="text-sm mb-4 max-w-3xl">{note}</p>
       {changes.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="ledger-table">

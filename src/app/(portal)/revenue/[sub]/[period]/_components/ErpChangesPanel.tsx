@@ -381,15 +381,7 @@ function MonthTrail({ period, trail, onOpen }: {
   return (
     <div className="mt-6" aria-label={`ERP audit trail of ${monthName(period, 'long')}'s bills`} role="region">
       <div className={s.topLine}>
-        <div>
-          <h3 className={s.sectionHeading}>ERP audit trail · {monthName(period, 'long')}&apos;s bills · {trail.rows.length}</h3>
-          <p className={s.subtitle}>
-            Every save of this month&apos;s bills that moved money — what earns, or the bill&apos;s total — as the ERP
-            sent it, newest first. The ERP keeps no audit trail of an order changed before its processing date; the
-            portal keeps its own from every save it receives (since {trail.since}). A change before the
-            salesperson&apos;s commission was given is counted with the month as it is; one after asks above.
-          </p>
-        </div>
+        <h3 className={s.sectionHeading}>ERP audit trail · {monthName(period, 'long')}&apos;s bills · {trail.rows.length}</h3>
       </div>
       {trail.rows.length === 0 ? (
         <div className={`${s.tableFrame} ${s.empty}`}>
