@@ -155,6 +155,7 @@ const INVOKER_WRITES: Readonly<Record<string, Readonly<Record<string, readonly W
   revenue_restore_double_claim: { comm_double_claim_dismissals: ['DELETE'] },
   revenue_exclude_order: { sales_order_exclusions: ['INSERT'], sales_order_open_bill_tags: ['UPDATE', 'DELETE'], sales_orders: ['UPDATE'] },
   revenue_include_order: { sales_order_exclusions: ['DELETE'], sales_order_open_bill_tags: ['INSERT', 'UPDATE'], sales_orders: ['UPDATE'] },
+  revenue_move_order: { sales_order_reassignments: ['INSERT', 'UPDATE', 'DELETE'], sales_order_open_bill_tags: ['INSERT', 'DELETE'], sales_order_shares: ['DELETE'], sales_orders: ['UPDATE'] },
   revenue_set_order_brand: { sales_order_brand_picks: ['INSERT', 'UPDATE', 'DELETE'], sales_order_lines: ['UPDATE'], sales_orders: ['UPDATE'] },
 }
 

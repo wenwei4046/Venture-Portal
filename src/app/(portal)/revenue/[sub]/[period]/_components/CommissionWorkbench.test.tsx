@@ -12,20 +12,20 @@ import CommissionWorkbench, { type PayrollBarFacts } from './CommissionWorkbench
 // The salary preview's pay-line editor saves through a server action (its own tests are SalaryCalculation.test).
 vi.mock('../../../pay-line-actions', () => ({ savePayLines: vi.fn() }))
 
-const { saveOpenPicks, refresh, push, excludeOrder, includeOrder, setOrderBrand, shareOrder, unshareOrder, url } = vi.hoisted(() => {
+const { saveOpenPicks, refresh, push, excludeOrder, includeOrder, setOrderBrand, shareOrder, unshareOrder, moveOrder, url } = vi.hoisted(() => {
   // Next re-renders `useSearchParams` from the browser's own pushState and
   // replaceState; the stand-in does the same through this subscription.
   const listeners = new Set<() => void>()
   return {
     saveOpenPicks: vi.fn(), refresh: vi.fn(), push: vi.fn(), excludeOrder: vi.fn(), includeOrder: vi.fn(),
-    setOrderBrand: vi.fn(), shareOrder: vi.fn(), unshareOrder: vi.fn(),
+    setOrderBrand: vi.fn(), shareOrder: vi.fn(), unshareOrder: vi.fn(), moveOrder: vi.fn(),
     url: {
       subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } },
       changed() { for (const listener of listeners) listener() },
     },
   }
 })
-vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: saveOpenPicks, excludeOrder, includeOrder, setOrderBrand, shareOrder, unshareOrder }))
+vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: saveOpenPicks, excludeOrder, includeOrder, setOrderBrand, shareOrder, unshareOrder, moveOrder }))
 vi.mock('../../../close-actions', () => ({ closeSalespeople: vi.fn(), reopenSalespeople: vi.fn() }))
 vi.mock('next/navigation', async () => {
   const { useMemo, useSyncExternalStore } = await import('react')
@@ -1316,5 +1316,64 @@ describe('CommissionWorkbench — rows from another month (user 2026-10-12)', ()
     expect(statusOf('SO-one')).toHaveTextContent('—')
     expect(statusOf('SO-two')).toHaveTextContent('After closePaid next month')
     expect(salesRow(personalTable(), 'SO-two').className).not.toMatch(/otherMonth/)
+  })
+})
+
+
+// 2026-10-12 — the user: "together with rightclick … can select move this
+// order to other sales person".
+describe('CommissionWorkbench — moving a bill to another salesperson', () => {
+  const TEAM = [{ staffId: 'agent', name: 'Anthony' }, { staffId: 'leader', name: 'Alex' }]
+  const result = (over = {}) => ({
+    orderId: 'one', orderNo: 'SO-one', changed: true,
+    to: { staffId: 'leader', name: 'Alex' }, from: { staffId: 'agent', name: 'Anthony' }, movedBack: false,
+    openBillRank: 1, openBillBack: null, shareTaken: null, ...over,
+  })
+
+  it('moves a bill from its right-click, says so above the table, opens the new ledger and undoes', async () => {
+    moveOrder.mockResolvedValueOnce({ ok: true, result: result() })
+    render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]}
+      monthStats={monthStats} shareTeam={TEAM} />)
+    choose('Anthony')
+    fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getByText('Arena'), { clientX: 400, clientY: 260 })
+    fireEvent.click(screen.getByRole('menuitem', { name: /Move to another salesperson/ }))
+    const panel = screen.getByRole('dialog', { name: 'Move SO-one' })
+    expect(within(within(panel).getByLabelText(/Move to/)).queryByRole('option', { name: 'Anthony' })).toBeNull()
+    fireEvent.change(within(panel).getByLabelText(/Move to/), { target: { value: 'leader' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Move to Alex' }))
+    await waitFor(() => expect(moveOrder).toHaveBeenCalledWith('one', 'leader', ''))
+    const notice = await screen.findByText(/SO-one is Alex’s now — moved from Anthony\. Its Open Bill pick \(1st\) came off/)
+    expect(screen.queryByRole('menu')).toBeNull()
+
+    fireEvent.click(within(notice).getByRole('button', { name: 'Open Alex' }))
+    expect(screen.getByRole('heading', { name: 'Alex' })).toBeVisible()
+    moveOrder.mockResolvedValueOnce({ ok: true, result: result({ to: { staffId: 'agent', name: 'Anthony' }, from: { staffId: 'leader', name: 'Alex' }, movedBack: true, openBillRank: null, openBillBack: 1 }) })
+    fireEvent.click(within(screen.getByText(/SO-one is Alex’s now/)).getByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(moveOrder).toHaveBeenLastCalledWith('one', 'agent'))
+    expect(await screen.findByText(/SO-one is back with Anthony, the salesperson the ERP names\. Its Open Bill pick \(1st\) is back\./)).toBeVisible()
+  })
+
+  it('says on the row whom a moved bill came from, and offers it back', () => {
+    const data = fixture()
+    data.moves = { one: { fromStaffId: 'leader', fromName: 'Alex', movedByName: 'HR', movedAt: '2026-10-12T03:00:00Z', note: 'keyed under the wrong name' } }
+    render(<CommissionWorkbench data={data} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]}
+      monthStats={monthStats} shareTeam={TEAM} />)
+    choose('Anthony')
+    const note = within(salesRow(personalTable(), 'SO-one')).getByText('Moved from Alex')
+    expect(note).toHaveAttribute('title', 'Moved by HR on 12 Oct 2026 — keyed under the wrong name')
+    fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getByText('Arena'), { clientX: 400, clientY: 260 })
+    fireEvent.click(screen.getByRole('menuitem', { name: /Move to another salesperson/ }))
+    expect(within(screen.getByRole('dialog', { name: 'Move SO-one' })).getByRole('button', { name: 'Give it back to Alex' })).toBeEnabled()
+  })
+
+  it('offers no move on an upsell, and none in a month whose run has paid', () => {
+    const data = fixture()
+    render(<CommissionWorkbench data={data} sub="fair" period="2026-08-01" runStatus="applied" savedTotals={[]}
+      monthStats={monthStats} shareTeam={TEAM} lockedPeriods={['2026-08-01']} />)
+    choose('Anthony')
+    fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getByText('Arena'), { clientX: 400, clientY: 260 })
+    const row = screen.getByRole('menuitem', { name: /Move to another salesperson/ })
+    expect(row).toBeDisabled()
+    expect(row).toHaveAttribute('title', 'The run for August 2026 has paid — reopen it before moving its bills')
   })
 })

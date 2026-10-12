@@ -9,7 +9,8 @@ import { loadFairCalendar } from './fair-calendar'
 import { loadOrderFairs } from './order-fairs'
 import { fairDays } from './upsales'
 import { loadPayBoard } from './pay-preview'
-import { loadCarriedCloses, loadUpsaleFacts, type UpsaleFact } from './row-origins'
+import { loadBillMoves, loadCarriedCloses, loadUpsaleFacts, type UpsaleFact } from './row-origins'
+import type { BillMoved } from '@/lib/commission/bill-move'
 
 /** Read-only inputs: opening the workbench never creates a run or changes payroll. */
 export async function loadCommissionWorkbench(
@@ -35,7 +36,7 @@ export async function loadCommissionWorkbench(
   // exists yet), the carried-forward bills with every bill's fair, and the
   // other-month rows' facts. One after another they were the whole of a
   // month's wait.
-  const [people, pay, { allOrders, placed }, upsales, carriedCloses] = await Promise.all([
+  const [people, pay, { allOrders, placed }, upsales, carriedCloses, moves] = await Promise.all([
     fetchByKeys<{ id: string; employee_name: string; employee_code: string | null }, string>(ids, keys =>
       db.from('hr_staff_costs').select('id, employee_name, employee_code').in('id', keys)),
     withPay
@@ -60,6 +61,9 @@ export async function loadCommissionWorkbench(
     })(),
     loadUpsaleFacts(db, subDepartmentId, upsaleIds),
     loadCarriedCloses(db, subDepartmentId, earlierPeriods),
+    // Bills somebody moved to another salesperson (2026-10-12): the month's
+    // own and every one the ledgers carry — the bills All bills lists too.
+    loadBillMoves(db, [...new Set([...monthOrders.map(o => o.orderId), ...input.orders.filter(o => !o.upsale).map(o => o.id)])]),
   ])
   const fairById = new Map(calendar.map(fair => [fair.fairId, fair]))
   const orders = allOrders.map(o => {
@@ -87,6 +91,8 @@ export async function loadCommissionWorkbench(
     upsales: upsales as Record<string, UpsaleFact>,
     /** The closes of the months the ledgers carry bills in from. */
     carriedCloses: carriedCloses as CloseBills[],
+    /** The bills moved to another salesperson, keyed by bill. */
+    moves: moves as Record<string, BillMoved>,
     people: people.map(p => ({ staffId: p.id, name: p.employee_name, employeeCode: p.employee_code })),
     payRows: pay.rows, payUnavailable: pay.unavailable,
     /** Why the month's pay lines cannot change, or null while they can. */
@@ -102,10 +108,11 @@ type Loaded = Awaited<ReturnType<typeof loadCommissionWorkbench>>
  * other-month rows' facts (2026-10-12): absent, a row says only what its own
  * fields can — an upsell is an upsell, a carried bill the month it came from.
  */
-export type CommissionWorkbenchData = Omit<Loaded, 'payLinesClosed' | 'upsales' | 'carriedCloses' | 'orders'>
+export type CommissionWorkbenchData = Omit<Loaded, 'payLinesClosed' | 'upsales' | 'carriedCloses' | 'moves' | 'orders'>
   & {
     payLinesClosed?: string | null
     upsales?: Readonly<Record<string, UpsaleFact>>
     carriedCloses?: readonly CloseBills[]
+    moves?: Readonly<Record<string, BillMoved>>
     orders: (Omit<Loaded['orders'][number], 'saleMonth'> & { saleMonth?: string | null })[]
   }

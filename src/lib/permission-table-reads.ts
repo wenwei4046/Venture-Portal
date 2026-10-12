@@ -157,6 +157,7 @@ export const TABLE_READS: Readonly<Record<string, readonly Want[]>> = {
   sales_import_batches: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_brand_picks: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_exclusions: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
+  sales_order_reassignments: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_lines: ['product_list.view', 'revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_open_bill_tags: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_shares: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],

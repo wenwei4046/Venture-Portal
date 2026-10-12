@@ -297,6 +297,8 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       origin: o.cancelled ? null : rowOrigin(
         { upsale: false, orderTotal: o.orderTotal, periodMonth: period, status: o.depositMet ? 'eligible' : 'deposit_pending' },
         period, { saleMonth: eventOf.get(o.orderId)?.saleMonth ?? null }),
+      // Moved here from another salesperson (2026-10-12).
+      moved: workbench?.moves?.[o.orderId] ?? null,
     }
   })
 

@@ -12,7 +12,7 @@ import {
   billHref, readWorkbenchLocation, sameWorkbenchView, workbenchSearch,
   type LedgerSort, type LedgerView, type WorkbenchLocation, type WorkbenchTab,
 } from '@/lib/commission/workbench-nav'
-import { formatMoney } from '@/lib/utils'
+import { formatIntlDate, formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import { computeRevenuePay } from '@/lib/revenue-pay'
 import { personPayLinesLock } from '@/lib/revenue-pay-lines'
@@ -22,9 +22,11 @@ import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench
 import { excludeOrder, includeOrder, saveOpenBillPicks } from '../../../run-actions'
 import { nameWarnings, payrollState, unmatchedWarnings, type RunStatus } from '@/lib/commission/payroll-send'
 import { useEntryScroll } from '@/components/layout/useEntryScroll'
-import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome, type BillShareOutcome } from '../orders/_components/BillContextMenu'
+import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome, type BillMoveOutcome, type BillShareOutcome } from '../orders/_components/BillContextMenu'
 import BillCountNotice from '../orders/_components/BillCountNotice'
 import BillShareNotice from '../orders/_components/BillShareNotice'
+import BillMoveNotice from '../orders/_components/BillMoveNotice'
+import { billMoveAction, movedNote, type BillMoveAction } from '@/lib/commission/bill-move'
 import { billBrandAction, brandOutcomeMessage, type BrandOption } from '@/lib/commission/bill-brand'
 import { closeVerdicts, ORIGIN_TONE, rowOrigin, type RowOrigin } from '@/lib/commission/row-origin'
 import { billShareAction, sharePct, type BillShareAction, type ShareCandidate, type ShareHolder } from '@/lib/commission/bill-share'
@@ -239,6 +241,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   const [billDone, setBillDone] = useState<BillMenuOutcome | null>(null)
   const [brandDone, setBrandDone] = useState<string | null>(null)
   const [shareDone, setShareDone] = useState<BillShareOutcome | null>(null)
+  const [moveDone, setMoveDone] = useState<BillMoveOutcome | null>(null)
   // The ledger's own button is the real Don't count too (user 2026-09-27): it
   // answers on the same notice, with the same Undo, as the right-click menu.
   const [billPending, startBill] = useTransition()
@@ -464,6 +467,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     if (how === 'push') {
       setBillDone(null)
       setShareDone(null)
+      setMoveDone(null)
       window.history.pushState(null, '', url)
     } else {
       window.history.replaceState(null, '', url)
@@ -540,6 +544,14 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     const closed = holdersOf(row).find(holder => closer.closedById.has(holder.staffId))
     return closed ? `${closed.name}’s ${monthLabel} is closed — reopen it before ${doing}` : null
   }
+  /** "Moved by HR on 12 Oct 2026 — keyed under the wrong name" */
+  function movedTitle(orderId: string): string | undefined {
+    const moved = data.moves?.[orderId]
+    if (!moved) return undefined
+    // Three letters a month (DESIGN.md › Date format: en-MY writes September "Sept").
+    const when = formatIntlDate(new Date(moved.movedAt), { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kuala_Lumpur' })
+    return `Moved${moved.movedByName ? ` by ${moved.movedByName}` : ''} on ${when}${moved.note ? ` — ${moved.note}` : ''}`
+  }
   /** Whose bill a shared row is, said from the row's own holder. */
   function shareNote(row: CommissionOrderRow | OverrideOrderRow): string | null {
     const share = row.share
@@ -563,6 +575,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     billMenu.closeMenu()
     setBrandDone(null)
     setShareDone(null)
+    setMoveDone(null)
     setBillDone(outcome.result.changed ? outcome : null)
   }
   // Share this bill (2026-09-30): anybody on the team, bar the owner; somebody
@@ -582,7 +595,37 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     billMenu.closeMenu()
     setBillDone(null)
     setBrandDone(null)
+    setMoveDone(null)
     setShareDone(outcome)
+  }
+  // Move to another salesperson (2026-10-12): the bill's OWNER changes — a
+  // shared bill's other holders keep their parts. Anybody on the team but
+  // whoever has it; somebody closed this month cannot take it, and nobody
+  // paid on it may be closed either.
+  function moveActionFor(row: CommissionOrderRow | OverrideOrderRow): BillMoveAction | null {
+    if (!shareTeam) return null
+    const moved = data.moves?.[row.orderId]
+    return billMoveAction(
+      {
+        owner: { staffId: row.share?.ownerStaffId ?? row.staffId, name: row.share?.ownerName ?? row.staffName },
+        named: moved ? { staffId: moved.fromStaffId, name: moved.fromName ?? 'nobody' } : null,
+        upsale: row.upsale,
+      },
+      { runLocked: lockedMonths.has(row.periodMonth), closedReason: closedHolder(row, 'moving this bill'), monthLabel: monthName(row.periodMonth) },
+    )
+  }
+  function moveMenuDone(outcome: BillMoveOutcome) {
+    billMenu.closeMenu()
+    setBillDone(null)
+    setBrandDone(null)
+    setShareDone(null)
+    setMoveDone(outcome)
+  }
+  // The notice's *Open NAME*: the ledger the bill now sits on, the notice kept.
+  function openMovedHolder(staffId: string) {
+    const outcome = moveDone
+    choosePerson(staffId)
+    setMoveDone(outcome)
   }
   // The notice's *Open NAME*: the ledger where the new part now sits, with
   // the notice still saying what happened.
@@ -610,6 +653,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     billMenu.closeMenu()
     setBillDone(null)
     setShareDone(null)
+    setMoveDone(null)
     const nameOf = (code: string) => brandOptions.find(o => o.code === code)?.name ?? code
     setBrandDone(outcome.result.changed ? brandOutcomeMessage(outcome.result, nameOf) : null)
   }
@@ -764,6 +808,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
             onDoubleClick={event => billMenu.onRowDoubleClick(event, rowHref(row))} onMouseDown={billMenu.onRowMouseDown}>
             <td className={s.stickyFirst}>{billCell(row, <>
               {row.share && <small className={s.shareNote}>{shareNote(row)}</small>}
+              {data.moves?.[row.orderId] && <small className={s.shareNote} title={movedTitle(row.orderId)}>{movedNote(data.moves[row.orderId])}</small>}
               {!overriding && <small>{statusLabel[(row as CommissionOrderRow).status]}</small>}
               {!overriding && unpricedIds.has(row.orderId) && <small className={c.unpricedNote}>Priced RM 0 in the ERP</small>}</>)}</td>
             {overriding && <td>{(row as OverrideOrderRow).downlineName}</td>}
@@ -850,6 +895,9 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     {shareDone && <BillShareNotice key={`${shareDone.orderId}:${shareDone.result.staffId}:${shareDone.result.after}:${shareDone.undone ? 'undone' : 'done'}`}
       outcome={shareDone} className={s.notice} buttonClassName={s.ghostButton} onChange={setShareDone}
       onOpenHolder={openHolder} currentStaffId={isPersonView ? personId : null} />}
+    {moveDone && <BillMoveNotice key={`${moveDone.result.orderId}:${moveDone.result.to.staffId}:${moveDone.undone ? 'undone' : 'done'}`}
+      outcome={moveDone} className={s.notice} buttonClassName={s.ghostButton} onChange={setMoveDone}
+      onOpenHolder={openMovedHolder} currentStaffId={isPersonView ? personId : null} />}
     {error && <p className={s.warning} role="alert">{error}</p>}
     {stalePicks && <p className={s.warning} role="alert">Saved Open Bill picks changed while this draft was open. Reset draft to use the latest picks before saving.</p>}
     {picks && <div className={s.toolbar}><button className={s.primaryButton} disabled={saving || locked || stalePicks || !data.input.scheme.enableOpenBill} onClick={savePicks}>{saving ? 'Saving…' : 'Save Open Bill picks'}</button><span className={s.muted}>{data.input.scheme.enableOpenBill ? 'Unsaved until you save them — payroll is unchanged.' : 'Open Bill is switched off for this month, so these picks pay nothing and cannot be saved. Switch it on under Review settings › This month pays first.'}</span></div>}
@@ -1120,7 +1168,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         const action = shareActionFor(billMenu.menu.row)
         return action ? { action, candidates: shareCandidates } : null
       })()}
-      onClose={billMenu.closeMenu} onDone={billMenuDone} onBrandDone={brandMenuDone} onShareDone={shareMenuDone} />}
+      move={(() => {
+        const action = moveActionFor(billMenu.menu.row)
+        return action ? { action, candidates: shareCandidates } : null
+      })()}
+      onClose={billMenu.closeMenu} onDone={billMenuDone} onBrandDone={brandMenuDone} onShareDone={shareMenuDone} onMoveDone={moveMenuDone} />}
   </section>
 }
 
