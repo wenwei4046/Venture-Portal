@@ -859,12 +859,12 @@ paper keyed as several documents shares its claim-form figure among them in
 proportion to what each held when the month was settled.
 
 **A cancellation is not asked; a shared bill's change follows its shares
-(2026-10-13, mig `20261013050000`).** A delivery that cancels or deletes a
-bill whose commission was given takes what is still given back by itself: a
-confirmed drop (`comm_upsales.answered_by_feed`) in the first month after the
-one that gave it, from the month the portal pays from, whose run has not paid
-and where nobody on the bill is closed — the question already waiting on the
-bill becomes it. The ERP counting the bill again withdraws it while that month
+(2026-10-13, migs `20261013050000` / `20261013060000`).** A delivery that
+cancels or deletes a bill whose commission was given takes what is still given
+back by itself: a confirmed drop (`comm_upsales.answered_by_feed`) in the
+current month — never before the month after the one that gave it — or the
+first after it whose run has not paid and where nobody on the bill is closed;
+the question already waiting on the bill becomes it. The ERP counting the bill again withdraws it while that month
 is open; after, giving it back is a *reinstated* question. Every drop, upsell
 and cancellation records the bill whose pay gave the commission
 (`settled_order_id`: the document's own row, or the claim-form row of the same

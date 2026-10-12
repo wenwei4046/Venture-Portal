@@ -524,31 +524,51 @@ const afterOnce = await upsalesNow()
 await db.exec(cancelAndShare)
 check(await upsalesNow(), afterOnce, '20261013050000 runs twice to the same end')
 
+// ══ 20261013060000: in the current month ════════════════════════════════════
+// The user, of HC8972 deducted into September (the first month still open):
+// "放在当月" — the current month, or the first after it open for everybody on
+// the bill.
+const thisMonth = await one(`SELECT GREATEST(date_trunc('month', (now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date)::date, '2026-09-01'::date)::text`)
+const monthName = month => one(`SELECT to_char($1::date, 'FMMonth YYYY')`, [month])
+const currentMonth = lf(await readFile(new URL('20261013060000_erp_cancel_deducted_in_current_month.sql', migrations), 'utf8'))
+await db.exec(currentMonth)
+check((await one(`SELECT prosrc FROM pg_proc WHERE proname = 'erp_sync_note_adjustment'`))
+  .includes('v_direct := erp_sync_first_open_month(v_sub, v_month, v_bill, v_staff);'), true,
+'the search for the month starts at the current month')
+const moved = await deduction('HC-SO-013367')
+check(moved.map(d => [d.id, d.month, d.amount]), [[questionWaiting, thisMonth, -10399]],
+  'HC8972, deducted into September by 20261013050000, moves to the current month — the same row')
+check(moved[0].note,
+  `The ERP cancelled HC-SO-013367 after its commission was given in August 2026 — taken back directly in ${await monthName(thisMonth)}`,
+  'and its note with it')
+const afterMove = await upsalesNow()
+await db.exec(currentMonth)
+check(await upsalesNow(), afterMove, '20261013060000 runs twice to the same end')
+
 // Sent again, cancelled: the one deduction, nothing to answer.
 const hc8972Lines = [{ group: 'MATTRESS', code: 'AKEMI IMMORTAL MATT (K)', amount: 10399 }]
 await deliver('HC-SO-013367', { agent: 'MELVIN CHONG', status: 'CANCELLED', paper: 'HC8972', lines: hc8972Lines })
 check((await deduction('HC-SO-013367')).length, 1, 'sent again: still the one deduction')
 check((await pending()).some(p => p.doc === 'HC-SO-013367'), false, 'and nothing to answer')
 
-// Back in the ERP while September is open: the deduction is simply withdrawn.
+// Back in the ERP while its month is open: the deduction is simply withdrawn.
 await deliver('HC-SO-013367', { agent: 'MELVIN CHONG', status: 'CONFIRMED', paper: 'HC8972', lines: hc8972Lines })
-check(await deduction('HC-SO-013367'), [], 'reinstated while September is open: the deduction is withdrawn')
+check(await deduction('HC-SO-013367'), [], 'reinstated while its month is open: the deduction is withdrawn')
 check((await pending()).some(p => p.doc === 'HC-SO-013367'), false, 'and nothing is asked')
 check((await trailOf('HC-SO-013367')).at(-1).kind, 'reinstated', 'the trail says reinstated')
 
 // Cancelled again: taken back again, and the save that cancelled it points at it.
 await deliver('HC-SO-013367', { agent: 'MELVIN CHONG', status: 'CANCELLED', paper: 'HC8972', lines: hc8972Lines })
 const again = await deduction('HC-SO-013367')
-check(again.map(d => [d.month, d.amount]), [['2026-09-01', -10399]], 'cancelled again: deducted directly again')
+check(again.map(d => [d.month, d.amount]), [[thisMonth, -10399]], 'cancelled again: deducted directly again, in the current month')
 check(await one(`SELECT adjustment_id FROM sales_order_erp_changes WHERE order_no = 'HC-SO-013367' ORDER BY received_at DESC, id DESC LIMIT 1`),
   again[0].id, 'the save that cancelled it points at the deduction it made')
 
-// MELVIN's September closed, then back in the ERP: what September took back
+// MELVIN's month closed, then back in the ERP: what that month took back
 // stays taken; giving it back is a question.
-await q(`INSERT INTO comm_salesperson_closes (sub_department_id, period_month, staff_id) VALUES ($1, '2026-09-01', $2)`, [FAIR, MELVIN])
+await q(`INSERT INTO comm_salesperson_closes (sub_department_id, period_month, staff_id) VALUES ($1, $2::date, $3)`, [FAIR, thisMonth, MELVIN])
 await deliver('HC-SO-013367', { agent: 'MELVIN CHONG', status: 'CONFIRMED', paper: 'HC8972', lines: hc8972Lines })
-check((await deduction('HC-SO-013367')).length, 1, 'with MELVIN\'s September closed, the deduction stays')
-const thisMonth = await one(`SELECT GREATEST(date_trunc('month', (now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date)::date, '2026-09-01'::date)::text`)
+check((await deduction('HC-SO-013367')).length, 1, 'with MELVIN\'s month closed, the deduction stays')
 check(await question('HC-SO-013367').then(x => [x.amount, x.erp_reason, x.month]), [10399, 'reinstated', thisMonth],
   'and giving it back is asked, as any upsell')
 
@@ -568,12 +588,13 @@ const closeSeptember = async (doc, staff) => {
 }
 await closeSeptember(SEP_DOC, ANTHONY)
 
-// Cancelled: October is closed for LUCAS, who holds half — his part could
-// never be taken there — so it goes into November.
+// Cancelled: October — the current month while it is — is closed for LUCAS,
+// who holds half; his part could never be taken there, so it goes on to the
+// next month.
 await deliver(SEP_DOC, { date: '2026-09-10', agent: 'ANTHONY', status: 'CANCELLED', lines: mattress(6000) })
 const shared = await deduction(SEP_DOC)
 check(shared.map(d => [d.month, d.amount, d.staff_id, d.erp_reason, d.settled_by, d.settled_order_id]),
-  [['2026-11-01', -6000, ANTHONY, 'cancelled', 'close', sepBill]],
+  [[thisMonth > '2026-10-01' ? thisMonth : '2026-11-01', -6000, ANTHONY, 'cancelled', 'close', sepBill]],
   'a shared bill cancelled: deducted in the first month open for everybody on it, following the bill that paid it')
 await refused(`UPDATE comm_upsales SET period_month = '2026-10-01' WHERE erp_doc_no = $1 AND status = 'confirmed'`, [SEP_DOC], '23CLS',
   'nobody moves it into a month a holder of the bill is closed in')
@@ -596,8 +617,8 @@ await deliver(SEP_DOC2, { date: '2026-09-11', agent: 'CHEA HUAN', lines: mattres
 await closeSeptember(SEP_DOC2, CHEA)
 r = await deliver(SEP_DOC2, { deleted: true })
 check([r.status, r.message], ['applied', 'excluded: deleted in the ERP'], 'deleted in the ERP')
-check((await deduction(SEP_DOC2)).map(d => [d.month, d.amount, d.erp_reason]), [['2026-10-01', -3000, 'deleted']],
-  'a deletion is deducted directly too — October, open for CHEA')
+check((await deduction(SEP_DOC2)).map(d => [d.month, d.amount, d.erp_reason]), [[thisMonth, -3000, 'deleted']],
+  'a deletion is deducted directly too — the current month, open for CHEA')
 
 // A deduction refused for any reason is asked instead.
 const SEP_DOC3 = 'HC-SO-2609-502'
