@@ -134,3 +134,38 @@ describe('Hiring › a request › candidates’ files', () => {
     expect(actions.saveHiringCandidate).not.toHaveBeenCalled()
   })
 })
+
+// The user (2026-10-12): at the foot of a request the + menu ran off the page, and the page would not
+// scroll to it. happy-dom lays nothing out, so every box sits at 700–730 of a 760px window and a menu
+// 80px tall sits 6px under it — or, turned over, 6px above (`menu-place.ts`, unit-tested there).
+describe('Hiring › a request › menus at the foot of the page', () => {
+  const rect = (top: number, height: number) =>
+    ({ top, bottom: top + height, height, left: 0, right: 220, width: 220, x: 0, y: top, toJSON: () => ({}) }) as DOMRect
+  const tall = window.innerHeight
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.getAttribute('role') !== 'menu') return rect(700, 30)
+      return this.dataset.up === 'true' ? rect(700 - 6 - 80, 80) : rect(736, 80)
+    })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 760 })
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: tall })
+  })
+
+  it('+ opens New candidate · Pick from Talent Bank above the button', () => {
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'Add a candidate' }))
+    expect(screen.getByRole('menu')).toHaveAttribute('data-up', 'true')
+    expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map(b => b.textContent)).toEqual(['＋New candidate', '⇣Pick from Talent Bank'])
+  })
+
+  it("a candidate's ⋯ does the same, and still does once Change status opens under it", () => {
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'More for Daniel Lee' }))
+    expect(screen.getByRole('menu')).toHaveAttribute('data-up', 'true')
+    fireEvent.click(screen.getByRole('menuitem', { name: /Change status/ }))
+    expect(screen.getByRole('menu')).toHaveAttribute('data-up', 'true')
+  })
+})

@@ -11,6 +11,7 @@ import { STAGE_COLOURS, StageChip } from './bits'
 import CandidateWindow from './CandidateWindow'
 import CandidateFieldsWindow from './CandidateFieldsWindow'
 import FilesDrawer from './FilesDrawer'
+import { useMenuPlace } from './menu-place'
 import { MoveToTalentWindow, PickTalentWindow } from './TalentWindows'
 import s from './hiring.module.css'
 
@@ -43,6 +44,9 @@ export default function Candidates({
   const [pickOpen, setPickOpen] = useState(false)
   const [toBank, setToBank] = useState<HiringCandidate | null>(null)
   const [, start] = useTransition()
+  // At the foot of the page a menu opens upward (2026-10-12): one is open at a time.
+  const addMenuRef = useMenuPlace<HTMLDivElement>(addMenu)
+  const rowMenuRef = useMenuPlace<HTMLDivElement>(menu !== null, `${menu?.id}:${menu?.status}`)
 
   const stage = (c: HiringCandidate, v: HiringCandidate['stage']) => {
     setMenu(null)
@@ -74,7 +78,7 @@ export default function Candidates({
             {addMenu ? (
               <>
                 <div className={s.menuCatch} onClick={() => setAddMenu(false)} aria-hidden="true" />
-                <div className={s.menu} role="menu">
+                <div ref={addMenuRef} className={s.menu} role="menu">
                   <button
                     type="button"
                     role="menuitem"
@@ -156,7 +160,7 @@ export default function Candidates({
               {open ? (
                 <>
                   <div className={s.menuCatch} onClick={() => setMenu(null)} aria-hidden="true" />
-                  <div className={s.menu} role="menu">
+                  <div ref={rowMenuRef} className={s.menu} role="menu">
                     {can.edit ? (
                       <button
                         type="button"
