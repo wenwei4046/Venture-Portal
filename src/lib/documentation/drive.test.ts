@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  EMPTY_DRIVE, HV, ROOT, crumbs, deptAt, driveFromRow, fileTone, folderAt, folderCards, folderNameRefusal, parentOf, parsePlace,
-  pathLine, personAt, placeExists, placeFiles, searchDrive, sizeLabel, takesFolders, type Drive,
+  BIN, EMPTY_DRIVE, HV, ROOT, binDaysLeft, binFrom, binLeftLabel, binSections, crumbs, deptAt, driveFromRow, fileTone, folderAt, folderCards,
+  folderNameRefusal, moveTargets, parentOf, parsePlace, pathLine, personAt, placeExists, placeFiles, searchDrive, sizeLabel, takesFolders, type Drive,
 } from './drive'
 import type { Documentation, PersonLetter } from './model'
 
@@ -43,6 +43,8 @@ const DRIVE: Drive = {
     { id: 'F1', ref: 'F-101', fileName: 'SOP.pdf', contentType: 'application/pdf', size: 2_400_000, parent: folderAt(CARRES_FIN), uploadedAt: '2026-10-12T02:00:00Z', uploadedBy: 'Amy', deletedAt: null, events: [] },
     { id: 'F2', ref: 'F-102', fileName: 'Old.xlsx', contentType: null, size: 900, parent: folderAt(CARRES_FIN), uploadedAt: '2026-10-12T02:00:00Z', uploadedBy: 'Amy', deletedAt: '2026-10-12T03:00:00Z', events: [] },
   ],
+  bin: [],
+  readAt: '',
 }
 
 describe('reading hr_drive()', () => {
@@ -162,5 +164,65 @@ describe('a file’s tile', () => {
 
   it('says its size', () => {
     expect([sizeLabel(null), sizeLabel(900), sizeLabel(980_000), sizeLabel(2_400_000), sizeLabel(24_000_000)]).toEqual(['', '900 B', '957 KB', '2.3 MB', '23 MB'])
+  })
+})
+
+// Move to… and the Bin (2026-10-13 — the user: "Data center 也加 Bin 和 Move to…", the Talent Bank's rules).
+describe('Move to…', () => {
+  it('every place a folder may go, top down — the Data center itself first, never a person, never itself or inside it', () => {
+    expect(moveTargets(DOC, DRIVE, folderAt(CARRES)).map(x => [x.path, x.depth])).toEqual([
+      ['Data center', 0],
+      ['HOUZS Venture', 1],
+      ['HOUZS Venture › Revenue', 2],
+      ['HOUZS Venture › HR', 2],
+    ])
+    const fin = moveTargets(DOC, DRIVE, folderAt(CARRES_FIN)).map(x => x.at)
+    expect(fin).toContain(folderAt(CARRES))
+    expect(fin).not.toContain(folderAt(CARRES_FIN))
+    expect(fin.some(at => parsePlace(at)?.kind === 'person')).toBe(false)
+  })
+})
+
+describe('the Bin', () => {
+  const OLD = '77777777-7777-4777-8777-777777777777'
+  const when = { deletedAt: '2026-10-12T08:00:00Z', deletedBy: 'Amy', expiresAt: '2026-11-11T08:00:00Z' }
+  const read = driveFromRow({
+    folders: [{ id: CARRES, name: 'Carres', parent: 'root', createdAt: 'x', createdBy: 'Amy' }],
+    files: [],
+    bin: [
+      { id: 'b1', kind: 'folder', name: 'Old', at: `folder:${CARRES}`, folderId: OLD, ...when },
+      { id: 'b2', kind: 'file', name: 'Draft.pdf', at: `folder:${OLD}`, fileId: 'F7', ref: 'F-107', contentType: 'application/pdf', size: '2048', ...when },
+      { id: 'b3', kind: 'file', name: 'Rates.xlsx', at: `dept:${REV}`, fileId: 'F8', ...when },
+      { id: 'b4', kind: 'letter', name: 'Not a Bin kind', at: 'root', ...when },
+      { kind: 'file', name: 'No id', at: 'root', ...when },
+    ],
+  })!
+
+  it('reads the Bin as it came, nothing malformed; the read’s time is the server’s to say', () => {
+    expect(read.bin.map(b => [b.id, b.kind, b.at])).toEqual([
+      ['b1', 'folder', `folder:${CARRES}`],
+      ['b2', 'file', `folder:${OLD}`],
+      ['b3', 'file', `dept:${REV}`],
+    ])
+    expect(read.bin[1]).toMatchObject({ fileId: 'F7', ref: 'F-107', contentType: 'application/pdf', size: 2048, deletedBy: 'Amy' })
+    expect(read.readAt).toBe('')
+    expect(driveFromRow({ folders: [] })!.bin).toEqual([])
+    expect(EMPTY_DRIVE.bin).toEqual([])
+  })
+
+  it('says where each was — through a folder in the Bin too', () => {
+    expect(read.bin.map(b => binFrom(b, DOC, read))).toEqual(['Carres', 'Carres › Old', 'HOUZS Venture › Revenue'])
+  })
+
+  it('counts the days left and draws as a place does: folders, then files', () => {
+    expect(binDaysLeft(read.bin[0], Date.parse('2026-10-13T08:00:00Z'))).toBe(29)
+    expect(binLeftLabel(binDaysLeft(read.bin[0], Date.parse('2026-11-11T07:00:00Z')))).toBe('1 day left')
+    const s = binSections(read.bin)
+    expect([s.folders.map(b => b.id), s.files.map(b => b.id)]).toEqual([['b1'], ['b2', 'b3']])
+  })
+
+  it('is not a place of the tree', () => {
+    expect(parsePlace(BIN)).toBeNull()
+    expect(placeExists(BIN, DOC, read)).toBe(false)
   })
 })

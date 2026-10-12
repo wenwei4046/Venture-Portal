@@ -2,21 +2,22 @@
 
 import { useState } from 'react'
 import { Window } from '@/components/hrv/overlay'
-import { parsePlace } from '@/lib/hiring/bank'
-import ds from '@/app/(portal)/team/documentation/_components/documentation.module.css'
-import { CompanyGlyph, FolderGlyph } from '@/app/(portal)/team/documentation/_components/drive/icons'
-import b from './bank.module.css'
+import ds from '../documentation.module.css'
+import { CompanyGlyph, FolderGlyph } from './icons'
+import s from './drive.module.css'
 
 /**
- * Move to… in the Talent Bank's Drive (2026-10-12): a person, a folder with everything in it, or everybody in a
- * department ("change name, and move together"). The Data center's window kind, 440px — where it is now, a finder,
- * every place it may go top down (indented a level at a time; the place it is in marked *Here now*), **Move here**.
+ * Move to… in a Drive (2026-10-12 for the Talent Bank — a person, a folder with everything in it, everybody in a
+ * department; 2026-10-13 for the Data center — a folder with everything in it). The Drive's window kind, 440px —
+ * where it is now, a finder, every place it may go top down (indented a level at a time; the place it is in marked
+ * *Here now*), **Move here**.
  */
 export default function MoveWindow({
   title,
   now,
   targets,
   current,
+  kindOf,
   onMove,
   onClose,
 }: {
@@ -27,6 +28,8 @@ export default function MoveWindow({
   targets: Array<{ at: string; path: string; depth: number }>
   /** The place it is in — shown, never picked. */
   current?: string
+  /** Which glyph a place wears: a company's building or a folder. */
+  kindOf: (at: string) => 'company' | 'folder'
   onMove: (at: string) => Promise<{ ok: true } | { ok: false; reason: string }>
   onClose: () => void
 }) {
@@ -58,10 +61,9 @@ export default function MoveWindow({
       </div>
       <div className={ds.winBody}>
         <input className={ds.winInput} value={query} placeholder="Find a company, department or folder" aria-label="Find a place" onChange={e => setQuery(e.target.value)} />
-        <div className={b.moveList} role="listbox" aria-label="Places">
+        <div className={s.moveList} role="listbox" aria-label="Places">
           {rows.map(x => {
             const here = x.at === current
-            const company = parsePlace(x.at)?.kind === 'company'
             return (
               <button
                 key={x.at}
@@ -69,7 +71,7 @@ export default function MoveWindow({
                 role="option"
                 aria-selected={picked === x.at}
                 aria-pressed={picked === x.at}
-                className={b.moveRow}
+                className={s.moveRow}
                 style={{ paddingLeft: 12 + (q ? 0 : x.depth * 18) }}
                 disabled={here}
                 onClick={() => {
@@ -77,13 +79,13 @@ export default function MoveWindow({
                   setError('')
                 }}
               >
-                <span className={b.moveIcon}>{company ? <CompanyGlyph size={16} /> : <FolderGlyph size={16} />}</span>
-                <span className={b.moveName} title={x.path}>{q ? x.path : x.path.split(' › ').at(-1)}</span>
-                {here ? <span className={b.moveHere}>Here now</span> : null}
+                <span className={s.moveIcon}>{kindOf(x.at) === 'company' ? <CompanyGlyph size={16} /> : <FolderGlyph size={16} />}</span>
+                <span className={s.moveName} title={x.path}>{q ? x.path : x.path.split(' › ').at(-1)}</span>
+                {here ? <span className={s.moveHere}>Here now</span> : null}
               </button>
             )
           })}
-          {rows.length ? null : <div className={b.moveEmpty}>No place matches “{query.trim()}”.</div>}
+          {rows.length ? null : <div className={s.moveEmpty}>No place matches “{query.trim()}”.</div>}
         </div>
         {error ? <span className={ds.winErr} role="alert">{error}</span> : null}
       </div>

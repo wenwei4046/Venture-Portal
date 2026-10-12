@@ -525,18 +525,8 @@ export function searchBank(query: string, tree: BankTree): BankHit[] {
 
 // ── The Bin ─────────────────────────────────────────────────────────────────
 
-const DAY = 86_400_000
-
-/** Whole days until the hourly sweep deletes it — 1 on its last day. */
-export function binDaysLeft(item: Pick<BinItem, 'expiresAt'>, now: number): number {
-  const t = Date.parse(item.expiresAt)
-  return Number.isFinite(t) ? Math.max(0, Math.ceil((t - now) / DAY)) : 0
-}
-
-/** "29 days left", "1 day left". */
-export function binLeftLabel(days: number): string {
-  return days === 1 ? '1 day left' : `${days} days left`
-}
+/** The days left, counted as the Data center's Bin counts them (one rule for both Drives). */
+export { binDaysLeft, binLeftLabel } from '@/lib/documentation/drive'
 
 /**
  * Where something in the Bin was, in words — "Carres › Sales"; a person's file, the person. A folder in the Bin is
