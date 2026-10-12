@@ -6,7 +6,7 @@ import type { Bank } from '@/lib/hiring/bank'
 const actions = vi.hoisted(() => ({
   addHiringFileType: vi.fn(), hiringFileLink: vi.fn(), removeHiringTalent: vi.fn(), addBankFolder: vi.fn(), renameBankFolder: vi.fn(),
   deleteBankFolder: vi.fn(), moveBankTalent: vi.fn(), addBankTalent: vi.fn(), saveBankFile: vi.fn(), deleteBankFile: vi.fn(),
-  moveBankFolder: vi.fn(), moveBankEveryone: vi.fn(),
+  moveBankFolder: vi.fn(), moveBankEveryone: vi.fn(), restoreBankItem: vi.fn(), deleteBankItemForever: vi.fn(), emptyBankBin: vi.fn(),
 }))
 const upload = vi.hoisted(() => ({ uploadHiringFile: vi.fn() }))
 const { push, flash } = vi.hoisted(() => ({ push: vi.fn(), flash: vi.fn() }))
@@ -29,6 +29,22 @@ const BANK: Bank = {
   folders: [{ id: SENIORS, name: 'Seniors', parent: 'dept:hv:Revenue', createdAt: '2026-10-12T08:00:00Z', createdBy: 'Grace Lim' }],
   files: [{ id: 'bf1', name: 'Walk-in CVs.pdf', contentType: 'application/pdf', size: 2048, parent: 'dept:hv:Finance', addedAt: '2026-10-12T08:00:00Z', addedBy: 'Grace Lim' }],
   places: { 'T-104': 'dept:hv:Revenue', 'T-103': 'dept:hv:HR', 'T-102': `folder:${SENIORS}`, 'T-101': 'dept:hv:Finance' },
+  bin: [],
+}
+
+// The Bin (2026-10-13): a folder HR deleted from Revenue, a person kept in it (named through the Bin), a file from
+// Carres › Sales and a file taken off Joyce Tan — each deleted on 12 Oct, gone for good on 11 Nov.
+const INTERNS = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1'
+const binned = { folderId: null, talentId: null, talentName: '', fileType: '', contentType: null, size: null,
+  deletedAt: '2026-10-12T08:00:00Z', deletedBy: 'Grace Lim', expiresAt: '2026-11-11T08:00:00Z' }
+const BIN_BANK: Bank = {
+  ...BANK,
+  bin: [
+    { ...binned, id: 'x1', kind: 'folder', name: 'Interns', at: 'dept:hv:Revenue', folderId: INTERNS },
+    { ...binned, id: 'x2', kind: 'talent', name: 'Sam Lee', at: `folder:${INTERNS}`, talentId: 'T-200' },
+    { ...binned, id: 'x3', kind: 'file', name: 'Old CVs.pdf', at: `dept:${CAR}:Sales`, contentType: 'application/pdf', size: 1024 },
+    { ...binned, id: 'x4', kind: 'talent_file', name: 'Joyce_IC.jpg', at: '', talentId: 'T-103', talentName: 'Joyce Tan', fileType: 'IC' },
+  ],
 }
 
 beforeEach(() => {
@@ -40,8 +56,8 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-const view = (can = { create: true, edit: true }, initialAt?: string) =>
-  render(<TalentBankView board={HIRING_BOARD} bank={BANK} bankError={null} can={can} initialAt={initialAt} />)
+const view = (can = { create: true, edit: true }, initialAt?: string, bank: Bank = BANK) =>
+  render(<TalentBankView board={HIRING_BOARD} bank={bank} bankError={null} can={can} initialAt={initialAt} />)
 const openCard = (name: RegExp) => fireEvent.click(screen.getByRole('button', { name }))
 const sections = () => [...document.querySelectorAll('[class*="sectHead"]')].map(h => h.textContent)
 const path = () => within(screen.getByRole('navigation', { name: 'Folder path' })).getAllByText(/./).map(x => x.textContent).filter(Boolean)
@@ -85,7 +101,7 @@ describe('Hiring › Talent Bank as a Drive', () => {
     expect(within(screen.getByRole('dialog')).getByText('HOUZS Venture › Finance')).toBeInTheDocument()
   })
 
-  it('a person’s ⋮: Open, Move to…, Remove from Talent Bank — asked twice', async () => {
+  it('a person’s ⋮: Open, Move to…, Remove from Talent Bank — asked twice, into the Bin', async () => {
     view(undefined, 'dept:hv:HR')
     fireEvent.click(screen.getByRole('button', { name: 'More actions for Joyce Tan' }))
     expect(screen.getAllByRole('menuitem').map(b => b.textContent)).toEqual(['Open', 'Move to…', 'Remove from Talent Bank'])
@@ -93,7 +109,7 @@ describe('Hiring › Talent Bank as a Drive', () => {
     expect(actions.removeHiringTalent).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Confirm remove' }))
     await waitFor(() => expect(actions.removeHiringTalent).toHaveBeenCalledWith('T-103'))
-    expect(flash).toHaveBeenCalledWith('Joyce Tan removed from the Talent Bank')
+    expect(flash).toHaveBeenCalledWith('Joyce Tan moved to the Bin')
   })
 
   it('Move to… lists every place, the one they are in marked; picked, they go there', async () => {
@@ -112,10 +128,10 @@ describe('Hiring › Talent Bank as a Drive', () => {
   })
 
   // 2026-10-12, "change name, and move together".
-  it('a folder’s ⋮: Rename, Move to… (with everything in it — never into itself), Delete', async () => {
+  it('a folder’s ⋮: Rename, Move to… (with everything in it — never into itself), Move to Bin', async () => {
     view(undefined, 'dept:hv:Revenue')
     fireEvent.click(screen.getByRole('button', { name: 'More actions for Seniors' }))
-    expect(screen.getAllByRole('menuitem').map(b => b.textContent)).toEqual(['Rename', 'Move to…', 'Delete'])
+    expect(screen.getAllByRole('menuitem').map(b => b.textContent)).toEqual(['Rename', 'Move to…', 'Move to Bin'])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Move to…' }))
     const win = within(screen.getByRole('dialog', { name: 'Move Seniors' }))
     expect(win.getByText('Now in HOUZS Venture › Revenue — everything in it goes with it')).toBeInTheDocument()
@@ -196,7 +212,7 @@ describe('Hiring › Talent Bank as a Drive', () => {
     ])
   })
 
-  it('+ New › Upload files keeps each file in the place; a file’s ⋮ views, downloads and deletes it', async () => {
+  it('+ New › Upload files keeps each file in the place; a file’s ⋮ views, downloads and moves it to the Bin', async () => {
     actions.hiringFileLink.mockResolvedValue({ ok: true, url: 'https://x/cvs', name: 'Walk-in CVs.pdf', preview: 'pdf' })
     const open = vi.spyOn(window, 'open').mockImplementation(() => null)
     const { container } = view(undefined, 'dept:hv:Finance')
@@ -208,9 +224,9 @@ describe('Hiring › Talent Bank as a Drive', () => {
     await waitFor(() => expect(actions.hiringFileLink).toHaveBeenCalledWith('bank', 'bf1', false))
     expect(open).toHaveBeenCalledWith('https://x/cvs', '_blank', 'noopener')
     fireEvent.click(screen.getByRole('button', { name: 'More actions for Walk-in CVs.pdf' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Confirm delete' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to Bin' }))
     await waitFor(() => expect(actions.deleteBankFile).toHaveBeenCalledWith('bf1'))
+    expect(flash).toHaveBeenCalledWith('Walk-in CVs.pdf moved to the Bin')
     open.mockRestore()
   })
 
@@ -231,5 +247,95 @@ describe('Hiring › Talent Bank as a Drive', () => {
     expect(screen.queryByRole('button', { name: 'More actions for Seniors' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'More actions for Nur Iman' }))
     expect(screen.getAllByRole('menuitem').map(b => b.textContent)).toEqual(['Open'])
+  })
+})
+
+// 2026-10-13, the user: "make a bin, then that bin will last for 30 days. file that last for more than 30days in bin,
+// will auto delete".
+describe('the Talent Bank’s Bin', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-13T08:00:00Z'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+  const bin = () => fireEvent.click(screen.getByRole('button', { name: /^Bin/ }))
+
+  it('the Bin button counts what is in it; the Bin lists its folders, people and files — where each was, the days left', () => {
+    view(undefined, undefined, BIN_BANK)
+    expect(screen.getByRole('button', { name: /^Bin/ }).textContent).toBe('Bin4')
+    bin()
+    expect(path()).toEqual(['Talent Bank', 'Bin'])
+    expect(new URLSearchParams(window.location.search).get('in')).toBe('bin')
+    expect(sections()).toEqual(['Folders 1', 'People 1', 'Files 2'])
+    expect(screen.queryByRole('button', { name: /New$/ })).toBeNull()
+    expect(screen.queryByPlaceholderText('Search the Talent Bank')).toBeNull()
+    expect(screen.getByRole('button', { name: /^Interns/ }).textContent).toContain('HOUZS Venture › Revenue · 29 days left')
+    // Sam Lee was in Interns, itself in the Bin: named through it.
+    expect(screen.getByRole('button', { name: /^Sam Lee/ }).textContent).toContain('HOUZS Venture › Revenue › Interns · 29 days left')
+    expect(screen.getByText('Carres › Sales')).toBeInTheDocument()
+    expect(screen.getByText('IC · Joyce Tan')).toBeInTheDocument()
+    expect(screen.getAllByText('29 days left')).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Talent Bank' }))
+    expect(sections()).toEqual(['Companies 2'])
+  })
+
+  it('opens from the address, and says to restore what is pressed', () => {
+    view(undefined, 'bin', BIN_BANK)
+    expect(path()).toEqual(['Talent Bank', 'Bin'])
+    fireEvent.click(screen.getByRole('button', { name: /^Interns/ }))
+    expect(flash).toHaveBeenCalledWith('Interns is in the Bin — restore it to open it.')
+    expect(path()).toEqual(['Talent Bank', 'Bin'])
+  })
+
+  it('⋮ › Restore puts it back, and says where', async () => {
+    actions.restoreBankItem.mockResolvedValue({ ok: true, label: 'HOUZS Venture › Revenue' })
+    view(undefined, 'bin', BIN_BANK)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Interns' }))
+    expect(screen.getAllByRole('menuitem').map(b => b.textContent)).toEqual(['Restore', 'Delete forever'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Restore' }))
+    await waitFor(() => expect(actions.restoreBankItem).toHaveBeenCalledWith('x1'))
+    expect(flash).toHaveBeenCalledWith('Interns restored to HOUZS Venture › Revenue')
+  })
+
+  it('⋮ › Delete forever is asked twice', async () => {
+    actions.deleteBankItemForever.mockResolvedValue({ ok: true })
+    view(undefined, 'bin', BIN_BANK)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Old CVs.pdf' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete forever' }))
+    expect(actions.deleteBankItemForever).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Confirm delete forever' }))
+    await waitFor(() => expect(actions.deleteBankItemForever).toHaveBeenCalledWith('x3'))
+    expect(flash).toHaveBeenCalledWith('Old CVs.pdf deleted forever')
+  })
+
+  it('Empty bin is asked twice', async () => {
+    actions.emptyBankBin.mockResolvedValue({ ok: true, count: 4 })
+    view(undefined, 'bin', BIN_BANK)
+    fireEvent.click(screen.getByRole('button', { name: /Empty bin/ }))
+    expect(actions.emptyBankBin).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /Confirm empty bin/ }))
+    await waitFor(() => expect(actions.emptyBankBin).toHaveBeenCalled())
+    expect(flash).toHaveBeenCalledWith('Bin emptied · 4 items deleted forever')
+  })
+
+  it('a refusal is said in the database’s words', async () => {
+    actions.restoreBankItem.mockResolvedValue({ ok: false, reason: 'Interns is there already — rename one first.' })
+    view(undefined, 'bin', BIN_BANK)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Interns' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Restore' }))
+    await waitFor(() => expect(flash).toHaveBeenCalledWith('Interns is there already — rename one first.'))
+  })
+
+  it('an empty Bin says so; without Edit there is nothing to press', () => {
+    view(undefined, 'bin')
+    expect(screen.getByText('The Bin is empty.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Empty bin/ })).toBeNull()
+    cleanup()
+    view({ create: false, edit: false }, 'bin', BIN_BANK)
+    expect(sections()).toEqual(['Folders 1', 'People 1', 'Files 2'])
+    expect(screen.queryByRole('button', { name: 'More actions for Interns' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Empty bin/ })).toBeNull()
   })
 })

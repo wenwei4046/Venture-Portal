@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  HV, ROOT, bankFromRow, canonicalAt, companiesOf, companyAt, crumbs, deptAt, departmentsOf, folderAt, folderCards, folderNameRefusal,
-  heldIn, holdsPeople, moveTargets, parsePlace, pathLine, placeExists, placeFiles, placeOfTalent, savedIn, searchBank, takesFolders, talentAt,
-  talentsIn, type BankTree,
+  BIN, HV, ROOT, bankFromRow, binDaysLeft, binFrom, binLeftLabel, binSections, canonicalAt, companiesOf, companyAt, crumbs, deptAt, departmentsOf,
+  folderAt, folderCards, folderNameRefusal, heldIn, holdsPeople, moveTargets, parsePlace, pathLine, placeExists, placeFiles, placeOfTalent, savedIn,
+  searchBank, takesFolders, talentAt, talentsIn, type BankTree,
 } from './bank'
 import type { HiringTalent } from './types'
 
@@ -182,5 +182,69 @@ describe('search', () => {
     expect(searchBank('closer', tree).map(h => h.kind)).toEqual(['talent'])
     expect(searchBank('walk-in', tree).map(h => h.kind)).toEqual(['file'])
     expect(searchBank('  ', tree)).toEqual([])
+  })
+})
+
+// The Bin (2026-10-13 — the user: "make a bin, then that bin will last for 30 days. file that last for more than 30days
+// in bin, will auto delete").
+describe('the Bin', () => {
+  const F_INTERNS = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9'
+  const when = { deletedAt: '2026-10-12T08:00:00Z', deletedBy: 'Grace Lim', expiresAt: '2026-11-11T08:00:00Z' }
+  const withBin = bankFromRow({
+    hq: ['Revenue'],
+    subs: [{ id: CAR, code: 'CAR', name: 'Carres', departments: ['Sales'], removed: false }],
+    folders: [{ id: F_OHANA, name: 'Ohana', parent: 'root', createdAt: '2026-10-12T08:00:00Z', createdBy: 'Grace Lim' }],
+    files: [],
+    places: {},
+    bin: [
+      // A folder HR deleted inside Ohana, then a person who was in it — named through the Bin.
+      { id: 'x1', kind: 'folder', name: 'Interns', at: `folder:${F_OHANA}`, folderId: F_INTERNS, ...when },
+      { id: 'x2', kind: 'talent', name: 'Sam', at: `folder:${F_INTERNS}`, talentId: T_ALI, ...when },
+      // In the list's own spelling, as the tree's departments are.
+      { id: 'x3', kind: 'file', name: 'Old CVs.pdf', at: `dept:${CAR}:sales`, contentType: 'application/pdf', size: 1024, ...when },
+      { id: 'x4', kind: 'talent_file', name: 'IC.jpg', at: null, talentId: T_MEI, talentName: 'Mei', fileType: 'IC', ...when },
+      { id: 'x5', kind: 'file', name: 'Top.pdf', at: 'root', ...when },
+      { id: 'x6', kind: 'nonsense', name: 'Bad', at: 'root', ...when },
+      { kind: 'file', name: 'No id', at: 'root', ...when },
+    ],
+  })!
+  const binTree: BankTree = { bank: withBin, talents: [] }
+
+  it('reads the Bin: each item kept as it came, the address in its list’s spelling, nothing malformed', () => {
+    expect(withBin.bin.map(b => [b.id, b.kind, b.at])).toEqual([
+      ['x1', 'folder', `folder:${F_OHANA}`],
+      ['x2', 'talent', `folder:${F_INTERNS}`],
+      ['x3', 'file', `dept:${CAR}:Sales`],
+      ['x4', 'talent_file', ''],
+      ['x5', 'file', 'root'],
+    ])
+    expect(withBin.bin[3]).toMatchObject({ talentName: 'Mei', fileType: 'IC', contentType: null, size: null })
+    expect(withBin.bin[2]).toMatchObject({ contentType: 'application/pdf', size: 1024, deletedBy: 'Grace Lim', expiresAt: '2026-11-11T08:00:00Z' })
+    expect(bankFromRow({ hq: [] })!.bin).toEqual([])
+  })
+
+  it('says where each was — a folder in the Bin too, a person’s file by the person', () => {
+    expect(withBin.bin.map(b => binFrom(b, binTree))).toEqual(['Ohana', 'Ohana › Interns', 'Carres › Sales', 'Mei', 'Talent Bank'])
+  })
+
+  it('counts the days left — 1 on the last day — and says them', () => {
+    const item = withBin.bin[0]
+    expect(binDaysLeft(item, Date.parse('2026-10-12T08:00:00Z'))).toBe(30)
+    expect(binDaysLeft(item, Date.parse('2026-10-13T08:00:00Z'))).toBe(29)
+    expect(binDaysLeft(item, Date.parse('2026-11-11T07:00:00Z'))).toBe(1)
+    expect(binDaysLeft(item, Date.parse('2026-11-12T00:00:00Z'))).toBe(0)
+    expect(binDaysLeft({ expiresAt: '' }, 0)).toBe(0)
+    expect([binLeftLabel(29), binLeftLabel(1)]).toEqual(['29 days left', '1 day left'])
+  })
+
+  it('draws as a place does: folders, people, then files — a person’s among them', () => {
+    const s = binSections(withBin.bin)
+    expect([s.folders, s.people, s.files].map(x => x.map(b => b.id))).toEqual([['x1'], ['x2'], ['x3', 'x4', 'x5']])
+  })
+
+  it('is not a place of the tree: the address keeps it, the tree does not draw it', () => {
+    expect(parsePlace(BIN)).toBeNull()
+    expect(placeExists(BIN, binTree)).toBe(false)
+    expect(canonicalAt(BIN, binTree)).toBe(BIN)
   })
 })

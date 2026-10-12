@@ -35,6 +35,44 @@
 .moveHere { font-size: 11px; color: rgb(var(--hv-brown)); flex: none; }
 .moveEmpty { padding: 14px 12px; font-size: 13px; color: rgb(var(--hv-brown)); }
 
+/* The Bin (2026-10-13): its button after the search — the search's pill, its count in mono — and, in the Bin, Empty
+   bin in the danger tone, asked once more (the armed pink). */
+.binBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: rgb(var(--hv-panel-3));
+  font: inherit;
+  font-size: 13.5px;
+  line-height: normal;
+  color: rgb(var(--hv-body-2));
+  cursor: pointer;
+  flex: none;
+}
+.binBtn:hover { background: rgb(var(--hv-row-hover)); color: rgb(var(--hv-ink)); }
+.binCount { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; color: rgb(var(--hv-brown)); }
+.emptyBin {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--hv-danger-border));
+  background: rgb(255 255 255);
+  font: inherit;
+  font-size: 13.5px;
+  line-height: normal;
+  color: rgb(var(--hv-danger));
+  cursor: pointer;
+  flex: none;
+}
+.emptyBin:hover, .emptyBin[data-armed='true'] { background: rgb(var(--hv-danger-bg)); }
+
 /* The place a new talent goes, in the Add talent drawer. */
 .keptIn { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; color: rgb(var(--hv-brown)); }
 .keptInPath { color: rgb(var(--hv-ink)); font-weight: 500; }

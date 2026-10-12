@@ -19,9 +19,14 @@ import type { HiringRequest, HiringTalent } from './types'
  * the guest link's list. A department nobody lists any more stays while something is in it. `hiring_bank()` (mig
  * 20261013030000) answers the companies, the folders and files HR keeps, and where each talent is; a talent saved
  * from a request is placed by the database by name (`hiring_bank_locate`) — `savedIn` says where, before it is.
+ *
+ * The Bin (mig 20261013061500, `?in=bin`): what was deleted in the last 30 days — a file, a folder, a person, a file
+ * taken off a person — none of it in the tree any more; `binFrom` says where each was.
  */
 
 export const ROOT = 'root'
+/** The Bin's address: not a place of the tree — what was deleted in the last 30 days (`?in=bin`). */
+export const BIN = 'bin'
 export const HV = 'company:hv'
 /** The portal's own company — always the first folder of the bank. */
 export const HV_NAME = 'HOUZS Venture'
@@ -55,6 +60,34 @@ export interface BankFile {
   addedBy: string
 }
 
+/**
+ * Something in the Bin (2026-10-13 — the user: "make a bin, then that bin will last for 30 days. file that last for
+ * more than 30days in bin, will auto delete"): a file kept in a place, a folder HR made, a person, or a file taken off a
+ * person. It waits 30 days, then the hourly sweep deletes it (mig 20261013061500).
+ */
+export type BinKind = 'file' | 'folder' | 'talent' | 'talent_file'
+
+export interface BinItem {
+  id: string
+  kind: BinKind
+  name: string
+  /** Where it was: its place's address (a person's file: '' — it was on `talentName`). */
+  at: string
+  /** A folder's own id: a folder:<id> another item was in may be this one, in the Bin too. */
+  folderId: string | null
+  talentId: string | null
+  /** A person's file: whose it was. */
+  talentName: string
+  /** A person's file: its type (Résumé, IC …). */
+  fileType: string
+  contentType: string | null
+  size: number | null
+  deletedAt: string
+  deletedBy: string
+  /** When the hourly sweep deletes it for good. */
+  expiresAt: string
+}
+
 export interface Bank {
   /** HOUZS Venture's departments, in Form settings' order. */
   hq: string[]
@@ -63,9 +96,11 @@ export interface Bank {
   files: BankFile[]
   /** Where each talent in the bank is: talent id → address. */
   places: Record<string, string>
+  /** The Bin, newest first. */
+  bin: BinItem[]
 }
 
-export const EMPTY_BANK: Bank = { hq: [], subs: [], folders: [], files: [], places: {} }
+export const EMPTY_BANK: Bank = { hq: [], subs: [], folders: [], files: [], places: {}, bin: [] }
 
 /** What the tree is read from: the bank's own answer and the people in it (the board's talents). */
 export interface BankTree {
@@ -113,6 +148,26 @@ export function bankFromRow(raw: unknown): Bank | null {
       }]
     }),
     places,
+    bin: arr(o.bin).flatMap(x => {
+      const b = obj(x)
+      const kind = str(b.kind)
+      if (!str(b.id) || !BIN_KINDS.includes(kind as BinKind)) return []
+      return [{
+        id: str(b.id),
+        kind: kind as BinKind,
+        name: str(b.name),
+        at: str(b.at),
+        folderId: strOrNull(b.folderId),
+        talentId: strOrNull(b.talentId),
+        talentName: str(b.talentName),
+        fileType: str(b.fileType),
+        contentType: strOrNull(b.contentType),
+        size: numOrNull(b.size),
+        deletedAt: str(b.deletedAt),
+        deletedBy: str(b.deletedBy),
+        expiresAt: str(b.expiresAt),
+      }]
+    }),
   }
   const listed = (at: string) => {
     const p = parsePlace(at)
@@ -125,8 +180,11 @@ export function bankFromRow(raw: unknown): Bank | null {
     folders: bank.folders.map(f => ({ ...f, parent: listed(f.parent) })),
     files: bank.files.map(f => ({ ...f, parent: listed(f.parent) })),
     places: Object.fromEntries(Object.entries(bank.places).map(([k, v]) => [k, listed(v)])),
+    bin: bank.bin.map(b => (b.at ? { ...b, at: listed(b.at) } : b)),
   }
 }
+
+const BIN_KINDS: readonly BinKind[] = ['file', 'folder', 'talent', 'talent_file']
 
 // ── Addresses ───────────────────────────────────────────────────────────────
 
@@ -457,4 +515,52 @@ export function searchBank(query: string, tree: BankTree): BankHit[] {
     .map(talent => ({ kind: 'talent' as const, talent, path: pathLine(placeOfTalent(talent, tree.bank), tree) }))
   const files: BankHit[] = tree.bank.files.filter(f => has(f.name)).map(file => ({ kind: 'file' as const, file, path: pathLine(file.parent, tree) }))
   return [...places, ...people, ...files].slice(0, 60)
+}
+
+// ── The Bin ─────────────────────────────────────────────────────────────────
+
+const DAY = 86_400_000
+
+/** Whole days until the hourly sweep deletes it — 1 on its last day. */
+export function binDaysLeft(item: Pick<BinItem, 'expiresAt'>, now: number): number {
+  const t = Date.parse(item.expiresAt)
+  return Number.isFinite(t) ? Math.max(0, Math.ceil((t - now) / DAY)) : 0
+}
+
+/** "29 days left", "1 day left". */
+export function binLeftLabel(days: number): string {
+  return days === 1 ? '1 day left' : `${days} days left`
+}
+
+/**
+ * Where something in the Bin was, in words — "Carres › Sales"; a person's file, the person. A folder in the Bin is
+ * named through the Bin (the tree no longer draws it), a department nobody lists by its own name.
+ */
+export function binFrom(item: BinItem, tree: BankTree): string {
+  if (item.kind === 'talent_file') return item.talentName
+  return addressWords(item.at, tree, new Set())
+}
+
+function addressWords(at: string, tree: BankTree, seen: Set<string>): string {
+  const p = parsePlace(at)
+  if (!p || p.kind === 'root' || p.kind === 'talent') return BANK_NAME
+  const company = (co: string) => (co === 'hv' ? HV_NAME : tree.bank.subs.find(s => s.id === co)?.name ?? '')
+  if (p.kind === 'company') return company(p.co)
+  if (p.kind === 'dept') return `${company(p.co)} › ${departmentsOf(p.co, tree).find(d => lower(d) === lower(p.dept)) ?? p.dept.trim()}`
+  if (seen.has(at)) return BANK_NAME
+  seen.add(at)
+  const live = tree.bank.folders.find(f => f.id === p.id)
+  const binned = tree.bank.bin.find(b => b.kind === 'folder' && b.folderId === p.id)
+  const folder = live ? { name: live.name, parent: live.parent } : binned ? { name: binned.name, parent: binned.at } : null
+  if (!folder) return BANK_NAME
+  return parsePlace(folder.parent)?.kind === 'root' ? folder.name : `${addressWords(folder.parent, tree, seen)} › ${folder.name}`
+}
+
+/** The Bin as the Drive draws a place: its folders, its people, then its files (a person's among them) — newest first. */
+export function binSections(bin: readonly BinItem[]): { folders: BinItem[]; people: BinItem[]; files: BinItem[] } {
+  return {
+    folders: bin.filter(b => b.kind === 'folder'),
+    people: bin.filter(b => b.kind === 'talent'),
+    files: bin.filter(b => b.kind === 'file' || b.kind === 'talent_file'),
+  }
 }

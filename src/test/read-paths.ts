@@ -243,10 +243,13 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Create, renamed, deleted or moved Edit.
   'hiring_bank', 'hiring_bank_folder_add', 'hiring_bank_folder_rename', 'hiring_bank_folder_delete', 'hiring_bank_move',
   'hiring_bank_add_talent', 'hiring_bank_file_add', 'hiring_bank_file_delete', 'hiring_bank_folder_move', 'hiring_bank_move_all',
+  // …its Bin (mig 20261013061500): Restore, Delete forever and Empty bin ask Edit.
+  'hiring_bank_bin_restore', 'hiring_bank_bin_delete', 'hiring_bank_bin_empty',
   // …and Admin › Guest Link's department rename, which takes the bank's people along (guest_link.edit).
   'guest_link_rename_department',
-  // The hourly sweep's (api/member-queue, the service role — mig 20261011210000): Hiring's day-old leftovers.
-  'hiring_leftovers',
+  // The hourly sweep's (api/member-queue, the service role — mig 20261011210000): Hiring's day-old leftovers, and
+  // (mig 20261013061500) what has waited 30 days in the Talent Bank's Bin.
+  'hiring_leftovers', 'hiring_bank_bin_purge',
   // View as a person (mig 20261011050000): each asks has_perm(view_switch).
   'view_as_person', 'view_as_people',
   // Admin › Meeting Rooms (mig 20261011090000): each asks has_any_action(rooms.*), a member's revenue_app.view:own.

@@ -60,7 +60,7 @@ export default function TalentPage({ board, talent: t, can }: { board: HiringBoa
     start(async () => {
       const out = await removeHiringTalent(t.id)
       if (!out.ok) return flash(out.reason)
-      flash(`${t.name} removed from the Talent Bank`)
+      flash(`${t.name} moved to the Bin`)
       router.push('/hiring/talent')
     })
   }
@@ -212,7 +212,7 @@ function TalentFiles({ board, talent: t, can }: { board: HiringBoard; talent: Hi
     setArmed(null)
     start(async () => {
       const out = await removeHiringFile(f.id)
-      flash(out.ok ? (out.warning ?? `${f.name} removed`) : out.reason)
+      flash(out.ok ? (out.warning ?? `${f.name} moved to the Bin`) : out.reason)
     })
   }
   const begin = () => {
