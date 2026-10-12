@@ -196,7 +196,7 @@ export default function HiringInsightsView({ board, today }: { board: HiringBoar
       <div className={s.everyTable} role="table" aria-label="Every request">
         <div className={s.everyInner}>
           <div className={`${s.everyThead} ${s.everyCols}`} role="row">
-            {['ID', 'Position', 'Department', 'Owner (HR)', 'Pax', 'Hired through', 'Budget / month', 'Hiring cost', 'Cost per hire', 'Submitted', 'Acknowledged', 'Filled / closed', 'To ack', 'To fill', 'Status'].map(h => (
+            {['ID', 'Position', 'Company', 'Department', 'Owner (HR)', 'Pax', 'Hired through', 'Budget / month', 'Hiring cost', 'Cost per hire', 'Submitted', 'Acknowledged', 'Filled / closed', 'To ack', 'To fill', 'Status'].map(h => (
               <span key={h} role="columnheader" className={['Pax', 'Budget / month', 'Hiring cost', 'Cost per hire', 'To ack', 'To fill'].includes(h) ? s.r : undefined}>
                 {h}
               </span>
@@ -218,6 +218,7 @@ export default function HiringInsightsView({ board, today }: { board: HiringBoar
                 <span className={s.everyPos}>{r.position}</span>
                 {r.hired ? <span className={s.everySub}>{r.hired}</span> : null}
               </span>
+              <span>{r.company}</span>
               <span>{r.department}</span>
               <span className={r.ownerSet ? s.cellOwner : s.waiting}>{r.owner}</span>
               <span className={`${s.r} ${s.monoCell}`}>{r.pax}</span>

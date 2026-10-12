@@ -88,6 +88,37 @@ describe('the guest page', () => {
     expect(guestCancel).not.toHaveBeenCalled()
   })
 
+  // 2026-10-12, the user: Request manpower's Department was HQ's list, not the company's.
+  it('asks Request manpower’s Department from the picked company’s list, and again for another company', () => {
+    const hire: GuestData = {
+      ...data,
+      hiring: true,
+      subs: [
+        { id: 'car', code: 'CAR', name: 'Carres', departments: ['Marketing', 'Sales'] },
+        { id: 'hk', code: 'HK', name: 'Hookka', departments: ['Management', 'Business Development'] },
+      ],
+      hireForm: [
+        { id: 'position', label: 'Position', type: 'text', options: [], required: true },
+        { id: 'dept', label: 'Department', type: 'select', options: ['Revenue · Fair', 'HR', 'Finance'].map(v => ({ v, label: v })), required: true },
+      ],
+    }
+    const optionsOf = (el: HTMLElement) => Array.from(el.querySelectorAll('option')).map(o => o.textContent)
+    render(<GuestPage code="hv-ABCDEFGH" initial={hire} initialTaken={taken} />)
+    fireEvent.click(screen.getByRole('button', { name: /Request manpower/ }))
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'car' } })
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Siti' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(optionsOf(screen.getByRole('combobox'))).toEqual(['Choose…', 'Marketing', 'Sales'])
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Sales' } })
+    expect(screen.getByRole('combobox')).toHaveValue('Sales')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'hk' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(optionsOf(screen.getByRole('combobox'))).toEqual(['Choose…', 'Management', 'Business Development'])
+    expect(screen.getByRole('combobox')).toHaveValue('')
+  })
+
   it('keeps Request manpower where it was when the guest steps back to Home', () => {
     render(<GuestPage code="hv-ABCDEFGH" initial={{ ...data, hiring: true }} initialTaken={taken} />)
     fireEvent.click(screen.getByRole('button', { name: /Request manpower/ }))

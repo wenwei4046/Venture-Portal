@@ -1035,7 +1035,7 @@
 .everyHead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
 .everyTable { border: 1px solid rgb(var(--hv-frame)); border-radius: 10px; overflow-x: auto; }
 .everyInner { min-width: max-content; }
-.everyCols { grid-template-columns: 80px 230px 150px 130px 60px 130px 150px 110px 110px 110px 120px 120px 80px 110px 130px; }
+.everyCols { grid-template-columns: 80px 230px 140px 150px 130px 60px 130px 150px 110px 110px 110px 120px 120px 80px 110px 130px; }
 .everyThead {
   display: grid;
   background: rgb(var(--hv-head));

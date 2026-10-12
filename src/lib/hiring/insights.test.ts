@@ -52,6 +52,17 @@ describe('this month (October)', () => {
       ['HR-204', 'Unassigned', '5 d so far', true],
     ])
   })
+
+  // 2026-10-12, the user: a guest's Department is its own company's — the table says whose.
+  it('says each request’s company: a guest’s own, HQ’s HOUZS Venture', () => {
+    const hq = req('HR-205')
+    const guest = { ...hq, id: 'HR-206', source: 'guest' as const, requestedBy: null, requesterCompany: 'Carres', answers: { ...hq.answers, dept: 'Sales' } }
+    const rows = insightsOf([guest, ...BOARD.requests], 'this', TODAY, id => personName(BOARD, id), departmentNames(BOARD)).rows
+    expect(rows.slice(0, 2).map(r => [r.id, r.company, r.department])).toEqual([
+      ['HR-206', 'Carres', 'Sales'],
+      ['HR-205', 'HOUZS Venture', 'Revenue · IR'],
+    ])
+  })
 })
 
 describe('all time', () => {

@@ -401,6 +401,36 @@ try {
     [['Interview', 'Chea Huan', 'Grace Lim']], 'the guest sees Grace booked it for Chea Huan')
   check(await anonMay('public.guest_link_day(text, date)'), true, 'and the day stays the link’s')
 
+  // ── 20261012220000: Request manpower's Department is the company's own, as Book a meeting room's (the user, 2026-10-12) ──
+  await db.exec('RESET ROLE')
+  const COMPANY_DEPTS = (await readFile(new URL('20261012220000_guest_hire_company_departments.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  const hireBody = () => one(`SELECT md5(prosrc) FROM pg_proc WHERE proname = 'guest_link_hire'`)
+  const hireBefore = await hireBody()
+  await db.exec(COMPANY_DEPTS)
+  const hireAfter = await hireBody()
+  check(hireAfter !== hireBefore, true, 'the request is swapped')
+  await db.exec(COMPANY_DEPTS)
+  check(await hireBody(), hireAfter, 'once, however often it runs')
+  check(await anonMay('public.guest_link_hire(text, uuid, text, jsonb, text, text)'), true, 'and stays the link’s')
+  await as(ADMIN, ['guest_link.edit'])
+  await q(`SELECT public.guest_link_set(NULL, NULL, true, NULL)`)
+  await asAnon()
+  const ask = (sub, answers) => q(HIRE, [fresh, sub, 'Wong', JSON.stringify(answers), null, null]).then(r => r[0].r)
+  await reject(HIRE, [fresh, HK, 'Wong', JSON.stringify({ position: 'Driver', dept: 'Finance' }), null, null],
+    /Pick a department from Hookka Sdn Bhd's list — reload the page if it has changed\./, 'HQ’s departments are not the company’s')
+  await reject(HIRE, [fresh, HK, 'Wong', JSON.stringify({ position: 'Driver', dept: 'warehouse' }), null, null],
+    /Pick a department from Hookka Sdn Bhd's list/, 'one of them exactly as listed')
+  check((await ask(HK, { position: 'Driver', dept: ' Delivery ' })).position, 'Driver', 'one of the company’s goes through')
+  await reject(HIRE, [fresh, CON, 'Ali', JSON.stringify({ position: 'Cleaner', dept: 'x'.repeat(61) }), null, null],
+    /Keep the department under 60 characters\./, 'a company with none listed: the guest’s own words, no longer than a listed one')
+  check((await ask(CON, { position: 'Cleaner', dept: 'Housekeeping' })).position, 'Cleaner', 'which go through')
+  check((await ask(HK, { position: 'Packer' })).position, 'Packer', 'left empty, it is the Hiring module’s to ask for (its own check)')
+  await db.exec('RESET ROLE')
+  check(await q(`SELECT company, department, answers ->> 'dept' AS dept FROM hire_calls WHERE answers ->> 'position' IN ('Cleaner', 'Packer') OR answers ? 'dept' ORDER BY answers ->> 'position'`),
+    [{ company: 'The Cont', department: null, dept: 'Housekeeping' }, { company: 'Hookka Sdn Bhd', department: null, dept: ' Delivery ' },
+     { company: 'Hookka Sdn Bhd', department: null, dept: null }],
+    'the answer stays the role’s Department; the guest’s own department is still not asked')
+
   console.log(`guest link: ${checks} checks passed`)
 } finally {
   await db.close()
