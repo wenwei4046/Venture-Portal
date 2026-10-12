@@ -18,7 +18,7 @@
  * save" files each copy into its person's folder. What HR made comes from
  * `hr_drive()` (mig 20261012220000).
  *
- * The Bin (mig 20261013100000, `?in=bin`, the Talent Bank's rules): a file or
+ * The Bin (mig 20261013183000, `?in=bin`, the Talent Bank's rules): a file or
  * a folder HR deleted in the last 30 days, none of it in the tree; `binFrom`
  * says where each was. A folder HR made moves with Move to… (`moveTargets`).
  */

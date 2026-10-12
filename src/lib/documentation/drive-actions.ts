@@ -17,7 +17,7 @@ import { DOC_BUCKET, type FileLink } from './server'
  * these run (lib/documentation/upload.ts, under `drive/`) — the database
  * checks they arrived.
  *
- * Since 2026-10-13 (mig 20261013100000, the Talent Bank's rules): Delete is
+ * Since 2026-10-13 (mig 20261013183000, the Talent Bank's rules): Delete is
  * Move to Bin — the Bin keeps a file (and its object) or an empty folder 30
  * days — with Restore, Delete forever and Empty bin; a folder moves with
  * Move to…, everything in it going along.
@@ -120,7 +120,7 @@ export async function deleteDriveFile(id: string): Promise<DocOutcome> {
   return { ok: true }
 }
 
-// ── The Bin (mig 20261013100000) ────────────────────────────────────────────
+// ── The Bin (mig 20261013183000) ────────────────────────────────────────────
 
 /** Bin › Restore: back where it was — the folders it was in with it, when they are in the Bin too (Edit). */
 export async function restoreDriveItem(id: string): Promise<{ ok: true; label: string } | { ok: false; reason: string }> {

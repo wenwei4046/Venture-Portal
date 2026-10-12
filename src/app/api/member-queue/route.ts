@@ -45,7 +45,7 @@ export async function GET(request: Request) {
       else if (leftovers.expired) console.info('Talent Bank bin let go', leftovers.expired, 'after 30 days')
       if (leftovers.listed) console.info('Hiring leftovers deleted', leftovers.deleted, 'of', leftovers.listed)
     }
-    // The Data center's Bin (mig 20261013100000): what waited 30 days goes, and its files with it. Counts only.
+    // The Data center's Bin (mig 20261013183000): what waited 30 days goes, and its files with it. Counts only.
     const dataCenterBin = await sweepDataCenterBin(db)
     if (!dataCenterBin) console.error('Data center bin sweep failed')
     else if (dataCenterBin.expired) console.info('Data center bin let go', dataCenterBin.expired, 'after 30 days; files deleted', dataCenterBin.deleted)

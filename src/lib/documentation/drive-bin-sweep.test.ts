@@ -4,7 +4,7 @@ import { DATA_CENTER_BIN_PER_RUN, sweepDataCenterBin } from './drive-bin-sweep'
 
 type Answer = { data: unknown; error: unknown }
 
-// The hourly sweep's Data center job (mig 20261013100000): the Bin lets go what waited 30 days, the bucket deletes
+// The hourly sweep's Data center job (mig 20261013183000): the Bin lets go what waited 30 days, the bucket deletes
 // their files, their trail says so — counted, never named.
 function client(purge: Answer | 'throws', removed: Answer | 'throws' = { data: [], error: null }) {
   const remove = vi.fn(async () => {

@@ -9,7 +9,7 @@ export const DATA_CENTER_BIN_PER_RUN = 200
 
 /**
  * The hourly sweep's Data center job (2026-10-13 — the user: "Data center 也加 Bin", as the Talent Bank's: a file or
- * a folder HR deleted waits 30 days, then goes by itself). `hr_drive_bin_purge` (mig 20261013100000, the service
+ * a folder HR deleted waits 30 days, then goes by itself). `hr_drive_bin_purge` (mig 20261013183000, the service
  * role's alone) deletes what has waited 30 days — a file greyed under "Show deleted" as a delete always left it — and
  * answers the files nobody holds any more; the Storage API removes them; `hr_drive_bin_files_gone` writes "File
  * deleted" on their trail. The session-side pair (`hr_documentation_leftovers`, `hr_documentation_files_removed`)

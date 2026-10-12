@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261013100000 (2026-10-13, People › Documentation › the Data center's Bin and
+// Local PostgreSQL regression for 20261013183000 (2026-10-13, People › Documentation › the Data center's Bin and
 // Move to… — the user, once the Talent Bank had both: "Data center 也加 Bin 和 Move to…"). Documentation's migrations,
 // Hiring's (their tables are in the review hardening's grants), the review hardening and the Drive (20261012220000)
 // run VERBATIM over stand-ins for what they read, the storage schema and the permission check — as
@@ -166,7 +166,7 @@ try {
            VALUES ($1, 'folder', $2, $3, 'Stranded.pdf', 'HR')`, [STRANDED, OLD40, strandedPath])
   await put(strandedPath)
 
-  await load('20261013100000_data_center_bin.sql')
+  await load('20261013183000_data_center_bin.sql')
 
   // ── The backfill: what was deleted in the last 30 days is in the Bin, nothing older, no file ──────────────────
   const backfilled = await q(`SELECT b.kind, b.folder_id, b.file_id, b.name, b.deleted_by_name, b.deleted_at = f.deleted_at AS kept

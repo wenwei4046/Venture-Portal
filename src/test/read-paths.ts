@@ -223,7 +223,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // a file made Create, renamed or deleted Edit.
   'hr_drive', 'hr_drive_file', 'hr_drive_log', 'hr_drive_folder_add', 'hr_drive_folder_rename', 'hr_drive_folder_delete',
   'hr_drive_file_add', 'hr_drive_file_delete',
-  // …its Bin and Move to… (mig 20261013100000): Restore, Delete forever, Empty bin and a folder's move ask Edit; the
+  // …its Bin and Move to… (mig 20261013183000): Restore, Delete forever, Empty bin and a folder's move ask Edit; the
   // hourly sweep's purge and its "File deleted" are the service role's (api/member-queue).
   'hr_drive_bin_restore', 'hr_drive_bin_delete', 'hr_drive_bin_empty', 'hr_drive_folder_move', 'hr_drive_bin_purge',
   'hr_drive_bin_files_gone',
