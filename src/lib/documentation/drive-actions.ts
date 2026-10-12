@@ -17,6 +17,11 @@ import { DOC_BUCKET, type FileLink } from './server'
  * these run (lib/documentation/upload.ts, under `drive/`) — the database
  * checks they arrived.
  *
+ * Since 2026-10-13 (mig 20261013100000, the Talent Bank's rules): Delete is
+ * Move to Bin — the Bin keeps a file (and its object) or an empty folder 30
+ * days — with Restore, Delete forever and Empty bin; a folder moves with
+ * Move to…, everything in it going along.
+ *
  * Refusals come back as `{ ok: false, reason }`: a thrown message never
  * reaches the browser in production.
  */
@@ -63,10 +68,20 @@ export async function renameDriveFolder(id: string, name: string): Promise<DocOu
   return { ok: true }
 }
 
+/** A folder's ⋮ › Move to Bin — only an empty one; the Bin keeps it 30 days (Edit). */
 export async function deleteDriveFolder(id: string): Promise<DocOutcome> {
   await requireActionOn('/team/documentation', 'documentation', 'edit')
   const { error } = await (await client()).rpc('hr_drive_folder_delete', { p_id: id })
   if (error) return { ok: false, reason: refusal(error, 'The folder could not be deleted. Please try again.') }
+  done()
+  return { ok: true }
+}
+
+/** A folder's ⋮ › Move to…: the folder and everything in it go together (Edit). */
+export async function moveDriveFolder(id: string, parent: string): Promise<DocOutcome> {
+  await requireActionOn('/team/documentation', 'documentation', 'edit')
+  const { error } = await (await client()).rpc('hr_drive_folder_move', { p_id: id, p_parent: parent })
+  if (error) return { ok: false, reason: refusal(error, 'The folder could not be moved. Please try again.') }
   done()
   return { ok: true }
 }
@@ -91,7 +106,10 @@ export async function saveDriveFile(input: {
   return { ok: true, id: String(data) }
 }
 
-/** Deleted: its row and trail stay (greyed under "Show deleted"), and its file goes from the bucket. */
+/**
+ * A file's ⋮ › Move to Bin: it waits there 30 days, its file kept (Edit). Deleted from the Bin, its row and trail stay
+ * greyed under "Show deleted" and its file goes from the bucket, as a delete always did.
+ */
 export async function deleteDriveFile(id: string): Promise<DocOutcome> {
   await requireActionOn('/team/documentation', 'documentation', 'edit')
   const supabase = await client()
@@ -100,6 +118,41 @@ export async function deleteDriveFile(id: string): Promise<DocOutcome> {
   await removeLeftoverFiles(supabase)
   done()
   return { ok: true }
+}
+
+// ── The Bin (mig 20261013100000) ────────────────────────────────────────────
+
+/** Bin › Restore: back where it was — the folders it was in with it, when they are in the Bin too (Edit). */
+export async function restoreDriveItem(id: string): Promise<{ ok: true; label: string } | { ok: false; reason: string }> {
+  await requireActionOn('/team/documentation', 'documentation', 'edit')
+  const { data, error } = await (await client()).rpc('hr_drive_bin_restore', { p_bin: id })
+  if (error) return { ok: false, reason: refusal(error, 'It could not be restored. Please try again.') }
+  done()
+  const label = data && typeof data === 'object' ? (data as { label?: unknown }).label : null
+  return { ok: true, label: typeof label === 'string' && label ? label : 'the Data center' }
+}
+
+/** Bin › Delete forever: deleted now — a file's row greyed under "Show deleted", its file out of the bucket (Edit). */
+export async function deleteDriveItemForever(id: string): Promise<DocOutcome> {
+  await requireActionOn('/team/documentation', 'documentation', 'edit')
+  const supabase = await client()
+  const { error } = await supabase.rpc('hr_drive_bin_delete', { p_bin: id })
+  if (error) return { ok: false, reason: refusal(error, 'It could not be deleted. Please try again.') }
+  await removeLeftoverFiles(supabase)
+  done()
+  return { ok: true }
+}
+
+/** Bin › Empty bin: everything in it, now (Edit). Answers how many went; their files leave the bucket a hundred at a time. */
+export async function emptyDriveBin(): Promise<{ ok: true; count: number } | { ok: false; reason: string }> {
+  await requireActionOn('/team/documentation', 'documentation', 'edit')
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('hr_drive_bin_empty')
+  if (error) return { ok: false, reason: refusal(error, 'The Bin could not be emptied. Please try again.') }
+  const count = Number((data as { count?: unknown } | null)?.count) || 0
+  for (let i = 0; i < Math.min(10, Math.ceil(count / 100)); i++) await removeLeftoverFiles(supabase)
+  done()
+  return { ok: true, count }
 }
 
 /** A Data center file, opened from the page: a short link made now, and a line on its trail (Viewed / Downloaded). */

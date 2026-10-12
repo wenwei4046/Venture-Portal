@@ -3,7 +3,7 @@ import { HvPage, PageHead } from '@/components/hrv/kit'
 import { canDo } from '@/lib/permission-actions'
 import { loadDocumentation } from '@/lib/documentation/server'
 import { loadDrive } from '@/lib/documentation/drive-server'
-import { EMPTY_DRIVE, parsePlace, personAt } from '@/lib/documentation/drive'
+import { BIN, EMPTY_DRIVE, parsePlace, personAt } from '@/lib/documentation/drive'
 import { startRead } from '@/lib/start-read'
 import DocumentationView, { type DocTab } from './_components/DocumentationView'
 
@@ -38,7 +38,8 @@ export default async function DocumentationPage({ searchParams }: { searchParams
   }
   const drive = await driveRead
   const initialTab = (TABS as readonly string[]).includes(tab ?? '') ? (tab as DocTab) : 'documents'
-  const initialAt = parsePlace(place) ? place! : person && read.data.people.some(p => p.id === person) ? personAt(person) : null
+  // A place of the tree, or the Bin (`?in=bin`, 2026-10-13).
+  const initialAt = place === BIN || parsePlace(place) ? place! : person && read.data.people.some(p => p.id === person) ? personAt(person) : null
   return (
     <DocumentationView
       data={read.data}

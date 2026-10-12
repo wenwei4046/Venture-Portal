@@ -17,11 +17,17 @@
  * (`hr_documentation()`), so they follow it by themselves — and "Publish &
  * save" files each copy into its person's folder. What HR made comes from
  * `hr_drive()` (mig 20261012220000).
+ *
+ * The Bin (mig 20261013100000, `?in=bin`, the Talent Bank's rules): a file or
+ * a folder HR deleted in the last 30 days, none of it in the tree; `binFrom`
+ * says where each was. A folder HR made moves with Move to… (`moveTargets`).
  */
 
 import { dataCenterPeople, deptLabel, fileExt, liveLetters, type DataCenterPerson, type DocEvent, type Documentation, type PersonLetter } from './model'
 
 export const ROOT = 'root'
+/** The Bin's address: not a place of the tree — what HR deleted in the last 30 days (`?in=bin`). */
+export const BIN = 'bin'
 export const HV = 'company:hv'
 /** The portal's own company — the one folder of the Data center made by itself. */
 export const HV_NAME = 'HOUZS Venture'
@@ -49,12 +55,38 @@ export interface DriveFile {
   events: DocEvent[]
 }
 
+/** Something in the Bin (2026-10-13): a file HR kept or a folder HR made, deleted; it waits 30 days, then goes. */
+export interface DriveBinItem {
+  id: string
+  kind: 'file' | 'folder'
+  name: string
+  /** Where it was: the address of the place it was in. */
+  at: string
+  /** A folder's own id: a folder:<id> another item was in may be this one, in the Bin too. */
+  folderId: string | null
+  fileId: string | null
+  ref: string
+  contentType: string | null
+  size: number | null
+  deletedAt: string
+  deletedBy: string
+  /** When the hourly sweep deletes it for good. */
+  expiresAt: string
+}
+
 export interface Drive {
   folders: DriveFolder[]
   files: DriveFile[]
+  /** The Bin, newest first. */
+  bin: DriveBinItem[]
+  /**
+   * When it was read, by the server's clock (`loadDrive`) — the Bin's days are counted from it, fresh after every
+   * write and the same on the server and in the browser. '' when not known.
+   */
+  readAt: string
 }
 
-export const EMPTY_DRIVE: Drive = { folders: [], files: [] }
+export const EMPTY_DRIVE: Drive = { folders: [], files: [], bin: [], readAt: '' }
 
 // ── Reading the database's answer ───────────────────────────────────────────
 
@@ -93,6 +125,26 @@ export function driveFromRow(raw: unknown): Drive | null {
         }),
       }]
     }),
+    bin: arr(o.bin).flatMap(b => {
+      const x = obj(b)
+      const kind = str(x.kind)
+      if (!str(x.id) || (kind !== 'file' && kind !== 'folder')) return []
+      return [{
+        id: str(x.id),
+        kind,
+        name: str(x.name),
+        at: str(x.at) || ROOT,
+        folderId: strOrNull(x.folderId),
+        fileId: strOrNull(x.fileId),
+        ref: str(x.ref),
+        contentType: strOrNull(x.contentType),
+        size: numOrNull(x.size),
+        deletedAt: str(x.deletedAt),
+        deletedBy: str(x.deletedBy),
+        expiresAt: str(x.expiresAt),
+      }]
+    }),
+    readAt: '',
   }
 }
 
@@ -336,4 +388,65 @@ export function searchDrive(query: string, doc: Tree, drive: Drive): SearchHit[]
     .filter(l => has(l.fileName) || has(l.typeName))
     .map(letter => ({ kind: 'letter' as const, letter, path: pathLine(personAt(letter.staffId), doc, drive) }))
   return [...places, ...files, ...letters].slice(0, 60)
+}
+
+// ── Move to… (2026-10-13) ───────────────────────────────────────────────────
+
+/**
+ * Every place a folder HR made may be moved to, top down, each with its path ("HOUZS Venture › Revenue"): the Data
+ * center itself, HOUZS Venture, its departments, the folders HR made — never a person (their folder is their record),
+ * never `from` or anything inside it. The Talent Bank's twin is lib/hiring/bank.ts `moveTargets`.
+ */
+export function moveTargets(doc: Tree, drive: Drive, from: string): Array<{ at: string; path: string; depth: number }> {
+  const out: Array<{ at: string; path: string; depth: number }> = [{ at: ROOT, path: 'Data center', depth: 0 }]
+  const walk = (at: string, depth: number) => {
+    for (const card of folderCards(at, doc, drive)) {
+      if (card.kind === 'person' || card.at === from) continue
+      out.push({ at: card.at, path: pathLine(card.at, doc, drive), depth })
+      walk(card.at, depth + 1)
+    }
+  }
+  walk(ROOT, 1)
+  return out
+}
+
+// ── The Bin (2026-10-13) ────────────────────────────────────────────────────
+
+const DAY = 86_400_000
+
+/** Whole days until the hourly sweep deletes it — 1 on its last day. Shared with the Talent Bank's Bin. */
+export function binDaysLeft(item: { expiresAt: string }, now: number): number {
+  const t = Date.parse(item.expiresAt)
+  return Number.isFinite(t) ? Math.max(0, Math.ceil((t - now) / DAY)) : 0
+}
+
+/** "29 days left", "1 day left". */
+export function binLeftLabel(days: number): string {
+  return days === 1 ? '1 day left' : `${days} days left`
+}
+
+/**
+ * Where something in the Bin was, in words — "HOUZS Venture › Revenue", "Carres › Sales". A folder in the Bin is
+ * named through the Bin (the tree no longer draws it).
+ */
+export function binFrom(item: DriveBinItem, doc: Tree, drive: Drive): string {
+  return binWords(item.at, doc, drive, new Set())
+}
+
+function binWords(at: string, doc: Tree, drive: Drive, seen: Set<string>): string {
+  const p = parsePlace(at)
+  if (!p || p.kind === 'root') return 'Data center'
+  if (p.kind !== 'folder') return pathLine(at, doc, drive)
+  if (seen.has(at)) return 'Data center'
+  seen.add(at)
+  const live = drive.folders.find(f => f.id === p.id)
+  const binned = drive.bin.find(b => b.kind === 'folder' && b.folderId === p.id)
+  const folder = live ? { name: live.name, parent: live.parent } : binned ? { name: binned.name, parent: binned.at } : null
+  if (!folder) return 'Data center'
+  return parsePlace(folder.parent)?.kind === 'root' ? folder.name : `${binWords(folder.parent, doc, drive, seen)} › ${folder.name}`
+}
+
+/** The Bin as the Drive draws a place: its folders, then its files — newest first in each. */
+export function binSections(bin: readonly DriveBinItem[]): { folders: DriveBinItem[]; files: DriveBinItem[] } {
+  return { folders: bin.filter(b => b.kind === 'folder'), files: bin.filter(b => b.kind === 'file') }
 }

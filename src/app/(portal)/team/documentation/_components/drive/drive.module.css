@@ -334,6 +334,77 @@
 /* ── The person's folder: their record over their letters ── */
 .personHint { font-size: 12px; color: rgb(var(--hv-brown)); margin-top: 6px; }
 
+/* ── Move to… (2026-10-12, the Talent Bank's; shared with the Data center since 2026-10-13): every place, top down,
+   indented by depth; the place it is in marked ── */
+.moveList {
+  display: flex;
+  flex-direction: column;
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 10px;
+}
+.moveRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid rgb(var(--hv-hairline));
+  background: rgb(255 255 255);
+  color: rgb(var(--hv-ink));
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.moveRow:last-child { border-bottom: 0; }
+.moveRow:hover { background: rgb(var(--hv-row-hover)); }
+.moveRow[aria-pressed='true'] { background: rgb(var(--hv-panel-3)); font-weight: 500; }
+.moveRow:disabled { color: rgb(var(--hv-faint)); cursor: default; background: rgb(255 255 255); }
+.moveIcon { display: inline-flex; color: rgb(var(--hv-brown)); flex: none; }
+.moveName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.moveHere { font-size: 11px; color: rgb(var(--hv-brown)); flex: none; }
+.moveEmpty { padding: 14px 12px; font-size: 13px; color: rgb(var(--hv-brown)); }
+
+/* ── The Bin (2026-10-13, both Drives): its pill after the search — the search's pill, its count in mono — and, in
+   the Bin, Empty bin in the danger tone, asked once more (the armed pink) ── */
+.binBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: rgb(var(--hv-panel-3));
+  font: inherit;
+  font-size: 13.5px;
+  line-height: normal;
+  color: rgb(var(--hv-body-2));
+  cursor: pointer;
+  flex: none;
+}
+.binBtn:hover { background: rgb(var(--hv-row-hover)); color: rgb(var(--hv-ink)); }
+.binCount { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; color: rgb(var(--hv-brown)); }
+.emptyBin {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--hv-danger-border));
+  background: rgb(255 255 255);
+  font: inherit;
+  font-size: 13.5px;
+  line-height: normal;
+  color: rgb(var(--hv-danger));
+  cursor: pointer;
+  flex: none;
+}
+.emptyBin:hover, .emptyBin[data-armed='true'] { background: rgb(var(--hv-danger-bg)); }
+
 /* ── New folder / Rename: the kit Window ── */
 .winField { display: flex; flex-direction: column; gap: 6px; }
 .winLabel { font-size: 12px; color: rgb(var(--hv-brown)); }

@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { DOC_BUCKET } from './bucket'
 import { documentationFromRow, type Documentation } from './model'
 
 /**
@@ -14,7 +15,8 @@ import { documentationFromRow, type Documentation } from './model'
  * read that is cached or stored.
  */
 
-export const DOC_BUCKET = 'hr-documents'
+// Kept in its own module so the hourly sweep (drive-bin-sweep.ts) can name the bucket without this server-only one.
+export { DOC_BUCKET }
 
 export type DocumentationRead = { ok: true; data: Documentation } | { ok: false; reason: string }
 

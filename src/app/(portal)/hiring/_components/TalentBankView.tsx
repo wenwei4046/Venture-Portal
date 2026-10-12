@@ -22,18 +22,21 @@ import { sizeLabel, type FolderCard } from '@/lib/documentation/drive'
 import { FileTile, FolderTile } from '@/app/(portal)/team/documentation/_components/drive/Cards'
 import FolderNameWindow from '@/app/(portal)/team/documentation/_components/drive/FolderNameWindow'
 import Menu, { type MenuItem } from '@/app/(portal)/team/documentation/_components/drive/Menu'
+import MoveWindow from '@/app/(portal)/team/documentation/_components/drive/MoveWindow'
 import {
   BinGlyph, ChevronGlyph, CompanyGlyph, DownGlyph, EyeGlyph, FolderGlyph, NewFolderGlyph, PenGlyph, PersonGlyph, RestoreGlyph, SearchGlyph, UploadGlyph,
 } from '@/app/(portal)/team/documentation/_components/drive/icons'
 import d from '@/app/(portal)/team/documentation/_components/drive/drive.module.css'
 import BankTalentTile from './BankTalentTile'
-import MoveWindow from './MoveWindow'
 import { WaitingFiles, sendWaiting, waitingProblem, type Waiting } from './HiringFiles'
 import b from './bank.module.css'
 import s from './hiring.module.css'
 
 /** What is being moved: a person, a folder with everything in it, or everybody in a department (2026-10-12). */
 type Moving = { kind: 'talent'; talent: HiringTalent } | { kind: 'folder'; card: FolderCard } | { kind: 'all'; card: FolderCard }
+
+/** The Move window's glyph for a place of the bank: a company's building, else a folder. */
+const kindOfPlace = (at: string): 'company' | 'folder' => (parsePlace(at)?.kind === 'company' ? 'company' : 'folder')
 
 /** Opens a Talent Bank file the way the browser downloads: a short link with its name. */
 async function linkTo(f: BankFile, download: boolean): Promise<string | null> {
@@ -336,7 +339,7 @@ export default function TalentBankView({
             can.edit && bank.bin.length ? (
               <button
                 type="button"
-                className={b.emptyBin}
+                className={d.emptyBin}
                 data-armed={emptying ? 'true' : undefined}
                 onClick={() => (emptying ? void emptyBin() : setEmptying(true))}
               >
@@ -353,10 +356,10 @@ export default function TalentBankView({
                   <button type="button" className={d.searchClear} onClick={() => setQuery('')} aria-label="Clear the search">×</button>
                 ) : null}
               </div>
-              <button type="button" className={b.binBtn} onClick={() => open(BIN)}>
+              <button type="button" className={d.binBtn} onClick={() => open(BIN)}>
                 <BinGlyph />
                 Bin
-                {bank.bin.length ? <span className={b.binCount}>{bank.bin.length}</span> : null}
+                {bank.bin.length ? <span className={d.binCount}>{bank.bin.length}</span> : null}
               </button>
             </>
           )}
@@ -640,6 +643,7 @@ function MoveFor({ moving, tree, onClose }: { moving: Moving; tree: BankTree; on
     const now = placeOfTalent(t, tree.bank)
     return (
       <MoveWindow
+        kindOf={kindOfPlace}
         title={`Move ${t.name}`}
         now={`Now in ${pathLine(now, tree)}`}
         targets={moveTargets(tree)}
@@ -658,6 +662,7 @@ function MoveFor({ moving, tree, onClose }: { moving: Moving; tree: BankTree; on
     const parent = parentOf(card.at, tree) ?? ROOT
     return (
       <MoveWindow
+        kindOf={kindOfPlace}
         title={`Move ${card.name}`}
         now={`Now in ${pathLine(parent, tree)} — everything in it goes with it`}
         targets={moveTargets(tree, { from: card.at, withRoot: true })}
@@ -674,6 +679,7 @@ function MoveFor({ moving, tree, onClose }: { moving: Moving; tree: BankTree; on
   const held = heldIn(card.at, tree)
   return (
     <MoveWindow
+      kindOf={kindOfPlace}
       title={`Move everyone in ${card.name}`}
       now={`${held.line} — now in ${pathLine(card.at, tree)}`}
       targets={moveTargets(tree, { from: card.at })}

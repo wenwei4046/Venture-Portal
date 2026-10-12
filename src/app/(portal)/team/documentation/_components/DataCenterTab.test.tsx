@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { HV, ROOT, deptAt, folderAt, personAt, type Drive } from '@/lib/documentation/drive'
+import { BIN, HV, ROOT, deptAt, folderAt, personAt, type Drive } from '@/lib/documentation/drive'
 import type { Documentation, PersonLetter } from '@/lib/documentation/model'
 
 const actions = vi.hoisted(() => ({ fileLetter: vi.fn(), withdrawLetter: vi.fn(), openDocumentationFile: vi.fn(), addLetterType: vi.fn() }))
 const drive = vi.hoisted(() => ({
   addDriveFolder: vi.fn(), renameDriveFolder: vi.fn(), deleteDriveFolder: vi.fn(), saveDriveFile: vi.fn(), deleteDriveFile: vi.fn(), openDriveFile: vi.fn(),
+  moveDriveFolder: vi.fn(), restoreDriveItem: vi.fn(), deleteDriveItemForever: vi.fn(), emptyDriveBin: vi.fn(),
 }))
 const upload = vi.hoisted(() => ({ uploadDocumentationFile: vi.fn() }))
 const { flash } = vi.hoisted(() => ({ flash: vi.fn() }))
@@ -60,6 +61,8 @@ const DRIVE: Drive = {
   files: [
     { id: 'F1', ref: 'F-101', fileName: 'SOP.pdf', contentType: 'application/pdf', size: 2_400_000, parent: folderAt(CARRES), uploadedAt: '2026-10-12T02:00:00Z', uploadedBy: 'Amy', deletedAt: null, events: [] },
   ],
+  bin: [],
+  readAt: '',
 }
 
 beforeEach(() => {
@@ -76,9 +79,19 @@ beforeEach(() => {
 afterEach(cleanup)
 
 /** The tab as the page holds it: the place is the page's state. */
-function Drive({ start = ROOT, can = { create: true, edit: true }, onView = vi.fn() }: { start?: string; can?: { create: boolean; edit: boolean }; onView?: (t: PreviewTarget) => void }) {
+function Drive({
+  start = ROOT,
+  can = { create: true, edit: true },
+  onView = vi.fn(),
+  drive: d = DRIVE,
+}: {
+  start?: string
+  can?: { create: boolean; edit: boolean }
+  onView?: (t: PreviewTarget) => void
+  drive?: Drive
+}) {
   const [at, setAt] = useState(start)
-  return <DataCenterTab data={DATA} drive={DRIVE} driveError={null} can={can} at={at} onAt={setAt} onView={onView} />
+  return <DataCenterTab data={DATA} drive={d} driveError={null} can={can} at={at} onAt={setAt} onView={onView} />
 }
 const path = () => screen.getByRole('navigation', { name: 'Folder path' })
 const here = () => within(path()).getByText((_, el) => el?.getAttribute('aria-current') === 'page')
@@ -123,16 +136,41 @@ describe('Documentation › Data center as a Drive', () => {
     expect(flash).toHaveBeenCalledWith('Policies made in HOUZS Venture')
   })
 
-  it('a folder HR made has Rename and Delete, Delete asked twice; one made by itself has no menu', async () => {
+  // 2026-10-13 (the Talent Bank's rules): a folder moves with everything in it, and goes to the Bin — not asked twice,
+  // it comes back.
+  it('a folder HR made has Rename, Move to… and Move to Bin; one made by itself has no menu', async () => {
     render(<Drive />)
     expect(screen.queryByRole('button', { name: 'More actions for HOUZS Venture' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'More actions for Carres' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
-    expect(drive.deleteDriveFolder).not.toHaveBeenCalled()
-    const armed = screen.getByRole('menuitem', { name: 'Confirm delete' })
-    expect(armed).toHaveAttribute('data-armed', 'true')
-    fireEvent.click(armed)
+    expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual(['Rename', 'Move to…', 'Move to Bin'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to Bin' }))
     await waitFor(() => expect(drive.deleteDriveFolder).toHaveBeenCalledWith(CARRES))
+    expect(flash).toHaveBeenCalledWith('Carres moved to the Bin')
+  })
+
+  it('a folder’s Move to… lists every place but itself and the people; picked, it goes there with everything in it', async () => {
+    drive.moveDriveFolder.mockResolvedValue({ ok: true })
+    render(<Drive />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Carres' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to…' }))
+    const win = within(screen.getByRole('dialog', { name: 'Move Carres' }))
+    expect(win.getByText('Now in Data center — everything in it goes with it')).toBeInTheDocument()
+    expect(win.getAllByRole('option').map(o => o.textContent)).toEqual(['Data centerHere now', 'HOUZS Venture', 'Revenue'])
+    expect(win.getByRole('option', { name: /Data center/ })).toBeDisabled()
+    fireEvent.click(win.getByRole('option', { name: 'Revenue' }))
+    fireEvent.click(win.getByRole('button', { name: 'Move here' }))
+    await waitFor(() => expect(drive.moveDriveFolder).toHaveBeenCalledWith(CARRES, deptAt(REV)))
+    expect(flash).toHaveBeenCalledWith('Carres moved to HOUZS Venture › Revenue')
+  })
+
+  it('a file’s ⋮ moves it to the Bin at once', async () => {
+    drive.deleteDriveFile.mockResolvedValue({ ok: true })
+    render(<Drive start={folderAt(CARRES)} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for SOP.pdf' }))
+    expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual(['View', 'Download', 'Move to Bin'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to Bin' }))
+    await waitFor(() => expect(drive.deleteDriveFile).toHaveBeenCalledWith('F1'))
+    expect(flash).toHaveBeenCalledWith('SOP.pdf moved to the Bin')
   })
 
   it('without Documentation · Edit nothing is renamed or deleted; without Create there is no + New', () => {
@@ -257,4 +295,89 @@ describe('the preview', () => {
 it('opens on a department named in the address', () => {
   render(<Drive start={deptAt(REV)} />)
   expect(here()).toHaveTextContent('Revenue')
+})
+
+// The Bin (2026-10-13 — the user: "Data center 也加 Bin 和 Move to…", as the Talent Bank's): a folder HR deleted at the
+// top, a file that was in it — named through the Bin — and one from Carres; each deleted on 12 Oct, gone on 11 Nov.
+describe('the Data center’s Bin', () => {
+  const OLD = '66666666-6666-4666-8666-666666666666'
+  const when = { ref: '', contentType: null, size: null, deletedAt: '2026-10-12T08:00:00Z', deletedBy: 'Amy', expiresAt: '2026-11-11T08:00:00Z' }
+  const BINNED: Drive = {
+    ...DRIVE,
+    bin: [
+      { ...when, id: 'b1', kind: 'folder', name: 'Old', at: ROOT, folderId: OLD, fileId: null },
+      { ...when, id: 'b2', kind: 'file', name: 'Draft.pdf', at: folderAt(OLD), folderId: null, fileId: 'F7', contentType: 'application/pdf' },
+      { ...when, id: 'b3', kind: 'file', name: 'Rates.xlsx', at: folderAt(CARRES), folderId: null, fileId: 'F8' },
+    ],
+  }
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-13T08:00:00Z'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('the Bin pill counts what is in it; the Bin lists its folders and files — where each was, the days left', () => {
+    render(<Drive drive={BINNED} />)
+    expect(screen.getByRole('button', { name: /^Bin/ })).toHaveTextContent('Bin3')
+    fireEvent.click(screen.getByRole('button', { name: /^Bin/ }))
+    expect(within(path()).getAllByText(/./).map(x => x.textContent).filter(Boolean)).toEqual(['Data center', 'Bin'])
+    expect([...document.querySelectorAll('[class*="sectHead"]')].map(h => h.textContent)).toEqual(['Folders 1', 'Files 2'])
+    expect(screen.queryByRole('button', { name: 'New' })).toBeNull()
+    expect(screen.queryByPlaceholderText('Search the Data center')).toBeNull()
+    expect(screen.getByRole('button', { name: /^Old/ })).toHaveTextContent('Data center · 29 days left')
+    // Draft.pdf was in Old, itself in the Bin: named through it.
+    expect(screen.getByText('Old', { selector: '[class*="fileSub"]' })).toBeInTheDocument()
+    expect(screen.getByText('Carres', { selector: '[class*="fileSub"]' })).toBeInTheDocument()
+    expect(screen.getAllByText('29 days left')).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: /^Old/ }))
+    expect(flash).toHaveBeenCalledWith('Old is in the Bin — restore it to open it.')
+  })
+
+  it('counts the days from when the Data center was read', () => {
+    render(<Drive start={BIN} drive={{ ...BINNED, readAt: '2026-10-12T08:00:00Z' }} />)
+    expect(screen.getAllByText('30 days left')).toHaveLength(2)
+  })
+
+  it('⋮ › Restore puts it back and says where; Delete forever and Empty bin are asked twice', async () => {
+    drive.restoreDriveItem.mockResolvedValue({ ok: true, label: 'Carres' })
+    drive.deleteDriveItemForever.mockResolvedValue({ ok: true })
+    drive.emptyDriveBin.mockResolvedValue({ ok: true, count: 3 })
+    render(<Drive start={BIN} drive={BINNED} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Rates.xlsx' }))
+    expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual(['Restore', 'Delete forever'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Restore' }))
+    await waitFor(() => expect(drive.restoreDriveItem).toHaveBeenCalledWith('b3'))
+    expect(flash).toHaveBeenCalledWith('Rates.xlsx restored to Carres')
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Draft.pdf' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete forever' }))
+    expect(drive.deleteDriveItemForever).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Confirm delete forever' }))
+    await waitFor(() => expect(drive.deleteDriveItemForever).toHaveBeenCalledWith('b2'))
+    expect(flash).toHaveBeenCalledWith('Draft.pdf deleted forever')
+    fireEvent.click(screen.getByRole('button', { name: /Empty bin/ }))
+    expect(drive.emptyDriveBin).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /Confirm empty bin/ }))
+    await waitFor(() => expect(drive.emptyDriveBin).toHaveBeenCalled())
+    expect(flash).toHaveBeenCalledWith('Bin emptied · 3 items deleted forever')
+  })
+
+  it('a refusal is said in the database’s words', async () => {
+    drive.restoreDriveItem.mockResolvedValue({ ok: false, reason: 'Old is there already — rename one first.' })
+    render(<Drive start={BIN} drive={BINNED} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Old' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Restore' }))
+    await waitFor(() => expect(flash).toHaveBeenCalledWith('Old is there already — rename one first.'))
+  })
+
+  it('an empty Bin says so; without Edit there is nothing to press', () => {
+    render(<Drive start={BIN} />)
+    expect(screen.getByText('The Bin is empty.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Empty bin/ })).toBeNull()
+    cleanup()
+    render(<Drive start={BIN} drive={BINNED} can={{ create: false, edit: false }} />)
+    expect(screen.queryByRole('button', { name: 'More actions for Old' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Empty bin/ })).toBeNull()
+  })
 })

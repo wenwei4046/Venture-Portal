@@ -28,7 +28,10 @@ export async function loadDrive(): Promise<DriveRead> {
     }
   }
   const drive = driveFromRow(data)
-  return drive ? { ok: true, data: drive } : { ok: false, reason: 'The Data center’s folders could not be read. Please try again.' }
+  // The Bin counts its days from the read, not from when the page was first drawn (mig 20261013100000).
+  return drive
+    ? { ok: true, data: { ...drive, readAt: new Date().toISOString() } }
+    : { ok: false, reason: 'The Data center’s folders could not be read. Please try again.' }
 }
 
 /** A Data center file: inline to look at, or as a download under its own name. */
