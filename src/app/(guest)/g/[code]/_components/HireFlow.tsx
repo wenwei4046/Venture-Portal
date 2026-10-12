@@ -22,13 +22,15 @@ import s from './guest.module.css'
  * Request manpower (2026-10-11, README §16 — the prototype's step-by-step
  * form, guest-phone-04): About you → The role → Candidate requirements → Job
  * description (type it, attach a file, or both) → Check and send. The fields
- * are Hiring › Form settings'; the request lands in Hiring › Requests as
- * "Submitted via guest link". From 900px the Preview column shows what HR
- * will see.
+ * are Hiring › Form settings' — but Department lists the picked company's own,
+ * as Book a meeting room does (2026-10-12); a different company asks it again.
+ * The request lands in Hiring › Requests as "Submitted via guest link". From
+ * 900px the Preview column shows what HR will see.
  */
 export function HireFlow({ code, data, hidden = false, onClosed }: { code: string; data: GuestOpen; hidden?: boolean; onClosed: () => void }) {
-  const groups = useMemo(() => hireGroups(data.hireForm, data.subs), [data.hireForm, data.subs])
   const [ans, setAns] = useState<Record<string, string>>({ headcount: '1' })
+  const co = ans._co ?? ''
+  const groups = useMemo(() => hireGroups(data.hireForm, data.subs, co), [data.hireForm, data.subs, co])
   const [file, setFile] = useState<{ name: string; path: string } | null>(null)
   const [uploading, setUploading] = useState(false)
   const [step, setStep] = useState(0)
@@ -42,7 +44,8 @@ export function HireFlow({ code, data, hidden = false, onClosed }: { code: strin
   const isReview = at === n
   const fileName = file?.name ?? null
   const set = (id: string, v: string) => {
-    setAns(a => ({ ...a, [id]: v }))
+    // Another company: its own departments, so the one picked goes.
+    setAns(a => (id === '_co' && v !== (a._co ?? '') ? { ...a, _co: v, dept: '' } : { ...a, [id]: v }))
     setErr('')
   }
 
@@ -90,7 +93,7 @@ export function HireFlow({ code, data, hidden = false, onClosed }: { code: strin
     const span = spansRow(f) ? { gridColumn: '1 / -1' } : undefined
     let input: React.ReactNode = null
     if (f.type === 'text') {
-      input = <input className={`${s.input} ${s.hInput}`} value={v} placeholder={hirePlaceholder(f)} maxLength={f.id === '_name' ? 80 : 400} onChange={e => set(f.id, e.target.value)} />
+      input = <input className={`${s.input} ${s.hInput}`} value={v} placeholder={hirePlaceholder(f)} maxLength={f.id === '_name' ? 80 : f.id === 'dept' ? 60 : 400} onChange={e => set(f.id, e.target.value)} />
     } else if (f.type === 'number') {
       const num = Number(v) || 0
       input = (

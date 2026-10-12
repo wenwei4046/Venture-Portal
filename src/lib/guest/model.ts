@@ -471,13 +471,29 @@ export function hireFormFromRows(v: unknown): HireField[] {
   })
 }
 
-/** About you, The role, Candidate requirements, Job description — the prototype's four steps (empty ones left out). */
-export function hireGroups(form: readonly HireField[], subs: readonly GuestSub[]): HireGroup[] {
+/**
+ * The role's Department is the picked company's own (2026-10-12, the user: Book a
+ * meeting room was linked to Admin › Guest Link › Subsidiaries & departments,
+ * Request manpower was not — "they use the same table"): Hiring › Form settings'
+ * choices are HQ's, so a Carres guest was offered Finance and IT. A company with
+ * none listed takes the guest's own words — Department is a core field, always
+ * asked. guest_link_hire holds the same rule (mig 20261012220000).
+ */
+export function companyDepartment(f: HireField, sub: GuestSub | null): HireField {
+  if (sub && !sub.departments.length) return { ...f, type: 'text', options: [] }
+  return { ...f, type: 'select', options: (sub?.departments ?? []).map(d => ({ v: d, label: d })) }
+}
+
+/** About you, The role, Candidate requirements, Job description — the prototype's four steps (empty ones left out). `co` is the company picked. */
+export function hireGroups(form: readonly HireField[], subs: readonly GuestSub[], co = ''): HireGroup[] {
   const you: HireField[] = [
     { id: '_co', label: 'Company', type: 'select', options: subs.map(s => ({ v: s.id, label: s.name })), required: true },
     { id: '_name', label: 'Your name', type: 'text', options: [], required: true },
   ]
-  const role = form.filter(f => ROLE_IDS.includes(f.id) || (!REQ_IDS.includes(f.id) && f.type !== 'longtext'))
+  const sub = subs.find(s => s.id === co) ?? null
+  const role = form
+    .filter(f => ROLE_IDS.includes(f.id) || (!REQ_IDS.includes(f.id) && f.type !== 'longtext'))
+    .map(f => (f.id === 'dept' ? companyDepartment(f, sub) : f))
   const req = form.filter(f => REQ_IDS.includes(f.id))
   const desc: HireField[] = [
     ...form.filter(f => f.type === 'longtext'),
@@ -492,9 +508,9 @@ export function hireGroups(form: readonly HireField[], subs: readonly GuestSub[]
   return groups.filter(g => g.fields.length)
 }
 
-/** A short choice (five or fewer, not the company) is a row of pills. */
+/** A short choice (five or fewer, not the company or its department — a dropdown, as Book a meeting room's) is a row of pills. */
 export function isChips(f: HireField): boolean {
-  return f.type === 'select' && f.options.length <= 5 && f.id !== '_co'
+  return f.type === 'select' && f.options.length <= 5 && f.id !== '_co' && f.id !== 'dept'
 }
 
 /** Long text, the file, and a row of more than three pills take the whole width. */
@@ -510,6 +526,7 @@ const HIRE_PLACEHOLDER: Record<string, string> = {
 }
 
 export function hirePlaceholder(f: HireField): string {
+  if (f.id === 'dept') return f.type === 'select' ? 'Choose…' : 'e.g. Operations'
   return HIRE_PLACEHOLDER[f.id] ?? (f.type === 'select' ? 'Choose…' : '')
 }
 

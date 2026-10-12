@@ -173,6 +173,22 @@ describe('request manpower', () => {
     expect(hireGroups(form.filter(f => f.id !== 'gender'), subs).map(g => g.key)).toEqual(['you', 'role', 'desc'])
   })
 
+  // 2026-10-12, the user: Book a meeting room was linked to Subsidiaries & departments, Request manpower was not.
+  it('asks the picked company’s own departments — never Form settings’ HQ list', () => {
+    const two = [
+      { id: 'car', code: 'CAR', name: 'Carres', departments: ['Marketing', 'Operation', 'Business Development', 'Sales', 'Management'] },
+      { id: 'new', code: '', name: 'New subsidiary', departments: [] },
+    ]
+    const deptOf = (co: string) => hireGroups(form, two, co)[1].fields.find(f => f.id === 'dept')!
+    const car = deptOf('car')
+    expect([car.label, car.type, car.required, car.options.map(o => o.v)]).toEqual(['Department', 'select', true, two[0].departments])
+    expect([isChips(car), hirePlaceholder(car), hireValue(car, { dept: 'Sales' }, null)]).toEqual([false, 'Choose…', 'Sales'])
+    expect(deptOf('').options).toEqual([])
+    const typed = deptOf('new')
+    expect([typed.type, typed.options, typed.required, hirePlaceholder(typed)]).toEqual(['text', [], true, 'e.g. Operations'])
+    expect(hireGroups(form, two, 'car')[1].fields.map(f => f.id)).toEqual(['position', 'dept', 'headcount', 'budget', 'shift'])
+  })
+
   it('draws short choices as pills, long ones as a dropdown', () => {
     const [dept, gender] = [form[1], form[4]]
     expect([isChips(dept), isChips(gender), spansRow(gender), spansRow(form[6])]).toEqual([false, true, false, true])

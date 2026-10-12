@@ -97,6 +97,8 @@ export interface InsightRow {
   id: string
   position: string
   hired: string
+  /** A guest's company, else HOUZS Venture. */
+  company: string
   department: string
   owner: string
   ownerSet: boolean
@@ -220,6 +222,9 @@ export function insightsOf(
       id: x.r.id,
       position: requestTitle(x.r),
       hired: x.r.status === 'filled' && x.r.hiredNames.length ? 'Hired: ' + x.r.hiredNames.join(', ') : '',
+      // Whose request it is (2026-10-12, the user): a guest's Department is its own company's
+      // (Carres's Sales), HQ's is HQ's — so the table says the company too.
+      company: x.r.requesterCompany || 'HOUZS Venture',
       department: answerOf(x.r, 'dept'),
       owner: x.r.ownerId ? ownerName(x.r.ownerId) || '—' : 'Unassigned',
       ownerSet: !!x.r.ownerId,
