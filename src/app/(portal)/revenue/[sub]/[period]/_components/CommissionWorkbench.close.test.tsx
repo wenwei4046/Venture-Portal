@@ -324,7 +324,8 @@ describe('closing one salesperson from their ledger', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Actions for SO-one' }))
     const item = screen.getByRole('menuitem', { name: /Don't count this bill/ })
     expect(item).toBeDisabled()
-    expect(item).toHaveTextContent('ANTHONY’s September 2026 is closed — reopen it before changing which bills count')
+    // One line a row since 2026-10-12: why it is shut is the row's tooltip.
+    expect(item).toHaveAttribute('title', 'ANTHONY’s September 2026 is closed — reopen it before changing which bills count')
   })
 
   it('turns Close off while the page holds a draft', () => {

@@ -20,7 +20,7 @@ describe('commission workbench server metadata', () => {
       currentHierarchy: [{ staffId: 'person-a' }], currentRules: {}, unmatchedOrderNos: [],
     })
     mocks.calendar.mockResolvedValue([{
-      fairId: 'fair-aug', venueKey: 'VENUE', displayName: 'Venue Hall', startDate: '2026-08-28', endDate: '2026-08-31',
+      fairId: 'fair-aug', venueKey: 'VENUE', displayName: 'Venue Hall', periodMonth: '2026-08-01', startDate: '2026-08-28', endDate: '2026-08-31',
       organiserName: 'Assigned organiser', erpOrganiserText: null,
     }])
     mocks.pay.mockRejectedValue(new Error('Individual pay is visible to HR and the Principal only'))
@@ -44,7 +44,12 @@ describe('commission workbench server metadata', () => {
       fair: { id: 'fair-aug', venueKey: 'VENUE', venueName: 'Venue Hall' },
       // No ERP pick on this bill, so no booth (2026-10-03).
       booth: null,
+      // Sold at an August fair (no day named, so the fair's month) — 2026-10-12.
+      saleMonth: '2026-08-01',
     }])
+    // Nothing from another month to explain: no upsells, no carried bills.
+    expect(result.upsales).toEqual({})
+    expect(result.carriedCloses).toEqual([])
     expect(result.payRows).toEqual([])
     expect(result.payUnavailable).toBe(true)
     expect(result.payLinesClosed).toBeNull()
@@ -74,7 +79,8 @@ describe('commission workbench server metadata', () => {
     } as unknown as SupabaseClient
     const bill = (orderId: string) => ({ orderId, venue: 'HALL', venueGroupName: 'HALL', location: null, organizer: null }) as MonthOrder
     const result = await loadCommissionWorkbench(db, 'sub-1', '2026-09-01', [bill('picked'), bill('pinned'), bill('cancelled')])
-    expect(selects).toEqual(['id, fair_event_id, fair_source, booth_brand:raw->fair->>brand, booth_status:raw->fair->>status'])
+    // …and the day of the fair the ERP says it was sold on (2026-10-12).
+    expect(selects).toEqual(['id, fair_event_id, fair_source, booth_brand:raw->fair->>brand, booth_status:raw->fair->>status, fair_date:raw->fair->>fairDate'])
     expect(result.orders.map(o => [o.orderId, o.booth])).toEqual([['picked', 'DUNLOPILLO'], ['pinned', null], ['cancelled', null]])
   })
 

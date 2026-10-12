@@ -11,8 +11,10 @@
  * Until 2026-09-27 the calendar was typed by hand on Revenue › Venues. Now the
  * ERP names the fair on every sales order — the salesperson has to pick the
  * event to open one — and `erp_sync_fair` keeps it, so a fair here is mostly
- * the ERP's (`source = 'erp'`). What remains for a person is moving a bill
- * into its fair's month (`FairMovesPanel` on the month page).
+ * the ERP's (`source = 'erp'`). Since 2026-10-12 nobody moves a bill into its
+ * fair's month either: a bill keyed after its fair's month is paid in the
+ * month it sits in, marked *Late key-in* on the ledger (`saleMonthOf`,
+ * `lib/commission/row-origin.ts`).
  */
 
 /** One fair: a place, the days it was open, and who ran it. */
@@ -42,6 +44,27 @@ export interface Fair {
    */
   confirmedToMove: number
   confirmedValueToMove: number
+}
+
+/**
+ * The month a bill at a fair was SOLD in — the TS twin of SQL
+ * `sales_order_sale_month()` (mig 20261006140000): the month of the day the
+ * ERP says it was sold (`raw.fair.fairDate`) when that day is one of the
+ * fair's, else the fair's own month. Null for a bill no fair claims.
+ *
+ * A bill keyed after its fair's month sits where it was keyed and is paid
+ * there (2026-10-12); this is how its ledger row knows it is a late key-in.
+ */
+export function saleMonthOf(
+  fairDate: string | null | undefined,
+  fair: Pick<Fair, 'startDate' | 'endDate' | 'periodMonth'> | null | undefined,
+): string | null {
+  if (!fair) return null
+  const day = typeof fairDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(fairDate) ? fairDate.slice(0, 10) : null
+  if (day && fair.startDate && day >= fair.startDate && day <= (fair.endDate ?? fair.startDate)) {
+    return `${day.slice(0, 7)}-01`
+  }
+  return fair.periodMonth.slice(0, 10)
 }
 
 /**

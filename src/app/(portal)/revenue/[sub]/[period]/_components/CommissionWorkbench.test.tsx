@@ -535,10 +535,11 @@ describe('CommissionWorkbench', () => {
     renderBoard()
     choose('Anthony')
     const table = personalTable()
-    expect(within(table).getAllByRole('columnheader').slice(0, 2).map(h => h.textContent)).toEqual(['Sales order', 'Ref No.'])
-    expect(within(salesRow(table, 'SO-one')).getAllByRole('cell')[1]).toHaveTextContent('HC13369')
+    // Status first since 2026-10-12 — why a row from another month is here.
+    expect(within(table).getAllByRole('columnheader').slice(0, 3).map(h => h.textContent)).toEqual(['Sales order', 'Status', 'Ref No.'])
+    expect(within(salesRow(table, 'SO-one')).getAllByRole('cell')[2]).toHaveTextContent('HC13369')
     // Keyed with no Ref No.: the double-claim check cannot match it, and the row says so.
-    expect(within(salesRow(table, 'SO-two')).getAllByRole('cell')[1]).toHaveTextContent('—No Ref No. in the ERP')
+    expect(within(salesRow(table, 'SO-two')).getAllByRole('cell')[2]).toHaveTextContent('—No Ref No. in the ERP')
     fireEvent.change(screen.getByRole('textbox', { name: 'Search sales orders' }), { target: { value: 'hc133' } })
     expect(within(table).getByRole('link', { name: 'SO-one' })).toBeVisible()
     expect(within(table).queryByRole('link', { name: 'SO-two' })).toBeNull()
@@ -549,7 +550,7 @@ describe('CommissionWorkbench', () => {
     data.input.orders = [...data.input.orders, ...upsalesToOrders([{ id: 'up', staff_id: 'agent', amount: 300, sold_on: '2026-08-20', original_ref: 'HC5315' }], '2026-08-01')]
     renderBoard(data)
     choose('Anthony')
-    const cell = within(salesRow(personalTable(), 'UPSALE HC5315')).getAllByRole('cell')[1]
+    const cell = within(salesRow(personalTable(), 'UPSALE HC5315')).getAllByRole('cell')[2]
     expect(cell).toHaveTextContent('—')
     expect(cell).not.toHaveTextContent('No Ref No.')
   })
@@ -1051,7 +1052,7 @@ describe("CommissionWorkbench — a ledger's bill menu (user 2026-09-27)", () =>
     fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getByText('Arena'), { clientX: 400, clientY: 260 })
     const item = within(screen.getByRole('menu', { name: 'Actions for SO-one' })).getByRole('menuitem', { name: /Don't count this bill/ })
     expect(item).toBeDisabled()
-    expect(item).toHaveTextContent('The run for August 2026 has paid')
+    expect(item).toHaveAttribute('title', expect.stringContaining('The run for August 2026 has paid'))
   })
 
   it('offers no menu on an upsale or a drop — they are not bills', () => {
@@ -1109,7 +1110,7 @@ describe("CommissionWorkbench — a ledger's bill menu (user 2026-09-27)", () =>
     fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getAllByRole('cell')[2], { clientX: 400, clientY: 260 })
     const row = screen.getByRole('menuitem', { name: /Brand for the margin/ })
     expect(row).toBeDisabled()
-    expect(row).toHaveTextContent('The run for August 2026 has paid')
+    expect(row).toHaveAttribute('title', expect.stringContaining('The run for August 2026 has paid'))
   })
 })
 
@@ -1198,7 +1199,7 @@ describe('CommissionWorkbench — a shared bill (user 2026-09-30)', () => {
     fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getByText('Arena'), { clientX: 400, clientY: 260 })
     const row = screen.getByRole('menuitem', { name: /Share this bill/ })
     expect(row).toBeDisabled()
-    expect(row).toHaveTextContent('Alex’s August 2026 is closed — reopen it before changing who shares this bill')
+    expect(row).toHaveAttribute('title', expect.stringContaining('Alex’s August 2026 is closed — reopen it before changing who shares this bill'))
     fireEvent.pointerDown(document.body)
 
     // SO-two is Anthony's alone: it can be shared — but not with Alex, who is closed.
@@ -1206,5 +1207,114 @@ describe('CommissionWorkbench — a shared bill (user 2026-09-30)', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /Share this bill/ }))
     const panel = screen.getByRole('dialog', { name: 'Share SO-two' })
     expect(within(within(panel).getByLabelText(/Share with/)).getByRole('option', { name: 'Alex — closed for August 2026' })).toBeDisabled()
+  })
+})
+
+describe('CommissionWorkbench — rows from another month (user 2026-10-12)', () => {
+  // "if the commission is pay in current month, but the bill is come from
+  // another month, i need the bar show different colour … then add a column
+  // status (show the reason — top up deposit, drop sales)"
+  function otherMonthFixture() {
+    const data = salaryFixture()
+    data.input.orders = [
+      ...data.input.orders,
+      // A July bill whose deposit was short when July closed, topped up since.
+      sale('july', 1_500, { periodMonth: '2026-07-01', orderDate: '2026-07-20', eventDate: '2026-07-20' }),
+      ...upsalesToOrders([
+        { id: 'up', staff_id: 'agent', amount: 600, sold_on: '2026-08-20', original_ref: 'HC13254', kind: 'upsale' },
+        { id: 'drop', staff_id: 'agent', amount: -200, sold_on: '2026-08-21', original_ref: 'HC8972', kind: 'drop' },
+      ], '2026-08-01'),
+    ]
+    data.orders = [
+      // SO-two sits in August but was sold at a July fair — keyed late.
+      ...data.orders.map(o => o.orderId === 'two' ? { ...o, saleMonth: '2026-07-01' } : o),
+      { orderId: 'july', venue: 'Hall', eventName: '20–22 Jul', organizer: 'Fair Co', location: 'KL', fair: null, booth: null, refNo: 'HC9000', paperNo: 'HC9000' },
+    ]
+    data.upsales = {
+      up: { kind: 'upsale', originalRef: 'HC13254', erpDocNo: 'HC-SO-013387', originalPeriod: '2026-07-01', bill: { orderId: 'bill-387', periodMonth: '2026-07-01' } },
+      drop: { kind: 'drop', originalRef: 'HC8972', erpDocNo: 'HC-SO-013367', originalPeriod: '2026-07-01', bill: null },
+    }
+    data.carriedCloses = [{ staffId: 'agent', periodMonth: '2026-07-01', heldIds: ['july'], billIds: ['july'] }]
+    return data
+  }
+  const statusOf = (orderNo: string) => within(salesRow(personalTable(), orderNo)).getAllByRole('cell')[1]
+
+  it('says why each row from another month is here, and colours the ones this month pays', () => {
+    renderBoard(otherMonthFixture())
+    choose('Anthony')
+    expect(statusOf('SO-july')).toHaveTextContent('Top up depositJul 2026 bill')
+    expect(statusOf('UPSALE HC13254')).toHaveTextContent('UpsellJul 2026 bill')
+    expect(statusOf('DROP HC8972')).toHaveTextContent('Drop salesJul 2026 bill')
+    expect(statusOf('SO-two')).toHaveTextContent('Late key-inJul 2026 fair')
+    expect(statusOf('SO-one')).toHaveTextContent('—')
+    for (const no of ['SO-july', 'UPSALE HC13254', 'DROP HC8972', 'SO-two']) {
+      expect(salesRow(personalTable(), no).className).toMatch(/otherMonth/)
+    }
+    expect(salesRow(personalTable(), 'SO-one').className).not.toMatch(/otherMonth/)
+    expect(screen.getByText(/4 paid here from another month/)).toBeVisible()
+    // The old note under the number is the Status column's now.
+    expect(within(personalTable()).queryByText(/Carried from/)).toBeNull()
+  })
+
+  it('opens the bill an upsell changed, named under it; a drop the portal holds no bill for opens nothing', () => {
+    renderBoard(otherMonthFixture())
+    choose('Anthony')
+    const upsell = salesRow(personalTable(), 'UPSALE HC13254')
+    expect(within(upsell).getByRole('link', { name: 'UPSALE HC13254' }).getAttribute('href'))
+      .toMatch(/^\/revenue\/fair\/2026-07-01\/orders\/bill-387\?from=/)
+    expect(upsell).toHaveTextContent('HC-SO-013387')
+    expect(within(salesRow(personalTable(), 'DROP HC8972')).queryByRole('link')).toBeNull()
+  })
+
+  it('opens a bill on a double-click of its row, but not from a control in it', () => {
+    renderBoard(otherMonthFixture())
+    choose('Anthony')
+    fireEvent.doubleClick(within(salesRow(personalTable(), 'SO-two')).getByText('Convention Centre'))
+    expect(push).toHaveBeenCalledWith(expect.stringMatching(/^\/revenue\/fair\/2026-08-01\/orders\/two\?from=/))
+    push.mockClear()
+    fireEvent.doubleClick(within(salesRow(personalTable(), 'SO-two')).getByRole('button', { name: 'Don’t count' }))
+    expect(push).not.toHaveBeenCalled()
+    // The upsell opens the bill it changed.
+    fireEvent.doubleClick(within(salesRow(personalTable(), 'UPSALE HC13254')).getAllByRole('cell')[3])
+    expect(push).toHaveBeenCalledWith(expect.stringMatching(/^\/revenue\/fair\/2026-07-01\/orders\/bill-387\?from=/))
+  })
+
+  it('lists each upsell and drop in the salary as an add or a deduction, by sales order', () => {
+    renderBoard(otherMonthFixture())
+    choose('Anthony')
+    fireEvent.click(screen.getByText('Salary calculation · current preview'))
+    const salary = screen.getByRole('table', { name: 'Current salary calculation' })
+    const upsell = within(salary).getByRole('row', { name: /Upsell · HC13254/ })
+    const drop = within(salary).getByRole('row', { name: /Drop sales · HC8972/ })
+    expect(upsell).toHaveTextContent('Sales order HC-SO-013387 · Jul 2026 bill')
+    expect(drop).toHaveTextContent('Sales order HC-SO-013367 · Jul 2026 bill')
+    // Anthony is paid 5%: + RM 30.00 on the upsell, RM (10.00) back on the drop.
+    expect(upsell).toHaveTextContent('+ RM 30.00')
+    expect(drop).toHaveTextContent('RM (10.00)')
+    expect(within(upsell).getByRole('link', { name: 'HC13254' })).toBeVisible()
+    // The commission line is the rest of it: with the two, the ledger's total again.
+    const money = (text: string) => {
+      const n = Number(text.replace(/[^\d.]/g, ''))
+      return text.includes('(') ? -n : n
+    }
+    const commission = within(salary).getByRole('row', { name: /Current commission/ })
+    // The person header's figure — the label beside its strong number.
+    const total = screen.getAllByText('Total commission')
+      .find(label => label.nextElementSibling?.tagName === 'STRONG')!.nextElementSibling!.textContent!
+    expect(money(within(commission).getAllByRole('cell')[1].textContent!) + 30 - 10).toBeCloseTo(money(total), 2)
+  })
+
+  it('says a bill of the month came in after its salesperson was closed — the next month pays it', () => {
+    const data = otherMonthFixture()
+    render(<CommissionWorkbench data={data} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]}
+      monthStats={monthStats} closes={{
+        subDepartmentId: 'sub', unavailable: null,
+        closes: [{ staffId: 'agent', closedAt: '2026-09-15T00:00:00Z', closedByName: 'HR', total: 0,
+          summary: parseCloseSummary({ name: 'Anthony', total: 0, bills: [{ id: 'one', no: 'SO-one', status: 'eligible', total: 0 }], overrides: [] }, 'Anthony') }],
+      }} />)
+    choose('Anthony')
+    expect(statusOf('SO-one')).toHaveTextContent('—')
+    expect(statusOf('SO-two')).toHaveTextContent('After closePaid next month')
+    expect(salesRow(personalTable(), 'SO-two').className).not.toMatch(/otherMonth/)
   })
 })

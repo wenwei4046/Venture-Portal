@@ -105,6 +105,21 @@ interface PaymentRow {
   merchant_provider?: unknown
 }
 
+/** A drop or an upsell the ERP found on this bill after it was settled (`comm_upsales`). */
+interface ChangeRow {
+  id: string
+  kind: 'upsale' | 'drop'
+  status: 'pending' | 'confirmed' | 'dismissed'
+  amount: number | string
+  sold_on: string
+  settled_amount: number | string | null
+  erp_amount: number | string | null
+  /** The month it is paid in once confirmed. */
+  period_month: string
+  original_ref: string
+  hr_staff_costs: { employee_name: string } | { employee_name: string }[] | null
+}
+
 /**
  * One bill, as the ERP sent it and as the engine will read it.
  *
@@ -180,7 +195,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   // The ledger's owner, when it is not the bill's own salesperson (an upline
   // reading a downline's bill on Overriding).
   const backPerson = back?.personId && back.personId !== order.staff_id && UUID.test(back.personId) ? back.personId : null
-  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares] =
+  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }] =
     await Promise.all([
       // Every column rather than a list: `cost_detail` exists only once
       // 20260924030000 is applied, and naming it would break this page before.
@@ -230,8 +245,24 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         : Promise.resolve({ data: null }),
       // Who else holds a part of it (2026-09-30): a shared bill names them all.
       order.staff_id ? loadOrderShares(supabase, [orderId]) : Promise.resolve([]),
+      // What the ERP changed on it after it was settled (2026-10-12): an upsell
+      // or a drop opened from a ledger lands here, on the bill it changed.
+      supabase
+        .from('comm_upsales')
+        .select('id, kind, status, amount, sold_on, settled_amount, erp_amount, period_month, original_ref, hr_staff_costs (employee_name)')
+        .eq('sub_department_id', subDept.id)
+        .eq('erp_doc_no', order.order_no)
+        .order('sold_on')
+        .order('created_at'),
     ])
   const byHand = exclusions?.get(orderId) ?? null
+  const changes = ((changeData ?? []) as unknown as ChangeRow[]).map(change => ({
+    ...change,
+    amount: Number(change.amount),
+    settled: change.settled_amount === null ? null : Number(change.settled_amount),
+    erp: change.erp_amount === null ? null : Number(change.erp_amount),
+    seller: (Array.isArray(change.hr_staff_costs) ? change.hr_staff_costs[0] : change.hr_staff_costs)?.employee_name ?? null,
+  }))
   const holders = order.staff_id && shares.length > 0
     ? holdersOf({ staffId: order.staff_id, name: order.hr_staff_costs?.employee_name ?? '—' },
         shares.map(sh => ({ staffId: sh.staffId, name: sh.name, pct: sh.pct })))
@@ -453,6 +484,69 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           tone={margin === null ? 'danger' : undefined}
         />
       </StatCards>
+
+      {/* What the ERP changed on this bill after its month was settled
+          (2026-10-12): an upsell or a drop opened from a salesperson's ledger
+          lands here, on the bill it changed. */}
+      {changes.length > 0 ? (
+        <section className="mb-10" aria-label="Changed after it was settled">
+          <div className="sect-head">
+            <h2>Changed after it was settled</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">{changes.length} {changes.length === 1 ? 'CHANGE' : 'CHANGES'}</span>
+          </div>
+          <p className="text-sm mb-4 max-w-3xl">
+            The ERP changed this bill after its month was settled. Each difference is a line of its own — an upsell
+            earns, a drop takes commission back — paid in the month somebody confirms it, at the salesperson&apos;s
+            rate and their upline&apos;s override. It moves neither this bill&apos;s margin nor that month&apos;s.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="ledger-table">
+              <thead>
+                <tr>
+                  <th>Found</th>
+                  <th>Change</th>
+                  <th className="m-hide">Salesperson</th>
+                  <th className="right m-hide">Settled</th>
+                  <th className="right m-hide">ERP now</th>
+                  <th className="right">Difference</th>
+                  <th>Paid</th>
+                </tr>
+              </thead>
+              <tbody>
+                {changes.map(change => (
+                  <tr key={change.id}>
+                    <td className="font-mono text-xs">{formatDate(change.sold_on)}</td>
+                    <td>
+                      <span className={`chip ${change.kind === 'drop' ? 'danger' : 'ledger'}`}>
+                        <span className="dot" />
+                        {change.kind === 'drop' ? 'Drop sales' : 'Upsell'}
+                      </span>
+                    </td>
+                    <td className="m-hide">{change.seller ?? '—'}</td>
+                    <td className="num m-hide">{change.settled === null ? '—' : formatMoney(change.settled)}</td>
+                    <td className="num m-hide">{change.erp === null ? '—' : formatMoney(change.erp)}</td>
+                    <td className="num">
+                      {change.amount < 0 ? <span className="neg">{formatMoney(change.amount)}</span> : formatMoney(change.amount)}
+                    </td>
+                    <td>
+                      {change.status === 'confirmed' ? (
+                        <Link href={`${revenuePath(subDept.slug, change.period_month)}?view=changes`} className="text-accent hover:underline">
+                          In {label(change.period_month)}
+                        </Link>
+                      ) : change.status === 'pending' ? (
+                        <span className="chip alert"><span className="dot" />Waiting for an answer</span>
+                      ) : (
+                        <span className="chip info"><span className="dot" />Not a change</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <section className="mb-10">
         <div className="sect-head">

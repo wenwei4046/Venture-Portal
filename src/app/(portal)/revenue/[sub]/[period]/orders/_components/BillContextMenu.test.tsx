@@ -95,7 +95,7 @@ describe('BillContextMenu', () => {
   it('counts a bill taken out by hand again in one click, saying who took it out', async () => {
     const { root, onDone } = menu({ kind: 'include', stillOut: null })
     const row = within(root).getByRole('menuitem', { name: /Count this bill again/ })
-    expect(row).toHaveTextContent('Taken out by Principal on 27 Sep 2026 — duplicate')
+    expect(row).toHaveAttribute('title', expect.stringContaining('Taken out by Principal on 27 Sep 2026 — duplicate'))
     fireEvent.click(row)
     await waitFor(() => expect(onDone).toHaveBeenCalled())
     expect(mocks.includeOrder).toHaveBeenCalledWith('order-1')
@@ -105,21 +105,21 @@ describe('BillContextMenu', () => {
   it('warns when counting again cannot bring the bill in', () => {
     const { root } = menu({ kind: 'include', stillOut: 'cancelled in the ERP' })
     expect(within(root).getByRole('menuitem', { name: /Count this bill again/ }))
-      .toHaveTextContent('It still will not count: cancelled in the ERP')
+      .toHaveAttribute('title', expect.stringContaining('It still will not count: cancelled in the ERP'))
   })
 
   it('offers nothing for a bill the ERP or the not-ours list keeps out', () => {
     const { root } = menu({ kind: 'unavailable', reason: 'Not our salesperson' })
     const row = within(root).getByRole('menuitem', { name: /Don't count this bill/ })
     expect(row).toBeDisabled()
-    expect(row).toHaveTextContent('Already not counted — Not our salesperson')
+    expect(row).toHaveAttribute('title', expect.stringContaining('Already not counted — Not our salesperson'))
   })
 
   it('offers nothing once the month has paid, and says why', () => {
     const { root } = menu({ kind: 'locked', excludedByHand: true, reason: 'The run for September 2026 has paid — reopen it before changing which bills count' })
     const row = within(root).getByRole('menuitem', { name: /Count this bill again/ })
     expect(row).toBeDisabled()
-    expect(row).toHaveTextContent(/has paid/)
+    expect(row).toHaveAttribute('title', expect.stringMatching(/has paid/))
   })
 
   it('opens the bill, here or in a new tab', () => {
@@ -135,20 +135,22 @@ describe('BillContextMenu', () => {
 
   it('keeps the link the right-click landed on', () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
-    const { root } = menu({ kind: 'exclude' }, { link: { href: '/revenue/fair/2026-09-01/orders?staff=s-1', label: 'ANTHONY' }, byRightClick: true })
+    const { root } = menu({ kind: 'exclude' }, { link: { href: '/revenue/fair/2026-09-01/orders?staff=s-1', label: 'ANTHONY' } })
     fireEvent.click(within(root).getByRole('menuitem', { name: /Open link in new tab/ }))
     expect(open).toHaveBeenCalledWith('/revenue/fair/2026-09-01/orders?staff=s-1', '_blank', 'noopener')
-    expect(within(root).getByText(/Shift \+ right-click/)).toBeInTheDocument()
+    // One line a row (2026-10-12): the link it landed on is the row's tooltip.
+    expect(within(root).getByRole('menuitem', { name: 'Open link in new tab' })).toHaveAttribute('title', 'ANTHONY')
     open.mockRestore()
   })
 
   it('keeps its rows while the confirmation is open, so the panel does not jump under the pointer', () => {
-    const { root } = menu({ kind: 'exclude' }, { byRightClick: true })
+    const { root } = menu({ kind: 'exclude' })
     const rowsBefore = root.children.length
     fireEvent.click(within(root).getByRole('menuitem', { name: /Don't count this bill/ }))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(root.children.length).toBe(rowsBefore)
-    expect(within(root).getByText(/Shift \+ right-click/)).toBeInTheDocument()
+    // No hint under the rows any more: the panel is its rows (2026-10-12).
+    expect(within(root).queryByText(/Shift \+ right-click/)).toBeNull()
   })
 
   it('closes on a click anywhere else', () => {
@@ -185,7 +187,8 @@ describe('BillContextMenu — Share this bill…', () => {
     mocks.shareOrder.mockResolvedValue({ ok: true, result })
     const { root, onShareDone } = shareMenu()
     const row = within(root).getByRole('menuitem', { name: /Share this bill/ })
-    expect(row).toHaveTextContent('With another salesperson — a part each')
+    // One line, no description under it (2026-10-12: "make it clean and nice").
+    expect(row.textContent).toBe('Share this bill…')
     // Choosing the row writes nothing — it opens the form beside it.
     fireEvent.click(row)
     expect(mocks.shareOrder).not.toHaveBeenCalled()
@@ -259,7 +262,7 @@ describe('BillContextMenu — Share this bill…', () => {
     mocks.unshareOrder.mockResolvedValue({ ok: true, result: { ...result, before: 0.5, after: null, parts: alone } })
     const { root, onShareDone } = shareMenu(halves)
     const row = within(root).getByRole('menuitem', { name: /Share this bill/ })
-    expect(row).toHaveTextContent('ADRIAN 50% · ANTHONY 50%')
+    expect(row).toHaveAttribute('title', expect.stringContaining('ADRIAN 50% · ANTHONY 50%'))
     fireEvent.click(row)
     const panel = screen.getByRole('dialog', { name: 'Share HC-SO-013493' })
     expect(within(within(panel).getByLabelText(/Share with/)).getByRole('option', { name: 'ANTHONY — holds 50%' })).toBeInTheDocument()
@@ -295,8 +298,8 @@ describe('BillContextMenu — Share this bill…', () => {
     const { root } = shareMenu(halves, 'locked')
     const row = within(root).getByRole('menuitem', { name: /Share this bill/ })
     expect(row).toBeDisabled()
-    expect(row).toHaveTextContent('ADRIAN 50% · ANTHONY 50%')
-    expect(row).toHaveTextContent('The run for September 2026 has paid')
+    expect(row).toHaveAttribute('title', expect.stringContaining('ADRIAN 50% · ANTHONY 50%'))
+    expect(row).toHaveAttribute('title', expect.stringContaining('The run for September 2026 has paid'))
   })
 
   it('has no share row where none is offered', () => {

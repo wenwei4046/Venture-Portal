@@ -1493,6 +1493,51 @@ frame's specials: *"一样改成向客户加收"*.
   September would have charged 7 bed frame lines and 42 of its 95 sofa bills,
   RM 2,200 in all — rolled back. Mig `20261006050000`.
 
+### 4.19 Rows from another month — said, coloured, never moved (2026-10-12)
+
+The user, on a salesperson's ledger: *"if the commission is pay in current month,
+but the bill is come from another month, i need the bar show different colour …
+then add a column status (show the reason — top up deposit, drop sales)"*; of
+upsells and drops: *"will not calculate back to … original order or current order
+month margin. it is a isolated order"*; of *Bills of another month's fair*: *"may
+remove, cause those orders will auto detect and add on the current month table"*;
+and of a late key-in: *"will go in the table as well … this is use for calculate
+sales for revenue view arena purpose. but commission, it will jump to the same
+month, then show up with different colour. if hr know this order is non calculation
+with comm, they will right click"*.
+
+- **Records follow the sale; commission the month still open.** A bill sits in
+  the month the ERP puts it in — its fair day's month when the ERP names the day
+  (§14, mig `20261006140000`), else the day it was keyed — and that month's sales,
+  the Revenue app and the Arena count it there. Its commission is paid by that
+  month while it is open for the salesperson, else by the first month still open
+  (§8.3, `carry.ts`). Nothing moves a bill between months any more: the month
+  page's *Bills of another month's fair* (`FairMovesPanel`, *Move the N
+  confirmed*) is gone.
+- **Status.** A ledger's first column after the bill (`lib/commission/row-origin.ts`):
+  *Top up deposit* — a bill of an earlier month its month's close held for the
+  deposit (`deferred_orders`); *Late key-in* — an earlier month's bill its close
+  did not have (it came in after), or a bill of this month sold at an earlier
+  month's fair (`saleMonthOf` ← `raw.fair.fairDate`, else the fair's month);
+  *Early key-in*; *Upsell* / *Drop sales* — the month of the bill it changed;
+  *Below deposit* — carried, still held, not paid here; *After close* — this
+  month's bill its salesperson's close did not take, paid next month. Every row
+  this month PAYS for another month's sale wears the other-month wash; the chip
+  says which kind. All bills says the same of a late key-in.
+- **Upsells and drops are isolated.** An upsale line was always outside every
+  margin (`inGoodsScope`): it moves neither its bill's margin — the settled bill is
+  frozen, the ERP's re-send held — nor the month's margin, penalty or incentive.
+  Each is a row of the seller's Personal table and the upline's Overriding; its
+  number opens the bill it changed; the salary preview lists each under *Current
+  commission* as an add or a deduction by sales order; the bill's page lists what
+  the ERP changed on it after it was settled.
+- **HR decides.** A late key-in already paid by hand (a claim form) is right-clicked
+  *Don't count this bill* (§4.10); the double-claim check (§4.14) flags one on
+  another bill's paper.
+- **Left as it was.** A month closed to the ERP feed — by hand, or before the
+  cutover — still HOLDS a new document dated into it (§14). On 2026-10-12 no such
+  document had arrived: every held delivery was a re-send of a bill already in.
+
 ## 5. Tax — Withholding instead of PCB
 
 Revenue salespeople have **no PCB**. They pay **Withholding Tax at 2% of total

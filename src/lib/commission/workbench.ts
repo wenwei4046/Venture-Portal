@@ -24,6 +24,12 @@ export interface WorkbenchOrderMeta {
   /** The ERP's Ref No. — the handwritten bill's number — and the paper number read from it (`paper-ref.ts`). */
   refNo?: string | null
   paperNo?: string | null
+  /**
+   * The month the bill was sold in by its fair (`saleMonthOf`, 2026-10-12):
+   * one keyed after its fair's month sits — and is paid — where it was keyed,
+   * a *Late key-in* on the ledger (`row-origin.ts`). Null or absent: no fair.
+   */
+  saleMonth?: string | null
 }
 
 export interface WorkbenchOptions {

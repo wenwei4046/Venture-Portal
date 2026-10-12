@@ -1,7 +1,22 @@
 'use client'
 
 import { useCallback, useState, type MouseEvent } from 'react'
+import { useRouter } from 'next/navigation'
 import type { MenuAnchor } from '../../../hierarchy/_components/ContextMenuPanel'
+
+/** What in a row keeps its own press: a double-click there is not the row's. */
+const ROW_CONTROLS = 'a, button, input, select, textarea, label, summary, [role="menuitem"], [role="dialog"]'
+
+/** Whether a press landed on the row itself — not a control in it, not something it portalled. */
+export function onTheRow(event: MouseEvent<HTMLElement>): boolean {
+  const row = event.currentTarget
+  const target = event.target as HTMLElement | null
+  if (!target || !row.contains(target)) return false
+  for (let el: HTMLElement | null = target; el && el !== row; el = el.parentElement) {
+    if (el.matches(ROW_CONTROLS)) return false
+  }
+  return true
+}
 
 /** The bill a menu is open on, and where it hangs. */
 export interface OpenBillMenu<Row> {
@@ -22,10 +37,31 @@ export interface OpenBillMenu<Row> {
  * (two holders' parts under one upline), and the ⋯ of each toggles its own.
  * `hrefOf` is the row's own link, so a right-click on it is not offered back
  * as "another link".
+ *
+ * A DOUBLE-CLICK on a row opens its bill (2026-10-12, the user: "for all sales
+ * order list on the table, need to able press in to show order detail") — the
+ * portal's way of opening a row (`SortableTable`, user 2026-10-02: 双击点开),
+ * with Ctrl / ⌘ for a new tab. A press on a control in the row stays the
+ * control's. `onRowDoubleClick` takes the href, so a row that is no bill of
+ * its own (an upsell) can open the bill it changed, or nothing.
  */
 export function useBillMenu<Row>(keyOf: (row: Row) => string, hrefOf: (row: Row) => string) {
+  const router = useRouter()
   const [menu, setMenu] = useState<OpenBillMenu<Row> | null>(null)
   const closeMenu = useCallback(() => setMenu(null), [])
+
+  function onRowDoubleClick(event: MouseEvent<HTMLElement>, href: string | null) {
+    if (!href || !onTheRow(event)) return
+    // The double-click picked the word under it; the bill is what was meant.
+    window.getSelection()?.removeAllRanges()
+    if (event.ctrlKey || event.metaKey) window.open(href, '_blank', 'noopener')
+    else router.push(href)
+  }
+
+  /** The second press of a double-click would otherwise select the word under it. */
+  function onRowMouseDown(event: MouseEvent<HTMLElement>) {
+    if (event.detail > 1 && onTheRow(event)) event.preventDefault()
+  }
 
   function onRowContextMenu(event: MouseEvent<HTMLElement>, row: Row) {
     // A control with a right-click of its own (Share…), or the browser's menu on purpose.
@@ -55,5 +91,5 @@ export function useBillMenu<Row>(keyOf: (row: Row) => string, hrefOf: (row: Row)
 
   const isOpenOn = (row: Row) => menu !== null && keyOf(menu.row) === keyOf(row)
 
-  return { menu, closeMenu, onRowContextMenu, onMenuButton, isOpenOn }
+  return { menu, closeMenu, onRowContextMenu, onMenuButton, isOpenOn, onRowDoubleClick, onRowMouseDown }
 }

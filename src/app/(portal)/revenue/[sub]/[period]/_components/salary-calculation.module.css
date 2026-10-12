@@ -103,6 +103,10 @@
 
 /* A pay line in the table: the same row as the rest, marked by a warm rule. */
 .lineRow td:first-child { box-shadow: inset 3px 0 0 rgb(var(--accent)); }
+/* An upsell or a drop inside the commission (2026-10-12): the ledger's
+   other-month wash and rule, so a line here is the row it came from above. */
+.adjustmentRow td { background: rgb(var(--work-other-month)); }
+.adjustmentRow td:first-child { box-shadow: inset 3px 0 0 rgb(var(--work-other-month-rule)); }
 
 @media (max-width: 599px) {
   /* Two rows a line: the type across the top beside its ✕, then the

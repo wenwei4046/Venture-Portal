@@ -3,13 +3,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { sortFairs, type Fair } from '@/lib/fair-calendar'
 
 /**
- * The fairs, and the bills sitting in another month than their fair's.
+ * The fairs.
  *
  * Since 2026-09-27 the fairs come from the ERP: the salesperson picks the
  * event on the sales order and the delivery carries it (`erp_sync_fair`), so
- * nobody types a fair or an organiser on the portal any more. What is left for
- * a person is the one step that moves money — putting a bill into its fair's
- * month — which the month page offers (`FairMovesPanel`).
+ * nobody types a fair or an organiser on the portal any more. Since
+ * 2026-10-12 nobody moves a bill into its fair's month either (the month
+ * page's *Bills of another month's fair* went): a bill keyed after its fair's
+ * month is paid where it sits and its ledger row says *Late key-in*
+ * (`saleMonthOf` in `lib/fair-calendar.ts`, `lib/commission/row-origin.ts`).
  *
  * The calendar is an RPC because it groups on the resolved PLACE — which
  * spellings are one venue lives in `comm_venues.canonical_key`, so only SQL
@@ -63,64 +65,4 @@ export async function loadFairCalendar(supabase: SupabaseClient): Promise<Fair[]
       confirmedValueToMove: Number(r.confirmed_value_to_move ?? 0),
     })),
   )
-}
-
-/** One bill whose fair counts in another month than the one it sits in. */
-export interface FairMove {
-  orderId: string
-  orderNo: string
-  orderDate: string
-  venue: string | null
-  salesperson: string
-  orderTotal: number
-  cancelled: boolean
-  fromPeriod: string
-  toPeriod: string
-  fairStart: string | null
-  fairEnd: string | null
-  organiser: string | null
-  /** A month on either side has paid, or is closed to the feed: it stays. */
-  locked: boolean
-  /** The ERP or a person placed it at that fair — not the calendar's guess. */
-  confirmed: boolean
-}
-
-interface MoveRpcRow {
-  order_id: string
-  order_no: string
-  order_date: string
-  venue: string | null
-  agent_name: string
-  employee_name: string | null
-  order_total: number | string
-  cancelled: boolean
-  from_period: string
-  to_period: string
-  fair_start: string | null
-  fair_end: string | null
-  organiser: string | null
-  locked: boolean
-  confirmed: boolean
-}
-
-/** Every such bill of one sub-department (`revenue_fair_calendar_moves`). */
-export async function loadFairMoves(supabase: SupabaseClient, subDepartmentId: string): Promise<FairMove[]> {
-  const { data, error } = await supabase.rpc('revenue_fair_calendar_moves', { p_sub_department_id: subDepartmentId })
-  if (error) throw new Error(`Could not read which bills belong to another month's fair: ${error.message}`)
-  return ((data ?? []) as MoveRpcRow[]).map(r => ({
-    orderId: r.order_id,
-    orderNo: r.order_no,
-    orderDate: r.order_date,
-    venue: r.venue,
-    salesperson: r.employee_name ?? r.agent_name,
-    orderTotal: Number(r.order_total),
-    cancelled: r.cancelled,
-    fromPeriod: r.from_period,
-    toPeriod: r.to_period,
-    fairStart: r.fair_start,
-    fairEnd: r.fair_end,
-    organiser: r.organiser,
-    locked: r.locked,
-    confirmed: r.confirmed,
-  }))
 }

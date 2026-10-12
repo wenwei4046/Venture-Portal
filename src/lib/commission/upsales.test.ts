@@ -140,6 +140,22 @@ describe('an upsale through the engine', () => {
     expect(s.marginIncentive).toBe(1_000)
     expect(s.productCommission).toBe(721) // 7% × 10,000 + 7% × 300
   })
+
+  // 2026-10-12, the user: "will not calculate back to … original order or
+  // current order month margin. it is a isolated order".
+  it('is an isolated order: an upsell and a drop leave every margin figure as it was, and pay only their own difference', () => {
+    const DROP = { id: 'd1', staff_id: 'yuny', amount: '-200.00', sold_on: '2026-08-30', original_ref: 'HC13911', kind: 'drop' as const }
+    // A bill under the penalty band, so a penalty is in play too.
+    const thin = bill({ lines: [{ id: 'l1', itemGroup: 'MATTRESS', productCode: 'AK-1', qty: 1, lineAmount: 10_000, brandCode: 'AKEMI', costAmount: 7_500 }] })
+    for (const own of [bill(), thin]) {
+      const before = statementsOf(input([own])).get('yuny')!
+      const after = statementsOf(input([own, ...upsalesToOrders([UPSALE, DROP], '2026-08-01')])).get('yuny')!
+      expect([after.marginRevenue, after.marginCost, after.marginPct, after.marginBandKey, after.marginIncentive, after.marginPenaltyWithheld])
+        .toEqual([before.marginRevenue, before.marginCost, before.marginPct, before.marginBandKey, before.marginIncentive, before.marginPenaltyWithheld])
+      // 7% of +300 and −200, never cut by the bill's band.
+      expect(after.productCommission - before.productCommission).toBeCloseTo(7, 2)
+    }
+  })
 })
 
 describe('an upsale on its way to the database', () => {

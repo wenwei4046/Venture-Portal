@@ -1,7 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { formatMoney } from '@/lib/utils'
+import { monthShort } from '@/lib/commission/row-origin'
 import { computeRevenuePay } from '@/lib/revenue-pay'
 import {
   MAX_DESCRIPTION,
@@ -28,6 +30,31 @@ import x from './salary-calculation.module.css'
 import { Select } from '@/components/hrv/select'
 
 const money = formatMoney
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
+
+/**
+ * An upsell or a drop inside the commission above (2026-10-12, the user: "for
+ * the drop and up sales … list with add and deduction (sales order)"): the
+ * salary lists each one under the commission it is part of — its own line,
+ * with the bill it changed — so the figure is never one number nobody can
+ * take apart.
+ */
+export interface SalaryAdjustment {
+  key: string
+  kind: 'upsell' | 'drop'
+  /** The paper number HR knows the bill by — HC13254. */
+  ref: string
+  /** The ERP's document it was found on — HC-SO-013387 — when known. */
+  bill: string | null
+  /** The month the bill was settled in, `YYYY-MM-01`. */
+  from: string | null
+  /** A downline's upsell or drop reaching this person as override: whose. Null for their own. */
+  via: string | null
+  /** What it adds (+) or takes back (−) of this person's commission. */
+  amount: number
+  /** The bill's own page, when the portal holds it. */
+  href: string | null
+}
 
 interface Props {
   staffName: string
@@ -35,6 +62,8 @@ interface Props {
   period: string
   /** The ledger's draft commission above — personal + overriding + group reward. */
   commission: number
+  /** The upsells and drops inside `commission`, each its own line. */
+  adjustments?: readonly SalaryAdjustment[]
   /** The person's salary inputs, or undefined when this session may not see them. */
   source: CommissionWorkbenchData['payRows'][number] | undefined
   payUnavailable: boolean
@@ -53,7 +82,7 @@ interface Props {
  * `lib/revenue-pay-lines.ts`: earnings in full and outside the statutory wage,
  * a deduction off take-home pay only.
  */
-export default function SalaryCalculation({ staffName, period, commission, source, payUnavailable, closedReason }: Props) {
+export default function SalaryCalculation({ staffName, period, commission, adjustments = [], source, payUnavailable, closedReason }: Props) {
   const [open, setOpen] = useState(false)
   /** Null while not editing. */
   const [drafts, setDrafts] = useState<PayLineDraft[] | null>(null)
@@ -94,6 +123,8 @@ export default function SalaryCalculation({ staffName, period, commission, sourc
   }) : null
   const earningLines = shown.filter(line => !payLineKind(line.kind).deduction)
   const deductionLines = shown.filter(line => payLineKind(line.kind).deduction)
+  // The commission before its upsells and drops; with them it is `commission` again.
+  const adjusted = round2(adjustments.reduce((total, a) => total + a.amount, 0))
   const dirty = editing && draftsDiffer(drafts, editableLines(openedFrom))
 
   // A new line, or the first one on opening, takes the focus on its type.
@@ -225,7 +256,12 @@ export default function SalaryCalculation({ staffName, period, commission, sourc
           <table className={`${s.table} ${s.salaryTable}`} aria-label="Current salary calculation">
             <thead><tr><th>Component</th><th className={s.numeric}>Amount</th></tr></thead>
             <tbody>
-              <tr><td>Current commission<small>Personal + overriding + group reward</small></td><td className={s.numeric}>{money(commission)}</td></tr>
+              <tr><td>Current commission<small>Personal + overriding + group reward{adjustments.length > 0 ? ' — the upsells and drops below apart' : ''}</small></td><td className={s.numeric}>{money(round2(commission - adjusted))}</td></tr>
+              {adjustments.map(a => <tr key={a.key} className={x.adjustmentRow} data-kind={a.kind}>
+                <td>{a.kind === 'drop' ? 'Drop sales' : 'Upsell'} · {a.href ? <Link href={a.href}>{a.ref}</Link> : a.ref}
+                  <small>{[a.bill ? `Sales order ${a.bill}` : null, a.from ? `${monthShort(a.from)} bill` : null,
+                    a.via ? `override on ${a.via}’s` : null].filter(Boolean).join(' · ')}</small></td>
+                <td className={s.numeric}>{a.amount < 0 ? <span className="neg">{money(a.amount)}</span> : `+ ${money(a.amount)}`}</td></tr>)}
               <tr><td>Other programmes<small>Already applied for this month</small></td><td className={s.numeric}>{money(source.commissionElsewhere)}</td></tr>
               <tr><td>Payroll adjustment</td><td className={s.numeric}>{money(source.payrollAdjustment)}</td></tr>
               <tr><td>Employer contributions deducted<small>EPF + SOCSO + EIS, funded from commission</small></td><td className={s.numeric}>{money(-salary.employerContributions)}</td></tr>
