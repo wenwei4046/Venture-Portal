@@ -6,7 +6,7 @@ import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { officeMonth, officeToday } from '@/lib/office-time'
-import { fetchAllRows } from '@/lib/paginate'
+import { fetchAllRows, fetchByKeys } from '@/lib/paginate'
 import { buildRepaymentPlan } from '@/lib/repayment-plan'
 import { overdueOf, type OverdueSummary } from '@/lib/repayment-calendar'
 import { fetchTermsHistory, isFundSourcePrincipal, termsForFundSource } from '@/lib/treasury-terms-data'
@@ -29,6 +29,11 @@ import OverdueTabs from './_components/OverdueTabs'
 // before the tabs, every month's table closes on its total, a loan they owe
 // us offers Net off (its Record repayment, where Netting is a type), the
 // netting log always shows, and on a phone a row opens onto the rest of it.
+// 2026-10-12 (user: 两个都改 … 对，照这个做): the netting & penalty log is what
+// was netted or charged on the tab's side, each on its day, over the last 30
+// days (the handoff's count) — on both tabs; a record marked paid or escalated
+// is no longer in it (it is neither, and keeps no day). Fund IN's Netted this
+// month counts the fund sources' nettings (it said "Netting is on loans").
 
 type OverdueRow = {
   id: string
@@ -62,16 +67,21 @@ interface Props {
   searchParams?: Promise<{ tab?: string }>
 }
 
+/** One netting or penalty, as the log lists it. */
+type LogEntry = { id: string; date: string; dealId: string; name: string; type: 'netting' | 'penalty'; amount: number }
+
+// The handoff labels a table's foot "Total" over two rows or more; a phone,
+// where the row's own label is all there is, always says it.
+const footLabel = (n: number) => (n > 1 ? 'Total' : <span className="md:hidden">Total</span>)
+
 /** A record's stage as the sheet's chip: escalated red, grace grey, else overdue amber. */
-function StageChip({ stage, status }: { stage: OverdueRow['overdue_stage']; status?: OverdueRow['status'] }) {
+function StageChip({ stage }: { stage: OverdueRow['overdue_stage'] }) {
   const [tone, label] =
-    status === 'paid'
-      ? ['ledger', 'paid']
-      : status === 'escalated' || stage === 'escalation'
-        ? ['danger', 'escalated']
-        : stage === 'grace'
-          ? ['info', 'grace']
-          : ['alert', 'overdue']
+    stage === 'escalation'
+      ? ['danger', 'escalated']
+      : stage === 'grace'
+        ? ['info', 'grace']
+        : ['alert', 'overdue']
   return (
     <span className={`chip ${tone}`}>
       <i className="dot" />
@@ -88,8 +98,11 @@ export default async function OverduePage({ searchParams }: Props) {
   const supabase = await createClient()
   const today = officeToday()
   const month = officeMonth()
+  // The log's 30 days, today among them (2026-10-12, the handoff's LAST 30 DAYS).
+  const logSince = dayjs(today).subtract(29, 'day').format('YYYY-MM-DD')
+  const monthStart = `${month}-01`
 
-  const [{ data: overdueRows }, { data: loans }, { data: companies }, { data: outstandingRows }, { data: loanNetting }, { data: sources }, { data: departments }, sourceReps] =
+  const [{ data: overdueRows }, { data: loans }, { data: companies }, { data: outstandingRows }, { data: loanMoveRows }, { data: sources }, { data: departments }, sourceReps] =
     await Promise.all([
       supabase
         .from('overdue_records')
@@ -99,8 +112,13 @@ export default async function OverduePage({ searchParams }: Props) {
       supabase.from('loans').select('id, company_id, principal, effective_rate, status'),
       supabase.from('companies').select('id, name, short_code'),
       supabase.from('loan_outstanding').select('loan_id, outstanding'),
-      // Netted this month: a loan's repayments knocked off by netting.
-      supabase.from('repayments').select('loan_id, amount, payment_type, payment_date').eq('payment_type', 'netting').gte('payment_date', `${month}-01`),
+      // A loan's nettings and penalties (2026-10-12): this month's nettings
+      // for the card, the last 30 days' nettings and penalties for the log.
+      supabase
+        .from('repayments')
+        .select('id, loan_id, amount, payment_type, payment_date')
+        .in('payment_type', ['netting', 'penalty'])
+        .gte('payment_date', logSince < monthStart ? logSince : monthStart),
       supabase
         .from('fund_sources')
         .select('id, status, amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, terms_effective_from, from_company_id, from_department_id, from_freetext_name')
@@ -109,10 +127,10 @@ export default async function OverduePage({ searchParams }: Props) {
       fetchAllRows((lo, hi) =>
         supabase
           .from('fund_source_repayments')
-          .select('fund_source_id, amount, payment_date, payment_type')
+          .select('id, fund_source_id, amount, payment_date, payment_type')
           .order('id', { ascending: true })
           .range(lo, hi),
-      ).catch(() => [] as Array<{ fund_source_id: string; amount: number; payment_date: string; payment_type: string }>),
+      ).catch(() => [] as Array<{ id: string; fund_source_id: string; amount: number; payment_date: string; payment_type: string }>),
     ])
 
   const rows = (overdueRows ?? []) as OverdueRow[]
@@ -131,12 +149,55 @@ export default async function OverduePage({ searchParams }: Props) {
     const loan = loanMap.get(loanId)
     return loan ? companyMap.get(loan.company_id) : undefined
   }
-  const netted = ((loanNetting ?? []) as Array<{ amount: number; payment_date: string }>).filter((r) => String(r.payment_date).slice(0, 7) === month)
+  // What was netted or charged (2026-10-12): a card counts the month's
+  // nettings, a log lists the last 30 days' nettings and penalties.
+  type Move = { id: string; amount: number; payment_type: string; payment_date: string }
+  const inMonth = (r: Move) => String(r.payment_date).slice(0, 7) === month
+  const loggable = (r: Move) => (r.payment_type === 'netting' || r.payment_type === 'penalty') && String(r.payment_date).slice(0, 10) >= logSince
+  const newestFirst = (a: LogEntry, b: LogEntry) => b.date.localeCompare(a.date) || b.amount - a.amount
+  const entry = (r: Move, dealId: string, name: string): LogEntry => ({
+    id: r.id,
+    date: String(r.payment_date).slice(0, 10),
+    dealId,
+    name,
+    type: r.payment_type === 'penalty' ? 'penalty' : 'netting',
+    amount: Number(r.amount),
+  })
+  const loanMoves = (loanMoveRows ?? []) as Array<Move & { loan_id: string }>
+  const netted = loanMoves.filter((r) => r.payment_type === 'netting' && inMonth(r))
   const nettedTotal = netted.reduce((s, r) => s + Number(r.amount), 0)
+  const outLog = loanMoves
+    .filter(loggable)
+    .map((r) => entry(r, r.loan_id, companyOf(r.loan_id)?.name ?? '—'))
+    .sort(newestFirst)
 
   // ── Fund IN: a fund source's installments passed unpaid ──
   const sourceList = (sources ?? []) as SourceRow[]
-  const history = sourceList.length ? await fetchTermsHistory(supabase, 'fund_source', sourceList.map((s) => s.id)) : new Map()
+  type Named = Pick<SourceRow, 'id' | 'from_company_id' | 'from_freetext_name' | 'from_department_id'>
+  const sourceName = (s: Named) =>
+    ((s.from_company_id ? companyMap.get(s.from_company_id)?.name : null) ??
+      s.from_freetext_name ??
+      (s.from_department_id ? deptName.get(s.from_department_id) : null) ??
+      'Fund source') as string
+  const fsMoves = sourceReps as Array<Move & { fund_source_id: string }>
+  const fsLogMoves = fsMoves.filter(loggable)
+  // A fund source netted in the last 30 days and repaid since is not among the
+  // live ones read above; its name is read beside the terms history.
+  const named = new Map<string, Named>(sourceList.map((s) => [s.id, s]))
+  const unnamed = Array.from(new Set(fsLogMoves.map((r) => r.fund_source_id).filter((id) => !named.has(id))))
+  const [history, gone] = await Promise.all([
+    sourceList.length ? fetchTermsHistory(supabase, 'fund_source', sourceList.map((s) => s.id)) : Promise.resolve(new Map()),
+    fetchByKeys(unnamed, (chunk) => supabase.from('fund_sources').select('id, from_company_id, from_department_id, from_freetext_name').in('id', chunk)),
+  ])
+  for (const s of gone as Named[]) named.set(s.id, s)
+  const fsNetted = fsMoves.filter((r) => r.payment_type === 'netting' && inMonth(r))
+  const fsNettedTotal = fsNetted.reduce((s, r) => s + Number(r.amount), 0)
+  const inLog = fsLogMoves
+    .map((r) => {
+      const s = named.get(r.fund_source_id)
+      return entry(r, r.fund_source_id, s ? sourceName(s) : 'Fund source')
+    })
+    .sort(newestFirst)
   const repsBySource = new Map<string, Array<{ date: string; type: string; amount: number; ref: null }>>()
   for (const r of sourceReps as Array<{ fund_source_id: string; amount: number; payment_date: string; payment_type: string }>) {
     const list = repsBySource.get(r.fund_source_id) ?? []
@@ -155,9 +216,7 @@ export default async function OverduePage({ searchParams }: Props) {
     })
     const due = overdueOf(plan, today)
     if (!due) continue
-    const co = s.from_company_id ? companyMap.get(s.from_company_id) : undefined
-    const name = (co?.name ?? s.from_freetext_name ?? (s.from_department_id ? deptName.get(s.from_department_id) : null) ?? 'Fund source') as string
-    owed.push({ source: s, name, months: plan.months, due })
+    owed.push({ source: s, name: sourceName(s), months: plan.months, due })
   }
   const inOutstanding = owed.reduce((s, o) => s + o.due.outstanding, 0)
   const longestIn = [...owed].sort((a, b) => b.due.daysPast - a.due.daysPast)[0] ?? null
@@ -175,10 +234,6 @@ export default async function OverduePage({ searchParams }: Props) {
   const monthsOf = (m: Map<string, unknown[]>) => Array.from(m.keys()).sort().reverse()
   const monthTitle = (ym: string) => dayjs(`${ym}-01`).format('MMMM YYYY')
   const outOf = (loanId: string) => outstandingMap.get(loanId) ?? Number(loanMap.get(loanId)?.principal ?? 0)
-  // The handoff labels a month's foot "Total" over two rows or more; a phone,
-  // where the row's own label is all there is, always says it.
-  const footLabel = (n: number) => (n > 1 ? 'Total' : <span className="md:hidden">Total</span>)
-  const log = rows.filter((r) => r.status !== 'pending')
 
   return (
     <div>
@@ -218,7 +273,7 @@ export default async function OverduePage({ searchParams }: Props) {
             icon="clock"
             note={longestIn ? longestIn.name : 'Nothing overdue'}
           />
-          <StatCard label="Netted this month" value={formatMoney(0)} icon="swap" note="Netting is on loans" />
+          <StatCard label="Netted this month" value={formatMoney(fsNettedTotal)} icon="swap" note={plural(fsNetted.length, 'netting', 'nettings')} />
         </StatCards>
       )}
 
@@ -318,47 +373,8 @@ export default async function OverduePage({ searchParams }: Props) {
             })
           )}
 
-          {/* ───────── The netting & penalty log — always on show. The
-              handoff counts the last 30 days, but a record carries no day it
-              was netted or settled, so the log keeps every one and says so. ───────── */}
-          <section className="mb-6">
-            <div className="sect-head">
-              <h2>Netting &amp; penalty log</h2>
-              <span className="rule" aria-hidden />
-              <span className="count">{plural(log.length, 'RECORD', 'RECORDS')} · ALL TIME</span>
-            </div>
-            {log.length === 0 ? (
-              <p className="text-sm text-graphite">Nothing netted or settled yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="ledger-table w-full">
-                  <thead>
-                    <tr>
-                      <th>Company</th>
-                      <th className="text-right right">Penalty</th>
-                      <th className="text-right right m-hide">Days</th>
-                      <th>Status</th>
-                      <th className="lt-toggle" aria-hidden />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {log.map((row) => (
-                      <LedgerRow key={row.id}>
-                        <td>{companyOf(row.loan_id)?.name ?? '—'}</td>
-                        <td className="num">{formatMoney(Number(row.penalty_amount ?? 0))}</td>
-                        <td className="num m-hide" data-label="Days">
-                          {row.overdue_days}
-                        </td>
-                        <td>
-                          <StageChip stage={row.overdue_stage} status={row.status} />
-                        </td>
-                      </LedgerRow>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
+          {/* ───────── The netting & penalty log — always on show. ───────── */}
+          <NettingLog side="out" entries={outLog} />
         </>
       ) : (
         <>
@@ -436,9 +452,74 @@ export default async function OverduePage({ searchParams }: Props) {
               )
             })
           )}
+
+          {/* ───────── The netting & penalty log — always on show. ───────── */}
+          <NettingLog side="in" entries={inLog} />
         </>
       )}
     </div>
+  )
+}
+
+/** The netting & penalty log (2026-10-12): what was netted or charged on one
+ *  side, each on its day, over the last 30 days — a loan's on Fund OUT, a
+ *  fund source's on Fund IN; each opens its deal. */
+function NettingLog({ side, entries }: { side: 'out' | 'in'; entries: LogEntry[] }) {
+  return (
+    <section className="mb-6">
+      <div className="sect-head">
+        <h2>Netting &amp; penalty log</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">
+          {entries.length} {entries.length === 1 ? 'ENTRY' : 'ENTRIES'} · LAST 30 DAYS
+        </span>
+      </div>
+      {entries.length === 0 ? (
+        <p className="text-sm text-graphite">No netting or penalty in the last 30 days.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="ledger-table w-full">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>{side === 'out' ? 'Company' : 'Fund source'}</th>
+                <th className="m-hide">Type</th>
+                <th className="text-right right">Amount</th>
+                <th className="lt-toggle" aria-hidden />
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((e) => (
+                <LedgerRow key={e.id}>
+                  <td className="whitespace-nowrap">{dayjs(e.date).format('D MMM YYYY')}</td>
+                  <td>
+                    <Link href={`/fund-${side}/${e.dealId}`} className="text-ink hover:text-accent">
+                      {e.name}
+                    </Link>
+                  </td>
+                  <td className="m-hide" data-label="Type">
+                    <span className={`chip ${e.type === 'penalty' ? 'danger' : 'ledger'}`}>
+                      <i className="dot" />
+                      {e.type}
+                    </span>
+                  </td>
+                  <td className="num">{formatMoney(e.amount)}</td>
+                </LedgerRow>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>{footLabel(entries.length)}</td>
+                <td />
+                <td className="m-hide" />
+                <td className="num">{formatMoney(entries.reduce((s, e) => s + e.amount, 0))}</td>
+                <td className="lt-toggle" aria-hidden />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </section>
   )
 }
 

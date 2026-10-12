@@ -1,5 +1,27 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-12 r (SHIPPED) — Overdue: the netting & penalty log, Fund IN's Netted this month
+
+The user asked what "ALL TIME" on the netting log meant; I had said netting keeps no date —
+wrong: a netting is a repayment row with its payment_date (2 so far, both fund sources,
+7 Aug 2026, RM 45,000 each). What has no date is an overdue record's status change
+(Mark paid / Escalate), and overdue_status has no 'netted' at all — so the old log listed
+paid / escalated overdue records, never a netting. Sample first (scratchpad
+overdue-netting-sample.html), then the user: 两个都改 … 对，照这个做.
+
+- **The log** (`overdue/page.tsx` `NettingLog`): on BOTH tabs, the tab's side's nettings and
+  penalties of the last 30 days (today − 29 → on), newest first — Date · Company / Fund
+  source (links to /fund-out|/fund-in/<id>) · Type chip (netting green, penalty red) ·
+  Amount, Total foot; "n ENTRIES · LAST 30 DAYS", empty "No netting or penalty in the last
+  30 days." Loans: `repayments` read now `.in('payment_type', ['netting','penalty'])` from the
+  earlier of the month start and the 30 days. Fund sources: from the page's existing
+  fund_source_repayments read (+ id); a source repaid since (not in the active/matured read)
+  is named through `fetchByKeys` beside the terms history. Paid / escalated overdue records
+  are no longer listed; StageChip lost its `status` param.
+- **Fund IN's Netted this month** counts the fund sources' nettings in the month (it was a
+  hard-coded RM 0 "Netting is on loans").
+- Rules: `.claude/rules/finance/finance-view.md` › OVERDUE'S NETTING LOG (2026-10-12).
+
 ## CHECKPOINT 2026-10-10 q (SHIPPED) — the leftovers of p done (user: 做完他)
 
 - **Venture Pool**: the ledger lists EVERY line (the latest-50 read is gone; it reuses the
