@@ -3,11 +3,10 @@
 import { useEffect, useState } from 'react'
 import { Drawer } from '@/components/hrv/overlay'
 import { flash } from '@/components/hrv/toast'
+import MemoCard, { openMemoFileIn } from '@/components/memos/MemoCard'
 import { previewPublished } from '@/lib/documentation/actions'
 import { openMemoFile } from '@/lib/memos/actions'
-import {
-  memoFileExt, memoParas, memoWhen, previewSummary, receiptOf, type MemoPreview,
-} from '@/lib/memos/model'
+import { memoWhen, previewSummary, receiptOf, type MemoPreview } from '@/lib/memos/model'
 import s from './documentation.module.css'
 
 /**
@@ -41,25 +40,13 @@ export default function MemoPreviewDrawer({ memoId, onClose }: { memoId: string 
   }, [memoId])
 
   function openFile(mode: 'view' | 'download') {
-    if (!memo?.attachment) return
-    // Readied in the press itself: a tab opened after the server answers is a pop-up to the browser.
-    const win = mode === 'view' ? window.open('', '_blank') : null
-    if (win) win.opener = null
-    void openMemoFile(memo.id, mode).then(link => {
-      if (!link.ok) {
-        win?.close()
-        flash(link.reason)
-        return
-      }
-      if (win) win.location.href = link.url
-      else {
-        window.location.assign(link.url)
-        flash(`Downloads ${link.fileName || memo.attachment?.name}`)
-      }
+    if (!memo) return
+    void openMemoFileIn(m => openMemoFile(memo.id, m), mode).then(refused => {
+      if (refused) flash(refused)
+      else if (mode === 'download') flash(`Downloads ${memo.attachment?.name ?? 'the file'}`)
     })
   }
 
-  const paras = memo ? memoParas(memo.body) : []
   return (
     <Drawer open={!!memoId} onClose={onClose} width={560} bare label={memo?.title ?? 'Preview'}>
       <div className={s.vwHead}>
@@ -85,30 +72,7 @@ export default function MemoPreviewDrawer({ memoId, onClose }: { memoId: string 
         <div className={s.vwPreview}><div className={s.vwNone}>Opening the memo…</div></div>
       ) : tab === 'memo' ? (
         <div className={s.vwPreview}>
-          <article className={s.mpCard} aria-label={`${memo.title}, as it reads`}>
-            <div className={s.mpFrom}>
-              <span className={s.mpFromTile} aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M12 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" />
-                </svg>
-              </span>
-              <span className={s.mpFromText}>
-                <span className={s.mpSender}>{memo.sender}</span>
-                <span className={s.mpWhen}>{memoWhen(memo.publishedAt)}</span>
-              </span>
-            </div>
-            <h3 className={s.mpTitle}>{memo.title}</h3>
-            {paras.map((p, i) => (
-              <p key={i} className={s.mpPara}>{p}</p>
-            ))}
-            {memo.attachment ? (
-              <div className={s.mpFile}>
-                <span className={s.mpFileTile} aria-hidden="true">{memoFileExt(memo.attachment.name)}</span>
-                <span className={s.mpFileName}>{memo.attachment.name}</span>
-                <button type="button" className={s.smallBtn} onClick={() => openFile('view')}>View</button>
-                <button type="button" className={s.smallBtn} onClick={() => openFile('download')}>Download</button>
-              </div>
-            ) : null}
+          <MemoCard memo={memo} onFile={memo.attachment ? openFile : undefined}>
             {memo.withdrawnAt ? (
               <div className={s.mpGone}>Withdrawn {memoWhen(memo.withdrawnAt)} — nobody sees it any more.</div>
             ) : memo.requiresAck ? (
@@ -119,7 +83,7 @@ export default function MemoPreviewDrawer({ memoId, onClose }: { memoId: string 
                 </span>
               </div>
             ) : null}
-          </article>
+          </MemoCard>
         </div>
       ) : (
         <div className={s.vwAudit}>

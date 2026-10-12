@@ -179,6 +179,80 @@ describe('the HR app’s bell (2026-10-11)', () => {
   })
 })
 
+// One's own memos (2026-10-12 — the user: a memo reaches its person in every view and is acknowledged once): the
+// bell's MEMO notice opens it, Home's "Waiting for you" heads with it, More lists them; opening it reads it and
+// Acknowledge is the login's receipt (lib/memos/actions.ts).
+describe('the HR app’s memos (2026-10-12)', () => {
+  const memo = {
+    id: 'm1', title: 'House rules', body: 'Read them.\n\nThey start Monday.', sender: 'People & Culture', kind: 'Memo',
+    publishedAt: '2026-10-12T09:44:13Z', version: 1, requiresAck: true, attachment: { name: 'Rules.pdf', type: 'application/pdf' },
+    readAt: null, acknowledgedAt: null,
+  }
+  const old = { ...memo, id: 'm0', title: 'Old notice', attachment: null, readAt: '2026-10-02T02:00:00Z', acknowledgedAt: '2026-10-02T02:00:00Z' }
+  const marks = () => {
+    const mark = vi.fn(async (_id: string, ack: boolean) => ({ ok: true as const, acknowledgedAt: ack ? '2026-10-12T10:01:00Z' : null }))
+    const refresh = vi.fn()
+    return { mark, refresh, acts: { ...actions, memoMark: mark, memoFile: vi.fn(async () => ({ ok: false as const, reason: 'This file was withdrawn.' })), refresh } }
+  }
+
+  it('Home’s “Waiting for you” heads with a memo to acknowledge, and opening it reads it', async () => {
+    const { mark, refresh, acts } = marks()
+    render(<HrApp data={{ ...data, memos: [old, memo], personalLogin: true }} actions={acts} />)
+    expect(screen.queryByText('All clear.')).toBeNull()
+    fireEvent.click(screen.getByText('House rules'))
+    expect(screen.getByRole('heading', { name: 'House rules' })).toBeInTheDocument()
+    expect(screen.getByText('They start Monday.')).toBeInTheDocument()
+    expect(screen.getByText('Rules.pdf')).toBeInTheDocument()
+    expect(screen.getByText('Needs your acknowledgement')).toBeInTheDocument()
+    await waitFor(() => expect(mark).toHaveBeenCalledWith('m1', false))
+    await waitFor(() => expect(refresh).toHaveBeenCalled())
+  })
+
+  it('Acknowledge records it once, for every view — then it says when', async () => {
+    const { mark, acts } = marks()
+    render(<HrApp data={{ ...data, memos: [memo], personalLogin: true }} actions={acts} />)
+    fireEvent.click(screen.getByText('House rules'))
+    fireEvent.click(screen.getByRole('button', { name: 'Acknowledge' }))
+    await waitFor(() => expect(mark).toHaveBeenCalledWith('m1', true))
+    expect(await screen.findByText(/You acknowledged this ·/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull()
+  })
+
+  it('the bell’s MEMO notice opens the memo', () => {
+    const { acts } = marks()
+    const notices = { unread: 1, items: [{ id: 'n9', kind: 'memo' as const, title: 'House rules', body: 'From People & Culture · please read and acknowledge', refKind: 'memo' as const, refId: 'm1', at: new Date().toISOString(), read: false }] }
+    render(<HrApp data={{ ...data, notices, memos: [memo], personalLogin: true }} actions={acts} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 1 new' }))
+    expect(screen.getByText('MEMO')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('From People & Culture · please read and acknowledge', { exact: false }))
+    expect(screen.getByRole('heading', { name: 'House rules' })).toBeInTheDocument()
+  })
+
+  it('a tapped push opens it (?open=memo:…); one taken back since opens the list', () => {
+    const { acts } = marks()
+    window.history.pushState(null, '', '/hr-app?open=memo:m1')
+    const { unmount } = render(<HrApp data={{ ...data, memos: [memo], personalLogin: true }} actions={acts} />)
+    expect(screen.getByRole('heading', { name: 'House rules' })).toBeInTheDocument()
+    expect(window.location.search).toBe('')
+    unmount()
+    window.history.pushState(null, '', '/hr-app?open=memo:gone')
+    render(<HrApp data={{ ...data, memos: [memo], personalLogin: true }} actions={acts} />)
+    expect(screen.getByRole('heading', { name: 'Memos' })).toBeInTheDocument()
+  })
+
+  it('More › Memos lists them; nothing to acknowledge while viewing as somebody', () => {
+    const { acts } = marks()
+    render(<HrApp data={{ ...data, memos: [memo, old], personalLogin: true }} actions={acts} />)
+    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'More' }))
+    fireEvent.click(screen.getByRole('button', { name: /Memos.*1 waiting for your acknowledgement/ }))
+    expect(screen.getByText('Old notice')).toBeInTheDocument()
+    cleanup()
+    render(<HrApp data={{ ...data, memos: [], viewingAs: 'Nurul Huda' }} actions={acts} />)
+    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'More' }))
+    expect(screen.queryByRole('button', { name: /^Memos/ })).toBeNull()
+  })
+})
+
 describe('the HR app with no meeting room yet', () => {
   it('greys out + Book: there is nothing to book', () => {
     render(<HrApp data={{ ...data, rooms: [] }} actions={actions} />)

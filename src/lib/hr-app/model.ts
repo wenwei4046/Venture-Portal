@@ -7,6 +7,7 @@
 
 import { formatIntlDate } from '@/lib/utils'
 import type { Notice, Notices } from '@/lib/push/notices'
+import type { MyMemo } from '@/lib/memos/model'
 
 export type HireStatus = 'submitted' | 'needs_info' | 'acknowledged' | 'filled' | 'cancelled' | 'declined'
 export type CandStage = 'shortlisted' | 'appointment' | 'offered' | 'hired' | 'rejected'
@@ -173,6 +174,12 @@ export interface HrAppData {
    * Never while viewing as somebody. Absent reads as shared.
    */
   personalLogin?: boolean
+  /**
+   * Their own memos (2026-10-12, mig 20261012210000 — the user: a memo reaches its person in every view and is
+   * acknowledged once): every memo addressed to the People record the login holds, with its receipt. None for a
+   * shared login, none while viewing as somebody. Absent reads as none.
+   */
+  memos?: MyMemo[]
 }
 
 /** A view of the one app (setViewAs): the portal as the Principal or Finance, this app, the Revenue app. */
@@ -374,10 +381,17 @@ export function clashOf(bookings: readonly HrBooking[], roomId: string, date: st
 
 // ── Notifications (2026-10-11, mig 20261011180000) ──
 
-/** A notice's tag, in the Review list's own colours: HIRE (a hiring request), ROOM (a meeting), REQ (a member's request). */
+/** A memo's tag (2026-10-12): the olive of Documentation's kind tag. */
+export const MEMO_TAG = { tag: 'MEMO', bg: 'rgb(238 240 226)', fg: 'rgb(88 98 68)' } as const
+
+/**
+ * A notice's tag, in the Review list's own colours: HIRE (a hiring request), ROOM (a meeting), REQ (a member's
+ * request), MEMO (a memo or letter for them — 2026-10-12).
+ */
 export function noticeTag(n: Pick<Notice, 'refKind'>): { tag: string; bg: string; fg: string } {
   if (n.refKind === 'hiring_request') return { tag: 'HIRE', bg: 'rgb(255 244 231)', fg: 'rgb(163 78 37)' }
   if (n.refKind === 'booking') return { tag: 'ROOM', bg: 'rgb(230 237 241)', fg: 'rgb(78 101 116)' }
+  if (n.refKind === 'memo') return { ...MEMO_TAG }
   return { tag: 'REQ', bg: 'rgb(240 236 230)', fg: 'rgb(78 52 38)' }
 }
 

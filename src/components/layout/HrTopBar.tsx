@@ -9,6 +9,7 @@ import { officeClock } from '@/lib/office-clock'
 import type { User, UserRole } from '@/types'
 import { Select } from '@/components/hrv/select'
 import { setViewAs } from './view-as-actions'
+import MemoBell from './MemoBell'
 import ViewAsPersonPicker from './ViewAsPersonPicker'
 
 /** The select's value while a person is viewed (2026-10-11). */
@@ -42,6 +43,8 @@ export default function HrTopBar({ user }: { user: User }) {
         <span className={s.name}>{displayName}</span>.
       </div>
       <div className={s.right}>
+        {/* One's own memos, as in every view (2026-10-12): a login a People record names, never while viewing as somebody. */}
+        {user.personalLogin === true && !user.viewingAs ? <MemoBell /> : null}
         {user.canSwitchView ? (
           <ViewSwitch value={user.role} viewingAs={user.viewingAs?.name} />
         ) : (

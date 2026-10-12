@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@/types'
 import { getRoleLabel } from '@/lib/roles'
 import { officeClock } from '@/lib/office-clock'
+import MemoBell from './MemoBell'
 import PortalViewSwitcher from './PortalViewSwitcher'
 import { useNavOwner } from './nav-owner'
 import ThemeToggle from './ThemeToggle'
@@ -25,6 +26,8 @@ export default function TopBar({ user, fin = false }: TopBarProps) {
   // Ultimate full access (`view_switch`, 2026-10-08) — the Principal role
   // used to be the test, which Full access now shares without the switcher.
   const canSwitchView = user.canSwitchView === true
+  // One's own memos, in every view (2026-10-12): a login a People record names, never while viewing as somebody.
+  const memos = user.personalLogin === true && !user.viewingAs
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -64,6 +67,7 @@ export default function TopBar({ user, fin = false }: TopBarProps) {
         </span>
         <span className="ml-auto flex items-center gap-3">
           {canSwitchView ? <PortalViewSwitcher value={user.role} viewingAs={user.viewingAs?.name} /> : null}
+          {memos ? <MemoBell /> : null}
           <ThemeToggle />
         </span>
       </div>
@@ -106,6 +110,7 @@ export default function TopBar({ user, fin = false }: TopBarProps) {
           <span className="text-muted/70">·</span>
           <span suppressHydrationWarning>{clock.quarter}</span>
         </div>
+        {memos ? <MemoBell /> : null}
         <ThemeToggle />
         {/* Sign out is in the More sheet on mobile — repeating it here cost
             ~90px of header width and truncated the greeting to "Good even…". */}

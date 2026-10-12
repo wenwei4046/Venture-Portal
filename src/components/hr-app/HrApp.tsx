@@ -13,11 +13,12 @@ import ViewingAsBanner from '@/components/layout/ViewingAsBanner'
 import { PASSWORD_CHANGED, useChangePassword, type ChangePassword } from '@/components/account/use-change-password'
 import { MIN_PASSWORD_LENGTH } from '@/lib/account/password'
 import {
-  CAND_STAGE, CHIP, HIRE_FILTERS, HR_APP_VIEWS, MAJOR_EVENTS, MEMBER_KIND, ORANGE, SLATE,
+  CAND_STAGE, CHIP, HIRE_FILTERS, HR_APP_VIEWS, MAJOR_EVENTS, MEMBER_KIND, MEMO_TAG, ORANGE, SLATE,
   bookingTimes, budgetLabel, candChip, clashOf, dayLabel, daysToFill, hireChip, hm, hourFrom, initials, isPendingHire,
   isPendingRequest, missingFor, noticeAgo, noticeTag, pipeline, positionLabel, requestStatusLabel, requestTitle, reviewItems, shiftDay, slotAt,
   type CandStage, type HrAppData, type HrAppView, type HrBooking, type HrHire,
 } from '@/lib/hr-app/model'
+import { ackedLine, memoDay, memoFileExt, memoParas, memoUnread, memoWaiting, memoWhen, memosInOrder, type MyMemo } from '@/lib/memos/model'
 import s from './hr-app.module.css'
 
 // The HR phone app (2026-10-11, HR revamp round 2 — README §17, the handoff's
@@ -53,6 +54,13 @@ export interface HrAppActions {
   switchView(view: HrAppView): void
   /** This login's own password (2026-10-12): the current one, then the new one twice — a personal login only. */
   changePassword: ChangePassword
+  /**
+   * Their own memo (2026-10-12): opened (`ack` false) or acknowledged — the LOGIN's receipt, so it is done in every
+   * view (the portal's bell, the Revenue app) at once. The account's own, not a module's (lib/memos/actions.ts).
+   */
+  memoMark(id: string, ack: boolean): Promise<{ ok: true; acknowledgedAt?: string | null } | { ok: false; reason: string }>
+  /** A memo's file: a short link made at the press. */
+  memoFile(id: string, mode: 'view' | 'download'): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
   /** After a write: read the app's data again. */
   refresh(): void
 }
@@ -67,6 +75,8 @@ type Page =
   | { k: 'docs' }
   | { k: 'person'; id: string }
   | { k: 'notices' }
+  | { k: 'memos' }
+  | { k: 'memo'; id: string }
 type Sheet =
   | { k: 'stage'; cid: string; name: string; cur: CandStage }
   | { k: 'ack' }
@@ -92,7 +102,7 @@ const TABS: Array<[Tab, string]> = [['home', 'Home'], ['review', 'Review'], ['hi
 const TITLES: Record<string, [string, string]> = {
   home: ['', 'Human Resource'], review: ['Inbox', 'Review'], hiring: ['Hiring', 'Requests'], rooms: ['Admin', 'Meeting rooms'],
   more: ['HR', 'More'], insights: ['Hiring', 'Insights'], talents: ['Hiring', 'Talent Bank'], docs: ['Documentation', 'Data center'],
-  notices: ['HR', 'Notifications'],
+  notices: ['HR', 'Notifications'], memos: ['For you', 'Memos'],
 }
 
 /** The book sheet opens on HR, as the prototype's does — or the first department there is. */
@@ -138,6 +148,15 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
   const live = d.bookings
   const items = useMemo(() => reviewItems(d), [d])
   const staffName = (id: string | null | undefined) => d.staff.find(p => p.id === id)?.name ?? id ?? '—'
+  // Their own memos (2026-10-12): waiting first, newest first — and what was opened or acknowledged here shows at
+  // once, before the app reads again.
+  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set())
+  const [acked, setAcked] = useState<ReadonlyMap<string, string>>(() => new Map())
+  const memos = useMemo<MyMemo[]>(() => memosInOrder((d.memos ?? []).map(m => ({
+    ...m,
+    readAt: m.readAt ?? (opened.has(m.id) || acked.has(m.id) ? m.publishedAt : null),
+    acknowledgedAt: m.acknowledgedAt ?? acked.get(m.id) ?? null,
+  }))), [d.memos, opened, acked])
 
   const push = (p: Page) => {
     setStack(st => [...st, p])
@@ -157,6 +176,10 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
     if (kind === 'hiring_request') {
       setTab('hiring')
       setStack(d.hires.some(h => h.id === id) ? [{ k: 'hire', id }] : [])
+    } else if (kind === 'memo') {
+      // A memo or letter for them (2026-10-12): it opens; one taken back since leaves its list.
+      setTab('home')
+      setStack(memos.some(m => m.id === id) ? [{ k: 'memo', id }] : [{ k: 'memos' }])
     } else if (kind === 'member_request') {
       setTab('review')
       setStack(d.requests.some(r => r.id === id) ? [{ k: 'req', id }] : [])
@@ -177,7 +200,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
     const target = openTarget(new URLSearchParams(window.location.search).get('open'))
     if (!target) return
     window.history.replaceState(null, '', window.location.pathname)
-    openRef(target.k === 'hire' ? 'hiring_request' : target.k === 'req' ? 'member_request' : 'booking', target.id)
+    openRef(target.k === 'hire' ? 'hiring_request' : target.k === 'req' ? 'member_request' : target.k === 'memo' ? 'memo' : 'booking', target.id)
     // Only on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -222,13 +245,46 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
   // ── the open talent / person ──
   const tt = top?.k === 'talent' ? d.talents.find(t => t.id === top.id) ?? null : null
   const pp = top?.k === 'person' ? d.staff.find(p => p.id === top.id) ?? null : null
+  // ── the open memo (2026-10-12) ──
+  const mm = top?.k === 'memo' ? memos.find(m => m.id === top.id) ?? null : null
+
+  // Opening a memo is reading it: the login's receipt, the same in every view (and its notice goes quiet).
+  const memoOpen = mm && memoUnread(mm) && !d.viewingAs ? mm.id : null
+  useEffect(() => {
+    if (!memoOpen) return
+    setOpened(prev => new Set(prev).add(memoOpen))
+    void actions.memoMark(memoOpen, false).then(r => {
+      if (r.ok) actions.refresh()
+    })
+    // Once per memo opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memoOpen])
+  const ackMemo = (id: string) =>
+    run(async () => {
+      const r = await actions.memoMark(id, true)
+      if (r.ok) setAcked(prev => new Map(prev).set(id, r.acknowledgedAt ?? new Date().toISOString()))
+      return r
+    }, undefined, false)
+  const openMemoFile = (id: string) => {
+    // A link made at the press (never kept): opened in a tab readied in the tap, with no handle back on the app.
+    const win = window.open('', '_blank')
+    if (win) win.opener = null
+    void actions.memoFile(id, 'view').then(res => {
+      if (res.ok && win) win.location.href = res.url
+      else {
+        win?.close()
+        if (!res.ok) setError(res.reason)
+      }
+    })
+  }
 
   const [kicker, title] =
     view === 'hire' ? [hr?.id ?? '', hr ? hr.position : '']
       : view === 'req' ? [rr ? MEMBER_KIND[rr.kind] : '', rr ? requestTitle(rr) : '']
         : view === 'talent' ? ['Talent Bank', tt?.name ?? '']
           : view === 'person' ? ['Data center', pp?.name ?? '']
-            : TITLES[view] ?? ['', '']
+            : view === 'memo' ? [mm?.kind ?? 'Memo', mm?.title ?? '']
+              : TITLES[view] ?? ['', '']
 
   return (
     <div className={s.app} data-hr-app="">
@@ -272,7 +328,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
           {error ? <div className={s.formErr} role="alert">{error}</div> : null}
 
           {view === 'home' ? (
-            <HomeScreen d={d} items={items} goTab={goTab} push={push} openBooking={id => openSheet({ k: 'booking', id })} staffName={staffName} />
+            <HomeScreen d={d} items={items} memos={memos} goTab={goTab} push={push} openBooking={id => openSheet({ k: 'booking', id })} staffName={staffName} />
           ) : null}
 
           {view === 'review' ? (
@@ -384,6 +440,19 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
 
           {view === 'more' ? (
             <section className={s.more}>
+              {/* Not in the handoff (2026-10-12): their own memos — the same ones the portal's bell and the Revenue app show. */}
+              {(memos.length > 0 || d.personalLogin) && !d.viewingAs ? (
+                <button type="button" className={s.moreRow} onClick={() => push({ k: 'memos' })}>
+                  <span className={s.moreIcon} style={{ background: MEMO_TAG.bg, color: MEMO_TAG.fg }}>✉</span>
+                  <span className={s.grow}>
+                    <span className={s.moreTitle}>Memos</span>
+                    <span className={s.moreSub}>
+                      {memos.filter(memoWaiting).length ? `${memos.filter(memoWaiting).length} waiting for your acknowledgement` : memos.length ? 'All acknowledged' : 'None for you yet'}
+                    </span>
+                  </span>
+                  <Chevron />
+                </button>
+              ) : null}
               {([
                 ['insights', 'Insights', 'Hiring time, cost and sources', '◔', 'rgb(230 237 241)', SLATE, d.parts.insights],
                 ['talents', 'Talent Bank', `${d.talents.length} people kept on file`, '★', 'rgb(255 244 231)', 'rgb(163 78 37)', d.parts.talent],
@@ -438,6 +507,53 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
           ) : null}
 
           {view === 'notices' ? <NoticesScreen items={d.notices.items} fresh={fresh} open={(n: Notice) => openRef(n.refKind, n.refId)} /> : null}
+
+          {view === 'memos' ? (
+            <>
+              {memos.map(m => (
+                <button key={m.id} type="button" className={s.item} onClick={() => push({ k: 'memo', id: m.id })}>
+                  <div className={s.itemTop}>
+                    <span className={s.itemTag} style={{ background: MEMO_TAG.bg, color: MEMO_TAG.fg }}>{m.kind === 'Memo' ? 'MEMO' : m.kind.toUpperCase()}</span>
+                    <span className={s.spacer} />
+                    <span className={s.itemWhen}>{memoDay(m.publishedAt)}</span>
+                  </div>
+                  <div className={s.itemTitle} style={memoUnread(m) ? { fontWeight: 700 } : undefined}>{m.title}</div>
+                  <div className={s.itemMeta}>
+                    {memoWaiting(m) ? `From ${m.sender} · needs your acknowledgement` : m.acknowledgedAt ? ackedLine(m.acknowledgedAt) : `From ${m.sender}`}
+                  </div>
+                </button>
+              ))}
+              {memos.length === 0 ? <div className={s.emptyCard}>No memos for you yet.</div> : null}
+            </>
+          ) : null}
+
+          {view === 'memo' && mm ? (
+            <>
+              <div className={s.pageChips}>
+                <span
+                  className={s.pageChip}
+                  style={memoWaiting(mm) ? { background: CHIP.alert[0], color: CHIP.alert[1] } : { background: CHIP.ledger[0], color: CHIP.ledger[1] }}
+                >
+                  {memoWaiting(mm) ? 'Needs your acknowledgement' : mm.acknowledgedAt ? 'Acknowledged' : 'Read'}
+                </span>
+              </div>
+              <div className={s.pageMeta}>From {mm.sender} · {memoWhen(mm.publishedAt)}</div>
+              {memoParas(mm.body).length ? (
+                <section className={s.long}>
+                  {memoParas(mm.body).map((p, i) => <p key={i} className={s.memoPara}>{p}</p>)}
+                </section>
+              ) : null}
+              {mm.attachment ? (
+                <div className={s.letter}>
+                  <span className={s.letterIcon}>{memoFileExt(mm.attachment.name)}</span>
+                  <span className={s.memoFileName}>{mm.attachment.name}</span>
+                  <button type="button" className={s.viewBtn} onClick={() => openMemoFile(mm.id)}>View</button>
+                </div>
+              ) : null}
+              {mm.acknowledgedAt ? <div className={s.memoAcked}>✓ {ackedLine(mm.acknowledgedAt)}</div> : null}
+            </>
+          ) : null}
+          {view === 'memo' && !mm ? <div className={s.emptyCard}>This memo was taken back.</div> : null}
 
           {view === 'insights' ? <InsightsScreen d={data} /> : null}
 
@@ -547,6 +663,14 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
       </div>
 
       {view === 'hire' && hr && d.may.hireApprove ? <HireBar hr={hr} busy={busy} openSheet={openSheet} cancel={() => run(() => actions.hireCancel(hr.id), undefined, false)} meId={d.meId} /> : null}
+      {/* A memo still waiting (2026-10-12): Acknowledge, once — for every view. Never while viewing as somebody. */}
+      {view === 'memo' && mm && memoWaiting(mm) && !d.viewingAs ? (
+        <div className={s.actBar}>
+          <button type="button" className={s.actBtn} style={{ borderColor: ORANGE, background: ORANGE, color: 'rgb(43 31 23)', flex: 1 }} disabled={busy} onClick={() => ackMemo(mm.id)}>
+            {busy ? 'Recording…' : 'Acknowledge'}
+          </button>
+        </div>
+      ) : null}
 
       <nav ref={barRef} className={`${s.tabs} ${tuck.tuckable}`} data-tucked={tucked ? '' : undefined} inert={tucked || undefined} aria-label="HR app">
         {TABS.map(([k, label]) => {
@@ -608,9 +732,11 @@ function NoticesScreen({ items, fresh, open }: { items: Notice[]; fresh: Readonl
   )
 }
 
-function HomeScreen({ d, items, goTab, push, openBooking, staffName }: {
+function HomeScreen({ d, items, memos, goTab, push, openBooking, staffName }: {
   d: HrAppData
   items: ReturnType<typeof reviewItems>
+  /** Their own memos (2026-10-12): the ones still waiting for Acknowledge head "Waiting for you". */
+  memos: MyMemo[]
   goTab: (t: Tab) => void
   push: (p: Page) => void
   openBooking: (id: string) => void
@@ -618,6 +744,7 @@ function HomeScreen({ d, items, goTab, push, openBooking, staffName }: {
 }) {
   const missing = d.staff.filter(p => missingFor(d, p.id).length).length
   const meetings = d.bookings.filter(b => b.date === d.today).sort((a, b) => a.from - b.from)
+  const waiting = memos.filter(memoWaiting)
   void staffName
   return (
     <>
@@ -644,7 +771,18 @@ function HomeScreen({ d, items, goTab, push, openBooking, staffName }: {
           <span className={s.cardTitle}>Waiting for you</span>
           <button type="button" className={s.cardLink} onClick={() => goTab('review')}>See all</button>
         </div>
-        {items.slice(0, 4).map(it => (
+        {/* A memo or letter waiting for their Acknowledge comes first (2026-10-12): it is theirs alone to do. */}
+        {waiting.slice(0, 4).map(m => (
+          <button key={`memo-${m.id}`} type="button" className={s.todo} onClick={() => push({ k: 'memo', id: m.id })}>
+            <span className={s.todoTag} style={{ background: MEMO_TAG.bg, color: MEMO_TAG.fg }}>{MEMO_TAG.tag}</span>
+            <span className={s.grow}>
+              <span className={s.line}>{m.title}</span>
+              <span className={s.meta12}>From {m.sender} · please acknowledge</span>
+            </span>
+            <Chevron />
+          </button>
+        ))}
+        {items.slice(0, Math.max(0, 4 - waiting.length)).map(it => (
           <button key={it.k + it.id} type="button" className={s.todo} onClick={() => push({ k: it.k, id: it.id })}>
             <span className={s.todoTag} style={{ background: it.tagBg, color: it.tagFg }}>{it.tag}</span>
             <span className={s.grow}>
@@ -654,7 +792,7 @@ function HomeScreen({ d, items, goTab, push, openBooking, staffName }: {
             <Chevron />
           </button>
         ))}
-        {items.length === 0 ? <div className={s.allClear}>All clear.</div> : null}
+        {items.length === 0 && waiting.length === 0 ? <div className={s.allClear}>All clear.</div> : null}
       </section>
       <section className={s.card18}>
         <div className={s.cardHead}>
