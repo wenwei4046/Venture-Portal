@@ -271,9 +271,47 @@ describe('BillContextMenu — Share this bill…', () => {
     fireEvent.change(within(panel).getByLabelText(/Share with/), { target: { value: 'anthony' } })
     expect(within(panel).getByLabelText(/Their part/)).toHaveValue(50)
 
-    fireEvent.click(within(panel).getByRole('button', { name: /Stop sharing with ANTHONY/ }))
+    fireEvent.click(within(panel).getByRole('button', { name: /Cancel share with ANTHONY/ }))
     await waitFor(() => expect(onShareDone).toHaveBeenCalled())
     expect(mocks.unshareOrder).toHaveBeenCalledWith('order-1', 'anthony')
+  })
+
+  // 2026-10-12 — the user: "for those shared bill, can pick cancel share as
+  // well — at ADRIAN's side press cancel share to ANTHONY, then ANTHONY's side
+  // will not have the share".
+  it('cancels a share in one click from the menu itself, one line per holder', async () => {
+    mocks.unshareOrder.mockResolvedValue({ ok: true, result: { ...result, before: 0.5, after: null, parts: alone } })
+    const { root, onShareDone } = shareMenu(halves)
+    const rows = within(root).getAllByRole('menuitem').map(r => r.textContent)
+    expect(rows.slice(rows.indexOf('Share this bill…'), rows.indexOf('Share this bill…') + 2))
+      .toEqual(['Share this bill…', 'Cancel share with ANTHONY'])
+    const cancel = within(root).getByRole('menuitem', { name: 'Cancel share with ANTHONY' })
+    expect(cancel).toHaveAttribute('title', 'ADRIAN takes the 50% back')
+    fireEvent.click(cancel)
+    // Nothing to confirm: it writes, and the notice offers Undo.
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(() => expect(onShareDone).toHaveBeenCalled())
+    expect(mocks.unshareOrder).toHaveBeenCalledWith('order-1', 'anthony')
+    expect(onShareDone.mock.calls[0][0]).toMatchObject({ orderId: 'order-1', result: { after: null } })
+  })
+
+  it('has a cancel line for every holder', () => {
+    const { root } = shareMenu([{ staffId: 'adrian', name: 'ADRIAN', pct: 0.5 },
+      { staffId: 'anthony', name: 'ANTHONY', pct: 0.3 }, { staffId: 'lucas', name: 'LUCAS', pct: 0.2 }])
+    expect(within(root).getAllByRole('menuitem', { name: /^Cancel share with/ }).map(r => r.textContent))
+      .toEqual(['Cancel share with ANTHONY', 'Cancel share with LUCAS'])
+  })
+
+  it('has no cancel line on a bill nobody shares', () => {
+    const { root } = shareMenu(alone)
+    expect(within(root).queryByRole('menuitem', { name: /Cancel share/ })).toBeNull()
+  })
+
+  it('shuts the cancel line, with why, once the month has paid', () => {
+    const { root } = shareMenu(halves, 'locked')
+    const cancel = within(root).getByRole('menuitem', { name: 'Cancel share with ANTHONY' })
+    expect(cancel).toBeDisabled()
+    expect(cancel).toHaveAttribute('title', expect.stringContaining('The run for September 2026 has paid'))
   })
 
   it('keeps a refusal in the panel', async () => {
@@ -323,13 +361,23 @@ describe('BillContextMenu — Move to another salesperson…', () => {
   const moved = (over = {}) => ({
     orderId: 'order-1', orderNo: 'HC-SO-013493', changed: true,
     to: { staffId: 'anthony', name: 'ANTHONY' }, from: OWNER, movedBack: false,
-    openBillRank: null, openBillBack: null, shareTaken: null, ...over,
+    openBillRank: null, openBillBack: null, shareTaken: null, shareBack: null, shareNotBack: null, ...over,
   })
-  function moveMenu(action: BillMoveAction = { kind: 'move', owner: OWNER, named: null }) {
+  function moveMenu(action: BillMoveAction = { kind: 'move', owner: OWNER, named: null },
+    parts: { staffId: string; name: string; pct: number }[] | null = null) {
     const onMoveDone = vi.fn()
-    const rendered = menu({ kind: 'exclude' }, { move: { action, candidates: TEAM }, onMoveDone })
+    const share = parts ? { action: { kind: 'share' as const, ownerStaffId: 'adrian', ownerName: 'ADRIAN', parts }, candidates: TEAM } : null
+    const rendered = menu({ kind: 'exclude' }, { move: { action, candidates: TEAM }, share, onMoveDone })
     return { ...rendered, onMoveDone }
   }
+
+  it('marks a holder in the list — moved to them, all of it is theirs', () => {
+    const { root } = moveMenu(undefined, [{ staffId: 'adrian', name: 'ADRIAN', pct: 0.5 }, { staffId: 'anthony', name: 'ANTHONY', pct: 0.5 }])
+    fireEvent.click(within(root).getByRole('menuitem', { name: /Move to another salesperson/ }))
+    const panel = screen.getByRole('dialog', { name: 'Move HC-SO-013493' })
+    expect(panel).toHaveTextContent("ADRIAN's bill, shared ADRIAN 50% · ANTHONY 50%.")
+    expect(within(within(panel).getByLabelText(/Move to/)).getByRole('option', { name: 'ANTHONY — holds 50%' })).toBeInTheDocument()
+  })
 
   it('is one line, and asks whom and why before it moves anything', async () => {
     mocks.moveOrder.mockResolvedValue({ ok: true, result: moved() })

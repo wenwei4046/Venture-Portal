@@ -420,7 +420,8 @@ const MOVE_REFUSALS = new Set(['23RUN', '23EXC', '23MOV'])
  * back. The rule is the database's (`revenue_move_order`, mig
  * 20261012170000): the bill becomes theirs everywhere a bill's salesperson
  * counts and stays theirs through every ERP re-send; the new holder's share
- * goes, the Open Bill pick goes (and comes back on the move back). This
+ * goes and is theirs again when the bill leaves them (mig 20261012190000), the
+ * Open Bill pick goes (and comes back on the move back). This
  * refuses, as a share does, a bill somebody paid on it has closed, a new
  * holder whose own month is closed, and anybody off the sub-department's team.
  *
@@ -459,6 +460,8 @@ export async function moveOrder(orderId: string, staffId: string | null, note?: 
     openBillRank?: number | null
     openBillBack?: number | null
     shareTaken?: number | string | null
+    shareBack?: number | string | null
+    shareNotBack?: number | string | null
   }
   const nameOf = await staffNames(supabase, [moved.staffId, moved.fromStaffId ?? null])
   if (moved.changed) revalidatePath('/revenue', 'layout')
@@ -473,9 +476,16 @@ export async function moveOrder(orderId: string, staffId: string | null, note?: 
       movedBack: moved.movedBack === true,
       openBillRank: moved.openBillRank ?? null,
       openBillBack: moved.openBillBack ?? null,
-      shareTaken: moved.shareTaken === null || moved.shareTaken === undefined ? null : Number(moved.shareTaken),
+      shareTaken: partOf(moved.shareTaken),
+      shareBack: partOf(moved.shareBack),
+      shareNotBack: partOf(moved.shareNotBack),
     },
   }
+}
+
+/** A part as PostgREST sends a numeric — "0.5000" — or null. */
+function partOf(value: number | string | null | undefined): number | null {
+  return value === null || value === undefined ? null : Number(value)
 }
 
 /** Names for a move's notice: a person, or "nobody" for a bill no salesperson is matched to. */

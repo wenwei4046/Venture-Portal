@@ -106,8 +106,8 @@ export default function ShareControl({
                   onClick={() => run(() => unshareOrder(orderId, s.staffId))}
                   disabled={isPending}
                   className="text-muted hover:text-danger disabled:opacity-40"
-                  title={`Stop sharing with ${s.name} — ${ownerName} holds that part again`}
-                  aria-label={`Stop sharing with ${s.name}`}
+                  title={`Cancel share with ${s.name} — ${ownerName} holds that part again`}
+                  aria-label={`Cancel share with ${s.name}`}
                 >
                   ×
                 </button>

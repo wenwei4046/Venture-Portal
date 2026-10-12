@@ -1187,6 +1187,31 @@ describe('CommissionWorkbench — a shared bill (user 2026-09-30)', () => {
     expect(await screen.findByText(/SO-one is no longer shared with Alex — Anthony holds all of it again\./)).toBeVisible()
   })
 
+  // 2026-10-12 — the user: "at ADRIAN's side press cancel share to ANTHONY,
+  // then ANTHONY's side will not have the share".
+  it('cancels a share from the owner’s ledger in one click, with Undo', async () => {
+    unshareOrder.mockResolvedValue({ ok: true, result: {
+      orderId: 'one', orderNo: 'SO-one', changed: true, staffId: 'leader', name: 'Alex', before: 0.5, after: null,
+      parts: [{ staffId: 'agent', name: 'Anthony', pct: 1 }],
+    } })
+    shareOrder.mockResolvedValue({ ok: true, result: {
+      orderId: 'one', orderNo: 'SO-one', changed: true, staffId: 'leader', name: 'Alex', before: null, after: 0.5,
+      parts: [{ staffId: 'agent', name: 'Anthony', pct: 0.5 }, { staffId: 'leader', name: 'Alex', pct: 0.5 }],
+    } })
+    render(<CommissionWorkbench data={sharedFixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]}
+      monthStats={monthStats} shareTeam={TEAM} />)
+    choose('Anthony')
+    fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getByText('Arena'), { clientX: 400, clientY: 260 })
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Cancel share with Alex' }))
+
+    await waitFor(() => expect(unshareOrder).toHaveBeenCalledWith('one', 'leader'))
+    const notice = await screen.findByText(/SO-one is no longer shared with Alex — Anthony holds all of it again\./)
+    expect(screen.queryByRole('menu')).toBeNull()
+    // Undo gives Alex the part back.
+    fireEvent.click(within(notice).getByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(shareOrder).toHaveBeenCalledWith('one', 'leader', 0.5))
+  })
+
   it('will not share a bill whose holder is closed, and never with somebody closed', () => {
     const data = sharedFixture()
     render(<CommissionWorkbench data={data} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]}

@@ -10,12 +10,15 @@
  * salesperson counts — their sales, their rate, their upline's override, their
  * ledger and their Revenue app — and stays theirs through every ERP re-send;
  * moving it to the salesperson the ERP names takes the move off. The new
- * holder's share of it goes (they hold it all); its Open Bill pick goes with it
- * and comes back on the move back. A paid month refuses (23RUN), a bill that
- * does not count refuses (23EXC), and the action refuses a bill or a
- * salesperson whose month is closed, and anybody off the team. This file only
- * decides what the menu shows and says what happened.
+ * holder's share of it goes (they hold it all) — remembered, and theirs again
+ * when the bill leaves them (mig 20261012190000), so an Undo is an undo; its
+ * Open Bill pick goes with it and comes back on the move back. A paid month
+ * refuses (23RUN), a bill that does not count refuses (23EXC), and the action
+ * refuses a bill or a salesperson whose month is closed, and anybody off the
+ * team. This file only decides what the menu shows and says what happened.
  */
+
+import { sharePct } from './bill-share'
 
 /** Who a bill is with, and who the ERP names when it was moved off them. */
 export interface BillHolder {
@@ -47,6 +50,10 @@ export interface BillMoveResult {
   openBillBack: number | null
   /** The part of it the new holder had held, now all theirs. */
   shareTaken: number | null
+  /** The part `from` held before a move made all of it theirs, theirs again now. */
+  shareBack: number | null
+  /** That part, when it could not be given back (the bill went to nobody, or no room was left). */
+  shareNotBack: number | null
 }
 
 /**
@@ -82,17 +89,26 @@ const RANKS = ['1st', '2nd', '3rd']
 export function moveMessage(result: BillMoveResult): string {
   if (!result.changed) return `${result.orderNo} is ${result.to.name}’s already — nothing moved.`
   const head = result.movedBack
-    ? `${result.orderNo} is back with ${result.to.name}, the salesperson the ERP names.`
+    ? result.to.staffId
+      ? `${result.orderNo} is back with ${result.to.name}, the salesperson the ERP names.`
+      : `${result.orderNo} has no salesperson again — the ERP names nobody matched yet.`
     : `${result.orderNo} is ${result.to.name}’s now — moved from ${result.from.name}.`
   const share = result.shareTaken
-    ? ` ${result.to.name} held ${Math.round(result.shareTaken * 1000) / 10}% of it; all of it is theirs now.`
+    ? ` ${result.to.name} held ${sharePct(result.shareTaken)} of it; all of it is theirs now.`
     : ''
+  const shareBack = result.shareBack
+    ? ` ${result.from.name}’s ${sharePct(result.shareBack)} share is back.`
+    : result.shareNotBack
+      ? result.to.staffId
+        ? ` ${result.from.name}’s ${sharePct(result.shareNotBack)} share did not come back — with the shares held now it would leave ${result.to.name} nothing. Share it again if it should be.`
+        : ` ${result.from.name}’s ${sharePct(result.shareNotBack)} share did not come back — nobody holds the bill to share it with.`
+      : ''
   const pick = result.openBillBack
     ? ` Its Open Bill pick (${RANKS[result.openBillBack - 1] ?? result.openBillBack}) is back.`
     : result.openBillRank
       ? ` Its Open Bill pick (${RANKS[result.openBillRank - 1] ?? result.openBillRank}) came off — it ranked ${result.from.name}’s day.`
       : ''
-  return `${head}${share}${pick}`
+  return `${head}${share}${shareBack}${pick}`
 }
 
 /** A bill that was moved, as its ledger row and its page say it. */

@@ -96,8 +96,9 @@ interface Props {
  *
  * *Share this bill…* (2026-09-30) opens a small form beside the menu: who
  * with, their part (50% to start), Save. The bill then sits on both ledgers,
- * each holder's part at their own rate; *Stop sharing with …* under it gives
- * a part back to the owner.
+ * each holder's part at their own rate; *Cancel share with …* — a line of the
+ * menu itself since 2026-10-12, and in the panel — gives a part back to the
+ * owner.
  */
 export default function BillContextMenu({ bill, anchor, monthLabel, link = null, brand = null, share = null, move = null, onClose, onDone, onBrandDone, onShareDone, onMoveDone }: Props) {
   const router = useRouter()
@@ -346,6 +347,23 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
     )
   }
 
+  // CANCEL SHARE (2026-10-12, the user: "for those shared bill, can pick cancel
+  // share as well — at ADRIAN's side press cancel share to ANTHONY, then
+  // ANTHONY's side will not have the share"): one line per holder, wherever
+  // the bill's menu opens — the owner's ledger, the holder's, All bills. One
+  // click; the owner takes the part back, and the notice offers Undo.
+  function cancelShareRows() {
+    if (!shareAction || !owner) return null
+    return holders.filter(h => h.staffId !== owner.staffId).map(h => (
+      <button key={h.staffId} type="button" role="menuitem" tabIndex={-1}
+        disabled={pending || shareAction.kind === 'locked'}
+        title={shareAction.kind === 'locked' ? shareAction.reason : `${owner.name} takes the ${sharePct(h.pct)} back`}
+        onClick={() => runShareWrite(() => unshareOrder(bill.orderId, h.staffId))}>
+        Cancel share with {h.name}
+      </button>
+    ))
+  }
+
   function backFromBrand() {
     if (writing.current) return
     restoreFocus.current = brandButton.current
@@ -477,6 +495,7 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
           </button>
         ) : null}
         {shareRow()}
+        {cancelShareRows()}
         {moveRow()}
         {countRow()}
         {brandRow()}
@@ -490,7 +509,8 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
           <div className={styles.menuHeading}>Move {bill.orderNo}</div>
           <p className={styles.confirmCopy}>
             {moveAction.owner.staffId ? `${moveAction.owner.name}'s bill` : 'A bill no salesperson is matched to'}
-            {moveAction.named ? ` (the ERP names ${moveAction.named.name})` : ''}. It becomes the new
+            {moveAction.named ? ` (the ERP names ${moveAction.named.name})` : ''}
+            {holders.length > 1 ? `, shared ${holdersLine(holders)}` : ''}. It becomes the new
             salesperson&apos;s — their sales, at their rate, with their upline&apos;s override — and stays theirs
             whatever the ERP sends next.
           </p>
@@ -499,11 +519,15 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
             <Select bare id={moveToId} data-autofocus value={moveTo} disabled={pending}
               onChange={event => { setMoveTo(event.target.value); setError(null) }}>
               <option value="">Choose a salesperson…</option>
-              {moveCandidates.map(c => (
-                <option key={c.staffId} value={c.staffId} disabled={!!c.closed}>
-                  {c.name}{c.closed ? ` — ${c.closed}` : ''}
-                </option>
-              ))}
+              {moveCandidates.map(c => {
+                // A holder takes all of it; their part comes back when it leaves them.
+                const held = heldBy(c.staffId)
+                return (
+                  <option key={c.staffId} value={c.staffId} disabled={!!c.closed}>
+                    {c.name}{held ? ` — holds ${sharePct(held.pct)}` : ''}{c.closed ? ` — ${c.closed}` : ''}
+                  </option>
+                )
+              })}
             </Select>
           </label>
           <label className={styles.dateField} htmlFor={moveNoteId}>
@@ -641,7 +665,7 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
                 <button key={h.staffId} type="button" disabled={pending}
                   onClick={() => runShareWrite(() => unshareOrder(bill.orderId, h.staffId))}>
                   <span className={styles.rowCopy}>
-                    <span>Stop sharing with {h.name}</span>
+                    <span>Cancel share with {h.name}</span>
                     <small>{owner.name} takes the {sharePct(h.pct)} back</small>
                   </span>
                 </button>
