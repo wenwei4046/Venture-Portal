@@ -1,198 +1,455 @@
 'use client'
 
-import { Fragment, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Chip, HvPage, PageHead, SecLabel } from '@/components/hrv/kit'
 import { Drawer } from '@/components/hrv/overlay'
-import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
-import { hiringFileLink, removeHiringTalent, saveHiringTalent } from '@/lib/hiring/actions'
-import { extLabel } from '@/lib/hiring/files'
-import { dayLabel, departmentNames, talentStatus } from '@/lib/hiring/view'
+import {
+  addBankFolder, addBankTalent, deleteBankFile, deleteBankFolder, hiringFileLink, moveBankEveryone, moveBankFolder, moveBankTalent, removeHiringTalent,
+  renameBankFolder, saveBankFile,
+} from '@/lib/hiring/actions'
+import {
+  ROOT, canonicalAt, crumbs, folderCards, folderNameRefusal, heldIn, holdsPeople, moveTargets, parentOf, parsePlace, pathLine, placeExists,
+  placeFiles, placeName, placeOfTalent, searchBank, takesFolders, talentAt, talentsIn, type Bank, type BankFile, type BankHit, type BankTree,
+} from '@/lib/hiring/bank'
+import { HIRING_ACCEPT, extLabel } from '@/lib/hiring/files'
+import { uploadHiringFile } from '@/lib/hiring/upload'
+import { dayLabel, talentStatus } from '@/lib/hiring/view'
 import type { HiringBoard, HiringFile, HiringFileType, HiringTalent } from '@/lib/hiring/types'
+import { sizeLabel, type FolderCard } from '@/lib/documentation/drive'
+import { FileTile, FolderTile } from '@/app/(portal)/team/documentation/_components/drive/Cards'
+import FolderNameWindow from '@/app/(portal)/team/documentation/_components/drive/FolderNameWindow'
+import Menu, { type MenuItem } from '@/app/(portal)/team/documentation/_components/drive/Menu'
+import {
+  BinGlyph, ChevronGlyph, CompanyGlyph, DownGlyph, EyeGlyph, FolderGlyph, NewFolderGlyph, PenGlyph, PersonGlyph, SearchGlyph, UploadGlyph,
+} from '@/app/(portal)/team/documentation/_components/drive/icons'
+import d from '@/app/(portal)/team/documentation/_components/drive/drive.module.css'
+import BankTalentTile from './BankTalentTile'
+import MoveWindow from './MoveWindow'
 import { WaitingFiles, sendWaiting, waitingProblem, type Waiting } from './HiringFiles'
+import b from './bank.module.css'
 import s from './hiring.module.css'
 
-type Nav = { dept?: string; pos?: string }
+/** What is being moved: a person, a folder with everything in it, or everybody in a department (2026-10-12). */
+type Moving = { kind: 'talent'; talent: HiringTalent } | { kind: 'folder'; card: FolderCard } | { kind: 'all'; card: FolderCard }
+
+/** What each place says under the path. */
+function hintOf(at: string): string {
+  const p = parsePlace(at)
+  if (!p) return ''
+  if (p.kind === 'root') {
+    return 'HOUZS Venture and the subsidiaries of Admin › Guest Link are here by themselves, each with its departments. Make a folder for another company, and folders by department inside it — somebody saved from a request is kept in their company and department by name.'
+  }
+  if (p.kind === 'company') {
+    return p.co === 'hv'
+      ? 'Its departments are Hiring › Form settings’ Department. Somebody saved from a request lands in their department by itself.'
+      : 'Its departments are its list in Admin › Guest Link. Somebody saved from one of its requests lands in their department by itself.'
+  }
+  if (p.kind === 'dept') return 'Everybody kept for this department — Move to… keeps somebody elsewhere.'
+  return 'Kept by HR — people and files.'
+}
+
+/** Opens a Talent Bank file the way the browser downloads: a short link with its name. */
+async function linkTo(f: BankFile, download: boolean): Promise<string | null> {
+  const link = await hiringFileLink('bank', f.id, download).catch(() => ({ ok: false as const, reason: 'The file could not be opened. Please try again.' }))
+  if (!link.ok) return link.reason
+  if (download) window.location.assign(link.url)
+  else window.open(link.url, '_blank', 'noopener')
+  return null
+}
 
 /**
- * Hiring › Talent Bank (README §13, portal-35): good candidates kept on file —
- * a 260px tree (search, All talent, each department and the positions under
- * it), the people as a table (right-click to remove), + Add talent (520px
- * drawer) and a person's 460px panel; Full page → opens their own page.
+ * Hiring › Talent Bank as a Drive (2026-10-12 — the user: "talent bank need be like google drive as well, can create
+ * new file, and name as well … so when save or upload can detect and locate file"; company › department › people,
+ * the companies and departments from Admin › Guest Link and from folders HR makes, HR's folders holding people and
+ * files). The Data center's Drive (People › Documentation): + New (New folder · Add talent · Upload files), the path
+ * back up, a search over the whole bank; folders as compact cards, people as cards, files as cards. A person opens
+ * their 460px panel as before (Full page → their own page). The place is the page's address (`?in=`).
  */
-export default function TalentBankView({ board, can }: { board: HiringBoard; can: { create: boolean; edit: boolean } }) {
+export default function TalentBankView({
+  board,
+  bank,
+  bankError,
+  can,
+  initialAt,
+}: {
+  board: HiringBoard
+  bank: Bank
+  bankError: string | null
+  can: { create: boolean; edit: boolean }
+  initialAt?: string
+}) {
   const router = useRouter()
-  const [q, setQ] = useState('')
-  const [nav, setNav] = useState<Nav>({})
-  const [openDepts, setOpenDepts] = useState<Record<string, boolean>>({})
-  const [menu, setMenu] = useState<string | null>(null)
+  const tree: BankTree = useMemo(() => ({ bank, talents: board.talents }), [bank, board.talents])
+  const [at, setAt] = useState(() => canonicalAt(initialAt ?? ROOT, tree))
+  const [query, setQuery] = useState('')
+  const [making, setMaking] = useState(false)
+  const [renaming, setRenaming] = useState<FolderCard | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [moving, setMoving] = useState<Moving | null>(null)
   const [sel, setSel] = useState<string | null>(null)
   const [armed, setArmed] = useState(false)
-  const [adding, setAdding] = useState(false)
+  const [dropping, setDropping] = useState(false)
+  const [uploading, setUploading] = useState(0)
+  const filePick = useRef<HTMLInputElement>(null)
   const [, start] = useTransition()
 
-  const depts = useMemo(() => {
-    const names = departmentNames(board)
-    return [...names, ...board.talents.map(t => t.department).filter(d => d && !names.includes(d))].filter((d, i, a) => a.indexOf(d) === i)
-  }, [board])
-  const qOk = (t: HiringTalent) => !q.trim() || `${t.name} ${t.position} ${t.notes}`.toLowerCase().includes(q.trim().toLowerCase())
-  const list = board.talents.filter(t => (!nav.dept || t.department === nav.dept) && (!nav.pos || t.position === nav.pos) && qOk(t))
+  const here = placeExists(at, tree) ? at : ROOT
+  const place = parsePlace(here)
+  const name = placeName(here, tree)
+  const path = crumbs(here, tree)
+  const folders = folderCards(here, tree)
+  const people = talentsIn(here, tree)
+  const files = placeFiles(here, bank)
+  const hits = useMemo(() => searchBank(query, tree), [query, tree])
   const picked = board.talents.find(t => t.id === sel) ?? null
+  const takesFiles = can.create && takesFolders(here)
+  const auto = folders.filter(c => !c.own)
+  const own = folders.filter(c => c.own)
+  const sections = [
+    { title: place?.kind === 'root' ? 'Companies' : 'Departments', cards: auto },
+    { title: 'Folders', cards: own },
+  ].filter(x => x.cards.length > 0)
 
-  const remove = (t: HiringTalent) =>
+  // The place is the page's address: a reload or a shared link opens it again (nothing is fetched).
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (here !== ROOT) url.searchParams.set('in', here)
+    else url.searchParams.delete('in')
+    if (url.href !== window.location.href) window.history.replaceState(null, '', url.href)
+  }, [here])
+
+  function open(next: string) {
+    setAt(next)
+    setQuery('')
+  }
+
+  function openTalent(t: HiringTalent) {
+    setSel(t.id)
+    setArmed(false)
+  }
+
+  async function makeFolder(folderName: string) {
+    const res = await addBankFolder(here, folderName)
+    if (res.ok) flash(`${folderName} made in ${name}`)
+    return res.ok ? { ok: true as const } : res
+  }
+
+  async function rename(card: FolderCard, folderName: string) {
+    const p = parsePlace(card.at)
+    if (!p) return { ok: false as const, reason: 'That folder is not there any more.' }
+    const res = await renameBankFolder(p.id, folderName)
+    if (res.ok) flash(`${card.name} is now ${folderName}`)
+    return res.ok ? { ok: true as const } : res
+  }
+
+  async function removeFolder(card: FolderCard) {
+    const p = parsePlace(card.at)
+    if (!p) return
+    const res = await deleteBankFolder(p.id)
+    flash(res.ok ? `${card.name} deleted` : res.reason)
+  }
+
+  const removeTalent = (t: HiringTalent) =>
     start(async () => {
       const out = await removeHiringTalent(t.id)
       if (!out.ok) return flash(out.reason)
       setSel(null)
-      setMenu(null)
       setArmed(false)
       flash(out.warning ?? `${t.name} removed from the Talent Bank`)
     })
-  const view = (f: HiringFile) =>
-    start(async () => {
-      const out = await hiringFileLink('file', f.id)
-      if (!out.ok) return flash(out.reason)
-      window.open(out.url, '_blank', 'noopener')
-    })
 
-  const head = nav.pos ?? nav.dept ?? 'All talent'
-  const sub = (nav.pos ? `${nav.dept} · ` : '') + list.length + (list.length === 1 ? ' person' : ' people')
+  async function uploadFiles(list: File[]) {
+    if (!list.length || !takesFiles) return
+    setUploading(n => n + list.length)
+    let saved = 0
+    let refused = ''
+    for (const file of list) {
+      try {
+        const up = await uploadHiringFile(file)
+        if (!up.ok) {
+          refused ||= `${file.name}: ${up.reason}`
+          continue
+        }
+        const res = await saveBankFile({ place: here, path: up.path, name: up.name, type: file.type, size: file.size })
+        if (res.ok) saved++
+        else refused ||= `${file.name}: ${res.reason}`
+      } catch {
+        refused ||= `${file.name} could not be uploaded. Please try again.`
+      } finally {
+        setUploading(n => n - 1)
+      }
+    }
+    const kept = `${saved} ${saved === 1 ? 'file' : 'files'} kept in ${name}`
+    flash(refused ? (saved ? `${kept} · ${refused}` : refused) : kept)
+  }
+
+  async function removeFile(f: BankFile) {
+    const res = await deleteBankFile(f.id)
+    flash(res.ok ? res.warning ?? `${f.name} deleted` : res.reason)
+  }
+
+  async function showFile(f: BankFile, download: boolean) {
+    const refused = await linkTo(f, download)
+    if (refused) flash(refused)
+  }
+
+  function openHit(h: BankHit) {
+    if (h.kind === 'place') return open(h.card.at)
+    if (h.kind === 'talent') {
+      open(placeOfTalent(h.talent, bank))
+      return openTalent(h.talent)
+    }
+    open(h.file.parent)
+    void showFile(h.file, false)
+  }
+
+  const newItems: Array<MenuItem | 'rule'> = [
+    ...(takesFolders(here) ? [{ key: 'folder', label: 'New folder', icon: <NewFolderGlyph />, onSelect: () => setMaking(true) }] : []),
+    ...(holdsPeople(here) ? [{ key: 'talent', label: 'Add talent', icon: <PersonGlyph size={16} />, onSelect: () => setAdding(true) }] : []),
+    'rule' as const,
+    { key: 'files', label: 'Upload files', icon: <UploadGlyph />, onSelect: () => filePick.current?.click() },
+  ]
+
+  // A folder HR made: Rename, Move to… (with everything in it), Delete. A department: Move everyone to… while something
+  // is right in it. Nothing for a company, nor without Edit.
+  const cardItems = (card: FolderCard): Array<MenuItem | 'rule'> => {
+    if (!can.edit) return []
+    if (card.own) {
+      return [
+        { key: 'rename', label: 'Rename', icon: <PenGlyph />, onSelect: () => setRenaming(card) },
+        { key: 'move', label: 'Move to…', icon: <FolderGlyph size={16} />, onSelect: () => setMoving({ kind: 'folder', card }) },
+        'rule',
+        { key: 'delete', label: 'Delete', confirm: 'Confirm delete', tone: 'danger', icon: <BinGlyph />, onSelect: () => void removeFolder(card) },
+      ]
+    }
+    if (card.kind === 'dept' && heldIn(card.at, tree).line) {
+      return [{ key: 'all', label: 'Move everyone to…', icon: <FolderGlyph size={16} />, onSelect: () => setMoving({ kind: 'all', card }) }]
+    }
+    return []
+  }
+
+  const talentItems = (t: HiringTalent): Array<MenuItem | 'rule'> => [
+    { key: 'open', label: 'Open', icon: <EyeGlyph />, onSelect: () => openTalent(t) },
+    ...(can.edit
+      ? [
+          { key: 'move', label: 'Move to…', icon: <FolderGlyph size={16} />, onSelect: () => setMoving({ kind: 'talent', talent: t }) },
+          'rule' as const,
+          { key: 'remove', label: 'Remove from Talent Bank', confirm: 'Confirm remove', tone: 'danger' as const, icon: <BinGlyph />, onSelect: () => removeTalent(t) },
+        ]
+      : []),
+  ]
+
+  const fileItems = (f: BankFile): Array<MenuItem | 'rule'> => [
+    { key: 'view', label: 'View', icon: <EyeGlyph />, onSelect: () => void showFile(f, false) },
+    { key: 'download', label: 'Download', icon: <DownGlyph />, onSelect: () => void showFile(f, true) },
+    ...(can.edit ? ['rule' as const, { key: 'delete', label: 'Delete', confirm: 'Confirm delete', tone: 'danger' as const, icon: <BinGlyph />, onSelect: () => void removeFile(f) }] : []),
+  ]
+
+  const onDragOver = (e: DragEvent) => {
+    if (!takesFiles || !e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    setDropping(true)
+  }
+  const onDrop = (e: DragEvent) => {
+    if (!takesFiles) return
+    e.preventDefault()
+    setDropping(false)
+    void uploadFiles(Array.from(e.dataTransfer.files))
+  }
 
   return (
     <HvPage>
       <PageHead eyebrow="Hiring · Talent Bank" title="Talent Bank" subtitle="Good candidates kept on file, ready to invite when a role opens." />
-      <div className={s.talGrid}>
-        <section className={s.tree} aria-label="Departments">
-          <input className={`${s.input} ${s.treeSearch}`} value={q} placeholder="Search name or notes" aria-label="Search name or notes" onChange={e => setQ(e.target.value)} />
-          <button type="button" className={s.treeRow} aria-current={!nav.dept} onClick={() => setNav({})}>
-            <span className={s.treeName}>All talent</span>
-            <span className={s.treeN}>{board.talents.filter(qOk).length}</span>
-          </button>
-          {depts.map(d => {
-            const mine = board.talents.filter(t => t.department === d && qOk(t))
-            const open = !!openDepts[d] || nav.dept === d
-            const positions = [...new Set(mine.map(t => t.position))]
-            // A Fragment, not a div: the department row and its positions sit in the tree's own 4px rhythm, as the
-            // prototype's do — and an opened department with nobody in it still draws its (empty) block.
-            return (
-              <Fragment key={d}>
-                <button
-                  type="button"
-                  className={s.treeRow}
-                  aria-current={nav.dept === d && !nav.pos}
-                  aria-expanded={open}
-                  onClick={() => {
-                    setNav({ dept: d })
-                    setOpenDepts(o => ({ ...o, [d]: !(nav.dept === d && !nav.pos) || !open }))
-                  }}
-                >
-                  <span className={s.treeCaret} data-open={open ? 'true' : undefined} aria-hidden="true">
-                    ▸
-                  </span>
-                  <span className={s.treeName}>{d}</span>
-                  <span className={s.treeN}>{mine.length}</span>
+      <div
+        className={d.drive}
+        data-drop={dropping ? 'true' : undefined}
+        onDragOver={onDragOver}
+        onDragLeave={e => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false)
+        }}
+        onDrop={onDrop}
+      >
+        <div className={d.bar}>
+          {can.create ? (
+            <Menu
+              label="New"
+              side="left"
+              items={newItems}
+              button={props => (
+                <button type="button" className={d.newBtn} {...props}>
+                  <span className={d.newPlus} aria-hidden="true">+</span>
+                  New
                 </button>
-                {open ? (
-                  <div className={s.treeKids}>
-                    {positions.map(p => (
-                      <button key={p} type="button" className={s.treeKid} aria-current={nav.dept === d && nav.pos === p} onClick={() => setNav({ dept: d, pos: p })}>
-                        <span className={s.treeKidName}>{p}</span>
-                        <span className={s.treeN}>{mine.filter(t => t.position === p).length}</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </Fragment>
-            )
-          })}
-        </section>
-
-        <div className={s.talMain}>
-          <div className={s.talHeadRow}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className={s.talHead}>{head}</div>
-              <div className={s.talSub}>{sub}</div>
-            </div>
-            {can.create ? (
-              <button type="button" className={s.btnOrange} onClick={() => setAdding(true)}>
-                + Add talent
-              </button>
+              )}
+            />
+          ) : null}
+          <nav className={d.crumbs} aria-label="Folder path">
+            {path.map((c, i) =>
+              i === path.length - 1 ? (
+                <span key={c.at} className={d.crumbHere} aria-current="page">{c.name}</span>
+              ) : (
+                <span key={c.at} style={{ display: 'contents' }}>
+                  <button type="button" className={d.crumb} onClick={() => open(c.at)}>{c.name}</button>
+                  <span className={d.crumbSep} aria-hidden="true"><ChevronGlyph size={14} /></span>
+                </span>
+              ),
+            )}
+          </nav>
+          <div className={d.searchWrap}>
+            <span className={d.searchIcon}><SearchGlyph size={15} /></span>
+            <input className={d.search} value={query} placeholder="Search the Talent Bank" aria-label="Search the Talent Bank" onChange={e => setQuery(e.target.value)} />
+            {query ? (
+              <button type="button" className={d.searchClear} onClick={() => setQuery('')} aria-label="Clear the search">×</button>
             ) : null}
           </div>
-          <div className={`${s.table} ${s.talTable}`} role="table" aria-label="Talent">
-            <div className={`${s.thead} ${s.talThead} ${s.talCols}`} role="row">
-              {['Name', 'Good fit for', 'Notes', 'Saved', 'Status'].map(h => (
-                <span key={h} role="columnheader">
-                  {h}
-                </span>
-              ))}
-            </div>
-            {list.map(t => {
-              const st = talentStatus(board, t)
-              return (
-                <div key={t.id} className={s.rowWrap}>
-                  <div
-                    role="row"
-                    tabIndex={0}
-                    className={`${s.row} ${s.talRow} ${s.talCols}`}
-                    aria-current={sel === t.id}
-                    onClick={() => {
-                      setSel(t.id)
-                      setMenu(null)
-                      setArmed(false)
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') setSel(t.id)
-                    }}
-                    onContextMenu={e => {
-                      e.preventDefault()
-                      setMenu(t.id)
-                    }}
-                  >
-                    <span>
-                      <span className={s.talName}>{t.name}</span>
-                      <span className={s.talSmall}>{t.fromRequest ? 'From ' + t.fromRequest : 'Added directly'}</span>
-                    </span>
-                    <span>
-                      <span style={{ display: 'block' }}>{t.position}</span>
-                      <span className={s.talSmall}>{t.department}</span>
-                    </span>
-                    <span className={s.talNote}>{t.notes.split('\n')[0]}</span>
-                    <span className={s.talWhen}>{dayLabel(t.savedAt)}</span>
-                    <span>
-                      <Chip tone={st.tone} style={{ fontSize: 10.5 }}>
-                        {st.label}
-                      </Chip>
-                    </span>
-                  </div>
-                  {menu === t.id ? (
-                    <>
-                      <div className={s.ctxCatch} onClick={() => setMenu(null)} onContextMenu={e => { e.preventDefault(); setMenu(null) }} aria-hidden="true" />
-                      <div className={`${s.ctx} ${s.talCtx}`} role="menu" aria-label={`${t.name} actions`}>
-                        <button type="button" role="menuitem" className={s.ctxItem} data-tone="ink" onClick={() => { setMenu(null); setSel(t.id); setArmed(false) }}>
-                          Open
-                        </button>
-                        {can.edit ? (
-                          <button type="button" role="menuitem" className={s.ctxItem} data-tone="danger" onClick={() => remove(t)}>
-                            Remove from Talent Bank
-                          </button>
-                        ) : null}
-                      </div>
-                    </>
-                  ) : null}
-                </div>
-              )
-            })}
-            {list.length ? null : <div className={s.listEmpty}>Nobody here yet.</div>}
-          </div>
-          <div className={s.listFoot} style={{ marginTop: 0 }}>
-            Right-click a row to remove it.
-          </div>
+          <input
+            ref={filePick}
+            type="file"
+            multiple
+            accept={HIRING_ACCEPT}
+            hidden
+            onChange={e => {
+              const list = Array.from(e.target.files ?? [])
+              e.target.value = ''
+              void uploadFiles(list)
+            }}
+          />
         </div>
+
+        {bankError ? <div className={d.error} role="alert">{bankError}</div> : null}
+
+        {query.trim() ? (
+          <div className={d.sect}>
+            <div className={d.sectHead}>
+              Found <span className={d.sectCount}>{hits.length}</span>
+            </div>
+            {hits.length ? (
+              <div className={d.results}>
+                {hits.map(h => {
+                  const key = h.kind === 'place' ? h.card.at : h.kind === 'talent' ? talentAt(h.talent.id) : `file:${h.file.id}`
+                  const title = h.kind === 'place' ? h.card.name : h.kind === 'talent' ? `${h.talent.name} · ${h.talent.position}` : h.file.name
+                  const kind = h.kind === 'place' ? (h.card.kind === 'company' ? 'Company' : h.card.kind === 'dept' ? 'Department' : 'Folder') : h.kind === 'talent' ? 'Person' : 'File'
+                  return (
+                    <button key={key} type="button" className={d.hit} onClick={() => openHit(h)}>
+                      <span className={d.folderIcon} data-kind={h.kind === 'place' ? h.card.kind : h.kind === 'talent' ? 'person' : 'file'}>
+                        {h.kind === 'place' ? (h.card.kind === 'company' ? <CompanyGlyph /> : <FolderGlyph />) : h.kind === 'talent' ? <PersonGlyph /> : <EyeGlyph size={20} />}
+                      </span>
+                      <span className={d.hitText}>
+                        <span className={d.hitName}>{title}</span>
+                        <span className={d.hitPath}>{h.path}</span>
+                      </span>
+                      <span className={d.hitKind}>{kind}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className={d.empty}>Nothing in the Talent Bank matches “{query.trim()}”.</div>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className={d.hint}>{hintOf(here)}</div>
+            {sections.map(sect => (
+              <div key={sect.title} className={d.sect}>
+                <div className={d.sectHead}>
+                  {sect.title} <span className={d.sectCount}>{sect.cards.length}</span>
+                </div>
+                <div className={d.grid}>
+                  {sect.cards.map(card => (
+                    <FolderTile
+                      key={card.at}
+                      card={card}
+                      canEdit={can.edit}
+                      onOpen={open}
+                      onRename={setRenaming}
+                      onDelete={c => void removeFolder(c)}
+                      items={cardItems(card)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+            {people.length ? (
+              <div className={d.sect}>
+                <div className={d.sectHead}>
+                  People <span className={d.sectCount}>{people.length}</span>
+                </div>
+                <div className={d.grid}>
+                  {people.map(t => (
+                    <BankTalentTile
+                      key={t.id}
+                      name={t.name}
+                      line={`${t.position} · ${talentStatus(board, t).label}`}
+                      items={talentItems(t)}
+                      onOpen={() => openTalent(t)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {files.length || uploading ? (
+              <div className={d.sect}>
+                <div className={d.sectHead}>
+                  Files <span className={d.sectCount}>{files.length}</span>
+                  {uploading ? <span className={d.sectCount}>· uploading {uploading}…</span> : null}
+                </div>
+                <div className={d.grid}>
+                  {files.map(f => (
+                    <FileTile
+                      key={f.id}
+                      title={f.name}
+                      fileName={f.name}
+                      contentType={f.contentType}
+                      onView={() => void showFile(f, false)}
+                      items={fileItems(f)}
+                      meta={
+                        <>
+                          <span>{dayLabel(f.addedAt)} · {f.addedBy}</span>
+                          <span className={d.fileMetaGap} />
+                          <span>{sizeLabel(f.size)}</span>
+                        </>
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {place?.kind !== 'root' && !folders.length && !people.length && !files.length && !uploading ? (
+              <div className={d.empty}>
+                <div className={d.emptyTitle}>This folder is empty.</div>
+                {can.create ? 'Press + New to make a folder, add a talent or upload files — or drop files here.' : 'Nobody has been kept here yet.'}
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
 
-      <AddTalentDrawer open={adding} depts={depts} types={board.fileTypes} canAddType={can.edit} onClose={() => setAdding(false)} />
+      {making ? (
+        <FolderNameWindow mode="new" where={`In ${name}`} check={n => folderNameRefusal(n, here, tree)} onSave={makeFolder} onClose={() => setMaking(false)} />
+      ) : null}
+      {renaming ? (
+        <FolderNameWindow
+          mode="rename"
+          where={renaming.name}
+          initial={renaming.name}
+          check={n => folderNameRefusal(n, parentOf(renaming.at, tree) ?? ROOT, tree, parsePlace(renaming.at)?.id)}
+          onSave={n => rename(renaming, n)}
+          onClose={() => setRenaming(null)}
+        />
+      ) : null}
+      {moving ? <MoveFor moving={moving} tree={tree} onClose={() => setMoving(null)} /> : null}
+
+      <AddTalentDrawer
+        open={adding}
+        place={here}
+        placeLabel={pathLine(here, tree)}
+        types={board.fileTypes}
+        canAddType={can.edit}
+        onClose={() => setAdding(false)}
+      />
 
       <Drawer
         open={!!picked}
@@ -222,9 +479,14 @@ export default function TalentBankView({ board, can }: { board: HiringBoard; can
                   type="button"
                   className={`${s.btnDanger} ${s.actWhite} ${s.armBtn}`}
                   data-armed={armed ? 'true' : undefined}
-                  onClick={() => (armed ? remove(picked) : setArmed(true))}
+                  onClick={() => (armed ? removeTalent(picked) : setArmed(true))}
                 >
                   {armed ? 'Confirm remove' : 'Remove'}
+                </button>
+              ) : null}
+              {can.edit ? (
+                <button type="button" className={s.btnPlain} onClick={() => setMoving({ kind: 'talent', talent: picked })}>
+                  Move to…
                 </button>
               ) : null}
               <button type="button" className={s.btnPlain} onClick={() => setSel(null)}>
@@ -237,53 +499,124 @@ export default function TalentBankView({ board, can }: { board: HiringBoard; can
           ) : null
         }
       >
-        {picked ? (
-          <div className={s.tsBody}>
-            <div className={s.facts}>
-              {[
-                ['Good fit for', picked.position, true],
-                ['Department', picked.department, true],
-                ['Phone', picked.phone || '—', false],
-                ['Email', picked.email || '—', false],
-                ['Saved from', picked.fromRequest || 'Added directly', false],
-                ['Saved', dayLabel(picked.savedAt), false],
-              ].map(([l, v, strong]) => (
-                <Pair key={String(l)} label={String(l)} value={String(v)} strong={!!strong} />
-              ))}
-            </div>
-            <div>
-              <SecLabel style={{ marginBottom: 6 }}>HR notes</SecLabel>
-              <div className={s.tsNotes}>{picked.notes || 'No notes yet.'}</div>
-            </div>
-            {picked.files.length ? (
-              <div className={s.hfGroup} role="group" aria-label="Files">
-                {picked.files.map(f => (
-                  <div key={f.id} className={s.tsFile}>
-                    <span className={s.extTile}>{extLabel(f.name)}</span>
-                    <span className={s.hfMain}>
-                      <span className={s.hfName}>{f.name}</span>
-                      <span className={s.hfKind}>{f.type}</span>
-                    </span>
-                    <button type="button" className={s.btnGhost} aria-label={`View ${f.name}`} onClick={() => view(f)}>
-                      View
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className={s.tsFile}>
-                <span className={s.extTile}>—</span>
-                <span className={s.tsFileName}>No files</span>
-              </div>
-            )}
-            <div>
-              <SecLabel style={{ marginBottom: 6 }}>Latest</SecLabel>
-              <div className={s.tsLatest}>{latestOf(picked)}</div>
-            </div>
-          </div>
-        ) : null}
+        {picked ? <TalentFacts board={board} talent={picked} keptIn={pathLine(placeOfTalent(picked, bank), tree)} /> : null}
       </Drawer>
     </HvPage>
+  )
+}
+
+/**
+ * Move to… for what is being moved (2026-10-12, "change name, and move together"): a person anywhere but the bank's
+ * top; a folder — with everything in it — anywhere but inside itself, the top included; everybody right in a department
+ * anywhere outside it.
+ */
+function MoveFor({ moving, tree, onClose }: { moving: Moving; tree: BankTree; onClose: () => void }) {
+  if (moving.kind === 'talent') {
+    const t = moving.talent
+    const now = placeOfTalent(t, tree.bank)
+    return (
+      <MoveWindow
+        title={`Move ${t.name}`}
+        now={`Now in ${pathLine(now, tree)}`}
+        targets={moveTargets(tree)}
+        current={now}
+        onMove={async at => {
+          const res = await moveBankTalent(t.id, at)
+          if (res.ok) flash(`${t.name} moved to ${pathLine(at, tree)}`)
+          return res.ok ? { ok: true as const } : res
+        }}
+        onClose={onClose}
+      />
+    )
+  }
+  const card = moving.card
+  if (moving.kind === 'folder') {
+    const parent = parentOf(card.at, tree) ?? ROOT
+    return (
+      <MoveWindow
+        title={`Move ${card.name}`}
+        now={`Now in ${pathLine(parent, tree)} — everything in it goes with it`}
+        targets={moveTargets(tree, { from: card.at, withRoot: true })}
+        current={parent}
+        onMove={async at => {
+          const res = await moveBankFolder(parsePlace(card.at)?.id ?? '', at)
+          if (res.ok) flash(`${card.name} moved to ${pathLine(at, tree)}`)
+          return res.ok ? { ok: true as const } : res
+        }}
+        onClose={onClose}
+      />
+    )
+  }
+  const held = heldIn(card.at, tree)
+  return (
+    <MoveWindow
+      title={`Move everyone in ${card.name}`}
+      now={`${held.line} — now in ${pathLine(card.at, tree)}`}
+      targets={moveTargets(tree, { from: card.at })}
+      onMove={async at => {
+        const res = await moveBankEveryone(card.at, at)
+        if (res.ok) flash(`${held.line} moved to ${pathLine(at, tree)}`)
+        return res.ok ? { ok: true as const } : res
+      }}
+      onClose={onClose}
+    />
+  )
+}
+
+/** A person's panel: what they fit, where they are kept, how to reach them, HR's notes, their files, the latest step. */
+function TalentFacts({ board, talent, keptIn }: { board: HiringBoard; talent: HiringTalent; keptIn: string }) {
+  const [, start] = useTransition()
+  const view = (f: HiringFile) =>
+    start(async () => {
+      const out = await hiringFileLink('file', f.id)
+      if (!out.ok) return flash(out.reason)
+      window.open(out.url, '_blank', 'noopener')
+    })
+  void board
+  return (
+    <div className={s.tsBody}>
+      <div className={s.facts}>
+        {[
+          ['Good fit for', talent.position, true],
+          ['Kept in', keptIn, true],
+          ['Phone', talent.phone || '—', false],
+          ['Email', talent.email || '—', false],
+          ['Saved from', talent.fromRequest || 'Added directly', false],
+          ['Saved', dayLabel(talent.savedAt), false],
+        ].map(([l, v, strong]) => (
+          <Pair key={String(l)} label={String(l)} value={String(v)} strong={!!strong} />
+        ))}
+      </div>
+      <div>
+        <SecLabel style={{ marginBottom: 6 }}>HR notes</SecLabel>
+        <div className={s.tsNotes}>{talent.notes || 'No notes yet.'}</div>
+      </div>
+      {talent.files.length ? (
+        <div className={s.hfGroup} role="group" aria-label="Files">
+          {talent.files.map(f => (
+            <div key={f.id} className={s.tsFile}>
+              <span className={s.extTile}>{extLabel(f.name)}</span>
+              <span className={s.hfMain}>
+                <span className={s.hfName}>{f.name}</span>
+                <span className={s.hfKind}>{f.type}</span>
+              </span>
+              <button type="button" className={s.btnGhost} aria-label={`View ${f.name}`} onClick={() => view(f)}>
+                View
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className={s.tsFile}>
+          <span className={s.extTile}>—</span>
+          <span className={s.tsFileName}>No files</span>
+        </div>
+      )}
+      <div>
+        <SecLabel style={{ marginBottom: 6 }}>Latest</SecLabel>
+        <div className={s.tsLatest}>{latestOf(talent)}</div>
+      </div>
+    </div>
   )
 }
 
@@ -303,21 +636,27 @@ function Pair({ label, value, strong }: { label: string; value: string; strong: 
   )
 }
 
-/** + Add talent (README §13 — the 520px drawer): a name and what they fit are needed; the rest helps — their files too, each with its type. */
+/**
+ * + New › Add talent (README §13 — the 520px drawer), in the place it is pressed: a name and what they fit are needed;
+ * the rest helps — their files too, each with its type. They are kept where the drawer was opened.
+ */
 function AddTalentDrawer({
   open,
-  depts,
+  place,
+  placeLabel,
   types,
   canAddType,
   onClose,
 }: {
   open: boolean
-  depts: string[]
+  place: string
+  placeLabel: string
   types: readonly HiringFileType[]
   canAddType: boolean
   onClose: () => void
 }) {
-  const [form, setForm] = useState({ name: '', phone: '', email: '', position: '', department: depts[0] ?? '', notes: '' })
+  const blank = { name: '', phone: '', email: '', position: '', notes: '' }
+  const [form, setForm] = useState(blank)
   const [waiting, setWaiting] = useState<Waiting[]>([])
   const [err, setErr] = useState('')
   const [pending, start] = useTransition()
@@ -326,7 +665,7 @@ function AddTalentDrawer({
     setErr('')
   }
   const close = () => {
-    setForm({ name: '', phone: '', email: '', position: '', department: depts[0] ?? '', notes: '' })
+    setForm(blank)
     setWaiting([])
     setErr('')
     onClose()
@@ -341,9 +680,9 @@ function AddTalentDrawer({
       const data = new FormData()
       for (const [k, v] of Object.entries(form)) data.set(k, v)
       data.set('files', JSON.stringify(sent.files))
-      const out = await saveHiringTalent(data)
+      const out = await addBankTalent(place, data)
       if (!out.ok) return setErr(out.reason)
-      flash(`${form.name.trim()} added to the Talent Bank`)
+      flash(`${form.name.trim()} added to ${placeLabel}`)
       close()
     })
   }
@@ -362,18 +701,14 @@ function AddTalentDrawer({
         </div>
       }
     >
+      <div className={b.keptIn}>
+        Kept in <span className={b.keptInPath}>{placeLabel}</span>
+      </div>
       <div className={s.addGrid}>
         <input className={s.input} value={form.name} placeholder="Name" aria-label="Name" onChange={set('name')} />
         <input className={s.input} value={form.phone} placeholder="Phone" aria-label="Phone" onChange={set('phone')} />
         <input className={s.input} value={form.email} placeholder="Email" aria-label="Email" onChange={set('email')} />
         <input className={s.input} value={form.position} placeholder="Good fit for (position)" aria-label="Good fit for (position)" onChange={set('position')} />
-        <Select bare className={s.select} value={form.department} aria-label="Department" onChange={set('department')}>
-          {depts.map(d => (
-            <option key={d} value={d}>
-              {d}
-            </option>
-          ))}
-        </Select>
       </div>
       <div className={s.hfGroup} role="group" aria-label="Files">
         <WaitingFiles types={types} kept={[]} waiting={waiting} canAddType={canAddType} onChange={next => { setWaiting(next); setErr('') }} />

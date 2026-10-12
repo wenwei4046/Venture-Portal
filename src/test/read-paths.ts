@@ -239,6 +239,12 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'hiring_source_set_active', 'hiring_source_remove', 'hiring_talent_save', 'hiring_talent_invite', 'hiring_talent_update',
   'hiring_talent_remove', 'hiring_files_add', 'hiring_file_replace', 'hiring_file_remove', 'hiring_file_type_add', 'hiring_file_downloaded',
   'hiring_orphan_files', 'hiring_file_type_rename', 'hiring_file_type_set_active',
+  // The Talent Bank as a Drive (mig 20261013030000): its read asks Hiring · View, a folder, a talent or a file added
+  // Create, renamed, deleted or moved Edit.
+  'hiring_bank', 'hiring_bank_folder_add', 'hiring_bank_folder_rename', 'hiring_bank_folder_delete', 'hiring_bank_move',
+  'hiring_bank_add_talent', 'hiring_bank_file_add', 'hiring_bank_file_delete', 'hiring_bank_folder_move', 'hiring_bank_move_all',
+  // …and Admin › Guest Link's department rename, which takes the bank's people along (guest_link.edit).
+  'guest_link_rename_department',
   // The hourly sweep's (api/member-queue, the service role — mig 20261011210000): Hiring's day-old leftovers.
   'hiring_leftovers',
   // View as a person (mig 20261011050000): each asks has_perm(view_switch).

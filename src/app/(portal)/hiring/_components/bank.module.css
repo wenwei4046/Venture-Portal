@@ -1,0 +1,40 @@
+/* Hiring › Talent Bank as a Drive (2026-10-12): what the Data center's Drive styles (team/documentation/_components/
+   drive/drive.module.css) do not have — a person's card status, the Move to… list, the Add talent drawer's place. */
+
+.status { font-size: 10.5px; }
+
+/* Move to…: every place, top down, indented by depth; the place they are in marked. */
+.moveList {
+  display: flex;
+  flex-direction: column;
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 10px;
+}
+.moveRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid rgb(var(--hv-hairline));
+  background: rgb(255 255 255);
+  color: rgb(var(--hv-ink));
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.moveRow:last-child { border-bottom: 0; }
+.moveRow:hover { background: rgb(var(--hv-row-hover)); }
+.moveRow[aria-pressed='true'] { background: rgb(var(--hv-panel-3)); font-weight: 500; }
+.moveRow:disabled { color: rgb(var(--hv-faint)); cursor: default; background: rgb(255 255 255); }
+.moveIcon { display: inline-flex; color: rgb(var(--hv-brown)); flex: none; }
+.moveName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.moveHere { font-size: 11px; color: rgb(var(--hv-brown)); flex: none; }
+.moveEmpty { padding: 14px 12px; font-size: 13px; color: rgb(var(--hv-brown)); }
+
+/* The place a new talent goes, in the Add talent drawer. */
+.keptIn { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; color: rgb(var(--hv-brown)); }
+.keptInPath { color: rgb(var(--hv-ink)); font-weight: 500; }
