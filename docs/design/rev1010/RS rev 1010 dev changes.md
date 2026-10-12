@@ -123,3 +123,24 @@ Design reference: `rev 1010.dc.html` (frames 1–6.3, plus 2.1 and 5.1).
 - Acceptance: as Daniel Tan (RS) → no switch; as Kelvin Lee (TL) → "Team | Mine" on every RS page, Insight has no Team | Me; tap Team → Control panel showing only Team Kelvin.
 
 **7.4 iPhone safe areas** — see the Must-do at the top of this file. Applies to every RS screen, sheet and overlay.
+
+---
+
+## 8 · Round 2 (added after the first hand-off)
+
+Build these on top of what is already live.
+
+**8.1 Profile › Back to Revenue app card**
+- Same card as the Control panel. `SalesProfile.tsx`, under "View my team" (or under the profile card when there's no team), above "Your workspace": 16px padding, radius 22px, background #F5EBE3, hover #EFE2D7, no border; 52×52 tile radius 14px #F6D9C4 with a rust #BD4A19 back arrow; title "Back to Revenue app" 17px/700, no sub-line; chevron #A8968B. Tap → back to the Revenue app (same as today's top-bar link).
+
+**8.2 Top bar removed; pages move up**
+- `SalesHeader.tsx` / `vm/header.ts`: no "Back to Revenue app" link, and the whole top bar row (48px) is not rendered on Inbox, Contacts, Calendar, Insight and Profile, so each page starts right under the safe area. The bell moves into each page's title row, at the right end: 40×40 circle, 1px #EBDDD2, white, shadow 0 2px 8px rgba(63,43,34,.06), bell 20px #3F2B22, rust badge top/right -4px. Inbox: after All ads (gap 8px). Contacts: right of "Contacts". Calendar: after Today (gap 8px). Insight: after the date chip (gap 8px). Profile: top-right corner of the profile card (14px in); the avatar + name row gets padding-right 48px so a long name wraps before the bell. Contacts' title row: margin-right -8px so its bell lines up with the other pages (main keeps 28px right padding for the A–Z index). Profile's sub-pages (Notifications, Auto-reply, Quick replies) keep the top bar with "‹ Profile". Chat unchanged.
+  - **Must keep:** the CRM root's `padding-top: env(safe-area-inset-top)` (see the iPhone safe areas item). Removing the top bar must not remove that padding: on an iPhone with a Dynamic Island the title row sits below it, never under it. Check on a real iPhone 15/16 Pro: nothing in the title row is covered.
+
+
+**8.3 Chat: remove the Book visit bar**
+- . In `SalesChat.tsx`, delete the full-width rust "Book visit" button above the composer (`notBooked` block). Booking stays in ⋮ › Appointment (Book a visit when none). Same change as the Control panel chat.
+
+**8.4 Team | Mine position** (Director and leaders on the RS side)
+- "Team | Mine" always sits at the right end of its own top row, on every RS page, same as the Control panel. Inbox: not in the title row left of All ads (supersedes the placement in 7.3 / header.ts › teamMineVM). Same segmented look (#F0E6DE track, white active pill, 28px tall). The bell stays in the title row (8.2).
+- If anything at the top is covered on an iPhone with a Dynamic Island, move it down: first row of every page and overlay starts at `calc(env(safe-area-inset-top, 0px) + 8px)` at the least. Fix in `crm.module.css`, not per page. Never shrink or hide to fit.

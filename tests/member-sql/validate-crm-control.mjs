@@ -241,4 +241,15 @@ check(crmPpl.find(p => p.id === S('ann')).title, (await q(`select t.name from ti
   check((await q(`select phone, unread from crm_contacts where external_id = 'MY.1052914074449222'`))[0], { phone: '+60198887777', unread: 2 }, 'the hand-typed number stays when they write again')
 }
 
+// 13. Round 2: a blocked date with set hours closes only those slots (mig 20261013210000); one without hours, the day.
+{
+  await q(`insert into crm_showrooms (id, name, active, sort_order, slots, cap, weekly, blocks) values ('pch', 'Puchong', true, 9, '{11:00,13:00,15:00,17:00}', 2, '{}',
+    '[{"a":"2026-10-07","b":"2026-10-07","why":"Training","t1":"14:00","t2":"17:00"},{"a":"2026-10-09","b":"2026-10-09","why":"Stock take"}]'::jsonb)`)
+  const at = async hm => { try { await q(`select public.crm_slot_check('pch', ($1 || '+08')::timestamptz, null)`, [`2026-10-07 ${hm}`]); return 'open' } catch (e) { return e.message } }
+  check([await at('11:00'), await at('13:00'), await at('15:00'), await at('17:00')],
+    ['open', 'open', 'Puchong is closed at that time.', 'open'], 'set hours 2–5 pm: 3 pm closed, 11, 1 and 5 pm open')
+  let whole = 'open'; try { await q(`select public.crm_slot_check('pch', '2026-10-09 11:00+08'::timestamptz, null)`) } catch (e) { whole = e.message }
+  check(whole, 'Puchong is closed that day.', 'a block without hours still closes the whole day')
+}
+
 console.log(`crm control panel: ${checks} checks passed`)

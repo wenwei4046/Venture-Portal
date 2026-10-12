@@ -6,9 +6,8 @@ import type { SalesTab } from "../ui";
 
 /**
  * Team | Mine (rev 1010 §7.3): the Director and anyone with a downline; Mine is this CRM, Team the Control panel scoped
- * to them. Viewing somebody (View as) shows it as THEY would see it — CrmApp hands their Team (user 2026-10-11). On
- * Inbox it sits in the title row, left of All ads (user 2026-10-11); on the other pages in the top bar. Never inside a
- * chat (neither is drawn there).
+ * to them. Viewing somebody (View as) shows it as THEY would see it — CrmApp hands their Team (user 2026-10-11). Since
+ * round 2 (§8.4) it sits at the right end of its own top row on every page, Inbox included. Never inside a chat.
  */
 export function teamMineVM(ctx: SalesCtx) {
   const toTeam = ctx.embedded?.toTeam;
@@ -19,17 +18,32 @@ export function teamMineVM(ctx: SalesCtx) {
   };
 }
 
-export function headerVM(ctx: SalesCtx, onExit: () => void) {
-  const { ui, set, data } = ctx;
+/** The bell (rev 1010 §8.2): opening Notifications reads nothing by itself — each update is read when tapped (§6). */
+export function titleBellVM(ctx: SalesCtx) {
+  const { set, data } = ctx;
   const unread = unreadNotifs(salesNotifs(ctx), data);
-  const tm = teamMineVM(ctx);
   return {
-    hasTM: tm.hasTM && ui.tab !== "inbox", tmTabs: tm.tmTabs,
-    backLabel: "Back to Revenue app", backVis: "visible" as const,
-    crmBack: () => { if (ui.profSub) { set(u => ({ ...u, profSub: null })); return; } onExit(); },
-    // Opening Notifications reads nothing by itself any more: each update is read when tapped (rev 1010 §6).
-    openNotifTop: () => { set(u => ({ ...u, tab: "profile", profSub: "notif", nTab: "unread", hist: [...u.hist, u.tab].slice(-20) })); },
-    hasNotifBadge: unread > 0, notifBadge: unread ? String(unread) : "",
+    open: () => { set(u => ({ ...u, tab: "profile", profSub: "notif", nTab: "unread", hist: [...u.hist, u.tab].slice(-20) })); },
+    has: unread > 0, n: unread ? String(unread) : "",
+  };
+}
+export type TitleBellVM = ReturnType<typeof titleBellVM>;
+/** What the five pages get beside their own view model (round 2): the bell in their title row, and Profile's way back. */
+export type ShellExtras = { tb: TitleBellVM; exitCrm: () => void };
+
+/**
+ * The top bar (round 2, §8.2): gone on Inbox, Contacts, Calendar, Insight and Profile — the bell is in each page's title
+ * row and Profile's card leads back to the Revenue app. It stays on Profile's sub-pages ("‹ Profile" and the bell) and,
+ * for Team | Mine, as its own row holding only the switch at its right end (§8.4).
+ */
+export function headerVM(ctx: SalesCtx) {
+  const { ui, set } = ctx;
+  const tm = teamMineVM(ctx), sub = !!ui.profSub, bell = titleBellVM(ctx);
+  return {
+    showTopBar: sub || tm.hasTM, hasTM: tm.hasTM, tmTabs: tm.tmTabs,
+    backLabel: "Profile", backVis: sub ? "visible" as const : "hidden" as const, bellTop: sub,
+    crmBack: () => { if (ui.profSub) set(u => ({ ...u, profSub: null })); },
+    openNotifTop: bell.open, hasNotifBadge: bell.has, notifBadge: bell.n,
   };
 }
 export type HeaderVM = ReturnType<typeof headerVM>;

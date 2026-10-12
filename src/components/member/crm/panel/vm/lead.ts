@@ -9,7 +9,7 @@
 import type { ChangeEvent } from "react";
 import type { CrmChatMessage, CrmCustomer } from "@/lib/member/crm-data";
 import { DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel } from "../../sales/vm/common";
-import { roomClosed, roomSlots, slotAt, windowLeft } from "../../sales/vm/chat";
+import { roomClosed, roomSlots, slotAt, slotBlocked, windowLeft } from "../../sales/vm/chat";
 import { infoRows } from "../../sales/vm/customer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
 import { oneAtATime } from "../../shared/once";
@@ -109,8 +109,9 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
       wk: Array.from({ length: 7 }, (_, k) => { const d = new Date(wS); d.setDate(wS.getDate() + k); return cell(d); }),
       // The showroom's own times that day; passed or full stay listed, struck through.
       slots: ALL_TIMES.filter(t => open.includes(t)).map((t): Slot => {
-        const at = slotAt(B.day, t), past = at <= now, n = taken(at), full = !past && n >= cap, ok = !past && !full, sel = B.slot === t && ok;
-        return { t, left: past ? "Passed" : full ? "Full" : `${cap - n} left`, hasLeft: true, pick: ok ? () => setB({ slot: t }) : undefined, cur: ok ? "pointer" : "not-allowed", deco: ok ? "none" : "line-through",
+        // A block with set hours closes the slots inside it (round 2), struck through as Closed.
+        const at = slotAt(B.day, t), past = at <= now, shut = !past && slotBlocked(room, B.day, t), n = taken(at), full = !past && !shut && n >= cap, ok = !past && !shut && !full, sel = B.slot === t && ok;
+        return { t, left: past ? "Passed" : shut ? "Closed" : full ? "Full" : `${cap - n} left`, hasLeft: true, pick: ok ? () => setB({ slot: t }) : undefined, cur: ok ? "pointer" : "not-allowed", deco: ok ? "none" : "line-through",
           bg: sel ? "#BD4A19" : ok ? "#fff" : "#F8F3EF", fg: sel ? "#fff" : ok ? "#3F2B22" : "#C9B8AC", bd: sel ? "#BD4A19" : ok ? "#EBDDD2" : "#F8F3EF" };
       }),
       bookLabel: B.slot ? `Book ${dayLabel(new Date(B.day))}, ${B.slot}` : "Pick a time", bookBg: B.slot ? "#BD4A19" : "#D9C7BA",
