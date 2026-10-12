@@ -396,6 +396,8 @@ export interface AdjustmentAnswer {
   status: 'pending' | 'confirmed' | 'dismissed'
   periodMonth: string
   amount: number
+  /** The feed answered it itself: a cancellation deducted directly (2026-10-13). */
+  answeredByFeed?: boolean
 }
 
 /**
@@ -413,6 +415,7 @@ export function commissionNote(c: Pick<ErpChange, 'kind' | 'settledAmount' | 'se
   if (c.kind === 'changed') return `${given} — earns the same`
   if (!answer) return `${given} — nothing to pay now`
   if (answer.status === 'pending') return `${given} — ${formatMoney(answer.amount)} waiting for an answer`
+  if (answer.status === 'confirmed' && answer.answeredByFeed) return `${given} — ${formatMoney(answer.amount)} deducted directly in ${formatMonth(answer.periodMonth)}`
   if (answer.status === 'confirmed') return `${given} — ${formatMoney(answer.amount)} paid in ${formatMonth(answer.periodMonth)}`
   return `${given} — let stand (Not a change)`
 }

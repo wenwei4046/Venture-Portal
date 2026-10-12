@@ -33,6 +33,10 @@ export interface UpsaleView {
   settledPeriod: string | null
   /** What gave it: a run, a salesperson's close, the claim form, a month closed to the feed. */
   settledBy: SettledBy | null
+  /** The feed answered it itself: a cancellation deducted directly (2026-10-13). */
+  answeredByFeed: boolean
+  /** The bill whose pay gave the commission: its shares split the change (2026-10-13). */
+  settledOrderId: string | null
   /** The month it is paid in (for a pending one: the first month it may be paid in). */
   periodMonth: string
   amount: number
@@ -83,7 +87,8 @@ function labelOf(f: FairEmbed | null): string | null {
 
 const UPSALE_SELECT =
   'id, staff_id, amount, sold_on, fair_event_id, original_ref, note, created_at, kind, source, status, ' +
-  'erp_doc_no, settled_amount, erp_amount, original_period, period_month, erp_reason, settled_period, settled_by, ' +
+  'erp_doc_no, settled_amount, erp_amount, original_period, period_month, erp_reason, settled_period, settled_by, answered_by_feed, ' +
+  'settled_order_id, ' +
   'hr_staff_costs (employee_name), ' +
   'comm_venue_events (venue_key, start_date, end_date, comm_venues (display_name), comm_organisers (name))'
 
@@ -105,6 +110,8 @@ type UpsaleRow = {
   erp_reason?: string | null
   settled_period?: string | null
   settled_by?: string | null
+  answered_by_feed?: boolean | null
+  settled_order_id?: string | null
   period_month: string
   hr_staff_costs: { employee_name: string } | { employee_name: string }[] | null
   comm_venue_events: FairEmbed | FairEmbed[] | null
@@ -130,6 +137,8 @@ function toView(r: UpsaleRow): UpsaleView {
     erpReason: REASONS.find(x => x === r.erp_reason) ?? null,
     settledPeriod: r.settled_period ?? null,
     settledBy: SETTLED_BY.find(x => x === r.settled_by) ?? null,
+    answeredByFeed: r.answered_by_feed === true,
+    settledOrderId: r.settled_order_id ?? null,
     periodMonth: r.period_month,
     amount: Number(r.amount),
     soldOn: r.sold_on,

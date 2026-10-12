@@ -10,7 +10,9 @@ import { exhibitionBrandOf, salesByExhibition } from '@/lib/exhibitions'
 import { agentKeyOf } from '@/lib/erp-sync/contract'
 import SchemeSwitches from './_components/SchemeSwitches'
 import { requireSubDepartment } from '../../_lib/sub-departments'
-import { loadBrandOptions, loadMonthOrders, loadOrderBrandPicks, loadShareTeam } from '../../_lib/month-orders'
+import { loadBrandOptions, loadMonthOrders, loadOrderBrandPicks, loadOrderShares, loadShareTeam } from '../../_lib/month-orders'
+import { holdersLine, holdersOf, type ShareHolder } from '@/lib/commission/bill-share'
+import { upsaleBillId } from '@/lib/commission/upsales'
 import { monthCommissionableValue } from '@/lib/commission/director-pay'
 import { loadMonthUpsales, loadPendingAdjustments } from '../../_lib/upsales'
 import { loadAdjustmentAnswers, loadDocChanges, loadMonthChanges } from '../../_lib/erp-changes'
@@ -256,6 +258,19 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   const adjustmentChangesRead = Promise.all([paidAdjustmentsRead, pendingAdjustmentsRead])
     .then(([paid, pending]) => loadDocChanges(supabase, subDept.id, [...paid, ...pending].flatMap(a => a.erpDocNo ? [a.erpDocNo] : [])))
     .catch(() => new Map<string, ErpChange[]>())
+  // Who shares the bill each change follows — the one whose pay gave the
+  // commission (2026-10-13): the run splits the change in its share ratio,
+  // and the row says so.
+  const adjustmentSharesRead = Promise.all([paidAdjustmentsRead, pendingAdjustmentsRead, adjustmentBillsRead])
+    .then(([paid, pending, bills]) => {
+      const billOfDoc = new Map([...bills].map(([doc, bill]) => [doc, bill.orderId]))
+      const ids = [...paid, ...pending].flatMap(change => {
+        const bill = upsaleBillId({ settled_order_id: change.settledOrderId, erp_doc_no: change.erpDocNo }, billOfDoc)
+        return bill ? [bill] : []
+      })
+      return loadOrderShares(supabase, [...new Set(ids)])
+    })
+    .catch(() => [] as Awaited<ReturnType<typeof loadOrderShares>>)
   const monthTrailRead = loadMonthChanges(supabase, subDept.id, period)
     .then(async read => ({
       ...read,
@@ -281,6 +296,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     adjustmentBills,
     adjustmentChanges,
     monthTrail,
+    adjustmentShares,
   ] = await Promise.all([
     batchRowRead,
     monthOrdersRead,
@@ -324,6 +340,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     adjustmentBillsRead,
     adjustmentChangesRead,
     monthTrailRead,
+    adjustmentSharesRead,
   ])
   if (monthLock.error) throw new Error(`Could not check the commission run: ${monthLock.error.message}`)
 
@@ -421,6 +438,19 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   }
   const billLinks = Object.fromEntries([...pendingAdjustments, ...paidAdjustments]
     .flatMap(change => { const href = changeHref(change); return href ? [[change.id, href]] : [] }))
+  // A change on a shared bill is paid in the bill's share ratio (2026-10-13;
+  // the user: "drop sales by share as well. Follow the share ratio") — the
+  // row names every holder and their part, the owner first.
+  const sharesOfBill = new Map<string, ShareHolder[]>()
+  for (const share of adjustmentShares) {
+    sharesOfBill.set(share.orderId, [...(sharesOfBill.get(share.orderId) ?? []), { staffId: share.staffId, name: share.name, pct: share.pct }])
+  }
+  const billOfDoc = new Map([...adjustmentBills].map(([doc, bill]) => [doc, bill.orderId]))
+  const holders = Object.fromEntries([...pendingAdjustments, ...paidAdjustments].flatMap(change => {
+    const bill = upsaleBillId({ settled_order_id: change.settledOrderId, erp_doc_no: change.erpDocNo }, billOfDoc)
+    const shares = bill ? (sharesOfBill.get(bill) ?? []).filter(share => share.staffId !== change.staffId) : []
+    return shares.length ? [[change.id, holdersLine(holdersOf({ staffId: change.staffId, name: change.staffName }, shares))]] : []
+  }))
   // The ERP audit trail (2026-10-13; the user: "任何改动只要一按 save 他的 sales
   // order，我这边都要能 track 到，记录在我们自己的 audit trail 里"). Each drop or
   // upsell says what the ERP changed and when; under them, every save that
@@ -454,7 +484,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   // Keyed: handed to a client component as a list of server-built children.
   const erpChangesPanel = (
     <ErpChangesPanel key="erp-changes" period={period} pending={pendingAdjustments} paid={paidAdjustments} locked={inPayroll}
-      settledBefore={settledBefore} inTab={inTab} billLinks={billLinks} briefs={briefs}
+      settledBefore={settledBefore} inTab={inTab} billLinks={billLinks} briefs={briefs} holders={holders}
       trail={monthTrail ? { rows: trailRows, more: monthTrail.more, since: formatDate(TRAIL_SINCE) } : undefined} />
   )
   // What each tab asks of somebody: the drops and upsells to answer; the

@@ -89,6 +89,12 @@ interface Props {
    * this month's bills, newest first. Absent: not shown.
    */
   trail?: { rows: TrailRowView[]; more: boolean; since: string }
+  /**
+   * Who shares the bill each change was found on, in words ("ADRIAN 50% ·
+   * ANTHONY 50%"), by the change's id — the run splits the change as it
+   * splits the bill (2026-10-13).
+   */
+  holders?: Readonly<Record<string, string>>
 }
 
 function monthName(period: string | null, style: 'long' | 'short' = 'short'): string {
@@ -114,6 +120,17 @@ function Difference({ change }: { change: UpsaleView }) {
     <>
       {signed(change.amount)}
       <small>{adjustmentLabel(change.kind, change.erpReason)}</small>
+      {change.status === 'confirmed' && change.answeredByFeed ? <small>Deducted directly</small> : null}
+    </>
+  )
+}
+
+/** The salesperson, and — on a shared bill — who shares it: the change is split as the bill is. */
+function Seller({ change, holders }: { change: UpsaleView; holders: string | undefined }) {
+  return (
+    <>
+      {change.staffName}
+      {holders ? <small>Split by share · {holders}</small> : null}
     </>
   )
 }
@@ -157,7 +174,7 @@ function Summary({ label, value, note }: { label: string; value: ReactNode; note
  * in its table design; it sat above the month's cards until then.
  */
 export default function ErpChangesPanel({
-  period, pending, paid = [], locked, settledBefore = null, inTab = false, billLinks = {}, briefs = {}, trail,
+  period, pending, paid = [], locked, settledBefore = null, inTab = false, billLinks = {}, briefs = {}, holders = {}, trail,
 }: Props) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -252,7 +269,7 @@ export default function ErpChangesPanel({
                 {pending.map(p => (
                   <tr key={p.id} onDoubleClick={event => openBill(event, p.id)}>
                     <td className={s.stickyFirst}><Bill change={p} href={billLinks[p.id]} /></td>
-                    <td>{p.staffName}</td>
+                    <td><Seller change={p} holders={holders[p.id]} /></td>
                     <td><WhatChanged brief={briefs[p.id]} /></td>
                     <td><Given change={p} /></td>
                     <td className={s.numeric}>{p.settledAmount === null ? '—' : formatMoney(p.settledAmount)}</td>
@@ -322,7 +339,7 @@ export default function ErpChangesPanel({
                   {paid.map(p => (
                     <tr key={p.id} onDoubleClick={event => openBill(event, p.id)}>
                       <td className={s.stickyFirst}><Bill change={p} href={billLinks[p.id]} /></td>
-                      <td>{p.staffName}</td>
+                      <td><Seller change={p} holders={holders[p.id]} /></td>
                       <td><WhatChanged brief={briefs[p.id]} /></td>
                       <td><Given change={p} /></td>
                       <td className={s.numeric}><Difference change={p} /></td>
