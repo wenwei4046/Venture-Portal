@@ -312,7 +312,8 @@ export function leadsHeld(leads: Pick<CrmLead, "assignedTo">[]): Record<string, 
 
 /**
  * The TypeScript twin of crm_assign_contact / crm_pick_inside / crm_fulltime_pick as rev 1011 has them (the functions
- * above are the 2026-10-03 dealer the old MemberCrm screens still draw). Keep the two in step: crm-team.test.ts runs the
+ * above are the 2026-10-03 dealer; no screen draws them since the old MemberCrm screens went, 2026-10-12). Keep the two
+ * in step: crm-team.test.ts runs the
  * same cases as tests/member-sql/validate-crm-control.mjs.
  *   - No ad: Organic Leads (nobody, no team) — sent by hand.
  *   - An ad with no rule: the team with fewest of this ad's enquiries (ties: lowest id), then inside it Evenly.

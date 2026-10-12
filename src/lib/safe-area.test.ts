@@ -105,7 +105,6 @@ const BARE_ALLOWED: Record<string, string> = {
   'src/components/member/app/shell.module.css': "var(--safe-bottom)'s own fallback",
   'src/components/member/member.module.css': 'MemberWorkspace — /member/preview only',
   'src/components/member/MemberLiveWorkspace.module.css': 'MemberWorkspace — /member/preview only',
-  'src/components/member/MemberCrm.module.css': 'the CRM before the redesign — mounted by nothing',
 }
 const PREVIEWS = 'src/components/member/design-preview/'
 
