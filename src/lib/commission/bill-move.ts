@@ -6,7 +6,7 @@
  *
  * The ERP names who sold a bill; this says the bill is somebody else's. The
  * rule is the database's (`sales_order_reassignments` + `revenue_move_order`,
- * mig 20261012140000): the bill becomes its new holder's everywhere a bill's
+ * mig 20261012170000): the bill becomes its new holder's everywhere a bill's
  * salesperson counts — their sales, their rate, their upline's override, their
  * ledger and their Revenue app — and stays theirs through every ERP re-send;
  * moving it to the salesperson the ERP names takes the move off. The new

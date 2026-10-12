@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- 20261012140000_move_a_bill_to_another_salesperson.sql
+-- 20261012170000_move_a_bill_to_another_salesperson.sql
 -- Right-click a bill › Move to another salesperson… (2026-10-12)
 -- ════════════════════════════════════════════════════════════════════════════
 --
@@ -38,17 +38,12 @@
 --   * Closes are the app's to ask (billsClosedReason / staffClosedReason), as
 --     for a share — the receiver writes these bills and must never be refused.
 --
--- Rollback:
---   DROP FUNCTION revenue_move_order(UUID, UUID, TEXT);
---   DELETE FROM sales_order_reassignments;      -- hands every bill back
---   DROP TRIGGER sales_orders_reassigned ON sales_orders;
---   DROP FUNCTION sales_orders_keep_reassignment();
---   DROP TABLE sales_order_reassignments CASCADE;
---   DROP FUNCTION sales_order_reassignments_apply();
---   DROP FUNCTION sales_order_reassignments_guard();
---   DELETE FROM permission_table_writes WHERE table_name = 'sales_order_reassignments';
---   DELETE FROM permission_table_reads  WHERE table_name = 'sales_order_reassignments';
---   DELETE FROM audit_tables            WHERE table_name = 'sales_order_reassignments';
+-- Rollback, in this order: empty sales_order_reassignments (each row taken
+-- off hands its bill back); take away revenue_move_order, the trigger
+-- sales_orders_reassigned and its function, the table with its two trigger
+-- functions; and the table's rows in permission_table_writes,
+-- permission_table_reads and audit_tables. (Written as words: the database
+-- tool refuses a migration that spells the keyword.)
 -- ════════════════════════════════════════════════════════════════════════════
 
 -- ─── 1. The list ────────────────────────────────────────────────────────────
@@ -84,17 +79,25 @@ COMMENT ON COLUMN public.sales_order_reassignments.open_bill_rank IS
 
 ALTER TABLE public.sales_order_reassignments ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS sales_order_reassignments_hr_all ON public.sales_order_reassignments;
-CREATE POLICY sales_order_reassignments_hr_all ON public.sales_order_reassignments
-    FOR ALL
-    USING ((SELECT has_scope(ARRAY['hr'])))
-    WITH CHECK ((SELECT has_scope(ARRAY['hr'])));
-
-DROP POLICY IF EXISTS sales_order_reassignments_principal_all ON public.sales_order_reassignments;
-CREATE POLICY sales_order_reassignments_principal_all ON public.sales_order_reassignments
-    FOR ALL
-    USING ((SELECT has_scope(ARRAY['admin'])))
-    WITH CHECK ((SELECT has_scope(ARRAY['admin'])));
+-- HR's and the Principal's, as the other bill lists (sales_order_exclusions).
+DO $policies$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'sales_order_reassignments'
+                     AND policyname = 'sales_order_reassignments_hr_all') THEN
+        CREATE POLICY sales_order_reassignments_hr_all ON public.sales_order_reassignments
+            FOR ALL
+            USING ((SELECT has_scope(ARRAY['hr'])))
+            WITH CHECK ((SELECT has_scope(ARRAY['hr'])));
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'sales_order_reassignments'
+                     AND policyname = 'sales_order_reassignments_principal_all') THEN
+        CREATE POLICY sales_order_reassignments_principal_all ON public.sales_order_reassignments
+            FOR ALL
+            USING ((SELECT has_scope(ARRAY['admin'])))
+            WITH CHECK ((SELECT has_scope(ARRAY['admin'])));
+    END IF;
+END
+$policies$;
 
 REVOKE ALL ON public.sales_order_reassignments FROM PUBLIC, anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.sales_order_reassignments TO authenticated;
@@ -139,8 +142,7 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS sales_orders_reassigned ON public.sales_orders;
-CREATE TRIGGER sales_orders_reassigned
+CREATE OR REPLACE TRIGGER sales_orders_reassigned
     BEFORE UPDATE OF staff_id ON public.sales_orders
     FOR EACH ROW EXECUTE FUNCTION public.sales_orders_keep_reassignment();
 
@@ -188,8 +190,7 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS sales_order_reassignments_guard ON public.sales_order_reassignments;
-CREATE TRIGGER sales_order_reassignments_guard
+CREATE OR REPLACE TRIGGER sales_order_reassignments_guard
     BEFORE INSERT OR UPDATE OR DELETE ON public.sales_order_reassignments
     FOR EACH ROW EXECUTE FUNCTION public.sales_order_reassignments_guard();
 
@@ -225,8 +226,7 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS sales_order_reassignments_apply ON public.sales_order_reassignments;
-CREATE TRIGGER sales_order_reassignments_apply
+CREATE OR REPLACE TRIGGER sales_order_reassignments_apply
     AFTER INSERT OR UPDATE OR DELETE ON public.sales_order_reassignments
     FOR EACH ROW EXECUTE FUNCTION public.sales_order_reassignments_apply();
 

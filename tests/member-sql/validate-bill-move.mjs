@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261012140000 — right-click a bill › Move
+// Local PostgreSQL regression for 20261012170000 — right-click a bill › Move
 // to another salesperson (2026-10-12; the user: "together with rightclick …
 // can select move this order to other sales person").
 //
@@ -96,7 +96,7 @@ await db.exec(`
 `)
 
 await db.exec(
-  (await readFile(new URL('../../supabase/migrations/20261012140000_move_a_bill_to_another_salesperson.sql', import.meta.url), 'utf8'))
+  (await readFile(new URL('../../supabase/migrations/20261012170000_move_a_bill_to_another_salesperson.sql', import.meta.url), 'utf8'))
     .replace(/\r\n/g, '\n'),
 )
 

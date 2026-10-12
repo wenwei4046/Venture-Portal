@@ -418,7 +418,7 @@ const MOVE_REFUSALS = new Set(['23RUN', '23EXC', '23MOV'])
  * another salesperson…*; the user: "can select move this order to other sales
  * person"), or — `staffId` null, or the salesperson the ERP names — give it
  * back. The rule is the database's (`revenue_move_order`, mig
- * 20261012140000): the bill becomes theirs everywhere a bill's salesperson
+ * 20261012170000): the bill becomes theirs everywhere a bill's salesperson
  * counts and stays theirs through every ERP re-send; the new holder's share
  * goes, the Open Bill pick goes (and comes back on the move back). This
  * refuses, as a share does, a bill somebody paid on it has closed, a new
