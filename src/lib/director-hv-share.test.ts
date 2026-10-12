@@ -121,36 +121,38 @@ describe('the window’s helpers', () => {
 })
 
 describe('reading what the database answers', () => {
-  it('reads a share with its lines and, for HR, its components', () => {
+  it('reads a share with its lines, its batch and its components', () => {
     const share = readHvShare({
       id: 's1',
       period_month: '2026-10-01',
       total_ctc: 15056.05,
       split_mode: 'percent',
-      status: 'transferred',
+      status: 'in_payroll',
       submitted_at: '2026-10-13T01:00:00+00:00',
       submitted_by: 'HR Manager',
-      transferred_at: '2026-10-14T02:00:00+00:00',
-      transfer_date: '2026-10-14',
-      transferred_by: 'Finance Manager',
+      batch_id: 'b1',
+      batch_no: 2,
+      batch_submitted_at: '2026-10-14T02:00:00+00:00',
       lines: [
-        { department_id: 'mkt', department: 'Marketing', amount: 7528.02, pct: 50, invoice_id: 'i1', invoice_no: 'HV-INV-202610-0060', voucher_id: 'v1', voucher_no: 'HV-OR-202610-0530' },
-        { department_id: 'dir', department: 'Director', stays: true, amount: 752.8, pct: 5, invoice_id: null, invoice_no: null, voucher_id: null, voucher_no: null },
+        { department_id: 'mkt', department: 'Marketing', stays: false, amount: 7528.02, pct: 50 },
+        { department_id: 'dir', department: 'Director', stays: true, amount: 752.8, pct: 5 },
       ],
       basic: 10000, kpi: 2000, allowance: 1500, employer_epf: 1440, employer_socso: 104.15, employer_eis: 11.9, er_manual: false,
     })
     expect(share).toMatchObject({
-      id: 's1', totalCtc: 15056.05, splitMode: 'percent', status: 'transferred', transferDate: '2026-10-14',
+      id: 's1', totalCtc: 15056.05, splitMode: 'percent', status: 'in_payroll', batchId: 'b1', batchNo: 2,
       components: { basic: 10000, kpi: 2000, allowance: 1500, employerEpf: 1440, employerSocso: 104.15, employerEis: 11.9, erManual: false },
     })
-    expect(share?.lines.map(l => [l.department, l.stays, l.amount, l.pct, l.invoiceNo, l.voucherNo])).toEqual([
-      ['Marketing', false, 7528.02, 50, 'HV-INV-202610-0060', 'HV-OR-202610-0530'],
-      ['Director', true, 752.8, 5, null, null],
+    expect(share?.lines.map(l => [l.department, l.stays, l.amount, l.pct])).toEqual([
+      ['Marketing', false, 7528.02, 50],
+      ['Director', true, 752.8, 5],
     ])
   })
 
-  it('reads Finance’s share without components, and nothing as nothing', () => {
-    expect(readHvShare({ id: 's2', total_ctc: 10, split_mode: 'amount', status: 'with_finance', lines: [] })?.components).toBeNull()
+  it('reads an open share without a batch, and nothing as nothing', () => {
+    expect(readHvShare({ id: 's2', total_ctc: 10, split_mode: 'amount', status: 'open', lines: [] })).toMatchObject({
+      status: 'open', batchId: null, batchNo: null, components: null,
+    })
     expect(readHvShare(null)).toBeNull()
     expect(readHvShare({})).toBeNull()
   })

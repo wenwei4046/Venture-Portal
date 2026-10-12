@@ -1,20 +1,17 @@
 import Link from 'next/link'
-import { officeTime, officeToday } from '@/lib/office-time'
+import { officeTime } from '@/lib/office-time'
 import { requirePermission, requirePage } from '@/lib/auth'
-import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
-import { readHvShare, type HvShare } from '@/lib/director-hv-share'
 import GenerateDeptPvForm from './_components/GenerateDeptPvForm'
-import HvShareTransfers from './_components/HvShareTransfers'
 import { cancelDeptRequest } from './actions'
 
 export default async function DeptRequestsPage() {
   await requirePage('/payments/dept-requests')
-  const user = await requirePermission('treasury')
+  await requirePermission('treasury')
   const supabase = await createClient()
 
-  const [{ data: requests }, { data: banks }, { data: hvQueue, error: hvError }] = await Promise.all([
+  const [{ data: requests }, { data: banks }] = await Promise.all([
     supabase
       .from('dept_payment_requests')
       .select(
@@ -30,17 +27,7 @@ export default async function DeptRequestsPage() {
       .select('id, bank_name, current_balance')
       .eq('status', 'active')
       .order('is_primary', { ascending: false }),
-    // HOUZS Venture's share of the directors' CTC, as HR sent it (2026-10-13).
-    supabase.rpc('director_hv_share_queue'),
   ])
-
-  const hvList = (key: 'pending' | 'transferred'): HvShare[] => {
-    if (hvError) return []
-    const raw = (hvQueue as Record<string, unknown> | null)?.[key]
-    return Array.isArray(raw) ? raw.map(readHvShare).filter((s): s is HvShare => s !== null) : []
-  }
-  const hvPending = hvList('pending')
-  const hvTransferred = hvList('transferred')
 
   const bankOptions = (banks ?? []).map((b) => ({
     id: b.id,
@@ -64,16 +51,6 @@ export default async function DeptRequestsPage() {
           <h1 className="page-title">Dept Payment Requests</h1>
         </div>
       </div>
-
-      {hvError ? null : (
-        <HvShareTransfers
-          pending={hvPending}
-          transferred={hvTransferred}
-          canTransfer={canDo(user, 'treasury', 'create')}
-          canUndo={canDo(user, 'treasury', 'void')}
-          today={officeToday()}
-        />
-      )}
 
       {/* ── Awaiting Finance ────────────────────────────────────────────── */}
       <section className="mb-12">

@@ -44,10 +44,12 @@ interface Props {
   existingCTC: ExistingCTC[]
   period: string
   /**
-   * HOUZS Venture's own row (2026-10-13): the month's share and every
-   * department that may pay it. Left out, the grid is the subsidiaries' alone.
+   * HOUZS Venture's own row (2026-10-13): the month's share, every department
+   * that may pay it, and whether the month's directors are already with
+   * Finance (the share rides their payroll batch, so it is fixed by then).
+   * Left out, the grid is the subsidiaries' alone.
    */
-  hv?: { departments: HvDepartment[]; share: HvShare | null }
+  hv?: { departments: HvDepartment[]; share: HvShare | null; directorsSent: boolean }
 }
 
 interface ERBreakdown {
@@ -89,8 +91,9 @@ function CTCInputGridBody({ directors, companies, existingCTC, period, hv }: Pro
   const [status, setStatus] = useState<'idle' | 'saving' | 'done'>('idle')
 
   const hvShare = hv?.share ?? null
-  // Transferred by Finance: the row is what moved, and changes once Finance undoes it.
-  const hvLocked = hvShare?.status === 'transferred'
+  // Carried by the directors' payroll batch — or the directors went to Finance
+  // without it: the row is fixed until Finance sends that batch back.
+  const hvLocked = hvShare?.status === 'in_payroll' || hv?.directorsSent === true
   const rows: Company[] = hv ? [HV_ROW, ...companies] : companies
 
   // Aggregate existing CTC by company (sum across all directors)
@@ -398,7 +401,7 @@ function CTCInputGridBody({ directors, companies, existingCTC, period, hv }: Pro
                   <td>
                     <div className="font-medium flex flex-wrap items-center gap-2">
                       {comp.name}
-                      {isHv && hvShare ? <HvShareChip share={hvShare} /> : null}
+                      {isHv && hv ? <HvShareChip share={hvShare} directorsSent={hv.directorsSent} /> : null}
                     </div>
                     <div className="font-mono text-[11px] mt-0.5">{comp.short_code}</div>
                   </td>
@@ -551,25 +554,41 @@ function CTCInputGridBody({ directors, companies, existingCTC, period, hv }: Pro
   )
 }
 
-/** Where HOUZS Venture's share stands — with Finance, or transferred (by whom and when on hover). */
-function HvShareChip({ share }: { share: HvShare }) {
-  if (share.status === 'transferred') {
-    const when = share.transferDate ? dayjs(share.transferDate).format('D MMM YYYY') : ''
+/**
+ * Where HOUZS Venture's share stands: saved and waiting for the directors'
+ * payroll batch, carried by it (which batch, when, on hover), or — the
+ * directors went to Finance without it — fixed until that batch comes back.
+ */
+function HvShareChip({ share, directorsSent }: { share: HvShare | null; directorsSent: boolean }) {
+  if (share?.status === 'in_payroll') {
+    const when = share.batchSubmittedAt ? officeTime(share.batchSubmittedAt).format('D MMM YYYY') : ''
     return (
       <span
         className="chip ledger"
-        title={`Transferred${when ? ` on ${when}` : ''}${share.transferredBy ? ` by ${share.transferredBy}` : ''} — Finance undoes it to change`}
+        title={`Went to Finance with payroll batch #${share.batchNo ?? '?'}${when ? ` on ${when}` : ''} — it changes once Finance sends that batch back`}
       >
         <span className="dot" />
-        Transferred
+        In payroll #{share.batchNo ?? '?'}
       </span>
     )
   }
-  const sent = share.submittedAt ? officeTime(share.submittedAt).format('D MMM YYYY HH:mm') : ''
+  if (directorsSent) {
+    return (
+      <span className="chip" title="The directors are with Finance — HOUZS Venture's share goes with their payroll batch, so it changes once Finance sends that batch back">
+        <span className="dot" />
+        Directors sent
+      </span>
+    )
+  }
+  if (!share) return null
+  const saved = share.submittedAt ? officeTime(share.submittedAt).format('D MMM YYYY HH:mm') : ''
   return (
-    <span className="chip alert" title={`Sent${sent ? ` ${sent}` : ''}${share.submittedBy ? ` by ${share.submittedBy}` : ''}`}>
+    <span
+      className="chip alert"
+      title={`Saved${saved ? ` ${saved}` : ''}${share.submittedBy ? ` by ${share.submittedBy}` : ''} — goes with the directors' payroll batch`}
+    >
       <span className="dot" />
-      With Finance
+      Waits for payroll
     </span>
   )
 }

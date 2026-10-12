@@ -112,20 +112,6 @@ export default async function VoucherLedger({
         }
       })())
 
-  // HOUZS Venture's director share waiting for its transfer (2026-10-13) —
-  // payment side only, a badge on Dept Requests where Finance transfers it.
-  const hvSharesRead = isReceipts
-    ? null
-    : startRead((async () => {
-        try {
-          const { data } = await supabase.rpc('director_hv_share_queue')
-          const pending = (data as { pending?: unknown } | null)?.pending
-          return Array.isArray(pending) ? pending.length : 0
-        } catch {
-          return 0
-        }
-      })())
-
   // Every source row (2026-10-08): 620 rows today, past PostgREST's 1000-row
   // cap the vouchers beyond it would lose their pool and category. Read as
   // written first: a voucher's labels join in arrival order, and two sources
@@ -156,8 +142,6 @@ export default async function VoucherLedger({
   const { count: payrollRequestsPending } = payrollRequestsRead ? await payrollRequestsRead : { count: 0 }
 
   const claimRequestsPending = claimRequestsRead ? await claimRequestsRead : 0
-
-  const hvSharesPending = hvSharesRead ? await hvSharesRead : 0
 
   // Post-mig 238: PVS rows reference chart_of_accounts via account_code
   // (the COA `code` IS the GL). Load once, index by voucher_id, then derive
@@ -344,8 +328,8 @@ export default async function VoucherLedger({
           {/* Dept Requests answers to Treasury, as its page does — the same
               gate as this ledger's, so whoever is here may go there. */}
           {!isReceipts ? (
-            <Link href="/payments/dept-requests" className={hvSharesPending > 0 ? ACT_LIT : ACT}>
-              Dept Requests{hvSharesPending > 0 ? ` · ${hvSharesPending}` : ''}
+            <Link href="/payments/dept-requests" className={ACT}>
+              Dept Requests
             </Link>
           ) : null}
           {!isReceipts && seesPayroll ? (
