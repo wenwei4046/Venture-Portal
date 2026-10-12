@@ -72,6 +72,10 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
             <em>I.</em> REPORTS · BALANCE SHEET · AS AT {asAt(period).toUpperCase()}
           </div>
           <h1 className="page-title">Balance Sheet</h1>
+          {/* One segment's slice is not expected to balance — equity and
+              liabilities mostly sit in the corporate segment. Said in a chip,
+              not a sentence (2026-10-12). */}
+          {segment ? <span className="chip alert mt-2"><span className="dot" />Segment only · won&apos;t balance</span> : null}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <ExportLinks variant="sheet" basePath="/reports/balance-sheet/export" period={period} compare={compare} segment={segment} />

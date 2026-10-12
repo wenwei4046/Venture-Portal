@@ -74,6 +74,16 @@ describe('the Balance Sheet on the sheet', () => {
     expect(card('Equity')).toHaveTextContent('RM 2,300,000.00')
     expect(card('Check')).toHaveTextContent('Balanced')
     expect(within(screen.getByRole('group', { name: 'Report controls' })).getByLabelText('As at')).toHaveValue('2026-10')
+    expect(screen.queryByText("Segment only · won't balance")).toBeNull()
+  })
+
+  // 2026-10-12: one segment's slice is not expected to balance (equity and
+  // liabilities mostly sit in the corporate segment) — a chip says so, the
+  // sentence went with the page's other descriptions.
+  it('says in a chip that one segment alone will not balance', async () => {
+    render(await BalanceSheetPage({ searchParams: Promise.resolve({ segment: 'corporate' }) }))
+    expect(document.querySelector('.page-head .chip')).toHaveTextContent("Segment only · won't balance")
+    expect(screen.queryByText(/expected to be off/)).toBeNull()
   })
 })
 
