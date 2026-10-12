@@ -9,16 +9,20 @@ import type { NavViewer } from './nav-config'
 const hr = withActions({ id: 'h', role: 'hr', permissions: ['team', 'director_salary', 'director_pool', 'revenue', 'member_requests_manage', 'audit_log'] }) as unknown as NavViewer
 
 describe("HR's sidebar", () => {
-  it('lists the prototype’s sections and rows, in its order', () => {
+  it('lists the sections and rows in the user’s order (2026-10-12)', () => {
     const sections = visibleHrNav(hrNavSections('fair'), hr)
     expect(sections.map(s => [s.roman, s.label, s.items.map(i => i.label)])).toEqual([
       [null, null, ['Overview']],
       ['I.', 'HR & Payroll', ['HR Costing', 'Payroll', 'Payment']],
-      ['II.', 'Directors', ['Director Salary', 'Director Pool']],
-      ['III.', 'Revenue', ['Comm Cal', 'Sales Groups', 'Rules']],
-      ['IV.', 'People', ['People Management', 'Hierarchy', 'Member Services']],
-      ['V.', 'Admin', ['Audit Log']],
+      ['II.', 'Revenue', ['Comm Cal', 'Sales Groups', 'Rules']],
+      ['III.', 'People', ['People Management', 'Hierarchy', 'Member Services']],
+      ['IV.', 'Admin', ['Audit Log']],
+      ['V.', 'Directors', ['Director Salary', 'Director Pool']],
     ])
+  })
+
+  it('puts Hiring first and Directors last: Hiring, HR & Payroll, Revenue, People, Admin, Directors', () => {
+    expect(hrNavSections('fair').map(s => s.label)).toEqual([null, 'Hiring', 'HR & Payroll', 'Revenue', 'People', 'Admin', 'Directors'])
   })
 
   it('opens Revenue on the sub-department it is handed', () => {

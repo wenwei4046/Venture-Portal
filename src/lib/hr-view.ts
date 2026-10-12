@@ -1,7 +1,7 @@
 // HR's view (2026-10-10, the HR revamp handoff — `.design/hr-revamp`): the
 // portal as HR reads it — the hr role, and the Principal viewing as HR — gets
-// the revamped shell: a square, full-height sidebar of icon tiles in five
-// sections (HR & Payroll, Directors, Revenue, People, Admin), the white
+// the revamped shell: a square, full-height sidebar of icon tiles in six
+// sections (Hiring, HR & Payroll, Revenue, People, Admin, Directors), the white
 // greeting bar, the 243 ground and the sheet that scrolls inside its frame.
 // Every other view keeps the shell it had (user: the design is HR's view).
 

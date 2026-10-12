@@ -1,12 +1,13 @@
-// HR's sidebar (2026-10-10, the HR revamp handoff): five sections of icon
-// tiles, each section in its own tone, in the prototype's order —
+// HR's sidebar (2026-10-10, the HR revamp handoff): sections of icon tiles,
+// each section in its own tone. The order is the user's (2026-10-12) —
 //
 //   Overview
-//   I.   HR & PAYROLL   HR Costing · Payroll · Payment
-//   II.  DIRECTORS      Director Salary · Director Pool
+//   I.   HIRING         Requests · Insights · Talent Bank
+//   II.  HR & PAYROLL   HR Costing · Payroll · Payment
 //   III. REVENUE        Comm Cal · Sales Groups · Rules
-//   IV.  PEOPLE         People Management · Hierarchy · Member Services
-//   V.   ADMIN          Audit Log  (since: Meeting Rooms, Guest Link; Change password — a personal login's)
+//   IV.  PEOPLE         People Management · Hierarchy · Member Services · Documentation
+//   V.   ADMIN          Meeting Rooms · Guest Link · Audit Log · Change password (a personal login's)
+//   VI.  DIRECTORS      Director Salary · Director Pool
 //
 // Claims and the Revenue Department page left HR's sidebar (their pages are
 // still there), and Fair | IR left it altogether: a Revenue page picks its
@@ -77,6 +78,16 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
       tone: 'walnut',
       items: [{ key: 'overview', label: 'Overview', icon: 'home', href: '/dashboard', match: p => under(p, '/dashboard'), visible: () => true }],
     },
+    // Round 2 (2026-10-11, README §3): HIRING, clay — first since 2026-10-12 (user).
+    {
+      label: 'Hiring',
+      tone: 'clay',
+      items: [
+        { key: 'hire', label: 'Requests', icon: 'hire', href: '/hiring/requests', match: p => under(p, '/hiring/requests'), visible: canAccessHiring },
+        { key: 'hireIns', label: 'Insights', icon: 'report', href: '/hiring/insights', match: p => under(p, '/hiring/insights'), visible: canAccessHiring },
+        { key: 'talent', label: 'Talent Bank', icon: 'staff', href: '/hiring/talent', match: p => under(p, '/hiring/talent'), visible: canAccessHiring },
+      ],
+    },
     {
       label: 'HR & Payroll',
       tone: 'clay',
@@ -91,14 +102,6 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
         },
         { key: 'pay', label: 'Payroll', icon: 'payroll', href: '/hr-costing/payroll', match: p => under(p, '/hr-costing/payroll'), visible: seesHrCosting },
         { key: 'pmt', label: 'Payment', icon: 'out', href: '/hr-costing/payment', match: p => under(p, '/hr-costing/payment'), visible: seesHrCosting },
-      ],
-    },
-    {
-      label: 'Directors',
-      tone: 'gold',
-      items: [
-        { key: 'dsal', label: 'Director Salary', icon: 'director', href: '/director-salary', match: p => under(p, '/director-salary'), visible: canAccessDirectorSalary },
-        { key: 'dpool', label: 'Director Pool', icon: 'in', href: '/director-pool', match: p => under(p, '/director-pool'), visible: canAccessDirectorPool },
       ],
     },
     {
@@ -120,16 +123,6 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
         { key: 'docs', label: 'Documentation', icon: 'doc', href: '/team/documentation', match: p => under(p, '/team/documentation'), visible: canAccessDocumentation },
       ],
     },
-    // Round 2 (2026-10-11, README §3): V. HIRING, clay.
-    {
-      label: 'Hiring',
-      tone: 'clay',
-      items: [
-        { key: 'hire', label: 'Requests', icon: 'hire', href: '/hiring/requests', match: p => under(p, '/hiring/requests'), visible: canAccessHiring },
-        { key: 'hireIns', label: 'Insights', icon: 'report', href: '/hiring/insights', match: p => under(p, '/hiring/insights'), visible: canAccessHiring },
-        { key: 'talent', label: 'Talent Bank', icon: 'staff', href: '/hiring/talent', match: p => under(p, '/hiring/talent'), visible: canAccessHiring },
-      ],
-    },
     {
       label: 'Admin',
       tone: 'walnut',
@@ -140,6 +133,14 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
         { key: 'audit', label: 'Audit Log', icon: 'report', href: '/audit-log', match: p => under(p, '/audit-log'), visible: canSeeAuditChanges },
         // Change password (2026-10-12): a person's own login only — never a shared one (principal@, hr@ …).
         { key: 'password', label: 'Change password', icon: 'lock', href: '/admin/password', match: p => under(p, '/admin/password'), visible: canChangePassword },
+      ],
+    },
+    {
+      label: 'Directors',
+      tone: 'gold',
+      items: [
+        { key: 'dsal', label: 'Director Salary', icon: 'director', href: '/director-salary', match: p => under(p, '/director-salary'), visible: canAccessDirectorSalary },
+        { key: 'dpool', label: 'Director Pool', icon: 'in', href: '/director-pool', match: p => under(p, '/director-pool'), visible: canAccessDirectorPool },
       ],
     },
   ]
