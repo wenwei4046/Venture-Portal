@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sortFairs, type Fair } from './fair-calendar'
+import { saleMonthOf, sortFairs, type Fair } from './fair-calendar'
 
 /**
  * The Kuching fair ran 28–31 August 2026 and its bills reached the ERP between
@@ -54,5 +54,28 @@ describe('sortFairs', () => {
       fair({ fairId: 'a', displayName: 'Arena' }),
     ]
     expect(sortFairs(rows).map(f => f.fairId)).toEqual(['a', 'z'])
+  })
+})
+
+// 2026-10-12: the TS twin of sales_order_sale_month() — a ledger row keyed in
+// another month than its fair's says so (Late key-in).
+describe('saleMonthOf', () => {
+  const crossing = fair({ periodMonth: '2026-09-01', startDate: '2026-09-30', endDate: '2026-10-02' })
+  it('is the month of the day sold, when that day is one of the fair’s', () => {
+    expect(saleMonthOf('2026-09-30', crossing)).toBe('2026-09-01')
+    expect(saleMonthOf('2026-10-01', crossing)).toBe('2026-10-01')
+    expect(saleMonthOf('2026-10-02T00:00:00', crossing)).toBe('2026-10-01')
+  })
+  it('is the fair’s own month for a day off its days, no day, or one that does not read', () => {
+    expect(saleMonthOf('2026-10-05', crossing)).toBe('2026-09-01')
+    expect(saleMonthOf(null, crossing)).toBe('2026-09-01')
+    expect(saleMonthOf('soon', crossing)).toBe('2026-09-01')
+  })
+  it('reads a one-day fair and an undated one', () => {
+    expect(saleMonthOf('2026-08-28', fair({ endDate: null }))).toBe('2026-08-01')
+    expect(saleMonthOf('2026-09-02', fair({ startDate: null, endDate: null, periodMonth: '2026-09-01' }))).toBe('2026-09-01')
+  })
+  it('is null for a bill no fair claims', () => {
+    expect(saleMonthOf('2026-09-18', null)).toBeNull()
   })
 })

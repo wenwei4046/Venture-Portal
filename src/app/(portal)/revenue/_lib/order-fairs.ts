@@ -16,6 +16,12 @@ import { boothOf } from '@/lib/exhibitions'
 export interface OrderFair {
   fairId: string | null
   booth: string | null
+  /**
+   * The day of the fair the ERP says the bill was sold on (`raw.fair.fairDate`,
+   * sent since 2026-09-24), as typed — `saleMonthOf` reads it. Null when the
+   * ERP named no day.
+   */
+  fairDate: string | null
 }
 
 interface Row {
@@ -24,16 +30,18 @@ interface Row {
   fair_source: string | null
   booth_brand: string | null
   booth_status: string | null
+  fair_date: string | null
 }
 
 export async function loadOrderFairs(db: SupabaseClient, orderIds: readonly string[]): Promise<Map<string, OrderFair>> {
   const rows = await fetchByKeys<Row, string>([...new Set(orderIds)], keys =>
     db.from('sales_orders')
-      .select('id, fair_event_id, fair_source, booth_brand:raw->fair->>brand, booth_status:raw->fair->>status')
+      .select('id, fair_event_id, fair_source, booth_brand:raw->fair->>brand, booth_status:raw->fair->>status, fair_date:raw->fair->>fairDate')
       .in('id', keys),
   )
   return new Map(rows.map(row => [row.id, {
     fairId: row.fair_event_id,
     booth: boothOf({ fairSource: row.fair_source, boothBrand: row.booth_brand, boothStatus: row.booth_status }),
+    fairDate: row.fair_date,
   }]))
 }

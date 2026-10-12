@@ -24,6 +24,12 @@
   --work-table-rule: 207 197 183;
   --work-table-border: 216 210 200;
   --work-row-hover: 255 245 233;
+  /* A row paid this month for a bill of another month (2026-10-12): a cool
+     wash nothing else on the sheet wears — not the peach of a hover or a
+     total, not a status's amber — and the Finance view's wait blue at its edge. */
+  --work-other-month: 234 242 251;
+  --work-other-month-hover: 222 234 248;
+  --work-other-month-rule: 46 92 138;
 }
 
 .page {
@@ -249,6 +255,25 @@
 .table tbody tr:nth-child(even) { background: rgb(var(--surface-2)); }
 .table tbody tr:hover { background: rgb(var(--work-row-hover)); }
 .table tbody tr:last-child td { border-bottom: 0; }
+/* Paid here, sold in another month (2026-10-12, `row-origin.ts`): one wash
+   across the row — the sticky cells inherit it — and its edge ruled, so the
+   rows a month carries in, and its upsells and drops, read as one group down
+   a long ledger. The Status column says which kind. */
+.table tbody tr.otherMonth,
+.table tbody tr.otherMonth:nth-child(even) { background: rgb(var(--work-other-month)); }
+.table tbody tr.otherMonth:hover { background: rgb(var(--work-other-month-hover)); }
+.table tbody tr.otherMonth > td:first-child { box-shadow: inset 3px 0 0 rgb(var(--work-other-month-rule)); }
+/* The footer's key for that wash. */
+.otherMonthKey {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 5px;
+  vertical-align: -1px;
+  border-radius: 2px;
+  background: rgb(var(--work-other-month));
+  box-shadow: inset 2px 0 0 rgb(var(--work-other-month-rule)), inset 0 0 0 1px rgb(var(--work-other-month-rule) / 0.35);
+}
 .table tbody td { height: 48px; }
 .table td a { text-decoration: underline; text-underline-offset: 3px; }
 .table td small { display: block; margin-top: 4px; font-size: 10px; line-height: 1.4; }

@@ -26,10 +26,11 @@ import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome, type Bill
 import BillCountNotice from '../orders/_components/BillCountNotice'
 import BillShareNotice from '../orders/_components/BillShareNotice'
 import { billBrandAction, brandOutcomeMessage, type BrandOption } from '@/lib/commission/bill-brand'
+import { closeVerdicts, ORIGIN_TONE, rowOrigin, type RowOrigin } from '@/lib/commission/row-origin'
 import { billShareAction, sharePct, type BillShareAction, type ShareCandidate, type ShareHolder } from '@/lib/commission/bill-share'
 import { useBillMenu } from '../orders/_components/useBillMenu'
 import CommissionMonthSummary, { type CommissionMonthStats } from './CommissionMonthSummary'
-import SalaryCalculation from './SalaryCalculation'
+import SalaryCalculation, { type SalaryAdjustment } from './SalaryCalculation'
 import NoCommission, { COMMISSIONABLE_HINT, DEPOSIT_HINT, DROP_HINT, GROUP_SALES_HINT, SALES_VALUE_HINT, UPSELL_HINT } from './NoCommission'
 import CloseBar from './CloseBar'
 import PayrollBar from './PayrollBar'
@@ -55,12 +56,16 @@ const TABS: [Tab, string][] = [
 ]
 /** The tabs that are the page's panels rather than cuts of the workbench's own board. */
 const REVIEW_TABS: readonly Tab[] = ['changes', 'claims']
-type Column = 'ref' | 'salesperson' | 'date' | 'venue' | 'event' | 'organizer' | 'location' | 'brand' | 'category' | 'sales' | 'commissionable' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
+type Column = 'status' | 'ref' | 'salesperson' | 'date' | 'venue' | 'event' | 'organizer' | 'location' | 'brand' | 'category' | 'sales' | 'commissionable' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
+// Status (2026-10-12): why a row from another month is on this month's ledger
+// — Top up deposit, Late key-in, Upsell, Drop sales (`row-origin.ts`). First,
+// so it is read without scrolling.
 // Sales person (2026-09-30): the one column a person's own ledger rarely
 // needs — until a bill is shared, and then it names both holders.
 // Ref No. (2026-10-03): the handwritten bill's number beside the ERP's — the
 // one a bill is checked back against, and the one double claims match on.
 const COLUMNS: [Column, string][] = [
+  ['status', 'Status'],
   ['ref', 'Ref No.'], ['salesperson', 'Sales person'], ['date', 'Date'], ['venue', 'Venue'], ['event', 'Event'], ['organizer', 'Organizer'],
   ['location', 'Sales location'], ['brand', 'Brand'], ['category', 'Category'], ['sales', 'Sales value'],
   ['commissionable', 'Commissionable value'],
@@ -491,6 +496,35 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     return `/revenue/${sub}/${period}${qs ? `?${qs}` : ''}`
   }, [searchParams, sub, period])
   const orderHref = (row: { periodMonth: string; orderId: string }) => billHref(sub, row.periodMonth, row.orderId, returnHere)
+  // An upsell or a drop is no bill of its own: it opens the bill it changed,
+  // when the portal holds it (2026-10-12).
+  function rowHref(row: CommissionOrderRow | OverrideOrderRow): string | null {
+    if (!row.upsale) return orderHref(row)
+    const bill = data.upsales?.[row.orderId]?.bill
+    return bill ? billHref(sub, bill.periodMonth, bill.orderId, returnHere) : null
+  }
+  // Where a row came from when it is not the month's own bill (2026-10-12,
+  // `row-origin.ts`): the Status column says why, and a row this month pays is
+  // drawn in the other-month colour.
+  const verdictOf = useMemo(() => closeVerdicts(data.carriedCloses ?? []), [data.carriedCloses])
+  const saleMonths = useMemo(() => new Map(data.orders.map(o => [o.orderId, o.saleMonth ?? null])), [data.orders])
+  function originOf(row: CommissionOrderRow | OverrideOrderRow): RowOrigin | null {
+    const fact = row.upsale ? data.upsales?.[row.orderId] : undefined
+    return rowOrigin(row, period, {
+      upsale: fact ? { kind: fact.kind, originalPeriod: fact.originalPeriod } : null,
+      saleMonth: saleMonths.get(row.orderId) ?? null,
+      // The close of a carried bill's own month, for its own salesperson —
+      // on Overriding, the downline whose bill it is.
+      closed: !row.upsale && row.periodMonth < period ? verdictOf(row.staffId, row.periodMonth, row.orderId) : null,
+      // A bill of this month its salesperson's close did not take: the next
+      // open month pays it (`carry.ts`).
+      afterClose: !row.upsale && row.periodMonth === period && cameAfterClose(row.staffId, row.orderId),
+    })
+  }
+  function cameAfterClose(staffId: string, orderId: string): boolean {
+    const close = closer.closedById.get(staffId)
+    return !!close && !close.summary.bills.some(bill => bill.id === orderId)
+  }
 
   // Right-click a bill on a ledger (2026-09-27): All bills' menu — open it, or
   // *Don't count this bill*, which takes it out of the month for good (until
@@ -581,8 +615,14 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   }
   /** The first cell of a bill's row: its number, the notes under it, and its ⋯. */
   function billCell(row: CommissionOrderRow | OverrideOrderRow, notes: ReactNode) {
-    // An upsale or a drop is not a bill: nothing to open, nothing to take out.
-    if (row.upsale) return <><span>{row.orderNo}</span>{notes}</>
+    // An upsale or a drop is not a bill: nothing to take out — but it opens
+    // the bill it changed, named under it (2026-10-12).
+    if (row.upsale) {
+      const href = rowHref(row)
+      const doc = data.upsales?.[row.orderId]?.erpDocNo
+      return <>{href ? <Link href={href}>{row.orderNo}</Link> : <span>{row.orderNo}</span>}
+        {doc && <small>{doc}</small>}{notes}</>
+    }
     return <div className={s.billCell}>
       <div><Link href={orderHref(row)}>{row.orderNo}</Link>{notes}</div>
       <button type="button" className={s.rowMenuButton} aria-haspopup="menu" data-bill-menu-trigger
@@ -668,9 +708,13 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       <span>{money(row.openBillBonus)}</span>
     </div>
   }
-  function cell(row: CommissionOrderRow | OverrideOrderRow, key: Column, overriding: boolean) {
+  function cell(row: CommissionOrderRow | OverrideOrderRow, key: Column, overriding: boolean, origin: RowOrigin | null = null) {
     const own = row as CommissionOrderRow
     switch (key) {
+      // Why a row from another month is here: a word on a wash, and the month it came from.
+      case 'status': return origin
+        ? <><span className={`chip ${ORIGIN_TONE[origin.kind]}`}><span className="dot" />{origin.label}</span><small>{origin.detail}</small></>
+        : <span className={s.muted}>—</span>
       // An upsale is no bill, so it has no paper of its own.
       case 'ref': return row.upsale ? <span className={s.muted}>—</span> : <PaperRefCell refNo={row.refNo} paperNo={row.paperNo} />
       // A shared bill names every holder, the owner first; the ledger's own person in bold.
@@ -704,32 +748,39 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       .sort((a, b) => (sort === 'commission_desc' ? b.totalCommission - a.totalCommission : sort === 'date_desc' ? b.orderDate.localeCompare(a.orderDate) : a.orderDate.localeCompare(b.orderDate)) || a.orderNo.localeCompare(b.orderNo))
     // Overriding names the downline in a column of its own.
     const visibleColumns = columns.filter(([key]) => !overriding || !['salesperson', 'kpi', 'incentive', 'open'].includes(key))
+    const fromOtherMonths = filtered.filter(row => originOf(row)?.paysHere).length
     return <div className={s.tableFrame} key={overriding ? 'overriding' : 'personal'}>
       <div className={s.tableScroll} role="region" aria-label={`${overriding ? 'Overriding' : 'Personal'} commission table, scroll horizontally`} tabIndex={0}>
         <table className={s.table} aria-label={overriding ? 'Overriding commission by downline order' : 'Personal commission by sales order'}>
           <thead><tr><th className={s.stickyFirst}>Sales order</th>{overriding && <th>Downline</th>}
             {visibleColumns.map(([key, label]) => <th key={key} title={key === 'sales' ? SALES_VALUE_HINT : key === 'commissionable' ? COMMISSIONABLE_HINT : undefined}>{overriding && key === 'product' ? 'Override basis' : label}</th>)}
             <th>Review</th><th className={s.stickyTotal}>Total commission</th></tr></thead>
-          <tbody>{filtered.map((row, i) => <tr key={`${row.orderId}:${overriding ? (row as OverrideOrderRow).downlineStaffId : row.staffId}:${i}`}
-            onContextMenu={row.upsale ? undefined : event => billMenu.onRowContextMenu(event, row)}>
+          <tbody>{filtered.map((row, i) => {
+            const origin = originOf(row)
+            return <tr key={`${row.orderId}:${overriding ? (row as OverrideOrderRow).downlineStaffId : row.staffId}:${i}`}
+            // Paid here, sold in another month: the other-month colour (2026-10-12).
+            className={origin?.paysHere ? s.otherMonth : undefined}
+            onContextMenu={row.upsale ? undefined : event => billMenu.onRowContextMenu(event, row)}
+            onDoubleClick={event => billMenu.onRowDoubleClick(event, rowHref(row))} onMouseDown={billMenu.onRowMouseDown}>
             <td className={s.stickyFirst}>{billCell(row, <>
               {row.share && <small className={s.shareNote}>{shareNote(row)}</small>}
-              {row.periodMonth !== period && <small>Carried from {row.periodMonth.slice(0, 7)}</small>}
               {!overriding && <small>{statusLabel[(row as CommissionOrderRow).status]}</small>}
               {!overriding && unpricedIds.has(row.orderId) && <small className={c.unpricedNote}>Priced RM 0 in the ERP</small>}</>)}</td>
             {overriding && <td>{(row as OverrideOrderRow).downlineName}</td>}
-            {visibleColumns.map(([key]) => <td key={key} className={NUMERIC_COLUMNS.includes(key) ? s.numeric : undefined}>{cell(row, key, overriding)}</td>)}
+            {visibleColumns.map(([key]) => <td key={key} className={NUMERIC_COLUMNS.includes(key) ? s.numeric : undefined}>{cell(row, key, overriding, origin)}</td>)}
             <td>{row.upsale ? <span className={s.muted}>Not a bill</span>
               : <button type="button" className={s.ghostButton} disabled={lockedMonths.has(row.periodMonth) || billPending}
                 title={lockedMonths.has(row.periodMonth) ? `${monthName(row.periodMonth)} is in payroll — a bill cannot leave it now` : 'Take this bill out of the commission; it stays out whatever the ERP sends next'}
                 onClick={() => dontCount(row)}>{billBusy === row.orderId ? 'Taking out…' : 'Don’t count'}</button>}</td>
             <td className={s.stickyTotal}>{money(row.totalCommission)}{overriding && <small>{pct((row as OverrideOrderRow).overrideRate)} overriding</small>}</td>
-          </tr>)}</tbody>
+          </tr>})}</tbody>
           <tfoot><tr><td className={s.stickyFirst}>Visible subtotal</td><td colSpan={visibleColumns.length + (overriding ? 2 : 1)}>{filtered.length} sales orders</td><td className={s.stickyTotal}>{money(sum(filtered, r => r.totalCommission))}</td></tr></tfoot>
         </table>
         {!filtered.length && <div className={s.empty}>No sales orders match this view.</div>}
       </div>
-      <div className={s.tableFooter}><span>{filtered.length} of {rows.length} rows · Scroll left / right to inspect the full sales line</span><span>Total commission stays visible →</span></div>
+      <div className={s.tableFooter}><span>{filtered.length} of {rows.length} rows
+        {fromOtherMonths > 0 && <> · <span className={s.otherMonthKey} aria-hidden />{fromOtherMonths} paid here from another month</>}
+        {' · '}Double-click a bill to open it · Scroll left / right to inspect the full sales line</span><span>Total commission stays visible →</span></div>
     </div>
   }
   /** Bills the deposit gate is holding — the whole team's, or one person's (`withPerson` false). */
@@ -745,10 +796,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
             <th>Paid</th><th title={DEPOSIT_HINT}>Deposit needed</th><th className={s.stickyTotal}>Still to collect</th></tr></thead>
           <tbody>{filtered.map(row => {
             const { required, short } = depositOf(row)
-            return <tr key={row.key} onContextMenu={event => billMenu.onRowContextMenu(event, row)}>
+            return <tr key={row.key} onContextMenu={event => billMenu.onRowContextMenu(event, row)}
+              onDoubleClick={event => billMenu.onRowDoubleClick(event, rowHref(row))} onMouseDown={billMenu.onRowMouseDown}>
               <td className={s.stickyFirst}>{billCell(row, <>
                 {row.share && <small className={s.shareNote}>{shareNote(row)}</small>}
-                {row.periodMonth !== period && <small>Carried from {row.periodMonth.slice(0, 7)}</small>}</>)}</td>
+                {row.periodMonth !== period && <small>{monthName(row.periodMonth)} bill</small>}</>)}</td>
               <td><PaperRefCell refNo={row.refNo} paperNo={row.paperNo} /></td>
               {withPerson && <td><button type="button" className={s.ghostButton} onClick={() => choosePerson(row.staffId, 'deposit')}>{row.staffName}</button></td>}
               <td>{row.orderDate}</td>
@@ -764,8 +816,30 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         </table>
         {!filtered.length && <div className={s.empty}>{rows.length ? 'No sales orders match this view.' : 'Every bill has met its deposit.'}</div>}
       </div>
-      <div className={s.tableFooter}><span>{filtered.length} of {rows.length} rows{shared ? ' · Shared bills show each holder’s part' : ''}</span><span>Still to collect stays visible →</span></div>
+      <div className={s.tableFooter}><span>{filtered.length} of {rows.length} rows{shared ? ' · Shared bills show each holder’s part' : ''} · Double-click a bill to open it</span><span>Still to collect stays visible →</span></div>
     </div>
+  }
+
+  // The upsells and drops inside the person's commission, each its own line
+  // of the salary below (2026-10-12, the user: "list with add and deduction
+  // (sales order)") — their own, and what a downline's brought them as override.
+  const salaryAdjustments: SalaryAdjustment[] = selected ? [
+    ...selected.personalRows.filter(row => row.upsale).map(row => adjustmentOf(row, row.totalCommission, null)),
+    ...selected.overridingRows.filter(row => row.upsale).map(row => adjustmentOf(row, row.overrideAmount, row.downlineName)),
+  ].filter(adjustment => adjustment.amount !== 0) : []
+  function adjustmentOf(row: CommissionOrderRow | OverrideOrderRow, amount: number, via: string | null): SalaryAdjustment {
+    const fact = data.upsales?.[row.orderId]
+    const origin = originOf(row)
+    return {
+      key: `${via ? 'override' : 'own'}:${row.key}`,
+      kind: origin?.kind === 'drop' ? 'drop' : 'upsell',
+      ref: fact?.originalRef ?? row.orderNo.replace(/^(UPSALE|DROP)\s*/, ''),
+      bill: fact?.erpDocNo ?? null,
+      from: origin?.fromMonth ?? null,
+      via,
+      amount,
+      href: rowHref(row),
+    }
   }
 
   const feedback = <>
@@ -937,7 +1011,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       {view !== 'deposit' && showExcluded && <div className={`${s.tableFrame} ${s.notCounted}`}>
         <div className={s.tableScroll}><table className={s.table} aria-label={`${selected.name} bills not counted`}>
           <thead><tr><th className={s.stickyFirst}>Not counted</th><th>Ref No.</th><th>Date</th><th title={SALES_VALUE_HINT}>Sales value</th><th>Count</th></tr></thead>
-          <tbody>{personNotCounted.map(b => <tr key={b.orderId}>
+          <tbody>{personNotCounted.map(b => <tr key={b.orderId}
+            onDoubleClick={event => billMenu.onRowDoubleClick(event, orderHref({ periodMonth: period, orderId: b.orderId }))} onMouseDown={billMenu.onRowMouseDown}>
             <td className={s.stickyFirst}><Link href={orderHref({ periodMonth: period, orderId: b.orderId })}>{b.orderNo}</Link><small>Taken out by hand</small></td>
             <td><PaperRefCell refNo={b.refNo ?? null} paperNo={b.paperNo ?? null} /></td>
             <td>{b.orderDate}</td>
@@ -957,6 +1032,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
           HR adds to it (2026-09-27). Keyed so one person's unsaved lines never
           follow the page to the next person. */}
       <SalaryCalculation key={selected.staffId} staffName={selected.name} period={period} commission={selected.totalCommission}
+        adjustments={salaryAdjustments}
         source={salarySource} payUnavailable={data.payUnavailable}
         closedReason={data.payLinesClosed ?? personPayLinesLock(salarySource?.payrollStatus, selected.name)} />
     </>}
@@ -974,7 +1050,9 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       {!openEnabled && <p className={s.notice}>Open Bill payout is switched off for this month. Saved picks remain visible and pay zero; picks open once it is switched on under Review settings › This month pays.</p>}
       {locked && <p className={s.notice}>This month is in payroll, so its Open Bill picks cannot change.</p>}
       <div className={s.toolbar}><input className={s.search} aria-label="Search Open Bill orders" placeholder="Search order, Ref No. or salesperson…" value={query} onChange={e => setQuery(e.target.value)} /><label className={s.chip}><input type="checkbox" checked={showAllOpen} onChange={e => setShowAllOpen(e.target.checked)} />Show all orders to add picks</label></div>
-      <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Open Bill orders"><thead><tr><th className={s.stickyFirst}>Sales order</th><th>Ref No.</th><th>Sales person</th><th>Event date</th><th>Venue</th><th>Brand / category</th><th>Sales value</th><th>Open Bill selection</th><th>Rate</th><th>Status</th><th className={s.stickyTotal}>Allocated bonus</th></tr></thead><tbody>{board.personalRows.filter(r => (showAllOpen || r.openBillRank != null) && matches(r)).map(r => <tr key={`${r.orderId}:${r.staffId}`}><td className={s.stickyFirst}>{r.orderNo}</td><td>{r.upsale ? <span className={s.muted}>—</span> : <PaperRefCell refNo={r.refNo} paperNo={r.paperNo} />}</td><td><button className={s.ghostButton} onClick={() => choosePerson(r.staffId)}>{r.staffName}</button></td><td>{r.eventDate}</td><td>{r.venue || '—'}</td><td>{r.brands.join(', ')}<small>{r.categories.join(', ')}</small></td><td className={s.numeric}>{money(r.orderTotal)}</td><td>{pickControl(r)}</td><td>{pct(r.openBillRate)}</td><td>{statusLabel[r.status]}</td><td className={s.stickyTotal}>{money(r.openBillBonus)}</td></tr>)}</tbody></table></div><div className={s.tableFooter}>Shared bills show each holder’s allocated part. All parts reconcile to the total bonus.</div></div>
+      <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Open Bill orders"><thead><tr><th className={s.stickyFirst}>Sales order</th><th>Ref No.</th><th>Sales person</th><th>Event date</th><th>Venue</th><th>Brand / category</th><th>Sales value</th><th>Open Bill selection</th><th>Rate</th><th>Status</th><th className={s.stickyTotal}>Allocated bonus</th></tr></thead><tbody>{board.personalRows.filter(r => (showAllOpen || r.openBillRank != null) && matches(r)).map(r => <tr key={`${r.orderId}:${r.staffId}`}
+        onDoubleClick={event => billMenu.onRowDoubleClick(event, rowHref(r))} onMouseDown={billMenu.onRowMouseDown}>
+        <td className={s.stickyFirst}>{(() => { const href = rowHref(r); return href ? <Link href={href}>{r.orderNo}</Link> : r.orderNo })()}</td><td>{r.upsale ? <span className={s.muted}>—</span> : <PaperRefCell refNo={r.refNo} paperNo={r.paperNo} />}</td><td><button className={s.ghostButton} onClick={() => choosePerson(r.staffId)}>{r.staffName}</button></td><td>{r.eventDate}</td><td>{r.venue || '—'}</td><td>{r.brands.join(', ')}<small>{r.categories.join(', ')}</small></td><td className={s.numeric}>{money(r.orderTotal)}</td><td>{pickControl(r)}</td><td>{pct(r.openBillRate)}</td><td>{statusLabel[r.status]}</td><td className={s.stickyTotal}>{money(r.openBillBonus)}</td></tr>)}</tbody></table></div><div className={s.tableFooter}>Shared bills show each holder’s allocated part. All parts reconcile to the total bonus.</div></div>
       <div className={s.footerTotal}><span>All selected bills · allocated bonus</span><strong>{money(totals.open)}</strong></div>
     </>}
 
