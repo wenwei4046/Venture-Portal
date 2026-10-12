@@ -1111,7 +1111,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         action: countActionFor(billMenu.menu.row),
         exclusionDetail: null,
       }}
-      anchor={billMenu.menu.anchor} link={billMenu.menu.link} byRightClick={billMenu.menu.byRightClick} monthLabel={monthLabel}
+      anchor={billMenu.menu.anchor} link={billMenu.menu.link} monthLabel={monthLabel}
       brand={(() => {
         const action = brandActionFor(billMenu.menu.row)
         return action ? { action, options: brandOptions } : null

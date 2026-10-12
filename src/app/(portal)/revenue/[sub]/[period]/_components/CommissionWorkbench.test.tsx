@@ -1052,7 +1052,7 @@ describe("CommissionWorkbench — a ledger's bill menu (user 2026-09-27)", () =>
     fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getByText('Arena'), { clientX: 400, clientY: 260 })
     const item = within(screen.getByRole('menu', { name: 'Actions for SO-one' })).getByRole('menuitem', { name: /Don't count this bill/ })
     expect(item).toBeDisabled()
-    expect(item).toHaveTextContent('The run for August 2026 has paid')
+    expect(item).toHaveAttribute('title', expect.stringContaining('The run for August 2026 has paid'))
   })
 
   it('offers no menu on an upsale or a drop — they are not bills', () => {
@@ -1110,7 +1110,7 @@ describe("CommissionWorkbench — a ledger's bill menu (user 2026-09-27)", () =>
     fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getAllByRole('cell')[2], { clientX: 400, clientY: 260 })
     const row = screen.getByRole('menuitem', { name: /Brand for the margin/ })
     expect(row).toBeDisabled()
-    expect(row).toHaveTextContent('The run for August 2026 has paid')
+    expect(row).toHaveAttribute('title', expect.stringContaining('The run for August 2026 has paid'))
   })
 })
 
@@ -1199,7 +1199,7 @@ describe('CommissionWorkbench — a shared bill (user 2026-09-30)', () => {
     fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getByText('Arena'), { clientX: 400, clientY: 260 })
     const row = screen.getByRole('menuitem', { name: /Share this bill/ })
     expect(row).toBeDisabled()
-    expect(row).toHaveTextContent('Alex’s August 2026 is closed — reopen it before changing who shares this bill')
+    expect(row).toHaveAttribute('title', expect.stringContaining('Alex’s August 2026 is closed — reopen it before changing who shares this bill'))
     fireEvent.pointerDown(document.body)
 
     // SO-two is Anthony's alone: it can be shared — but not with Alex, who is closed.

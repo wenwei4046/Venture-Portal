@@ -56,8 +56,6 @@ interface Props {
   monthLabel: string
   /** Another link the right-click landed on — the salesperson's bills, the venue. */
   link?: { href: string; label: string } | null
-  /** Opened by a right-click, which is when the browser's own menu is worth a mention. */
-  byRightClick?: boolean
   /**
    * *Brand for the margin* (2026-09-27): only on a bill nothing names a brand
    * for, or one given its brand here. Null or absent: no row.
@@ -87,7 +85,7 @@ interface Props {
  * each holder's part at their own rate; *Stop sharing with …* under it gives
  * a part back to the owner.
  */
-export default function BillContextMenu({ bill, anchor, monthLabel, link = null, byRightClick = false, brand = null, share = null, onClose, onDone, onBrandDone, onShareDone }: Props) {
+export default function BillContextMenu({ bill, anchor, monthLabel, link = null, brand = null, share = null, onClose, onDone, onBrandDone, onShareDone }: Props) {
   const router = useRouter()
   const boundary = useRef<HTMLDivElement>(null)
   const countButton = useRef<HTMLButtonElement>(null)
@@ -229,28 +227,26 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
     runShareWrite(() => shareOrder(bill.orderId, shareWith, part))
   }
 
+  // ONE LINE A ROW (2026-10-12, the user: "delete the description on the
+  // selection, make it clean and nice"). What a row's second line said is its
+  // tooltip now — why a row is shut, who holds a shared bill — and the panel
+  // it opens says the rest.
   function shareRow() {
     if (!shareAction) return null
-    const shared = holders.length > 1
+    const shared = holders.length > 1 ? holdersLine(holders) : null
     if (shareAction.kind === 'locked') {
       return (
-        <button type="button" role="menuitem" tabIndex={-1} disabled>
-          <span className={styles.rowCopy}>
-            <span>Share this bill</span>
-            {shared ? <small>{holdersLine(holders)}</small> : null}
-            <small>{shareAction.reason}</small>
-          </span>
+        <button type="button" role="menuitem" tabIndex={-1} disabled
+          title={[shared, shareAction.reason].filter(Boolean).join(' — ')}>
+          Share this bill
         </button>
       )
     }
     return (
       <button ref={shareButton} type="button" role="menuitem" tabIndex={-1} aria-haspopup="dialog"
         aria-expanded={!!sharePanel} aria-controls={sharePanel ? shareId : undefined} disabled={pending}
-        onClick={openShare}>
-        <span className={styles.rowCopy}>
-          <span>Share this bill…</span>
-          <small>{shared ? holdersLine(holders) : 'With another salesperson — a part each'}</small>
-        </span>
+        title={shared ?? undefined} onClick={openShare}>
+        Share this bill…
       </button>
     )
   }
@@ -287,22 +283,16 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
     const picked = brand.action.picked
     if (brand.action.kind === 'locked') {
       return (
-        <button type="button" role="menuitem" tabIndex={-1} disabled>
-          <span className={styles.rowCopy}>
-            <span>Brand for the margin</span>
-            <small>{brand.action.reason}</small>
-          </span>
+        <button type="button" role="menuitem" tabIndex={-1} disabled title={brand.action.reason}>
+          Brand for the margin
         </button>
       )
     }
     return (
       <button ref={brandButton} type="button" role="menuitem" tabIndex={-1} aria-haspopup="dialog"
         aria-expanded={!!brandPanel} aria-controls={brandPanel ? brandId : undefined} disabled={pending}
-        onClick={openBrand}>
-        <span className={styles.rowCopy}>
-          <span>Brand for the margin…</span>
-          <small>{picked ? `Picked here: ${nameOf(picked)}` : 'Nothing on this bill names a brand'}</small>
-        </span>
+        title={picked ? `Picked here: ${nameOf(picked)}` : 'Nothing on this bill names a brand'} onClick={openBrand}>
+        Brand for the margin…
       </button>
     )
   }
@@ -347,39 +337,27 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
         return (
           <button ref={countButton} type="button" role="menuitem" tabIndex={-1} aria-haspopup="dialog"
             aria-expanded={!!confirm} aria-controls={confirm ? confirmId : undefined} disabled={pending}
-            onClick={openConfirm}>
-            <span className={styles.rowCopy}>
-              <span>Don&apos;t count this bill…</span>
-              <small>Takes it out of {monthLabel}&apos;s commission</small>
-            </span>
+            title={`Takes it out of ${monthLabel}'s commission`} onClick={openConfirm}>
+            Don&apos;t count this bill…
           </button>
         )
       case 'include':
         return (
-          <button type="button" role="menuitem" tabIndex={-1} disabled={pending} onClick={() => run(false)}>
-            <span className={styles.rowCopy}>
-              <span>Count this bill again</span>
-              {bill.exclusionDetail ? <small>{bill.exclusionDetail}</small> : null}
-              {action.stillOut ? <small>It still will not count: {action.stillOut}</small> : null}
-            </span>
+          <button type="button" role="menuitem" tabIndex={-1} disabled={pending} onClick={() => run(false)}
+            title={[bill.exclusionDetail, action.stillOut ? `It still will not count: ${action.stillOut}` : null].filter(Boolean).join(' — ') || undefined}>
+            Count this bill again
           </button>
         )
       case 'locked':
         return (
-          <button type="button" role="menuitem" tabIndex={-1} disabled>
-            <span className={styles.rowCopy}>
-              <span>{action.excludedByHand ? 'Count this bill again' : "Don't count this bill"}</span>
-              <small>{action.reason}</small>
-            </span>
+          <button type="button" role="menuitem" tabIndex={-1} disabled title={action.reason}>
+            {action.excludedByHand ? 'Count this bill again' : "Don't count this bill"}
           </button>
         )
       case 'unavailable':
         return (
-          <button type="button" role="menuitem" tabIndex={-1} disabled>
-            <span className={styles.rowCopy}>
-              <span>Don&apos;t count this bill</span>
-              <small>Already not counted — {action.reason}</small>
-            </span>
+          <button type="button" role="menuitem" tabIndex={-1} disabled title={`Already not counted — ${action.reason}`}>
+            Don&apos;t count this bill
           </button>
         )
     }
@@ -399,8 +377,8 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
           Open bill in new tab
         </button>
         {link ? (
-          <button type="button" role="menuitem" tabIndex={-1} disabled={pending} onClick={() => open(link.href, true)}>
-            <span className={styles.rowCopy}><span>Open link in new tab</span><small>{link.label}</small></span>
+          <button type="button" role="menuitem" tabIndex={-1} disabled={pending} title={link.label} onClick={() => open(link.href, true)}>
+            Open link in new tab
           </button>
         ) : null}
         {shareRow()}
@@ -408,9 +386,6 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
         {brandRow()}
         {!confirm && !brandPanel && !sharePanel && pending ? <p role="status" className={styles.hint}>Saving…</p> : null}
         {!confirm && !brandPanel && !sharePanel && error ? <p role="alert" className={styles.error}>{error}</p> : null}
-        {/* Stays while the confirmation is open: a panel that lost a row would
-            jump under the pointer that just chose from it. */}
-        {byRightClick ? <p className={styles.hint}>Shift + right-click opens the browser&apos;s own menu.</p> : null}
       </MenuPanel>
 
       {confirm ? (

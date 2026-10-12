@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useTransition, type ReactNode } from 'react'
+import Link from 'next/link'
+import { useState, useTransition, type MouseEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import type { UpsaleView } from '../../../_lib/upsales'
 import { confirmErpAdjustment, dismissErpAdjustment, reopenErpAdjustment } from '../../../upsale-actions'
+import { onTheRow } from '../orders/_components/useBillMenu'
 import s from './commission-workbench.module.css'
 
 interface Props {
@@ -29,6 +31,12 @@ interface Props {
    * an empty state. Alone on a page it says nothing when there is nothing.
    */
   inTab?: boolean
+  /**
+   * The bill each change was found on (2026-10-12), by the change's id: its
+   * number is a link and a double-click on its row opens it. A change whose
+   * bill the portal does not hold has none.
+   */
+  billLinks?: Readonly<Record<string, string>>
 }
 
 function monthName(period: string | null, style: 'long' | 'short' = 'short'): string {
@@ -40,10 +48,10 @@ function signed(amount: number) {
   return amount < 0 ? <span className="neg">{formatMoney(amount)}</span> : formatMoney(amount)
 }
 
-function Bill({ change }: { change: UpsaleView }) {
+function Bill({ change, href }: { change: UpsaleView; href?: string }) {
   return (
     <>
-      <span>{change.originalRef}</span>
+      {href ? <Link href={href}>{change.originalRef}</Link> : <span>{change.originalRef}</span>}
       {change.erpDocNo && change.erpDocNo !== change.originalRef ? <small>{change.erpDocNo}</small> : null}
     </>
   )
@@ -78,7 +86,7 @@ function Summary({ label, value, note }: { label: string; value: ReactNode; note
  * Undo sends it back to wait. A tab of the month's workbench since 2026-09-30,
  * in its table design; it sat above the month's cards until then.
  */
-export default function ErpChangesPanel({ period, pending, paid = [], locked, settledBefore = null, inTab = false }: Props) {
+export default function ErpChangesPanel({ period, pending, paid = [], locked, settledBefore = null, inTab = false, billLinks = {} }: Props) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -86,6 +94,15 @@ export default function ErpChangesPanel({ period, pending, paid = [], locked, se
   const [isPending, startTransition] = useTransition()
 
   if (!inTab && pending.length === 0 && paid.length === 0) return null
+
+  /** A double-click on a change's row opens its bill — not one on its buttons. */
+  function openBill(event: MouseEvent<HTMLElement>, id: string) {
+    const href = billLinks[id]
+    if (!href || !onTheRow(event)) return
+    window.getSelection()?.removeAllRanges()
+    if (event.ctrlKey || event.metaKey) window.open(href, '_blank', 'noopener')
+    else router.push(href)
+  }
 
   const drops = pending.filter(p => p.kind === 'drop').reduce((a, p) => a + p.amount, 0)
   const upsells = pending.filter(p => p.kind === 'upsale').reduce((a, p) => a + p.amount, 0)
@@ -157,8 +174,8 @@ export default function ErpChangesPanel({ period, pending, paid = [], locked, se
               </thead>
               <tbody>
                 {pending.map(p => (
-                  <tr key={p.id}>
-                    <td className={s.stickyFirst}><Bill change={p} /></td>
+                  <tr key={p.id} onDoubleClick={event => openBill(event, p.id)}>
+                    <td className={s.stickyFirst}><Bill change={p} href={billLinks[p.id]} /></td>
                     <td>{p.staffName}</td>
                     <td>{monthName(p.originalPeriod)}</td>
                     <td className={s.numeric}>{p.settledAmount === null ? '—' : formatMoney(p.settledAmount)}</td>
@@ -224,8 +241,8 @@ export default function ErpChangesPanel({ period, pending, paid = [], locked, se
                 </thead>
                 <tbody>
                   {paid.map(p => (
-                    <tr key={p.id}>
-                      <td className={s.stickyFirst}><Bill change={p} /></td>
+                    <tr key={p.id} onDoubleClick={event => openBill(event, p.id)}>
+                      <td className={s.stickyFirst}><Bill change={p} href={billLinks[p.id]} /></td>
                       <td>{p.staffName}</td>
                       <td>{monthName(p.originalPeriod)}</td>
                       <td className={s.numeric}><Difference change={p} /></td>

@@ -6,6 +6,7 @@ import { formatMoney } from '@/lib/utils'
 import type { BillCountAction } from '@/lib/commission/bill-exclusion'
 import { brandOutcomeMessage, type BillBrandAction, type BrandOption } from '@/lib/commission/bill-brand'
 import { billShareAction, holdersOf, type BillShareAction } from '@/lib/commission/bill-share'
+import { ORIGIN_TONE, type RowOrigin } from '@/lib/commission/row-origin'
 import s from '../../_components/commission-workbench.module.css'
 import NoCommission, { COMMISSIONABLE_HINT, SALES_VALUE_HINT } from '../../_components/NoCommission'
 import PaperRefCell from '../../_components/PaperRefCell'
@@ -78,15 +79,23 @@ export interface BillRow {
     disabledReason: string
   }
   commission: { product: number; kpi: number; marginIncentive: number; openBill: number; total: number } | null
+  /**
+   * A bill keyed in another month than its fair's (2026-10-12): paid in this
+   * month, said in Status and drawn in the other-month colour, as on a
+   * salesperson's ledger (`row-origin.ts`). Null for the month's own sale.
+   */
+  origin?: RowOrigin | null
 }
 
 type Column =
-  | 'ref' | 'salesperson' | 'date' | 'customer' | 'venue' | 'event' | 'organizer' | 'location' | 'brand'
+  | 'origin' | 'ref' | 'salesperson' | 'date' | 'customer' | 'venue' | 'event' | 'organizer' | 'location' | 'brand'
   | 'category' | 'sales' | 'commissionable' | 'paid' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
 
+// Status (2026-10-12): why a bill sold in another month is paid in this one.
 // Ref No. (2026-10-03, user: follow erp sales order number, but with reference
 // …): the handwritten bill's number, beside the ERP's, to check a bill back.
 const COLUMNS: [Column, string][] = [
+  ['origin', 'Status'],
   ['ref', 'Ref No.'], ['salesperson', 'Salesperson'], ['date', 'Date'], ['customer', 'Customer'], ['venue', 'Venue'],
   ['event', 'Event'], ['organizer', 'Organizer'], ['location', 'Sales location'], ['brand', 'Brand'],
   ['category', 'Category'], ['sales', 'Sales value'], ['commissionable', 'Commissionable value'],
@@ -134,7 +143,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
   const [sort, setSort] = useState('date_asc')
   const [showExcluded, setShowExcluded] = useState(initialShowExcluded)
   const [hidden, setHidden] = useState<Column[]>(['location'])
-  const { menu, closeMenu, onRowContextMenu, onMenuButton, isOpenOn } = useBillMenu<BillRow>(r => r.orderId, r => r.href)
+  const { menu, closeMenu, onRowContextMenu, onMenuButton, isOpenOn, onRowDoubleClick, onRowMouseDown } = useBillMenu<BillRow>(r => r.orderId, r => r.href)
   const [done, setDone] = useState<BillMenuOutcome | null>(null)
   const [brandDone, setBrandDone] = useState<string | null>(null)
   const [shareDone, setShareDone] = useState<BillShareOutcome | null>(null)
@@ -169,6 +178,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
   const subtotalSales = round2(visible.filter(r => !r.cancelled).reduce((a, r) => a + r.orderTotal, 0))
   const subtotalCommissionable = round2(visible.filter(r => !r.cancelled).reduce((a, r) => a + r.commissionable, 0))
   const subtotalCommission = round2(visible.reduce((a, r) => a + (r.commission?.total ?? 0), 0))
+  const lateCount = visible.filter(r => !r.cancelled && r.origin?.paysHere).length
 
   function menuDone(outcome: BillMenuOutcome) {
     closeMenu()
@@ -222,6 +232,9 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
 
   function cell(r: BillRow, key: Column) {
     switch (key) {
+      case 'origin': return r.origin
+        ? <><span className={`chip ${ORIGIN_TONE[r.origin.kind]}`}><span className="dot" />{r.origin.label}</span><small>{r.origin.detail}</small></>
+        : <span className={s.muted}>—</span>
       case 'ref': return <PaperRefCell refNo={r.refNo} paperNo={r.paperNo} />
       case 'salesperson': return salesperson(r)
       case 'date': return <>{r.orderDate}{r.sequenceInDay ? <small className={s.muted}>#{r.sequenceInDay} of the day</small> : null}</>
@@ -301,8 +314,10 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
               title={key === 'sales' ? SALES_VALUE_HINT : key === 'commissionable' ? COMMISSIONABLE_HINT : undefined}>{label}</th>)}
             <th className={s.stickyTotal}>Total commission</th>
           </tr></thead>
-          <tbody>{visible.map(r => <tr key={r.orderId} className={r.cancelled ? s.excluded : undefined}
-            onContextMenu={event => onRowContextMenu(event, r)}>
+          <tbody>{visible.map(r => <tr key={r.orderId}
+            className={r.cancelled ? s.excluded : r.origin?.paysHere ? s.otherMonth : undefined}
+            onContextMenu={event => onRowContextMenu(event, r)}
+            onDoubleClick={event => onRowDoubleClick(event, r.href)} onMouseDown={onRowMouseDown}>
             <td className={s.stickyFirst}>
               <div className={s.billCell}>
                 <div>
@@ -332,7 +347,9 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
         {!visible.length && <div className={s.empty}>No bills match this view.</div>}
       </div>
       <div className={s.tableFooter}>
-        <span>{visible.length} of {rows.length} bills · Scroll left / right to inspect the full sales line · Right-click a bill for its menu</span>
+        <span>{visible.length} of {rows.length} bills
+          {lateCount > 0 && <> · <span className={s.otherMonthKey} aria-hidden />{lateCount} sold in another month</>}
+          {' · '}Double-click a bill to open it · Right-click for its menu · Scroll left / right to inspect the full sales line</span>
         <span>Total commission stays visible →</span>
       </div>
     </div>
@@ -347,7 +364,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
         action: menu.row.countAction,
         exclusionDetail: menu.row.exclusionDetail,
       }}
-      anchor={menu.anchor} link={menu.link} byRightClick={menu.byRightClick} monthLabel={monthLabel}
+      anchor={menu.anchor} link={menu.link} monthLabel={monthLabel}
       brand={menu.row.brandAction ? { action: menu.row.brandAction, options: brandOptions } : null}
       share={(() => {
         const action = shareActionOf(menu.row)

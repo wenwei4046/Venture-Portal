@@ -8,7 +8,7 @@ import type { MenuAnchor } from '../../../hierarchy/_components/ContextMenuPanel
 const ROW_CONTROLS = 'a, button, input, select, textarea, label, summary, [role="menuitem"], [role="dialog"]'
 
 /** Whether a press landed on the row itself — not a control in it, not something it portalled. */
-function onTheRow(event: MouseEvent<HTMLElement>): boolean {
+export function onTheRow(event: MouseEvent<HTMLElement>): boolean {
   const row = event.currentTarget
   const target = event.target as HTMLElement | null
   if (!target || !row.contains(target)) return false

@@ -1,4 +1,3 @@
-import { Fragment } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -6,6 +5,7 @@ import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
+import { billHref } from '@/lib/commission/workbench-nav'
 import { exhibitionBrandOf, salesByExhibition } from '@/lib/exhibitions'
 import { agentKeyOf } from '@/lib/erp-sync/contract'
 import SchemeSwitches from './_components/SchemeSwitches'
@@ -23,9 +23,8 @@ import CommissionWorkbench from './_components/CommissionWorkbench'
 import ErpFeedChip from './_components/ErpFeedChip'
 import DoubleClaimPanel from './_components/DoubleClaimPanel'
 import ErpChangesPanel from './_components/ErpChangesPanel'
-import FairMovesPanel from './_components/FairMovesPanel'
-import { loadFairMoves } from '../../_lib/fair-calendar'
 import { loadSalespersonCloses } from '../../_lib/salesperson-closes'
+import { loadBillsByDocNo } from '../../_lib/row-origins'
 import workbenchStyles from './_components/commission-workbench.module.css'
 
 interface PageProps {
@@ -91,9 +90,16 @@ interface StatementRow {
  * venue until 2026-10-03) — are every cut of the month's bills, in one table
  * design. Since 2026-09-30 the rail also carries the month's two review
  * panels, which sat stacked above the cards: *Drops & upsells* (what the ERP
- * changed on settled bills, and bills of another month's fair) and *Double
- * claims*, where every group says why it was flagged and what each of its
- * bills has been through.
+ * changed on settled bills) and *Double claims*, where every group says why it
+ * was flagged and what each of its bills has been through.
+ *
+ * NO MORE *Bills of another month's fair* (2026-10-12, the user: "may remove,
+ * cause those orders will auto detect and add on the current month table, and
+ * list with different colour … so this table no need anymore"). Nobody moves
+ * a bill between months: a bill keyed after its fair's month is paid where it
+ * sits — or, sitting in its sale month after its salesperson was closed, by
+ * the next month still open — and the ledger names it *Late key-in* in the
+ * other-month colour (`lib/commission/row-origin.ts`).
  */
 export default async function CommissionPeriodPage({ params }: PageProps) {
   await requirePage('/revenue/[sub]/[period]')
@@ -223,6 +229,17 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   // read leaves the menu without the row rather than the month without a page.
   const shareTeamRead = loadShareTeam(supabase, subDept.schemeId).catch(() => undefined)
 
+  // The drops and upsells the ERP found that somebody paid into this month
+  // (Undo sends one back), those still to answer from any month (paid into
+  // the month somebody confirms them in, 2026-09-26) — and the bill each was
+  // found on, so its row opens it (2026-10-12).
+  const paidAdjustmentsRead = loadMonthUpsales(supabase, subDept.id, period).then(rows => rows.filter(row => row.source === 'erp'))
+  const pendingAdjustmentsRead = loadPendingAdjustments(supabase, subDept.id)
+  const adjustmentBillsRead = Promise.all([paidAdjustmentsRead, pendingAdjustmentsRead])
+    .then(([paid, pending]) => loadBillsByDocNo(supabase, subDept.id, [...paid, ...pending].flatMap(a => a.erpDocNo ? [a.erpDocNo] : [])))
+    // A bill that cannot be found leaves its row without a link, not the month without a page.
+    .catch(() => new Map<string, { orderId: string; periodMonth: string }>())
+
   const [
     batchRow,
     monthOrders,
@@ -231,23 +248,23 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     statements,
     [paidAdjustments, monthLock],
     workbench,
-    [feedMonth, doubleClaims, { data: paidRunRows }, pendingAdjustments, fairMoves],
+    [feedMonth, doubleClaims, { data: paidRunRows }, pendingAdjustments],
     openBillMonth,
     payrollClosed,
     earlierLocks,
     closes,
     brandMenu,
     shareTeam,
+    adjustmentBills,
   ] = await Promise.all([
     batchRowRead,
     monthOrdersRead,
     schemeRead,
     runRead,
     statementsRead,
-    // The drops and upsells the ERP found that somebody paid into this month
-    // (Undo sends one back), and whether the month is in payroll.
+    // …and whether the month is in payroll.
     Promise.all([
-      loadMonthUpsales(supabase, subDept.id, period).then(rows => rows.filter(row => row.source === 'erp')),
+      paidAdjustmentsRead,
       once(supabase.rpc('commission_order_period_locked', { p_sub_department_id: subDept.id, p_period: period })),
     ]),
     workbenchRead,
@@ -270,11 +287,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
           supabase.from('comm_runs').select('period_month')
             .eq('sub_department_id', subDept.id).in('status', ['applied', 'locked']),
         ),
-        // Drops and upsells the ERP found on settled bills, from any month —
-        // they are paid into the month somebody confirms them in (2026-09-26).
-        loadPendingAdjustments(supabase, subDept.id),
-        // Bills in another month than the fair the ERP names (2026-09-27).
-        hasBatch ? loadFairMoves(supabase, subDept.id) : Promise.resolve([]),
+        pendingAdjustmentsRead,
       ]),
     ),
     openBillMonthRead,
@@ -283,6 +296,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     closesRead,
     brandMenuRead,
     shareTeamRead,
+    adjustmentBillsRead,
   ])
   if (monthLock.error) throw new Error(`Could not check the commission run: ${monthLock.error.message}`)
 
@@ -372,19 +386,22 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
       inTab={inTab}
     />
   ) : null
+  // Each drop or upsell opens the bill it was found on (2026-10-12) — the
+  // bill's own month, back to this tab.
+  const changeHref = (change: { erpDocNo: string | null }) => {
+    const bill = change.erpDocNo ? adjustmentBills.get(change.erpDocNo) : undefined
+    return bill ? billHref(subDept.slug, bill.periodMonth, bill.orderId, `${revenuePath(subDept.slug, period)}?view=changes`) : null
+  }
+  const billLinks = Object.fromEntries([...pendingAdjustments, ...paidAdjustments]
+    .flatMap(change => { const href = changeHref(change); return href ? [[change.id, href]] : [] }))
   // Keyed: handed to a client component as a list of server-built children.
   const erpChangesPanel = (
-    <Fragment key="erp-changes">
-      <ErpChangesPanel period={period} pending={pendingAdjustments} paid={paidAdjustments} locked={inPayroll}
-        settledBefore={settledBefore} inTab={inTab} />
-      <FairMovesPanel period={period} subDepartmentId={subDept.id} moves={fairMoves} />
-    </Fragment>
+    <ErpChangesPanel key="erp-changes" period={period} pending={pendingAdjustments} paid={paidAdjustments} locked={inPayroll}
+      settledBefore={settledBefore} inTab={inTab} billLinks={billLinks} />
   )
-  // What each tab asks of somebody: the drops and upsells to answer, and the
-  // bills FairMovesPanel lists (a move touching this month that is not locked);
-  // the groups not yet checked, and the months that ride in unpaid.
+  // What each tab asks of somebody: the drops and upsells to answer; the
+  // groups not yet checked, and the months that ride in unpaid.
   const changesWaiting = pendingAdjustments.length
-    + fairMoves.filter(m => !m.locked && (m.fromPeriod === period || m.toPeriod === period)).length
   const claimsWaiting = claimGroups.filter(group => !group.dismissed).length + carriedUnpaid.length
 
   const monthHeader = (

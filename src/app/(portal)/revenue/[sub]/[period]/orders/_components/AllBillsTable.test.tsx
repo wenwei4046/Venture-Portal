@@ -83,7 +83,7 @@ describe('AllBillsTable — the bill menu', () => {
     table()
     fireEvent.contextMenu(screen.getByRole('link', { name: 'ANTHONY' }), { clientX: 400, clientY: 260 })
     const root = screen.getByRole('menu', { name: 'Actions for HC-SO-013493' })
-    expect(within(root).getByRole('menuitem', { name: /Open link in new tab/ })).toHaveTextContent('ANTHONY')
+    expect(within(root).getByRole('menuitem', { name: /Open link in new tab/ })).toHaveAttribute('title', 'ANTHONY')
   })
 
   it('opens and closes from the ⋯ beside the order number, for whoever cannot right-click', () => {
@@ -144,7 +144,7 @@ describe('AllBillsTable — brand for the margin', () => {
     expect(screen.queryByRole('menuitem', { name: /Brand for the margin/ })).toBeNull()
     fireEvent.pointerDown(document.body)
     fireEvent.contextMenu(screen.getByText('Chu Fook tiang'), { clientX: 400, clientY: 300 })
-    expect(screen.getByRole('menuitem', { name: /Brand for the margin…/ })).toHaveTextContent('Nothing on this bill names a brand')
+    expect(screen.getByRole('menuitem', { name: /Brand for the margin…/ })).toHaveAttribute('title', expect.stringContaining('Nothing on this bill names a brand'))
   })
 
   it('gives the bill the brand picked, and says which ladder it follows now', async () => {
@@ -165,7 +165,7 @@ describe('AllBillsTable — brand for the margin', () => {
     table([bill({ ...brandless(), brands: ['ZANOTTI'], brandAction: { kind: 'pick', picked: 'ZANOTTI' } })])
     fireEvent.contextMenu(screen.getByText('Chu Fook tiang'), { clientX: 400, clientY: 300 })
     const row = screen.getByRole('menuitem', { name: /Brand for the margin/ })
-    expect(row).toHaveTextContent('Picked here: Zanotti')
+    expect(row).toHaveAttribute('title', expect.stringContaining('Picked here: Zanotti'))
     fireEvent.click(row)
     const panel = screen.getByRole('dialog', { name: 'Brand for HC-SO-2609-127' })
     expect(within(panel).getByRole('button', { name: 'Zanotti (picked)' })).toBeDisabled()
@@ -188,7 +188,7 @@ describe('AllBillsTable — brand for the margin', () => {
     fireEvent.contextMenu(screen.getByText('Chu Fook tiang'), { clientX: 400, clientY: 300 })
     const row = screen.getByRole('menuitem', { name: /Brand for the margin/ })
     expect(row).toBeDisabled()
-    expect(row).toHaveTextContent('has paid')
+    expect(row).toHaveAttribute('title', expect.stringContaining('has paid'))
   })
 })
 
@@ -213,7 +213,7 @@ describe('AllBillsTable — Share this bill…', () => {
     const root = screen.getByRole('menu', { name: 'Actions for HC-SO-013493' })
     expect(root).toHaveTextContent('HC-SO-013493 · ANTHONY + ADRIAN')
     const row = within(root).getByRole('menuitem', { name: /Share this bill/ })
-    expect(row).toHaveTextContent('ANTHONY 50% · ADRIAN 50%')
+    expect(row).toHaveAttribute('title', expect.stringContaining('ANTHONY 50% · ADRIAN 50%'))
     fireEvent.click(row)
     const panel = screen.getByRole('dialog', { name: 'Share HC-SO-013493' })
     fireEvent.change(within(panel).getByLabelText(/Share with/), { target: { value: 's-2' } })
@@ -231,7 +231,7 @@ describe('AllBillsTable — Share this bill…', () => {
     fireEvent.contextMenu(screen.getByText('Sarida'), { clientX: 400, clientY: 260 })
     const row = screen.getByRole('menuitem', { name: /Share this bill/ })
     expect(row).toBeDisabled()
-    expect(row).toHaveTextContent('The run for September 2026 has paid')
+    expect(row).toHaveAttribute('title', expect.stringContaining('The run for September 2026 has paid'))
   })
 })
 
@@ -241,7 +241,8 @@ describe('AllBillsTable — the Ref No. column', () => {
   it('shows the handwritten bill’s number beside the ERP’s', () => {
     table()
     const header = screen.getAllByRole('columnheader').map(th => th.textContent)
-    expect(header.slice(0, 2)).toEqual(['Sales order', 'Ref No.'])
+    // Status first since 2026-10-12: a bill sold in another month says so there.
+    expect(header.slice(0, 3)).toEqual(['Sales order', 'Status', 'Ref No.'])
     const row = screen.getByRole('link', { name: 'HC-SO-013493' }).closest('tr')!
     expect(within(row).getByText('HC13369')).toBeInTheDocument()
   })
@@ -271,5 +272,36 @@ describe('AllBillsTable — the Ref No. column', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Ref No.' }))
     expect(screen.queryByRole('columnheader', { name: 'Ref No.' })).toBeNull()
     expect(screen.queryByText('HC13369')).toBeNull()
+  })
+})
+
+// 2026-10-12 — a bill keyed in this month for another month's fair is paid
+// here, said in Status and drawn in the other-month colour; a double-click on
+// a bill's row opens it.
+describe('AllBillsTable — a late key-in, and opening a bill', () => {
+  const late = bill({
+    orderId: 'order-2', orderNo: 'HC-SO-2610-167', href: '/revenue/fair/2026-10-01/orders/order-2',
+    origin: { kind: 'late', label: 'Late key-in', fromMonth: '2026-09-01', detail: 'Sep 2026 fair', paysHere: true },
+  })
+
+  it('says why and colours the row', () => {
+    table([bill(), late])
+    const row = screen.getByRole('link', { name: 'HC-SO-2610-167' }).closest('tr')!
+    expect(within(row).getAllByRole('cell')[1]).toHaveTextContent('Late key-inSep 2026 fair')
+    expect(row.className).toMatch(/otherMonth/)
+    const own = screen.getByRole('link', { name: 'HC-SO-013493' }).closest('tr')!
+    expect(within(own).getAllByRole('cell')[1]).toHaveTextContent('—')
+    expect(own.className).not.toMatch(/otherMonth/)
+    expect(screen.getByText(/1 sold in another month/)).toBeVisible()
+  })
+
+  it('opens a bill on a double-click of its row, not of a control in it', () => {
+    table([bill(), late])
+    // The customer — plain text; the venue is a link of its own.
+    fireEvent.doubleClick(screen.getAllByText('Sarida')[1])
+    expect(mocks.push).toHaveBeenCalledWith('/revenue/fair/2026-10-01/orders/order-2')
+    mocks.push.mockClear()
+    fireEvent.doubleClick(screen.getByRole('button', { name: 'Actions for HC-SO-2610-167' }))
+    expect(mocks.push).not.toHaveBeenCalled()
   })
 })

@@ -39,6 +39,30 @@ interface BillRow {
   period_month: string
 }
 
+/**
+ * The bills these ERP documents are, among this sub-department's months as
+ * they stand (a committed batch), by document number — where an upsell or a
+ * drop the ERP found takes its reader.
+ */
+export async function loadBillsByDocNo(
+  db: SupabaseClient,
+  subDepartmentId: string,
+  docNos: readonly string[],
+): Promise<Map<string, { orderId: string; periodMonth: string }>> {
+  const keys = [...new Set(docNos.filter(Boolean))]
+  const bills = await fetchByKeys<BillRow, string>(keys, chunk =>
+    db.from('sales_orders')
+      .select('id, order_no, period_month, sales_import_batches!inner (status, sub_department_id)')
+      .in('order_no', chunk)
+      .eq('sales_import_batches.status', 'committed')
+      .eq('sales_import_batches.sub_department_id', subDepartmentId), 'the bills the upsells and drops changed')
+  const byDoc = new Map<string, { orderId: string; periodMonth: string }>()
+  for (const bill of bills) {
+    if (!byDoc.has(bill.order_no)) byDoc.set(bill.order_no, { orderId: bill.id, periodMonth: bill.period_month })
+  }
+  return byDoc
+}
+
 /** The facts of these upsales and drops (`comm_upsales.id`), keyed by id. */
 export async function loadUpsaleFacts(
   db: SupabaseClient,
@@ -51,24 +75,15 @@ export async function loadUpsaleFacts(
     db.from('comm_upsales')
       .select('id, kind, amount, original_ref, erp_doc_no, original_period')
       .in('id', keys), 'the month’s upsells and drops')
-  // The bill each was found on, among this sub-department's months as they stand.
-  const docNos = [...new Set(rows.flatMap(row => row.erp_doc_no ? [row.erp_doc_no] : []))]
-  const bills = await fetchByKeys<BillRow, string>(docNos, keys =>
-    db.from('sales_orders')
-      .select('id, order_no, period_month, sales_import_batches!inner (status, sub_department_id)')
-      .in('order_no', keys)
-      .eq('sales_import_batches.status', 'committed')
-      .eq('sales_import_batches.sub_department_id', subDepartmentId), 'the bills the upsells and drops changed')
-  const billOf = new Map<string, BillRow>()
-  for (const bill of bills) if (!billOf.has(bill.order_no)) billOf.set(bill.order_no, bill)
+  const billOf = await loadBillsByDocNo(db, subDepartmentId, rows.flatMap(row => row.erp_doc_no ? [row.erp_doc_no] : []))
   return Object.fromEntries(rows.map(row => {
     const bill = row.erp_doc_no ? billOf.get(row.erp_doc_no) : undefined
     const fact: UpsaleFact = {
       kind: row.kind === 'drop' || (row.kind === null && Number(row.amount) < 0) ? 'drop' : 'upsale',
       originalRef: row.original_ref,
       erpDocNo: row.erp_doc_no,
-      originalPeriod: row.original_period ?? bill?.period_month ?? null,
-      bill: bill ? { orderId: bill.id, periodMonth: bill.period_month } : null,
+      originalPeriod: row.original_period ?? bill?.periodMonth ?? null,
+      bill: bill ?? null,
     }
     return [row.id, fact]
   }))

@@ -3,9 +3,9 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import type { UpsaleView } from '../../../_lib/upsales'
 import ErpChangesPanel from './ErpChangesPanel'
 
-const { confirm, dismiss, reopen, refresh } = vi.hoisted(() => ({ confirm: vi.fn(), dismiss: vi.fn(), reopen: vi.fn(), refresh: vi.fn() }))
+const { confirm, dismiss, reopen, refresh, push } = vi.hoisted(() => ({ confirm: vi.fn(), dismiss: vi.fn(), reopen: vi.fn(), refresh: vi.fn(), push: vi.fn() }))
 vi.mock('../../../upsale-actions', () => ({ confirmErpAdjustment: confirm, dismissErpAdjustment: dismiss, reopenErpAdjustment: reopen }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh, push }) }))
 
 /** HC13911 was paid in August on 16,888; the ERP now says 14,800. */
 const DROP: UpsaleView = {
@@ -144,5 +144,23 @@ describe('ErpChangesPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pay in Sep 2026' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('That change is no longer waiting')
     expect(refresh).not.toHaveBeenCalled()
+  })
+
+  // 2026-10-12 — "for all sales order list on the table, need to able press in to show order detail".
+  it('opens the bill each change was found on — its number, or a double-click on its row', () => {
+    const href = '/revenue/fair/2026-08-01/orders/bill-13911?from=%2Frevenue%2Ffair%2F2026-09-01%3Fview%3Dchanges'
+    render(<ErpChangesPanel period="2026-09-01" pending={[DROP, UPSELL]} locked={false} billLinks={{ d1: href }} />)
+    const table = screen.getByRole('table', { name: 'Drops and upsells to answer' })
+    expect(within(table).getByRole('link', { name: 'HC13911' })).toHaveAttribute('href', href)
+    // HC5315 is no bill the portal holds: no link, and its row opens nothing.
+    expect(within(table).queryByRole('link', { name: 'HC5315' })).toBeNull()
+    fireEvent.doubleClick(within(within(table).getByRole('row', { name: /HC5315/ })).getByText('YUNY'))
+    expect(push).not.toHaveBeenCalled()
+    fireEvent.doubleClick(within(within(table).getByRole('row', { name: /HC13911/ })).getByText('CHEA HUAN'))
+    expect(push).toHaveBeenCalledWith(href)
+    // A double-click on its buttons is the buttons'.
+    push.mockClear()
+    fireEvent.doubleClick(within(within(table).getByRole('row', { name: /HC13911/ })).getByRole('button', { name: 'Pay in Sep 2026' }))
+    expect(push).not.toHaveBeenCalled()
   })
 })

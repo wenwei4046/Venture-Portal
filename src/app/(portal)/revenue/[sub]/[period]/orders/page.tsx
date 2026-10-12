@@ -11,6 +11,7 @@ import { buildCommissionWorkbench } from '@/lib/commission/workbench'
 import { commissionByBill, type BillCommission } from '@/lib/commission/bill-commission'
 import { billCountAction, describeExclusion, exclusionReason } from '@/lib/commission/bill-exclusion'
 import { billBrandAction } from '@/lib/commission/bill-brand'
+import { rowOrigin } from '@/lib/commission/row-origin'
 import { requireSubDepartment } from '../../../_lib/sub-departments'
 import {
   loadBrandOptions,
@@ -291,6 +292,11 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
         : o.cancelled || commissionNote
           ? null
           : { product: 0, kpi: 0, marginIncentive: 0, openBill: 0, total: 0 },
+      // Keyed in this month for another month's fair (2026-10-12): this month
+      // pays it, and says so as the salesperson's ledger does.
+      origin: o.cancelled ? null : rowOrigin(
+        { upsale: false, orderTotal: o.orderTotal, periodMonth: period, status: o.depositMet ? 'eligible' : 'deposit_pending' },
+        period, { saleMonth: eventOf.get(o.orderId)?.saleMonth ?? null }),
     }
   })
 
