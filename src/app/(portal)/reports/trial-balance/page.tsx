@@ -83,9 +83,6 @@ export default async function TrialBalancePage({ searchParams }: Props) {
           {segment ? `${segName.toUpperCase()} · ` : ''}AS AT {dateLabel.toUpperCase()}
         </span>
       </div>
-      <p className="text-xs text-graphite mb-3 max-w-3xl">
-        Every postable GL account as at {dateLabel}. Header accounts (1000, 9050) roll up through their children. Σ Dr must equal Σ Cr.
-      </p>
 
       {!tb.reconciles ? (
         <div className="sheet-danger mb-4">

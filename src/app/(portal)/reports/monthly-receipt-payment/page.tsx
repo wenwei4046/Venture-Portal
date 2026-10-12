@@ -193,9 +193,6 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
             <em>·</em> REPORTS · MONTHLY RECEIPT &amp; PAYMENT · FY {year}
           </div>
           <h1 className="page-title">Monthly Receipt &amp; Payment</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
-            FY {year} · read-only · all amounts RM
-          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {!isDeptMgr && (
@@ -222,12 +219,6 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
       </div>
 
       <ReportViewToggle pair="receipt-payment" active="monthly" period={period} segment={segment || undefined} />
-
-      <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
-        跟 Monthly Cash Flow 同一个格子:Accumulated + 每个月一栏。多出最下面一块:
-        <em>月末未收</em> — 按<em>发票</em>算:每个月月底还没收清的发票余额(开单 − 已收 − CN),
-        付清了就消失,底下每家还欠钱的公司一行。
-      </p>
 
       <ReportSearchProvider>
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch lg:items-start">

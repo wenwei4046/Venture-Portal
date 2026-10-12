@@ -31,10 +31,6 @@ export default function NotesEditor({
         }}
         placeholder="e.g. HC deposit · lent to: 2990"
       />
-      <p className="fin-hint">
-        Write &ldquo;lent to: 2990&rdquo; here and the Company Statement shows it as this position&apos;s lent-to badge — the
-        mirror of a loan&apos;s SC.
-      </p>
       <div className="fin-field-row">
         <button
           type="button"

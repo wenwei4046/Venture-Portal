@@ -37,12 +37,6 @@ interface Props {
   initialInvite: { staffId: string | null } | null
 }
 
-const SUBTITLE: Record<PeopleTab, string> = {
-  people: 'Everyone on the payroll, the title they hold and the department it sits under. An account is what lets somebody sign in.',
-  permissions:
-    'What each title may do, by view and tab. Titles point at a template; one person can still be raised or lowered on their own.',
-}
-
 /**
  * People Management as the HR revamp draws it (2026-10-10, the handoff's
  * variant A): the kit's head with Invite user · Import InfoTech · + Add
@@ -94,7 +88,6 @@ export default function PeopleManagement({
       <PageHead
         eyebrow="People · Management"
         title="People"
-        subtitle={SUBTITLE[tab]}
         right={
           canInvite || canAddPeople ? (
             <div className={s.headActions}>

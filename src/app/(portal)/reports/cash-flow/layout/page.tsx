@@ -97,11 +97,6 @@ export default async function CashFlowStatementLayoutPage({ searchParams }: Prop
             <em>III.</em> REPORTS · CASH FLOW STATEMENT · EDIT LAYOUT
           </div>
           <h1 className="page-title">Cash Flow 版面</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
-            收、出两边各自分组 —— 建 section(例如「借贷与还款」「日常开销」)、把账目拖进去、用 ↑↓ 排顺序。
-            拖「▣ 整组」= 整个父账号连底下的全部账目一起归位,以后新开的子账目也自动跟着。
-            没拖的账目会落在「其他」,不会漏掉。每个 section 里面照旧按 COA 父子收拢。
-          </p>
         </div>
       </div>
 

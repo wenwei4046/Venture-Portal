@@ -216,9 +216,7 @@ export function RoomsSchedule({
           </div>
         )}
       </div>
-      <div className={s.note}>
-        Everyone can see the schedule. Only the person who booked a meeting can cancel it. Viewing as {me}.
-      </div>
+      <div className={s.note}>Viewing as {me}.</div>
     </>
   )
 }

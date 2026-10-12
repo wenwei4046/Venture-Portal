@@ -112,7 +112,6 @@ describe('Daily Bank on the sheet', () => {
     const foot = board.querySelector('tfoot') as HTMLElement
     expect(foot).toHaveTextContent('Total available')
     expect(foot).toHaveTextContent('1,350.00')
-    expect(document.querySelector('.db-note')).toHaveTextContent('Each department column reads top→bottom')
   })
 
   it('on a phone reads the board as a card per bank: what is free, how it got there, what waits', () => {
@@ -151,11 +150,13 @@ describe('Daily Bank on the sheet', () => {
     expect(tableOf('Alliance').querySelector('tfoot .db-neg')).toHaveTextContent('(50.00)')
   })
 
-  // 2026-10-10 — the handoff's phone: the long note stays on the desk, and By
-  // bank reads as a stacked list (the table would scroll sideways).
-  it('keeps the long note off a phone', () => {
+  // 2026-10-10 — the handoff's phone: By bank reads as a stacked list (the
+  // table would scroll sideways). 2026-10-12 — the long note under the board
+  // and the subtitle are gone on every screen (the user: too messy).
+  it('carries no long note and no subtitle', () => {
     render(<DailyBankView data={data()} today="2026-10-09" />)
-    expect(document.querySelector('.db-note')).toHaveClass('hidden', 'md:block')
+    expect(document.querySelector('.db-note')).toBeNull()
+    expect(document.querySelector('.page-sub')).toBeNull()
   })
 
   it('on a phone reads By bank as a stacked list per bank', () => {

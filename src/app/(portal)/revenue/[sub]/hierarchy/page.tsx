@@ -129,7 +129,6 @@ function SalesGroupsHead({ name, switcher }: { name: string; switcher: SwitcherD
       bare
       eyebrow={`Revenue · ${name}`}
       title="Sales Groups"
-      subtitle={`Who sells under whom in ${name}, and the rank each person is paid from.`}
       right={<SubDeptSwitcher data={switcher} view="sg" />}
     />
   )

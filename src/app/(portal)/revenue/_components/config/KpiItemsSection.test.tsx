@@ -235,6 +235,5 @@ describe('Rules › KPI items', () => {
     expect(within(ladder).getByRole('textbox', { name: 'Tier 1 label' })).toHaveValue('Tier 1')
     expect(within(ladder).getByRole('spinbutton', { name: 'Tier 1 minimum units' })).toHaveValue(10)
     expect(within(ladder).getByRole('spinbutton', { name: 'Tier 1 bonus percent' })).toHaveValue(20)
-    expect(screen.getByText(/twelve cables at RM 30 pay RM 360 \+ 20% = RM 432/)).toBeInTheDocument()
   })
 })

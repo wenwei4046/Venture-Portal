@@ -135,7 +135,6 @@ export default function WaitingList({
         ))}
         {list.length === 0 ? <div className={s.listEmpty}>Nobody is on {subDeptName}&apos;s waiting list.</div> : null}
       </GridTable>
-      <div className={s.hint}>Applicants accepted in Member services or added here, in the order they joined the list.</div>
 
       <Drawer
         open={open !== null}

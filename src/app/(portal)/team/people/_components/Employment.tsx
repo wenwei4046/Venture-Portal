@@ -56,16 +56,10 @@ export default function Employment({
                 charts and every active list. Nothing is deleted.
               </>
             ) : (
-              <>
-                Active. Deactivating takes them off both hierarchy charts and moves them to the
-                roster&rsquo;s Inactive tab.
-              </>
+              'Active.'
             )
           ) : (
-            <>
-              Inactive. Their record is intact — reactivating puts them back on the charts where
-              they left off.
-            </>
+            'Inactive.'
           )}
         </div>
         {error ? <div className="sheet-danger mt-2 mb-0">{error}</div> : null}

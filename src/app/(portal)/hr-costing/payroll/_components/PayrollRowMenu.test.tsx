@@ -36,7 +36,7 @@ function life(r: PayrollRowData): LifecycleRow {
 
 function open(r = row()) {
   const onDone = vi.fn()
-  render(<PayrollRowMenu row={r} period="2027-12-01" anchor={{ left: 10, top: 10, bottom: 30 }} byRightClick
+  render(<PayrollRowMenu row={r} period="2027-12-01" anchor={{ left: 10, top: 10, bottom: 30 }}
     actions={rowActions(life(r), false)} status={rowStatusView(life(r))} onClose={vi.fn()} onDone={onDone} />)
   return { onDone }
 }
@@ -53,10 +53,16 @@ afterEach(() => {
 describe('PayrollRowMenu — Resubmit and Second payroll', () => {
   // User 2026-09-27: 我可以按 resubmit 或者是 second payroll … 以后要 track 的话，
   // 就容易 track 回：哪一些是写错要 resubmit，哪一些是属于 second payroll.
+  // One line a row (2026-10-12, as the bill menu): what each is for is its tooltip.
   it('offers both to somebody already sent, each saying what it is for', () => {
     open()
-    expect(screen.getByRole('menuitem', { name: /^Resubmit…/ })).toHaveTextContent('A correction to what was sent')
-    expect(screen.getByRole('menuitem', { name: /^Second payroll…/ })).toHaveTextContent('A planned second payment for December 2027 (e.g. the 15th)')
+    const resubmit = screen.getByRole('menuitem', { name: /^Resubmit…/ })
+    const second = screen.getByRole('menuitem', { name: /^Second payroll…/ })
+    expect(resubmit.textContent).toBe('Resubmit…')
+    expect(resubmit).toHaveAttribute('title', expect.stringContaining('A correction to what was sent'))
+    expect(second.textContent).toBe('Second payroll…')
+    expect(second).toHaveAttribute('title', expect.stringContaining('A planned second payment for December 2027 (e.g. the 15th)'))
+    expect(screen.queryByText(/Shift \+ right-click/)).toBeNull()
   })
 
   it('opens a second payroll as a second payroll, after asking', async () => {
@@ -93,7 +99,7 @@ describe('PayrollRowMenu — Reset statutory to JADUAL', () => {
     actions.resetStaffStatutoryToLookup.mockResolvedValue(undefined)
     const { onDone } = open(row({ ...draft, statutory_typed: ['epf_ee', 'pcb'] }))
     const item = screen.getByRole('menuitem', { name: /^Reset statutory to JADUAL/ })
-    expect(item).toHaveTextContent('Typed by hand: EPF employee, PCB')
+    expect(item).toHaveAttribute('title', expect.stringContaining('Typed by hand: EPF employee, PCB'))
     fireEvent.click(item)
     await waitFor(() => expect(actions.resetStaffStatutoryToLookup).toHaveBeenCalledWith('row-1'))
     await waitFor(() => expect(onDone).toHaveBeenCalledWith("CHEW WEE HO: EPF, SOCSO, EIS and PCB are JADUAL's again"))
@@ -101,7 +107,7 @@ describe('PayrollRowMenu — Reset statutory to JADUAL', () => {
 
   it('offers it for the InfoTech file’s figures too', () => {
     open(row({ ...draft, statutory_overridden_at: '2026-08-05T02:00:00Z' }))
-    expect(screen.getByRole('menuitem', { name: /^Reset statutory to JADUAL/ })).toHaveTextContent('From the InfoTech file')
+    expect(screen.getByRole('menuitem', { name: /^Reset statutory to JADUAL/ })).toHaveAttribute('title', expect.stringContaining('From the InfoTech file'))
   })
 
   it('offers nothing when every figure is JADUAL’s, or once the row has been sent', () => {

@@ -103,7 +103,6 @@ textarea.input { resize: vertical; }
 }
 .uploadCard { display: flex; flex-direction: column; gap: 14px; }
 .saveRow { display: flex; align-items: center; gap: 10px; }
-.note { font-size: 12px; color: rgb(var(--hv-brown)); line-height: 1.5; }
 .listHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .listHeadRight { display: flex; align-items: center; gap: 10px; }
 .showDeleted {

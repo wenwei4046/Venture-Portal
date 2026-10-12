@@ -51,7 +51,6 @@ export default async function RevenueRulesPage({ params }: PageProps) {
         <PageHead
           eyebrow={`Revenue · ${subDept.name}`}
           title="Rules"
-          subtitle={`What ${subDept.name} pays, and to whom. Every figure a run produces comes from here.`}
           right={<SubDeptSwitcher data={switcher} view="rules" />}
         />
       }

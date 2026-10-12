@@ -34,22 +34,6 @@ import s from './hiring.module.css'
 /** What is being moved: a person, a folder with everything in it, or everybody in a department (2026-10-12). */
 type Moving = { kind: 'talent'; talent: HiringTalent } | { kind: 'folder'; card: FolderCard } | { kind: 'all'; card: FolderCard }
 
-/** What each place says under the path. */
-function hintOf(at: string): string {
-  const p = parsePlace(at)
-  if (!p) return ''
-  if (p.kind === 'root') {
-    return 'HOUZS Venture and the subsidiaries of Admin › Guest Link are here by themselves, each with its departments. Make a folder for another company, and folders by department inside it — somebody saved from a request is kept in their company and department by name.'
-  }
-  if (p.kind === 'company') {
-    return p.co === 'hv'
-      ? 'Its departments are Hiring › Form settings’ Department. Somebody saved from a request lands in their department by itself.'
-      : 'Its departments are its list in Admin › Guest Link. Somebody saved from one of its requests lands in their department by itself.'
-  }
-  if (p.kind === 'dept') return 'Everybody kept for this department — Move to… keeps somebody elsewhere.'
-  return 'Kept by HR — people and files.'
-}
-
 /** Opens a Talent Bank file the way the browser downloads: a short link with its name. */
 async function linkTo(f: BankFile, download: boolean): Promise<string | null> {
   const link = await hiringFileLink('bank', f.id, download).catch(() => ({ ok: false as const, reason: 'The file could not be opened. Please try again.' }))
@@ -261,7 +245,7 @@ export default function TalentBankView({
 
   return (
     <HvPage>
-      <PageHead eyebrow="Hiring · Talent Bank" title="Talent Bank" subtitle="Good candidates kept on file, ready to invite when a role opens." />
+      <PageHead eyebrow="Hiring · Talent Bank" title="Talent Bank" />
       <div
         className={d.drive}
         data-drop={dropping ? 'true' : undefined}
@@ -351,7 +335,6 @@ export default function TalentBankView({
           </div>
         ) : (
           <>
-            <div className={d.hint}>{hintOf(here)}</div>
             {sections.map(sect => (
               <div key={sect.title} className={d.sect}>
                 <div className={d.sectHead}>

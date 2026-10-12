@@ -211,7 +211,7 @@ export default function ReconReview({
       {openS.length > 0 || unmatchedBook.length > 0 ? (
         <section className="mb-10">
           <div className="flex items-center justify-between mb-3 flex-wrap gap-3 sticky top-0 z-10 bg-paper py-2">
-            <h2 className="font-serif text-xl text-ink">Unmatched — pick one from each table</h2>
+            <h2 className="font-serif text-xl text-ink">Unmatched</h2>
             <div className="flex items-center gap-3">
               {sSelLines.length > 0 ? (
                 <span className="font-mono text-xs text-graphite">
@@ -415,11 +415,6 @@ export default function ReconReview({
               </table>
             </div>
           </div>
-
-          <p className="font-serif italic text-muted text-xs mt-2">
-            Statement-only = money moved that the books miss (record it, come back and match).
-            Book-only = uncleared / in-transit items.
-          </p>
         </section>
       ) : null}
 

@@ -44,18 +44,6 @@ function Fig({ n, kind, dash = true }: { n: number; kind?: 'in' | 'pend'; dash?:
   return <span className={kind === 'in' ? 'db-in' : undefined}>{formatMoneyBare(n)}</span>
 }
 
-const NOTE = (
-  <>
-    Each department column reads top→bottom: <b>Balance B/F</b> (balance up to the day before) → <b>Received today</b> (green) →
-    <b> Pending</b> unpaid items (brown · payee + PV, submitted and awaiting the Principal, deducted from the department set on the PV) →
-    <b> Available balance</b> (green) = current balance − pending. <b>Paid items are already deducted</b> from the balance (not listed
-    separately). <b>Venture</b> covers corporate + treasury (fund in/out) + anything untagged. Today&apos;s columns tie to the Dept Pool
-    page&apos;s per-bank breakdown — the inter-billing gap is folded into the primary bank. The bottom <b>Total available</b> adds up
-    every bank&apos;s available across departments — the cash truly free. Past dates are GL-only (no inter-billing fold-in) with the
-    pending list rebuilt from submit/approve timestamps — both approximate.
-  </>
-)
-
 export default function DailyBankView({ data, today }: { data: DailyBankData; today: string }) {
   if (data.columns?.length) COLS = data.columns
   const router = useRouter()
@@ -189,10 +177,6 @@ export default function DailyBankView({ data, today }: { data: DailyBankData; to
               </button>
             </div>
           </div>
-          <p className="page-sub">
-            Where the cash stands today: balance b/f, money in, pending payments awaiting the Principal, and what is truly free — per
-            bank, split by department.
-          </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {!isToday ? (
@@ -242,11 +226,10 @@ export default function DailyBankView({ data, today }: { data: DailyBankData; to
         variant="control"
       />
 
-      {/* The board — what Get image and PNG capture. The long note is the
-          desk's; a phone goes without it (2026-10-10, the handoff). */}
+      {/* The board — what Get image and PNG capture. Its long reading note is
+          gone (2026-10-12, user: the descriptions made the view messy). */}
       <div ref={captureRef} className="dbank">
         {view === 'matrix' ? <MatrixView data={data} label={dayLabel} /> : <BanksView data={data} />}
-        <p className="db-note hidden md:block">{NOTE}</p>
       </div>
       {toast}
     </div>

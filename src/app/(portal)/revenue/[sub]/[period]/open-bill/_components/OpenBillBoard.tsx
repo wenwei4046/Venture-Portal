@@ -160,13 +160,6 @@ export default function OpenBillBoard({ orders, rates, readOnly }: Props) {
         <p className="text-danger text-sm mb-4">{error}</p>
       ) : null}
 
-      {readOnly ? (
-        <p className="sheet-notice max-w-3xl">
-          This month is in payroll, so its picks cannot change — the statements would describe bills that
-          no longer earned what they say they did.
-        </p>
-      ) : null}
-
       {shown.length === 0 ? (
         <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
           <p className="text-md font-bold mb-1">Nothing left to review.</p>
@@ -228,6 +221,8 @@ export default function OpenBillBoard({ orders, rates, readOnly }: Props) {
                                 key={r}
                                 onClick={() => pick(o, o.rank === r ? null : r)}
                                 disabled={readOnly || isPending}
+                                // Why every pick is shut — no notice above the list (2026-10-12).
+                                title={readOnly ? 'This month is in payroll, so its picks cannot change' : undefined}
                                 className={[
                                   'font-mono text-[11px] px-2.5 py-1 rounded-control border transition-colors disabled:opacity-40',
                                   o.rank === r

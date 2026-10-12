@@ -434,7 +434,6 @@
 .right { text-align: right; }
 .mono { font-family: var(--font-mono), 'Chivo Mono', monospace; }
 .chev { display: flex; color: rgb(var(--hv-brown)); }
-.hint { margin-top: 10px; font-size: 12px; color: rgb(var(--hv-brown)); }
 
 /* ── Drawers and windows ── */
 .scrim {

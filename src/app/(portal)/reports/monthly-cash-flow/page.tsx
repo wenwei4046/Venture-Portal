@@ -104,9 +104,6 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
             <em>III.</em> REPORTS · MONTHLY CASH FLOW · FY {year}
           </div>
           <h1 className="page-title">Monthly Cash Flow</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
-            FY {year} · read-only · all amounts RM · direct method
-          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {/* Edit layout edits the SHARED company layout — hide from dept managers. */}
@@ -135,13 +132,6 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
       </div>
 
       <ReportViewToggle pair="cash-flow" active="monthly" period={period} segment={segment || undefined} />
-
-      <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
-        Direct-method cash movement, grouped under your own categories (edit the
-        layout to drag accounts between categories — subtotals recompute
-        automatically). Each month is a column with an Accumulated total; inflows
-        positive, outflows negative.
-      </p>
 
       {/* Provider bridges the rail's search box to the matrix that owns the rows. */}
       <ReportSearchProvider>

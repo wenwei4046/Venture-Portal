@@ -82,7 +82,9 @@ describe('BrandWeeksPanel', () => {
     await within(table).findByRole('row', { name: /LAWRENCE/ })
     expect(within(table).queryAllByRole('button')).toEqual([])
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
-    expect(screen.getByText(/change who attends a booth there/)).toBeInTheDocument()
+    // No lede or chip legend in prose (2026-10-12: the wording made the view messy) — each chip's tooltip says why.
+    expect(screen.queryByText(/change who attends a booth there/)).toBeNull()
+    expect(screen.queryByText(/A solid chip is the booth/)).toBeNull()
   })
 
   it('says when the ERP last sent it, and whom it lists that no member matches', async () => {

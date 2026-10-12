@@ -198,12 +198,6 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
                 {companyCount} COMPAN{companyCount === 1 ? 'Y' : 'IES'}
               </span>
             </div>
-            <p className="text-sm -mt-2 mb-4">
-              What Finance bills each subsidiary · Save here, then submit on the{' '}
-              <Link href={tabHref('submission')} className="text-accent hover:text-accent-hover">
-                Submission tab →
-              </Link>
-            </p>
 
             <CTCInputGrid
               directors={(directors ?? []).map(d => ({
@@ -242,22 +236,16 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
                 {actualRows.length} DIRECTOR{actualRows.length === 1 ? '' : 'S'}
               </span>
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 -mt-2 mb-5">
-              <p className="text-sm">
-                Actual payroll run imported from InfoTech ·{' '}
-                <Link href={tabHref('submission')} className="text-accent hover:text-accent-hover">
-                  {directorState.withFinance > 0 || directorState.completed > 0 ? 'View submission →' : 'Complete →'}
-                </Link>
-              </p>
-              {canEditMonth ? (
+            {canEditMonth ? (
+              <div className="flex sm:justify-end -mt-2 mb-5">
                 <Link
                   href={`/director-salary/import?period=${dayjs(period).format('YYYY-MM')}`}
-                  className="self-start sm:self-auto shrink-0 bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
+                  className="shrink-0 bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
                 >
                   Import InfoTech →
                 </Link>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
 
             {actualRows.length === 0 ? (
               <DirectorPayrollEmptyState period={period} canImport={canEditMonth} />
@@ -425,22 +413,19 @@ function SubmissionTab({
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
         <div className="min-w-0">
           <h2 className="sheet-heading">{state.heading}</h2>
-          <p className="sheet-subtitle">
-            {state.withFinance > 0 || state.completed > 0
-              ? <>
-                  {state.detail}{' '}
-                  <Link href={`/hr-costing/payroll/${period}`} className="text-accent hover:text-accent-hover">
-                    HR › Payroll →
-                  </Link>
-                </>
-              : missing.length === 0
-                ? 'Preview below — Complete locks the directors and lists them on HR › Payroll, where Submit to Finance sends them with the next batch'
-                : `To complete: ${missing.join(' · ')}`}
-          </p>
+          {state.withFinance > 0 || state.completed > 0 ? (
+            <p className="sheet-subtitle">
+              {state.detail}{' '}
+              <Link href={`/hr-costing/payroll/${period}`} className="text-accent hover:text-accent-hover">
+                HR › Payroll →
+              </Link>
+            </p>
+          ) : missing.length > 0 ? (
+            <p className="sheet-subtitle">To complete: {missing.join(' · ')}</p>
+          ) : null}
           {submitted && submission ? (
             <p className="sheet-subtitle">
-              Billing snapshot {officeTime(submission.submitted_at).format('D MMM YYYY HH:mm')} · Finance sees these totals +
-              the per-subsidiary split on Billing
+              Billing snapshot {officeTime(submission.submitted_at).format('D MMM YYYY HH:mm')}
             </p>
           ) : null}
           {fundingRequest ? (
@@ -612,23 +597,6 @@ function SubmissionTab({
               </tfoot>
             </table>
           </div>
-
-          <div className="sheet-notice">
-            <p>
-              Two advance views: <strong>{formatMoney(gap.advanceLedger)}</strong> is the ledger
-              figure — debt booked against only the directors who fell short.{' '}
-              <strong>{formatMoney(gap.advanceCash)}</strong> is the cash figure used in the table
-              above, which nets off directors whose share ran above their fixed salary, so the
-              buckets tally against the difference.
-            </p>
-            <p className="mt-2">
-              Computed on the fly from this period&rsquo;s figures at the rates in Director Pool
-              settings ({gapSettings.savingPct}% saving · {gapSettings.gbPct}/
-              {100 - gapSettings.gbPct} split). <strong>Nothing here is written to the database</strong> —
-              these buckets have no ledger of their own yet, so the difference simply sits in the HV
-              bank account.
-            </p>
-          </div>
         </section>
       )}
 
@@ -704,12 +672,6 @@ function SubmissionTab({
                   </tfoot>
                 </table>
               </div>
-              <div className="table-frame-foot">
-                <span>
-                  Per-director detail is visible to HR and Principal only — Finance receives the
-                  aggregate totals above, never individual salaries.
-                </span>
-              </div>
             </div>
           </>
         )}
@@ -729,7 +691,6 @@ function SubmissionTab({
             <p className="text-sm">
               No CTC entered for this period yet — fill the Pool Breakdown grid on the Calculation tab.
             </p>
-            <p className="text-xs mt-2">{BILLING_NOTE}</p>
           </div>
         ) : (
           <div className="table-frame">
@@ -780,18 +741,12 @@ function SubmissionTab({
                 </tfoot>
               </table>
             </div>
-            <div className="table-frame-foot">
-              <span>{BILLING_NOTE}</span>
-            </div>
           </div>
         )}
       </section>
     </div>
   )
 }
-
-const BILLING_NOTE =
-  'Finance bills each subsidiary via Create Invoice → Director attribution; the modal auto-fills from these amounts.'
 
 export interface DirectorPayrollState {
   draft: number

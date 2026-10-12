@@ -21,9 +21,15 @@
 /* The menus portal with `sheet-theme` (DESIGN.md › "Sheet theme"): orange is a
    surface there, never lettering, so a picked row is a peach wash in ink. */
 .menu button:hover:not(:disabled), .menu button:focus-visible, .menu button[aria-expanded="true"] { background: rgb(var(--accent-bg)); color: rgb(var(--ink)); outline: none; }
-/* No pointer events: the panel hears the hover instead, and collapses the branch a disabled row is standing under. Every disabled row prints its reason inline, so no native title tooltip is lost.
+/* A disabled row says why it is shut in its tooltip (one line a row since #323,
+   2026-10-12), so it keeps its pointer events: the hover reaches it and the
+   browser shows its `title`. Nothing else changes: React fires no click or
+   mouseenter on a disabled button, the hover rule above skips it
+   (`:not(:disabled)`) so it never lights up, and the panel still hears the
+   hover — MenuPanel reads a disabled row as no row, so the branch beside it
+   collapses as before.
    The sheet's `--muted` is black, so a disabled row is told apart by fading, the way the Move popover's are. */
-.menu button:disabled { color: rgb(var(--muted)); opacity: 0.5; cursor: default; pointer-events: none; }
+.menu button:disabled { color: rgb(var(--muted)); opacity: 0.5; cursor: default; }
 .rowCopy { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .rowCopy small { font-size: 11px; line-height: 1.4; color: rgb(var(--muted)); }
 .chevron { flex-shrink: 0; color: rgb(var(--muted)); font-size: 15px; }

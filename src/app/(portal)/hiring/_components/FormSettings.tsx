@@ -108,7 +108,6 @@ export default function FormSettings({ board, onPreview }: { board: HiringBoard;
             Preview form
           </button>
         </div>
-        <div className={s.fsLede}>Changes apply to new requests. Position and Department are needed for the request list, so they can be renamed but not removed.</div>
         <div className={`${s.fsCols} ${s.fsHeadRow}`}>
           <span />
           <span>Field</span>
@@ -189,8 +188,7 @@ export default function FormSettings({ board, onPreview }: { board: HiringBoard;
       </section>
 
       <section className={s.fsCard} aria-label="Hiring sources">
-        <div className={s.fsTitle} style={{ marginBottom: 4 }}>Hiring sources</div>
-        <div className={s.fsLede4}>Where a hire came from. Picked when a request is marked filled, and counted in Insights. Turn off the ones you don&apos;t use.</div>
+        <div className={s.fsTitle} style={{ marginBottom: 12 }}>Hiring sources</div>
         <div className={s.sources}>
           {board.sources.map(src => (
             <div key={src.id} className={s.source}>
@@ -300,10 +298,7 @@ function FileTypes({ types }: { types: readonly HiringFileType[] }) {
 
   return (
     <section className={s.fsCard} aria-label="File types">
-      <div className={s.fsTitle} style={{ marginBottom: 4 }}>File types</div>
-      <div className={s.fsLede4}>
-        What a candidate&apos;s or a talent&apos;s file is, picked when it is added. Turn off the ones you don&apos;t use: they leave the picker, and the files already filed under them keep them.
-      </div>
+      <div className={s.fsTitle} style={{ marginBottom: 12 }}>File types</div>
       <div className={s.sources}>
         {types.map(t => (
           <div key={t.id} className={s.source} data-off={t.active ? undefined : 'true'}>

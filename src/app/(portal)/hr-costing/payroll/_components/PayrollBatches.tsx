@@ -76,12 +76,6 @@ export default function PayrollBatches({ period, batches, headline, closed }: Pr
             </tbody>
           </table>
         </div>
-        <div className="table-frame-foot">
-          <span>
-            Each batch is funded on its own: Finance raises its funding PV, the Principal approves it, and its people
-            can be paid on HR › Payment. A resubmit&apos;s or a second payroll&apos;s batch carries only the difference.
-          </span>
-        </div>
       </div>
     </section>
   )

@@ -2696,7 +2696,6 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .space-tool:hover:not(:disabled) { background: rgb(var(--surface-2)); }
 .space-tool:disabled { opacity: .5; cursor: not-allowed; }
 .space-zoom { width: 40px; padding: 0; border: 0; background: none; color: rgb(var(--ink)); font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 12px; text-align: center; cursor: pointer; }
-.space-hint { position: absolute; right: 12px; bottom: 12px; z-index: 6; padding: 6px 10px; border-radius: 6px; background: rgb(255 255 255 / .92); color: rgb(var(--hv-sg-text, 90 98 108)); font-size: 11px; line-height: normal; pointer-events: none; }
 .space-memberships { display: flex; flex-wrap: wrap; gap: 6px; }
 .space-memberships button { font-weight: 400; font-size: 11px; }
 .company-canvas .space-team-heading { background: transparent; border: 0; border-radius: 0; }
@@ -4228,7 +4227,6 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .dbank .db-sub { display: block; margin-top: 2px; font-size: 11px; color: rgb(var(--muted)); }
 .dbank .db-vno { font-size: 11.5px; color: rgb(var(--graphite)); white-space: nowrap; }
 .dbank .db-desc { color: rgb(var(--graphite)); }
-.dbank .db-note { margin: 0; padding: 4px 2px 0; font-size: 11px; line-height: 1.6; color: rgb(138 119 101); }
 .dbank .db-phone { display: grid; gap: 12px; }
 @media (min-width: 768px) { .dbank .db-phone { display: none; } }
 .dbank .db-card { border: 1px solid rgb(216 210 200); border-radius: 12px; overflow: hidden; background: rgb(var(--surface)); }
@@ -4676,7 +4674,6 @@ a.stat-card:hover { border-color: rgb(var(--accent)); box-shadow: 0 4px 14px rgb
   }
   .dept-mode-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
   .dept-mode-eyebrow { font-size: 10px; font-weight: 500; letter-spacing: 0.09em; text-transform: uppercase; }
-  .dept-mode-meaning { font-size: 12px; line-height: 1.5; }
   .dept-mode-switch {
     display: inline-flex;
     align-items: center;
@@ -5500,7 +5497,6 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .sched-alert { color: rgb(150 100 12); }
 .sched-danger { color: rgb(176 40 34); }
 .sched-info { color: rgb(108 104 98); }
-.sched .sched-note { margin: 8px 2px 0; font-size: 11px; line-height: 1.6; color: rgb(138 119 101); }
 .sched .sched-recorded {
   margin-top: 14px;
   padding: 10px 14px;
@@ -5828,9 +5824,7 @@ table.ledger-table.audit-saves td { vertical-align: top; }
    numbers are red, in brackets"). */
 .fin-view .neg { color: #B02822; }
 .rpt-field { letter-spacing: 0.05em; }
-.rpt-find-hint { margin-left: 4px; font-weight: 400; letter-spacing: 0; text-transform: none; color: rgb(148 139 128); }
 .rpt-range-word { font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: rgb(117 100 86); }
-.rpt-cons { margin: 0 0 10px; font-size: 11.5px; font-style: italic; color: rgb(150 100 12); }
 /* The Company Statement's column groups (2026-10-10, the handoff): to collect
    green, to repay red (the user took the handoff's red over the August
    orange, 2026-10-10); the total tinted navy. */
@@ -6137,32 +6131,6 @@ table.ledger-table.audit-saves td { vertical-align: top; }
   font-weight: 400;
   color: rgb(169 179 199);
 }
-.fin-view .pay-note {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin: 0;
-  padding: 12px 14px;
-  border: 1px solid rgb(62 78 112);
-  border-radius: 8px;
-  background: rgb(41 57 92);
-  color: #fff;
-  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
-  font-size: 13px;
-  line-height: 1.5;
-}
-.fin-view .pay-note-dot {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #fff;
-  transform: translateY(-1px);
-}
-.fin-view .pay-note-dot[data-tone='pending_approval'] { background: #2E5C8A; }
-.fin-view .pay-note-dot[data-tone='approved'] { background: #E99A53; }
-.fin-view .pay-note-dot[data-tone='paid'] { background: #156E4E; }
-.fin-view .pay-note-dot[data-tone='voided'] { background: #B02822; }
 
 /* ── Billing: Invoice (Service Billing), Statements, Billing Allocator ──
    (2026-10-10, the Finance revamp handoff — agent "billing"). Every rule
@@ -6844,7 +6812,6 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
 .sch-card-date { margin: 2px 0 10px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(117 100 86); }
 .cal-card .sch-card-dl > div { padding: 2px 0; border-bottom: 0; }
 .cal-card .sch-card-dl dd { text-align: right; }
-.sch-card-foot { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgb(236 234 229); font-size: 11px; color: rgb(117 100 86); }
 
 /* The phone's day list (shown only where .cal-agenda is, below 768px): the
    day and its net, then its instalments in one box. */

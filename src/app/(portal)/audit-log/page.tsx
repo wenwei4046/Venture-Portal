@@ -116,10 +116,6 @@ export default async function AuditChangesPage({
             <em>I.</em> ADMIN · AUDIT LOG · CHANGES
           </div>
           <h1 className="page-title">Changes</h1>
-          <p className="sheet-subtitle">
-            Who changed what and when, with every value before and after. You see the areas your own permissions open;
-            salary, NRIC and bank values only where your title may see them.
-          </p>
         </div>
       </div>
 

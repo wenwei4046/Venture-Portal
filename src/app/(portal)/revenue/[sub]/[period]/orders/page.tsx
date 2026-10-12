@@ -186,14 +186,13 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
         atFair ? (fairMeta?.fair?.venueName ?? null) : venueName,
       ].filter(Boolean).join(' · ') || null
     : null
-  const exhibitionNote = !exhibition
-    ? null
-    : atFair
-      ? `Every bill of this exhibition${fairMeta && (fairMeta.organizer || fairMeta.eventName)
-        ? ` — ${[fairMeta.organizer, fairMeta.eventName].filter(Boolean).join(' · ')}` : ''}`
-      : fairFilter === NO_FAIR
-        ? 'Every bill written here that no fair claims — it is placed by fixing the event on the order in the ERP'
-        : brandFilter === NO_BRAND ? 'Every bill this month that names no brand' : 'Every bill of this brand this month'
+  // Under the title, only what tells the filter apart (2026-10-12 — the
+  // sentences saying what a filtered list holds went): the salesperson's code,
+  // or the fair's organiser and days.
+  const fairDetail = atFair && fairMeta ? [fairMeta.organizer, fairMeta.eventName].filter(Boolean).join(' · ') : ''
+  const subtitle = staffFilter && staffFilter !== 'unmatched'
+    ? person?.employeeCode ?? null
+    : !staffFilter && fairDetail ? fairDetail : null
 
   const total = rows.reduce((a, o) => a + o.orderTotal, 0)
   const held = rows.filter(o => !o.cancelled && !o.depositMet)
@@ -316,16 +315,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
               shares.find(sh => sh.staffId === staffFilter)?.name ??
               (staffFilter === 'unmatched' ? 'Unmatched bills' : exhibitionTitle ?? venueName ?? 'Sales orders')}
           </h1>
-          {filtered ? (
-            <p className="text-sm mt-3">
-              {person || shares.some(sh => sh.staffId === staffFilter)
-                ? `${person?.employeeCode ? person.employeeCode + ' · ' : ''}every bill of theirs this month, and every bill shared with them`
-                : null}
-              {staffFilter === 'unmatched' ? 'Bills whose ERP agent is not yet a salesperson here, so they pay nobody' : null}
-              {exhibitionNote && !staffFilter ? exhibitionNote : null}
-              {venueName && !staffFilter && !exhibition ? 'Every bill written at this venue' : null}
-            </p>
-          ) : null}
+          {subtitle ? <p className="text-sm mt-3">{subtitle}</p> : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {filtered ? (
@@ -378,25 +368,21 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
           <span className="rule" aria-hidden />
           <span className="count">{rows.length} BILLS</span>
         </div>
-        <p className="text-sm mb-4 max-w-3xl">
-          In the order the day wrote them — the running number is what the Open Bill bonus reads.
-          {openBillPaid ? (
-            <>
-              {' '}
-              {tagged.length} of {live.length} carry a pick
-              {stillSuggested > 0 ? (
-                <>
-                  ,{' '}
-                  <span className="chip alert">
-                    <span className="dot" />
-                    {stillSuggested} still the importer&apos;s guess
-                  </span>
-                </>
-              ) : null}
-              .
-            </>
-          ) : null}
-        </p>
+        {/* The picks' count, not a sentence on how the list is ordered (2026-10-12). */}
+        {openBillPaid ? (
+          <p className="text-sm mb-4 max-w-3xl">
+            {tagged.length} of {live.length} carry a pick
+            {stillSuggested > 0 ? (
+              <>
+                ,{' '}
+                <span className="chip alert">
+                  <span className="dot" />
+                  {stillSuggested} still the importer&apos;s guess
+                </span>
+              </>
+            ) : null}
+          </p>
+        ) : null}
 
         {base0.length === 0 ? (
           <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
@@ -414,37 +400,6 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
             brandOptions={brandOptions}
           />
         )}
-
-        <p className="text-xs mt-3 max-w-3xl">
-          &quot;Total commission&quot; is the live calculation&apos;s personal commission on the bill —
-          every shared part added together, overriding left to the upline — from the same rules as
-          the month&apos;s salesperson ledger, without its review drafts. A held bill pays in the
-          month its deposit clears. Open the bill to see it line by line. Right-click a bill — or its ⋯ —
-          for <em>Don&apos;t count this bill</em>: it leaves the month&apos;s commission the way a bill
-          cancelled in the ERP does, and stays out whatever the ERP sends next until somebody counts it
-          again (<em>Show excluded</em> lists it).
-          {openBillPaid ? (
-            <>
-              {' '}
-              {/* Drawn the way the picker draws a suggestion, so the words point
-                  at the thing on the row rather than at a colour. */}
-              An Open Bill pick in a{' '}
-              <span className="px-1 border border-dashed border-alert bg-alert-bg rounded-sm">dashed outline</span>{' '}
-              is still the
-              importer&apos;s guess from the document number; click it to agree, click another to move
-              it, click a solid one to clear it. Ranks are held per salesperson per event day, so
-              claiming a taken rank moves it off the bill that held it.{' '}
-              <Link
-                href={revenuePath(subDept.slug, period)}
-                className="text-accent hover:underline"
-              >
-                What the picks add up to
-              </Link>{' '}
-              — every pick, whose, and the bonus it pays — is the month&apos;s Open Bill tab.
-              {runLocked ? ' This month is in payroll, so its picks cannot change.' : ''}
-            </>
-          ) : null}
-        </p>
       </section>
 
       {/* The gap is about the month, not about this filter — a code nobody can

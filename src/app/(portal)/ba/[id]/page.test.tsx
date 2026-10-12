@@ -109,7 +109,6 @@ describe('a financing’s own page', () => {
     expect(within(actions).getAllByRole('button').map((b) => b.textContent)).toEqual(['Generate PV', 'Bill interest', 'Mark settled'])
     expect(within(actions).getByRole('button', { name: 'Generate PV' })).toHaveClass('btn-pri')
     expect(within(actions).getByRole('button', { name: 'Bill interest' })).toHaveClass('btn-sec')
-    expect(actions).toHaveTextContent('Generate PV pays HC the interest')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Bill interest' })) })
     expect(mocks.generateBaInvoice).toHaveBeenCalledWith(BA.id)
     expect(await screen.findByText(/HV-INV-202610-0050/)).toBeInTheDocument()
@@ -120,14 +119,16 @@ describe('a financing’s own page', () => {
     expect(mocks.setBaStatus).toHaveBeenCalledWith(BA.id, 'settled')
   })
 
-  it('says what was billed and paid, and a settled one says it is done and is only reopened', async () => {
+  // 2026-10-12 — the sentences beside the buttons are gone (the user: too
+  // messy); the head's chip says it is settled, and what was billed and paid stays.
+  it('says what was billed and paid, and a settled one is only reopened', async () => {
     database({ ...BA, status: 'settled' }, { invoice_no: 'HV-INV-202610-0050', status: 'issued' }, { voucher_no: 'HV-PV-202610-0090', status: 'paid' })
     render(await page())
     expect(document.querySelector('.page-head .chip')).toHaveClass('ledger')
     expect(card('Interest billing')).toHaveAttribute('data-tone', 'ledger')
     expect(card('Interest billing')).toHaveTextContent('HV-INV-202610-0050')
     const actions = screen.getByRole('heading', { name: 'Actions' }).closest('section') as HTMLElement
-    expect(actions).toHaveTextContent('Repaid on 16 Oct 2026. Nothing left to do on this BA.')
+    expect(actions).not.toHaveTextContent('Nothing left to do on this BA')
     expect(actions).toHaveTextContent('HV-INV-202610-0050 · issued')
     expect(actions).toHaveTextContent('HV-PV-202610-0090 · paid')
     expect(within(actions).queryByRole('button', { name: /Generate PV|Bill interest/ })).toBeNull()

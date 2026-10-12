@@ -104,15 +104,17 @@ describe('Debtor Aging on the sheet', () => {
     expect(card('31–60 days')).toHaveTextContent('RM 6,000.00')
     const controls = screen.getByRole('group', { name: 'Report controls' })
     expect(within(controls).getByRole('combobox', { name: 'As at' })).toHaveValue('2026-09')
-    expect(screen.getByText(/dated on or before 30 Sep 2026/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/reports/debtor-aging/export?format=xlsx&view=detail&as_at=2026-09')
+    // What "unpaid" means here is TODAY's — said by a chip, the sentence went 2026-10-12.
+    expect(document.querySelector('.page-head .chip')).toHaveTextContent('Unpaid as of today')
+    expect(screen.queryByText(/dated on or before/)).toBeNull()
   })
 
   it('reads as at today unless a past month is picked', async () => {
     render(await DebtorAgingPage({ searchParams: Promise.resolve({}) }))
     const controls = screen.getByRole('group', { name: 'Report controls' })
     expect(within(controls).getByRole('combobox', { name: 'As at' })).toHaveValue('2026-10')
-    expect(screen.queryByText(/dated on or before/)).toBeNull()
+    expect(screen.queryByText('Unpaid as of today')).toBeNull()
   })
 
   it('notes what to follow up and the company owing longest', async () => {
@@ -124,7 +126,6 @@ describe('Debtor Aging on the sheet', () => {
   it('finds a company by name, nothing hidden', async () => {
     render(await DebtorAgingPage({ searchParams: Promise.resolve({}) }))
     const controls = screen.getByRole('group', { name: 'Report controls' })
-    expect(within(controls).getByText('· highlights only')).toBeInTheDocument()
     fireEvent.change(within(controls).getByRole('searchbox', { name: 'Find company' }), { target: { value: 'design' } })
     expect(screen.getByText('1 match')).toBeInTheDocument()
     // The table's rows (the Over 60 card names the company too).
@@ -155,8 +156,8 @@ describe('Loan Aging on the sheet', () => {
     expect(card('1–30 days')).toHaveTextContent('HOUZS Kitchen')
     expect(card('31–90 days')).toHaveTextContent('RM 0.00')
     expect(screen.queryByRole('group', { name: 'To repay · outstanding' })).toBeNull()
-    expect(document.querySelector('.page-sub')).toHaveTextContent('days late')
-    expect(document.querySelector('.page-sub')).not.toHaveTextContent('months late')
+    // 2026-10-12 — no subtitle explaining the page (the user: too messy).
+    expect(document.querySelector('.page-sub')).toBeNull()
     const collect = screen.getByRole('heading', { level: 2, name: 'To Collect · aging — Fund OUT' }).closest('section') as HTMLElement
     expect(Array.from(collect.querySelectorAll('thead th')).map((th) => th.textContent)).toEqual(['Counterparty', 'Not due', '1–30 days', '31–90 days', '90+ days', 'Total due'])
     const alls = Array.from(document.querySelectorAll('tr.rpt-all')).map((r) => r.textContent)

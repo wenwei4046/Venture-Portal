@@ -76,7 +76,6 @@ export default async function NewJournalVoucherPage({
             <em>I.</em> TREASURY · MANUAL VOUCHERS · {prefill ? 'COPY' : 'NEW'}
           </div>
           <h1 className="page-title">{prefill ? 'Copy Journal Voucher' : 'New Journal Voucher'}</h1>
-          <p className="page-sub">Debits must equal credits. Press Ins to add a line.</p>
         </div>
       </div>
 

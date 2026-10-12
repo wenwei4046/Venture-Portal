@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import dayjs from 'dayjs'
 import { generateBaInvoice, setBaStatus } from '../../actions'
 import { AttachmentChips, PvModal, type BankOption, type BaRow } from '../../_components/BaView'
 
@@ -14,8 +13,8 @@ import { AttachmentChips, PvModal, type BankOption, type BaRow } from '../../_co
 // 2026-10-10 — in the handoff's words: Generate PV (the PV to HC, the primary
 // action — it opens the bank and day to pay from) and Bill interest (the
 // invoice to the borrower, while it is still to bill); Mark settled stays
-// beside them. A settled one: "Repaid on {its maturity}. Nothing left to do
-// on this BA." and Reopen.
+// beside them. A settled one: Reopen. Beside the buttons, only what was billed
+// and paid (2026-10-12, user: the descriptions made the view messy).
 
 export function BaDocuments({ row }: { row: BaRow }) {
   return <AttachmentChips row={row} full />
@@ -73,13 +72,7 @@ export default function BaDetailActions({ row, banks }: { row: BaRow; banks: Ban
             Reopen
           </button>
         ) : null}
-        <span className="note">
-          {active
-            ? `${trail}Generate PV pays HC the interest (6001) — pick the bank and the payment date in the next step. Bill interest drafts the charge to the borrower as an invoice (5028). Mark settled once it is collected and repaid — that releases the limit.`
-            : row.status === 'settled'
-              ? `Repaid on ${dayjs(row.maturityDate).format('D MMM YYYY')}. Nothing left to do on this BA. ${trail}`.trim()
-              : `Cancelled — nothing left to do on this BA. ${trail}`.trim()}
-        </span>
+        {trail ? <span className="note">{trail.trim()}</span> : null}
       </div>
       {message ? <div className="mt-3 border border-hairline rounded-md bg-surface p-3 text-sm font-sans text-ledger">✓ {message}</div> : null}
       {error ? <div className="mt-3 bg-danger-bg border border-danger text-danger rounded-md p-3 text-sm font-sans">{error}</div> : null}

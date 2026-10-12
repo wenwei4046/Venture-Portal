@@ -9,7 +9,6 @@ import TeamOrgChart, { ALL_DEPARTMENTS, type ChartPerson } from './TeamOrgChart'
 import PeopleRoles from './PeopleRoles'
 import LevelsList from './LevelsList'
 import TitleWindow, { type DepartmentOption } from './TitleWindow'
-import s from './hierarchy.module.css'
 
 export type HierarchyTab = 'chart' | 'roles' | 'levels'
 
@@ -150,11 +149,6 @@ export default function HierarchyView({
             onFocusDept={setFocusDept}
             canEdit={canEdit}
           />
-          <p className={s.note}>
-            Roles align by L level across department zones, with higher levels above and equal levels on the same row. Expand a
-            department or team to explore its reporting lines, and search a name to find every role they hold. People in several
-            Revenue sub-departments appear in each role; edit additional roles on their own sub-department hierarchy.
-          </p>
         </div>
       )}
 

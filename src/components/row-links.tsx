@@ -45,8 +45,9 @@ export function useRowLinks<T>({ href, title, more }: Options<T>): {
   let menu: ReactNode = null
   if (at) {
     const extra = more?.(at.row) ?? []
+    // Open says nothing of the double-click beside it (2026-10-12: no usage hints).
     const items: RowMenuItem[] = [
-      { key: 'open', label: fin ? 'Open' : '打开', hint: fin ? 'or double-click' : '双击也可以', onSelect: () => onRowOpen(at.row) },
+      { key: 'open', label: fin ? 'Open' : '打开', onSelect: () => onRowOpen(at.row) },
       {
         key: 'new-tab',
         label: fin ? 'Open in new tab' : '在新分页打开',

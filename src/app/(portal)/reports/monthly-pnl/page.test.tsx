@@ -81,7 +81,10 @@ describe('the Monthly P&L, company-wide', () => {
     expect(card('Net margin · accumulated')).toHaveTextContent('30.4%')
   })
 
-  it('puts the period, find, segment and level on one row, and says the view is consolidated', async () => {
+  // 2026-10-12 — the consolidated note is gone (the user: descriptions make
+  // the view messy); the Segment choice already reads "All segments
+  // (consolidated)".
+  it('puts the period, find, segment and level on one row, with no consolidated note', async () => {
     render(await page())
     const row = screen.getByRole('group', { name: 'Report controls' })
     expect(within(row).getByRole('combobox', { name: 'From' })).toHaveValue('2026-01')
@@ -89,7 +92,7 @@ describe('the Monthly P&L, company-wide', () => {
     expect(within(row).getByRole('combobox', { name: 'Segment' })).toHaveValue('')
     expect(within(row).getByRole('searchbox', { name: 'Find account by code or name' })).toBeInTheDocument()
     expect(within(row).getByRole('button', { name: 'L3' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText('Consolidated view eliminates inter-billing between segments — pick a segment to see its own charges.')).toBeInTheDocument()
+    expect(screen.queryByText(/Consolidated view eliminates inter-billing/)).toBeNull()
   })
 
   // 2026-10-10 — the handoff's table: Accumulated a shade darker, the current

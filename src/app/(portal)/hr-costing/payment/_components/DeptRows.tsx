@@ -144,7 +144,6 @@ export default function DeptRows({
             </tfoot>
           </table>
         </div>
-        <div className="table-frame-foot">Generate by Department groups remaining payments by department and component. Manual generate creates one PV per selected payment. Payments already covered by a PV are excluded.</div>
       </div>
     </div>
   )

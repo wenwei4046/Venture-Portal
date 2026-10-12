@@ -130,12 +130,6 @@ export default function InvoicePageActions({
   }
   const postedAccounts = [...posted.entries()].map(([code, amt]) => ({ code, amount: amt })).sort((a, b) => a.code.localeCompare(b.code))
 
-  const note = isDraft
-    ? 'Approving issues the invoice and posts it to the GL. A draft can still be edited or deleted.'
-    : isIssued
-      ? 'Settle collects the remaining balance. Invoices from the same company can be settled together on one receipt from Service Billing.'
-      : 'Paid. Refund or raise a credit note if something was billed wrong.'
-
   return (
     <>
       <div className="fin-actions">
@@ -195,8 +189,6 @@ export default function InvoicePageActions({
             {can.edit ? <button type="button" className="btn-sec" onClick={() => open('reassign')}>Change account</button> : null}
           </>
         ) : null}
-
-        <span className="note">{note}</span>
 
         {panel === 'settle' ? (
           <form className="fin-inline-form" onSubmit={settle} aria-label="Settle">

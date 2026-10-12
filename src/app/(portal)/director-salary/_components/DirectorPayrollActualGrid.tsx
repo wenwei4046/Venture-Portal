@@ -182,14 +182,10 @@ function DirectorPayrollActualGridBody({ rows, period }: Props) {
         <StatCard label="Total PCB" value={formatMoney(totals.pcb)} icon="receipt" note="Tax withheld" />
       </StatCards>
 
+      {/* Holds its height with nothing ticked, so ticking never moves the table. */}
       <div className="flex flex-wrap items-center justify-between mb-3 gap-x-4 gap-y-2 min-h-[1.75rem]">
-        {someSelected ? (
+        {someSelected && (
           <span className="text-xs font-medium">{selected.size} selected</span>
-        ) : (
-          <p className="text-xs">
-            All values in RM · imported verbatim from InfoTech · click the row arrow for the EE
-            breakdown.
-          </p>
         )}
         {someSelected && (
           <div className="flex items-center gap-2">
@@ -263,12 +259,6 @@ function DirectorPayrollActualGridBody({ rows, period }: Props) {
               ))}
             </tbody>
           </table>
-        </div>
-        <div className="table-frame-foot">
-          <span>
-            Edit values inline — figures stick as typed (no recompute; the InfoTech file is the
-            source of truth). Statutory, PCB, Gross and Net are edited in the expanded panel (▾).
-          </span>
         </div>
       </div>
 

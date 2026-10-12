@@ -465,8 +465,10 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   }
   /** Everything that can be done to this invoice in its present status. */
   function menuItems(inv: Invoice): RowMenuItem[] {
+    // One line an item (2026-10-12, the user): a hint is the item's tooltip
+    // (RowMenu), and Open says nothing of the double-click, as row-links' Open.
     const items: RowMenuItem[] = [
-      { key: 'open', label: fin ? 'Open' : '打开', hint: fin ? 'or double-click' : '发票页 · 双击也可以', onSelect: () => router.push(pageOf(inv)) },
+      { key: 'open', label: fin ? 'Open' : '打开', onSelect: () => router.push(pageOf(inv)) },
     ]
     // The handoff's row menu: Open, Open in new tab, then the page's own (2026-10-10).
     if (fin) {
@@ -1039,10 +1041,6 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
             <div className="bulk-bar" role="region" aria-label="Decision on what is ticked">
               <div className="bulk-bar-l">
                 <b>{selectedIds.size}</b> selected · <b>RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</b>
-                <small>
-                  {' · '}
-                  {crossCompany ? '一张收据只能结同一家公司的单' : 'one receipt covers them all — same payer only'}
-                </small>
               </div>
               <div className="bulk-bar-r">
                 <button type="button" onClick={clearSelection} className="bulk-quiet font-sans text-sm">

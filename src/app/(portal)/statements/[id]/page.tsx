@@ -163,13 +163,11 @@ export default async function StatementDetailPage({ params }: Props) {
                 </button>
               </form>
             ) : null}
-            <span className="note">
-              {isDraft
-                ? 'Once issued the statement locks.'
-                : statement.issued_at
-                  ? `Issued ${officeTime(statement.issued_at).format('D MMM YYYY HH:mm')}`
-                  : 'Issued.'}
-            </span>
+            {isIssued ? (
+              <span className="note">
+                {statement.issued_at ? `Issued ${officeTime(statement.issued_at).format('D MMM YYYY HH:mm')}` : 'Issued.'}
+              </span>
+            ) : null}
           </div>
         </section>
       ) : null}

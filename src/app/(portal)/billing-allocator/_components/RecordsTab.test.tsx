@@ -88,11 +88,13 @@ const headers = (table: HTMLTableElement) =>
 beforeEach(() => vi.clearAllMocks())
 
 describe('the allocator’s Records on the sheet', () => {
-  it('heads the month’s expenses and says in a notice what still has to be billed', () => {
+  it('heads the month’s expenses; no notice repeats what the head’s To bill card says', () => {
     render(<RecordsTab data={data()} onEdit={vi.fn()} />)
     expect(head('Allocations').querySelector('.count')).toHaveTextContent('3 EXPENSES · SEPTEMBER 2026')
-    const notice = document.querySelector('.bil-notice') as HTMLElement
-    expect(notice).toHaveTextContent('To bill RM 1,289.52 across 2 companies — Generate invoices bills every company’s share in one go.')
+    // 2026-10-12 (the user: the descriptions clutter the view) — the To bill
+    // card above the tabs carries the figure.
+    expect(document.querySelector('.bil-notice')).toBeNull()
+    expect(screen.queryByText(/Generate invoices bills every company/)).toBeNull()
     // The button is the page head's now.
     expect(screen.queryByRole('button', { name: /Generate/ })).toBeNull()
   })
@@ -136,7 +138,8 @@ describe('the allocator’s Records on the sheet', () => {
     fireEvent.doubleClick(row('Office Rental'))
     expect(mocks.push).toHaveBeenCalledWith('/billing-allocator/t1')
     fireEvent.contextMenu(row("AI TOOLS-SEP'2026"))
-    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['打开双击也可以', '在新分页打开', 'Edit in Calculate', 'Delete'])
+    // Open says nothing of the double-click (2026-10-12, no usage hints).
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['打开', '在新分页打开', 'Edit in Calculate', 'Delete'])
   })
 
   it('lets the unbilled be corrected or deleted; a billed record is locked', () => {

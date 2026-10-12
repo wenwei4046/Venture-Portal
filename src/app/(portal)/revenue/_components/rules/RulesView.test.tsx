@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CommissionSettingsData, SchemeRow } from '../config/types'
 
@@ -118,7 +118,6 @@ describe('RulesView', () => {
       ['Policy', ['Promotion criteria']],
     ])
     expect(within(list()).getByRole('button', { name: 'Scheme rules' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByText('Item rules appear when their switch on Scheme rules is on.')).toBeInTheDocument()
     expect(screen.getByText('Components')).toBeInTheDocument()
   })
 
@@ -133,11 +132,13 @@ describe('RulesView', () => {
     expect(window.history.pushState).toHaveBeenCalledWith(null, '', '?tab=ranks')
   })
 
-  it('opens the section the URL names, under its title and one line', () => {
+  // The section's one line under its title went on 2026-10-12: the title alone.
+  it('opens the section the URL names, under its title alone', () => {
     nav.params = new URLSearchParams('tab=open-bill')
     renderView(true)
     expect(within(list()).getByRole('button', { name: 'Open Bill rates' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByText('The uplift paid on an Open Bill.')).toBeInTheDocument()
+    expect(screen.getAllByText('Open Bill rates')).toHaveLength(2) // the list's row and the section's title
+    expect(screen.queryByText('The uplift paid on an Open Bill.')).toBeNull()
   })
 
   it('keeps KPI items mounted, hidden, while another section is read', () => {

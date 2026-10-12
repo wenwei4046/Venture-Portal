@@ -102,7 +102,6 @@ describe('Settings for Finance', () => {
     render(await SettingsPage({ searchParams: Promise.resolve({ tab: 'departments' }) }))
     expect(document.querySelector('.page-eyebrow')).toHaveTextContent('ADMIN · CONFIGURATION · DEPARTMENTS')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Departments')
-    expect(screen.getByText('Finance can add departments; editing segment, pool GL and billing mode is Principal-only.')).toBeInTheDocument()
     expect(card('Departments')).toHaveTextContent('2')
     expect(card('Departments')).toHaveTextContent('1 cost center')
     expect(card('Bill back salary')).toHaveTextContent('1')

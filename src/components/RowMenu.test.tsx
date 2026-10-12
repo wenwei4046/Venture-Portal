@@ -26,8 +26,18 @@ describe('RowMenu', () => {
   it('lists the items under the row it is for', () => {
     menu()
     expect(screen.getByRole('menu', { name: 'Actions for HV-INV-202610-0008 · issued' })).toBeInTheDocument()
-    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['PDF看发票', 'Refund', '作废'])
+    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['PDF', 'Refund', '作废'])
     expect(screen.getByRole('separator')).toBeInTheDocument()
+  })
+
+  // 2026-10-12 (the user: the descriptions make the view too messy; as the
+  // bill menu, #323): one line an item — its hint is the tooltip.
+  it('draws an item on one line, its hint as the tooltip', () => {
+    menu()
+    const pdf = screen.getByRole('menuitem', { name: 'PDF' })
+    expect(pdf).toHaveAttribute('title', '看发票')
+    expect(screen.queryByText('看发票')).toBeNull()
+    expect(screen.getByRole('menuitem', { name: 'Refund' })).not.toHaveAttribute('title')
   })
 
   it('runs the chosen action and closes', () => {

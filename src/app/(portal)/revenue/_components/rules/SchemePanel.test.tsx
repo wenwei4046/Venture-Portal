@@ -45,7 +45,7 @@ afterEach(() => {
 
 describe('SchemePanel', () => {
   it('shows each component as a switch, in the prototype’s order, Saved until something moves', () => {
-    render(<SchemePanel scheme={ir} subName="IR" canManage />)
+    render(<SchemePanel scheme={ir} canManage />)
     const components = screen.getAllByRole('switch').map(s => s.getAttribute('aria-label')).filter(l => l !== 'Override base includes KPI revenue')
     expect(components).toEqual([
       'Product revenue commission',
@@ -60,11 +60,10 @@ describe('SchemePanel', () => {
     expect(sw('Product revenue commission')).toHaveAttribute('aria-checked', 'true')
     expect(sw('KPI item allowance')).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByRole('button', { name: 'Saved' })).toBeInTheDocument()
-    expect(screen.getByText('Which components IR pays. A switched-off component is skipped by the engine, and the item-rule tabs it reads come and go with it.')).toBeInTheDocument()
   })
 
   it('marks a changed switch with a dot and turns Saved into Save', () => {
-    render(<SchemePanel scheme={ir} subName="IR" canManage />)
+    render(<SchemePanel scheme={ir} canManage />)
     fireEvent.click(sw('KPI item allowance'))
     expect(sw('KPI item allowance')).toHaveAttribute('aria-checked', 'true')
     expect(screen.getAllByLabelText('changed')).toHaveLength(1)
@@ -74,7 +73,7 @@ describe('SchemePanel', () => {
   })
 
   it('opens the group package’s three layer settings at 2 · 2 · 3 when it is switched on', () => {
-    render(<SchemePanel scheme={ir} subName="IR" canManage />)
+    render(<SchemePanel scheme={ir} canManage />)
     expect(screen.queryByLabelText('Group sales layers')).toBeNull()
     fireEvent.click(sw('Group incentive package'))
     expect(screen.getByLabelText('Group sales layers')).toHaveValue(2)
@@ -83,7 +82,7 @@ describe('SchemePanel', () => {
   })
 
   it('puts the layer settings back when the package is switched off again — out of sight, they bind Fair too', () => {
-    render(<SchemePanel scheme={ir} subName="IR" canManage />)
+    render(<SchemePanel scheme={ir} canManage />)
     fireEvent.click(sw('Group incentive package'))
     fireEvent.click(sw('Group incentive package'))
     expect(screen.queryByLabelText('changed')).toBeNull()
@@ -92,7 +91,7 @@ describe('SchemePanel', () => {
 
   it('saves every switch and setting in one go, then refreshes the list of sections', async () => {
     act.saveSchemeRules.mockResolvedValue({ ok: true })
-    render(<SchemePanel scheme={ir} subName="IR" canManage />)
+    render(<SchemePanel scheme={ir} canManage />)
     fireEvent.click(sw('Open Bill bonus'))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(act.saveSchemeRules).toHaveBeenCalledTimes(1))
@@ -110,7 +109,7 @@ describe('SchemePanel', () => {
 
   it('says why a save was refused, and keeps the draft', async () => {
     act.saveSchemeRules.mockResolvedValue({ ok: false, reason: 'Give the deposit gate a threshold, or switch it off' })
-    render(<SchemePanel scheme={ir} subName="IR" canManage />)
+    render(<SchemePanel scheme={ir} canManage />)
     fireEvent.click(sw('Open Bill bonus'))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Give the deposit gate a threshold, or switch it off')
@@ -121,7 +120,7 @@ describe('SchemePanel', () => {
   // 2026-10-11, the user: the cost basis is set on Product List › Costing
   // Setting only — two places for one number left nobody sure which counted.
   it('keeps the default rate mode and leaves the Revenue Team cost basis to the Product List', () => {
-    render(<SchemePanel scheme={ir} subName="IR" canManage />)
+    render(<SchemePanel scheme={ir} canManage />)
     expect(screen.getByText('Default rate mode')).toBeInTheDocument()
     expect(screen.getByLabelText('Default rate mode')).toHaveValue('variable')
     expect(screen.queryByText(/cost basis/i)).toBeNull()
@@ -130,7 +129,7 @@ describe('SchemePanel', () => {
   })
 
   it('is read-only for whoever may not manage the rules', () => {
-    render(<SchemePanel scheme={ir} subName="IR" canManage={false} />)
+    render(<SchemePanel scheme={ir} canManage={false} />)
     expect(screen.queryByRole('button', { name: /^Save/ })).toBeNull()
     expect(sw('KPI item allowance')).toBeDisabled()
     fireEvent.click(sw('KPI item allowance'))

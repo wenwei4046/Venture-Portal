@@ -299,7 +299,6 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
           })}
         </GridTable>
       </div>
-      <div className={hv.hint}>Click a person for their card. Right-click to invite them as a user.</div>
 
       {/* An account nobody is attached to can still sign in — worth seeing. */}
       {unattachedAccounts.length > 0 ? (
@@ -310,10 +309,6 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
               {unattachedAccounts.length} {unattachedAccounts.length === 1 ? 'ACCOUNT' : 'ACCOUNTS'}
             </span>
           </div>
-          <p className={s.accountsNote}>
-            These can sign in but are not on the roster above, so no title decides what they may do: each keeps the role it
-            was made with. Somebody on the roster gets a login of their own from Invite user.
-          </p>
           <GridTable label="Accounts without a person">
             <GridHead cols="minmax(0,1.2fr) minmax(0,1.6fr) 140px 120px" cells={['Account', 'Email', 'Role', 'Status']} cellStyle={{ padding: '11px 14px' }} />
             {unattachedAccounts.map((a, i) => (

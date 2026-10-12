@@ -72,10 +72,6 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
             <em>I.</em> REPORTS · BALANCE SHEET · AS AT {asAt(period).toUpperCase()}
           </div>
           <h1 className="page-title">Balance Sheet</h1>
-          <p className="page-sub">
-            As-at balances from the general ledger. Equity carries a &ldquo;Retained &amp; current earnings&rdquo; line (cumulative P&amp;L to
-            date), so Assets = Liabilities + Equity to the cent. ▸ on an account shows its movements in the month.
-          </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <ExportLinks variant="sheet" basePath="/reports/balance-sheet/export" period={period} compare={compare} segment={segment} />
@@ -103,9 +99,6 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
             {segName.toUpperCase()} · AS AT {asAt(period).toUpperCase()}
           </span>
         </div>
-        {segment ? (
-          <p className="fin-notice mb-3">With a segment picked the check is expected to be off — equity and liabilities mostly sit in the corporate segment.</p>
-        ) : null}
         <GlReportView
           basePath="/reports/balance-sheet"
           period={period}

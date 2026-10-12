@@ -4,7 +4,6 @@ import type { ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { HvPage } from '@/components/hrv/kit'
 import {
-  RULES_DESC,
   groupedRulesTabs,
   resolveRulesTab,
   visibleRulesTabs,
@@ -23,7 +22,8 @@ import s from './rules.module.css'
 /**
  * One sub-department's Rules page (2026-10-10, the HR revamp, variant A): a
  * grouped side list — Pay structure · Item rules · Headcount · Policy — and
- * the open section beside it, under its 20px title and one line. Scheme
+ * the open section beside it, under its 20px title (its one line went on
+ * 2026-10-12, with the list's note on item rules). Scheme
  * rules, Ranks and Capacity are the prototype's own; every other section is
  * the table it always was ("same content as today").
  *
@@ -74,10 +74,9 @@ export default function RulesView({
     window.history.pushState(null, '', `?${params.toString()}`)
   }
 
-  const desc = (key: RulesTab) => RULES_DESC[key].replace('{sub}', subDept.name)
   const titled = (key: RulesTab, body: ReactNode) => (
     <>
-      <SectionTop title={tabs.find(t => t.key === key)?.label ?? key} desc={desc(key)} />
+      <SectionTop title={tabs.find(t => t.key === key)?.label ?? key} />
       {body}
     </>
   )
@@ -116,11 +115,10 @@ export default function RulesView({
               ))}
             </div>
           ))}
-          <div className={s.navNote}>Item rules appear when their switch on Scheme rules is on.</div>
         </nav>
         <div style={{ minWidth: 0 }}>
           {tab === 'scheme' ? (
-            <SchemePanel scheme={scheme} subName={subDept.name} canManage={canManage} />
+            <SchemePanel scheme={scheme} canManage={canManage} />
           ) : tab === 'ranks' ? (
             <RanksPanel data={data} scheme={scheme} holders={holders} canManage={canManage} />
           ) : tab === 'ladder' ? (

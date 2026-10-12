@@ -676,7 +676,8 @@ describe('HierarchySpaces department membership actions', () => {
     expect(adapters.add).not.toHaveBeenCalled()
     const titles = screen.getByRole('menu', { name: 'Add Yuny to IR as' })
     expect(titles).toHaveTextContent('No upline is copied. Set it in IR after adding.')
-    expect(within(titles).getByRole('menuitem', { name: 'Team Assistant' })).toHaveTextContent('Current title')
+    // One line a row (2026-10-12): "Current title" is the row's tooltip.
+    expect(within(titles).getByRole('menuitem', { name: 'Team Assistant' })).toHaveAttribute('title', 'Current title')
     fireEvent.click(within(titles).getByRole('menuitem', { name: 'Team Leader' }))
 
     await waitFor(() => expect(adapters.add).toHaveBeenCalledOnce())

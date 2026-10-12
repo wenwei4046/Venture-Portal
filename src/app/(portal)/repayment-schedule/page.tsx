@@ -121,10 +121,6 @@ export default async function RepaymentSchedulePage({
             <h1 className="page-title">Repayment Schedule</h1>
             <MonthNav month={currentYM} isCurrent={isCurrentMonth} />
           </div>
-          <p className="page-sub">
-            Flat amortisation: principal = original ÷ tenure, interest = original × monthly rate. Repayment PVs awaiting approval carry a
-            &ldquo;Pending PV&rdquo; tag and only count as paid once approved.
-          </p>
         </div>
         {canDo(user, 'treasury', 'export') ? (
           <div className="flex flex-wrap items-center justify-end gap-2">

@@ -24,9 +24,6 @@ export default async function RevenueDepartmentPage() {
             <em>II.</em> REVENUE · DEPARTMENT
           </div>
           <h1 className="page-title">Revenue Department</h1>
-          <p className="text-sm mt-3">
-            The department as a whole — each sub-department runs its own commission.
-          </p>
         </div>
       </div>
 

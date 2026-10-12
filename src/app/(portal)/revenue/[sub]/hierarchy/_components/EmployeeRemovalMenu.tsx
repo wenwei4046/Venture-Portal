@@ -190,10 +190,12 @@ export default function EmployeeRemovalMenu({ id, person, currentDepartment, des
       || confirmation?.destination && destinationKey(confirmation.destination) === key
     return <button key={key} ref={button => { if (button) destinationButtons.current.set(key, button); else destinationButtons.current.delete(key) }}
       type="button" role="menuitem" tabIndex={-1} aria-label={item.name} disabled={pending || !!reason}
-      aria-haspopup={existing ? 'dialog' : 'menu'} aria-expanded={!!expanded} title={reason ?? undefined}
+      aria-haspopup={existing ? 'dialog' : 'menu'} aria-expanded={!!expanded}
+      // One line a row (2026-10-12, as the bill menu): why it is shut, or that they are already there, is its tooltip.
+      title={reason ?? (existing ? 'Already a member · keep its title and upline' : undefined)}
       onMouseEnter={() => openDestination(destination, false)} onClick={() => openDestination(destination, true)}
       onKeyDown={event => openWithArrow(event, () => openDestination(destination, true))}>
-      <span className={styles.rowCopy}><span>{item.name}</span><small>{reason ?? (existing ? 'Already a member · keep its title and upline' : destination.kind === 'department' ? 'Change company department' : 'Choose a title')}</small></span>
+      <span>{item.name}</span>
       {!reason ? <span className={styles.chevron} aria-hidden>›</span> : null}
     </button>
   }
@@ -214,14 +216,14 @@ export default function EmployeeRemovalMenu({ id, person, currentDepartment, des
         <span>Move to other department</span><span className={styles.chevron} aria-hidden>›</span>
       </button>
       <button type="button" role="menuitem" tabIndex={-1} aria-haspopup="dialog" disabled={pending || !!removeReason}
-        title={removeReason ?? undefined} onClick={event => openConfirmation('remove', event.currentTarget)}>
-        <span className={styles.rowCopy}><span>Remove from this department</span>
-          {removeReason ? <small>{removeReason}</small>
-            : newBase ? <small>Their base moves to {newBase.name}</small> : null}</span>
+        title={removeReason ?? (newBase ? `Their base moves to ${newBase.name}` : undefined)}
+        onClick={event => openConfirmation('remove', event.currentTarget)}>
+        Remove from this department
       </button>
       <button type="button" role="menuitem" tabIndex={-1} aria-haspopup="dialog" disabled={pending || !canManageEmployment || !!sourceIssue}
+        title={canManageEmployment ? undefined : 'Requires People Management permission.'}
         onClick={event => openConfirmation('terminate', event.currentTarget)}>
-        <span className={styles.rowCopy}><span>Terminate employee</span><small>{canManageEmployment ? 'No longer working for the company' : 'Requires People Management permission.'}</small></span>
+        Terminate employee
       </button>
     </MenuPanel>
 
@@ -246,7 +248,6 @@ export default function EmployeeRemovalMenu({ id, person, currentDepartment, des
       {titleMenu.destination.item.titles.map(title => <button key={title.id} type="button" role="menuitem" tabIndex={-1}
         disabled={pending || !!reasonFor(titleMenu.destination)} aria-haspopup="dialog"
         onClick={event => openConfirmation('move', event.currentTarget, titleMenu.destination, title)}>{title.name}</button>)}
-      <p className={styles.hint}>Choose a title, then confirm the move. No reporting line is copied.</p>
     </MenuPanel> : null}
 
     {confirmation ? <MenuPanel id={confirmationId} label={confirmationLabel} anchor={confirmation.anchor} submenu dialog focus

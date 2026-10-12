@@ -153,10 +153,7 @@ export default async function OpexPage({ searchParams }: Props) {
       ) : null}
 
       <section className="border border-hairline rounded-md bg-surface p-6 mb-10">
-        <h2 className="font-serif italic text-ink text-md mb-1">12-month trend</h2>
-        <p className="font-serif italic text-graphite text-xs mb-4">
-          Total monthly OPEX for {dept.name}
-        </p>
+        <h2 className="font-serif italic text-ink text-md mb-4">12-month trend</h2>
         <OpexTrendChart data={trend} />
       </section>
 

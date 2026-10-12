@@ -166,7 +166,8 @@ describe('Due to collect', () => {
     expect(Array.from(due.querySelectorAll('thead th[data-col]')).map((th) => th.textContent?.replace(/[↕▲▼]/g, '').trim())).toEqual([
       'Counterparty', 'Type', 'Principal', 'Interest', 'Total due', 'Received · Oct', 'Short', '',
     ])
-    expect(due).toHaveTextContent('Min interest = interest must be paid in full each month')
+    // No note under the table (2026-10-12, the user: descriptions clutter the view).
+    expect(due).not.toHaveTextContent('Min interest = interest must be paid in full each month')
     expect(due.querySelector('tfoot')).toHaveTextContent('Total')
   })
 

@@ -11,6 +11,45 @@
 
 ## Implementation rules — read this first
 
+### No descriptions on the page (v3.66, 2026-10-12) — overrides every subtitle, lede and hint described below
+
+The user, circling six of them on HR's pages: "find all this wording … like a
+description, i want delete it, cause this cause the view too messy". A page
+says what it is with its eyebrow and title, a section with its heading, a tab
+with its label, a menu row with its words — never a sentence under them that
+explains what the page or section is, how a tab works, what a rule means, why
+the screen looks as it does, or where to click. Gone from every portal page
+and every view (the phone apps — Revenue app, HR app — were not part of it):
+
+- **Page subtitles** — `PageHead subtitle`, `.page-sub`, a sentence under the
+  `page-title`. A subtitle stays only when it is live data (*Signed in as …*,
+  a voucher's own description, *{borrower} · {bank}*).
+- **Section, panel and tab ledes** — the line under a section heading or a tab
+  rail (`.subtitle`, `.sheet-subtitle`, report cards' one-line descriptions).
+- **Explanatory notices** — a box or a paragraph that explains a rule, a
+  setting's effect or a method (*Below 30% of the order total, so none of the
+  commission is released yet…*). A notice that was the only place a CURRENT
+  STATE showed becomes a 2–4 word chip beside what it concerns (*Payout off
+  this month* beside a tab's heading when its payout is switched off); a state
+  shown elsewhere on the page (a status bar, a chip, a disabled button) loses
+  the sentence outright.
+- **Usage hints** — *Right-click a row to remove it.*, *Shift + right-click
+  opens the browser's own menu.*, *Double-click to open · right-click for
+  more*, *· highlights only*. The behaviour stays; only the words went.
+- **A menu row's second line** — one line a row (the bill menu's rule of
+  2026-10-12, now every menu: `RowMenu`, `row-links`, the payroll row menu);
+  what it said — why a row is shut, who holds a bill, what a row does — is the
+  row's `title=` tooltip. A disabled row must still take the hover for that
+  tooltip to show.
+
+What stays: errors, and warnings that name a problem to fix (with its link or
+list); empty states; figures, dates, counts, chips, statuses and a stat card's
+short note; a row's own note on why it differs (*Moved from ADRIAN*, *Not open
+yet — …*); and everything inside a window, drawer, panel or form a click opens
+— those sentences say what a write will do. PDFs, CSVs and print are documents,
+not the view. A new page, or a prototype that brings a description with it,
+leaves the description out (`src/lib/no-page-descriptions.test.ts`).
+
 ### Sheet theme — the portal's new tone, HR's view first (v3.9–v3.10, 2026-09-27)
 
 Comm Cal's month (#151 → #162) is the reference for how the portal now looks,
@@ -128,7 +167,8 @@ sheet `.sheet-theme` declares the Comm Cal month's tokens:
    holds. A month shown as a hero moves into the eyebrow/title; its status line
    becomes the primary card's note.
 3. Sections: `.sect-head` (17px/600 title over the same rule and mono count), or
-   `.sheet-heading` + `.sheet-subtitle` for a heading with one sentence.
+   `.sheet-heading`; a `.sheet-subtitle` under it only for a line of live
+   status or data, never a description (v3.66).
 4. Tables: every `.ledger-table` becomes the month's table automatically — a
    framed well (`216 210 200`, 10px radius), an uppercase 10px/600 header band
    (`235 231 224` over a `207 197 183` rule), white / `#F7F7F5` zebra, peach
@@ -188,8 +228,8 @@ disagree, the file wins; every value is the prototype's.**
 - **The kit** (`components/hrv/`: `kit.tsx` static pieces, `tabs.tsx`,
   `overlay.tsx`, `toast.tsx`, `icons.tsx`, one `hrv.module.css`; colours are
   the `--hv-*` tokens on `.sheet-theme`): the page head (10px/600/.18em eyebrow
-  behind a 2×10 orange bar — no roman numeral — Georgia 36/1.1, 13px subtitle,
-  the 64px orange segment; `bare` when tabs sit under it), tabs (8px tops,
+  behind a 2×10 orange bar — no roman numeral — Georgia 36/1.1, a 13px subtitle
+  only when it is live data (*Signed in as …*; v3.66), the 64px orange segment; `bare` when tabs sit under it), tabs (8px tops,
   peach + `inset 0 -2px 0` orange, 600; boxed counts), summary cards (the
   prototype's own sizes per page), chips (mono 11px word + 5px dot on a wash),
   grid tables (the prototype's tables are CSS grids: a `216 210 200` frame,
@@ -448,7 +488,8 @@ disagree, the file wins; every value is the prototype's.**
   7px red dot (`--hv-danger`, white ring) on a changed box, Reset to title
   (7px 12px, hairline) and Save (7px 16px, accent) in the footer before Full
   page; above the matrix, in the legacy note's style, a line when their boxes
-  were saved over another template. Foot: 12px `--hv-brown` note, Save 7px 16px accent. Measured against
+  were saved over another template. Foot, for whoever may manage: *Unsaved changes to X* 12px `--hv-brown` while
+  there are edits (no note otherwise, no foot for a reader — v3.66), Save 7px 16px accent. Measured against
   the prototype (`states-pr8a.json`).
 - **Cross-check** with a measuring script that finds each element by its text
   on both and diffs computed font / colour / size / padding / border / radius
@@ -522,7 +563,7 @@ the quiet buttons have NO fill of their own — they sit on the white sheet.
   dashed file box (*No file chosen* · *PDF, Excel, Word or image*, Upload →
   Replace in a white 7px 14px button), department chips (6px 12px, radius 7,
   gap 6 — the ☑/☐ its own item; peach with an orange rim when on), Save (the
-  accent, 8px 18px), the 12px note. The list: a row per file — a 38px olive
+  accent, 8px 18px) — the 12px note under it went in v3.66. The list: a row per file — a 38px olive
   tile (`238 240 226` / `88 98 68`, mono 10px 500 extension), the name 500, a
   12px brown `file · day · who` line, department pills (1px 8px, radius 999,
   11px), View · Download (5px 10px, radius 6, unfilled, orange rim on hover)
@@ -766,8 +807,8 @@ The rest of **V. HIRING** (README §12–13; the handoff's `Revenue App.dc.html`
 lines 1145–1270, the drawers 1334–1364 and 1484–1497). Values in
 `hiring/_components/hiring.module.css`.
 
-- **Insights** (`/hiring/insights`, *How long each request takes, from
-  submitted to acknowledged to filled.*). The period bar: a white segmented
+- **Insights** (`/hiring/insights`; how long each request takes, from
+  submitted to acknowledged to filled — the page no longer says so, v3.66). The period bar: a white segmented
   box (3px, radius 10) — **This month** · **All time** · a 1px rule ·
   **Pick a month** (calendar and chevron; the picked one dark `43 31 23` on
   cream, 500) — then the range in words (`1 Oct 2026 – 31 Oct 2026`, 12.5px).
@@ -795,8 +836,7 @@ lines 1145–1270, the drawers 1334–1364 and 1484–1497). Values in
   band, its facts (`150px | 1fr`; budget, cost and start in clay 600), the
   Audit trail, **Close** and **View full →**. A request is in the period when
   it was submitted or filled in it.
-- **Talent Bank** (`/hiring/talent`, *Good candidates kept on file, ready to
-  invite when a role opens.*) **is a Drive since v3.74** (2026-10-12 — the
+- **Talent Bank** (`/hiring/talent`; no subtitle since v3.75) **is a Drive since v3.74** (2026-10-12 — the
   user: "like google drive as well, can create new file, and name as well …
   so when save or upload can detect and locate file"), drawn with the Data
   center's own parts (*Data center as a Drive*, v3.69 — its bar, cards, ⋮
@@ -816,8 +856,8 @@ lines 1145–1270, the drawers 1334–1364 and 1484–1497). Values in
   center's file cards; ⋮ View, Download, Delete asked twice). A folder HR
   made has a ⋮ of **Rename**, **Move to…** (with everything in it) and
   **Delete**; a department, while something is right in it, **Move everyone
-  to…**; a company none. A grey hint under the path says where each place's
-  folders come from. Files may be dropped onto the page. **Move to…** is one
+  to…**; a company none. (The grey hint under the path that said where each place's
+  folders come from went in v3.75.) Files may be dropped onto the page. **Move to…** is one
   440px window for the three — *Move Nur Iman* / *Move Seniors* / *Move
   everyone in Sales*, under it where it is now (*— everything in it goes
   with it*; *2 people, 1 folder — now in …*), a finder, every company,
@@ -1819,7 +1859,7 @@ project memory. Everything below lives in `globals.css` under "Payroll grid".
 | `.pg-in.manual` (+ `.num.manual`, `.ro.manual`) | A statutory figure somebody typed over JADUAL: a 3.5px `--accent` dot in the field's top-left corner (clear of the right-aligned digits, inside the 6px radius), and a title saying it stays until *Reset statutory to JADUAL*. It survives `.dirty` and `:focus` (declared after both, whose `background` shorthand would wipe it). A row past draft shows the bare figure with the dot on its left, centred on the line. The legend above the well carries it as *typed over JADUAL* (`.pg-legend i.mn`) | Only a figure that overrides a computed default and stays until reset |
 | `.pg-band` (`.group-btn` in `td.group-cell`) | The roster's department band, with the Gross / Net subtotal sitting in the frozen block directly under the two columns it sums | Grouped money grids |
 | `td.pg-status` (the frozen **Status** column, `--w-status` 138px, since 2026-09-27) | Where each person's pay stands, as one chip: `Draft` (muted) · `Open on Comm Cal` / `On Director Salary` (muted — completed elsewhere) · `Completed 27 Sep` (ledger) · `Submitted #2` (alert — with Finance) · `Paid` (ledger) · `Resubmit · editing` / `Resubmit ready` (accent). The detail — when, by which batch, what happens next — is the cell's tooltip. The band's status cell says `3 sent · 2 ready`; the frozen offsets run `.l0`–`.l5` | Any grid whose rows move through a lifecycle |
-| `.icon-btn.more` + right-click | Every row's ⋯ — the only button at the end of the row besides a dirty row's Save; the paycheck ▾ that sat beside it went 2026-09-30, since the menu's *Open paycheck* and the name itself open the same window — and a right-click anywhere on the row open the same paper menu (`PayrollRowMenu`, on the hierarchy's `MenuPanel` — see "Bill context menu"): *Open paycheck* / *Open on Comm Cal* / *Open on Director Salary*, *Complete*, *Unlock*, *Reset statutory to JADUAL* (a draft whose statutory was typed or came from the InfoTech file; its line names the typed figures), **Resubmit…** (adjacent confirmation, then the row unlocks: amounts only go up, the next batch sends the difference) and *Put back as sent*. Shift + right-click keeps the browser's menu | Rows with more than one action |
+| `.icon-btn.more` + right-click | Every row's ⋯ — the only button at the end of the row besides a dirty row's Save; the paycheck ▾ that sat beside it went 2026-09-30, since the menu's *Open paycheck* and the name itself open the same window — and a right-click anywhere on the row open the same paper menu (`PayrollRowMenu`, on the hierarchy's `MenuPanel` — see "Bill context menu"): *Open paycheck* / *Open on Comm Cal* / *Open on Director Salary*, *Complete*, *Unlock*, *Reset statutory to JADUAL* (a draft whose statutory was typed or came from the InfoTech file; its tooltip names the typed figures), **Resubmit…** (adjacent confirmation, then the row unlocks: amounts only go up, the next batch sends the difference) and *Put back as sent*. Shift + right-click keeps the browser's menu | Rows with more than one action |
 | `.pg-win` + `.pg-scrim` | One person's paycheck as a floating window over a scrim (`--scrim` at .42): header with n / N, the month and department, ‹ › to step through people and × / Esc to close; a payslip-shaped body — Earnings; Deductions (unpaid leave, deduction, SKBBK, then EPF / SOCSO / EIS employee and PCB — *Withholding tax* read-only in its place when the People record says so); Employer (EPF / SOCSO / EIS) with *Reset to JADUAL* beneath while a clean draft has typed figures; then Computed (pro-rata, cost to company, gross, net to bank) — and a footer with Payslip and Save. It is a second view of the row's figures, never a copy — the inputs write the row's own edit state, so a change in either place shows in both. Opened by the name or the ⋯ menu; closing hands focus back to the name | Opening a row from a dense grid. The first inline version sat in the same paper tones as the table and read as part of it; the scrim is what makes it unmistakably in front |
 
 ### Payroll batches (2026-09-27 — HR › Payroll, the unified Payroll)
@@ -1864,27 +1904,29 @@ read-only, the name a link to Director Salary). The page's rules:
   resubmitted person reads as the remainder still to pay.
 - **Resubmit and Second payroll** (2026-09-27, later): the row menu offers both on
   somebody already sent, two adjacent items with their own inline
-  confirmations — *Resubmit…* (small: *A correction to what was sent*) and
-  *Second payroll…* (small: *A planned second payment for {month} (e.g. the
+  confirmations — *Resubmit…* (tooltip: *A correction to what was sent*) and
+  *Second payroll…* (tooltip: *A planned second payment for {month} (e.g. the
   15th)*). They unlock alike; only the words differ, and the status chip says
   which (*Second payroll · editing* / *Second payroll ready*). A row that can
-  take neither shows one disabled *Resubmit · Second payroll* item with the
-  reason.
+  take neither shows one disabled *Resubmit · Second payroll* item, the reason
+  its tooltip. The menu is one line a row like the bill menu (2026-10-12): its
+  head is the name · department over the status chip's word, the detail on
+  hover.
 - **Department mode** (2026-09-30): a department is a *Cost center* or
   *Centralized*. Its switch is `.dept-mode-switch` — a 30px pill holding a
   34×20 track and the current mode's name, on (accent track, accent wash) =
   Centralized. On a department's own page it sits in a `.dept-mode` strip right
-  under the page head: `HR · DEPARTMENT MODE` eyebrow, the switch, then one line
-  on what the mode means; in Settings › Departments it is the *Mode* column's
-  cell. Flipping it never acts at once — an inline `.dept-mode-ask` panel (accent
-  wash) says what will happen (*HR leaves Billing Allocation … 3 splits on
-  payroll still in draft will be cleared*) with *Switch to Centralized* and
-  *Cancel*. Somebody who may not switch sees it disabled and *Switched by the
-  Principal.*
+  under the page head: `HR · DEPARTMENT MODE` eyebrow and the switch (the line
+  on what the mode means went 2026-10-12 — no descriptions on the page); in
+  Settings › Departments it is the *Mode* column's cell. Flipping it never acts
+  at once — an inline `.dept-mode-ask` panel (accent wash) says what will happen
+  (*HR leaves Billing Allocation … 3 splits on payroll still in draft will be
+  cleared*) with *Switch to Centralized* and *Cancel*. Somebody who may not
+  switch sees it disabled, *Only the Principal can switch this* its tooltip.
 - **Billing Allocation follows the grid** (2026-09-30): one card per payroll row
   of a cost-center department, in the grid's order (centralized departments are
   named under the title instead — *Not listed: Marketing (12) and Revenue
-  Department (32) — centralized …*), with the status chip beside the name in the grid's words
+  Department (32) — centralized.*), with the status chip beside the name in the grid's words
   (`Draft` plain · `Completed 30 Sep` ledger · `With Finance` alert · `Paid`
   ledger · `Resubmit · editing` / `Resubmit ready` accent · `Closed for good`).
   Past draft a card is frozen — company selects and % inputs disabled, no
@@ -2330,10 +2372,11 @@ Who changed what, when, before and after, for every table people change
 group — **Changes** (`/audit-log`) for anybody whose permissions open some
 area of the history, **Access** (`/audit-log/access`, who read what) for the
 Principal — never a tab rail between them. Each reader sees their own areas
-only; the page says so in its intro rather than hiding it.
+only; *Areas you read* and a value's *hidden from your title* say so (the
+intro that said it went in v3.66).
 
 - **Head**: `.page-head`, eyebrow *ADMIN · AUDIT LOG · CHANGES*, title
-  *Changes*, a `.sheet-subtitle` of what is shown and why some values are not.
+  *Changes* — no subtitle.
 - **Summary cards** (`StatCards`): *Saves today* (primary, *Last {time}*),
   *Changes · 7 days*, *People · 7 days*, *Areas you read* (*5 of 12* + the
   areas, links to the register fold).

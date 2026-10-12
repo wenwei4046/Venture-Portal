@@ -179,7 +179,9 @@ describe('a fund source’s repayment start, a date', () => {
     expect(card('Expected repayment (first installment)')).toHaveTextContent('15 Aug 2026')
     expect(within(screen.getByRole('region', { name: 'Details' })).getAllByText('15 Aug 2026').length).toBeGreaterThan(0)
     expect(field()).toHaveValue('')
-    expect(screen.getByText(/Unset, it is 15 Aug 2026/)).toBeInTheDocument()
+    // 2026-10-12 (the user: descriptions clutter the view) — the empty field and
+    // the Expected repayment card say it; no sentence under the field.
+    expect(screen.queryByText(/Unset, it is/)).toBeNull()
   })
 
   it('reads a month set before dates could be picked as that month on the effective date’s day', async () => {

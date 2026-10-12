@@ -27,7 +27,6 @@ export default function DirectorPayNote({ terms, statement, monthValue, monthLab
   return (
     <p className={s.notice} role="note" aria-label="Director pay">
       <strong>Director pay · {monthLabel} · {formatMoney(paid)}</strong>
-      {' '}— set on Rules › Directors.
       {terms.fixedAmount > 0 && <> Fixed amount {formatMoney(terms.fixedAmount)}.</>}
       {hasIncentive && (
         <>
@@ -39,7 +38,6 @@ export default function DirectorPayNote({ terms, statement, monthValue, monthLab
               : <>not yet — {formatMoney(monthValue)}, {formatMoney(threshold - monthValue)} to go.</>}
         </>
       )}
-      {' '}Their own bills pay their rank&apos;s rate and nothing more; no override reaches a director.
     </p>
   )
 }

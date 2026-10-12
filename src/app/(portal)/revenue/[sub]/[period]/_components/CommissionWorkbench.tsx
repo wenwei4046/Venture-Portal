@@ -424,9 +424,6 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   }
   const personHeld = held.filter(r => r.staffId === personId)
   const personNotCounted = personId ? notCounted.filter(b => b.staffId === personId) : []
-  const depositNote = threshold == null
-    ? 'This scheme has no deposit gate — every bill counts in the month it is written.'
-    : `Below ${pct(threshold)} of the order total, so none of the commission is released yet. Nothing is lost — each one pays in the month its deposit clears.`
   const exhibitionTotals = { bills: exhibitions.reduce((a, x) => a + x.orders, 0), total: sum(exhibitions, x => x.total), commissionable: sum(exhibitions, x => x.commissionable) }
   // The brands on the tab, bills with none last — one brand's exhibitions at a time.
   const exhibitionBrands = [...new Set(exhibitions.map(x => x.brand))]
@@ -824,15 +821,13 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         {!filtered.length && <div className={s.empty}>No sales orders match this view.</div>}
       </div>
       <div className={s.tableFooter}><span>{filtered.length} of {rows.length} rows
-        {fromOtherMonths > 0 && <> · <span className={s.otherMonthKey} aria-hidden />{fromOtherMonths} paid here from another month</>}
-        {' · '}Double-click a bill to open it · Scroll left / right to inspect the full sales line</span><span>Total commission stays visible →</span></div>
+        {fromOtherMonths > 0 && <> · <span className={s.otherMonthKey} aria-hidden />{fromOtherMonths} paid here from another month</>}</span></div>
     </div>
   }
   /** Bills the deposit gate is holding — the whole team's, or one person's (`withPerson` false). */
   function depositTable(rows: CommissionOrderRow[], withPerson: boolean) {
     const filtered = rows.filter(matches)
       .sort((a, b) => a.orderDate.localeCompare(b.orderDate) || a.orderNo.localeCompare(b.orderNo) || a.staffName.localeCompare(b.staffName))
-    const shared = new Set(rows.filter((r, i) => rows.findIndex(x => x.orderId === r.orderId) !== i).map(r => r.orderId)).size > 0
     return <div className={s.tableFrame} key={withPerson ? 'deposit-team' : 'deposit-person'}>
       <div className={s.tableScroll} role="region" aria-label="Orders below deposit, scroll horizontally" tabIndex={0}>
         <table className={s.table} aria-label={withPerson ? 'Orders below deposit' : `${selected?.name ?? 'Salesperson'} orders below deposit`}>
@@ -861,7 +856,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         </table>
         {!filtered.length && <div className={s.empty}>{rows.length ? 'No sales orders match this view.' : 'Every bill has met its deposit.'}</div>}
       </div>
-      <div className={s.tableFooter}><span>{filtered.length} of {rows.length} rows{shared ? ' · Shared bills show each holder’s part' : ''} · Double-click a bill to open it</span><span>Still to collect stays visible →</span></div>
+      <div className={s.tableFooter}><span>{filtered.length} of {rows.length} rows</span></div>
     </div>
   }
 
@@ -1032,11 +1027,12 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         <Summary label="Estimated take-home pay" value={salary ? money(salary.net) : 'Not available'} note={salary ? (selectedClose ? 'Based on the closed commission' : 'Based on current commission') : data.payUnavailable ? 'Salary preview is unavailable for this session' : 'Payroll inputs are not set for this person'} />
       </div>
 
-      {/* What payroll holds for them — only a month that was sent holds anything (2026-09-27). */}
-      <div className={s.topLine}><span className={s.muted}>{locked
-        ? <>In payroll: {money(saved?.total ?? 0)}{Math.abs((saved?.total ?? 0) - selected.totalCommission) >= .01 ? ` · Difference ${money(selected.totalCommission - (saved?.total ?? 0))}` : ''}</>
-        : 'Not in payroll yet'}</span>
-        {locked && saved && <Link href={`/revenue/${sub}/${period}/pay/${selected.staffId}`}>Payroll breakdown ↗</Link>}</div>
+      {/* What payroll holds for them — only a month that was sent holds anything
+          (2026-09-27), so the line is drawn only then (2026-10-12: no "Not in
+          payroll yet" line on a month that is not). */}
+      {locked && <div className={s.topLine}><span className={s.muted}>
+        In payroll: {money(saved?.total ?? 0)}{Math.abs((saved?.total ?? 0) - selected.totalCommission) >= .01 ? ` · Difference ${money(selected.totalCommission - (saved?.total ?? 0))}` : ''}</span>
+        {saved && <Link href={`/revenue/${sub}/${period}/pay/${selected.staffId}`}>Payroll breakdown ↗</Link>}</div>}
       {selectedDirector && <DirectorPayNote terms={selectedDirector} statement={selected.statement}
         monthValue={data.input.monthCommissionableValue ?? null} monthLabel={monthLabel} />}
       <div className={s.tabs} role="tablist" aria-label="Salesperson commission type">
@@ -1044,7 +1040,6 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         <button role="tab" aria-selected={view === 'overriding'} className={view === 'overriding' ? s.activeTab : undefined} onClick={() => showLedger('overriding')}>Overriding <span className={s.badge}>{selected.overridingRows.length}</span></button>
         <button role="tab" aria-selected={view === 'deposit'} className={view === 'deposit' ? s.activeTab : undefined} onClick={() => showLedger('deposit')}>Below deposit <span className={s.badge}>{personHeld.length}</span></button>
       </div>
-      {view === 'deposit' && <p className={`${s.subtitle} ${s.tabNote}`}>{depositNote}</p>}
       <div className={s.toolbar}><input className={s.search} aria-label="Search sales orders" placeholder="Search order, Ref No., venue or brand…" value={query} onChange={e => setQuery(e.target.value)} />
         <Select bare aria-label="Filter brand" value={brand} onChange={e => setBrand(e.target.value)}><option value="">All brands</option>{brands.map(b => <option key={b}>{b}</option>)}</Select>
         {view !== 'deposit' && <Select bare aria-label="Sort sales orders" value={sort} onChange={e => setSort(e.target.value as LedgerSort)}><option value="date_asc">Date · oldest first</option><option value="date_desc">Date · newest first</option><option value="commission_desc">Commission · highest first</option></Select>}
@@ -1087,26 +1082,28 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     </>}
 
     {tab === 'kpi' && <>
-      <div className={s.topLine}><div><h2 className={s.sectionHeading}>KPI across the team</h2><p className={s.subtitle}>Qualifying item quantities and commission expense for every salesperson.</p></div></div>
-      {!effectiveInput.scheme.enableKpi && <p className={s.notice}>KPI payout is switched off in this scheme. Configured KPI sales are listed; payable expense is zero. It is switched on under Review settings › This month pays.</p>}
+      {/* The month's state, not a sentence (2026-10-12): a badge says KPI pays nothing this month. */}
+      <div className={s.topLine}><div className="flex flex-wrap items-center gap-2"><h2 className={s.sectionHeading}>KPI across the team</h2>
+        {!effectiveInput.scheme.enableKpi && <span className={s.warningBadge}>Payout off this month</span>}</div></div>
       {effectiveInput.kpiItems.length === 0 && <p className={s.warning}>No KPI items are configured for this date. <Link href={`${revenuePath(sub, 'rules')}?tab=kpi`}>Choose the SKUs and specials and their amounts on Rules › KPI items</Link> to calculate quantities and expenses.</p>}
       <div className={s.summaryGrid}><Summary label="KPI items" value={quantity(totals.kpiQty)} /><Summary label="Base expense" value={money(totals.kpiBase)} /><Summary label="Threshold bonus" value={money(totals.kpiTotal - totals.kpiBase)} /><Summary label="Total KPI expense" value={money(totals.kpiTotal)} /></div>
       <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="KPI expense by salesperson"><thead><tr><th>Sales person</th><th>Title / rank</th><th>KPI items</th><th>Base amount</th><th>Threshold bonus</th><th className={s.stickyTotal}>Total KPI expense</th></tr></thead><tbody>{board.people.map(p => <tr key={p.staffId}><td><button className={s.ghostButton} onClick={() => choosePerson(p.staffId)}>{p.name} ↗</button></td><td>{p.titleLabel}<small>{p.rankLabel}</small></td><td>{quantity(board.kpi.find(k => k.staffId === p.staffId)?.soldQty ?? 0)}<small>{quantity(p.statement?.kpiQty ?? 0)} payable · {quantity(board.kpi.find(k => k.staffId === p.staffId)?.heldQty ?? 0)} held</small></td><td className={s.numeric}>{money((p.statement?.kpiBase ?? 0))}</td><td className={s.numeric}>+ {money((p.statement?.kpiCommission ?? 0) - (p.statement?.kpiBase ?? 0))}<small>{pct(p.statement?.kpiThresholdPct)}</small></td><td className={s.stickyTotal}>{money((p.statement?.kpiCommission ?? 0))}</td></tr>)}</tbody><tfoot><tr><td colSpan={5}>Total KPI expense</td><td className={s.stickyTotal}>{money(totals.kpiTotal)}</td></tr></tfoot></table></div></div>
     </>}
 
     {tab === 'open' && <>
-      <div className={s.topLine}><div><h2 className={s.sectionHeading}>Open Bill allocation</h2><p className={s.subtitle}>Review every selected bill across the team. One rank per salesperson, per event day.</p></div><div className={s.overviewTotal}><span>Total Open Bill bonus</span><strong>{money(totals.open)}</strong></div></div>
-      {!openEnabled && <p className={s.notice}>Open Bill payout is switched off for this month. Saved picks remain visible and pay zero; picks open once it is switched on under Review settings › This month pays.</p>}
-      {locked && <p className={s.notice}>This month is in payroll, so its Open Bill picks cannot change.</p>}
+      {/* The month's state, not a sentence (2026-10-12): a badge says why every bonus is RM 0. */}
+      <div className={s.topLine}><div className="flex flex-wrap items-center gap-2"><h2 className={s.sectionHeading}>Open Bill allocation</h2>
+        {!openEnabled && <span className={s.warningBadge}>Payout off this month</span>}</div>
+        <div className={s.overviewTotal}><span>Total Open Bill bonus</span><strong>{money(totals.open)}</strong></div></div>
       <div className={s.toolbar}><input className={s.search} aria-label="Search Open Bill orders" placeholder="Search order, Ref No. or salesperson…" value={query} onChange={e => setQuery(e.target.value)} /><label className={s.chip}><input type="checkbox" checked={showAllOpen} onChange={e => setShowAllOpen(e.target.checked)} />Show all orders to add picks</label></div>
       <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Open Bill orders"><thead><tr><th className={s.stickyFirst}>Sales order</th><th>Ref No.</th><th>Sales person</th><th>Event date</th><th>Venue</th><th>Brand / category</th><th>Sales value</th><th>Open Bill selection</th><th>Rate</th><th>Status</th><th className={s.stickyTotal}>Allocated bonus</th></tr></thead><tbody>{board.personalRows.filter(r => (showAllOpen || r.openBillRank != null) && matches(r)).map(r => <tr key={`${r.orderId}:${r.staffId}`}
         onDoubleClick={event => billMenu.onRowDoubleClick(event, rowHref(r))} onMouseDown={billMenu.onRowMouseDown}>
-        <td className={s.stickyFirst}>{(() => { const href = rowHref(r); return href ? <Link href={href}>{r.orderNo}</Link> : r.orderNo })()}</td><td>{r.upsale ? <span className={s.muted}>—</span> : <PaperRefCell refNo={r.refNo} paperNo={r.paperNo} />}</td><td><button className={s.ghostButton} onClick={() => choosePerson(r.staffId)}>{r.staffName}</button></td><td>{r.eventDate}</td><td>{r.venue || '—'}</td><td>{r.brands.join(', ')}<small>{r.categories.join(', ')}</small></td><td className={s.numeric}>{money(r.orderTotal)}</td><td>{pickControl(r)}</td><td>{pct(r.openBillRate)}</td><td>{statusLabel[r.status]}</td><td className={s.stickyTotal}>{money(r.openBillBonus)}</td></tr>)}</tbody></table></div><div className={s.tableFooter}>Shared bills show each holder’s allocated part. All parts reconcile to the total bonus.</div></div>
+        <td className={s.stickyFirst}>{(() => { const href = rowHref(r); return href ? <Link href={href}>{r.orderNo}</Link> : r.orderNo })()}</td><td>{r.upsale ? <span className={s.muted}>—</span> : <PaperRefCell refNo={r.refNo} paperNo={r.paperNo} />}</td><td><button className={s.ghostButton} onClick={() => choosePerson(r.staffId)}>{r.staffName}</button></td><td>{r.eventDate}</td><td>{r.venue || '—'}</td><td>{r.brands.join(', ')}<small>{r.categories.join(', ')}</small></td><td className={s.numeric}>{money(r.orderTotal)}</td><td>{pickControl(r)}</td><td>{pct(r.openBillRate)}</td><td>{statusLabel[r.status]}</td><td className={s.stickyTotal}>{money(r.openBillBonus)}</td></tr>)}</tbody></table></div></div>
       <div className={s.footerTotal}><span>All selected bills · allocated bonus</span><strong>{money(totals.open)}</strong></div>
     </>}
 
     {tab === 'deposit' && <>
-      <div className={s.topLine}><div><h2 className={s.sectionHeading}>Waiting on a deposit</h2><p className={s.subtitle}>{depositNote}</p></div></div>
+      <div className={s.topLine}><h2 className={s.sectionHeading}>Waiting on a deposit</h2></div>
       <div className={s.summaryGrid}>
         <Summary label="Bills below deposit" value={String(heldTotals.bills)} />
         <Summary label="Sales value held" value={money(heldTotals.sales)} />
@@ -1119,7 +1116,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     </>}
 
     {tab === 'exhibition' && <>
-      <div className={s.topLine}><div><h2 className={s.sectionHeading}>Sales exhibition</h2><p className={s.subtitle}>Every bill of the month at the exhibition it was written at. An exhibition is one brand’s booth at one fair: the same venue, organiser and days with another brand is another exhibition, the way the ERP opens one project per brand booth. A bill belongs to the booth the salesperson picked when opening it in the ERP, whatever its goods — a Dunlopillo pillow sold at the Akemi booth is Akemi’s — and a bill with no booth goes by its own brand. Nothing is picked here. Bills no fair claims are grouped by brand and venue, and are placed by fixing the event on the order in the ERP.</p></div>
+      <div className={s.topLine}><h2 className={s.sectionHeading}>Sales exhibition</h2>
         <div className={s.overviewTotal}><span>Total sales value</span><strong>{money(exhibitionTotals.total)}</strong></div></div>
       <div className={s.toolbar}>
         <input className={s.search} aria-label="Search exhibitions" placeholder="Search brand, venue or organizer…" value={query} onChange={e => setQuery(e.target.value)} />
@@ -1142,7 +1139,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         <tfoot><tr><td className={s.stickyFirst}>{shownExhibitions.length < exhibitions.length ? 'Visible exhibitions' : 'All exhibitions'}</td><td colSpan={4}>{shownExhibitions.length} {shownExhibitions.length === 1 ? 'exhibition' : 'exhibitions'}</td><td>{shownExhibitions.reduce((a, x) => a + x.orders, 0)}</td><td className={s.stickyTotal}>{money(sum(shownExhibitions, x => x.total))}</td></tr></tfoot>
       </table>
       {!shownExhibitions.length && <div className={s.empty}>{exhibitions.length ? 'No exhibitions match this search.' : 'No bills this month.'}</div>}
-      </div><div className={s.tableFooter}><span>{exhibitionTotals.bills} bills · {money(exhibitionTotals.commissionable)} of it earns commission</span><span>A venue opens that exhibition’s bills →</span></div></div>
+      </div><div className={s.tableFooter}><span>{exhibitionTotals.bills} bills · {money(exhibitionTotals.commissionable)} of it earns commission</span></div></div>
     </>}
 
     {/* The page's own panels, server-built (2026-09-30). */}

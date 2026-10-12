@@ -11,12 +11,10 @@ import { setLoanRepaymentStart } from '../../actions'
 export default function RepaymentStartEditor({
   loanId,
   current,
-  defaultHint,
   min,
 }: {
   loanId: string
   current: string | null // YYYY-MM-DD
-  defaultHint: string
   /** The disbursement: the repayment does not start before it. */
   min?: string
 }) {
@@ -48,9 +46,6 @@ export default function RepaymentStartEditor({
         </button>
         {saved && !isPending ? <span className="fin-saved">Saved ✓</span> : null}
       </div>
-      <p className="fin-hint">
-        The first installment is due on this date, and every one after it on the same day of the month. Unset, it is {defaultHint}.
-      </p>
       {error ? <p className="fin-error">{error}</p> : null}
     </div>
   )

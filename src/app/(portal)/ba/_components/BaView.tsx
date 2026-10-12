@@ -1041,10 +1041,6 @@ export default function BaView({
             <em>I.</em> TREASURY · INVOICE FINANCING
           </div>
           <h1 className="page-title">Invoice Financing</h1>
-          <p className="page-sub">
-            HC&apos;s facility with the bank — the principal never touches HV&apos;s account, but the interest is real: bill the
-            borrower (5028) and pay HC (6001) straight from each row. Bank interest is reference only (HC&apos;s cost).
-          </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button type="button" className="btn-quiet-sheet" onClick={() => setShowCalc(true)}>

@@ -116,11 +116,12 @@ export default function CommCalBody({ data, empty = null }: { data: CommCalData;
         ) : null}
         <div className={s.pays}>
           <span className={s.strong}>{data.cutover ? `Pays from ${monthName(data.cutover.firstPaidMonth)}` : 'Pays every month'}</span>
-          <span className={s.paysNote}>
-            {data.cutover
-              ? `${data.settledRange ? `${data.settledRange} settled by hand` : 'Earlier months settled by hand'}${data.cutover.setByName ? ` · ${data.cutover.setByName}` : ''}, ${dayMonth(data.cutover.setAt)}`
-              : 'a bill rides into the next run until a run pays it'}
-          </span>
+          {/* Who set the first paid month and when; no line explaining "Pays every month" (2026-10-12). */}
+          {data.cutover ? (
+            <span className={s.paysNote}>
+              {`${data.settledRange ? `${data.settledRange} settled by hand` : 'Earlier months settled by hand'}${data.cutover.setByName ? ` · ${data.cutover.setByName}` : ''}, ${dayMonth(data.cutover.setAt)}`}
+            </span>
+          ) : null}
           {data.canManage && data.sub.schemeId ? (
             <button type="button" className={s.change} onClick={() => setPaysOpen(true)}>
               Change
