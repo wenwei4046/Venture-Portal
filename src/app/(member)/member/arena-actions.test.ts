@@ -7,6 +7,8 @@ const mocks=vi.hoisted(()=>({getUser:vi.fn(),createClient:vi.fn(),rpc:vi.fn()}))
 vi.mock("server-only",()=>({}));
 vi.mock("@/lib/auth",()=>({getMemberUser:mocks.getUser}));
 vi.mock("@/lib/supabase/server",()=>({createClient:mocks.createClient}));
+// Monday 12 Oct 2026 in the office: this week's fair weekend is 16–18 Oct.
+vi.mock("@/lib/office-time",()=>({officeToday:()=>"2026-10-12"}));
 const membershipId="10000000-0000-4000-8000-000000000001";
 const context={staffId:"10000000-0000-4000-8000-000000000002",subDepartmentId:membershipId};
 beforeEach(()=>{
@@ -41,6 +43,20 @@ describe("Arena identity boundary",()=>{
     mocks.getUser.mockResolvedValue({role:"revenue_member",actualRole:"principal",is_active:true,permissions:[]});
     await fetchMemberArena(membershipId,"2026-09","monthly",context);
     expect(mocks.rpc).toHaveBeenCalledWith("member_principal_arena_booth_history",{p_staff:context.staffId,p_sub_department:membershipId});
+  });
+  // The user, 2026-10-12: "they only view their current and previous assign, but not future" —
+  // a later weekend the ERP already lists them at never reaches the phone, for the member or the
+  // Principal viewing them.
+  it("hands over this week's brand week and the ones before it, never a later weekend",async()=>{
+    const week=(friday:string)=>({staffId:context.staffId,week:friday,source:"erp",brand:"AKEMI",fairId:null,venue:"MID VALLEY",organizer:"BIGHOME",start:friday,end:friday,booths:1});
+    const weeks=["2026-10-09","2026-10-16","2026-10-23","2026-10-30"].map(week);
+    mocks.rpc.mockImplementation(async(name:string)=>/booth_history$/.test(name)
+      ?{data:{events:[],weeks},error:null}:{data:{people:[]},error:null});
+    const member=await fetchMemberArena(membershipId,"2026-10","monthly");
+    expect(member.ok&&member.data.history?.weeks?.map(w=>w.week)).toEqual(["2026-10-09","2026-10-16"]);
+    mocks.getUser.mockResolvedValue({role:"revenue_member",actualRole:"principal",is_active:true,permissions:[]});
+    const viewing=await fetchMemberArena(membershipId,"2026-10","monthly",context);
+    expect(viewing.ok&&viewing.data.history?.weeks?.map(w=>w.week)).toEqual(["2026-10-09","2026-10-16"]);
   });
   // Brand weeks come from the ERP's Sales Attending (2026-10-12): nobody — the
   // member, the Principal viewing them — has a way to save one any more.

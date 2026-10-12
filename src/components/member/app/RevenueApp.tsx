@@ -68,7 +68,7 @@ import SchemeSheet from "./profile/SchemeSheet";
 import PasswordSheet from "./profile/PasswordSheet";
 import type { ChangePassword } from "@/components/account/use-change-password";
 import { schemeVM } from "./profile/scheme-model";
-import { brandMonthVM } from "./profile/brand-weeks-model";
+import { brandWeeksVM } from "./profile/brand-weeks-model";
 import TeamPage, { PersonSheet } from "./profile/TeamPage";
 import RequestsPage, { RequestSheet, type RequestFilter } from "./profile/RequestsPage";
 import TrackPage, { RequestInfoSheet, type TrackSegment } from "./profile/TrackPage";
@@ -379,9 +379,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const curPeriod = useMemo(() => monthPeriod(period, period), [period]);
   const now = useInsightData({ source, membershipId, schemeId, context, readable, period: curPeriod, recent, recentFrom: prevMonth, recentUntil: period, recentFailed, gen, track });
   const arenaCur = useMonthArena({ source, membershipId, context, readable, month: period, mark: markViewed, gen, track });
-  // Last month while it is still being worked: its Arena is read by the pages that show it — brand weeks,
-  // the claim form's weekends, the team map — and not on every open.
-  const workPages = route.screen === "account" && (route.pf === "brandWeeks" || route.pf === "requests" || route.pf === "team");
+  // Last month while it is still being worked: its Arena is read by the pages that show it — the claim
+  // form's weekends, the team map — and not on every open. (My brand weeks reads this month's: its history
+  // carries the two months before too.)
+  const workPages = route.screen === "account" && (route.pf === "requests" || route.pf === "team");
   const arenaWork = useMonthArena({ source, membershipId, context, readable, month: working && working !== period && workPages ? working : null,
     mark: markViewed, gen, track });
   const arenaToday = arenaCur.snapshot;
@@ -962,10 +963,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     salary: principal ? undefined : data.profile.salary, bands: data.bands, hidden,
   }), [me.name, me.ini, me.title, me.rank, membership, principal, incData, data.profile.salary, data.bands, hidden]);
 
-  // My brand weeks (read only since 2026-10-12): this month's weekends first, then the month still being
-  // worked — where the ERP's Sales Attending puts the person read, else the booth with the most of their bills.
-  const bwSnaps = useMemo(() => [arenaNow ?? arena, arenaNow ? arena : null].filter((x): x is MemberArenaSnapshot => !!x), [arena, arenaNow]);
-  const bwMonths = useMemo(() => (bwSnaps.length ? bwSnaps.map(snap => brandMonthVM(snap, klToday(), snap.selfId || null, !!context)) : null), [bwSnaps, context]);
+  // My brand weeks (read only since 2026-10-12): this month and the two before it, newest first, up to this
+  // week's weekend and never a later one — where the ERP's Sales Attending puts the person read, else the
+  // booth with the most of their bills. This month's Arena carries all three months' (its history's `weeks`).
+  const bwMonths = useMemo(() => (arenaToday ? brandWeeksVM(arenaToday, today, arenaToday.selfId || null) : null), [arenaToday, today]);
 
   // The claim form's choices: the member's fair weekends, HR's rates, their team, the departments.
   // View as reads them too — the forms open on the viewed person's choices (and send nothing).

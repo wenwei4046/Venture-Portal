@@ -1077,23 +1077,40 @@
 .vaAction { flex: 0 0 auto; font-size: calc(13px * var(--rv-type)); font-weight: 650; color: var(--rv-accent); }
 .vaViewing { color: var(--rv-green); }
 
-/* ── My brand weeks (no prototype page: built from the sheet and row parts) ── */
-.bwMonth { display: flex; flex-direction: column; }
-.bwHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--rv-line); }
+/* ── My brand weeks (no prototype page: built from the app's row and badge parts) ──
+   Redrawn 2026-10-12 for the user: a month to a fold (this month open), and per weekend only
+   the brand, the venue and the organizer, beside a W1 badge in the brand's two colours. */
+.bwMonths { display: flex; flex-direction: column; border-top: 1px solid var(--rv-line); }
+.bwMonth { display: flex; flex-direction: column; border-bottom: 1px solid var(--rv-line); }
+.bwHead {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--rv-ink);
+  text-align: left;
+}
+.bwMonthName { flex: 1; min-width: 0; font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.02em; }
 .bwCount { font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); white-space: nowrap; }
-.bwWeek { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-bottom: 1px solid var(--rv-rule); }
+.bwChevron { flex: none; color: var(--rv-sub); transition: transform .2s ease; }
+.bwChevronOpen { transform: rotate(180deg); }
+.bwWeeks { display: flex; flex-direction: column; border-top: 1px solid var(--rv-rule); }
+.bwWeek { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 14px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--rv-rule); }
 .bwWeek:last-child { border-bottom-color: transparent; }
-.bwTop { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.bwTitle { font-size: calc(15px * var(--rv-type)); font-weight: 650; }
-.bwWhen { font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); white-space: nowrap; }
-/* My brand weeks, read only (2026-10-12): the booth the ERP lists them at (solid), or auto-located (dashed). */
-.bwPlace { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.bwBrand { display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--rv-handle); background: var(--rv-white); color: var(--rv-ink); font-size: calc(13px * var(--rv-type)); font-weight: 500; white-space: nowrap; flex: none; }
-.bwBrandAuto { border-style: dashed; color: var(--rv-sub); }
-.bwWhere { font-size: calc(13px * var(--rv-type)); color: var(--rv-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bwBrandOn { border-color: var(--rv-accent); background: var(--rv-accent); color: var(--rv-white); font-weight: 700; }
-.bwNote { font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); }
-.bwLocked { color: var(--rv-amber); }
+.bwBadge { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: calc(13px * var(--rv-type)); font-weight: 700; font-variant-numeric: tabular-nums; }
+.bwBody { min-width: 0; }
+.bwWhen { display: flex; align-items: center; gap: 8px; min-height: 20px; font-size: calc(13px * var(--rv-type)); font-weight: 600; color: var(--rv-sub); }
+/* This week's weekend — the last one shown (nothing after it is). */
+.bwNow { font-size: calc(11px * var(--rv-type)); font-weight: 650; color: var(--rv-accent); background: var(--rv-orange-bg); border-radius: 9px; padding: 1px 7px; }
+.bwFacts { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 4px 12px; margin: 6px 0 0; }
+.bwFacts dt { font-size: calc(13px * var(--rv-type)); line-height: 1.45; color: var(--rv-sub); }
+.bwFacts dd { margin: 0; font-size: calc(14px * var(--rv-type)); line-height: 1.4; font-weight: 600; color: var(--rv-ink); overflow-wrap: anywhere; }
+.bwFacts .bwBrandName { font-weight: 700; }
+.bwEmpty { margin: 6px 0 0; font-size: calc(14px * var(--rv-type)); color: var(--rv-sub); }
 
 /* ── Commission scheme (a sheet built from the person sheet's parts) ── */
 .schemeTiers { display: flex; flex-direction: column; }
