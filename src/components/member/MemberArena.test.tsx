@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MemberArenaSnapshot } from "@/lib/member/arena";
 import MemberArena from "./MemberArena";
 
-const actions = vi.hoisted(() => ({ fetch: vi.fn(), save: vi.fn(), savePrincipal: vi.fn() }));
-vi.mock("@/app/(member)/member/arena-actions", () => ({ fetchMemberArena: actions.fetch, saveMemberArenaBrandWeeks: actions.save, savePrincipalArenaBrandWeeks: actions.savePrincipal }));
+const actions = vi.hoisted(() => ({ fetch: vi.fn() }));
+vi.mock("@/app/(member)/member/arena-actions", () => ({ fetchMemberArena: actions.fetch }));
 // September 2026 on 3 October: the first three weekends have closed, the last is open until 6 October.
 const weekLocks=[{week:"2026-09-04",closesOn:"2026-09-13",locked:true},{week:"2026-09-11",closesOn:"2026-09-20",locked:true},
   {week:"2026-09-18",closesOn:"2026-09-27",locked:true},{week:"2026-09-25",closesOn:"2026-10-06",locked:false}];
@@ -17,66 +17,44 @@ const snapshot: MemberArenaSnapshot={membershipId,department:"Fair",selfId:"real
     {id:"real-employee",name:"Actual Employee",self:true,sales:4000,held:0,orders:1,kpiQty:3,marginRevenue:4000,marginCost:2000,blindOrders:0,brands:{AKEMI:{sales:4000,held:0,orders:1,kpiQty:3,marginRevenue:4000,marginCost:2000,blindOrders:0}}},
     {id:"colleague",name:"Other Employee",self:false,sales:8000,held:0,orders:1,kpiQty:2,marginRevenue:8000,marginCost:6000,blindOrders:0,brands:{}},
   ]};
-beforeEach(()=>{actions.fetch.mockReset().mockResolvedValue({ok:true,data:structuredClone(snapshot)});actions.save.mockReset().mockResolvedValue({ok:true});actions.savePrincipal.mockReset().mockResolvedValue({ok:true});});
+beforeEach(()=>{actions.fetch.mockReset().mockResolvedValue({ok:true,data:structuredClone(snapshot)});});
+const history=(weeks:object[],events:object[]=[])=>({asOf:"2026-10-12T00:00:00Z",provisional:true as const,unassignedOrders:0,unassignedSales:0,
+  championship:{status:"pending" as const,reason:"Pending."},events,weeks});
+const brandWeek=(week:string,source:"erp"|"auto",brand:string,venue:string)=>({staffId:"real-employee",week,source,brand,fairId:"f",venue,
+  organizer:"MLE",start:week,end:week,booths:source==="erp"?1:null});
 afterEach(cleanup);
 describe("Live Member Arena",()=>{
-  // The Principal's view of a member is the back office for brand weeks
-  // (user 2026-10-03: after 一个星期后就不能再改了，除非 … 后台这边改): any week,
-  // closed ones too, saved for that member — never as them.
-  it("shows selected Principal results and lets the back office change the member's weeks, closed ones too",async()=>{
+  // Brand weeks come from the ERP's Sales Attending (2026-10-12): the Principal's view of a member reads
+  // them like the member does — nothing to pick, nothing to save.
+  it("shows selected Principal results and the member's brand weeks, read only",async()=>{
     const context={staffId:"real-employee",subDepartmentId:membershipId};
     actions.fetch.mockResolvedValue({ok:true,data:{...structuredClone(snapshot),principalView:true,selfId:"",viewedStaffId:context.staffId,weekLocks,
-      people:snapshot.people.map(person=>({...person,self:false})),brandWeeks:{weeks:4,counts:{AKEMI:3,ERGOTEX:0,ZANOTTI:1,DUNLOP:0},
-        picks:{"2026-09-04":"AKEMI","2026-09-11":"AKEMI","2026-09-18":"ZANOTTI","2026-09-25":"AKEMI"}}}});
+      people:snapshot.people.map(person=>({...person,self:false})),
+      history:history([brandWeek("2026-09-18","erp","ZANOTTI","MVEC SOUTHKEY"),brandWeek("2026-09-25","erp","AKEMI","PENANG WATERFRONT")])}});
     render(<MemberArena membershipId={membershipId} context={context}/>);
     fireEvent.click(await screen.findByRole("button",{name:/Sales Ranking/}));
     expect(actions.fetch).toHaveBeenCalledWith(membershipId,expect.any(String),"monthly",context);
     expect(screen.getByText("Actual Employee · Result")).toBeInTheDocument();
     expect(screen.queryByText("You")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button",{name:"Arena"}));
+    expect(screen.getByRole("button",{name:/Member brand weeks/})).toHaveTextContent("2 of 4 weeks from the ERP");
     fireEvent.click(screen.getByRole("button",{name:/Member brand weeks/}));
-    expect(screen.getByText(/Back office · any week can be changed here, closed ones too/)).toBeInTheDocument();
-    expect(screen.getByText("4 of 4 weeks picked")).toBeInTheDocument();
-    const weeks=screen.getAllByRole("combobox",{name:/Brand for week/});
-    // The third weekend of September was Zanotti, and it closed on 27 Sep — still the back office's to change.
-    expect(weeks[2]).toHaveValue("ZANOTTI");
-    expect(screen.getByText("Weekend of 18–20 Sep").closest("label")).toHaveTextContent("Closed 27 Sep");
-    expect(weeks.every(week=>!(week as HTMLSelectElement).disabled)).toBe(true);
-    fireEvent.change(weeks[2],{target:{value:"AKEMI"}});
-    fireEvent.click(screen.getByRole("button",{name:"Save brand weeks"}));
-    await waitFor(()=>expect(screen.getByRole("status",{name:"Brand weeks save status"})).toHaveTextContent("Actual Employee’s brand weeks are saved."));
-    expect(actions.savePrincipal).toHaveBeenCalledWith(membershipId,snapshot.period,
-      {"2026-09-04":"AKEMI","2026-09-11":"AKEMI","2026-09-18":"AKEMI","2026-09-25":"AKEMI"},context);
-    expect(actions.save).not.toHaveBeenCalled();
+    const weeks=within(screen.getByRole("region",{name:"Actual Employee’s brand weeks"}));
+    expect(weeks.getByText("Weekend of 18–20 Sep").closest("li")).toHaveTextContent("From the ERP’s Sales AttendingZanottiMVEC SOUTHKEY · MLE");
+    expect(weeks.queryAllByRole("combobox")).toEqual([]);
+    expect(weeks.queryAllByRole("button")).toEqual([]);
   });
 
-  it("keeps a member's closed weeks as they are, says what each was auto-located at, and leaves the open week to pick",async()=>{
+  it("says which weekends the ERP lists the member at, which were auto-located, and which had none",async()=>{
     actions.fetch.mockResolvedValue({ok:true,data:{...structuredClone(snapshot),weekLocks,
-      brandWeeks:{weeks:4,counts:{AKEMI:1,ERGOTEX:0,ZANOTTI:0,DUNLOP:0},picks:{"2026-09-04":"AKEMI"}},
-      history:{asOf:"2026-10-03T00:00:00Z",provisional:true as const,unassignedOrders:0,unassignedSales:0,
-        championship:{status:"pending" as const,reason:"Pending."},
-        events:[{id:"f2|ZANOTTI",brand:"ZANOTTI",week:"2026-09-18",closesOn:"2026-09-27",locked:true,venue:"MVEC SOUTHKEY",start:"2026-09-18",end:"2026-09-20",periodMonth:"2026-09",
-          people:[{id:"real-employee",name:"Actual Employee",sales:4000,held:0,orders:1,confirmed:false}]}]}}});
+      history:history([brandWeek("2026-09-04","erp","AKEMI","SUNWAY PYRAMID"),brandWeek("2026-09-18","auto","ZANOTTI","MVEC SOUTHKEY")])}});
     render(<MemberArena membershipId={membershipId}/>);
     fireEvent.click(await screen.findByRole("button",{name:/My brand weeks/}));
-    const weeks=screen.getAllByRole("combobox",{name:/Brand for week/}) as HTMLSelectElement[];
-    expect(weeks.map(week=>week.disabled)).toEqual([true,true,true,false]);
-    expect(screen.getByText("Weekend of 4–6 Sep").closest("label")).toHaveTextContent("Closed 13 Sep");
-    expect(screen.getByText("Weekend of 11–13 Sep").closest("label")).toHaveTextContent("Closed 20 Sep · not picked");
-    expect(screen.getByText("Weekend of 18–20 Sep").closest("label")).toHaveTextContent("Closed 27 Sep · auto-located: ZANOTTI");
-    expect(screen.getByText("Weekend of 25–27 Sep").closest("label")).toHaveTextContent("Open until 6 Oct");
-    fireEvent.change(weeks[3],{target:{value:"DUNLOP"}});
-    fireEvent.click(screen.getByRole("button",{name:"Save brand weeks"}));
-    await waitFor(()=>expect(actions.save).toHaveBeenCalledWith(membershipId,snapshot.period,{"2026-09-04":"AKEMI","2026-09-25":"DUNLOP"}));
-    expect(actions.savePrincipal).not.toHaveBeenCalled();
-  });
-
-  it("offers no save once every week of the month has closed",async()=>{
-    actions.fetch.mockResolvedValue({ok:true,data:{...structuredClone(snapshot),weekLocks:weekLocks.map(lock=>({...lock,locked:true}))}});
-    render(<MemberArena membershipId={membershipId}/>);
-    fireEvent.click(await screen.findByRole("button",{name:/My brand weeks/}));
+    const weeks=within(screen.getByRole("region",{name:"My brand weeks"}));
+    expect(weeks.getByText("Weekend of 4–6 Sep").closest("li")).toHaveTextContent("From the ERP’s Sales Attending");
+    expect(weeks.getByText("Weekend of 11–13 Sep").closest("li")).toHaveTextContent("No fair this weekend");
+    expect(weeks.getByText("Weekend of 18–20 Sep").closest("li")).toHaveTextContent("Auto-located · the booth with the most bills");
     expect(screen.queryByRole("button",{name:"Save brand weeks"})).not.toBeInTheDocument();
-    expect(screen.getByText(/Every week of this month has closed/)).toBeInTheDocument();
   });
 
   it("discards an old member response after the Principal selects another member",async()=>{
@@ -123,36 +101,16 @@ describe("Live Member Arena",()=>{
     expect(screen.queryByRole("region",{name:"Top three"})).not.toBeInTheDocument();
     expect(screen.getByText("Not ranked")).toBeInTheDocument();
   });
-  // One brand per week (2026-10-03): the Fair results rank the member at that
-  // brand's booth that week.
-  it("picks a brand for each week and only confirms after authenticated persistence succeeds",async()=>{
+  // One brand week a weekend (2026-10-03), from the ERP since 2026-10-12: before the ERP has sent its Sales
+  // Attending the page lists the month's weekends with nothing to pick.
+  it("lists the month's weekends with nothing to pick before the ERP lists anybody",async()=>{
     render(<MemberArena membershipId={membershipId}/>);
-    expect(await screen.findByRole("button",{name:/My brand weeks/})).toHaveTextContent("0 of 4 weeks picked");
+    expect(await screen.findByRole("button",{name:/My brand weeks/})).toHaveTextContent("0 of 4 weeks from the ERP");
     fireEvent.click(screen.getByRole("button",{name:/My brand weeks/}));
-    const weeks=screen.getAllByRole("combobox",{name:/Brand for week/});
-    expect(weeks).toHaveLength(4);
     expect(screen.getByText("Weekend of 4–6 Sep")).toBeInTheDocument();
-    expect(screen.getByText(/0 of 4 weeks picked · A week not picked counts the booth with the most bills/)).toBeInTheDocument();
-    fireEvent.change(weeks[0],{target:{value:"AKEMI"}});
-    fireEvent.change(weeks[2],{target:{value:"ZANOTTI"}});
-    fireEvent.change(weeks[3],{target:{value:"DUNLOP"}});
-    fireEvent.change(weeks[3],{target:{value:""}});
-    expect(screen.getByText(/2 of 4 weeks picked/)).toBeInTheDocument();
-    const save=screen.getByRole("button",{name:"Save brand weeks"});
-    actions.save.mockResolvedValueOnce({ok:false,error:"Save failed. Try again."});
-    fireEvent.click(save);
-    expect(await screen.findByRole("status",{name:"Brand weeks save status"})).toHaveTextContent("Save failed");
-    expect(actions.save).toHaveBeenCalledWith(membershipId,snapshot.period,{"2026-09-04":"AKEMI","2026-09-18":"ZANOTTI","2026-09-25":undefined});
-    // Saved: the page reads the Arena again — the weeks move the Fair results — without blanking.
-    const reads=actions.fetch.mock.calls.length;
-    actions.fetch.mockResolvedValue({ok:true,data:{...structuredClone(snapshot),
-      brandWeeks:{weeks:4,counts:{AKEMI:1,ERGOTEX:0,ZANOTTI:1,DUNLOP:0},picks:{"2026-09-04":"AKEMI","2026-09-18":"ZANOTTI"}}}});
-    fireEvent.click(save);
-    await waitFor(()=>expect(screen.getByRole("status",{name:"Brand weeks save status"})).toHaveTextContent("Your brand weeks are saved."));
-    await waitFor(()=>expect(actions.fetch.mock.calls.length).toBe(reads+1));
-    expect(screen.queryByText("Loading your rankings…")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button",{name:"Arena"}));
-    expect(screen.getByRole("button",{name:/My brand weeks/})).toHaveTextContent("2 of 4 weeks picked");
+    expect(screen.getAllByText("No fair this weekend")).toHaveLength(4);
+    expect(screen.queryAllByRole("combobox",{name:/Brand for week/})).toEqual([]);
+    expect(screen.queryByRole("button",{name:"Save brand weeks"})).not.toBeInTheDocument();
   });
   it("keeps deferred Fair and Championship information explicit without manufacturing points",async()=>{
     render(<MemberArena membershipId={membershipId}/>);
@@ -188,11 +146,11 @@ describe("Live Member Arena",()=>{
       championship:{status:"pending" as const,reason:"Championship totals need every ranking source and a settled scoring ledger."},
       events:[
         {id:"f1|AKEMI",fairId:"f1",brand:"AKEMI",week:"2026-09-11",venue:"MID VALLEY",start:"2026-09-11",end:"2026-09-13",periodMonth:"2026-09",people:[
-          {id:"real-employee",name:"Actual Employee",sales:4000,held:0,orders:1,confirmed:false,scoring:true}]},
+          {id:"real-employee",name:"Actual Employee",sales:4000,held:0,orders:1,source:"auto",scoring:true}]},
         {id:"f1|ZANOTTI",fairId:"f1",brand:"ZANOTTI",week:"2026-09-11",venue:"MID VALLEY",start:"2026-09-11",end:"2026-09-13",periodMonth:"2026-09",people:[
-          {id:"colleague",name:"Other Employee",sales:8000,held:0,orders:1,confirmed:true,scoring:true},
+          {id:"colleague",name:"Other Employee",sales:8000,held:0,orders:1,source:"erp",scoring:true},
           // Sold more at Zanotti than its own seller, but it is not this week's scoring booth.
-          {id:"real-employee",name:"Actual Employee",sales:9000,held:0,orders:1,confirmed:false,scoring:false}]}]}}});
+          {id:"real-employee",name:"Actual Employee",sales:9000,held:0,orders:1,source:"auto",scoring:false}]}]}}});
     render(<MemberArena membershipId={membershipId}/>);
     expect(await screen.findByRole("button",{name:/Championship & Fair results/})).toHaveTextContent("2 completed booths");
     fireEvent.click(screen.getByRole("button",{name:/Championship & Fair results/}));
@@ -213,26 +171,25 @@ describe("Live Member Arena",()=>{
     const mine=screen.getByRole("row",{name:/Actual Employee/});
     expect(mine).toHaveTextContent("1 fair");
     expect(within(mine).getByLabelText("1 time in 1st place")).toBeInTheDocument();
-    expect(screen.getByText("Unconfirmed · pick the brand week")).toBeInTheDocument();
-    expect(screen.getByText(/1 of your fair finishes is placed by the booth with the most bills that week/)).toBeInTheDocument();
+    expect(screen.getByText("Auto-located · not on the ERP’s Sales Attending")).toBeInTheDocument();
+    expect(screen.getByText(/1 of your fair finishes was auto-located: the ERP’s Sales Attending lists you at no booth that weekend/)).toBeInTheDocument();
     expect(screen.getByText(/RM 13,588 over 3 bills were written at another booth than the seller’s brand week.*earn no points there/)).toBeInTheDocument();
     // The record is the scoring booth's 4,000, not the 9,000 off the brand week.
     expect(screen.getByText(/^AKEMI · MID VALLEY · 11 Sept? – 13 Sept?$/)).toBeInTheDocument();
   });
-  // Seven days after the fair nobody can pick any more (user 2026-10-03): a
-  // guess is auto-located, and the page says so, and who can still change it.
-  it("says a closed week's guess was auto-located and only the back office changes it",async()=>{
+  // Brand weeks come from the ERP (2026-10-12): a placement by the bills is auto-located, open week or closed,
+  // and the page says the ERP is where it changes; a placement the ERP made says nothing.
+  it("says a placement by the bills was auto-located and that HR changes it in the ERP",async()=>{
     actions.fetch.mockResolvedValue({ok:true,data:{...structuredClone(snapshot),history:{
       asOf:"2026-10-03T00:00:00Z",provisional:true as const,unassignedOrders:0,unassignedSales:0,
       championship:{status:"pending" as const,reason:"Pending."},
       events:[{id:"f1|AKEMI",fairId:"f1",brand:"AKEMI",week:"2026-09-11",closesOn:"2026-09-20",locked:true,venue:"MID VALLEY",start:"2026-09-11",end:"2026-09-13",periodMonth:"2026-09",people:[
-        {id:"real-employee",name:"Actual Employee",sales:4000,held:0,orders:1,confirmed:false}]}]}}});
+        {id:"real-employee",name:"Actual Employee",sales:4000,held:0,orders:1,source:"auto"}]}]}}});
     render(<MemberArena membershipId={membershipId}/>);
     fireEvent.click(await screen.findByRole("button",{name:/Championship & Fair results/}));
-    expect(screen.getByText(/^Auto-located · the brand week closed on 20 Sept?$/)).toBeInTheDocument();
-    expect(screen.queryByText(/^Unconfirmed/)).not.toBeInTheDocument();
-    expect(screen.getByText(/1 of your fair finishes was auto-located: no brand was picked before the week closed/)).toBeInTheDocument();
-    expect(screen.getByText(/Only the back office can change it now/)).toBeInTheDocument();
+    expect(screen.getByText("Auto-located · not on the ERP’s Sales Attending")).toBeInTheDocument();
+    expect(screen.getByText(/1 of your fair finishes was auto-located: the ERP’s Sales Attending lists you at no booth that weekend/)).toBeInTheDocument();
+    expect(screen.getByText(/HR changes it in the ERP/)).toBeInTheDocument();
   });
   it("says which tier the month reached and what it is worth, brand by brand",async()=>{
     render(<MemberArena membershipId={membershipId}/>);

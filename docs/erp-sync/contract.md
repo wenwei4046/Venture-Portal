@@ -704,3 +704,106 @@ human's pin, else `venue_event_for_order` on the delivery's venue and date)
 keeps the month it is in; if that fair is in another month, the calendar lists
 the move and a human makes it. A document no fair claims follows `so_date` as
 before. The month-lock check follows the month the bill lives in.
+
+## 11. Sales Attending — who works each booth (2026-10-12)
+
+> The user: "Houzs ERP side got add on the sales attending for every project
+> fair, so our sales is no more needed to select brand week. They can auto
+> locate where they work, with the correct data … arena only calculate the
+> correct point for current work week by detecting brand week." And for the
+> booths nobody is listed at: "we set 2 layer. 1 layer is use track by erp
+> houzs, if fail, then go with auto detect, same engine with previous one."
+
+The ERP's PMS lists, on every project — one brand's booth at a fair — the
+salespeople attending it (`public.project_sales_attendees` → `sales_reps`).
+That list IS a seller's brand week now: the one booth a weekend whose Fair
+result earns them points, and the fair a claim is for. Nobody picks one in the
+portal any more.
+
+### 11.1 What travels
+
+One delivery = the WHOLE of one company's projects whose `start_date` is on or
+after `since`, with or without anybody listed, cancelled ones included:
+
+```jsonc
+{ "companyId": 1, "snapshotAt": "2026-10-12T07:46:03Z", "since": "2026-04-01",
+  "booths": [
+    { "projectId": 363, "code": "…", "name": "…", "brand": "AKEMI", "venue": "MID VALLEY",
+      "organizer": "BIGHOME", "startDate": "2026-10-02", "endDate": "2026-10-04",
+      "status": "confirmed", "eventType": "exhibition",            // project_event_types.slug
+      "attendees": [
+        { "salesRepId": 54, "code": "SR-015", "name": "Chea Huan",
+          "salespersonId": "b7eabf08-…" }                          // scm.staff.id of the rep's login, or null
+      ] } ] }
+```
+
+`salespersonId` is the id the order feed already sends as a bill's
+salesperson, so the portal names the person by `comm_agent_aliases` — a rep
+the portal has never seen a bill from is listed but not matched (logged as
+`unmatched`). No price, no cost, no customer.
+
+### 11.2 The endpoint
+
+| | |
+|---|---|
+| Receiver | `POST https://<portal-host>/api/erp/v1/sales-attending` — the order feed's `/sales-orders` sibling |
+| Auth | identical to the order feed — `x-sync-secret`, the same key |
+| Cap | 5,000 booths a delivery (~32 a month today) |
+| Cadence | whenever a project or its list changed — sent whole when the ERP's digest moved |
+
+`ingest_erp_sales_attending` (mig `20261012140000`, service role only) owns
+every write: each booth is upserted into `erp_booths`, its list replaced in
+`erp_booth_staff`, and **every booth of the company from `since` on that the
+delivery does not list is deleted** (gone over there). Booths before `since`
+stay as last told. An older `snapshotAt` than the one held answers 200
+`{ outcome: "stale" }` and changes nothing (two pushes can overlap). Answers
+otherwise as the catalogue: 401 wrong key, 422 unreadable (with the reason),
+500 a database fault, 503 no key; 200 `{ ok, outcome: "applied", booths,
+attendees, retired, unreadable, monthsMoved, unmatched }`. Every delivery is
+logged in `erp_sync_events` (`doc_no = 'sales-attending'`). A month whose
+booths changed forgets its kept My honours (`member_honour_months`).
+
+### 11.3 What the portal does with it
+
+`member_erp_brand_weeks(sub, staff?)` is the first layer: for each portal
+person, the booth the ERP lists them at for each fair weekend — the weekend
+named by the Friday of the Monday–Sunday week the fair opens in, the Arena's
+weeks. Listed at two booths that weekend → the one they wrote the most bills
+at (the second layer's own measure), then the earlier, then the lower project
+id. A booth is read at the portal's fair for it: the one the order feed pinned
+the project to (`comm_venue_events.erp_project_ids`), else the same place on
+overlapping days (`erp_sync_fair`'s rule); it writes no fair of its own.
+
+Where the ERP lists somebody at no booth that weekend, the second layer is the
+engine as it was: the brand they opened the most bills for that week, at the
+fair with the most bills for it (`member_arena_booth_history_for_staff`, mig
+`20261012150000`). Read by the Arena's booth boards (`scoring`, and each
+person's `source`: `erp` | `auto`), the claim form (`member_claim_brand_week`
+→ `member_claim_detail_for`), Insight's weeks (`member_order_book_for_staff`
+`brandWeeks`), My brand weeks and Today (the history's `weeks`, cut to the
+person read) and HR's People › Member services › Brand weeks
+(`member_admin_brand_weeks` `erp`). The four ways a pick was saved are gone; a
+wrong week is fixed in the ERP.
+
+### 11.4 What the ERP side does
+
+Built in the ERP repo beside the catalogue push: one SQL function builds a
+company's delivery (`since` = the first of the month six months back, so it
+moves once a month), its md5 is the digest, statement triggers on `projects`,
+`project_sales_attendees` and `sales_reps` mark a change in the same
+transaction, and the kick / `*/5` cron posts it to the `/sales-attending`
+sibling when the digest moved. Same gates and response taxonomy as the
+catalogue. See the ERP's `docs/modules/venture-portal-feed.md`.
+
+### 11.5 What the ERP held on 2026-10-12 (relayed in once by hand that day)
+
+318 booths from 2026-04-01, 268 listed. Lists start in earnest on the weekend
+of 18 Sep 2026: the 4 and 11 Sep weekends list nobody but The Commune Kulai, so
+they stay auto-located. Two of the portal's Fair sellers, JASON and LOUIS, have
+an ERP login (`scm.staff`) but no `sales_reps` row, so the PMS cannot list them
+at all — every weekend of theirs is auto-located until the ERP adds them.
+Listed but no portal person: NG PENG CHUEN, Hwa Sheng, Junie, Kingsley, Shi
+Ting. Against the old guess the scoring booth moved for three: LAWRENCE and PEI
+FEN on 25 Sep (to the booth the ERP lists them at), and ETHAN on 2 Oct (listed
+at Sabah; his one bill that weekend says Setia Spice, so that weekend scores
+nothing until the list or the bill is corrected).

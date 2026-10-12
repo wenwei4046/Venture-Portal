@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchMemberArena, saveMemberArenaBrandWeeks, savePrincipalArenaBrandWeeks } from "./arena-actions";
+import * as arenaActions from "./arena-actions";
+
+const { fetchMemberArena } = arenaActions;
 
 const mocks=vi.hoisted(()=>({getUser:vi.fn(),createClient:vi.fn(),rpc:vi.fn()}));
 vi.mock("server-only",()=>({}));
@@ -30,13 +32,8 @@ describe("Arena identity boundary",()=>{
     expect((await fetchMemberArena(membershipId,"2026-09","monthly",{...context,subDepartmentId:context.staffId})).ok).toBe(false);
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
-  it("never lets Principal save another member's brand weeks",async()=>{
-    mocks.getUser.mockResolvedValue({role:"principal",is_active:true,permissions:["member_insight"]});
-    expect((await saveMemberArenaBrandWeeks(membershipId,"2026-09",{"2026-09-04":"AKEMI"})).ok).toBe(false);
-    expect(mocks.rpc).not.toHaveBeenCalled();
-  });
-  // Booth by booth (2026-10-03): the Fair results come from the booth read, and
-  // a member saves which brand each week was.
+  // Booth by booth (2026-10-03): the Fair results come from the booth read —
+  // since 2026-10-12 with the person's brand weeks, which come from the ERP.
   it("reads the Fair results booth by booth, for the member and for a Principal",async()=>{
     await fetchMemberArena(membershipId,"2026-09","monthly");
     expect(mocks.rpc).toHaveBeenCalledWith("member_arena_booth_history",{p_sub_department:membershipId});
@@ -45,26 +42,9 @@ describe("Arena identity boundary",()=>{
     await fetchMemberArena(membershipId,"2026-09","monthly",context);
     expect(mocks.rpc).toHaveBeenCalledWith("member_principal_arena_booth_history",{p_staff:context.staffId,p_sub_department:membershipId});
   });
-  it("saves the picked weeks only, and refuses a week or brand the month does not have",async()=>{
-    mocks.rpc.mockResolvedValue({data:null,error:null});
-    expect((await saveMemberArenaBrandWeeks(membershipId,"2026-09",{"2026-09-04":"AKEMI","2026-09-11":undefined,"2026-09-25":"DUNLOP"})).ok).toBe(true);
-    expect(mocks.rpc).toHaveBeenCalledWith("member_arena_save_brand_week_picks",{p_sub_department:membershipId,p_period:"2026-09",p_picks:{"2026-09-04":"AKEMI","2026-09-25":"DUNLOP"}});
-    mocks.rpc.mockClear();
-    expect((await saveMemberArenaBrandWeeks(membershipId,"2026-09",{"2026-09-05":"AKEMI"})).ok).toBe(false);
-    expect((await saveMemberArenaBrandWeeks(membershipId,"2026-09",{"2026-09-04":"MYLATEX" as never})).ok).toBe(false);
-    expect(mocks.rpc).not.toHaveBeenCalled();
-  });
-  // After a week closes only the back office changes it (user 2026-10-03):
-  // the Principal, for the member they are viewing.
-  it("lets the back office set a member's weeks, and nobody else",async()=>{
-    mocks.rpc.mockResolvedValue({data:null,error:null});
-    expect((await savePrincipalArenaBrandWeeks(membershipId,"2026-09",{"2026-09-04":"ZANOTTI"},context)).ok).toBe(false);
-    expect(mocks.rpc).not.toHaveBeenCalled();
-    mocks.getUser.mockResolvedValue({role:"revenue_member",actualRole:"principal",is_active:true,permissions:[]});
-    expect((await savePrincipalArenaBrandWeeks(membershipId,"2026-09",{"2026-09-04":"ZANOTTI","2026-09-11":undefined},context)).ok).toBe(true);
-    expect(mocks.rpc).toHaveBeenCalledWith("member_principal_save_brand_week_picks",{p_staff:context.staffId,p_sub_department:membershipId,p_period:"2026-09",p_picks:{"2026-09-04":"ZANOTTI"}});
-    mocks.rpc.mockClear();
-    expect((await savePrincipalArenaBrandWeeks(membershipId,"2026-09",{"2026-09-04":"ZANOTTI"},{...context,subDepartmentId:context.staffId})).ok).toBe(false);
-    expect(mocks.rpc).not.toHaveBeenCalled();
+  // Brand weeks come from the ERP's Sales Attending (2026-10-12): nobody — the
+  // member, the Principal viewing them — has a way to save one any more.
+  it("offers no brand-week save",()=>{
+    expect(Object.keys(arenaActions).sort()).toEqual(["fetchMemberArena"]);
   });
 });

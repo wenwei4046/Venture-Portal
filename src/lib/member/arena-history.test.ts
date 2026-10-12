@@ -46,13 +46,14 @@ describe("arenaFairEvents", () => {
 });
 
 // Booth by booth (2026-10-03): an exhibition is a brand's booth at a fair, and
-// a seller placed there by guess — no brand picked for the week — says so.
+// since 2026-10-12 a seller the ERP's Sales Attending lists nowhere that
+// weekend — placed by their bills — says so.
 describe("booth boards", () => {
-  it("labels each board by its booth and marks a guessed placement", () => {
+  it("labels each board by its booth and marks an auto-located placement", () => {
     const events = arenaFairEvents(history([
       { ...event("f1|AKEMI", "2026-09-25", "2026-09-27", [
-        { ...person("james", "James", 27888, 3), confirmed: false },
-        { ...person("lawrence", "Lawrence", 4047), confirmed: true },
+        { ...person("james", "James", 27888, 3), source: "auto" },
+        { ...person("lawrence", "Lawrence", 4047), source: "erp" },
       ], "PENANG WATERFRONT CONVENTION CENTRE"), brand: "AKEMI", fairId: "f1", week: "2026-09-25" },
       { ...event("f1|ZANOTTI", "2026-09-25", "2026-09-27", [person("wei", "Wei Pin", 52006, 9)], "PENANG WATERFRONT CONVENTION CENTRE"),
         brand: "ZANOTTI", fairId: "f1", week: "2026-09-25" },
@@ -62,23 +63,22 @@ describe("booth boards", () => {
       ["f1|ZANOTTI", "ZANOTTI · PENANG WATERFRONT CONVENTION CENTRE", "ZANOTTI"],
     ]);
     // Each booth is ranked on its own: Wei Pin's 52,006 does not push James off first.
-    expect(events[0].rows.map(row => [row.name, row.position, row.unconfirmed])).toEqual([["James", 1, true], ["Lawrence", 2, false]]);
-    expect(events[1].rows.map(row => [row.name, row.position, row.unconfirmed])).toEqual([["Wei Pin", 1, false]]);
+    expect(events[0].rows.map(row => [row.name, row.position, row.autoLocated])).toEqual([["James", 1, true], ["Lawrence", 2, false]]);
+    // No brand week at all (no source): nothing to explain.
+    expect(events[1].rows.map(row => [row.name, row.position, row.autoLocated])).toEqual([["Wei Pin", 1, false]]);
   });
 
-  // Seven days after the fair the week closes (user 2026-10-03): a guess is
-  // then auto-located for good, and the board says which it is.
-  it("calls a guess unconfirmed while its week is open, auto-located once it closes", () => {
+  // Whether the week has closed no longer matters (2026-10-12): nothing is picked, so a placement by the
+  // bills is auto-located the day the fair ends, and one the ERP made never is.
+  it("calls a placement by the bills auto-located, open week or closed, and the ERP's never", () => {
     const [open, closed] = arenaFairEvents(history([
-      { ...event("f2|AKEMI", "2026-09-25", "2026-09-27", [{ ...person("a", "Ada", 5000), confirmed: false }]),
+      { ...event("f2|AKEMI", "2026-09-25", "2026-09-27", [{ ...person("a", "Ada", 5000), source: "auto" }]),
         brand: "AKEMI", week: "2026-09-25", closesOn: "2026-10-06", locked: false },
-      { ...event("f1|AKEMI", "2026-09-04", "2026-09-06", [{ ...person("a", "Ada", 4000), confirmed: false }, { ...person("b", "Ben", 3000), confirmed: true }]),
+      { ...event("f1|AKEMI", "2026-09-04", "2026-09-06", [{ ...person("a", "Ada", 4000), source: "auto" }, { ...person("b", "Ben", 3000), source: "erp" }]),
         brand: "AKEMI", week: "2026-09-04", closesOn: "2026-09-13", locked: true },
     ]), "2026-09-01", "2026-09-30").sort((x, y) => y.start.localeCompare(x.start));
-    expect(open).toMatchObject({ closesOn: "2026-10-06", locked: false });
-    expect(open.rows[0]).toMatchObject({ unconfirmed: true, autoLocated: false });
-    expect(closed).toMatchObject({ closesOn: "2026-09-13", locked: true });
-    expect(closed.rows.map(row => [row.name, row.unconfirmed, row.autoLocated])).toEqual([["Ada", false, true], ["Ben", false, false]]);
+    expect(open.rows[0]).toMatchObject({ autoLocated: true });
+    expect(closed.rows.map(row => [row.name, row.autoLocated])).toEqual([["Ada", true], ["Ben", false]]);
   });
 
   // A seller on a board off their brand week (user 2026-10-03: 30 千本身在那个
@@ -95,8 +95,8 @@ describe("booth boards", () => {
     expect(board.rows.map(row => [row.name, row.position, row.offWeek, row.value])).toEqual([
       ["Wei Pin", 1, false, 52006], ["James Seow", 2, true, 30000], ["Anthony", 3, false, 25606],
     ]);
-    // Off the scoring board, a guess is that board's to explain, not this one's.
-    expect(board.rows[1]).toMatchObject({ unconfirmed: false, autoLocated: false });
+    // Off the scoring board, a placement is that board's to explain, not this one's.
+    expect(board.rows[1]).toMatchObject({ autoLocated: false });
   });
 
   it("never sets a record from a board that did not score", () => {

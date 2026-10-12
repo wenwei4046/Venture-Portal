@@ -1389,6 +1389,17 @@ the Big Home fair at Mid Valley, never with the 10k written elsewhere that week.
 - **A bill with no ERP booth pick** (before the fair picker, or a fair placed by a
   person or the calendar) counts at its seller's booth that week.
 - **Highest Fair Record** is the best single scoring booth.
+- **Since 2026-10-12 nobody picks a brand week: it comes from the ERP** (user:
+  "our sales is no more needed to select brand week … their work location is
+  fixed by Houzs ERP side"; "1 layer is use track by erp houzs, if fail, then go
+  with auto detect, same engine with previous one"). The booth that scores is the
+  one the ERP's PMS *Sales Attending* lists the seller at for that weekend (two
+  booths → the one with the most of their bills); a weekend it lists them nowhere
+  falls to the guess above. The lock, *Unconfirmed*, the member's and both back
+  offices' saves are gone; My brand weeks and HR's grid only show it. Mirrored
+  through `POST /api/erp/v1/sales-attending` (`docs/erp-sync/contract.md` §11),
+  migs `20261012140000` / `20261012150000`; the decision in full:
+  `.claude/rules/revenue/revenue-app.md` › BRAND WEEKS COME FROM THE ERP.
 
 On 2026-10-03 data: 38 fairs became 66 booth boards (7 of them no-brand); RM
 4,331,895 on the old boards = the same RM 4,331,895 on the booth boards, of which

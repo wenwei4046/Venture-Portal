@@ -1057,10 +1057,12 @@
 .bwTop { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .bwTitle { font-size: calc(15px * var(--rv-type)); font-weight: 650; }
 .bwWhen { font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); white-space: nowrap; }
-.bwBrands { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.bwBrand { height: 38px; padding: 0 4px; border-radius: 12px; border: 1px solid var(--rv-handle); background: var(--rv-white); color: var(--rv-ink); font-size: calc(13px * var(--rv-type)); font-weight: 500; white-space: nowrap; }
+/* My brand weeks, read only (2026-10-12): the booth the ERP lists them at (solid), or auto-located (dashed). */
+.bwPlace { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.bwBrand { display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--rv-handle); background: var(--rv-white); color: var(--rv-ink); font-size: calc(13px * var(--rv-type)); font-weight: 500; white-space: nowrap; flex: none; }
+.bwBrandAuto { border-style: dashed; color: var(--rv-sub); }
+.bwWhere { font-size: calc(13px * var(--rv-type)); color: var(--rv-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bwBrandOn { border-color: var(--rv-accent); background: var(--rv-accent); color: var(--rv-white); font-weight: 700; }
-.bwBrand:disabled { opacity: .55; }
 .bwNote { font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); }
 .bwLocked { color: var(--rv-amber); }
 

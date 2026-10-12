@@ -291,7 +291,7 @@ export interface ClaimWeek {
   /** That fair's first and last day (`YYYY-MM-DD`): an Airbnb stay must cover them. */
   start: string | null;
   end: string | null;
-  /** Not picked in My brand weeks: the Arena placed them at the brand they opened the most bills for. */
+  /** Not on the ERP's Sales Attending that weekend: placed at the booth they opened the most bills at (2026-10-12). */
   auto: boolean;
   /** A claim is only ever for the member's own brand week's fair (user 2026-10-06). */
   claimable: boolean;

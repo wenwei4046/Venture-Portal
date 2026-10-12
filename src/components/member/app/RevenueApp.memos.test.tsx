@@ -50,7 +50,7 @@ function source(make: () => MemberData) {
   return {
     refresh: vi.fn(async () => ({ ok: true as const, data: make() })),
     insight: none, kpi: none, orgMap: none, insightRange: none, quote: none, memo: none, requestHistory: none, orderBook: none, arena: none,
-    cancelRequest: none, income: none, departmentIncome: none, honours: none, saveBrandWeeks: none, claimRates: none, submitRequest: none,
+    cancelRequest: none, income: none, departmentIncome: none, honours: none, claimRates: none, submitRequest: none,
     memoReceipts: vi.fn(async () => ({ ok: true as const, data: [] })),
   } satisfies RevenueSource;
 }

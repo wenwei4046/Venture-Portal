@@ -33,9 +33,7 @@ export interface Standing extends Candidate {
   /** Brand shares apply monthly; longer periods sum the monthly contributions. */
   brandShare?: number | null;
   contributionBase?: number; contributionIncentive?: number; contributionPoints?: number;
-  /** Live Fair results (2026-10-03): placed at a booth by guess, not by the brand week they picked — the week still open. */
-  unconfirmed?: boolean;
-  /** …and once the week has closed: auto-located for good. */
+  /** Live Fair results (2026-10-12): not on the ERP's Sales Attending that weekend, so placed at the booth with the most of their bills. */
   autoLocated?: boolean;
   /** On this board with their sales and no placing — not their scoring booth this week. */
   offWeek?: boolean;

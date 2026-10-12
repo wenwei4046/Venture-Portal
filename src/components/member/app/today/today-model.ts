@@ -3,7 +3,7 @@ import type { MemberOrderBook } from "@/lib/member/order-book";
 import { marginStanding } from "../insight/insight-model";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import { arenaIncentive, arenaMonthFridays, arenaRankings, type ArenaMetric, type MemberArenaSnapshot } from "@/lib/member/arena";
-import { dayLabel, dayRange, monthName, ordinalSuffix, rm2, shortDay } from "../format";
+import { dayLabel, dayRange, monthName, ordinalSuffix, rm2 } from "../format";
 import { ICON } from "../icons";
 
 /**
@@ -34,7 +34,7 @@ export interface TodayInput {
   /** This month's Insight block for this sub-department. */
   insight?: MemberInsightBlock;
   kpi?: MemberKpiSummary | null;
-  /** This month's Arena (monthly window): the boards' ranks, this week's fair, the brand weeks to save. */
+  /** This month's Arena (monthly window): the boards' ranks, and this week's booth (its history's `weeks`). */
   arena?: MemberArenaSnapshot | null;
   /** This month's bills and the brands' ladders — the margin's tier. */
   book?: MemberOrderBook | null;
@@ -49,11 +49,10 @@ export interface TodayInput {
   requests: MemberRequest[];
   /** RQ-2609-004 style code of a request. */
   requestCode: (request: MemberRequest) => string;
-  /** False when their ticks close My brand weeks (2026-10-11): no reminder to save the weeks. Absent: open. */
-  brandWeeks?: boolean;
 }
 
 export type TodoTone = "memo" | "request" | "weeks";
+/** `brandWeeks` / `weeks`: the prototype's "Save … brand weeks" (its fixtures); the live app has had nothing to save since 2026-10-12. */
 export type TodoTarget = "memos" | "requests" | "brandWeeks";
 export interface TodayTodo {
   key: string; tone: TodoTone; icon: string; title: string; sub: string; target: TodoTarget;
@@ -167,16 +166,6 @@ function todos(input: TodayInput): TodayTodo[] {
     out.push({ key: `rq-${request.id}`, tone: "request", icon: ICON.receipt, target: "requests", requestKind: request.kind,
       title: `${KIND[request.kind]} needs info`, sub: `${input.requestCode(request)} · HR returned it` });
   }
-  const arena = input.arena;
-  const period = input.today.slice(0, 7);
-  if (input.brandWeeks !== false && arena && arena.period === period && arena.weekLocks?.length) {
-    const picks = arena.brandWeeks?.picks ?? {};
-    const open = arena.weekLocks.filter(lock => !lock.locked && !picks[lock.week]).sort((a, b) => a.closesOn.localeCompare(b.closesOn));
-    if (open.length) {
-      out.push({ key: "weeks", tone: "weeks", icon: ICON.calendar, target: "brandWeeks",
-        title: `Save ${monthName(period)} brand weeks`, sub: `Due ${shortDay(open[0].closesOn)}` });
-    }
-  }
   return out;
 }
 
@@ -188,15 +177,15 @@ function thisWeek(input: TodayInput): TodayWeek | null {
   const index = fridays.indexOf(friday);
   if (index < 0) return null;
   const end = new Date(new Date(`${friday}T00:00:00Z`).getTime() + 2 * 86_400_000).toISOString().slice(0, 10);
-  const pick = arena.period === friday.slice(0, 7) ? arena.brandWeeks?.picks?.[friday] : undefined;
-  const brand = pick ? BRAND_NAME[pick] ?? pick : null;
-  const booth = pick ? arena.history?.events.find(event => event.week === friday && event.brand === pick) : undefined;
+  // The week's booth (2026-10-12): where the ERP's Sales Attending lists them — this weekend's too, before
+  // its fair ends — else, once the fair is over, the booth with the most of their bills.
+  const week = arena.history?.weeks?.find(w => w.week === friday && (!arena.selfId || w.staffId === arena.selfId));
+  const brand = week?.brand ? BRAND_NAME[week.brand] ?? week.brand : null;
   return {
-    title: `Week ${index + 1} · ${brand ? `${brand} week` : "Brand week not picked"}`,
-    dates: booth ? dayRange(booth.start, booth.end) : dayRange(friday, end),
-    // My brand weeks closed by their ticks: no pointer to a page they cannot open.
-    venue: booth?.venue ?? (brand || input.brandWeeks === false ? null : "Pick your brand in My brand weeks"),
-    org: booth?.organizer ?? null,
+    title: `Week ${index + 1} · ${brand ? `${brand} week` : "No brand week yet"}`,
+    dates: week?.start && week.end ? dayRange(week.start, week.end) : dayRange(friday, end),
+    venue: week?.venue ?? null,
+    org: week?.organizer ?? null,
   };
 }
 
