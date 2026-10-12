@@ -67,17 +67,19 @@ const shown = (text: string) =>
 const DATA_SUBTITLES = ['src/app/(portal)/admin/password/page.tsx']
 const DATA_PAGE_SUBS = ['src/app/(portal)/reconciliation/journal-entries/[id]/page.tsx']
 
-// The hints the pages carried until 2026-10-12. The behaviour they described
-// stays (a right-click, a double-click, Shift for the browser's own menu);
-// only the words went.
+// The hints the pages carried until 2026-10-12, as they opened a sentence. The
+// behaviour they described stays (a right-click, a double-click, Shift for the
+// browser's own menu); only the words went. A tooltip may still say it, held
+// in a constant as much as in `title=` — "More actions — or right-click the
+// row" — so the forms are matched as written, capital first.
 const HINTS = [
-  /Shift \+ right-click opens/i,
-  /Right-click (a|the|each) (row|bill|person|request|line)\b/i,
-  /Right-click to (invite|acknowledge|remove)/i,
-  /Double-click (to open|a (row|bill) to open)/i,
-  /Click a (person|card|request|customer) (for|to)\b/i,
+  /Shift \+ right-click opens/,
+  /Right-click (a|the|each) (row|bill|person|request|line)\b/,
+  /Right-click to (invite|acknowledge|remove)/,
+  /Double-click (to open|a (row|bill) to open)/,
+  /Click a (person|card|request|customer) (for|to)\b/,
   /双击一行打开/,
-  /highlights only/i,
+  /highlights only/,
 ]
 
 describe('no descriptions on the page', () => {
