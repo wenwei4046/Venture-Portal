@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatDate } from '@/lib/utils'
 import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
 import { buildRepaymentPlan } from '@/lib/repayment-plan'
+import { defaultStart, fundSourceStart } from '@/lib/repayment-start'
 import { cancelFundSource } from '../actions'
 import { ConfirmButton } from './_components/ConfirmButton'
 import WithdrawButton from './_components/WithdrawButton'
@@ -208,6 +209,12 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
 
   const repaymentsList = repayments ?? []
 
+  // The repayment start (2026-10-12, user: expected repayment 和 repayment
+  // start date 应该要一样): the date the first instalment falls due — the
+  // Expected repayment — and every instalment's day.
+  const start = fundSourceStart(source)
+  const unsetStart = defaultStart(source.effective_date)
+
   // The Repayment schedule (2026-10-09): the plan by the terms, the money in
   // set against it oldest first.
   const plan = buildRepaymentPlan({
@@ -220,7 +227,7 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
     })),
     isPrincipal: isFundSourcePrincipal,
     today,
-    dueDay: source.effective_date ? dayjs(source.effective_date).date() : 1,
+    dueDay: start.day,
     status: source.status,
   })
 
@@ -337,12 +344,12 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
             note={`${source.lock_in_months}M · ${source.maturity_date ? `matures ${dateLong(source.maturity_date)}` : 'no maturity'}${monthsLeft}`}
           />
         ) : null}
-        {source.repayment_date ? (
+        {start.date && source.status !== 'cancelled' ? (
           <StatCard
             label="Expected repayment (first installment)"
-            value={dateLong(source.repayment_date)}
+            value={dateLong(start.date)}
             icon="clock"
-            note={source.lock_in_months ? `Full repayment: ${formatDate(expectedFullRepaymentDate(source.repayment_date, source.lock_in_months))}` : 'No fixed term'}
+            note={source.lock_in_months ? `Full repayment: ${formatDate(expectedFullRepaymentDate(start.date, source.lock_in_months))}` : 'No fixed term'}
           />
         ) : null}
       </StatCards>
@@ -365,7 +372,7 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
             title: 'Dates',
             items: [
               { label: 'Effective date', value: dateLong(source.effective_date) },
-              { label: 'Expected repayment', value: source.repayment_date ? dateLong(source.repayment_date) : '—' },
+              { label: 'Expected repayment', value: start.date ? dateLong(start.date) : '—' },
               { label: 'Maturity date', value: source.maturity_date ? dateLong(source.maturity_date) : '—' },
             ],
           },
@@ -405,12 +412,9 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
         <div className="fin-form">
           <RepaymentStartEditor
             sourceId={source.id}
-            current={((source as { repayment_start_month?: string | null }).repayment_start_month ?? null)?.slice(0, 7) ?? null}
-            defaultHint={
-              source.effective_date
-                ? dayjs(`${(source.effective_date as string).slice(0, 7)}-01`).add(1, 'month').format('YYYY-MM')
-                : 'the month after receipt'
-            }
+            current={start.set ? start.date : null}
+            defaultHint={unsetStart ? dateLong(unsetStart) : 'the month after receipt'}
+            min={source.effective_date ?? undefined}
           />
           <MinPayInterestToggle sourceId={source.id} current={(source as { min_pay_interest?: boolean }).min_pay_interest === true} />
         </div>

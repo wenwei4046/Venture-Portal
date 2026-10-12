@@ -432,6 +432,9 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
       lock_in_months: lockInMonths || null,
       effective_date: effectiveDate,
       repayment_date: repaymentDate,
+      // The Expected repayment is the repayment start: its month moves with it
+      // (2026-10-12, user: 应该要一样).
+      repayment_start_month: dayjs(repaymentDate).startOf('month').format('YYYY-MM-DD'),
       maturity_date: repaymentDate,
       notes,
       account_code: accountCode,
@@ -514,25 +517,40 @@ export async function withdrawFundSource(id: string): Promise<{ error: string } 
   return undefined
 }
 
-// ─── 还款起始月 (Finance self-service, mig 20260724050000) ───────────────────
+// ─── Repayment start (Finance self-service, mig 20260724050000) ─────────────
+// 2026-10-12 (user: 现在只能选月份不能选日期 → expected repayment 和 repayment
+// start date 应该要一样): a date — the first instalment's, every later one on
+// its day. The RPC keeps it as the Expected repayment (repayment_date) with its
+// month as the start month (p_month carries the whole date).
 export async function setFundSourceRepaymentStart(
   id: string,
-  month: string
+  date: string
 ): Promise<{ error: string } | undefined> {
   await requireActionOn('/fund-in', 'treasury', 'edit')
   const supabase = await createClient()
 
   if (!id) return { error: 'Fund source id is required' }
-  if (!/^\d{4}-\d{2}$/.test(month)) return { error: '格式要 YYYY-MM(选一个月份)' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !dayjs(date).isValid()) return { error: 'Pick a date' }
+
+  const { data: source } = await supabase.from('fund_sources').select('effective_date').eq('id', id).maybeSingle()
+  if (!source) return { error: 'Fund source not found' }
+  const effective = (source as { effective_date: string | null }).effective_date
+  if (effective && date < effective) {
+    return { error: `The repayment cannot start before the effective date, ${dayjs(effective).format('D MMM YYYY')}` }
+  }
 
   const { error } = await supabase.rpc('set_fund_source_repayment_start' as never, {
     p_fund_source_id: id,
-    p_month: `${month}-01`,
+    p_month: date,
   } as never)
-  if (error) return { error: `保存失败: ${error.message}` }
+  if (error) return { error: `Could not save: ${error.message}` }
 
   revalidatePath(`/fund-in/${id}`)
+  revalidatePath('/fund-in')
+  revalidatePath('/overdue')
+  revalidatePath('/dashboard')
   revalidatePath('/reports/loan-aging')
+  revalidatePath('/reports/fund-summary')
   revalidatePath('/repayment-schedule')
   return undefined
 }

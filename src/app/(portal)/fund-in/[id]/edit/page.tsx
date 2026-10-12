@@ -5,6 +5,7 @@ import { requireAnyActionOn, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import type { AccountType } from '@/lib/coa'
+import { fundSourceStart } from '@/lib/repayment-start'
 import type { AccountOption } from '@/components/AccountPicker'
 import EditFundSourceForm from './_components/EditFundSourceForm'
 import AmendFundSourceForm from './_components/AmendFundSourceForm'
@@ -121,7 +122,9 @@ export default async function EditFundSourcePage({ params }: Props) {
           cost_rate_percent: Number(source.cost_rate) * 100,
           lock_in_months: source.lock_in_months ?? 12,
           effective_date: source.effective_date as string,
-          repayment_date: (source.repayment_date as string | null) ?? source.effective_date as string,
+          // The repayment start the schedule goes by — unset, the month after
+          // the effective date (2026-10-12, user: 应该要一样).
+          repayment_date: fundSourceStart(source).date ?? (source.effective_date as string),
           notes: source.notes ?? '',
           account_code: (source as { account_code: string | null }).account_code ?? null,
           bank_account_id: (source as { bank_account_id: string | null }).bank_account_id ?? null,

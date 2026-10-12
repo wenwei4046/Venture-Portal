@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/office-time', async (orig) => ({ ...(await orig<object>()), officeToday: () => '2026-10-10', officeMonth: () => '2026-10' }))
 
 import { fetchLoanMonitorData } from './loan-monitor'
+import { projected, selectedColumns } from '@/test/select-columns'
 
 const ROWS: Record<string, unknown[]> = {
   loans: [
@@ -66,6 +67,29 @@ describe('Loan Aging as at a past day', () => {
     // April and May paid; June (87 days), July (57) and August (26) are not.
     expect(data.collect.due).toHaveLength(1)
     expect(data.collect.due[0].days).toMatchObject({ notDue: 0, d30: 11200, d90: 22400, d90plus: 0, total: 33600 })
+  })
+
+  // 2026-10-12 (user: 现在只能选月份不能选日期): each instalment is aged from
+  // the repayment start's day — the date Finance picked — not the disbursement's.
+  it('ages each instalment from the repayment start’s day', async () => {
+    const rows: Record<string, unknown[]> = {
+      ...ROWS,
+      loans: [{ ...(ROWS.loans[0] as Record<string, unknown>), repayment_start_month: '2026-04-01', repayment_start_date: '2026-04-01' }],
+    }
+    // Only the columns selected come back, as from PostgREST.
+    const projecting = {
+      from: (table: string) => {
+        let columns: string[] | null = null
+        const q: Record<string, unknown> = {}
+        for (const m of ['eq', 'in', 'order', 'lte', 'gte', 'range']) q[m] = () => q
+        q.select = (c?: string) => ((columns = selectedColumns(c)), q)
+        q.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: projected((rows[table] ?? []) as Array<Record<string, unknown>>, columns), error: null }).then(res)
+        return q
+      },
+    } as never
+    const data = await fetchLoanMonitorData(projecting, { asOf: '2026-08-31' })
+    // June (91 days), July (61) and August (30), each from the 1st.
+    expect(data.collect.due[0].days).toMatchObject({ notDue: 0, d30: 11200, d90: 11200, d90plus: 11200, total: 33600 })
   })
 
   it('reads today as it always has when no day is asked', async () => {

@@ -3,17 +3,22 @@
 import { useState, useTransition } from 'react'
 import { setLoanRepaymentStart } from '../../actions'
 
-// Finance self-service: the agreed first-installment month (还款起始月) that
-// drives the Loan Monitor's 本月应收. Unset = defaults to disbursement +1.
+// Finance self-service: the agreed first repayment for a loan — the date its
+// first instalment falls due, every later one on the same day of the month.
+// Unset = the month after disbursement, on its day.
 // 2026-10-09: a field of the page's Repayment settings panel (the handoff).
+// 2026-10-12 (user: 现在只能选月份不能选日期): a date, not a month.
 export default function RepaymentStartEditor({
   loanId,
   current,
   defaultHint,
+  min,
 }: {
   loanId: string
-  current: string | null // YYYY-MM
+  current: string | null // YYYY-MM-DD
   defaultHint: string
+  /** The disbursement: the repayment does not start before it. */
+  min?: string
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -24,7 +29,7 @@ export default function RepaymentStartEditor({
     <div className="fin-field">
       <label htmlFor="repayment-start">Repayment starts</label>
       <div className="fin-field-row">
-        <input id="repayment-start" type="month" value={value} onChange={(e) => setValue(e.target.value)} />
+        <input id="repayment-start" type="date" value={value} min={min} onChange={(e) => setValue(e.target.value)} />
         <button
           type="button"
           className="btn-sec"
@@ -44,8 +49,7 @@ export default function RepaymentStartEditor({
         {saved && !isPending ? <span className="fin-saved">Saved ✓</span> : null}
       </div>
       <p className="fin-hint">
-        Which month the first installment falls in (agreed to start repaying in May — pick May). Unset defaults to {defaultHint}. The
-        Loan Monitor&apos;s due-this-month follows this.
+        The first installment is due on this date, and every one after it on the same day of the month. Unset, it is {defaultHint}.
       </p>
       {error ? <p className="fin-error">{error}</p> : null}
     </div>

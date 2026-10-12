@@ -5048,6 +5048,7 @@ export type Database = {
           min_pay_interest: boolean
           principal: number
           repayment_start_month: string | null
+          repayment_start_date: string | null
           terms_effective_from: string | null
           repayment_terms: string | null
           risk_premium: number
@@ -5070,6 +5071,7 @@ export type Database = {
           min_pay_interest?: boolean
           principal: number
           repayment_start_month?: string | null
+          repayment_start_date?: string | null
           terms_effective_from?: string | null
           repayment_terms?: string | null
           risk_premium: number
@@ -5092,6 +5094,7 @@ export type Database = {
           min_pay_interest?: boolean
           principal?: number
           repayment_start_month?: string | null
+          repayment_start_date?: string | null
           terms_effective_from?: string | null
           repayment_terms?: string | null
           risk_premium?: number

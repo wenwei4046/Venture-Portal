@@ -436,26 +436,39 @@ export async function recordLoanRepaymentReceived(formData: FormData) {
   redirect(`/fund-out/${loanId}`)
 }
 
-// ─── 还款起始月 (Finance self-service, mig 20260724050000) ───────────────────
-// Agreed first-installment month for the Loan Monitor / schedules. NULL =
-// default (month after disbursement). Display/schedule metadata only.
+// ─── Repayment start (Finance self-service, mig 20260724050000) ─────────────
+// The agreed first instalment for the schedules. NULL = default (the month
+// after disbursement, on its day). Display/schedule metadata only.
+// 2026-10-12 (user: 现在只能选月份不能选日期): a date — the first instalment's,
+// every later one on its day. The RPC keeps it as repayment_start_date with
+// its month as the start month (p_month carries the whole date).
 export async function setLoanRepaymentStart(
   id: string,
-  month: string
+  date: string
 ): Promise<{ error: string } | undefined> {
   await requireActionOn('/fund-out', 'treasury', 'edit')
   const supabase = await createClient()
 
   if (!id) return { error: 'Loan id is required' }
-  if (!/^\d{4}-\d{2}$/.test(month)) return { error: '格式要 YYYY-MM(选一个月份)' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !dayjs(date).isValid()) return { error: 'Pick a date' }
+
+  const { data: loan } = await supabase.from('loans').select('disbursement_date').eq('id', id).maybeSingle()
+  if (!loan) return { error: 'Loan not found' }
+  const disbursed = (loan as { disbursement_date: string | null }).disbursement_date
+  if (disbursed && date < disbursed) {
+    return { error: `The repayment cannot start before the disbursement, ${dayjs(disbursed).format('D MMM YYYY')}` }
+  }
 
   const { error } = await supabase.rpc('set_loan_repayment_start' as never, {
     p_loan_id: id,
-    p_month: `${month}-01`,
+    p_month: date,
   } as never)
-  if (error) return { error: `保存失败: ${error.message}` }
+  if (error) return { error: `Could not save: ${error.message}` }
 
   revalidatePath(`/fund-out/${id}`)
+  revalidatePath('/fund-out')
+  revalidatePath('/overdue')
+  revalidatePath('/dashboard')
   revalidatePath('/reports/loan-aging')
   revalidatePath('/repayment-schedule')
   return undefined

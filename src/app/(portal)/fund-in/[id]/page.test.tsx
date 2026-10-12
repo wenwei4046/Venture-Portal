@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
 
 // 2026-10-09 — a fund source's page per the user's Claude Design handoff
@@ -23,11 +23,12 @@ vi.mock('./_components/RecordRepaymentForm', () => ({ default: (p: { outstanding
 vi.mock('./_components/WithdrawButton', () => ({ default: () => <button type="button">Withdraw</button> }))
 
 import FundSourcePage from './page'
+import { setFundSourceRepaymentStart } from '../actions'
 
 // HOUZS Century's deposit: 30,000 over 3 months at 1%, two installments in.
 const SOURCE = {
-  id: 'fs-1', source_type: 'subsidiary', status: 'active', amount: 30000, cost_rate: 0.01, lock_in_months: 3, compound_interest: false,
-  effective_date: '2026-07-15', repayment_start_month: null, terms_effective_from: null, repayment_date: '2026-08-15', maturity_date: '2026-10-15',
+  id: 'fs-1', source_type: 'subsidiary', status: 'active', amount: 30000, cost_rate: 0.01, lock_in_months: 3 as number | null, compound_interest: false,
+  effective_date: '2026-07-15', repayment_start_month: null as string | null, terms_effective_from: null, repayment_date: '2026-08-15' as string | null, maturity_date: '2026-10-15' as string | null,
   from_company_id: 'co-hc', from_department_id: null, from_freetext_name: null, from_director_id: null, bank_account_id: 'b1', account_code: '4010',
   notes: 'lent to: 2990', min_pay_interest: false, created_at: '2026-07-15T02:00:00Z', repaid_at: null as string | null, repaid_by: null as string | null,
 }
@@ -147,6 +148,55 @@ describe('a fund source’s page', () => {
     render(await page())
     expect(screen.getByRole('link', { name: 'Edit fund source' })).toHaveAttribute('href', '/fund-in/fs-1/edit')
     expect(screen.getByRole('button', { name: 'Withdraw' })).toBeInTheDocument()
+  })
+})
+
+// 2026-10-12 (user: 现在只能选月份不能选日期 → expected repayment 和 repayment
+// start date 应该要一样): Repayment starts is a date — the Expected repayment
+// is that date, and the schedule's instalments fall on its day.
+describe('a fund source’s repayment start, a date', () => {
+  // Carres' 30,000 at 2% with no fixed term from 14 Sep, its start picked as 7 Oct.
+  const CARRES = {
+    ...SOURCE, amount: 30000, cost_rate: 0.02, lock_in_months: null, effective_date: '2026-09-14',
+    repayment_start_month: '2026-10-01', repayment_date: '2026-10-07', maturity_date: '2026-10-07',
+  }
+  const field = () => screen.getByLabelText('Repayment starts')
+  const scheduleRows = () =>
+    (screen.getByRole('heading', { name: 'Repayment schedule' }).closest('section') as HTMLElement).querySelectorAll('table.sched-table tbody tr')
+
+  it('shows the date picked as the Expected repayment, in the field and on the schedule', async () => {
+    database(CARRES, [])
+    render(await page())
+    expect(card('Expected repayment (first installment)')).toHaveTextContent('7 Oct 2026')
+    expect(field()).toHaveAttribute('type', 'date')
+    expect(field()).toHaveValue('2026-10-07')
+    expect(scheduleRows()[0]).toHaveTextContent('7 Oct 2026')
+  })
+
+  it('unset, is the month after the effective date on its day', async () => {
+    database({ ...SOURCE, repayment_date: null, repayment_start_month: null }, [])
+    render(await page())
+    expect(card('Expected repayment (first installment)')).toHaveTextContent('15 Aug 2026')
+    expect(within(screen.getByRole('region', { name: 'Details' })).getAllByText('15 Aug 2026').length).toBeGreaterThan(0)
+    expect(field()).toHaveValue('')
+    expect(screen.getByText(/Unset, it is 15 Aug 2026/)).toBeInTheDocument()
+  })
+
+  it('reads a month set before dates could be picked as that month on the effective date’s day', async () => {
+    database({ ...SOURCE, repayment_date: null, repayment_start_month: '2026-09-01' }, [])
+    render(await page())
+    expect(field()).toHaveValue('2026-09-15')
+    expect(card('Expected repayment (first installment)')).toHaveTextContent('15 Sep 2026')
+    expect(scheduleRows()[0]).toHaveTextContent('15 Sep 2026')
+  })
+
+  it('saves the date picked', async () => {
+    vi.mocked(setFundSourceRepaymentStart).mockResolvedValue(undefined)
+    database(CARRES, [])
+    render(await page())
+    fireEvent.change(field(), { target: { value: '2026-10-14' } })
+    fireEvent.click(within(field().closest('.fin-field') as HTMLElement).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(setFundSourceRepaymentStart).toHaveBeenCalledWith('fs-1', '2026-10-14'))
   })
 })
 

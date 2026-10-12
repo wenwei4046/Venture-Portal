@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
 
 // 2026-10-09 — a loan's page per the user's Claude Design handoff (Phase 3 of
@@ -22,11 +22,13 @@ vi.mock('../_components/RepaymentForm', () => ({ default: (p: { outstanding: num
 vi.mock('./_components/VoidRepaymentButton', () => ({ default: (p: { label: string }) => <button type="button">Reverse {p.label}</button> }))
 
 import LoanPage from './page'
+import { setLoanRepaymentStart } from '../actions'
 
 // 60,000 to Carres over 6 months at 4%, from May: five installments in.
 const LOAN = {
   id: 'loan-4', company_id: 'co-car', status: 'active', principal: 60000, base_rate: 0.00583, risk_premium: 0.03417, effective_rate: 0.04,
-  tenure_months: 6, compound_interest: false, disbursement_date: '2025-09-02' as string | null, repayment_start_month: '2026-05-01', terms_effective_from: null,
+  tenure_months: 6, compound_interest: false, disbursement_date: '2025-09-02' as string | null, repayment_start_month: '2026-05-01',
+  repayment_start_date: null as string | null, terms_effective_from: null,
   repayment_terms: 'EMI 分期 · 月息4% · 6期 · 资金来源: HC-58k', min_pay_interest: false, created_by: 'u1', approved_by: 'u2' as string | null,
   approved_at: '2025-09-02T03:00:00Z' as string | null, created_at: '2025-09-01T02:00:00Z',
 }
@@ -148,6 +150,36 @@ describe('a loan’s page', () => {
     expect(card('Tenure')).toHaveTextContent('Maturity set once disbursed')
     expect(screen.getByRole('button', { name: 'Cancel this loan' })).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Details' })).getByText('Awaiting Principal approval')).toBeInTheDocument()
+  })
+})
+
+// 2026-10-12 (user: 现在只能选月份不能选日期): Repayment starts is a date, and
+// the schedule's instalments fall on its day.
+describe('a loan’s repayment start, a date', () => {
+  const field = () => screen.getByLabelText('Repayment starts')
+
+  it('puts the instalments on the day picked', async () => {
+    database({ ...LOAN, repayment_start_date: '2026-05-20' })
+    render(await page())
+    expect(field()).toHaveAttribute('type', 'date')
+    expect(field()).toHaveValue('2026-05-20')
+    const rows = (screen.getByRole('heading', { name: 'Repayment schedule' }).closest('section') as HTMLElement).querySelectorAll('table.sched-table tbody tr')
+    expect(rows[5]).toHaveTextContent('20 Oct 2026')
+    // The sixth falls on the 20th: not yet due on the 9th.
+    expect(document.querySelector('.page-head .chip')).toHaveTextContent('active')
+  })
+
+  it('reads a month set before dates could be picked as that month on the disbursement’s day', async () => {
+    render(await page())
+    expect(field()).toHaveValue('2026-05-02')
+  })
+
+  it('saves the date picked', async () => {
+    vi.mocked(setLoanRepaymentStart).mockResolvedValue(undefined)
+    render(await page())
+    fireEvent.change(field(), { target: { value: '2026-05-20' } })
+    fireEvent.click(within(field().closest('.fin-field') as HTMLElement).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(setLoanRepaymentStart).toHaveBeenCalledWith('loan-4', '2026-05-20'))
   })
 })
 

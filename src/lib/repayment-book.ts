@@ -8,6 +8,7 @@ import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from './paginate'
 import { buildRepaymentPlan, type PlanPayment, type RepaymentPlan } from './repayment-plan'
+import { fundSourceStart, loanStart } from './repayment-start'
 import { fetchTermsHistory, isFundSourcePrincipal, isLoanPrincipal, termsForFundSource, termsForLoan } from './treasury-terms-data'
 
 export interface BookDeal {
@@ -70,13 +71,13 @@ export async function loadRepaymentBook(supabase: SupabaseClient, today: string,
     loansToo
       ? supabase
           .from('loans')
-          .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, terms_effective_from')
+          .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, repayment_start_date, terms_effective_from')
           .eq('status', 'active')
       : none,
     sourcesToo
       ? supabase
           .from('fund_sources')
-          .select('id, status, amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, terms_effective_from, from_company_id, from_department_id, from_director_id, from_freetext_name')
+          .select('id, status, amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, repayment_date, terms_effective_from, from_company_id, from_department_id, from_director_id, from_freetext_name')
           .in('status', ['active', 'matured'])
       : none,
     supabase.from('companies').select('id, name, short_code'),
@@ -112,7 +113,6 @@ export async function loadRepaymentBook(supabase: SupabaseClient, today: string,
   }
   const loanPays = grouped(loanReps, 'loan_id')
   const sourcePays = grouped(sourceReps, 'fund_source_id')
-  const dayOf = (d: unknown) => (d ? dayjs(d as string).date() : 1)
 
   const deals: BookDeal[] = []
   for (const l of loanList) {
@@ -129,7 +129,8 @@ export async function loadRepaymentBook(supabase: SupabaseClient, today: string,
         payments: loanPays.get(id) ?? [],
         isPrincipal: isLoanPrincipal,
         today,
-        dueDay: dayOf(l.disbursement_date),
+        // Each instalment on the repayment start's day (2026-10-12).
+        dueDay: loanStart(l).day,
         status: l.status as string,
       }),
     })
@@ -152,7 +153,7 @@ export async function loadRepaymentBook(supabase: SupabaseClient, today: string,
         payments: sourcePays.get(id) ?? [],
         isPrincipal: isFundSourcePrincipal,
         today,
-        dueDay: dayOf(s.effective_date),
+        dueDay: fundSourceStart(s).day,
         status: s.status as string,
       }),
     })

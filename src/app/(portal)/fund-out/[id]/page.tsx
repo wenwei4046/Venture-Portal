@@ -8,6 +8,7 @@ import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { buildRepaymentPlan } from '@/lib/repayment-plan'
+import { defaultStart, loanStart } from '@/lib/repayment-start'
 import { overdueOf } from '@/lib/repayment-calendar'
 import { cancelLoan } from '../actions'
 import RepaymentForm from '../_components/RepaymentForm'
@@ -132,6 +133,11 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
   const noRepayments = repaymentList.length === 0
   const canCancelLoan = canVoid && (isPendingApproval || (isActive && noRepayments))
 
+  // The repayment start (2026-10-12, user: 现在只能选月份不能选日期): the date
+  // the first instalment falls due, and every instalment's day.
+  const start = loanStart(loan)
+  const unsetStart = defaultStart(loan.disbursement_date)
+
   // The Repayment schedule (2026-10-09): the plan by the terms, the money in
   // set against it oldest first.
   const today = officeToday()
@@ -145,7 +151,7 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
     })),
     isPrincipal: isLoanPrincipal,
     today,
-    dueDay: loan.disbursement_date ? dayjs(loan.disbursement_date).date() : 1,
+    dueDay: start.day,
     status: loan.status,
   })
   // Overdue (2026-10-12): an instalment past its day unpaid, on this plan —
@@ -315,12 +321,9 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
           <FundingSourceEditor loanId={loan.id} repaymentTerms={(loan.repayment_terms as string | null) ?? null} />
           <RepaymentStartEditor
             loanId={loan.id}
-            current={((loan as { repayment_start_month?: string | null }).repayment_start_month ?? null)?.slice(0, 7) ?? null}
-            defaultHint={
-              loan.disbursement_date
-                ? dayjs(`${(loan.disbursement_date as string).slice(0, 7)}-01`).add(1, 'month').format('YYYY-MM')
-                : 'the month after disbursement'
-            }
+            current={start.set ? start.date : null}
+            defaultHint={unsetStart ? dateLong(unsetStart) : 'the month after disbursement'}
+            min={loan.disbursement_date ?? undefined}
           />
           <MinPayInterestToggle loanId={loan.id} current={(loan as { min_pay_interest?: boolean }).min_pay_interest === true} />
         </div>

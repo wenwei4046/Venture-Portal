@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { projected, selectedColumns } from '@/test/select-columns'
 import { bookWindow, loadRepaymentBook, type BookDeal } from './repayment-book'
 import type { PlanRow, RepaymentPlan } from './repayment-plan'
 
@@ -75,9 +76,12 @@ describe('loading one side of the book', () => {
     return {
       from: (table: string) => {
         read.push(table)
+        // Only the columns selected come back, as from PostgREST.
+        let columns: string[] | null = null
         const q: Record<string, unknown> = {}
-        for (const m of ['select', 'eq', 'in', 'order', 'range']) q[m] = () => q
-        q.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: TABLES[table] ?? [], error: null }).then(res)
+        for (const m of ['eq', 'in', 'order', 'range']) q[m] = () => q
+        q.select = (c?: string) => ((columns = selectedColumns(c)), q)
+        q.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: projected(TABLES[table] ?? [], columns), error: null }).then(res)
         return q
       },
     }
@@ -115,5 +119,22 @@ describe('loading one side of the book', () => {
   it('reads both sides when asked for neither', async () => {
     const deals = await loadRepaymentBook(client([]) as never, '2026-10-09')
     expect(deals.map((d) => d.kind)).toEqual(['collect', 'pay'])
+  })
+
+  // 2026-10-12 (user: 现在只能选月份不能选日期): a deal's instalments fall on its
+  // repayment start's day — the date Finance picked.
+  it('puts each deal’s instalments on its repayment start’s day', async () => {
+    const saved = { loans: TABLES.loans, fund_sources: TABLES.fund_sources }
+    TABLES.loans = [{ ...saved.loans[0], repayment_start_month: '2026-08-01', repayment_start_date: '2026-08-25' }]
+    TABLES.fund_sources = [{ ...saved.fund_sources[0], repayment_start_month: '2026-10-01', repayment_date: '2026-10-07' }]
+    try {
+      const deals = await loadRepaymentBook(client([]) as never, '2026-10-09')
+      expect(deals.map((d) => d.plan.rows.map((r) => r.due))).toEqual([
+        ['2026-08-25', '2026-09-25', '2026-10-25'],
+        ['2026-10-07', '2026-11-07', '2026-12-07'],
+      ])
+    } finally {
+      Object.assign(TABLES, saved)
+    }
   })
 })

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
+import { projected, selectedColumns } from '@/test/select-columns'
 
 // 2026-10-09 — Overdue & Netting per the user's Claude Design handoff (Phase 3
 // of the Finance revamp): two tabs — Fund OUT, what they owe us, and Fund IN,
@@ -63,11 +64,14 @@ function database(over: Record<string, unknown[]> = {}) {
   mocks.createClient.mockResolvedValue({
     from: (table: string) => {
       let rows = (tables[table] ?? []) as Array<Record<string, unknown>>
+      // Only the columns selected come back, as from PostgREST.
+      let columns: string[] | null = null
       const q: Record<string, unknown> = {}
-      for (const m of ['select', 'eq', 'neq', 'gte', 'lte', 'order', 'range']) q[m] = () => q
+      for (const m of ['eq', 'neq', 'gte', 'lte', 'order', 'range']) q[m] = () => q
+      q.select = (c?: string) => ((columns = selectedColumns(c)), q)
       // A read by a list (fund sources by status or by id, repayments by type) answers only those rows.
       q.in = (c: string, vs: unknown[]) => ((rows = rows.filter((r) => vs.includes(r[c]))), q)
-      q.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve({ data: rows, error: null }).then(res, rej)
+      q.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve({ data: projected(rows, columns), error: null }).then(res, rej)
       return q
     },
   })
@@ -143,6 +147,22 @@ describe('Overdue & Netting on the sheet', () => {
     expect(row).toHaveTextContent('RM 4,120.00')
     expect(row).toHaveTextContent('Instalment 2 of 3')
     expect(within(row).getByRole('link', { name: 'Record payment' })).toHaveAttribute('href', '/fund-in/fs1')
+  })
+
+  // 2026-10-12 (user: 现在只能选月份不能选日期): an instalment is late from its
+  // repayment start's day — the date Finance picked — not the effective date's.
+  it('counts what we owe late from the repayment start’s day', async () => {
+    database({
+      fund_sources: [
+        {
+          id: 'fs1', status: 'active', amount: 12000, cost_rate: 0.01, lock_in_months: 3, compound_interest: false, effective_date: '2026-07-15',
+          repayment_start_month: '2026-08-01', repayment_date: '2026-08-25', terms_effective_from: null, from_company_id: null, from_department_id: null, from_freetext_name: 'Tan S.H.',
+        },
+      ],
+    })
+    render(await page('in'))
+    // September's falls on the 25th: 14 days on the 9th of October, not 24.
+    expect(card('Longest overdue')).toHaveTextContent('14 days')
   })
 })
 

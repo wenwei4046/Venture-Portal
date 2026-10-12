@@ -1,5 +1,30 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-12 w (SHIPPED) — the repayment start is a date
+
+User: "这个repayment setting 到我set 了10月不会更新？" → (Carres' card said 7 Oct, its schedule
+14 Oct) → "现在只能选月份不能选日期" → "expected repayment 和 repayment start date 应该要一样" →
+"可以，照这个做".
+
+- Repayment starts on /fund-in/[id] and /fund-out/[id] is a DATE picker (`RepaymentStartEditor`,
+  `min` = the money's date; the actions refuse a month and a date before the effective date /
+  disbursement). One date: a fund source's `repayment_date` (its Expected repayment card + Dates,
+  now always shown but on a cancelled source), a loan's new `repayment_start_date`; the month in
+  `repayment_start_month`. Mig 20261012190000 (applied): `loans.repayment_start_date`;
+  `set_fund_source_repayment_start` / `set_loan_repayment_start` keep their signature, p_month
+  carries the whole date; the fund source's also moves a no-fixed-term maturity equal to the old date.
+- `lib/repayment-start` (`repaymentStart` / `fundSourceStart` / `loanStart` / `defaultStart`):
+  the date and its day; unset = the month after the money moved, on its day; a `repayment_date`
+  outside the start month is an old note (repaid legacy rows keep their schedules). Every plan reads
+  its day there: both deal pages, `lib/repayment-book` (Overview, Fund OUT list, Overdue Fund OUT),
+  Overdue's Fund IN, the calendar (`_lib/schedule-data`), `lib/loan-monitor` (Loan aging).
+- A pending fund source's edit moves `repayment_start_month` with its Expected repayment, and the
+  edit form opens on the start in effect (was the effective date). The Principal's Amend form was
+  left as it was.
+- `src/test/select-columns.ts`: fakes answer only the selected columns (book, Overdue, calendar,
+  Loan aging tests) — a reader that forgets the new column fails.
+- Carres (403255f0) still reads 7 Oct (its typed Expected repayment) until the user picks 14/10.
+
 ## CHECKPOINT 2026-10-12 v (SHIPPED) — a department's statements open on the Cash Flow
 
 User: "department pool 可以default 开 cash flow 先吗？" — `statementPath(slug)` defaults to the Cash Flow

@@ -13,6 +13,7 @@ import { isLoanUnscheduled, loanMonthlyInstallment } from '@/lib/treasury-schedu
 import { buildTermsSegments, currentSegment, principalPaidSince, resolveFirstDueYM, segmentedUnpaid, segmentRemainingPeriods, termsChanged } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isFundSourcePrincipal, isLoanPrincipal, principalPaidByMonth, termsForFundSource, termsForLoan } from '@/lib/treasury-terms-data'
 import { fundingSourceFromTerms } from '@/lib/utils'
+import { fundSourceStart, loanStart } from '@/lib/repayment-start'
 import {
   agingByDays,
   agingByMonths,
@@ -88,9 +89,8 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient, opts: { asO
   const past = !!opts.asOf && /^\d{4}-\d{2}-\d{2}$/.test(opts.asOf) && opts.asOf < realToday
   const today = past ? (opts.asOf as string) : realToday
   const currentYM = past ? today.slice(0, 7) : officeMonth()
-  // An installment falls due on the deal's own day of the month (its
-  // disbursement / effective date's), as on its Repayment schedule.
-  const dayOf = (d: unknown) => (d ? Number(String(d).slice(8, 10)) || 1 : 1)
+  // An installment falls due on the deal's own day of the month — its
+  // repayment start's (lib/repayment-start) — as on its Repayment schedule.
 
   const [
     { data: loansRead },
@@ -105,7 +105,7 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient, opts: { asO
   ] = await Promise.all([
     supabase
       .from('loans')
-      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, terms_effective_from')
+      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, repayment_start_date, terms_effective_from')
       .in('status', past ? ['active', 'fully_repaid'] : ['active']),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     supabase.from('companies').select('id, name, short_code'),
@@ -114,7 +114,7 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient, opts: { asO
     ),
     supabase
       .from('fund_sources')
-      .select('id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, terms_effective_from')
+      .select('id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, repayment_date, terms_effective_from')
       .in('status', past ? ['active', 'matured', 'repaid'] : ['active', 'matured']),
     supabase.from('fund_source_outstanding').select('fund_source_id, outstanding, total_principal_paid'),
     fetchAllRows((lo, hi) =>
@@ -259,7 +259,8 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient, opts: { asO
       detail: `RM ${money(principal)} @ ${(rate * 100).toFixed(3)}%/mo · ${tenure}mo · ${remainingLeft} left${termsTag}`,
       source,
       buckets,
-      days: agingByDays(unpaid, dayOf(l.disbursement_date), today),
+      // Aged from the repayment start's day (2026-10-12).
+      days: agingByDays(unpaid, loanStart(l).day, today),
     })
   }
 
@@ -331,7 +332,7 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient, opts: { asO
       counterparty: from as string,
       detail: `RM ${money(amount)} @ ${(rate * 100).toFixed(3)}%/mo · ${lockIn}mo · ${remaining} left${termsTag}`,
       buckets,
-      days: agingByDays(unpaid, dayOf(s.effective_date), today),
+      days: agingByDays(unpaid, fundSourceStart(s).day, today),
     })
   }
 

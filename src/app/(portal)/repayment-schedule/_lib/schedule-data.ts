@@ -1,4 +1,3 @@
-import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { officeMonth, officeToday } from '@/lib/office-time'
 import { fetchAllRows } from '@/lib/paginate'
@@ -7,6 +6,7 @@ import { resolveFirstDueYM } from '@/lib/loan-monitor'
 import { buildTermsSegments, compoundRoll, currentSegment, principalPaidSince, segmentRemainingPeriods, termsChanged, type TermsSegment } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isFundSourcePrincipal, isLoanPrincipal, principalPaidByMonth, termsForFundSource, termsForLoan } from '@/lib/treasury-terms-data'
 import { buildRepaymentPlan } from '@/lib/repayment-plan'
+import { fundSourceStart, loanStart } from '@/lib/repayment-start'
 import { monthEvents, type CalendarEntry } from '@/lib/repayment-calendar'
 import { fromCalendar } from '@/lib/deal-return'
 import { fundingSourceFromTerms } from '@/lib/utils'
@@ -53,7 +53,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   const [{ data: loans }, { data: loanOut }, { data: companies }, { data: loanReps }] = await Promise.all([
     supabase
       .from('loans')
-      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, min_pay_interest, repayment_start_month, terms_effective_from')
+      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, min_pay_interest, repayment_start_month, repayment_start_date, terms_effective_from')
       .in('status', ['active', 'fully_repaid']),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     supabase.from('companies').select('id, short_code, name'),
@@ -236,7 +236,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   // ── 应付 (fund sources) + repayment history + compounding meta + pending PVs ──
   const [payable, { data: fsMetaRows }, { data: fsReps }, { data: pendingPvs }, { data: fsDepts }, { data: fsDirectors }] = await Promise.all([
     listPayableFundSources({ includeSettledInMonth: currentYM }),
-    supabase.from('fund_sources').select('id, status, from_company_id, from_department_id, from_director_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, repayment_start_month, amount, cost_rate, lock_in_months, terms_effective_from'),
+    supabase.from('fund_sources').select('id, status, from_company_id, from_department_id, from_director_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, repayment_start_month, repayment_date, amount, cost_rate, lock_in_months, terms_effective_from'),
     fetchAllRows((lo, hi) => supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
     supabase
       .from('payment_vouchers')
@@ -448,7 +448,8 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
         .map((rp) => ({ date: String(rp.payment_date).slice(0, 10), type: rp.payment_type as string, amount: Number(rp.amount), ref: null })),
       isPrincipal: isLoanPrincipal,
       today,
-      dueDay: l.disbursement_date ? dayjs(l.disbursement_date as string).date() : 1,
+      // Each instalment on the repayment start's day (2026-10-12).
+      dueDay: loanStart(l).day,
       status: l.status as string,
     })
     events.push(
@@ -485,7 +486,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
         .map((rp) => ({ date: String(rp.payment_date).slice(0, 10), type: rp.payment_type as string, amount: Number(rp.amount), ref: null })),
       isPrincipal: isFundSourcePrincipal,
       today,
-      dueDay: m.effective_date ? dayjs(m.effective_date as string).date() : 1,
+      dueDay: fundSourceStart(m).day,
       status: m.status as string,
     })
     events.push(...monthEvents(plan, { kind: 'pay', name, href: fromCalendar(`/fund-in/${id}`, month), rate: Number(m.cost_rate), principal: Number(m.amount) }, currentYM, today))

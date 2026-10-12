@@ -8,6 +8,7 @@ import { formatMoney } from '@/lib/utils'
 import { officeMonth, officeToday } from '@/lib/office-time'
 import { fetchAllRows, fetchByKeys } from '@/lib/paginate'
 import { buildRepaymentPlan } from '@/lib/repayment-plan'
+import { fundSourceStart } from '@/lib/repayment-start'
 import { overdueOf, type OverdueSummary } from '@/lib/repayment-calendar'
 import { fetchTermsHistory, isFundSourcePrincipal, termsForFundSource } from '@/lib/treasury-terms-data'
 import { loadRepaymentBook, type BookDeal } from '@/lib/repayment-book'
@@ -44,6 +45,7 @@ type SourceRow = {
   compound_interest: boolean | null
   effective_date: string | null
   repayment_start_month: string | null
+  repayment_date?: string | null
   terms_effective_from: string | null
   from_company_id: string | null
   from_department_id: string | null
@@ -94,7 +96,7 @@ export default async function OverduePage({ searchParams }: Props) {
         .gte('payment_date', logSince < monthStart ? logSince : monthStart),
       supabase
         .from('fund_sources')
-        .select('id, status, amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, terms_effective_from, from_company_id, from_department_id, from_director_id, from_freetext_name')
+        .select('id, status, amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, repayment_date, terms_effective_from, from_company_id, from_department_id, from_director_id, from_freetext_name')
         .in('status', ['active', 'matured']),
       supabase.from('departments').select('id, name'),
       fetchAllRows((lo, hi) =>
@@ -189,7 +191,8 @@ export default async function OverduePage({ searchParams }: Props) {
       payments: repsBySource.get(s.id) ?? [],
       isPrincipal: isFundSourcePrincipal,
       today,
-      dueDay: s.effective_date ? dayjs(s.effective_date).date() : 1,
+      // Each instalment on the repayment start's day (2026-10-12).
+      dueDay: fundSourceStart(s).day,
       status: s.status,
     })
     const due = overdueOf(plan, today)
