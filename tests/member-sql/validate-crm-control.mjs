@@ -223,4 +223,22 @@ check(crmPpl.find(p => p.id === S('ann')).title, (await q(`select t.name from ti
   check([f.mode, f.vals[S('ben')]['0'], f.vals[S('ben')]['1'], f.vals[S('ben')]['2']], ['turns', 1, 0, 0], 'Max full time became turns: ticked only on a chosen day with a value')
 }
 
+// 12. A WhatsApp customer with a username comes only with their BSUID (mig 20261012100000): no phone made up from it;
+// the number the salesperson types in is kept when they write again.
+{
+  const wa = (externalId, waId) => q(`select public.crm_ingest_whatsapp($1::jsonb, '[]'::jsonb, 0, '{}'::jsonb)`, [JSON.stringify([{
+    externalId, phoneNumberId: 'PN-U', waId, name: 'Carrie', kind: 'text', body: 'Hi',
+    mediaId: null, mediaMime: null, sentAt: '2026-10-12T03:00:00.000Z', ad: null,
+  }])])
+  await wa('wamid.u1', 'MY.1052914074449222')
+  await wa('wamid.u2', '60123450000')
+  check((await q(`select external_id, phone from crm_contacts where account_id = 'PN-U' order by external_id`)), [
+    { external_id: '60123450000', phone: '+60123450000' },
+    { external_id: 'MY.1052914074449222', phone: null },
+  ], 'a number becomes the phone; a BSUID leaves it empty')
+  await q(`update crm_contacts set phone = '+60198887777' where external_id = 'MY.1052914074449222'`)
+  await wa('wamid.u3', 'MY.1052914074449222')
+  check((await q(`select phone, unread from crm_contacts where external_id = 'MY.1052914074449222'`))[0], { phone: '+60198887777', unread: 2 }, 'the hand-typed number stays when they write again')
+}
+
 console.log(`crm control panel: ${checks} checks passed`)

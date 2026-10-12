@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { cleanText, metaTemplateBody, metaTemplateName, sendError, sendWhatsAppText, submitWhatsAppTemplate, templateStatusOf, templateSubmitRequest, textRequest, windowOpen } from "./send";
+import { addressee, cleanText, messageRequest, metaTemplateBody, metaTemplateName, sendError, sendWhatsAppText, submitWhatsAppTemplate, templateStatusOf, templateSubmitRequest, textRequest, windowOpen } from "./send";
 
 describe("the 24-hour window", () => {
   const now = new Date("2026-10-02T12:00:00Z");
@@ -30,6 +30,24 @@ describe("the request", () => {
     expect(init.headers.Authorization).toBe("Bearer TOKEN");
     expect(JSON.parse(init.body)).toEqual({ messaging_product: "whatsapp", recipient_type: "individual", to: "60123456789", type: "text", text: { preview_url: false, body: "Hello" } });
     expect(url.includes("TOKEN") || init.body.includes("TOKEN")).toBe(false);
+  });
+});
+
+describe("a customer with a WhatsApp username (BSUID)", () => {
+  it("is addressed by `recipient`, a number still by `to`", () => {
+    expect(addressee("60123456789")).toEqual({ to: "60123456789" });
+    expect(addressee("+60123456789")).toEqual({ to: "+60123456789" });
+    expect(addressee("MY.1052914074449222")).toEqual({ recipient: "MY.1052914074449222" });
+    const body = JSON.parse(textRequest("PN1", "MY.1", "Hi", "T").init.body);
+    expect(body).toMatchObject({ recipient: "MY.1", type: "text" });
+    expect(body.to).toBeUndefined();
+  });
+
+  it("moves `to` to `recipient` in any message sent to a BSUID", () => {
+    const body = JSON.parse(messageRequest("PN1", "T", { to: "MY.1", type: "image", image: { id: "M" } }).init.body);
+    expect(body).toMatchObject({ recipient: "MY.1", type: "image", image: { id: "M" } });
+    expect(body.to).toBeUndefined();
+    expect(JSON.parse(messageRequest("PN1", "T", { to: "60123", type: "text" }).init.body)).toMatchObject({ to: "60123" });
   });
 });
 
