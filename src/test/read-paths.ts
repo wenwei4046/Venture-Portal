@@ -191,6 +191,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'create_payroll_statutory_selection', 'current_actions', 'current_permissions', 'current_sensitive_fields', 'current_tabs',
   'delete_manual_journal_voucher', 'delete_voucher_attachment', 'department_modes', 'department_set_cost_model',
   'dept_invoice_settlements', 'dept_request_pv_rejected', 'director_payroll_complete', 'director_payroll_uncomplete',
+  // HOUZS Venture's director share (mig 20261013170000): Director Salary · View / Edit, Treasury · View / Create / Void.
+  'director_hv_share_of', 'director_hv_share_queue', 'director_hv_share_save', 'director_hv_share_transfer', 'director_hv_share_undo',
   'director_private_fields', 'erp_feed_month_closed', 'erp_feed_secret', 'erp_link_drop_secret', 'erp_link_put_secret',
   'execute_fund_source_cancel', 'execute_loan_cancel', 'generate_invoices_from_request', 'generate_monthly_invoices',
   'generate_pv_for_dept_request', 'get_dept_opex_rows', 'get_director_ctc_by_company', 'get_hr_cost_submissions_list',

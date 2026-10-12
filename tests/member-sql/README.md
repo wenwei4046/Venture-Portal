@@ -212,3 +212,25 @@ fault in the trail never fails its delivery; and (`020000`) a row points at a
 question only when it moved what earns — the drop that opened it, never a
 later save of a status. Run only these checks with
 `npm run test:erp-change-trail --prefix tests/member-sql`.
+
+The default command also runs `validate-director-hv-share.mjs` (Director
+Salary: HOUZS Venture's own share, `20261013170000`). The migration runs
+verbatim over stand-ins for the roster, departments, invoices, receipts, the
+dept pools and the journal, with production's bodies for the triggers and
+helpers it leans on (the CTC total, a receipt marking its invoice paid, the
+source rows' sum, the journal, a receipt's pool reversal). Its 72 checks: who
+may call what (no publishable key, the helpers and tables closed to sessions);
+HR's save by percentage — each line to the sen, the rounding on the biggest
+percentage — and by amount with the ER keyed by hand, every refusal (short of
+100%, a sen short, a department twice, none, a month not its first day), and
+who may (Director Salary · Edit to save, · View to read; Finance neither);
+Finance's list without the components; Transfer — an invoice to each paying
+department's pool dated the payroll month's last day, its two journals
+(Venture Office's in `corporate`), a receipt by netting on the transfer date
+numbered past one taken elsewhere, the primary and mirror source rows, each
+pool pair under its receipt, the Director department's own line moving
+nothing, the page's guard asked; HR's lock after it (the same figures a no-op,
+a change refused); Undo — voided, every journal reversed in a pair, the pools
+back, the share waiting again; and the locked months, the payroll month's and
+the transfer date's. Run only these checks with
+`npm run test:director-hv-share --prefix tests/member-sql`.
