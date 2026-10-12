@@ -48,7 +48,7 @@ async function removeLeftoverFiles(supabase: SupabaseClient): Promise<void> {
 const done = () => revalidatePath(PAGE)
 
 export async function addDriveFolder(parent: string, name: string): Promise<DocIdOutcome> {
-  await requireActionOn(PAGE, 'documentation', 'create')
+  await requireActionOn('/team/documentation', 'documentation', 'create')
   const { data, error } = await (await client()).rpc('hr_drive_folder_add', { p_parent: parent, p_name: name })
   if (error) return { ok: false, reason: refusal(error, 'The folder could not be made. Please try again.') }
   done()
@@ -56,7 +56,7 @@ export async function addDriveFolder(parent: string, name: string): Promise<DocI
 }
 
 export async function renameDriveFolder(id: string, name: string): Promise<DocOutcome> {
-  await requireActionOn(PAGE, 'documentation', 'edit')
+  await requireActionOn('/team/documentation', 'documentation', 'edit')
   const { error } = await (await client()).rpc('hr_drive_folder_rename', { p_id: id, p_name: name })
   if (error) return { ok: false, reason: refusal(error, 'The folder could not be renamed. Please try again.') }
   done()
@@ -64,7 +64,7 @@ export async function renameDriveFolder(id: string, name: string): Promise<DocOu
 }
 
 export async function deleteDriveFolder(id: string): Promise<DocOutcome> {
-  await requireActionOn(PAGE, 'documentation', 'edit')
+  await requireActionOn('/team/documentation', 'documentation', 'edit')
   const { error } = await (await client()).rpc('hr_drive_folder_delete', { p_id: id })
   if (error) return { ok: false, reason: refusal(error, 'The folder could not be deleted. Please try again.') }
   done()
@@ -78,7 +78,7 @@ export async function saveDriveFile(input: {
   contentType: string | null
   size: number
 }): Promise<DocIdOutcome> {
-  await requireActionOn(PAGE, 'documentation', 'create')
+  await requireActionOn('/team/documentation', 'documentation', 'create')
   const { data, error } = await (await client()).rpc('hr_drive_file_add', {
     p_parent: input.parent,
     p_path: input.path,
@@ -93,7 +93,7 @@ export async function saveDriveFile(input: {
 
 /** Deleted: its row and trail stay (greyed under "Show deleted"), and its file goes from the bucket. */
 export async function deleteDriveFile(id: string): Promise<DocOutcome> {
-  await requireActionOn(PAGE, 'documentation', 'edit')
+  await requireActionOn('/team/documentation', 'documentation', 'edit')
   const supabase = await client()
   const { error } = await supabase.rpc('hr_drive_file_delete', { p_id: id })
   if (error) return { ok: false, reason: refusal(error, 'The file could not be deleted. Please try again.') }
@@ -104,7 +104,7 @@ export async function deleteDriveFile(id: string): Promise<DocOutcome> {
 
 /** A Data center file, opened from the page: a short link made now, and a line on its trail (Viewed / Downloaded). */
 export async function openDriveFile(id: string, mode: 'view' | 'download'): Promise<FileLink> {
-  await requireActionOn(PAGE, 'documentation', 'view')
+  await requireActionOn('/team/documentation', 'documentation', 'view')
   const link = await driveFileLink(id, mode)
   if (!link.ok) return link
   const { error } = await (await client()).rpc('hr_drive_log', { p_id: id, p_what: mode === 'view' ? 'Viewed' : 'Downloaded' })

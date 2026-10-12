@@ -1,30 +1,41 @@
+import { useState } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { HV, ROOT, deptAt, folderAt, personAt, type Drive } from '@/lib/documentation/drive'
 import type { Documentation, PersonLetter } from '@/lib/documentation/model'
 
-const actions = vi.hoisted(() => ({ fileLetter: vi.fn(), withdrawLetter: vi.fn(), openDocumentationFile: vi.fn() }))
+const actions = vi.hoisted(() => ({ fileLetter: vi.fn(), withdrawLetter: vi.fn(), openDocumentationFile: vi.fn(), addLetterType: vi.fn() }))
+const drive = vi.hoisted(() => ({
+  addDriveFolder: vi.fn(), renameDriveFolder: vi.fn(), deleteDriveFolder: vi.fn(), saveDriveFile: vi.fn(), deleteDriveFile: vi.fn(), openDriveFile: vi.fn(),
+}))
+const upload = vi.hoisted(() => ({ uploadDocumentationFile: vi.fn() }))
 const { flash } = vi.hoisted(() => ({ flash: vi.fn() }))
 vi.mock('@/lib/documentation/actions', () => actions)
-vi.mock('@/lib/documentation/upload', () => ({ uploadDocumentationFile: vi.fn() }))
+vi.mock('@/lib/documentation/drive-actions', () => drive)
+vi.mock('@/lib/documentation/upload', () => upload)
 vi.mock('@/components/hrv/toast', () => ({ flash }))
 
 import DataCenterTab from './DataCenterTab'
-import PreviewDrawer from './PreviewDrawer'
+import PreviewDrawer, { type PreviewTarget } from './PreviewDrawer'
 
-// Data center's Withdraw (2026-10-11, the user's answer E): a letter filed to the
-// wrong person is withdrawn from their record — asked twice, as Delete is — and
-// waits greyed under "Show withdrawn", its trail a View away, its file never
-// opened again.
+// The Data center as a Drive (2026-10-12 — the user: company → department → the person; "+ New" makes a folder for a
+// subsidiary and folders by department inside it). And, as before (2026-10-11, the user's answer E), a letter filed
+// to the wrong person is withdrawn from their record — asked twice — and waits greyed under "Show withdrawn", its
+// trail a View away, its file never opened again.
+
+const REV = '11111111-1111-4111-8111-111111111111'
+const ZACK = '33333333-3333-4333-8333-333333333333'
+const CARRES = '55555555-5555-4555-8555-555555555555'
 
 const letter = (over: Partial<PersonLetter>): PersonLetter => ({
-  id: 'L1', ref: 'D-101', staffId: 'zack', staffName: 'Zack', typeId: 'offer', typeName: 'Offer letter', fileName: 'Offer_zack.pdf',
+  id: 'L1', ref: 'D-101', staffId: ZACK, staffName: 'Zack', typeId: 'offer', typeName: 'Offer letter', fileName: 'Offer_zack.pdf',
   contentType: 'application/pdf', size: 1, filedAt: '2026-10-01T02:00:00Z', filedBy: 'HR Manager', source: 'upload',
   readAt: null, acknowledgedAt: null, withdrawnAt: null, events: [], ...over,
 })
 
 const DATA: Documentation = {
-  departments: [{ id: 'rev', name: 'Revenue Department', people: 1 }],
-  people: [{ id: 'zack', name: 'Zack', code: 'HV010', title: 'Senior Revenue Specialist', departmentId: 'rev' }],
+  departments: [{ id: REV, name: 'Revenue Department', people: 1 }],
+  people: [{ id: ZACK, name: 'Zack', code: 'HV010', title: 'Senior Revenue Specialist', departmentId: REV }],
   documents: [],
   letterTypes: [
     { id: 'offer', name: 'Offer letter', compulsory: true, count: 0 },
@@ -44,34 +55,133 @@ const DATA: Documentation = {
   published: [],
 }
 
+const DRIVE: Drive = {
+  folders: [{ id: CARRES, name: 'Carres', parent: ROOT, createdAt: '2026-10-12T01:00:00Z', createdBy: 'Amy' }],
+  files: [
+    { id: 'F1', ref: 'F-101', fileName: 'SOP.pdf', contentType: 'application/pdf', size: 2_400_000, parent: folderAt(CARRES), uploadedAt: '2026-10-12T02:00:00Z', uploadedBy: 'Amy', deletedAt: null, events: [] },
+  ],
+}
+
 beforeEach(() => {
-  for (const fn of Object.values(actions)) fn.mockReset()
+  for (const fn of [...Object.values(actions), ...Object.values(drive), ...Object.values(upload)]) fn.mockReset()
   actions.withdrawLetter.mockResolvedValue({ ok: true, person: 'Zack', type: 'Warning letter' })
   actions.openDocumentationFile.mockResolvedValue({ ok: false, reason: 'not in this test' })
+  drive.openDriveFile.mockResolvedValue({ ok: false, reason: 'not in this test' })
+  drive.addDriveFolder.mockResolvedValue({ ok: true, id: 'new' })
+  drive.deleteDriveFolder.mockResolvedValue({ ok: true })
+  drive.saveDriveFile.mockResolvedValue({ ok: true, id: 'F9' })
+  upload.uploadDocumentationFile.mockResolvedValue({ ok: true, path: 'drive/x/Rates.xlsx', fileName: 'Rates.xlsx', contentType: null, size: 5 })
   flash.mockReset()
 })
 afterEach(cleanup)
 
-const record = () => within(screen.getByRole('region', { name: 'Zack' }))
-const view = (can = { create: true, edit: true }, onView = vi.fn()) =>
-  render(<DataCenterTab data={DATA} can={can} person="zack" onPerson={vi.fn()} onView={onView} />)
+/** The tab as the page holds it: the place is the page's state. */
+function Drive({ start = ROOT, can = { create: true, edit: true }, onView = vi.fn() }: { start?: string; can?: { create: boolean; edit: boolean }; onView?: (t: PreviewTarget) => void }) {
+  const [at, setAt] = useState(start)
+  return <DataCenterTab data={DATA} drive={DRIVE} driveError={null} can={can} at={at} onAt={setAt} onView={onView} />
+}
+const path = () => screen.getByRole('navigation', { name: 'Folder path' })
+const here = () => within(path()).getByText((_, el) => el?.getAttribute('aria-current') === 'page')
 
-describe('Documentation › Data center › Withdraw', () => {
+describe('Documentation › Data center as a Drive', () => {
+  it('opens on the companies: HOUZS Venture by itself, then the folders HR made', () => {
+    render(<Drive />)
+    expect(here()).toHaveTextContent('Data center')
+    expect(screen.getByRole('button', { name: /HOUZS Venture/ })).toHaveTextContent('1 department · 1 person')
+    expect(screen.getByRole('button', { name: /^Carres/ })).toHaveTextContent('1 file')
+  })
+
+  it('walks HOUZS Venture › a department › a person, and back up by the path', () => {
+    render(<Drive />)
+    fireEvent.click(screen.getByRole('button', { name: /HOUZS Venture/ }))
+    expect(here()).toHaveTextContent('HOUZS Venture')
+    expect(screen.getByLabelText('1 person missing a compulsory letter')).toHaveTextContent('1')
+    fireEvent.click(screen.getByRole('button', { name: /^Revenue/ }))
+    expect(screen.getByLabelText('Offer letter missing')).toHaveTextContent('!')
+    fireEvent.click(screen.getByRole('button', { name: /^Zack/ }))
+    expect(within(path()).getAllByRole('button').map(b => b.textContent)).toEqual(['Data center', 'HOUZS Venture', 'Revenue'])
+    expect(screen.getByRole('region', { name: 'Zack' })).toBeInTheDocument()
+    fireEvent.click(within(path()).getByRole('button', { name: 'HOUZS Venture' }))
+    expect(here()).toHaveTextContent('HOUZS Venture')
+  })
+
+  it('+ New › New folder makes one where you are', async () => {
+    render(<Drive start={HV} />)
+    fireEvent.click(screen.getByRole('button', { name: 'New' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New folder' }))
+    const win = screen.getByRole('dialog', { name: 'New folder' })
+    expect(within(win).getByText('In HOUZS Venture')).toBeInTheDocument()
+    fireEvent.change(within(win).getByLabelText('Folder name'), { target: { value: 'Revenue' } })
+    fireEvent.click(within(win).getByRole('button', { name: 'Create' }))
+    expect(within(win).getByRole('alert')).toHaveTextContent('Revenue is here already.')
+    expect(drive.addDriveFolder).not.toHaveBeenCalled()
+    fireEvent.change(within(win).getByLabelText('Folder name'), { target: { value: 'Policies' } })
+    fireEvent.click(within(win).getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(drive.addDriveFolder).toHaveBeenCalledWith(HV, 'Policies'))
+    expect(flash).toHaveBeenCalledWith('Policies made in HOUZS Venture')
+  })
+
+  it('a folder HR made has Rename and Delete, Delete asked twice; one made by itself has no menu', async () => {
+    render(<Drive />)
+    expect(screen.queryByRole('button', { name: 'More actions for HOUZS Venture' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Carres' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
+    expect(drive.deleteDriveFolder).not.toHaveBeenCalled()
+    const armed = screen.getByRole('menuitem', { name: 'Confirm delete' })
+    expect(armed).toHaveAttribute('data-armed', 'true')
+    fireEvent.click(armed)
+    await waitFor(() => expect(drive.deleteDriveFolder).toHaveBeenCalledWith(CARRES))
+  })
+
+  it('without Documentation · Edit nothing is renamed or deleted; without Create there is no + New', () => {
+    render(<Drive can={{ create: false, edit: false }} />)
+    expect(screen.queryByRole('button', { name: 'More actions for Carres' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'New' })).toBeNull()
+  })
+
+  it('a folder HR made holds files: a press views one, + New › Upload files puts more in it', async () => {
+    const onView = vi.fn()
+    render(<Drive start={folderAt(CARRES)} onView={onView} />)
+    fireEvent.click(screen.getByRole('button', { name: 'View SOP.pdf' }))
+    expect(onView).toHaveBeenCalledWith({ kind: 'drive', id: 'F1' })
+    expect(screen.getByText('2.3 MB')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'New' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Upload files' }))
+    const input = document.querySelector('input[type="file"][multiple]') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [new File(['x'], 'Rates.xlsx')] } })
+    await waitFor(() => expect(drive.saveDriveFile).toHaveBeenCalledWith({ parent: folderAt(CARRES), path: 'drive/x/Rates.xlsx', fileName: 'Rates.xlsx', contentType: null, size: 5 }))
+    expect(upload.uploadDocumentationFile).toHaveBeenCalledWith('drive', expect.any(File))
+    expect(flash).toHaveBeenCalledWith('1 file saved in Carres')
+  })
+
+  it('search finds anything in the Data center and opens where it is', () => {
+    render(<Drive />)
+    fireEvent.change(screen.getByLabelText('Search the Data center'), { target: { value: 'zack' } })
+    fireEvent.click(screen.getAllByRole('button', { name: /Zack/ })[0])
+    expect(screen.getByRole('region', { name: 'Zack' })).toBeInTheDocument()
+  })
+})
+
+describe('a person’s folder: their record, as before', () => {
+  const record = () => within(screen.getByRole('region', { name: 'Zack' }))
+  const view = (can = { create: true, edit: true }, onView = vi.fn()) => render(<Drive start={personAt(ZACK)} can={can} onView={onView} />)
+
   it('shows the letters still on file; the withdrawn one counts for nothing — its compulsory type is missing again', () => {
     view()
     expect(record().getByText('Offer letter missing')).toBeInTheDocument()
     expect(record().getByText(/1 letter on file/)).toBeInTheDocument()
     expect(record().getAllByText('Warning letter')).toHaveLength(1)
     expect(screen.getByRole('button', { name: 'Show withdrawn (1)' })).toBeInTheDocument()
+    expect(record().getByText(/every copy Publish & save makes for Zack, land in this folder by themselves/)).toBeInTheDocument()
   })
 
   it('asks once more, then withdraws and says who no longer sees it', async () => {
     view()
-    fireEvent.click(record().getByRole('button', { name: 'Withdraw Warning letter' }))
+    fireEvent.click(record().getByRole('button', { name: 'More actions for Warning letter' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Withdraw' }))
     expect(actions.withdrawLetter).not.toHaveBeenCalled()
-    const armed = record().getByRole('button', { name: 'Confirm withdrawing Warning letter' })
+    const armed = screen.getByRole('menuitem', { name: 'Confirm withdraw' })
     expect(armed).toHaveAttribute('data-armed', 'true')
-    expect(armed).toHaveTextContent('Confirm withdraw')
     fireEvent.click(armed)
     await waitFor(() => expect(actions.withdrawLetter).toHaveBeenCalledWith('L2'))
     expect(flash).toHaveBeenCalledWith('Warning letter withdrawn · Zack no longer sees it')
@@ -80,31 +190,42 @@ describe('Documentation › Data center › Withdraw', () => {
   it('says the refusal in words when it cannot', async () => {
     actions.withdrawLetter.mockResolvedValue({ ok: false, reason: 'That letter is already withdrawn.' })
     view()
-    fireEvent.click(record().getByRole('button', { name: 'Withdraw Warning letter' }))
-    fireEvent.click(record().getByRole('button', { name: 'Confirm withdrawing Warning letter' }))
+    fireEvent.click(record().getByRole('button', { name: 'More actions for Warning letter' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Withdraw' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Confirm withdraw' }))
     await waitFor(() => expect(flash).toHaveBeenCalledWith('That letter is already withdrawn.'))
   })
 
   it('without Documentation · Edit there is nothing to withdraw', () => {
     view({ create: true, edit: false })
-    expect(record().queryByRole('button', { name: /Withdraw/ })).toBeNull()
+    fireEvent.click(record().getByRole('button', { name: 'More actions for Warning letter' }))
+    expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual(['View', 'Download'])
   })
 
   it('a withdrawn letter waits greyed under “Show withdrawn”, View only', () => {
     const onView = vi.fn()
     view(undefined, onView)
     fireEvent.click(screen.getByRole('button', { name: 'Show withdrawn (1)' }))
-    const row = record().getByText('Withdrawn · 11 Oct').closest('div')!
-    expect(row).toHaveAttribute('data-gone', 'true')
-    expect(within(row).queryByRole('button', { name: /Download|Withdraw/ })).toBeNull()
-    fireEvent.click(within(row).getByRole('button', { name: 'View' }))
-    expect(onView).toHaveBeenCalledWith('L1')
+    const card = record().getByText('Withdrawn · 11 Oct').closest('[data-gone]')!
+    expect(card).toHaveAttribute('data-gone', 'true')
+    fireEvent.click(within(card as HTMLElement).getByRole('button', { name: 'More actions for Offer letter' }))
+    expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual(['View'])
+    fireEvent.click(within(card as HTMLElement).getByRole('button', { name: 'View Offer letter' }))
+    expect(onView).toHaveBeenCalledWith({ kind: 'letter', id: 'L1' })
     expect(screen.getByRole('button', { name: 'Hide withdrawn (1)' })).toBeInTheDocument()
+  })
+
+  it('+ New in a person’s folder uploads a letter, never a folder', () => {
+    view()
+    fireEvent.click(screen.getByRole('button', { name: 'New' }))
+    expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual(['Upload a letter'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Upload a letter' }))
+    expect(screen.getByRole('dialog', { name: 'Upload a letter' })).toBeInTheDocument()
   })
 })
 
-describe('the preview of a withdrawn letter', () => {
-  it('opens on its trail, never its file', () => {
+describe('the preview', () => {
+  it('of a withdrawn letter opens on its trail, never its file', () => {
     render(<PreviewDrawer data={DATA} target={{ kind: 'letter', id: 'L1' }} onClose={vi.fn()} />)
     expect(actions.openDocumentationFile).not.toHaveBeenCalled()
     expect(screen.getByRole('tab', { name: /Audit trail/ })).toHaveAttribute('aria-selected', 'true')
@@ -114,9 +235,24 @@ describe('the preview of a withdrawn letter', () => {
     expect(screen.getByText(/No longer on Zack's record or in the Revenue app; its trail stays\./)).toBeInTheDocument()
   })
 
-  it('a letter still on file opens its file as before', async () => {
+  it('of a letter still on file opens its file as before', async () => {
     render(<PreviewDrawer data={DATA} target={{ kind: 'letter', id: 'L2' }} onClose={vi.fn()} />)
     await waitFor(() => expect(actions.openDocumentationFile).toHaveBeenCalledWith('letter', 'L2', 'view'))
     expect(screen.getByRole('tab', { name: 'Preview' })).toHaveAttribute('aria-selected', 'true')
   })
+
+  it('of a Data center file opens it through its own link and names its folder', async () => {
+    render(<PreviewDrawer data={DATA} drive={DRIVE} target={{ kind: 'drive', id: 'F1' }} onClose={vi.fn()} />)
+    await waitFor(() => expect(drive.openDriveFile).toHaveBeenCalledWith('F1', 'view'))
+    expect(actions.openDocumentationFile).not.toHaveBeenCalled()
+    expect(screen.getByText('File · Carres')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: /Audit trail/ }))
+    expect(screen.getByText('Folder').nextElementSibling).toHaveTextContent('Carres')
+  })
+})
+
+// A department's address the page can be opened on (`?in=dept:<id>`).
+it('opens on a department named in the address', () => {
+  render(<Drive start={deptAt(REV)} />)
+  expect(here()).toHaveTextContent('Revenue')
 })
