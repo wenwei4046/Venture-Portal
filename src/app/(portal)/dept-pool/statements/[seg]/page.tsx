@@ -42,7 +42,9 @@ export default async function DeptStatementPage({ params, searchParams }: Props)
   if (!dept) notFound()
 
   const sp = await searchParams
-  const view: StatementView = sp.view === 'cash-flow' ? 'cash-flow' : 'pnl'
+  // The Cash Flow first (2026-10-12, user: default 开 cash flow 先); an old
+  // ?view=cash-flow link lands there too.
+  const view: StatementView = sp.view === 'pnl' ? 'pnl' : 'cash-flow'
   const nowYM = officeMonth()
   const period = YM.test(sp.period ?? '') ? (sp.period as string) : nowYM
   const range = reportRange({ from: sp.from, period }, nowYM)

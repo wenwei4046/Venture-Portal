@@ -1,5 +1,11 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-12 v (SHIPPED) — a department's statements open on the Cash Flow
+
+User: "department pool 可以default 开 cash flow 先吗？" — `statementPath(slug)` defaults to the Cash Flow
+(the bare /dept-pool/statements/<slug>), the P&L is `?view=pnl`; the page reads any other view as the
+Cash Flow, so old `?view=cash-flow` links still land there. The sidebar rows link the bare path.
+
 ## CHECKPOINT 2026-10-12 u (SHIPPED) — the calendar without 0.00; a director's fund source by name
 
 User: "这个calender 0.00 是什么？先确定，别做" → explained (0% deals with no fixed term get a

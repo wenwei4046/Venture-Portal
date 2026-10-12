@@ -36,10 +36,11 @@ export function statementDepts(registry: readonly DeptRegistryRow[]): StatementD
 
 export type StatementView = 'pnl' | 'cash-flow'
 
-/** A department's page: the P&L unless the Cash Flow is asked for, with the period kept. */
-export function statementPath(slug: string, view: StatementView = 'pnl', period: { period?: string; from?: string } = {}): string {
+/** A department's page: the Cash Flow unless the P&L is asked for (2026-10-12,
+ *  user: default 开 cash flow 先), with the period kept. */
+export function statementPath(slug: string, view: StatementView = 'cash-flow', period: { period?: string; from?: string } = {}): string {
   const qs = new URLSearchParams()
-  if (view === 'cash-flow') qs.set('view', 'cash-flow')
+  if (view === 'pnl') qs.set('view', 'pnl')
   if (period.period) qs.set('period', period.period)
   if (period.from) qs.set('from', period.from)
   const q = qs.toString()

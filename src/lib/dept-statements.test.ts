@@ -67,19 +67,20 @@ describe('the departments Dept Pool lists', () => {
   })
 })
 
+// 2026-10-12 (user: department pool 可以 default 开 cash flow 先吗？): the page
+// opens on the Cash Flow; the P&L is asked for.
 describe('a department’s statements page', () => {
-  it('opens on the P&L', () => {
+  it('opens on the Cash Flow', () => {
     expect(statementPath('marketing')).toBe('/dept-pool/statements/marketing')
+    expect(statementPath('marketing', 'cash-flow')).toBe('/dept-pool/statements/marketing')
   })
 
-  it('opens on the Cash Flow when asked', () => {
-    expect(statementPath('marketing', 'cash-flow')).toBe('/dept-pool/statements/marketing?view=cash-flow')
+  it('opens on the P&L when asked', () => {
+    expect(statementPath('marketing', 'pnl')).toBe('/dept-pool/statements/marketing?view=pnl')
   })
 
   it('keeps the period it was given', () => {
-    expect(statementPath('hr', 'cash-flow', { period: '2026-09', from: '2026-03' })).toBe(
-      '/dept-pool/statements/hr?view=cash-flow&period=2026-09&from=2026-03',
-    )
-    expect(statementPath('hr', 'pnl', { period: '2026-09' })).toBe('/dept-pool/statements/hr?period=2026-09')
+    expect(statementPath('hr', 'pnl', { period: '2026-09', from: '2026-03' })).toBe('/dept-pool/statements/hr?view=pnl&period=2026-09&from=2026-03')
+    expect(statementPath('hr', 'cash-flow', { period: '2026-09' })).toBe('/dept-pool/statements/hr?period=2026-09')
   })
 })

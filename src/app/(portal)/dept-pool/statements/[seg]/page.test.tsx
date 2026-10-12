@@ -106,15 +106,15 @@ beforeEach(() => {
 
 describe('a department’s own P&L under Dept Pool', () => {
   it('heads with the department and its period, the P&L picked', async () => {
-    render(await page('marketing'))
+    render(await page('marketing', { view: 'pnl' }))
     expect(document.querySelector('.page-eyebrow')).toHaveTextContent('DEPARTMENTS · MARKETING · JAN – OCT 2026')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Marketing')
     expect(within(views()).getByRole('link', { name: 'P&L' })).toHaveAttribute('aria-current', 'page')
-    expect(within(views()).getByRole('link', { name: 'Cash Flow' })).toHaveAttribute('href', '/dept-pool/statements/marketing?view=cash-flow')
+    expect(within(views()).getByRole('link', { name: 'Cash Flow' })).toHaveAttribute('href', '/dept-pool/statements/marketing')
   })
 
   it('reads the department’s P&L — the one Reports shows with it picked', async () => {
-    render(await page('marketing'))
+    render(await page('marketing', { view: 'pnl' }))
     expect(mocks.requireActionOn).toHaveBeenCalledWith(expect.any(String), 'reports', 'view')
     expect(mocks.buildPnlAccounts).toHaveBeenCalledWith([], [], { year: 2026, throughMonth: 10, segment: ['marketing'] })
     // One segment is never the consolidated view: nothing is eliminated.
@@ -133,7 +133,7 @@ describe('a department’s own P&L under Dept Pool', () => {
   })
 
   it('cuts the months to From and exports the department', async () => {
-    render(await page('marketing', { period: '2026-09', from: '2026-03' }))
+    render(await page('marketing', { view: 'pnl', period: '2026-09', from: '2026-03' }))
     expect(document.querySelector('.page-eyebrow')).toHaveTextContent('DEPARTMENTS · MARKETING · MAR – SEP 2026')
     expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/reports/monthly-pnl/export?format=xlsx&period=2026-09&segment=marketing&from=2026-03')
     expect(screen.getByRole('link', { name: 'PDF' })).toHaveAttribute('href', '/reports/monthly-pnl/export?format=pdf&period=2026-09&segment=marketing&from=2026-03')
@@ -141,27 +141,29 @@ describe('a department’s own P&L under Dept Pool', () => {
 
   it('keeps the period across the switch', async () => {
     render(await page('hr', { period: '2026-09', from: '2026-03' }))
-    expect(within(views()).getByRole('link', { name: 'Cash Flow' })).toHaveAttribute('href', '/dept-pool/statements/hr?view=cash-flow&period=2026-09&from=2026-03')
+    expect(within(views()).getByRole('link', { name: 'P&L' })).toHaveAttribute('href', '/dept-pool/statements/hr?view=pnl&period=2026-09&from=2026-03')
   })
 
   it('reads Venture as corporate with treasury, as Reports does', async () => {
-    render(await page('venture'))
+    render(await page('venture', { view: 'pnl' }))
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Venture')
     expect(mocks.buildPnlAccounts).toHaveBeenCalledWith([], [], expect.objectContaining({ segment: ['corporate', 'treasury'] }))
   })
 
   it('opens a department added since, from the registry', async () => {
-    render(await page('revenue-department'))
+    render(await page('revenue-department', { view: 'pnl' }))
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Revenue Department')
     expect(mocks.buildPnlAccounts).toHaveBeenCalledWith([], [], expect.objectContaining({ segment: ['revenue_department'] }))
   })
 })
 
+// 2026-10-12 (user: department pool 可以 default 开 cash flow 先吗？): the page
+// opens on the Cash Flow; an old ?view=cash-flow link still lands there.
 describe('a department’s own Cash Flow under Dept Pool', () => {
-  it('switches to the Cash Flow, with the bridge that ties it to the pool', async () => {
-    render(await page('marketing', { view: 'cash-flow' }))
+  it('opens on the Cash Flow, with the bridge that ties it to the pool', async () => {
+    render(await page('marketing'))
     expect(within(views()).getByRole('link', { name: 'Cash Flow' })).toHaveAttribute('aria-current', 'page')
-    expect(within(views()).getByRole('link', { name: 'P&L' })).toHaveAttribute('href', '/dept-pool/statements/marketing')
+    expect(within(views()).getByRole('link', { name: 'P&L' })).toHaveAttribute('href', '/dept-pool/statements/marketing?view=pnl')
     expect(mocks.sides).toHaveBeenCalledWith([], [{ code: 'IB' }, { code: 'PC' }], new Set(['3000']), { year: 2026, throughMonth: 10, segment: ['marketing'] })
     expect(mocks.bridge).toHaveBeenCalled()
     expect(mocks.buildPnlAccounts).not.toHaveBeenCalled()
@@ -169,6 +171,11 @@ describe('a department’s own Cash Flow under Dept Pool', () => {
     expect(card('Closing cash')).toHaveTextContent('RM 115,000.00')
     expect(document.querySelector('.sect-head .count')).toHaveTextContent('MARKETING · JAN – OCT 2026')
     expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/reports/monthly-cash-flow/export?format=xlsx&period=2026-10&segment=marketing')
+  })
+
+  it('still opens the Cash Flow from an old ?view=cash-flow link', async () => {
+    render(await page('marketing', { view: 'cash-flow' }))
+    expect(within(views()).getByRole('link', { name: 'Cash Flow' })).toHaveAttribute('aria-current', 'page')
   })
 })
 
