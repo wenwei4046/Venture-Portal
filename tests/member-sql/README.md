@@ -214,23 +214,28 @@ later save of a status. Run only these checks with
 `npm run test:erp-change-trail --prefix tests/member-sql`.
 
 The default command also runs `validate-director-hv-share.mjs` (Director
-Salary: HOUZS Venture's own share, `20261013170000`). The migration runs
-verbatim over stand-ins for the roster, departments, invoices, receipts, the
-dept pools and the journal, with production's bodies for the triggers and
-helpers it leans on (the CTC total, a receipt marking its invoice paid, the
-source rows' sum, the journal, a receipt's pool reversal). Its 72 checks: who
-may call what (no publishable key, the helpers and tables closed to sessions);
-HR's save by percentage — each line to the sen, the rounding on the biggest
-percentage — and by amount with the ER keyed by hand, every refusal (short of
-100%, a sen short, a department twice, none, a month not its first day), and
-who may (Director Salary · Edit to save, · View to read; Finance neither);
-Finance's list without the components; Transfer — an invoice to each paying
-department's pool dated the payroll month's last day, its two journals
-(Venture Office's in `corporate`), a receipt by netting on the transfer date
-numbered past one taken elsewhere, the primary and mirror source rows, each
-pool pair under its receipt, the Director department's own line moving
-nothing, the page's guard asked; HR's lock after it (the same figures a no-op,
-a change refused); Undo — voided, every journal reversed in a pair, the pools
-back, the share waiting again; and the locked months, the payroll month's and
-the transfer date's. Run only these checks with
+Salary: HOUZS Venture's own share — `20261013170000` as it first shipped, then
+`20261013233000`, which makes it payroll: the batch that carries the month's
+directors asks the departments HR picked for their part, no invoice, no
+transfer). Both migrations run verbatim over stand-ins for the roster,
+departments, invoices, receipts, the dept pools, the journal and the payroll's
+batches, lines and funding requests; the three functions `233000` swaps a
+statement of are production's bodies, loaded from the migrations that hold
+them (md5 checked). Its 82 checks: a transferred share stopping the migration
+and an open one waiting again; the transfer, its undo and Finance's list gone;
+who may call what (no publishable key, the helpers, triggers and tables closed
+to sessions); HR's save by percentage — each line to the sen, the rounding on
+the biggest percentage — and by amount with the ER keyed by hand, every
+refusal, and who may (Director Salary · Edit to save, · View to read; Finance
+neither); the funding request of a batch with the month's directors carrying
+the share (not the lines alone, not a staff-only batch, not a top-up, never
+more on the departments than the directors' payroll — the Director
+department's own line moving nothing), HR's lock while it does; Finance's
+breakdown (each department its part, the Director pool that much less, the
+parts making the request); the accrual figures a segment (each part's CTC
+exact, Venture Office's in `corporate`, every JV balanced, the figures as
+production's dry-run gave them, nothing made or lost); each pool paying its
+part, Venture Office's found by its name; Finance sending the batch back and
+the next batch carrying the new split; the directors gone without it; the
+locked months; and nobody signed in. Run only these checks with
 `npm run test:director-hv-share --prefix tests/member-sql`.

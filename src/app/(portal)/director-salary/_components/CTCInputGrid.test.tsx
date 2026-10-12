@@ -97,26 +97,26 @@ describe('CTCInputGrid · HOUZS Venture’s row', () => {
     periodMonth: '2026-10-01',
     totalCtc: 6000,
     splitMode: 'percent',
-    status: 'with_finance',
+    status: 'open',
     submittedAt: '2026-10-13T01:00:00+00:00',
     submittedBy: 'HR Manager',
-    transferredAt: null,
-    transferDate: null,
-    transferredBy: null,
+    batchId: null,
+    batchNo: null,
+    batchSubmittedAt: null,
     lines: [
-      { departmentId: 'dep-mkt', department: 'Marketing', stays: false, amount: 3600, pct: 60, invoiceId: null, invoiceNo: null, voucherId: null, voucherNo: null },
-      { departmentId: 'dep-rev', department: 'Revenue Department', stays: false, amount: 2400, pct: 40, invoiceId: null, invoiceNo: null, voucherId: null, voucherNo: null },
+      { departmentId: 'dep-mkt', department: 'Marketing', stays: false, amount: 3600, pct: 60 },
+      { departmentId: 'dep-rev', department: 'Revenue Department', stays: false, amount: 2400, pct: 40 },
     ],
     components: { basic: 5000, kpi: 0, allowance: 1000, employerEpf: 0, employerSocso: 0, employerEis: 0, erManual: false },
     ...over,
   })
-  const hvGrid = (hvShare: HvShare | null) => (
+  const hvGrid = (hvShare: HvShare | null, directorsSent = false) => (
     <CTCInputGrid
       directors={directors}
       companies={companies}
       existingCTC={[ctc('co-2990', 2500)]}
       period="2026-10-01"
-      hv={{ departments, share: hvShare }}
+      hv={{ departments, share: hvShare, directorsSent }}
     />
   )
   const dialog = () => screen.getByRole('dialog', { name: "HOUZS Venture's share" })
@@ -127,7 +127,7 @@ describe('CTCInputGrid · HOUZS Venture’s row', () => {
     expect(screen.getByLabelText('Allowance — HOUZS Venture')).toHaveValue(1000)
     const rows = screen.getAllByRole('row')
     expect(within(rows[1]).getByText('HOUZS Venture')).toBeInTheDocument()
-    expect(within(rows[1]).getByText('With Finance')).toBeInTheDocument()
+    expect(within(rows[1]).getByText('Waits for payroll')).toBeInTheDocument()
     // 2,500 (2990) + 5,000 (HV) basic; the grand total 8,500.
     const foot = rows[rows.length - 1]
     expect(within(foot).getByText('7,500.00')).toBeInTheDocument()
@@ -217,10 +217,21 @@ describe('CTCInputGrid · HOUZS Venture’s row', () => {
     expect(batchSaveCTC.mock.calls[1][2]).toEqual({ basic: 0, kpi: 0, allowance: 0, erManual: false, splitMode: 'amount', lines: [] })
   })
 
-  it('locks the row once Finance has transferred it, and saves the subsidiaries alone', async () => {
-    render(hvGrid(share({ status: 'transferred', transferDate: '2026-10-14', transferredBy: 'Finance Manager' })))
+  // The user, 2026-10-13: "应该是直接转出去，就是 payout 出去 payroll 才对" — the
+  // share goes with the directors' payroll batch, and is fixed while it is there.
+  it('locks the row once the directors’ payroll batch carries it, and saves the subsidiaries alone', async () => {
+    render(hvGrid(share({ status: 'in_payroll', batchId: 'batch-7', batchNo: 7, batchSubmittedAt: '2026-10-14T02:00:00+00:00' }), true))
     expect(screen.getByLabelText('Basic — HOUZS Venture')).toBeDisabled()
-    expect(screen.getByText('Transferred')).toBeInTheDocument()
+    expect(screen.getByText('In payroll #7')).toBeInTheDocument()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(batchSaveCTC.mock.calls[0][2]).toBeNull()
+  })
+
+  it('locks it too once the directors went to Finance without it — no batch would carry it', async () => {
+    render(hvGrid(null, true))
+    expect(screen.getByLabelText('Basic — HOUZS Venture')).toBeDisabled()
+    expect(screen.getByText('Directors sent')).toBeInTheDocument()
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(batchSaveCTC.mock.calls[0][2]).toBeNull()

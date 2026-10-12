@@ -55,31 +55,48 @@ export type Guard = {
 
 const quoted = (s: string) => [...s.matchAll(/'([^']*)'/g)].map(v => v[1])
 
-/** Every `pg_temp.tab_guard(…)` / `pg_temp.tab_guard_sites(…)` in the migrations. */
+const sameSig = (a: string, b: string) => a.replace(/\s+/g, '').toLowerCase() === b.replace(/\s+/g, '').toLowerCase()
+
+/**
+ * Every `pg_temp.tab_guard(…)` / `pg_temp.tab_guard_sites(…)` in the migrations —
+ * less the functions a later statement drops, whose guard goes with them
+ * (HOUZS Venture's transfer and undo, mig 20261013233000).
+ */
 export function guards(): Guard[] {
   const out = new Map<string, Guard>()
   for (const f of migrationFiles()) {
     const sql = sqlOf(f)
+    // The file's statements in its own order: a function dropped and guarded again stays guarded.
+    const steps: Array<{ at: number; run: () => void }> = []
     for (const m of sql.matchAll(/SELECT pg_temp\.tab_guard\('public\.(\w+)\(([^)]*)\)',\s*\$\$([\s\S]*?)\$\$,\s*ARRAY\[([^\]]*)\]\)/g)) {
       // A choice between pages (CASE … THEN ARRAY[…] ELSE ARRAY[…] END) — each ARRAY a branch.
       const branches = [...m[3].matchAll(/ARRAY\[((?:\s*'[^']*'\s*,?)*)\s*\]/g)].map(b => quoted(b[1]))
-      out.set(m[1], { fn: m[1], sig: `${m[1]}(${m[2]})`, pages: [...new Set(branches.flat())].sort(), branches, wants: quoted(m[4]), sites: null, file: f })
+      steps.push({ at: m.index!, run: () => out.set(m[1], { fn: m[1], sig: `${m[1]}(${m[2]})`, pages: [...new Set(branches.flat())].sort(), branches, wants: quoted(m[4]), sites: null, file: f }) })
     }
     for (const m of sql.matchAll(/SELECT pg_temp\.tab_guard_sites\('public\.(\w+)\(([^)]*)\)',\s*ARRAY\[((?:\s*'[^']*',?)*)\s*\]\)/g)) {
       const sites = quoted(m[3]).map(s => {
         const [pages, wants] = s.split('|')
         return { pages: pages.split(','), wants: wants.split(',') }
       })
-      out.set(m[1], {
-        fn: m[1],
-        sig: `${m[1]}(${m[2]})`,
-        pages: [...new Set(sites.flatMap(s => s.pages))].sort(),
-        branches: sites.map(s => s.pages),
-        wants: [...new Set(sites.flatMap(s => s.wants))],
-        sites,
-        file: f,
+      steps.push({
+        at: m.index!,
+        run: () => out.set(m[1], {
+          fn: m[1],
+          sig: `${m[1]}(${m[2]})`,
+          pages: [...new Set(sites.flatMap(s => s.pages))].sort(),
+          branches: sites.map(s => s.pages),
+          wants: [...new Set(sites.flatMap(s => s.wants))],
+          sites,
+          file: f,
+        }),
       })
     }
+    // A drop in a comment drops nothing; blanking keeps every position where it was.
+    const code = sql.replace(/--[^\n]*/g, c => ' '.repeat(c.length))
+    for (const m of code.matchAll(/DROP FUNCTION (?:IF EXISTS )?public\.(\w+)\(([^)]*)\)/gi)) {
+      steps.push({ at: m.index!, run: () => { if (sameSig(out.get(m[1])?.sig ?? '', `${m[1]}(${m[2]})`)) out.delete(m[1]) } })
+    }
+    steps.sort((a, b) => a.at - b.at).forEach(s => s.run())
   }
   return [...out.values()]
 }
