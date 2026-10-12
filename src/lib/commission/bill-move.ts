@@ -109,3 +109,8 @@ export interface BillMoved {
 export function movedNote(moved: BillMoved): string {
   return moved.fromName ? `Moved from ${moved.fromName}` : 'Moved here'
 }
+
+/** The same mid-sentence, as the bill's page says it: "moved from ADRIAN" — the name as written. */
+export function movedPhrase(moved: BillMoved): string {
+  return moved.fromName ? `moved from ${moved.fromName}` : 'moved here'
+}

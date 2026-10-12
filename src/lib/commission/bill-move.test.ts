@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { billMoveAction, movedNote, moveMessage, moveProblem, type BillMoveResult } from './bill-move'
+import { billMoveAction, movedNote, movedPhrase, moveMessage, moveProblem, type BillMoveResult } from './bill-move'
 
 // 2026-10-12 — the user: "together with rightclick … can select move this
 // order to other sales person".
@@ -64,5 +64,15 @@ describe('movedNote', () => {
       .toBe('Moved from ADRIAN')
     expect(movedNote({ fromStaffId: null, fromName: null, movedByName: 'HR', movedAt: '2026-10-12T08:00:00Z', note: null }))
       .toBe('Moved here')
+  })
+})
+
+describe('movedPhrase', () => {
+  // The bill's page says it mid-sentence; lower-casing movedNote wrote "adrian".
+  it('keeps the name as it is written', () => {
+    expect(movedPhrase({ fromStaffId: 'adrian', fromName: 'ADRIAN', movedByName: 'HR', movedAt: '2026-10-12T08:00:00Z', note: null }))
+      .toBe('moved from ADRIAN')
+    expect(movedPhrase({ fromStaffId: null, fromName: null, movedByName: 'HR', movedAt: '2026-10-12T08:00:00Z', note: null }))
+      .toBe('moved here')
   })
 })

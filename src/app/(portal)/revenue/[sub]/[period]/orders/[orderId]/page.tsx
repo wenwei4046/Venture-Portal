@@ -31,7 +31,7 @@ import { paperRef } from '@/lib/commission/paper-ref'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
 import { loadOrderExclusions, loadOrderShares } from '../../../../_lib/month-orders'
 import { loadBillMoves } from '../../../../_lib/row-origins'
-import { movedNote } from '@/lib/commission/bill-move'
+import { movedPhrase } from '@/lib/commission/bill-move'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string; orderId: string }>
@@ -404,7 +404,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
             {moved ? (
               <>
                 <span title={[moved.movedByName ? `by ${moved.movedByName}` : null, moved.note].filter(Boolean).join(' — ') || undefined}>
-                  {movedNote(moved).toLowerCase()} on {formatDate(moved.movedAt)}
+                  {movedPhrase(moved)} on {formatDate(moved.movedAt)}
                 </span>
                 {' · '}
               </>
