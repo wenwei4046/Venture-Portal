@@ -269,7 +269,7 @@ Every delivery becomes one row in the portal's `erp_sync_events` and one of:
 | `applied` | a new order, an update, or an order becoming excluded | yes — header upserted, lines replaced, day re-sequenced, Open Bill suggestions re-derived, batch counters refreshed |
 | `duplicate` | same `snapshotAt` as the row already holds | no |
 | `stale` | an older `snapshotAt` than the row already holds (out-of-order retry) | no |
-| `held` | the month's commission run is **applied/locked**, the month is **closed to the feed** (`erp_feed_closed_months`, 2026-09-26 — a delivery that would write into OR out of it), or the month was **file-imported** | no — payload kept; HR replays after reopening the run or the month |
+| `held` | the month's commission run is **applied/locked**, the month is **closed to the feed** (`erp_feed_closed_months`, 2026-09-26 — a delivery that would write into OR out of it), or the month was **file-imported**. Since 2026-10-12 (mig `20261012200000`) a NEW document whose sale month is paid or closed is no longer held: it is `applied` in the first month still open from the month it was keyed in (message *created — keyed late: sold in September 2026, which is paid, so it counts in October 2026*); held only when no month up to the office's own is open | no — payload kept; HR replays after reopening the run or the month |
 | `skipped` | a brand-new `DRAFT`; a delete for a document the portal never saw; an order dated before the feed window | no |
 
 **Commission rule, mirrored from the ERP** (`scm/shared/hr-commission.ts`,
@@ -394,6 +394,11 @@ A window of 401s between the two only delays deliveries — the outbox retries.
   pays from*) makes every earlier month closed to the feed for good — its
   deliveries are `held` and its changes become drops/upsells as above. A re-send
   never moves a bill that lives in a paying month back into one of them.
+- **A late key-in (2026-10-12).** A NEW document sold at a fair of a month
+  already paid, or before the cutover, lands in the first month still open from
+  the month it was keyed in — Comm Cal marks it *Late key-in · Sep 2026 fair* and
+  pays it there; one already paid by hand on a claim form shows in *Double
+  claims* and HR takes it out with *Don't count this bill*.
 - **A month was file-imported before the feed existed.** Its deliveries are
   `held` too. Retire that import (supersede it) and replay, or leave the month
   as imported — the feed never overwrites a file month.
