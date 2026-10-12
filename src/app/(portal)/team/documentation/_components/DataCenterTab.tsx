@@ -81,6 +81,18 @@ export default function DataCenterTab({
   const people = useMemo(() => dataCenterPeople(data), [data])
   const person = place?.kind === 'person' ? people.find(p => p.id === place.id) ?? null : null
   const folders = folderCards(here, data, drive)
+  // What People makes, named by what it is (the companies, a company's departments, a department's people), then the
+  // folders HR made there.
+  const auto = folders.filter(c => !c.own)
+  const own = folders.filter(c => c.own)
+  const sections = (
+    place?.kind === 'root'
+      ? [{ title: 'Companies', cards: folders }]
+      : [
+          { title: place?.kind === 'company' ? 'Departments' : 'People', cards: auto },
+          { title: 'Folders', cards: own },
+        ]
+  ).filter(x => x.cards.length > 0)
   const files = placeFiles(here, drive, showDeleted)
   const deletedHere = drive.files.filter(f => f.parent === here && f.deletedAt).length
   const hits = useMemo(() => searchDrive(query, data, drive), [query, data, drive])
@@ -286,18 +298,18 @@ export default function DataCenterTab({
       ) : (
         <>
           {hintOf(here, name) ? <div className={s.hint}>{hintOf(here, name)}</div> : null}
-          {folders.length ? (
-            <div className={s.sect}>
+          {sections.map(sect => (
+            <div key={sect.title} className={s.sect}>
               <div className={s.sectHead}>
-                Folders <span className={s.sectCount}>{folders.length}</span>
+                {sect.title} <span className={s.sectCount}>{sect.cards.length}</span>
               </div>
               <div className={s.grid}>
-                {folders.map(card => (
+                {sect.cards.map(card => (
                   <FolderTile key={card.at} card={card} canEdit={can.edit} onOpen={open} onRename={setRenaming} onDelete={c => void removeFolder(c)} />
                 ))}
               </div>
             </div>
-          ) : null}
+          ))}
           {files.length || uploading ? (
             <div className={s.sect}>
               <div className={s.sectHead}>
