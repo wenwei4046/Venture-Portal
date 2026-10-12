@@ -23,6 +23,14 @@
  * (`member_claim_detail_for`) and stores ITS answer, so a figure sent from a
  * browser is never the one that is paid — only a plane ticket's price and an
  * Airbnb invoice's total are typed, and HR checks both against the invoice.
+ *
+ *   Food        (2026-10-13, the user) HR's rate a day × the days of the
+ *               member's brand weeks' fairs they worked in a MONTH — sent once
+ *               a month ("submit by total month"), after it is over: every
+ *               weekend of it, all its days or the ones they tick (a day they
+ *               did not go is left out). Fair's only, for the titles HR picks;
+ *               no invoice, no region; a month and a day are claimed once
+ *               (`member_claim_food_detail`, `member_food_claim_taken`).
  */
 
 export interface ClaimRegion {
@@ -54,6 +62,18 @@ export interface ClaimRates {
   regions: ClaimRegion[];
   /** This month's and last month's fairs, by fair id. */
   fairs: Record<string, ClaimFair>;
+  /** The food claim HR set (2026-10-13); absent from a read older than it. */
+  food?: FoodClaimRates;
+}
+
+/** The food claim as HR set it: Fair's, a rate a day, and the titles that may claim it. */
+export interface FoodClaimRates {
+  /** The one sub-department it is for — Fair (the user: "only for fair sub-department"). */
+  subDepartmentId: string | null;
+  /** RM a day; null until HR sets it. */
+  perDay: number | null;
+  /** The names of the titles whose holders may claim it. */
+  titles: string[];
 }
 
 export type ClaimInput =
@@ -190,6 +210,125 @@ export function claimAmount(rates: ClaimRates, input: ClaimInput): number {
   return cap === null ? 0 : Math.min(invoice, cap);
 }
 
+// ── The food claim (2026-10-13) ──
+
+/**
+ * May this member send a food claim here: the sub-department is the one it is for (Fair), HR set a rate,
+ * and the member's title there is one HR picked. The database asks the same (`member_claim_food_detail`).
+ */
+export function foodOpenTo(rates: Pick<ClaimRates, "food"> | null | undefined, subDepartmentId: string | null | undefined, title: string | null | undefined): boolean {
+  const food = rates?.food;
+  if (!food || !subDepartmentId || food.subDepartmentId !== subDepartmentId) return false;
+  if (food.perDay === null || !(food.perDay > 0)) return false;
+  const mine = (title ?? "").trim().toLowerCase();
+  return !!mine && food.titles.some(t => t.trim().toLowerCase() === mine);
+}
+
+/**
+ * The days of a brand week's fair, `YYYY-MM-DD`, first to last — its own days, else its weekend's, Friday
+ * to Sunday (the brand week is named by its Friday; `member_claim_food_detail` takes the same).
+ */
+export function fairDays(fair: { start: string | null; end: string | null }, weekend: string): string[] {
+  const known = !!fair.start && !!fair.end && fair.start <= fair.end;
+  const first = known ? fair.start! : weekend;
+  const last = known ? fair.end! : shiftDay(weekend, 2);
+  const out: string[] = [];
+  for (let day = first; day <= last && out.length < 31; day = shiftDay(day, 1)) out.push(day);
+  return out;
+}
+
+/** A day of the fair as the form offers it: free to claim, in another food claim of theirs, or still to come. */
+export type FoodDayState = "open" | "claimed" | "ahead";
+
+export function foodDayState(day: string, today: string, claimed: ReadonlySet<string>): FoodDayState {
+  if (claimed.has(day)) return "claimed";
+  return day > today ? "ahead" : "open";
+}
+
+/** What a food claim is paid: the rate a day × the days, RM — 0 while either is missing. */
+export function foodAmount(perDay: number | null | undefined, days: number): number {
+  return perDay && perDay > 0 && days > 0 ? round2(perDay * days) : 0;
+}
+
+/**
+ * A food claim is sent for a MONTH (the user, 2026-10-13: "they will submit by total month … dont by week submit"):
+ * the brand weeks whose Friday falls in it, and once it is over — from the 1st of the next month, so none of its
+ * days is still to come. `member_claim_food_detail` refuses the same.
+ */
+export function monthOfWeek(week: string): string {
+  return week.slice(0, 7);
+}
+
+/** The 1st of the month after `YYYY-MM`, `YYYY-MM-DD` — the day its food can be claimed from. */
+export function foodMonthOpensOn(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+}
+
+export function foodMonthOver(month: string, today: string): boolean {
+  return today >= foodMonthOpensOn(month);
+}
+
+/** The months a member's own live food claims hold, and each one's request number (one claim a month). */
+export function claimedFoodMonths(
+  requests: readonly { id: string; kind: string; status: string; detail: Record<string, unknown> | null | undefined; requestNo?: string | null }[],
+  exceptId?: string | null,
+): Map<string, string | null> {
+  const out = new Map<string, string | null>();
+  for (const r of requests) {
+    if (r.id === exceptId || r.kind !== "claim" || r.detail?.claimType !== "food") continue;
+    if (r.status === "draft" || r.status === "withdrawn" || r.status === "rejected") continue;
+    const month = r.detail?.month;
+    if (typeof month === "string" && !out.has(month)) out.set(month, r.requestNo ?? null);
+  }
+  return out;
+}
+
+/** A food claim's weekends as the phone sends them: each Friday once, its days `YYYY-MM-DD`, in order. */
+export interface FoodWeekPick {
+  week: string;
+  days: string[];
+}
+
+const isDay = (v: unknown): v is string => {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(`${v}T00:00:00Z`);
+  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === v;
+};
+
+/**
+ * The weekends a food claim sends, read strictly — 1 to 6 weekends of the month, each once, each with 1 to 31 real
+ * days; null when anything else arrives (the server refuses it; the database checks every day against the fair).
+ */
+export function readFoodWeeks(raw: unknown, month: string): FoodWeekPick[] | null {
+  if (!Array.isArray(raw) || raw.length < 1 || raw.length > 6) return null;
+  const seen = new Set<string>();
+  const out: FoodWeekPick[] = [];
+  for (const item of raw) {
+    const x = item && typeof item === "object" ? (item as Record<string, unknown>) : null;
+    if (!x || !isDay(x.week) || monthOfWeek(x.week) !== month || seen.has(x.week)) return null;
+    if (!Array.isArray(x.days) || x.days.length < 1 || x.days.length > 31 || !x.days.every(isDay)) return null;
+    seen.add(x.week);
+    out.push({ week: x.week, days: [...new Set(x.days as string[])].sort() });
+  }
+  return out.sort((a, b) => a.week.localeCompare(b.week));
+}
+
+/** The days a member's own food claims still hold — every one but a draft, a cancelled or a rejected claim. */
+export function claimedFoodDays(
+  requests: readonly { id: string; kind: string; status: string; detail: Record<string, unknown> | null | undefined }[],
+  exceptId?: string | null,
+): Set<string> {
+  const out = new Set<string>();
+  for (const r of requests) {
+    if (r.id === exceptId || r.kind !== "claim" || r.detail?.claimType !== "food") continue;
+    if (r.status === "draft" || r.status === "withdrawn" || r.status === "rejected") continue;
+    const days = r.detail?.days;
+    if (Array.isArray(days)) for (const d of days) if (typeof d === "string") out.add(d);
+  }
+  return out;
+}
+
 /** Rates read defensively from the database's JSON — anything malformed reads as not set. */
 export function readClaimRates(raw: unknown): ClaimRates {
   const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
@@ -218,5 +357,15 @@ export function readClaimRates(raw: unknown): ClaimRates {
         ? [{ id: x.id, name: x.name, spots, planeTicket: x.planeTicket === true }] : [];
     }),
     fairs,
+    food: readFood(o.food, money),
+  };
+}
+
+function readFood(raw: unknown, money: (v: unknown) => number | null): FoodClaimRates {
+  const f = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return {
+    subDepartmentId: typeof f.subDepartmentId === "string" && f.subDepartmentId ? f.subDepartmentId : null,
+    perDay: money(f.perDay),
+    titles: Array.isArray(f.titles) ? f.titles.filter((t): t is string => typeof t === "string" && t.trim() !== "") : [],
   };
 }

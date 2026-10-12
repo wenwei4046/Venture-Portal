@@ -87,6 +87,29 @@ export function shortDay(date: string): string {
   return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]}`;
 }
 
+/** `Fri` — a day's weekday. */
+export function weekdayShort(date: string): string {
+  return WEEKDAYS_SHORT[utc(date).getUTCDay()];
+}
+
+/** `9, 10, 11 Oct`, or `30, 31 Oct, 1 Nov` across a month end — a food claim's days (2026-10-13). */
+export function dayList(days: readonly string[]): string {
+  const parts: string[] = [];
+  let run: number[] = [];
+  let month = -1;
+  for (const day of [...days].sort()) {
+    const d = utc(day);
+    if (d.getUTCMonth() !== month && run.length) {
+      parts.push(`${run.join(", ")} ${MONTHS_SHORT[month]}`);
+      run = [];
+    }
+    month = d.getUTCMonth();
+    run.push(d.getUTCDate());
+  }
+  if (run.length) parts.push(`${run.join(", ")} ${MONTHS_SHORT[month]}`);
+  return parts.join(", ");
+}
+
 /** `9–11 Oct`, or `30 Oct – 1 Nov` across a month end. */
 export function dayRange(start: string, end: string): string {
   const a = utc(start), b = utc(end);

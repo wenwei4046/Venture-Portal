@@ -23,6 +23,7 @@ import { formFromRow, type WaitingForm } from "@/lib/commission/waiting-form";
 import { waitingAnswersFrom, type WaitingAnswer } from "./waiting-answers";
 import { queuesFrom, type WaitingQueue } from "./waiting-queue";
 import { SEND_REFUSED, appClosed, requestPageOf } from "./app-pages";
+import { readFoodWeeks, type FoodWeekPick } from "./claim-rules";
 import type { MemberArenaSnapshot } from "./arena";
 import type { ArenaHistorySnapshot } from "./arena-history";
 import type {
@@ -1069,6 +1070,8 @@ export async function submitMemberRequest(
       subDepartmentId = field(form, "targetDepartmentId");
     uuid(subDepartmentId, "department");
     const detail: Record<string, string | number | boolean> = {};
+    // A food claim's weekends and their days (2026-10-13): the only list a claim sends.
+    let foodWeeks: FoodWeekPick[] | null = null;
     let verified: VerifiedInvoice | null = null;
     // A waiting list or a replacement: HR's own questions and its signed form.
     let answers: WaitingAnswer[] = [];
@@ -1084,12 +1087,29 @@ export async function submitMemberRequest(
       // total is typed and paid up to a limit by head count — HR's figure a
       // night for a small group, the rate × people × nights for a bigger one
       // (2026-10-12: that rate is a limit too, not a fixed amount).
-      if (claimType !== "outstation" && claimType !== "airbnb") throw new Error("Choose Outstation or Airbnb.");
-      Object.assign(detail, {
-        claimType,
-        week: date(field(form, "week"), "brand week"),
-        notes: field(form, "notes", 1500),
-      });
+      if (claimType !== "outstation" && claimType !== "airbnb" && claimType !== "food") throw new Error("Choose Outstation, Airbnb or a food claim.");
+      if (claimType === "food") {
+        // A food claim (2026-10-13 — "submit by total month … dont by week submit"): a month, its weekends and the
+        // days of each they worked. The database checks each is their own brand week's, the days its fair's and
+        // come already, the month over and claimed by no other food claim of theirs, and pays HR's rate a day.
+        const month = field(form, "month");
+        if (!MONTH.test(month)) throw new Error("Choose the month the food claim is for.");
+        let weeks: unknown = null;
+        try {
+          weeks = JSON.parse(field(form, "weeks", 6000) || "null");
+        } catch {
+          weeks = null;
+        }
+        foodWeeks = readFoodWeeks(weeks, month);
+        if (!foodWeeks) throw new Error("Tick the days you worked at the fairs.");
+        Object.assign(detail, { claimType, month, notes: field(form, "notes", 1500) });
+      } else {
+        Object.assign(detail, {
+          claimType,
+          week: date(field(form, "week"), "brand week"),
+          notes: field(form, "notes", 1500),
+        });
+      }
       if (claimType === "outstation") {
         const price = field(form, "amount");
         if (price) {
@@ -1102,7 +1122,7 @@ export async function submitMemberRequest(
             invoiceHash: createHash("sha256").update(verified.bytes).digest("hex"),
           });
         }
-      } else {
+      } else if (claimType === "airbnb") {
         const count = (name: string) => {
           const n = Number(field(form, name));
           if (!Number.isInteger(n) || n < 0 || n > 40) throw new Error("Check who stayed.");
@@ -1263,7 +1283,7 @@ export async function submitMemberRequest(
       {
         p_kind: kind,
         p_sub_department: subDepartmentId,
-        p_detail: answers.length ? { ...detail, answers } : detail,
+        p_detail: { ...detail, ...(foodWeeks ? { weeks: foodWeeks } : {}), ...(answers.length ? { answers } : {}) },
         p_idempotency: key,
         p_revision: revision,
       },

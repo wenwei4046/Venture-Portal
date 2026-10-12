@@ -305,6 +305,41 @@ describe('a member sends a request', () => {
     expect(mocks.adminClient).not.toHaveBeenCalled()
   })
 
+  // 2026-10-13: a food claim is a month — its weekends and the days of each ticked ("submit by total month");
+  // the rate, the fairs and the amount are the database's.
+  it('a food claim: the month and its weekends, each once and in order — no week, no amount, no invoice', async () => {
+    const weeks = JSON.stringify([
+      { week: '2026-09-18', days: ['2026-09-20', '2026-09-18', '2026-09-18'] },
+      { week: '2026-09-11', days: ['2026-09-11'] },
+    ])
+    const result = await submitMemberRequest(form({
+      kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'food', month: '2026-09', weeks,
+      notes: 'Saturday off', amount: '999', rate: '50', week: '2026-09-18',
+    }))
+    expect(result).toEqual({ ok: true, data: sent })
+    expect(mocks.rpc).toHaveBeenNthCalledWith(1, 'member_prepare_request', {
+      p_kind: 'claim', p_sub_department: fair, p_idempotency: key, p_revision: null,
+      p_detail: { claimType: 'food', month: '2026-09', notes: 'Saturday off', weeks: [
+        { week: '2026-09-11', days: ['2026-09-11'] }, { week: '2026-09-18', days: ['2026-09-18', '2026-09-20'] },
+      ] },
+    })
+    expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
+    expect(mocks.adminClient).not.toHaveBeenCalled()
+  })
+
+  it('refuses a food claim with no month, no weekend, or one it cannot read', async () => {
+    const food = (more: Record<string, string>) => submitMemberRequest(form({ kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'food', notes: '', ...more }))
+    expect(await food({ weeks: '[]' })).toEqual({ ok: false, error: 'Choose the month the food claim is for.' })
+    expect(await food({ month: '2026-13', weeks: '[]' })).toEqual({ ok: false, error: 'Choose the month the food claim is for.' })
+    for (const weeks of ['', '[]', 'not json', JSON.stringify([{ week: '2026-10-02', days: ['2026-10-02'] }]), JSON.stringify([{ week: '2026-09-11', days: ['2026-09-31'] }]),
+      JSON.stringify([{ week: '2026-09-11', days: [] }]), JSON.stringify([{ week: '2026-09-11', days: ['2026-09-11'] }, { week: '2026-09-11', days: ['2026-09-12'] }])]) {
+      expect(await food({ month: '2026-09', weeks })).toEqual({ ok: false, error: 'Tick the days you worked at the fairs.' })
+    }
+    expect(await submitMemberRequest(form({ kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'lunch', week: '2026-10-09', notes: '' })))
+      .toEqual({ ok: false, error: 'Choose Outstation, Airbnb or a food claim.' })
+    mocks.rpc.mockReset()
+  })
+
   it('a plane ticket: its price and its invoice, attested before it is sent', async () => {
     const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37])
     const upload = vi.fn(async () => ({ error: null }))

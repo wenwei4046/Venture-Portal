@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  airbnbCap, airbnbGroup, claimAmount, fairRegion, isOutstation, nightsBetween, readClaimRates, shiftDay, stayProblem, stayWindow, tapStayDay,
+  airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairRegion, foodAmount, foodDayState, foodMonthOpensOn,
+  foodMonthOver, foodOpenTo, isOutstation, monthOfWeek, nightsBetween, readClaimRates, readFoodWeeks, shiftDay, stayProblem, stayWindow, tapStayDay,
   type ClaimRates, type StayPick,
 } from "./claim-rules";
 
@@ -225,13 +226,113 @@ describe("readClaimRates", () => {
       base: "Klang Valley", perSpot: 50, perPaxNight: 65, groupMaxPax: 2, groupCapPerNight: 220,
       regions: [{ id: "a", name: "Penang", spots: 4, planeTicket: false }, { id: "b", name: "Sabah", spots: 6, planeTicket: true }],
       fairs: { f1: { venue: "PENANG WATERFRONT CONVENTION CENTRE", regionId: "a" }, f2: { venue: "MVEC SOUTHKEY", regionId: null } },
+      food: { subDepartmentId: null, perDay: null, titles: [] },
     });
   });
+  it("reads the food claim HR set (2026-10-13)", () => {
+    expect(readClaimRates({ food: { subDepartmentId: "fair", perDay: "20.00", titles: ["Team Leader", "", 3, "Revenue Specialist"] } }).food)
+      .toEqual({ subDepartmentId: "fair", perDay: 20, titles: ["Team Leader", "Revenue Specialist"] });
+    expect(readClaimRates({ food: { perDay: -1, titles: "Team Leader" } }).food).toEqual({ subDepartmentId: null, perDay: null, titles: [] });
+  });
   it("treats anything malformed as not set", () => {
-    expect(readClaimRates(null)).toEqual({ base: "Klang Valley", perSpot: null, perPaxNight: null, groupMaxPax: 3, groupCapPerNight: null, regions: [], fairs: {} });
+    expect(readClaimRates(null)).toEqual({ base: "Klang Valley", perSpot: null, perPaxNight: null, groupMaxPax: 3, groupCapPerNight: null, regions: [], fairs: {},
+      food: { subDepartmentId: null, perDay: null, titles: [] } });
     expect(readClaimRates({ groupMaxPax: 0 }).groupMaxPax).toBe(3);
     expect(readClaimRates({ groupMaxPax: 2.5 }).groupMaxPax).toBe(3);
     expect(readClaimRates({ perSpot: -5, regions: [{ id: 1, name: "x", spots: 2 }, { id: "b", name: "Ipoh", spots: 1.5 }] }).regions).toEqual([]);
     expect(readClaimRates({ fairs: [{ fairId: 3, venue: "x" }, { venue: "no id" }] }).fairs).toEqual({});
+  });
+});
+
+// The food claim (2026-10-13 — the user: a rate a day, the titles HR picks, the days of the brand week the
+// member worked; "this food claim is only for fair sub-department").
+describe("the food claim", () => {
+  const FAIR = "71709f7e-9f7c-4e28-80cf-ce21be336995";
+  const food = (over: Partial<NonNullable<ClaimRates["food"]>> = {}) => ({ food: { subDepartmentId: FAIR, perDay: 20, titles: ["Team Leader"], ...over } });
+
+  it("is open in Fair, with a rate, to a title HR ticked — and to nobody else", () => {
+    expect(foodOpenTo(food(), FAIR, "Team Leader")).toBe(true);
+    expect(foodOpenTo(food(), FAIR, " team leader ")).toBe(true);
+    expect(foodOpenTo(food(), FAIR, "Revenue Specialist")).toBe(false);
+    expect(foodOpenTo(food(), "ir-sub", "Team Leader")).toBe(false);
+    expect(foodOpenTo(food({ perDay: null }), FAIR, "Team Leader")).toBe(false);
+    expect(foodOpenTo(food({ perDay: 0 }), FAIR, "Team Leader")).toBe(false);
+    expect(foodOpenTo(food({ subDepartmentId: null }), FAIR, "Team Leader")).toBe(false);
+    expect(foodOpenTo({}, FAIR, "Team Leader")).toBe(false);
+    expect(foodOpenTo(null, FAIR, "Team Leader")).toBe(false);
+    expect(foodOpenTo(food(), FAIR, "")).toBe(false);
+  });
+
+  it("offers the fair's own days, else its weekend Friday to Sunday", () => {
+    expect(fairDays({ start: "2026-10-09", end: "2026-10-11" }, "2026-10-09")).toEqual(["2026-10-09", "2026-10-10", "2026-10-11"]);
+    expect(fairDays({ start: "2026-10-30", end: "2026-11-01" }, "2026-10-30")).toEqual(["2026-10-30", "2026-10-31", "2026-11-01"]);
+    expect(fairDays({ start: null, end: null }, "2026-10-16")).toEqual(["2026-10-16", "2026-10-17", "2026-10-18"]);
+    // Ends before it starts: read as its weekend.
+    expect(fairDays({ start: "2026-10-11", end: "2026-10-09" }, "2026-10-09")).toEqual(["2026-10-09", "2026-10-10", "2026-10-11"]);
+  });
+
+  it("holds back a day already claimed, and a day still to come", () => {
+    const claimed = new Set(["2026-10-09"]);
+    expect(foodDayState("2026-10-09", "2026-10-13", claimed)).toBe("claimed");
+    expect(foodDayState("2026-10-10", "2026-10-13", claimed)).toBe("open");
+    expect(foodDayState("2026-10-13", "2026-10-13", claimed)).toBe("open");
+    expect(foodDayState("2026-10-14", "2026-10-13", claimed)).toBe("ahead");
+  });
+
+  it("pays the rate a day for each day", () => {
+    expect(foodAmount(20, 3)).toBe(60);
+    expect(foodAmount(12.5, 3)).toBe(37.5);
+    expect(foodAmount(null, 3)).toBe(0);
+    expect(foodAmount(20, 0)).toBe(0);
+  });
+
+  it("counts the days a member's live food claims hold — not a draft's, a cancelled or a rejected one's, nor the one sent back", () => {
+    const claim = (id: string, status: string, days: unknown, claimType = "food") => ({ id, kind: "claim", status, detail: { claimType, days } });
+    const requests = [
+      claim("a", "submitted", ["2026-10-09", "2026-10-10"]),
+      claim("b", "paid", ["2026-10-03"]),
+      claim("c", "withdrawn", ["2026-10-11"]),
+      claim("d", "rejected", ["2026-10-04"]),
+      claim("e", "draft", ["2026-10-05"]),
+      claim("f", "needs_info", ["2026-10-17"]),
+      claim("g", "submitted", ["2026-10-18"], "airbnb"),
+      { id: "h", kind: "waiting", status: "submitted", detail: { days: ["2026-10-19"] } },
+      claim("i", "approved", "2026-10-20"),
+    ];
+    expect([...claimedFoodDays(requests)].sort()).toEqual(["2026-10-03", "2026-10-09", "2026-10-10", "2026-10-17"]);
+    expect([...claimedFoodDays(requests, "f")].sort()).toEqual(["2026-10-03", "2026-10-09", "2026-10-10"]);
+  });
+});
+
+// A food claim is a month (2026-10-13 — "they will submit by total month, for every pax, dont by week submit").
+describe("the food claim's month", () => {
+  it("is the month of each weekend's Friday, claimed from the 1st of the next", () => {
+    expect(monthOfWeek("2026-10-30")).toBe("2026-10");
+    expect(foodMonthOpensOn("2026-10")).toBe("2026-11-01");
+    expect(foodMonthOpensOn("2026-12")).toBe("2027-01-01");
+    expect(foodMonthOver("2026-10", "2026-10-31")).toBe(false);
+    expect(foodMonthOver("2026-10", "2026-11-01")).toBe(true);
+    expect(foodMonthOver("2026-09", "2026-10-13")).toBe(true);
+  });
+
+  it("knows the months a member's live food claims hold, with their numbers", () => {
+    const claim = (id: string, status: string, month: string, requestNo: string | null = null) => ({ id, kind: "claim", status, requestNo, detail: { claimType: "food", month } });
+    const held = claimedFoodMonths([
+      claim("a", "submitted", "2026-09", "RQ-2610-004"), claim("b", "withdrawn", "2026-08"), claim("c", "rejected", "2026-07"),
+      claim("d", "paid", "2026-06", "RQ-2607-001"), claim("e", "needs_info", "2026-05"),
+      { id: "f", kind: "claim", status: "submitted", requestNo: null, detail: { claimType: "airbnb", month: "2026-04" } },
+    ]);
+    expect([...held.entries()]).toEqual([["2026-09", "RQ-2610-004"], ["2026-06", "RQ-2607-001"], ["2026-05", null]]);
+    expect(claimedFoodMonths([claim("e", "needs_info", "2026-05")], "e").size).toBe(0);
+  });
+
+  it("reads the weekends sent strictly: of the month, each once, real days", () => {
+    expect(readFoodWeeks([{ week: "2026-09-18", days: ["2026-09-20", "2026-09-18", "2026-09-18"] }, { week: "2026-09-11", days: ["2026-09-11"] }], "2026-09"))
+      .toEqual([{ week: "2026-09-11", days: ["2026-09-11"] }, { week: "2026-09-18", days: ["2026-09-18", "2026-09-20"] }]);
+    for (const bad of [null, [], "x", [{ week: "2026-10-02", days: ["2026-10-02"] }], [{ week: "2026-09-11", days: [] }], [{ week: "2026-09-11", days: ["2026-09-31"] }],
+      [{ week: "2026-09-11", days: ["11 Sep"] }], [{ week: "2026-09-11", days: ["2026-09-11"] }, { week: "2026-09-11", days: ["2026-09-12"] }],
+      Array.from({ length: 7 }, (_, i) => ({ week: `2026-09-0${i + 1}`, days: [`2026-09-0${i + 1}`] }))]) {
+      expect(readFoodWeeks(bad, "2026-09")).toBeNull();
+    }
   });
 });

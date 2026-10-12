@@ -200,6 +200,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'get_payroll_funding_paid', 'get_staff_billing_allocation', 'get_staff_own_share_allocation', 'get_submitted_hr_summary',
   'hr_dashboard_summary', 'log_data_access', 'lookup_pcb', 'mark_journal_entry_reversed', 'member_admin_brand_weeks',
   'member_admin_claim_settings', 'member_admin_save_claim_settings',
+  // People › Member services › Food claim (mig 20261013150000): member_is_manager, and the save member.manage too.
+  'member_admin_food_claim', 'member_admin_save_food_claim',
   'member_capacity_of', 'member_process_all_queues',
   'member_sub_department_requests',
   // Sales Groups › Waiting list's flow (mig 20261010140000): each asks member_is_manager (the form also lets in member_requests).

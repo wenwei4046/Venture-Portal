@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { adminMemberAction, type AdminMemberData } from "@/lib/member/server";
 import { HvPage, PageHead } from "@/components/hrv/kit";
 import MemberServicesView from "./_components/MemberServicesView";
-import { loadClaimRates, loadRequestFacts } from "./_lib/member-services";
+import { loadClaimRates, loadFoodClaim, loadRequestFacts } from "./_lib/member-services";
 export const dynamic = "force-dynamic";
 
 /**
@@ -28,10 +28,11 @@ export default async function MemberAdminPage({
   const requests = user.permissions.includes("member_requests_manage");
   const memos = user.permissions.includes("member_memos_manage");
   if (!requests && !memos) redirect("/dashboard");
-  const [result, facts, claimRates] = await Promise.all([
+  const [result, facts, claimRates, foodClaim] = await Promise.all([
     adminMemberAction({ action: "list" }),
     requests ? loadRequestFacts() : Promise.resolve(null),
     requests ? loadClaimRates() : Promise.resolve(null),
+    requests ? loadFoodClaim() : Promise.resolve(null),
   ]);
   if (!result.ok)
     return (
@@ -46,6 +47,7 @@ export default async function MemberAdminPage({
       data={data}
       facts={facts}
       claimRates={claimRates}
+      foodClaim={foodClaim}
       initialRequestId={requestId && data.requests.some((r) => r.id === requestId) ? requestId : null}
     />
   );
