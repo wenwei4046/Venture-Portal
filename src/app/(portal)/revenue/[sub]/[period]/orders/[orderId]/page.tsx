@@ -32,6 +32,20 @@ import { requireSubDepartment } from '../../../../_lib/sub-departments'
 import { loadOrderExclusions, loadOrderShares } from '../../../../_lib/month-orders'
 import { loadBillMoves } from '../../../../_lib/row-origins'
 import { movedPhrase } from '@/lib/commission/bill-move'
+import { loadAdjustmentAnswers, loadBillChanges } from '../../../../_lib/erp-changes'
+import {
+  adjustmentLabel,
+  commissionNote,
+  describeChange,
+  earnsDelta,
+  kindLabel,
+  kindTone,
+  TRAIL_SINCE,
+  type AdjustmentAnswer,
+  type AdjustmentReason,
+  type ErpChange,
+} from '@/lib/commission/erp-changes'
+import { officeTime } from '@/lib/office-time'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string; orderId: string }>
@@ -119,6 +133,8 @@ interface ChangeRow {
   /** The month it is paid in once confirmed. */
   period_month: string
   original_ref: string
+  /** Why the ERP's figure moved (2026-10-13): cancelled, deleted, on_hold, … — null before then. */
+  erp_reason: AdjustmentReason | null
   hr_staff_costs: { employee_name: string } | { employee_name: string }[] | null
 }
 
@@ -197,7 +213,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   // The ledger's owner, when it is not the bill's own salesperson (an upline
   // reading a downline's bill on Overriding).
   const backPerson = back?.personId && back.personId !== order.staff_id && UUID.test(back.personId) ? back.personId : null
-  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves] =
+  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail] =
     await Promise.all([
       // Every column rather than a list: `cost_detail` exists only once
       // 20260924030000 is applied, and naming it would break this page before.
@@ -251,13 +267,24 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       // or a drop opened from a ledger lands here, on the bill it changed.
       supabase
         .from('comm_upsales')
-        .select('id, kind, status, amount, sold_on, settled_amount, erp_amount, period_month, original_ref, hr_staff_costs (employee_name)')
+        .select('id, kind, status, amount, sold_on, settled_amount, erp_amount, period_month, original_ref, erp_reason, hr_staff_costs (employee_name)')
         .eq('sub_department_id', subDept.id)
         .eq('erp_doc_no', order.order_no)
         .order('sold_on')
         .order('created_at'),
       // Moved here from another salesperson (2026-10-12): from whom, by whom, why.
       loadBillMoves(supabase, [orderId]),
+      // Every save the ERP made of it that changed something (2026-10-13), and
+      // where each drop or upsell it opened stands. Read softly: a trail that
+      // cannot be read leaves the section out, not the bill without a page.
+      order.source === 'erp_sync'
+        ? loadBillChanges(supabase, subDept.id, order.order_no)
+            .then(async changes => ({
+              changes,
+              answers: await loadAdjustmentAnswers(supabase, changes.flatMap(c => c.adjustmentId ? [c.adjustmentId] : [])),
+            }))
+            .catch(() => null)
+        : Promise.resolve(null),
     ])
   const byHand = exclusions?.get(orderId) ?? null
   const moved = moves[orderId] ?? null
@@ -533,7 +560,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                     <td>
                       <span className={`chip ${change.kind === 'drop' ? 'danger' : 'ledger'}`}>
                         <span className="dot" />
-                        {change.kind === 'drop' ? 'Drop sales' : 'Upsell'}
+                        {adjustmentLabel(change.kind, change.erp_reason)}
                       </span>
                     </td>
                     <td className="m-hide">{change.seller ?? '—'}</td>
@@ -560,6 +587,11 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           </div>
         </section>
       ) : null}
+
+      {/* The ERP audit trail (2026-10-13; the user: "任何改动只要一按 save 他的
+          sales order，我这边都要能 track 到，记录在我们自己的 audit trail 里"):
+          every save of this bill that changed something, newest first. */}
+      {trail ? <ErpTrailSection changes={trail.changes} answers={trail.answers} /> : null}
 
       <section className="mb-10">
         <div className="sect-head">
@@ -795,6 +827,76 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
 
 /** One fact about the bill: a compact definition cell in the sheet's tone,
  *  quieter than the summary cards above it. */
+/**
+ * Every save of the bill the ERP sent that changed something (2026-10-13,
+ * `sales_order_erp_changes`): when, what kind of change on what earns, what
+ * changed in words, and what it meant for commission — counted with its
+ * month while nothing had been given, a drop or an upsell to answer once it
+ * had. The ERP keeps no audit trail of an order changed before its
+ * processing date; this is the portal's own.
+ */
+function ErpTrailSection({ changes, answers }: { changes: ErpChange[]; answers: Map<string, AdjustmentAnswer> }) {
+  const oldest = changes.at(-1)
+  const note = !oldest
+    ? `No save has changed this bill since the record began on ${formatDate(TRAIL_SINCE)}.`
+    : oldest.kind === 'opened'
+      ? 'Every save since the ERP sent it first.'
+      : `Kept from ${formatDate(oldest.receivedAt)}; saves before it were written over the bill without a record.`
+  return (
+    <section className="mb-10" aria-label="ERP audit trail">
+      <div className="sect-head">
+        <h2>ERP audit trail</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">{changes.length} {changes.length === 1 ? 'SAVE' : 'SAVES'}</span>
+      </div>
+      <p className="text-sm mb-4 max-w-3xl">
+        Every time the ERP saved this bill and something changed, newest first — kept by the portal, because the
+        ERP keeps no audit trail of an order changed before its processing date. An upsell, a drop or a
+        cancellation is measured on what earns; transport never counts. {note}
+      </p>
+      {changes.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="ledger-table">
+            <thead>
+              <tr>
+                <th>Saved</th>
+                <th>Change</th>
+                <th className="right m-hide">Earned before</th>
+                <th className="right">Earns now</th>
+                <th className="right">Difference</th>
+                <th>What changed</th>
+                <th className="m-hide">Commission</th>
+              </tr>
+            </thead>
+            <tbody>
+              {changes.map(c => {
+                const delta = earnsDelta(c)
+                return (
+                  <tr key={c.id}>
+                    <td className="font-mono text-xs whitespace-nowrap">{officeTime(c.savedAt ?? c.receivedAt).format('D MMM YYYY HH:mm')}</td>
+                    <td>
+                      <span className={`chip ${kindTone(c.kind)}`}><span className="dot" />{kindLabel(c.kind, c.statusAfter)}</span>
+                    </td>
+                    <td className="num m-hide whitespace-nowrap">{c.commissionableBefore === null ? '—' : formatMoney(c.commissionableBefore)}</td>
+                    <td className="num whitespace-nowrap">{c.commissionableAfter === null ? '—' : formatMoney(c.commissionableAfter)}</td>
+                    <td className="num whitespace-nowrap">
+                      {delta === 0 ? '—' : delta < 0 ? <span className="neg">{formatMoney(delta)}</span> : formatMoney(delta)}
+                    </td>
+                    <td className="text-xs">
+                      {describeChange(c.before, c.after).map(line => <div key={line}>{line}</div>)}
+                    </td>
+                    <td className="text-xs m-hide">{commissionNote(c, c.adjustmentId ? answers.get(c.adjustmentId) : null)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
 function Fact({ label: text, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0 border border-hairline rounded-md bg-surface-2 px-4 py-3">

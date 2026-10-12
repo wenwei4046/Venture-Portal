@@ -515,7 +515,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   function originOf(row: CommissionOrderRow | OverrideOrderRow): RowOrigin | null {
     const fact = row.upsale ? data.upsales?.[row.orderId] : undefined
     return rowOrigin(row, period, {
-      upsale: fact ? { kind: fact.kind, originalPeriod: fact.originalPeriod } : null,
+      upsale: fact ? { kind: fact.kind, originalPeriod: fact.originalPeriod, reason: fact.reason ?? null } : null,
       saleMonth: saleMonths.get(row.orderId) ?? null,
       // The close of a carried bill's own month, for its own salesperson —
       // on Overriding, the downline whose bill it is.
@@ -878,6 +878,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     return {
       key: `${via ? 'override' : 'own'}:${row.key}`,
       kind: origin?.kind === 'drop' ? 'drop' : 'upsell',
+      label: origin?.label,
       ref: fact?.originalRef ?? row.orderNo.replace(/^(UPSALE|DROP)\s*/, ''),
       bill: fact?.erpDocNo ?? null,
       from: origin?.fromMonth ?? null,

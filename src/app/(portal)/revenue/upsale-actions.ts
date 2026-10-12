@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn } from '@/lib/auth'
+import { firstPayableMonth, payableIn } from '@/lib/commission/erp-changes'
 
 /**
  * Drops and upsells the ERP finds on settled bills (2026-09-26): each waits in
@@ -114,13 +115,25 @@ export async function confirmErpAdjustment(adjustmentId: string, period: string)
 
   const { data: row, error: readError } = await supabase
     .from('comm_upsales')
-    .select('sub_department_id, status')
+    .select('sub_department_id, status, settled_period, erp_doc_no')
     .eq('id', adjustmentId)
     .maybeSingle()
   if (readError) throw new Error(readError.message)
   if (!row) throw new Error('That change is no longer waiting — the ERP may have put it back.')
-  const { sub_department_id: subDepartmentId, status } = row as { sub_department_id: string; status: string }
+  const { sub_department_id: subDepartmentId, status, settled_period: settledPeriod, erp_doc_no: docNo } = row as {
+    sub_department_id: string
+    status: string
+    settled_period: string | null
+    erp_doc_no: string | null
+  }
   if (status !== 'pending') throw new Error('That change has already been answered.')
+
+  // Paid only in a month after the one that gave the commission (2026-10-13):
+  // that month already counts the bill as the ERP has it now. The table
+  // refuses it too (23ADJ); this says so in words first.
+  if (!payableIn(period, settledPeriod)) {
+    throw new Error(`The commission on ${docNo ?? 'this bill'} was given in ${settledPeriod?.slice(0, 7)} — pay this change in ${firstPayableMonth(settledPeriod)?.slice(0, 7)} or later.`)
+  }
 
   // A month settled by hand, before the portal pays, takes no run: paid into
   // it, the change would never be paid at all (2026-09-27).

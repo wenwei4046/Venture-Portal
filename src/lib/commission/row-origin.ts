@@ -1,4 +1,5 @@
 import type { CommissionOrderStatus } from './workbench'
+import { adjustmentLabel, type AdjustmentReason } from './erp-changes'
 
 /**
  * A LEDGER ROW FROM ANOTHER MONTH (2026-10-12).
@@ -62,8 +63,11 @@ export interface RowOrigin {
 export type CloseVerdict = 'held' | 'absent' | 'counted'
 
 export interface RowOriginFacts {
-  /** An upsale or a drop: what the `comm_upsales` row says of itself. */
-  upsale?: { kind: 'upsale' | 'drop'; originalPeriod: string | null } | null
+  /**
+   * An upsale or a drop: what the `comm_upsales` row says of itself — and,
+   * since 2026-10-13, why the ERP's figure moved (a cancellation is said so).
+   */
+  upsale?: { kind: 'upsale' | 'drop'; originalPeriod: string | null; reason?: AdjustmentReason | null } | null
   /** The month the bill was sold in by its fair (`saleMonthOf`); null when it has no fair. */
   saleMonth?: string | null
   /** A bill carried in from an earlier month: its own month's close (null when no close says). */
@@ -102,7 +106,7 @@ export function rowOrigin(row: OriginRow, period: string, facts: RowOriginFacts 
     const from = facts.upsale?.originalPeriod?.slice(0, 10) ?? null
     return {
       kind: drop ? 'drop' : 'upsell',
-      label: drop ? 'Drop sales' : 'Upsell',
+      label: adjustmentLabel(drop ? 'drop' : 'upsale', facts.upsale?.reason),
       fromMonth: from,
       detail: from ? `${monthShort(from)} bill` : 'An earlier bill',
       paysHere,

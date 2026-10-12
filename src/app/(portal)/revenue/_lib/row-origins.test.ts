@@ -37,14 +37,17 @@ describe('loadUpsaleFacts', () => {
         { id: 'up', kind: 'upsale', amount: '600.00', original_ref: 'HC13254', erp_doc_no: 'HC-SO-013387', original_period: '2026-08-01' },
         // Typed by hand on August's claim form: no ERP document, no bill.
         { id: 'hand', kind: null, amount: '-2088.00', original_ref: 'HC13911', erp_doc_no: null, original_period: null },
+        // Cancelled in the ERP after its commission was given (2026-10-13): said so.
+        { id: 'gone', kind: 'drop', amount: '-10399.00', original_ref: 'HC8972', erp_doc_no: null, original_period: '2026-08-01', erp_reason: 'cancelled' },
       ],
       sales_orders: [{ id: 'bill-387', order_no: 'HC-SO-013387', period_month: '2026-08-01' }],
     })
-    const facts = await loadUpsaleFacts(db, 'fair', ['up', 'hand', 'up'])
+    const facts = await loadUpsaleFacts(db, 'fair', ['up', 'hand', 'up', 'gone'])
     expect(facts).toEqual({
-      up: { kind: 'upsale', originalRef: 'HC13254', erpDocNo: 'HC-SO-013387', originalPeriod: '2026-08-01', bill: { orderId: 'bill-387', periodMonth: '2026-08-01' } },
+      up: { kind: 'upsale', originalRef: 'HC13254', erpDocNo: 'HC-SO-013387', originalPeriod: '2026-08-01', reason: null, bill: { orderId: 'bill-387', periodMonth: '2026-08-01' } },
       // No kind recorded: its sign says it is a drop.
-      hand: { kind: 'drop', originalRef: 'HC13911', erpDocNo: null, originalPeriod: null, bill: null },
+      hand: { kind: 'drop', originalRef: 'HC13911', erpDocNo: null, originalPeriod: null, reason: null, bill: null },
+      gone: { kind: 'drop', originalRef: 'HC8972', erpDocNo: null, originalPeriod: '2026-08-01', reason: 'cancelled', bill: null },
     })
     const bills = asked.find(call => call.table === 'sales_orders')!
     // August's ERP bills sit in a batch the claim form superseded: no batch status asked.

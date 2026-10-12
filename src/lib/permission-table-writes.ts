@@ -257,6 +257,7 @@ export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
   erp_sync_events: each(REVENUE_WORK),
   sales_import_batches: each(REVENUE_WORK),
   sales_order_brand_picks: each(REVENUE_WORK),
+  sales_order_erp_changes: each(REVENUE_WORK),
   sales_order_exclusions: each(REVENUE_WORK),
   sales_order_lines: each(REVENUE_WORK),
   sales_order_open_bill_tags: each(REVENUE_WORK),
