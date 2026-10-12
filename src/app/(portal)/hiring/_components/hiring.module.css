@@ -581,6 +581,8 @@
   animation: hiringFade 0.15s ease;
   box-sizing: content-box;
 }
+/* No room under its button at the foot of the page: it opens above (`menu-place.ts`, 2026-10-12). */
+.menu[data-up='true'] { top: auto; bottom: calc(100% + 6px); }
 .menuItem {
   padding: 8px 10px;
   border-radius: 6px;

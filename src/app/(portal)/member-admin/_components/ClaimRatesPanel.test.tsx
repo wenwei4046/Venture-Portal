@@ -65,12 +65,12 @@ describe('ClaimRatesPanel', () => {
   it('shows the refusal and keeps what was typed', async () => {
     save.mockResolvedValue({ ok: false, error: 'Check the rates, every region’s name and spots, and the venues’ regions.' })
     render(<ClaimRatesPanel initial={rates} />)
-    fireEvent.change(screen.getByRole('textbox', { name: 'Per person a night' }), { target: { value: '70' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Limit per person a night' }), { target: { value: '70' } })
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     })
     expect(screen.getByRole('alert')).toHaveTextContent('Check the rates')
-    expect(screen.getByRole('textbox', { name: 'Per person a night' })).toHaveValue('70')
+    expect(screen.getByRole('textbox', { name: 'Limit per person a night' })).toHaveValue('70')
   })
 
   it('says when the rates could not be read', () => {

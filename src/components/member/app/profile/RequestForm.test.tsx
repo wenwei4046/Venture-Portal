@@ -142,27 +142,34 @@ describe("a member's own claim (user 2026-10-06)", () => {
   });
 
   // User 2026-10-06: up to HR's small group (3, RM 220 a night) the member keys the invoice and is
-  // paid it up to cap × nights — "2， claim 220*2=440"; four or more are RM 65 each, nothing typed.
+  // paid it up to cap × nights — "2， claim 220*2=440". User 2026-10-12: a bigger group keys its
+  // invoice too — RM 65 a pax a night is "set as a cap … not auto calculate", unlike Outstation's spots.
   describe("an Airbnb stay", () => {
     const capped: FormOptions = { ...options, rates: { ...options.rates, groupCapPerNight: 220 } };
+    // The brand week's fair is Fri 2 – Sun 4 Oct, so the calendar opens Thu 1 – Mon 5 Oct.
+    const day = (label: string) => screen.getByRole("button", { name: new RegExp(`^${label}(,|$)`) });
+    const tap = (...labels: string[]) => labels.forEach(label => fireEvent.click(day(label)));
     const stay = (male: number, female: number) => {
       pick(/Airbnb accommodation/);
-      fireEvent.change(screen.getByLabelText("Check-in"), { target: { value: "2026-10-02" } });
-      fireEvent.change(screen.getByLabelText("Check-out"), { target: { value: "2026-10-04" } });
+      tap("Fri, 2 Oct", "Sun, 4 Oct");
       for (let i = 0; i < male; i++) fireEvent.click(screen.getByRole("button", { name: "More male" }));
       for (let i = 0; i < female; i++) fireEvent.click(screen.getByRole("button", { name: "More female" }));
     };
+    const invoiceTotal = (value: string) => fireEvent.change(screen.getByLabelText("Invoice total (RM)"), { target: { value } });
     const claimed = () => screen.getByText("Claim amount").nextElementSibling?.textContent;
+    const row = (label: string) => screen.getByText(label).nextElementSibling;
+    /** The two boxes under the calendar: what check-in and check-out say. */
+    const ends = () => ["Check-in", "Check-out"].map(label => `${label}${row(label)?.textContent}`);
 
     it("a small group keys the invoice's total and is paid it, up to the cap a night", async () => {
       const onSubmit = vi.fn(async (form: FormData) => { void form; return { ok: true as const, code: "RQ-2610-003" }; });
       const { container } = claimForm(false, onSubmit, capped);
       stay(1, 1);
-      expect(screen.getByText("Up to, per night").nextElementSibling).toHaveTextContent("RM 220.00");
-      expect(screen.getByText("Most for this stay").nextElementSibling).toHaveTextContent("RM 440.00");
-      fireEvent.change(screen.getByLabelText("Invoice total (RM)"), { target: { value: "380.50" } });
+      expect(row("Up to, per night")).toHaveTextContent("RM 220.00");
+      expect(row("Most for this stay")).toHaveTextContent("RM 440.00");
+      invoiceTotal("380.50");
       expect(claimed()).toBe("RM 380.50");
-      fireEvent.change(screen.getByLabelText("Invoice total (RM)"), { target: { value: "500" } });
+      invoiceTotal("500");
       expect(claimed()).toBe("RM 440.00");
       expect(screen.getByText("The invoice is over the limit, so the claim is RM 440.00. HR checks it against the invoice.")).toBeInTheDocument();
       const invoice = new File(["%PDF-1.7"], "stay.pdf", { type: "application/pdf" });
@@ -179,36 +186,63 @@ describe("a member's own claim (user 2026-10-06)", () => {
       const onSubmit = vi.fn();
       claimForm(false, onSubmit, capped);
       stay(0, 1);
-      expect(screen.getByLabelText("Invoice total (RM)")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
       expect(screen.getByRole("alert")).toHaveTextContent("Enter the stay's total from its invoice.");
       expect(onSubmit).not.toHaveBeenCalled();
     });
 
-    it("more than the small group is paid per person, and there is nothing to key", () => {
-      claimForm(false, vi.fn(), capped);
+    it("more than the small group keys its invoice too, and is paid it up to RM 65 a pax a night", async () => {
+      const onSubmit = vi.fn(async (form: FormData) => { void form; return { ok: true as const, code: "RQ-2610-004" }; });
+      const { container } = claimForm(false, onSubmit, capped);
       stay(2, 2);
-      expect(screen.queryByLabelText("Invoice total (RM)")).not.toBeInTheDocument();
-      expect(screen.getByText("Rate per pax per night").nextElementSibling).toHaveTextContent("RM 65.00");
+      expect(row("Up to, per pax per night")).toHaveTextContent("RM 65.00");
+      expect(row("Most for this stay")).toHaveTextContent("RM 520.00");
+      expect(claimed()).toBe("RM 0.00");
+      expect(screen.getByText("More than 3 pax claim the invoice's total, up to RM 65 per pax a night. HR checks it against the invoice.")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("Enter the stay's total from its invoice.");
+      invoiceTotal("480");
+      expect(claimed()).toBe("RM 480.00");
+      invoiceTotal("600");
       expect(claimed()).toBe("RM 520.00");
-      expect(screen.getByText("More than 3 pax are paid the fixed rate per pax. You can't edit the amount.")).toBeInTheDocument();
+      expect(screen.getByText("The invoice is over the limit, so the claim is RM 520.00. HR checks it against the invoice.")).toBeInTheDocument();
+      fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [new File(["%PDF-1.7"], "stay.pdf", { type: "application/pdf" })] } });
+      fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+      expect(await screen.findByText("RQ-2610-004")).toBeInTheDocument();
+      expect(sent(onSubmit)).toMatchObject({ claimType: "airbnb", male: "2", female: "2", amount: "600" });
     });
 
     it("follows the head count HR sets", () => {
       claimForm(false, vi.fn(), { ...capped, rates: { ...capped.rates, groupMaxPax: 2 } });
       stay(2, 1);
-      expect(screen.queryByLabelText("Invoice total (RM)")).not.toBeInTheDocument();
+      expect(row("Most for this stay")).toHaveTextContent("RM 390.00");
+      invoiceTotal("500");
       expect(claimed()).toBe("RM 390.00");
     });
 
-    // User 2026-10-06: "airbnb only allow claim outstation fair, then date stay limit in 7 days".
+    it("with no small-group figure, every stay is capped by the person", () => {
+      claimForm(false, vi.fn());
+      stay(1, 1);
+      expect(row("Most for this stay")).toHaveTextContent("RM 260.00");
+      invoiceTotal("200");
+      expect(claimed()).toBe("RM 200.00");
+      expect(screen.getByText("You claim the invoice's total, up to RM 65 per pax a night. HR checks it against the invoice.")).toBeInTheDocument();
+    });
+
+    it("says so on the category, which is not fixed like Outstation's spots", () => {
+      claimForm(false, vi.fn());
+      expect(screen.getByRole("button", { name: /Airbnb accommodation/ })).toHaveTextContent("Up to RM 65 per pax per night");
+      expect(screen.getByRole("button", { name: /^Outstation/ })).toHaveTextContent("Fixed by spots for the route");
+    });
+
+    // User 2026-10-06: "airbnb only allow claim outstation fair".
     it("is for an outstation fair only: a local one has no Airbnb claim, and sends nothing", () => {
       const onSubmit = vi.fn();
       claimForm(false, onSubmit, capped);
       pick(/Airbnb accommodation/);
       pick(/MID VALLEY/);
       expect(screen.getByText("MID VALLEY is local to Klang Valley, so there is no Airbnb claim.")).toBeInTheDocument();
-      expect(screen.queryByLabelText("Check-in")).not.toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Check-in and check-out" })).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
       expect(screen.getByRole("alert")).toHaveTextContent("MID VALLEY is local to Klang Valley, so there is no Airbnb claim.");
       expect(onSubmit).not.toHaveBeenCalled();
@@ -219,53 +253,92 @@ describe("a member's own claim (user 2026-10-06)", () => {
       pick(/Airbnb accommodation/);
       pick(/MVEC SOUTHKEY/);
       expect(screen.getByText("HR has not set the region for MVEC SOUTHKEY yet. It can be claimed once they have.")).toBeInTheDocument();
-      expect(screen.queryByLabelText("Check-in")).not.toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Check-in and check-out" })).not.toBeInTheDocument();
       pick(/Zanotti week/);
-      expect(screen.getByLabelText("Check-in")).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Check-in and check-out" })).toBeInTheDocument();
     });
 
-    it("takes a stay of up to 7 nights that covers the fair's days", () => {
+    // User 2026-10-12: one calendar, opened on the brand week — "开始天减一到结束天加一 … 这个 17 到 21 号
+    // 就是 maximum 他们可以定的日期范围。那个 range 直接开放给他们，他们只需要在里面点这几天就行".
+    it("opens one calendar on the brand week: the day before the fair to the day after, and nothing else", () => {
       claimForm(false, vi.fn(), capped);
       pick(/Airbnb accommodation/);
-      expect(screen.getByText("Up to 7 nights, covering the fair's days (2–4 Oct).")).toBeInTheDocument();
-      fireEvent.change(screen.getByLabelText("Check-in"), { target: { value: "2026-09-28" } });
-      fireEvent.change(screen.getByLabelText("Check-out"), { target: { value: "2026-10-05" } });
-      expect(screen.getByText("Nights").nextElementSibling).toHaveTextContent("7 nights");
-      expect(screen.getByText("Up to 7 nights, covering the fair's days (2–4 Oct).")).toBeInTheDocument();
+      const calendar = screen.getByRole("group", { name: "Check-in and check-out" });
+      expect(calendar).toHaveTextContent("Oct 2026");
+      const open = [...calendar.querySelectorAll("button[aria-label]")].filter(b => !(b as HTMLButtonElement).disabled).map(b => b.getAttribute("aria-label"));
+      expect(open).toEqual(["Thu, 1 Oct", "Fri, 2 Oct, fair day", "Sat, 3 Oct, fair day", "Sun, 4 Oct, fair day", "Mon, 5 Oct"]);
+      expect(day("Wed, 30 Sep")).toBeDisabled();
+      expect(day("Tue, 6 Oct")).toBeDisabled();
+      expect(screen.getByText("Open from the day before the fair to the day after (1–5 Oct). Dots mark the fair's days.")).toBeInTheDocument();
+      expect(ends()).toEqual(["Check-inTap a day", "Check-out—"]);
     });
 
-    it("refuses an eighth night, and pays nothing while it is there", () => {
-      const onSubmit = vi.fn();
-      claimForm(false, onSubmit, capped);
-      stay(1, 1);
-      fireEvent.change(screen.getByLabelText("Check-in"), { target: { value: "2026-09-27" } });
-      fireEvent.change(screen.getByLabelText("Check-out"), { target: { value: "2026-10-05" } });
-      fireEvent.change(screen.getByLabelText("Invoice total (RM)"), { target: { value: "500" } });
-      expect(screen.getByText("A stay is at most 7 nights.")).toBeInTheDocument();
-      expect(claimed()).toBe("RM 0.00");
-      fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
-      expect(screen.getByRole("alert")).toHaveTextContent("A stay is at most 7 nights.");
-      expect(onSubmit).not.toHaveBeenCalled();
+    it("tapping 2, 3 and 4 Oct is in on the 2nd, out on the 4th — two nights", () => {
+      claimForm(false, vi.fn(), capped);
+      pick(/Airbnb accommodation/);
+      tap("Fri, 2 Oct");
+      expect(ends()).toEqual(["Check-inFri, 2 Oct", "Check-outTap a day"]);
+      tap("Sat, 3 Oct", "Sun, 4 Oct");
+      expect(ends()).toEqual(["Check-inFri, 2 Oct", "Check-outSun, 4 Oct"]);
+      expect(row("Nights")).toHaveTextContent("2 nights");
+      expect(day("Sat, 3 Oct")).toHaveAttribute("aria-pressed", "true");
+      expect(day("Thu, 1 Oct")).toHaveAttribute("aria-pressed", "false");
+      fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+      expect(ends()).toEqual(["Check-inTap a day", "Check-out—"]);
     });
 
-    it("refuses a stay that misses the fair", () => {
+    it("takes the whole of it — in the day before, out the day after", () => {
+      claimForm(false, vi.fn(), capped);
+      stay(1, 1);
+      tap("Thu, 1 Oct", "Mon, 5 Oct");
+      expect(row("Nights")).toHaveTextContent("4 nights");
+      expect(row("Most for this stay")).toHaveTextContent("RM 880.00");
+      expect(screen.getByText("Open from the day before the fair to the day after (1–5 Oct). Dots mark the fair's days.")).toBeInTheDocument();
+    });
+
+    it("refuses only the night before the fair, and pays nothing while it is picked", () => {
       const onSubmit = vi.fn();
       claimForm(false, onSubmit, capped);
-      stay(1, 1);
-      fireEvent.change(screen.getByLabelText("Check-in"), { target: { value: "2026-09-29" } });
-      fireEvent.change(screen.getByLabelText("Check-out"), { target: { value: "2026-10-02" } });
+      pick(/Airbnb accommodation/);
+      tap("Thu, 1 Oct", "Fri, 2 Oct");
+      for (const who of ["More male", "More female"]) fireEvent.click(screen.getByRole("button", { name: who }));
+      invoiceTotal("200");
       expect(screen.getByText("The stay must cover the fair's days (2–4 Oct).")).toBeInTheDocument();
+      expect(claimed()).toBe("RM 0.00");
       fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
       expect(screen.getByRole("alert")).toHaveTextContent("The stay must cover the fair's days (2–4 Oct).");
       expect(onSubmit).not.toHaveBeenCalled();
     });
 
-    it("with no cap set, every stay is per person", () => {
-      claimForm(false, vi.fn());
-      stay(1, 1);
-      expect(screen.queryByLabelText("Invoice total (RM)")).not.toBeInTheDocument();
-      expect(claimed()).toBe("RM 260.00");
-      expect(screen.getByText("Set by the fixed rate. You can't edit the amount.")).toBeInTheDocument();
+    it("asks for the days on the calendar before anything goes", () => {
+      const onSubmit = vi.fn();
+      claimForm(false, onSubmit, capped);
+      pick(/Airbnb accommodation/);
+      tap("Fri, 2 Oct");
+      fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("Tap your check-in and check-out days on the calendar.");
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("another brand week opens on its own days, and drops a stay outside them", () => {
+      claimForm(false, vi.fn(), capped);
+      pick(/Airbnb accommodation/);
+      tap("Fri, 2 Oct", "Sun, 4 Oct");
+      pick(/Zanotti week/);
+      const calendar = screen.getByRole("group", { name: "Check-in and check-out" });
+      expect(calendar).toHaveTextContent("Sep 2026");
+      expect(ends()).toEqual(["Check-inTap a day", "Check-out—"]);
+      expect([...calendar.querySelectorAll("button[aria-label]")].filter(b => !(b as HTMLButtonElement).disabled).map(b => b.getAttribute("aria-label")))
+        .toEqual(["Thu, 17 Sep", "Fri, 18 Sep, fair day", "Sat, 19 Sep, fair day", "Sun, 20 Sep, fair day", "Mon, 21 Sep"]);
+    });
+
+    it("a brand week whose fair has no days of its own opens on its weekend, Friday to Sunday", () => {
+      claimForm(false, vi.fn(), { ...capped, weeks: [week({ start: null, end: null }), ...capped.weeks.slice(1)] });
+      pick(/Airbnb accommodation/);
+      expect(day("Thu, 1 Oct")).toBeEnabled();
+      expect(day("Fri, 2 Oct, fair day")).toBeEnabled();
+      expect(day("Mon, 5 Oct")).toBeEnabled();
+      expect(day("Tue, 6 Oct")).toBeDisabled();
     });
   });
 });

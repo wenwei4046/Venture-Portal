@@ -3,9 +3,10 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { ICON, Svg } from "../icons";
 import Sheet, { SheetHandle } from "../Sheet";
-import { initials, rm2 } from "../format";
+import { dayRange, initials, rm2 } from "../format";
 import type { ClaimWeek, FormOptions, RequestKindVM } from "./profile-vm";
-import { airbnbGroup, claimAmount, fairRegion, isOutstation, MAX_STAY_NIGHTS, nightsBetween, stayProblem } from "@/lib/member/claim-rules";
+import StayCalendar from "./StayCalendar";
+import { airbnbCap, airbnbGroup, claimAmount, fairRegion, isOutstation, nightsBetween, stayProblem, stayWindow } from "@/lib/member/claim-rules";
 import { applicationFormHtml, BUILTIN_FIELDS, FORM_KINDS, REPLACEMENT_BUILTIN_FIELDS, type WaitingField } from "@/lib/commission/waiting-form";
 import { answersFor, blankRequired, capacityLine, fillIn, priorAnswers } from "@/lib/member/waiting-answers";
 import s from "./profile.module.css";
@@ -147,16 +148,28 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   const stayValue = money(stay);
   const nights = nightsBetween(checkIn, checkOut);
   const pax = male + female;
-  // By head count only (user 2026-10-06): up to HR's small-group size the invoice's total is
-  // typed and paid up to HR's cap a night; more people are paid per person, nothing typed.
-  // Nobody counted yet reads as the smallest group, so the total's box does not jump in on the first +.
+  // The invoice's total is typed and paid up to a cap by head count: up to HR's small group, HR's
+  // figure a night (user 2026-10-06); more people, the rate a person a night — a cap too (2026-10-12).
+  // Nobody counted yet reads as the smallest group, so the cap's rows do not jump on the first +.
   const group = airbnbGroup(options.rates, Math.max(1, pax));
   const capPerNight = options.rates.groupCapPerNight ?? 0;
-  // Airbnb is for an outstation fair only, a stay of at most 7 nights covering its days (user 2026-10-06).
-  const stayIssue = weekRow ? stayProblem(checkIn, checkOut, weekRow, weekRow.dates) : null;
+  const perPax = options.rates.perPaxNight;
+  // Airbnb is for an outstation fair only (2026-10-06); its stay falls between the day before the fair
+  // and the day after (2026-10-12), tapped on one calendar that opens on just those days.
+  const range = weekRow ? stayWindow(weekRow, weekRow.key) : null;
+  const stayIssue = weekRow && range ? stayProblem(checkIn, checkOut, range, weekRow.dates) : null;
+  const stayNights = stayIssue ? 0 : nights ?? 0;
+  const cap = airbnbCap(options.rates, pax, stayNights);
   const amount = useMemo(() => claimAmount(options.rates, cat === "outstation"
     ? { type: "outstation", regionId: regionRow?.id ?? null, ticket: ticketValue }
-    : { type: "airbnb", pax, nights: stayIssue ? 0 : nights ?? 0, invoice: stayValue }), [options.rates, cat, regionRow, ticketValue, pax, nights, stayIssue, stayValue]);
+    : { type: "airbnb", pax, nights: stayNights, invoice: stayValue }), [options.rates, cat, regionRow, ticketValue, pax, stayNights, stayValue]);
+  /** Another brand week: a stay picked for the last one stays only if it falls in this one's days. */
+  const pickWeek = (w: ClaimWeek) => {
+    setWeek(w.key);
+    const next = stayWindow(w, w.key);
+    const fits = (day: string) => !day || (day >= next.first && day <= next.last);
+    if (!fits(checkIn) || !fits(checkOut)) { setCheckIn(""); setCheckOut(""); }
+  };
   const department = options.departments.find(d => d.id === (kind === "waiting" ? target || options.departmentId : options.departmentId));
   // The waiting list's answers as one map: the built-in sub-department is always chosen.
   const answered = { ...vals, target: target || options.departmentId };
@@ -221,10 +234,10 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
       } else {
         if (!regionRow) return setError(`HR has not set the region for ${venue} yet, so it cannot be claimed.`);
         if (!isOutstation(regionRow)) return setError(`${venue} is local to ${options.rates.base}, so there is no Airbnb claim.`);
-        if (!checkIn || !checkOut || nights === null || nights < 1) return setError("Enter the check-in and check-out dates.");
+        if (!checkIn || !checkOut || nights === null || nights < 1) return setError("Tap your check-in and check-out days on the calendar.");
         if (stayIssue) return setError(stayIssue);
         if (male + female < 1) return setError("Add who stayed.");
-        if (group && !(stayValue && stayValue > 0)) return setError("Enter the stay's total from its invoice.");
+        if (!(stayValue && stayValue > 0)) return setError("Enter the stay's total from its invoice.");
         if (!(amount > 0)) return setError("HR has not set the Airbnb rate yet.");
         if (!file) return setError("Add the invoice.");
         if (file.size > 3 * 1024 * 1024) return setError("The invoice must be 3 MB or smaller.");
@@ -232,7 +245,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
         form.set("end", checkOut);
         form.set("male", String(male));
         form.set("female", String(female));
-        if (group) form.set("amount", stay.trim());
+        form.set("amount", stay.trim());
         form.set("invoice", file);
       }
     } else if (kind === "replacement") {
@@ -355,7 +368,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
           <>
             <div className={s.field}><span className={s.fieldLabel}>Claim category</span>
               <div className={s.cats}>
-                {([["outstation", "Outstation", "Fixed by spots for the route", CAT_OUT], ["airbnb", "Airbnb accommodation", options.rates.perPaxNight !== null ? `${rm0(options.rates.perPaxNight)} per pax per night` : "Rate not set yet", CAT_AIR]] as const).map(([id, label, note, d]) => (
+                {([["outstation", "Outstation", "Fixed by spots for the route", CAT_OUT], ["airbnb", "Airbnb accommodation", perPax !== null ? `Up to ${rm0(perPax)} per pax per night` : "Rate not set yet", CAT_AIR]] as const).map(([id, label, note, d]) => (
                   <button key={id} className={`${s.cat} ${cat === id ? s.catOn : ""}`} onClick={() => setCat(id)} aria-pressed={cat === id}>
                     <span className={s.catIcon}><Svg d={d} size={17} sw={1.9} /></span>
                     <span className={s.catLabel}>{label}</span>
@@ -369,7 +382,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                 {options.weeks.map(w => {
                   const on = w.key === week;
                   return (
-                    <button key={w.key} className={`${s.week} ${on ? s.weekOn : ""} ${w.claimable ? "" : s.weekOff}`} onClick={() => setWeek(w.key)} aria-pressed={on}
+                    <button key={w.key} className={`${s.week} ${on ? s.weekOn : ""} ${w.claimable ? "" : s.weekOff}`} onClick={() => pickWeek(w)} aria-pressed={on}
                       disabled={!w.claimable} style={on ? { borderColor: w.color, background: w.tint } : undefined}>
                       <span className={`${s.weekBadge} ${s.weekBadgeMonth}`} style={{ background: w.color }}><span className={s.weekMonth}>{w.month}</span>{w.n}</span>
                       <span className={s.weekText}>
@@ -435,12 +448,15 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
               <p className={s.local}>{venue} is local to {options.rates.base}, so there is no Airbnb claim.</p>
             ) : (
               <>
-                <div className={s.two}>
-                  <label className={s.field}><span className={s.fieldLabel}>Check-in</span><input type="date" className={s.input} value={checkIn} onChange={e => setCheckIn(e.target.value)} /></label>
-                  <label className={s.field}><span className={s.fieldLabel}>Check-out</span><input type="date" className={s.input} value={checkOut} onChange={e => setCheckOut(e.target.value)} /></label>
+                <div className={s.field}><span className={s.fieldLabel}>Check-in and check-out</span>
+                  {range && (
+                    <StayCalendar range={range} checkIn={checkIn} checkOut={checkOut} tone={weekRow.color}
+                      onPick={next => { setCheckIn(next.checkIn); setCheckOut(next.checkOut); setError(null); }} />
+                  )}
                 </div>
-                {(stayIssue || (weekRow.start && weekRow.end)) && (
-                  <p className={stayIssue ? s.formError : s.formNote}>{stayIssue ?? `Up to ${MAX_STAY_NIGHTS} nights, covering the fair's days (${weekRow.dates}).`}</p>
+                {range && (
+                  <p className={stayIssue ? s.formError : s.formNote}>{stayIssue
+                    ?? `Open from the day before the fair to the day after (${dayRange(range.first, range.last)}). Dots mark the fair's days.`}</p>
                 )}
                 <div className={s.field}><span className={s.fieldLabel}>Who stayed</span>
                   <div className={s.pax}>
@@ -448,30 +464,24 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                     <Counter label="Female" value={female} onChange={setFemale} />
                   </div>
                 </div>
-                {group && (
-                  <label className={s.field}><span className={s.fieldLabel}>Invoice total (RM)</span>
-                    <input type="text" inputMode="decimal" className={s.input} placeholder="e.g. 380.00" value={stay} onChange={e => setStay(e.target.value)} maxLength={12} />
-                  </label>
-                )}
+                <label className={s.field}><span className={s.fieldLabel}>Invoice total (RM)</span>
+                  <input type="text" inputMode="decimal" className={s.input} placeholder="e.g. 380.00" value={stay} onChange={e => setStay(e.target.value)} maxLength={12} />
+                </label>
                 <div className={s.sum}>
                   <div className={s.sumRow}><span className={s.sumLabel}>Total pax</span><span className={s.sumValue}>{pax} pax · {male} male, {female} female</span></div>
                   <div className={s.sumRow}><span className={s.sumLabel}>Nights</span><span className={s.sumValue}>{nights !== null && nights > 0 ? `${nights} night${nights === 1 ? "" : "s"}` : "—"}</span></div>
-                  {group ? (
-                    <>
-                      <div className={s.sumRow}><span className={s.sumLabel}>Up to, per night</span><span className={s.sumValue}>{rm2(capPerNight)}</span></div>
-                      <div className={s.sumRow}><span className={s.sumLabel}>Most for this stay</span><span className={s.sumValue}>{nights !== null && nights > 0 ? rm2(capPerNight * nights) : "—"}</span></div>
-                    </>
-                  ) : (
-                    <div className={s.sumRow}><span className={s.sumLabel}>Rate per pax per night</span><span className={s.sumValue}>{options.rates.perPaxNight !== null ? rm2(options.rates.perPaxNight) : "Not set"}</span></div>
-                  )}
+                  {group
+                    ? <div className={s.sumRow}><span className={s.sumLabel}>Up to, per night</span><span className={s.sumValue}>{rm2(capPerNight)}</span></div>
+                    : <div className={s.sumRow}><span className={s.sumLabel}>Up to, per pax per night</span><span className={s.sumValue}>{perPax !== null ? rm2(perPax) : "Not set"}</span></div>}
+                  <div className={s.sumRow}><span className={s.sumLabel}>Most for this stay</span><span className={s.sumValue}>{cap !== null ? rm2(cap) : "—"}</span></div>
                   <div className={s.sumTotal}><span className={s.sumTotalLabel}>Claim amount</span><span className={s.sumTotalValue}>{rm2(amount)}</span></div>
-                  <span className={s.sumNote}>{group
-                    ? (stayValue !== null && nights !== null && nights > 0 && stayValue > capPerNight * nights
-                      ? `The invoice is over the limit, so the claim is ${rm2(amount)}. HR checks it against the invoice.`
-                      : `Up to ${options.rates.groupMaxPax} pax claim the invoice's total, up to ${rm0(capPerNight)} a night. HR checks it against the invoice.`)
-                    : capPerNight > 0
-                      ? `More than ${options.rates.groupMaxPax} pax are paid the fixed rate per pax. You can't edit the amount.`
-                      : "Set by the fixed rate. You can't edit the amount."}</span>
+                  <span className={s.sumNote}>{stayValue !== null && cap !== null && stayValue > cap
+                    ? `The invoice is over the limit, so the claim is ${rm2(amount)}. HR checks it against the invoice.`
+                    : group
+                      ? `Up to ${options.rates.groupMaxPax} pax claim the invoice's total, up to ${rm0(capPerNight)} a night. HR checks it against the invoice.`
+                      : perPax === null
+                        ? "HR has not set the Airbnb rate yet."
+                        : `${capPerNight > 0 ? `More than ${options.rates.groupMaxPax} pax claim` : "You claim"} the invoice's total, up to ${rm0(perPax)} per pax a night. HR checks it against the invoice.`}</span>
                 </div>
                 <Invoice file={file} fileRef={fileRef} onFile={setFile} />
               </>
