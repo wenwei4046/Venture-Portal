@@ -408,7 +408,7 @@ function SubmissionTab({
   // Where the billing-vs-payroll difference went. Derived on the fly from the
   // figures already on this tab — nothing is written to the database.
   // HOUZS Venture's own share is in the pool with the subsidiaries': its
-  // departments pay it into the Director pool (2026-10-13).
+  // departments pay it through the directors' payroll (2026-10-13).
   const hv = hvShare?.components ?? null
   const gap =
     totals && (byCompany.length > 0 || hv)
@@ -770,12 +770,12 @@ function SubmissionTab({
 
       {/* HOUZS Venture's own share (2026-10-13): no invoice to a subsidiary —
           it is payroll its departments pay, carried by the directors' batch. */}
-      {hvShare ? <HvShareSection share={hvShare} /> : null}
+      {hvShare ? <HvShareSection share={hvShare} directorsSent={state.withFinance > 0} /> : null}
     </div>
   )
 }
 
-function HvShareSection({ share }: { share: HvShare }) {
+function HvShareSection({ share, directorsSent }: { share: HvShare; directorsSent: boolean }) {
   const carried = share.status === 'in_payroll'
   return (
     <section className="mt-12">
@@ -792,6 +792,11 @@ function HvShareSection({ share }: { share: HvShare }) {
             <span className="dot" />
             In payroll #{share.batchNo ?? '?'}
             {share.batchSubmittedAt ? ` · ${officeTime(share.batchSubmittedAt).format('D MMM YYYY')}` : ''}
+          </span>
+        ) : directorsSent ? (
+          <span className="chip">
+            <span className="dot" />
+            Directors sent
           </span>
         ) : (
           <span className="chip alert">
