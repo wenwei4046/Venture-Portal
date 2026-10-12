@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  arenaIncentive, arenaMonthFridays, arenaRankings, arenaShortDay, arenaWeekendLabel,
+  arenaIncentive, arenaMonthFridays, arenaRankings, arenaShortDay, arenaWeekendLabel, arenaWeekFriday, arenaWeeksSoFar,
   type ArenaPerson, type ArenaTier,
 } from "./arena";
 const row = (id: string, sales: number, cost: number, extra: Partial<ArenaPerson> = {}): ArenaPerson => ({ id, name: id, self: false, sales, held: 0, orders: 1, kpiQty: 2, marginRevenue: sales, marginCost: cost, blindOrders: 0, brands: {}, ...extra });
@@ -49,6 +49,23 @@ describe("brand weeks", () => {
     expect(arenaWeekendLabel("2026-09-04")).toBe("4–6 Sep");
     expect(arenaWeekendLabel("2026-10-30")).toBe("30 Oct – 1 Nov");
     expect(arenaShortDay("2026-10-06")).toBe("6 Oct");
+  });
+
+  it("finds this week's fair weekend: Monday to Saturday look ahead, Sunday looks back", () => {
+    expect(arenaWeekFriday("2026-10-12")).toBe("2026-10-16"); // Mon
+    expect(arenaWeekFriday("2026-10-16")).toBe("2026-10-16"); // Fri
+    expect(arenaWeekFriday("2026-10-17")).toBe("2026-10-16"); // Sat
+    expect(arenaWeekFriday("2026-10-18")).toBe("2026-10-16"); // Sun
+    expect(arenaWeekFriday("2026-11-01")).toBe("2026-10-30"); // Sun, into the month before
+    expect(arenaWeekFriday("2026-11-30")).toBe("2026-12-04"); // Mon, into the month after
+  });
+
+  it("keeps this week's brand week and the ones before it, never a later weekend (user 2026-10-12)", () => {
+    const weeks = ["2026-10-02", "2026-10-09", "2026-10-16", "2026-10-23", "2026-10-30"].map(week => ({ week }));
+    expect(arenaWeeksSoFar(weeks, "2026-10-12").map(w => w.week)).toEqual(["2026-10-02", "2026-10-09", "2026-10-16"]);
+    expect(arenaWeeksSoFar(weeks, "2026-10-18").map(w => w.week)).toEqual(["2026-10-02", "2026-10-09", "2026-10-16"]);
+    expect(arenaWeeksSoFar(weeks, "2026-10-19").map(w => w.week)).toEqual(["2026-10-02", "2026-10-09", "2026-10-16", "2026-10-23"]);
+    expect(arenaWeeksSoFar([], "2026-10-12")).toEqual([]);
   });
 });
 

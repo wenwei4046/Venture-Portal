@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { memberDemo } from "@/lib/member/demo";
 import type { MemberArenaSnapshot } from "@/lib/member/arena";
@@ -110,7 +110,9 @@ async function open(make: () => MemberData, search: string) {
   window.history.replaceState({}, "", `/member${search}`);
   const source = fakeSource(make);
   render(<RevenueApp initialData={make()} initialSearch={search} today="2026-10-05" source={source.api} />);
-  expect(await screen.findByText("0 of 5 from the ERP")).toBeInTheDocument();
+  // My brand weeks has drawn its months: this week's weekend (W2, 9–11 Oct on Monday 5 Oct) is not listed yet.
+  expect(await screen.findByText("Not assigned yet")).toBeInTheDocument();
+  expect(screen.queryByText("MID VALLEY")).not.toBeInTheDocument();
   return source;
 }
 
@@ -176,14 +178,19 @@ describe("RevenueApp refreshes only when pulled (2026-10-06)", () => {
 
     expect(screen.getByText("Refreshing…")).toBeInTheDocument();
     expect(screen.queryByText("Loading your fair weekends…")).not.toBeInTheDocument();
-    expect(screen.getByText("0 of 5 from the ERP")).toBeInTheDocument();
+    expect(screen.getByText("Not assigned yet")).toBeInTheDocument();
+    expect(screen.queryByText("MID VALLEY")).not.toBeInTheDocument();
     expect(calls(api.arena)).toBe(reads.arena + 1);
     expect(calls(api.orderBook)).toBe(reads.book + 1);
     expect(calls(api.income)).toBe(reads.income + 1);
     expect(api.refresh).toHaveBeenCalledTimes(1);
 
     await source.release();
-    expect(await screen.findByText("1 of 5 from the ERP")).toBeInTheDocument();
+    // ANTHONY's weekend of 2 October, now listed: its brand, venue and organizer.
+    expect(await screen.findByText("MID VALLEY")).toBeInTheDocument();
+    const october = screen.getByRole("region", { name: "October 2026" });
+    expect(within(october).getByText("Akemi")).toBeInTheDocument();
+    expect(within(october).getByText("BIGHOME")).toBeInTheDocument();
     expect(screen.queryByText("Refreshing…")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
@@ -206,7 +213,8 @@ describe("RevenueApp refreshes only when pulled (2026-10-06)", () => {
     pull(300);
     await source.release();
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't refresh. Pull down to try again.");
-    expect(screen.getByText("0 of 5 from the ERP")).toBeInTheDocument();
+    expect(screen.getByText("Not assigned yet")).toBeInTheDocument();
+    expect(screen.queryByText("MID VALLEY")).not.toBeInTheDocument();
     expect(screen.queryByText("Loading your fair weekends…")).not.toBeInTheDocument();
     expect(reload).not.toHaveBeenCalled();
   });
@@ -229,7 +237,7 @@ describe("RevenueApp refreshes only when pulled (2026-10-06)", () => {
     await source.release();
     expect(screen.queryByText("Refreshing…")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByText("0 of 5 from the ERP")).toBeInTheDocument();
+    expect(screen.getByText("Not assigned yet")).toBeInTheDocument();
   });
 
   it("back after ten minutes away it reads everything again once; after two, nothing", async () => {
@@ -257,7 +265,7 @@ describe("RevenueApp refreshes only when pulled (2026-10-06)", () => {
     await source.release();
     expect(api.refresh).toHaveBeenCalledTimes(1);
     expect(calls(api.arena, "2026-09")).toBe(2);
-    expect(screen.getByText("0 of 5 from the ERP")).toBeInTheDocument();
+    expect(screen.getByText("Not assigned yet")).toBeInTheDocument();
   });
 });
 

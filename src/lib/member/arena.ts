@@ -96,6 +96,27 @@ export function arenaWeekendLabel(friday: string): string {
     ? `${day(start)}–${day(end)} ${month(end)}`
     : `${day(start)} ${month(start)} – ${day(end)} ${month(end)}`;
 }
+/**
+ * The Friday of the fair weekend `day` (`YYYY-MM-DD`) belongs to: a week runs
+ * Monday to Sunday, so Monday–Saturday look ahead to that week's Friday and a
+ * Sunday looks back two days. "This week" for Today's week card and My brand weeks.
+ */
+export function arenaWeekFriday(day: string): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  const dow = d.getUTCDay(); // 0 Sun … 6 Sat
+  const offset = dow === 0 ? -2 : 5 - dow; // Sun → back to Fri; Mon–Sat → this week's Fri
+  return new Date(d.getTime() + offset * 86_400_000).toISOString().slice(0, 10);
+}
+/**
+ * The brand weeks a member is shown: this week's and every one before it —
+ * never a later weekend the ERP's Sales Attending already lists them at (the
+ * user, 2026-10-12: "they only view their current and previous assign, but not
+ * future"). `today` is the office's day.
+ */
+export function arenaWeeksSoFar<T extends { week: string }>(weeks: readonly T[], today: string): T[] {
+  const friday = arenaWeekFriday(today);
+  return weeks.filter(w => w.week <= friday);
+}
 export function arenaRankings(people: readonly ArenaPerson[], metric: ArenaMetric, brand?: string): ArenaRankedPerson[] {
   const rows = people.map(person => {
     const score = brand ? person.brands[brand] : person;

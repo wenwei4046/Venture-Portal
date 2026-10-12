@@ -2,7 +2,7 @@ import type { MemberBand, MemberIncome, MemberInsightBlock, MemberMemo, MemberRe
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import { marginStanding } from "../insight/insight-model";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
-import { arenaIncentive, arenaMonthFridays, arenaRankings, type ArenaMetric, type MemberArenaSnapshot } from "@/lib/member/arena";
+import { arenaIncentive, arenaMonthFridays, arenaRankings, arenaWeekFriday, type ArenaMetric, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { dayLabel, dayRange, monthName, ordinalSuffix, rm2 } from "../format";
 import { ICON } from "../icons";
 
@@ -95,13 +95,8 @@ export function shortTier(label: string): string {
   return label.replace(/^incentive\s+/i, "");
 }
 
-/** The Friday of the fair weekend this week belongs to (Mon–Sun). */
-export function weekFriday(today: string): string {
-  const d = new Date(`${today}T00:00:00Z`);
-  const dow = d.getUTCDay(); // 0 Sun … 6 Sat
-  const offset = dow === 0 ? -2 : 5 - dow; // Sun → back to Fri; Mon–Sat → this week's Fri
-  return new Date(d.getTime() + offset * 86_400_000).toISOString().slice(0, 10);
-}
+/** The Friday of the fair weekend this week belongs to (Mon–Sun) — My brand weeks cuts at the same one. */
+export const weekFriday = arenaWeekFriday;
 
 function salesMetric(input: TodayInput): TodayMetric {
   const sales = input.insight?.me.sales ?? 0;

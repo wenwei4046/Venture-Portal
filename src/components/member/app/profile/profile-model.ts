@@ -471,6 +471,10 @@ const WEEK_TONE: Record<string, [string, string]> = {
   AKEMI: ["var(--rv-accent)", "var(--rv-peach-bg)"], ERGOTEX: ["var(--rv-green)", "var(--rv-green-bg)"],
   ZANOTTI: ["var(--rv-amber)", "var(--rv-gold-tint)"], DUNLOP: ["var(--rv-brown)", "var(--rv-sand)"],
 };
+/** A brand week's two colours — the claim form's week badges and My brand weeks'; no brand is the quiet pair. */
+export function brandWeekTone(brand: string | null): [string, string] {
+  return brand ? WEEK_TONE[brand] ?? ["var(--rv-brown)", "var(--rv-sand)"] : ["var(--rv-sub)", "var(--rv-sand)"];
+}
 
 /**
  * The fair weekends a claim can be for, newest first: every weekend of the
@@ -500,7 +504,7 @@ export function claimWeeks(snapshots: readonly (MemberArenaSnapshot | null | und
           ? { brand: scoring.brand ?? null, venue: scoring.venue, organizer: scoring.organizer ?? null, start: scoring.start, end: scoring.end, fairId: scoring.fairId ?? null }
           : null;
       const brand = booth?.brand ?? null;
-      const [color, tint] = brand ? WEEK_TONE[brand] ?? ["var(--rv-brown)", "var(--rv-sand)"] : ["var(--rv-sub)", "var(--rv-sand)"];
+      const [color, tint] = brandWeekTone(brand);
       out.set(friday, {
         key: friday, month, n: `W${i + 1}`, brandWeek: brand ? `${WEEK_BRAND[brand] ?? brand} week` : "No brand week", brand,
         dates: booth?.start && booth.end ? dayRange(booth.start, booth.end) : arenaWeekendLabel(friday), venue: booth?.venue ?? null, org: booth?.organizer ?? null,

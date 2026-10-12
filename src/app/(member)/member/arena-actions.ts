@@ -6,8 +6,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isPrincipalAccount } from "@/lib/view-as";
 import { principalReadContext } from "@/lib/member/read-access";
 import type { MemberReadContext } from "@/lib/member/types";
-import type { ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
+import { arenaWeeksSoFar, type ArenaWindow, type MemberArenaSnapshot } from "@/lib/member/arena";
 import type { ArenaHistorySnapshot } from "@/lib/member/arena-history";
+import { officeToday } from "@/lib/office-time";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function validPeriod(period: string) { return /^\d{4}-(0[1-9]|1[0-2])$/.test(period); }
@@ -48,7 +49,11 @@ export async function fetchMemberArena(membershipId: string, period: string, win
       ...(principal ? { p_staff: context!.staffId } : {}),
     });
     if (!history.error && history.data && Array.isArray(history.data.events)) {
-      snapshot.history = history.data as ArenaHistorySnapshot;
+      const read = history.data as ArenaHistorySnapshot;
+      // This week's brand week and the ones before it reach the phone, never a later weekend the
+      // ERP already lists them at (the user, 2026-10-12: "they only view their current and previous
+      // assign, but not future"). Today's week card and My brand weeks show no more than that.
+      snapshot.history = read.weeks ? { ...read, weeks: arenaWeeksSoFar(read.weeks, officeToday()) } : read;
     } else {
       snapshot.historyError = "Fair results are not available yet. Your sales, margin and KPI rankings are up to date.";
     }
