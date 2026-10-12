@@ -39,5 +39,6 @@ export async function loadTalentBank(): Promise<BankRead> {
   if (!bank) {
     return { ok: false, reason: error?.code === '42501' ? 'Hiring needs Hiring · View.' : 'The Talent Bank’s folders could not be read. Please try again.' }
   }
-  return { ok: true, bank }
+  // The Bin counts its days from the read, not from when the page was first drawn (mig 20261013061500).
+  return { ok: true, bank: { ...bank, readAt: new Date().toISOString() } }
 }

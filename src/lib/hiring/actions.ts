@@ -312,7 +312,10 @@ export async function replaceHiringFile(file: string, upload: { path: string; na
   return deleted ? { ok: true } : { ok: true, warning: LEFT_IN_STORAGE }
 }
 
-/** Remove: a file off its record, and out of the bucket once nobody else's record names it (Edit). */
+/**
+ * Remove: a file off its record (Edit). A Talent Bank person's waits in the Bin for 30 days (mig 20261013061500); a
+ * candidate's leaves the bucket once nobody else's record names it.
+ */
 export async function removeHiringFile(file: string): Promise<HiringOutcome> {
   await requireActionOn('/hiring/talent/[id]', 'hiring', 'edit')
   const supabase = await client()
@@ -434,7 +437,7 @@ export async function renameBankFolder(id: string, name: string): Promise<Hiring
   return call('hiring_bank_folder_rename', { p_id: id, p_name: name }, 'The folder could not be renamed. Please try again.')
 }
 
-/** A folder's ⋮ › Delete — only an empty one (Edit). */
+/** A folder's ⋮ › Move to Bin — only an empty one; the Bin keeps it 30 days (Edit). */
 export async function deleteBankFolder(id: string): Promise<HiringOutcome> {
   await requireActionOn('/hiring/talent', 'hiring', 'edit')
   return call('hiring_bank_folder_delete', { p_id: id }, 'The folder could not be deleted. Please try again.')
@@ -511,7 +514,7 @@ export async function saveBankFile(input: { place: string; path: string; name: s
   return { ok: true }
 }
 
-/** A file's ⋮ › Delete: off the bank, and out of the bucket (Edit). */
+/** A file's ⋮ › Move to Bin: off the bank, its object kept while the Bin keeps it — 30 days (Edit). */
 export async function deleteBankFile(id: string): Promise<HiringOutcome> {
   await requireActionOn('/hiring/talent', 'hiring', 'edit')
   const supabase = await client()
@@ -535,9 +538,9 @@ export async function saveTalentNotes(talent: string, notes: string): Promise<Hi
 }
 
 /**
- * Remove from Talent Bank: they leave the bank (their row stays for its
- * history) and their files come off — out of the bucket once nobody else's
- * record names them (a candidate they were may still).
+ * Remove from Talent Bank: they leave the bank for its Bin, their files with
+ * them, for 30 days (mig 20261013061500) — Restore brings them back; then the
+ * hourly sweep deletes the files (their row stays, removed, for its history).
  */
 export async function removeHiringTalent(talent: string): Promise<HiringOutcome> {
   await requireActionOn('/hiring/talent', 'hiring', 'edit')
@@ -548,4 +551,41 @@ export async function removeHiringTalent(talent: string): Promise<HiringOutcome>
   await sweep(supabase)
   refresh()
   return deleted ? { ok: true } : { ok: true, warning: LEFT_IN_STORAGE }
+}
+
+// ── The Talent Bank's Bin (mig 20261013061500) ──────────────────────────────
+
+/** Bin › Restore: back where it was — what it was in with it, when that is in the Bin too (Edit). Answers where, in words. */
+export async function restoreBankItem(id: string): Promise<{ ok: true; label: string } | { ok: false; reason: string }> {
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
+  const { data, error } = await (await client()).rpc('hiring_bank_bin_restore', { p_bin: id })
+  if (error) return { ok: false, reason: refusal(error, 'It could not be restored. Please try again.') }
+  refresh()
+  const label = data && typeof data === 'object' ? (data as { label?: unknown }).label : null
+  return { ok: true, label: typeof label === 'string' && label ? label : 'the Talent Bank' }
+}
+
+/** Bin › Delete forever: out of the Bin now, and out of the bucket once nobody else's record names it (Edit). */
+export async function deleteBankItemForever(id: string): Promise<HiringOutcome> {
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('hiring_bank_bin_delete', { p_bin: id })
+  if (error) return { ok: false, reason: refusal(error, 'It could not be deleted. Please try again.') }
+  const deleted = await deleteObjects(supabase, orphansOf(data))
+  await sweep(supabase)
+  refresh()
+  return deleted ? { ok: true } : { ok: true, warning: LEFT_IN_STORAGE }
+}
+
+/** Bin › Empty bin: everything in it, now (Edit). Answers how many went. */
+export async function emptyBankBin(): Promise<{ ok: true; count: number; warning?: string } | { ok: false; reason: string }> {
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('hiring_bank_bin_empty')
+  if (error) return { ok: false, reason: refusal(error, 'The Bin could not be emptied. Please try again.') }
+  const deleted = await deleteObjects(supabase, orphansOf(data))
+  await sweep(supabase)
+  refresh()
+  const count = Number((data as { count?: unknown } | null)?.count) || 0
+  return deleted ? { ok: true, count } : { ok: true, count, warning: LEFT_IN_STORAGE }
 }

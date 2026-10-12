@@ -35,10 +35,15 @@ export async function GET(request: Request) {
     // Phone notifications a write left unsent (mig 20261011180000) — through the outbox's own secret, not the service role.
     await flushPush()
     // Hiring's leftovers (mig 20261011210000; the user: every hour, even when nobody touches Hiring): files no
-    // record names, over a day old, a bounded batch through the Storage API. Counts only — the names are people's files.
+    // record names, over a day old, a bounded batch through the Storage API — after the Talent Bank's Bin has let go
+    // what waited there 30 days (mig 20261013061500). Counts only — the names are people's files.
     const leftovers = await sweepHiringLeftovers(db)
     if (!leftovers) console.error('Hiring leftover sweep failed')
-    else if (leftovers.listed) console.info('Hiring leftovers deleted', leftovers.deleted, 'of', leftovers.listed)
+    else {
+      if (leftovers.expired === null) console.error('Talent Bank bin sweep failed')
+      else if (leftovers.expired) console.info('Talent Bank bin let go', leftovers.expired, 'after 30 days')
+      if (leftovers.listed) console.info('Hiring leftovers deleted', leftovers.deleted, 'of', leftovers.listed)
+    }
     if (error || !data || !['complete', 'partial', 'skipped'].includes(data.status)) {
       // Log codes only. Never echo SQL errors, credentials or private rows.
       console.error('Member queue worker failed', error?.code ?? 'invalid_result')

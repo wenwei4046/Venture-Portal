@@ -6,12 +6,13 @@ import { Chip, HvPage, PageHead, SecLabel } from '@/components/hrv/kit'
 import { Drawer } from '@/components/hrv/overlay'
 import { flash } from '@/components/hrv/toast'
 import {
-  addBankFolder, addBankTalent, deleteBankFile, deleteBankFolder, hiringFileLink, moveBankEveryone, moveBankFolder, moveBankTalent, removeHiringTalent,
-  renameBankFolder, saveBankFile,
+  addBankFolder, addBankTalent, deleteBankFile, deleteBankFolder, deleteBankItemForever, emptyBankBin, hiringFileLink, moveBankEveryone, moveBankFolder,
+  moveBankTalent, removeHiringTalent, renameBankFolder, restoreBankItem, saveBankFile,
 } from '@/lib/hiring/actions'
 import {
-  ROOT, canonicalAt, crumbs, folderCards, folderNameRefusal, heldIn, holdsPeople, moveTargets, parentOf, parsePlace, pathLine, placeExists,
-  placeFiles, placeName, placeOfTalent, searchBank, takesFolders, talentAt, talentsIn, type Bank, type BankFile, type BankHit, type BankTree,
+  BANK_NAME, BIN, ROOT, binDaysLeft, binFrom, binLeftLabel, binSections, canonicalAt, crumbs, folderCards, folderNameRefusal, heldIn, holdsPeople,
+  moveTargets, parentOf, parsePlace, pathLine, placeExists, placeFiles, placeName, placeOfTalent, searchBank, takesFolders, talentAt, talentsIn,
+  type Bank, type BankFile, type BankHit, type BankTree, type BinItem,
 } from '@/lib/hiring/bank'
 import { HIRING_ACCEPT, extLabel } from '@/lib/hiring/files'
 import { uploadHiringFile } from '@/lib/hiring/upload'
@@ -22,7 +23,7 @@ import { FileTile, FolderTile } from '@/app/(portal)/team/documentation/_compone
 import FolderNameWindow from '@/app/(portal)/team/documentation/_components/drive/FolderNameWindow'
 import Menu, { type MenuItem } from '@/app/(portal)/team/documentation/_components/drive/Menu'
 import {
-  BinGlyph, ChevronGlyph, CompanyGlyph, DownGlyph, EyeGlyph, FolderGlyph, NewFolderGlyph, PenGlyph, PersonGlyph, SearchGlyph, UploadGlyph,
+  BinGlyph, ChevronGlyph, CompanyGlyph, DownGlyph, EyeGlyph, FolderGlyph, NewFolderGlyph, PenGlyph, PersonGlyph, RestoreGlyph, SearchGlyph, UploadGlyph,
 } from '@/app/(portal)/team/documentation/_components/drive/icons'
 import d from '@/app/(portal)/team/documentation/_components/drive/drive.module.css'
 import BankTalentTile from './BankTalentTile'
@@ -50,6 +51,10 @@ async function linkTo(f: BankFile, download: boolean): Promise<string | null> {
  * files). The Data center's Drive (People › Documentation): + New (New folder · Add talent · Upload files), the path
  * back up, a search over the whole bank; folders as compact cards, people as cards, files as cards. A person opens
  * their 460px panel as before (Full page → their own page). The place is the page's address (`?in=`).
+ *
+ * The Bin (2026-10-13 — the user: "make a bin, then that bin will last for 30 days. file that last for more than
+ * 30days in bin, will auto delete"): what is deleted here — a file, a folder, a person, a file off a person — waits
+ * there, its days counting down, for Restore or Delete forever; the hourly sweep deletes it after 30 days.
  */
 export default function TalentBankView({
   board,
@@ -76,9 +81,14 @@ export default function TalentBankView({
   const [armed, setArmed] = useState(false)
   const [dropping, setDropping] = useState(false)
   const [uploading, setUploading] = useState(0)
+  const [emptying, setEmptying] = useState(false)
+  // The Bin's days count from the server's read — fresh after every write; the page's first draw only when unknown.
+  const [drawnAt] = useState(() => Date.now())
+  const now = Date.parse(bank.readAt) || drawnAt
   const filePick = useRef<HTMLInputElement>(null)
   const [, start] = useTransition()
 
+  const inBin = at === BIN
   const here = placeExists(at, tree) ? at : ROOT
   const place = parsePlace(here)
   const name = placeName(here, tree)
@@ -88,7 +98,7 @@ export default function TalentBankView({
   const files = placeFiles(here, bank)
   const hits = useMemo(() => searchBank(query, tree), [query, tree])
   const picked = board.talents.find(t => t.id === sel) ?? null
-  const takesFiles = can.create && takesFolders(here)
+  const takesFiles = can.create && !inBin && takesFolders(here)
   const auto = folders.filter(c => !c.own)
   const own = folders.filter(c => c.own)
   const sections = [
@@ -96,17 +106,19 @@ export default function TalentBankView({
     { title: 'Folders', cards: own },
   ].filter(x => x.cards.length > 0)
 
-  // The place is the page's address: a reload or a shared link opens it again (nothing is fetched).
+  // The place is the page's address: a reload or a shared link opens it again (nothing is fetched). The Bin is `?in=bin`.
+  const address = inBin ? BIN : here
   useEffect(() => {
     const url = new URL(window.location.href)
-    if (here !== ROOT) url.searchParams.set('in', here)
+    if (address !== ROOT) url.searchParams.set('in', address)
     else url.searchParams.delete('in')
     if (url.href !== window.location.href) window.history.replaceState(null, '', url.href)
-  }, [here])
+  }, [address])
 
   function open(next: string) {
     setAt(next)
     setQuery('')
+    setEmptying(false)
   }
 
   function openTalent(t: HiringTalent) {
@@ -132,7 +144,7 @@ export default function TalentBankView({
     const p = parsePlace(card.at)
     if (!p) return
     const res = await deleteBankFolder(p.id)
-    flash(res.ok ? `${card.name} deleted` : res.reason)
+    flash(res.ok ? `${card.name} moved to the Bin` : res.reason)
   }
 
   const removeTalent = (t: HiringTalent) =>
@@ -141,7 +153,7 @@ export default function TalentBankView({
       if (!out.ok) return flash(out.reason)
       setSel(null)
       setArmed(false)
-      flash(out.warning ?? `${t.name} removed from the Talent Bank`)
+      flash(out.warning ?? `${t.name} moved to the Bin`)
     })
 
   async function uploadFiles(list: File[]) {
@@ -171,7 +183,25 @@ export default function TalentBankView({
 
   async function removeFile(f: BankFile) {
     const res = await deleteBankFile(f.id)
-    flash(res.ok ? res.warning ?? `${f.name} deleted` : res.reason)
+    flash(res.ok ? res.warning ?? `${f.name} moved to the Bin` : res.reason)
+  }
+
+  // ── The Bin ──
+  async function restore(item: BinItem) {
+    const res = await restoreBankItem(item.id)
+    flash(res.ok ? `${item.name} restored to ${res.label}` : res.reason)
+  }
+
+  async function deleteForever(item: BinItem) {
+    const res = await deleteBankItemForever(item.id)
+    flash(res.ok ? res.warning ?? `${item.name} deleted forever` : res.reason)
+  }
+
+  async function emptyBin() {
+    setEmptying(false)
+    const res = await emptyBankBin()
+    if (!res.ok) return flash(res.reason)
+    flash(res.warning ?? `Bin emptied · ${res.count} ${res.count === 1 ? 'item' : 'items'} deleted forever`)
   }
 
   async function showFile(f: BankFile, download: boolean) {
@@ -196,8 +226,8 @@ export default function TalentBankView({
     { key: 'files', label: 'Upload files', icon: <UploadGlyph />, onSelect: () => filePick.current?.click() },
   ]
 
-  // A folder HR made: Rename, Move to… (with everything in it), Delete. A department: Move everyone to… while something
-  // is right in it. Nothing for a company, nor without Edit.
+  // A folder HR made: Rename, Move to… (with everything in it), Move to Bin. A department: Move everyone to… while
+  // something is right in it. Nothing for a company, nor without Edit.
   const cardItems = (card: FolderCard): Array<MenuItem | 'rule'> => {
     if (!can.edit) return []
     if (card.own) {
@@ -205,7 +235,7 @@ export default function TalentBankView({
         { key: 'rename', label: 'Rename', icon: <PenGlyph />, onSelect: () => setRenaming(card) },
         { key: 'move', label: 'Move to…', icon: <FolderGlyph size={16} />, onSelect: () => setMoving({ kind: 'folder', card }) },
         'rule',
-        { key: 'delete', label: 'Delete', confirm: 'Confirm delete', tone: 'danger', icon: <BinGlyph />, onSelect: () => void removeFolder(card) },
+        { key: 'delete', label: 'Move to Bin', tone: 'danger', icon: <BinGlyph />, onSelect: () => void removeFolder(card) },
       ]
     }
     if (card.kind === 'dept' && heldIn(card.at, tree).line) {
@@ -228,8 +258,21 @@ export default function TalentBankView({
   const fileItems = (f: BankFile): Array<MenuItem | 'rule'> => [
     { key: 'view', label: 'View', icon: <EyeGlyph />, onSelect: () => void showFile(f, false) },
     { key: 'download', label: 'Download', icon: <DownGlyph />, onSelect: () => void showFile(f, true) },
-    ...(can.edit ? ['rule' as const, { key: 'delete', label: 'Delete', confirm: 'Confirm delete', tone: 'danger' as const, icon: <BinGlyph />, onSelect: () => void removeFile(f) }] : []),
+    ...(can.edit ? ['rule' as const, { key: 'delete', label: 'Move to Bin', tone: 'danger' as const, icon: <BinGlyph />, onSelect: () => void removeFile(f) }] : []),
   ]
+
+  // Something in the Bin: Restore, or Delete forever (asked once more). Without Edit, nothing.
+  const binItems = (item: BinItem): Array<MenuItem | 'rule'> =>
+    can.edit
+      ? [
+          { key: 'restore', label: 'Restore', icon: <RestoreGlyph />, onSelect: () => void restore(item) },
+          'rule',
+          { key: 'forever', label: 'Delete forever', confirm: 'Confirm delete forever', tone: 'danger', icon: <BinGlyph />, onSelect: () => void deleteForever(item) },
+        ]
+      : []
+  const inTheBin = (item: BinItem) => () => flash(`${item.name} is in the Bin — restore it to open it.`)
+  const binLine = (item: BinItem) => `${binFrom(item, tree)} · ${binLeftLabel(binDaysLeft(item, now))}`
+  const bin = binSections(bank.bin)
 
   const onDragOver = (e: DragEvent) => {
     if (!takesFiles || !e.dataTransfer.types.includes('Files')) return
@@ -256,7 +299,7 @@ export default function TalentBankView({
         onDrop={onDrop}
       >
         <div className={d.bar}>
-          {can.create ? (
+          {can.create && !inBin ? (
             <Menu
               label="New"
               side="left"
@@ -270,24 +313,53 @@ export default function TalentBankView({
             />
           ) : null}
           <nav className={d.crumbs} aria-label="Folder path">
-            {path.map((c, i) =>
-              i === path.length - 1 ? (
-                <span key={c.at} className={d.crumbHere} aria-current="page">{c.name}</span>
-              ) : (
-                <span key={c.at} style={{ display: 'contents' }}>
-                  <button type="button" className={d.crumb} onClick={() => open(c.at)}>{c.name}</button>
-                  <span className={d.crumbSep} aria-hidden="true"><ChevronGlyph size={14} /></span>
-                </span>
-              ),
+            {inBin ? (
+              <>
+                <button type="button" className={d.crumb} onClick={() => open(ROOT)}>{BANK_NAME}</button>
+                <span className={d.crumbSep} aria-hidden="true"><ChevronGlyph size={14} /></span>
+                <span className={d.crumbHere} aria-current="page">Bin</span>
+              </>
+            ) : (
+              path.map((c, i) =>
+                i === path.length - 1 ? (
+                  <span key={c.at} className={d.crumbHere} aria-current="page">{c.name}</span>
+                ) : (
+                  <span key={c.at} style={{ display: 'contents' }}>
+                    <button type="button" className={d.crumb} onClick={() => open(c.at)}>{c.name}</button>
+                    <span className={d.crumbSep} aria-hidden="true"><ChevronGlyph size={14} /></span>
+                  </span>
+                ),
+              )
             )}
           </nav>
-          <div className={d.searchWrap}>
-            <span className={d.searchIcon}><SearchGlyph size={15} /></span>
-            <input className={d.search} value={query} placeholder="Search the Talent Bank" aria-label="Search the Talent Bank" onChange={e => setQuery(e.target.value)} />
-            {query ? (
-              <button type="button" className={d.searchClear} onClick={() => setQuery('')} aria-label="Clear the search">×</button>
-            ) : null}
-          </div>
+          {inBin ? (
+            can.edit && bank.bin.length ? (
+              <button
+                type="button"
+                className={b.emptyBin}
+                data-armed={emptying ? 'true' : undefined}
+                onClick={() => (emptying ? void emptyBin() : setEmptying(true))}
+              >
+                <BinGlyph />
+                {emptying ? 'Confirm empty bin' : 'Empty bin'}
+              </button>
+            ) : null
+          ) : (
+            <>
+              <div className={d.searchWrap}>
+                <span className={d.searchIcon}><SearchGlyph size={15} /></span>
+                <input className={d.search} value={query} placeholder="Search the Talent Bank" aria-label="Search the Talent Bank" onChange={e => setQuery(e.target.value)} />
+                {query ? (
+                  <button type="button" className={d.searchClear} onClick={() => setQuery('')} aria-label="Clear the search">×</button>
+                ) : null}
+              </div>
+              <button type="button" className={b.binBtn} onClick={() => open(BIN)}>
+                <BinGlyph />
+                Bin
+                {bank.bin.length ? <span className={b.binCount}>{bank.bin.length}</span> : null}
+              </button>
+            </>
+          )}
           <input
             ref={filePick}
             type="file"
@@ -304,7 +376,76 @@ export default function TalentBankView({
 
         {bankError ? <div className={d.error} role="alert">{bankError}</div> : null}
 
-        {query.trim() ? (
+        {inBin ? (
+          bank.bin.length ? (
+            <>
+              {bin.folders.length ? (
+                <div className={d.sect}>
+                  <div className={d.sectHead}>
+                    Folders <span className={d.sectCount}>{bin.folders.length}</span>
+                  </div>
+                  <div className={d.grid}>
+                    {bin.folders.map(item => (
+                      <FolderTile
+                        key={item.id}
+                        card={{ at: `${BIN}:${item.id}`, kind: 'folder', name: item.name, line: binLine(item), missing: 0, missingWhy: '', own: true }}
+                        canEdit={false}
+                        onOpen={inTheBin(item)}
+                        onRename={() => undefined}
+                        onDelete={() => undefined}
+                        items={binItems(item)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {bin.people.length ? (
+                <div className={d.sect}>
+                  <div className={d.sectHead}>
+                    People <span className={d.sectCount}>{bin.people.length}</span>
+                  </div>
+                  <div className={d.grid}>
+                    {bin.people.map(item => (
+                      <BankTalentTile key={item.id} name={item.name} line={binLine(item)} items={binItems(item)} onOpen={inTheBin(item)} />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {bin.files.length ? (
+                <div className={d.sect}>
+                  <div className={d.sectHead}>
+                    Files <span className={d.sectCount}>{bin.files.length}</span>
+                  </div>
+                  <div className={d.grid}>
+                    {bin.files.map(item => (
+                      <FileTile
+                        key={item.id}
+                        title={item.name}
+                        sub={item.kind === 'talent_file' ? [item.fileType, item.talentName].filter(Boolean).join(' · ') : binFrom(item, tree)}
+                        fileName={item.name}
+                        contentType={item.contentType}
+                        onView={inTheBin(item)}
+                        items={binItems(item)}
+                        meta={
+                          <>
+                            <span>{dayLabel(item.deletedAt)} · {item.deletedBy}</span>
+                            <span className={d.fileMetaGap} />
+                            <span>{binLeftLabel(binDaysLeft(item, now))}</span>
+                          </>
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div className={d.empty}>
+              <div className={d.emptyTitle}>The Bin is empty.</div>
+              What is deleted in the Talent Bank waits here for 30 days, then goes for good.
+            </div>
+          )
+        ) : query.trim() ? (
           <div className={d.sect}>
             <div className={d.sectHead}>
               Found <span className={d.sectCount}>{hits.length}</span>

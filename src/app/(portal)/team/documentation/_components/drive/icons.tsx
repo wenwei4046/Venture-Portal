@@ -32,6 +32,8 @@ export const DownGlyph = ({ size = 16 }: { size?: number }) => svg(size, <path d
 export const PenGlyph = ({ size = 16 }: { size?: number }) => svg(size, <path d="M4 20h4L19 9l-4-4L4 16Z M13.5 6.5l4 4" />)
 export const BinGlyph = ({ size = 16 }: { size?: number }) =>
   svg(size, <path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6" />)
+/** An arrow turning back — the Talent Bank's Bin › Restore. */
+export const RestoreGlyph = ({ size = 16 }: { size?: number }) => svg(size, <><path d="M4 12a8 8 0 1 0 2.4-5.7" /><path d="M4 4v4.5h4.5" /></>)
 export const BackGlyph = ({ size = 16 }: { size?: number }) => svg(size, <path d="M15 6l-6 6 6 6" />, 2)
 export const ChevronGlyph = ({ size = 16 }: { size?: number }) => svg(size, <path d="M9 6l6 6-6 6" />, 2)
 export const SearchGlyph = ({ size = 16 }: { size?: number }) => svg(size, <><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></>, 2)
