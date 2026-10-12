@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { Drawer } from '@/components/hrv/overlay'
 import { flash } from '@/components/hrv/toast'
 import { openDocumentationFile } from '@/lib/documentation/actions'
+import { openDriveFile } from '@/lib/documentation/drive-actions'
+import { EMPTY_DRIVE, pathLine, type Drive } from '@/lib/documentation/drive'
 import {
   LETTER_STATUS, deptLabel, docDay, letterStatus, letterTrail, previewKind, type DocEvent, type Documentation,
 } from '@/lib/documentation/model'
@@ -12,7 +14,8 @@ import { SHEET_COLS, SHEET_ROWS, columnLetter, figureColumns, type SheetPreview 
 import { downloadFile } from './DocumentsTab'
 import s from './documentation.module.css'
 
-export type PreviewTarget = { kind: 'document' | 'letter'; id: string }
+/** A document, a letter on somebody's record, or a file HR keeps in a Data center folder (`drive`, 2026-10-12). */
+export type PreviewTarget = { kind: 'document' | 'letter' | 'drive'; id: string }
 
 interface Shown {
   kicker: string
@@ -27,7 +30,27 @@ interface Shown {
   events: DocEvent[]
 }
 
-function shownOf(data: Documentation, t: PreviewTarget): Shown | null {
+function shownOf(data: Documentation, t: PreviewTarget, drive: Drive): Shown | null {
+  if (t.kind === 'drive') {
+    const f = drive.files.find(x => x.id === t.id)
+    if (!f) return null
+    const where = pathLine(f.parent, data, drive)
+    return {
+      kicker: `File · ${where}`,
+      title: f.fileName,
+      file: `${f.fileName} · ${f.ref}`,
+      fileName: f.fileName,
+      contentType: f.contentType,
+      canDownload: !f.deletedAt,
+      gone: f.deletedAt ? `Deleted ${docDay(f.deletedAt)}. Its file went with it; its trail stays.` : null,
+      facts: [
+        { l: 'Folder', v: where },
+        { l: 'Uploaded', v: `${docDay(f.uploadedAt)} by ${f.uploadedBy}` },
+        { l: 'Status', v: f.deletedAt ? 'Deleted' : 'Kept for HR — sent to nobody' },
+      ],
+      events: f.events,
+    }
+  }
   if (t.kind === 'document') {
     const d = data.documents.find(x => x.id === t.id)
     if (!d) return null
@@ -76,14 +99,25 @@ function shownOf(data: Documentation, t: PreviewTarget): Shown | null {
  * trail. Opening it is a line on the trail (Viewed); its link is made then and
  * lives five minutes.
  */
-export default function PreviewDrawer({ data, target, onClose }: { data: Documentation; target: PreviewTarget | null; onClose: () => void }) {
+export default function PreviewDrawer({
+  data,
+  drive = EMPTY_DRIVE,
+  target,
+  onClose,
+}: {
+  data: Documentation
+  /** The Data center's own folders and files (2026-10-12) — for a `drive` target. */
+  drive?: Drive
+  target: PreviewTarget | null
+  onClose: () => void
+}) {
   const [tab, setTab] = useState<'preview' | 'audit'>('preview')
   const [url, setUrl] = useState<string | null>(null)
   const [failed, setFailed] = useState('')
   // A spreadsheet, read from its link in the browser (null: not read yet, or it could not be).
   const [sheet, setSheet] = useState<SheetPreview | null>(null)
   const [sheetFailed, setSheetFailed] = useState(false)
-  const shown = target ? shownOf(data, target) : null
+  const shown = target ? shownOf(data, target, drive) : null
   const kind = shown ? previewKind(shown.fileName, shown.contentType) : 'none'
   const key = target ? `${target.kind}:${target.id}` : ''
   const gone = shown?.gone ?? null
@@ -99,7 +133,8 @@ export default function PreviewDrawer({ data, target, onClose }: { data: Documen
     setSheetFailed(false)
     // Deleted or withdrawn: there is no file to open (and no "Viewed" to write), only the trail.
     if (gone) return
-    void openDocumentationFile(target.kind, target.id, 'view').then(async link => {
+    const opening = target.kind === 'drive' ? openDriveFile(target.id, 'view') : openDocumentationFile(target.kind, target.id, 'view')
+    void opening.then(async link => {
       if (!live) return
       if (!link.ok) { setFailed(link.reason); return }
       setUrl(link.url)
@@ -124,7 +159,14 @@ export default function PreviewDrawer({ data, target, onClose }: { data: Documen
 
   async function download() {
     if (!target || !shown) return
-    const refused = await downloadFile(target.kind, target.id)
+    let refused: string | null
+    if (target.kind === 'drive') {
+      const link = await openDriveFile(target.id, 'download')
+      refused = link.ok ? null : link.reason
+      if (link.ok) window.location.assign(link.url)
+    } else {
+      refused = await downloadFile(target.kind, target.id)
+    }
     flash(refused ?? `Downloads ${shown.fileName}`)
   }
 

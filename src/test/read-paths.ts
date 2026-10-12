@@ -215,6 +215,10 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'hr_letter_withdraw', 'hr_documentation_leftovers', 'hr_documentation_files_removed',
   // Withdraw a published memo (mig 20261011200000): Documentation · Edit.
   'hr_memo_withdraw',
+  // The Data center as a Drive (mig 20261012220000): its read and a file's path ask Documentation · View, a folder or
+  // a file made Create, renamed or deleted Edit.
+  'hr_drive', 'hr_drive_file', 'hr_drive_log', 'hr_drive_folder_add', 'hr_drive_folder_rename', 'hr_drive_folder_delete',
+  'hr_drive_file_add', 'hr_drive_file_delete',
   // The Revenue app's View as (mig 20261011110000): has_any_action(documentation.view).
   'member_documents_of',
   // A replacement runs itself on its date (mig 20261010170000): HR's two ask member_is_manager; the

@@ -417,8 +417,8 @@ export function safeFileName(name: string): string {
   return (cleaned || 'file').slice(-120)
 }
 
-/** Where a file goes in the bucket: `documents/<id>/x.pdf`, `letters/<staff>/<id>/x.pdf`, `publish/<id>/x.pdf`. */
-export function objectPath(folder: 'documents' | 'publish' | { letterFor: string }, id: string, fileName: string): string {
+/** Where a file goes in the bucket: `documents/<id>/x.pdf`, `letters/<staff>/<id>/x.pdf`, `publish/<id>/x.pdf`, `drive/<id>/x.pdf` (a Data center folder's, 2026-10-12). */
+export function objectPath(folder: 'documents' | 'publish' | 'drive' | { letterFor: string }, id: string, fileName: string): string {
   const base = typeof folder === 'string' ? folder : `letters/${folder.letterFor}`
   return `${base}/${id}/${safeFileName(fileName)}`
 }

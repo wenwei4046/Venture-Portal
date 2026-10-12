@@ -44,6 +44,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'member_replacement_form',
   // Documentation (mig 20261011070000): the page's read, a file's path, a member's documents.
   'hr_documentation', 'hr_documentation_file', 'member_documents',
+  // …and the Data center's own folders and files, and one's path (mig 20261012220000).
+  'hr_drive', 'hr_drive_file',
   // …and, the Revenue app's View as, one member's (mig 20261011110000).
   'member_documents_of',
   // Hiring (round 2): the board and where a file is.
