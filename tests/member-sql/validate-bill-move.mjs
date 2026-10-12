@@ -9,7 +9,10 @@
 // where it came from; moving back (or to nobody) hands it to the salesperson
 // the ERP names; a paid month and a bill that does not count are refused; the
 // new holder's share goes; the Open Bill pick leaves with the bill and comes
-// back with it while its rank is free. No live I/O.
+// back with it while its rank is free. And 20261012190000: the part a move took
+// from its new holder is theirs again when the bill leaves them — on the move
+// back, an undo or a move on — unless the bill goes to nobody or the parts held
+// meanwhile leave no room. No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
@@ -65,7 +68,9 @@ await db.exec(`
   CREATE TABLE comm_agent_aliases (agent_key text PRIMARY KEY, staff_id uuid, erp_salesperson_id text);
   CREATE TABLE sales_order_shares (
     order_id uuid REFERENCES sales_orders (id) ON DELETE CASCADE, staff_id uuid, share_pct numeric,
-    PRIMARY KEY (order_id, staff_id));
+    created_by uuid, created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (order_id, staff_id),
+    CONSTRAINT share_pct_between CHECK (share_pct > 0 AND share_pct < 1));
   CREATE TABLE sales_order_open_bill_tags (
     id serial PRIMARY KEY, order_id uuid UNIQUE REFERENCES sales_orders (id) ON DELETE CASCADE,
     sub_department_id uuid, staff_id uuid, event_date date, bill_rank smallint, auto_suggested boolean,
@@ -93,12 +98,38 @@ await db.exec(`
   CREATE FUNCTION permission_reads_guard(text) RETURNS integer LANGUAGE sql AS $$ SELECT 0 $$;
   CREATE FUNCTION audit_register(p_table text, p_label text, p_area text, p_read text[], p_mode text DEFAULT 'all',
     p_keys text[] DEFAULT '{}', p_labels text[] DEFAULT '{}') RETURNS text LANGUAGE sql AS $$ SELECT p_mode $$;
+
+  -- Production's sales_order_shares_guard (mig 20260924010000): a paid month,
+  -- a bill nobody holds, a share for its owner and shares leaving the owner
+  -- nothing are refused.
+  CREATE FUNCTION sales_order_shares_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+  DECLARE
+      v_order sales_orders%ROWTYPE;
+      v_sub   uuid;
+      v_row   sales_order_shares%ROWTYPE;
+      v_total numeric;
+  BEGIN
+      v_row := CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+      SELECT * INTO v_order FROM sales_orders WHERE id = v_row.order_id;
+      SELECT b.sub_department_id INTO v_sub FROM sales_import_batches b WHERE b.id = v_order.batch_id;
+      IF commission_order_period_locked(v_sub, v_order.period_month) THEN
+          RAISE EXCEPTION 'paid' USING ERRCODE = '23RUN';
+      END IF;
+      IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+      IF v_order.staff_id IS NULL THEN RAISE EXCEPTION 'nobody holds it' USING ERRCODE = '23SHR'; END IF;
+      IF NEW.staff_id = v_order.staff_id THEN RAISE EXCEPTION 'the owner' USING ERRCODE = '23SHR'; END IF;
+      SELECT COALESCE(SUM(share_pct), 0) INTO v_total FROM sales_order_shares
+       WHERE order_id = NEW.order_id AND staff_id <> NEW.staff_id;
+      IF v_total + NEW.share_pct >= 1 THEN RAISE EXCEPTION 'nothing left' USING ERRCODE = '23SHR'; END IF;
+      RETURN NEW;
+  END $$;
+  CREATE TRIGGER sales_order_shares_guard BEFORE INSERT OR UPDATE OR DELETE ON sales_order_shares
+      FOR EACH ROW EXECUTE FUNCTION sales_order_shares_guard();
 `)
 
-await db.exec(
-  (await readFile(new URL('../../supabase/migrations/20261012170000_move_a_bill_to_another_salesperson.sql', import.meta.url), 'utf8'))
-    .replace(/\r\n/g, '\n'),
-)
+for (const file of ['20261012170000_move_a_bill_to_another_salesperson.sql', '20261012190000_a_move_gives_the_share_back.sql']) {
+  await db.exec((await readFile(new URL(`../../supabase/migrations/${file}`, import.meta.url), 'utf8')).replace(/\r\n/g, '\n'))
+}
 
 await q(`INSERT INTO users VALUES ($1, 'HR')`, [HR_USER])
 await q(`INSERT INTO hr_staff_costs VALUES ($1, 'ADRIAN'), ($2, 'ANTHONY'), ($3, 'LUCAS'), ($4, 'MEI TING')`,
@@ -180,6 +211,64 @@ const shared = await move(b75, ANTHONY)
 check([Number(shared.shareTaken), await staffOf(b75)], [0.3, ANTHONY], 'the new holder’s part goes — they hold it all')
 check(await q('SELECT staff_id, share_pct::text FROM sales_order_shares WHERE order_id = $1', [b75]),
   [{ staff_id: LUCAS, share_pct: '0.2' }], 'the other holder keeps theirs')
+
+// ── 20261012190000: the part a move took comes back when the bill leaves them ─
+const sharesOf = async order => (await q(
+  'SELECT staff_id, share_pct::text AS pct FROM sales_order_shares WHERE order_id = $1 ORDER BY staff_id', [order]))
+  .map(r => `${r.staff_id === ANTHONY ? 'ANTHONY' : r.staff_id === LUCAS ? 'LUCAS' : r.staff_id === ADRIAN ? 'ADRIAN' : 'MEI TING'} ${r.pct}`)
+
+// Undo: ADRIAN 50 · ANTHONY 50, moved to ANTHONY, then back.
+const b81 = await bill(81)
+await q('INSERT INTO sales_order_shares (order_id, staff_id, share_pct, created_by) VALUES ($1, $2, 0.5, $3)', [b81, ANTHONY, HR_USER])
+const toHolder = await move(b81, ANTHONY)
+check([Number(toHolder.shareTaken), await sharesOf(b81)], [0.5, []], 'moved to the holder: their part merges into the whole')
+check(Number(await one('SELECT share_taken_pct FROM sales_order_reassignments WHERE order_id = $1', [b81])), 0.5,
+  'and the move remembers it')
+const undone = await move(b81, ADRIAN)
+check([undone.movedBack, Number(undone.shareBack), undone.shareNotBack, await staffOf(b81), await sharesOf(b81)],
+  [true, 0.5, null, ADRIAN, ['ANTHONY 0.5']], 'undone: ADRIAN 50 · ANTHONY 50 again')
+check(await one('SELECT created_by FROM sales_order_shares WHERE order_id = $1', [b81]), HR_USER,
+  'the part comes back as it was given')
+
+// The way never matters: ADRIAN 50 · ANTHONY 30 · LUCAS 20 → ANTHONY → LUCAS is
+// what ADRIAN → LUCAS would be; back to ADRIAN is where it started.
+const b80 = await bill(80)
+await q('INSERT INTO sales_order_shares (order_id, staff_id, share_pct) VALUES ($1, $2, 0.3), ($1, $3, 0.2)', [b80, ANTHONY, LUCAS])
+await move(b80, ANTHONY)
+check(await sharesOf(b80), ['LUCAS 0.2'], 'with ANTHONY: LUCAS keeps 20%')
+const onward = await move(b80, LUCAS)
+check([Number(onward.shareBack), Number(onward.shareTaken), await staffOf(b80), await sharesOf(b80)],
+  [0.3, 0.2, LUCAS, ['ANTHONY 0.3']], 'moved on to LUCAS: ANTHONY has his 30% again, LUCAS holds the rest')
+const home = await move(b80, ADRIAN)
+check([Number(home.shareBack), await sharesOf(b80)], [0.2, ['ANTHONY 0.3', 'LUCAS 0.2']], 'back to ADRIAN: as it started')
+
+// Undo of a move on: LUCAS → ANTHONY undone is LUCAS's with ANTHONY's 50% again.
+const b83 = await bill(83)
+await q('INSERT INTO sales_order_shares (order_id, staff_id, share_pct) VALUES ($1, $2, 0.5)', [b83, ANTHONY])
+await move(b83, LUCAS)
+await move(b83, ANTHONY)
+check(await sharesOf(b83), [], 'moved on to the holder: all his')
+const stepBack = await move(b83, LUCAS)
+check([stepBack.movedBack, Number(stepBack.shareBack), await staffOf(b83), await sharesOf(b83)],
+  [false, 0.5, LUCAS, ['ANTHONY 0.5']], 'its undo: LUCAS’s again, ANTHONY 50%')
+
+// No room: a bigger part given meanwhile — it is not put back, and says so.
+const b82 = await bill(82)
+await q('INSERT INTO sales_order_shares (order_id, staff_id, share_pct) VALUES ($1, $2, 0.5)', [b82, ANTHONY])
+await move(b82, ANTHONY)
+await q('INSERT INTO sales_order_shares (order_id, staff_id, share_pct) VALUES ($1, $2, 0.6)', [b82, LUCAS])
+const crowded = await move(b82, ADRIAN)
+check([crowded.movedBack, crowded.shareBack, Number(crowded.shareNotBack), await sharesOf(b82)],
+  [true, null, 0.5, ['LUCAS 0.6']], 'a part that would leave ADRIAN nothing is not put back')
+
+// Nobody to share with: an unmatched bill handed back to nobody.
+const b84 = await bill(84, { staff: null, agent: 'NEW AGENT 2', sp: null })
+await move(b84, NOBODY_YET)
+await q('INSERT INTO sales_order_shares (order_id, staff_id, share_pct) VALUES ($1, $2, 0.4)', [b84, ANTHONY])
+await move(b84, ANTHONY)
+const toNoOne = await move(b84, null)
+check([toNoOne.movedBack, await staffOf(b84), Number(toNoOne.shareNotBack), await sharesOf(b84)],
+  [true, null, 0.4, []], 'handed back to nobody: the part has nobody to be shared with')
 
 // ── Open Bill: the pick leaves with the bill and comes back with it ──────────
 await q('INSERT INTO open_bill_months VALUES ($1)', [SEP])

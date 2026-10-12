@@ -40,7 +40,7 @@ describe('moveMessage', () => {
   const result: BillMoveResult = {
     orderId: 'o', orderNo: 'HC-SO-2609-070', changed: true,
     to: { staffId: 'anthony', name: 'ANTHONY' }, from: ADRIAN, movedBack: false,
-    openBillRank: null, openBillBack: null, shareTaken: null,
+    openBillRank: null, openBillBack: null, shareTaken: null, shareBack: null, shareNotBack: null,
   }
   it('says whose it is now and whose it was', () => {
     expect(moveMessage(result)).toBe('HC-SO-2609-070 is ANTHONY’s now — moved from ADRIAN.')
@@ -55,6 +55,17 @@ describe('moveMessage', () => {
   })
   it('says nothing moved when nothing did', () => {
     expect(moveMessage({ ...result, changed: false })).toBe('HC-SO-2609-070 is ANTHONY’s already — nothing moved.')
+  })
+  // 20261012190000: the part a move took is theirs again when the bill leaves them.
+  it('says the part a move took is back — an undo is an undo', () => {
+    expect(moveMessage({ ...result, to: ADRIAN, from: { staffId: 'anthony', name: 'ANTHONY' }, movedBack: true, shareBack: 0.5 }))
+      .toBe('HC-SO-2609-070 is back with ADRIAN, the salesperson the ERP names. ANTHONY’s 50% share is back.')
+  })
+  it('says when that part could not come back, and why', () => {
+    expect(moveMessage({ ...result, to: ADRIAN, from: { staffId: 'anthony', name: 'ANTHONY' }, movedBack: true, shareNotBack: 0.5 }))
+      .toBe('HC-SO-2609-070 is back with ADRIAN, the salesperson the ERP names. ANTHONY’s 50% share did not come back — with the shares held now it would leave ADRIAN nothing. Share it again if it should be.')
+    expect(moveMessage({ ...result, to: { staffId: null, name: 'nobody' }, from: { staffId: 'anthony', name: 'ANTHONY' }, movedBack: true, shareNotBack: 0.4 }))
+      .toBe('HC-SO-2609-070 has no salesperson again — the ERP names nobody matched yet. ANTHONY’s 40% share did not come back — nobody holds the bill to share it with.')
   })
 })
 

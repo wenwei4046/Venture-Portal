@@ -1195,7 +1195,7 @@ bills are read (user 2026-09-30: 右 click 加多一个 option 是 share 单 —
 | | |
 |---|---|
 | Where | *Share this bill…* on a bill's right-click (or ⋯): a salesperson's ledger on Comm Cal — Personal, Overriding, Below deposit — the month's Below deposit tab, and Sales orders (beside *Share…* under the name) |
-| The form | **Share with** — the sub-department's team (`loadShareTeam`), never the owner; somebody closed this month cannot be picked. **Their part** — 50% to start, a holder's own part when they already hold one, else half of what the owner still keeps. Save; *Stop sharing with …* gives a part back |
+| The form | **Share with** — the sub-department's team (`loadShareTeam`), never the owner; somebody closed this month cannot be picked. **Their part** — 50% to start, a holder's own part when they already hold one, else half of what the owner still keeps. Save; *Cancel share with …* gives a part back — in the panel, and since 2026-10-12 a line of the menu itself, one per holder, on every ledger the bill sits on (the user: "at adrian side press cancel share to anthony, then anthony side will dont have share") |
 | The money | unchanged since 2026-09-24: the owner keeps 1 − Σ(shares); each part is the bill scaled down — lines, cost, total, paid — so it passes the deposit gate and lands in the margin band exactly as the whole bill does; it is paid at its holder's own rate and climbs its holder's own upline line; one release per bill, in the owner's name |
 | Both ledgers | every part carries `SalesOrder.share` (the owner and every holder's part, stamped by `splitOrdersByShares`; the engine never reads it). The other holder's ledger lists their part with *From ADRIAN's bill* under the number; the owner's says *Shared with ANTHONY*; the **Sales person** column names both with their parts, and Sales value reads *50% of RM X* |
 | Refused | a paid month (23RUN, trigger); shares leaving the owner nothing or naming the owner (23SHR, trigger); a bill anybody paid on it has closed (`assertBillsNotClosed`); a NEW holder whose own month is closed from the bill's month on (`assertStaffNotClosed` — their locked figure would silently stop matching their ledger); somebody off the sub-department's team (the run would pay nobody) |
@@ -1564,7 +1564,7 @@ with rightclick … can select move this order to other sales person"*.
 | What it is | one row of `sales_order_reassignments` (mig `20261012170000`) per moved bill, and `sales_orders.staff_id` IS its person — so it is their sales, paid at their rate, climbing their upline's override, on their ledger and in their Revenue app, exactly as if the ERP had named them. Nothing in the engine reads the row |
 | Kept | the trigger `sales_orders_reassigned` (BEFORE UPDATE OF staff_id, DEFINER) puts the row's person back whenever anybody writes the bill's salesperson — the live receiver re-sending it (it rewrites `staff_id` from the alias on every save), a replay, an agent matched on Data source |
 | Undone | moving it to the salesperson the ERP names — or the notice's *Undo* — takes the row off, and the bill goes back to the alias's person (by the ERP's salesperson id, else by agent name, else whoever had it) |
-| Shares and Open Bill | the new holder's share of it goes (they hold all of it now; other holders keep theirs). Its Open Bill pick goes — it ranked the old salesperson's day — remembered on the row and put back on the move back while the rank is free (a suggestion gives way, a hand pick does not) |
+| Shares and Open Bill | the new holder's share of it goes (they hold all of it now; other holders keep theirs) — remembered on the move (`share_taken_*`, mig `20261012190000`) and theirs again when the bill leaves them: moved back, undone or moved on, so the end never depends on the way (ADRIAN 50 · ANTHONY 50 → ANTHONY → LUCAS = LUCAS 50 · ANTHONY 50) and an Undo is an undo; not given back to nobody, nor where the shares held meanwhile leave no room (the notice says so). Its Open Bill pick goes — it ranked the old salesperson's day — remembered on the row and put back on the move back while the rank is free (a suggestion gives way, a hand pick does not) |
 | Refused | a paid month (23RUN, the table's trigger and `revenue_move_order`); a bill that does not count (23EXC — count it again first); a bill anybody paid on it has closed (`billsClosedReason`); a NEW holder closed this month (`staffClosedReason`); somebody off the sub-department's team (`offTeamReason`) |
 | Months | only the holder changes. The bill stays in its month with its Status (§4.19); a drop or an upsell found on it later goes to whoever its run paid (`erp_sync_note_adjustment`) |
 
@@ -1574,10 +1574,11 @@ with rightclick … can select move this order to other sales person"*.
 and every word the notice says). `revenue_move_order` is SECURITY INVOKER: the
 mover's own row policies — HR's and the Principal's, with the `needs_action_*`
 checks asking `revenue.edit` — answer every write. PGlite:
-`tests/member-sql/validate-bill-move.mjs` (28 checks — a move, a re-send, an agent
+`tests/member-sql/validate-bill-move.mjs` (39 checks — a move, a re-send, an agent
 match, a move on, the move back, a bill nobody was matched to, the Open Bill pick
-and the share, and the database's refusals; the closes and the team are the
-Server Action's).
+and the share — taken, given back on an undo, a move on and the move back, kept
+out where there is no room or nobody — and the database's refusals; the closes
+and the team are the Server Action's).
 
 ## 5. Tax — Withholding instead of PCB
 
