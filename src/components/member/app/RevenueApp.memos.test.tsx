@@ -85,3 +85,61 @@ describe("memos addressed to people, in View as", () => {
     expect((await screen.findAllByText("Increment letter")).length).toBeGreaterThan(0);
   });
 });
+
+// 2026-10-12 — the user: Kris "在打开 memo 时是看不到附件的". The file sent with a memo is a row of its sheet — its tile,
+// its name, View and a download — each a short link made at the tap.
+describe("a memo's file", () => {
+  const withFile = (): MemberData => ({
+    ...memberDemo(), demo: false, requests: [], incomes: [],
+    memos: [{ ...memo("m-file", "House rules", []), attachmentName: "20261011_161025.jpg.jpeg", attachmentType: "image/jpeg", kind: "Memo" }],
+  });
+
+  it("shows in the memo, and View opens its link in a tab readied at the tap", async () => {
+    window.history.replaceState({}, "", "/member?page=account&view=memos");
+    const src = source(withFile);
+    const memoFile = vi.fn(async () => ({ ok: true as const, data: { url: "https://files.example/rules.jpeg", fileName: "20261011_161025.jpg.jpeg" } }));
+    const tab = { opener: {} as unknown, location: { href: "" }, close: vi.fn() };
+    vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
+    render(<RevenueApp initialData={withFile()} initialSearch="?page=account&view=memos" today="2026-10-05" source={{ ...src, memo: vi.fn(async () => ({ ok: true as const, data: { acknowledgedAt: null } })), memoFile }} />);
+    await act(async () => {});
+    (await screen.findAllByText("House rules"))[0].closest("button")!.click();
+    await act(async () => {});
+    expect(screen.getByText("20261011_161025.jpg.jpeg")).toBeInTheDocument();
+    expect(screen.getByText("JPEG")).toBeInTheDocument();
+    screen.getByRole("button", { name: "View" }).click();
+    await act(async () => {});
+    expect(memoFile).toHaveBeenCalledWith("m-file", "view");
+    expect(tab.location.href).toBe("https://files.example/rules.jpeg");
+  });
+});
+
+// 2026-10-12 — a memo reaches its person in every view: a Principal whose login a People record names reads their OWN
+// memos in the Revenue app while viewing nobody, and acknowledges them there (the login's receipt).
+describe("the Principal's own memos", () => {
+  it("viewing nobody: their own, which they may acknowledge", async () => {
+    window.history.replaceState({}, "", "/member?page=account&view=memos");
+    const src = source(principalData);
+    const ack = vi.fn(async () => ({ ok: true as const, data: { acknowledgedAt: "2026-10-12T10:01:00Z" } }));
+    render(<RevenueApp initialData={principalData()} initialSearch="?page=account&view=memos" today="2026-10-05" source={{ ...src, memo: ack }}
+      own={{ memos: [memo("m-mine", "Director memo", [], undefined)] }} />);
+    await act(async () => {});
+    expect((await screen.findAllByText("Director memo")).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("Offer letter")).toHaveLength(0);
+    screen.getAllByText("Director memo")[0].closest("button")!.click();
+    await act(async () => {});
+    screen.getByRole("button", { name: "Acknowledge" }).click();
+    await act(async () => {});
+    expect(ack).toHaveBeenCalledWith("m-mine", true);
+    expect(screen.getByText(/You acknowledged this memo/)).toBeInTheDocument();
+  });
+
+  it("viewing a member: theirs, read-only, as before", async () => {
+    await act(async () => {});
+    window.history.replaceState({}, "", "/member?page=account&view=memos&staff=anthony");
+    render(<RevenueApp initialData={principalData()} initialSearch="?page=account&view=memos&staff=anthony" today="2026-10-05" source={source(principalData)}
+      own={{ memos: [memo("m-mine", "Director memo", [], undefined)] }} />);
+    await act(async () => {});
+    expect(screen.getAllByText("Offer letter").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("Director memo")).toHaveLength(0);
+  });
+});

@@ -255,6 +255,8 @@ export interface MemoVM {
   needsAck: boolean;
   acked: boolean;
   ackedText: string;
+  /** The file sent with it (2026-10-12): its name and the tile's "PDF" / "JPEG" — null when there is none. */
+  file?: { name: string; ext: string } | null;
 }
 
 // ── View as ──

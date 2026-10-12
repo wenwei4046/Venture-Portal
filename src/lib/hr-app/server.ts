@@ -17,6 +17,8 @@ import { canDo } from '@/lib/permission-actions'
 import { actionsOnPage, opensPage, type PageRoute } from '@/lib/page-tabs'
 import { can } from '@/lib/permissions'
 import { loginIsPersonal } from '@/lib/account/personal-login'
+import { loadMyMemos } from '@/lib/memos/server'
+import { NO_MEMOS } from '@/lib/memos/model'
 import type { User } from '@/types'
 import { hrAppViewOf, shiftDay, type HrAppData, type HrBooking, type HrHire, type HrMemberRequest, type HrTalent, type MemberKind } from './model'
 
@@ -201,7 +203,7 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
   const today = officeToday()
   const { parts, may } = appAccess(user)
   const readsHiring = parts.hiring || parts.insights || parts.talent
-  const [members, factsRead, range, people, docs, hiring, notices, personal] = await Promise.all([
+  const [members, factsRead, range, people, docs, hiring, notices, personal, mine] = await Promise.all([
     parts.requests ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
     parts.requests ? (async () => (await client()).rpc('member_admin_request_facts'))() : Promise.resolve(null),
     parts.rooms ? readRoomsRange(today, shiftDay(today, 6)) : Promise.resolve(null),
@@ -219,6 +221,8 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
         })(),
     // More › Change password, for a login of their own — never hr@ or another shared one (2026-10-12).
     user.viewingAs ? Promise.resolve(false) : loginIsPersonal(),
+    // Their own memos (2026-10-12): the login's, in every view — never somebody else's while viewing as them.
+    user.viewingAs ? Promise.resolve(NO_MEMOS) : loadMyMemos(),
   ])
   const board = hiring?.ok ? hiring.board : null
 
@@ -261,5 +265,6 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     notices: notices && !notices.error ? noticesFromRow(notices.data) : { unread: 0, items: [] },
     views: user.canSwitchView && !user.viewingAs ? { current: hrAppViewOf(user.role) } : null,
     personalLogin: personal,
+    memos: mine.memos,
   }
 }

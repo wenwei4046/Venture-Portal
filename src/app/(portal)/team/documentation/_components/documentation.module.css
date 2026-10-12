@@ -879,3 +879,14 @@ textarea.input { resize: vertical; }
   .letterRow[data-edit='true'] { flex-wrap: wrap; row-gap: 10px; }
   .letterRow[data-edit='true'] .letterType { flex-basis: calc(100% - 52px); }
 }
+
+/* ── Publish › Preview (2026-10-12): the card is components/memos/MemoCard; here what HR sees around it ── */
+.mpAck { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.mpAckBtn { height: 44px; border-radius: 14px; background: rgb(var(--hv-accent)); display: grid; place-items: center; font-size: 14px; font-weight: 700; color: rgb(43 31 23); opacity: 0.85; }
+.mpAckNote { font-size: 12px; line-height: 1.45; color: rgb(var(--hv-brown)); text-align: center; }
+.mpGone { font-size: 12.5px; color: rgb(var(--hv-danger)); }
+.mpSummary { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11.5px; color: rgb(var(--hv-brown)); margin-bottom: 10px; }
+.mpPerson { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid rgb(var(--hv-hairline)); font-size: 13px; }
+.mpPersonName { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mpPersonDept { font-weight: 400; color: rgb(var(--hv-brown)); }
+.mpPersonWhen { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; color: rgb(var(--hv-brown)); white-space: nowrap; }

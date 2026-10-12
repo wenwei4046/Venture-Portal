@@ -116,6 +116,12 @@ export interface RevenueAppProps {
    * previews.
    */
   changePassword?: ChangePassword;
+  /**
+   * The Principal's own memos (2026-10-12 — the user: a memo reaches its person in every view and is acknowledged
+   * once): their People record's, handed in by the layout for a Principal whose login a record names. While they view
+   * nobody, Profile › Memos and the bell are these; acknowledging one is the login's receipt, as in the portal.
+   */
+  own?: { memos: MemberData["memos"] };
   /** A preview draws the prototype's device around the app. */
   device?: Device;
   /** Fixtures: a fixed "today" and the source the preview reads. */
@@ -180,7 +186,7 @@ function useDesk(ref: RefObject<HTMLDivElement | null>): boolean {
 
 const NO_NOTICES: Notices = { unread: 0, items: [] };
 
-export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
+export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, own, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
   // The live app keeps its answers on the phone, per account (2026-10-08, read-memory.ts): the next open shows them
   // at once and reads everything again behind them.
   const account = initialData.demo ? "" : initialData.profile.userId;
@@ -404,9 +410,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const settledArena = useMonthArena({ source, membershipId, context, readable, month: settledPeriod, mark: markViewed, gen, track }).snapshot;
 
   // A memo to a sub-department shows on its page; one addressed to people (Documentation, 2026-10-11) is the member's own —
-  // the Principal sees it only while viewing one of its recipients.
-  const memos = useMemo(() => data.memos.filter(m => (m.departments.length ? m.departments.includes(membership?.name ?? "")
-    : !principal || (!!viewed && (m.recipients ?? []).includes(viewed.id)))), [data.memos, membership?.name, principal, viewed]);
+  // the Principal sees it only while viewing one of its recipients. Viewing nobody, a Principal whose login a People record
+  // names reads their OWN memos here (2026-10-12), as in the portal's every view and the HR app.
+  const ownMode = principal && !viewed && !!own;
+  const memos = useMemo(() => (ownMode && own ? own.memos : data.memos.filter(m => (m.departments.length ? m.departments.includes(membership?.name ?? "")
+    : !principal || (!!viewed && (m.recipients ?? []).includes(viewed.id))))), [ownMode, own, data.memos, membership?.name, principal, viewed]);
   const requests = data.requests;
 
   // ── the bell ──
@@ -418,15 +426,17 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     return { period: settled.period, subName: membership?.name ?? "", ranked: arenaRankings(settledArena.people, "sales").filter(r => r.position).length,
       sales: rank("sales"), margin: rank("margin"), champ: null };
   }, [settled, settledArena, membership?.name]);
-  const nf = useMemo(() => notifications({ now: new Date(), memos: principal && !viewed ? [] : memos, requests: principal && !viewed ? [] : requests,
+  // A memo's notice (2026-10-12) is not listed twice: the memo itself is the bell's item, and opening it reads its notice.
+  const appNotices = useMemo(() => notices.items.filter(n => n.refKind !== "memo"), [notices.items]);
+  const nf = useMemo(() => notifications({ now: new Date(), memos: principal && !viewed && !ownMode ? [] : memos, requests: principal && !viewed ? [] : requests,
     settled, salary: data.profile.salary, results, readAll, requestCode,
     // News about a page their ticks close is not shown (2026-10-11).
     opens: go => go.to === "memo" || go.to === "none" || (go.to === "requests" ? requestPage(closed, go.kind ?? "claim") !== null : shows(closed, go.to)),
-    notices: principal ? [] : notices.items,
-  }), [memos, requests, settled, data.profile.salary, results, readAll, principal, viewed, closed, notices.items]);
+    notices: principal ? [] : appNotices,
+  }), [memos, requests, settled, data.profile.salary, results, readAll, principal, viewed, ownMode, closed, appNotices]);
   // The bell's dot counts what the database told them until they open it; opening it reads them (they stay marked new in the list until the next open).
   const [noticesSeen, setNoticesSeen] = useState(false);
-  const unseenNotices = principal || noticesSeen ? 0 : notices.unread;
+  const unseenNotices = principal || noticesSeen ? 0 : appNotices.filter(n => !n.read).length;
   const seeNotices = useCallback(() => {
     if (unseenNotices > 0) {
       setNoticesSeen(true);
@@ -741,18 +751,19 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     ? { staffId: viewedId, byMemo: new Map(receiptsRead.value.map(x => [x.memoId, x])) } : null), [viewedId, receiptsRead.value]);
   const memoVMs: MemoVM[] = useMemo(() => {
     if (fxp) return fxp.memos.map(m => ({ ...m, read: m.read || memoRead.has(m.id) || memoAcked.has(m.id), acked: m.acked || memoAcked.has(m.id) }));
-    if (principal) {
+    // The Principal's own (2026-10-12): their receipts, as a member's are.
+    if (principal && !ownMode) {
       const theirs = viewed && viewedReceipts?.staffId === viewed.id ? viewedReceipts.byMemo : new Map();
       return memos.map(m => memoVM({ ...m, readAt: theirs.get(m.id)?.readAt ?? null, acknowledgedAt: theirs.get(m.id)?.acknowledgedAt ?? null },
         { read: new Set(), acked: new Map() }));
     }
     return memos.map(m => memoVM(m, { read: memoRead, acked: memoAcked }));
-  }, [fxp, principal, viewed, viewedReceipts, memos, memoRead, memoAcked]);
+  }, [fxp, principal, ownMode, viewed, viewedReceipts, memos, memoRead, memoAcked]);
   const profileVM = useMemo(() => {
     if (fxp) return principal && !viewed ? fxp.main.principal : viewed ? fxp.main.viewing[viewed.id] ?? fxp.main.me : fxp.main.me;
     return profileMainVM({ name: me.name, title: me.title, rank: me.rank, subName: principal && !viewed ? null : membership?.name ?? null,
-      requests: myRequests, memos: principal && !viewed ? [] : memoVMs });
-  }, [fxp, principal, viewed, me, membership?.name, myRequests, memoVMs]);
+      requests: myRequests, memos: principal && !viewed && !ownMode ? [] : memoVMs });
+  }, [fxp, principal, ownMode, viewed, me, membership?.name, myRequests, memoVMs]);
   const [cancelled, setCancelled] = useState<ReadonlySet<string>>(() => new Set());
   const reqRows = useMemo(() => {
     const rows = fxp ? fxp.requests.rows : requestRowsVM(myRequests, nameOf, queues);
@@ -784,24 +795,54 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     goScreen("today", { staff: staffId, department: departmentId });
   }, [goScreen]);
 
-  // Memos: opening one is reading it; acknowledging records the member's name and time for HR.
+  // Memos: opening one is reading it; acknowledging records the member's name and time for HR. The Principal's own
+  // memos (2026-10-12) are theirs to read and acknowledge — viewing a member stays read-only.
+  const memoReadOnly = readOnlyView && !ownMode;
   const openMemo = useCallback((id: string) => {
     setMemoError(null);
     setMemoPick(id);
-    if (readOnlyView || memoRead.has(id)) return;
+    if (memoReadOnly || memoRead.has(id)) return;
     setMemoRead(prev => new Set(prev).add(id));
     const memo = memos.find(m => m.id === id);
     if (!fxp && memo && !memo.readAt) void source.memo(id, false);
-  }, [readOnlyView, memoRead, memos, fxp, source]);
+  }, [memoReadOnly, memoRead, memos, fxp, source]);
+  // A memo's file (2026-10-12): a short link asked for at the tap, opened in a tab readied in the same tap.
+  const openMemoFile = useCallback((id: string, mode: "view" | "download") => {
+    if (!source.memoFile) return;
+    setMemoError(null);
+    const win = mode === "view" ? window.open("", "_blank") : null;
+    if (win) win.opener = null;
+    void settleRead(source.memoFile(id, mode)).then(res => {
+      if (res.ok) {
+        if (win) win.location.href = res.data.url;
+        else window.location.assign(res.data.url);
+      } else {
+        win?.close();
+        setMemoError(res.error);
+      }
+    });
+  }, [source]);
+  // A tapped push about a memo opens it (`/member?memo=…`, lib/push/notices noticeUrl): its page, the memo, once.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const id = q.get("memo");
+    if (!id) return;
+    q.delete("memo");
+    window.history.replaceState(null, "", window.location.pathname + (q.toString() ? `?${q}` : ""));
+    goScreen("account", { pf: "memos" });
+    if (memos.some(m => m.id === id)) openMemo(id);
+    // Only on opening.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const ackMemo = useCallback(async () => {
-    if (!memoPick || readOnlyView) return;
+    if (!memoPick || memoReadOnly) return;
     setMemoBusy(true); setMemoError(null);
     const result = fxp ? { ok: true as const, data: { acknowledgedAt: new Date().toISOString() } } : await source.memo(memoPick, true);
     setMemoBusy(false);
     if (!result.ok) { setMemoError(result.error); return; }
     const at = result.data.acknowledgedAt ?? new Date().toISOString();
     setMemoAcked(prev => new Map(prev).set(memoPick, at));
-  }, [memoPick, readOnlyView, fxp, source]);
+  }, [memoPick, memoReadOnly, fxp, source]);
   const memoPickVM = memoPick ? memoVMs.find(m => m.id === memoPick) ?? null : null;
 
   // Requests: send one, cancel one still with HR, update one HR returned.
@@ -1293,7 +1334,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
               <RoomViewSheet {...rooms.view} />
             </>
           )}
-          {route.pf === "memos" && <MemoSheet open={memoPick !== null} memo={memoPickVM} busy={memoBusy} readOnly={readOnlyView} error={memoError} onAck={() => void ackMemo()} onClose={() => setMemoPick(null)} />}
+          {route.pf === "memos" && <MemoSheet open={memoPick !== null} memo={memoPickVM} busy={memoBusy} readOnly={memoReadOnly} error={memoError} onAck={() => void ackMemo()} onClose={() => setMemoPick(null)}
+            onFile={memoPick && source.memoFile && !fxp ? mode => openMemoFile(memoPick, mode) : undefined} />}
           {!route.pf && shows(closed, "scheme") && <SchemeSheet open={schemeOpen} vm={schemeView} onClose={() => setSchemeOpen(false)} />}
           {!route.pf && ownPassword && <PasswordSheet open={pwOpen} onClose={() => setPwOpen(false)} change={ownPassword} />}
         </>

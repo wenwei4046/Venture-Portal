@@ -56,8 +56,12 @@ export default function MemosPage({ memos, tab, onTab, onBack, onOpen }: {
   );
 }
 
-/** One memo, read in full; acknowledging records the member's name and time for HR (lines 1680–1697). */
-export function MemoSheet({ open, memo, busy, readOnly, error, onAck, onClose }: {
+/**
+ * One memo, read in full; acknowledging records the member's name and time for HR (lines 1680–1697). The file sent
+ * with it (2026-10-12 — the user: Kris "在打开 memo 时是看不到附件的") is a row under the body: its tile, its name, View
+ * and Download, each a short link made at the tap.
+ */
+export function MemoSheet({ open, memo, busy, readOnly, error, onAck, onClose, onFile }: {
   open: boolean;
   memo: MemoVM | null;
   busy: boolean;
@@ -65,6 +69,8 @@ export function MemoSheet({ open, memo, busy, readOnly, error, onAck, onClose }:
   error: string | null;
   onAck: () => void;
   onClose: () => void;
+  /** Open the memo's file — absent where nothing can be read (the design preview). */
+  onFile?: (mode: "view" | "download") => void;
 }) {
   const c = memo ? MEMO_CAT[memo.cat] : null;
   const needs = !!memo && memo.needsAck && !memo.acked;
@@ -80,6 +86,20 @@ export function MemoSheet({ open, memo, busy, readOnly, error, onAck, onClose }:
             </div>
             <h2 className={s.mdTitle}>{memo.title}</h2>
             {memo.paras.map((p, i) => <p key={i} className={s.mdPara}>{p}</p>)}
+            {memo.file && (
+              <div className={s.mdFile}>
+                <span className={s.mdFileExt} aria-hidden="true">{memo.file.ext}</span>
+                <span className={s.mdFileName}>{memo.file.name}</span>
+                {onFile && (
+                  <>
+                    <button className={s.mdFileBtn} onClick={() => onFile("view")}>View</button>
+                    <button className={s.mdFileBtn} onClick={() => onFile("download")} aria-label={`Download ${memo.file.name}`}>
+                      <Svg d={ICON.download} size={16} sw={2} />
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
             {memo.acked && <div className={s.mdAcked}><Svg d={ICON.tick} size={18} sw={2.4} />{memo.ackedText}</div>}
             {error && <p className={s.formError}>{error}</p>}
           </div>

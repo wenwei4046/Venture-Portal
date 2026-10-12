@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn, requireAnyActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { memoPreviewFromRow, type MemoPreview } from '@/lib/memos/model'
+import { pushSoon } from '@/lib/push/outbox'
 import { DOC_BUCKET, documentationFileLink, type FileLink } from './server'
 
 /**
@@ -149,6 +151,8 @@ export async function fileLetter(input: {
   })
   if (error) return { ok: false, reason: refusal(error, 'The letter could not be filed. Please try again.') }
   revalidateDocs()
+  // The letter travels as a memo: its person is told, on their phone too (mig 20261012210000).
+  pushSoon()
   return { ok: true, id: String(data) }
 }
 
@@ -241,6 +245,23 @@ export async function publishDocumentation(input: {
   })
   if (error) return { ok: false, reason: refusal(error, 'It could not be published. Please try again.') }
   revalidateDocs()
+  // Everyone it reaches is told — in every view, and on their phone (2026-10-12, mig 20261012210000).
+  pushSoon()
   const recipients = Number((data as { recipients?: unknown } | null)?.recipients ?? input.staffIds.length)
   return { ok: true, recipients: Number.isFinite(recipients) ? recipients : input.staffIds.length }
+}
+
+export type PreviewOutcome = { ok: true; preview: MemoPreview } | { ok: false; reason: string }
+
+/**
+ * Publish › Preview (2026-10-12 — the user: "因为我已经发过了这个 memo，我可以
+ * preview，就 preview 这个 memo 是长怎样的"): the memo as its people read it — and
+ * where each of them stands with it (`hr_memo_preview`, Documentation · View).
+ */
+export async function previewPublished(id: string): Promise<PreviewOutcome> {
+  await requireActionOn('/team/documentation', 'documentation', 'view')
+  const { data, error } = await (await client()).rpc('hr_memo_preview', { p_memo: id })
+  if (error) return { ok: false, reason: refusal(error, 'The memo could not be opened. Please try again.') }
+  const preview = memoPreviewFromRow(data)
+  return preview ? { ok: true, preview } : { ok: false, reason: 'The memo could not be opened. Please try again.' }
 }

@@ -136,7 +136,7 @@ describe('publish', () => {
     const groups = audienceGroups(departments, people, new Set([REV, HR]), new Set(['zack']))
     expect(groups.map(g => [g.department.id, g.all.length, g.picked.map(p => p.id)])).toEqual([[REV, 2, ['chea']], [HR, 1, ['grace']]])
     expect(audienceLabel(groups)).toBe('Revenue · Chea Huan  /  HR · everyone')
-    expect(publishSummary(groups)).toBe('Goes to 2 people. Each one must tap Acknowledge in the Revenue app.')
+    expect(publishSummary(groups)).toBe('Goes to 2 people. Each one is told and must tap Acknowledge — once, in any view.')
     expect(publishSummary([])).toBe('Pick a department to choose who it goes to.')
   })
 

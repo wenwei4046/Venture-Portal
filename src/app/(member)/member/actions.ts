@@ -2,6 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { pushSoon } from "@/lib/push/outbox";
+import { getMemberUser } from "@/lib/auth";
+import { isPrincipalAccount } from "@/lib/view-as";
+import { markMyMemo, openMemoFile } from "@/lib/memos/actions";
 import type { MemberReadContext, QuoteInput } from "@/lib/member/types";
 export type { AdminMemberInput, AdminMemberData } from "@/lib/member/server";
 import {
@@ -116,9 +119,23 @@ export async function fetchMemberWaitingQueue(context?: Pick<MemberReadContext, 
   return loadMemberWaitingQueue(context);
 }
 export async function acknowledgeMemberMemo(id: string, ack: boolean) {
+  // The Principal's own memos (2026-10-12): their People record is not a Revenue member's, so their receipt goes
+  // through the login's own function — the very row the portal's bell and the HR app write.
+  const user = await getMemberUser();
+  if (user && isPrincipalAccount(user)) {
+    const own = await markMyMemo(id, ack);
+    return own.ok
+      ? { ok: true as const, data: { id, readAt: own.readAt, acknowledgedAt: own.acknowledgedAt, version: 1 } }
+      : { ok: false as const, error: own.reason };
+  }
   const result = await acknowledge(id, ack);
   if (result.ok) revalidatePath("/member");
   return result;
+}
+/** A memo's file (2026-10-12): a short link made at the tap — to its person, or to the Principal viewing them. */
+export async function openMemberMemoFile(id: string, mode: "view" | "download") {
+  const link = await openMemoFile(id, mode);
+  return link.ok ? { ok: true as const, data: { url: link.url, fileName: link.fileName } } : { ok: false as const, error: link.reason };
 }
 export async function adminMemberAction(command: AdminMemberCommand) {
   const result = await administer(command);
