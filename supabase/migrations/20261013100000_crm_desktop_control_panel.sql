@@ -87,8 +87,7 @@ begin
   end if;
   return new;
 end $$;
-drop trigger if exists crm_contacts_journey on public.crm_contacts;
-create trigger crm_contacts_journey after insert or update of assigned_to, status on public.crm_contacts
+create or replace trigger crm_contacts_journey after insert or update of assigned_to, status on public.crm_contacts
   for each row execute function public.crm_journey_contact();
 
 create or replace function public.crm_journey_message()
@@ -102,8 +101,7 @@ begin
   end if;
   return new;
 end $$;
-drop trigger if exists crm_messages_journey on public.crm_messages;
-create trigger crm_messages_journey after insert on public.crm_messages
+create or replace trigger crm_messages_journey after insert on public.crm_messages
   for each row execute function public.crm_journey_message();
 
 create or replace function public.crm_journey_visit()
@@ -126,8 +124,7 @@ begin
   end if;
   return new;
 end $$;
-drop trigger if exists crm_appointments_journey on public.crm_appointments;
-create trigger crm_appointments_journey after insert or update of state, start_at, showroom on public.crm_appointments
+create or replace trigger crm_appointments_journey after insert or update of state, start_at, showroom on public.crm_appointments
   for each row execute function public.crm_journey_visit();
 
 revoke all on function public.crm_journey_contact() from public, anon, authenticated;
@@ -333,7 +330,8 @@ do $$ begin
       using (contact_id in (select crm_contacts.id from crm_contacts));
   end if;
 end $$;
-SELECT public.audit_register('crm_notes', 'CRM notes', 'Member services', '{}', 'none');
+SELECT public.audit_register('crm_notes', 'CRM notes', 'Member services', '{}', 'none',
+  p_reason => 'A note is a record already: who wrote it and when, never edited.');
 
 create or replace function public.crm_add_note(p_contact uuid, p_body text)
 returns public.crm_notes language plpgsql security definer set search_path = public as $$

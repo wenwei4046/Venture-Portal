@@ -49,7 +49,7 @@
 
 Principal 和 Director 看到的是同一份設定（同一個資料庫，每 5 秒重新讀）；**History** 列出誰改了什麼。
 
-## 4. 資料庫變更（`supabase/migrations/20261013100000_crm_desktop_control_panel.sql`，**尚未套用到正式環境**）
+## 4. 資料庫變更（`supabase/migrations/20261013100000_crm_desktop_control_panel.sql`，**2026-10-13 已套用到正式環境**，你同意後）
 
 - B1 `crm_events` 多了客人歷程：assigned、first_reply、appt_booked / changed / cancelled、visit、status（trigger 自動記；舊資料用既有欄位補第一筆）
 - B2 `crm_remind()` —— 只有 CRM · Manage
@@ -66,5 +66,5 @@ Principal 和 Director 看到的是同一份設定（同一個資料庫，每 5 
 ## 5. 還沒接 / 等你
 
 - **Meta Ads**（Ads Performance 的花費、曝光、Running/Paused）：等你確認 Meta 那邊。
-- **正式環境套用 migration**：要你同意才做。
+- 正式環境 migration：已套用（2026-10-13）。Principal、Director、無權限帳號的試跑（已還原）都照權限走。
 - Messenger 卡片若用你填的地圖連結，會直接開那個網址（不經 `/nav.html`）；正式環境上需要實測一次。
