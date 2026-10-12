@@ -803,6 +803,30 @@
 .sumNote { font-size: calc(11.5px * var(--rv-type)); color: var(--rv-sub); }
 .local { margin: 0; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
 .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+/* An Airbnb stay on one calendar (2026-10-12): only the day before the fair to the day after can be
+   tapped, the fair's days carry a dot in the brand's colour, the stay is a band from its check-in to its
+   check-out, and the box the next tap fills is the orange one. */
+.cal { display: flex; flex-direction: column; gap: 10px; padding: 12px 10px 10px; border-radius: 14px; border: 1px solid var(--rv-handle); background: var(--rv-white); }
+.calHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; padding: 0 6px; }
+.calTitle { font-size: calc(14px * var(--rv-type)); font-weight: 700; }
+.calClear { padding: 2px 0; border: 0; background: none; color: var(--rv-accent); font-family: inherit; font-size: calc(12.5px * var(--rv-type)); font-weight: 650; }
+.calGrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; }
+.calDow { padding-bottom: 4px; text-align: center; color: var(--rv-sub); font-size: calc(11px * var(--rv-type)); font-weight: 650; }
+.calDay { position: relative; height: 44px; padding: 0; border: 0; background: none; display: grid; place-items: center; color: var(--rv-ink); font-family: inherit; -webkit-tap-highlight-color: transparent; }
+.calDay:disabled { color: var(--rv-sub); opacity: .4; }
+.calDay[data-band]::before { content: ""; position: absolute; top: 4px; bottom: 4px; left: 0; right: 0; background: var(--rv-cream); }
+.calDay[data-band="in"]::before { left: 50%; }
+.calDay[data-band="out"]::before { right: 50%; }
+.calNum { position: relative; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: calc(14.5px * var(--rv-type)); font-weight: 600; font-variant-numeric: tabular-nums; }
+.calDay[data-fair] .calNum { font-weight: 750; }
+.calDay[data-end] .calNum { background: var(--rv-accent); color: var(--rv-white); font-weight: 800; box-shadow: 0 2px 6px var(--rv-accent-18); }
+.calDot { position: absolute; bottom: 8px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--cal-fair); }
+.calDay[data-end] .calDot { background: var(--rv-white); }
+.calEnds { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.calEnd { min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--rv-rule); background: var(--rv-paper-warm); }
+.calEnd[data-next] { border-color: var(--rv-accent); background: var(--rv-cream); }
+.calEndLabel { color: var(--rv-sub); font-size: calc(11px * var(--rv-type)); font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }
+.calEndDay { font-size: calc(14px * var(--rv-type)); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pax { display: flex; gap: 8px; }
 .paxBox { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 14px; border: 1px solid var(--rv-handle); }
 .paxLabel { font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); }

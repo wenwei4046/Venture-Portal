@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { airbnbGroup, claimAmount, fairRegion, isOutstation, nightsBetween, readClaimRates, stayProblem, type ClaimRates } from "./claim-rules";
+import {
+  airbnbCap, airbnbGroup, claimAmount, fairRegion, isOutstation, nightsBetween, readClaimRates, shiftDay, stayProblem, stayWindow, tapStayDay,
+  type ClaimRates, type StayPick,
+} from "./claim-rules";
 
 const rates: ClaimRates = {
   base: "Klang Valley",
@@ -27,16 +30,19 @@ describe("claimAmount — the rate HR set, never a typed figure (2026-10-05)", (
     expect(claimAmount(rates, { type: "outstation", regionId: null })).toBe(0);
   });
 
-  it("prices Airbnb per person per night (user: 每人每晚)", () => {
-    expect(claimAmount(rates, { type: "airbnb", pax: 2, nights: 2 })).toBe(260);
-    expect(claimAmount(rates, { type: "airbnb", pax: 3, nights: 1 })).toBe(195);
+  // User 2026-10-12: "per pax max cap is this amount, not like per pax fix this amount".
+  it("pays an Airbnb invoice up to the rate per person per night (每人每晚), never more", () => {
+    expect(claimAmount(rates, { type: "airbnb", pax: 2, nights: 2, invoice: 300 })).toBe(260);
+    expect(claimAmount(rates, { type: "airbnb", pax: 2, nights: 2, invoice: 180.4 })).toBe(180.4);
+    expect(claimAmount(rates, { type: "airbnb", pax: 3, nights: 1, invoice: 195 })).toBe(195);
   });
 
-  it("pays nothing until HR has set the rate, or with nobody or no night", () => {
+  it("pays nothing until HR has set the rate, or with nobody, no night or no invoice total", () => {
     expect(claimAmount({ ...rates, perSpot: null }, { type: "outstation", regionId: "pg" })).toBe(0);
-    expect(claimAmount({ ...rates, perPaxNight: null }, { type: "airbnb", pax: 2, nights: 2 })).toBe(0);
-    expect(claimAmount(rates, { type: "airbnb", pax: 0, nights: 2 })).toBe(0);
-    expect(claimAmount(rates, { type: "airbnb", pax: 2, nights: 0 })).toBe(0);
+    expect(claimAmount({ ...rates, perPaxNight: null }, { type: "airbnb", pax: 2, nights: 2, invoice: 200 })).toBe(0);
+    expect(claimAmount(rates, { type: "airbnb", pax: 0, nights: 2, invoice: 200 })).toBe(0);
+    expect(claimAmount(rates, { type: "airbnb", pax: 2, nights: 0, invoice: 200 })).toBe(0);
+    expect(claimAmount(rates, { type: "airbnb", pax: 2, nights: 2 })).toBe(0);
   });
 });
 
@@ -59,22 +65,25 @@ describe("a plane ticket", () => {
   });
 });
 
-// User 2026-10-06: by head count only. Up to HR's small group (3, RM 220 a night) the invoice's
-// total is paid up to cap × nights — "2， claim 220*2=440"; more people go back to RM 65 each.
-describe("Airbnb: a small group claims its invoice, up to HR's cap a night", () => {
+// User 2026-10-06: up to HR's small group (3, RM 220 a night) the invoice's total is paid up to
+// cap × nights — "2， claim 220*2=440". User 2026-10-12: a bigger group keys its invoice too, and is
+// paid it up to RM 65 × people × nights — the rate a person a night is a cap as well.
+describe("Airbnb: the invoice's total, up to a cap by head count", () => {
   const capped: ClaimRates = { ...rates, groupCapPerNight: 220 };
 
   it("pays one, two or three people their invoice, up to RM 220 × 2 nights", () => {
     for (const pax of [1, 2, 3]) {
+      expect(airbnbCap(capped, pax, 2)).toBe(440);
       expect(claimAmount(capped, { type: "airbnb", pax, nights: 2, invoice: 500 })).toBe(440);
       expect(claimAmount(capped, { type: "airbnb", pax, nights: 2, invoice: 380.5 })).toBe(380.5);
     }
   });
 
-  it("pays four people per person, whatever the invoice says", () => {
+  it("pays four people their invoice up to RM 65 × 4 × 2 nights — not RM 520 whatever it says", () => {
     expect(airbnbGroup(capped, 4)).toBe(false);
+    expect(airbnbCap(capped, 4, 2)).toBe(520);
     expect(claimAmount(capped, { type: "airbnb", pax: 4, nights: 2, invoice: 999 })).toBe(520);
-    expect(claimAmount(capped, { type: "airbnb", pax: 4, nights: 2 })).toBe(520);
+    expect(claimAmount(capped, { type: "airbnb", pax: 4, nights: 2, invoice: 480 })).toBe(480);
   });
 
   it("follows the head count HR sets", () => {
@@ -83,42 +92,101 @@ describe("Airbnb: a small group claims its invoice, up to HR's cap a night", () 
     expect(claimAmount(two, { type: "airbnb", pax: 3, nights: 2, invoice: 500 })).toBe(390);
   });
 
-  it("pays a small group nothing until its invoice total is typed", () => {
+  it("pays nothing until the invoice's total is typed, small group or not", () => {
     expect(claimAmount(capped, { type: "airbnb", pax: 2, nights: 2 })).toBe(0);
     expect(claimAmount(capped, { type: "airbnb", pax: 2, nights: 2, invoice: 0 })).toBe(0);
+    expect(claimAmount(capped, { type: "airbnb", pax: 5, nights: 2 })).toBe(0);
   });
 
-  it("pays everybody per person while HR has set no cap", () => {
+  it("caps everybody by the person while HR has set no small-group figure", () => {
     expect(airbnbGroup(rates, 3)).toBe(false);
     expect(claimAmount(rates, { type: "airbnb", pax: 3, nights: 2, invoice: 500 })).toBe(390);
     expect(claimAmount({ ...rates, groupCapPerNight: 0 }, { type: "airbnb", pax: 3, nights: 2, invoice: 500 })).toBe(390);
   });
+
+  it("has no cap to say while it cannot be worked out", () => {
+    expect(airbnbCap({ ...capped, perPaxNight: null }, 4, 2)).toBeNull();
+    expect(airbnbCap(capped, 0, 2)).toBeNull();
+    expect(airbnbCap(capped, 2, 0)).toBeNull();
+  });
 });
 
-// User 2026-10-06: "airbnb only allow claim outstation fair, then date stay limit in 7 days".
-describe("Airbnb: an outstation fair, a stay of up to 7 nights around it", () => {
+describe("Airbnb: an outstation fair only (user 2026-10-06)", () => {
   it("is outstation when the route has spots or is flown to", () => {
     expect(isOutstation({ id: "pg", name: "Penang", spots: 4, planeTicket: false })).toBe(true);
     expect(isOutstation({ id: "sb", name: "Sabah", spots: 0, planeTicket: true })).toBe(true);
     expect(isOutstation({ id: "kl", name: "KL", spots: 0, planeTicket: false })).toBe(false);
   });
+});
 
-  const fair = { start: "2026-09-25", end: "2026-09-27" };
-  it("takes a stay of up to 7 nights that covers a day of the fair", () => {
-    expect(stayProblem("2026-09-24", "2026-09-28", fair, "25–27 Sep")).toBeNull();
-    expect(stayProblem("2026-09-27", "2026-09-28", fair, "25–27 Sep")).toBeNull(); // the last night
-    expect(stayProblem("2026-09-21", "2026-09-28", fair, "25–27 Sep")).toBeNull(); // 7 nights
+// User 2026-10-12: "比如原本是 18 到 20 号 … 17 号 check-in … 21 号 check-out。这个 17 到 21 号就是
+// maximum 他们可以定的日期范围" — the window replaces the old most-7-nights rule.
+describe("Airbnb: a stay from the day before the fair to the day after", () => {
+  const fair = stayWindow({ start: "2026-09-18", end: "2026-09-20" }, "2026-09-18");
+
+  it("opens the day before the fair for check-in and the day after it for check-out", () => {
+    expect(fair).toEqual({ start: "2026-09-18", end: "2026-09-20", first: "2026-09-17", last: "2026-09-21" });
+    expect(stayWindow({ start: "2026-09-30", end: "2026-10-02" }, "2026-10-02")).toMatchObject({ first: "2026-09-29", last: "2026-10-03" });
   });
 
-  it("refuses an eighth night, and a stay that misses the fair", () => {
-    expect(stayProblem("2026-09-20", "2026-09-28", fair, "25–27 Sep")).toBe("A stay is at most 7 nights.");
-    expect(stayProblem("2026-09-23", "2026-09-25", fair, "25–27 Sep")).toBe("The stay must cover the fair's days (25–27 Sep).");
-    expect(stayProblem("2026-09-28", "2026-09-30", fair, "25–27 Sep")).toBe("The stay must cover the fair's days (25–27 Sep).");
+  it("takes a fair with no days of its own as its weekend, Friday to Sunday", () => {
+    expect(stayWindow({ start: null, end: null }, "2026-09-25")).toEqual({ start: "2026-09-25", end: "2026-09-27", first: "2026-09-24", last: "2026-09-28" });
   });
 
-  it("says nothing until both dates are in, and does not compare a fair with no dates", () => {
-    expect(stayProblem("", "2026-09-28", fair, "25–27 Sep")).toBeNull();
-    expect(stayProblem("2026-09-01", "2026-09-03", { start: null, end: null }, "")).toBeNull();
+  it("takes the whole window, and any stay inside it with a night of the fair", () => {
+    expect(stayProblem("2026-09-17", "2026-09-21", fair, "18–20 Sep")).toBeNull(); // 4 nights, all of it
+    expect(stayProblem("2026-09-18", "2026-09-20", fair, "18–20 Sep")).toBeNull();
+    expect(stayProblem("2026-09-20", "2026-09-21", fair, "18–20 Sep")).toBeNull(); // the last night
+  });
+
+  it("a long fair's window holds more than seven nights — it is the limit now", () => {
+    const week = stayWindow({ start: "2026-10-05", end: "2026-10-11" }, "2026-10-09");
+    expect(nightsBetween(week.first, week.last)).toBe(8);
+    expect(stayProblem(week.first, week.last, week, "5–11 Oct")).toBeNull();
+  });
+
+  it("refuses a night before the window or after it, and only the night before the fair", () => {
+    const outside = "Check in from 17 Sep and check out by 21 Sep: the day before the fair to the day after.";
+    expect(stayProblem("2026-09-16", "2026-09-19", fair, "18–20 Sep")).toBe(outside);
+    expect(stayProblem("2026-09-18", "2026-09-22", fair, "18–20 Sep")).toBe(outside);
+    expect(stayProblem("2026-09-17", "2026-09-18", fair, "18–20 Sep")).toBe("The stay must cover the fair's days (18–20 Sep).");
+  });
+
+  it("says nothing until both dates are in", () => {
+    expect(stayProblem("", "2026-09-21", fair, "18–20 Sep")).toBeNull();
+    expect(stayProblem("2026-09-17", "", fair, "18–20 Sep")).toBeNull();
+  });
+});
+
+describe("tapStayDay — tap the days you stayed (user 2026-10-12)", () => {
+  const tap = (...days: string[]) => days.reduce<StayPick>((pick, day) => tapStayDay(pick, `2026-09-${day}`), { checkIn: "", checkOut: "" });
+  const stay = (checkIn: string, checkOut = "") => ({ checkIn: checkIn && `2026-09-${checkIn}`, checkOut: checkOut && `2026-09-${checkOut}` });
+
+  it("25, 26, 27 — or just 25 and 27 — is in on the 25th, out on the 27th", () => {
+    expect(tap("25")).toEqual(stay("25"));
+    expect(tap("25", "26", "27")).toEqual(stay("25", "27"));
+    expect(tap("25", "27")).toEqual(stay("25", "27"));
+    expect(tap("27", "25")).toEqual(stay("25", "27"));
+  });
+
+  it("a day before or after the stay stretches it there", () => {
+    expect(tap("25", "27", "24")).toEqual(stay("24", "27"));
+    expect(tap("25", "27", "28")).toEqual(stay("25", "28"));
+  });
+
+  it("its first or last day taps off; a day inside ends it there", () => {
+    expect(tap("24", "28", "28")).toEqual(stay("24", "27"));
+    expect(tap("24", "28", "24")).toEqual(stay("25", "28"));
+    expect(tap("24", "28", "26")).toEqual(stay("24", "26"));
+    expect(tap("25", "26", "26")).toEqual(stay("25"));
+    expect(tap("25", "26", "25")).toEqual(stay("26"));
+    expect(tap("25", "25")).toEqual(stay(""));
+  });
+
+  it("counts across a month's end", () => {
+    expect(shiftDay("2026-09-30", 1)).toBe("2026-10-01");
+    expect(shiftDay("2026-10-01", -1)).toBe("2026-09-30");
+    expect(tapStayDay({ checkIn: "2026-09-30", checkOut: "2026-10-02" }, "2026-10-02")).toEqual({ checkIn: "2026-09-30", checkOut: "2026-10-01" });
   });
 });
 
