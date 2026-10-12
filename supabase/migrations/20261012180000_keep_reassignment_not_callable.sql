@@ -1,0 +1,22 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- 20261012180000_keep_reassignment_not_callable.sql
+-- The move's keeper answers to its trigger only (2026-10-12)
+-- ════════════════════════════════════════════════════════════════════════════
+--
+-- sales_orders_keep_reassignment() (mig 20261012170000) is a SECURITY DEFINER
+-- trigger function, and it kept the EXECUTE a new function gets: the security
+-- advisor listed it as callable by `authenticated` through /rest/v1/rpc. A
+-- trigger function cannot run that way, and a trigger fires without EXECUTE
+-- (checked only when the trigger is created) — so it is taken away, as
+-- member_honours_forget_order_month's was (mig 20261005070000).
+--
+-- Dry run on production first (rolled back): with the grant gone an HR session
+-- still moved HC-SO-2610-021 to ANTHONY and back, its own UPDATE of the bill's
+-- salesperson was still put back to ANTHONY by the trigger, and a direct call
+-- was refused (42501).
+--
+-- Rollback: GRANT EXECUTE ON FUNCTION public.sales_orders_keep_reassignment()
+-- TO authenticated.
+-- ════════════════════════════════════════════════════════════════════════════
+
+REVOKE ALL ON FUNCTION public.sales_orders_keep_reassignment() FROM PUBLIC, anon, authenticated;
