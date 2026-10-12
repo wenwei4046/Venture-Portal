@@ -4,7 +4,7 @@ import { claimPayoutLine, readClaimPayout } from "@/lib/member/claim-payout";
 import { canEditRequest, EDIT_FIELDS, editValues, lockedNote } from "@/lib/member/request-edit";
 import { placeOf, type WaitingQueue } from "@/lib/member/waiting-queue";
 import { memoFileExt } from "@/lib/memos/model";
-import { MONTHS_SHORT, dayRange, initials, klDate, klDayTime, klLongTime, monthShort, rm, rm2, shortDay } from "../format";
+import { MONTHS_SHORT, dayList, dayRange, initials, klDate, klDayTime, klLongTime, monthShort, rm, rm2, shortDay } from "../format";
 import type {
   ClaimWeek, MemoCat, MemoVM, PersonSheetVM, ProfileMainVM, RequestDetailVM, RequestEventVM, RequestKindVM, RequestRowVM,
   TeamDot, TeamKidVM, TeamLevelVM, TeamNodeVM, TeamVM, Tone, TrackVM, VaGroupVM,
@@ -81,9 +81,21 @@ export const requestStatus = (status: string, at?: { position?: number | null; d
   return [word, tone];
 };
 
-const KIND_LABEL: Record<RequestKindVM, string> = { claim: "Claim", replacement: "Replacement", waiting: "Waiting list" };
+const KIND_LABEL: Record<RequestKindVM, string> = { claim: "Claim", food: "Food claim", replacement: "Replacement", waiting: "Waiting list" };
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v !== "" ? Number(v) : NaN);
+/** A food claim's days, as stored (`YYYY-MM-DD`). */
+const foodDays = (d: Record<string, unknown>) => (Array.isArray(d.days) ? d.days.filter((x): x is string => typeof x === "string") : []);
+/** A food claim's month (2026-10-13: one a month), `Oct 2026`. */
+const foodMonth = (d: Record<string, unknown>) => str(d.monthLabel) || (/^\d{4}-\d{2}$/.test(str(d.month)) ? monthShort(str(d.month)) : "");
+/** The fairs a food claim's weekends were at, each once. */
+const foodFairs = (d: Record<string, unknown>) => [...new Set((Array.isArray(d.weeks) ? d.weeks : [])
+  .map(w => (w && typeof w === "object" ? str((w as Record<string, unknown>).location) : "")).filter(Boolean))];
+
+/** The app's kind of a request: a food claim is a claim the app shows on its own (2026-10-13). */
+export function requestKindOf(r: Pick<MemberRequest, "kind" | "detail">): RequestKindVM {
+  return r.kind === "claim" && r.detail?.claimType === "food" ? "food" : r.kind;
+}
 
 /** `Outstation claim · Mid Valley Megamall`, `Amelia Tan · Waiting List`, `DARREN ONG · Replacement`. */
 export function requestTitle(r: MemberRequest, nameOf: (staffId: string) => string | null): string {
@@ -91,6 +103,7 @@ export function requestTitle(r: MemberRequest, nameOf: (staffId: string) => stri
   if (r.kind === "claim") {
     const type = str(d.claimType);
     const where = str(d.location);
+    if (type === "food") return `Food claim${foodMonth(d) ? ` · ${foodMonth(d)}` : ""}`;
     if (type === "outstation" && d.planeTicket === true) return `Plane ticket claim${where ? ` · ${where}` : ""}`;
     if (type === "outstation") return `Outstation claim${where ? ` · ${where}` : ""}`;
     if (type === "airbnb") return `Airbnb claim${where ? ` · ${where}` : ""}`;
@@ -117,6 +130,10 @@ export function requestSummary(r: MemberRequest, nameOf: (staffId: string) => st
   const amount = num(d.amount);
   const money = Number.isFinite(amount) ? rm2(amount) : "";
   if (r.kind === "claim") {
+    if (str(d.claimType) === "food") {
+      const days = foodDays(d);
+      return [days.length ? `${days.length} day${days.length === 1 ? "" : "s"}` : "", foodMonth(d), money].filter(Boolean).join(" · ");
+    }
     if (str(d.claimType) === "outstation" && d.planeTicket === true) return [str(d.regionName), "plane ticket", money].filter(Boolean).join(" · ");
     if (str(d.claimType) === "outstation") return [str(d.regionName) || str(d.region), Number.isFinite(num(d.spots)) ? `${num(d.spots)} spots` : "", money].filter(Boolean).join(" · ");
     if (str(d.claimType) === "airbnb") {
@@ -154,7 +171,7 @@ export function requestRowsVM(requests: readonly MemberRequest[], nameOf: (staff
     .sort(newestFirst)
     .map(r => {
       const [status, tone] = statusOf(r, queues);
-      return { id: r.id, kind: r.kind, title: requestTitle(r, nameOf), sub: `${requestCode(r)} · ${shortDay(klDate(sent(r)))}`, status, tone };
+      return { id: r.id, kind: requestKindOf(r), title: requestTitle(r, nameOf), sub: `${requestCode(r)} · ${shortDay(klDate(sent(r)))}`, status, tone };
     });
 }
 
@@ -229,8 +246,15 @@ export function requestDetailVM(r: MemberRequest, events: readonly RequestEvent[
           { l: "Reason", v: str(d.reason) },
         ]
       : [
-          { l: "Type", v: KIND_LABEL[r.kind] },
+          { l: "Type", v: KIND_LABEL[requestKindOf(r)] },
           { l: "Submitted", v: shortDay(klDate(sent(r))) },
+          // A food claim: its month, the days it is for, the fairs and the rate a day (2026-10-13).
+          ...(requestKindOf(r) === "food" ? [
+            { l: "Month", v: foodMonth(d) },
+            { l: "Days", v: foodDays(d).length ? `${dayList(foodDays(d))} · ${foodDays(d).length} day${foodDays(d).length === 1 ? "" : "s"}` : "" },
+            { l: "Fairs", v: foodFairs(d).join(", ") },
+            { l: "Rate a day", v: Number.isFinite(num(d.rate)) ? rm2(num(d.rate)) : "" },
+          ] : []),
           ...(Number.isFinite(amount) ? [{ l: "Claim amount", v: rm2(amount) }] : []),
           { l: "Current step", v: status },
           ...(payout ? [{ l: "Payment", v: payout }] : []),
@@ -509,7 +533,7 @@ export function claimWeeks(snapshots: readonly (MemberArenaSnapshot | null | und
         key: friday, month, n: `W${i + 1}`, brandWeek: brand ? `${WEEK_BRAND[brand] ?? brand} week` : "No brand week", brand,
         dates: booth?.start && booth.end ? dayRange(booth.start, booth.end) : arenaWeekendLabel(friday), venue: booth?.venue ?? null, org: booth?.organizer ?? null,
         fairId: booth?.fairId ?? null, start: booth?.start ?? null, end: booth?.end ?? null,
-        auto: week ? week.source === "auto" : !!scoring, claimable: !!booth?.fairId, color, tint,
+        auto: week ? week.source === "auto" : !!scoring, claimable: !!booth?.fairId, worked: !!booth, color, tint,
       });
     });
   }

@@ -40,6 +40,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'get_submitted_hr_summary', 'gl_net_by_account', 'hr_dashboard_summary', 'lookup_eis', 'lookup_epf', 'lookup_pcb', 'lookup_socso',
   'member_admin_brand_weeks', 'member_admin_claim_settings', 'member_admin_request_facts', 'member_admin_snapshot', 'member_capacity_of', 'member_catalogue',
   'member_memo_reads', 'member_sub_department_requests', 'member_waiting_form', 'member_waiting_transfer', 'next_staff_code',
+  // Member services › Food claim (mig 20261013150000).
+  'member_admin_food_claim',
   // The replacement list's form (mig 20261011130000).
   'member_replacement_form',
   // Documentation (mig 20261011070000): the page's read, a file's path, a member's documents.

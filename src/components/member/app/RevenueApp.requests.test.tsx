@@ -217,3 +217,77 @@ describe("a member's waiting lists and replacements", () => {
     expect(sheet.queryByRole("button", { name: "Cancel request" })).not.toBeInTheDocument();
   });
 });
+
+// The food claim (2026-10-13): Fair's only, for the titles HR ticked — in View as, the viewed person's title.
+describe("a food claim", () => {
+  const FOOD = (titles: string[], subDepartmentId = "fair") => ({ ...RATES, food: { subDepartmentId, perDay: 20, titles } });
+  async function open(make: () => MemberData, search: string, rates: ReturnType<typeof FOOD>) {
+    window.history.replaceState({}, "", `/member${search}`);
+    const live = { ...source(make), claimRates: vi.fn(async () => ({ ok: true as const, data: rates })) };
+    render(<RevenueApp initialData={make()} initialSearch={search} today="2026-10-05" source={live} />);
+    expect(await screen.findByRole("heading", { name: "Requests" })).toBeInTheDocument();
+    await waitFor(() => expect(live.claimRates).toHaveBeenCalled());
+    await waitFor(() => expect(live.arena).toHaveBeenCalled());
+    await act(async () => {});
+    return live;
+  }
+
+  it("a Team Leader in Fair, a title HR ticked, opens it on their month — sent once the month is over", async () => {
+    const live = await open(memberData, "?page=account&view=requests&department=fair", FOOD(["Team Leader"]));
+    fireEvent.click(await screen.findByRole("button", { name: /Submit food claim/ }));
+    const food = within(form("Submit food claim"));
+    expect(food.getByRole("button", { name: "Oct 2026" })).toHaveAttribute("aria-pressed", "true");
+    const card = food.getByRole("button", { name: /Akemi week · 2–4 Oct/ });
+    expect(card).toHaveTextContent("3 days");
+    fireEvent.click(card);
+    fireEvent.click(food.getByRole("button", { name: /^Sat 3 Oct/ }));
+    expect(food.getByText("RM 40.00")).toBeInTheDocument();
+    expect(food.getByText("Claimed once the month is over, from 1 Nov.")).toBeInTheDocument();
+    fireEvent.click(food.getByRole("button", { name: "Review & submit claim" }));
+    expect(food.getByRole("alert")).toHaveTextContent("Food for Oct 2026 is claimed once the month is over, from 1 Nov.");
+    expect(live.submitRequest).not.toHaveBeenCalled();
+  });
+
+  it("is not offered to a title HR did not tick, nor outside Fair", async () => {
+    await open(memberData, "?page=account&view=requests&department=fair", FOOD(["Revenue Specialist"]));
+    expect(screen.getByRole("button", { name: /Submit claim/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Submit food claim/ })).not.toBeInTheDocument();
+    cleanup();
+    // Jia En is a Revenue Specialist in IR: ticked, but IR has no food claim.
+    await open(memberData, "?page=account&view=requests&department=ir", FOOD(["Revenue Specialist"]));
+    expect(screen.queryByRole("button", { name: /Submit food claim/ })).not.toBeInTheDocument();
+  });
+
+  it("in View as follows the viewed person's title, and sends nothing", async () => {
+    const live = await open(principalData, "?page=account&view=requests&department=fair&staff=anthony", FOOD(["Team Leader"]));
+    fireEvent.click(await screen.findByRole("button", { name: /Submit food claim/ }));
+    expect(within(form("Submit food claim")).getByRole("button", { name: "Read-only while viewing as" })).toBeDisabled();
+    expect(live.submitRequest).not.toHaveBeenCalled();
+    cleanup();
+    await open(principalData, "?page=account&view=requests&department=fair&staff=yuny", FOOD(["Team Leader"]));
+    expect(screen.queryByRole("button", { name: /Submit food claim/ })).not.toBeInTheDocument();
+  });
+
+  it("one sent is listed under Food claim and opens on its days", async () => {
+    const SENT_FOOD: MemberRequest = {
+      id: "f1", kind: "claim", title: "Food claim · Sep 2026", status: "submitted", createdAt: "2026-10-05T04:00:00Z",
+      submittedAt: "2026-10-05T04:00:00Z", requestNo: "RQ-2610-009", staffId: "jia",
+      detail: { claimType: "food", category: "Food", month: "2026-09", monthLabel: "Sep 2026",
+        weeks: [{ week: "2026-09-25", location: "PENANG WATERFRONT", days: ["2026-09-25", "2026-09-26"] }],
+        days: ["2026-09-25", "2026-09-26"], dayCount: 2, rate: 20, amount: 40 },
+    };
+    const withFood = () => ({ ...memberData(), requests: [SENT_FOOD, { ...SENT, id: "r2", requestNo: "RQ-2610-002" }] });
+    await open(withFood, "?page=account&view=requests&department=fair", FOOD(["Team Leader"]));
+    fireEvent.click(screen.getByRole("button", { name: "Food claim" }));
+    const list = screen.getByRole("heading", { name: "My requests" }).closest("section")!;
+    expect(within(list).queryByText("Outstation claim")).not.toBeInTheDocument();
+    fireEvent.click(within(list).getByRole("button", { name: /Food claim · Sep 2026/ }));
+    const sheet = within(screen.getByRole("dialog", { name: "Food claim · Sep 2026" }));
+    expect(sheet.getByText("Sep 2026")).toBeInTheDocument();
+    expect(sheet.getByText("25, 26 Sep · 2 days")).toBeInTheDocument();
+    expect(sheet.getByText("PENANG WATERFRONT")).toBeInTheDocument();
+    expect(sheet.getByText("RM 20.00")).toBeInTheDocument();
+    expect(sheet.getByText("RM 40.00")).toBeInTheDocument();
+    expect(sheet.getByRole("button", { name: "Cancel request" })).toBeInTheDocument();
+  });
+});

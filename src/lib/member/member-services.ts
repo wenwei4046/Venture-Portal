@@ -159,6 +159,11 @@ export function requestFacts(r: MemberRequest, facts: RequestFacts | undefined, 
         : [
             ["Claim category", CATEGORY[str(d.category)] ?? str(d.category)],
             ["Claim amount", money(d.amount)],
+            // A food claim (2026-10-13): its month, the days it is for and the fair of each weekend, at HR's rate a day.
+            ["Month", str(d.claimType) === "food" ? str(d.monthLabel) || str(d.month) : ""],
+            ["Days", str(d.claimType) === "food" ? foodDaysLine(d) : ""],
+            ["Fairs", str(d.claimType) === "food" ? foodFairsLine(d) : ""],
+            ["Rate a day", str(d.claimType) === "food" && number(d.rate) !== null ? `${formatMoney(number(d.rate)!)} × ${foodDayCount(d)} day${foodDayCount(d) === 1 ? "" : "s"}` : ""],
             // An Airbnb stay is its invoice's total up to a limit by head count (2026-10-12): both, to check against the invoice.
             ["Invoice total", str(d.claimType) === "airbnb" ? money(d.invoiceAmount) : ""],
             ["Most for the stay", str(d.claimType) === "airbnb" ? airbnbLimit(d) : ""],
@@ -182,6 +187,34 @@ function airbnbLimit(d: Record<string, unknown>): string {
   if (cap === null || rate === null || nights === null) return "";
   const n = `${nights} night${nights === 1 ? "" : "s"}`;
   return d.group === true ? `${formatMoney(cap)} · ${formatMoney(rate)} a night × ${n}` : `${formatMoney(cap)} · ${pax ?? "?"} pax × ${formatMoney(rate)} × ${n}`;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+const foodDays = (d: Record<string, unknown>) =>
+  (Array.isArray(d.days) ? d.days.filter((x): x is string => typeof x === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x)) : []).sort();
+const foodDayCount = (d: Record<string, unknown>) => foodDays(d).length;
+
+/** A food claim's days: `9, 10, 11 Oct`, or `30, 31 Oct, 1 Nov` across a month end. */
+export function foodDaysLine(d: Record<string, unknown>): string {
+  const parts: string[] = [];
+  for (const day of foodDays(d)) {
+    const month = MONTHS[Number(day.slice(5, 7)) - 1];
+    const last = parts[parts.length - 1];
+    if (last && last.endsWith(` ${month}`)) parts[parts.length - 1] = `${last.slice(0, -month.length - 1)}, ${Number(day.slice(8, 10))} ${month}`;
+    else parts.push(`${Number(day.slice(8, 10))} ${month}`);
+  }
+  return parts.join(", ");
+}
+
+/** A food claim's weekends: `MID VALLEY 2, 3, 4 Oct · IOI GECC 9, 10, 11 Oct`. */
+export function foodFairsLine(d: Record<string, unknown>): string {
+  if (!Array.isArray(d.weeks)) return "";
+  return d.weeks.flatMap(w => {
+    const x = w && typeof w === "object" ? (w as Record<string, unknown>) : null;
+    if (!x) return [];
+    const days = foodDaysLine({ days: x.days });
+    return days ? [`${str(x.location) || "A fair"} ${days}`] : [];
+  }).join(" · ");
 }
 
 /** A waiting list's answers to HR's own questions, as `detail.answers` keeps them. */
