@@ -62,6 +62,24 @@ describe("parsing a delivery", () => {
     }]);
   });
 
+  it("takes a customer who uses a WhatsApp username by their BSUID when Meta sends no number", () => {
+    const d = parseDelivery(delivery({
+      ...base,
+      contacts: [{ user_id: "MY.1052914074449222", profile: { name: "Carrie MS", username: "carriems" } }],
+      messages: [{ id: "wamid.u", from_user_id: "MY.1052914074449222", timestamp: "1790000000", type: "text", text: { body: "WhatsApp testing" } }],
+    }));
+    expect(d.messages.map(m => [m.waId, m.name, m.body])).toEqual([["MY.1052914074449222", "Carrie MS", "WhatsApp testing"]]);
+  });
+
+  it("keeps the number when Meta sends both it and the BSUID", () => {
+    const d = parseDelivery(delivery({
+      ...base,
+      contacts: [{ wa_id: "60123456789", user_id: "MY.1", profile: { name: "Tan" } }],
+      messages: [{ id: "wamid.b", from: "60123456789", from_user_id: "MY.1", type: "text", text: { body: "Hi" } }],
+    }));
+    expect(d.messages.map(m => [m.waId, m.name])).toEqual([["60123456789", "Tan"]]);
+  });
+
   it("keeps a photo or voice note as a media id to download later, with its caption", () => {
     const d = parseDelivery(delivery({ ...base, messages: [
       { id: "wamid.2", from: "601", timestamp: "1790000001", type: "image", image: { id: "MEDIA1", mime_type: "image/jpeg", caption: "My kitchen" } },

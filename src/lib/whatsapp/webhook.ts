@@ -49,6 +49,8 @@ interface WaMedia { id?: string; mime_type?: string; caption?: string; filename?
 interface WaMessage {
   id?: string;
   from?: string;
+  /** The customer's business-scoped user ID (BSUID) — the only id Meta sends when they use a WhatsApp username and hide their number (2026). */
+  from_user_id?: string;
   timestamp?: string;
   type?: string;
   text?: { body?: string };
@@ -63,7 +65,7 @@ interface WaStatus { id?: string; status?: string; timestamp?: string; recipient
 interface WaValue {
   messaging_product?: string;
   metadata?: { phone_number_id?: string; display_phone_number?: string };
-  contacts?: { wa_id?: string; profile?: { name?: string } }[];
+  contacts?: { wa_id?: string; user_id?: string; profile?: { name?: string; username?: string } }[];
   messages?: WaMessage[];
   statuses?: WaStatus[];
 }
@@ -75,7 +77,7 @@ export type WaMessageKind = "text" | "image" | "video" | "audio" | "document" | 
 export interface WaInboundMessage {
   externalId: string;           // wamid — re-deliveries carry the same one
   phoneNumberId: string;        // our number the customer wrote to
-  waId: string;                 // the customer's WhatsApp id (their number, digits)
+  waId: string;                 // the customer's WhatsApp id: their number (digits), or their BSUID ("MY.1052…") when a username hides it
   name: string | null;          // their WhatsApp profile name
   kind: WaMessageKind;
   body: string | null;          // text, caption, button title or a location summary
@@ -105,7 +107,10 @@ const iso = (unixSeconds: string | undefined) => {
 };
 
 function readMessage(m: WaMessage, phoneNumberId: string, names: Map<string, string>): WaInboundMessage | null {
-  if (!m.id || !m.from) return null;
+  // A customer with a WhatsApp username may come with no number at all, only their BSUID (user 2026-10-12: a
+  // colleague's "WhatsApp testing" was dropped). The number is kept whenever Meta sends it.
+  const from = m.from || m.from_user_id;
+  if (!m.id || !from) return null;
   const media: WaMedia | undefined = m.image ?? m.video ?? m.audio ?? m.document ?? m.sticker;
   const known: WaMessageKind[] = ["text", "image", "video", "audio", "document", "sticker", "location", "button"];
   const kind: WaMessageKind = m.type === "interactive" ? "button" : known.includes(m.type as WaMessageKind) ? (m.type as WaMessageKind) : "other";
@@ -119,8 +124,8 @@ function readMessage(m: WaMessage, phoneNumberId: string, names: Map<string, str
   return {
     externalId: m.id,
     phoneNumberId,
-    waId: m.from,
-    name: names.get(m.from) ?? null,
+    waId: from,
+    name: names.get(from) ?? null,
     kind,
     body,
     mediaId: media?.id ?? null,
@@ -140,7 +145,8 @@ export function parseDelivery(body: unknown): WaDelivery {
       const v = change?.value;
       if (change?.field !== "messages" || v?.messaging_product !== "whatsapp" || !v.metadata?.phone_number_id) { out.ignored++; continue; }
       const phoneNumberId = v.metadata.phone_number_id;
-      const names = new Map((v.contacts ?? []).filter(c => c.wa_id).map(c => [c.wa_id!, c.profile?.name ?? ""]));
+      // Each contact's name under every id it carries — its number and its BSUID — so either finds it.
+      const names = new Map((v.contacts ?? []).flatMap(c => [c.wa_id, c.user_id].filter((k): k is string => !!k).map(k => [k, c.profile?.name ?? ""] as const)));
       for (const m of v.messages ?? []) { const row = readMessage(m, phoneNumberId, names); if (row) out.messages.push(row); }
       for (const s of v.statuses ?? []) {
         if (!s.id || !["sent", "delivered", "read", "failed"].includes(s.status ?? "")) continue;

@@ -30,6 +30,20 @@ export function cleanText(text: string): { ok: true; text: string } | { ok: fals
   return { ok: true, text: body };
 }
 
+/**
+ * Who a message goes to. A customer known by their number gets `to`; one known only by their business-scoped user ID
+ * (a WhatsApp username hides the number — "MY.1052914074449222") gets `recipient` and no `to`, as Meta asks
+ * (developers.facebook.com/docs/whatsapp/business-scoped-user-ids; user 2026-10-12).
+ */
+export const addressee = (id: string): { to: string } | { recipient: string } => (/^\+?\d+$/.test(id) ? { to: id } : { recipient: id });
+
+/** A message's own fields with its `to` turned into whichever addressee field Meta wants for that id. */
+function addressed(message: Record<string, unknown>): Record<string, unknown> {
+  if (typeof message.to !== "string") return message;
+  const { to, ...rest } = message;
+  return { ...addressee(to), ...rest };
+}
+
 /** The Cloud API request for a plain text reply. */
 export function textRequest(phoneNumberId: string, to: string, body: string, token: string) {
   return {
@@ -37,7 +51,7 @@ export function textRequest(phoneNumberId: string, to: string, body: string, tok
     init: {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to, type: "text", text: { preview_url: false, body } }),
+      body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", ...addressee(to), type: "text", text: { preview_url: false, body } }),
     },
   };
 }
@@ -84,7 +98,7 @@ export function messageRequest(phoneNumberId: string, token: string, message: Re
     init: {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", ...message }),
+      body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", ...addressed(message) }),
     },
   };
 }
