@@ -82,7 +82,9 @@ export default function TalentBankView({
   const [dropping, setDropping] = useState(false)
   const [uploading, setUploading] = useState(0)
   const [emptying, setEmptying] = useState(false)
-  const [now] = useState(() => Date.now())
+  // The Bin's days count from the server's read — fresh after every write; the page's first draw only when unknown.
+  const [drawnAt] = useState(() => Date.now())
+  const now = Date.parse(bank.readAt) || drawnAt
   const filePick = useRef<HTMLInputElement>(null)
   const [, start] = useTransition()
 

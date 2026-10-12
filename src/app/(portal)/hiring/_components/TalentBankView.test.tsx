@@ -30,6 +30,7 @@ const BANK: Bank = {
   files: [{ id: 'bf1', name: 'Walk-in CVs.pdf', contentType: 'application/pdf', size: 2048, parent: 'dept:hv:Finance', addedAt: '2026-10-12T08:00:00Z', addedBy: 'Grace Lim' }],
   places: { 'T-104': 'dept:hv:Revenue', 'T-103': 'dept:hv:HR', 'T-102': `folder:${SENIORS}`, 'T-101': 'dept:hv:Finance' },
   bin: [],
+  readAt: '',
 }
 
 // The Bin (2026-10-13): a folder HR deleted from Revenue, a person kept in it (named through the Bin), a file from
@@ -279,6 +280,12 @@ describe('the Talent Bank’s Bin', () => {
     expect(screen.getAllByText('29 days left')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: 'Talent Bank' }))
     expect(sections()).toEqual(['Companies 2'])
+  })
+
+  // E2E 2026-10-13: a file put in the Bin after the page was drawn read "31 days left" — the days count from the read.
+  it('counts the days from when the bank was read, not from when the page was first drawn', () => {
+    view(undefined, 'bin', { ...BIN_BANK, readAt: '2026-10-12T08:00:00Z' })
+    expect(screen.getAllByText('30 days left')).toHaveLength(2)
   })
 
   it('opens from the address, and says to restore what is pressed', () => {

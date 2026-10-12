@@ -98,9 +98,14 @@ export interface Bank {
   places: Record<string, string>
   /** The Bin, newest first. */
   bin: BinItem[]
+  /**
+   * When it was read, by the server's clock (`loadTalentBank`) — the Bin's days are counted from it, so they are fresh
+   * after every write, and the same on the server and in the browser. '' when not known.
+   */
+  readAt: string
 }
 
-export const EMPTY_BANK: Bank = { hq: [], subs: [], folders: [], files: [], places: {}, bin: [] }
+export const EMPTY_BANK: Bank = { hq: [], subs: [], folders: [], files: [], places: {}, bin: [], readAt: '' }
 
 /** What the tree is read from: the bank's own answer and the people in it (the board's talents). */
 export interface BankTree {
@@ -168,6 +173,7 @@ export function bankFromRow(raw: unknown): Bank | null {
         expiresAt: str(b.expiresAt),
       }]
     }),
+    readAt: '',
   }
   const listed = (at: string) => {
     const p = parsePlace(at)

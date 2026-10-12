@@ -221,6 +221,8 @@ describe('the Bin', () => {
     expect(withBin.bin[3]).toMatchObject({ talentName: 'Mei', fileType: 'IC', contentType: null, size: null })
     expect(withBin.bin[2]).toMatchObject({ contentType: 'application/pdf', size: 1024, deletedBy: 'Grace Lim', expiresAt: '2026-11-11T08:00:00Z' })
     expect(bankFromRow({ hq: [] })!.bin).toEqual([])
+    // When it was read is the server's to say (`loadTalentBank`), not the row's.
+    expect(withBin.readAt).toBe('')
   })
 
   it('says where each was — a folder in the Bin too, a person’s file by the person', () => {
