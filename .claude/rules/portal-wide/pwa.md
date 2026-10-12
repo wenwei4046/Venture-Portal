@@ -10,6 +10,8 @@ paths:
   - "src/app/layout.tsx"
   - "next.config.ts"
   - "src/components/member/app/shell/**"
+  - "src/components/member/app/shell.module.css"
+  - "src/components/hr-app/hr-app.module.css"
   - "src/components/layout/BottomTabBar.tsx"
   - "tools/generate-pwa-icons.mjs"
 ---
@@ -51,3 +53,9 @@ The phone's navigation bar after a reload (2026-10-10) — the installed app dra
 - **A scroll inside `[role="dialog"]`, `[inert]` or `[aria-hidden="true"]` moves nothing** — a sheet, a drawer, a page sliding over: the bar is under it; and the Revenue app keeps its closed pages mounted (the first phone check scrolled the closed View as list, and the bar left an unmoved Today). A page that slides over the screen says `role="dialog"` (View as gained it, as Notifications had).
 - **Whatever stands on the portal's tab bar reads `--tabbar-h`, never a bare 54px** — 54px, 0 under `html[data-tabbar-tucked]` (set by `BottomTabBar` while tucked): Finance's `.bulk-bar`; the HR view's `.hrv-frame`, whose sheet scrolls inside itself with its foot always in view, and that frame's drawers, scrims, windows and toasts (`hrv.module.css`; `hrv/phone-overlays.test.ts`). A page whose content simply runs on (`PortalFrame`'s 54 + 24px, `.sheet-frame`'s 54 + 10px) keeps its bottom padding — only the end of its content.
 - Tests: `components/pwa/tuck.test.tsx`, `layout/BottomTabBar.test.tsx`, `hr-app/HrApp.test.tsx` › *the tab bar while reading on*.
+
+**A PHONE APP'S FRAME IS FIXED TO THE SCREEN, NEVER `100dvh` (2026-10-12 — the user, two screenshots of the HR app on an Android phone with three buttons: "supposed to be 我一按进去，我都还没有滑下去，那个 bar 已经在下面了 … 我要滑下去才看得到").** Opened, the tab bar showed only its top edge above the phone's buttons; scrolled down by a navigation bar's height (~57px, measured off the two screenshots), the head went and the whole bar came. The HR app's `.app` was `height: 100dvh` on a ground of `min-height: 100dvh`; in the installed app Chrome's bottom chin (Chrome 135+: the strip it keeps over the phone's own bar, which "affects the size of the viewport" — developer.chrome.com/docs/css-ui/edge-to-edge) left 100dvh a bar taller than the screen it showed, so the document could scroll by that much and the bar at its foot opened out of sight. Not seen on a device by us — read off the screenshots' pixels (the bar's top 13px showing, the frame's foot at the screen's own bottom edge) and Chrome's guide.
+- The HR app's `.app` and its ground (`(hr-app)/hr-app/layout.tsx`), and the Revenue app's `.screenLive` (the live app and its loading frame, `AppFrame`), are `position: fixed; inset: 0` — the screen the phone shows, whatever 100dvh says; a bar fixed at `bottom: 0` stays above the chin (Chrome's guide). The document holds nothing in flow, so nothing can scroll it — and a root scroll is also what would make the chin step away and take the screen's foot under the phone's buttons. Nothing changes where 100dvh is right (a Pixel 7: the same 839px frame, the tab bar at 773–839, before and after).
+- The HR app's sheets are 86% of that fixed box (`100%`), not of 100dvh. `--safe-bottom` is unchanged: still the padding that lifts a bar off a phone's bar the page is drawn under.
+- `container-type` (the Revenue app's `.app`, `rv`) contains no fixed box — no layout containment — so `.screenLive` is the screen's, not the container's.
+- Held by `src/lib/safe-area.test.ts` › *the phone apps fill the screen they are shown on, not 100dvh*: both frames fixed with `inset: 0` and no viewport-height unit; no `vh` / `dvh` / `svh` / `lvh` anywhere in the HR app's stylesheet or layout.
