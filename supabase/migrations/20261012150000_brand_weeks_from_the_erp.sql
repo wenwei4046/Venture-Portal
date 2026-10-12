@@ -504,6 +504,8 @@ BEGIN
       FROM public.member_erp_brand_weeks(p_sub_department) w
       WHERE w.week=ANY(v_fridays) AND w.staff_id IN (SELECT r.staff_id FROM public.member_admin_brand_weeks_roster(v_scheme) r)
       GROUP BY w.staff_id) x),
+    -- Nothing is picked any more; a page from before 2026-10-12 still reads the key.
+    'picks','{}'::jsonb,
     -- Whom the ERP lists at a booth of the month that the portal cannot name:
     -- no sales order of theirs has come in, or no login over there.
     'unlisted',(SELECT coalesce(jsonb_agg(DISTINCT s.name ORDER BY s.name),'[]'::jsonb)
