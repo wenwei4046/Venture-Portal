@@ -28,6 +28,7 @@ import DirectorPayrollActualGrid, {
 import DirectorPeriodPicker from './_components/DirectorPeriodPicker'
 import LedgerRow from '@/components/LedgerRow'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import { readHvDepartments, readHvShare, type HvShare } from '@/lib/director-hv-share'
 
 interface Props {
   searchParams: Promise<{ period?: string; tab?: string }>
@@ -69,6 +70,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
     { data: actualPayrollRows },
     { data: fundingRequest },
     { data: dpSettings },
+    { data: hvRaw, error: hvError },
   ] = await Promise.all([
     supabase.from('directors').select('id, name, code, weightage, min_payout').eq('status', 'active').order('code'),
     supabase.from('companies').select('id, name, short_code, director_heads').eq('is_active', true).order('name'),
@@ -97,7 +99,16 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
     // Saving / 75-25 split rates for the billing-vs-payroll reconciliation.
     // Same source the /director-pool calculator reads — never hardcoded here.
     supabase.from('dp_settings').select('saving_pct, gb_pct').eq('id', 1).maybeSingle(),
+    // HOUZS Venture's own share (2026-10-13) and every department that may pay it.
+    supabase.rpc('director_hv_share_of', { p_period: period }),
   ])
+
+  // Unreadable (an older database, a refused read) → the grid is the subsidiaries' alone.
+  const hvRead = hvError ? null : (hvRaw as { departments?: unknown; share?: unknown } | null)
+  const hv = hvRead
+    ? { departments: readHvDepartments(hvRead.departments), share: readHvShare(hvRead.share) }
+    : undefined
+  const hvShare = hv?.share ?? null
 
   // Director actual payroll (InfoTech import) — verbatim rows + director code.
   const actualRows: DirectorPayrollRowData[] = (actualPayrollRows ?? []).map(r => ({
@@ -224,6 +235,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
                 er_manual: r.er_manual === true,
               }))}
               period={period}
+              hv={hv}
             />
           </section>
 
@@ -274,6 +286,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
             minPayout: Number(d.min_payout),
           }))}
           payrollRows={actualRows}
+          hvShare={hvShare}
           liveByCompany={((liveByCompany as ByCompanyRow[] | null) ?? []).map(r => ({
             ...r,
             basic: r.basic == null ? null : Number(r.basic),
@@ -325,6 +338,7 @@ function SubmissionTab({
   gapSettings,
   gapDirectors,
   payrollRows,
+  hvShare,
   liveByCompany,
 }: {
   period: string
@@ -339,6 +353,8 @@ function SubmissionTab({
   gapSettings: GapSettings
   gapDirectors: GapDirector[]
   payrollRows: DirectorPayrollRowData[]
+  /** HOUZS Venture's own share (2026-10-13): part of the pool, paid by its departments. */
+  hvShare: HvShare | null
   liveByCompany: ByCompanyRow[]
 }) {
   const submitted = !!submission
@@ -386,16 +402,18 @@ function SubmissionTab({
 
   // Where the billing-vs-payroll difference went. Derived on the fly from the
   // figures already on this tab — nothing is written to the database.
+  // HOUZS Venture's own share is in the pool with the subsidiaries': its
+  // departments pay it into the Director pool (2026-10-13).
+  const hv = hvShare?.components ?? null
   const gap =
-    totals && byCompany.length > 0
+    totals && (byCompany.length > 0 || hv)
       ? calculateDirectorGap({
-          poolBasic: byCompany.reduce((s, r) => s + (r.basic ?? 0), 0),
-          poolKpi: byCompany.reduce((s, r) => s + (r.kpi ?? 0), 0),
-          poolAllowance: byCompany.reduce((s, r) => s + (r.allowance ?? 0), 0),
-          ctcEmployerStat: byCompany.reduce(
-            (s, r) => s + (r.epf_er ?? 0) + (r.socso_er ?? 0) + (r.eis_er ?? 0),
-            0,
-          ),
+          poolBasic: byCompany.reduce((s, r) => s + (r.basic ?? 0), 0) + (hv?.basic ?? 0),
+          poolKpi: byCompany.reduce((s, r) => s + (r.kpi ?? 0), 0) + (hv?.kpi ?? 0),
+          poolAllowance: byCompany.reduce((s, r) => s + (r.allowance ?? 0), 0) + (hv?.allowance ?? 0),
+          ctcEmployerStat:
+            byCompany.reduce((s, r) => s + (r.epf_er ?? 0) + (r.socso_er ?? 0) + (r.eis_er ?? 0), 0) +
+            (hv ? hv.employerEpf + hv.employerSocso + hv.employerEis : 0),
           payrollGross: totals.payrollGross,
           payrollEmployerStat: totals.statutoryEr,
           settings: gapSettings,
@@ -480,7 +498,7 @@ function SubmissionTab({
               row's walnut card. */}
           <StatCards label="Billing against payroll">
             <StatCard
-              label="Billed to subsidiaries"
+              label={hv ? 'Subsidiaries + HOUZS Venture' : 'Billed to subsidiaries'}
               value={formatMoney(gap.ctcTotal)}
               icon="receipt"
               note={`Gross ${formatMoney(gap.ctcGross)} + ER stat`}
@@ -744,7 +762,78 @@ function SubmissionTab({
           </div>
         )}
       </section>
+
+      {/* HOUZS Venture's own share (2026-10-13): no invoice to a subsidiary —
+          the departments HR picked pay it into the Director pool when Finance
+          transfers it (Payments › Dept Requests). */}
+      {hvShare ? <HvShareSection share={hvShare} /> : null}
     </div>
+  )
+}
+
+function HvShareSection({ share }: { share: HvShare }) {
+  const transferred = share.status === 'transferred'
+  return (
+    <section className="mt-12">
+      <div className="sect-head">
+        <h2>HOUZS Venture&rsquo;s Share</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">
+          {share.lines.length} DEPARTMENT{share.lines.length === 1 ? '' : 'S'}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {transferred ? (
+          <span className="chip ledger">
+            <span className="dot" />
+            Transferred{share.transferDate ? ` ${dayjs(share.transferDate).format('D MMM YYYY')}` : ''}
+          </span>
+        ) : (
+          <span className="chip alert">
+            <span className="dot" />
+            With Finance
+          </span>
+        )}
+      </div>
+      <div className="table-frame">
+        <div className="table-frame-scroll">
+          <table className="ledger-table">
+            <thead>
+              <tr>
+                <th>Department</th>
+                {share.splitMode === 'percent' ? <th className="right">Share</th> : null}
+                <th className="right">Amount</th>
+                {transferred ? <th className="m-hide">Invoice · Receipt</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {share.lines.map(l => (
+                <tr key={l.departmentId}>
+                  <td className="font-medium">{l.department}</td>
+                  {share.splitMode === 'percent' ? (
+                    <td className="num">{l.pct == null ? '—' : `${Number(l.pct.toFixed(4))}%`}</td>
+                  ) : null}
+                  <td className="num">{formatMoney(l.amount)}</td>
+                  {transferred ? (
+                    <td className="m-hide font-mono text-[12px]">
+                      {l.stays ? 'Stays in pool' : l.invoiceNo && l.voucherNo ? `${l.invoiceNo} · ${l.voucherNo}` : '—'}
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="font-bold">Total</td>
+                {share.splitMode === 'percent' ? <td className="num">100%</td> : null}
+                <td className="num font-bold">{formatMoney(share.totalCtc)}</td>
+                {transferred ? <td className="m-hide" /> : null}
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
   )
 }
 

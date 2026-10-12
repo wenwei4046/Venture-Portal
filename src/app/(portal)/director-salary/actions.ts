@@ -15,6 +15,7 @@ import {
 import { notifyDirectorSalaryCalculated } from '@/lib/slack'
 import dayjs from 'dayjs'
 import { DIRECTOR_ROW_COLUMNS } from '@/lib/private-columns'
+import type { HvSplitMode } from '@/lib/director-hv-share'
 
 // ─── Save CTC ──────────────────────────────────────────────────────
 
@@ -71,13 +72,70 @@ export interface BatchCTCInput {
   employerEis?: number
 }
 
-export async function batchSaveCTC(period: string, records: BatchCTCInput[]) {
+/**
+ * HOUZS Venture's own row of the Pool Breakdown (2026-10-13) and the
+ * departments that pay it — director_hv_share_save keeps both and puts the
+ * share with Finance. All zero clears the month's share; `null` leaves it as
+ * it is (nothing typed, or Finance has transferred it).
+ */
+export interface HvShareInput {
+  basic: number
+  kpi: number
+  allowance: number
+  erManual: boolean
+  employerEpf?: number
+  employerSocso?: number
+  employerEis?: number
+  splitMode: HvSplitMode
+  lines: Array<{ departmentId: string; amount?: number; pct?: number }>
+}
+
+/** A refusal HR acts on comes back in words — production hides a thrown message. */
+export type BatchSaveResult =
+  | { ok: true; saved: number; cleared: number }
+  | { ok: false; reason: string }
+
+export async function batchSaveCTC(
+  period: string,
+  records: BatchCTCInput[],
+  hv: HvShareInput | null = null,
+): Promise<BatchSaveResult> {
   const user = await requireActionOn('/director-salary', 'director_salary', 'edit')
   const supabase = await createClient()
 
   const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
 
-  await assertPeriodOpen(supabase, periodNorm)
+  try {
+    await assertPeriodOpen(supabase, periodNorm)
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : 'This month is closed' }
+  }
+
+  // HOUZS Venture's share first: its refusals are the ones HR acts on (a split
+  // that does not add up, a transfer Finance has to undo first), and nothing of
+  // the subsidiaries' is written until it stands.
+  if (hv) {
+    const money = (n: number | undefined) => Math.round(Number(n ?? 0) * 100) / 100
+    const { error: hvErr } = await supabase.rpc('director_hv_share_save', {
+      p_period: periodNorm,
+      p_basic: money(hv.basic),
+      p_kpi: money(hv.kpi),
+      p_allowance: money(hv.allowance),
+      p_er_manual: hv.erManual === true,
+      p_epf: money(hv.employerEpf),
+      p_socso: money(hv.employerSocso),
+      p_eis: money(hv.employerEis),
+      p_split_mode: hv.splitMode,
+      p_lines: hv.lines.map(l =>
+        hv.splitMode === 'percent'
+          ? { department_id: l.departmentId, pct: Number(l.pct ?? 0) }
+          : { department_id: l.departmentId, amount: money(l.amount) },
+      ),
+    })
+    if (hvErr) return { ok: false, reason: hvErr.message }
+    revalidatePath('/payments/dept-requests')
+    revalidatePath('/payments')
+  }
 
   // An all-zero row is an explicit "this company has no CTC this month" —
   // delete its rows instead of silently skipping them (pre-2026-07-03 the
@@ -149,7 +207,7 @@ export async function batchSaveCTC(period: string, records: BatchCTCInput[]) {
   }
 
   revalidatePath('/director-salary')
-  return { saved: keep.length, cleared: clearedCompanyIds.length }
+  return { ok: true, saved: keep.length, cleared: clearedCompanyIds.length }
 }
 
 // ─── Calculate Director Salary ─────────────────────────────────────
