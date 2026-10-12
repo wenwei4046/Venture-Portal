@@ -76,7 +76,7 @@ export default function TalentPage({ board, talent: t, can }: { board: HiringBoa
 
   return (
     <HvPage>
-      <PageHead eyebrow="Hiring · Talent Bank" title="Talent Bank" subtitle="Good candidates kept on file, ready to invite when a role opens." />
+      <PageHead eyebrow="Hiring · Talent Bank" title="Talent Bank" />
       <Link href="/hiring/talent" className={s.back}>
         ‹ Talent Bank
       </Link>

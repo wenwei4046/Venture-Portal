@@ -41,8 +41,6 @@ interface Props {
   /** As at a month on the control row (2026-10-10): the month shown and the
    *  choices; picking one reloads the page with ?as_at=. */
   asAt?: { value: string; options: Array<{ value: string; label: string }> }
-  /** A line under the control row (what an As at reads). */
-  note?: string
   /** Shown instead of the table when nothing is outstanding. */
   empty?: string
 }
@@ -51,7 +49,7 @@ function money(v: number, bare = false) {
   return v ? <span className="num">{bare ? formatMoneyBare(v) : formatMoney(v)}</span> : <span className="num text-muted">—</span>
 }
 
-export default function AgingByCustomer({ byPayer, invoices, totals, allRow = false, columns = AGING_BUCKETS, search = false, sheet = false, asAt, note, empty }: Props) {
+export default function AgingByCustomer({ byPayer, invoices, totals, allRow = false, columns = AGING_BUCKETS, search = false, sheet = false, asAt, empty }: Props) {
   const amount = (v: number) => (sheet ? formatMoneyBare(v) : formatMoney(v))
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [find, setFind] = useState('')
@@ -96,9 +94,7 @@ export default function AgingByCustomer({ byPayer, invoices, totals, allRow = fa
             </form>
           ) : null}
           <div className="rpt-field rpt-find">
-            <span>
-              Find company <span className="rpt-find-hint">· highlights only</span>
-            </span>
+            <span>Find company</span>
             <div className="rpt-find-box">
               <input
                 type="search"
@@ -116,7 +112,6 @@ export default function AgingByCustomer({ byPayer, invoices, totals, allRow = fa
           </div>
         </div>
       ) : null}
-      {note ? <p className="rpt-cons">{note}</p> : null}
       {empty ? (
         <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
           <p className="text-sm">{empty}</p>

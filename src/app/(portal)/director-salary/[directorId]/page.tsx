@@ -61,7 +61,6 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
               <em>I.</em> DIRECTOR · PAYOUT · {periodLabel.toUpperCase()}
             </div>
             <h1 className="page-title">Director {director.code}</h1>
-            <p className="text-sm mt-3">Payout not yet calculated for this period.</p>
           </div>
         </div>
         <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
@@ -126,7 +125,6 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
           </div>
           <h1 className="page-title">{director.name} — {director.code}</h1>
           <p className="text-sm mt-3 flex flex-wrap items-center gap-2">
-            Payout detail.
             <span className={`chip ${statusChip}`}><span className="dot" />{payout.status}</span>
           </p>
         </div>
@@ -223,9 +221,7 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
             </div>
 
             <div className="pt-3 border-t border-hairline space-y-2">
-              <p className="text-[10px] font-medium uppercase tracking-[0.06em]">
-                Deductions <span className="normal-case tracking-normal font-normal">— click any value to override</span>
-              </p>
+              <p className="text-[10px] font-medium uppercase tracking-[0.06em]">Deductions</p>
               <div className="flex items-baseline justify-between">
                 <span className="text-sm">EPF ER</span>
                 <EditableDeduction payoutId={payout.id} field="payroll_epf_er" value={n(payout.payroll_epf_er)} kind="payroll" readOnly={payout.status !== 'draft'} />

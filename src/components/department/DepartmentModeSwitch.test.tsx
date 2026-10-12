@@ -29,12 +29,14 @@ afterEach(() => {
 // User 2026-09-30: an on/off switch per department between cost center and
 // centralized, flipped by the highest authority.
 describe('DepartmentModeSwitch', () => {
-  it('shows the mode and what it means, off for a cost center', () => {
+  // 2026-10-12 (the user: the descriptions make the view too messy): the
+  // switch names the mode; no line beside it says what the mode means.
+  it('shows the mode, off for a cost center — and no line on what it means', () => {
     render(<DepartmentModeSwitch department={dept()} />)
     const toggle = screen.getByRole('switch', { name: 'HR is centralized' })
     expect(toggle).toHaveAttribute('aria-checked', 'false')
     expect(toggle).toHaveTextContent('Cost center')
-    expect(screen.getByText(/its pool should net to zero/)).toBeInTheDocument()
+    expect(screen.queryByText(/its pool should net to zero/)).toBeNull()
   })
 
   it('asks before switching, says what will be cleared, then switches and refreshes', async () => {
@@ -81,9 +83,11 @@ describe('DepartmentModeSwitch', () => {
     expect(refresh).not.toHaveBeenCalled()
   })
 
-  it('is read-only for somebody who may not switch it', () => {
+  it('is read-only for somebody who may not switch it — the tooltip says who does', () => {
     render(<DepartmentModeSwitch department={dept({ canSwitch: false })} />)
-    expect(screen.getByRole('switch', { name: 'HR is centralized' })).toBeDisabled()
-    expect(screen.getByText('Switched by the Principal.')).toBeInTheDocument()
+    const toggle = screen.getByRole('switch', { name: 'HR is centralized' })
+    expect(toggle).toBeDisabled()
+    expect(toggle).toHaveAttribute('title', 'Only the Principal can switch this')
+    expect(screen.queryByText('Switched by the Principal.')).toBeNull()
   })
 })

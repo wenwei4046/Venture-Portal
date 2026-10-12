@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
 import { decidesPoolClaims } from '@/lib/surfaces'
@@ -62,17 +61,6 @@ export default async function ClaimsPage() {
             <em>I.</em> CLAIMS · POOL
           </div>
           <h1 className="page-title">Claims</h1>
-          <p className="text-sm mt-3 max-w-2xl">
-            Spending charged to a pool, approved by Finance. A Revenue member&apos;s
-            own claim is decided in{' '}
-            <Link
-              href="/member-admin"
-              className="underline underline-offset-[3px] decoration-ink/35 hover:decoration-ink"
-            >
-              People › Member services
-            </Link>
-            .
-          </p>
         </div>
         <NewClaimForm />
       </div>

@@ -46,10 +46,6 @@ export default function MinPayInterestToggle({
         {isPending ? <span className="fin-saved text-muted">Saving…</span> : null}
         {saved && !isPending ? <span className="fin-saved">Saved ✓</span> : null}
       </label>
-      <p className="fin-hint">
-        When on, the Repayment schedule tracks whether each month&apos;s interest is received in full, and the statement shows the
-        monthly minimum interest.
-      </p>
       {error ? <p className="fin-error">{error}</p> : null}
     </div>
   )

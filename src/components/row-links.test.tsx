@@ -28,16 +28,18 @@ describe('useRowLinks on the Finance view', () => {
       </FinViewProvider>,
     )
     fireEvent.contextMenu(screen.getByText('row'))
-    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Openor double-click', 'Open in new tab'])
+    // Open says nothing of the double-click, not even as a tooltip (2026-10-12).
+    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Open', 'Open in new tab'])
+    expect(screen.getByRole('menuitem', { name: 'Open' })).not.toHaveAttribute('title')
     expect(screen.getByRole('menu')).toHaveAttribute('data-fin', 'true')
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Open or double-click' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open' }))
     expect(push).toHaveBeenCalledWith('/fund-out/l1')
   })
 
   it('keeps its Chinese elsewhere', () => {
     render(<List />)
     fireEvent.contextMenu(screen.getByText('row'))
-    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['打开双击也可以', '在新分页打开'])
+    expect(screen.getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['打开', '在新分页打开'])
     expect(screen.getByRole('menu')).not.toHaveAttribute('data-fin')
   })
 })

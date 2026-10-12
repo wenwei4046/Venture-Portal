@@ -79,20 +79,6 @@ export const RULES_TABS: readonly RulesTabItem[] = [
   { key: 'promotion', label: 'Promotion criteria', group: 'Policy' },
 ]
 
-/** The one line under each section's title (the prototype's). `{sub}` = the sub-department. */
-export const RULES_DESC: Record<RulesTab, string> = {
-  scheme: 'Which components {sub} pays. A switched-off component is skipped by the engine, and the item-rule tabs it reads come and go with it.',
-  ladder: 'Titles from the most senior down, and the rank each one gives.',
-  ranks: 'The rates a title pays from, lettered from the top of the catalogue.',
-  directors: 'What the Revenue Directors this sub-department reports to are paid.',
-  groups: 'Which product groups count as commissionable.',
-  kpi: 'Flat RM per unit, and the threshold ladder.',
-  'open-bill': 'The uplift paid on an Open Bill.',
-  brands: 'Each brand’s penalty and incentive rungs.',
-  capacity: 'How many people {sub} can hold. Capacity counts active members and reserved positions; waiting-list matching only reserves a seat while one is free.',
-  promotion: 'The recorded promotion policy.',
-}
-
 /** The visible tabs under their groups; a group with none drops out. */
 export function groupedRulesTabs(visible: readonly RulesTabItem[]): Array<{ label: RulesGroup; items: RulesTabItem[] }> {
   return RULES_GROUPS.map(label => ({ label, items: visible.filter(t => t.group === label) })).filter(g => g.items.length > 0)

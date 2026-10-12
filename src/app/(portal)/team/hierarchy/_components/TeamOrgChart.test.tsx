@@ -609,7 +609,8 @@ describe('company hierarchy overview and independent roles', () => {
     expect(flow().nodesConnectable).toBe(false)
     fireEvent.click(screen.getByTestId('node:chea'))
     expect(screen.queryByRole('button', { name: /Detach/ })).toBeNull()
-    expect(screen.getByText('Click a card to select it.')).toBeTruthy()
+    // No usage hints under the chart (2026-10-12: the wording made the view messy).
+    expect(screen.queryByText(/Click a card to select it/)).toBeNull()
     expect(document.body.textContent).not.toMatch(/can be changed by dragging/)
   })
 

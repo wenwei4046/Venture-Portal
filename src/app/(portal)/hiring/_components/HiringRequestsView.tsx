@@ -40,7 +40,7 @@ export default function HiringRequestsView({
 
   return (
     <HvPage>
-      <PageHead eyebrow="Hiring · Requests" title="Hiring requests" subtitle="Manpower requests from every department, from submission to filled." />
+      <PageHead eyebrow="Hiring · Requests" title="Hiring requests" />
       <Tabs items={items} active={shown} onSelect={k => setTab(k as Tab)} size="compact" style={{ margin: '-4px 0 18px', flexWrap: 'wrap' }} label="Hiring requests" />
       {shown === 'review' ? (
         <RequestInbox board={board} filter={filter} onFilter={setFilter} selected={selected} onSelect={setSelected} onNewRequest={() => setNewOpen(true)} canCreate={can.create} canApprove={can.approve} />

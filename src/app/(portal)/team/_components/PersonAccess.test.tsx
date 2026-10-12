@@ -47,14 +47,15 @@ describe('a person’s own permissions, by view and tab (HR revamp 8)', () => {
   it('opens on their title’s view, and lowers one box for them alone with a red dot', async () => {
     const onSaved = vi.fn()
     render(<PersonAccess access={access()} canEdit onSaved={onSaved} personName="Anthony" />)
-    expect(screen.getByText(/From title/)).toHaveTextContent('From title TEAM LEADER. A red dot marks a box changed for Anthony only.')
+    // No lede over the matrix (2026-10-12: the explanatory wording made the view messy).
+    expect(screen.queryByText(/From title/)).toBeNull()
+    expect(screen.queryByText(/A red dot marks/)).toBeNull()
     expect(screen.getByRole('tab', { name: /Revenue app/ })).toHaveAttribute('aria-selected', 'true')
     // 16 Revenue app tabs since the rest of Profile got its boxes (2026-10-11); the Revenue Team sees 13.
     expect(screen.getByRole('tab', { name: /Revenue app/ })).toHaveTextContent('13/16')
     fireEvent.click(box('Quote · Create'))
     expect(box('Quote · Create')).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByLabelText('changed for this person')).toBeInTheDocument()
-    expect(screen.getByText(/1 change from the title/)).toBeInTheDocument()
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
     expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', boxes: [{ tab: 'rev.quote', action: 'create', granted: false }] })
     expect(onSaved).toHaveBeenCalled()

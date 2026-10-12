@@ -151,7 +151,6 @@ describe('an invoice’s own page', () => {
     database(ISSUED)
     mocks.settleInvoicesConsolidated.mockResolvedValue({ voucherId: 'v42', voucherNo: 'HV-OR-202610-0042', settledCount: 0, total: 1000, isPartial: true })
     render(await page())
-    expect(screen.getByText(/^Settle collects the remaining balance/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Settle' }))
     expect(screen.getByLabelText('Bank account')).toHaveValue('b1')
     expect(screen.getByLabelText('Payment date')).toHaveValue('2026-10-09')
@@ -206,7 +205,6 @@ describe('an invoice’s own page', () => {
     expect(card('Due')).toHaveTextContent('Draft')
     expect(screen.queryByRole('button', { name: 'Settle' })).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Receipts' })).toBeNull()
-    expect(screen.getByText(/^Approving issues the invoice/)).toBeInTheDocument()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Approve & issue' })) })
     expect((mocks.approveInvoice.mock.calls[0][0] as FormData).get('id')).toBe('i13')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Delete' })) })
@@ -229,7 +227,6 @@ describe('an invoice’s own page', () => {
     expect(or).toHaveTextContent('consolidated receipt · RM 5,000.00 in all')
     expect(screen.getByRole('link', { name: 'Refund' })).toHaveAttribute('href', '/payments/new?mode=refund&invoice_id=i13&return_to=/invoices/i13')
     expect(screen.getByRole('button', { name: '+ Credit note' })).toBeInTheDocument()
-    expect(screen.getByText(/^Paid\./)).toBeInTheDocument()
   })
 
   it('names a department pool and a free-text party with its contact; a pool settles on the voucher page', async () => {

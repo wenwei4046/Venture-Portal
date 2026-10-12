@@ -286,11 +286,6 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
             )}
           </span>
         ) : null}
-        <span className="note">
-          Finance’s own list, apart from HR’s. A person’s share can be split across companies; HOUZS Venture (own) is HV’s own share and is
-          never billed. Changing the list updates this month’s snapshot — to bill an earlier month on its own list, save that month’s snapshot
-          first. Whatever HR left short of 100% comes in as HV own.
-        </span>
         <span className="bil-snapshots">
           Snapshots
           {data.snapshotPeriods.length > 0 ? (

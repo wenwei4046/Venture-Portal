@@ -106,9 +106,6 @@ export default function CreditNotesList({ rows }: { rows: CreditNoteRow[] }) {
           {rows.length} {rows.length === 1 ? 'CREDIT NOTE' : 'CREDIT NOTES'}
         </span>
       </div>
-      <p className="text-muted text-xs -mt-2 mb-3">
-        Draft CNs wait for Principal approval; approving posts the credit and reduces the invoice balance.
-      </p>
 
       {error ? (
         <div className="mb-3 bg-danger/10 border border-danger/30 text-danger rounded-md px-3 py-2 text-sm font-sans">

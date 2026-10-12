@@ -228,7 +228,8 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
         disabled={pending || !!titleChangeReason()} title={titleChangeReason() ?? `Choose a title in ${currentDepartment.name}`}
         onMouseEnter={() => openChangeTitles(false)} onClick={() => openChangeTitles(true)}
         onKeyDown={event => openWithArrow(event, () => openChangeTitles(true))}>
-        <span className={styles.rowCopy}><span>Change title</span>{titleChangeReason() ? <small>{titleChangeReason()}</small> : null}</span>
+        {/* One line a row (2026-10-12, as the bill menu): why it is shut is its tooltip. */}
+        <span>Change title</span>
         {!titleChangeReason() ? <span aria-hidden className={styles.chevron}>›</span> : null}
       </button> : null}
       {onUpline ? <button type="button" role="menuitem" tabIndex={-1} disabled={pending}
@@ -262,7 +263,7 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
             disabled={pending || !!reason} title={reason ?? `Choose a title in ${item.name}`}
             onMouseEnter={() => openTitles(item, false)} onClick={() => openTitles(item, true)}
             onKeyDown={event => openWithArrow(event, () => openTitles(item, true))}>
-            <span className={styles.rowCopy}><span>{item.name}</span>{reason ? <small>{reason}</small> : null}</span>
+            <span>{item.name}</span>
             <span className={styles.chevron} aria-hidden>{item.memberStaffIds.includes(person.staffId) ? '✓' : !reason ? '›' : null}</span>
           </button>
         })}
@@ -278,8 +279,9 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
       <div className={styles.menuHeading}>{changingTitle ? `Title in ${selectedDestination.name}` : `Add to ${selectedDestination.name} as…`}</div>
       {selectedDestination.titles.map(title => <button key={title.id} type="button" role="menuitem" tabIndex={-1}
         aria-label={title.name} disabled={pending || (changingTitle ? !!titleChangeReason() || title.id === person.titleId : !!reasonFor(selectedDestination))}
+        title={title.id === person.titleId ? 'Current title' : undefined}
         onClick={() => save(selectedDestination, title)}>
-        <span className={styles.rowCopy}><span>{title.name}</span>{title.id === person.titleId ? <small>Current title</small> : null}</span>
+        <span>{title.name}</span>
         {changingTitle && title.id === person.titleId ? <span className={styles.chevron} aria-hidden>✓</span> : null}
       </button>)}
       {pending ? <p role="status" className={styles.hint}>{changingTitle ? 'Saving…' : 'Adding…'}</p>

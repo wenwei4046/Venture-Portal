@@ -452,22 +452,19 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         </div>
       </div>
 
+      {/* Why the bill does not count — the state alone (2026-10-12); how to
+          bring it back is the bill's own right-click menu. */}
       {order.cancelled ? (
         <div className="sheet-warning">
           {order.excluded_reason === 'manual' ? (
             <>
               This bill does not count:{' '}
               <strong>{byHand ? describeExclusion(byHand).replace(/^Taken/, 'taken') : 'taken out of the month by hand'}</strong>
-              . It stays out whatever the ERP sends next — right-click it on{' '}
-              <Link href={`${revenuePath(subDept.slug, period, 'orders')}?show=all`} className="text-accent hover:underline">
-                All bills
-              </Link>{' '}
-              and choose <em>Count this bill again</em> to bring it back.
+              .
             </>
           ) : order.excluded_reason === 'ignored_agent' ? (
             <>
-              This bill earns nothing: <strong>its salesperson ({order.agent_name}) is not ours to pay</strong>. It
-              comes back if the name is put back under <em>Not our salespeople</em> on Comm Cal.
+              This bill earns nothing: <strong>its salesperson ({order.agent_name}) is not ours to pay</strong>.
             </>
           ) : (
             <>
@@ -475,7 +472,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
               <strong>
                 {order.erp_on_hold ? 'it is on hold in the ERP' : `its ERP status is ${order.erp_status}`}
               </strong>
-              . It stays here and comes back the moment the ERP releases it.
+              .
             </>
           )}
         </div>
@@ -535,11 +532,6 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
             <span className="rule" aria-hidden />
             <span className="count">{changes.length} {changes.length === 1 ? 'CHANGE' : 'CHANGES'}</span>
           </div>
-          <p className="text-sm mb-4 max-w-3xl">
-            The ERP changed this bill after its month was settled. Each difference is a line of its own — an upsell
-            earns, a drop takes commission back — paid in the month somebody confirms it, at the salesperson&apos;s
-            rate and their upline&apos;s override. It moves neither this bill&apos;s margin nor that month&apos;s.
-          </p>
           <div className="overflow-x-auto">
             <table className="ledger-table">
               <thead>
@@ -764,16 +756,11 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
             </tfoot>
           </table>
         </div>
+        {/* The split in figures (2026-10-12 — the sentences on how each part is paid went;
+            the line chips and the cards above carry the rest). */}
         <p className="text-xs mt-3 max-w-3xl">
           Commissionable {formatMoney(commissionable)} · KPI items {formatMoney(split.kpiAmount)} · not commissionable{' '}
-          {formatMoney(excluded)}. A KPI item&apos;s amount comes off the bill&apos;s sales and is paid flat as KPI
-          instead of a rate; transport and disposal earn nothing either way.
-          {charged !== 0
-            ? ` What its bed frames' divan, leg, gap and total height were charged (${formatMoney(charged)}) earns the rate like the rest of the bill and is left out of its margin on both sides.`
-            : ''}
-          {split.uncovered
-            ? ' Its sales do not cover the KPI items it carries, so none is paid on it — it is paid as sales.'
-            : ''}
+          {formatMoney(excluded)}
         </p>
       </section>
 
@@ -784,10 +771,6 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
             <span className="rule" aria-hidden />
             <span className="count">{formatMoney(paid)} PAID</span>
           </div>
-          <p className="text-sm mb-4 max-w-3xl">
-            As the ERP recorded them. What the deposit gate measures is the total against{' '}
-            {required === null ? 'no threshold' : formatMoney(required)}.
-          </p>
           <div className="overflow-x-auto">
             <table className="ledger-table">
               <thead>
@@ -849,11 +832,8 @@ function ErpTrailSection({ changes, answers }: { changes: ErpChange[]; answers: 
         <span className="rule" aria-hidden />
         <span className="count">{changes.length} {changes.length === 1 ? 'SAVE' : 'SAVES'}</span>
       </div>
-      <p className="text-sm mb-4 max-w-3xl">
-        Every time the ERP saved this bill and something changed, newest first — kept by the portal, because the
-        ERP keeps no audit trail of an order changed before its processing date. An upsell, a drop or a
-        cancellation is measured on what earns; transport never counts. {note}
-      </p>
+      {/* How far back the trail reaches — its state, not a description of it (2026-10-12). */}
+      <p className="text-sm mb-4 max-w-3xl">{note}</p>
       {changes.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="ledger-table">

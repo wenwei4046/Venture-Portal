@@ -101,11 +101,7 @@ export default function MonthlyReportControls({
                 </span>
               ) : null}
             </div>
-          ) : (
-            <p className="font-serif italic text-muted text-[11px] mt-1.5 leading-snug">
-              Highlights only — nothing is hidden, so every total still covers the full report.
-            </p>
-          )}
+          ) : null}
         </div>
       ) : null}
 

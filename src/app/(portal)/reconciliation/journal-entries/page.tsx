@@ -82,7 +82,6 @@ export default async function JournalEntriesPage() {
             <em>I.</em> TREASURY · MANUAL VOUCHERS
           </div>
           <h1 className="page-title">Journal Entries</h1>
-          <p className="page-sub">Manual journal vouchers. Debits must equal credits.</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {canCreate ? (

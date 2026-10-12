@@ -183,6 +183,13 @@ export default function ErpChangesPanel({
   const drops = pending.filter(p => p.kind === 'drop').reduce((a, p) => a + p.amount, 0)
   const upsells = pending.filter(p => p.kind === 'upsale').reduce((a, p) => a + p.amount, 0)
   const paidNet = paid.reduce((a, p) => a + p.amount, 0)
+  // Why nothing can be paid into this month: the Pay in button's tooltip, not
+  // a notice above the table (2026-10-12).
+  const payShut = settledBefore
+    ? `${monthName(period, 'long')} was settled by hand and takes no run — pay these in ${settledBefore} or later`
+    : locked
+      ? `${monthName(period, 'long')} is in payroll — open a later month to pay these`
+      : undefined
 
   function answer(id: string, action: () => Promise<void>) {
     setError(null)
@@ -213,15 +220,7 @@ export default function ErpChangesPanel({
   return (
     <section aria-label="Drops and upsells the ERP found">
       <div className={s.topLine}>
-        <div>
-          <h2 className={s.sectionHeading}>Drops and upsells the ERP found</h2>
-          <p className={s.subtitle}>
-            The ERP changed bills whose commission was already given — closed on Comm Cal, paid by a run, or
-            settled by hand before the portal paid. Each difference is paid in the month you confirm it, at the
-            salesperson&apos;s own rate — a drop or a cancellation takes its commission back — and moves their
-            upline&apos;s override the same way. Transport and other charges never count.
-          </p>
-        </div>
+        <h2 className={s.sectionHeading}>Drops and upsells the ERP found</h2>
       </div>
 
       {pending.length > 0 || paid.length > 0 ? (
@@ -231,16 +230,6 @@ export default function ErpChangesPanel({
           <Summary label="Upsells waiting" value={formatMoney(upsells)} note="Earns at the salesperson’s rate" />
           <Summary label={`Paid in ${monthName(period, 'long')}`} value={String(paid.length)} note={<>net {signed(paidNet)}</>} />
         </div>
-      ) : null}
-
-      {settledBefore && pending.length > 0 ? (
-        <p className={s.notice}>
-          {monthName(period, 'long')} was settled by hand and takes no run — pay these in {settledBefore} or later.
-        </p>
-      ) : locked && pending.length > 0 ? (
-        <p className={s.notice}>
-          {monthName(period, 'long')} is in payroll — open a later month to pay these.
-        </p>
       ) : null}
 
       {pending.length > 0 ? (
@@ -275,7 +264,7 @@ export default function ErpChangesPanel({
                           type="button"
                           className={s.primaryButton}
                           disabled={locked || Boolean(settledBefore) || notYet(p) || isPending}
-                          title={notYet(p) ? notYetTitle(p) : undefined}
+                          title={payShut ?? (notYet(p) ? notYetTitle(p) : undefined)}
                           onClick={() => answer(p.id, () => confirmErpAdjustment(p.id, period))}
                         >
                           {busy === p.id ? 'Saving…' : `Pay in ${monthName(period)}`}
@@ -392,15 +381,7 @@ function MonthTrail({ period, trail, onOpen }: {
   return (
     <div className="mt-6" aria-label={`ERP audit trail of ${monthName(period, 'long')}'s bills`} role="region">
       <div className={s.topLine}>
-        <div>
-          <h3 className={s.sectionHeading}>ERP audit trail · {monthName(period, 'long')}&apos;s bills · {trail.rows.length}</h3>
-          <p className={s.subtitle}>
-            Every save of this month&apos;s bills that moved money — what earns, or the bill&apos;s total — as the ERP
-            sent it, newest first. The ERP keeps no audit trail of an order changed before its processing date; the
-            portal keeps its own from every save it receives (since {trail.since}). A change before the
-            salesperson&apos;s commission was given is counted with the month as it is; one after asks above.
-          </p>
-        </div>
+        <h3 className={s.sectionHeading}>ERP audit trail · {monthName(period, 'long')}&apos;s bills · {trail.rows.length}</h3>
       </div>
       {trail.rows.length === 0 ? (
         <div className={`${s.tableFrame} ${s.empty}`}>

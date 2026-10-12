@@ -203,10 +203,13 @@ describe('DoubleClaimPanel', () => {
         `/revenue/fair/2026-09-01/orders/b?from=${encodeURIComponent('/revenue/fair/2026-09-01?view=claims')}`)
     })
 
-    it('says the subtitle’s paper number is the ERP’s Ref No.', () => {
+    // The heading stands alone (2026-10-12): the subtitle explaining what is
+    // flagged went with the rest of the page's descriptions.
+    it('carries no subtitle under its heading', () => {
       render(<DoubleClaimPanel {...props} groups={[]} carried={[]} explanations={{}} inTab />)
-      expect(screen.getByRole('region', { name: 'Possible double claims' }))
-        .toHaveTextContent("which the ERP keeps as the sales order's Ref No.")
+      const region = screen.getByRole('region', { name: 'Possible double claims' })
+      expect(within(region).getByRole('heading', { name: 'Possible double claims' })).toBeVisible()
+      expect(region).not.toHaveTextContent("which the ERP keeps as the sales order's Ref No.")
     })
   })
 })

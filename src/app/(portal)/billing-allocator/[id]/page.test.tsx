@@ -124,7 +124,6 @@ describe('an allocation’s own page', () => {
     expect(screen.getByRole('link', { name: 'View HV-INV-202609-0013 · Marketing' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Delete|Generate/ })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Correct this record' })).toBeNull()
-    expect(screen.getByText(/^Billed — /)).toBeInTheDocument()
   })
 
   it('before billing, generates the invoices, sends the record back to Calculate, or deletes it', async () => {
@@ -142,7 +141,6 @@ describe('an allocation’s own page', () => {
     expect(card('To bill')).toHaveTextContent('RM 1,289.52')
     expect(card('To bill')).toHaveTextContent('Not invoiced yet')
     expect(screen.getByRole('link', { name: 'Correct this record' })).toHaveAttribute('href', '/billing-allocator?period=2026-09&edit=t6')
-    expect(screen.getByText(/^Not billed yet\./)).toBeInTheDocument()
     // 2026-10-10 — the handoff: Generate invoices is the page head's primary,
     // not one of the Actions panel's buttons.
     const head = document.querySelector('.page-head') as HTMLElement

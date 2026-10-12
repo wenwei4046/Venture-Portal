@@ -28,9 +28,11 @@ export function openWithArrow(event: KeyboardEvent, open: () => void) {
 /**
  * A hover that lands anywhere but the row which opened a submenu should
  * collapse that submenu: leaving one row for another is how a pointer says it
- * changed its mind. Disabled rows take no pointer events (CSS), so the panel
- * itself receives the hover for them — which is the whole point, because the
- * rows a cascade most often strands are the greyed-out ones underneath.
+ * changed its mind. A disabled row fires nothing of its own, so the panel
+ * hears the hover for it and reads it as no row (`MenuPanel`) — which is the
+ * whole point, because the rows a cascade most often strands are the
+ * greyed-out ones underneath. (They take the pointer since 2026-10-12, so
+ * their tooltip — the reason they are shut — shows.)
  * `hoverMayCollapse` keeps that to branches the pointer opened: once focus has
  * moved into a submenu it was clicked or typed into, and Escape dismisses it.
  */
@@ -85,7 +87,9 @@ export default function MenuPanel({ id, label, anchor, submenu = false, hidden =
   return <div ref={ref} id={id} role={dialog ? 'dialog' : 'menu'} tabIndex={-1} aria-label={label} className={styles.menu}
     style={{ ...position, visibility: hidden ? 'hidden' : undefined }}
     onMouseOver={onRowHover ? event => {
-      if (ref.current) onRowHover((event.target as HTMLElement).closest('button'), ref.current)
+      // A disabled row is no row: hovering it collapses a branch as a gap does.
+      const row = (event.target as HTMLElement).closest('button')
+      if (ref.current) onRowHover(row && !row.disabled ? row : null, ref.current)
     } : undefined} onKeyDown={event => {
       event.stopPropagation()
       if (dialog) {

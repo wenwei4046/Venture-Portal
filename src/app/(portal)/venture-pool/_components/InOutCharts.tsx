@@ -69,7 +69,7 @@ export default function InOutCharts({ monthIn, monthOut, trend }: { monthIn: num
       <div className="vp-panel">
         <h3>12-month In/Out</h3>
         <div className="vp-sub">
-          Venture Pool — money flowing in and out by month · {withData} of {trend.length} months have data
+          {withData} of {trend.length} months have data
         </div>
         <div className="vp-bars-wrap">
           <div className="vp-ticks" aria-hidden>

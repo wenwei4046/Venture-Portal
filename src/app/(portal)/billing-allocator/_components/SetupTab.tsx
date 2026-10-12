@@ -122,10 +122,6 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-xs text-muted max-w-3xl">
-          Only the Allocator is affected: a company switched off leaves the split grid, Equal and the staff list’s choices. Loans, invoices and
-          everything else are untouched, and old records still show its name.
-        </p>
       </section>
 
       {/* ── Categories ── */}
@@ -173,9 +169,6 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
             </tbody>
           </table>
         </div>
-        <p className="mb-3 text-xs text-muted max-w-3xl">
-          A category may name a COA income account — the invoice lines raised for it post there; left empty, they post to the default (5000).
-        </p>
         {catEdit ? (
           <div className="fin-form">
             <div className="fin-field">
@@ -272,10 +265,6 @@ export default function SetupTab({ data }: { data: AllocatorData }) {
             </tbody>
           </table>
         </div>
-        <p className="mb-3 text-xs text-muted max-w-3xl">
-          Save a monthly expense as a template: picking it in Calculate fills the name, amount, method and category, and a Percentage template
-          brings each company’s share too.
-        </p>
 
         {tplEdit ? (
           <div className="fin-form">

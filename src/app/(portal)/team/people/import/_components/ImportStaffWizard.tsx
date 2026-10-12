@@ -170,17 +170,7 @@ export default function ImportStaffWizard() {
         {/* New people are what the file adds to the roster — the row's walnut
             card. The rest say what it does to the people already on it, and
             which rows it leaves behind (red while there are any). */}
-        <StatCards
-          label="What this file will do"
-          note={
-            preview.directors.length > 0 ? (
-              <>
-                Directors are managed in Director Salary — their payroll rows are written when
-                you Save and Calculate there, not via this import.
-              </>
-            ) : undefined
-          }
-        >
+        <StatCards label="What this file will do">
           <StatCard
             label="To create"
             value={String(preview.toCreate.length)}

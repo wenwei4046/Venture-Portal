@@ -136,14 +136,10 @@ export default async function SettingsPage({ searchParams }: Props) {
   const billBack = realDepartments.filter((d) => d.own_share_billback).length
   const head =
     activeTabResolved === 'accounts'
-      ? { eyebrow: 'ADMIN · CONFIGURATION · ACCOUNTS', title: 'Chart of Accounts', sub: null }
+      ? { eyebrow: 'ADMIN · CONFIGURATION · ACCOUNTS', title: 'Chart of Accounts' }
       : activeTabResolved === 'departments'
-        ? {
-            eyebrow: 'ADMIN · CONFIGURATION · DEPARTMENTS',
-            title: 'Departments',
-            sub: 'Finance can add departments; editing segment, pool GL and billing mode is Principal-only.',
-          }
-        : { eyebrow: 'ADMIN · CONFIGURATION', title: 'Settings', sub: null }
+        ? { eyebrow: 'ADMIN · CONFIGURATION · DEPARTMENTS', title: 'Departments' }
+        : { eyebrow: 'ADMIN · CONFIGURATION', title: 'Settings' }
 
   const headText = (
     <div className="min-w-0">
@@ -151,7 +147,6 @@ export default async function SettingsPage({ searchParams }: Props) {
         <em>I.</em> {head.eyebrow}
       </div>
       <h1 className="page-title">{head.title}</h1>
-      {head.sub ? <p className="page-sub">{head.sub}</p> : null}
     </div>
   )
   // 2026-10-10 — the handoff has no tab strip: Finance's two tabs are the

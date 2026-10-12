@@ -15,12 +15,16 @@ import { useFinView } from '@/components/layout/fin-view'
 // Portaled to <body> and positioned in viewport coordinates, like the column
 // filter in SortableTable: a transformed ancestor would otherwise re-base
 // `fixed` and the menu would open somewhere else on the page.
+//
+// ONE LINE AN ITEM (2026-10-12, the user on the portal's descriptions: "I want
+// delete it, cause this cause the view too messy" — as the bill menu went in
+// #323): an item's `hint` is its tooltip, no longer words drawn beside its label.
 
 export type RowMenuItem =
   | {
       key: string
       label: string
-      /** A few words beside the label saying what it does. */
+      /** A few words on what it does, or why it is shut — the item's tooltip. */
       hint?: string
       danger?: boolean
       disabled?: boolean
@@ -107,6 +111,7 @@ export default function RowMenu({ title, anchor, items, onClose }: Props) {
             type="button"
             role="menuitem"
             disabled={item.disabled}
+            title={item.hint}
             onClick={() => {
               onClose()
               item.onSelect()
@@ -116,7 +121,6 @@ export default function RowMenu({ title, anchor, items, onClose }: Props) {
             }`}
           >
             <span>{item.label}</span>
-            {item.hint ? <span className="text-[11px] text-muted">{item.hint}</span> : null}
           </button>
         ),
       )}

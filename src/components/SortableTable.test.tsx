@@ -497,12 +497,15 @@ describe('SortableTable opening a row', () => {
     expect(onRowContextMenu).toHaveBeenCalledTimes(1)
   })
 
-  it('says how, in the toolbar — and that a right-click has more when it does', () => {
-    const { unmount } = table({ onRowOpen: vi.fn() })
-    expect(screen.getByText('双击一行打开')).toBeInTheDocument()
+  // 2026-10-12 (the user: the descriptions make the view too messy): the
+  // toolbar no longer says how to open a row or that a right-click has more.
+  it('says nothing in the toolbar of the double-click or the right-click', () => {
+    const { unmount } = table({ onRowOpen: vi.fn(), layoutId: undefined })
+    expect(screen.queryByText(/双击一行打开/)).toBeNull()
     unmount()
     table({ onRowOpen: vi.fn(), onRowContextMenu: vi.fn() })
-    expect(screen.getByText('双击一行打开 · 右键更多')).toBeInTheDocument()
+    expect(screen.queryByText(/双击一行打开|右键更多/)).toBeNull()
+    expect(screen.queryByText(/Double-click to open|right-click for more/)).toBeNull()
   })
 
   it('a table that opens nothing is as it was: rows are not focusable, nothing is said', () => {
@@ -719,7 +722,6 @@ describe('the Finance revamp', () => {
 
   it('speaks English on the Finance view', () => {
     fin({ onRowOpen: vi.fn(), onRowContextMenu: vi.fn(), columns: rangeColumns })
-    expect(screen.getByText('Double-click to open · right-click for more')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Filter Amount' }))
     expect(within(popover()).getByPlaceholderText('Search…')).toBeInTheDocument()
     expect(within(popover()).getByRole('button', { name: 'Clear filter' })).toBeInTheDocument()

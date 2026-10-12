@@ -260,11 +260,6 @@ export default async function DeptPoolPage({
             </div>
           )}
         </section>
-
-        <p className="font-serif italic text-muted text-xs">
-          Accrual basis, cumulative to date — billed revenue − cost − expense −
-          inter-billing since inception. Switch to Cash for actual pool movement.
-        </p>
       </div>
     )
   }
@@ -765,18 +760,7 @@ export default async function DeptPoolPage({
 
       {perBankBreakdown ? (
         <section className="mb-12">
-          <div className="flex items-baseline justify-between mb-1">
-            <h2 className="font-serif text-xl text-ink">Per-bank breakdown</h2>
-            <span className="font-serif italic text-muted text-xs">
-              Derived from journal_lines · cash basis
-            </span>
-          </div>
-          <p className="font-serif italic text-muted text-xs mb-4 max-w-2xl">
-            Per-segment cash slice on each HV bank account. Sums down each bank
-            column = bank balance; sums across each row = department total
-            (matches &ldquo;By department&rdquo;). Inter-billing recharges settle
-            as an internal Hong Leong transfer between departments.
-          </p>
+          <h2 className="font-serif text-xl text-ink mb-4">Per-bank breakdown</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -826,13 +810,6 @@ export default async function DeptPoolPage({
           </div>
         </section>
       ) : null}
-
-      <p className="font-serif italic text-muted text-xs">
-        Dept Pools: invoices settled + P&amp;L in, payroll consolidation + expenses out.
-        Venture (Office) = every JE tagged segment=corporate hitting a HV bank
-        account. Total above = all 6 segments&apos; allocations summed = physical
-        bank balance.
-      </p>
     </div>
   )
 }

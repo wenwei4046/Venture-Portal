@@ -1,54 +1,20 @@
 import { requirePermission, requirePage } from '@/lib/auth'
 import Link from 'next/link'
 
+// Each card is its report's name alone (2026-10-12, user: the descriptions made
+// the view messy).
 const reports = [
-  {
-    href: '/reports/cash-flow',
-    title: 'Cash Flow',
-    description: 'CFO view — money in, dept-level outflow, group general expenses. Categories follow Settings labels.',
-  },
-  {
-    href: '/reports/income-statement',
-    title: 'Income Statement',
-    description: 'Per-department P&L (revenue − cost = margin) plus group general expenses and net profit.',
-  },
-  {
-    href: '/reports/balance-sheet',
-    title: 'Balance Sheet',
-    description: 'Assets, Liabilities, Equity at a point in time. Retained earnings is YTD net profit.',
-  },
-  {
-    href: '/reports/trial-balance',
-    title: 'Trial Balance',
-    description: 'Snapshot of every GL account at a date. Σ Dr = Σ Cr.',
-  },
-  {
-    href: '/reports/ledger',
-    title: 'General Ledger',
-    description: 'Per-account journal lines with running balance over a period.',
-  },
+  { href: '/reports/cash-flow', title: 'Cash Flow' },
+  { href: '/reports/income-statement', title: 'Income Statement' },
+  { href: '/reports/balance-sheet', title: 'Balance Sheet' },
+  { href: '/reports/trial-balance', title: 'Trial Balance' },
+  { href: '/reports/ledger', title: 'General Ledger' },
   // Fund Summary + Claims Summary removed from the index (user 2026-09-15);
   // /reports/fund-summary and /reports/claims still resolve by URL.
-  {
-    href: '/reports/base-rate',
-    title: 'Base Rate History',
-    description: 'Quarterly weighted cost + margin = base rate over time.',
-  },
-  {
-    href: '/reports/debtor-aging',
-    title: 'Debtor Aging',
-    description: 'Invoices billed but not yet collected, bucketed by days past due.',
-  },
-  {
-    href: '/reports/loan-aging',
-    title: 'Loan Aging',
-    description: 'This-month dues not yet settled (both ways) + outstanding balances, scheduled vs undecided.',
-  },
-  {
-    href: '/reports/company-statement',
-    title: 'Company Statement',
-    description: 'Per-counterparty two-way statement — to collect vs to repay, principal and interest split, payoff months, bank-statement export.',
-  },
+  { href: '/reports/base-rate', title: 'Base Rate History' },
+  { href: '/reports/debtor-aging', title: 'Debtor Aging' },
+  { href: '/reports/loan-aging', title: 'Loan Aging' },
+  { href: '/reports/company-statement', title: 'Company Statement' },
 ]
 
 export default async function ReportsPage() {
@@ -73,8 +39,7 @@ export default async function ReportsPage() {
             href={r.href}
             className="block border border-hairline rounded-md bg-surface p-6 hover:bg-surface-2/40 transition-colors"
           >
-            <h2 className="font-serif text-xl text-ink mb-1">{r.title}</h2>
-            <p className="font-serif italic text-graphite text-sm">{r.description}</p>
+            <h2 className="font-serif text-xl text-ink">{r.title}</h2>
           </Link>
         ))}
       </div>

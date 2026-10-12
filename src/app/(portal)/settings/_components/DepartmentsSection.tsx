@@ -354,9 +354,6 @@ export default function DepartmentsSection({
             ]}
           />
         </div>
-        <p className="text-xs text-graphite mt-3 max-w-3xl">
-          Names can&apos;t change, departments can&apos;t be deleted, and a provision can&apos;t be undone.
-        </p>
       </section>
     </>
   )

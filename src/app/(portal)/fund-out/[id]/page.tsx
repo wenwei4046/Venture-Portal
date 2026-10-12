@@ -8,7 +8,7 @@ import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { buildRepaymentPlan } from '@/lib/repayment-plan'
-import { defaultStart, loanStart } from '@/lib/repayment-start'
+import { loanStart } from '@/lib/repayment-start'
 import { overdueOf } from '@/lib/repayment-calendar'
 import { cancelLoan } from '../actions'
 import RepaymentForm from '../_components/RepaymentForm'
@@ -136,7 +136,6 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
   // The repayment start (2026-10-12, user: 现在只能选月份不能选日期): the date
   // the first instalment falls due, and every instalment's day.
   const start = loanStart(loan)
-  const unsetStart = defaultStart(loan.disbursement_date)
 
   // The Repayment schedule (2026-10-09): the plan by the terms, the money in
   // set against it oldest first.
@@ -322,7 +321,6 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
           <RepaymentStartEditor
             loanId={loan.id}
             current={start.set ? start.date : null}
-            defaultHint={unsetStart ? dateLong(unsetStart) : 'the month after disbursement'}
             min={loan.disbursement_date ?? undefined}
           />
           <MinPayInterestToggle loanId={loan.id} current={(loan as { min_pay_interest?: boolean }).min_pay_interest === true} />
@@ -397,16 +395,18 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
           <div className="sect-head">
             <h2>Actions</h2>
             <span className="rule" aria-hidden />
-            <span className="count">{isPendingApproval ? 'BEFORE PRINCIPAL APPROVES' : 'CANCELLATION NEEDS PRINCIPAL APPROVAL'}</span>
+            {/* A filed cancellation is named here, as Fund IN's is (2026-10-12:
+                the sentence that said so went; who and when stay below). */}
+            <span className="count">
+              {pendingCancel ? 'CANCELLATION PENDING' : isPendingApproval ? 'BEFORE PRINCIPAL APPROVES' : 'CANCELLATION NEEDS PRINCIPAL APPROVAL'}
+            </span>
           </div>
           {pendingCancel ? (
             // A cancellation request is already filed. Show it (Finance can't
             // open /approvals, so this is their only window into the status).
             <div className="fin-actions">
               <span className="note">
-                ⏳ Cancellation pending Principal approval — requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} on{' '}
-                {stamp(pendingCancel.created_at)}. The Principal approves it in Approvals; the loan reverses (bank, Venture Pool, GL)
-                and is marked cancelled.
+                Requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} · {stamp(pendingCancel.created_at)}
               </span>
             </div>
           ) : canCancelLoan ? (
@@ -431,11 +431,6 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
               <button type="submit" className="btn-danger">
                 {isActive ? 'Request cancellation (needs Principal)' : 'Cancel this loan'}
               </button>
-              <span className="note">
-                {isActive
-                  ? 'Active loan: files an approval request. Once the Principal approves, bank balance, Venture Pool, and GL entries are reversed and the loan is marked cancelled.'
-                  : 'Finance can cancel before the Principal approves. The loan and its approval request are both marked rejected in one transaction.'}
-              </span>
             </form>
           ) : (
             <div className="fin-actions">

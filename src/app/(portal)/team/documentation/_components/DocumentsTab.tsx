@@ -151,7 +151,6 @@ export default function DocumentsTab({
               Save
             </button>
           </div>
-          <div className={s.note}>Everyone in the departments you pick sees it under Documentation in the Revenue app.</div>
         </section>
       ) : null}
 

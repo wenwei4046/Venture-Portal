@@ -815,7 +815,6 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
                   style={{ left: department.bounds.x + SPACE_DEPARTMENT_PADDING, top: department.bounds.y + SPACE_DEPARTMENT_HEADER + SPACE_DEPARTMENT_PADDING + 18 }}>No members yet</div>)}
             </ViewportPortal>
           </ReactFlow>
-          <div className="space-hint" aria-hidden="true">Click a person to see them · drag to move · hold over somebody to change upline</div>
           {dropTarget && dropPerson ? <div className={`space-drop-notice${dropTarget.reason ? ' refused' : ''}`} role="status">
             {/* The notice paints its words orange; on the sheet they are ink,
                 with the orange left to its frame. A refusal keeps its danger. */}
@@ -829,10 +828,11 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
       </UplineContext.Provider>
       </PersonMenuContext.Provider>
       <div className="space-footer" aria-live="polite">
-        <div>
-          <strong>{selectedRecord ? `${selectedRecord.person.name} · ${selectedRecord.department.name}` : 'Sub-department → Team → Member'}</strong>
-          <span>{selectedRecord ? `${selectedRecord.person.titleName ?? 'No title'} · ${selectedRecord.person.rankLabel ?? 'No rank yet'}${selectedReportsTo ? ` · reports to ${selectedReportsTo}` : ''}` : 'Drag a team border or heading to move it · Members align inside · Hold over a person to change team'}</span>
-        </div>
+        {/* The person picked, or nothing — the line on how to use the chart went (2026-10-12). */}
+        {selectedRecord ? <div>
+          <strong>{`${selectedRecord.person.name} · ${selectedRecord.department.name}`}</strong>
+          <span>{`${selectedRecord.person.titleName ?? 'No title'} · ${selectedRecord.person.rankLabel ?? 'No rank yet'}${selectedReportsTo ? ` · reports to ${selectedReportsTo}` : ''}`}</span>
+        </div> : null}
         {selectedRecord ? <div className="flex flex-wrap gap-1.5" aria-label="This person's other memberships">
           {records.filter(record => record.person.staffId === selectedRecord.person.staffId && record.id !== selectedRecord.id).map(record =>
             <button type="button" key={record.id} className={TOOL_BUTTON} onClick={() => reveal(record.id)}>{record.department.name} · {record.person.titleName ?? 'No title'} ↗</button>)}

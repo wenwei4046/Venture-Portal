@@ -73,7 +73,7 @@ export default function CloseBar({ monthLabel, rows, ticked, busy, disabledReaso
               ? `${monthLabel} is closed — all ${rows.length} salespeople`
               : `${closedCount} of ${rows.length} closed`}
           </strong>
-          <span>{closedCount > 0 ? `${formatMoney(lockedTotal)} locked` : `Close each salesperson once their ${monthLabel} is checked — their commission is then locked`}</span>
+          {closedCount > 0 ? <span>{formatMoney(lockedTotal)} locked</span> : null}
           <div className={c.meter} role="progressbar" aria-label="Salespeople closed" aria-valuemin={0} aria-valuemax={rows.length} aria-valuenow={closedCount}>
             <span style={{ width: `${share}%` }} />
           </div>

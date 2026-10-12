@@ -114,7 +114,6 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
             </span>
           </div>
           <GlReportView
-            notice={consolidated ? 'Consolidated view eliminates inter-billing between segments — pick a segment to see its own charges.' : undefined}
             basePath="/reports/income-statement"
             period={period}
             compare={compare}
@@ -148,15 +147,6 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
       </div>
 
       <ReportViewToggle pair="pnl" active="single" period={period} segment={segment || undefined} />
-
-      <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
-        Built straight from the general ledger — the same journal lines the Trial Balance ties to.
-        Gross profit = revenue − COGS; net income adds other income and deducts expenses.
-        Click ▸ on an account to see its journal transactions for the period.
-        {consolidated ? (
-          <> <em className="text-accent">合并视图已抵销部门间互收 — inter-billing between segments is eliminated here; pick a segment to see its own charges.</em></>
-        ) : null}
-      </p>
 
       <GlReportView
         basePath="/reports/income-statement"

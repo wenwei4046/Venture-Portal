@@ -53,7 +53,7 @@ export default function PersonAccess({
   canEdit: boolean
   /** The card reloads itself; the full page needs only the refresh. */
   onSaved?: () => void
-  /** "Anthony" in "A red dot marks a box changed for Anthony only." */
+  /** "Anthony" in "Anthony’s own boxes were saved over another template." */
   personName?: string
   /** The person window's footer, where Reset to title and Save stand (the handoff's). */
   footSlot?: HTMLElement | null
@@ -146,10 +146,6 @@ function TemplateAccess({
           {canEdit ? <button type="button" className={s.all} disabled={pending} onClick={clearLegacy}>Clear them</button> : null}
         </p>
       ) : null}
-      <p className={s.lead}>
-        From title <b>{access.titleName}</b>. A red dot marks a box changed for {who} only.
-        {changes > 0 ? ` ${changes} ${changes === 1 ? 'change' : 'changes'} from the title.` : ''}
-      </p>
       <TabMatrix
         ticks={ticks}
         base={base}

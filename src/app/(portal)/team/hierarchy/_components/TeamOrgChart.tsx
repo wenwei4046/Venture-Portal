@@ -880,7 +880,7 @@ function Chart({
           ) : null}
           {pending ? ' · saving…' : ''}
         </p>
-        <span>{pending ? 'Saving reporting line…' : 'Height follows L level · Higher levels above'}</span>
+        {pending ? <span>Saving reporting line…</span> : null}
       </div>
 
       {/* Somebody who holds several roles: a white panel with one pill per
@@ -931,15 +931,15 @@ function Chart({
         </ReactFlow>
       </div>
 
-      <div className="space-footer">
-        <span className="text-xs">Expand a department, then a team. Drag headings left or right; L levels determine height.</span>
-        {selectedPerson?.secondaryRole && selectedPerson.membershipHref ? (
+      {/* The footer holds only an action now (2026-10-12: its usage hints went); it stays on the right. */}
+      {selectedPerson?.secondaryRole && selectedPerson.membershipHref ? (
+        <div className="space-footer" style={{ justifyContent: 'flex-end' }}>
           <Link href={selectedPerson.membershipHref} className={`text-xs ${SHEET_LINK}`}>
             Edit {selectedPerson.name}&rsquo;s {selectedPerson.subDepartment} role on Revenue →
           </Link>
-        ) : !canEdit ? (
-          <span className="text-xs">Click a card to select it.</span>
-        ) : selected && visibleIds.has(selected) ? (
+        </div>
+      ) : canEdit && selected && visibleIds.has(selected) ? (
+        <div className="space-footer" style={{ justifyContent: 'flex-end' }}>
           <button
             type="button"
             disabled={pending}
@@ -948,12 +948,8 @@ function Chart({
           >
             Detach {byId.get(selected)?.name} to the top level
           </button>
-        ) : (
-          <span className="text-xs">
-            Click a card to select it, then detach it if it should report to nobody.
-          </span>
-        )}
-      </div>
+        </div>
+      ) : null}
 
       {/* The legend. Each line's sample carries its colour — the red one
           included — so the words beside them stay black. */}
@@ -998,15 +994,6 @@ function Chart({
           </Link>
         ) : null}
       </div>
-
-      <p className="text-xs mt-3 max-w-3xl leading-relaxed">
-        Cards with the same L level share a row, even when one reports to another. Arrows show the reporting direction.
-        Each card represents one role. A person with appointments in multiple sub-departments
-        appears in each, with that role&rsquo;s title and reporting line. Select a card to
-        switch between their roles.{canEdit
-          ? ' Primary reporting lines can be changed by dragging to a manager; additional Revenue roles are edited in their own sub-department.'
-          : ''}
-      </p>
     </div>
   )
 }

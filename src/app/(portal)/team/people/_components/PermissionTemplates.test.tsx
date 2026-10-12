@@ -85,7 +85,9 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     renderTab()
     expect(screen.getByLabelText('Title template')).toHaveValue(HR)
     expect(screen.getByText('2 templates')).toBeInTheDocument()
-    expect(screen.getByText(/gets these, unless their own Permissions tab overrides one/)).toHaveTextContent('Everyone holding HR · Payroll gets these, unless their own Permissions tab overrides one.')
+    // No lede over the matrix and no standing foot note (2026-10-12: the wording made the view messy).
+    expect(screen.queryByText(/gets these, unless their own Permissions tab overrides one/)).toBeNull()
+    expect(screen.queryByText(/Applies to everyone holding/)).toBeNull()
     // A template with no ticks stored is drawn from its cells: Overview, HR Costing's three pages, Audit Log (Changes).
     expect(screen.getByRole('tab', { name: /HR view/ })).toHaveAttribute('aria-selected', 'true')
     // Of the HR view's 20 tabs (round 2 added Documentation, Hiring ×3, Meeting Rooms, Guest Link).
@@ -93,7 +95,6 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     expect(box('Payroll · View')).toHaveAttribute('aria-checked', 'true')
     expect(box('Payroll · Approve')).toHaveAttribute('aria-checked', 'false')
     expect(box('Overview · Create')).toBeDisabled()
-    expect(screen.getByText('Applies to everyone holding HR · Payroll')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
     expect(screen.getByText('SR · 1')).toBeInTheDocument()
     expect(screen.getByText('Titles with no template yet')).toBeInTheDocument()

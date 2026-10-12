@@ -442,10 +442,6 @@ function AdvanceView(p: DashProps) {
   const g = { pay: 0, fixed: 0, vr: 0, adv: 0, advStat: 0, allowStat: 0 }
   return (
     <div>
-      <p className="sheet-notice">
-        当 Total Pay &lt; Fixed Salary 时，差额作为 Salary Advance（预支）累计。KPI 盈余抵消累计
-        Advance；Adv Statutory 与 75% Allow Statutory 都会加入欠款。
-      </p>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <Card label="Total Accumulated Advance" value={<Money v={adjTotal} dash="RM 0.00" />} sub={`All directors (${latest.name})`} danger={adjTotal < 0} />
         {cards.map(({ d, adjAccum, adj, totStat }) => (

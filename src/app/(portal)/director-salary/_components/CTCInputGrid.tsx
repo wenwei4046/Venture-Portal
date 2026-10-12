@@ -404,12 +404,7 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
         >
           {status === 'saving' ? 'Saving...' : 'Save'}
         </button>
-        {status === 'done' && (
-          <span className="flex items-center gap-2 text-sm">
-            <span className="chip ledger"><span className="dot" />Saved</span>
-            submit to Finance on the Submission tab.
-          </span>
-        )}
+        {status === 'done' && <span className="chip ledger"><span className="dot" />Saved</span>}
         {error && <span className="text-sm text-danger">{error}</span>}
       </div>
     </div>

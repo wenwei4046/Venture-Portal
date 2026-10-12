@@ -94,7 +94,7 @@ function toFormData(scheme: SchemeRow, f: Form): FormData {
   return fd
 }
 
-export default function SchemePanel({ scheme, subName, canManage }: { scheme: SchemeRow; subName: string; canManage: boolean }) {
+export default function SchemePanel({ scheme, canManage }: { scheme: SchemeRow; canManage: boolean }) {
   const router = useRouter()
   const saved = formOf(scheme)
   const savedKey = JSON.stringify(saved)
@@ -168,7 +168,6 @@ export default function SchemePanel({ scheme, subName, canManage }: { scheme: Sc
     <>
       <SectionTop
         title="Scheme rules"
-        desc={`Which components ${subName} pays. A switched-off component is skipped by the engine, and the item-rule tabs it reads come and go with it.`}
         action={
           canManage ? (
             <button type="button" className={s.save} data-dirty={dirty ? 'true' : 'false'} onClick={save} disabled={pending} aria-disabled={!dirty}>

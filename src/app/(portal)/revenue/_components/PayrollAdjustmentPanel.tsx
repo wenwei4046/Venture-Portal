@@ -25,13 +25,12 @@ function PayrollStateChip({ status }: { status: string }) {
 }
 
 export default function PayrollAdjustmentPanel({
-  read, periodLabel, staffNames, statement = false, runSynced,
+  read, periodLabel, staffNames, statement = false,
 }: {
   read: RevenuePayrollAdjustmentRead
   periodLabel: string
   staffNames: ReadonlyMap<string, string>
   statement?: boolean
-  runSynced: boolean
 }) {
   if (!read.unavailable && !read.rows.length) return null
   return (
@@ -44,10 +43,6 @@ export default function PayrollAdjustmentPanel({
       {read.unavailable ? <p className="text-sm text-danger" role="status">
         Payroll adjustments are currently unavailable. The source commission calculation remains visible above.
       </p> : <>
-        <p className="text-sm mb-4 max-w-3xl">
-          These are each person&apos;s monthly totals across all Revenue sub-departments. The payroll adjustment applies once to that monthly total.
-          {!runSynced ? ' This sub-department run is not currently synced; the payroll figures reflect the last saved payroll.' : ''}
-        </p>
         {statement ? read.rows.map(row => <div key={row.staffId}>
           <div className="overflow-x-auto">
             <table className="ledger-table" aria-label="Monthly gross commission reconciliation">

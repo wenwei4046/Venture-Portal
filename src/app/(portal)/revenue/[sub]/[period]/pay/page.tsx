@@ -58,10 +58,9 @@ export default async function MonthPayPage({ params }: PageProps) {
             <em>I.</em> REVENUE · {subDept.name.toUpperCase()} · {label(period).toUpperCase()}
           </div>
           <h1 className="page-title">What this month pays</h1>
+          {/* The state only (2026-10-12): preview or in payroll. */}
           <p className="text-sm mt-3">
-            {synced
-              ? 'Synced to payroll — these are the figures payroll holds.'
-              : 'A preview from the computed run. Payroll is written when the run is synced.'}
+            {synced ? 'Synced to payroll' : 'A preview from the computed run'}
           </p>
         </div>
         <Link
@@ -256,13 +255,6 @@ export default async function MonthPayPage({ params }: PageProps) {
                 </tfoot>
               </table>
             </div>
-            <p className="text-xs mt-3 max-w-3xl">
-              Gross commission is the whole month&apos;s — every programme that has applied a run, plus any
-              reviewed payroll adjustment. The employer&apos;s EPF, SOCSO and EIS are funded from it, which is
-              why gross pay is lower than gross commission. Pay lines — a special claim, allowance or
-              incentive, or a deduction, added on the salesperson&apos;s ledger — are in net pay. Open a name
-              for the payslip and the rules behind each figure.
-            </p>
           </section>
         </>
       )}

@@ -105,7 +105,7 @@ export default function RequestPage({
 
   return (
     <HvPage>
-      <PageHead eyebrow="Hiring · Requests" title="Hiring requests" subtitle="Manpower requests from every department, from submission to filled." />
+      <PageHead eyebrow="Hiring · Requests" title="Hiring requests" />
       <Link href="/hiring/requests?tab=listing" className={s.back}>
         ‹ All requests
       </Link>

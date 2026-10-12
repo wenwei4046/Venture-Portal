@@ -49,7 +49,7 @@ export default function MemberServicesView({
 
   return (
     <HvPage>
-      <PageHead eyebrow="People · Member services" title="Member services" subtitle="Manage HR requests, waiting lists and the member catalogue." />
+      <PageHead eyebrow="People · Member services" title="Member services" />
       {tabs.length > 1 ? (
         <Tabs
           items={tabs}

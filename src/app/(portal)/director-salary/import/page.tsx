@@ -18,21 +18,18 @@ export default async function DirectorPayrollImportPage({ searchParams }: Props)
 
   return (
     <div>
+      <Link
+        href={`/director-salary?period=${dayjs(period).format('YYYY-MM')}`}
+        className="inline-block mb-3 text-sm hover:text-accent transition-colors"
+      >
+        ← Back to Director Salary
+      </Link>
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
             <em>I.</em> DIRECTOR · PAYROLL IMPORT · {periodLabel.toUpperCase()}
           </div>
           <h1 className="page-title">Import Director Payroll</h1>
-          <p className="text-sm mt-3">
-            InfoTech director-only export · verbatim import ·{' '}
-            <Link
-              href={`/director-salary?period=${dayjs(period).format('YYYY-MM')}`}
-              className="text-accent hover:text-accent-hover"
-            >
-              ← back to Director Salary
-            </Link>
-          </p>
         </div>
         <DirectorPeriodPicker period={period} basePath="/director-salary/import" />
       </div>

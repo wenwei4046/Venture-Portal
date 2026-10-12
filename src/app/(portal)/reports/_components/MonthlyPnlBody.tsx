@@ -25,7 +25,6 @@ export default function MonthlyPnlBody({
   segmentLabel,
   segment = '',
   segments = [],
-  consolidated = false,
 }: {
   pnl: Awaited<ReturnType<typeof loadMonthlyPnl>>
   range: ReportRange
@@ -35,7 +34,6 @@ export default function MonthlyPnlBody({
   segment?: string
   /** Empty = no segment choice. */
   segments?: ReportSegmentOption[]
-  consolidated?: boolean
 }) {
   const cost = data.accounts.filter((a) => a.defaultCategory === 'cost' || a.defaultCategory === 'expense')
   const expenses = data.columns.map((_, i) => r2(-cost.reduce((s, a) => s + (a.values[i] ?? 0), 0)))
@@ -76,9 +74,6 @@ export default function MonthlyPnlBody({
             segment={segment}
             segments={segments}
           />
-          {consolidated ? (
-            <p className="rpt-cons">Consolidated view eliminates inter-billing between segments — pick a segment to see its own charges.</p>
-          ) : null}
           <SheetReport columns={sheetColumns(cut.columns, nowYM)} rows={sheetFromMatrix(cut.rows)} pctBase={cut.base} />
         </section>
       </ReportSearchProvider>

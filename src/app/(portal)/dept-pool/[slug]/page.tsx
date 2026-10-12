@@ -115,9 +115,7 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
             <div className={`statement-amount ${balance < 0 ? 'text-danger' : 'text-num-ink'}`}>
               {formatMoney(balance)}
             </div>
-            <div className="font-mono text-xs text-muted mt-2">
-              {balance === 0 ? 'No movements yet' : 'Running balance — see History tab for full ledger'}
-            </div>
+            {balance === 0 ? <div className="font-mono text-xs text-muted mt-2">No movements yet</div> : null}
           </div>
 
           <div className="lg:col-span-5 space-y-2">

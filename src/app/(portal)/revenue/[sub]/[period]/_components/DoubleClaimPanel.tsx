@@ -259,15 +259,7 @@ export default function DoubleClaimPanel({
   return (
     <section aria-label="Possible double claims">
       <div className={s.topLine}>
-        <div>
-          <h2 className={s.sectionHeading}>Possible double claims</h2>
-          <p className={s.subtitle}>
-            A bill is flagged when its paper number — the number on the customer&apos;s handwritten bill, which
-            the ERP keeps as the sales order&apos;s Ref No. — is on more than one bill a run could pay or already
-            paid. Each one says why it looks like one sale paid twice (or why it probably is not), what the bills
-            share and where they part, and what every bill has been through.
-          </p>
-        </div>
+        <h2 className={s.sectionHeading}>Possible double claims</h2>
         {atRisk > 0 ? (
           <div className={s.overviewTotal}>
             <span>Would be paid twice</span>

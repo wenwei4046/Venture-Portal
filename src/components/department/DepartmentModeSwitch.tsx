@@ -4,7 +4,6 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   COST_MODEL_LABEL,
-  costModelSummary,
   switchConsequence,
   switchedNote,
   type CostModel,
@@ -18,8 +17,13 @@ import { setDepartmentCostModel } from '@/app/(portal)/settings/department-mode-
 // Whether it is live follows the person signed in (`canSwitch`), not the view
 // they are looking through: the Principal flips it from HR's or Finance's view.
 //
-//   panel — on a department's own page, with the mode's one-line meaning
+//   panel — on a department's own page
 //   cell  — a row of Settings › Departments
+//
+// The switch alone (2026-10-12, the user: the descriptions make the view too
+// messy): no line on what the mode means, and no "Switched by the Principal."
+// under a switch somebody may not flip — it is drawn disabled and its tooltip
+// says who switches it.
 
 export default function DepartmentModeSwitch({
   department,
@@ -120,11 +124,7 @@ export default function DepartmentModeSwitch({
       <div className="dept-mode-row">
         <span className="dept-mode-eyebrow">{department.name} · department mode</span>
         {toggle}
-        <span className="dept-mode-meaning">{costModelSummary(model)}</span>
       </div>
-      {!department.canSwitch ? (
-        <p className="text-[11px] mt-1.5 mb-0">Switched by the Principal.</p>
-      ) : null}
       {question}
       {status}
     </section>

@@ -20,14 +20,7 @@ export default async function WaitingTransfer({ requestId, viewer }: { requestId
   const read: WaitingTransferRead = viewer.permissions.includes('member_requests_manage')
     ? await loadWaitingTransfer(requestId)
     : { ok: false, reason: 'Transferring from the waiting list needs HR request management access.' }
-  const name = read.ok ? read.facts.newPerson : null
-  const head = (
-    <PageHead
-      eyebrow="People · Management"
-      title="People"
-      subtitle={name ? `Complete the record to bring ${name} into the company.` : 'Transfer from the waiting list.'}
-    />
-  )
+  const head = <PageHead eyebrow="People · Management" title="People" />
 
   if (!read.ok) {
     return (

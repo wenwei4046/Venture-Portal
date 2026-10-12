@@ -29,16 +29,6 @@ async function downloadDrive(id: string): Promise<string | null> {
 }
 
 /** What each place says under the path. */
-function hintOf(at: string, name: string): string {
-  const p = parsePlace(at)
-  if (!p) return ''
-  if (p.kind === 'root') return 'HOUZS Venture, its departments and its people come from People by themselves. Make a folder here for a subsidiary, and folders by department inside it.'
-  if (p.kind === 'company') return 'Each department’s people come from People. Publish & save files every copy into its person’s folder by itself.'
-  if (p.kind === 'dept') return `Everybody active in ${name} — each folder is their record.`
-  if (p.kind === 'folder') return 'Kept for HR — a file here is a record, sent to nobody.'
-  return ''
-}
-
 /**
  * Documentation › Data center as a Drive (2026-10-12 — the user: the people column "scroll 得很高"; "参考 Google
  * Drive 的做法 … 可以 create folder 的", company → department → the person; HR is centralized, so a subsidiary
@@ -297,7 +287,6 @@ export default function DataCenterTab({
         <PersonFolder data={data} person={person} can={can} onView={id => onView({ kind: 'letter', id })} onUpload={() => setLetterUpload(true)} />
       ) : (
         <>
-          {hintOf(here, name) ? <div className={s.hint}>{hintOf(here, name)}</div> : null}
           {sections.map(sect => (
             <div key={sect.title} className={s.sect}>
               <div className={s.sectHead}>

@@ -484,7 +484,6 @@ export default async function PaymentDetailPage({ params }: Props) {
                 </span>
               }
             >
-              <p className="text-sm text-muted mb-3">Payment amounts and receiving accounts recorded when this PV was generated.</p>
               <div className="overflow-x-auto">
                 <table className="ledger-table" aria-label="Salary payments on this voucher">
                   <thead>
@@ -547,7 +546,6 @@ export default async function PaymentDetailPage({ params }: Props) {
                 </span>
               }
             >
-              <p className="text-sm text-muted mb-3">Employees, departments and amounts recorded when this PV was generated.</p>
               <div className="overflow-x-auto">
                 <table className="ledger-table" aria-label="Statutory contributions covered by this voucher">
                   <thead>

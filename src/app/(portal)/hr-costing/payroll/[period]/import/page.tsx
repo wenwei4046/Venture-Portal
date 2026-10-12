@@ -34,9 +34,6 @@ export default async function ImportPage({ params }: PageProps) {
             <em>I.</em> HR · PAYROLL IMPORT · {formatPeriodLabel(period).toUpperCase()}
           </div>
           <h1 className="page-title">Import InfoTech</h1>
-          <p className="text-sm mt-3">
-            Importing into <strong className="font-bold">{formatPeriodLabel(period)}</strong> — switch the period to import a different month.
-          </p>
         </div>
         {/* suffix keeps you on the import page while changing the target month */}
         <PeriodPicker period={period} suffix="/import" />

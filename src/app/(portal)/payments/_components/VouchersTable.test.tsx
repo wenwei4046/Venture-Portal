@@ -291,7 +291,10 @@ describe('the Finance revamp', () => {
     // The payer is named twice on the Finance view: in its column, and as the
     // phone's title of a row that has no number (2026-10-10).
     fireEvent.contextMenu(screen.getAllByText('The Cont')[0].closest('tr') as HTMLElement)
-    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Openor double-click', 'Open in new tab', 'Change datewhen the date was keyed wrong', 'Change amountloan repayment rows'])
+    // One line an item (2026-10-12, the user): what the hint said is the item's tooltip.
+    const items = screen.getAllByRole('menuitem')
+    expect(items.map((m) => m.textContent)).toEqual(['Open', 'Open in new tab', 'Change date', 'Change amount'])
+    expect(items[2]).toHaveAttribute('title', 'when the date was keyed wrong')
   })
 })
 

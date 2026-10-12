@@ -86,7 +86,6 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
           segmentLabel={segName}
           segment={segment}
           segments={segments}
-          consolidated={consolidated}
         />
       </div>
     )
@@ -104,10 +103,6 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
             <em>III.</em> REPORTS · MONTHLY P&amp;L · FY {year}
           </div>
           <h1 className="page-title">Monthly P&amp;L</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
-            FY {year} · read-only · all amounts RM · % of sales
-            {consolidated ? <> · <em className="text-accent">内部互收已抵销</em></> : null}
-          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {/* Edit layout edits the SHARED company P&L layout — hide from dept managers. */}
@@ -135,13 +130,6 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
       </div>
 
       <ReportViewToggle pair="pnl" active="monthly" period={period} segment={segment || undefined} />
-
-      <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
-        Each month of the fiscal year as its own column, with an Accumulated
-        (year-to-date) column. Grouped under your own categories (edit the layout
-        to drag accounts around — subtotals recompute automatically). Cost /
-        expense show negative; % is each line against that column&rsquo;s sales.
-      </p>
 
       {/* Provider bridges the rail's search box to the matrix that owns the rows. */}
       <ReportSearchProvider>

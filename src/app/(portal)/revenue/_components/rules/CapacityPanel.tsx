@@ -63,10 +63,7 @@ export default function CapacityPanel({
 
   return (
     <>
-      <SectionTop
-        title="Capacity"
-        desc={`How many people ${subName} can hold. Capacity counts active members and reserved positions; waiting-list matching only reserves a seat while one is free.`}
-      />
+      <SectionTop title="Capacity" />
       {!data ? (
         <p className={s.saveError} role="alert" style={{ margin: 0 }}>
           {initial.ok ? 'The capacity could not be read.' : initial.reason}

@@ -293,7 +293,6 @@ describe('CommissionWorkbench', () => {
     expect(tab).toHaveTextContent('1')
     fireEvent.click(tab)
     expect(screen.getByRole('heading', { name: 'Waiting on a deposit' })).toBeVisible()
-    expect(screen.getByText(/Below 30% of the order total/)).toBeVisible()
     const table = screen.getByRole('table', { name: 'Orders below deposit' })
     expect(within(table).queryByText('SO-one')).toBeNull()
     const row = salesRow(table, 'SO-two')
@@ -569,9 +568,21 @@ describe('CommissionWorkbench', () => {
     expect(screen.getAllByText('RM 1,220.50').length).toBeGreaterThan(0)
   })
 
+  it('marks the KPI payout off with a badge, not a notice, while the scheme pays no KPI', () => {
+    const data = fixture()
+    data.input.scheme.enableKpi = false
+    renderBoard(data)
+    fireEvent.click(screen.getByRole('tab', { name: /^KPI Items/ }))
+    const badge = screen.getByText('Payout off this month')
+    expect(badge).toBeVisible()
+    expect(badge.parentElement).toHaveTextContent('KPI across the teamPayout off this month')
+    expect(screen.queryByText(/KPI payout is switched off/)).toBeNull()
+  })
+
   it('shows cross-agent KPI expense and lets a KPI name return to their commission table', () => {
     renderBoard()
     fireEvent.click(screen.getByRole('tab', { name: /^KPI Items/ }))
+    expect(screen.queryByText('Payout off this month')).toBeNull()
     const table = screen.getByRole('table', { name: 'KPI expense by salesperson' })
     expect(salesRow(table, 'Anthony')).toHaveTextContent('RM 40.00+ RM 8.0020%RM 48.00')
     expect(screen.getByText('Total KPI expense', { selector: 'span' }).parentElement).toHaveTextContent('RM 48.00')
@@ -608,7 +619,6 @@ describe('CommissionWorkbench', () => {
     openTab()
     expect(screen.getByRole('checkbox', { name: /^Open Bill SO-one$/ })).toBeDisabled()
     expect(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' })).toBeDisabled()
-    expect(screen.getByText('This month is in payroll, so its Open Bill picks cannot change.')).toBeVisible()
     expect(saveOpenPicks).not.toHaveBeenCalled()
   })
 
@@ -747,7 +757,9 @@ describe('CommissionWorkbench', () => {
   it('says what payroll holds for a person only once the month is in it', () => {
     renderBoard(salaryFixture(), 'computed', [{ staffId: 'agent', total: 1223 }])
     choose('Anthony')
-    expect(screen.getByText('Not in payroll yet')).toBeVisible()
+    // A month not in payroll draws no line at all (2026-10-12) — no "Not in payroll yet".
+    expect(screen.queryByText('Not in payroll yet')).toBeNull()
+    expect(screen.queryByText(/^In payroll:/)).toBeNull()
     expect(screen.queryByRole('link', { name: /breakdown/i })).toBeNull()
     cleanup()
     visit('')
@@ -770,13 +782,22 @@ describe('CommissionWorkbench', () => {
     expect(screen.getByText('Salary preview is unavailable for this session. Commission can still be reviewed above.')).toBeVisible()
   })
 
-  it('keeps the Open Bill picks shut while the month pays no Open Bill, and says where it is switched on', () => {
+  // The state, not a sentence (2026-10-12): a badge beside the heading says why
+  // every bonus is RM 0 — the notice that explained it went.
+  it('keeps the Open Bill picks shut while the month pays no Open Bill, and marks the payout off', () => {
+    renderBoard()
+    openTab()
+    expect(screen.queryByText('Payout off this month')).toBeNull()
+    cleanup()
+
     const data = fixture()
     data.input.scheme.enableOpenBill = false
     renderBoard(data)
     openTab()
-    expect(screen.getByText(/^Open Bill payout is switched off for this month/))
-      .toHaveTextContent('picks open once it is switched on under Review settings › This month pays')
+    const badge = screen.getByText('Payout off this month')
+    expect(badge).toBeVisible()
+    expect(badge.parentElement).toHaveTextContent('Open Bill allocationPayout off this month')
+    expect(screen.queryByText(/Open Bill payout is switched off/)).toBeNull()
     expect(screen.getByRole('checkbox', { name: 'Open Bill SO-one' })).toBeDisabled()
     expect(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' })).toBeDisabled()
     expect(salesRow(screen.getByRole('table', { name: 'Open Bill orders' }), 'SO-one')).toHaveTextContent('RM 0.00')

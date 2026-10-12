@@ -111,18 +111,6 @@ export default function ImportWizard({ period }: Props) {
           </span>
           <span className="text-xs mt-2 block">InfoTech format only</span>
         </label>
-        <div className="mt-5 text-xs space-y-1">
-          <p className="font-medium">Everything is imported verbatim — the file is the source of truth:</p>
-          <ul className="list-disc ml-5 space-y-0.5">
-            <li><span className="font-mono">Tot. Sal</span> → Basic · <span className="font-mono">OT/Shift/Rest-PH</span> → OT Amount · <span className="font-mono">Allowance Add</span> → Allowance · <span className="font-mono">Bonus</span> → Commission</li>
-            <li><span className="font-mono">EPF / SOCSO / EIS</span> (ER + EE) · <span className="font-mono">PCB</span> · <span className="font-mono">Gross</span> · <span className="font-mono">NettWgs</span> → written exactly as exported, no recompute</li>
-            <li>Missing payroll rows are created automatically — no need to generate the period first</li>
-          </ul>
-          <p className="mt-2">
-            Editing an input field on the grid afterwards re-triggers the system recompute for that row.
-            Directors are skipped — Director Salary handles them.
-          </p>
-        </div>
         {error && <p className="mt-4 text-sm text-danger">{error}</p>}
       </div>
     )

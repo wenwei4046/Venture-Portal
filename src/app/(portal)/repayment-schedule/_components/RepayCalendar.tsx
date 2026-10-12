@@ -247,7 +247,6 @@ export default function RepayCalendar({ month, today, events }: { month: string;
               <dd>{formatMoney(hover.e.principal)}</dd>
             </div>
           </dl>
-          <div className="sch-card-foot">Click to open the full record</div>
         </div>
       ) : null}
     </div>

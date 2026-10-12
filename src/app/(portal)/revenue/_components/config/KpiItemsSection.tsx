@@ -28,7 +28,7 @@ import { saveKpiItems } from '../../kpi-actions'
 import { createClient } from '@/lib/supabase/client'
 import { searchSkuMaster, type KpiSkuHit } from '@/lib/commission/kpi-sku-search'
 import { deleteKpiThreshold, upsertKpiThreshold } from '../../config-actions'
-import { ActionButton, Field, Hidden, Hint, RowForm, SaveButton, SectionHead, toPct } from '@/components/RowForm'
+import { ActionButton, Field, Hidden, RowForm, SaveButton, SectionHead, toPct } from '@/components/RowForm'
 import type { CommissionSettingsData, KpiItemRow, SchemeRow } from './types'
 
 type PickSource = 'sku' | KpiOptionPool
@@ -518,11 +518,6 @@ function ThresholdLadder({ data, scheme }: { data: CommissionSettingsData; schem
   return (
     <div className="mt-10">
       <SectionHead title="Threshold ladder" count={`${data.kpiThresholds.length} RUNG${data.kpiThresholds.length === 1 ? '' : 'S'}`} />
-      <Hint>
-        Sell this many KPI units in the month — every KPI item counted together — and the <em>whole</em> KPI
-        amount is uplifted. The highest rung reached applies; the rungs do not add up. With a rung at 10 units ·
-        20%, twelve cables at RM 30 pay RM 360 + 20% = RM 432.
-      </Hint>
       <div className="overflow-x-auto">
         <table className="ledger-table" aria-label="KPI threshold ladder">
           <thead>

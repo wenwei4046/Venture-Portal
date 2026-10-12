@@ -11,14 +11,11 @@ const Find = createContext('')
 export function LoanFindProvider({
   names,
   asAt,
-  note,
   children,
 }: {
   names: string[]
   /** As at a month (2026-10-10): picking one reloads the page with ?as_at=. */
   asAt?: { value: string; options: Array<{ value: string; label: string }> }
-  /** A line under the control row (what an As at reads). */
-  note?: string
   children: React.ReactNode
 }) {
   const [q, setQ] = useState('')
@@ -41,9 +38,7 @@ export function LoanFindProvider({
           </form>
         ) : null}
         <div className="rpt-field rpt-find">
-          <span>
-            Find company <span className="rpt-find-hint">· highlights only</span>
-          </span>
+          <span>Find company</span>
           <div className="rpt-find-box">
             <input
               type="search"
@@ -60,7 +55,6 @@ export function LoanFindProvider({
           </div>
         </div>
       </div>
-      {note ? <p className="rpt-cons">{note}</p> : null}
       {children}
     </Find.Provider>
   )

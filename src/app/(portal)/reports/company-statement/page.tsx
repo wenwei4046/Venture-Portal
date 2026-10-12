@@ -73,17 +73,6 @@ export default async function CompanyStatementPage() {
         />
       </StatCards>
 
-      <p className="text-xs text-graphite mb-4 max-w-3xl">
-        One row per counterparty: to collect (loans lent out) vs to repay (fund
-        sources taken in). Interest — fixed-term deals count remaining
-        installments to payoff (original × monthly rate × periods left);
-        compounding positions show what has accrued unpaid to date; no-term
-        positions stay out of the totals and carry monthly interest as
-        reference only. Payoff — on schedule shows the contractual finish
-        month, behind schedule projects one catch-up a month. Click a row to
-        expand.
-      </p>
-
       <StatementView rows={rows} totals={totals} />
     </div>
   )

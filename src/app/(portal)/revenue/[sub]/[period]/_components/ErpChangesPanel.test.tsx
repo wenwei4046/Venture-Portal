@@ -91,10 +91,13 @@ describe('ErpChangesPanel', () => {
     expect(window.confirm).toHaveBeenLastCalledWith("HC13911: let the ERP's figure stand and pay no drop?")
   })
 
+  // Why is the button's tooltip, not a notice above the table (2026-10-12).
   it('pays nothing into a month that is in payroll', () => {
     render(<ErpChangesPanel period="2026-09-01" pending={[DROP]} locked />)
-    expect(screen.getByText(/September 2026 is in payroll — open a later month to pay these\./)).toBeVisible()
+    expect(screen.queryByText(/is in payroll — open a later month/)).toBeNull()
     expect(screen.getByRole('button', { name: 'Pay in Sep 2026' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Pay in Sep 2026' }))
+      .toHaveAttribute('title', 'September 2026 is in payroll — open a later month to pay these')
     expect(screen.getByRole('button', { name: 'Not a change' })).toBeEnabled()
   })
 
@@ -102,8 +105,10 @@ describe('ErpChangesPanel', () => {
   // into it would never be paid at all.
   it('pays nothing into a month settled by hand', () => {
     render(<ErpChangesPanel period="2026-08-01" pending={[DROP]} locked={false} settledBefore="September 2026" />)
-    expect(screen.getByText(/August 2026 was settled by hand and takes no run — pay these in September 2026 or later/)).toBeVisible()
+    expect(screen.queryByText(/was settled by hand and takes no run/)).toBeNull()
     expect(screen.getByRole('button', { name: 'Pay in Aug 2026' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Pay in Aug 2026' }))
+      .toHaveAttribute('title', 'August 2026 was settled by hand and takes no run — pay these in September 2026 or later')
     expect(screen.getByRole('button', { name: 'Not a change' })).toBeEnabled()
   })
 
