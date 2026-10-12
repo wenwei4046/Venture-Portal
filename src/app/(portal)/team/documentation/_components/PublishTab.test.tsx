@@ -2,9 +2,13 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Documentation, Published } from '@/lib/documentation/model'
 
-const actions = vi.hoisted(() => ({ addPublishType: vi.fn(), deletePublishType: vi.fn(), publishDocumentation: vi.fn(), withdrawMemo: vi.fn() }))
+const actions = vi.hoisted(() => ({
+  addPublishType: vi.fn(), deletePublishType: vi.fn(), publishDocumentation: vi.fn(), withdrawMemo: vi.fn(), previewPublished: vi.fn(),
+}))
+const memoActions = vi.hoisted(() => ({ openMemoFile: vi.fn(), markMyMemo: vi.fn() }))
 const { flash } = vi.hoisted(() => ({ flash: vi.fn() }))
 vi.mock('@/lib/documentation/actions', () => actions)
+vi.mock('@/lib/memos/actions', () => memoActions)
 vi.mock('@/lib/documentation/upload', () => ({ uploadDocumentationFile: vi.fn() }))
 vi.mock('@/components/hrv/toast', () => ({ flash }))
 
@@ -98,5 +102,69 @@ describe('Documentation › Publish › Withdraw', () => {
     expect(within(row as HTMLElement).getByText('Withdrawn 11 Oct by Grace Lim · Had reached 12 people · 9 acknowledged · attachment deleted')).toBeInTheDocument()
     expect(within(row as HTMLElement).queryByRole('button')).toBeNull()
     expect(list().getByRole('button', { name: 'Hide withdrawn (1)' })).toBeInTheDocument()
+  })
+})
+
+// Publish › Preview (2026-10-12 — the user: "因为我已经发过了这个 memo，我可以 preview，就 preview 这个 memo 是长怎样的"):
+// a published memo as its people read it, its file, and where each of them stands.
+describe('Documentation › Publish › Preview', () => {
+  const preview = {
+    id: 'p1', title: 'House rules', body: 'Please read the rules.\n\nThey start on Monday.', sender: 'People & Culture', kind: 'Memo',
+    publishedAt: '2026-10-12T09:44:13Z', requiresAck: true, attachment: { name: 'Rules.pdf', type: 'application/pdf' }, withdrawnAt: null,
+    people: [
+      { staffId: 'kris', name: 'KRIS', department: 'Revenue', hasLogin: true, readAt: '2026-10-12T09:44:39Z', acknowledgedAt: null },
+      { staffId: 'zack', name: 'Zack', department: 'Revenue', hasLogin: false, readAt: null, acknowledgedAt: null },
+      { staffId: 'loo', name: 'LOO WEN WEI', department: 'Director', hasLogin: true, readAt: '2026-10-12T09:50:00Z', acknowledgedAt: '2026-10-12T09:51:00Z' },
+    ],
+  }
+
+  it('a memo still out has Preview; a withdrawn one does not', () => {
+    view()
+    expect(list().getByRole('button', { name: 'Preview House rules' })).toBeInTheDocument()
+    fireEvent.click(list().getByRole('button', { name: 'Show withdrawn (1)' }))
+    const row = list().getByText('Old notice').closest('[data-gone]') as HTMLElement
+    expect(within(row).queryByRole('button', { name: /Preview/ })).toBeNull()
+  })
+
+  it('opens the memo as it reads — from, title, each paragraph, its file — and who has it', async () => {
+    actions.previewPublished.mockResolvedValue({ ok: true, preview })
+    view({ create: false, edit: false })
+    fireEvent.click(list().getByRole('button', { name: 'Preview House rules' }))
+    const drawer = await screen.findByRole('dialog', { name: 'House rules' })
+    expect(actions.previewPublished).toHaveBeenCalledWith('p1')
+    const card = within(drawer).getByRole('article', { name: 'House rules, as it reads' })
+    expect(within(card).getByText('Please read the rules.')).toBeInTheDocument()
+    expect(within(card).getByText('They start on Monday.')).toBeInTheDocument()
+    expect(within(card).getByText('Rules.pdf')).toBeInTheDocument()
+    expect(within(card).getByText('PDF')).toBeInTheDocument()
+    expect(within(card).getByText(/Each person taps Acknowledge once/)).toBeInTheDocument()
+
+    fireEvent.click(within(drawer).getByRole('tab', { name: /Who has it/ }))
+    expect(within(drawer).getByText('1 of 3 acknowledged · 1 has no login yet')).toBeInTheDocument()
+    expect(within(drawer).getByText('Acknowledged')).toBeInTheDocument()
+    expect(within(drawer).getByText('Opened')).toBeInTheDocument()
+    expect(within(drawer).getByText('No login yet')).toBeInTheDocument()
+  })
+
+  it('its file opens from the preview, a short link made at the press', async () => {
+    actions.previewPublished.mockResolvedValue({ ok: true, preview })
+    memoActions.openMemoFile.mockResolvedValue({ ok: false, reason: 'This file was withdrawn.' })
+    const opened = { opener: {} as unknown, location: { href: '' }, close: vi.fn() }
+    const open = vi.spyOn(window, 'open').mockReturnValue(opened as unknown as Window)
+    view()
+    fireEvent.click(list().getByRole('button', { name: 'Preview House rules' }))
+    const drawer = await screen.findByRole('dialog', { name: 'House rules' })
+    fireEvent.click(within(drawer).getByRole('button', { name: 'View' }))
+    await waitFor(() => expect(memoActions.openMemoFile).toHaveBeenCalledWith('p1', 'view'))
+    await waitFor(() => expect(flash).toHaveBeenCalledWith('This file was withdrawn.'))
+    expect(opened.close).toHaveBeenCalled()
+    open.mockRestore()
+  })
+
+  it('says so when it cannot be opened', async () => {
+    actions.previewPublished.mockResolvedValue({ ok: false, reason: 'That memo is not there any more.' })
+    view()
+    fireEvent.click(list().getByRole('button', { name: 'Preview House rules' }))
+    expect(await screen.findByText('That memo is not there any more.')).toBeInTheDocument()
   })
 })

@@ -10,6 +10,7 @@ import {
 } from '@/lib/documentation/model'
 import { uploadDocumentationFile } from '@/lib/documentation/upload'
 import { firstDepartment } from './DocumentsTab'
+import MemoPreviewDrawer from './MemoPreviewDrawer'
 import SwitchMenu from './SwitchMenu'
 import s from './documentation.module.css'
 
@@ -22,7 +23,9 @@ import s from './documentation.module.css'
  * also files the attachment into every recipient's Data center. With
  * Documentation · Edit a published memo can be withdrawn from everyone it
  * reached (2026-10-11 — asks once more, as Delete does); withdrawn ones wait
- * greyed under "Show withdrawn" with what they had reached.
+ * greyed under "Show withdrawn" with what they had reached. Each one still out
+ * has **Preview** (2026-10-12): the memo as its people read it, and where each
+ * of them stands with it (MemoPreviewDrawer).
  */
 export default function PublishTab({ data, can }: { data: Documentation; can: { create: boolean; edit: boolean } }) {
   const [kind, setKind] = useState('Memo')
@@ -38,6 +41,7 @@ export default function PublishTab({ data, can }: { data: Documentation; can: { 
   const [justAdded, setJustAdded] = useState<{ name: string; before: Documentation['publishTypes'] } | null>(null)
   const [armed, setArmed] = useState<string | null>(null)
   const [showGone, setShowGone] = useState(false)
+  const [previewing, setPreviewing] = useState<string | null>(null)
   const live = data.published.filter(m => !m.withdrawnAt)
   const gone = data.published.filter(m => m.withdrawnAt)
 
@@ -356,6 +360,9 @@ export default function PublishTab({ data, can }: { data: Documentation; can: { 
                   <span className={s.ackFill} style={{ width: `${ack.pct}%` }} />
                 </span>
                 <span className={s.ackLine}>{ack.line}</span>
+                <button type="button" className={s.smallBtn} aria-label={`Preview ${m.title}`} onClick={() => setPreviewing(m.id)}>
+                  Preview
+                </button>
                 {can.edit ? (
                   <button
                     type="button"
@@ -394,6 +401,7 @@ export default function PublishTab({ data, can }: { data: Documentation; can: { 
           </button>
         ) : null}
       </section>
+      <MemoPreviewDrawer memoId={previewing} onClose={() => setPreviewing(null)} />
     </div>
   )
 }

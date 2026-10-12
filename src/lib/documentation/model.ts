@@ -346,11 +346,15 @@ export function publishRefusal(p: { title: string; body: string; hasFile: boolea
   return null
 }
 
-/** "Goes to 12 people. Each one must tap Acknowledge in the Revenue app." */
+/**
+ * "Goes to 12 people. Each one is told and must tap Acknowledge — once, in any view." A memo reaches its people
+ * in every face of the app since 2026-10-12 (the portal's every view, the HR app, the Revenue app), not only the
+ * Revenue app.
+ */
 export function publishSummary(groups: readonly AudienceGroup[]): string {
   const to = groups.reduce((n, g) => n + g.picked.length, 0)
   return to
-    ? `Goes to ${plural(to, 'person', 'people')}. Each one must tap Acknowledge in the Revenue app.`
+    ? `Goes to ${plural(to, 'person', 'people')}. Each one is told and must tap Acknowledge — once, in any view.`
     : 'Pick a department to choose who it goes to.'
 }
 
