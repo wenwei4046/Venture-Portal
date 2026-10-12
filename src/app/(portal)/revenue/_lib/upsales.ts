@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { AdjustmentReason, SettledBy } from '@/lib/commission/erp-changes'
 
 /**
  * The month's drops and upsells (2026-09-24): those the ERP found and nobody has
@@ -22,7 +23,17 @@ export interface UpsaleView {
   erpAmount: number | null
   /** The month the bill was settled in. */
   originalPeriod: string | null
-  /** The month it is paid in (for a pending one: the month it was found). */
+  /**
+   * Why the ERP's figure moved — amount, cancelled, deleted, on_hold,
+   * not_counted, reinstated (2026-10-13); null on a row typed by hand or
+   * found before then.
+   */
+  erpReason: AdjustmentReason | null
+  /** The month whose pay gave the commission on the bill: a change is paid only after it. */
+  settledPeriod: string | null
+  /** What gave it: a run, a salesperson's close, the claim form, a month closed to the feed. */
+  settledBy: SettledBy | null
+  /** The month it is paid in (for a pending one: the first month it may be paid in). */
   periodMonth: string
   amount: number
   soldOn: string
@@ -72,7 +83,7 @@ function labelOf(f: FairEmbed | null): string | null {
 
 const UPSALE_SELECT =
   'id, staff_id, amount, sold_on, fair_event_id, original_ref, note, created_at, kind, source, status, ' +
-  'erp_doc_no, settled_amount, erp_amount, original_period, period_month, ' +
+  'erp_doc_no, settled_amount, erp_amount, original_period, period_month, erp_reason, settled_period, settled_by, ' +
   'hr_staff_costs (employee_name), ' +
   'comm_venue_events (venue_key, start_date, end_date, comm_venues (display_name), comm_organisers (name))'
 
@@ -91,10 +102,16 @@ type UpsaleRow = {
   settled_amount: number | string | null
   erp_amount: number | string | null
   original_period: string | null
+  erp_reason?: string | null
+  settled_period?: string | null
+  settled_by?: string | null
   period_month: string
   hr_staff_costs: { employee_name: string } | { employee_name: string }[] | null
   comm_venue_events: FairEmbed | FairEmbed[] | null
 }
+
+const REASONS: readonly AdjustmentReason[] = ['amount', 'cancelled', 'deleted', 'on_hold', 'not_counted', 'reinstated']
+const SETTLED_BY: readonly SettledBy[] = ['run', 'close', 'hand', 'frozen']
 
 const money = (v: number | string | null): number | null => (v === null || v === undefined ? null : Number(v))
 
@@ -110,6 +127,9 @@ function toView(r: UpsaleRow): UpsaleView {
     settledAmount: money(r.settled_amount),
     erpAmount: money(r.erp_amount),
     originalPeriod: r.original_period,
+    erpReason: REASONS.find(x => x === r.erp_reason) ?? null,
+    settledPeriod: r.settled_period ?? null,
+    settledBy: SETTLED_BY.find(x => x === r.settled_by) ?? null,
     periodMonth: r.period_month,
     amount: Number(r.amount),
     soldOn: r.sold_on,

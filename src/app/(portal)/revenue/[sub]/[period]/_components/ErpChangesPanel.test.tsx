@@ -11,6 +11,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh, push }) }))
 const DROP: UpsaleView = {
   id: 'd1', staffId: 'ch', staffName: 'CHEA HUAN', kind: 'drop', source: 'erp', status: 'pending',
   erpDocNo: 'HC-SO-013911', settledAmount: 16_888, erpAmount: 14_800, originalPeriod: '2026-08-01',
+  erpReason: null, settledPeriod: null, settledBy: null,
   periodMonth: '2026-09-01', amount: -2_088, soldOn: '2026-09-18', fairEventId: null, fairLabel: null,
   originalRef: 'HC13911', note: null,
 }
@@ -144,6 +145,70 @@ describe('ErpChangesPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pay in Sep 2026' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('That change is no longer waiting')
     expect(refresh).not.toHaveBeenCalled()
+  })
+
+  // 2026-10-13 — the ERP audit trail: "判断是 upsell 还是 drop sales or
+  // cancelation … 如果是 cancellation … 这边应该能看到 … 就要 deduction".
+  describe('what the ERP changed, and what gave the commission (2026-10-13)', () => {
+    const CANCELLED: UpsaleView = {
+      ...DROP, id: 'c1', erpDocNo: 'HC-SO-013367', originalRef: 'HC8972', staffName: 'MELVIN CHONG',
+      settledAmount: 10_399, erpAmount: 0, amount: -10_399, erpReason: 'cancelled', settledBy: 'hand', settledPeriod: '2026-08-01',
+    }
+    const CLOSED: UpsaleView = {
+      ...DROP, id: 'k1', erpDocNo: 'HC-SO-2609-101', originalRef: 'HC14001', staffName: 'LUCAS',
+      settledAmount: 4_000, erpAmount: 3_000, amount: -1_000, erpReason: 'amount', settledBy: 'close', settledPeriod: '2026-09-01',
+      originalPeriod: '2026-09-01',
+    }
+
+    it('says a cancellation is one, and what gave the commission', () => {
+      render(<ErpChangesPanel period="2026-10-01" pending={[CANCELLED, CLOSED]} locked={false} briefs={{
+        c1: { savedLabel: '12 Oct 2026 14:41', kind: 'cancelled', statusAfter: 'CANCELLED', summary: ['Status Confirmed → Cancelled'] },
+      }} />)
+      const table = screen.getByRole('table', { name: 'Drops and upsells to answer' })
+      const row = within(table).getByRole('row', { name: /HC8972/ })
+      expect(row).toHaveTextContent('RM (10,399.00)Cancelled')
+      expect(row).toHaveTextContent('Claim form · Aug 2026')
+      expect(row).toHaveTextContent('CancelledSaved 12 Oct 2026 14:41Status Confirmed → Cancelled')
+      // Found before the trail was kept: nothing to say of it.
+      expect(within(table).getByRole('row', { name: /HC14001/ })).toHaveTextContent('LUCAS—Closed · Sep 2026')
+    })
+
+    it('pays a change only in a month after the close that gave the commission', () => {
+      render(<ErpChangesPanel period="2026-09-01" pending={[CLOSED, DROP]} locked={false} />)
+      const closed = within(screen.getByRole('row', { name: /HC14001/ })).getByRole('button', { name: 'Pay in Sep 2026' })
+      expect(closed).toBeDisabled()
+      expect(closed).toHaveAttribute('title', expect.stringContaining('Pay this change in Oct 2026 or later'))
+      expect(within(screen.getByRole('row', { name: /HC13911/ })).getByRole('button', { name: 'Pay in Sep 2026' })).toBeEnabled()
+    })
+
+    it('lists the month\'s audit trail: what each save changed and what it meant', () => {
+      const href = '/revenue/fair/2026-10-01/orders/o1?from=x'
+      render(<ErpChangesPanel period="2026-10-01" pending={[]} locked={false} inTab trail={{
+        since: '13 Oct 2026', more: false, rows: [
+          { id: 't2', savedLabel: '14 Oct 2026 09:10', orderNo: 'HC-SO-2610-001', paper: 'HC14002', href, seller: 'LUCAS',
+            kind: 'drop', statusAfter: 'CONFIRMED', before: 5_000, after: 4_000, delta: -1_000,
+            summary: ['AKEMI EQUINOX MATT (Q): RM 5,000.00 → RM 4,000.00'], commission: 'Not given yet — Oct 2026 counts it as it is now' },
+          { id: 't1', savedLabel: '13 Oct 2026 18:00', orderNo: 'HC-SO-2610-002', paper: null, href: null, seller: 'ANTHONY',
+            kind: 'upsell', statusAfter: 'CONFIRMED', before: 2_000, after: 2_500, delta: 500,
+            summary: ['Added PILLOW · RM 500.00'], commission: 'Given (Closed · Oct 2026) — RM 500.00 waiting for an answer' },
+        ],
+      }} />)
+      const trail = screen.getByRole('table', { name: 'ERP audit trail' })
+      const drop = within(trail).getByRole('row', { name: /HC-SO-2610-001/ })
+      expect(drop).toHaveTextContent('14 Oct 2026 09:10HC-SO-2610-001HC14002LUCASDrop salesRM 5,000.00RM 4,000.00RM (1,000.00)')
+      expect(drop).toHaveTextContent('AKEMI EQUINOX MATT (Q): RM 5,000.00 → RM 4,000.00Not given yet — Oct 2026 counts it as it is now')
+      expect(within(drop).getByRole('link', { name: 'HC-SO-2610-001' })).toHaveAttribute('href', href)
+      fireEvent.doubleClick(within(drop).getByText('LUCAS'))
+      expect(push).toHaveBeenCalledWith(href)
+      expect(within(trail).getByRole('row', { name: /HC-SO-2610-002/ })).toHaveTextContent('UpsellRM 2,000.00RM 2,500.00RM 500.00')
+      expect(within(trail).getByRole('row', { name: /2 saves/ })).toHaveTextContent('RM (500.00)')
+    })
+
+    it('says when no save moved money', () => {
+      render(<ErpChangesPanel period="2026-10-01" pending={[]} locked={false} inTab trail={{ since: '13 Oct 2026', more: false, rows: [] }} />)
+      expect(screen.getByRole('region', { name: "ERP audit trail of October 2026's bills" }))
+        .toHaveTextContent('No save has moved money on October 2026\'s bills since the record began.')
+    })
   })
 
   // 2026-10-12 — "for all sales order list on the table, need to able press in to show order detail".

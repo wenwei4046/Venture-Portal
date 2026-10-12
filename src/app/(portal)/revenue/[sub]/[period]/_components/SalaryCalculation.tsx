@@ -42,6 +42,8 @@ const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
 export interface SalaryAdjustment {
   key: string
   kind: 'upsell' | 'drop'
+  /** Its word, when it is more than the kind — "Cancelled" (2026-10-13). */
+  label?: string
   /** The paper number HR knows the bill by — HC13254. */
   ref: string
   /** The ERP's document it was found on — HC-SO-013387 — when known. */
@@ -258,7 +260,7 @@ export default function SalaryCalculation({ staffName, period, commission, adjus
             <tbody>
               <tr><td>Current commission<small>Personal + overriding + group reward{adjustments.length > 0 ? ' — the upsells and drops below apart' : ''}</small></td><td className={s.numeric}>{money(round2(commission - adjusted))}</td></tr>
               {adjustments.map(a => <tr key={a.key} className={x.adjustmentRow} data-kind={a.kind}>
-                <td>{a.kind === 'drop' ? 'Drop sales' : 'Upsell'} · {a.href ? <Link href={a.href}>{a.ref}</Link> : a.ref}
+                <td>{a.label ?? (a.kind === 'drop' ? 'Drop sales' : 'Upsell')} · {a.href ? <Link href={a.href}>{a.ref}</Link> : a.ref}
                   <small>{[a.bill ? `Sales order ${a.bill}` : null, a.from ? `${monthShort(a.from)} bill` : null,
                     a.via ? `override on ${a.via}’s` : null].filter(Boolean).join(' · ')}</small></td>
                 <td className={s.numeric}>{a.amount < 0 ? <span className="neg">{money(a.amount)}</span> : `+ ${money(a.amount)}`}</td></tr>)}

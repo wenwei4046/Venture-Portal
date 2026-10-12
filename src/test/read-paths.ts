@@ -135,11 +135,13 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   // The ERP's own path is the service role; Comm Cal's "reopen a month" replays
   // the held deliveries through it under the session (replayHeldErpEvents).
   // (Its body says "claims" only in a comment.)
+  // Since 20261013010000 every way out also writes the ERP audit trail and asks
+  // whether a salesperson's standing close gave the commission.
   ingest_erp_sales_order: [
     'comm_agent_aliases', 'comm_brands', 'comm_cutovers', 'comm_item_groups', 'comm_order_releases', 'comm_organisers',
-    'comm_products', 'comm_runs', 'comm_schemes', 'comm_sub_departments', 'comm_upsales', 'comm_venue_events', 'comm_venues',
-    'departments', 'erp_feed_settings', 'erp_sync_events', 'sales_import_batches', 'sales_order_lines',
-    'sales_order_open_bill_tags', 'sales_orders',
+    'comm_products', 'comm_runs', 'comm_salesperson_closes', 'comm_schemes', 'comm_sub_departments', 'comm_upsales',
+    'comm_venue_events', 'comm_venues', 'departments', 'erp_feed_settings', 'erp_sync_events', 'sales_import_batches',
+    'sales_order_erp_changes', 'sales_order_lines', 'sales_order_open_bill_tags', 'sales_orders',
   ],
   ladder_delete_level: ['title_levels', 'titles'],
   ladder_insert_level: ['title_levels'],
@@ -287,6 +289,7 @@ export const TRIGGER_READS: Readonly<Record<string, readonly string[]>> = {
   comm_rank_defs_propagate: ['comm_ranks'],
   comm_ranks_follow_rank_def: ['comm_rank_defs'],
   guard_commission_run_scope: ['comm_schemes', 'comm_statement_lines', 'comm_statements', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
+  comm_upsales_after_settled: [],
   comm_upsales_closed_month_guard: ['hr_staff_costs'],
   comm_upsales_guard: ['comm_order_releases', 'comm_runs'],
   comm_venue_events_canonical: ['comm_venues'],
@@ -325,6 +328,7 @@ export const TRIGGERS: ReadonlyArray<{ table: string; fn: string; events: readon
   { table: 'comm_rank_defs', fn: 'comm_rank_defs_propagate', events: ['UPDATE'] },
   { table: 'comm_ranks', fn: 'comm_ranks_follow_rank_def', events: ['INSERT', 'UPDATE'] },
   { table: 'comm_runs', fn: 'guard_commission_run_scope', events: ['INSERT', 'UPDATE'] },
+  { table: 'comm_upsales', fn: 'comm_upsales_after_settled', events: ['INSERT', 'UPDATE'] },
   { table: 'comm_upsales', fn: 'comm_upsales_closed_month_guard', events: ['INSERT', 'DELETE', 'UPDATE'] },
   { table: 'comm_upsales', fn: 'comm_upsales_guard', events: ['INSERT', 'DELETE', 'UPDATE'] },
   { table: 'comm_venue_events', fn: 'comm_venue_events_canonical', events: ['INSERT', 'UPDATE'] },

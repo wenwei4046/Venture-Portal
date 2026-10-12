@@ -4,10 +4,51 @@ import Link from 'next/link'
 import { useState, useTransition, type MouseEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
+import {
+  adjustmentLabel,
+  firstPayableMonth,
+  kindLabel,
+  kindTone,
+  payableIn,
+  settledWord,
+  type ErpChangeKind,
+} from '@/lib/commission/erp-changes'
 import type { UpsaleView } from '../../../_lib/upsales'
 import { confirmErpAdjustment, dismissErpAdjustment, reopenErpAdjustment } from '../../../upsale-actions'
 import { onTheRow } from '../orders/_components/useBillMenu'
 import s from './commission-workbench.module.css'
+
+/**
+ * What the ERP changed that a drop or an upsell is about (2026-10-13): the
+ * save that moved its money, from the ERP audit trail — when, and in words.
+ */
+export interface ChangeBrief {
+  /** The office's day and time of the Save: "30 Sep 2026 10:45". */
+  savedLabel: string
+  kind: ErpChangeKind
+  statusAfter: string | null
+  /** What changed, a sentence each — the lines first. */
+  summary: string[]
+}
+
+/** One save of the month's ERP audit trail that moved money (2026-10-13). */
+export interface TrailRowView {
+  id: string
+  savedLabel: string
+  orderNo: string
+  /** The paper the bill is on, when it is not the document's own number. */
+  paper: string | null
+  href: string | null
+  seller: string
+  kind: ErpChangeKind
+  statusAfter: string | null
+  before: number | null
+  after: number | null
+  delta: number
+  summary: string[]
+  /** What it meant for commission, in words. */
+  commission: string
+}
 
 interface Props {
   /** YYYY-MM-01 — the month a confirmed change is paid in. */
@@ -37,6 +78,17 @@ interface Props {
    * bill the portal does not hold has none.
    */
   billLinks?: Readonly<Record<string, string>>
+  /**
+   * What the ERP changed that each drop or upsell is about (2026-10-13), by
+   * the change's id — from the ERP audit trail. None: found before the trail
+   * was kept.
+   */
+  briefs?: Readonly<Record<string, ChangeBrief>>
+  /**
+   * The month's ERP audit trail (2026-10-13): every save that moved money on
+   * this month's bills, newest first. Absent: not shown.
+   */
+  trail?: { rows: TrailRowView[]; more: boolean; since: string }
 }
 
 function monthName(period: string | null, style: 'long' | 'short' = 'short'): string {
@@ -61,7 +113,25 @@ function Difference({ change }: { change: UpsaleView }) {
   return (
     <>
       {signed(change.amount)}
-      <small>{change.kind === 'drop' ? 'Drop sales' : 'Upsell'}</small>
+      <small>{adjustmentLabel(change.kind, change.erpReason)}</small>
+    </>
+  )
+}
+
+/** What gave the commission: "Claim form · Aug 2026", "Closed · Sep 2026" — the month alone before 2026-10-13. */
+function Given({ change }: { change: UpsaleView }) {
+  return <>{change.settledBy ? settledWord(change.settledBy, change.settledPeriod) : monthName(change.originalPeriod)}</>
+}
+
+/** When the ERP made the change and what it was, from the audit trail. */
+function WhatChanged({ brief }: { brief: ChangeBrief | undefined }) {
+  if (!brief) return <span className="text-graphite">—</span>
+  return (
+    <>
+      <span className={`chip ${kindTone(brief.kind)}`}><span className="dot" />{kindLabel(brief.kind, brief.statusAfter)}</span>
+      <small>Saved {brief.savedLabel}</small>
+      {brief.summary.slice(0, 2).map(line => <small key={line}>{line}</small>)}
+      {brief.summary.length > 2 ? <small>+ {brief.summary.length - 2} more on the bill</small> : null}
     </>
   )
 }
@@ -86,18 +156,24 @@ function Summary({ label, value, note }: { label: string; value: ReactNode; note
  * Undo sends it back to wait. A tab of the month's workbench since 2026-09-30,
  * in its table design; it sat above the month's cards until then.
  */
-export default function ErpChangesPanel({ period, pending, paid = [], locked, settledBefore = null, inTab = false, billLinks = {} }: Props) {
+export default function ErpChangesPanel({
+  period, pending, paid = [], locked, settledBefore = null, inTab = false, billLinks = {}, briefs = {}, trail,
+}: Props) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [undoing, setUndoing] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  if (!inTab && pending.length === 0 && paid.length === 0) return null
+  if (!inTab && pending.length === 0 && paid.length === 0 && !trail?.rows.length) return null
 
   /** A double-click on a change's row opens its bill — not one on its buttons. */
   function openBill(event: MouseEvent<HTMLElement>, id: string) {
-    const href = billLinks[id]
+    openTrailBill(event, billLinks[id] ?? null)
+  }
+
+  /** A double-click on an audit-trail row opens its bill, as on every bill list. */
+  function openTrailBill(event: MouseEvent<HTMLElement>, href: string | null) {
     if (!href || !onTheRow(event)) return
     window.getSelection()?.removeAllRanges()
     if (event.ctrlKey || event.metaKey) window.open(href, '_blank', 'noopener')
@@ -125,15 +201,25 @@ export default function ErpChangesPanel({ period, pending, paid = [], locked, se
     })
   }
 
+  /** Paid only in a month after the one that gave the commission (2026-10-13, 23ADJ). */
+  const notYet = (p: UpsaleView) => !payableIn(period, p.settledPeriod)
+  const notYetTitle = (p: UpsaleView) => {
+    const first = firstPayableMonth(p.settledPeriod)
+    return first
+      ? `The commission on this bill was given in ${monthName(p.settledPeriod)} — that month already counts it as the ERP has it now. Pay this change in ${monthName(first)} or later.`
+      : undefined
+  }
+
   return (
     <section aria-label="Drops and upsells the ERP found">
       <div className={s.topLine}>
         <div>
           <h2 className={s.sectionHeading}>Drops and upsells the ERP found</h2>
           <p className={s.subtitle}>
-            The ERP changed bills of months that were already settled. Each difference is paid in the month
-            you confirm it, at the salesperson&apos;s own rate — a drop takes its commission back — and moves
-            their upline&apos;s override the same way. Transport and other charges never count.
+            The ERP changed bills whose commission was already given — closed on Comm Cal, paid by a run, or
+            settled by hand before the portal paid. Each difference is paid in the month you confirm it, at the
+            salesperson&apos;s own rate — a drop or a cancellation takes its commission back — and moves their
+            upline&apos;s override the same way. Transport and other charges never count.
           </p>
         </div>
       </div>
@@ -165,7 +251,8 @@ export default function ErpChangesPanel({ period, pending, paid = [], locked, se
                 <tr>
                   <th className={s.stickyFirst}>Bill</th>
                   <th>Salesperson</th>
-                  <th>Settled in</th>
+                  <th>What the ERP changed</th>
+                  <th>Commission given</th>
                   <th className={s.numeric}>Settled</th>
                   <th className={s.numeric}>ERP now</th>
                   <th className={s.numeric}>Difference</th>
@@ -177,7 +264,8 @@ export default function ErpChangesPanel({ period, pending, paid = [], locked, se
                   <tr key={p.id} onDoubleClick={event => openBill(event, p.id)}>
                     <td className={s.stickyFirst}><Bill change={p} href={billLinks[p.id]} /></td>
                     <td>{p.staffName}</td>
-                    <td>{monthName(p.originalPeriod)}</td>
+                    <td><WhatChanged brief={briefs[p.id]} /></td>
+                    <td><Given change={p} /></td>
                     <td className={s.numeric}>{p.settledAmount === null ? '—' : formatMoney(p.settledAmount)}</td>
                     <td className={s.numeric}>{p.erpAmount === null ? '—' : formatMoney(p.erpAmount)}</td>
                     <td className={s.numeric}><Difference change={p} /></td>
@@ -186,7 +274,8 @@ export default function ErpChangesPanel({ period, pending, paid = [], locked, se
                         <button
                           type="button"
                           className={s.primaryButton}
-                          disabled={locked || Boolean(settledBefore) || isPending}
+                          disabled={locked || Boolean(settledBefore) || notYet(p) || isPending}
+                          title={notYet(p) ? notYetTitle(p) : undefined}
                           onClick={() => answer(p.id, () => confirmErpAdjustment(p.id, period))}
                         >
                           {busy === p.id ? 'Saving…' : `Pay in ${monthName(period)}`}
@@ -212,7 +301,7 @@ export default function ErpChangesPanel({ period, pending, paid = [], locked, se
               <tfoot>
                 <tr>
                   <td className={s.stickyFirst}>{pending.length} to answer</td>
-                  <td colSpan={4}>drops {signed(drops)} · upsells {formatMoney(upsells)}</td>
+                  <td colSpan={5}>drops {signed(drops)} · upsells {formatMoney(upsells)}</td>
                   <td className={s.numeric}>{signed(drops + upsells)}</td>
                   <td />
                 </tr>
@@ -234,7 +323,8 @@ export default function ErpChangesPanel({ period, pending, paid = [], locked, se
                   <tr>
                     <th className={s.stickyFirst}>Bill</th>
                     <th>Salesperson</th>
-                    <th>Settled in</th>
+                    <th>What the ERP changed</th>
+                    <th>Commission given</th>
                     <th className={s.numeric}>Difference</th>
                     {locked ? null : <th aria-label="Undo" />}
                   </tr>
@@ -244,7 +334,8 @@ export default function ErpChangesPanel({ period, pending, paid = [], locked, se
                     <tr key={p.id} onDoubleClick={event => openBill(event, p.id)}>
                       <td className={s.stickyFirst}><Bill change={p} href={billLinks[p.id]} /></td>
                       <td>{p.staffName}</td>
-                      <td>{monthName(p.originalPeriod)}</td>
+                      <td><WhatChanged brief={briefs[p.id]} /></td>
+                      <td><Given change={p} /></td>
                       <td className={s.numeric}><Difference change={p} /></td>
                       {locked ? null : (
                         <td>
@@ -277,7 +368,91 @@ export default function ErpChangesPanel({ period, pending, paid = [], locked, se
         </div>
       ) : null}
 
+      {trail ? <MonthTrail period={period} trail={trail} onOpen={openTrailBill} /> : null}
+
       {error ? <p role="alert" className={s.warning}>{error}</p> : null}
     </section>
+  )
+}
+
+/**
+ * The month's ERP audit trail (2026-10-13; the user: "任何改动只要一按 save
+ * 他的 sales order，我这边都要能 track 到，记录在我们自己的 audit trail 里").
+ * Every save that moved money on this month's bills — what earns, or the
+ * bill's total — newest first: what the ERP changed, by how much, and what it
+ * meant for commission. A save that moved no money (a status, a payment) is on
+ * the bill's own page.
+ */
+function MonthTrail({ period, trail, onOpen }: {
+  period: string
+  trail: NonNullable<Props['trail']>
+  onOpen: (event: MouseEvent<HTMLElement>, href: string | null) => void
+}) {
+  const net = trail.rows.reduce((a, r) => a + r.delta, 0)
+  return (
+    <div className="mt-6" aria-label={`ERP audit trail of ${monthName(period, 'long')}'s bills`} role="region">
+      <div className={s.topLine}>
+        <div>
+          <h3 className={s.sectionHeading}>ERP audit trail · {monthName(period, 'long')}&apos;s bills · {trail.rows.length}</h3>
+          <p className={s.subtitle}>
+            Every save of this month&apos;s bills that moved money — what earns, or the bill&apos;s total — as the ERP
+            sent it, newest first. The ERP keeps no audit trail of an order changed before its processing date; the
+            portal keeps its own from every save it receives (since {trail.since}). A change before the
+            salesperson&apos;s commission was given is counted with the month as it is; one after asks above.
+          </p>
+        </div>
+      </div>
+      {trail.rows.length === 0 ? (
+        <div className={`${s.tableFrame} ${s.empty}`}>
+          No save has moved money on {monthName(period, 'long')}&apos;s bills since the record began.
+        </div>
+      ) : (
+        <div className={s.tableFrame}>
+          <div className={s.tableScroll} role="region" aria-label="ERP audit trail, scroll horizontally" tabIndex={0}>
+            <table className={s.table} aria-label="ERP audit trail">
+              <thead>
+                <tr>
+                  <th className={s.stickyFirst}>Saved</th>
+                  <th>Bill</th>
+                  <th>Salesperson</th>
+                  <th>Change</th>
+                  <th className={s.numeric}>Earned before</th>
+                  <th className={s.numeric}>Earns now</th>
+                  <th className={s.numeric}>Difference</th>
+                  <th>What changed</th>
+                  <th>Commission</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trail.rows.map(r => (
+                  <tr key={r.id} onDoubleClick={event => onOpen(event, r.href)}>
+                    <td className={s.stickyFirst}>{r.savedLabel}</td>
+                    <td>
+                      {r.href ? <Link href={r.href}>{r.orderNo}</Link> : <span>{r.orderNo}</span>}
+                      {r.paper ? <small>{r.paper}</small> : null}
+                    </td>
+                    <td>{r.seller}</td>
+                    <td><span className={`chip ${kindTone(r.kind)}`}><span className="dot" />{kindLabel(r.kind, r.statusAfter)}</span></td>
+                    <td className={s.numeric}>{r.before === null ? '—' : formatMoney(r.before)}</td>
+                    <td className={s.numeric}>{r.after === null ? '—' : formatMoney(r.after)}</td>
+                    <td className={s.numeric}>{r.delta === 0 ? '—' : signed(r.delta)}</td>
+                    <td>{r.summary.map(line => <small key={line}>{line}</small>)}</td>
+                    <td><small>{r.commission}</small></td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td className={s.stickyFirst}>{trail.rows.length} saves</td>
+                  <td colSpan={5}>{trail.more ? 'The latest 500 — every save is on its bill’s page' : 'What earns moved by'}</td>
+                  <td className={s.numeric}>{signed(Math.round(net * 100) / 100)}</td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

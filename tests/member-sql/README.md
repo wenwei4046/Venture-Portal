@@ -187,3 +187,28 @@ somebody else's name, never a group holding a payroll run; a Director decides
 everything in the queue; the Executive office reads it and decides nothing;
 row policies keep a Checker off their own request and hr@ off bank balances;
 with no sign-in the old Principal-only rule stands.
+
+`validate-erp-change-trail.mjs` covers the ERP audit trail (`20261013010000` and
+`20261013020000`,
+2026-10-13). It builds the world the migration meets — the receiver verbatim
+from `20261012200000`, `erp_sync_note_adjustment` verbatim from
+`20261003170000`, August settled by hand with ZNT6185's claim-form RM 15,700
+held by the ERP as two documents (RM 8,000 + RM 7,700) — drives the old rule
+first (the two false drops the user saw), then applies the migration twice.
+Its 57 checks: the receiver swapped from production's body (14 ways out
+through `erp_sync_after_delivery`, the pending question no longer deleted on
+an applied write); the held deliveries' trail rebuilt (a status change, a
+drop, a cancellation, each document's own part of the paper); the waiting
+questions asked again — ZNT6185's gone, the real ones with why and what gave
+the commission; a split paper's real change asks only its own part; "Not a
+change" sets the figure later changes are measured from; an open month's
+bill opened, re-sent unchanged (no row), dropped, re-statused and re-charged
+for transport (changed, not a drop); a salesperson's close keeps the bill's
+value on its release, a later change is a drop payable from the next month
+(23ADJ in the close's own), a cancellation deducts what is still given, a
+reinstatement asks nothing, a reopened close takes its question back and a
+new close asks it anew; a hold, a deletion and a document never held; and a
+fault in the trail never fails its delivery; and (`020000`) a row points at a
+question only when it moved what earns — the drop that opened it, never a
+later save of a status. Run only these checks with
+`npm run test:erp-change-trail --prefix tests/member-sql`.

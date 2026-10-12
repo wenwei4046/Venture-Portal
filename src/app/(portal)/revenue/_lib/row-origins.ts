@@ -2,6 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchByKeys } from '@/lib/paginate'
 import type { CloseBills } from '@/lib/commission/row-origin'
+import type { AdjustmentReason } from '@/lib/commission/erp-changes'
 import type { BillMoved } from '@/lib/commission/bill-move'
 
 /**
@@ -21,6 +22,8 @@ export interface UpsaleFact {
   erpDocNo: string | null
   /** The month the bill was settled in. */
   originalPeriod: string | null
+  /** Why the ERP's figure moved (2026-10-13) — a cancellation is said so on the ledger; null before then. */
+  reason?: AdjustmentReason | null
   /** The bill's own page — its id and the month it sits in; null when the portal holds no such bill. */
   bill: { orderId: string; periodMonth: string } | null
 }
@@ -32,7 +35,10 @@ interface UpsaleRow {
   original_ref: string
   erp_doc_no: string | null
   original_period: string | null
+  erp_reason?: string | null
 }
+
+const REASONS: readonly AdjustmentReason[] = ['amount', 'cancelled', 'deleted', 'on_hold', 'not_counted', 'reinstated']
 
 interface BillRow {
   id: string
@@ -76,7 +82,7 @@ export async function loadUpsaleFacts(
   if (ids.length === 0) return {}
   const rows = await fetchByKeys<UpsaleRow, string>(ids, keys =>
     db.from('comm_upsales')
-      .select('id, kind, amount, original_ref, erp_doc_no, original_period')
+      .select('id, kind, amount, original_ref, erp_doc_no, original_period, erp_reason')
       .in('id', keys), 'the month’s upsells and drops')
   const billOf = await loadBillsByDocNo(db, subDepartmentId, rows.flatMap(row => row.erp_doc_no ? [row.erp_doc_no] : []))
   return Object.fromEntries(rows.map(row => {
@@ -86,6 +92,7 @@ export async function loadUpsaleFacts(
       originalRef: row.original_ref,
       erpDocNo: row.erp_doc_no,
       originalPeriod: row.original_period ?? bill?.periodMonth ?? null,
+      reason: REASONS.find(r => r === row.erp_reason) ?? null,
       bill: bill ?? null,
     }
     return [row.id, fact]

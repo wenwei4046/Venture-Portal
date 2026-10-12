@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney } from '@/lib/utils'
+import { formatDate, formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import { billHref } from '@/lib/commission/workbench-nav'
 import { exhibitionBrandOf, salesByExhibition } from '@/lib/exhibitions'
@@ -13,6 +13,16 @@ import { requireSubDepartment } from '../../_lib/sub-departments'
 import { loadBrandOptions, loadMonthOrders, loadOrderBrandPicks, loadShareTeam } from '../../_lib/month-orders'
 import { monthCommissionableValue } from '@/lib/commission/director-pay'
 import { loadMonthUpsales, loadPendingAdjustments } from '../../_lib/upsales'
+import { loadAdjustmentAnswers, loadDocChanges, loadMonthChanges } from '../../_lib/erp-changes'
+import {
+  changeFor,
+  commissionNote,
+  describeChange,
+  earnsDelta,
+  TRAIL_SINCE,
+  type ErpChange,
+} from '@/lib/commission/erp-changes'
+import { officeTime } from '@/lib/office-time'
 import { loadCommissionWorkbench } from '../../_lib/commission-workbench'
 import { loadErpFeedMonth } from '../../_lib/erp-feed-month'
 import { loadOpenBillMonthSetting, resolveOpenBill } from '../../_lib/open-bill-month'
@@ -22,7 +32,7 @@ import { explainDoubleClaim } from '@/lib/commission/double-claim-reasons'
 import CommissionWorkbench from './_components/CommissionWorkbench'
 import ErpFeedChip from './_components/ErpFeedChip'
 import DoubleClaimPanel from './_components/DoubleClaimPanel'
-import ErpChangesPanel from './_components/ErpChangesPanel'
+import ErpChangesPanel, { type ChangeBrief, type TrailRowView } from './_components/ErpChangesPanel'
 import { loadSalespersonCloses } from '../../_lib/salesperson-closes'
 import { loadBillsByDocNo } from '../../_lib/row-origins'
 import workbenchStyles from './_components/commission-workbench.module.css'
@@ -239,6 +249,19 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     .then(([paid, pending]) => loadBillsByDocNo(supabase, subDept.id, [...paid, ...pending].flatMap(a => a.erpDocNo ? [a.erpDocNo] : [])))
     // A bill that cannot be found leaves its row without a link, not the month without a page.
     .catch(() => new Map<string, { orderId: string; periodMonth: string }>())
+  // The ERP audit trail (2026-10-13): what the ERP changed that each drop or
+  // upsell is about, and every save that moved money on this month's bills
+  // with what its drop or upsell came to. Read softly: a trail that cannot be
+  // read leaves the tab as it was, never the month without a page.
+  const adjustmentChangesRead = Promise.all([paidAdjustmentsRead, pendingAdjustmentsRead])
+    .then(([paid, pending]) => loadDocChanges(supabase, subDept.id, [...paid, ...pending].flatMap(a => a.erpDocNo ? [a.erpDocNo] : [])))
+    .catch(() => new Map<string, ErpChange[]>())
+  const monthTrailRead = loadMonthChanges(supabase, subDept.id, period)
+    .then(async read => ({
+      ...read,
+      answers: await loadAdjustmentAnswers(supabase, read.changes.flatMap(c => c.adjustmentId ? [c.adjustmentId] : [])),
+    }))
+    .catch(() => null)
 
   const [
     batchRow,
@@ -256,6 +279,8 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     brandMenu,
     shareTeam,
     adjustmentBills,
+    adjustmentChanges,
+    monthTrail,
   ] = await Promise.all([
     batchRowRead,
     monthOrdersRead,
@@ -297,6 +322,8 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     brandMenuRead,
     shareTeamRead,
     adjustmentBillsRead,
+    adjustmentChangesRead,
+    monthTrailRead,
   ])
   if (monthLock.error) throw new Error(`Could not check the commission run: ${monthLock.error.message}`)
 
@@ -394,10 +421,41 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   }
   const billLinks = Object.fromEntries([...pendingAdjustments, ...paidAdjustments]
     .flatMap(change => { const href = changeHref(change); return href ? [[change.id, href]] : [] }))
+  // The ERP audit trail (2026-10-13; the user: "任何改动只要一按 save 他的 sales
+  // order，我这边都要能 track 到，记录在我们自己的 audit trail 里"). Each drop or
+  // upsell says what the ERP changed and when; under them, every save that
+  // moved money on this month's bills and what it meant for commission.
+  const savedLabel = (c: ErpChange) => officeTime(c.savedAt ?? c.receivedAt).format('D MMM YYYY HH:mm')
+  const briefs: Record<string, ChangeBrief> = Object.fromEntries([...pendingAdjustments, ...paidAdjustments].flatMap(a => {
+    const change = a.erpDocNo ? changeFor(a.id, adjustmentChanges.get(a.erpDocNo) ?? []) : null
+    return change
+      ? [[a.id, { savedLabel: savedLabel(change), kind: change.kind, statusAfter: change.statusAfter, summary: describeChange(change.before, change.after) }]]
+      : []
+  }))
+  const ordersById = new Map(monthOrders.map(o => [o.orderId, o]))
+  const trailRows: TrailRowView[] = (monthTrail?.changes ?? []).map(c => {
+    const bill = c.orderId ? ordersById.get(c.orderId) : undefined
+    return {
+      id: c.id,
+      savedLabel: savedLabel(c),
+      orderNo: c.orderNo,
+      paper: bill?.paperNo && bill.paperNo !== c.orderNo ? bill.paperNo : null,
+      href: c.orderId ? billHref(subDept.slug, period, c.orderId, `${revenuePath(subDept.slug, period)}?view=changes`) : null,
+      seller: bill ? (bill.employeeName ?? bill.agentName) : (c.after?.salesperson ?? '—'),
+      kind: c.kind,
+      statusAfter: c.statusAfter,
+      before: c.commissionableBefore,
+      after: c.commissionableAfter,
+      delta: earnsDelta(c),
+      summary: describeChange(c.before, c.after),
+      commission: commissionNote(c, c.adjustmentId ? monthTrail?.answers.get(c.adjustmentId) : null),
+    }
+  })
   // Keyed: handed to a client component as a list of server-built children.
   const erpChangesPanel = (
     <ErpChangesPanel key="erp-changes" period={period} pending={pendingAdjustments} paid={paidAdjustments} locked={inPayroll}
-      settledBefore={settledBefore} inTab={inTab} billLinks={billLinks} />
+      settledBefore={settledBefore} inTab={inTab} billLinks={billLinks} briefs={briefs}
+      trail={monthTrail ? { rows: trailRows, more: monthTrail.more, since: formatDate(TRAIL_SINCE) } : undefined} />
   )
   // What each tab asks of somebody: the drops and upsells to answer; the
   // groups not yet checked, and the months that ride in unpaid.

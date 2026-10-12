@@ -285,6 +285,14 @@ releases it. `deleted: true` excludes it as `DELETED`.
 retry always carries the newest state; the guard exists for two in-flight
 requests of one document crossing on the wire. Send it.
 
+**The audit trail (2026-10-13).** Every `applied` or `held` delivery of a
+document the portal holds is compared with what the portal knew of it before,
+and when anything it reads changed — status, hold, amount, lines, salesperson,
+customer, dates, venue, balance — the portal keeps a row of its own ERP audit
+trail (`sales_order_erp_changes`, §12). The ERP keeps none for an order changed
+before its processing date; nothing on the ERP's side changes for it. Send
+every save, as now.
+
 **PROVEN** on the live schema (rolled back) and again through the HTTP receiver
 on 2026-09-05: new → duplicate → stale → update → match salesperson → second
 order same day (sequence 2, brand from lines) → draft skipped → hold excluded
@@ -812,3 +820,46 @@ Ting. Against the old guess the scoring booth moved for three: LAWRENCE and PEI
 FEN on 25 Sep (to the booth the ERP lists them at), and ETHAN on 2 Oct (listed
 at Sabah; his one bill that weekend says Setia Spice, so that weekend scores
 nothing until the list or the bill is corrected).
+
+## 12. The ERP audit trail, kept by the portal (2026-10-13)
+
+> The user: "ERP 本身在开完单的时候，如果 process date 还没到，他做任何改动（比如
+> 改 amount 或者改 product 等等），都不会记录在 audit trail … 但实际上他们一旦
+> 开单 … 我已经给了 commission … 只要他开了单，任何改动只要一按 save 他的
+> sales order，我这边都要能 track 到，记录在我们自己的 audit trail 里 … 判断是
+> upsell 还是 drop sales or cancelation".
+
+The ERP's own audit trail (`so_audit`, amendments) starts at an order's
+processing date: a sales order edited before it — its amount, its products —
+leaves no record there. The feed already sends the whole document on every save
+(the kick, §1), so the portal keeps the record instead. Nothing changes on the
+ERP's side.
+
+`ingest_erp_sales_order` reads what the portal last knew of the document (the
+trail's last state, else the bill as it holds it) and, on every way out
+(`erp_sync_after_delivery`, mig `20261013010000`), compares the delivery with
+it. A difference in anything the portal reads is one row: the document before
+and after, what kind of change it was on what EARNS — `opened` · `upsell` ·
+`drop` · `cancelled` · `deleted` · `on_hold` · `reinstated` · `changed`
+(transport and service lines move the bill's total, never the kind) — and
+whether its commission had already been given. A delivery that changed
+nothing the portal reads (a cost the portal does not use) writes no row. A
+fault in the trail is a `change_trail_failed` warning on the delivery's log,
+never a failed delivery: the ERP still gets its 200.
+
+**When a change is a drop or an upsell to answer.** While a bill's commission
+has not been given, a change simply counts in its own month. Once it has — a
+salesperson's close released it (since the unified payroll no run is applied,
+so the close IS the payment), a run paid it, the claim form settled its month,
+or its month is closed to the feed — the difference from what was given is a
+pending drop or upsell on Comm Cal › Drops & upsells, with why
+(`erp_reason`: amount · cancelled · deleted · on_hold · not_counted ·
+reinstated), payable in a month after the one that gave the commission. A
+paper keyed as several documents shares its claim-form figure among them in
+proportion to what each held when the month was settled.
+
+**Where it is read.** A bill's page (*ERP audit trail*), and the month's Drops
+& upsells tab (what each question is about; every save that moved money on the
+month's bills). Rebuilt on 2026-10-12 from the held deliveries the feed kept
+since 2026-09-26; an applied delivery before then kept no payload, so an older
+bill's trail starts with its next save.
