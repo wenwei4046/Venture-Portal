@@ -196,6 +196,22 @@ describe('the treasury Overview’s lists are sheet tables', () => {
     expect(foot).toHaveTextContent('+520,000.00')
   })
 
+  // 2026-10-12: a company is overdue when one of its loans has an instalment
+  // past its day unpaid — the live book, as the Overdue page reads it — not
+  // the records Detect overdue used to write (dashboard_summary.has_overdue).
+  it('Subsidiaries: a company reads overdue from its loans’ plans', async () => {
+    database({
+      ...SUMMARY,
+      // The summary's ids are the companies' own; its flag says the opposite of the loans.
+      subsidiaries: SUMMARY.subsidiaries.map((s) => ({ ...s, id: s.short_code === 'HC' ? 'co-hc' : 'co-hb', has_overdue: s.short_code === 'HC' })),
+    })
+    await draw(FINANCE())
+    const subs = section('Subsidiaries')
+    const rowOf = (name: string) => within(subs).getByText(name).closest('tr') as HTMLElement
+    expect(within(rowOf('HOUZS Bedding')).getByText('overdue').closest('.chip')).toHaveClass('danger')
+    expect(within(rowOf('HOUZS Century')).queryByText('overdue')).toBeNull()
+  })
+
   it('the instalments behind and coming up: sheet tables; a row opens its deal, which goes back to the Overview', async () => {
     await draw(FINANCE())
     const behind = section('Overdue instalments')
@@ -242,7 +258,9 @@ describe('the treasury Overview’s fold, alerts, KPI rows and phone head', () =
     const alerts = section('Alerts')
     expect(alerts.querySelector('ul')).toBeNull()
     expect(Array.from(alerts.querySelectorAll('thead th')).map((th) => th.textContent)).toEqual(['Type', 'Message'])
-    const row = within(alerts).getByText('Overdue: 2 records pending').closest('tr') as HTMLElement
+    // The overdue alert is the book's (2026-10-12): HB's loan has September behind.
+    expect(within(alerts).queryByText('Overdue: 2 records pending')).toBeNull()
+    const row = within(alerts).getByText('Overdue: 1 loan with an instalment past its day').closest('tr') as HTMLElement
     expect(within(row).getByText('warning').closest('.chip')).toHaveClass('alert')
     expect(within(alerts).getByText('1 fund source(s) maturing in 30 days').closest('tr')).not.toBeNull()
   })

@@ -7,6 +7,8 @@ import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, fundingSourceFromTerms } from '@/lib/utils'
+import { loadRepaymentBook } from '@/lib/repayment-book'
+import { overdueOf, type OverdueSummary } from '@/lib/repayment-calendar'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import ExportCSVButton from './_components/ExportCSVButton'
 import LoansTable from './_components/LoansTable'
@@ -15,9 +17,10 @@ import LoanTabs from './_components/LoanTabs'
 // Fund OUT on the sheet (2026-10-09, the user's Claude Design handoff — Phase 3
 // of the Finance revamp): five cards — what is lent out, the weighted rate,
 // its spread over the cost of the funds (Fund IN's weighted cost), what
-// matures within 30 days, what is overdue (an open record on the Overdue
-// page) — the status tabs counted with Overdue among them, and the loans in a
-// scroll box with their status as chips.
+// matures within 30 days, what is overdue — the status tabs counted with
+// Overdue among them, and the loans in a scroll box with their status as
+// chips. Overdue (2026-10-12) is an active loan with an instalment past its day
+// unpaid, read from its repayment plan as the Overdue page reads it.
 
 type LoanRow = {
   id: string
@@ -53,19 +56,20 @@ export default async function FundOutPage({ searchParams }: Props) {
   const canAmend = canDo(user, 'treasury', 'approve')
   const supabase = await createClient()
   const { status: statusFilter } = await searchParams
+  const today = officeToday()
 
   const [
     { data: loans },
     { data: companies },
     { data: outstandingRows },
-    { data: overdueRows },
+    loanBook,
     { data: sourceRows },
   ] = await Promise.all([
     supabase.from('loans').select('*').order('created_at', { ascending: false }),
     supabase.from('companies').select('id, name, short_code'),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid, total_interest_paid'),
-    // Overdue = an open record on the Overdue page (Detect overdue writes them).
-    supabase.from('overdue_records').select('loan_id').eq('status', 'pending'),
+    // Overdue = an instalment past its day unpaid, on each active loan's plan.
+    loadRepaymentBook(supabase, today, { only: 'collect' }),
     // The cost of the funds: Fund IN's active sources.
     supabase.from('fund_sources').select('amount, cost_rate').eq('status', 'active'),
   ])
@@ -77,11 +81,15 @@ export default async function FundOutPage({ searchParams }: Props) {
   const outstandingMap = new Map(
     (outstandingRows ?? []).map((o) => [o.loan_id, o as OutstandingRow])
   )
-  const overdueIds = new Set(((overdueRows ?? []) as Array<{ loan_id: string }>).map((o) => o.loan_id))
+  const overdueBy = new Map<string, OverdueSummary>()
+  for (const deal of loanBook) {
+    const due = overdueOf(deal.plan, today)
+    if (due) overdueBy.set(deal.id, due)
+  }
   const outstandingOf = (l: LoanRow) => Number(outstandingMap.get(l.id)?.outstanding ?? l.principal)
 
   const active = loanList.filter((l) => l.status === 'active')
-  const overdue = active.filter((l) => overdueIds.has(l.id))
+  const overdue = active.filter((l) => overdueBy.has(l.id))
   const pending = loanList.filter((l) => l.status === 'pending_approval')
   const repaid = loanList.filter((l) => l.status === 'fully_repaid')
 
@@ -95,7 +103,6 @@ export default async function FundOutPage({ searchParams }: Props) {
   const spread = weightedRate - costOfFunds
 
   // Maturing within 30 days: a scheduled loan's disbursement + its tenure.
-  const today = officeToday()
   const maturing = active.filter((l) => {
     if (isLoanUnscheduled(l.repayment_terms) || !l.disbursement_date || !l.tenure_months) return false
     const days = dayjs(l.disbursement_date).add(Number(l.tenure_months), 'month').diff(today, 'day')
@@ -175,7 +182,7 @@ export default async function FundOutPage({ searchParams }: Props) {
         <StatCard
           tone={overdue.length > 0 ? 'danger' : 'default'}
           label="Overdue"
-          value={formatMoney(overdue.reduce((s, l) => s + outstandingOf(l), 0))}
+          value={formatMoney(overdue.reduce((s, l) => s + (overdueBy.get(l.id)?.outstanding ?? 0), 0))}
           icon="alert"
           href={overdue.length > 0 ? '/overdue' : undefined}
           note={overdue.length > 0 ? `${overdue.length} ${overdue.length === 1 ? 'loan' : 'loans'} · see Overdue` : 'None'}
@@ -222,7 +229,7 @@ export default async function FundOutPage({ searchParams }: Props) {
                     effectiveRate: Number(loan.effective_rate),
                     status: loan.status,
                     fundingSource: fundingSourceFromTerms(loan.repayment_terms),
-                    overdue: loan.status === 'active' && overdueIds.has(loan.id),
+                    overdue: loan.status === 'active' && overdueBy.has(loan.id),
                   }
                 })}
               />

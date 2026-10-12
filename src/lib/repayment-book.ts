@@ -16,6 +16,9 @@ export interface BookDeal {
   id: string
   name: string
   href: string
+  /** The company it is with: a loan's borrower, the company a fund source came
+   *  from; null for a director, a department or a name (2026-10-12). */
+  companyId?: string | null
   plan: RepaymentPlan
 }
 
@@ -24,6 +27,7 @@ export interface BookEntry {
   id: string
   name: string
   href: string
+  companyId?: string | null
   /** YYYY-MM-DD */
   due: string
   no: number
@@ -40,7 +44,7 @@ export function bookWindow(deals: readonly BookDeal[], today: string, days = 14)
   for (const d of deals) {
     for (const r of d.plan.rows) {
       if (r.outstanding <= 0.005) continue
-      const entry: BookEntry = { kind: d.kind, id: d.id, name: d.name, href: d.href, due: r.due, no: r.no, months: d.plan.months, outstanding: r.outstanding }
+      const entry: BookEntry = { kind: d.kind, id: d.id, name: d.name, href: d.href, companyId: d.companyId ?? null, due: r.due, no: r.no, months: d.plan.months, outstanding: r.outstanding }
       if (r.due < today) overdue.push(entry)
       else if (r.due <= end) upcoming.push(entry)
     }
@@ -54,24 +58,37 @@ type Row = Record<string, unknown>
 /**
  * The live book: active loans and active / matured fund sources, each with
  * its plan. Reads what the deals' own pages read (their terms over time and
- * every repayment, paginated).
+ * every repayment, paginated). `only` reads one side (2026-10-12): the
+ * Overdue page's Fund OUT, the Fund OUT list and a company's overdue need the
+ * loans alone.
  */
-export async function loadRepaymentBook(supabase: SupabaseClient, today: string): Promise<BookDeal[]> {
+export async function loadRepaymentBook(supabase: SupabaseClient, today: string, opts: { only?: 'collect' | 'pay' } = {}): Promise<BookDeal[]> {
+  const loansToo = opts.only !== 'pay'
+  const sourcesToo = opts.only !== 'collect'
+  const none = Promise.resolve({ data: [] as Row[] })
   const [{ data: loans }, { data: sources }, { data: companies }, { data: departments }, loanReps, sourceReps] = await Promise.all([
-    supabase
-      .from('loans')
-      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, terms_effective_from')
-      .eq('status', 'active'),
-    supabase
-      .from('fund_sources')
-      .select('id, status, amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, terms_effective_from, from_company_id, from_department_id, from_freetext_name')
-      .in('status', ['active', 'matured']),
+    loansToo
+      ? supabase
+          .from('loans')
+          .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, terms_effective_from')
+          .eq('status', 'active')
+      : none,
+    sourcesToo
+      ? supabase
+          .from('fund_sources')
+          .select('id, status, amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, terms_effective_from, from_company_id, from_department_id, from_freetext_name')
+          .in('status', ['active', 'matured'])
+      : none,
     supabase.from('companies').select('id, name, short_code'),
-    supabase.from('departments').select('id, name'),
-    fetchAllRows<Row>((lo, hi) => supabase.from('repayments').select('loan_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi)),
-    fetchAllRows<Row>((lo, hi) =>
-      supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi),
-    ),
+    sourcesToo ? supabase.from('departments').select('id, name') : none,
+    loansToo
+      ? fetchAllRows<Row>((lo, hi) => supabase.from('repayments').select('loan_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi))
+      : Promise.resolve([] as Row[]),
+    sourcesToo
+      ? fetchAllRows<Row>((lo, hi) =>
+          supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi),
+        )
+      : Promise.resolve([] as Row[]),
   ])
   const loanList = (loans ?? []) as Row[]
   const sourceList = (sources ?? []) as Row[]
@@ -103,6 +120,7 @@ export async function loadRepaymentBook(supabase: SupabaseClient, today: string)
       id,
       name: ((co?.name ?? co?.short_code) as string | undefined) ?? 'Loan',
       href: `/fund-out/${id}`,
+      companyId: (l.company_id as string | null) ?? null,
       plan: buildRepaymentPlan({
         terms: termsForLoan(l as Parameters<typeof termsForLoan>[0], loanHist.get(id) ?? []),
         payments: loanPays.get(id) ?? [],
@@ -121,6 +139,7 @@ export async function loadRepaymentBook(supabase: SupabaseClient, today: string)
       id,
       name: ((co?.name as string | undefined) ?? (s.from_freetext_name as string | null) ?? (s.from_department_id ? deptName.get(s.from_department_id as string) : null) ?? 'Fund source') as string,
       href: `/fund-in/${id}`,
+      companyId: (s.from_company_id as string | null) ?? null,
       plan: buildRepaymentPlan({
         terms: termsForFundSource(s as Parameters<typeof termsForFundSource>[0], sourceHist.get(id) ?? []),
         payments: sourcePays.get(id) ?? [],

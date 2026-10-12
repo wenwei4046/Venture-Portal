@@ -10,43 +10,30 @@ import { fetchAllRows, fetchByKeys } from '@/lib/paginate'
 import { buildRepaymentPlan } from '@/lib/repayment-plan'
 import { overdueOf, type OverdueSummary } from '@/lib/repayment-calendar'
 import { fetchTermsHistory, isFundSourcePrincipal, termsForFundSource } from '@/lib/treasury-terms-data'
+import { loadRepaymentBook, type BookDeal } from '@/lib/repayment-book'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import LedgerRow from '@/components/LedgerRow'
-import { markOverduePaid } from './actions'
-import DetectOverdueButton from './_components/DetectOverdueButton'
-import EscalateButton from './_components/EscalateButton'
 import OverdueTabs from './_components/OverdueTabs'
 
 // Overdue & Netting on the sheet (2026-10-09, the user's Claude Design handoff
-// — Phase 3 of the Finance revamp). Two tabs:
-//   Fund OUT · they owe us — the overdue records Detect overdue writes, by
-//     month, with their penalty, and the netting & penalty log;
-//   Fund IN · we owe — a fund source's installments whose day has passed with
-//     something unpaid on them, read off its repayment plan (lib/repayment-
-//     plan, the same rows as its page's Repayment schedule).
+// — Phase 3 of the Finance revamp). Two tabs, each read off the deals'
+// repayment plans (lib/repayment-plan, the same rows as a deal's page's
+// Repayment schedule): the instalments whose day has passed with something
+// unpaid on them, under the month of the oldest —
+//   Fund OUT · they owe us — the active loans (2026-10-12, user: 我不想要自己按
+//     detect over due, 就打开时就最新: no Detect overdue, no record to mark paid
+//     or escalate — a payment recorded on the loan clears its row);
+//   Fund IN · we owe — the active and matured fund sources.
 // Four cards each: what is overdue, the penalty, the longest overdue, what was
 // netted this month. 2026-10-10 (the handoff, more closely): the cards come
 // before the tabs, every month's table closes on its total, a loan they owe
-// us offers Net off (its Record repayment, where Netting is a type), the
-// netting log always shows, and on a phone a row opens onto the rest of it.
+// us offers its Record repayment (where Netting is a type), the netting log
+// always shows, and on a phone a row opens onto the rest of it.
 // 2026-10-12 (user: 两个都改 … 对，照这个做): the netting & penalty log is what
 // was netted or charged on the tab's side, each on its day, over the last 30
 // days (the handoff's count) — on both tabs; a record marked paid or escalated
 // is no longer in it (it is neither, and keeps no day). Fund IN's Netted this
 // month counts the fund sources' nettings (it said "Netting is on loans").
-
-type OverdueRow = {
-  id: string
-  loan_id: string
-  period_month: string
-  overdue_days: number
-  overdue_stage: 'grace' | 'late_1' | 'late_2' | 'escalation' | null
-  is_overdue: boolean
-  penalty_rate: number | null
-  penalty_amount: number | null
-  status: 'pending' | 'paid' | 'escalated'
-  created_at: string
-}
 
 type SourceRow = {
   id: string
@@ -74,21 +61,9 @@ type LogEntry = { id: string; date: string; dealId: string; name: string; type: 
 // where the row's own label is all there is, always says it.
 const footLabel = (n: number) => (n > 1 ? 'Total' : <span className="md:hidden">Total</span>)
 
-/** A record's stage as the sheet's chip: escalated red, grace grey, else overdue amber. */
-function StageChip({ stage }: { stage: OverdueRow['overdue_stage'] }) {
-  const [tone, label] =
-    stage === 'escalation'
-      ? ['danger', 'escalated']
-      : stage === 'grace'
-        ? ['info', 'grace']
-        : ['alert', 'overdue']
-  return (
-    <span className={`chip ${tone}`}>
-      <i className="dot" />
-      {label}
-    </span>
-  )
-}
+/** "Instalment 3 of 6 · 3 unpaid" — the oldest unpaid, the plan's length, how many. */
+const dueNote = (due: OverdueSummary, months: number | null) =>
+  `Instalment ${due.oldestNo}${months ? ` of ${months}` : ''}${due.count > 1 ? ` · ${due.count} unpaid` : ''}`
 
 export default async function OverduePage({ searchParams }: Props) {
   await requirePage('/overdue')
@@ -102,16 +77,13 @@ export default async function OverduePage({ searchParams }: Props) {
   const logSince = dayjs(today).subtract(29, 'day').format('YYYY-MM-DD')
   const monthStart = `${month}-01`
 
-  const [{ data: overdueRows }, { data: loans }, { data: companies }, { data: outstandingRows }, { data: loanMoveRows }, { data: sources }, { data: departments }, sourceReps] =
+  const [loanBook, { data: loans }, { data: companies }, { data: loanMoveRows }, { data: sources }, { data: departments }, sourceReps] =
     await Promise.all([
-      supabase
-        .from('overdue_records')
-        .select('*')
-        .order('period_month', { ascending: false })
-        .order('overdue_days', { ascending: false }),
-      supabase.from('loans').select('id, company_id, principal, effective_rate, status'),
+      // Fund OUT (2026-10-12): every active loan's repayment plan.
+      loadRepaymentBook(supabase, today, { only: 'collect' }),
+      // Every loan's borrower, for the log's names (a loan repaid since too).
+      supabase.from('loans').select('id, company_id'),
       supabase.from('companies').select('id, name, short_code'),
-      supabase.from('loan_outstanding').select('loan_id, outstanding'),
       // A loan's nettings and penalties (2026-10-12): this month's nettings
       // for the card, the last 30 days' nettings and penalties for the log.
       supabase
@@ -133,18 +105,17 @@ export default async function OverduePage({ searchParams }: Props) {
       ).catch(() => [] as Array<{ id: string; fund_source_id: string; amount: number; payment_date: string; payment_type: string }>),
     ])
 
-  const rows = (overdueRows ?? []) as OverdueRow[]
   const loanMap = new Map((loans ?? []).map((l) => [l.id, l]))
   const companyMap = new Map((companies ?? []).map((c) => [c.id, { name: c.name, code: c.short_code }]))
-  const outstandingMap = new Map((outstandingRows ?? []).map((o) => [o.loan_id, Number(o.outstanding)]))
   const deptName = new Map(((departments ?? []) as Array<{ id: string; name: string }>).map((d) => [d.id, d.name]))
 
-  // ── Fund OUT: the open records ──
-  const active = rows.filter((r) => r.status === 'pending')
-  const totalPenalty = active.reduce((sum, r) => sum + Number(r.penalty_amount ?? 0), 0)
-  const loanIds = Array.from(new Set(active.map((r) => r.loan_id)))
-  const outOutstanding = loanIds.reduce((s, id) => s + (outstandingMap.get(id) ?? Number(loanMap.get(id)?.principal ?? 0)), 0)
-  const longestOut = [...active].sort((a, b) => b.overdue_days - a.overdue_days)[0] ?? null
+  // ── Fund OUT: a loan's installments passed unpaid, longest first ──
+  const outOwed = loanBook
+    .map((deal) => ({ deal, due: overdueOf(deal.plan, today) }))
+    .filter((o): o is { deal: BookDeal; due: OverdueSummary } => o.due !== null)
+    .sort((a, b) => b.due.daysPast - a.due.daysPast || b.due.outstanding - a.due.outstanding)
+  const outOutstanding = outOwed.reduce((s, o) => s + o.due.outstanding, 0)
+  const longestOut = outOwed[0] ?? null
   const companyOf = (loanId: string) => {
     const loan = loanMap.get(loanId)
     return loan ? companyMap.get(loan.company_id) : undefined
@@ -166,6 +137,8 @@ export default async function OverduePage({ searchParams }: Props) {
   const loanMoves = (loanMoveRows ?? []) as Array<Move & { loan_id: string }>
   const netted = loanMoves.filter((r) => r.payment_type === 'netting' && inMonth(r))
   const nettedTotal = netted.reduce((s, r) => s + Number(r.amount), 0)
+  const penalties = loanMoves.filter((r) => r.payment_type === 'penalty' && inMonth(r))
+  const penaltyTotal = penalties.reduce((s, r) => s + Number(r.amount), 0)
   const outLog = loanMoves
     .filter(loggable)
     .map((r) => entry(r, r.loan_id, companyOf(r.loan_id)?.name ?? '—'))
@@ -221,19 +194,17 @@ export default async function OverduePage({ searchParams }: Props) {
   const inOutstanding = owed.reduce((s, o) => s + o.due.outstanding, 0)
   const longestIn = [...owed].sort((a, b) => b.due.daysPast - a.due.daysPast)[0] ?? null
 
-  // Detecting and escalating raise records; Mark paid edits one (2026-10-08, PR2).
+  // Recording a repayment is Treasury · Create (the loan's own form).
   const canFinanceAct = canDo(user, 'treasury', 'create')
-  const canMarkPaid = canDo(user, 'treasury', 'edit')
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
-  // The overdue by the month it fell due.
-  const outByMonth = new Map<string, OverdueRow[]>()
-  for (const r of active) outByMonth.set(r.period_month.slice(0, 7), [...(outByMonth.get(r.period_month.slice(0, 7)) ?? []), r])
+  // The overdue by the month the oldest unpaid instalment fell due.
+  const outByMonth = new Map<string, typeof outOwed>()
+  for (const o of outOwed) outByMonth.set(o.due.oldestDue.slice(0, 7), [...(outByMonth.get(o.due.oldestDue.slice(0, 7)) ?? []), o])
   const inByMonth = new Map<string, typeof owed>()
   for (const o of owed) inByMonth.set(o.due.oldestDue.slice(0, 7), [...(inByMonth.get(o.due.oldestDue.slice(0, 7)) ?? []), o])
   const monthsOf = (m: Map<string, unknown[]>) => Array.from(m.keys()).sort().reverse()
   const monthTitle = (ym: string) => dayjs(`${ym}-01`).format('MMMM YYYY')
-  const outOf = (loanId: string) => outstandingMap.get(loanId) ?? Number(loanMap.get(loanId)?.principal ?? 0)
 
   return (
     <div>
@@ -245,20 +216,19 @@ export default async function OverduePage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Overdue &amp; Netting</h1>
         </div>
-        {canFinanceAct ? <DetectOverdueButton /> : null}
       </div>
 
       {/* The cards, then the tabs (the handoff). */}
       {tab === 'out' ? (
         <StatCards label="Overdue · Fund OUT">
-          <StatCard tone="primary" label="Overdue outstanding" value={formatMoney(outOutstanding)} icon="alert" note={plural(loanIds.length, 'company', 'companies')} />
-          <StatCard tone={totalPenalty > 0 ? 'danger' : 'default'} label="Penalty accrued" value={formatMoney(totalPenalty)} icon="receipt" note="Since due date" />
+          <StatCard tone="primary" label="Overdue outstanding" value={formatMoney(outOutstanding)} icon="alert" note={plural(outOwed.length, 'loan', 'loans')} />
+          <StatCard tone={penaltyTotal > 0 ? 'danger' : 'default'} label="Penalty this month" value={formatMoney(penaltyTotal)} icon="receipt" note={plural(penalties.length, 'penalty', 'penalties')} />
           <StatCard
             tone={longestOut ? 'danger' : 'default'}
             label="Longest overdue"
-            value={longestOut ? `${longestOut.overdue_days} days` : '—'}
+            value={longestOut ? `${longestOut.due.daysPast} days` : '—'}
             icon="clock"
-            note={longestOut ? companyOf(longestOut.loan_id)?.name ?? '—' : 'Nothing overdue'}
+            note={longestOut ? longestOut.deal.name : 'Nothing overdue'}
           />
           <StatCard label="Netted this month" value={formatMoney(nettedTotal)} icon="swap" note={plural(netted.length, 'netting', 'nettings')} />
         </StatCards>
@@ -278,25 +248,25 @@ export default async function OverduePage({ searchParams }: Props) {
       )}
 
       <Suspense fallback={null}>
-        <OverdueTabs counts={{ out: loanIds.length, in: owed.length }} />
+        <OverdueTabs counts={{ out: outOwed.length, in: owed.length }} />
       </Suspense>
 
       {tab === 'out' ? (
         <>
-          {active.length === 0 ? (
-            <AllClearState canFinanceAct={canFinanceAct} />
+          {outOwed.length === 0 ? (
+            <div className="py-16 text-center border border-hairline rounded-md bg-surface">
+              <p className="font-sans text-ledger text-lg mb-2">All loans current.</p>
+              <p className="font-sans text-muted text-sm">No installment of theirs has passed its day unpaid.</p>
+            </div>
           ) : (
             monthsOf(outByMonth).map((ym) => {
               const list = outByMonth.get(ym)!
-              const penalty = list.reduce((s, r) => s + Number(r.penalty_amount ?? 0), 0)
               return (
                 <section key={ym} className="mb-9">
                   <div className="sect-head">
                     <h2>{monthTitle(ym)}</h2>
                     <span className="rule" aria-hidden />
-                    <span className="count">
-                      {plural(list.length, 'LOAN', 'LOANS')} · UNPAID INTEREST
-                    </span>
+                    <span className="count">{plural(list.length, 'LOAN', 'LOANS')} · THEY OWE US</span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="ledger-table w-full">
@@ -306,62 +276,49 @@ export default async function OverduePage({ searchParams }: Props) {
                           <th className="text-right right">Outstanding</th>
                           <th className="text-right right">Days past</th>
                           <th className="m-hide">Status</th>
-                          <th className="text-right right m-hide">Penalty</th>
+                          <th className="m-hide">Note</th>
                           <th className="m-hide" />
                           <th className="lt-toggle" aria-hidden />
                         </tr>
                       </thead>
                       <tbody>
-                        {list.map((row) => {
-                          const company = companyOf(row.loan_id)
-                          return (
-                            <LedgerRow key={row.id}>
-                              <td>
-                                <Link href={`/fund-out/${row.loan_id}`} className="text-ink hover:text-accent">
-                                  {company?.name ?? '—'}
+                        {list.map((o) => (
+                          <LedgerRow key={o.deal.id}>
+                            <td>
+                              <Link href={o.deal.href} className="text-ink hover:text-accent">
+                                {o.deal.name}
+                              </Link>
+                              <div className="text-[11px] text-graphite mt-0.5">{o.deal.companyId ? companyMap.get(o.deal.companyId)?.code ?? '' : ''}</div>
+                            </td>
+                            <td className="num">{formatMoney(o.due.outstanding)}</td>
+                            <td className="num">{o.due.daysPast}</td>
+                            <td className="m-hide" data-label="Status">
+                              <span className="chip alert">
+                                <i className="dot" />
+                                overdue
+                              </span>
+                            </td>
+                            <td className="m-hide text-graphite" data-label="Note">
+                              {dueNote(o.due, o.deal.plan.months)}
+                            </td>
+                            <td className="m-hide text-right">
+                              {/* The loan's Record repayment, where Netting is a type. */}
+                              {canFinanceAct ? (
+                                <Link href={`${o.deal.href}#repayment-form`} className="sch-row-btn border-0">
+                                  Record receipt
                                 </Link>
-                                <div className="text-[11px] text-graphite mt-0.5">{company?.code ?? ''}</div>
-                              </td>
-                              <td className="num">{formatMoney(outOf(row.loan_id))}</td>
-                              <td className="num">{row.overdue_days}</td>
-                              <td className="m-hide" data-label="Status">
-                                <StageChip stage={row.overdue_stage} />
-                              </td>
-                              <td className="num neg m-hide" data-label="Penalty">
-                                {Number(row.penalty_amount ?? 0) ? formatMoney(-Number(row.penalty_amount)) : '—'}
-                              </td>
-                              <td className="m-hide text-right">
-                                {canFinanceAct || canMarkPaid ? (
-                                  <div className="sch-row-acts">
-                                    {canFinanceAct && row.overdue_stage === 'escalation' ? <EscalateButton overdueId={row.id} /> : null}
-                                    {canMarkPaid ? (
-                                      <form action={markOverduePaid}>
-                                        <input type="hidden" name="id" value={row.id} />
-                                        <button type="submit" className="sch-row-btn">
-                                          Mark paid
-                                        </button>
-                                      </form>
-                                    ) : null}
-                                    {/* Net off (the handoff): the loan's Record repayment, where Netting is a type. */}
-                                    {canFinanceAct ? (
-                                      <Link href={`/fund-out/${row.loan_id}#repayment-form`} className="sch-row-btn border-0">
-                                        Net off
-                                      </Link>
-                                    ) : null}
-                                  </div>
-                                ) : null}
-                              </td>
-                            </LedgerRow>
-                          )
-                        })}
+                              ) : null}
+                            </td>
+                          </LedgerRow>
+                        ))}
                       </tbody>
                       <tfoot>
                         <tr>
                           <td>{footLabel(list.length)}</td>
-                          <td className="num">{formatMoney(list.reduce((s, r) => s + outOf(r.loan_id), 0))}</td>
+                          <td className="num">{formatMoney(list.reduce((s, o) => s + o.due.outstanding, 0))}</td>
                           <td />
                           <td className="m-hide" />
-                          <td className={`num m-hide${penalty ? ' neg' : ''}`}>{penalty ? formatMoney(-penalty) : '—'}</td>
+                          <td className="m-hide" />
                           <td className="m-hide" />
                           <td className="lt-toggle" aria-hidden />
                         </tr>
@@ -423,9 +380,7 @@ export default async function OverduePage({ searchParams }: Props) {
                               </span>
                             </td>
                             <td className="m-hide text-graphite" data-label="Note">
-                              Instalment {o.due.oldestNo}
-                              {o.months ? ` of ${o.months}` : ''}
-                              {o.due.count > 1 ? ` · ${o.due.count} unpaid` : ''}
+                              {dueNote(o.due, o.months)}
                             </td>
                             <td className="m-hide text-right">
                               <Link href={`/fund-in/${o.source.id}`} className="sch-row-btn border-0">
@@ -520,22 +475,5 @@ function NettingLog({ side, entries }: { side: 'out' | 'in'; entries: LogEntry[]
         </div>
       )}
     </section>
-  )
-}
-
-function AllClearState({ canFinanceAct }: { canFinanceAct: boolean }) {
-  return (
-    <div className="py-16 text-center border border-hairline rounded-md bg-surface">
-      <p className="font-sans text-ledger text-lg mb-2">All loans current.</p>
-      <p className="font-sans text-muted text-sm">
-        {canFinanceAct ? (
-          <>
-            No overdue records pending. Click <em>Detect overdue</em> to scan active loans.
-          </>
-        ) : (
-          <>No overdue records pending.</>
-        )}
-      </p>
-    </div>
   )
 }

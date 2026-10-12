@@ -8,6 +8,7 @@ import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { buildRepaymentPlan } from '@/lib/repayment-plan'
+import { overdueOf } from '@/lib/repayment-calendar'
 import { cancelLoan } from '../actions'
 import RepaymentForm from '../_components/RepaymentForm'
 import FundingSourceEditor from './_components/FundingSourceEditor'
@@ -25,8 +26,8 @@ import { allTermsChanges, buildTermsSegments, currentSegment } from '@/lib/treas
 import { fetchTermsHistory, isLoanPrincipal, paidByMonthByType, principalPaidByMonth, termsForLoan } from '@/lib/treasury-terms-data'
 
 // A loan's page (2026-10-09, the user's Claude Design handoff — Phase 3 of the
-// Finance revamp): the borrower as the title with its status chip (an open
-// record on the Overdue page reads it overdue), Print schedule and Amend
+// Finance revamp): the borrower as the title with its status chip (an
+// instalment past its day unpaid reads it overdue), Print schedule and Amend
 // terms at the head, the cards, the terms, dates and approval trail in
 // groups, then Repayment settings, Terms over time, the Repayment schedule
 // (it replaces the repayment history; the payments as recorded fold away
@@ -62,7 +63,6 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
     { data: repayments },
     { data: approver },
     { data: creator },
-    { data: overdueRows },
   ] = await Promise.all([
     supabase
       .from('companies')
@@ -83,8 +83,6 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
       ? supabase.from('users').select('name').eq('id', loan.approved_by).single()
       : Promise.resolve({ data: null }),
     supabase.from('users').select('name').eq('id', loan.created_by).single(),
-    // Overdue = an open record on the Overdue page (Detect overdue writes them).
-    supabase.from('overdue_records').select('id').eq('loan_id', loan.id).eq('status', 'pending').limit(1),
   ])
 
   // Terms over time (2026-09-21): segments + each 从某月起 change with its 差价.
@@ -131,7 +129,6 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
   const isPendingApproval = loan.status === 'pending_approval'
   const isActive = loan.status === 'active'
   const isRepaid = loan.status === 'fully_repaid'
-  const overdue = isActive && (overdueRows ?? []).length > 0
   const noRepayments = repaymentList.length === 0
   const canCancelLoan = canVoid && (isPendingApproval || (isActive && noRepayments))
 
@@ -151,6 +148,9 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
     dueDay: loan.disbursement_date ? dayjs(loan.disbursement_date).date() : 1,
     status: loan.status,
   })
+  // Overdue (2026-10-12): an instalment past its day unpaid, on this plan —
+  // as the Overdue page reads it.
+  const overdue = isActive && overdueOf(plan, today) !== null
   // This month's row (or the last one) gives the monthly figures.
   const thisRow = plan.rows.find((r) => r.ym === officeMonth()) ?? plan.rows[plan.rows.length - 1] ?? null
   const monthlyInterest = thisRow?.interest ?? currentSegment(termsSegments, officeMonth()).interestPerMonth

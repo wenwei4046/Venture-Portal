@@ -36,8 +36,8 @@ const REPAYMENTS = months.flatMap((m, i) => [
   { id: `i${i}`, payment_date: `2026-${m}-02`, payment_type: 'interest', amount: 2400, notes: `Auto-synced from voucher HV-OR-2026${m}-00${i}` },
 ])
 
-function database(loan = LOAN, repayments = REPAYMENTS, overdue = false) {
-  const lists: Record<string, unknown[]> = { repayments, overdue_records: overdue ? [{ id: 'o1' }] : [] }
+function database(loan = LOAN, repayments = REPAYMENTS) {
+  const lists: Record<string, unknown[]> = { repayments }
   const singles: Record<string, unknown> = {
     loans: loan,
     companies: { name: 'Carres', short_code: 'CAR' },
@@ -74,7 +74,8 @@ describe('a loan’s page', () => {
     expect(screen.getByRole('link', { name: '← Back to Fund OUT' })).toHaveAttribute('href', '/fund-out')
     expect(document.querySelector('.page-eyebrow')).toHaveTextContent('TREASURY · LOAN OUT')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Carres')
-    expect(document.querySelector('.page-head .chip')).toHaveClass('ledger')
+    // The sixth instalment is 7 days past its day: overdue, as its schedule says.
+    expect(document.querySelector('.page-head .chip')).toHaveClass('danger')
     expect(document.querySelector('.page-head p')).toHaveTextContent('CAR · Created 1 September 2025')
     expect(screen.getByRole('button', { name: 'Print schedule' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Amend terms' })).toHaveAttribute('href', '/fund-out/loan-4/edit')
@@ -111,8 +112,7 @@ describe('a loan’s page', () => {
     expect(screen.getByLabelText('Funding source')).toHaveValue('HC-58k')
   })
 
-  it('reads an overdue loan red, and opens the print sheet when asked', async () => {
-    database(LOAN, REPAYMENTS, true)
+  it('reads a loan with an instalment past its day red, and opens the print sheet when asked', async () => {
     render(await page('1'))
     expect(document.querySelector('.page-head .chip')).toHaveClass('danger')
     expect(document.querySelector('.page-head .chip')).toHaveTextContent('overdue')
@@ -120,6 +120,20 @@ describe('a loan’s page', () => {
     const sheet = screen.getByRole('dialog', { name: 'Repayment Schedule · Carres' })
     expect(sheet).toHaveTextContent('FUND OUT · LOAN')
     expect(sheet).toHaveTextContent('Borrower')
+  })
+
+  // 2026-10-12: overdue is read from the plan (as the Overdue page reads it),
+  // not from a record Detect overdue wrote.
+  it('reads a loan whose instalments are all paid active', async () => {
+    database(LOAN, [
+      ...REPAYMENTS,
+      { id: 'p5', payment_date: '2026-10-02', payment_type: 'principal', amount: 10000, notes: 'Auto-synced from voucher HV-OR-202610-005' },
+      { id: 'i5', payment_date: '2026-10-02', payment_type: 'interest', amount: 2400, notes: 'Auto-synced from voucher HV-OR-202610-005' },
+    ])
+    render(await page())
+    expect(document.querySelector('.page-head .chip')).toHaveClass('ledger')
+    expect(document.querySelector('.page-head .chip')).toHaveTextContent('active')
+    expect(card('Monthly interest')).not.toHaveAttribute('data-tone', 'danger')
   })
 
   it('lets an untouched active loan ask for cancellation with a reason, and a pending one be cancelled', async () => {

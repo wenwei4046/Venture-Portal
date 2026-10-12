@@ -1,5 +1,41 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-12 t (SHIPPED) — Fund OUT's overdue read live, no Detect overdue
+
+The user: "我不想要自己按detect over due, 就打开时就最新不行吗？" → sample (scratchpad
+fundout-simple-sample.html: Carres 175,000 frozen-at-21-days record vs RM 155,000 · 150 days ·
+Instalment 2 of 8 · 5 unpaid; "不要华语字" — the page is English) → "可以".
+
+- **The rule everywhere Fund OUT says overdue**: an active loan with an instalment past its day
+  with something unpaid on it, from its repayment plan (lib/repayment-plan, the loan page's
+  own Repayment schedule) — `loadRepaymentBook(supabase, today, { only: 'collect' })` +
+  `overdueOf(plan, today)`, the same as Fund IN always was. Amount = those instalments' unpaid;
+  days = from the oldest (live); a compounding deal counts this month's interest only (past
+  months roll into its balance); 0% deals never fall due.
+- **Overdue page · Fund OUT**: months by the oldest unpaid instalment (newest first), Company
+  (code under it) · Outstanding · Days past · Status (overdue, alert) · Note ("Instalment 3 of
+  6 · 3 unpaid", `dueNote`, Fund IN uses it too) · Record receipt (→ /fund-out/<id>#repayment-
+  form, Treasury · Create); cards Overdue outstanding (n loans), **Penalty this month**
+  (penalty repayments this month; was "Penalty accrued" from the records), Longest overdue,
+  Netted this month. No Detect overdue, Mark paid or Escalate; empty = "All loans current."
+- **Fund OUT list**: Overdue card = the unpaid instalments (was the overdue loans' whole
+  outstanding), the Overdue tab and each row's chip from the same reading. **Loan page**: chip
+  overdue = `overdueOf(plan)` on its own plan. **Overview**: Subsidiaries' overdue chip from the
+  book's overdue collect entries by `companyId` (new on BookDeal / BookEntry); the summary's
+  "Overdue: n records pending" alert is replaced by "Overdue: n loans with an instalment past
+  its day" (book) — other summary alerts kept.
+- `loadRepaymentBook` gained `opts.only` ('collect' | 'pay': skips the other side's reads) and
+  `companyId` (a loan's borrower / a fund source's company).
+- **No longer read by any page**: `overdue_records` (the 13 records of 22 Sep 2026 stay,
+  unread — not deleted). Dead now, left in place: `overdue/_components/DetectOverdueButton.tsx`,
+  `EscalateButton.tsx`, `overdue/actions.ts` (detectOverdue / submitEscalation /
+  markOverduePaid), `fund-out/actions.ts listPayableLoans` (no caller). The DB's
+  dashboard_summary still computes has_overdue and that alert (ignored by the Overview);
+  approve_*_voucher still marks a loan's latest pending record paid (harmless).
+- Repayment Schedule calendar: 0.00 cells = 0% no-term deals (interest 0 each month) and
+  director fund sources show "Fund source" (no director name) — explained to the user, not
+  changed (user not asked to).
+
 ## CHECKPOINT 2026-10-12 s (SHIPPED) — copied repayment vouchers lost their fund source
 
 The user (Overdue · Fund IN): "houzs 那两笔我一个欠一期，然后还有一期 pending release 罢了" — right.

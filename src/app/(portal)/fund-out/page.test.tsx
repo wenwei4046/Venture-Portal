@@ -6,8 +6,9 @@ import { withActions } from '@/test/with-actions'
 // 2026-10-09 — Fund OUT per the user's Claude Design handoff (Phase 3 of the
 // Finance revamp): five cards — what is lent out, the weighted rate, the
 // spread over the cost of funds, what matures within 30 days, what is
-// overdue — and the status tabs counted, an Overdue tab among them (an active
-// loan with an open record on the Overdue page).
+// overdue — and the status tabs counted, an Overdue tab among them. Overdue
+// (2026-10-12) is an active loan with an instalment past its day unpaid, read
+// from its repayment plan as the Overdue page reads it — no record to detect.
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
@@ -27,9 +28,11 @@ const loan = (id: string, company_id: string, status: string, principal: number,
   id, company_id, status, principal, effective_rate, base_rate: 0.005, risk_premium: effective_rate - 0.005, tenure_months: 12,
   disbursement_date: '2026-01-05', repayment_terms: 'EMI 分期', created_at: '2026-01-02T03:00:00Z', ...over,
 })
+// l1 repays from November (nothing due yet); l2 from August, on the 20th —
+// August and September unpaid: 2 x 6,166.67.
 const LOANS = [
-  loan('l1', 'co-car', 'active', 100000, 0.02),
-  loan('l2', 'co-hk', 'active', 50000, 0.04, { disbursement_date: '2025-10-20' }), // matures 20 Oct 2026
+  loan('l1', 'co-car', 'active', 100000, 0.02, { repayment_start_month: '2026-11-01' }),
+  loan('l2', 'co-hk', 'active', 50000, 0.04, { disbursement_date: '2025-10-20', repayment_start_month: '2026-08-01' }), // matures 20 Oct 2026
   loan('l3', 'co-car', 'pending_approval', 30000, 0.02),
   loan('l4', 'co-hk', 'fully_repaid', 20000, 0.02),
 ]
@@ -42,14 +45,14 @@ function database() {
       { loan_id: 'l1', outstanding: 80000, total_principal_paid: 20000, total_interest_paid: 4000 },
       { loan_id: 'l2', outstanding: 40000, total_principal_paid: 10000, total_interest_paid: 2000 },
     ],
-    overdue_records: [{ loan_id: 'l2' }],
+    repayments: [],
     fund_sources: [{ amount: 200000, cost_rate: 0.01 }],
   }
   mocks.createClient.mockResolvedValue({
     from: (table: string) => {
       const result = { data: tables[table] ?? [], error: null }
       const q: Record<string, unknown> = {}
-      for (const m of ['select', 'eq', 'order', 'in']) q[m] = () => q
+      for (const m of ['select', 'eq', 'order', 'in', 'range']) q[m] = () => q
       q.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve(result).then(res, rej)
       return q
     },
@@ -85,7 +88,7 @@ describe('Fund OUT on the sheet', () => {
     const overdue = screen.getByRole('link', { name: 'Overdue' })
     expect(overdue).toHaveAttribute('href', '/overdue')
     expect(overdue).toHaveAttribute('data-tone', 'danger')
-    expect(overdue).toHaveTextContent('RM 40,000.00')
+    expect(overdue).toHaveTextContent('RM 12,333.34')
     expect(overdue).toHaveTextContent('1 loan · see Overdue')
     expect(screen.getByRole('link', { name: 'Record new loan' })).toHaveAttribute('href', '/fund-out/new')
   })

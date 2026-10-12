@@ -886,7 +886,7 @@ export default async function DashboardPage() {
 
   const pendingCount = summary.pending_approvals_count ?? 0
   const subsidiaries = summary.subsidiaries ?? []
-  const alerts = summary.alerts ?? []
+  const summaryAlerts = summary.alerts ?? []
 
   const pendingApprovalRefs = new Map<string, string | null>()
   const pendingApprovalAmounts = new Map<string, number | null>()
@@ -931,6 +931,19 @@ export default async function DashboardPage() {
   const monthTitle = officeTime().format('MMMM YYYY')
   const canRecordPayment = canDo(user, 'treasury', 'create')
   const book = bookWindow(bookRead ? await bookRead : [], officeToday())
+  // A company is overdue when one of its loans has an instalment past its day
+  // unpaid (2026-10-12) — the book, as the Overdue page reads it; no longer
+  // the records Detect overdue wrote (dashboard_summary's has_overdue).
+  const overdueCompanies = new Set(book.overdue.filter((e) => e.kind === 'collect' && e.companyId).map((e) => e.companyId as string))
+  // …and so is the overdue alert: the loans with an instalment past its day,
+  // in place of the summary's count of those records.
+  const overdueLoans = new Set(book.overdue.filter((e) => e.kind === 'collect').map((e) => e.id)).size
+  const alerts: Alert[] = [
+    ...(overdueLoans > 0
+      ? [{ severity: 'warning' as const, message: `Overdue: ${overdueLoans} ${overdueLoans === 1 ? 'loan' : 'loans'} with an instalment past its day` }]
+      : []),
+    ...summaryAlerts.filter((a) => !a.message.startsWith('Overdue: ')),
+  ]
 
   return (
     <div>
@@ -1334,7 +1347,7 @@ export default async function DashboardPage() {
               loans: Number(sub.loans_outstanding ?? 0),
               net: Number(sub.net_position ?? 0),
               position: sub.position,
-              hasOverdue: sub.has_overdue,
+              hasOverdue: overdueCompanies.has(sub.id),
             }))}
           />
         )}
