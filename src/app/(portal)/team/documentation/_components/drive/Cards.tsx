@@ -10,7 +10,8 @@ import s from './drive.module.css'
 /**
  * A folder of the Data center (2026-10-12): the compact card of the user's Drive screenshot — its glyph (a company,
  * a department's folder, a person), the name, what is in it, a red "!" where a compulsory letter is missing; a folder
- * HR made has a ⋮ with Rename and Delete for Documentation · Edit. A press opens it.
+ * HR made has a ⋮ with Rename and Delete for Documentation · Edit. A press opens it. `items` gives a card a ⋮ of its
+ * own instead (the Talent Bank's Drive: a folder's Move to…, a department's Move everyone to…).
  */
 export function FolderTile({
   card,
@@ -18,14 +19,24 @@ export function FolderTile({
   onOpen,
   onRename,
   onDelete,
+  items,
 }: {
   card: FolderCard
   canEdit: boolean
   onOpen: (at: string) => void
   onRename: (card: FolderCard) => void
   onDelete: (card: FolderCard) => void
+  items?: Array<MenuItem | 'rule'>
 }) {
   const Glyph = card.kind === 'company' ? CompanyGlyph : card.kind === 'person' ? PersonGlyph : FolderGlyph
+  const menu: Array<MenuItem | 'rule'> =
+    items ??
+    (card.own && canEdit
+      ? [
+          { key: 'rename', label: 'Rename', icon: <PenGlyph />, onSelect: () => onRename(card) },
+          { key: 'delete', label: 'Delete', confirm: 'Confirm delete', tone: 'danger', icon: <BinGlyph />, onSelect: () => onDelete(card) },
+        ]
+      : [])
   return (
     <div className={s.folder} data-kind={card.kind}>
       <button type="button" className={s.folderOpen} onClick={() => onOpen(card.at)}>
@@ -42,15 +53,7 @@ export function FolderTile({
           {card.kind === 'person' ? '!' : card.missing}
         </span>
       ) : null}
-      {card.own && canEdit ? (
-        <Menu
-          label={`More actions for ${card.name}`}
-          items={[
-            { key: 'rename', label: 'Rename', icon: <PenGlyph />, onSelect: () => onRename(card) },
-            { key: 'delete', label: 'Delete', confirm: 'Confirm delete', tone: 'danger', icon: <BinGlyph />, onSelect: () => onDelete(card) },
-          ]}
-        />
-      ) : null}
+      {menu.length ? <Menu label={`More actions for ${card.name}`} items={menu} /> : null}
     </div>
   )
 }

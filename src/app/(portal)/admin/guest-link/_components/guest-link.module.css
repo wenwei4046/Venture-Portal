@@ -218,6 +218,20 @@
   font-size: 12.5px;
 }
 .deptX { padding: 0 5px; cursor: pointer; color: rgb(117 100 86); }
+/* A chip's name renames it in place (2026-10-12): the name a button, then a field of its width. */
+.deptName { cursor: text; border-radius: 4px; }
+.deptName:hover { text-decoration: underline dotted rgb(117 100 86); text-underline-offset: 3px; }
+.deptEdit {
+  box-sizing: content-box;
+  min-width: 40px;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 1px solid rgb(233 154 83);
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+  background: none;
+}
 .newDept {
   box-sizing: content-box;
   width: 120px;

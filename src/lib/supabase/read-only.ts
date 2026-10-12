@@ -50,8 +50,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'hr_memo_preview', 'memo_attachment',
   // …and, the Revenue app's View as, one member's (mig 20261011110000).
   'member_documents_of',
-  // Hiring (round 2): the board and where a file is.
-  'hiring_board', 'hiring_file_path',
+  // Hiring (round 2): the board and where a file is — and the Talent Bank's folders (mig 20261013030000).
+  'hiring_board', 'hiring_file_path', 'hiring_bank',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',
   'revenue_costing_gaps', 'revenue_fair_calendar', 'revenue_fair_calendar_moves', 'revenue_month_orders', 'revenue_payroll_adjustments',
   'revenue_possible_double_claims', 'revenue_uncosted_products', 'rnp_invoice_events', 'staff_private_fields', 'team_directory',
