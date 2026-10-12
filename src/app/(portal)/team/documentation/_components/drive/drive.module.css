@@ -1,0 +1,348 @@
+/* People › Documentation › Data center as a Drive (2026-10-12 — the user's Google Drive screenshot: "+ New", the
+   folders as a grid of compact cards, the files as cards with a big preview, a path to go back up). Colours through
+   `--hv-*`; the person's record keeps documentation.module.css's own look. */
+
+.drive { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.drive[data-drop='true'] { outline: 2px dashed rgb(var(--hv-accent)); outline-offset: 6px; border-radius: 12px; }
+
+/* ── The bar: + New, the path, search ── */
+.bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.newWrap { position: relative; flex: none; }
+.newBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 22px 0 16px;
+  border-radius: 16px;
+  border: 1px solid rgb(var(--hv-hairline));
+  background: rgb(255 255 255);
+  box-shadow: 0 1px 2px rgb(43 31 23 / 0.1), 0 2px 8px rgb(43 31 23 / 0.08);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: normal;
+  color: rgb(var(--hv-ink));
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+.newBtn:hover, .newBtn[aria-expanded='true'] { box-shadow: 0 2px 6px rgb(43 31 23 / 0.14), 0 8px 18px rgb(43 31 23 / 0.1); }
+.newPlus { font-size: 24px; line-height: 1; font-weight: 300; color: rgb(var(--hv-accent)); margin-top: -2px; }
+.crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; flex: 1; min-width: 220px; }
+.crumb {
+  font: inherit;
+  font-size: 15px;
+  line-height: normal;
+  color: rgb(var(--hv-body-2));
+  padding: 5px 9px;
+  border-radius: 9px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.crumb:hover { background: rgb(var(--hv-panel-3)); color: rgb(var(--hv-ink)); }
+.crumbHere { font-size: 20px; font-weight: 500; color: rgb(var(--hv-ink)); padding: 4px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.crumbSep { color: rgb(var(--hv-faint)); display: flex; }
+.searchWrap { position: relative; width: 300px; max-width: 100%; flex: none; }
+.searchIcon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); display: flex; color: rgb(var(--hv-brown)); pointer-events: none; }
+.search {
+  width: 100%;
+  height: 40px;
+  padding: 0 34px 0 38px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: rgb(var(--hv-panel-3));
+  font: inherit;
+  font-size: 13.5px;
+  line-height: normal;
+  color: rgb(var(--hv-ink));
+  outline: none;
+  box-sizing: border-box;
+}
+.search::placeholder { color: rgb(var(--hv-brown)); }
+.search:focus { background: rgb(255 255 255); border-color: rgb(var(--hv-hairline)); box-shadow: 0 1px 6px rgb(43 31 23 / 0.12); }
+.searchClear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: rgb(var(--hv-brown));
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+}
+.searchClear:hover { background: rgb(0 0 0 / 0.06); }
+.hint { font-size: 12.5px; color: rgb(var(--hv-brown)); margin-top: -4px; line-height: 1.5; }
+.error { font-size: 12.5px; color: rgb(var(--hv-danger)); }
+
+/* ── Sections ── */
+.sect { display: flex; flex-direction: column; gap: 10px; }
+.sectHead { display: flex; align-items: baseline; gap: 8px; font-size: 13px; font-weight: 500; color: rgb(var(--hv-body-2)); }
+.sectCount { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; font-weight: 400; color: rgb(var(--hv-brown)); }
+.sectRight { margin-left: auto; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 12px; }
+.empty {
+  padding: 34px 20px;
+  border: 1px dashed rgb(var(--hv-frame));
+  border-radius: 12px;
+  text-align: center;
+  color: rgb(var(--hv-brown));
+  font-size: 13px;
+  line-height: 1.6;
+}
+.emptyTitle { color: rgb(var(--hv-ink)); font-weight: 500; font-size: 14px; }
+.toggle {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 12px;
+  line-height: normal;
+  color: rgb(var(--hv-body-2));
+  cursor: pointer;
+  text-decoration: underline;
+  border: 0;
+  background: none;
+  padding: 0;
+}
+
+/* ── A folder: a compact card, the icon, the name and what is in it ── */
+.folder {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 58px;
+  padding: 0 6px 0 14px;
+  border-radius: 12px;
+  background: rgb(var(--hv-panel-3));
+  border: 1px solid transparent;
+  box-sizing: border-box;
+  transition: background 0.12s;
+}
+.folder:hover { background: rgb(var(--hv-row-hover)); }
+.folder:focus-within { border-color: rgb(var(--hv-accent)); }
+.folderOpen {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  line-height: normal;
+  text-align: left;
+  color: rgb(var(--hv-ink));
+  cursor: pointer;
+  outline: none;
+}
+.folderIcon { flex: none; display: flex; color: rgb(var(--hv-walnut)); }
+.folderIcon[data-kind='company'] { color: rgb(var(--hv-orange-text)); }
+.folderIcon[data-kind='person'] { color: rgb(var(--hv-body-2)); }
+.folderText { min-width: 0; display: flex; flex-direction: column; }
+.folderName { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.folderLine { font-size: 11.5px; color: rgb(var(--hv-brown)); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bang {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: rgb(var(--hv-danger));
+  color: rgb(255 255 255);
+  display: grid;
+  place-items: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  flex: none;
+  box-sizing: border-box;
+}
+
+/* ── The ⋮ menu (a folder's, a file's, + New's) ── */
+.menuWrap { position: relative; flex: none; display: flex; }
+.dots {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  color: rgb(var(--hv-body-2));
+  padding: 0;
+}
+.dots:hover, .dots[aria-expanded='true'] { background: rgb(0 0 0 / 0.07); color: rgb(var(--hv-ink)); }
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 35;
+  min-width: 200px;
+  background: rgb(255 255 255);
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgb(43 31 23 / 0.16);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.menu[data-side='left'] { right: auto; left: 0; }
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  color: rgb(var(--hv-ink));
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+.menuItem:hover, .menuItem:focus-visible { background: rgb(var(--hv-panel-2)); outline: none; }
+.menuItem:disabled { opacity: 0.5; cursor: not-allowed; }
+.menuItem[data-tone='danger'] { color: rgb(var(--hv-danger)); }
+/* Asked once more, as Delete everywhere in Documentation: the armed pink stays under the pointer. */
+.menuItem[data-armed='true'], .menuItem[data-armed='true']:hover { background: rgb(var(--hv-danger-bg)); }
+.menuIcon { display: flex; color: rgb(var(--hv-body-2)); width: 18px; justify-content: center; }
+.menuItem[data-tone='danger'] .menuIcon { color: rgb(var(--hv-danger)); }
+.menuRule { height: 1px; background: rgb(var(--hv-hairline)); margin: 4px 2px; }
+
+/* ── A file: its name over a big preview, as Drive draws it ── */
+.file {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  background: rgb(var(--hv-panel-3));
+  border: 1px solid transparent;
+  box-sizing: border-box;
+  transition: background 0.12s;
+  min-width: 0;
+}
+.file:hover { background: rgb(var(--hv-row-hover)); }
+.file:focus-within { border-color: rgb(var(--hv-accent)); }
+.file[data-gone='true'] { opacity: 0.55; }
+.fileTop { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; min-height: 44px; box-sizing: border-box; }
+.fileBadge {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: rgb(255 255 255);
+}
+.fileTitle { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fileName { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fileSub { font-size: 11px; color: rgb(var(--hv-brown)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.filePreview {
+  margin: 0 8px;
+  height: 128px;
+  border-radius: 8px;
+  background: rgb(255 255 255);
+  border: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font: inherit;
+  outline: none;
+}
+.fileMeta { display: flex; align-items: center; gap: 8px; padding: 8px 14px 10px; font-size: 11.5px; color: rgb(var(--hv-brown)); min-height: 18px; }
+.fileMetaGap { flex: 1; }
+.gone { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; color: rgb(var(--hv-danger)); }
+
+/* The big page in the preview: a folded sheet with the extension, in the file's own colour. */
+.sheet {
+  position: relative;
+  width: 70px;
+  height: 88px;
+  border-radius: 8px;
+  background: rgb(255 255 255);
+  border: 1px solid rgb(var(--hv-hairline));
+  box-shadow: 0 3px 10px rgb(43 31 23 / 0.1);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 10px;
+  box-sizing: border-box;
+}
+.sheetFold { position: absolute; top: -1px; right: -1px; width: 18px; height: 18px; border-radius: 0 8px 0 7px; background: rgb(var(--hv-panel-3)); }
+.sheetLine { position: absolute; left: 12px; right: 18px; height: 3px; border-radius: 2px; background: rgb(var(--hv-panel-3)); }
+.sheetLine1 { top: 16px; }
+.sheetLine2 { top: 25px; right: 26px; }
+.sheetLine3 { top: 34px; right: 12px; }
+.sheetExt {
+  position: relative;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgb(255 255 255);
+}
+.tone[data-tone='pdf'] { background: rgb(var(--hv-danger)); }
+.tone[data-tone='sheet'] { background: rgb(var(--hv-ledger)); }
+.tone[data-tone='doc'] { background: rgb(var(--hv-blue)); }
+.tone[data-tone='image'] { background: rgb(var(--hv-orange-text)); }
+.tone[data-tone='other'] { background: rgb(var(--hv-walnut)); }
+
+/* A letter's status on its card (Delivered / Opened / Acknowledged), as the Letters tab's chips. */
+.status { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+.status[data-tone='info'] { color: rgb(var(--hv-blue)); border-color: rgb(var(--hv-blue) / 0.35); background: rgb(var(--hv-blue) / 0.06); }
+.status[data-tone='alert'] { color: rgb(var(--hv-alert)); border-color: rgb(var(--hv-alert-border)); background: rgb(var(--hv-alert-bg)); }
+.status[data-tone='ledger'] { color: rgb(var(--hv-ledger)); border-color: rgb(var(--hv-ledger-border)); background: rgb(var(--hv-ledger-bg)); }
+.status[data-tone='gone'] { color: rgb(var(--hv-danger)); border-color: rgb(var(--hv-danger-border)); background: rgb(var(--hv-danger-bg)); }
+
+/* ── Search results: a row each, its place under its name ── */
+.results { display: flex; flex-direction: column; border: 1px solid rgb(var(--hv-hairline)); border-radius: 12px; overflow: hidden; }
+.hit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border: 0;
+  border-bottom: 1px solid rgb(var(--hv-hairline));
+  background: rgb(255 255 255);
+  font: inherit;
+  line-height: normal;
+  text-align: left;
+  color: rgb(var(--hv-ink));
+  cursor: pointer;
+}
+.hit:last-child { border-bottom: 0; }
+.hit:hover, .hit:focus-visible { background: rgb(var(--hv-row-hover)); outline: none; }
+.hitText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hitName { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hitPath { font-size: 11.5px; color: rgb(var(--hv-brown)); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hitKind { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; color: rgb(var(--hv-brown)); text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* ── The person's folder: their record over their letters ── */
+.personHint { font-size: 12px; color: rgb(var(--hv-brown)); margin-top: 6px; }
+
+/* ── New folder / Rename: the kit Window ── */
+.winField { display: flex; flex-direction: column; gap: 6px; }
+.winLabel { font-size: 12px; color: rgb(var(--hv-brown)); }
+
+@media (max-width: 767px) {
+  .searchWrap { width: 100%; order: 3; }
+  .crumbs { min-width: 0; }
+  .crumbHere { font-size: 17px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .filePreview { height: 104px; }
+}

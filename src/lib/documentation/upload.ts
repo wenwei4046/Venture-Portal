@@ -16,7 +16,7 @@ export type Uploaded = { ok: true; path: string; fileName: string; contentType: 
 
 const BUCKET = 'hr-documents'
 
-export async function uploadDocumentationFile(folder: 'documents' | 'publish' | { letterFor: string }, file: File): Promise<Uploaded> {
+export async function uploadDocumentationFile(folder: 'documents' | 'publish' | 'drive' | { letterFor: string }, file: File): Promise<Uploaded> {
   const refused = fileRefusal(file)
   if (refused) return { ok: false, reason: refused }
   const path = objectPath(folder, crypto.randomUUID(), file.name)
