@@ -31,7 +31,7 @@ function fakeDb(rows: Record<string, unknown[]>) {
 }
 
 describe('loadUpsaleFacts', () => {
-  it('names the bill each upsell or drop changed, among the sub-department’s months as they stand', async () => {
+  it('names the bill each upsell or drop changed — the ERP’s own row of the document, whatever its batch', async () => {
     const { db, asked } = fakeDb({
       comm_upsales: [
         { id: 'up', kind: 'upsale', amount: '600.00', original_ref: 'HC13254', erp_doc_no: 'HC-SO-013387', original_period: '2026-08-01' },
@@ -47,9 +47,10 @@ describe('loadUpsaleFacts', () => {
       hand: { kind: 'drop', originalRef: 'HC13911', erpDocNo: null, originalPeriod: null, bill: null },
     })
     const bills = asked.find(call => call.table === 'sales_orders')!
+    // August's ERP bills sit in a batch the claim form superseded: no batch status asked.
     expect(bills.filters).toEqual([
       ['in:order_no', ['HC-SO-013387']],
-      ['eq:sales_import_batches.status', 'committed'],
+      ['eq:source', 'erp_sync'],
       ['eq:sales_import_batches.sub_department_id', 'fair'],
     ])
   })

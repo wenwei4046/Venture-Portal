@@ -40,9 +40,11 @@ interface BillRow {
 }
 
 /**
- * The bills these ERP documents are, among this sub-department's months as
- * they stand (a committed batch), by document number — where an upsell or a
- * drop the ERP found takes its reader.
+ * The bills these ERP documents are, by document number — where an upsell or
+ * a drop the ERP found takes its reader. The ERP's own row of the document
+ * (`source = 'erp_sync'`, one per document — the receiver's own lookup),
+ * whatever its batch: a month settled by hand keeps its ERP bills in a batch
+ * the claim form superseded (August 2026), and they are still the bills.
  */
 export async function loadBillsByDocNo(
   db: SupabaseClient,
@@ -52,9 +54,9 @@ export async function loadBillsByDocNo(
   const keys = [...new Set(docNos.filter(Boolean))]
   const bills = await fetchByKeys<BillRow, string>(keys, chunk =>
     db.from('sales_orders')
-      .select('id, order_no, period_month, sales_import_batches!inner (status, sub_department_id)')
+      .select('id, order_no, period_month, sales_import_batches!inner (sub_department_id)')
       .in('order_no', chunk)
-      .eq('sales_import_batches.status', 'committed')
+      .eq('source', 'erp_sync')
       .eq('sales_import_batches.sub_department_id', subDepartmentId), 'the bills the upsells and drops changed')
   const byDoc = new Map<string, { orderId: string; periodMonth: string }>()
   for (const bill of bills) {
