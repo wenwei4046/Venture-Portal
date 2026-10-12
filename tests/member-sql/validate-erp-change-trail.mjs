@@ -455,4 +455,166 @@ check((await one(`SELECT warnings FROM erp_sync_events WHERE id = $1`, [r.eventI
   'the fault is a warning on its delivery')
 await db.exec(`ALTER TABLE sales_order_erp_changes DROP CONSTRAINT trail_refuses`)
 
+// ══ 20261013050000 ═══════════════════════════════════════════════════════════
+// A cancellation is deducted directly; a shared bill's change follows the
+// shares of the bill that paid it (2026-10-13; the user: "两人共享的单如果被
+// drop，扣的金额还是全部算在单主身上 … want drop sales by share as well. Follow
+// the share ratio" and "取消的单要不要不用按, just direct deduct").
+//
+// What it meets on production, VERBATIM: who holds a share of a bill, when a
+// salesperson's month is closed, when a run has paid a month, and the table's
+// own guards.
+await db.exec(`CREATE TABLE sales_order_shares (order_id uuid NOT NULL, staff_id uuid NOT NULL, share_pct numeric NOT NULL,
+  PRIMARY KEY (order_id, staff_id))`)
+await productionFunction('20260911020000_commission_order_sub_departments', 'commission_order_period_locked')
+await productionFunction('20260927040000_salesperson_month_close', 'comm_staff_month_closed')
+await productionFunction('20260927040000_salesperson_month_close', 'comm_upsales_closed_month_guard')
+await productionFunction('20260926020000_portal_pays_from_and_erp_adjustments', 'comm_upsales_guard')
+await db.exec(`
+  CREATE TRIGGER comm_upsales_closed_month BEFORE INSERT OR DELETE OR UPDATE ON comm_upsales
+    FOR EACH ROW EXECUTE FUNCTION comm_upsales_closed_month_guard();
+  CREATE TRIGGER comm_upsales_guard BEFORE INSERT OR DELETE OR UPDATE ON comm_upsales
+    FOR EACH ROW EXECUTE FUNCTION comm_upsales_guard();`)
+// md5 of each body without carriage returns: production keeps the older ones
+// as they were sent, with Windows line ends (commission_order_period_locked).
+for (const [fn, md5] of [
+  ['commission_order_period_locked', '1cc2abf204556e6e500458bc2ed65e1c'],
+  ['comm_staff_month_closed', 'f6688b538b666189c23194d2d4458b7e'],
+  ['comm_upsales_closed_month_guard', 'cb7e21e220681e6f032fbdb17b6735fa'],
+  ['comm_upsales_guard', '8bb7ab5d51b61b5c87f47b6c0a401d5c'],
+  ['comm_upsales_after_settled', '08e18c1a4c2f524dca8a47a939785f4c'],
+  ['erp_sync_settled_basis', '9a7fd7bfd84c076be873eac36beb45b7'],
+  ['erp_sync_review_order', '248a8a12bb02027ebe06ed02ce97b483'],
+]) check(await one(`SELECT md5(replace(prosrc, chr(13), '')) FROM pg_proc WHERE proname = $1`, [fn]), md5, `${fn} is production's body`)
+
+const claimForm = paper => one(`SELECT o.id FROM sales_orders o JOIN sales_import_batches b ON b.id = o.batch_id
+                                 WHERE o.order_no = $1 AND b.source = 'file' AND b.status = 'committed'`, [paper])
+const deduction = async doc => (await q(`
+  SELECT id, period_month::text AS month, amount::float AS amount, staff_id, erp_reason, settled_by, settled_order_id, note
+    FROM comm_upsales WHERE erp_doc_no = $1 AND status = 'confirmed' AND answered_by_feed ORDER BY created_at`, [doc]))
+const questionWaiting = await one(`SELECT id FROM comm_upsales WHERE erp_doc_no = 'HC-SO-013367' AND status = 'pending'`)
+
+const cancelAndShare = lf(await readFile(new URL('20261013050000_erp_changes_cancel_and_share.sql', migrations), 'utf8'))
+await db.exec(cancelAndShare)
+
+// HC8972, cancelled while its question waited: the question became the
+// deduction — in September, the first month the portal pays (August was the
+// claim form's) and MELVIN is open — measured from the claim form that paid it.
+const hc8972 = await deduction('HC-SO-013367')
+check(hc8972.map(d => [d.id, d.month, d.amount, d.staff_id, d.erp_reason, d.settled_by, d.settled_order_id]),
+  [[questionWaiting, '2026-09-01', -10399, MELVIN, 'cancelled', 'hand', await claimForm('HC8972')]],
+  'a cancellation waiting for an answer is deducted directly, the same row')
+check(hc8972[0].note, 'The ERP cancelled HC-SO-013367 after its commission was given in August 2026 — taken back directly in September 2026',
+  'and says so')
+check(await one(`SELECT adjustment_id FROM sales_order_erp_changes WHERE order_no = 'HC-SO-013367' AND kind = 'cancelled'`),
+  questionWaiting, 'the trail\'s cancellation still points at it')
+check((await pending()).filter(p => p.doc.startsWith('HC-SO-0133')), [
+  { doc: 'HC-SO-013335', amount: -8194, settled: 16388, erp: 8194 },
+  { doc: 'HC-SO-013385', amount: -500, settled: 7000, erp: 6500 },
+], 'a drop is still asked')
+check(await one(`SELECT settled_order_id FROM comm_upsales WHERE erp_doc_no = 'HC-SO-013335' AND status = 'pending'`),
+  await claimForm('HC11556'), 'a drop on a bill the claim form paid follows the claim-form row — its shares split it')
+check(await one(`SELECT settled_order_id FROM comm_upsales WHERE erp_doc_no = 'HC-SO-013385' AND status = 'pending'`),
+  await claimForm('ZNT6185'), 'each of ZNT6185\'s documents follows its one claim-form row')
+
+// Run again: nothing moves.
+const upsalesNow = () => q(`SELECT id, status, amount::float AS amount, period_month::text AS month, answered_by_feed, settled_order_id
+                              FROM comm_upsales ORDER BY id`)
+const afterOnce = await upsalesNow()
+await db.exec(cancelAndShare)
+check(await upsalesNow(), afterOnce, '20261013050000 runs twice to the same end')
+
+// Sent again, cancelled: the one deduction, nothing to answer.
+const hc8972Lines = [{ group: 'MATTRESS', code: 'AKEMI IMMORTAL MATT (K)', amount: 10399 }]
+await deliver('HC-SO-013367', { agent: 'MELVIN CHONG', status: 'CANCELLED', paper: 'HC8972', lines: hc8972Lines })
+check((await deduction('HC-SO-013367')).length, 1, 'sent again: still the one deduction')
+check((await pending()).some(p => p.doc === 'HC-SO-013367'), false, 'and nothing to answer')
+
+// Back in the ERP while September is open: the deduction is simply withdrawn.
+await deliver('HC-SO-013367', { agent: 'MELVIN CHONG', status: 'CONFIRMED', paper: 'HC8972', lines: hc8972Lines })
+check(await deduction('HC-SO-013367'), [], 'reinstated while September is open: the deduction is withdrawn')
+check((await pending()).some(p => p.doc === 'HC-SO-013367'), false, 'and nothing is asked')
+check((await trailOf('HC-SO-013367')).at(-1).kind, 'reinstated', 'the trail says reinstated')
+
+// Cancelled again: taken back again, and the save that cancelled it points at it.
+await deliver('HC-SO-013367', { agent: 'MELVIN CHONG', status: 'CANCELLED', paper: 'HC8972', lines: hc8972Lines })
+const again = await deduction('HC-SO-013367')
+check(again.map(d => [d.month, d.amount]), [['2026-09-01', -10399]], 'cancelled again: deducted directly again')
+check(await one(`SELECT adjustment_id FROM sales_order_erp_changes WHERE order_no = 'HC-SO-013367' ORDER BY received_at DESC, id DESC LIMIT 1`),
+  again[0].id, 'the save that cancelled it points at the deduction it made')
+
+// MELVIN's September closed, then back in the ERP: what September took back
+// stays taken; giving it back is a question.
+await q(`INSERT INTO comm_salesperson_closes (sub_department_id, period_month, staff_id) VALUES ($1, '2026-09-01', $2)`, [FAIR, MELVIN])
+await deliver('HC-SO-013367', { agent: 'MELVIN CHONG', status: 'CONFIRMED', paper: 'HC8972', lines: hc8972Lines })
+check((await deduction('HC-SO-013367')).length, 1, 'with MELVIN\'s September closed, the deduction stays')
+const thisMonth = await one(`SELECT GREATEST(date_trunc('month', (now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date)::date, '2026-09-01'::date)::text`)
+check(await question('HC-SO-013367').then(x => [x.amount, x.erp_reason, x.month]), [10399, 'reinstated', thisMonth],
+  'and giving it back is asked, as any upsell')
+
+// ── A shared bill: September, ANTHONY's, LUCAS holding half ─────────────────
+const SEP_DOC = 'HC-SO-2609-500'
+r = await deliver(SEP_DOC, { date: '2026-09-10', agent: 'ANTHONY', lines: mattress(6000) })
+check([r.status, r.message], ['applied', 'created'], 'a September bill')
+const sepBill = await one(`SELECT id FROM sales_orders WHERE order_no = $1`, [SEP_DOC])
+await q(`INSERT INTO sales_order_shares VALUES ($1, $2, 0.5)`, [sepBill, LUCAS])
+const SEP_RUN = await one(`INSERT INTO comm_runs (sub_department_id, period_month, status) VALUES ($1, '2026-09-01', 'computed') RETURNING id`, [FAIR])
+const closeSeptember = async (doc, staff) => {
+  await q(`INSERT INTO comm_salesperson_closes (sub_department_id, period_month, staff_id)
+           SELECT $1, '2026-09-01', $2 WHERE NOT EXISTS (SELECT 1 FROM comm_salesperson_closes
+             WHERE sub_department_id = $1 AND period_month = '2026-09-01' AND staff_id = $2 AND reopened_at IS NULL)`, [FAIR, staff])
+  await q(`INSERT INTO comm_order_releases (order_no, run_id, staff_id, period_month, order_period_month, product_revenue, sub_department_id)
+           VALUES ($1, $2, $3, '2026-09-01', '2026-09-01', 1, $4)`, [doc, SEP_RUN, staff, FAIR])
+}
+await closeSeptember(SEP_DOC, ANTHONY)
+
+// Cancelled: October is closed for LUCAS, who holds half — his part could
+// never be taken there — so it goes into November.
+await deliver(SEP_DOC, { date: '2026-09-10', agent: 'ANTHONY', status: 'CANCELLED', lines: mattress(6000) })
+const shared = await deduction(SEP_DOC)
+check(shared.map(d => [d.month, d.amount, d.staff_id, d.erp_reason, d.settled_by, d.settled_order_id]),
+  [['2026-11-01', -6000, ANTHONY, 'cancelled', 'close', sepBill]],
+  'a shared bill cancelled: deducted in the first month open for everybody on it, following the bill that paid it')
+await refused(`UPDATE comm_upsales SET period_month = '2026-10-01' WHERE erp_doc_no = $1 AND status = 'confirmed'`, [SEP_DOC], '23CLS',
+  'nobody moves it into a month a holder of the bill is closed in')
+
+// Undo sends it back to be asked — and the feed leaves it asked.
+await q(`UPDATE comm_upsales SET status = 'pending', decided_by = $2, decided_at = NULL, answered_by_feed = false
+         WHERE erp_doc_no = $1 AND status = 'confirmed'`, [SEP_DOC, HR_USER])
+await deliver(SEP_DOC, { date: '2026-09-10', agent: 'ANTHONY', status: 'CANCELLED', lines: mattress(6000) })
+await q(`SELECT erp_sync_review_order($1, $2)`, [FAIR, SEP_DOC])
+check(await question(SEP_DOC).then(x => [x.amount, x.erp_reason]), [-6000, 'cancelled'],
+  'sent back with Undo, a cancellation stays a question')
+check(await deduction(SEP_DOC), [], 'the feed does not take it again')
+await refused(`UPDATE comm_upsales SET status = 'confirmed', period_month = '2026-10-01', decided_at = clock_timestamp()
+               WHERE erp_doc_no = $1 AND status = 'pending'`, [SEP_DOC], '23CLS',
+  'and HR cannot pay it into October either, where LUCAS is closed')
+
+// Deleted in the ERP: the same as cancelled.
+const SEP_DOC2 = 'HC-SO-2609-501'
+await deliver(SEP_DOC2, { date: '2026-09-11', agent: 'CHEA HUAN', lines: mattress(3000) })
+await closeSeptember(SEP_DOC2, CHEA)
+r = await deliver(SEP_DOC2, { deleted: true })
+check([r.status, r.message], ['applied', 'excluded: deleted in the ERP'], 'deleted in the ERP')
+check((await deduction(SEP_DOC2)).map(d => [d.month, d.amount, d.erp_reason]), [['2026-10-01', -3000, 'deleted']],
+  'a deletion is deducted directly too — October, open for CHEA')
+
+// A deduction refused for any reason is asked instead.
+const SEP_DOC3 = 'HC-SO-2609-502'
+await deliver(SEP_DOC3, { date: '2026-09-12', agent: 'CHEA HUAN', lines: mattress(2000) })
+await closeSeptember(SEP_DOC3, CHEA)
+await db.exec(`ALTER TABLE comm_upsales ADD CONSTRAINT no_feed_answers CHECK (NOT answered_by_feed) NOT VALID`)
+await deliver(SEP_DOC3, { date: '2026-09-12', agent: 'CHEA HUAN', status: 'CANCELLED', lines: mattress(2000) })
+await db.exec(`ALTER TABLE comm_upsales DROP CONSTRAINT no_feed_answers`)
+check(await question(SEP_DOC3).then(x => [x.amount, x.erp_reason]), [-2000, 'cancelled'], 'refused, the cancellation is asked as before')
+check(await deduction(SEP_DOC3), [], 'nothing half-done')
+
+// Who may call what.
+for (const fn of ['erp_sync_settled_bill(uuid,text)', 'erp_sync_adjustment_bill(uuid,uuid,text)', 'erp_sync_closed_holder(uuid,date,uuid,uuid)',
+  'erp_sync_holders_closed(uuid,date,uuid,uuid)', 'erp_sync_first_open_month(uuid,date,uuid,uuid)']) {
+  check([await one(`SELECT has_function_privilege('anon', $1, 'EXECUTE')`, [fn]),
+    await one(`SELECT has_function_privilege('authenticated', $1, 'EXECUTE')`, [fn])], [false, true], `${fn}: the browser's key may not call it`)
+}
+check(await one(`SELECT has_function_privilege('authenticated', 'comm_upsales_holders_guard()', 'EXECUTE')`), false, 'the guard is the trigger\'s alone')
+
 console.log(`ERP change trail: ${checks} checks passed`)

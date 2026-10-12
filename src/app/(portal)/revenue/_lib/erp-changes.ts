@@ -77,12 +77,13 @@ export async function loadDocChanges(db: SupabaseClient, subDepartmentId: string
 /** Where each change's drop or upsell stands now (comm_upsales), by id. */
 export async function loadAdjustmentAnswers(db: SupabaseClient, ids: readonly string[]): Promise<Map<string, AdjustmentAnswer>> {
   const keys = [...new Set(ids)]
-  const rows = await fetchByKeys<{ id: string; status: string; period_month: string; amount: number | string }, string>(keys, chunk =>
-    db.from('comm_upsales').select('id, status, period_month, amount').in('id', chunk), 'the drops and upsells')
+  const rows = await fetchByKeys<{ id: string; status: string; period_month: string; amount: number | string; answered_by_feed: boolean | null }, string>(keys, chunk =>
+    db.from('comm_upsales').select('id, status, period_month, amount, answered_by_feed').in('id', chunk), 'the drops and upsells')
   return new Map(rows.map(r => [r.id, {
     id: r.id,
     status: r.status === 'confirmed' || r.status === 'dismissed' ? r.status : 'pending',
     periodMonth: r.period_month,
     amount: Number(r.amount),
+    answeredByFeed: r.answered_by_feed === true,
   }]))
 }
