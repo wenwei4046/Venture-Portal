@@ -52,10 +52,14 @@ const profileFrag = (() => {
 
 // rev 1010 §7.3 Team | Mine in the top bar of every RS page, between the back link and the bell — the prototype's
 // Director pill (RS Insight's isDir / dirTabs), centred in the bar; shown to the Director and to anyone with a downline.
+// Round 2 (§8.2 / §8.4): the bar shows only on Profile's sub-pages ("‹ Profile" and the bell) and for Team | Mine, which
+// then sits alone at its right end — the RS prototypes' showTopBar; the bell moves into each page's title row.
 const headerFrag = (() => {
   const pill = protoNode("RS Insight", "{{ isDir }}").replace("{{ isDir }}", "{{ hasTM }}").replace("{{ dirTabs }}", "{{ tmTabs }}")
     .replace("align-self: flex-start;", "align-self: center; margin-left: auto;");
-  return once(lines(36, 39), '<span onClick="{{ openNotifTop }}"', pill + '<span onClick="{{ openNotifTop }}"');
+  const bar = lines(36, 39), bell = balanced(bar, '<span onClick="{{ openNotifTop }}"', "span", "3b header");
+  const withPill = once(bar, bell, pill + '<sc-if value="{{ bellTop }}" hint-placeholder-val="{{ false }}">' + bell + "</sc-if>");
+  return '<sc-if value="{{ showTopBar }}" hint-placeholder-val="{{ false }}">' + withPill + "</sc-if>";
 })();
 
 const line34 = src[33];
@@ -107,6 +111,8 @@ const PATCHES = {
     // by the inset (crm.module.css, the safe-areas MUST), so 16 px is what max() gives inside it — and on an iPhone the
     // inset is not added twice.
     [/(<main style=\{\{ position: "relative", flex: "1 1 auto", minHeight: "0", boxSizing: "border-box", padding: )"6px 20px 8px"/, "$1\"16px 20px 8px\""],
+    // 8.3 (round 2) No full-width "Book visit" bar above the composer: booking stays in ⋮ › Appointment.
+    [/\{!!\(v\.notBooked\) && \(<>[\s\S]*?Book visit<\/span>\s*<\/div>\s*<\/>\)\}\s*/, ""],
     // 1.2 Every bubble lifts a little off the wallpaper.
     ["boxSizing: \"border-box\", borderRadius: m.radius, background: m.bg,", "boxSizing: \"border-box\", borderRadius: m.radius, boxShadow: \"0 1px 1px rgba(63,43,34,.10)\", background: m.bg,"]],
   // Switch to: a whole department's list scrolls inside the sheet instead of running off the screen (user 2026-10-09).
@@ -124,20 +130,47 @@ const INFO_SHEET = [
   ["<span onClick={v.ctChat} style={{ height: \"50px\",", "<span onClick={v.ctChat} style={{ flex: \"none\", height: \"50px\","],
 ];
 for (const n of ["SalesContacts", "SalesCalendar", "SalesInsight"]) PATCHES[n] = [...(PATCHES[n] ?? []), ...INFO_SHEET];
-// Inbox: Team | Mine moves from the top bar into the title row, just left of All ads (user 2026-10-11) — the top bar's
-// own pill markup; margin-left auto keeps it beside All ads.
-PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []), ["<span onClick={v.openAd} style",
-  '{!!(v.hasTM) && (<>\n        <div style={{ flex: "none", alignSelf: "center", marginLeft: "auto", display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "#F0E6DE" }}>\n' +
-  '          {(v.tmTabs).map((d, d_i) => (<Fragment key={d_i}>\n' +
-  '            <span onClick={d.pick} style={{ height: "28px", padding: "0 14px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: d.bg, color: d.fg, boxShadow: d.sh, cursor: "pointer" }}>{d.label}</span>\n' +
-  '          </Fragment>))}\n        </div>\n      </>)}\n        <span onClick={v.openAd} style']];
-// Top bar with Team | Mine: "‹ Back to Revenue app", the pill and the bell filled the 335 px to the pixel, so the link
-// broke onto two lines (user 2026-10-11). The link stays on one line; the pill's tabs take 12 px a side, not 14 (here and
-// beside All ads), which leaves room.
-PATCHES.SalesHeader = [...(PATCHES.SalesHeader ?? []),
-  ['fontSize: "14px", fontWeight: "600", cursor: "pointer" }}><svg width="20"', 'fontSize: "14px", fontWeight: "600", whiteSpace: "nowrap", flex: "none", cursor: "pointer" }}><svg width="20"'],
-  ['padding: "0 14px", borderRadius: "9px"', 'padding: "0 12px", borderRadius: "9px"']];
-PATCHES.SalesInbox[PATCHES.SalesInbox.length - 1][1] = PATCHES.SalesInbox[PATCHES.SalesInbox.length - 1][1].replace('padding: "0 14px", borderRadius: "9px"', 'padding: "0 12px", borderRadius: "9px"');
+// Round 2 (rev 1010 §8.2): the bell moves into each page's title row, at its right end — the Control panel prototype's
+// round button (40×40, 1px #EBDDD2, white, soft shadow, 20 px bell, rust badge top/right -4px).
+const BELL = "{!!(v.tb) && (<>\n          <span onClick={v.tb.open} title=\"Notifications\" style={{ position: \"relative\", flex: \"none\", width: \"40px\", height: \"40px\", boxSizing: \"border-box\", borderRadius: \"50%\", border: \"1px solid #EBDDD2\", background: \"#fff\", display: \"grid\", placeItems: \"center\", color: \"#3F2B22\", boxShadow: \"0 2px 8px rgba(63,43,34,.06)\", cursor: \"pointer\" }}>\n            <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.8\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\n              <path d=\"M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0\">\n              </path>\n            </svg>\n            {!!(v.tb.has) && (<>\n              <span style={{ position: \"absolute\", top: \"-4px\", right: \"-4px\", minWidth: \"18px\", height: \"18px\", padding: \"0 5px\", boxSizing: \"border-box\", borderRadius: \"9px\", background: \"#BD4A19\", border: \"2px solid #fff\", color: \"#fff\", display: \"grid\", placeItems: \"center\", fontSize: \"10px\", fontWeight: \"700\" }}>{v.tb.n}</span>\n            </>)}\n          </span>\n        </>)}";
+// Inbox: after All ads, 8 px apart (the title takes the room, so All ads and the bell sit right). Team | Mine left the title
+// row for its own top row (§8.4, superseding 2026-10-11's place beside All ads).
+PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []),
+  ['<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>\n        <h1 style={{ margin: "0", fontSize: "28px",',
+    '<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>\n        <h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "28px",'],
+  [/(<span onClick=\{v\.openAd\}[\s\S]*?<\/span>)(\s*<\/div>\s*<label)/, "$1\n        " + BELL + "$2"]];
+// Contacts: right of the title; the row reaches 8 px into main's 28 px right padding (kept for the A–Z index), so its bell
+// lines up with the other pages'.
+PATCHES.SalesContacts = [...(PATCHES.SalesContacts ?? []),
+  ['<div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>\n          <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Contacts</h1>\n        </div>',
+    '<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginRight: "-8px" }}>\n          <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Contacts</h1>\n          ' + BELL + '\n        </div>']];
+// Calendar: after Today, 8 px apart.
+PATCHES.SalesCalendar = [...(PATCHES.SalesCalendar ?? []),
+  ['<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px" }}>\n        <h1 style={{ margin: "0", fontSize: "26px",',
+    '<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "0 20px" }}>\n        <h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "26px",'],
+  [/(<span onClick=\{v\.calToday\}[^\n]*?>Today<\/span>)/, "$1\n        " + BELL]];
+// Insight: after the date chip, 8 px apart.
+PATCHES.SalesInsight = [...(PATCHES.SalesInsight ?? []),
+  ['<div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>\n        <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: "0" }}>\n          <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Insight</h1>',
+    '<div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>\n        <div style={{ flex: "1", display: "flex", flexDirection: "column", gap: "2px", minWidth: "0" }}>\n          <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Insight</h1>'],
+  [/(<span onClick=\{v\.openRange\}[\s\S]*?<\/svg><\/span>)/, "$1\n        " + BELL]];
+// Profile: the bell in the profile card's top-right corner, 14 px in; the avatar + name row keeps 48 px clear of it so a long
+// name wraps first. Then "Back to Revenue app" (§8.1): the Control panel prototype's card, under View my team (or the
+// profile card), above Your workspace.
+PATCHES.SalesProfile = [...(PATCHES.SalesProfile ?? []),
+  ['<div style={{ borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)",', '<div style={{ position: "relative", borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)",'],
+  ['<div style={{ display: "flex", alignItems: "center", gap: "14px" }}>\n            <span style={{ flex: "none", width: "64px", height: "64px",',
+    "{!!(v.tb) && (<>\n          <span onClick={v.tb.open} title=\"Notifications\" style={{ position: \"absolute\", top: \"14px\", right: \"14px\", flex: \"none\", width: \"40px\", height: \"40px\", boxSizing: \"border-box\", borderRadius: \"50%\", border: \"1px solid #EBDDD2\", background: \"#fff\", display: \"grid\", placeItems: \"center\", color: \"#3F2B22\", boxShadow: \"0 2px 8px rgba(63,43,34,.06)\", cursor: \"pointer\" }}>\n            <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.8\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\n              <path d=\"M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0\">\n              </path>\n            </svg>\n            {!!(v.tb.has) && (<>\n              <span style={{ position: \"absolute\", top: \"-4px\", right: \"-4px\", minWidth: \"18px\", height: \"18px\", padding: \"0 5px\", boxSizing: \"border-box\", borderRadius: \"9px\", background: \"#BD4A19\", border: \"2px solid #fff\", color: \"#fff\", display: \"grid\", placeItems: \"center\", fontSize: \"10px\", fontWeight: \"700\" }}>{v.tb.n}</span>\n            </>)}\n          </span>\n        </>)}" + '\n          <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "48px" }}>\n            <span style={{ flex: "none", width: "64px", height: "64px",'],
+  ['<div style={{ display: "flex", flexDirection: "column" }}>\n          <h2 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: "700", letterSpacing: "-.02em" }}>Your workspace</h2>',
+    '<div onClick={v.exitCrm} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px", borderRadius: "22px", background: "#F5EBE3", color: "#3F2B22", cursor: "pointer" }} className={H.hov13}>\n' +
+    '          <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "14px", background: "#F6D9C4", color: "#BD4A19", display: "grid", placeItems: "center" }}>\n' +
+    '            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">\n' +
+    '              <path d="M10 17l-5-5 5-5M5 12h11a4 4 0 0 1 4 4v3">\n              </path>\n            </svg>\n          </span>\n' +
+    '          <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>\n            <strong style={{ fontSize: "17px", fontWeight: "700" }}>Back to Revenue app</strong>\n          </span>\n' +
+    '          <svg style={{ flex: "none", color: "#A8968B" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">\n            <path d="m9 6 6 6-6 6">\n            </path>\n          </svg>\n        </div>\n' +
+    '        <div style={{ display: "flex", flexDirection: "column" }}>\n          <h2 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: "700", letterSpacing: "-.02em" }}>Your workspace</h2>']];
+// The five pages read the bell (and Profile its way back) beside their own view model: header.ts › ShellExtras.
+const EXTRAS = new Set(["SalesInbox", "SalesContacts", "SalesCalendar", "SalesInsight", "SalesProfile"]);
 for (const [name, vm, frag, doc, vmOverride] of parts) {
   let body = convert(frag);
   for (const [a, b] of PATCHES[name] ?? []) {
@@ -148,17 +181,17 @@ for (const [name, vm, frag, doc, vmOverride] of parts) {
   // Text with an apostrophe ("doesn't") renders as written; lint is told so on that file only.
   const apos = /[>}][^<>{}]*'[^<>{}]*[<{]/.test(body.replace(/"[^"]*"/g, '""'));
   const usesFragment = body.includes("<Fragment");
-  const usesH = body.includes("H.hov");
+  const usesH = body.includes("H.hov"), extras = EXTRAS.has(name);
   const vmFile = vmOverride ?? name.replace(/^Sales/, "").replace(/^ShellBanners$/, "Shell").toLowerCase();
   const code = `"use client";
 ${apos ? "/* eslint-disable react/no-unescaped-entities -- generated from the design; its text keeps its own apostrophes */\n" : ""}
 // GENERATED from docs/design_handoff_crm_roles/CRM Revenue View.dc.html (3b) by the
 // design converter — markup and styles exactly as designed. Behaviour lives in
 // ./vm/${vmFile}.ts. To change the look, change the design and regenerate.
-${usesFragment ? 'import { Fragment } from "react";\n' : ""}${usesH ? 'import H from "../crm.module.css";\n' : ""}import type { ${vm} } from "./vm/${vmFile}";
+${usesFragment ? 'import { Fragment } from "react";\n' : ""}${usesH ? 'import H from "../crm.module.css";\n' : ""}import type { ${vm} } from "./vm/${vmFile}";${extras ? '\nimport type { ShellExtras } from "./vm/header";' : ""}
 
 /** ${doc} */
-export default function ${name}({ v }: { v: ${vm} }) {
+export default function ${name}({ v }: { v: ${vm}${extras ? " & ShellExtras" : ""} }) {
   return (<>${body}</>);
 }
 `;

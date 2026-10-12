@@ -15,7 +15,7 @@ import SalesInsight from "./SalesInsight";
 import SalesProfile from "./SalesProfile";
 import SalesChat from "./SalesChat";
 import SalesNav from "./SalesNav";
-import { headerVM, navVM, shellVM } from "./vm/header";
+import { headerVM, navVM, shellVM, titleBellVM } from "./vm/header";
 import { inboxVM } from "./vm/inbox";
 import { contactsVM } from "./vm/contacts";
 import { calendarVM } from "./vm/calendar";
@@ -32,15 +32,17 @@ export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: (
   useFollowNewest(ui.chat, ctx.data.customers.find(c => c.id === ui.chat)?.messages.length ?? 0);
   const { set } = ctx;
   useCloseOnOutside(!!ui.hm?.menu, useCallback(() => set(u => ({ ...u, hm: null })), [set]));
+  // Round 2: each page's title row has the bell; Profile's card leads back to the Revenue app (the top bar's link is gone).
+  const x = { tb: titleBellVM(ctx), exitCrm: onExit };
   return (<>
     <SalesShellBanners v={shellVM(ctx)} />
     {!chat && (<>
-      <SalesHeader v={headerVM(ctx, onExit)} />
-      {ui.tab === "inbox" && <SalesInbox v={inboxVM(ctx)} />}
-      {ui.tab === "contacts" && <SalesContacts v={contactsVM(ctx)} />}
-      {ui.tab === "calendar" && <SalesCalendar v={calendarVM(ctx)} />}
-      {ui.tab === "insight" && <SalesInsight v={insightVM(ctx)} />}
-      {ui.tab === "profile" && <SalesProfile v={profileVM(ctx)} />}
+      <SalesHeader v={headerVM(ctx)} />
+      {ui.tab === "inbox" && <SalesInbox v={{ ...inboxVM(ctx), ...x }} />}
+      {ui.tab === "contacts" && <SalesContacts v={{ ...contactsVM(ctx), ...x }} />}
+      {ui.tab === "calendar" && <SalesCalendar v={{ ...calendarVM(ctx), ...x }} />}
+      {ui.tab === "insight" && <SalesInsight v={{ ...insightVM(ctx), ...x }} />}
+      {ui.tab === "profile" && <SalesProfile v={{ ...profileVM(ctx), ...x }} />}
     </>)}
     {chat && (<>
       <SalesChat v={chat} />

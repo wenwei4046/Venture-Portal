@@ -166,14 +166,6 @@ export default function SalesChat({ v }: { v: ChatVM }) {
           </>)}
         </Fragment>))}
       </div>
-      {!!(v.notBooked) && (<>
-        <div style={{ flex: "none", display: "flex", gap: "6px", overflow: "hidden" }}>
-          <span onClick={v.openBook} style={{ flex: "1", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px", minHeight: "44px", padding: "0 20px", borderRadius: "22px", background: "#BD4A19", color: "#FFFFFF", fontSize: "16px", fontWeight: "650", whiteSpace: "nowrap", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14">
-              </path>
-            </svg>Book visit</span>
-        </div>
-      </>)}
       {!!(v.editText) && (<>
         <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", padding: "8px 8px 8px 12px", borderRadius: "12px", background: "#F5EBE3" }}>
           <svg style={{ flex: "none", color: "#BD4A19" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

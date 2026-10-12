@@ -22,7 +22,18 @@ import { memberWorkTypeVM, templatesVM } from "./profile-1011";
 import { teamName, teamOf } from "../../shared/people";
 import { customerForm } from "../../sales/vm/customer";
 import { DAY, day0 } from "../../sales/vm/common";
+import type { KeyboardEvent } from "react";
 import type { PanelCtx } from "./common";
+
+/** The ad editor's numbers (rev 1011 §8): Enter moves to the next visible number box and selects it; on the last one the
+ * keyboard closes. Never a submit. The prototype's own handler, over the page (the app has no screen-label root). */
+export function enterNext(e: KeyboardEvent<HTMLInputElement>) {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const list = [...document.querySelectorAll<HTMLInputElement>("input[data-num-step]")].filter(x => x.offsetParent !== null);
+  const nx = list[list.indexOf(e.currentTarget) + 1];
+  if (nx) { nx.focus(); nx.select(); } else e.currentTarget.blur();
+}
 
 /** A group whose screen is off: never read by the markup (it sits behind show.*), typed as the group. */
 const off = <T,>() => undefined as unknown as T;
@@ -41,14 +52,19 @@ export function panelAppVM(ctx: PanelCtx) {
   const hd = tab === "assign" && ui.asSec && !lead ? { ...hd0, showHead: true, backLabel: "Assignment", back: () => ctx.patch({ asSec: null }) } : hd0;
   const as0 = show.as ? assignVM(ctx) : undefined;
   const x = assignExtraVM(ctx, as0);
-  const as = as0 ? { ...as0, adRows: x.adRows, ae: x.aeSave ? { ...as0.ae, ...x.aeSave } : as0.ae } : undefined;
+  const as = as0 ? { ...as0, adRows: x.adRows, ae: { ...as0.ae, ...x.aeApply, ...(x.aeSave ?? {}) } } : undefined;
   const cal = show.cal ? calendarVM(ctx) : undefined;
-  // Team | Mine (rev 1011: the Director, and leaders with a downline), never in a chat: on Inbox in the title row left of
-  // Contacts, as the salesperson's Inbox has it left of All ads (user 2026-10-11); on the other pages in the top bar.
-  const tm = !!ctx.toMyCrm && !lead, dirTop = tm && !show.ib, ibTM = tm && show.ib;
+  // Team | Mine (rev 1011: the Director, and leaders with a downline), never in a chat: at the right end of its own top
+  // row on every page, Inbox included (round 2, §8). The top bar shows only for it or a back link ("‹ Profile" on Ads
+  // Performance, "‹ Assignment" in a section); the bell sits in each page's title row, or in the top bar beside a back
+  // link — the prototype's bellIn / bellTop.
+  const dirTop = !!ctx.toMyCrm && !lead;
   return {
     show, hd, bl, cf,
-    topBar: !!(bl.showBell || hd.showHead || dirTop), dirTop, ibTM, dirMine: () => ctx.toMyCrm?.(),
+    topBar: !!(hd.showHead || dirTop), dirTop, dirMine: () => ctx.toMyCrm?.(),
+    bellIn: !!bl.showBell && !hd.showHead, bellTop: !!bl.showBell && hd.showHead,
+    // Profile › Back to Revenue app (round 2): the only way back now.
+    exitCrm: () => ctx.exitApp(), enterNext,
     // The Insight line: "All access" for whoever sees everybody, else their team (a leader on the Team side).
     accessLbl: ctx.data.can.viewAll ? "All access" : teamName(teamOf(ctx.me.id, ctx.data.people)) || "My team",
     // Member work type, Showrooms, Cold lead templates, Ads Performance: CRM · Manage only.

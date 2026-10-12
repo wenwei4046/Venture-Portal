@@ -82,7 +82,8 @@ export interface CrmVisit {
   remindedAt: string | null;
 }
 
-export interface CrmBlock { a: string; b: string; why: string }
+/** A closure from a to b (YYYY-MM-DD). With t1 / t2 ("HH:MM") only those hours each day (round 2); without, the whole day. */
+export interface CrmBlock { a: string; b: string; why: string; t1?: string; t2?: string }
 export interface CrmRoom {
   id: string;
   name: string;

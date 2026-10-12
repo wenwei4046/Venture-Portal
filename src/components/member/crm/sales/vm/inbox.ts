@@ -9,7 +9,6 @@ import type { ChangeEvent, MouseEvent } from "react";
 import { DEFAULT_LABELS, LABEL_SWATCHES, type CrmCustomer, type CrmLabel } from "@/lib/member/crm-data";
 import { BORDER, CHANNEL, dayLabel, firstName, ini, INK, isCold, lastChat, lastReal, STATUS_LABEL, stop, timeLabel, urgencyOf, type PEvent, type SalesCtx } from "./common";
 import type { InboxFilter } from "../ui";
-import { teamMineVM } from "./header";
 
 /** One row's preview: a card we sent reads as what it was; ours start "You: ". */
 export function previewOf(c: CrmCustomer): string {
@@ -109,8 +108,6 @@ export function inboxVM(ctx: SalesCtx) {
   const togglePref = (k: "pinned" | "muted") => async () => { if (!ml) return; closeMore(); await act.setPref(ml.id, { [k]: !mp?.[k] }); };
 
   return {
-    // Team | Mine beside All ads (user 2026-10-11; header.ts › teamMineVM).
-    ...teamMineVM(ctx),
     q: ui.q, setQ: (e: ChangeEvent<HTMLInputElement>) => patch({ q: e.target.value }), clearQ: () => patch({ q: "" }),
     inboxToast: !ui.chat && ui.toast ? ui.toast : "",
     chips3b, leadsView, stop,

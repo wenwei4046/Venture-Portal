@@ -6,15 +6,27 @@
 import { Fragment } from "react";
 import H from "../crm.module.css";
 import type { ProfileVM } from "./vm/profile";
+import type { ShellExtras } from "./vm/header";
 
 /** Profile: card, View my team, workspace, Notifications (Unread | Read), Quick replies, Auto-reply. */
-export default function SalesProfile({ v }: { v: ProfileVM }) {
+export default function SalesProfile({ v }: { v: ProfileVM & ShellExtras }) {
   return (<>
             
     <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
       {!!(v.profMain) && (<>
-        <div style={{ borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)", border: "1px solid #EBDDD2", boxShadow: "0 6px 20px rgba(63,43,34,.06)", padding: "18px 16px 16px", display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+        <div style={{ position: "relative", borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)", border: "1px solid #EBDDD2", boxShadow: "0 6px 20px rgba(63,43,34,.06)", padding: "18px 16px 16px", display: "flex", flexDirection: "column", gap: "16px" }}>
+          {!!(v.tb) && (<>
+          <span onClick={v.tb.open} title="Notifications" style={{ position: "absolute", top: "14px", right: "14px", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0">
+              </path>
+            </svg>
+            {!!(v.tb.has) && (<>
+              <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", background: "#BD4A19", border: "2px solid #fff", color: "#fff", display: "grid", placeItems: "center", fontSize: "10px", fontWeight: "700" }}>{v.tb.n}</span>
+            </>)}
+          </span>
+        </>)}
+          <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "48px" }}>
             <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.meIniX}</span>
             <div style={{ minWidth: "0" }}>
               <h1 style={{ margin: "0", fontSize: "24px", fontWeight: "700", letterSpacing: "-.02em" }}>{v.meNameX}</h1>
@@ -50,6 +62,21 @@ export default function SalesProfile({ v }: { v: ProfileVM }) {
             </svg>
           </div>
         </>)}
+        <div onClick={v.exitCrm} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px", borderRadius: "22px", background: "#F5EBE3", color: "#3F2B22", cursor: "pointer" }} className={H.hov13}>
+          <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "14px", background: "#F6D9C4", color: "#BD4A19", display: "grid", placeItems: "center" }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 17l-5-5 5-5M5 12h11a4 4 0 0 1 4 4v3">
+              </path>
+            </svg>
+          </span>
+          <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
+            <strong style={{ fontSize: "17px", fontWeight: "700" }}>Back to Revenue app</strong>
+          </span>
+          <svg style={{ flex: "none", color: "#A8968B" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m9 6 6 6-6 6">
+            </path>
+          </svg>
+        </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <h2 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: "700", letterSpacing: "-.02em" }}>Your workspace</h2>
           <div onClick={v.openNotif} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", cursor: "pointer" }}>

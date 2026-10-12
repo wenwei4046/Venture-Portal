@@ -19,6 +19,7 @@
 .hov10:hover { border-color: #B9CCE3 !important; }
 .hov11:hover { border-color: #D9C7BA !important; }
 .hov12:hover { border-color: #E9BFA0 !important; }
+.hov13:hover { background: #EFE2D7 !important; }
 
 /* The app: full screen on a phone, the design's own font and colours. */
 .app {
@@ -73,9 +74,13 @@
  * .app pads itself by the insets (the bottom through --safe-bottom, globals.css, never the bare env —
  * src/lib/safe-area.test.ts). The status-bar strip shows the page's top colour: #FFFFFF (RS, any chat),
  * #FBF7F3 (Control panel); under the panel's white bottom bar the strip stays white.
+ * Round 2 (rev 1010 §8.2 / rev 1011 §8): with the top bar gone the title rows sit right under the inset, so on a phone
+ * with one the first row starts at least 8 px below it (--crm-top); with no inset (a desktop) nothing is added and the
+ * pages measure as the prototypes.
  */
 .app {
-  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) var(--safe-bottom) env(safe-area-inset-left, 0px);
+  --crm-top: calc(env(safe-area-inset-top, 0px) + min(8px, env(safe-area-inset-top, 0px)));
+  padding: var(--crm-top) env(safe-area-inset-right, 0px) var(--safe-bottom) env(safe-area-inset-left, 0px);
 }
 .app.panel { background: linear-gradient(#FBF7F3, #FBF7F3) top / 100% calc(100% - var(--safe-bottom)) no-repeat, #FFFFFF; }
 .app.panel:has(main [data-chat-list]) { background: #FFFFFF; }
@@ -83,7 +88,7 @@
    with a transparent border its own background paints under (the design's padding is left exactly as is):
    a bottom sheet lifts above the home indicator; a full-screen page (slideIn) starts below the status bar. */
 .app > [style*="absolute"] > [style*="sheetUp"] { border-bottom: var(--safe-bottom) solid transparent; }
-.app > [style*="slideIn"] { border-top: env(safe-area-inset-top, 0px) solid transparent; border-bottom: var(--safe-bottom) solid transparent; }
+.app > [style*="slideIn"] { border-top: var(--crm-top) solid transparent; border-bottom: var(--safe-bottom) solid transparent; }
 /* The reply box's hint stays on one line ("Reply to Hakimi…"), cut with an ellipsis, and the box shows no scrollbar. */
 .app textarea[data-draft]::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app textarea[data-draft] { scrollbar-width: none; }
