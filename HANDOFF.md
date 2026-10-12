@@ -1,5 +1,30 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-12 s (SHIPPED) — copied repayment vouchers lost their fund source
+
+The user (Overdue · Fund IN): "houzs 那两笔我一个欠一期，然后还有一期 pending release 罢了" — right.
+The two HOUZS Century deals (60k dcf15071…, 58k 32460c13…) had their 4th instalments PAID on
+28 Aug by HV-PV-202608-0312 / 0313 — copies of July's linked PVs (0149 / 0150). Copy voucher
+did not carry fund_source_id / loan_id / repayment_breakdown, so approval wrote no
+fund_source_repayments: GL right (4052 / 6000, same lines as July), sub-ledger short
+(Overdue, Repayment Schedule, fund-in pages, fund_source_outstanding all off by 19,666.67).
+The 5th instalments (HV-PV-202610-0449 / 0450, pending approval) and the Director loan
+repayments HV-PV-202610-0478 (→ 4cb7ee6d Lim Wei Liang 1000+300) / 0479 (→ 2a6255d2 Lim Wei
+Siang 1500+450) were unlinked copies too.
+
+- **Data (execute_sql, one transaction, user: 三样都做)**: 0312 / 0313 linked (fund_source_id +
+  repayment_breakdown) and their repayments inserted as approval would (principal + interest,
+  2026-08-28, "Auto-synced from voucher …", payment_voucher_id, created_by = their approver
+  cbc6a18a…) — no JE (the PV's own posting stands); 0449 / 0450 / 0478 / 0479 linked so
+  approve_single_voucher / approve_voucher_batch* sync them. After: 60k outstanding 20,000,
+  58k 19,333.32. Checked first: payment_vouchers' UPDATE triggers all key on a status change
+  or payroll / statutory lines; fund_source_repayments has no GL trigger.
+- **Code**: `copyPaymentVoucher` carries fund_source_id / loan_id / repayment_breakdown while
+  the deal is live (fund source active|matured, loan active); otherwise a plain copy as
+  before. The edit action already locks a linked voucher's amount to its breakdown.
+  Tests: `payments/actions.copy-repayment.test.ts`.
+- Rules: `.claude/rules/finance/finance-view.md` › A REPAYMENT'S COPY (2026-10-12).
+
 ## CHECKPOINT 2026-10-12 r (SHIPPED) — Overdue: the netting & penalty log, Fund IN's Netted this month
 
 The user asked what "ALL TIME" on the netting log meant; I had said netting keeps no date —

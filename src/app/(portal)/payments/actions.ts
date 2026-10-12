@@ -907,8 +907,13 @@ export async function approveVoucher(formData: FormData) {
 // ─── Copy a payment voucher into a new DRAFT ─────────────────────────────────
 // Recurring expense PVs repeat with small tweaks, so let Finance duplicate one
 // into a fresh draft (header + source rows) and edit it before submitting.
-// Transaction-specific links (invoice/loan/fund_source/repayment_breakdown) are
-// deliberately NOT copied — a copy is a new expense, not a re-run of a repayment.
+// An invoice link is never copied. A repayment's deal is (2026-10-12, user:
+// 三样都做): copied without it, HV-PV-202608-0312 / 0313 — the 4th instalments
+// to HOUZS Century — were paid but never reached the fund sources' own records,
+// and the Overdue page showed them unpaid. So a repayment's copy repays the same
+// fund source (or loan) with the same principal / interest while that deal is
+// still live; the amount then stays locked to that split, as on any repayment
+// voucher. A deal since repaid gets a plain copy, as before.
 export async function copyPaymentVoucher(formData: FormData): Promise<void> {
   const user = await requireActionOn('/payments/[id]', 'treasury', 'create')
   const supabase = await createClient()
@@ -918,12 +923,28 @@ export async function copyPaymentVoucher(formData: FormData): Promise<void> {
 
   const { data: src, error: srcErr } = await supabase
     .from('payment_vouchers')
-    .select('voucher_type, direction, amount, payee_name, payee_company_id, bank_account_id, description, payment_method, target_pool, reference_type')
+    .select('voucher_type, direction, amount, payee_name, payee_company_id, bank_account_id, description, payment_method, target_pool, reference_type, fund_source_id, loan_id, repayment_breakdown')
     .eq('id', sourceId)
     .single()
   if (srcErr || !src) throw new Error('Source voucher not found')
   // A copy carries the payee and the amount into a draft the caller can read.
   if (isPayrollReference(src.reference_type) && !canSeePayrollPayouts(user)) throw new Error('Source voucher not found')
+
+  // The deal a repayment's copy repays — the same one, while it is live.
+  let deal: { fund_source_id: string | null; loan_id: string | null; repayment_breakdown: typeof src.repayment_breakdown } = {
+    fund_source_id: null,
+    loan_id: null,
+    repayment_breakdown: null,
+  }
+  if (src.repayment_breakdown && src.fund_source_id) {
+    const { data: fs } = await supabase.from('fund_sources').select('status').eq('id', src.fund_source_id).maybeSingle()
+    if (fs && (fs.status === 'active' || fs.status === 'matured')) {
+      deal = { fund_source_id: src.fund_source_id, loan_id: null, repayment_breakdown: src.repayment_breakdown }
+    }
+  } else if (src.repayment_breakdown && src.loan_id) {
+    const { data: loan } = await supabase.from('loans').select('status').eq('id', src.loan_id).maybeSingle()
+    if (loan && loan.status === 'active') deal = { fund_source_id: null, loan_id: src.loan_id, repayment_breakdown: src.repayment_breakdown }
+  }
 
   // New voucher number — same scheme as createPaymentVoucher.
   const period = officeTime().format('YYYYMM') // the office's month, not UTC's
@@ -947,6 +968,7 @@ export async function copyPaymentVoucher(formData: FormData): Promise<void> {
       payment_method: src.payment_method,
       target_pool: src.target_pool,
       source_pool: null,
+      ...deal,
       // A copy is a NEW payment, so it gets today rather than the original's
       // date - and never NULL: omitting the column here is how
       // HV-PV-202609-0437 reached pending_approval with no payment date
