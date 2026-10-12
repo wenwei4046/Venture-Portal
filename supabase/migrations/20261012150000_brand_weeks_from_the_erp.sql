@@ -27,8 +27,8 @@
 -- guessed (only where the ERP lists nobody), week_brand / fits / placed (the
 -- two layers), each person's `source` (and `confirmed` = listed by the ERP,
 -- for an app that still reads it), the fair's organiser, and `weeks` — every
--- seller's brand week of last month's and this month's weekends, the ERP's
--- upcoming ones too.
+-- seller's brand week of this month's weekends and the two months' before, the
+-- ERP's upcoming ones too.
 CREATE OR REPLACE FUNCTION public.member_arena_booth_history_for_staff(p_sub_department uuid, p_scheme uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -38,8 +38,10 @@ AS $function$
 DECLARE
   v_today date:=(now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date;
   v_current date:=date_trunc('month',v_today)::date;
-  -- The brand weeks the app shows: last month's weekends and this month's.
-  v_weeks_from date:=(date_trunc('month',v_today)-interval '1 month')::date;
+  -- The brand weeks the app shows (My brand weeks, Today, the claim form): this
+  -- month's weekends and the two months' before — the month still being worked
+  -- can be two back early in a month.
+  v_weeks_from date:=(date_trunc('month',v_today)-interval '2 months')::date;
   v_weeks_until date:=(date_trunc('month',v_today)+interval '1 month')::date;
   v_result jsonb;
 BEGIN
@@ -177,9 +179,9 @@ BEGIN
     SELECT coalesce(sum(bp.orders),0) AS orders,coalesce(sum(bp.sales),0) AS sales
     FROM booth_people bp WHERE NOT bp.scoring
   ), shown_weeks AS (
-    -- Each seller's brand week, last month's weekends and this month's: where
-    -- the ERP lists them (upcoming weekends too), else where the second layer
-    -- placed them by their bills.
+    -- Each seller's brand week, this month's weekends and the two months'
+    -- before: where the ERP lists them (upcoming weekends too), else where the
+    -- second layer placed them by their bills.
     SELECT e.staff_id,e.week,'erp'::text AS source,e.brand,e.fair_id,e.venue,e.organizer,e.start_date,e.end_date,e.booths
     FROM erp_weeks e WHERE e.week>=v_weeks_from AND e.week<v_weeks_until
     UNION ALL
@@ -464,8 +466,9 @@ $function$;
 
 -- ── HR's grid (People › Member services › Brand weeks): read only ────────────
 -- Production md5 b9476a4b6031bd7421c7ec947310b752. Changed: `erp` — each
--- member's booth the ERP lists for the month's weekends — and `unlisted`, whom
--- the ERP lists that the portal cannot name; no saved picks, no saved-by.
+-- member's booth the ERP lists for the month's weekends — `unlisted`, whom
+-- the ERP lists that the portal cannot name, and `erpReceivedAt`, when the
+-- ERP last sent it; no saved picks, no saved-by.
 CREATE OR REPLACE FUNCTION public.member_admin_brand_weeks(p_sub_department uuid, p_period text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -486,6 +489,8 @@ BEGIN
     'period',p_period,
     'subDepartmentId',p_sub_department,
     'asOf',now(),
+    -- When the ERP last sent its Sales Attending.
+    'erpReceivedAt',(SELECT max(d.applied_at) FROM public.erp_attendance_deliveries d),
     'weeks',(SELECT coalesce(jsonb_agg(jsonb_build_object('week',x.week,'closesOn',x.closes_on,
         'locked',v_today>x.closes_on) ORDER BY x.week),'[]'::jsonb)
       FROM (SELECT w AS week,public.member_arena_week_closes_on(w) AS closes_on FROM unnest(v_fridays) w) x),

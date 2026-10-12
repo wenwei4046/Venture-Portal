@@ -60,7 +60,7 @@ function heldSource(kept: [MemberRead, unknown][], answers: { dept: () => Depart
   const none = vi.fn(async () => ({ ok: false as const, error: "not in this test" }));
   const api: RevenueSource = {
     refresh: none, orgMap: none, insightRange: none, quote: none, memo: none, requestHistory: none, submitRequest: none, cancelRequest: none,
-    claimRates: none, honours: none, saveBrandWeeks: none, memoReceipts: none,
+    claimRates: none, honours: none, memoReceipts: none,
     income: () => hold("income", () => ({ ok: false as const, error: "not in this test" })),
     departmentIncome: () => hold("departmentIncome", () => ({ ok: true as const, data: answers.dept() })),
     insight: (period?: string) => hold(`insight:${period}`, () => ({ ok: false as const, error: "not in this test" })),

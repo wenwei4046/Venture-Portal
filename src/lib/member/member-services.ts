@@ -391,7 +391,7 @@ export function memoRefusal(title: string, body: string, audience: readonly stri
 
 // ── Brand weeks ─────────────────────────────────────────────────────────────
 
-/** The four brands a week can be, in the order a click cycles them, and their chip colours. */
+/** The four brands a brand week can be, and their chip colours (HR’s Brand weeks grid). */
 export const WEEK_BRANDS = [
   { code: "AKEMI", name: "Akemi", fg: "189 74 25", bg: "255 240 228" },
   { code: "DUNLOP", name: "Dunlopillo", fg: "78 101 116", bg: "230 237 241" },
@@ -405,14 +405,3 @@ export function weekBrand(code: string | null | undefined) {
   return WEEK_BRANDS.find(b => b.code === code) ?? null;
 }
 
-/** A click: Akemi → Dunlopillo → Zanotti → Ergotex → not picked → Akemi. */
-export function nextWeekBrand(code: string | null | undefined): WeekBrandCode | null {
-  const at = WEEK_BRANDS.findIndex(b => b.code === code);
-  if (at === -1) return WEEK_BRANDS[0].code;
-  return at === WEEK_BRANDS.length - 1 ? null : WEEK_BRANDS[at + 1].code;
-}
-
-/** "1 week changed" / "3 weeks changed". */
-export function weeksChangedText(n: number): string {
-  return `${n} week${n === 1 ? "" : "s"} changed`;
-}

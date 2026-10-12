@@ -10,7 +10,7 @@ import { setViewAs } from "@/components/layout/view-as-actions";
 import PushAsk from "@/components/pwa/PushAsk";
 import { reportPushTrouble, savePushSubscription } from "@/lib/push/actions";
 import type { MemberOrderBook } from "@/lib/member/order-book";
-import { arenaRankings, type ArenaWeekBrand, type ArenaWeekPicks, type MemberArenaSnapshot } from "@/lib/member/arena";
+import { arenaRankings, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { championshipMonth, championshipStandings } from "@/lib/member/championship";
 import base from "./base.module.css";
 import s from "./shell.module.css";
@@ -68,7 +68,7 @@ import SchemeSheet from "./profile/SchemeSheet";
 import PasswordSheet from "./profile/PasswordSheet";
 import type { ChangePassword } from "@/components/account/use-change-password";
 import { schemeVM } from "./profile/scheme-model";
-import { brandMonthVM, picksToSave } from "./profile/brand-weeks-model";
+import { brandMonthVM } from "./profile/brand-weeks-model";
 import TeamPage, { PersonSheet } from "./profile/TeamPage";
 import RequestsPage, { RequestSheet, type RequestFilter } from "./profile/RequestsPage";
 import TrackPage, { RequestInfoSheet, type TrackSegment } from "./profile/TrackPage";
@@ -215,8 +215,6 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // My income closed (the user, 2026-10-11: "go with your recommendations for hidden amount"): Today's income card
   // keeps its place with the amount hidden, as the eye hides it — and no eye, nor Profile's Privacy, can show it.
   const incomeShut = !shows(closed, "income");
-  // My brand weeks closed: no chip, no page, and Today does not remind them to save the weeks.
-  const weeksOpen = shows(closed, "brandWeeks");
   const requestKinds = useMemo(() => (["claim", "replacement", "waiting"] as const).filter(kind => sends(closed, requestPageOf(kind))), [closed]);
   const quoteSends = sends(closed, "quote");
   useEffect(() => {
@@ -609,9 +607,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     today, first: me.first, title: me.title, rank: me.rank, income, incomeStatus, salary: todaySalary, hidden: hidden || incomeShut,
     department: principal && !viewed && !fixture ? membership?.name ?? "the department" : undefined,
     insight: now.block ?? undefined, kpi: now.kpi, arena: arenaToday, book: now.book, bands: data.bands, memos, requests, requestCode,
-    metricsLoading: now.loading && !now.block && !data.demo, arenaLoading: arenaCur.loading && !data.demo, brandWeeks: weeksOpen,
+    metricsLoading: now.loading && !now.block && !data.demo, arenaLoading: arenaCur.loading && !data.demo,
   }, champRank), [today, me, income, incomeStatus, todaySalary, hidden, incomeShut, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book,
-    now.loading, arenaCur.loading, data.demo, data.bands, memos, requests, champRank, weeksOpen]);
+    now.loading, arenaCur.loading, data.demo, data.bands, memos, requests, champRank]);
 
   // ── Insight: Month / Quarter / Year, opening on the current month ──
   const [insKind, setInsKind] = useState<PeriodKind>("monthly");
@@ -923,40 +921,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     salary: principal ? undefined : data.profile.salary, bands: data.bands, hidden,
   }), [me.name, me.ini, me.title, me.rank, membership, principal, incData, data.profile.salary, data.bands, hidden]);
 
-  // My brand weeks: this month's weekends first, then the month still being worked; the edits not saved yet, per month.
-  const backOffice = principal && !!context;
-  const [bwEdits, setBwEdits] = useState<Record<string, ArenaWeekPicks>>({});
-  const [bwBusy, setBwBusy] = useState(false);
-  const [bwError, setBwError] = useState<string | null>(null);
-  const [bwSaved, setBwSaved] = useState(false);
-  useEffect(() => { setBwEdits({}); setBwSaved(false); setBwError(null); }, [membershipId, context?.staffId]);
+  // My brand weeks (read only since 2026-10-12): this month's weekends first, then the month still being
+  // worked — where the ERP's Sales Attending puts the person read, else the booth with the most of their bills.
   const bwSnaps = useMemo(() => [arenaNow ?? arena, arenaNow ? arena : null].filter((x): x is MemberArenaSnapshot => !!x), [arena, arenaNow]);
-  const bwMonths = useMemo(() => (bwSnaps.length ? bwSnaps.map(snap => brandMonthVM(snap, bwEdits[snap.period], backOffice)) : null), [bwSnaps, bwEdits, backOffice]);
-  const pickBrandWeek = (month: string, week: string, brand: ArenaWeekBrand | undefined) => {
-    setBwSaved(false); setBwError(null);
-    setBwEdits(prev => ({ ...prev, [month]: { ...prev[month], [week]: brand } }));
-  };
-  const saveBrandWeeks = async () => {
-    if (!membershipId || bwBusy) return;
-    setBwBusy(true); setBwError(null);
-    try {
-      for (const snap of bwSnaps) {
-        if (!brandMonthVM(snap, bwEdits[snap.period], backOffice).dirty) continue;
-        const r = await source.saveBrandWeeks(membershipId, snap.period, picksToSave(snap, bwEdits[snap.period]), context);
-        if (!r.ok) { setBwError(r.error); return; }
-        // Read the month again: the weeks' booths, Today's reminder and the Arena all follow the new picks.
-        const fresh = await source.arena(membershipId, snap.period, "monthly", context);
-        if (fresh.ok) {
-          const next = viewedAs(fresh.data, context?.staffId);
-          if (snap.period === period) arenaCur.replace(next); else arenaWork.replace(next);
-        }
-        setBwEdits(prev => Object.fromEntries(Object.entries(prev).filter(([m]) => m !== snap.period)));
-      }
-      setBwSaved(true);
-    } finally {
-      setBwBusy(false);
-    }
-  };
+  const bwMonths = useMemo(() => (bwSnaps.length ? bwSnaps.map(snap => brandMonthVM(snap, klToday(), snap.selfId || null)) : null), [bwSnaps]);
 
   // The claim form's choices: the member's fair weekends, HR's rates, their team, the departments.
   // View as reads them too — the forms open on the viewed person's choices (and send nothing).
@@ -1067,8 +1035,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // A pull only from the page itself — never while a sheet is up — and never on the preview's fixtures,
   // nor on the Product List, which holds its edits until Save.
   const pullable = !data.demo && !fixture && !anyPanel && !nfOpen && !vaOpen && !onProducts;
-  // A reload for a newer release loses nothing: no sheet or form open, no brand weeks picked and not saved.
-  reloadable.current = pullable && !bwBusy && !bwMonths?.some(m => m.dirty);
+  // A reload for a newer release loses nothing: no sheet or form open.
+  reloadable.current = pullable;
   // View as takes the page column's place too (the prototype's `vaPE` opens the rail). The Product List
   // keeps the whole column and makes room inside itself instead (`shift`).
   const rail = desk && !onProducts && (nfOpen || anyPanel || (route.screen === "quote" && quoteSends) || vaOpen);
@@ -1210,8 +1178,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else if (pf === "memos") {
       page = <MemosPage memos={memoVMs} tab={memoTab} onTab={setMemoTab} onBack={back} onOpen={openMemo} />;
     } else if (pf === "brandWeeks") {
-      page = <BrandWeeksPage months={bwMonths} backOffice={backOffice} busy={bwBusy} error={bwError} saved={bwSaved}
-        onPick={pickBrandWeek} onSave={() => void saveBrandWeeks()} onBack={back} />;
+      page = <BrandWeeksPage months={bwMonths} viewing={!!context} onBack={back} />;
     } else {
       page = <ProfileMain vm={docs.unseen ? { ...profileVM, badges: { ...profileVM.badges, docs: String(docs.unseen) } } : profileVM} hidden={hidden} crm={crm} closedRows={closedRows} push={!principal && !data.demo} actions={{
         open: (key: WorkKey) => goScreen("account", { pf: key }),

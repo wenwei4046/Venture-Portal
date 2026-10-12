@@ -1,7 +1,8 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { memberDemo } from "@/lib/member/demo";
-import type { ArenaWeekPicks, MemberArenaSnapshot } from "@/lib/member/arena";
+import type { MemberArenaSnapshot } from "@/lib/member/arena";
+import type { ArenaBrandWeek } from "@/lib/member/arena-history";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import type { MemberData, MemberReadContext } from "@/lib/member/types";
 import type { RevenueSource } from "./source";
@@ -52,14 +53,19 @@ function book(from: string, through: string): MemberOrderBook {
   return value;
 }
 
-function arena(membershipId: string, period: string, context: MemberReadContext | undefined, picks: ArenaWeekPicks): MemberArenaSnapshot {
+function arena(membershipId: string, period: string, context: MemberReadContext | undefined, weeks: ArenaBrandWeek[]): MemberArenaSnapshot {
   return {
     principalView: !!context, viewedStaffId: context?.staffId, membershipId, department: "Fair", selfId: context ? "" : "jia",
     period, window: "monthly", from: `${period}-01`, through: `${period}-05`, asOf: "2026-10-05T04:00:00Z", live: true,
-    people: [], brands: [], weekLocks: [], tiers: [],
-    brandWeeks: { weeks: 5, counts: { AKEMI: 0, ERGOTEX: 0, ZANOTTI: 0, DUNLOP: 0 }, picks },
+    people: [], brands: [], weekLocks: [], tiers: [], brandWeeks: null,
+    // The person read's brand weeks (2026-10-12): from the ERP's Sales Attending, else the most bills.
+    history: { asOf: "2026-10-05T04:00:00Z", provisional: true, events: [], unassignedOrders: 0, unassignedSales: 0,
+      championship: { status: "pending", reason: "" }, weeks },
   };
 }
+/** ANTHONY listed at Akemi · MID VALLEY for the weekend of 2 October. */
+const LISTED: ArenaBrandWeek[] = [{ staffId: "anthony", week: "2026-10-02", source: "erp", brand: "AKEMI", fairId: "f1",
+  venue: "MID VALLEY", organizer: "BIGHOME", start: "2026-10-02", end: "2026-10-04", booths: 1 }];
 
 /**
  * A source that answers at once until `hold()`, then keeps every answer until `release()` — so what the
@@ -67,7 +73,7 @@ function arena(membershipId: string, period: string, context: MemberReadContext 
  */
 function fakeSource(make: () => MemberData) {
   // offline: every request fails to arrive; stale: a newer release is live and refuses this page's actions.
-  const world = { picks: {} as ArenaWeekPicks, failArena: false, offline: false, stale: false };
+  const world = { weeks: [] as ArenaBrandWeek[], failArena: false, offline: false, stale: false };
   const waiting: (() => void)[] = [];
   let holding = false;
   const answer = <T,>(value: () => T): Promise<T> => {
@@ -84,14 +90,14 @@ function fakeSource(make: () => MemberData) {
     refresh: vi.fn(() => answer(() => ({ ok: true as const, data: make() }))),
     insight: vi.fn(async (_period: string | undefined, _context?: MemberReadContext) => ({ ok: false as const, error: "not in this test" })),
     kpi: none, orgMap: none, insightRange: none, quote: none, memo: none, requestHistory: none,
-    submitRequest: none, cancelRequest: none, claimRates: none, honours: none, saveBrandWeeks: none, departmentIncome: none,
+    submitRequest: none, cancelRequest: none, claimRates: none, honours: none, departmentIncome: none,
     // Today's income: Comm Cal's engine for the live month (#195), asked for by ids.
     income: vi.fn(async () => ({ ok: false as const, error: "not in this test" })),
     memoReceipts: vi.fn(() => answer(() => ({ ok: true as const, data: [] }))),
     orderBook: vi.fn((_sub: string, from: string, until: string) => answer(() => ({ ok: true as const, data: book(from, until) }))),
     arena: vi.fn((membershipId: string, period: string, _window: string, context?: MemberReadContext) => answer(() => (world.failArena
       ? { ok: false as const, error: "Arena could not be loaded." }
-      : { ok: true as const, data: arena(membershipId, period, context, world.picks) }))),
+      : { ok: true as const, data: arena(membershipId, period, context, world.weeks) }))),
   } satisfies RevenueSource;
   return {
     api, world,
@@ -104,7 +110,7 @@ async function open(make: () => MemberData, search: string) {
   window.history.replaceState({}, "", `/member${search}`);
   const source = fakeSource(make);
   render(<RevenueApp initialData={make()} initialSearch={search} today="2026-10-05" source={source.api} />);
-  expect(await screen.findByText("0 of 5 picked")).toBeInTheDocument();
+  expect(await screen.findByText("0 of 5 from the ERP")).toBeInTheDocument();
   return source;
 }
 
@@ -164,20 +170,20 @@ describe("RevenueApp refreshes only when pulled (2026-10-06)", () => {
     expect(api.income).toHaveBeenCalledWith("fair", "2026-10", { staffId: "anthony", subDepartmentId: "fair" });
     const reads = { arena: calls(api.arena), book: calls(api.orderBook), income: calls(api.income) };
     source.hold();
-    source.world.picks = { "2026-10-02": "AKEMI" };
+    source.world.weeks = LISTED;
 
     pull(300);
 
     expect(screen.getByText("Refreshing…")).toBeInTheDocument();
     expect(screen.queryByText("Loading your fair weekends…")).not.toBeInTheDocument();
-    expect(screen.getByText("0 of 5 picked")).toBeInTheDocument();
+    expect(screen.getByText("0 of 5 from the ERP")).toBeInTheDocument();
     expect(calls(api.arena)).toBe(reads.arena + 1);
     expect(calls(api.orderBook)).toBe(reads.book + 1);
     expect(calls(api.income)).toBe(reads.income + 1);
     expect(api.refresh).toHaveBeenCalledTimes(1);
 
     await source.release();
-    expect(await screen.findByText("1 of 5 picked")).toBeInTheDocument();
+    expect(await screen.findByText("1 of 5 from the ERP")).toBeInTheDocument();
     expect(screen.queryByText("Refreshing…")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
@@ -196,11 +202,11 @@ describe("RevenueApp refreshes only when pulled (2026-10-06)", () => {
     const source = await open(principalData, VIEW_AS);
     source.hold();
     source.world.offline = true;
-    source.world.picks = { "2026-10-02": "AKEMI" };
+    source.world.weeks = LISTED;
     pull(300);
     await source.release();
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't refresh. Pull down to try again.");
-    expect(screen.getByText("0 of 5 picked")).toBeInTheDocument();
+    expect(screen.getByText("0 of 5 from the ERP")).toBeInTheDocument();
     expect(screen.queryByText("Loading your fair weekends…")).not.toBeInTheDocument();
     expect(reload).not.toHaveBeenCalled();
   });
@@ -215,19 +221,6 @@ describe("RevenueApp refreshes only when pulled (2026-10-06)", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("…but never over brand weeks picked and not saved: it says so instead", async () => {
-    const source = await open(principalData, VIEW_AS);
-    fireEvent.click(screen.getAllByRole("button", { name: "Akemi" })[0]);
-    expect(screen.getByText("1 of 5 picked")).toBeInTheDocument();
-    source.hold();
-    source.world.stale = true;
-    pull(300);
-    await source.release();
-    expect(reload).not.toHaveBeenCalled();
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't refresh");
-    expect(screen.getByText("1 of 5 picked")).toBeInTheDocument();
-  });
-
   it("a read answering \"not available\" (KPI off, no payroll row) is not a failed pull", async () => {
     const source = await open(principalData, VIEW_AS);
     source.hold();
@@ -236,7 +229,7 @@ describe("RevenueApp refreshes only when pulled (2026-10-06)", () => {
     await source.release();
     expect(screen.queryByText("Refreshing…")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByText("0 of 5 picked")).toBeInTheDocument();
+    expect(screen.getByText("0 of 5 from the ERP")).toBeInTheDocument();
   });
 
   it("back after ten minutes away it reads everything again once; after two, nothing", async () => {
@@ -264,7 +257,7 @@ describe("RevenueApp refreshes only when pulled (2026-10-06)", () => {
     await source.release();
     expect(api.refresh).toHaveBeenCalledTimes(1);
     expect(calls(api.arena, "2026-09")).toBe(2);
-    expect(screen.getByText("0 of 5 picked")).toBeInTheDocument();
+    expect(screen.getByText("0 of 5 from the ERP")).toBeInTheDocument();
   });
 });
 

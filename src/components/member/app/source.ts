@@ -5,7 +5,7 @@ import type { DepartmentIncome, MemberIncome } from "@/lib/member/income";
 import type { MemberHonours, MemberWaitingForm } from "@/lib/member/server";
 import type { WaitingQueue } from "@/lib/member/waiting-queue";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
-import type { ArenaWeekPicks, ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
+import type { ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
 import {
   acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberReplacementFormLink, fetchMemberWaitingFormLink, submitMemberRequest,
@@ -13,7 +13,7 @@ import {
   type fetchMemberInsightRange, type fetchMemberOrderBook, type fetchMemberOrgMap, type fetchMemberRequestHistory, type fetchPrincipalMemoReceipts,
   type refreshMemberData,
 } from "@/app/(member)/member/actions";
-import { saveMemberArenaBrandWeeks, savePrincipalArenaBrandWeeks, type fetchMemberArena } from "@/app/(member)/member/arena-actions";
+import type { fetchMemberArena } from "@/app/(member)/member/arena-actions";
 import type { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
 import { readMemberBatch, type MemberRead } from "@/app/(member)/member/batch-actions";
 import { bookMemberRoom, cancelMemberBooking, type MemberBookInput, type fetchMemberRooms } from "@/app/(member)/member/rooms-actions";
@@ -117,8 +117,6 @@ export interface RevenueSource {
   honours(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberHonours>>;
   /** View as: the viewed person's memo receipts. */
   memoReceipts(staffId: string): Promise<Outcome<{ memoId: string; readAt: string | null; acknowledgedAt: string | null }[]>>;
-  /** A month's brand weeks — the member's own open weeks, or (a Principal viewing them) any week. */
-  saveBrandWeeks(subDepartmentId: string, period: string, picks: ArenaWeekPicks, context?: MemberReadContext): Promise<Outcome<true>>;
   /** The Quote's catalogue (2026-10-08) — read when the Quote needs it, no longer with every open. */
   catalogue?(): Promise<Outcome<MemberCatalogue>>;
   /** Book a room (2026-10-11): the rooms and their bookings from one day to another, and who may be picked. */
@@ -147,7 +145,7 @@ const nothing = async () => ({ ok: false as const, error: "Preview data only." }
 export const demoSource: RevenueSource = {
   refresh: nothing, insight: nothing, kpi: nothing, arena: nothing, orgMap: nothing, orderBook: nothing, insightRange: nothing, quote: nothing,
   memo: nothing, requestHistory: nothing, submitRequest: nothing, cancelRequest: nothing, claimRates: nothing, memoReceipts: nothing, income: nothing, honours: nothing,
-  departmentIncome: nothing, saveBrandWeeks: nothing, catalogue: nothing,
+  departmentIncome: nothing, catalogue: nothing,
 };
 
 /** What a read action answers. */
@@ -214,12 +212,6 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     cancelBooking: id => cancelMemberBooking(id),
     documents: context => go<Answer<typeof fetchMemberDocuments>>(ask.documents(context)),
     openDocument: (id, context) => openMemberDoc(id, context?.staffId),
-    async saveBrandWeeks(subDepartmentId, period, picks, context) {
-      const result = context
-        ? await savePrincipalArenaBrandWeeks(subDepartmentId, period, picks, context)
-        : await saveMemberArenaBrandWeeks(subDepartmentId, period, picks);
-      return result.ok ? { ok: true, data: true } : { ok: false, error: result.error };
-    },
     ...(memory ? {
       peek: <T,>(request: MemberRead) => memory.get<T>(readKey(request)),
       ready: memory.ready,

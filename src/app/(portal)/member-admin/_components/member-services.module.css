@@ -149,7 +149,6 @@
 .bwHeadRow { background: rgb(var(--hv-head)); border-bottom: 1px solid rgb(var(--hv-head-rule)); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .bwHeadRow > span:first-child { padding: 11px 14px; }
 .bwHeadRow > span { padding: 11px 10px; }
-.bwState { font-weight: 400; color: rgb(var(--hv-brown)); margin-left: 4px; }
 .bwRow { border-bottom: 1px solid rgb(var(--hv-hairline)); }
 .bwName { padding: 8px 14px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bwCell { padding: 6px 8px; }
@@ -165,22 +164,14 @@
   font: inherit;
   font-size: 11.5px;
   line-height: normal;
-  cursor: pointer;
+  cursor: default;
   white-space: nowrap;
 }
+/* Read only since 2026-10-12: solid = the ERP's Sales Attending, dashed = auto-located, faint = no fair. */
 .bwChip[data-guess='true'] { background: rgb(255 255 255); border-style: dashed; border-color: rgb(var(--bw-fg, var(--hv-frame))); }
-.bwChip[data-changed='true'] { background: rgb(var(--hv-peach)); border: 1px solid rgb(var(--hv-accent)); }
-.bwChip:disabled { cursor: progress; }
-.bwChip:focus-visible { outline: 2px solid rgb(var(--hv-ink)); outline-offset: 2px; }
+.bwChip[data-none='true'] { background: transparent; color: rgb(var(--hv-quiet)); }
 .bwDot { width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--bw-fg, var(--hv-quiet))); flex: none; }
-.bwBar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; background: rgb(var(--hv-peach)); border-top: 1px solid rgb(var(--hv-accent)); }
-.bwBarText { font-size: 12.5px; }
-.bwBarText b { font-weight: 500; }
-.bwBarActions { display: flex; gap: 8px; }
-.discard { padding: 7px 12px; border: 1px solid rgb(var(--hv-hairline)); border-radius: 6px; background: rgb(255 255 255); font: inherit; font-size: 13px; line-height: normal; cursor: pointer; color: rgb(var(--hv-ink)); }
-.save { padding: 7px 14px; border: 0; border-radius: 6px; background: rgb(var(--hv-accent)); font: inherit; font-size: 13px; line-height: normal; cursor: pointer; color: rgb(var(--hv-ink)); }
-.save:hover:not(:disabled) { background: rgb(var(--hv-accent-hover)); }
-.discard:disabled, .save:disabled { opacity: 0.5; cursor: not-allowed; }
+.bwWhere { display: block; margin-top: 3px; padding-left: 2px; font-size: 10.5px; color: rgb(var(--hv-body-2)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .foot { margin-top: 10px; font-size: 12px; color: rgb(var(--hv-brown)); }
 .loading { padding: 28px; text-align: center; color: rgb(var(--hv-brown)); }
 .alert { margin: 0 0 12px; padding: 10px 12px; border-radius: 8px; background: rgb(var(--hv-danger-bg)); color: rgb(var(--hv-danger)); font-size: 12.5px; }

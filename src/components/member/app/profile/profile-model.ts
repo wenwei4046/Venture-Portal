@@ -473,33 +473,37 @@ const WEEK_TONE: Record<string, [string, string]> = {
 /**
  * The fair weekends a claim can be for, newest first: every weekend of the
  * months the member's Arena covers that has already begun. A claim is only for
- * the member's own brand week (user 2026-10-06), and the fair is the booth the
- * Arena scores them at that weekend — the brand they picked, else the one they
- * opened the most bills for; picked but nothing written there, that brand's
- * booth with the most bills. The database's `member_claim_brand_week` reads the
- * same boards the same way. No brand week = nothing to claim that weekend.
+ * the member's own brand week (user 2026-10-06), and since 2026-10-12 that is
+ * the booth the Houzs ERP's Sales Attending lists them at, else — a weekend it
+ * lists them nowhere — the booth they opened the most bills at (the read's
+ * `weeks`; `member_claim_brand_week` reads the same two layers). No brand week,
+ * or a booth the portal has no fair for yet, = nothing to claim that weekend.
  */
 export function claimWeeks(snapshots: readonly (MemberArenaSnapshot | null | undefined)[], today: string): ClaimWeek[] {
   const out = new Map<string, ClaimWeek>();
-  const orders = (e: { people: { orders: number }[] }) => e.people.reduce((n, p) => n + (p.orders || 0), 0);
   for (const snap of snapshots) {
     if (!snap) continue;
     const me = snap.selfId;
     const events = snap.history?.events ?? [];
+    const weeks = snap.history?.weeks;
     const month = (MONTHS_SHORT[Number(snap.period.slice(5, 7)) - 1] ?? "").toUpperCase();
     arenaMonthFridays(snap.period).forEach((friday, i) => {
       if (friday > today || out.has(friday)) return;
-      const saved = snap.brandWeeks?.picks?.[friday] ?? null;
-      const scoring = me ? events.find(e => e.week === friday && e.people.some(p => p.id === me && p.scoring !== false)) : undefined;
-      const booth = scoring ?? (saved
-        ? events.filter(e => e.week === friday && e.brand === saved).sort((a, b) => orders(b) - orders(a) || a.id.localeCompare(b.id))[0]
-        : undefined);
-      const brand = booth?.brand ?? saved ?? null;
+      const week = weeks?.find(w => w.week === friday && (!me || w.staffId === me));
+      // A read from before the brand weeks came with it: the booth the Arena scores them at.
+      const scoring = !weeks && me ? events.find(e => e.week === friday && e.people.some(p => p.id === me && p.scoring !== false)) : undefined;
+      const booth = week
+        ? { brand: week.brand, venue: week.venue, organizer: week.organizer, start: week.start, end: week.end, fairId: week.fairId }
+        : scoring
+          ? { brand: scoring.brand ?? null, venue: scoring.venue, organizer: scoring.organizer ?? null, start: scoring.start, end: scoring.end, fairId: scoring.fairId ?? null }
+          : null;
+      const brand = booth?.brand ?? null;
       const [color, tint] = brand ? WEEK_TONE[brand] ?? ["var(--rv-brown)", "var(--rv-sand)"] : ["var(--rv-sub)", "var(--rv-sand)"];
       out.set(friday, {
         key: friday, month, n: `W${i + 1}`, brandWeek: brand ? `${WEEK_BRAND[brand] ?? brand} week` : "No brand week", brand,
-        dates: booth ? dayRange(booth.start, booth.end) : arenaWeekendLabel(friday), venue: booth?.venue ?? null, org: booth?.organizer ?? null,
-        fairId: booth?.fairId ?? null, start: booth?.start ?? null, end: booth?.end ?? null, auto: !!booth && !saved, claimable: !!booth?.fairId, color, tint,
+        dates: booth?.start && booth.end ? dayRange(booth.start, booth.end) : arenaWeekendLabel(friday), venue: booth?.venue ?? null, org: booth?.organizer ?? null,
+        fairId: booth?.fairId ?? null, start: booth?.start ?? null, end: booth?.end ?? null,
+        auto: week ? week.source === "auto" : !!scoring, claimable: !!booth?.fairId, color, tint,
       });
     });
   }

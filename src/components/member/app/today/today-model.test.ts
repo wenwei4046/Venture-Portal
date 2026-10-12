@@ -110,39 +110,36 @@ describe("Sales / Margin / KPI", () => {
 describe("Needs your action", () => {
   const memo = (id: string, title: string, ack: string | null): MemberMemo => ({ id, title, body: "", sender: "HR", publishedAt: "2026-10-02T01:00:00Z", effectiveAt: "2026-10-02", version: 1, requiresAck: true, readAt: null, acknowledgedAt: ack, departments: [] });
   const request = (id: string, status: string): MemberRequest => ({ id, kind: "replacement", title: "Replacement · Marcus Lim", status, createdAt: "2026-09-02T08:30:00Z", detail: {} });
-  it("lists memos to acknowledge, returned requests and open brand weeks", () => {
+  it("lists memos to acknowledge and returned requests — and no brand weeks to save (they come from the ERP, 2026-10-12)", () => {
     const m = todayModel({
       ...base,
       memos: [memo("a", "October brand weeks are open", null), memo("b", "Deposit rule reminder", null), memo("c", "Old", "2026-09-01")],
       requests: [request("2609-004", "needs_info"), request("x", "submitted")],
-      arena: arena([], { weekLocks: [{ week: "2026-10-02", closesOn: "2026-10-11", locked: false }, { week: "2026-10-09", closesOn: "2026-10-18", locked: false }], brandWeeks: { weeks: 5, counts: { AKEMI: 1, ERGOTEX: 0, ZANOTTI: 0, DUNLOP: 0 }, picks: { "2026-10-02": "AKEMI" } } }),
+      arena: arena([], { weekLocks: [{ week: "2026-10-02", closesOn: "2026-10-11", locked: false }, { week: "2026-10-09", closesOn: "2026-10-18", locked: false }] }),
     });
     expect(m.todo.map(t => [t.title, t.sub])).toEqual([
       ["Acknowledge 2 memos", "October brand weeks are open · Deposit rule reminder"],
       ["Replacement needs info", "RQ-2609-004 · HR returned it"],
-      ["Save October brand weeks", "Due 18 Oct"],
     ]);
-  });
-  it("My brand weeks closed by their ticks (2026-10-11): no reminder to save them, nor a pointer to the page", () => {
-    const weeks = arena([], { weekLocks: [{ week: "2026-10-09", closesOn: "2026-10-18", locked: false }], brandWeeks: { weeks: 5, counts: { AKEMI: 0, ERGOTEX: 0, ZANOTTI: 0, DUNLOP: 0 }, picks: {} } });
-    const m = todayModel({ ...base, arena: weeks, brandWeeks: false });
-    expect(m.todo.map(t => t.title)).not.toContain("Save October brand weeks");
-    expect(m.week?.venue).toBeNull();
-    expect(todayModel({ ...base, arena: weeks }).week?.venue).toBe("Pick your brand in My brand weeks");
   });
 });
 
 describe("This week and Your Arena", () => {
-  it("names this week's brand week and the booth it is at", () => {
+  // The week's booth (2026-10-12): where the ERP's Sales Attending lists the member — this weekend's too,
+  // while its fair is still on.
+  it("names this week's brand week and the booth the ERP lists them at", () => {
+    const weeks = [
+      { staffId: "me", week: "2026-10-02", source: "erp", brand: "ERGOTEX", fairId: "f", venue: "IOI City Mall", organizer: "Mega Home Fair", start: "2026-10-02", end: "2026-10-04", booths: 1 },
+      { staffId: "other", week: "2026-10-02", source: "erp", brand: "AKEMI", fairId: "g", venue: "MID VALLEY", organizer: "BIGHOME", start: "2026-10-02", end: "2026-10-04", booths: 1 },
+    ];
     const m = todayModel({ ...base, arena: arena([], {
-      brandWeeks: { weeks: 5, counts: { AKEMI: 0, ERGOTEX: 1, ZANOTTI: 0, DUNLOP: 0 }, picks: { "2026-10-02": "ERGOTEX" } },
-      history: { asOf: "", provisional: true, events: [{ id: "f|ERGOTEX", fairId: "f", brand: "ERGOTEX", venue: "IOI City Mall", start: "2026-10-02", end: "2026-10-04", week: "2026-10-02", periodMonth: "2026-10", people: [], organizer: "Mega Home Fair" }] } as unknown as MemberArenaSnapshot["history"],
+      history: { asOf: "", provisional: true, events: [], weeks } as unknown as MemberArenaSnapshot["history"],
     }) });
     expect(m.week).toEqual({ title: "Week 1 · Ergotex week", dates: "2–4 Oct", venue: "IOI City Mall", org: "Mega Home Fair" });
   });
-  it("says when this week's brand is not picked yet", () => {
+  it("says when this week has no brand week yet — nothing to pick, no pointer to a page", () => {
     const m = todayModel({ ...base, arena: arena([]) });
-    expect(m.week).toEqual({ title: "Week 1 · Brand week not picked", dates: "2–4 Oct", venue: "Pick your brand in My brand weeks", org: null });
+    expect(m.week).toEqual({ title: "Week 1 · No brand week yet", dates: "2–4 Oct", venue: null, org: null });
   });
   it("ranks the person on Sales, Margin and KPI; Championship waits for its points", () => {
     const people = [

@@ -3,7 +3,10 @@
  * booth by booth since 2026-10-03 (`member_arena_booth_history`): one event
  * per brand's booth at a fair, holding every bill written there. A seller is
  * on every board they wrote at, and ONE a week scores (user: 你照样上榜，只是
- * 你上榜了没有拿到积分 … 能算积分的只有一个).
+ * 你上榜了没有拿到积分 … 能算积分的只有一个) — their brand week: since
+ * 2026-10-12 the booth the Houzs ERP's Sales Attending lists them at, else
+ * the booth they opened the most bills at (user: "1 layer is use track by erp
+ * houzs, if fail, then go with auto detect, same engine with previous one").
  */
 export interface ArenaFairPerson {
   id: string;
@@ -12,10 +15,11 @@ export interface ArenaFairPerson {
   held: number;
   orders: number;
   /**
-   * Placed by the brand they picked for the week (My brand weeks). False:
-   * not picked yet, so placed at the brand they opened the most bills for.
+   * Where the week's booth came from (2026-10-12): `erp` — the ERP's Sales
+   * Attending lists them; `auto` — it lists them nowhere that weekend, so the
+   * booth they opened the most bills at. Null on a board of a week with neither.
    */
-  confirmed?: boolean;
+  source?: "erp" | "auto" | null;
   /**
    * The one board this week whose place earns points. False: ranked on the
    * board like anybody — another booth than their brand week, or a second
@@ -39,10 +43,31 @@ export interface ArenaFairEvent {
   organizer?: string | null;
   /** The fair weekend — the Friday of the week the fair opens in. */
   week?: string;
-  /** The last day the week's brand can be picked: seven days after its fairs. */
+  /** Seven days after its fairs — the day a week closed when brand weeks were picked (before 2026-10-12). */
   closesOn?: string | null;
-  /** Past `closesOn`: a guessed placement is auto-located for good. */
   locked?: boolean;
+}
+
+/**
+ * One person's brand week (2026-10-12): the booth that counts for them that
+ * fair weekend, named by its Friday. The member's and the Principal's reads
+ * carry only the person read: this month's weekends and the two months' before.
+ */
+export interface ArenaBrandWeek {
+  staffId: string;
+  /** The Friday of the week the fair opens in. */
+  week: string;
+  /** `erp` — the ERP's Sales Attending lists them there (upcoming weekends too); `auto` — it lists them nowhere, so the booth they wrote the most bills at. */
+  source: "erp" | "auto";
+  brand: string | null;
+  /** The portal's fair; null for an ERP booth nobody has written a bill at yet. */
+  fairId: string | null;
+  venue: string | null;
+  organizer: string | null;
+  start: string | null;
+  end: string | null;
+  /** How many booths the ERP lists them at that weekend (the one with the most of their bills counts). Null for `auto`. */
+  booths: number | null;
 }
 
 export interface ArenaHistorySnapshot {
@@ -55,6 +80,8 @@ export interface ArenaHistorySnapshot {
   /** What is ranked on a board with no points: another booth than the seller's brand week, or a second fair that week. */
   offWeekOrders?: number;
   offWeekSales?: number;
+  /** The person read's brand weeks (absent from a read before 2026-10-12). */
+  weeks?: ArenaBrandWeek[];
   championship: { status: "pending"; reason: string };
 }
 
@@ -75,9 +102,7 @@ export interface ArenaFairStanding {
   basePoints: 0;
   incentivePoints: 0;
   points: 0;
-  /** Placed by guess — no brand picked for the week — while the week is still open. */
-  unconfirmed: boolean;
-  /** Placed by guess and the week has closed: auto-located (2026-10-03). */
+  /** Not on the ERP's Sales Attending that weekend: placed at the booth they opened the most bills at. */
   autoLocated: boolean;
   /** Ranked on this board like anybody, but it is not their scoring booth this week: the place earns no points. */
   offWeek: boolean;
@@ -91,8 +116,6 @@ export interface ArenaFairDisplayEvent {
   start: string;
   end: string;
   brand: string | null;
-  closesOn: string | null;
-  locked: boolean;
   rows: ArenaFairStanding[];
 }
 
@@ -160,7 +183,7 @@ function uniqueEvents(events: readonly ArenaFairEvent[]): ArenaFairEvent[] {
   return [...known.values()].sort((a, b) => a.end.localeCompare(b.end) || a.id.localeCompare(b.id));
 }
 
-const standing = (person: ArenaFairPerson & { position: number | null }, locked: boolean): ArenaFairStanding => ({
+const standing = (person: ArenaFairPerson & { position: number | null }): ArenaFairStanding => ({
   id: person.id, name: person.name, value: person.sales,
   // An unreadable result is pending, a real zero is a known zero, and neither
   // is a place. Only the finish is carried; no award rides along with it.
@@ -168,8 +191,7 @@ const standing = (person: ArenaFairPerson & { position: number | null }, locked:
   position: person.position, scoringPosition: null, scoringValue: 0,
   basePoints: 0, incentivePoints: 0, points: 0,
   // Off the scoring board the guess is not this board's to explain.
-  unconfirmed: scores(person) && person.confirmed === false && !locked,
-  autoLocated: scores(person) && person.confirmed === false && locked,
+  autoLocated: scores(person) && person.source === "auto",
   offWeek: !scores(person),
 });
 
@@ -188,8 +210,8 @@ export function arenaFairEvents(history: ArenaHistorySnapshot, from: string, thr
     .filter(event => event.end >= from && event.end <= through)
     .map(event => ({
       id: event.id, label: arenaBoothLabel(event), venue: event.venue, start: event.start, end: event.end,
-      brand: event.brand ?? null, closesOn: event.closesOn ?? null, locked: event.locked === true,
-      rows: rankedPeople(event.people).map(person => standing(person, event.locked === true)),
+      brand: event.brand ?? null,
+      rows: rankedPeople(event.people).map(person => standing(person)),
     }));
 }
 

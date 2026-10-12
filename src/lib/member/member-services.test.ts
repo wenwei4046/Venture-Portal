@@ -15,7 +15,6 @@ import {
   memoLine,
   memoReadsFromRow,
   memoRefusal,
-  nextWeekBrand,
   replacementRefusal,
   requestCaption,
   requestFacts,
@@ -29,7 +28,6 @@ import {
   scheduledNotice,
   seatOptions,
   weekBrand,
-  weeksChangedText,
 } from './member-services'
 
 const FAIR = '71709f7e-9f7c-4e28-80cf-ce21be336995'
@@ -278,13 +276,9 @@ describe('Publish memo', () => {
 })
 
 describe('Brand weeks', () => {
-  it('cycles Akemi → Dunlopillo → Zanotti → Ergotex → not picked', () => {
-    expect(nextWeekBrand(null)).toBe('AKEMI')
-    expect(nextWeekBrand('AKEMI')).toBe('DUNLOP')
-    expect(nextWeekBrand('ZANOTTI')).toBe('ERGOTEX')
-    expect(nextWeekBrand('ERGOTEX')).toBeNull()
+  it('names each brand and gives it its chip colours', () => {
     expect(weekBrand('DUNLOP')?.name).toBe('Dunlopillo')
-    expect(weeksChangedText(1)).toBe('1 week changed')
-    expect(weeksChangedText(3)).toBe('3 weeks changed')
+    expect(weekBrand('AKEMI')).toMatchObject({ fg: '189 74 25', bg: '255 240 228' })
+    expect(weekBrand('AKEMI FRAGRANCE')).toBeNull()
   })
 })

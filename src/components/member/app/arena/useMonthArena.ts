@@ -8,8 +8,6 @@ import { ask, untracked, type RevenueSource, type TrackRead } from "../source";
 export interface MonthArena {
   /** The month's Arena (monthly window, fair history included), or null while there is none to show. */
   snapshot: MemberArenaSnapshot | null;
-  /** Put a newer answer in its place (brand weeks just saved and read again). */
-  replace: (snapshot: MemberArenaSnapshot) => void;
   /** Nothing to show yet and the read has not answered: a placeholder, not "no place". */
   loading: boolean;
 }
@@ -56,5 +54,5 @@ export function useMonthArena({ source, membershipId, context, readable, month, 
   }, [source, membershipId, context, readable, month, key, gen, track]);
 
   const shownNow = month ? snapshot : null;
-  return { snapshot: shownNow, replace: setSnapshot, loading: !!month && !shownNow && answered !== key };
+  return { snapshot: shownNow, loading: !!month && !shownNow && answered !== key };
 }

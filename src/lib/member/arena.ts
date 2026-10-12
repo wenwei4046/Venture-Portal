@@ -12,15 +12,15 @@ export interface ArenaPerson extends ArenaScore {
 }
 export type ArenaWeekBrand = "AKEMI" | "ERGOTEX" | "ZANOTTI" | "DUNLOP";
 /**
- * The brand a member worked each week of a month, keyed by the week's Friday
- * (`YYYY-MM-DD`); a week left out is not picked (2026-10-03). The Fair results
- * rank the member only at that brand's booth that week.
+ * The brand a member picked for each week of a month, keyed by the week's
+ * Friday — picked from 2026-10-03 to 2026-10-12, never once saved, and read by
+ * nothing since brand weeks come from the ERP's Sales Attending (the
+ * history's `weeks`). The snapshot still carries the empty store.
  */
 export type ArenaWeekPicks = Partial<Record<string, ArenaWeekBrand>>;
 export interface ArenaBrandWeeks {
   weeks: 4 | 5;
   counts: { AKEMI: number; ERGOTEX: number; ZANOTTI: number; DUNLOP: number };
-  /** Which brand each week was — the counts follow from it. */
   picks?: ArenaWeekPicks;
 }
 /** One rung of one brand's incentive ladder, exactly as the scheme has it. */
@@ -28,9 +28,9 @@ export interface ArenaTier {
   brand: string; bandKey: string; label: string; marginPct: number; amount: number;
 }
 /**
- * Whether a week of the month can still be picked (2026-10-03, user: 结束之后
- * 的一个星期 … 没有填就 closing 了): open until seven days after its fair's
- * last day. Closed, only the back office changes it.
+ * A week of the month and the day it closes — seven days after its fair's last
+ * day (2026-10-03; what a pick could no longer change while brand weeks were
+ * picked). HR's grid still names the weeks by it.
  */
 export interface ArenaWeekLock { week: string; closesOn: string; locked: boolean }
 export interface MemberArenaSnapshot {
@@ -38,8 +38,8 @@ export interface MemberArenaSnapshot {
   membershipId: string; department: string; selfId: string;
   period: string; window: ArenaWindow; from: string; through: string; asOf: string; live: boolean;
   people: ArenaPerson[]; brands: { code: string; name: string }[];
+  /** The old pick store (empty; see ArenaWeekPicks) — a brand week is the history's `weeks` now. */
   brandWeeks: ArenaBrandWeeks | null;
-  /** The month's weeks, each with the day it closes. */
   weekLocks?: ArenaWeekLock[];
   /** Empty until the scheme configures a ladder; the board then says so. */
   tiers: ArenaTier[];
@@ -64,7 +64,7 @@ export const ARENA_WEEK_BRANDS = [
 ] as const;
 /**
  * The weeks of a month (`YYYY-MM`), each named by its Friday — the fair
- * weekends a member picks a brand for. A fair belongs to the week it opens in,
+ * weekends a brand week is for. A fair belongs to the week it opens in,
  * so September 2026 is 4, 11, 18 and 25; October has five. The twin of SQL's
  * `member_arena_month_fridays`.
  */
@@ -78,32 +78,6 @@ export function arenaMonthFridays(period: string): string[] {
     if (date.getUTCDay() === 5) fridays.push(date.toISOString().slice(0, 10));
   }
   return fridays;
-}
-/** Picks a member may save for a month: only its weeks, only the four brands. */
-export function validArenaWeekPicks(period: string, value: unknown): value is ArenaWeekPicks {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const weeks = new Set(arenaMonthFridays(period));
-  return weeks.size > 0 && Object.entries(value).every(([week, brand]) => weeks.has(week)
-    && (brand === null || brand === undefined || ARENA_WEEK_BRANDS.some(({ code }) => code === brand)));
-}
-/** The weeks picked, as the save stores them: picked weeks only. */
-export function arenaWeekPicksToSave(period: string, picks: ArenaWeekPicks): ArenaWeekPicks {
-  return Object.fromEntries(arenaMonthFridays(period).flatMap(week => picks[week] ? [[week, picks[week]]] : []));
-}
-/** What a save leaves the month holding: the weeks, the count per brand and the picks. */
-export function arenaBrandWeeksFrom(period: string, picks: ArenaWeekPicks): ArenaBrandWeeks {
-  const saved = arenaWeekPicksToSave(period, picks);
-  const count = (code: ArenaWeekBrand) => Object.values(saved).filter(brand => brand === code).length;
-  return { weeks: arenaMonthFridays(period).length === 5 ? 5 : 4,
-    counts: { AKEMI: count("AKEMI"), ERGOTEX: count("ERGOTEX"), ZANOTTI: count("ZANOTTI"), DUNLOP: count("DUNLOP") }, picks: saved };
-}
-/**
- * Whether a member's own save could change this week: a closed week must come
- * back exactly as it was stored (the back office is not held to it).
- */
-export function closedWeekChanged(picks: ArenaWeekPicks, stored: ArenaWeekPicks, locks: readonly ArenaWeekLock[]): string | null {
-  const changed = locks.find(lock => lock.locked && (picks[lock.week] ?? null) !== (stored[lock.week] ?? null));
-  return changed?.week ?? null;
 }
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 /** "13 Sep" — the day a week closes. */

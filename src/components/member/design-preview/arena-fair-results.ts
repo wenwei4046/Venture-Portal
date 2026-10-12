@@ -19,12 +19,8 @@ export interface FairPlacementResult {
   status: FairPlacementStatus;
   /** The booth's brand on a live board; null for a fictional venue. */
   brand: string | null;
-  /** Placed at this booth by guess — the brand week is not picked yet and still open. */
-  unconfirmed: boolean;
-  /** Placed by guess after the week closed: auto-located. */
+  /** Not on the ERP's Sales Attending that weekend: placed at the booth with the most of their bills (2026-10-12). */
   autoLocated: boolean;
-  /** The last day the week's brand can be picked. */
-  closesOn: string | null;
 }
 
 export interface FairPlacementSummary {
@@ -113,8 +109,7 @@ export function summarizeFairResults(
         eventId: event.id, venue: event.venue, start: event.start, end: event.end,
         weekId: event.weekId ?? null, ...result,
         sales: recorded.salesConflict ? Number.NaN : recorded.row.value,
-        brand: event.brand ?? null, unconfirmed: recorded.row.unconfirmed === true,
-        autoLocated: recorded.row.autoLocated === true, closesOn: event.closesOn ?? null,
+        brand: event.brand ?? null, autoLocated: recorded.row.autoLocated === true,
       });
       // Ranked there, but the week's points — and its medal — are the scoring board's.
       if (result.status === "offweek") { summary.offWeek++; continue; }
