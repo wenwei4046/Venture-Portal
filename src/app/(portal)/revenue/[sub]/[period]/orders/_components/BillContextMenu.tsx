@@ -3,9 +3,10 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { excludeOrder, includeOrder, setOrderBrand, shareOrder, unshareOrder, type BillBrandResult, type BillCountResult } from '../../../../run-actions'
+import { excludeOrder, includeOrder, moveOrder, setOrderBrand, shareOrder, unshareOrder, type BillBrandResult, type BillCountResult } from '../../../../run-actions'
 import type { BillCountAction } from '@/lib/commission/bill-exclusion'
 import type { BillBrandAction, BrandOption } from '@/lib/commission/bill-brand'
+import { moveProblem, type BillMoveAction, type BillMoveResult } from '@/lib/commission/bill-move'
 import {
   defaultPartFor, holdersLine, parsePart, partsAfter, shareProblem, sharePct,
   type BillShareAction, type BillShareAnswer, type BillShareResult, type ShareCandidate, type ShareHolder,
@@ -50,6 +51,13 @@ export interface BillShareOutcome {
   undone?: boolean
 }
 
+/** What *Move to another salesperson…* did (2026-10-12). */
+export interface BillMoveOutcome {
+  result: BillMoveResult
+  /** Set once the notice's Undo has moved it back: nothing left to undo. */
+  undone?: boolean
+}
+
 interface Props {
   bill: BillMenuBill
   anchor: MenuAnchor
@@ -66,10 +74,16 @@ interface Props {
    * may be shared with. Null or absent: no row.
    */
   share?: { action: BillShareAction; candidates: readonly ShareCandidate[] } | null
+  /**
+   * *Move to another salesperson…* (2026-10-12): whose the bill is, and the
+   * team it may go to. Null or absent: no row.
+   */
+  move?: { action: BillMoveAction; candidates: readonly ShareCandidate[] } | null
   onClose: () => void
   onDone: (outcome: BillMenuOutcome) => void
   onBrandDone?: (outcome: BillBrandOutcome) => void
   onShareDone?: (outcome: BillShareOutcome) => void
+  onMoveDone?: (outcome: BillMoveOutcome) => void
 }
 
 /**
@@ -85,12 +99,13 @@ interface Props {
  * each holder's part at their own rate; *Stop sharing with …* under it gives
  * a part back to the owner.
  */
-export default function BillContextMenu({ bill, anchor, monthLabel, link = null, brand = null, share = null, onClose, onDone, onBrandDone, onShareDone }: Props) {
+export default function BillContextMenu({ bill, anchor, monthLabel, link = null, brand = null, share = null, move = null, onClose, onDone, onBrandDone, onShareDone, onMoveDone }: Props) {
   const router = useRouter()
   const boundary = useRef<HTMLDivElement>(null)
   const countButton = useRef<HTMLButtonElement>(null)
   const brandButton = useRef<HTMLButtonElement>(null)
   const shareButton = useRef<HTMLButtonElement>(null)
+  const moveButton = useRef<HTMLButtonElement>(null)
   const restoreFocus = useRef<HTMLButtonElement | null>(null)
   const writing = useRef(false)
   const [pending, startTransition] = useTransition()
@@ -102,6 +117,10 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
   const [shareStacked, setShareStacked] = useState(false)
   const [shareWith, setShareWith] = useState('')
   const [partText, setPartText] = useState('50')
+  const [movePanel, setMovePanel] = useState<{ anchor: MenuAnchor } | null>(null)
+  const [moveStacked, setMoveStacked] = useState(false)
+  const [moveTo, setMoveTo] = useState('')
+  const [moveNote, setMoveNote] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
   const noteId = useId()
@@ -110,6 +129,9 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
   const shareId = useId()
   const shareWithId = useId()
   const partId = useId()
+  const moveId = useId()
+  const moveToId = useId()
+  const moveNoteId = useId()
   const action = bill.action
   const nameOf = (code: string) => brand?.options.find(o => o.code === code)?.name ?? code
 
@@ -143,13 +165,14 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
   useLayoutEffect(() => {
     restoreFocus.current?.focus({ preventScroll: true })
     restoreFocus.current = null
-  }, [confirm, brandPanel, sharePanel])
+  }, [confirm, brandPanel, sharePanel, movePanel])
 
   function openConfirm() {
     if (writing.current || !countButton.current) return
     setError(null)
     setBrandPanel(null)
     setSharePanel(null)
+    setMovePanel(null)
     setConfirm({ anchor: beside(countButton.current) })
   }
 
@@ -158,7 +181,78 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
     setError(null)
     setConfirm(null)
     setSharePanel(null)
+    setMovePanel(null)
     setBrandPanel({ anchor: beside(brandButton.current) })
+  }
+
+  // ── Move to another salesperson (2026-10-12) ─────────────────────────────
+  // Who it goes to (the team, never whoever has it now) and, if they like,
+  // why; Move writes it. A bill already moved can go back to the salesperson
+  // the ERP names from the same panel.
+  const moveAction = move?.action ?? null
+  const moveCandidates = (move?.candidates ?? []).filter(c => c.staffId !== moveAction?.owner.staffId)
+  const moveTarget = moveCandidates.find(c => c.staffId === moveTo) ?? null
+  const moveIssue = moveAction ? moveProblem(moveAction.owner, moveTo) : null
+
+  function openMove() {
+    if (writing.current || !moveButton.current || !moveAction) return
+    setError(null)
+    setConfirm(null)
+    setBrandPanel(null)
+    setSharePanel(null)
+    setMoveTo('')
+    setMoveNote('')
+    setMovePanel({ anchor: beside(moveButton.current) })
+  }
+
+  function backFromMove() {
+    if (writing.current) return
+    restoreFocus.current = moveButton.current
+    setMovePanel(null)
+    setMoveStacked(false)
+    setError(null)
+  }
+
+  function runMove(staffId: string | null) {
+    if (writing.current) return
+    writing.current = true
+    setError(null)
+    startTransition(async () => {
+      try {
+        const answer = await moveOrder(bill.orderId, staffId, moveNote)
+        // A refusal comes back as words (a closed month, a paid run): it stays in the panel.
+        if (!answer.ok) {
+          setError(answer.reason)
+          return
+        }
+        router.refresh()
+        writing.current = false
+        onMoveDone?.({ result: answer.result })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'That did not save'
+        if (!message.includes('NEXT_REDIRECT')) setError(message)
+      } finally {
+        writing.current = false
+      }
+    })
+  }
+
+  function moveRow() {
+    if (!moveAction) return null
+    if (moveAction.kind === 'locked') {
+      return (
+        <button type="button" role="menuitem" tabIndex={-1} disabled title={moveAction.reason}>
+          Move to another salesperson
+        </button>
+      )
+    }
+    return (
+      <button ref={moveButton} type="button" role="menuitem" tabIndex={-1} aria-haspopup="dialog"
+        aria-expanded={!!movePanel} aria-controls={movePanel ? moveId : undefined} disabled={pending}
+        title={moveAction.named ? `Moved here from ${moveAction.named.name}` : undefined} onClick={openMove}>
+        Move to another salesperson…
+      </button>
+    )
   }
 
   // ── Share this bill (2026-09-30) ─────────────────────────────────────────
@@ -179,6 +273,7 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
     setError(null)
     setConfirm(null)
     setBrandPanel(null)
+    setMovePanel(null)
     setShareWith('')
     setPartText(String(defaultPartFor(holders, shareAction.ownerStaffId, '')))
     setSharePanel({ anchor: beside(shareButton.current) })
@@ -367,7 +462,7 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
   return createPortal(
     <div ref={boundary} className={`${styles.layer} sheet-theme`} onContextMenu={event => event.preventDefault()}>
       <MenuPanel label={`Actions for ${bill.orderNo}`} anchor={anchor} focus
-        hidden={(!!confirm && confirmStacked) || (!!brandPanel && brandStacked) || (!!sharePanel && shareStacked)}
+        hidden={(!!confirm && confirmStacked) || (!!brandPanel && brandStacked) || (!!sharePanel && shareStacked) || (!!movePanel && moveStacked)}
         onBack={close} onClose={close}>
         <div className={styles.menuHeading}>{bill.orderNo}{bill.who ? ` · ${bill.who}` : ''}</div>
         <button type="button" role="menuitem" tabIndex={-1} disabled={pending} onClick={() => open(bill.href, false)}>
@@ -382,11 +477,63 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
           </button>
         ) : null}
         {shareRow()}
+        {moveRow()}
         {countRow()}
         {brandRow()}
-        {!confirm && !brandPanel && !sharePanel && pending ? <p role="status" className={styles.hint}>Saving…</p> : null}
-        {!confirm && !brandPanel && !sharePanel && error ? <p role="alert" className={styles.error}>{error}</p> : null}
+        {!confirm && !brandPanel && !sharePanel && !movePanel && pending ? <p role="status" className={styles.hint}>Saving…</p> : null}
+        {!confirm && !brandPanel && !sharePanel && !movePanel && error ? <p role="alert" className={styles.error}>{error}</p> : null}
       </MenuPanel>
+
+      {movePanel && moveAction ? (
+        <MenuPanel id={moveId} label={`Move ${bill.orderNo}`} anchor={movePanel.anchor} submenu dialog focus
+          onStackedChange={setMoveStacked} onBack={backFromMove} onClose={close}>
+          <div className={styles.menuHeading}>Move {bill.orderNo}</div>
+          <p className={styles.confirmCopy}>
+            {moveAction.owner.staffId ? `${moveAction.owner.name}'s bill` : 'A bill no salesperson is matched to'}
+            {moveAction.named ? ` (the ERP names ${moveAction.named.name})` : ''}. It becomes the new
+            salesperson&apos;s — their sales, at their rate, with their upline&apos;s override — and stays theirs
+            whatever the ERP sends next.
+          </p>
+          <label className={styles.dateField} htmlFor={moveToId}>
+            Move to
+            <Select bare id={moveToId} data-autofocus value={moveTo} disabled={pending}
+              onChange={event => { setMoveTo(event.target.value); setError(null) }}>
+              <option value="">Choose a salesperson…</option>
+              {moveCandidates.map(c => (
+                <option key={c.staffId} value={c.staffId} disabled={!!c.closed}>
+                  {c.name}{c.closed ? ` — ${c.closed}` : ''}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <label className={styles.dateField} htmlFor={moveNoteId}>
+            Why (optional)
+            <input id={moveNoteId} type="text" value={moveNote} maxLength={500} disabled={pending}
+              placeholder="e.g. keyed under the wrong name"
+              onChange={event => { setMoveNote(event.target.value); setError(null) }}
+              onKeyDown={event => {
+                if (event.key !== 'Enter') return
+                event.preventDefault()
+                if (!moveIssue && moveTarget) runMove(moveTarget.staffId)
+              }} />
+          </label>
+          <button type="button" disabled={pending} onClick={backFromMove}>Cancel</button>
+          <button type="button" className={styles.primary} disabled={pending || !!moveIssue || !moveTarget}
+            onClick={() => moveTarget && runMove(moveTarget.staffId)}>
+            {moveTarget ? `Move to ${moveTarget.name}` : 'Move'}
+          </button>
+          {moveAction.named && moveAction.named.staffId !== moveAction.owner.staffId ? (
+            <>
+              <div className={styles.groupHeading}>Moved here</div>
+              <button type="button" disabled={pending} onClick={() => runMove(moveAction.named?.staffId ?? null)}>
+                {moveAction.named.staffId ? `Give it back to ${moveAction.named.name}` : 'Give it back — to no salesperson'}
+              </button>
+            </>
+          ) : null}
+          {pending ? <p role="status" className={styles.hint}>Saving…</p> : null}
+          {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+        </MenuPanel>
+      ) : null}
 
       {confirm ? (
         <MenuPanel id={confirmId} label={`Don't count ${bill.orderNo}`} anchor={confirm.anchor} submenu dialog focus

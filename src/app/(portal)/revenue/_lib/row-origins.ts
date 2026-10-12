@@ -2,6 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchByKeys } from '@/lib/paginate'
 import type { CloseBills } from '@/lib/commission/row-origin'
+import type { BillMoved } from '@/lib/commission/bill-move'
 
 /**
  * What a ledger row from another month needs beyond the engine's line
@@ -89,6 +90,48 @@ export async function loadUpsaleFacts(
     }
     return [row.id, fact]
   }))
+}
+
+interface MoveRow {
+  order_id: string
+  from_staff_id: string | null
+  moved_by_name: string | null
+  moved_at: string
+  note: string | null
+  from_staff: { employee_name: string } | { employee_name: string }[] | null
+}
+
+/**
+ * The bills of these that somebody moved to another salesperson (2026-10-12,
+ * `sales_order_reassignments`), keyed by bill: whose each was, who moved it,
+ * when and why. A ledger row says *Moved from ADRIAN* and its menu offers it
+ * back. Read softly: a bill without its note is still the bill, so a failed
+ * read leaves the notes off rather than the month without a page.
+ */
+export async function loadBillMoves(db: SupabaseClient, orderIds: readonly string[]): Promise<Record<string, BillMoved>> {
+  const ids = [...new Set(orderIds.filter(Boolean))]
+  if (ids.length === 0) return {}
+  try {
+    const rows = await fetchByKeys<MoveRow, string>(ids, keys =>
+      db.from('sales_order_reassignments')
+        // Named: the table points at hr_staff_costs twice (whose it is, whose it was).
+        .select('order_id, from_staff_id, moved_by_name, moved_at, note, from_staff:hr_staff_costs!sales_order_reassignments_from_staff_id_fkey (employee_name)')
+        .in('order_id', keys), 'the bills moved to another salesperson')
+    return Object.fromEntries(rows.filter(row => row.order_id).map(row => {
+      const from = Array.isArray(row.from_staff) ? row.from_staff[0] : row.from_staff
+      const moved: BillMoved = {
+        fromStaffId: row.from_staff_id,
+        fromName: from?.employee_name ?? null,
+        movedByName: row.moved_by_name,
+        movedAt: row.moved_at,
+        note: row.note,
+      }
+      return [row.order_id, moved]
+    }))
+  } catch (error) {
+    console.error('[comm-cal] could not read the moved bills', error)
+    return {}
+  }
 }
 
 interface CloseRow {

@@ -1538,6 +1538,36 @@ with comm, they will right click"*.
   cutover — still HOLDS a new document dated into it (§14). On 2026-10-12 no such
   document had arrived: every held delivery was a re-send of a bill already in.
 
+### 4.20 A bill moved to another salesperson — from its right-click (2026-10-12)
+
+The ERP names who sold a bill (its salesperson, through `comm_agent_aliases`).
+The portal could take a bill out (§4.10) or give a part of it away (§4.13), never
+say *this bill is ANTHONY's*; a bill keyed under the wrong name was fixed in the
+ERP or not at all, because every re-send wrote the name back. The user: *"together
+with rightclick … can select move this order to other sales person"*.
+
+| | |
+|---|---|
+| Where | *Move to another salesperson…* on a bill's right-click (or ⋯): a salesperson's ledger on Comm Cal — Personal, Overriding, Below deposit — the month's Below deposit tab, and All bills. Not on an upsell or a drop (no bill) |
+| The form | **Move to** — the sub-department's team (`loadShareTeam`), never whoever has it; somebody closed this month cannot be picked. **Why** — optional, kept with the move. On a moved bill, *Give it back to ADRIAN* |
+| What it is | one row of `sales_order_reassignments` (mig `20261012170000`) per moved bill, and `sales_orders.staff_id` IS its person — so it is their sales, paid at their rate, climbing their upline's override, on their ledger and in their Revenue app, exactly as if the ERP had named them. Nothing in the engine reads the row |
+| Kept | the trigger `sales_orders_reassigned` (BEFORE UPDATE OF staff_id, DEFINER) puts the row's person back whenever anybody writes the bill's salesperson — the live receiver re-sending it (it rewrites `staff_id` from the alias on every save), a replay, an agent matched on Data source |
+| Undone | moving it to the salesperson the ERP names — or the notice's *Undo* — takes the row off, and the bill goes back to the alias's person (by the ERP's salesperson id, else by agent name, else whoever had it) |
+| Shares and Open Bill | the new holder's share of it goes (they hold all of it now; other holders keep theirs). Its Open Bill pick goes — it ranked the old salesperson's day — remembered on the row and put back on the move back while the rank is free (a suggestion gives way, a hand pick does not) |
+| Refused | a paid month (23RUN, the table's trigger and `revenue_move_order`); a bill that does not count (23EXC — count it again first); a bill anybody paid on it has closed (`billsClosedReason`); a NEW holder closed this month (`staffClosedReason`); somebody off the sub-department's team (`offTeamReason`) |
+| Months | only the holder changes. The bill stays in its month with its Status (§4.19); a drop or an upsell found on it later goes to whoever its run paid (`erp_sync_note_adjustment`) |
+
+`moveOrder` (`run-actions.ts`, gate `revenue.edit` on the month page) answers
+`{ ok: true, result } | { ok: false, reason }` (`BillMoveAnswer`,
+`lib/commission/bill-move.ts`, which also holds the menu's row, the form's check
+and every word the notice says). `revenue_move_order` is SECURITY INVOKER: the
+mover's own row policies — HR's and the Principal's, with the `needs_action_*`
+checks asking `revenue.edit` — answer every write. PGlite:
+`tests/member-sql/validate-bill-move.mjs` (28 checks — a move, a re-send, an agent
+match, a move on, the move back, a bill nobody was matched to, the Open Bill pick
+and the share, and the database's refusals; the closes and the team are the
+Server Action's).
+
 ## 5. Tax — Withholding instead of PCB
 
 Revenue salespeople have **no PCB**. They pay **Withholding Tax at 2% of total

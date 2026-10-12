@@ -1,18 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { BillCountAction } from '@/lib/commission/bill-exclusion'
+import type { BillMoveAction } from '@/lib/commission/bill-move'
 
 const mocks = vi.hoisted(() => ({
   excludeOrder: vi.fn(),
   includeOrder: vi.fn(),
   shareOrder: vi.fn(),
   unshareOrder: vi.fn(),
+  moveOrder: vi.fn(),
   refresh: vi.fn(),
   push: vi.fn(),
 }))
 vi.mock('../../../../run-actions', () => ({
   excludeOrder: mocks.excludeOrder, includeOrder: mocks.includeOrder,
-  shareOrder: mocks.shareOrder, unshareOrder: mocks.unshareOrder,
+  shareOrder: mocks.shareOrder, unshareOrder: mocks.unshareOrder, moveOrder: mocks.moveOrder,
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh, push: mocks.push }) }))
 
@@ -305,5 +307,82 @@ describe('BillContextMenu — Share this bill…', () => {
   it('has no share row where none is offered', () => {
     const { root } = menu({ kind: 'exclude' })
     expect(within(root).queryByRole('menuitem', { name: /Share this bill/ })).toBeNull()
+  })
+})
+
+
+// 2026-10-12 — the user: "together with rightclick … can select move this
+// order to other sales person".
+describe('BillContextMenu — Move to another salesperson…', () => {
+  const TEAM = [
+    { staffId: 'adrian', name: 'ADRIAN' },
+    { staffId: 'anthony', name: 'ANTHONY' },
+    { staffId: 'lucas', name: 'LUCAS', closed: 'closed for September 2026' },
+  ]
+  const OWNER = { staffId: 'adrian', name: 'ADRIAN' }
+  const moved = (over = {}) => ({
+    orderId: 'order-1', orderNo: 'HC-SO-013493', changed: true,
+    to: { staffId: 'anthony', name: 'ANTHONY' }, from: OWNER, movedBack: false,
+    openBillRank: null, openBillBack: null, shareTaken: null, ...over,
+  })
+  function moveMenu(action: BillMoveAction = { kind: 'move', owner: OWNER, named: null }) {
+    const onMoveDone = vi.fn()
+    const rendered = menu({ kind: 'exclude' }, { move: { action, candidates: TEAM }, onMoveDone })
+    return { ...rendered, onMoveDone }
+  }
+
+  it('is one line, and asks whom and why before it moves anything', async () => {
+    mocks.moveOrder.mockResolvedValue({ ok: true, result: moved() })
+    const { root, onMoveDone } = moveMenu()
+    const row = within(root).getByRole('menuitem', { name: /Move to another salesperson/ })
+    expect(row.textContent).toBe('Move to another salesperson…')
+    fireEvent.click(row)
+    expect(mocks.moveOrder).not.toHaveBeenCalled()
+
+    const panel = screen.getByRole('dialog', { name: 'Move HC-SO-013493' })
+    const who = within(panel).getByLabelText(/Move to/)
+    // Whoever has it is never offered; somebody closed this month is, greyed with why.
+    expect(within(who).queryByRole('option', { name: 'ADRIAN' })).toBeNull()
+    expect(within(who).getByRole('option', { name: 'LUCAS — closed for September 2026' })).toBeDisabled()
+    expect(within(panel).getByRole('button', { name: 'Move' })).toBeDisabled()
+
+    fireEvent.change(who, { target: { value: 'anthony' } })
+    fireEvent.change(within(panel).getByLabelText(/Why/), { target: { value: 'keyed under the wrong name' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Move to ANTHONY' }))
+    await waitFor(() => expect(onMoveDone).toHaveBeenCalled())
+    expect(mocks.moveOrder).toHaveBeenCalledWith('order-1', 'anthony', 'keyed under the wrong name')
+    expect(mocks.refresh).toHaveBeenCalled()
+    expect(onMoveDone.mock.calls[0][0]).toMatchObject({ result: { to: { name: 'ANTHONY' } } })
+  })
+
+  it('keeps a refusal in the panel', async () => {
+    mocks.moveOrder.mockResolvedValue({ ok: false, reason: 'ANTHONY’s September 2026 is closed — reopen it before moving this bill' })
+    const { root, onMoveDone } = moveMenu()
+    fireEvent.click(within(root).getByRole('menuitem', { name: /Move to another salesperson/ }))
+    const panel = screen.getByRole('dialog', { name: 'Move HC-SO-013493' })
+    fireEvent.change(within(panel).getByLabelText(/Move to/), { target: { value: 'anthony' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Move to ANTHONY' }))
+    expect(await within(panel).findByRole('alert')).toHaveTextContent(/is closed/)
+    expect(onMoveDone).not.toHaveBeenCalled()
+  })
+
+  it('gives a moved bill back to the salesperson the ERP names', async () => {
+    mocks.moveOrder.mockResolvedValue({ ok: true, result: moved({ to: OWNER, from: { staffId: 'anthony', name: 'ANTHONY' }, movedBack: true }) })
+    const { root, onMoveDone } = moveMenu({ kind: 'move', owner: { staffId: 'anthony', name: 'ANTHONY' }, named: OWNER })
+    const row = within(root).getByRole('menuitem', { name: /Move to another salesperson/ })
+    expect(row).toHaveAttribute('title', 'Moved here from ADRIAN')
+    fireEvent.click(row)
+    const panel = screen.getByRole('dialog', { name: 'Move HC-SO-013493' })
+    expect(panel).toHaveTextContent('the ERP names ADRIAN')
+    fireEvent.click(within(panel).getByRole('button', { name: 'Give it back to ADRIAN' }))
+    await waitFor(() => expect(onMoveDone).toHaveBeenCalled())
+    expect(mocks.moveOrder).toHaveBeenCalledWith('order-1', 'adrian', '')
+  })
+
+  it('is shut, with why, where the bill cannot move', () => {
+    const { root } = moveMenu({ kind: 'locked', owner: OWNER, named: null, reason: 'The run for September 2026 has paid — reopen it before moving its bills' })
+    const row = within(root).getByRole('menuitem', { name: /Move to another salesperson/ })
+    expect(row).toBeDisabled()
+    expect(row).toHaveAttribute('title', 'The run for September 2026 has paid — reopen it before moving its bills')
   })
 })

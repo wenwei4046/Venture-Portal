@@ -30,6 +30,8 @@ import { holdersLine, holdersOf } from '@/lib/commission/bill-share'
 import { paperRef } from '@/lib/commission/paper-ref'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
 import { loadOrderExclusions, loadOrderShares } from '../../../../_lib/month-orders'
+import { loadBillMoves } from '../../../../_lib/row-origins'
+import { movedPhrase } from '@/lib/commission/bill-move'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string; orderId: string }>
@@ -195,7 +197,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   // The ledger's owner, when it is not the bill's own salesperson (an upline
   // reading a downline's bill on Overriding).
   const backPerson = back?.personId && back.personId !== order.staff_id && UUID.test(back.personId) ? back.personId : null
-  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }] =
+  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves] =
     await Promise.all([
       // Every column rather than a list: `cost_detail` exists only once
       // 20260924030000 is applied, and naming it would break this page before.
@@ -254,8 +256,11 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         .eq('erp_doc_no', order.order_no)
         .order('sold_on')
         .order('created_at'),
+      // Moved here from another salesperson (2026-10-12): from whom, by whom, why.
+      loadBillMoves(supabase, [orderId]),
     ])
   const byHand = exclusions?.get(orderId) ?? null
+  const moved = moves[orderId] ?? null
   const changes = ((changeData ?? []) as unknown as ChangeRow[]).map(change => ({
     ...change,
     amount: Number(change.amount),
@@ -396,6 +401,14 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
             ) : null}
             {order.customer_name ?? 'no customer name'} ·{' '}
             {holders ? `shared ${holdersLine(holders)}` : order.hr_staff_costs?.employee_name ?? `${order.agent_name} (unmatched)`} ·{' '}
+            {moved ? (
+              <>
+                <span title={[moved.movedByName ? `by ${moved.movedByName}` : null, moved.note].filter(Boolean).join(' — ') || undefined}>
+                  {movedPhrase(moved)} on {formatDate(moved.movedAt)}
+                </span>
+                {' · '}
+              </>
+            ) : null}
             {formatDate(order.order_date)}
             {order.sequence_in_day ? ` · bill #${order.sequence_in_day} of the day` : ''}
           </p>

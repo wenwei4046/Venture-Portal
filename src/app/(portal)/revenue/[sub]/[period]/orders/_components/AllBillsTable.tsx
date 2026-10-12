@@ -7,12 +7,14 @@ import type { BillCountAction } from '@/lib/commission/bill-exclusion'
 import { brandOutcomeMessage, type BillBrandAction, type BrandOption } from '@/lib/commission/bill-brand'
 import { billShareAction, holdersOf, type BillShareAction } from '@/lib/commission/bill-share'
 import { ORIGIN_TONE, type RowOrigin } from '@/lib/commission/row-origin'
+import { billMoveAction, movedNote, type BillMoveAction, type BillMoved } from '@/lib/commission/bill-move'
 import s from '../../_components/commission-workbench.module.css'
 import NoCommission, { COMMISSIONABLE_HINT, SALES_VALUE_HINT } from '../../_components/NoCommission'
 import PaperRefCell from '../../_components/PaperRefCell'
-import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome, type BillShareOutcome } from './BillContextMenu'
+import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome, type BillMoveOutcome, type BillShareOutcome } from './BillContextMenu'
 import BillCountNotice from './BillCountNotice'
 import BillShareNotice from './BillShareNotice'
+import BillMoveNotice from './BillMoveNotice'
 import OpenBillPicker from './OpenBillPicker'
 import ShareControl, { type ShareHolder, type TeamMember } from './ShareControl'
 import { useBillMenu } from './useBillMenu'
@@ -85,6 +87,8 @@ export interface BillRow {
    * salesperson's ledger (`row-origin.ts`). Null for the month's own sale.
    */
   origin?: RowOrigin | null
+  /** Moved here from another salesperson (2026-10-12, `sales_order_reassignments`). */
+  moved?: BillMoved | null
 }
 
 type Column =
@@ -147,6 +151,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
   const [done, setDone] = useState<BillMenuOutcome | null>(null)
   const [brandDone, setBrandDone] = useState<string | null>(null)
   const [shareDone, setShareDone] = useState<BillShareOutcome | null>(null)
+  const [moveDone, setMoveDone] = useState<BillMoveOutcome | null>(null)
 
   const excludedCount = rows.filter(r => r.cancelled).length
   const brands = useMemo(() => [...new Set(rows.flatMap(r => r.brands))].sort(), [rows])
@@ -184,6 +189,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
     closeMenu()
     setBrandDone(null)
     setShareDone(null)
+    setMoveDone(null)
     setDone(outcome.result.changed ? outcome : null)
   }
 
@@ -191,6 +197,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
     closeMenu()
     setDone(null)
     setShareDone(null)
+    setMoveDone(null)
     const nameOf = (code: string) => brandOptions.find(o => o.code === code)?.name ?? code
     setBrandDone(outcome.result.changed ? brandOutcomeMessage(outcome.result, nameOf) : null)
   }
@@ -199,7 +206,29 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
     closeMenu()
     setDone(null)
     setBrandDone(null)
+    setMoveDone(null)
     setShareDone(outcome)
+  }
+
+  function moveMenuDone(outcome: BillMoveOutcome) {
+    closeMenu()
+    setDone(null)
+    setBrandDone(null)
+    setShareDone(null)
+    setMoveDone(outcome)
+  }
+
+  /** *Move to another salesperson…* (2026-10-12): the bill's owner changes; the month's lock and the server ask the rest. */
+  function moveActionOf(r: BillRow): BillMoveAction | null {
+    return billMoveAction(
+      {
+        owner: { staffId: r.staff?.id ?? null, name: r.staff?.name ?? r.agent?.name ?? '—' },
+        named: r.moved ? { staffId: r.moved.fromStaffId, name: r.moved.fromName ?? 'nobody' } : null,
+        cancelled: r.cancelled,
+      },
+      // shareDisabled is the month's lock or a bill that does not count; the second is said above.
+      { runLocked: r.shareDisabled && !r.cancelled, closedReason: null, monthLabel },
+    )
   }
 
   /** *Share this bill…* on the right-click (2026-09-30): the same as *Share…* under the name. */
@@ -221,6 +250,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
     return <>
       <Link href={r.staff.href}>{r.staff.name}</Link>
       {r.staff.code && <small className={s.muted}>{r.staff.code}</small>}
+      {r.moved && <small className={s.shareNote}>{movedNote(r.moved)}</small>}
       <ShareControl orderId={r.orderId} ownerStaffId={r.staff.id} ownerName={r.staff.name}
         shares={r.shares} team={team} disabled={r.shareDisabled} disabledReason={r.shareDisabledReason} />
     </>
@@ -304,6 +334,8 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
     {brandDone && <p className={s.notice} role="status">{brandDone}</p>}
     {shareDone && <BillShareNotice key={`${shareDone.orderId}:${shareDone.result.staffId}:${shareDone.result.after}:${shareDone.undone ? 'undone' : 'done'}`}
       outcome={shareDone} className={s.notice} buttonClassName={s.ghostButton} onChange={setShareDone} />}
+    {moveDone && <BillMoveNotice key={`${moveDone.result.orderId}:${moveDone.result.to.staffId}:${moveDone.undone ? 'undone' : 'done'}`}
+      outcome={moveDone} className={s.notice} buttonClassName={s.ghostButton} onChange={setMoveDone} />}
 
     <div className={s.tableFrame}>
       <div className={s.tableScroll} role="region" aria-label="All bills, scroll horizontally" tabIndex={0}>
@@ -370,6 +402,10 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
         const action = shareActionOf(menu.row)
         return action ? { action, candidates: team } : null
       })()}
-      onClose={closeMenu} onDone={menuDone} onBrandDone={brandMenuDone} onShareDone={shareMenuDone} />}
+      move={(() => {
+        const action = moveActionOf(menu.row)
+        return action ? { action, candidates: team } : null
+      })()}
+      onClose={closeMenu} onDone={menuDone} onBrandDone={brandMenuDone} onShareDone={shareMenuDone} onMoveDone={moveMenuDone} />}
   </div>
 }

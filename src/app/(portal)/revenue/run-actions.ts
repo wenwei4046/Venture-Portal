@@ -8,6 +8,7 @@ import { openBillOnFor } from './_lib/open-bill-month'
 import { assertBillsNotClosed, billsClosedReason, staffClosedReason } from './_lib/salesperson-closes'
 import { loadOrderShares, loadShareTeam } from './_lib/month-orders'
 import { holdersOf, type BillShareAnswer, type BillShareResult, type ShareHolder } from '@/lib/commission/bill-share'
+import type { BillMoveAnswer } from '@/lib/commission/bill-move'
 import { fetchByKeys } from '@/lib/paginate'
 
 /**
@@ -407,6 +408,85 @@ export async function unshareOrder(orderId: string, staffId: string): Promise<Bi
     result: shareResult(orderId, changed ? await readSharedBill(supabase, orderId) : bill,
       { staffId, name: held?.name ?? '—' }, held?.pct ?? null, changed),
   }
+}
+
+/** The move table's own refusals (a paid month, a bill that does not count, nobody named), as words. */
+const MOVE_REFUSALS = new Set(['23RUN', '23EXC', '23MOV'])
+
+/**
+ * Move a bill to another salesperson (2026-10-12, right-click › *Move to
+ * another salesperson…*; the user: "can select move this order to other sales
+ * person"), or — `staffId` null, or the salesperson the ERP names — give it
+ * back. The rule is the database's (`revenue_move_order`, mig
+ * 20261012170000): the bill becomes theirs everywhere a bill's salesperson
+ * counts and stays theirs through every ERP re-send; the new holder's share
+ * goes, the Open Bill pick goes (and comes back on the move back). This
+ * refuses, as a share does, a bill somebody paid on it has closed, a new
+ * holder whose own month is closed, and anybody off the sub-department's team.
+ *
+ * Answers with who holds it now, or with why not (`BillMoveAnswer`).
+ */
+export async function moveOrder(orderId: string, staffId: string | null, note?: string | null): Promise<BillMoveAnswer> {
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
+  if (typeof orderId !== 'string' || !orderId) return { ok: false, reason: 'Which bill?' }
+  if (staffId !== null && (typeof staffId !== 'string' || !staffId)) return { ok: false, reason: 'Move it to whom?' }
+  const why = typeof note === 'string' ? note.trim().slice(0, 500) : ''
+  const supabase = await client()
+
+  const bill = await readSharedBill(supabase, orderId)
+  if (bill.cancelled) return { ok: false, reason: `${bill.orderNo} does not count this month — count it again before moving it.` }
+  if (staffId !== null && staffId === bill.ownerStaffId) return { ok: false, reason: `It is ${bill.ownerName}’s bill already.` }
+
+  const refused = (await Promise.all([
+    runLockReason(supabase, bill.periodMonth, bill.subDepartmentId),
+    billsClosedReason(supabase, [orderId]),
+    staffId ? offTeamReason(supabase, bill.subDepartmentId, staffId) : Promise.resolve(null),
+    staffId ? staffClosedReason(supabase, staffId, bill.subDepartmentId, bill.periodMonth) : Promise.resolve(null),
+  ])).find(reason => reason !== null)
+  if (refused) return { ok: false, reason: refused }
+
+  const { data, error } = await supabase.rpc('revenue_move_order', { p_order_id: orderId, p_staff_id: staffId, p_note: why || null })
+  if (error) {
+    if (MOVE_REFUSALS.has(error.code ?? '')) return { ok: false, reason: error.message }
+    throw new Error(error.message)
+  }
+  const moved = data as {
+    orderNo: string
+    changed: boolean
+    staffId: string | null
+    fromStaffId?: string | null
+    movedBack?: boolean
+    openBillRank?: number | null
+    openBillBack?: number | null
+    shareTaken?: number | string | null
+  }
+  const nameOf = await staffNames(supabase, [moved.staffId, moved.fromStaffId ?? null])
+  if (moved.changed) revalidatePath('/revenue', 'layout')
+  return {
+    ok: true,
+    result: {
+      orderId,
+      orderNo: moved.orderNo,
+      changed: moved.changed,
+      to: { staffId: moved.staffId, name: nameOf(moved.staffId) },
+      from: { staffId: moved.fromStaffId ?? bill.ownerStaffId, name: moved.fromStaffId === undefined ? bill.ownerName : nameOf(moved.fromStaffId) },
+      movedBack: moved.movedBack === true,
+      openBillRank: moved.openBillRank ?? null,
+      openBillBack: moved.openBillBack ?? null,
+      shareTaken: moved.shareTaken === null || moved.shareTaken === undefined ? null : Number(moved.shareTaken),
+    },
+  }
+}
+
+/** Names for a move's notice: a person, or "nobody" for a bill no salesperson is matched to. */
+async function staffNames(supabase: SupabaseClient, ids: readonly (string | null)[]): Promise<(id: string | null) => string> {
+  const wanted = [...new Set(ids.filter((id): id is string => typeof id === 'string' && id.length > 0))]
+  const { data, error } = wanted.length
+    ? await supabase.from('hr_staff_costs').select('id, employee_name').in('id', wanted)
+    : { data: [], error: null }
+  if (error) throw new Error(`Could not read who the bill is with: ${error.message}`)
+  const names = new Map(((data ?? []) as { id: string; employee_name: string }[]).map(row => [row.id, row.employee_name]))
+  return id => (id ? names.get(id) ?? '—' : 'nobody')
 }
 
 /** What taking a bill out, or counting it again, did. */
