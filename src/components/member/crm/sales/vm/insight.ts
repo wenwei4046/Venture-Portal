@@ -131,7 +131,7 @@ export function insightVM(ctx: SalesCtx) {
     lsRows,
     // Customer info over the list: ‹ back to the list; the backdrop closes both.
     ctOpen: !!ci, ctClose: () => patch({ insInfo: null, insList: null }), ctBack: () => patch({ insInfo: null }), ctName: ci?.name ?? "", ctIni: ci ? ini(ci.name) : "",
-    ctRows: ci ? infoRows(ci) : [],
+    ctRows: ci ? infoRows(ci, data) : [],
     ctChat: () => { if (!ci) return; set(u => ({ ...u, tab: "inbox", chat: ci.id, insInfo: null, insList: null, hist: [...u.hist, u.tab].slice(-20) })); act.openChat(ci.id); },
     ctEdit: () => { if (ci) set(u => ({ ...u, cform: { customerId: ci.id, edit: true }, insInfo: null })); },
   };

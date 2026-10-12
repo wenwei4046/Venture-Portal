@@ -478,6 +478,8 @@
   }
   /* The Product List takes the whole column (the prototype's mainPL/mainPR 0). */
   .main.mainProducts { padding-left: 0; padding-right: 0; }
+  /* So does the CRM on a computer (2026-10-12): it scrolls inside its own columns. */
+  .main.mainCrm { position: relative; overflow: hidden; padding-left: 0; padding-right: 0; }
 }
 
 /* The Product List page scrolls inside itself: the column is its frame. */

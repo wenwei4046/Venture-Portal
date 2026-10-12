@@ -61,4 +61,6 @@ module.exports = [
   [/<div style=\{\{ display: "flex", flexDirection: "column", borderRadius: "14px", border: "1px solid #EBDDD2" \}\}>(\s*\{\(v\.ci\.Rows\))/,
     "<div style={{ flex: \"none\", display: \"flex\", flexDirection: \"column\", borderRadius: \"14px\", border: \"1px solid #EBDDD2\" }}>$1"],
   ["<span onClick={v.ci.Chat} style={{ height: \"50px\",", "<span onClick={v.ci.Chat} style={{ flex: \"none\", height: \"50px\","],
+  // The customer form follows the Control panel's Forms (CRM Desktop rev 1, B5) — tools/crm-design/form-patches.cjs.
+  ...require("./form-patches.cjs")(),
 ];

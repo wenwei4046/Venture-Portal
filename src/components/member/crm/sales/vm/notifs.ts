@@ -44,6 +44,13 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
       out.push({ id: i.id, kind: "status", from, ini: ini(from), lead: i.customerName, text: `You ${i.state} ${from}'s ${i.kind === "share" ? "invitation" : "move request"}`, at: atLabel(t, now), time: t, ok: i.state === "accepted", pending: false });
     }
   }
+  // A reminder to reply, from the Control panel on a computer (CRM Desktop rev 1, B2): theirs, in the bell's own row.
+  const custOf = (id: string) => data.customers.find(c => c.id === id)?.name ?? "";
+  for (const e of data.events) {
+    if (e.kind !== "reminded" || e.owner !== me) continue;
+    const from = nameOf(e.actor), t = new Date(e.at).getTime();
+    out.push({ id: "r" + e.id, kind: "status", from, ini: ini(from), lead: custOf(e.customerId), text: `${firstName(from)} reminded you to reply`, at: atLabel(t, now), time: t, ok: false, pending: false });
+  }
   // Customers given to them (user 2026-10-09): a new enquiry the CRM dealt, or one someone assigned.
   for (const c of data.customers) {
     if (c.assignedTo !== me || !c.assignedAt) continue;

@@ -31,10 +31,14 @@ export const slotAt = (day: number, label: string) => {
   const d = new Date(day); d.setHours((Number(m[1]) % 12) + (m[3] === "pm" ? 12 : 0), Number(m[2]), 0, 0); return d;
 };
 const iso = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-/** Closed that day: a weekly closure or a blocked date range. */
-export const roomClosed = (r: CrmRoom | undefined, day: number) => !!r && (r.weekly.includes(new Date(day).getDay()) || r.blocks.some(b => iso(day) >= b.a && iso(day) <= (b.b || b.a)));
-/** The room's slots open on that weekday (0 = Monday in the slot code). */
-export const roomSlots = (r: CrmRoom | undefined, day: number) => !r ? [] : r.slots.filter(s => !s.includes("@") || s.split("@")[1].includes(String((new Date(day).getDay() + 6) % 7))).map(t12);
+const onDay = (b: CrmRoom["blocks"][number], day: number) => iso(day) >= b.a && iso(day) <= (b.b || b.a);
+/** Closed that day: a weekly closure or a blocked date range — one closed only for some hours (CRM Desktop rev 1, B9) is not. */
+export const roomClosed = (r: CrmRoom | undefined, day: number) => !!r && (r.weekly.includes(new Date(day).getDay()) || r.blocks.some(b => !b.ranges?.length && onDay(b, day)));
+/** The room's slots open on that weekday (0 = Monday in the slot code), less those a closure for some hours takes (as crm_slot_check). */
+export const roomSlots = (r: CrmRoom | undefined, day: number) => !r ? [] : r.slots
+  .filter(s => !s.includes("@") || s.split("@")[1].includes(String((new Date(day).getDay() + 6) % 7)))
+  .filter(s => { const hm = s.split("@")[0]; return !r.blocks.some(b => onDay(b, day) && (b.ranges ?? []).some(g => hm >= g.f && hm < g.t)); })
+  .map(t12);
 
 /** The system lines a chat shows between messages: visits, outcomes, invitations, takeovers. */
 function systemLines(ctx: SalesCtx, c: CrmCustomer): { at: string; text: string }[] {
@@ -183,7 +187,7 @@ export function chatVM(ctx: SalesCtx) {
     apptChange: () => { if (!nextVisit) return; const d = new Date(nextVisit.start); set(u => ({ ...u, hm: null, book: { customerId: c.id, room: Math.max(0, rooms.findIndex(r => r.id === nextVisit.showroomId)), day: day0(d), slot: timeLabel(d), visitId: nextVisit.id } })); },
     apptCancel: () => { if (nextVisit) set(u => ({ ...u, hm: null, cancelAsk: nextVisit.id })); },
     apptBook: goBook,
-    infoOpen: !!hm.info, edit: () => set(u => ({ ...u, hm: null, cform: { customerId: c.id, edit: true } })), rows: infoRows(c),
+    infoOpen: !!hm.info, edit: () => set(u => ({ ...u, hm: null, cform: { customerId: c.id, edit: true } })), rows: infoRows(c, data),
     shareOpen: !!hm.share,
     groups: [{ name: myTeam ? teamName(myTeam) : "My team", c: RUST, n: teamPeople.length, people: teamPeople.map(p => {
       const done = already.has(p.id), on = done || ss.includes(p.id);

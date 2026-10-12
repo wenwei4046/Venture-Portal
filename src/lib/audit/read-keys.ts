@@ -37,4 +37,6 @@ export const AUDIT_READ_KEYS = [
   'documentation',
   // The guest link and its subsidiaries (2026-10-11).
   'guest_link',
+  // The CRM's settings and forms, for CRM · Manage — the desktop's History (CRM Desktop rev 1, mig 20261013100000).
+  'crm_manage',
 ] as const satisfies readonly Permission[]

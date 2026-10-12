@@ -24,6 +24,9 @@ import SalesShellBanners from "./sales/SalesShellBanners";
 import { shellVM } from "./sales/vm/header";
 import { byTeam, downlineOf } from "./shared/people";
 import PanelScreens from "./panel/PanelScreens";
+import DeskScreens from "./desk/DeskScreens";
+import type { DeskApp as DeskAppFrame } from "./desk/vm/ctx";
+import D from "./desk/desk.module.css";
 import { makePanelActions } from "./panel/actions";
 import { initialPanelUi, type PanelTab, type PanelUi } from "./panel/ui";
 import { teamsOf, type PanelCtx } from "./panel/vm/common";
@@ -35,7 +38,12 @@ const MINE_TAB: Record<PanelTab, SalesTab> = { overview: "insight", inbox: "inbo
 /** On demo data (/member/preview) the Control panel is looked at with ?crmAs=boss or ?crmAs=hod. */
 const demoViewer = () => (typeof window === "undefined" ? undefined : new URLSearchParams(window.location.search).get("crmAs") ?? undefined);
 
-export default function CrmApp({ live, salesperson, onExit }: { live: boolean; salesperson: string; onExit: () => void }) {
+/**
+ * `desk`: the Revenue app is on a computer (2026-10-12, the user: My leads & appointments opens a desktop version on a
+ * computer, the phone's on a phone). The Control panel then opens as panel/desk/PanelDesk — the same data, writes and
+ * view models, laid out wide; the salesperson CRM stays the phone's until its desktop is built on the same frame.
+ */
+export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame }) {
   const [data, setData] = useState<CrmData | null>(() => (live ? null : crmDemoData(salesperson)));
   const [problem, setProblem] = useState("");
   const [now, setNow] = useState(() => new Date());
@@ -56,9 +64,9 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
   useEffect(() => {
     if (!live) return;
     let current = true;
-    void fetchCrmData().then(r => { if (current) { if (r.ok) setData(r.data); else setProblem(r.error); } });
+    void fetchCrmData({ journey: desk }).then(r => { if (current) { if (r.ok) setData(r.data); else setProblem(r.error); } });
     return () => { current = false; };
-  }, [live]);
+  }, [live, desk]);
   // Live: new messages arrive without a reload (user 2026-10-09: 我發送 receive 但是 crm inbox 收不到 —
   // it was saved; the screen had read once). Read again every 5 s while on screen and at once on coming
   // back; never two reads at a time, and a read begun before one of our own changes is dropped, so it
@@ -71,7 +79,8 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
       busy = true;
       const started = Date.now();
       try {
-        const r = await fetchCrmData();
+        // The desktop also reads every customer's journey (Chat progress, CRM Desktop rev 1).
+        const r = await fetchCrmData({ journey: desk });
         if (!stopped && r.ok && started >= (refs.localAt ?? 0)) setData(r.data);
       } finally { busy = false; }
     };
@@ -80,7 +89,7 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
     document.addEventListener("visibilitychange", back);
     window.addEventListener("focus", back);
     return () => { stopped = true; clearInterval(t); document.removeEventListener("visibilitychange", back); window.removeEventListener("focus", back); };
-  }, [live, refs]);
+  }, [live, refs, desk]);
   // Demo only: whose eyes, after the first paint (the server cannot read the address's ?crmAs).
   useEffect(() => { const v = demoViewer(); if (!live && v) setData(crmDemoData(salesperson, v)); }, [live, salesperson]);
   // The clock behind the colours: every minute the waits grow.
@@ -124,11 +133,13 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
       {body}
     </div>
   );
-  if (!data) return shell(<p className={H.loading}>{problem || "Loading your customers…"}</p>);
+  // A line instead of the CRM (loading, not in it): on a computer in the page, not in a phone-sized box.
+  const notice = (line: React.ReactNode) => (desk ? <div className={D.desk}><p className={H.loading}>{line}</p></div> : shell(<p className={H.loading}>{line}</p>));
+  if (!data) return notice(problem || "Loading your customers…");
   const me = personOf(data.viewerId, data.people);
-  if (!me) return shell(<p className={H.loading}>{data.setup === "no_role"
+  if (!me) return notice(data.setup === "no_role"
     ? "Your job title has no role in the CRM. The CRM is for the Revenue team; if you should be in it, ask your administrator to check your title in People."
-    : "Your login is not linked to your employee record in People yet. Once your administrator links them, your customers appear here."}</p>);
+    : "Your login is not linked to your employee record in People yet. Once your administrator links them, your customers appear here.");
 
   // Whoever holds CRM · View at All sees everyone: the Control panel, and anyone's own CRM from it
   // (2026-10-10: the permission matrix decides — the Principal and the Revenue Director by their templates).
@@ -176,6 +187,14 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
         : sells ? () => { openCrmOf(me.id); setUi(u => ({ ...u, tab: MINE_TAB[panelUi.tab] })); } : undefined,
       exitApp: onExit, slotCounts,
     };
+    // On a computer, whoever holds View at All (the Principal and the Director — user 2026-10-12) gets the desktop
+    // Control panel: CRM Desktop rev 1, built to its prototype (2026-10-13), on the same data and writes.
+    if (desk && full && panelFor.id === me.id && deskApp) {
+      return (
+        <DeskScreens data={data} me={me} now={now} live={live} act={panelAct} setData={setDataSafe} teams={teams} directors={pctx.directors}
+          nameOf={nameOf} app={deskApp} exit={onExit} toMine={pctx.toMyCrm} problem={problem} />
+      );
+    }
     // Viewing somebody's Team: the same "Viewing X's CRM · Switch · Exit" banner their own CRM has (user 2026-10-11).
     // Switch stays on the Team side when the next person has one; Exit is back to one's own panel.
     const banner = panelFor.id !== me.id ? shellVM({

@@ -1,0 +1,19 @@
+/*
+ * The desktop CRM's ground (CRM Desktop rev 1). The generated markup (DeskApp.tsx) is the prototype's, drawn on a
+ * browser's OWN defaults plus its inline styles — so inside it every element returns to the browser's stylesheet
+ * (all: revert), whatever Tailwind's preflight, the portal's globals and the Revenue app set: a <button> keeps the
+ * browser's font as the prototype's does, headings their own sizes, boxes content-box. An inline style still wins (it
+ * is the element's own), and so do the generated hover / focus classes (!important, desk-hover.module.css).
+ * Tripled class: above the portal's heaviest global selector, h1:not(.sr-only):not(…) (0,2,1).
+ */
+.root { line-height: normal; letter-spacing: normal; text-align: left; -webkit-font-smoothing: antialiased; }
+.root.root.root *:not(svg, svg *) { all: revert; }
+/* An SVG's drawing is its presentation attributes (stroke, fill …), which `all` would undo too: only what preflight
+   sets on the svg box itself goes back. */
+.root.root.root svg { display: revert; vertical-align: revert; box-sizing: revert; border: revert; }
+/* The prototype's canvas (CRM Desktop rev 1.dc.html) colours its links. */
+.root.root.root a { color: #BD4A19; }
+.root.root.root a:hover { color: #A3371A; }
+
+/* The reply box's hint: the design draws it as text in #757575 — `all: revert` does not reach ::placeholder, where the portal's grey-blue would show. */
+.root.root.root ::placeholder { color: #757575; opacity: 1; }

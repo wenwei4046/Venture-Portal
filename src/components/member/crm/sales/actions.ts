@@ -22,7 +22,8 @@ export interface SalesActions {
   setPref(customerId: string, p: Partial<CrmPrefs>): Promise<void>;
   saveLabels(labels: { id?: string | null; name: string; color: string }[]): Promise<CrmLabel[] | null>;
   setLabel(customerId: string, labelId: string, on: boolean): Promise<void>;
-  saveDetails(customerId: string, f: { name: string; phone: string; type: string; size: string; loc: string; req: string; budget: string }): Promise<boolean>;
+  /** `extra`: answers to the questions the Control panel added to Customer info (CRM Desktop rev 1, B5); null clears one. */
+  saveDetails(customerId: string, f: { name: string; phone: string; type: string; size: string; loc: string; req: string; budget: string; extra?: Record<string, string | null> }): Promise<boolean>;
   book(customerId: string, roomId: string, start: string): Promise<boolean>;
   moveVisit(visitId: string, roomId: string, start: string): Promise<boolean>;
   cancelVisit(visitId: string): Promise<boolean>;
@@ -147,8 +148,15 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       });
     },
     async saveDetails(customerId, f) {
-      if (!(await write("crm_save_details", { p_contact: customerId, p_name: f.name, p_phone: f.phone, p_type: f.type, p_size: f.size, p_location: f.loc, p_requirement: f.req, p_budget: f.budget })).ok) return false;
-      patchCustomer(customerId, c => ({ ...c, name: f.name.trim(), phone: f.phone.trim() || c.phone, details: { type: f.type, size: f.size, loc: f.loc.trim(), req: f.req.trim(), budget: f.budget.trim() } }));
+      // With answers to the form's own questions, the nine-argument function (mig 20261013100000); else the eight as before.
+      if (!(await write("crm_save_details", { p_contact: customerId, p_name: f.name, p_phone: f.phone, p_type: f.type, p_size: f.size, p_location: f.loc, p_requirement: f.req, p_budget: f.budget, ...(f.extra ? { p_extra: f.extra } : {}) })).ok) return false;
+      const merged = (old: Record<string, string> | undefined) => {
+        if (!f.extra) return old;
+        const next: Record<string, string> = { ...(old ?? {}) };
+        for (const [k, v] of Object.entries(f.extra)) { if (v == null || v === "") delete next[k]; else next[k] = v; }
+        return next;
+      };
+      patchCustomer(customerId, c => ({ ...c, name: f.name.trim(), phone: f.phone.trim() || c.phone, details: { type: f.type, size: f.size, loc: f.loc.trim(), req: f.req.trim(), budget: f.budget.trim() }, extra: merged(c.extra) }));
       return true;
     },
     async book(customerId, roomId, start) {

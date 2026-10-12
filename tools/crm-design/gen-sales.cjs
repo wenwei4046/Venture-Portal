@@ -124,6 +124,8 @@ const INFO_SHEET = [
   ["<span onClick={v.ctChat} style={{ height: \"50px\",", "<span onClick={v.ctChat} style={{ flex: \"none\", height: \"50px\","],
 ];
 for (const n of ["SalesContacts", "SalesCalendar", "SalesInsight"]) PATCHES[n] = [...(PATCHES[n] ?? []), ...INFO_SHEET];
+// The customer form follows the Control panel's Forms (CRM Desktop rev 1, B5): every copy of it.
+for (const n of ["SalesChat", "SalesContacts", "SalesCalendar", "SalesInsight", "SalesCustomerForm"]) PATCHES[n] = [...(PATCHES[n] ?? []), ...require("./form-patches.cjs")()];
 // Inbox: Team | Mine moves from the top bar into the title row, just left of All ads (user 2026-10-11) — the top bar's
 // own pill markup; margin-left auto keeps it beside All ads.
 PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []), ["<span onClick={v.openAd} style",

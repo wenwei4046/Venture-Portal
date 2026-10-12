@@ -37,6 +37,8 @@ export interface CustomerForm {
   customerId: string;
   edit: boolean;
   name?: string; phone?: string; type?: string; size?: string; loc?: string; req?: string; budget?: string;
+  /** Answers to the form's own questions as typed (CRM Desktop rev 1, B5), by question id. */
+  extra?: Record<string, string>;
 }
 
 export interface SalesUi {

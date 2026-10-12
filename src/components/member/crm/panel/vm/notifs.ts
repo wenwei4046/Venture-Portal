@@ -46,7 +46,9 @@ export function panelNotifs(ctx: PanelCtx): PanelNotif[] {
     out.push({ key: `o${c.id}@${c.lastCustomerAt}`, kind: "overdue", at: at.toISOString(), who: c.name, text: `has waited ${Math.floor(u.waitingMinutes / 60)} h for`, lead: nameOf(c.assignedTo) === "—" ? "a reply" : nameOf(c.assignedTo), tail: "",
       extra: `Last message ${last.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" })}` });
   }
-  return out.sort((a, b) => b.at.localeCompare(a.at));
+  // Deleted on the computer (CRM Desktop rev 1, B3): gone from their phone too — they are the same person's.
+  const gone = new Set(data.notifDeleted ?? []);
+  return out.filter(n => !gone.has(n.key)).sort((a, b) => b.at.localeCompare(a.at));
 }
 
 export function notifsVM(ctx: PanelCtx) {
