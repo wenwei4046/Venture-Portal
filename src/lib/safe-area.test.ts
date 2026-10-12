@@ -153,3 +153,38 @@ describe('bottom bars stand on --safe-bottom', () => {
     expect(css).toMatch(/\n\.screen\[data-platform="android"\] \{ --sheet-safe: max\(0px, calc\(var\(--safe-bottom, 0px\) - 6px\)\); \}/)
   })
 })
+
+// 2026-10-12, the user's two screenshots of the HR app on an Android phone (three buttons): opened, the tab bar
+// showed only its top edge above the phone's buttons; scrolled down by a navigation bar's height, the head went
+// and the bar came. The frame was `height: 100dvh`, which the installed app made a navigation bar taller than the
+// screen (Chrome's bottom chin), and the page under it was `min-height: 100dvh`. A phone app's frame is now FIXED
+// to the screen — the document has nothing to scroll — and nothing on these surfaces is sized by a viewport unit.
+describe('the phone apps fill the screen they are shown on, not 100dvh', () => {
+  const rule = (file: string, selector: string) => {
+    const css = uncommented(readFileSync(resolve(ROOT, file), 'utf8'))
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return css.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+  }
+
+  it.each([
+    ['src/components/hr-app/hr-app.module.css', '.app'],
+    ['src/components/member/app/shell.module.css', '.screenLive'],
+  ])('%s %s is fixed to the screen', (file, selector) => {
+    const body = rule(file, selector)
+    expect(body).toMatch(/position:\s*fixed;/)
+    expect(body).toMatch(/inset:\s*0;/)
+    expect(body).not.toMatch(/\b100[dsl]?vh\b/)
+  })
+
+  it.each([
+    'src/components/hr-app/hr-app.module.css',
+    'src/app/(hr-app)/hr-app/layout.tsx',
+  ])('%s sizes nothing by the viewport’s height', file => {
+    expect(uncommented(readFileSync(resolve(ROOT, file), 'utf8'))).not.toMatch(/\d+[dsl]?vh\b/)
+  })
+
+  it('the HR app’s ground is fixed too, so no page under the frame can scroll', () => {
+    const layout = uncommented(readFileSync(resolve(ROOT, 'src/app/(hr-app)/hr-app/layout.tsx'), 'utf8'))
+    expect(layout).toMatch(/position:\s*'fixed',\s*inset:\s*0/)
+  })
+})

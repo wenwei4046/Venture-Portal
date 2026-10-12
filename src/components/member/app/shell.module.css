@@ -59,9 +59,14 @@
 .frameAndroid .screen { border-radius: 36px; }
 .frameDesk .screen { border-radius: 14px; }
 /* live: the real status bar and home indicator are the phone's own. The phone's own bar at the foot stays
-   white whatever the status colour: it shows there while the nav is tucked away (2026-10-11, pwa/tuck.ts). */
+   white whatever the status colour: it shows there while the nav is tucked away (2026-10-11, pwa/tuck.ts).
+   The screen is fixed to what the phone shows (`inset: 0`), never `100dvh` (2026-10-12): in the installed app on an
+   Android phone with three-button navigation 100dvh came out a navigation bar taller than the screen (Chrome's bottom
+   chin), the page could be scrolled by that much, and a bottom bar opened under the phone's buttons (the HR app's,
+   on the user's phone — hr-app.module.css › `.app`). */
 .screenLive {
-  height: 100dvh;
+  position: fixed;
+  inset: 0;
   padding-top: env(safe-area-inset-top, 0px);
   background: linear-gradient(var(--rv-white), var(--rv-white)) bottom / 100% var(--safe-bottom, 0px) no-repeat, var(--status-bg, var(--rv-white));
   transition: background-color 220ms ease;
