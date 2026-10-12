@@ -1545,9 +1545,19 @@ with comm, they will right click"*.
 - **HR decides.** A late key-in already paid by hand (a claim form) is right-clicked
   *Don't count this bill* (§4.10); the double-claim check (§4.14) flags one on
   another bill's paper.
-- **Left as it was.** A month closed to the ERP feed — by hand, or before the
-  cutover — still HOLDS a new document dated into it (§14). On 2026-10-12 no such
-  document had arrived: every held delivery was a re-send of a bill already in.
+- **A late key-in of a paid or closed month lands in a month still open**
+  (2026-10-12, mig `20261012200000`; the user, shown the choice: "can go for b").
+  A NEW document whose sale month's run is applied — or which is closed to the
+  feed, by hand or before the cutover — used to be HELD: in no month's table, the
+  Revenue app or the Arena, paid to nobody. It now lands in the first month still
+  open from the month it was keyed in (its order date's; never its sale month or
+  before, never past the office's own month): *Late key-in · Sep 2026 fair*, the
+  other-month wash, that month's sales and rate. Already paid by hand → Double
+  claims (*Would pay twice*) → *Don't count*. No month open → held, as before. A
+  bill already in the portal keeps its month on every re-send. Until 2026-10-12
+  no such document had arrived (every held delivery was a re-send); after
+  September's commission is applied, every September-fair bill keyed late would
+  have been.
 
 ### 4.20 A bill moved to another salesperson — from its right-click (2026-10-12)
 
