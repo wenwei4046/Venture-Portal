@@ -31,6 +31,7 @@ import { makePanelActions } from "./panel/actions";
 import { initialPanelUi, type PanelTab, type PanelUi } from "./panel/ui";
 import { teamsOf, type PanelCtx } from "./panel/vm/common";
 import { useSwipeToClose } from "./shared/swipe-close";
+import { keepSending } from "./shared/pending";
 
 /** Team | Mine keeps the page: one's CRM page → the Control panel's (it has no Contacts: its Inbox lists everybody's). */
 const TEAM_TAB: Record<SalesTab, PanelTab> = { inbox: "inbox", contacts: "inbox", calendar: "calendar", insight: "overview", profile: "profile" };
@@ -84,7 +85,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       try {
         // The desktop also reads every customer's journey (Chat progress, CRM Desktop rev 1).
         const r = await fetchCrmData({ journey: desk });
-        if (!stopped && r.ok && started >= (refs.localAt ?? 0)) setData(r.data);
+        if (!stopped && r.ok && started >= (refs.localAt ?? 0)) setData(prev => keepSending(prev, r.data));
       } finally { busy = false; }
     };
     const t = setInterval(() => void pull(), 5_000);

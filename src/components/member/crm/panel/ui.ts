@@ -50,6 +50,9 @@ export interface PanelUi {
   reSheet: boolean;
   pick: string;
   pDraft: string;
+  /** A voice note being recorded in the chat: when it started (shared/voice.ts); pRecTick moves its clock. */
+  pRec: number | null;
+  pRecTick?: number;
   toast: string;
   // Assignment
   sendFor: string | null;
@@ -89,7 +92,7 @@ export interface PanelUi {
 export const initialPanelUi = (): PanelUi => ({
   tab: "overview", period: "month", ovRange: null, cmp: null, cmpFold: false, ovSheet: null, openT: {},
   inbTeam: "", inbWho: "", pcOpen: false, pcQ: "",
-  lead: null, pMenu: false, pInfo: false, pForm: null, calInfo: null, cLs: false, asSec: null, ftx: null, bp: null, hlOpen: false, ftsOpen: false, tplOpen: false, tplEd: null, pBook: null, reSheet: false, pick: "", pDraft: "", toast: "",
+  lead: null, pMenu: false, pInfo: false, pForm: null, calInfo: null, cLs: false, asSec: null, ftx: null, bp: null, hlOpen: false, ftsOpen: false, tplOpen: false, tplEd: null, pBook: null, reSheet: false, pick: "", pDraft: "", pRec: null, toast: "",
   sendFor: null, sdSel: null, mvFor: null, mvSel: null, undo: null, movedRec: {}, adEd: null, ftEd: null, att: false, attF: "all", asgF: null,
   viewAs: false, vaQ: "", nfOpen: false, nfF: "", nfR: "unread", roomsOpen: false, rmEdit: null, rmTP: null, rmDel: null,
   cView: "list", cTeam: "all", cPerson: "", cpSheet: false, cDay: null, cGM: null, cRange: null, crSheet: null,

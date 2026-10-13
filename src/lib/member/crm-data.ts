@@ -29,7 +29,8 @@ export interface CrmChatMessage {
   kind: string;
   text: string;
   at: string;
-  status?: "sent" | "delivered" | "read" | "failed";
+  /** "sending": on screen at once while it goes (user 2026-10-13: sending felt slow); never stored. */
+  status?: "sending" | "sent" | "delivered" | "read" | "failed";
   error?: string;
   /** Who of us wrote it (staff id) when the server knows — "Sent by" shows when it is not the customer's own person. */
   by?: string;
@@ -328,7 +329,8 @@ const lostReasons = new Set<string>(CRM_LOST_REASONS.map(r => r.value));
 
 export function chatMessage(row: CrmMessageRowX): CrmChatMessage {
   const label = MEDIA_LABEL[row.kind];
-  const shown = row.media_id ? MEDIA_KIND[row.kind] : undefined;
+  // A file to show: WhatsApp's media id, our own copy of what we sent, or Messenger's address — all through our route.
+  const shown = row.media_id || row.media_path || row.media_url ? MEDIA_KIND[row.kind] : undefined;
   // A template we sent is its text; media with a file is its caption; media without one is named.
   const text = row.kind === "template" || row.kind === "text" ? row.body ?? ""
     : shown ? row.body ?? "" : label ? (row.body ? `${label} · ${row.body}` : label) : row.body ?? "";

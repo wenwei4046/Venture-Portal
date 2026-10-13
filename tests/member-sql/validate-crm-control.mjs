@@ -252,4 +252,15 @@ check(crmPpl.find(p => p.id === S('ann')).title, (await q(`select t.name from ti
   check(whole, 'Puchong is closed that day.', 'a block without hours still closes the whole day')
 }
 
+// 14. A customer's Messenger photo keeps Meta's address so the chat shows it (mig 20261013240000); any other host, none.
+{
+  const msg = (mid, url) => ({ externalId: mid, pageId: 'PG1', psid: 'PS-photo', name: 'Photo Fan', kind: 'image', body: null, sentAt: '2026-10-13T03:00:00.000Z', ad: null, mediaUrl: url })
+  await q(`select public.crm_ingest_messenger($1::jsonb, '[]'::jsonb, '[]'::jsonb, 0, '{}'::jsonb)`,
+    [JSON.stringify([msg('m.photo1', 'https://scontent.xx.fbcdn.net/v/a.jpg?x=1'), msg('m.photo2', 'https://evil.example.com/a.jpg')])])
+  check(await q(`select external_id, media_url from crm_messages where external_id like 'm.photo%' order by external_id`), [
+    { external_id: 'm.photo1', media_url: 'https://scontent.xx.fbcdn.net/v/a.jpg?x=1' },
+    { external_id: 'm.photo2', media_url: null },
+  ], "Meta's CDN address kept, another host's dropped")
+}
+
 console.log(`crm control panel: ${checks} checks passed`)

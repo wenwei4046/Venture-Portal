@@ -15,6 +15,7 @@ import { BORDER, gb, CHANNEL, day0, DAY, daySep, dayLabel, firstName, ini, msgTi
 import { customerFormVM, infoRows } from "./customer";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { oneAtATime } from "../../shared/once";
+import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { CHAT_WALL } from "../wall";
 
 const RUST = "#BD4A19", INK = "#3F2B22", SUB = "rgb(128 107 96)", BD = "#EBDDD2";
@@ -80,6 +81,9 @@ export function windowLeft(c: CrmCustomer, now: Date): string {
   return "";
 }
 
+/** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
+let recTimer: ReturnType<typeof setInterval> | undefined;
+
 export function chatVM(ctx: SalesCtx) {
   const { ui, set, patch, data, now, act, refs, owner, nameOf, live } = ctx;
   const c = ui.chat ? data.customers.find(x => x.id === ui.chat) : undefined;
@@ -117,6 +121,8 @@ export function chatVM(ctx: SalesCtx) {
     const card = m.card;
     const cd = card ? new Date(card.start) : null;
     const read = m.status === "read";
+    // A photo, video or voice note shows as itself (2026-10-13), from our route or — while it is being sent — the phone.
+    const md = m.media, mk = md?.kind;
     // "Sent by": a reply from someone other than the customer's own person.
     const by = mine && m.by && m.by !== c.assignedTo && !m.auto ? nameOf(m.by) : m.auto ? "Auto-reply" : "";
     return {
@@ -130,9 +136,12 @@ export function chatVM(ctx: SalesCtx) {
         // Tap the card → Calendar on the visit's date.
         go: () => set(u => ({ ...u, chat: null, tab: "calendar", calView: "month", calSel: day0(cd), calYM: [cd.getFullYear(), cd.getMonth()], hist: [...u.hist, u.tab].slice(-20) })),
       } : null,
-      pDisp: card ? "none" : "block", size: "14px", textStyle: "normal", textColor: "inherit", parts: parts(m.media && !m.text ? (m.media.kind === "image" ? "📷 Photo" : "📄 " + (m.media.name ?? "Document")) : m.text),
+      img: mk === "image" ? md!.url : "", vid: mk === "video" ? md!.url : "", aud: mk === "audio" ? md!.url : "", file: mk === "file" ? md!.url : "",
+      pDisp: card || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: "14px", textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : mk === "file" ? "📄 " + m.text : m.text),
       timeJustify: "flex-end", timeColor: mine ? "#806B60" : SUB, by, at: msgTime(m.at),
-      tick: mine, tickColor: read ? "#2F8FD8" : "#A8968B", tickLabel: read ? "Read" : m.status === "failed" ? "Not delivered" : "Delivered",
+      tick: mine, tickColor: read ? "#2F8FD8" : m.status === "failed" ? "#A3371A" : "#A8968B", tickLabel: m.status === "sending" ? "Sending" : read ? "Read" : m.status === "failed" ? "Not delivered" : "Delivered",
+      // Sending: a small clock until it went (then the two ticks).
+      tickPath: m.status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1" : "M1 6l3 3 6-7M7 8.5l.5.5 6-7",
       showTools: ui.hover === key, enter: () => patch({ hover: key }), leave: () => set(u => (u.hover === key ? { ...u, hover: null } : u)),
       openMenu: () => patch({ menu: { msgId: key, full: true, from: m.from, text: m.text } }),
       openReact: () => patch({ menu: { msgId: key, full: false, from: m.from, text: m.text } }),
@@ -371,13 +380,24 @@ export function chatVM(ctx: SalesCtx) {
           return { name: t.label ?? t.name.replace(/_/g, " ").replace(/^\w/, x => x.toUpperCase()), text: t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] || "…"),
             send: async () => { if (await oneAtATime(`send:${c.id}`, () => act.sendTemplate(c.id, t, params))) { patch({ tpl: false }); scrollDown(); } } };
         });
+  // The message shows at once and the box empties (2026-10-13: sending felt slow); a send that fails puts the words back
+  // into an empty box. Sends of one chat go out in the order tapped (actions › inTurn), so a second tap sends the next.
   const sendDraft = async () => {
-    const text = draft.trim(); if (!text || ui.sending) return;
-    patch({ sending: true });
-    const ok = await oneAtATime(`send:${c.id}`, () => act.send(c.id, text, ui.reply?.msgId ?? null));
-    if (ok === undefined) return; // the first tap is still sending
-    set(u => ({ ...u, sending: false, ...(ok ? { draft: { ...u.draft, [c.id]: "" }, reply: null } : {}) }));
-    if (ok) scrollDown();
+    const text = draft.trim(); if (!text) return;
+    const replyTo = ui.reply?.msgId ?? null;
+    set(u => ({ ...u, draft: { ...u.draft, [c.id]: "" }, reply: null }));
+    scrollDown();
+    const ok = await act.send(c.id, text, replyTo);
+    if (!ok) set(u => ({ ...u, draft: { ...u.draft, [c.id]: u.draft[c.id] ? u.draft[c.id] : text } }));
+  };
+  // Voice notes: tap the mic to record, then Send or Cancel; the time ticks on screen.
+  const recOn = ui.rec != null;
+  const recStop = (send: boolean) => async () => {
+    clearInterval(recTimer); recTimer = undefined;
+    set(u => ({ ...u, rec: null }));
+    if (!send) { cancelVoice(); return; }
+    const file = await stopVoice();
+    if (file && (await act.sendMedia(c.id, file, ""))) scrollDown();
   };
 
   return {
@@ -407,11 +427,25 @@ export function chatVM(ctx: SalesCtx) {
       ["Quick replies", "M13 2 4 14h7l-1 8 9-12h-7l1-8Z", "#A46312", () => patch({ att: false, qr: true })],
     ] as [string, string, string, () => void][]).map(([label, icon, color, go]) => ({ label, icon, color, go })),
     /** The chat's hidden file pickers (Photos · Document) send what is chosen, the draft as its caption. */
+    // Photos (several at once), the camera's photo or video, a document: each goes as its own message, in order; the
+    // typed words go with the first as its caption.
     pickMedia: async (e: ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]; e.target.value = "";
-      if (!file) return;
-      if (await oneAtATime(`send:${c.id}`, () => act.sendMedia(c.id, file, draft.trim()))) { setDraft(""); scrollDown(); }
+      const files = [...(e.target.files ?? [])]; e.target.value = "";
+      if (!files.length) return;
+      const caption = draft.trim();
+      if (caption) setDraft("");
+      scrollDown();
+      await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
     },
+    openCamera: () => document.getElementById("crm-pick-camera")?.click(),
+    micTap: async () => {
+      if (recOn) return;
+      const why = await startVoice();
+      if (why) { set(u => ({ ...u, toast: why })); return; }
+      set(u => ({ ...u, rec: Date.now() }));
+      recTimer = setInterval(() => set(u => (u.rec != null ? { ...u, recTick: Date.now() } : u)), 500);
+    },
+    rec: recOn ? { time: recTime(ui.rec as number, ui.recTick && ui.recTick > (ui.rec as number) ? ui.recTick : Date.now()), cancel: recStop(false), send: recStop(true) } : null,
     qrOpen: ui.qr, closeQR: () => patch({ qr: false }),
     qrList: qrs.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid #EBDDD2" : "0",
       pick: () => set(u => ({ ...u, qr: false, draft: { ...u.draft, [c.id]: q.message } })),

@@ -32,9 +32,9 @@ export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
   const v = panelAppVM(ctx);
   return (<>
     <PanelApp v={v} />
-    {/* The chat's + (a document) and camera (a photo) open these. */}
+    {/* The chat's + (a document) and camera (photos and videos, several at once) open these. */}
     {!!ui.lead && (<>
-      <input id="crm-panel-photo" type="file" accept="image/jpeg,image/png" onChange={v.ld.lx.pickMedia} style={{ display: "none" }} />
+      <input id="crm-panel-photo" type="file" accept="image/*,video/*" multiple onChange={v.ld.lx.pickMedia} style={{ display: "none" }} />
       <input id="crm-panel-file" type="file" onChange={v.ld.lx.pickMedia} style={{ display: "none" }} />
     </>)}
   </>);

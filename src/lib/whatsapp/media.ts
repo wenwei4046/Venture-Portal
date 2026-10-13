@@ -7,7 +7,7 @@
 import { GRAPH_VERSION } from "./send";
 
 /** What the chat may show inline; anything else is offered as a download. */
-const INLINE = /^(image\/(jpeg|png|webp|gif)|video\/(mp4|3gpp)|audio\/(ogg|mpeg|mp4|aac|amr|opus))\b/i;
+const INLINE = /^(image\/(jpeg|png|webp|gif)|video\/(mp4|3gpp|quicktime)|audio\/(ogg|mpeg|mp4|aac|amr|opus|webm|x-m4a))\b/i;
 
 export const inlineType = (mime: string | null | undefined) => !!mime && INLINE.test(mime);
 
@@ -15,6 +15,23 @@ export const inlineType = (mime: string | null | undefined) => !!mime && INLINE.
 export const validMediaId = (id: string | null | undefined): id is string => !!id && /^\d{5,32}$/.test(id);
 
 export type MediaResult = { ok: true; body: ReadableStream<Uint8Array> | null; type: string; length: string | null } | { ok: false; status: number; error: string };
+
+/**
+ * A customer's Messenger attachment: Meta gives a signed address on its own CDN, read as it is (no token). Only ever from
+ * Meta's hosts; an address Meta no longer serves is "no longer available".
+ */
+export async function fetchMessengerMedia(address: string, fetchImpl: typeof fetch = fetch): Promise<MediaResult> {
+  let url: URL;
+  try { url = new URL(address); } catch { return { ok: false, status: 400, error: "Not a file address." }; }
+  if (url.protocol !== "https:" || !/(^|\.)(fbcdn\.net|fbsbx\.com|facebook\.com)$/.test(url.hostname)) return { ok: false, status: 400, error: "Not a Messenger file." };
+  try {
+    const file = await fetchImpl(url, { cache: "no-store" });
+    if (!file.ok) return { ok: false, status: file.status === 403 || file.status === 404 ? 404 : 502, error: "Messenger no longer has this file." };
+    return { ok: true, body: file.body, type: file.headers.get("content-type") || "application/octet-stream", length: file.headers.get("content-length") };
+  } catch {
+    return { ok: false, status: 502, error: "Could not download the file from Messenger." };
+  }
+}
 
 export async function fetchWhatsAppMedia(mediaId: string, token: string, fetchImpl: typeof fetch = fetch): Promise<MediaResult> {
   if (!validMediaId(mediaId)) return { ok: false, status: 400, error: "Not a media id." };

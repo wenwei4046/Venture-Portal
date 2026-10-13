@@ -12,6 +12,7 @@ import type { CrmAutoReplySet, CrmCard, CrmChatMessage, CrmData, CrmLabel, CrmPr
 import type { WaTemplate } from "@/lib/whatsapp/send";
 import { createClient } from "@/lib/supabase/client";
 import { withMapLinks } from "@/lib/member/crm-maps";
+import { mediaKindOf, mediaPath } from "@/lib/member/crm-media";
 import { dayLabel, timeLabel, windowShut } from "./vm/common";
 
 export interface SalesActions {
@@ -81,6 +82,17 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
     setData(d => ({ ...d, customers: d.customers.map(c => (c.id === id ? f(c) : c)) }));
   // A reply from anyone clears the chat's unread (crm_record_out, user 2026-10-09: 谁回复都清零).
   const addMessage = (customerId: string, m: CrmChatMessage) => patchCustomer(customerId, c => ({ ...c, messages: [...c.messages, m], status: c.status === "new" ? "follow_up" : c.status, unread: m.from === "me" ? 0 : c.unread }));
+  // Sending shows at once (user 2026-10-13: a message took seconds to appear): a "sending" copy goes into the chat, the
+  // real one takes its place when it went and was kept, or it leaves again and the caller says why. One chat's sends go
+  // one after another, in the order tapped.
+  const swapMessage = (customerId: string, tempId: string, m: CrmChatMessage | null) =>
+    patchCustomer(customerId, c => ({ ...c, messages: m ? c.messages.map(x => (x.id === tempId ? m : x)) : c.messages.filter(x => x.id !== tempId) }));
+  const queues = new Map<string, Promise<unknown>>();
+  const inTurn = <T,>(customerId: string, run: () => Promise<T>): Promise<T> => {
+    const next = (queues.get(customerId) ?? Promise.resolve()).catch(() => undefined).then(run);
+    queues.set(customerId, next);
+    return next;
+  };
   const room = (id: string) => data().rooms.find(r => r.id === id);
   const visit = (id: string) => data().visits.find(v => v.id === id);
   const setVisit = (id: string, f: (v: CrmVisit) => CrmVisit) => setData(d => ({ ...d, visits: d.visits.map(v => (v.id === id ? f(v) : v)) }));
@@ -111,9 +123,11 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
     },
     async send(customerId, text, replyTo) {
       if (!live) { addMessage(customerId, { id: uid(), from: "me", kind: "text", text: text.trim(), at: new Date().toISOString(), status: "sent", by: me, ...(replyTo ? { replyTo } : {}) }); return true; }
-      const r = await sendCrmMessage(customerId, text, { replyTo });
-      if (!r.ok) { toast(r.error); return false; }
-      addMessage(customerId, r.message);
+      const tempId = `sending-${uid()}`;
+      addMessage(customerId, { id: tempId, from: "me", kind: "text", text: text.trim(), at: new Date().toISOString(), status: "sending", by: me, ...(replyTo ? { replyTo } : {}) });
+      const r = await inTurn(customerId, () => sendCrmMessage(customerId, text, { replyTo }));
+      if (!r.ok) { swapMessage(customerId, tempId, null); toast(r.error); return false; }
+      swapMessage(customerId, tempId, r.message);
       return true;
     },
     async react(messageId, emoji) {
@@ -283,13 +297,25 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       return true;
     },
     async sendMedia(customerId, file, caption) {
-      if (file.size > 4 * 1024 * 1024) { toast("A photo or file can be up to 4 MB."); return false; }
-      if (!live) { addMessage(customerId, { id: uid(), from: "me", kind: file.type.startsWith("image/") ? "image" : "document", text: caption || file.name, at: new Date().toISOString(), status: "sent", by: me }); return true; }
-      const form = new FormData();
-      form.append("contact", customerId); form.append("caption", caption); form.append("file", file, file.name);
-      const r = await sendCrmMedia(form);
-      if (!r.ok) { toast(r.error); return false; }
-      addMessage(customerId, r.message);
+      // Photos, videos and voice notes (2026-10-13): shown at once from the phone itself, then put in the private bucket
+      // crm-media straight from the browser (no 4 MB Server Action), then sent by the server from there.
+      if (file.size > 25 * 1024 * 1024) { toast("A photo, video or file can be up to 25 MB."); return false; }
+      const mime = (file.type || "application/octet-stream").split(";")[0];
+      const kind = mediaKindOf(mime), shown = kind === "document" ? "file" : kind;
+      const local = typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : "";
+      const draft: CrmChatMessage = { id: `sending-${uid()}`, from: "me", kind, text: kind === "document" ? file.name : caption, at: new Date().toISOString(), status: live ? "sending" : "sent", by: me,
+        ...(local ? { media: { kind: shown, url: local, ...(shown === "file" ? { name: file.name } : {}) } } : {}) };
+      addMessage(customerId, draft);
+      if (!live) return true;
+      const r = await inTurn(customerId, async () => {
+        const path = mediaPath(customerId, file.name || "file", mime);
+        const up = await createClient().storage.from("crm-media").upload(path, file, { contentType: mime, upsert: false });
+        if (up.error) return { ok: false as const, error: "The file could not be uploaded. Check the connection and try again." };
+        return sendCrmMedia({ contact: customerId, path, name: file.name || "file", mime, caption });
+      });
+      if (!r.ok) { swapMessage(customerId, draft.id, null); toast(r.error); return false; }
+      // Keep showing the phone's own copy until the chat is read again (no second download right after sending).
+      swapMessage(customerId, draft.id, r.message.media && local ? { ...r.message, media: { ...r.message.media, url: local } } : r.message);
       return true;
     },
     async slotCounts(roomId, from, to) {

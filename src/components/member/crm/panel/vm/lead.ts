@@ -13,6 +13,10 @@ import { roomClosed, roomSlots, slotAt, slotBlocked, windowLeft } from "../../sa
 import { infoRows } from "../../sales/vm/customer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
 import { oneAtATime } from "../../shared/once";
+import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
+
+/** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
+let recTimer: ReturnType<typeof setInterval> | undefined;
 
 /**
  * Send or move a customer, then offer 30 s to undo it (Organic Leads' Send to,
@@ -48,11 +52,16 @@ export function leadVM(ctx: PanelCtx) {
   };
   const msgs = (c?.messages ?? []).map((m, k, arr) => {
     const sep = daySep(m.at, now), mine = m.from === "me", by = mine && m.by && m.by !== ow ? `Sent by ${nameOf(m.by)}` : m.auto ? "Auto-reply" : "";
-    return { sep: !k || daySep(arr[k - 1].at, now) !== sep ? sep : "", time: msgTime(m.at), mine, text: m.text || (m.media ? `[${m.media.kind === "image" ? "Photo" : m.media.kind === "audio" ? "Voice note" : m.media.kind === "video" ? "Video" : "File"}]` : ""), at: msgTime(m.at),
+    // A photo, video or voice note shows as itself (2026-10-13), as in the salesperson's chat; a file opens.
+    const md = m.media, mk = md?.kind, shows = mk === "image" || mk === "video" || mk === "audio";
+    return { sep: !k || daySep(arr[k - 1].at, now) !== sep ? sep : "", time: msgTime(m.at), mine, text: m.text || (md && !shows ? (md.name ?? "File") : ""), at: msgTime(m.at),
+      img: mk === "image" ? md!.url : "", vid: mk === "video" ? md!.url : "", aud: mk === "audio" ? md!.url : "", file: mk === "file" ? md!.url : "",
+      tickC: m.status === "read" ? "#2F8FD8" : m.status === "failed" ? "#A3371A" : "#A8968B",
+      tickPath: m.status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1" : "M1 6l3 3 6-7M7 8.5l.5.5 6-7",
       by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? "#FCD6B8" : "#fff", bd: mine ? "#FCD6B8" : "#fff", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
       // A visit sent to the customer shows as the visit card, as in the salesperson's chat (sales/vm/chat.ts › ev), not
       // as its text with the map links (user 2026-10-11). Tap → Calendar on that day.
-      ...visitCard(m.card), pDisp: m.card ? "none" : "block" };
+      ...visitCard(m.card), pDisp: m.card || (shows && !m.text) ? "none" : "block" };
   });
   return {
     onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
@@ -84,9 +93,28 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   // A first booking asks for the customer's details first (step 1 of 2), as the salesperson's does.
   const openBook = () => { if (!c) return; if (c.detailsSaved) toBook(c.id); else patch({ pMenu: false, pInfo: false, pForm: { customerId: c.id, edit: false } }); };
   const setB = (p: Partial<NonNullable<typeof B>>) => set(u => (u.pBook ? { ...u, pBook: { ...u.pBook, ...p } } : u));
+  // Shows at once and the box empties (2026-10-13); a failed send puts the words back into an empty box.
   const send = async () => {
     if (!c || !has) return;
-    if (await oneAtATime(`send:${c.id}`, () => act.send(c.id, draft.trim()))) set(u => ({ ...u, pDraft: "" }));
+    const text = draft.trim();
+    set(u => ({ ...u, pDraft: "" }));
+    if (!(await act.send(c.id, text))) set(u => ({ ...u, pDraft: u.pDraft || text }));
+  };
+  // Voice notes: with nothing typed the round button is the mic — tap to record, then Send or Cancel.
+  const recOn = ui.pRec != null;
+  const micTap = async () => {
+    if (recOn || !c) return;
+    const why = await startVoice();
+    if (why) { patch({ toast: why }); return; }
+    set(u => ({ ...u, pRec: Date.now() }));
+    recTimer = setInterval(() => set(u => (u.pRec != null ? { ...u, pRecTick: Date.now() } : u)), 500);
+  };
+  const recStop = (sendIt: boolean) => async () => {
+    clearInterval(recTimer); recTimer = undefined;
+    set(u => ({ ...u, pRec: null }));
+    if (!sendIt) { cancelVoice(); return; }
+    const file = await stopVoice();
+    if (file && c) await act.sendMedia(c.id, file, "");
   };
   const room = B ? rooms[B.room] ?? rooms[0] : undefined;
   const taken = (start: Date) => data.visits.filter(v => v.showroomId === room?.id && v.state === "booked" && new Date(v.start).getTime() === start.getTime()).length;
@@ -129,14 +157,18 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   })() : [];
   return {
     inbox: on, viewOnly: false, draft, setDraft: (e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value; set(u => ({ ...u, pDraft: v })); },
-    send: has ? () => void send() : undefined, sendBg: has ? "#BD4A19" : "#D9C7BA",
+    send: has ? () => void send() : () => void micTap(), sendBg: has ? "#BD4A19" : "#D9C7BA",
+    rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()), cancel: recStop(false), send: recStop(true) } : null,
     // + = a document, the camera = a photo (PanelScreens' hidden pickers); the typed text goes as the caption.
     attach: () => document.getElementById("crm-panel-file")?.click(),
     photo: () => document.getElementById("crm-panel-photo")?.click(),
+    // Several photos and videos at once, each its own message; the typed words go with the first.
     pickMedia: async (e: ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]; e.target.value = "";
-      if (!file || !c) return;
-      if (await oneAtATime(`send:${c.id}`, () => act.sendMedia(c.id, file, draft.trim()))) set(u => ({ ...u, pDraft: "" }));
+      const files = [...(e.target.files ?? [])]; e.target.value = "";
+      if (!files.length || !c) return;
+      const caption = draft.trim();
+      if (caption) set(u => ({ ...u, pDraft: "" }));
+      await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
     },
     ph: c ? `Reply to ${first(c.name)}…` : "", sendIcon: has ? "M5 12h14m-6-6 6 6-6 6" : "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0m7 7v3", sendTitle: has ? "Send" : "Voice note",
     chC: c?.channel === "messenger" ? "#2F6FB5" : "#1F7A4D", menuOpen: on && ui.pMenu, toggleMenu: () => set(u => ({ ...u, pMenu: !u.pMenu })),

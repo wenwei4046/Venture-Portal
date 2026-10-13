@@ -22,9 +22,15 @@ export interface MsgInbound {
   name: string | null;   // filled by the route from the profile, when Meta gives it
   kind: MsgKind;
   body: string | null;
+  /** A photo, video, voice message or file: Meta's address for it (its own CDN, https only), shown through our route. */
+  mediaUrl?: string | null;
   sentAt: string;        // ISO
   ad: { sourceId: string | null; headline: string | null; sourceUrl: string | null } | null;
 }
+
+/** Meta's own file hosts only (the ingest asks the same). */
+export const metaMediaUrl = (u: string | undefined | null): string | null =>
+  !!u && /^https:\/\/[A-Za-z0-9.-]+\.(fbcdn\.net|fbsbx\.com|facebook\.com)\//.test(u) ? u : null;
 
 export interface MsgDelivery {
   messages: MsgInbound[];
@@ -86,6 +92,7 @@ export function parseMessengerDelivery(body: unknown): MsgDelivery {
           ?? (first?.payload?.coordinates ? `${first.payload.coordinates.lat},${first.payload.coordinates.long}` : null);
         out.messages.push({
           externalId: e.message.mid, pageId, psid, name: null, kind: e.message.text ? "text" : kindOf(first), body: body ?? null,
+          ...(["image", "video", "audio", "file"].includes(first?.type ?? "") && metaMediaUrl(first?.payload?.url) ? { mediaUrl: metaMediaUrl(first?.payload?.url) } : {}),
           sentAt: iso(e.timestamp), ad: adOf(e.message.referral ?? e.referral),
         });
         continue;
