@@ -125,7 +125,7 @@ tools/
 └── yoga-setter-sweep.mjs        ← measures what src/lib/export/pdf.test.ts
                                    actually catches (see TESTING.md)
 docs/
-├── DESIGN.md                       ← Design system v3.0 (Ledger-Dense / single source of truth for ALL UI)
+├── DESIGN.md                       ← Design system v4.0 — single source of truth for ALL UI
 ├── db-schema.md                    ← Database schema reference (32 tables)
 ├── access-matrix.md                ← Role permissions reference
 ├── module-spec-phase1.md           ← ✅ Shipped: Dashboard, Fund IN/OUT, Overdue, Statements
@@ -160,11 +160,11 @@ erp-sync/contract.md — the Houzs ERP → portal LIVE sales-order feed (2026-09
   rows, verbatim), what each outcome means, and the three SQL files the ERP
   team applies on their side (`docs/erp-sync/houzs-erp-side/`). Read this before
   touching `src/lib/erp-sync/`, `src/app/api/erp/` or `ingest_erp_sales_order`.
-DESIGN.md — v3.0 Ledger-Dense design system. **Single source of truth for all UI.** Colors, typography, components, page anatomy, the v3.0 utility classes (`.num`, `.ledger-table`, `.page-head`, etc), and canonical reference pages.
+DESIGN.md — v4.0, the HOUZS Venture Design System (Claude Design) mapped to the code. **Single source of truth for all UI.** Part I: themes, tokens, type, components. Part II: portal rules, utility classes, canonical pages. Part III: page specs. Part IV: version index.
 ALWAYS reference these docs before implementing any feature.
 
 Other project docs (at repo root):
-TODOS.md — Phase 1.5 tech debt, Phase 2/3 prerequisites, compliance gates
+TODOS.md — the open items only (tech debt, compliance gates)
 .gstack/qa-reports/qa-report-phase1-2026-04-10.md — Phase 1 acceptance audit (6 findings, 2 fixed, 3 deferred to 1.5)
 Permissions — the rules (history: `.claude/rules/portal-wide/permissions.md`)
 Every gate reads a PERMISSION, never a role (2026-09-01). A title points at a TEMPLATE (2026-10-08): cells = function × action (view create edit approve void export manage) × reach (own / dept / all), plus the sensitive fields salary / nric / bank; one person may be raised or lowered on a cell. `users.role` — the account's hidden KIND, the template's `base_role` — survives only as the fallback for an account with no template and for the few checks named in `src/lib/kind-checks.test.ts`, which fails on any new `user.role`. Do not add gates that read it.
@@ -276,20 +276,28 @@ Do not invent parallel design docs (no `DESIGN-v2.md`, `STYLE.md`, `UI-NOTES.md`
 Do not hardcode hex colors in components — use Tailwind tokens (`text-ink`, `bg-paper`, `text-num-ink`, `border-hairline`, `text-accent`, `text-danger`) backed by CSS vars in `globals.css`
 Do not use the superpowers plugin (brainstorming/TDD/writing-plans skills, `docs/superpowers/` plan+spec files) unless really needed — default to working directly; reserve it for genuinely complex multi-step features where the planning overhead pays off
 
-UI Conventions (v3.0 — enforced)
-**Read `docs/DESIGN.md` first before adding or amending any UI.** It contains the v3.0 implementation rules + utility class catalog + canonical reference pages.
+UI Conventions (DESIGN.md v4.0 — enforced)
+**Read `docs/DESIGN.md` first before adding or amending any UI**: Part I is the design system (two themes, tokens, type, which component for which job), Part II is the portal's rules, and Part III holds your page. The visual source is the Claude Design project "HOUZS Venture Design System" (link in DESIGN.md).
 
-Six non-negotiable rules every new/amended page must follow:
-1. **Page header** — wrap top of page in `<div className="page-head">` containing `<div className="page-eyebrow"><em>I.</em> SECTION · NAME</div>` + `<h1 className="page-title">…</h1>`. Right side may hold an action button.
-2. **Money cells use `.num`** — `<td className="num">{formatMoney(x)}</td>`. Negatives get `<span className="neg">`. Hero figures use `text-num-ink` + `tabular` + `tracking-[-0.01em]`.
-3. **Data tables use `.ledger-table`** — `<table className="ledger-table">` with bare `<th>` / `<td>`. Class wires up surface bg, zebra rows, hover, hairline borders, padding, and right-aligned `.num`. Stop hand-rolling `<table className="w-full text-sm">…border-b…hover:bg-…`.
-4. **Section headings use `.sect-head`** — medium-weight upright sans title + hairline rule extending right + uppercase mono counter. See `src/app/(portal)/statements/monthly/page.tsx` for the canonical pattern.
-5. **Colors via CSS variables only** — no hex outside `globals.css`. Use `text-ink` / `text-num-ink` / `text-graphite` / `bg-paper` / `bg-surface` / `border-hairline` / `text-accent` / `text-danger` / `text-ledger` / `text-alert` / `text-info`.
-6. **A new route folder with child routes gets a `loading.tsx`** that renders `RouteSkeleton` — see Navigation speed under Coding Conventions.
-7. **HR's view sits on the white sheet (2026-09-27, DESIGN.md › "Sheet theme").** Every route under `/dashboard` (all four roles' Overview), `/hr-costing`, `/director-salary`, `/director-pool`, `/revenue`, `/claims`, `/team` (People) and `/member-admin` — `lib/sheet-routes.ts` — is drawn by PortalFrame on one white sheet in Comm Cal's month's tone: black lettering, orange `#E99A53` only as a surface (buttons, active tab, markers — never text), walnut for the one primary figure. Open such a page with `StatCards`/`StatCard` (`components/sheet/StatCard.tsx`), not a hero or a figure strip; statuses are `.chip`s; a closing total goes in `<tfoot>`. Extending the tone to another section = add its prefix there and convert the page the same way. Reference: `src/app/(portal)/hr-costing/page.tsx`.
+Rules every new or amended page follows:
+1. **Pick the theme first.**
+   - HR: every portal page, on the white sheet (`lib/sheet-routes.ts`).
+   - Revenue: `[data-revenue-app]` — the Revenue app and the CRM.
+   - One theme per page; `data-theme` is light/dark mode, not a view.
+2. **Page header.** Use `.page-head` (`<div className="page-eyebrow"><em>I.</em> SECTION · NAME</div>` + `<h1 className="page-title">`), or the kit's `PageHead` on HR's pages. No description under it (DESIGN.md › No descriptions on the page).
+3. **Money and figures.**
+   - Money cells use `.num`: `<td className="num">{formatMoney(x)}</td>`, negatives in `<span className="neg">`.
+   - A page opens on `StatCards` / `StatCard` (`components/sheet/StatCard.tsx`), not a hero or a figure strip.
+4. **Tables.** `.ledger-table` with bare `<th>` / `<td>` (a closing total in `<tfoot>`), `SortableTable`, or the kit's grid tables. A table of 5+ columns folds on a phone.
+5. **Section headings** use `.sect-head`, or the kit's `SectHead`.
+6. **Colours only through tokens.**
+   - Tailwind tokens (`text-ink`, `bg-paper`, `border-hairline`, `text-danger` …), or the design system's `--ds-*` / `ds-*` classes for new work. No hex outside `globals.css`.
+   - On the sheet, orange `#E99A53` is a surface, never lettering.
+   - One primary action and one dark object per screen. Statuses are `.chip`s.
+7. **A new route folder with child routes gets a `loading.tsx`** that renders `RouteSkeleton` (see Navigation speed under Coding Conventions).
+8. **Faces.**
+   - Page titles: Newsreader (`--font-display`). Body: Inter. Figures: Chivo Mono.
+   - The Revenue app's titles and amounts: Inter Tight (`--font-display-rv`).
+   - Georgia is for print only. `src/lib/design-system-tokens.test.ts` guards the tokens and the faces.
 
-Canonical reference pages (copy these patterns when in doubt):
-- Page header + hero number + ledger table → `src/app/(portal)/fund-out/page.tsx`
-- Multi-column hero summary → `src/app/(portal)/payments/page.tsx`
-- Section-grouped tables → `src/app/(portal)/statements/[id]/page.tsx`, `src/app/(portal)/reports/loan-aging/page.tsx`
-- Sidebar (roman numerals + dot/bar markers) → `src/components/layout/Sidebar.tsx`
+Canonical reference pages: DESIGN.md › Part II › Canonical reference pages (the sheet page is `src/app/(portal)/hr-costing/page.tsx`).
