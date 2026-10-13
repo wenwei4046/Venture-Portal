@@ -44,6 +44,10 @@ module.exports = [
   // (Round 2, 2026-10-13: Team | Mine sits at the right end of its own top row on every page, Inbox included, at the
   // prototype's 14 px a side — the 2026-10-11 patches that put it in Inbox's title row and narrowed it are gone, as the
   // top bar no longer holds "‹ Back to Revenue app" beside it. rev 1011 §8.)
+  // Full time team editor: the people table keeps its rows full height and the page scrolls (user 2026-10-13: LAWRENCE's
+  // title was cut — the scroller squeezed the table, whose overflow is hidden, to make room for the week below).
+  [/<div style=\{\{ display: "flex", flexDirection: "column", borderRadius: "16px", background: "#fff", border: "1px solid #EBDDD2", overflow: "hidden" \}\}>(\s*<div style=\{\{ display: "grid", gridTemplateColumns: "minmax\(0, 1fr\) repeat\(7, 30px\)", alignItems: "center", gap: "4px", padding: "10px 12px 6px" \}\}>)/,
+    '<div style={{ flex: "none", display: "flex", flexDirection: "column", borderRadius: "16px", background: "#fff", border: "1px solid #EBDDD2", overflow: "hidden" }}>$1'],
   // Customer info: the rows and Open chat keep their size; the sheet scrolls instead (user 2026-10-11, as the RS sheets).
   [/<div style=\{\{ display: "flex", flexDirection: "column", borderRadius: "14px", border: "1px solid #EBDDD2" \}\}>(\s*\{\(v\.ci\.Rows\))/,
     "<div style={{ flex: \"none\", display: \"flex\", flexDirection: \"column\", borderRadius: \"14px\", border: \"1px solid #EBDDD2\" }}>$1"],
