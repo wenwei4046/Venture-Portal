@@ -122,7 +122,12 @@ const SEGMENT_LABEL: Record<string, string> = {
   director: 'Director',
   it: 'IT',
   revenue_department: 'Revenue Department',
+  // Venture Office's segment — its part of HOUZS Venture's director share (mig 20261013233000).
+  corporate: 'Venture Office',
 }
+
+/** A segment as an accrual JV names it: "Venture Office Salary - Dec'27 · batch #1". */
+export const segmentLabel = (segment: string): string => SEGMENT_LABEL[segment] ?? segment
 
 export interface AccrualPostResult {
   posted: string[]
@@ -210,12 +215,12 @@ export async function postPayrollBatchAccrualJVs(
         continue
       }
       throw new Error(
-        `${SEGMENT_LABEL[segment] ?? segment} already has an accrual JV for batch #${batchNo} at RM ${prior.toFixed(2)}, but the batch totals RM ${total.toFixed(2)} — reverse the old JV first, then retry.`,
+        `${segmentLabel(segment)} already has an accrual JV for batch #${batchNo} at RM ${prior.toFixed(2)}, but the batch totals RM ${total.toFixed(2)} — reverse the old JV first, then retry.`,
       )
     }
     await postJournalEntry(supabase, {
       transactionDate: monthEnd,
-      description: `${SEGMENT_LABEL[segment] ?? segment} Salary - ${monthLabel} · batch #${batchNo}`,
+      description: `${segmentLabel(segment)} Salary - ${monthLabel} · batch #${batchNo}`,
       referenceType: 'payroll_accrual',
       referenceId: opts.batchId,
       segment,
@@ -297,13 +302,13 @@ export async function postPayrollAccrualJVs(
         continue
       }
       throw new Error(
-        `${SEGMENT_LABEL[segment] ?? segment} already has an accrual JV for ${monthLabel} at RM ${prior.toFixed(2)}, but this payroll totals RM ${total.toFixed(2)} — reverse the old JV first, then re-run.`,
+        `${segmentLabel(segment)} already has an accrual JV for ${monthLabel} at RM ${prior.toFixed(2)}, but this payroll totals RM ${total.toFixed(2)} — reverse the old JV first, then re-run.`,
       )
     }
     const lines = buildAccrualLines(sums, monthLabel)
     await postJournalEntry(supabase, {
       transactionDate: monthEnd,
-      description: `${SEGMENT_LABEL[segment] ?? segment} Salary - ${monthLabel}`,
+      description: `${segmentLabel(segment)} Salary - ${monthLabel}`,
       referenceType: 'payroll_accrual',
       referenceId: opts.kind === 'staff' ? (opts.runId ?? undefined) : undefined,
       segment,
