@@ -66,5 +66,5 @@ Principal 和 Director 看到的是同一份設定（同一個資料庫，每 5 
 ## 5. 還沒接 / 等你
 
 - **Meta Ads**（Ads Performance 的花費、曝光、Running/Paused）：等你確認 Meta 那邊。
-- 正式環境 migration：已套用（2026-10-13）。Principal、Director、無權限帳號的試跑（已還原）都照權限走。
+- 正式環境 migration：`20261013100000` 與修正 `20261013220000`（兩種時段格式都認）都已套用（2026-10-13）。Principal、Director、無權限帳號的試跑（已還原）都照權限走。
 - Messenger 卡片若用你填的地圖連結，會直接開那個網址（不經 `/nav.html`）；正式環境上需要實測一次。
