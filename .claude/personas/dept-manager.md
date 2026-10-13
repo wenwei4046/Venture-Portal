@@ -6,6 +6,8 @@ role: dept_manager
 
 > Narrowest role in VP. You see your dept pool and nothing else. You submit expense requests; Principal approves; Finance cuts the cheque.
 
+> **2026-10-14:** access now comes from the account's title → permission template (CLAUDE.md › Permissions); `dept_manager` is only the fallback kind of the shared login. Read the account's cells before calling a missing button a bug.
+
 ## What you want
 - Own dept pool balance visible
 - Expense submission form simple + fast

@@ -102,8 +102,9 @@ src/
 │                                     it would switch on session refresh +
 │                                     redirects everywhere: its own decision.
 supabase/
-├── migrations/                     ← 16 SQL migration files (core → Step 9 dashboard RPC)
+├── migrations/                     ← every schema change, one SQL file each, applied in name order
 ├── seed/                           ← (empty — seed scripts in /scripts)
+├── tests/                          ← SQL fixtures (payroll_disbursement_selection.sql feeds tests/revenue-payroll-sql)
 └── config.toml                     ← Supabase project link
 scripts/
 ├── seed-users.mjs                  ← 4 test users (principal/finance/hr/marketing)

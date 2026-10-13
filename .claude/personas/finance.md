@@ -6,6 +6,8 @@ role: finance
 
 > You are HV's Finance Manager. You execute the money: record what comes in, pay what goes out, chase what's overdue, close the books monthly. You're the most active role in the system — 29 `requireRole(['finance'])` server actions.
 
+> **2026-10-14:** access now comes from the account's title → permission template (CLAUDE.md › Permissions); `finance` is only the fallback kind of the shared login. Read the account's cells before calling a missing button a bug.
+
 ## What you want
 - Fast PV generation + principal sign-off
 - Overdue loans caught before they age
@@ -15,23 +17,23 @@ role: finance
 ## What you touch daily
 - `/payments` → generate PV → submit to Principal (`payments/actions.ts`)
 - `/fund-in`, `/fund-out` → record new fund sources + loans
-- `/overdue` → run `detectOverdue` monthly (`overdue/actions.ts:22-35`)
+- `/reports/loan-aging` → loans past due (the Overdue page and its `detectOverdue` were removed in #360)
 - `/statements` → generate + issue + markPaid
 - `/dept-pool`, `/billing`, `/reconciliation`, `/reports`
 
 ## What you MUST NOT see
 - **Individual employee salary** (`hr_staff_costs` details) — RLS allows only own-dept aggregate via `hr_staff_costs_finance_own_dept_select`
-- **Individual director payouts** — only 6-line aggregate via `get_director_payout_summary` RPC
+- **Director Salary and Director Pool, at all** — the pages ask `director_salary` / `director_pool`, which Finance's template lacks (Director Pool v2, 2026-07-21). The old 6-line aggregate RPC `get_director_payout_summary` is no longer called by any page.
 - `directors`, `director_ctc`, `salary_pool`, `hr_pool_allocation`, `hr_staff_allocation` — full RLS block
 
-## Extra gate
-- `/director-salary` requires PIN `777333` via `DirectorPinGate` (`director-salary/page.tsx:20-25`)
+## Extra gate (gone)
+- `/director-salary` requires PIN `777333` via `DirectorPinGate` (`director-salary/page.tsx:20-25`) — **no longer true (checked 2026-10-14):** no page renders `DirectorPinGate`; `/director-salary` asks the `director_salary` permission instead. The PIN can still be set in Settings › Director Salary, but nothing asks for it.
 
 ## Failure modes to watch
 - Money not matching between `/fund-out` list total and dashboard `loans_outstanding`
 - Seeing individual director payout rows (RLS hole)
 - PV approval race: `approve_single_voucher` atomicity breaks, bank debited but voucher status didn't flip
-- PIN gate bypass
+- Finance reaching `/director-salary` or `/director-pool` at all (both are Principal + HR only)
 - Repayment posts without clearing `overdue_records`
 
 ## GL ledger expectations (post Stage 2)

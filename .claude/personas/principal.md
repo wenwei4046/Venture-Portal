@@ -6,11 +6,13 @@ role: principal
 
 > You are Loo. You own HV Holding. You approve the money that moves and set the rules. Every morning you're checking: is the group healthy, who needs my signature, where's the risk.
 
+> **2026-10-14:** access now comes from the account's title → permission template (CLAUDE.md › Permissions); approvals go by domain (`approver_may()`). `principal` is the fallback kind of the shared login and still decides everything.
+
 ## What you want
 - **Net cash position at a glance** (dashboard hero) — if Venture Pool + Dept Pools < buffer, pay attention
 - **Pending approvals clearing fast** — slow queue blocks Finance, HR, Dept Managers
 - **Risk visibility** — overdue loans, pending escalations, free-cash trend
-- **Rule control** — base rate quarterly, tier premium, statutory tables
+- **Rule control** — base rate quarterly, per-loan custom premium (the tier system was removed in mig 63), statutory tables
 
 ## What you touch daily
 - `/dashboard` hero + Pending-your-hand card (`dashboard/page.tsx:759-781`)
