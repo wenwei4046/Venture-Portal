@@ -1,5 +1,5 @@
 /** The Control panel's bottom bar: Insight · Inbox · Assignment · Calendar · Profile, with what waits on each. */
-import { urgencyOf } from "../../sales/vm/common";
+import { day0, urgencyOf } from "../../sales/vm/common";
 import type { PanelTab } from "../ui";
 import type { PanelCtx } from "./common";
 
@@ -17,7 +17,8 @@ export function navVM(ctx: PanelCtx) {
     overview: 0, profile: 0, ads: 0,
     inbox: data.customers.filter(c => urgencyOf(c, now).level !== "none").length,
     assign: data.customers.filter(c => !c.assignedTo && !c.teamId && !c.held).length,
-    calendar: data.visits.filter(v => v.state === "booked" && new Date(v.start) > now).length,
+    // Today's booked visits (the owner, 2026-10-13: "today appt"; it was every upcoming one).
+    calendar: data.visits.filter(v => v.state === "booked" && day0(new Date(v.start)) === day0(now)).length,
   };
   return {
     // Assignment is CRM · Manage's (2026-10-10); the database refuses its writes without it anyway.
