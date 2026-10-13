@@ -11,11 +11,19 @@ import { GRAPH_VERSION } from "../whatsapp/send";
 
 export type MessengerWindow = "open" | "human_agent" | "shut";
 
-export function messengerWindow(lastCustomerAt: string | null | undefined, now: Date = new Date()): MessengerWindow {
+/**
+ * Whether Meta has approved Human Agent for the app (App Review, submitted 2026-10-12). Until it does, a reply after 24 h
+ * is refused by Meta, so the window shuts at 24 h and the chat is a cold lead (the owner, 2026-10-13: Kyky Loke could
+ * not be answered but was not in Cold leads). Set to true once Meta approves; the 24 h – 7 days HUMAN_AGENT window
+ * then opens again everywhere (the screens and the send ask this one function).
+ */
+export const HUMAN_AGENT_APPROVED = false;
+
+export function messengerWindow(lastCustomerAt: string | null | undefined, now: Date = new Date(), humanAgent = HUMAN_AGENT_APPROVED): MessengerWindow {
   const t = lastCustomerAt ? new Date(lastCustomerAt).getTime() : NaN;
   if (!Number.isFinite(t)) return "shut";
   const hours = (now.getTime() - t) / 3_600_000;
-  return hours < 24 ? "open" : hours < 24 * 7 ? "human_agent" : "shut";
+  return hours < 24 ? "open" : humanAgent && hours < 24 * 7 ? "human_agent" : "shut";
 }
 
 const graph = (path: string) => `https://graph.facebook.com/${GRAPH_VERSION}/${path}`;

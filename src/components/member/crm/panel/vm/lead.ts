@@ -66,7 +66,7 @@ export function leadVM(ctx: PanelCtx) {
       ...visitCard(m.card), pDisp: m.card || (shows && !m.text) ? "none" : "block" };
   });
   return {
-    onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
+    onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, pEmoji: null, pPick: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
     ld: {
       name: c?.name ?? "", ini: c ? ini(c.name) : "", ad: c?.ad ?? "", ownerFirst: ow ? first(ownerName) : "No one", ownerName,
       // No "· reply window open Xh Ym" under the name (rev 1011 §2.3, as RS rev 1010 §1.4); the cold banner stays.

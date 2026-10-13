@@ -146,33 +146,6 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </>)}
             </section>
           </>)}
-          <h2 style={{ flex: "none", margin: "4px 4px -10px", fontSize: "20px", fontWeight: "700", letterSpacing: "-.02em" }}>Needs your action</h2>
-          <section style={{ flex: "none", padding: "4px 16px", borderRadius: "20px", background: "#fff", boxShadow: "0 1px 2px rgba(63,43,34,.04), 0 6px 18px rgba(63,43,34,.06)", display: "flex", flexDirection: "column" }}>
-            <div onClick={v.ov.openAtt} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "16px 0", cursor: "pointer" }}>
-              <span style={{ flex: "none", width: "38px", height: "38px", borderRadius: "12px", background: "#FBE7E2", color: "#A3371A", display: "grid", placeItems: "center" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-14v5l3 2">
-                  </path>
-                </svg>
-              </span>
-              <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                <strong style={{ fontSize: "15px", fontWeight: "650" }}>Awaiting reply</strong>
-                <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ display: "flex" }}>
-                    {(v.ov.attOwners).map((o, o_i) => (<Fragment key={o_i}>
-                      <span title={o.name} style={{ width: "22px", height: "22px", marginLeft: o.ml, borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "9px", fontWeight: "700", boxShadow: "0 0 0 2px #fff" }}>{o.ini}</span>
-                    </Fragment>))}
-                  </span>
-                  <small style={{ fontSize: "12px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ov.attOwnersText}</small>
-                </span>
-              </span>
-              <em style={{ fontStyle: "normal", minWidth: "26px", height: "26px", padding: "0 8px", boxSizing: "border-box", borderRadius: "13px", background: "#A3371A", color: "#fff", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "700" }}>{v.ov.awaitN}</em>
-              <svg style={{ color: "#806B60" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m9 6 6 6-6 6">
-                </path>
-              </svg>
-            </div>
-          </section>
           <h2 style={{ flex: "none", margin: "4px 4px -10px", fontSize: "20px", fontWeight: "700", letterSpacing: "-.02em" }}>Team performance</h2>
           <section style={{ flex: "none", padding: "20px 18px 16px", borderRadius: "22px", background: "#fff", boxShadow: "0 1px 2px rgba(63,43,34,.04), 0 6px 18px rgba(63,43,34,.06)", display: "flex", flexDirection: "column", gap: "6px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 46px 50px 54px", gap: "6px", alignItems: "baseline", paddingBottom: "6px" }}>

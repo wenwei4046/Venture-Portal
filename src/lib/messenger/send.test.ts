@@ -5,12 +5,16 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 
 describe("Messenger's reply windows", () => {
   const now = new Date("2026-10-10T12:00:00Z");
-  it("is open for 24 hours, then Human Agent until 7 days, then shut", () => {
+  it("with Human Agent approved: open for 24 hours, then Human Agent until 7 days, then shut", () => {
+    expect(messengerWindow("2026-10-10T00:00:00Z", now, true)).toBe("open");
+    expect(messengerWindow("2026-10-09T11:00:00Z", now, true)).toBe("human_agent");
+    expect(messengerWindow("2026-10-03T13:00:00Z", now, true)).toBe("human_agent");
+    expect(messengerWindow("2026-10-03T11:00:00Z", now, true)).toBe("shut");
+    expect(messengerWindow(null, now, true)).toBe("shut");
+  });
+  it("until Meta approves Human Agent: shut after 24 hours (a cold lead)", () => {
     expect(messengerWindow("2026-10-10T00:00:00Z", now)).toBe("open");
-    expect(messengerWindow("2026-10-09T11:00:00Z", now)).toBe("human_agent");
-    expect(messengerWindow("2026-10-03T13:00:00Z", now)).toBe("human_agent");
-    expect(messengerWindow("2026-10-03T11:00:00Z", now)).toBe("shut");
-    expect(messengerWindow(null, now)).toBe("shut");
+    expect(messengerWindow("2026-10-09T11:00:00Z", now)).toBe("shut");
   });
 });
 

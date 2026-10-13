@@ -65,9 +65,11 @@ module.exports = [
   // Team inbox cards: a long press or a swipe left opens Send to (user 2026-10-13; vm/inbox.ts › gestures).
   ['<div onClick={r.open} style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "12px", borderRadius: "14px",',
     '<div onClick={r.open} onClickCapture={r.guard} onPointerDown={r.down} onPointerMove={r.move} onPointerUp={r.up} onPointerCancel={r.cancel} onContextMenu={r.noMenu} style={{ WebkitTouchCallout: "none", userSelect: "none", display: "flex", flexDirection: "column", gap: "6px", padding: "12px", borderRadius: "14px",'],
-  // No Organic Leads (the owner, 2026-10-13: "organic lead 直接給 director … 可以刪掉"): Insight's Needs your action loses its
-  // row, and an ad nobody set says what really happens to its leads.
-  [/<div onClick=\{v\.ov\.goAssign\}[\s\S]*?<\/div>\s*(<div onClick=\{v\.ov\.openAtt\})/, "$1"],
+  // No Organic Leads (the owner, 2026-10-13: "organic lead 直接給 director … 可以刪掉"), and Insight's Needs your action is gone
+  // whole — it was the Inbox's Attention again ("刪掉 team 中 need your action，跟 inbox 中 need a reply 是一樣"); an ad
+  // nobody set says what really happens to its leads.
+  [/<h2 style=\{\{[^}]*\}\}>Needs your action<\/h2>\s*<section[\s\S]*?<\/section>\s*/, ""],
+  // The Team inbox's "Needs a reply" column is Attention, as everybody's Mine inbox calls it (vm/inbox.ts).
   ["Not assigned yet · leads wait in Organic Leads", "Not assigned yet · dealt evenly across teams"],
   // Full time team editor: the people table keeps its rows full height and the page scrolls (user 2026-10-13: LAWRENCE's
   // title was cut — the scroller squeezed the table, whose overflow is hidden, to make room for the week below).

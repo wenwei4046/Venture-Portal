@@ -52,7 +52,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
       // No Organic Leads card (the owner, 2026-10-13: an enquiry from no ad goes straight to the Revenue Director).
       ["Ads", data.can.viewAll ? "Ads to teams" : "Ads to my team", "#2F6FB5", "M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Zm14-2a4 4 0 0 1 0 6",
         adIds.length + " ads" + (heldC.length ? " · " + heldC.length + (heldC.length === 1 ? " lead" : " leads") + " over the limit" : unset ? " · " + unset + " on the default (evenly)" : " · all set"), heldC.length],
-      ["Aw", "Awaiting reply", "#8E4B6E", "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", waiting ? waiting + " need a reply" + (overdue ? " · " + overdue + " overdue" : "") : "Everyone is answered", waiting],
+      // No Awaiting reply card (the owner, 2026-10-13): the Team inbox's Attention is the same list.
       ["Ft", "Full time lead allocation", "#387557", "M8 2v4m8-4v4M3 10h18M5 4h14v17H5V4Zm4 11 2 2 4-4", ftTeams ? ftTeams + " of " + teams.length + " teams set" : "Not set for any team", 0],
     ] as const).map(([k, title, c, icon, sub, n]) => ({ title, c, icon, sub, subFg: "#806B60", n, hasN: n > 0, go: go(k) })),
     held: heldAds.map(ad => {

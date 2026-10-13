@@ -83,6 +83,16 @@ export function windowLeft(c: CrmCustomer, now: Date): string {
   return "";
 }
 
+/**
+ * Why a message did not reach the customer, in words, under it (the owner, 2026-10-13: a video showed only a red tick).
+ * WhatsApp's 131053 after a video = it could not take the video's format — an iPhone's High Efficiency (HEVC) video;
+ * Messenger takes it, and an iPhone set to Most Compatible records one WhatsApp takes.
+ */
+export function failNote(error: string | null | undefined): string {
+  if (error && /131053/.test(error)) return "Not delivered · WhatsApp cannot take this video's format. On iPhone: Settings › Camera › Formats › Most Compatible, then record again.";
+  return error ? `Not delivered · ${error}` : "Not delivered";
+}
+
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -115,7 +125,7 @@ export function chatVM(ctx: SalesCtx) {
     if (it.kind === "sys") return {
       sep, plain: true, align: "center", max: "100%", rowDir: "row" as const, rxGap: "0", radius: "12px", bg: "rgba(255,255,255,.8)", borderStyle: "dashed", border: BORDER, textAlign: "center" as const, fg: SUB,
       quote: null, ev: null, pDisp: "block", size: "12px", textStyle: "normal", textColor: "inherit", parts: parts(it.text), timeJustify: "center", timeColor: SUB, by: "", at: msgTime(at),
-      tick: false, tickColor: "#A8968B", tickLabel: "", showTools: false, openMenu: undefined, openReact: undefined, reaction: "", rxLeft: "auto", rxRight: "auto", rbLeft: "auto", rbRight: "auto",
+      tick: false, tickColor: "#A8968B", tickLabel: "", failNote: "", showTools: false, openMenu: undefined, openReact: undefined, reaction: "", rxLeft: "auto", rxRight: "auto", rbLeft: "auto", rbRight: "auto",
       enter: undefined, leave: undefined,
     };
     const m = it.m, mine = m.from === "me", key = m.id;
@@ -141,6 +151,7 @@ export function chatVM(ctx: SalesCtx) {
       img: mk === "image" ? md!.url : "", vid: mk === "video" ? md!.url : "", aud: mk === "audio" ? md!.url : "", file: mk === "file" ? md!.url : "",
       pDisp: card || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: "14px", textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : mk === "file" ? "📄 " + m.text : m.text),
       timeJustify: "flex-end", timeColor: mine ? "#806B60" : SUB, by, at: msgTime(m.at),
+      failNote: mine && m.status === "failed" ? failNote(m.error) : "",
       tick: mine, tickColor: read ? "#2F8FD8" : m.status === "failed" ? "#A3371A" : "#A8968B", tickLabel: m.status === "sending" ? "Sending" : read ? "Read" : m.status === "failed" ? "Not delivered" : "Delivered",
       // Sending: a small clock until it went (then the two ticks).
       tickPath: m.status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1" : "M1 6l3 3 6-7M7 8.5l.5.5 6-7",
@@ -407,7 +418,8 @@ export function chatVM(ctx: SalesCtx) {
   return {
     cl: { name: c.name, ad: c.ad, first, ini: ini(c.name), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon },
     wallBg: CHAT_WALL.bg, wallImg: CHAT_WALL.img, wallSize: CHAT_WALL.size,
-    closeChat: () => set(u => ({ ...u, chat: null, menu: null, book: null, tpl: false, qr: false, att: false, hm: null, reply: null })),
+    // Leaving a chat folds the emoji panel away, so the next chat opens tidy (the owner, 2026-10-13).
+    closeChat: () => set(u => ({ ...u, chat: null, menu: null, book: null, tpl: false, qr: false, att: false, hm: null, reply: null, emoji: null, pick: null })),
     hm: hmVM, msgs3b, // stop comes with the customer form below
     pinText: pinned ? plain(pinned.text) : "", unpin: () => void act.setPref(c.id, { pinnedMessageId: null }),
     chatCold: shut, chatWarm: !shut,

@@ -9,6 +9,7 @@ import type { ChangeEvent, MouseEvent } from "react";
 import { DEFAULT_LABELS, LABEL_SWATCHES, type CrmCustomer, type CrmLabel } from "@/lib/member/crm-data";
 import { BORDER, CHANNEL, dayLabel, firstName, ini, INK, isCold, lastChat, lastReal, STATUS_LABEL, stop, timeLabel, urgencyOf, type PEvent, type SalesCtx } from "./common";
 import type { InboxFilter } from "../ui";
+import { isNewChat } from "../../shared/new-chat";
 
 /** One row's preview: a card we sent reads as what it was; ours start "You: ". */
 export function previewOf(c: CrmCustomer): string {
@@ -38,11 +39,14 @@ export function inboxVM(ctx: SalesCtx) {
     if (!f) return true;
     if (f.type === "status") return STATUS_LABEL[c.status] === f.v;
     if (f.type === "urgency") return urgencyOf(c, now).level !== "none";
+    if (f.type === "new") return isNewChat(c);
     return labelsOf(c).some(l => l.name === f.v);
   };
   const usedLabels = data.labels.filter(l => mine.some(c => (data.customerLabels[c.id] ?? []).includes(l.id)));
   const chipDefs: [string, NonNullable<InboxFilter>["type"] | null, string | null, number][] = [
     ["All", null, null, warm.length],
+    // New (2026-10-13): not answered by them since it came or was handed to them — shared/new-chat.ts.
+    ["New", "new", "#BD4A19", warm.filter(isNewChat).length],
     ["Attention", "urgency", "#A3371A", warm.filter(c => urgencyOf(c, now).level !== "none").length],
     ...([["Follow up", "#A46312"], ["Appointment", "#387557"], ["Won", "#2F6FB5"], ["Lost", "#806B60"]] as const)
       .map(([s, dot]): [string, "status", string, number] => [s, "status", dot, warm.filter(c => STATUS_LABEL[c.status] === s).length]),
