@@ -3,7 +3,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import { officeTime } from '@/lib/office-time'
 import { openTarget, type Notice, type NoticeRef } from '@/lib/push/notices'
-import { PUSH_WORDS, pushState, turnPushOff, turnPushOn, type PushState, type PushTrouble } from '@/components/pwa/push-client'
+import { PUSH_WORDS, popUpNeedsTurningOn, pushState, turnPushOff, turnPushOn, type PushState, type PushTrouble } from '@/components/pwa/push-client'
+import PopUpGuide from '@/components/pwa/PopUpGuide'
 import PushAsk from '@/components/pwa/PushAsk'
 import { useTuckOnScroll } from '@/components/pwa/tuck'
 import tuck from '@/components/pwa/tuck.module.css'
@@ -206,6 +207,8 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
   }, [])
   // This phone's pushes: asked of the browser once the app is open; the permission only when the row is pressed.
   const [pushNow, setPushNow] = useState<PushState | null>(null)
+  // Make them pop up (2026-10-14): an Android phone shows them in the shade only, until the person turns that on.
+  const [popUpGuide, setPopUpGuide] = useState(false)
   useEffect(() => {
     void pushState().then(setPushNow).catch(() => setPushNow('unsupported'))
   }, [])
@@ -472,6 +475,18 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
                   <span className={s.pushSwitch} data-on={pushNow === 'on' ? '1' : undefined} aria-hidden="true" />
                 </button>
               ) : null}
+              {!d.viewingAs && pushNow === 'on' && popUpNeedsTurningOn() ? (
+                <button type="button" className={s.moreRow} onClick={() => setPopUpGuide(true)}>
+                  <span className={s.moreIcon} style={{ background: 'rgb(255 240 228)', color: 'rgb(189 74 25)' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2ZM8.5 5h7a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm2.5 14h2" />
+                    </svg>
+                  </span>
+                  <span className={s.grow}><span className={s.moreTitle}>Make them pop up</span><span className={s.moreSub}>Pop on screen, once per phone</span></span>
+                  <Chevron />
+                </button>
+              ) : null}
+              {popUpGuide ? <PopUpGuide onClose={() => setPopUpGuide(false)} /> : null}
               {/* Not in the handoff (2026-10-12 — the user: a change password "in their profile tab", "just for that
                   personal acc"): a login of their own only, never hr@ or another shared one, never while viewing as. */}
               {d.personalLogin && !d.viewingAs ? (

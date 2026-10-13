@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { adminClient } from '@/lib/supabase/admin'
+import { pushSoon } from '@/lib/push/outbox'
 import { parseDelivery, signatureValid, verifyHandshake } from '@/lib/whatsapp/webhook'
 
 /**
@@ -19,6 +20,9 @@ import { parseDelivery, signatureValid, verifyHandshake } from '@/lib/whatsapp/w
  *     `crm_ingest_whatsapp`, which owns every write (and the delivery log);
  *     a refused delivery is logged straight to crm_channel_events.
  *   - the path is excluded from the session middleware.
+ *   - a delivery that brought customers' messages is pushed to the phones of whoever has those chats once Meta has
+ *     its answer (`pushSoon`, mig 20261014030000 wrote the notices beside the messages) — through the outbox's own
+ *     secret and the publishable key, never this route's service role.
  *
  * ANSWERS 200 FOR EVERY SIGNED DELIVERY IT CHOSE NOT TO APPLY (a duplicate,
  * a field we do not read). Meta retries non-2xx with backoff for hours and
@@ -74,5 +78,7 @@ export async function POST(request: Request) {
     console.error('crm_ingest_whatsapp failed:', error.message)
     return NextResponse.json({ ok: false, error: 'ingest failed' }, { status: 500 })
   }
+  // Only a delivery with new messages can have told somebody something (a receipt-only one never does).
+  if (Number((data as { messages?: unknown } | null)?.messages) > 0) pushSoon()
   return NextResponse.json({ ok: true, result: data })
 }

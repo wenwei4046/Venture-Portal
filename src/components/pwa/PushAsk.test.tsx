@@ -6,6 +6,8 @@ const client = vi.hoisted(() => ({
   turnPushOn: vi.fn(),
   askedBefore: vi.fn(),
   rememberAsked: vi.fn(),
+  popUpNeedsTurningOn: vi.fn(() => false),
+  sendTestNotice: vi.fn(async () => true),
 }))
 vi.mock('./push-client', () => client)
 
@@ -20,6 +22,8 @@ beforeEach(() => {
   vi.stubGlobal('Notification', { permission: 'default' })
   client.healPush.mockResolvedValue('off')
   client.askedBefore.mockReturnValue(false)
+  client.popUpNeedsTurningOn.mockReturnValue(false)
+  client.sendTestNotice.mockResolvedValue(true)
 })
 afterEach(() => {
   cleanup()
@@ -86,5 +90,41 @@ describe('the first open’s question', () => {
       expect(screen.queryByRole('dialog')).toBeNull()
       cleanup()
     }
+  })
+})
+
+// Make them pop up (2026-10-14 — the user: "make sure jump up"): Android shows an installed web app's notices in the
+// shade until the person turns on Pop on screen for it — so, turned on, an Android phone is told how next.
+describe('after Allow, on an Android phone', () => {
+  it('shows how to make them pop up, sends a test, and Done closes it', async () => {
+    client.turnPushOn.mockResolvedValue({ state: 'on' })
+    client.popUpNeedsTurningOn.mockReturnValue(true)
+    render(<PushAsk app="revenue" save={save} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Allow notifications' }))
+    expect(await screen.findByRole('dialog', { name: 'Make them pop up' })).toBeInTheDocument()
+    expect(screen.getByText(/Pop on screen/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Send a test' }))
+    await waitFor(() => expect(client.sendTestNotice).toHaveBeenCalled())
+    expect(await screen.findByRole('button', { name: 'Send another' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('a test the phone could not show says so', async () => {
+    client.turnPushOn.mockResolvedValue({ state: 'on' })
+    client.popUpNeedsTurningOn.mockReturnValue(true)
+    client.sendTestNotice.mockResolvedValueOnce(false)
+    render(<PushAsk app="hr" save={save} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Allow notifications' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Send a test' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('could not show it')
+  })
+
+  it('an iPhone or a computer is not told — they show them already', async () => {
+    client.turnPushOn.mockResolvedValue({ state: 'on' })
+    client.popUpNeedsTurningOn.mockReturnValue(false)
+    render(<PushAsk app="revenue" save={save} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Allow notifications' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 })

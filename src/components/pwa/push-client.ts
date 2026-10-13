@@ -119,6 +119,28 @@ export async function turnPushOff(remove: (endpoint: string) => Promise<Saved>):
   return { state: 'off' }
 }
 
+/**
+ * An Android phone: its notifications pop up only once the person turns that on for the app (PopUpGuide) — an
+ * installed web app's are Default importance there. An iPhone shows them as banners already.
+ */
+export const popUpNeedsTurningOn = () => typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
+
+/**
+ * Show a customer's message as it will arrive (public/sw.js › `vp-test-notice`): the same picture, words and alert,
+ * on this phone only — nothing is sent anywhere. False when the phone cannot show it.
+ */
+export async function sendTestNotice(): Promise<boolean> {
+  try {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return false
+    const reg = await activeRegistration(4000)
+    if (!reg?.active) return false
+    reg.active.postMessage({ type: 'vp-test-notice', url: window.location.pathname + window.location.search })
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** What the rows say. */
 export const PUSH_WORDS: Readonly<Record<PushState, string>> = {
   on: 'On — this phone shows new notifications',

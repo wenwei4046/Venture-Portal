@@ -6,7 +6,11 @@ import type { PushApp } from './config'
  * the app the phone turned notifications on in.
  */
 export type NoticeKind = 'hiring' | 'rooms' | 'review' | 'memo'
-export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo'
+/**
+ * `crm_contact` / `crm_invite` (2026-10-14, mig 20261014030000): the CRM's own notices — a customer's message, a new
+ * lead, a visit, a reminder, an invitation. They reach the phone only: the bells never list them (the CRM keeps its own).
+ */
+export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo' | 'crm_contact' | 'crm_invite'
 
 export interface Notice {
   id: string
@@ -58,6 +62,9 @@ export function noticesFromRow(v: unknown): Notices {
  */
 export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): string {
   const id = encodeURIComponent(n.refId)
+  // The CRM lives in the Revenue app whichever app the phone signed up in: the chat, or (an invitation) its notifications.
+  if (n.refKind === 'crm_contact') return `/member?page=account&view=crm&chat=${id}`
+  if (n.refKind === 'crm_invite') return '/member?page=account&view=crm&crm=notifs'
   if (app === 'hr') {
     if (n.refKind === 'hiring_request') return `/hr-app?open=hire:${id}`
     if (n.refKind === 'booking') return `/hr-app?open=booking:${id}`
@@ -66,6 +73,38 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
   }
   if (n.refKind === 'memo') return `/member?memo=${id}`
   return n.refKind === 'booking' ? '/member?page=account&view=rooms' : '/member?bell=1'
+}
+
+/**
+ * The tag a notice shows under on the phone: a later one with the same tag takes its place. One customer's chat is one
+ * tag (`crm:<contact>`), so their messages gather on one notice as a chat app's do; everything else is its own.
+ */
+export function noticeTag(n: { id: string; refKind: NoticeRef; refId: string }): string {
+  return n.refKind === 'crm_contact' ? crmChatTag(n.refId) : n.id
+}
+
+export const crmChatTag = (contactId: string) => `crm:${contactId}`
+
+/** What the phone draws for a CRM notice (mig 20261014030000, `app_notifications.data`): the customer, their channel, the line. */
+export interface CrmPush {
+  /** WhatsApp or Messenger: the badge on the customer's picture. */
+  ch: 'whatsapp' | 'messenger' | null
+  /** The customer, as the CRM names them. */
+  name: string
+  /** This notice's line in the chat's gathered notice. */
+  line: string
+  /** When it happened (ISO): the lines' order. */
+  at: string
+}
+
+export function crmPushFromRow(v: unknown): CrmPush | null {
+  if (!isObj(v) || !str(v.name)) return null
+  return {
+    ch: v.ch === 'whatsapp' || v.ch === 'messenger' ? v.ch : null,
+    name: str(v.name).slice(0, 100),
+    line: str(v.line).slice(0, 300),
+    at: str(v.at),
+  }
 }
 
 export type OpenTarget = { k: 'hire' | 'booking' | 'req' | 'memo'; id: string }

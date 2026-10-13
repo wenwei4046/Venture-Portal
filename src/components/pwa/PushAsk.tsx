@@ -2,14 +2,15 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import type { PushApp } from '@/lib/push/config'
-import { askedBefore, healPush, rememberAsked, turnPushOn, type PushState, type PushTrouble } from './push-client'
+import PopUpGuide from './PopUpGuide'
+import { askedBefore, healPush, popUpNeedsTurningOn, rememberAsked, turnPushOn, type PushState, type PushTrouble } from './push-client'
 import s from './push-ask.module.css'
 
 type Saved = { ok: true } | { ok: false; reason: string }
 
 const BODY: Readonly<Record<PushApp, string>> = {
   hr: 'New requests, hiring updates and meeting bookings reach this phone the moment they happen — even with the app closed.',
-  revenue: 'Meetings booked for you and news on your requests reach this phone the moment they happen — even with the app closed.',
+  revenue: 'Your customers’ messages, new leads, meetings booked for you and news on your requests reach this phone the moment they happen — even with the app closed.',
 }
 
 /**
@@ -29,6 +30,8 @@ export default function PushAsk({ app, save, trouble, onState }: {
   onState?: (state: PushState) => void
 }) {
   const [open, setOpen] = useState(false)
+  // Turned on, on an Android phone: how to make them pop up comes next (2026-10-14).
+  const [guide, setGuide] = useState(false)
   const [reason, setReason] = useState('')
   const [busy, start] = useTransition()
   const tell = useRef(onState)
@@ -49,6 +52,7 @@ export default function PushAsk({ app, save, trouble, onState }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  if (guide) return <PopUpGuide onClose={() => setGuide(false)} />
   if (!open) return null
   const allow = () =>
     start(async () => {
@@ -61,6 +65,7 @@ export default function PushAsk({ app, save, trouble, onState }: {
       // On, blocked, or the phone's own prompt waved away: the question was answered.
       rememberAsked()
       setOpen(false)
+      if (res.state === 'on' && popUpNeedsTurningOn()) setGuide(true)
     })
   const later = () => {
     rememberAsked()

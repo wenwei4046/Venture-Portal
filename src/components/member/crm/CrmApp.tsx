@@ -32,6 +32,11 @@ import { initialPanelUi, type PanelTab, type PanelUi } from "./panel/ui";
 import { teamsOf, type PanelCtx } from "./panel/vm/common";
 import { useSwipeToClose } from "./shared/swipe-close";
 import { keepSending } from "./shared/pending";
+import { answerOnScreen, closeNotices } from "@/components/pwa/notice-screen";
+import { crmChatTag } from "@/lib/push/notices";
+
+/** Where a tapped phone notice opens the CRM (2026-10-14, lib/push/notices noticeUrl): a customer's chat, or the notifications. */
+export type CrmOpen = { chat: string } | { notifs: true };
 
 /** Team | Mine keeps the page: one's CRM page → the Control panel's (it has no Contacts: its Inbox lists everybody's). */
 const TEAM_TAB: Record<SalesTab, PanelTab> = { inbox: "inbox", contacts: "inbox", calendar: "calendar", insight: "overview", profile: "profile" };
@@ -45,7 +50,7 @@ const demoViewer = () => (typeof window === "undefined" ? undefined : new URLSea
  * computer, the phone's on a phone). The Control panel then opens as panel/desk/PanelDesk — the same data, writes and
  * view models, laid out wide; the salesperson CRM stays the phone's until its desktop is built on the same frame.
  */
-export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame }) {
+export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null }) {
   const [data, setData] = useState<CrmData | null>(() => (live ? null : crmDemoData(salesperson)));
   // Any bottom sheet closes when pulled down (user 2026-10-13).
   useSwipeToClose();
@@ -137,6 +142,45 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     // eslint-disable-next-line react-hooks/exhaustive-deps -- book.day only matters through bookMonth
   }, [bookRoom, bookMonth, act, data?.visits.length]);
 
+  // The phone's notices (2026-10-14, the user: a customer's message on one's own chat pops up as a chat app's does).
+  // The chat open on the screen — set as the screens are chosen below — is the one being read: the service worker
+  // does not announce it over itself, and its notice leaves the phone's shade, now and on coming back to the app.
+  const onScreenChat = useRef<string | null>(null);
+  useEffect(() => {
+    if (!live) return;
+    const stop = answerOnScreen(tag => !!onScreenChat.current && tag === crmChatTag(onScreenChat.current));
+    const back = () => { if (document.visibilityState === "visible" && onScreenChat.current) void closeNotices(crmChatTag(onScreenChat.current)); };
+    document.addEventListener("visibilitychange", back);
+    return () => { stop(); document.removeEventListener("visibilitychange", back); };
+  }, [live]);
+  useEffect(() => {
+    if (live && onScreenChat.current) void closeNotices(crmChatTag(onScreenChat.current));
+  }, [live, ui.chat, panelUi.lead, hodMode, viewing, teamAs]);
+  // A tapped notice opens its place once the customers are read: one's own chat in Mine; a chat one may only watch
+  // (CRM · View at All) on the Team side; an invitation, Mine's notifications.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!data || !open || opened.current) return;
+    const me = personOf(data.viewerId, data.people);
+    if (!me) return;
+    opened.current = true;
+    if ("notifs" in open) {
+      setViewing(null); setTeamAs(null); setHodMode("crm");
+      setUi(u => ({ ...initialSalesUi(), toast: u.toast, tab: "profile", profSub: "notif", nTab: "unread" }));
+      return;
+    }
+    const c = data.customers.find(x => x.id === open.chat);
+    if (!c) return;
+    if (c.assignedTo === me.id || data.shares.some(s => s.staffId === me.id && s.customerId === c.id)) {
+      setViewing(null); setTeamAs(null); setHodMode("crm");
+      setUi(u => ({ ...initialSalesUi(), toast: u.toast, tab: "inbox", chat: c.id }));
+      act.openChat(c.id);
+    } else if (data.can.viewAll) {
+      setViewing(null); setTeamAs(null); setHodMode("panel");
+      setPanelUi(u => ({ ...u, tab: "inbox", lead: c.id, nfOpen: false }));
+    }
+  }, [data, open, act]);
+
   const shell = (body: React.ReactNode, extra = "") => (
     // data-revenue-app: the portal's display serif stays off the CRM's headings (globals.css).
     <div className={extra ? `${H.app} ${extra}` : H.app} data-revenue-app="">
@@ -146,6 +190,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   );
   // A line instead of the CRM (loading, not in it): on a computer in the page, not in a phone-sized box.
   const notice = (line: React.ReactNode) => (desk ? <div className={D.desk}><p className={H.loading}>{line}</p></div> : shell(<p className={H.loading}>{line}</p>));
+  onScreenChat.current = null;
   if (!data) return notice(problem || "Loading your customers…");
   const me = personOf(data.viewerId, data.people);
   if (!me) return notice(data.setup === "no_role"
@@ -217,6 +262,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
         exitAs: () => { setTeamAs(null); setViewing(null); },
       },
     } as unknown as SalesCtx) : null;
+    onScreenChat.current = panelUi.lead;
     return shell(<>
       {problem && <p className={H.problem}>{problem}</p>}
       {banner && <SalesShellBanners v={banner} />}
@@ -250,6 +296,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       exitAs: () => { setViewing(null); setUi(u => ({ ...u, tab: full ? "inbox" : "profile", chat: null, filter: null })); },
     },
   };
+  onScreenChat.current = ui.chat;
   return shell(<>
     {problem && <p className={H.problem}>{problem}</p>}
     <SalesScreens ctx={ctx} onExit={onExit} />

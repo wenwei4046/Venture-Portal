@@ -33,6 +33,18 @@ const CRM_WRITES = [
 ] as const;
 export type CrmWrite = (typeof CRM_WRITES)[number];
 
+/**
+ * The writes that can tell somebody's phone something (2026-10-14, mig 20261014030000): a customer given to them, a
+ * visit for their customer, an invitation or its answer, a reminder. Pushed once the answer has gone back; the outbox
+ * is loaded only then — this module is imported by the CRM's screens.
+ */
+const TELLS: ReadonlySet<string> = new Set([
+  "crm_send_to", "crm_send_to_team", "crm_assign_member", "crm_give_to_hod", "crm_save_ad_assign",
+  "crm_book", "crm_move_appointment", "crm_set_appointment_state", "crm_visit_outcome",
+  "crm_invite", "crm_answer_invite", "crm_remind",
+]);
+const pushAfter = () => import("@/lib/push/outbox").then(m => m.pushSoon(), () => undefined);
+
 export async function crmWrite(name: CrmWrite, args: Record<string, unknown>): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
   try {
     if (!CRM_WRITES.includes(name)) throw new Error("Unknown action.");
@@ -42,6 +54,7 @@ export async function crmWrite(name: CrmWrite, args: Record<string, unknown>): P
     const db = (await createClient()) as unknown as SupabaseClient;
     const { data, error } = await db.rpc(name, args);
     if (error) throw new Error(error.message);
+    if (TELLS.has(name)) await pushAfter();
     return { ok: true, data };
   } catch (error) {
     const message = error instanceof Error ? error.message : "That could not be saved. Please try again.";

@@ -118,17 +118,24 @@ export interface PushMessage {
   url: string
   /** A later message with the same tag replaces this one on the device. */
   tag?: string
+  /** The notice's own id: a repeat of one already gathered under its tag is not added twice. */
+  id?: string
+  /** A CRM notice (2026-10-14): the customer's picture is drawn from these, and a chat's lines gather under one tag. */
+  crm?: { ch: 'whatsapp' | 'messenger' | null; name: string; line: string; at: string }
 }
 
 export type SendOutcome = { ok: true } | { ok: false; gone: boolean; status: number }
 
-/** Send one message to one device. `gone` — the subscription is no more (404 / 410): forget it. */
+/**
+ * Send one message to one device. `gone` — the subscription is no more (404 / 410): forget it.
+ * `urgency` (RFC 8030 §5.3): `high` reaches a phone asleep at once — a customer waiting on a chat; the rest is `normal`.
+ */
 export async function sendPush(
   sub: Subscription,
   message: PushMessage,
   keys: { publicKey: string; privateKey: string },
   subject: string,
-  opts: { ttlSeconds?: number; now?: number; fetcher?: typeof fetch } = {},
+  opts: { ttlSeconds?: number; now?: number; fetcher?: typeof fetch; urgency?: 'normal' | 'high' } = {},
 ): Promise<SendOutcome> {
   const body = await encrypt(enc.encode(JSON.stringify(message)), sub)
   const res = await (opts.fetcher ?? fetch)(sub.endpoint, {
@@ -138,7 +145,7 @@ export async function sendPush(
       'Content-Encoding': 'aes128gcm',
       'Content-Type': 'application/octet-stream',
       TTL: String(opts.ttlSeconds ?? 24 * 3600),
-      Urgency: 'normal',
+      Urgency: opts.urgency ?? 'normal',
     },
     body: body as BodyInit,
   })

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { adminClient } from '@/lib/supabase/admin'
+import { pushSoon } from '@/lib/push/outbox'
 import { signatureValid, verifyHandshake } from '@/lib/whatsapp/webhook'
 import { parseMessengerDelivery } from '@/lib/messenger/webhook'
 import { pageToken, profileName } from '@/lib/messenger/send'
@@ -24,6 +25,9 @@ import { pageToken, profileName } from '@/lib/messenger/send'
  *   - before it, the customer's name is asked of Meta with the Page's token
  *     (best effort, 3 s): Messenger, unlike WhatsApp, does not send it.
  *   - excluded from the session middleware.
+ *   - a delivery that brought customers' messages is pushed to the phones of whoever has those chats once Meta has
+ *     its answer (`pushSoon`, mig 20261014030000) — the outbox's own secret and the publishable key, never the
+ *     service role.
  *
  * 200 for every signed delivery it chose not to apply; non-2xx only for what a
  * retry can fix (500) or a human must (401 / 503).
@@ -90,5 +94,7 @@ export async function POST(request: Request) {
     console.error('crm_ingest_messenger failed:', error.message)
     return NextResponse.json({ ok: false, error: 'ingest failed' }, { status: 500 })
   }
+  // Only a delivery with new messages can have told somebody something (a receipt-only one never does).
+  if (Number((data as { messages?: unknown } | null)?.messages) > 0) pushSoon()
   return NextResponse.json({ ok: true, result: data })
 }
