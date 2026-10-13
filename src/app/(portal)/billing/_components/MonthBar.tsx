@@ -22,9 +22,12 @@ interface Props {
   /** A smaller control beside a page title. */
   compact?: boolean
   disabled?: boolean
+  /** Months the grid marks with a dot — `YYYY-MM` → what its tooltip says
+   *  (the Statements page's months that have statements, 2026-10-14). */
+  marked?: Readonly<Record<string, string>>
 }
 
-export default function MonthBar({ month, onGo, picker = false, compact = false, disabled = false }: Props) {
+export default function MonthBar({ month, onGo, picker = false, compact = false, disabled = false, marked }: Props) {
   const [open, setOpen] = useState(false)
   const [year, setYear] = useState(() => Number(month.slice(0, 4)))
   const ref = useRef<HTMLDivElement>(null)
@@ -117,6 +120,8 @@ export default function MonthBar({ month, onGo, picker = false, compact = false,
                   type="button"
                   aria-pressed={key === month}
                   data-now={key === now || undefined}
+                  data-marked={marked?.[key] ? true : undefined}
+                  title={marked?.[key]}
                   onClick={() => go(key)}
                 >
                   {m}

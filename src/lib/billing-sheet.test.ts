@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { invoiceSummary, payrollBasisSummary, payrollBillingLines, statementsSummary } from './billing-sheet'
+import { invoiceSummary, payrollBasisSummary, payrollBillingLines, statementMonths, statementsMonth, statementsSummary } from './billing-sheet'
 
 // 2026-10-07 — Service Billing and the monthly Statements on the sheet (the
 // user approved the Invoice / Statements sample, v6). The figures behind the
@@ -98,6 +98,8 @@ describe('payrollBillingLines', () => {
   })
 })
 
+// 2026-10-14 — the Statements page shows one month at a time (user: 在上面能够
+// 选择月份。我不要它把全部月份的 statement 都挤在一个 tab).
 describe('statementsSummary', () => {
   const statements = [
     { period_month: '2026-09-01', status: 'draft', total_invoice: 22507.9, total_contra: 600, net_amount: 21907.9 },
@@ -105,20 +107,46 @@ describe('statementsSummary', () => {
     { period_month: '2026-05-01', status: 'issued', total_invoice: 31225.39, total_contra: 0, net_amount: 31225.39 },
     { period_month: '2026-05-01', status: 'paid', total_invoice: 100, total_contra: 0, net_amount: 100 },
   ]
-  it('names the latest period and totals it, and counts every statement by status', () => {
-    expect(statementsSummary(statements)).toEqual({
-      latestPeriod: '2026-09-01',
-      latestCount: 2,
-      latestInvoice: 22507.9,
-      latestContra: 5000,
-      latestNet: 17507.9,
+  it('totals the month on show, and counts every month’s statements by status', () => {
+    expect(statementsSummary(statements, '2026-09')).toEqual({
+      count: 2,
+      invoice: 22507.9,
+      contra: 5000,
+      net: 17507.9,
       draft: 2,
+      draftMonths: 1,
       issued: 1,
       paid: 1,
       total: 4,
     })
+    expect(statementsSummary(statements, '2026-05')).toMatchObject({ count: 2, invoice: 31325.39, contra: 0, net: 31325.39, draft: 2, total: 4 })
   })
-  it('is empty-safe', () => {
-    expect(statementsSummary([])).toMatchObject({ latestPeriod: null, latestCount: 0, total: 0 })
+  it('counts the months a draft is left in', () => {
+    expect(statementsSummary([...statements, { ...statements[0], period_month: '2026-04-01' }], '2026-09')).toMatchObject({ draft: 3, draftMonths: 2 })
+  })
+  it('is empty-safe, and a month with none is all zeros', () => {
+    expect(statementsSummary([], '2026-10')).toMatchObject({ count: 0, net: 0, draft: 0, draftMonths: 0, total: 0 })
+    expect(statementsSummary(statements, '2026-08')).toMatchObject({ count: 0, invoice: 0, contra: 0, net: 0, total: 4 })
+  })
+})
+
+describe('the month the Statements page shows', () => {
+  const statements = [{ period_month: '2026-05-01' }, { period_month: '2026-09-01' }, { period_month: '2026-09-01' }]
+  it('lists the months that have statements, newest first', () => {
+    expect(statementMonths(statements)).toEqual(['2026-09', '2026-05'])
+    expect(statementMonths([])).toEqual([])
+  })
+  it('is the month asked for, else the newest with statements, else the fallback', () => {
+    const months = statementMonths(statements)
+    expect(statementsMonth('2026-05', months, '2026-10')).toBe('2026-05')
+    // A month with none is still the one asked for — the page says it has none.
+    expect(statementsMonth('2026-08', months, '2026-10')).toBe('2026-08')
+    expect(statementsMonth('2026-05-01', months, '2026-10')).toBe('2026-05')
+    expect(statementsMonth(undefined, months, '2026-10')).toBe('2026-09')
+    expect(statementsMonth(undefined, [], '2026-10')).toBe('2026-10')
+  })
+  it('takes no month that is not one', () => {
+    const months = statementMonths(statements)
+    for (const bad of ['2026-13', '2026-00', 'May', '26-05', '2026-5', '']) expect(statementsMonth(bad, months, '2026-10'), bad).toBe('2026-09')
   })
 })

@@ -173,7 +173,7 @@ States: `pending_approval → active → fully_repaid | cancelled`.
 | Repay (via debit PV) | PV with `loan_id` + breakdown → `approve_single_voucher` | `repayments` synced (interest→penalty→principal), overdue marked paid. GL per voucher rules (§2). **Skips venture_pool `loan_repayment_in`** — see gaps. |
 | Cancel (pending) | Finance · `#cancelLoan` → `cancel_loan_and_approval` RPC | loan→cancelled, both approvals→rejected, paired PV→voided. No GL (nothing posted yet). |
 | Cancel (active) | Finance `request_loan_cancel` → Principal `#approveRequest` → `execute_loan_cancel` RPC (mig 229, atomic) | Blocked if any repayment exists. venture_pool `fund_in` reversal; loan→cancelled; disbursement PV→voided; primary bank cache += principal; reversing JE. **Stale codes:** mig 229 still posts Dr bank GL (fallback `'1010'`) / Cr `'1020'` — pre-238 codes never updated to 305x leaves. Original disbursement JE stays; reversal is a new entry. |
-| Overdue detect | Finance · `overdue/actions.ts#detectOverdue` | `overdue_records` upsert for previous month where paid < expected interest. Informational only — no GL/penalty automation; escalation is a manual approval flow. |
+| Overdue (read live) | No action — gone with the Overdue page (Detect 2026-10-12, the page 2026-10-14) | Overdue is read live off each active loan's repayment plan (`loadRepaymentBook` + `overdueOf`): Fund OUT's Overdue card and tab, the loan's chip, the Overview, the Repayment Schedule. `overdue_records` keeps its old rows; nothing writes or reads it. |
 
 ---
 

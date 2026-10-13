@@ -58,6 +58,10 @@ export default async function StatementDetailPage({ params }: Props) {
   const net = Number(statement.net_amount)
   const companyName = company?.name ?? '—'
   const period = dayjs(statement.period_month).format('MMMM YYYY')
+  // The list shows one month at a time (2026-10-14): back to this one's. The
+  // sidebar's bare /statements/monthly, where its newest month showed, counts
+  // as where the reader came from too.
+  const listHref = `/statements/monthly?period=${dayjs(statement.period_month).format('YYYY-MM')}`
   const direction = net >= 0 ? `${companyName} pays HV` : `HV owes ${companyName}`
 
   // Issue and Mark paid move the statement along: Treasury · Edit (2026-10-08, PR2).
@@ -69,7 +73,7 @@ export default async function StatementDetailPage({ params }: Props) {
   return (
     <div>
       <div className="mb-3">
-        <ReturnLink href="/statements/monthly" className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
+        <ReturnLink href={listHref} alsoFrom={['/statements/monthly']} className="text-[13px] text-graphite hover:text-ink font-sans transition-colors">
           ← Back to Statements
         </ReturnLink>
       </div>

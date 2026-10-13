@@ -133,31 +133,56 @@ export function payrollBasisSummary(lines: PayrollBillingLine[]): string {
     .join(' · ')
 }
 
+// The Statements page shows ONE month at a time (2026-10-14, user: 在上面能够
+// 选择月份。我不要它把全部月份的 statement 都挤在一个 tab): the month asked for,
+// else the newest that has statements. Its first two cards are that month's;
+// Draft and All statements stay every month's, so a draft left in another
+// month still shows.
+
 export interface StatementsSummary {
-  latestPeriod: string | null
-  latestCount: number
-  latestInvoice: number
-  latestContra: number
-  latestNet: number
+  /** The month on show — its statements and their totals. */
+  count: number
+  invoice: number
+  contra: number
+  net: number
+  /** Every month's. */
   draft: number
+  /** How many months still hold a draft. */
+  draftMonths: number
   issued: number
   paid: number
   total: number
 }
 
-export function statementsSummary(
-  statements: Array<{ period_month: string; status: string; total_invoice: number | string; total_contra: number | string; net_amount: number | string }>,
-): StatementsSummary {
-  const latestPeriod = statements.reduce<string | null>((max, s) => (max === null || s.period_month > max ? s.period_month : max), null)
-  const latest = statements.filter((s) => s.period_month === latestPeriod)
+type StatementFigures = { period_month: string; status: string; total_invoice: number | string; total_contra: number | string; net_amount: number | string }
+
+const monthOf = (periodMonth: string) => String(periodMonth).slice(0, 7)
+
+/** The months that have statements, `YYYY-MM`, newest first. */
+export function statementMonths(statements: Array<{ period_month: string }>): string[] {
+  return Array.from(new Set(statements.map((s) => monthOf(s.period_month)))).sort().reverse()
+}
+
+/**
+ * The month the page shows, `YYYY-MM`: the one asked for (`?period=2026-05`,
+ * or a day in it), else the newest month that has statements, else `fallback`.
+ */
+export function statementsMonth(asked: string | null | undefined, months: readonly string[], fallback: string): string {
+  if (asked && /^\d{4}-(0[1-9]|1[0-2])(-\d{2})?$/.test(asked)) return asked.slice(0, 7)
+  return months[0] ?? fallback
+}
+
+/** The cards: the month on show (`YYYY-MM`), and every month's drafts and count. */
+export function statementsSummary(statements: StatementFigures[], month: string): StatementsSummary {
+  const shown = statements.filter((s) => monthOf(s.period_month) === month)
   const count = (status: string) => statements.filter((s) => s.status === status).length
   return {
-    latestPeriod,
-    latestCount: latest.length,
-    latestInvoice: r2(latest.reduce((s, x) => s + Number(x.total_invoice), 0)),
-    latestContra: r2(latest.reduce((s, x) => s + Number(x.total_contra), 0)),
-    latestNet: r2(latest.reduce((s, x) => s + Number(x.net_amount), 0)),
+    count: shown.length,
+    invoice: r2(shown.reduce((s, x) => s + Number(x.total_invoice), 0)),
+    contra: r2(shown.reduce((s, x) => s + Number(x.total_contra), 0)),
+    net: r2(shown.reduce((s, x) => s + Number(x.net_amount), 0)),
     draft: count('draft'),
+    draftMonths: new Set(statements.filter((s) => s.status === 'draft').map((s) => monthOf(s.period_month))).size,
     issued: count('issued'),
     paid: count('paid'),
     total: statements.length,
