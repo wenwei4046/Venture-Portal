@@ -209,12 +209,12 @@ export default async function VoucherLedger({
     for (const d of (depts ?? []) as Array<{ name: string }>) departmentNames.add(d.name)
   }
   const allLocked = byPerson ? [] : lockPayrollBatches(all.filter((v) => isPayrollReference(v.reference_type)), departmentNames)
-  // The Payroll batches tab holds the salary batches only, as it does for the
-  // vouchers themselves; it is not a status, so the batches pass it whole.
-  const lockedSalary = allLocked.filter((b) => b.referenceType === 'payroll_disbursement')
-  const lockedBatches = payrollTab
-    ? filterLockedBatches(lockedSalary, { ...filters, tab: 'all' })
-    : filterLockedBatches(allLocked, filters)
+  // Read by department, payroll lives in the Payroll batches tab and nowhere
+  // else (2026-10-14, the user on All's batches: "i want remove all this, dont
+  // show up here" → 只放在 Payroll batches tab): every batch — salary,
+  // statutory, funding — there, none in All or a status tab. The tab is not a
+  // status, so the batches pass it whole.
+  const lockedBatches = payrollTab ? filterLockedBatches(allLocked, { ...filters, tab: 'all' }) : []
   const lockedCount = lockedBatches.reduce((n, b) => n + b.count, 0)
 
   // Apply all filters in-memory. Summary stats below use `all` (unfiltered
@@ -261,15 +261,23 @@ export default async function VoucherLedger({
   // 2026") names the batch they collapse under in VouchersTable.
   const batchKeyOf = (v: { reference_type: string | null; description: string | null }) =>
     v.reference_type === 'payroll_disbursement' ? (v.description ?? 'Payroll disbursement').split(' — ')[0].trim() : undefined
-  const batchCount =
-    new Set(open.map(batchKeyOf).filter((k): k is string => !!k)).size + lockedSalary.length
-  const counts = {
-    all: all.length,
-    draft: all.filter((v) => v.status === 'draft').length,
-    pending_approval: all.filter((v) => v.status === 'pending_approval').length,
-    approved: all.filter((v) => v.status === 'approved').length,
-    paid: all.filter((v) => v.status === 'paid').length,
-    voided: all.filter((v) => v.status === 'voided').length,
+  const batchCount = byPerson
+    ? new Set(open.map(batchKeyOf).filter((k): k is string => !!k)).size
+    : allLocked.length
+  // The cards count every voucher; each tab counts what it lists — read by
+  // department, All and the status tabs list no payroll (2026-10-14).
+  const countsOf = (vs: typeof all) => ({
+    all: vs.length,
+    draft: vs.filter((v) => v.status === 'draft').length,
+    pending_approval: vs.filter((v) => v.status === 'pending_approval').length,
+    approved: vs.filter((v) => v.status === 'approved').length,
+    paid: vs.filter((v) => v.status === 'paid').length,
+    voided: vs.filter((v) => v.status === 'voided').length,
+  })
+  const counts = countsOf(all)
+  const listed = byPerson ? all : open
+  const tabCounts = {
+    ...countsOf(listed),
     // A tab of their own on the payment side (2026-10-09).
     ...(isReceipts ? {} : { payroll: batchCount }),
   }
@@ -436,7 +444,7 @@ export default async function VoucherLedger({
       ) : (
         <section>
           <Suspense fallback={null}>
-            <PaymentTabs counts={counts} />
+            <PaymentTabs counts={tabCounts} />
           </Suspense>
 
           {/* The old filter row is gone (2026-10-10, the user: 照设计档) —
@@ -452,8 +460,8 @@ export default async function VoucherLedger({
               </span>
             ) : (
               <span className="count">
-                {filtered.length + lockedCount + extraFiltered.length} of {all.length + extraRows.length} {noun}
-                {all.length + extraRows.length === 1 ? '' : 's'}
+                {filtered.length + lockedCount + extraFiltered.length} of {listed.length + extraRows.length} {noun}
+                {listed.length + extraRows.length === 1 ? '' : 's'}
                 {tab !== 'all' ? ` · ${tab.replace('_', ' ')}` : ''}
               </span>
             )}

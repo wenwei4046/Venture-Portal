@@ -108,19 +108,18 @@ export async function GET(req: Request) {
   const payrollTab = tab === 'payroll'
 
   // Without Payroll payouts — or on the Finance view — the file carries payroll
-  // the way the page shows it: each batch department by department, and none
-  // of its vouchers (lib/payroll-vouchers.ts).
+  // the way the page shows it: each batch department by department, none of
+  // its vouchers, and only from the Payroll batches tab (2026-10-14) — never
+  // in All or a status tab (lib/payroll-vouchers.ts).
   const open = byPerson ? all : all.filter((v) => !isPayrollReference(v.reference_type))
   let lockedBatches: LockedBatch[] = []
-  if (!byPerson) {
+  if (!byPerson && payrollTab) {
     const { data: depts } = await supabase.from('departments').select('name')
     const allLocked = lockPayrollBatches(
       all.filter((v) => isPayrollReference(v.reference_type)),
       new Set(((depts ?? []) as Array<{ name: string }>).map((d) => d.name)),
     )
-    lockedBatches = payrollTab
-      ? filterLockedBatches(allLocked.filter((b) => b.referenceType === 'payroll_disbursement'), { ...filters, tab: 'all' })
-      : filterLockedBatches(allLocked, filters)
+    lockedBatches = filterLockedBatches(allLocked, { ...filters, tab: 'all' })
   }
 
   // Apply all filters in-memory (same logic as page)

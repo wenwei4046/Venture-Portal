@@ -59,12 +59,20 @@ describe('the Payments export', () => {
     expect(sheet().map((r) => r.payee_name)).toEqual(['TNB', 'Aina binti Example', 'Bala Sample', 'KWSP'])
   })
 
-  // 2026-10-13: department by department, as the page lists it.
-  it('carries payroll by department for a treasury account without it', async () => {
+  // 2026-10-14 — as the page lists it: no payroll in All, every payroll batch
+  // in the Payroll batches tab, department by department.
+  it('carries no payroll from All for a treasury account without the right', async () => {
     mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
     await get()
     expect(sheet().map((r) => [r.voucher_no, r.date, r.type, r.status, r.payee_name, r.amount])).toEqual([
       ['HV-PV-202610-0450', '06/10/2026', 'expense', 'paid', 'TNB', 1200],
+    ])
+  })
+
+  it('the Payroll batches tab exports every payroll batch, by department', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+    await get('&status=payroll')
+    expect(sheet().map((r) => [r.voucher_no, r.date, r.type, r.status, r.payee_name, r.amount])).toEqual([
       [null, '05/10/2026', 'payroll', '2 paid', 'Payroll disbursement Sep 2026 · Marketing (2 vouchers, department total)', 7300.75],
       [null, '04/10/2026', 'payroll', '1 paid', 'KWSP Sep 2026 · Zeta (1 voucher, department total)', 1014],
     ])
@@ -76,20 +84,17 @@ describe('the Payments export', () => {
   it('…and so on the Finance view, whatever the account may see', async () => {
     mocks.requirePermission.mockResolvedValue({ role: 'finance', actualRole: 'principal', lens: 'finance', permissions: ['treasury', 'payroll_payouts', 'hr_costing'] })
     await get()
-    expect(sheet().map((r) => r.payee_name)).toEqual([
-      'TNB', 'Payroll disbursement Sep 2026 · Marketing (2 vouchers, department total)', 'KWSP Sep 2026 · Zeta (1 voucher, department total)',
-    ])
-  })
-
-  it('the Payroll batches tab exports the salary batches only', async () => {
-    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+    expect(sheet().map((r) => r.payee_name)).toEqual(['TNB'])
+    mocks.exportXlsxResponse.mockClear()
     await get('&status=payroll')
-    expect(sheet().map((r) => r.payee_name)).toEqual(['Payroll disbursement Sep 2026 · Marketing (2 vouchers, department total)'])
+    expect(sheet().map((r) => r.payee_name)).toEqual([
+      'Payroll disbursement Sep 2026 · Marketing (2 vouchers, department total)', 'KWSP Sep 2026 · Zeta (1 voucher, department total)',
+    ])
   })
 
   it('…and a search for a person brings back no batch', async () => {
     mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
-    await get('&q=aina')
+    await get('&status=payroll&q=aina')
     expect(sheet()).toEqual([])
   })
 })
