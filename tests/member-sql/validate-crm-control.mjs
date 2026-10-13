@@ -72,12 +72,13 @@ const as = async (who, sql, params = []) => {
 const refused = async (who, sql, params, pattern, what) => { await assert.rejects(() => as(who, sql, params), pattern, what); checks++ }
 const name = staff => ({ [S('ann')]: 'ann', [S('amir')]: 'amir', [S('ben')]: 'ben', [S('tla')]: 'tla', [S('tlb')]: 'tlb', [S('hod')]: 'hod' })[staff] ?? staff
 
-// 1. rev 1011 §6.4: an ad nobody set is dealt evenly across the teams; only an enquiry from no ad waits in Organic Leads.
+// 1. rev 1011 §6.4: an ad nobody set is dealt evenly across the teams; an enquiry from no ad goes to the Revenue Director
+// (mig 20261013260000 — it waited in Organic Leads before).
 {
   const a = await arrive('AD-NONE'), b = await arrive('AD-NONE')
   check([name(a.team_id), name(b.team_id)].sort(), ['tla', 'tlb'], 'an ad nobody set: one enquiry to each team')
   check(!!a.assigned_to && !!b.assigned_to, true, '…each given to somebody in it')
-  check(await arrive(null), { assigned_to: null, team_id: null }, 'an enquiry from no ad waits in Organic Leads')
+  check(await arrive(null), { assigned_to: S('hod'), team_id: null }, 'an enquiry from no ad goes to the Revenue Director')
 }
 
 // 2. Evenly: everyone in the teams in turn.
@@ -151,7 +152,10 @@ check(name((await q(`select assigned_to from crm_contacts where id = $1`, [organ
 check(name((await q(`select team_id from crm_contacts where id = $1`, [organic]))[0].team_id), 'tla', '…in her team')
 await as('boss', `select public.crm_send_to($1, null)`, [organic])
 check((await q(`select assigned_to, team_id from crm_contacts where id = $1`, [organic]))[0], { assigned_to: null, team_id: null }, 'Undo: back to Organic Leads')
-await refused('boss', `select public.crm_send_to($1, $2)`, [organic, S('boss')], /takes enquiries/, 'the Principal takes no enquiries')
+// The Principal may be sent a customer since 2026-10-13 (their Mine); somebody with no CRM role still may not.
+await as('boss', `select public.crm_send_to($1, $2)`, [organic, S('boss')])
+check((await q(`select assigned_to from crm_contacts where id = $1`, [organic]))[0].assigned_to, S('boss'), 'the Principal can be given a customer (Mine)')
+await as('boss', `select public.crm_send_to($1, null)`, [organic])
 
 // 8. The Principal and the Director may answer anyone; a salesperson only their own line.
 const bens = (await q(`select id from crm_contacts where assigned_to = $1 limit 1`, [S('ben')]))[0].id

@@ -15,6 +15,7 @@ import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
 import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
+import { pickedOf, pickVM } from "../../shared/pick";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
@@ -160,13 +161,24 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     inbox: on, viewOnly: false, draft, setDraft: (e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value; set(u => ({ ...u, pDraft: v })); },
     send: has ? () => void send() : () => void micTap(), sendBg: has ? "#BD4A19" : "#D9C7BA",
     // The sticker button: an emoji sheet; each tap adds one to the reply.
-    emojiOpen: !!ui.pEmoji, openEmoji: () => patch({ pEmoji: true }), closeEmoji: () => patch({ pEmoji: false }),
+    // Open only in the chat it was opened in.
+    emojiOpen: !!c && ui.pEmoji === c.id, openEmoji: () => patch({ pEmoji: c?.id ?? null }), closeEmoji: () => patch({ pEmoji: null }),
     emojis: CHAT_EMOJIS.map(e => ({ e, pick: () => set(u => ({ ...u, pDraft: withEmoji(u.pDraft, e) })) })),
     rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()), cancel: recStop(false), send: recStop(true) } : null,
     // + = a document, the camera = a photo (PanelScreens' hidden pickers); the typed text goes as the caption.
     attach: () => document.getElementById("crm-panel-file")?.click(),
     photo: () => document.getElementById("crm-panel-photo")?.click(),
-    // Several photos and videos at once, each its own message; the typed words go with the first.
+    // Photos and videos (the camera button) wait on the preview with its HD switch; a document (+) goes at once.
+    pickVisual: (e: ChangeEvent<HTMLInputElement>) => {
+      const files = [...(e.target.files ?? [])]; e.target.value = "";
+      if (files.length) set(u => ({ ...u, pPick: pickedOf(files) }));
+    },
+    pk: c ? pickVM(ui.pPick, p => set(u => ({ ...u, pPick: p })), async files => {
+      const caption = draft.trim();
+      if (caption) set(u => ({ ...u, pDraft: "" }));
+      await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
+    }) : null,
+    // Several files at once, each its own message; the typed words go with the first.
     pickMedia: async (e: ChangeEvent<HTMLInputElement>) => {
       const files = [...(e.target.files ?? [])]; e.target.value = "";
       if (!files.length || !c) return;

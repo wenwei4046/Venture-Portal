@@ -2,6 +2,8 @@
 // must match exactly once in the generated markup, so a regenerated design that moved it fails loudly here.
 // Every one is listed for the owner in docs/design/crm-desktop-rev1/BUILD-NOTES.md.
 module.exports = [
+  [`Not assigned yet · leads wait in Organic Leads</span>`, `Not assigned yet · dealt evenly across teams</span>`,
+    "No Organic Leads (the owner, 2026-10-13): an ad nobody set is dealt evenly across the teams; an enquiry from no ad goes to the Revenue Director."],
   // ── The Revenue app's own top bar: its real words and buttons (the prototype draws them as text) ──
   [`borderRadius: "14px", background: "#FFFFFF", fontFamily: "Inter, sans-serif", color: "#3F2B22", WebkitFontSmoothing: "antialiased", boxShadow: "0 1px 2px rgba(63,43,34,.08), 0 12px 40px rgba(63,43,34,.10)" }}`,
     `borderRadius: v.frameRadius, background: "#FFFFFF", fontFamily: "Inter, sans-serif", color: "#3F2B22", WebkitFontSmoothing: "antialiased", boxShadow: v.frameShadow }}`,
@@ -83,6 +85,8 @@ function chatPatches(inn, out, text, time, reply, list, draft, setDraft, draftKe
   const e = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const NO = "(?:(?!<span title|\\{!!\\(v\\.)[\\s\\S])*?";
   const SYS = `{ alignSelf: "center", display: "inline-flex", alignItems: "center", gap: "6px", maxWidth: "86%", margin: "4px 0", padding: "6px 12px", borderRadius: "10px", background: "rgba(107,100,90,.12)", color: "#6B645A", fontSize: "12px", fontWeight: "600", textAlign: "center" }`;
+  // 2026-10-13 (the user: a voice note, photo or video came as a document to open): shown as itself, as on the phone.
+  const MEDIA = `{!!(m.img) && (<a href={m.img} target="_blank" rel="noreferrer" style={{ display: "block", margin: "-2px -4px 4px" }}><img src={m.img} alt="Photo" style={{ display: "block", width: "100%", maxWidth: "280px", maxHeight: "320px", objectFit: "cover", borderRadius: "12px" }} /></a>)}{!!(m.vid) && (<video src={m.vid} controls playsInline preload="metadata" style={{ display: "block", width: "300px", maxWidth: "100%", margin: "-2px -4px 4px", borderRadius: "12px", background: "#000" }} />)}{!!(m.aud) && (<audio src={m.aud} controls preload="metadata" style={{ display: "block", width: "280px", maxWidth: "100%", height: "40px", margin: "0 0 2px" }} />)}`;
   const BELL = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto" }}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"></path></svg>`;
   const bubbles = new RegExp(
     `(<span style=\\{\\{ alignSelf: "center", margin: "4px 0 2px"[^\\n]*?\\}\\}>)(?:Today|\\{v\\.aw\\.time\\})</span>\\s*` +
@@ -93,8 +97,8 @@ function chatPatches(inn, out, text, time, reply, list, draft, setDraft, draftKe
     `{(${list}).map((m, m_i) => (<Fragment key={m_i}>` +
     `{!!(m.day) && (<>${pill}{m.day}</span></>)}` +
     `{!!(m.sys) && (<><span style={${SYS}}>{!!(m.bell) && (<>${BELL}</>)}{m.sys}</span></>)}` +
-    `{!!(m.inn) && (<>${inDiv}${CARD}{!!(m.text) && (<p style=${pSt}>{m.text}</p>)}{!!(m.media) && (<p style=${pSt}><a href={m.mediaHref || undefined} target="_blank" rel="noreferrer">{m.media}</a></p>)}<span style=${inTime}>{m.time}</span></div></>)}` +
-    `{!!(m.out) && (<>${outDiv}${CARD}{!!(m.text) && (<p style=${pSt}>{m.text}</p>)}{!!(m.media) && (<p style=${pSt}><a href={m.mediaHref || undefined} target="_blank" rel="noreferrer">{m.media}</a></p>)}<span style=${outTime}>{m.time}{!!(m.hasTick) && (<svg ${svgA}stroke={m.tick}${svgB}>${svgIn}</svg>)}{!!(m.failed) && (<span style={{ color: "#A3371A", fontWeight: "600" }}>Not sent</span>)}</span></div></>)}` +
+    `{!!(m.inn) && (<>${inDiv}${CARD}{!!(m.text) && (<p style=${pSt}>{m.text}</p>)}${MEDIA}{!!(m.media) && (<p style=${pSt}><a href={m.mediaHref || undefined} target="_blank" rel="noreferrer">{m.media}</a></p>)}<span style=${inTime}>{m.time}</span></div></>)}` +
+    `{!!(m.out) && (<>${outDiv}${CARD}{!!(m.text) && (<p style=${pSt}>{m.text}</p>)}${MEDIA}{!!(m.media) && (<p style=${pSt}><a href={m.mediaHref || undefined} target="_blank" rel="noreferrer">{m.media}</a></p>)}<span style=${outTime}>{m.time}{!!(m.hasTick) && (<svg ${svgA}stroke={m.tick}${svgB}>${svgIn}</svg>)}{!!(m.failed) && (<span style={{ color: "#A3371A", fontWeight: "600" }}>Not sent</span>)}</span></div></>)}` +
     `</Fragment>))}`;
   const composer = new RegExp(
     `<span title="Send a file" style=(\\{\\{[^\\n]*?\\}\\})>(${NO})</span>(\\s*<span style=\\{\\{[^\\n]*?\\}\\}>\\s*)<span style=\\{\\{ flex: "1", minWidth: "0", fontSize: "15px", color: "#757575"[^\\n]*?\\}\\}>\\{${e(reply)}\\}</span>(${NO})` +
@@ -107,5 +111,5 @@ function chatPatches(inn, out, text, time, reply, list, draft, setDraft, draftKe
   return [
     [bubbles, loop, `The ${aw ? "Awaiting reply" : "pane's"} chat shows the whole conversation in the design's bubbles (it draws one).`],
     [composer, box, `The ${aw ? "Awaiting reply" : "pane's"} reply box can be typed in and sends; + and the camera attach.`],
-  ];
+];
 }

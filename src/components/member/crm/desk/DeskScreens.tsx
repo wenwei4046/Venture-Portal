@@ -17,6 +17,7 @@ import R from "./desk-root.module.css";
 import { deskVM } from "./vm/app";
 import { initialDeskUi, type DeskActions, type DeskApp as DeskAppFrame, type DeskUi } from "./vm/ctx";
 import { historyRows } from "./vm/history";
+import { useDeskPlace, withSavedPlace } from "./nav";
 
 export interface DeskScreensProps {
   data: CrmData;
@@ -40,7 +41,9 @@ const MIN_W = 1280, MIN_H = 800;
 
 export default function DeskScreens(p: DeskScreensProps) {
   const { data, live, act, setData } = p;
-  const [ui, setUi] = useState<DeskUi>(initialDeskUi);
+  // A refresh opens where this tab was; Back steps through the clicks (./nav.ts, user 2026-10-13).
+  const [ui, setUi] = useState<DeskUi>(() => withSavedPlace(initialDeskUi()));
+  useDeskPlace(ui, setUi);
   const patch = useCallback((x: Partial<DeskUi>) => setUi(u => ({ ...u, ...x })), []);
   const [size, setSize] = useState({ W: 1440, H: 900 });
   const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});

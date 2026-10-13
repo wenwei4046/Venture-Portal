@@ -82,7 +82,9 @@ export interface SalesUi {
   /** A voice note being recorded: when it started (shared/voice.ts); recTick moves its clock. */
   rec: number | null;
   /** The emoji sheet (the composer's sticker button). */
-  emoji?: boolean;
+  emoji?: string | null;
+  /** Photos / videos picked, waiting on the preview with its HD switch (shared/pick.ts). */
+  pick?: import("../shared/pick").Picked | null;
   recTick?: number;
   // Calendar
   calView: "month" | "week" | "day";
@@ -122,6 +124,8 @@ export const initialSalesUi = (): SalesUi => ({
 export interface SalesRefs {
   ls?: { x: number; y: number } | null;
   lsT?: number;
+  /** A row's long press (opens More). */
+  lp?: ReturnType<typeof setTimeout>;
   cs?: { id: string; x0: number; b: number } | null;
   moved?: boolean;
   dr?: { x: number; left: number; moved: boolean } | null;

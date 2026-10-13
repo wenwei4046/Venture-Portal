@@ -148,22 +148,6 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
           </>)}
           <h2 style={{ flex: "none", margin: "4px 4px -10px", fontSize: "20px", fontWeight: "700", letterSpacing: "-.02em" }}>Needs your action</h2>
           <section style={{ flex: "none", padding: "4px 16px", borderRadius: "20px", background: "#fff", boxShadow: "0 1px 2px rgba(63,43,34,.04), 0 6px 18px rgba(63,43,34,.06)", display: "flex", flexDirection: "column" }}>
-            <div onClick={v.ov.goAssign} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "16px 0", borderBottom: "1px solid #EBDDD2", cursor: "pointer" }}>
-              <span style={{ flex: "none", width: "38px", height: "38px", borderRadius: "12px", background: "#FFF0E4", color: "#BD4A19", display: "grid", placeItems: "center" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 5h16v11H9l-5 4V5Zm4 4h8M8 12h5">
-                  </path>
-                </svg>
-              </span>
-              <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                <strong style={{ fontSize: "15px", fontWeight: "650" }}>Organic Leads</strong>
-              </span>
-              <em style={{ fontStyle: "normal", minWidth: "26px", height: "26px", padding: "0 8px", boxSizing: "border-box", borderRadius: "13px", background: "#BD4A19", color: "#fff", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "700" }}>{v.ov.waitingN}</em>
-              <svg style={{ color: "#806B60" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m9 6 6 6-6 6">
-                </path>
-              </svg>
-            </div>
             <div onClick={v.ov.openAtt} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "16px 0", cursor: "pointer" }}>
               <span style={{ flex: "none", width: "38px", height: "38px", borderRadius: "12px", background: "#FBE7E2", color: "#A3371A", display: "grid", placeItems: "center" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -360,7 +344,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                   <small style={{ minWidth: "22px", height: "22px", padding: "0 7px", boxSizing: "border-box", borderRadius: "11px", background: "#fff", color: g.c, display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "700" }}>{g.n}</small>
                 </span>
                 {(g.rows).map((r, r_i) => (<Fragment key={r_i}>
-                  <div onClick={r.open} style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "12px", borderRadius: "14px", background: "#fff", boxShadow: "0 1px 3px rgba(63,43,34,.06)", cursor: "pointer" }}>
+                  <div onClick={r.open} onClickCapture={r.guard} onPointerDown={r.down} onPointerMove={r.move} onPointerUp={r.up} onPointerCancel={r.cancel} onContextMenu={r.noMenu} style={{ WebkitTouchCallout: "none", userSelect: "none", display: "flex", flexDirection: "column", gap: "6px", padding: "12px", borderRadius: "14px", background: "#fff", boxShadow: "0 1px 3px rgba(63,43,34,.06)", cursor: "pointer" }}>
                     <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <span style={{ flex: "none", width: "30px", height: "30px", borderRadius: "50%", background: r.ownBg, display: "grid", placeItems: "center", fontSize: "11px", fontWeight: "700" }}>{r.ini}</span>
                       <strong style={{ flex: "1", minWidth: "0", fontSize: "14px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</strong>
@@ -496,12 +480,19 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </div>
               </Fragment>))}
             </div>
-            {!!(v.ld.lx.emojiOpen) && (<div onClick={v.ld.lx.closeEmoji} style={{ position: "absolute", inset: "0", zIndex: "8", background: "rgba(63,43,34,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeIn 200ms ease-out" }}>
-        <div onClick={v.ol.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 16px 20px", display: "flex", flexDirection: "column", gap: "8px", maxHeight: "55%", overflowY: "auto", scrollbarWidth: "none", boxSizing: "border-box" }}>
+            {!!(v.ld.lx.pk) && (<div onClick={v.ld.lx.pk?.cancel} style={{ position: "absolute", inset: "0", zIndex: "9", background: "rgba(63,43,34,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeIn 200ms ease-out" }}>
+        <div onClick={v.ld.lx.pk?.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 16px 20px", display: "flex", flexDirection: "column", gap: "12px", maxHeight: "88%", boxSizing: "border-box" }}>
           <span style={{ flex: "none", alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2" }}></span>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(8, minmax(0, 1fr))", gap: "4px" }}>
-            {(v.ld.lx.emojis).map((e, e_i) => (<Fragment key={e_i}><span onClick={e.pick} style={{ height: "42px", display: "grid", placeItems: "center", fontSize: "26px", borderRadius: "10px", cursor: "pointer" }}>{e.e}</span></Fragment>))}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+            <span onClick={v.ld.lx.pk?.toggleHd} title="HD" style={{ flex: "none", height: "28px", padding: "0 10px", boxSizing: "border-box", borderRadius: "8px", border: `1.5px solid ${v.ld.lx.pk?.hdBd}`, background: v.ld.lx.pk?.hdBg, color: v.ld.lx.pk?.hdFg, display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "800", letterSpacing: ".05em", cursor: "pointer" }}>HD</span>
+            <strong style={{ fontSize: "15px", fontWeight: "700", color: "#3F2B22" }}>{v.ld.lx.pk?.title}</strong>
+            <span onClick={v.ld.lx.pk?.cancel} style={{ flex: "none", fontSize: "14px", fontWeight: "650", color: "#806B60", cursor: "pointer" }}>Cancel</span>
           </div>
+          <div style={{ display: "flex", gap: "8px", overflowX: "auto", scrollbarWidth: "none" }}>
+            {(v.ld.lx.pk?.items ?? []).map((it, it_i) => (<Fragment key={it_i}><div style={{ flex: "none", width: "104px", height: "104px", borderRadius: "12px", overflow: "hidden", background: "#F5EBE3" }}>{it.img ? (<img src={it.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />) : (<video src={it.vid} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} />)}</div></Fragment>))}
+          </div>
+          <span style={{ fontSize: "12px", color: "#806B60" }}>{v.ld.lx.pk?.note}</span>
+          <span onClick={v.ld.lx.pk?.send} style={{ flex: "none", height: "48px", borderRadius: "24px", background: "#BD4A19", color: "#fff", display: "grid", placeItems: "center", fontSize: "16px", fontWeight: "650", cursor: "pointer" }}>{v.ld.lx.pk?.sendLabel}</span>
         </div>
       </div>)}
       {!!(v.ld.lx.rec) && (<div style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -538,6 +529,16 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </svg>
               </span>
             </div>
+            {!!(v.ld.lx.emojiOpen) && (<div style={{ flex: "none", padding: "8px 12px 6px", borderTop: "1px solid #EBDDD2", background: "#FBF7F3", display: "flex", flexDirection: "column", gap: "6px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: ".06em", color: "#806B60" }}>EMOJI</span>
+          <span onClick={v.ld.lx.closeEmoji} style={{ fontSize: "13px", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }}>Done</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(8, minmax(0, 1fr))", gap: "2px", maxHeight: "196px", overflowY: "auto", scrollbarWidth: "none" }}>
+          {(v.ld.lx.emojis).map((e, e_i) => (<Fragment key={e_i}><span onClick={e.pick} style={{ height: "40px", display: "grid", placeItems: "center", fontSize: "26px", borderRadius: "10px", cursor: "pointer" }}>{e.e}</span></Fragment>))}
+        </div>
+      </div>)}
+      
           </>)}
           {!!(v.ld.lx.viewOnly) && (<>
             <div data-chat-list="1" style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -1078,7 +1079,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                       </svg>
                     </div>
                     {!!(a.resNone) && (<>
-                      <span style={{ fontSize: "12px", color: "#A8968B" }}>Not assigned yet · leads wait in Organic Leads</span>
+                      <span style={{ fontSize: "12px", color: "#A8968B" }}>Not assigned yet · dealt evenly across teams</span>
                     </>)}
                     {!!(a.hasLeg) && (<>
                       <div style={{ display: "flex", height: "6px", borderRadius: "3px", overflow: "hidden", background: "#EEF3F9", gap: "2px" }}>

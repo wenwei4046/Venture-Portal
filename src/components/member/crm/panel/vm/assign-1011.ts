@@ -49,7 +49,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     heldTitle: heldC.length + (heldC.length === 1 ? " lead" : " leads") + " over the limit",
     onOrg: sec === "Org", onAds: sec === "Ads", onAw: sec === "Aw", onFt: sec === "Ft",
     cards: ([
-      ["Org", "Organic Leads", "#BD4A19", "M4 5h16v11H9l-5 4V5Zm4 4h8M8 12h5", orgN ? orgN + " to send" : "Nothing waiting", orgN],
+      // No Organic Leads card (the owner, 2026-10-13: an enquiry from no ad goes straight to the Revenue Director).
       ["Ads", data.can.viewAll ? "Ads to teams" : "Ads to my team", "#2F6FB5", "M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Zm14-2a4 4 0 0 1 0 6",
         adIds.length + " ads" + (heldC.length ? " · " + heldC.length + (heldC.length === 1 ? " lead" : " leads") + " over the limit" : unset ? " · " + unset + " on the default (evenly)" : " · all set"), heldC.length],
       ["Aw", "Awaiting reply", "#8E4B6E", "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", waiting ? waiting + " need a reply" + (overdue ? " · " + overdue + " overdue" : "") : "Everyone is answered", waiting],

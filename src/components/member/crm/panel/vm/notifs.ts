@@ -17,7 +17,7 @@ const K: Record<Kind, [string, string, string, string]> = {
   overdue: ["Overdue", "#A3371A", "#FBE4DE", "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-15v5l3 2"],
 };
 
-export interface PanelNotif { key: string; kind: Kind; at: string; who: string; text: string; lead: string; tail: string; extra: string }
+export interface PanelNotif { key: string; kind: Kind; at: string; who: string; text: string; lead: string; tail: string; extra: string; /** The customer it is about: a tap opens that chat. */ customerId?: string }
 
 /** The last 14 days of it, newest first. */
 export function panelNotifs(ctx: PanelCtx): PanelNotif[] {
@@ -27,7 +27,7 @@ export function panelNotifs(ctx: PanelCtx): PanelNotif[] {
   for (const e of data.events) {
     if (new Date(e.at).getTime() < since) continue;
     const to = String(e.data.to ?? e.owner ?? "");
-    const base = { key: `e${e.id}`, at: e.at, who: nameOf(e.actor), lead: cust(e.customerId) };
+    const base = { key: `e${e.id}`, at: e.at, who: nameOf(e.actor), lead: cust(e.customerId), customerId: e.customerId };
     if (e.kind === "moved") out.push({ ...base, kind: "move", text: "moved", tail: ` to ${nameOf(to)}`, extra: e.data.by_manager ? "" : `Accepted by ${nameOf(to)}` });
     if (e.kind === "move_declined") out.push({ ...base, kind: "move", text: "asked to move", tail: ` to ${nameOf(to)}`, extra: `Declined by ${nameOf(to)}` });
     if (e.kind === "shared") out.push({ ...base, kind: "share", text: `shared a chat with ${nameOf(to)} ·`, tail: "", extra: `Accepted by ${nameOf(to)}` });
@@ -43,7 +43,7 @@ export function panelNotifs(ctx: PanelCtx): PanelNotif[] {
     const u = urgencyOf(c, now);
     if (u.level !== "overdue" || !c.lastCustomerAt) continue;
     const last = new Date(c.lastCustomerAt), at = new Date(last.getTime() + 9 * 3_600_000);
-    out.push({ key: `o${c.id}@${c.lastCustomerAt}`, kind: "overdue", at: at.toISOString(), who: c.name, text: `has waited ${Math.floor(u.waitingMinutes / 60)} h for`, lead: nameOf(c.assignedTo) === "—" ? "a reply" : nameOf(c.assignedTo), tail: "",
+    out.push({ key: `o${c.id}@${c.lastCustomerAt}`, customerId: c.id, kind: "overdue", at: at.toISOString(), who: c.name, text: `has waited ${Math.floor(u.waitingMinutes / 60)} h for`, lead: nameOf(c.assignedTo) === "—" ? "a reply" : nameOf(c.assignedTo), tail: "",
       extra: `Last message ${last.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" })}` });
   }
   // Deleted on the computer (CRM Desktop rev 1, B3): gone from their phone too — they are the same person's.
@@ -65,7 +65,11 @@ export function notifsVM(ctx: PanelCtx) {
     const c = K[n.kind], read = isRead(n);
     return { who: n.who, text: n.text, lead: n.lead, tail: n.tail, extra: n.extra, at: new Date(n.at).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" }),
       tag: c[0], iFg: c[1], iBg: c[2], icon: c[3], rule: k ? "1px solid #F5EEE9" : "0", dot: read ? "transparent" : "#BD4A19", rowBg: read ? "#fff" : "#FFFAF6",
-      tap: () => { if (!read) act.readNotifs([n.key]); } };
+      // Tapped: read, and the chat it is about opens (user 2026-10-13: 點了裡面的未讀訊息要有跳到該功能).
+      tap: () => {
+        if (!read) act.readNotifs([n.key]);
+        if (n.customerId && data.customers.some(c => c.id === n.customerId)) patch({ nfOpen: false, lead: n.customerId, pick: "", toast: "", ...(["overview", "calendar", "assign", "inbox"].includes(ui.tab) ? {} : { tab: "inbox" as const }) });
+      } };
   };
   const groups: { day: string; items: ReturnType<typeof row>[] }[] = [];
   for (const n of list) { const day = dayOf(n.at); let g = groups.find(x => x.day === day); if (!g) groups.push(g = { day, items: [] }); g.items.push(row(n, g.items.length)); }

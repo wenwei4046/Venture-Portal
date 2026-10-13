@@ -1,5 +1,5 @@
 /** Top bar (back to the Revenue app, the bell), the bottom bar, and the View-my-team banner. */
-import { firstName, ini, RUST, SUB, stop, type SalesCtx } from "./common";
+import { day0, firstName, ini, RUST, SUB, stop, type SalesCtx } from "./common";
 import { salesNotifs, unreadNotifs } from "./notifs";
 import { teamName, teamOf, titleOf } from "../../shared/people";
 import type { SalesTab } from "../ui";
@@ -60,8 +60,9 @@ export function navVM(ctx: SalesCtx) {
   const { ui, set, data, mine, now } = ctx;
   const unread = unreadNotifs(salesNotifs(ctx), data);
   const ids = new Set(mine.map(c => c.id));
-  const upcoming = data.visits.filter(v => ids.has(v.customerId) && v.state === "booked" && new Date(v.start) > now).length;
-  const badges: Record<SalesTab, number> = { inbox: mine.reduce((n, c) => n + (c.unread || 0), 0), contacts: 0, calendar: upcoming, insight: 0, profile: unread };
+  // Calendar's badge: today's booked visits (the owner, 2026-10-13: "日曆圖示上的改成 today appt"; it was every upcoming one).
+  const today = day0(now), todayAppts = data.visits.filter(v => ids.has(v.customerId) && v.state === "booked" && day0(new Date(v.start)) === today).length;
+  const badges: Record<SalesTab, number> = { inbox: mine.reduce((n, c) => n + (c.unread || 0), 0), contacts: 0, calendar: todayAppts, insight: 0, profile: unread };
   return {
     nav3b: NAV.map(([id, label, icon]) => ({
       label, icon, badge: badges[id], color: ui.tab === id ? RUST : SUB, weight: ui.tab === id ? 600 : 500,

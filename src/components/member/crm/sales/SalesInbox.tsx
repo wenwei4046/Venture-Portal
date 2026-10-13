@@ -70,7 +70,7 @@ export default function SalesInbox({ v }: { v: InboxVM & ShellExtras }) {
                 <path d="M5 12h.01M12 12h.01M19 12h.01">
                 </path>
               </svg>More</span>
-            <div onClick={l.open} onPointerDown={l.down} onPointerUp={l.up} style={{ position: "relative", display: "flex", gap: "12px", padding: "14px 0", background: "#fff", transform: `translateX(${l.tx})`, transition: "transform 220ms cubic-bezier(.2,.8,.2,1)", touchAction: "pan-y", userSelect: "none", cursor: "pointer" }}>
+            <div onClick={l.open} onPointerDown={l.down} onPointerUp={l.up} onPointerCancel={l.cancel} onContextMenu={l.noMenu} style={{ WebkitTouchCallout: "none", position: "relative", display: "flex", gap: "12px", padding: "14px 0", background: "#fff", transform: `translateX(${l.tx})`, transition: "transform 220ms cubic-bezier(.2,.8,.2,1)", touchAction: "pan-y", userSelect: "none", cursor: "pointer" }}>
               <span style={{ position: "absolute", right: l.iconRight, top: "50%", transform: "translateY(-50%)", display: "flex", gap: "6px", color: "#806B60" }}>
                 {!!(l.isMuted) && (<>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-label="Muted">

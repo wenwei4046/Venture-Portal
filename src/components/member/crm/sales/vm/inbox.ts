@@ -82,8 +82,16 @@ export function inboxVM(ctx: SalesCtx) {
       rule: n ? `1px solid ${BORDER}` : "0", isMuted: mu, isPinned: pi, iconRight: c.unread ? "28px" : "0px", padR: `${32 + (mu ? 22 : 0) + (pi ? 22 : 0)}px`,
       // Swipe left reveals More; a tap opens the chat (or closes an open swipe).
       tx: ui.swipe === c.id ? "-84px" : "0px", moreOp: ui.swipe === c.id ? 1 : 0,
-      down: (e: PEvent) => { refs.ls = { x: e.clientX, y: e.clientY }; },
+      // A long press opens More (user 2026-10-13: "按久久跳出功能鍵"), where Assign to is for whoever may assign.
+      down: (e: PEvent) => {
+        refs.ls = { x: e.clientX, y: e.clientY };
+        clearTimeout(refs.lp);
+        refs.lp = setTimeout(() => { refs.ls = null; refs.lsT = Date.now(); navigator.vibrate?.(10); patch({ swipe: null, moreLead: c.id, moreView: "main" }); }, 500);
+      },
+      cancel: () => { clearTimeout(refs.lp); refs.ls = null; },
+      noMenu: (e: MouseEvent) => e.preventDefault(),
       up: (e: PEvent) => {
+        clearTimeout(refs.lp);
         const s = refs.ls; refs.ls = null; if (!s) return;
         const dx = e.clientX - s.x, dy = e.clientY - s.y;
         if (Math.abs(dx) > 30 && Math.abs(dx) > Math.abs(dy)) { refs.lsT = Date.now(); patch({ swipe: dx < 0 ? c.id : null }); }
@@ -131,6 +139,9 @@ export function inboxVM(ctx: SalesCtx) {
       // Opens the chat on its Customer info sheet.
       ["Contact info", "M12 16v-4M12 8h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", () => { if (!ml) return; set(u => ({ ...u, moreLead: null, moreView: "main", chat: ml.id, hm: { info: true } })); act.openChat(ml.id); }],
       [mine2.length ? `Label · ${mine2.join(", ")}` : "Label", "M3 12V4h8l10 10-8 8L3 12Zm5-4h.01", () => patch({ moreView: "labels" })],
+      // Assign to (user 2026-10-13): for whoever may assign (the Principal / Director in someone's CRM) — the chat's own
+      // Assign to sheet, opened over the chat.
+      ...(ctx.embedded?.assignTo ? [["Assign to", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => { if (!ml) return; set(u => ({ ...u, moreLead: null, moreView: "main", chat: ml.id, hm: { assign: true, sel: null } })); act.openChat(ml.id); }] as [string, string, () => void]] : []),
     ] as [string, string, () => void][]).map(([label, icon, go], k) => ({ label, icon, go, rule: k ? "1px solid #EBDDD2" : "0" })),
     // Block: off this person's Inbox and Contacts (the customer stays in the CRM; WhatsApp itself is not told).
     moreBlockLabel: ml ? `Block ${ml.name}` : "",

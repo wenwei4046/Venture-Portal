@@ -17,8 +17,20 @@ export function useFollowNewest(chatId: string | null | undefined, count: number
       const el = e.target as HTMLElement | null;
       if (el?.dataset?.chatList) atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
     };
+    // A photo, video or voice note that finishes loading makes the list taller: a reader at the bottom stays at the
+    // bottom (user 2026-10-13: a chat must open on its newest message — the pictures pushed it out of view).
+    const onLoad = (e: Event) => {
+      const el = (e.target as Element | null)?.closest?.("[data-chat-list]") as HTMLElement | null;
+      if (el && atBottom.current) el.scrollTop = el.scrollHeight;
+    };
     document.addEventListener("scroll", onScroll, true);
-    return () => document.removeEventListener("scroll", onScroll, true);
+    document.addEventListener("load", onLoad, true);
+    document.addEventListener("loadedmetadata", onLoad, true);
+    return () => {
+      document.removeEventListener("scroll", onScroll, true);
+      document.removeEventListener("load", onLoad, true);
+      document.removeEventListener("loadedmetadata", onLoad, true);
+    };
   }, []);
   useEffect(() => {
     const prev = last.current;
