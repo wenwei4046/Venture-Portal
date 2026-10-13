@@ -467,7 +467,7 @@ function navEntries(data: NavData): NavEntry[] {
         { href: '/settings?tab=departments', label: 'Departments', tab: 'departments', permissionTabs: ['fin.chart_of_account'], visible: canAccessCategories },
         { href: '/reports/base-rate', label: 'Base Rate History', visible: canAccessReports },
         { href: '/settings?tab=treasury', label: 'Treasury', tab: 'treasury', permissionTabs: ['pri.settings'], visible: canAccessSettings },
-        { href: '/settings?tab=overdue', label: 'Overdue Config', tab: 'overdue', permissionTabs: ['pri.settings'], visible: canAccessSettings },
+        // Overdue Config left with the Overdue page (2026-10-14, user: 一起拿掉).
         { href: '/settings?tab=splits', label: 'Splits', tab: 'splits', permissionTabs: ['pri.settings'], visible: canAccessSettings },
         { href: '/settings?tab=directors', label: 'Directors', tab: 'directors', permissionTabs: ['pri.settings'], visible: canAccessSettings },
         { href: '/settings?tab=companies', label: 'Companies', tab: 'companies', permissionTabs: ['pri.settings'], visible: canAccessSettings },

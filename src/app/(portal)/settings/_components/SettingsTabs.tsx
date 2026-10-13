@@ -5,7 +5,6 @@ import { SlidingTabs, type TabItem } from '@/components/motion/SlidingTabs'
 
 export type SettingsTab =
   | 'treasury'
-  | 'overdue'
   | 'splits'
   | 'directors'
   | 'companies'
@@ -17,7 +16,7 @@ export type SettingsTab =
 
 const ALL_TABS: TabItem[] = [
   { key: 'treasury', label: 'Treasury' },
-  { key: 'overdue', label: 'Overdue' },
+  // Overdue went with the Overdue page (2026-10-14, user: 一起拿掉).
   { key: 'splits', label: 'Splits' },
   { key: 'directors', label: 'Directors' },
   { key: 'companies', label: 'Companies' },

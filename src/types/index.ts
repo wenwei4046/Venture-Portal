@@ -448,18 +448,6 @@ export interface TreasuryConfig {
   updated_at: string
 }
 
-export type OverdueConfigStage = 'grace' | 'late_1' | 'late_2' | 'escalation'
-
-export interface OverdueConfig {
-  id: string
-  stage: OverdueConfigStage
-  days_from: number
-  days_to?: number
-  penalty_rate: number
-  updated_by?: string
-  updated_at: string
-}
-
 // ─── API Helpers ──────────────────────────────────────────────────────────────
 
 export interface ApiResponse<T> {

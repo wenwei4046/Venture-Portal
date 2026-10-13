@@ -10,7 +10,6 @@ import {
   type AccountType,
   type CashFlowCategory,
 } from '@/lib/coa'
-import type { OverdueConfigStage } from '@/types'
 
 // ─── Treasury Config (op_margin, saving_rate) ────────────────────────────────
 
@@ -76,49 +75,8 @@ export async function updateTreasuryConfig(formData: FormData) {
   revalidatePath('/dashboard')
 }
 
-// ─── Overdue Stages (grace / late_1 / late_2 / escalation) ────────────────────
-
-export async function updateOverdueStages(formData: FormData) {
-  const user = await requireActionOn('/settings', 'settings', 'manage')
-  const supabase = await createClient()
-
-  const stages: OverdueConfigStage[] = ['grace', 'late_1', 'late_2', 'escalation']
-
-  for (const stage of stages) {
-    const daysFromRaw = formData.get(`${stage}_days_from`) as string | null
-    const daysToRaw = formData.get(`${stage}_days_to`) as string | null
-    const penaltyRaw = formData.get(`${stage}_penalty`) as string | null
-
-    if (daysFromRaw === null || penaltyRaw === null) continue
-
-    const daysFrom = parseInt(daysFromRaw, 10)
-    const daysTo = daysToRaw && daysToRaw !== '' ? parseInt(daysToRaw, 10) : null
-    const penaltyPercent = parseFloat(penaltyRaw)
-
-    if (isNaN(daysFrom) || daysFrom < 0) {
-      throw new Error(`${stage}: days from must be a non-negative integer`)
-    }
-    if (daysTo !== null && (isNaN(daysTo) || daysTo < daysFrom)) {
-      throw new Error(`${stage}: days to must be >= days from`)
-    }
-    if (isNaN(penaltyPercent) || penaltyPercent < 0 || penaltyPercent >= 100) {
-      throw new Error(`${stage}: penalty rate must be between 0 and 100%`)
-    }
-
-    const { error } = await supabase
-      .from('overdue_config')
-      .update({
-        days_from: daysFrom,
-        days_to: daysTo,
-        penalty_rate: penaltyPercent / 100,
-        updated_by: user.id,
-      })
-      .eq('stage', stage)
-    if (error) throw new Error(`Failed to update ${stage}: ${error.message}`)
-  }
-
-  revalidatePath('/settings')
-}
+// Overdue Stages (grace / late_1 / late_2 / escalation) left on 2026-10-14 with
+// Settings › Overdue — nothing read the stages or their penalty rates.
 
 // ─── Rent / Utility Splits (Phase 2 Step 8) ──────────────────────────────────
 
