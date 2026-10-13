@@ -1351,7 +1351,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               <strong style={{ fontSize: "22px", fontWeight: "700", letterSpacing: "-.02em" }}>{v.ftx.name}</strong>
             </div>
             <div style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "14px 16px 20px", display: "flex", flexDirection: "column", gap: "14px" }}>
-              <div style={{ display: "flex", flexDirection: "column", borderRadius: "16px", background: "#fff", border: "1px solid #EBDDD2", overflow: "hidden" }}>
+              <div style={{ flex: "none", display: "flex", flexDirection: "column", borderRadius: "16px", background: "#fff", border: "1px solid #EBDDD2", overflow: "hidden" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) repeat(7, 30px)", alignItems: "center", gap: "4px", padding: "10px 12px 6px" }}>
                   <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: ".04em", color: "#A8968B" }}>PERSON</span>
                   {(v.ftx.heads).map((h, h_i) => (<Fragment key={h_i}>
