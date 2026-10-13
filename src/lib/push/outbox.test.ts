@@ -6,8 +6,8 @@ vi.mock('./config', () => ({
   VAPID_PUBLIC_KEY: 'BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8',
   VAPID_SUBJECT: 'https://venture.example',
 }))
-import { flushPush, outboxSecret } from './outbox'
-import { noticeUrl, noticesFromRow, openTarget } from './notices'
+import { flushPush, outboxSecret, pushMessageOf } from './outbox'
+import { crmPushFromRow, noticeTag, noticeUrl, noticesFromRow, openTarget } from './notices'
 
 // RFC 8291's example keys stand in for the server's (any valid P-256 pair will do).
 const PRIVATE = 'yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw'
@@ -96,5 +96,51 @@ describe('a notice', () => {
       { id: 'n2', kind: 'nonsense', title: 'T', refKind: 'booking', refId: 'b1' },
     ] })).toEqual({ unread: 2, items: [{ id: 'n1', kind: 'rooms', title: 'T', body: 'B', refKind: 'booking', refId: 'b1', at: '2026-10-11T03:00:00Z', read: false }] })
     expect(noticesFromRow(null)).toEqual({ unread: 0, items: [] })
+  })
+})
+
+// The CRM tells a person's phone about their own chats (2026-10-14, mig 20261014030000): a customer's message, a new
+// lead, a visit, a reminder, an invitation.
+describe('a CRM notice', () => {
+  const LEAD = {
+    id: 'n9', kind: 'crm', title: 'New lead · Chrisss', body: '帅哥', refKind: 'crm_contact', refId: 'c1',
+    data: { ch: 'whatsapp', name: 'Chrisss', line: 'New lead · 帅哥', at: '2026-10-14T00:08:00Z' },
+  }
+
+  it('goes at once — high urgency reaches a phone asleep — while the rest go as before', async () => {
+    process.env.VAPID_PRIVATE_KEY = PRIVATE
+    const db = fakeDb([
+      { ...LEAD, subs: [{ endpoint: 'https://fcm.googleapis.com/crm', ...DEVICE, app: 'hr' }] },
+      { id: 'n1', kind: 'rooms', title: 'Booked', body: '', refKind: 'booking', refId: 'b1', subs: [{ endpoint: 'https://fcm.googleapis.com/room', ...DEVICE, app: 'hr' }] },
+    ])
+    const urgency: Record<string, string> = {}
+    const fetcher = vi.fn(async (url: string, init: RequestInit) => {
+      urgency[url] = (init.headers as Record<string, string>).Urgency
+      return new Response(null, { status: 201 })
+    })
+    expect(await flushPush({ client: db.client as never, fetcher: fetcher as never })).toEqual({ sent: 2, gone: 0 })
+    expect(urgency).toEqual({ 'https://fcm.googleapis.com/crm': 'high', 'https://fcm.googleapis.com/room': 'normal' })
+  })
+
+  it('opens the chat in the Revenue app whichever app the phone signed up in, gathered under the chat’s tag', () => {
+    const due = { ...LEAD, refKind: 'crm_contact' as const, crm: crmPushFromRow(LEAD.data) }
+    const message = { title: 'New lead · Chrisss', body: '帅哥', url: '/member?page=account&view=crm&chat=c1', tag: 'crm:c1', id: 'n9',
+      crm: { ch: 'whatsapp', name: 'Chrisss', line: 'New lead · 帅哥', at: '2026-10-14T00:08:00Z' } }
+    expect(pushMessageOf(due, 'hr')).toEqual(message)
+    expect(pushMessageOf(due, 'revenue')).toEqual(message)
+  })
+
+  it('an invitation opens the CRM’s notifications, each under its own tag', () => {
+    expect(noticeUrl({ refKind: 'crm_invite', refId: 'i1' }, 'revenue')).toBe('/member?page=account&view=crm&crm=notifs')
+    expect(noticeUrl({ refKind: 'crm_invite', refId: 'i1' }, 'hr')).toBe('/member?page=account&view=crm&crm=notifs')
+    expect(noticeTag({ id: 'n7', refKind: 'crm_invite', refId: 'i1' })).toBe('n7')
+    expect(noticeTag({ id: 'n8', refKind: 'booking', refId: 'b1' })).toBe('n8')
+  })
+
+  it('keeps only a well-formed picture and line; the rest of the bells’ notices carry none', () => {
+    expect(crmPushFromRow({ ch: 'telegram', name: 'Mei', line: 'Hi', at: 'x' })).toEqual({ ch: null, name: 'Mei', line: 'Hi', at: 'x' })
+    expect(crmPushFromRow({ ch: 'messenger', line: 'no name' })).toBeNull()
+    expect(crmPushFromRow(null)).toBeNull()
+    expect(pushMessageOf({ id: 'n1', title: 'T', body: 'B', refKind: 'booking', refId: 'b1', crm: null }, 'hr')).toEqual({ title: 'T', body: 'B', url: '/hr-app?open=booking:b1', tag: 'n1', id: 'n1' })
   })
 })

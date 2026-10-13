@@ -3,8 +3,8 @@ import { after } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { VAPID_PUBLIC_KEY, VAPID_SUBJECT, type PushApp } from './config'
-import { noticeUrl, type NoticeRef } from './notices'
-import { b64url, fromB64url, sendPush, type SendOutcome, type Subscription } from './webpush'
+import { crmPushFromRow, noticeTag, noticeUrl, type CrmPush, type NoticeRef } from './notices'
+import { b64url, fromB64url, sendPush, type PushMessage, type SendOutcome, type Subscription } from './webpush'
 
 /**
  * Pushing what is due (2026-10-11, mig 20261011180000). The database writes a
@@ -18,7 +18,12 @@ import { b64url, fromB64url, sendPush, type SendOutcome, type Subscription } fro
  * it does nothing; it never throws into the work that called it.
  */
 
-type Due = { id: string; title: string; body: string; refKind: NoticeRef; refId: string; subs: Array<Subscription & { app: PushApp }> }
+type Due = {
+  id: string; kind: string; title: string; body: string; refKind: NoticeRef; refId: string
+  /** A CRM notice's picture and line (mig 20261014030000); null for the rest. */
+  crm: CrmPush | null
+  subs: Array<Subscription & { app: PushApp }>
+}
 
 function outboxClient(): SupabaseClient {
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
@@ -39,8 +44,14 @@ function dueFromRow(v: unknown): Due[] {
     if (typeof n?.id !== 'string' || !Array.isArray(n.subs)) return []
     const subs = n.subs.filter((s): s is Subscription & { app: PushApp } =>
       !!s && typeof s.endpoint === 'string' && typeof s.p256dh === 'string' && typeof s.auth === 'string' && (s.app === 'revenue' || s.app === 'hr'))
-    return [{ id: n.id, title: String(n.title ?? ''), body: String(n.body ?? ''), refKind: n.refKind as NoticeRef, refId: String(n.refId ?? ''), subs }]
+    const crm = n.kind === 'crm' ? crmPushFromRow((x as { data?: unknown }).data) : null
+    return [{ id: n.id, kind: String(n.kind ?? ''), title: String(n.title ?? ''), body: String(n.body ?? ''), refKind: n.refKind as NoticeRef, refId: String(n.refId ?? ''), crm, subs }]
   })
+}
+
+/** What one device is sent for a notice: its words, where a tap opens, and — for the CRM — what the phone draws. */
+export function pushMessageOf(n: Pick<Due, 'id' | 'title' | 'body' | 'refKind' | 'refId' | 'crm'>, app: PushApp): PushMessage {
+  return { title: n.title, body: n.body, url: noticeUrl(n, app), tag: noticeTag(n), id: n.id, ...(n.crm ? { crm: n.crm } : {}) }
 }
 
 /**
@@ -68,8 +79,10 @@ export async function flushPush(opts: { client?: SupabaseClient; fetcher?: typeo
       const done: string[] = []
       const goneEndpoints: string[] = []
       await Promise.all(due.map(async n => {
+        // A customer waiting on a chat goes at once, even to a phone asleep (2026-10-14); the rest as before.
+        const urgency = n.kind === 'crm' ? 'high' : 'normal'
         const outcomes: SendOutcome[] = await Promise.all(n.subs.map(s =>
-          sendPush(s, { title: n.title, body: n.body, url: noticeUrl(n, s.app), tag: n.id }, keys, VAPID_SUBJECT, { fetcher: opts.fetcher })
+          sendPush(s, pushMessageOf(n, s.app), keys, VAPID_SUBJECT, { fetcher: opts.fetcher, urgency })
             .catch((): SendOutcome => ({ ok: false, gone: false, status: 0 }))))
         outcomes.forEach((o, i) => { if (!o.ok && o.gone) goneEndpoints.push(n.subs[i].endpoint) })
         if (outcomes.some(o => o.ok) || outcomes.every(o => !o.ok && o.gone)) done.push(n.id)

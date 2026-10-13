@@ -84,7 +84,7 @@ import { claimWeeks, memoVM, profileMainVM, replaceable, requestCode, requestDet
 import { foodOpenTo, type ClaimRates } from "@/lib/member/claim-rules";
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
-import CrmApp from "../crm/CrmApp";
+import CrmApp, { type CrmOpen } from "../crm/CrmApp";
 import type { Notices } from "@/lib/push/notices";
 import { readNotices } from "@/lib/push/actions";
 
@@ -580,6 +580,17 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     openNotif();
     // Only on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // A tapped push about a CRM chat or invitation opens the CRM there (`/member?page=account&view=crm&chat=…` or
+  // `&crm=notifs`, lib/push/notices noticeUrl): the CRM opens that chat, or its notifications, once.
+  const [crmOpen, setCrmOpen] = useState<CrmOpen | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const chat = q.get("chat"), notifs = q.get("crm") === "notifs";
+    if (!chat && !notifs) return;
+    q.delete("chat"); q.delete("crm");
+    window.history.replaceState(window.history.state, "", window.location.pathname + (q.toString() ? `?${q}` : ""));
+    setCrmOpen(chat ? { chat } : { notifs: true });
   }, []);
   const openSheet = useCallback((next: Sheet) => { setNfOpen(false); setSheet(next); }, []);
 
@@ -1228,7 +1239,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else if (pf === "crm" && crm) {
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       // On a computer the Control panel draws the app's frame itself (CRM Desktop rev 1): its greeting, bell and links are these.
-      page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} onExit={back} desk={desk} deskApp={desk ? {
+      page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} onExit={back} desk={desk} open={crmOpen} deskApp={desk ? {
         greeting: fixture?.greeting ?? greeting(), subName: membership?.name ?? "", dateLine: `${longDayLabel(today)} · ${quarterLabel(today)}`,
         bellUnread: nfCount > 0 || nf.items.some(n => n.unread), notifCount: nfCount,
         go: screen => goScreen(screen), openNotifications: openNotif, openBell: toggleNotif, openSubDept: () => openSheet("sd"), signOut,
