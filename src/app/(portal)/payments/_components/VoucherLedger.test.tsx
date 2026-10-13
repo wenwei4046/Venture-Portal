@@ -120,16 +120,39 @@ describe('Payments, for a treasury account without Payroll payouts', () => {
     mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
   })
 
-  // 2026-10-13 — the user: "就算能看到 pv，应该也是看到 by 整个部门才对".
-  it('sends the browser no payroll voucher — each batch department by department', async () => {
+  // 2026-10-14 — the user on All's batches: "i want remove all this, dont show
+  // up here" → 只放在 Payroll batches tab.
+  it('All lists no payroll at all — and counts only what it lists', async () => {
     database()
     const { container } = render(await VoucherLedger({ direction: 'debit', params: {} }))
-    expect(sent().filter((r) => !r.locked).map((r) => r.id)).toEqual(['v-tnb'])
-    expect(sent().filter((r) => r.locked).map((r) => [r.batchKey, r.payee_name, r.description, r.amount, r.status])).toEqual([
-      ['KWSP Sep 2026', 'Zeta', 'KWSP Sep 2026 · 1 张 · 1 paid', 1014, 'paid'],
-      ['Payroll bank transfer Sep 2026', 'Zeta', 'Payroll bank transfer Sep 2026 · 1 张 · 1 pending approval', 4225, 'pending_approval'],
-      ['Payroll disbursement Sep 2026', 'Marketing', 'Payroll disbursement Sep 2026 · 2 张 · 2 paid', 7300.75, 'paid'],
+    expect(sent().map((r) => r.id)).toEqual(['v-tnb'])
+    expect(sent().some((r) => r.locked)).toBe(false)
+    expect(JSON.parse(screen.getByTestId('tabs').textContent ?? '{}')).toEqual({
+      all: 1, draft: 0, pending_approval: 0, approved: 0, paid: 1, voided: 0, payroll: 3,
+    })
+    expect(screen.getByText('1 of 1 voucher')).toBeVisible()
+    for (const secret of ['Aina', 'Bala', 'Zeta', 'Payroll disbursement', 'KWSP', 'HV-PV-202610-0451']) {
+      expect(container.innerHTML).not.toContain(secret)
+    }
+  })
+
+  it('…nor does a status tab', async () => {
+    database()
+    render(await VoucherLedger({ direction: 'debit', params: { status: 'pending_approval' } }))
+    expect(screen.queryByTestId('sent')).toBeNull() // the one pending voucher is the funding transfer
+    expect(JSON.parse(screen.getByTestId('tabs').textContent ?? '{}').pending_approval).toBe(0)
+  })
+
+  // 2026-10-13 — the user: "就算能看到 pv，应该也是看到 by 整个部门才对".
+  it('the Payroll batches tab holds every payroll batch — salary, statutory, funding — department by department', async () => {
+    database()
+    const { container } = render(await VoucherLedger({ direction: 'debit', params: { status: 'payroll' } }))
+    expect(sent().map((r) => [r.batchKey, r.payee_name, r.description, r.amount, r.status, r.locked])).toEqual([
+      ['KWSP Sep 2026', 'Zeta', 'KWSP Sep 2026 · 1 张 · 1 paid', 1014, 'paid', true],
+      ['Payroll bank transfer Sep 2026', 'Zeta', 'Payroll bank transfer Sep 2026 · 1 张 · 1 pending approval', 4225, 'pending_approval', true],
+      ['Payroll disbursement Sep 2026', 'Marketing', 'Payroll disbursement Sep 2026 · 2 张 · 2 paid', 7300.75, 'paid', true],
     ])
+    expect(screen.getByText('3 batches · 4 vouchers')).toBeVisible()
     // Not a person, not a voucher number of theirs, not one person's amount.
     for (const secret of ['Aina', 'Bala', 'HV-PV-202610-0451', 'HV-PV-202610-0452', 'HV-PV-202610-0453', 'HR custody', '3,200.50', '4,100.25']) {
       expect(container.innerHTML).not.toContain(secret)
@@ -140,7 +163,7 @@ describe('Payments, for a treasury account without Payroll payouts', () => {
   // them in English ("26 vouchers · 26 paid"); its batch sums them again.
   it('sends each department line’s count and status alongside, and nothing more', async () => {
     database()
-    render(await VoucherLedger({ direction: 'debit', params: {} }))
+    render(await VoucherLedger({ direction: 'debit', params: { status: 'payroll' } }))
     const rows = sent() as Array<{ locked?: boolean; payee_name: string; lockedNote?: { count: number; statusText: string } }>
     expect(rows.filter((r) => r.locked).map((r) => [r.payee_name, r.lockedNote])).toEqual([
       ['Zeta', { count: 1, statusText: '1 paid', statusCounts: { paid: 1 } }],
@@ -149,19 +172,12 @@ describe('Payments, for a treasury account without Payroll payouts', () => {
     ])
   })
 
-  it('the Payroll batches tab holds the salary batches only, by department, and counts them', async () => {
-    database()
-    render(await VoucherLedger({ direction: 'debit', params: { status: 'payroll' } }))
-    expect(sent().map((r) => [r.batchKey, r.payee_name, r.locked])).toEqual([['Payroll disbursement Sep 2026', 'Marketing', true]])
-    expect(JSON.parse(screen.getByTestId('tabs').textContent ?? '{}').payroll).toBe(1)
-  })
-
-  it('still totals every voucher in the summary, and counts the folded ones', async () => {
+  it('still totals every voucher in the summary cards', async () => {
     database()
     render(await VoucherLedger({ direction: 'debit', params: {} }))
     expect(screen.getByText('RM 9,514.75')).toBeVisible() // paid: 1,200 + 3,200.50 + 4,100.25 + 1,014
     expect(screen.getByText('RM 4,225.00')).toBeVisible() // pending: the funding transfer
-    expect(screen.getByText('5 of 5 vouchers')).toBeVisible()
+    expect(screen.getByText('5')).toBeVisible() // All vouchers
   })
 
   it('has no way into Payroll Requests, and does not ask how many are waiting', async () => {
@@ -173,37 +189,39 @@ describe('Payments, for a treasury account without Payroll payouts', () => {
 
   it('a search for a person finds nothing: a batch answers to its own name only', async () => {
     database()
-    render(await VoucherLedger({ direction: 'debit', params: { q: 'aina' } }))
+    render(await VoucherLedger({ direction: 'debit', params: { status: 'payroll', q: 'aina' } }))
     expect(screen.queryByTestId('sent')).toBeNull()
-    expect(screen.getByText('0 of 5 vouchers')).toBeVisible()
+    expect(screen.getByText('0 batches · 0 vouchers')).toBeVisible()
   })
 
   it('…and a search for the batch finds the batch, by department', async () => {
     database()
-    render(await VoucherLedger({ direction: 'debit', params: { q: 'payroll disbursement' } }))
+    render(await VoucherLedger({ direction: 'debit', params: { status: 'payroll', q: 'payroll disbursement' } }))
     expect(sent().map((r) => [r.batchKey, r.payee_name, r.locked])).toEqual([['Payroll disbursement Sep 2026', 'Marketing', true]])
   })
 
   it('a pool or an amount filter leaves the batches out rather than read inside them', async () => {
     database()
-    render(await VoucherLedger({ direction: 'debit', params: { min: '4000' } }))
-    expect(screen.queryByTestId('sent')).toBeNull() // TNB is under 4,000 and no batch is offered
-    expect(screen.getByText('0 of 5 vouchers')).toBeVisible()
+    render(await VoucherLedger({ direction: 'debit', params: { status: 'payroll', min: '4000' } }))
+    expect(screen.queryByTestId('sent')).toBeNull()
+    expect(screen.getByText('0 batches · 0 vouchers')).toBeVisible()
   })
 })
 
 // 2026-10-13 — the user on the Principal's Finance view: "按部门，跟 Finance 一样".
 describe('Payments, on the Finance view', () => {
-  it('lists payroll by department as Finance does, and keeps the way into Payroll Requests', async () => {
+  it('lists payroll by department as Finance does — in its own tab only — and keeps the way into Payroll Requests', async () => {
     mocks.requirePermission.mockResolvedValue({ role: 'finance', actualRole: 'principal', lens: 'finance', permissions: ['treasury', 'payroll_payouts', 'hr_costing'] })
     const { from } = database()
-    const { container } = render(await VoucherLedger({ direction: 'debit', params: {} }))
-    expect(sent().filter((r) => !r.locked).map((r) => r.id)).toEqual(['v-tnb'])
-    expect(sent().filter((r) => r.locked).map((r) => r.payee_name)).toEqual(['Zeta', 'Zeta', 'Marketing'])
-    for (const secret of ['Aina', 'Bala', 'HV-PV-202610-0451']) expect(container.innerHTML).not.toContain(secret)
+    const all = render(await VoucherLedger({ direction: 'debit', params: {} }))
+    expect(sent().map((r) => r.id)).toEqual(['v-tnb'])
     // The lens keeps the account's power: Payroll Requests is still there.
     expect(screen.getByRole('link', { name: /Payroll Requests/ })).toHaveTextContent('2')
     expect(from).toHaveBeenCalledWith('payroll_payment_requests')
+    all.unmount()
+    const { container } = render(await VoucherLedger({ direction: 'debit', params: { status: 'payroll' } }))
+    expect(sent().map((r) => [r.payee_name, r.locked])).toEqual([['Zeta', true], ['Zeta', true], ['Marketing', true]])
+    for (const secret of ['Aina', 'Bala', 'HV-PV-202610-0451']) expect(container.innerHTML).not.toContain(secret)
   })
 
   it('HR’s view still lists each person', async () => {
