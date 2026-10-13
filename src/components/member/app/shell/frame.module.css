@@ -34,7 +34,7 @@
 /* ── could not load ── */
 .error { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 300px; padding: 0 20px; text-align: center; }
 .errorIcon { width: 52px; height: 52px; border-radius: 50%; background: var(--rv-red-bg); color: var(--rv-red); display: grid; place-items: center; }
-.errorTitle { margin: 0; font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.01em; color: var(--rv-ink); }
+.errorTitle { margin: 0; font-family: var(--font-display-rv); font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.01em; color: var(--rv-ink); }
 .errorText { margin: 6px 0 0; font-size: calc(14px * var(--rv-type)); line-height: 1.45; color: var(--rv-sub); }
 /* the app's primary button (profile.module.css `.primary`), with its refresh icon */
 .retry {

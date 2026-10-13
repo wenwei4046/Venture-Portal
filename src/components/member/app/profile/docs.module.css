@@ -19,7 +19,7 @@
   font-size: calc(14.5px * var(--rv-type));
   font-weight: 600;
 }
-.title { margin: 0; font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
+.title { margin: 0; font-family: var(--font-display-rv); font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
 .lede { margin: 0; font-size: calc(14.0217px * var(--rv-type)); color: var(--rv-sub); }
 
 .row {

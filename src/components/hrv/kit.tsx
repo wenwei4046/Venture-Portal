@@ -16,7 +16,7 @@ export function HvPage({ children, className = '' }: { children: ReactNode; clas
 }
 
 /**
- * The head: an eyebrow with its 2×10 orange bar, the Georgia title, a line,
+ * The head: an eyebrow with its 2×10 orange bar, the Newsreader title, a line,
  * the right-hand controls, and the rule with its 64px orange segment —
  * `bare` (Sales Groups) gives up the rule and the segment because its tabs
  * sit right under it.

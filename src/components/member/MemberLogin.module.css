@@ -45,11 +45,11 @@
 }
 .eyebrow { font-size: 10px; letter-spacing: .18em; font-weight: 600; color: #6d5b49; }
 .story h2 { margin: 22px 0 18px; color: #3d2c20; font-family: var(--font-display), Georgia, serif; font-size: clamp(42px, 4.5vw, 63px); line-height: 1.04; font-weight: 400; letter-spacing: -.045em; }
-.story h2 em { font-weight: 400; color: inherit; }
+.story h2 em { font-family: var(--font-newsreader-italic), var(--font-display); font-weight: 400; color: inherit; }
 .storyCopy > p:last-child { color: #6d5b49; font-size: 14px; line-height: 1.8; }
 .art { position: relative; margin: 12px -24px -2px; flex: 1; display: flex; flex-direction: column; justify-content: center; }
 .art > svg { width: 100%; max-height: 310px; overflow: visible; }
-.artNote { position: absolute; bottom: 13%; left: 6%; font-family: var(--font-display), Georgia, serif; font-size: 14px; font-style: italic; color: #705c47; }
+.artNote { position: absolute; bottom: 13%; left: 6%; font-family: var(--font-newsreader-italic), var(--font-display); font-size: 14px; font-style: italic; color: #705c47; }
 .storyFooter { display: flex; flex-wrap: wrap; gap: 10px 22px; border-top: 1px solid #c9bda955; padding-top: 22px; color: #705c47; font-size: 11px; }
 .storyFooter span + span::before { content: "·"; margin-right: 22px; }
 .loginColumn { min-width: 0; display: flex; align-items: center; justify-content: center; padding: 42px clamp(32px, 5vw, 72px); }

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, Noto_Sans_SC, Chivo_Mono } from 'next/font/google'
+import { Inter, Newsreader, Noto_Sans_SC, Chivo_Mono } from 'next/font/google'
 import NavProgress from '@/components/layout/NavProgress'
 import PwaRegister from '@/components/pwa/PwaRegister'
 import SafeAreaMemory from '@/components/pwa/SafeAreaMemory'
@@ -9,7 +9,32 @@ import './globals.css'
 
 // Typography — loaded via next/font for zero-CLS self-hosting.
 // Inter for body and headline amounts; Chivo Mono for dense table figures.
-// Page titles use the system Georgia stack, with Noto Sans SC for CJK.
+// Page titles are Newsreader (Georgia behind it), with Noto Sans SC for CJK.
+// The Revenue app's display face, Inter Tight, loads with the app's own layout
+// (components/member/app/fonts.ts) — the portal never downloads it.
+
+// Newsreader (2026-10-14, the HOUZS Venture Design System): the one serif in
+// the product — every portal page title, the HR kit's PageHead, the Product
+// List's headings, the sign-in page's lines. Variable on opsz, so the 36px
+// title gets the display cut by itself. Print documents keep Georgia.
+const newsreader = Newsreader({
+  subsets: ['latin'],
+  axes: ['opsz'],
+  variable: '--font-newsreader',
+  display: 'swap',
+})
+
+// Its true italic, for the sign-in page's two italic lines only — never
+// preloaded, so no other page downloads it (a slanted roman is what the
+// browser draws without it, and Georgia had a real italic).
+const newsreaderItalic = Newsreader({
+  subsets: ['latin'],
+  style: 'italic',
+  axes: ['opsz'],
+  variable: '--font-newsreader-italic',
+  display: 'swap',
+  preload: false,
+})
 
 const inter = Inter({
   subsets: ['latin'],
@@ -80,7 +105,7 @@ export default function RootLayout({
   return (
     <html
       lang="en-MY"
-      className={`${inter.variable} ${chivoMono.variable} ${notoSansSc.variable}`}
+      className={`${inter.variable} ${newsreader.variable} ${newsreaderItalic.variable} ${chivoMono.variable} ${notoSansSc.variable}`}
       suppressHydrationWarning
     >
       <head>

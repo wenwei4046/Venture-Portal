@@ -25,7 +25,7 @@
 
 .body { flex: 1 1 auto; overflow-y: auto; scrollbar-width: none; padding: 0 20px 32px; display: flex; flex-direction: column; gap: 20px; }
 .body::-webkit-scrollbar { display: none; }
-.title { margin: 0; font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.2; }
+.title { margin: 0; font-family: var(--font-display-rv); font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.2; }
 .summary { margin: 6px 0 0; font-size: calc(14px * var(--rv-type)); color: var(--rv-sub); }
 
 .tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; padding: 3px; border-radius: 13px; background: var(--rv-sand); }
@@ -58,7 +58,7 @@
 
 .big { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: 14px; background: var(--rv-brown); color: var(--rv-white); padding: 12px 4px; }
 .bigCell { text-align: center; }
-.bigV { font-size: calc(20px * var(--rv-type)); font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.bigV { font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .bigL { font-size: calc(11.5px * var(--rv-type)); color: var(--rv-blush); margin-top: 2px; }
 
 .link {
