@@ -124,9 +124,11 @@ export default function DeptRows({
                         <button type="button" className="pay-btn text" onClick={() => onOpen(g.key)}>
                           {g.vouchers.length > 0 ? `${g.vouchers.length} PV${g.vouchers.length === 1 ? '' : 's'} · View` : 'View employees'}
                         </button>
+                        {/* By department is the way (2026-10-13, the user: 预设按部门，例外才一人一张) —
+                            a PV per person names that person and their pay to whoever reads the PVs. */}
                         {remaining > 0 ? <>
-                          <button type="button" className="pay-btn sec" onClick={() => onGenerate(g, 'department')} disabled={!canGenerate || busy != null} title={reason}>Generate by Department</button>
-                          <button type="button" className="pay-btn sec" onClick={() => onGenerate(g, 'employee')} disabled={!canGenerate || busy != null} title={reason}>Manual generate</button>
+                          <button type="button" className="pay-btn pri" onClick={() => onGenerate(g, 'department')} disabled={!canGenerate || busy != null} title={reason}>Generate by Department</button>
+                          <button type="button" className="pay-btn text" onClick={() => onGenerate(g, 'employee')} disabled={!canGenerate || busy != null} title={reason ?? 'One PV per person — for an exception'}>Manual generate</button>
                         </> : null}
                       </div>
                     </td>

@@ -3,7 +3,7 @@ import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
 import { notFound } from 'next/navigation'
 import { requirePermission, requirePage } from '@/lib/auth'
-import { canSeePayrollPayouts } from '@/lib/roles'
+import { listsPayrollByPerson } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import DeptPoolTabs from '../_components/DeptPoolTabs'
@@ -152,11 +152,11 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
       ) : null}
 
       {activeTab === 'history' ? (
-        <HistoryTable deptId={marketing.id} filter={historyFilter} seesPayroll={canSeePayrollPayouts(user)} />
+        <HistoryTable deptId={marketing.id} filter={historyFilter} seesPayroll={listsPayrollByPerson(user)} />
       ) : null}
 
       {activeTab === 'pnl' ? (
-        <MarketingPnlView deptId={marketing.id} period={period} seesPayroll={canSeePayrollPayouts(user)} />
+        <MarketingPnlView deptId={marketing.id} period={period} seesPayroll={listsPayrollByPerson(user)} />
       ) : null}
 
       {activeTab === 'request-payment' && canSubmitExpense ? (

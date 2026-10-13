@@ -1,8 +1,8 @@
 import React from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn } from '@/lib/auth'
-import { canSeePayrollPayouts } from '@/lib/roles'
-import { filterLockedBatches, isPayrollReference, lockPayrollBatches } from '@/lib/payroll-vouchers'
+import { listsPayrollByPerson } from '@/lib/roles'
+import { filterLockedBatches, isPayrollReference, lockPayrollBatches, type LockedBatch } from '@/lib/payroll-vouchers'
 import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
@@ -38,7 +38,8 @@ const POOL_LABELS: Record<string, string> = {
 
 export async function GET(req: Request) {
   const user = await requireActionOn('/payments', 'treasury', 'export')
-  const seesPayroll = canSeePayrollPayouts(user)
+  // Payroll person by person, or by department as the page lists it (2026-10-13).
+  const byPerson = listsPayrollByPerson(user)
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
 
@@ -103,17 +104,30 @@ export async function GET(req: Request) {
   const all = vouchers ?? []
   const tab = statusFilter ?? 'all'
   const filters = { tab, typeFilter, poolFilter, fromFilter, toFilter, minFilter, maxFilter, qFilter }
+  // The Payroll batches tab: the salary vouchers only, as on the page.
+  const payrollTab = tab === 'payroll'
 
-  // Without Payroll payouts the file carries payroll the way the page shows
-  // it: one total per batch and none of its vouchers (lib/payroll-vouchers.ts).
-  const open = seesPayroll ? all : all.filter((v) => !isPayrollReference(v.reference_type))
-  const lockedBatches = seesPayroll
-    ? []
-    : filterLockedBatches(lockPayrollBatches(all.filter((v) => isPayrollReference(v.reference_type))), filters)
+  // Without Payroll payouts — or on the Finance view — the file carries payroll
+  // the way the page shows it: each batch department by department, and none
+  // of its vouchers (lib/payroll-vouchers.ts).
+  const open = byPerson ? all : all.filter((v) => !isPayrollReference(v.reference_type))
+  let lockedBatches: LockedBatch[] = []
+  if (!byPerson) {
+    const { data: depts } = await supabase.from('departments').select('name')
+    const allLocked = lockPayrollBatches(
+      all.filter((v) => isPayrollReference(v.reference_type)),
+      new Set(((depts ?? []) as Array<{ name: string }>).map((d) => d.name)),
+    )
+    lockedBatches = payrollTab
+      ? filterLockedBatches(allLocked.filter((b) => b.referenceType === 'payroll_disbursement'), { ...filters, tab: 'all' })
+      : filterLockedBatches(allLocked, filters)
+  }
 
   // Apply all filters in-memory (same logic as page)
   const filtered = open.filter((v) => {
-    if (tab !== 'all' && v.status !== tab) return false
+    if (payrollTab) {
+      if (v.reference_type !== 'payroll_disbursement') return false
+    } else if (tab !== 'all' && v.status !== tab) return false
     if (typeFilter && v.voucher_type !== typeFilter) return false
     if (poolFilter) {
       if (v.direction === 'credit') {
@@ -175,20 +189,22 @@ export async function GET(req: Request) {
   })
 
   for (const b of lockedBatches) {
-    dated.push({
-      raw: b.latest,
-      row: {
-        voucher_no: null,
-        date: officeDay(b.latest).format('DD/MM/YYYY'),
-        direction: 'debit',
-        type: 'payroll',
-        status: b.statusText,
-        payee_name: `${b.label} (${b.count} voucher${b.count === 1 ? '' : 's'}, total only)`,
-        amount: b.total,
-        catLabel: 'Payroll',
-        poolLabel: '—',
-      },
-    })
+    for (const d of b.departments) {
+      dated.push({
+        raw: d.latest,
+        row: {
+          voucher_no: null,
+          date: officeDay(d.latest).format('DD/MM/YYYY'),
+          direction: 'debit',
+          type: 'payroll',
+          status: d.statusText,
+          payee_name: `${b.label} · ${d.department} (${d.count} voucher${d.count === 1 ? '' : 's'}, department total)`,
+          amount: d.total,
+          catLabel: 'Payroll',
+          poolLabel: '—',
+        },
+      })
+    }
   }
   if (lockedBatches.length > 0) dated.sort((a, b) => new Date(b.raw).getTime() - new Date(a.raw).getTime())
 

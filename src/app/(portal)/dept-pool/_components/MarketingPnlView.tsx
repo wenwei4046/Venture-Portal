@@ -9,8 +9,9 @@ import { isPayrollReference, lockPayrollBatches } from '@/lib/payroll-vouchers'
 interface Props {
   deptId: string
   period: string // YYYY-MM-01
-  /** false = the viewer may not see one person's pay (canSeePayrollPayouts):
-   *  payroll vouchers in the history below show as one total per batch. */
+  /** false = the viewer may not see one person's pay, or reads the Finance view
+   *  (lib/roles.ts listsPayrollByPerson): payroll vouchers in the history below
+   *  show as one total per batch. */
   seesPayroll: boolean
 }
 

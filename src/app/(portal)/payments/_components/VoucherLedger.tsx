@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
-import { canSeePayrollPayouts } from '@/lib/roles'
+import { canSeePayrollPayouts, listsPayrollByPerson } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
 import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
@@ -57,8 +57,11 @@ export default async function VoucherLedger({
 }) {
   const user = await requirePermission('treasury')
   // Without Payroll payouts (2026-10-02) payroll is one locked total per
-  // batch: its vouchers are folded here, on the server, and never sent on.
+  // batch, department by department (2026-10-13): its vouchers are folded
+  // here, on the server, and never sent on. The Finance view folds them too
+  // (lib/roles.ts listsPayrollByPerson); Payroll Requests stays the right's.
   const seesPayroll = canSeePayrollPayouts(user)
+  const byPerson = listsPayrollByPerson(user)
   const supabase = await createClient()
   const isReceipts = direction === 'credit'
   const statusFilter = params.status
@@ -134,6 +137,10 @@ export default async function VoucherLedger({
   // The receipt side names each receipt's bank (2026-10-09, the Finance revamp).
   const banksRead = isReceipts ? startRead(supabase.from('bank_accounts').select('id, bank_name')) : null
 
+  // A locked payroll batch stands department by department (2026-10-13): the
+  // names a voucher's text may give its department by (lib/payroll-vouchers).
+  const departmentsRead = byPerson || isReceipts ? null : startRead(supabase.from('departments').select('name'))
+
   // Money that moved outside the voucher flow (extraRows below).
   const extraRowsRead = startRead(isReceipts ? fetchReceiptExtras(supabase) : fetchPaymentExtras(supabase))
 
@@ -186,15 +193,28 @@ export default async function VoucherLedger({
   const all = vouchers ?? []
   const tab = statusFilter ?? 'all'
   const filters = { tab, typeFilter, poolFilter, fromFilter, toFilter, minFilter, maxFilter, qFilter }
+  // The Payroll batches tab (2026-10-09): the payroll disbursements, which
+  // VouchersTable folds under their batch, and nothing else.
+  const payrollTab = tab === 'payroll'
 
   const extraFiltered = filterReceiptExtras(extraRows, filters)
 
   // The rows this account may open, and the payroll batches it may only see
-  // the total of. The summary above the table still counts every voucher.
-  const open = seesPayroll ? all : all.filter((v) => !isPayrollReference(v.reference_type))
-  const lockedBatches = seesPayroll
-    ? []
-    : filterLockedBatches(lockPayrollBatches(all.filter((v) => isPayrollReference(v.reference_type))), filters)
+  // by department (2026-10-13). The summary above the table still counts every
+  // voucher.
+  const open = byPerson ? all : all.filter((v) => !isPayrollReference(v.reference_type))
+  const departmentNames = new Set<string>()
+  if (departmentsRead) {
+    const { data: depts } = await departmentsRead
+    for (const d of (depts ?? []) as Array<{ name: string }>) departmentNames.add(d.name)
+  }
+  const allLocked = byPerson ? [] : lockPayrollBatches(all.filter((v) => isPayrollReference(v.reference_type)), departmentNames)
+  // The Payroll batches tab holds the salary batches only, as it does for the
+  // vouchers themselves; it is not a status, so the batches pass it whole.
+  const lockedSalary = allLocked.filter((b) => b.referenceType === 'payroll_disbursement')
+  const lockedBatches = payrollTab
+    ? filterLockedBatches(lockedSalary, { ...filters, tab: 'all' })
+    : filterLockedBatches(allLocked, filters)
   const lockedCount = lockedBatches.reduce((n, b) => n + b.count, 0)
 
   // Apply all filters in-memory. Summary stats below use `all` (unfiltered
@@ -207,9 +227,6 @@ export default async function VoucherLedger({
   const isLoanRepay = (v: { fund_source_id?: string | null; loan_id?: string | null; voucher_type?: string | null }) =>
     v.fund_source_id != null || v.loan_id != null || v.voucher_type === 'loan_repayment'
 
-  // The Payroll batches tab (2026-10-09): the payroll disbursements, which
-  // VouchersTable folds under their batch, and nothing else.
-  const payrollTab = tab === 'payroll'
   const filtered = open.filter((v) => {
     if (payrollTab) {
       if (v.reference_type !== 'payroll_disbursement') return false
@@ -245,7 +262,7 @@ export default async function VoucherLedger({
   const batchKeyOf = (v: { reference_type: string | null; description: string | null }) =>
     v.reference_type === 'payroll_disbursement' ? (v.description ?? 'Payroll disbursement').split(' — ')[0].trim() : undefined
   const batchCount =
-    new Set(open.map(batchKeyOf).filter((k): k is string => !!k)).size + lockedBatches.length
+    new Set(open.map(batchKeyOf).filter((k): k is string => !!k)).size + lockedSalary.length
   const counts = {
     all: all.length,
     draft: all.filter((v) => v.status === 'draft').length,
@@ -500,22 +517,25 @@ export default async function VoucherLedger({
                         ? { kind: 'voucher' as const, id: v.id, date: (v.payment_date as string).slice(0, 10) }
                         : undefined,
                   }
-                }), ...lockedBatches.map<VoucherRow>((b) => ({
-                  // One row for the whole batch: what it is, how many, how much.
-                  id: `locked-${b.label}`,
+                }), ...lockedBatches.flatMap((b) => b.departments.map<VoucherRow>((d) => ({
+                  // One row per department of the batch (2026-10-13): which
+                  // department, how many, how much — folded under the batch.
+                  id: `locked-${b.label}|${d.department}`,
                   voucher_no: null,
                   direction: 'debit',
-                  amount: b.total,
-                  payee_name: b.label,
-                  status: b.statuses.length === 1 ? b.statuses[0] : 'mixed',
+                  amount: d.total,
+                  payee_name: d.department,
+                  status: d.statuses.length === 1 ? d.statuses[0] : 'mixed',
                   catLabel: 'Payroll',
                   poolLabel: '—',
-                  description: `${b.count} 张 · ${b.statusText} · 只显示总数`,
-                  paymentOrCreatedDate: b.latest,
+                  description: `${b.label} · ${d.count} 张 · ${d.statusText}`,
+                  paymentOrCreatedDate: d.latest,
+                  batchKey: b.label,
                   locked: true,
-                  // For the Finance view's English line (2026-10-10).
-                  lockedNote: { count: b.count, statusText: b.statusText },
-                })), ...extraFiltered]}
+                  // For the Finance view's English line (2026-10-10), and the
+                  // batch's own count when its departments are put together.
+                  lockedNote: { count: d.count, statusText: d.statusText, statusCounts: d.statusCounts },
+                }))), ...extraFiltered]}
                 // A text search must be able to land on one person's salary
                 // PV, so the batches stay flat while ?q= is set.
                 collapseBatches={!qFilter}

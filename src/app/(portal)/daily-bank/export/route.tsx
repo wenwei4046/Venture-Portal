@@ -6,7 +6,7 @@ import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn } from '@/lib/auth'
-import { canSeePayrollPayouts } from '@/lib/roles'
+import { listsPayrollByPerson } from '@/lib/roles'
 import { fetchDailyBank } from '@/lib/daily-bank-data'
 import { officeToday } from '@/lib/office-time'
 import { sumAmounts } from '@/lib/daily-bank'
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   const date =
     /^\d{4}-\d{2}-\d{2}$/.test(raw) && dayjs(raw).isValid() ? raw : officeToday()
 
-  const data = await fetchDailyBank(supabase, date, { seesPayroll: canSeePayrollPayouts(user) })
+  const data = await fetchDailyBank(supabase, date, { seesPayroll: listsPayrollByPerson(user) })
   // Dynamic departments: the column set comes from the payload (cores + one
   // per provisioned full dept), so the PDF matches the screen.
   const colKeys = data.columns.map(c => c.key)

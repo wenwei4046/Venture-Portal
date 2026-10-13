@@ -41,6 +41,21 @@ beforeEach(() => {
   actions.statutory.mockResolvedValue({ count: 6, people: 3, total: 102 })
 })
 
+// 2026-10-13 — the user: "预设按部门，例外才一人一张": a PV per person names that
+// person and their pay to whoever reads the PVs.
+describe('generating by department is the way', () => {
+  it('Generate by Department is the row’s main button, Manual generate a quiet one — on Salary and on Statutory', () => {
+    render(<PaymentBoard {...boardProps()} />)
+    for (const panel of ['payment-salary-panel', 'payment-statutory-panel']) {
+      const scope = within(document.getElementById(panel) as HTMLElement)
+      expect(scope.getAllByRole('button', { name: 'Generate by Department', hidden: true })[0]).toHaveClass('pay-btn', 'pri')
+      const manual = scope.getAllByRole('button', { name: 'Manual generate', hidden: true })[0]
+      expect(manual).toHaveClass('pay-btn', 'text')
+      expect(manual).not.toHaveClass('pri')
+    }
+  })
+})
+
 describe('Payment statement tabs and confirmation', () => {
   it('reviews separate net basic and commission with independent, frozen receiving accounts', async () => {
     const props = boardProps()

@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import { officeMonth } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn } from '@/lib/auth'
+import { listsPayrollByPerson } from '@/lib/roles'
 import {
   applyGlRefs,
   buildCashFlow,
@@ -59,7 +60,8 @@ export async function GET(req: Request) {
   const [rawLines, accounts, glRefs, bankCodes, ib, inLayoutRaw, outLayoutRaw, arReads] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
-    fetchGlRefs(supabase),
+    // Salary lines by department for whoever reads payroll that way (2026-10-13).
+    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user) }),
     bankCodesRead,
     consolidated ? null : fetchInterBillingCashFlow(supabase, bankCodesRead),
     readReportLayout(supabase, 'cash_flow_in'),

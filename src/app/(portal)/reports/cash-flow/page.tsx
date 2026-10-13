@@ -9,6 +9,7 @@ import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
+import { listsPayrollByPerson } from '@/lib/roles'
 import {
   applyGlRefs,
   buildCashFlow,
@@ -76,7 +77,8 @@ export default async function CashFlowPage({ searchParams }: Props) {
   const [rawLines, accounts, glRefs, bankCodes, ib, inLayoutRaw, outLayoutRaw] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
-    fetchGlRefs(supabase),
+    // Salary lines by department for whoever reads payroll that way (2026-10-13).
+    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user) }),
     bankCodesRead,
     // Fold inter-billing settles (dept_pools-only, no GL) in as synthetic
     // transfer lines so each segment's closing cash ties to its Dept Pool.

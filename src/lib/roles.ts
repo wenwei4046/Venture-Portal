@@ -23,9 +23,22 @@ export function canSeePayrollPayouts(u: PermissionHolder): boolean {
   // What ONE named person is paid, as the treasury side shows it: a salary or
   // statutory voucher, its print, the payroll bank file, Payroll Requests.
   // Treasury alone stops short of it (2026-10-02, the finance executive) —
-  // such an account gets payroll as one total per batch (lib/payroll-vouchers).
+  // such an account gets payroll by department (lib/payroll-vouchers).
   // Whoever runs payroll in HR Costing sees it regardless: the vouchers are theirs.
   return can(u, 'payroll_payouts', 'hr_costing')
+}
+
+/**
+ * Whether a LIST shows payroll person by person — Payments and its export,
+ * Daily Bank, a pool's History, the ledgers: the right to (canSeePayrollPayouts),
+ * and not on the Finance view. The user (2026-10-13), on the Finance view
+ * showing each salary voucher: "按部门，跟 Finance 一样" — so the lens draws
+ * payroll by department, as an account without the right reads it. A voucher's
+ * own page, its print, Payroll Requests, the bank file and Approvals still ask
+ * the right alone: the lens keeps the account's power ("Approvals 照旧给你看明细").
+ */
+export function listsPayrollByPerson(u: (PermissionHolder & { lens?: 'hr' | 'finance' }) | null | undefined): boolean {
+  return !!u && canSeePayrollPayouts(u) && u.lens !== 'finance'
 }
 
 export function canAccessBilling(u: PermissionHolder): boolean {

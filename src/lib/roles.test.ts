@@ -12,6 +12,7 @@ import {
   canApproveClaims,
   canSeeIndividualSalary,
   canSeePayrollPayouts,
+  listsPayrollByPerson,
   canAccessTeam,
 } from './roles'
 import type { UserRole } from '@/types'
@@ -139,6 +140,18 @@ describe('the gates, on a configured title', () => {
     expect(canAccessTreasury(financeExecutive)).toBe(true)
     expect(canSeePayrollPayouts(financeExecutive)).toBe(false)
     expect(canSeePayrollPayouts(financeManager)).toBe(true)
+  })
+
+  // 2026-10-13 — the user on the Finance view: "按部门，跟 Finance 一样".
+  it('lists payroll by person with the right — and never on the Finance view, which keeps the right itself', () => {
+    const principal = { permissions: ['treasury', 'payroll_payouts', 'hr_costing'] }
+    expect(listsPayrollByPerson(principal)).toBe(true)
+    expect(listsPayrollByPerson({ ...principal, lens: 'hr' as const })).toBe(true)
+    const onFinanceView = { ...principal, lens: 'finance' as const }
+    expect(listsPayrollByPerson(onFinanceView)).toBe(false)
+    expect(canSeePayrollPayouts(onFinanceView)).toBe(true)
+    // An account without the right lists by department wherever it is.
+    expect(listsPayrollByPerson({ permissions: ['treasury'] })).toBe(false)
   })
 
   it('holds nothing for an empty set', () => {

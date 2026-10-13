@@ -9,6 +9,7 @@ import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
+import { listsPayrollByPerson } from '@/lib/roles'
 import { applyGlRefs, buildPnl, fetchAllJournalLines, fetchCoaAccounts, fetchGlRefs, monthPeriod } from '@/lib/gl-reports'
 import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/consolidation'
 import { pnlBlocks } from '@/lib/gl-report-blocks'
@@ -50,7 +51,8 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
   const [rawLines, accounts, glRefs, elim] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
-    fetchGlRefs(supabase),
+    // Salary lines by department for whoever reads payroll that way (2026-10-13).
+    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user) }),
     consolidated ? fetchInterBillingElimination(supabase) : Promise.resolve(null),
   ])
   let lines = applyGlRefs(rawLines, glRefs)

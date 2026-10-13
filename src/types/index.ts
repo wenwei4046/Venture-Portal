@@ -17,6 +17,10 @@ export interface User {
   // Set only while a Principal is masked by the view-as switcher: `role`
   // carries the masked role driving gates/UI, `actualRole` the real one.
   actualRole?: UserRole
+  // HR's or Finance's view worn over the account's own power (the LENS,
+  // 2026-10-11 — lib/auth.ts). On Finance's, payroll is listed by department
+  // as Finance reads it (2026-10-13, lib/roles.ts listsPayrollByPerson).
+  lens?: 'hr' | 'finance'
   // The REAL account holds `view_switch` (Ultimate full access, and the
   // Principal account) — so the view switcher shows, masked or not. Full
   // access is everything else without it (2026-10-08).

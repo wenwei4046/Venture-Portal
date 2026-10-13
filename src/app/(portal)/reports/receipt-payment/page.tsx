@@ -13,6 +13,7 @@ import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
+import { listsPayrollByPerson } from '@/lib/roles'
 import {
   applyGlRefs,
   buildCashFlow,
@@ -77,7 +78,8 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
   const [rawLines, accounts, glRefs, bankCodes, ib, inLayoutRaw, outLayoutRaw, arReads] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
-    fetchGlRefs(supabase),
+    // Salary lines by department for whoever reads payroll that way (2026-10-13).
+    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user) }),
     bankCodesRead,
     consolidated ? null : fetchInterBillingCashFlow(supabase, bankCodesRead),
     readReportLayout(supabase, 'cash_flow_in'),

@@ -429,6 +429,14 @@ point 5); a page from elsewhere still opens. The owner kind follows the account
 view. Only the member app's Revenue View still masks (role defaults). Seeing the
 portal exactly as somebody else does is View as a person, read-only (next).
 
+**…BUT FINANCE'S VIEW LISTS PAYROLL BY DEPARTMENT (2026-10-13, the user: 按部门，
+跟 Finance 一样).** `getUser` marks a lens (`User.lens` = 'hr' | 'finance'), and
+`listsPayrollByPerson(user)` (lib/roles.ts) = `canSeePayrollPayouts` and not on
+Finance's lens — what every LIST of payroll asks (Payments and its export, Daily
+Bank, a pool's History, the ledgers). The right itself still opens a voucher,
+its print, Payroll Requests, the bank file and Approvals, so the lens keeps the
+account's power. The rule: `../finance/finance-view.md` › PAYROLL BY DEPARTMENT.
+
 **PAGES AND SIDEBARS FOLLOW THE TABS (2026-10-11, the HR revamp 8b — point 6:
 app gates per tab).** Every portal page asks `await requirePage('<its route>')`
 FIRST — its route as the folders spell it, `/fund-in/[id]/edit` — and
