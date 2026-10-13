@@ -1120,8 +1120,8 @@ export async function approveRequestGroupPartial(args: {
   revalidatePath('/hr-costing/payment')
 }
 
-// ─── Batch voucher details for CombinedApprovalCard modal (Principal) ────────
-// Called when Principal clicks "View details" on a combined approval card.
+// ─── Batch voucher details for BatchDetailsModal (Principal) ─────────────────
+// Called when Principal opens a row tagged Combined in the approvals queue.
 // Batches the voucher + sources + attachments lookups so an N-voucher modal
 // opens in 3 round-trips, not 3N.
 

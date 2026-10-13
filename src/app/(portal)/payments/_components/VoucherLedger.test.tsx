@@ -22,7 +22,6 @@ vi.mock('@/lib/payment-extras', () => ({ fetchPaymentExtras: vi.fn(async () => [
 vi.mock('./PaymentTabs', () => ({
   default: (props: { counts?: Record<string, number> }) => <pre data-testid="tabs">{JSON.stringify(props.counts ?? null)}</pre>,
 }))
-vi.mock('./PaymentFilters', () => ({ default: () => <div data-testid="payment-filters" /> }))
 vi.mock('./BackToTop', () => ({ default: () => null }))
 // The table is a client component: its props are exactly what the server sends
 // to the browser, so they are printed and read here as the browser would get them.
