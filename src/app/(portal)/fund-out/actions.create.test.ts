@@ -9,7 +9,7 @@ import { describe } from 'vitest'
  *   - happy path: createLoan returns both loan_id and approval_id via RPC
  *   - simulated approval_request INSERT failure → loan rolled back, no orphan
  *
- * @see docs/plan-phase1-5.md Step 4 — original fix spec
- * @see docs/plan-phase2.md — M1 deferral rationale
+ * @see docs/plan-phase1-5.md Step 4 — original fix spec (removed 2026-10-14; git history)
+ * @see docs/plan-phase2.md — M1 deferral rationale (removed 2026-10-14; git history)
  */
 describe.todo('createLoan — M1 atomicity regression (deferred)')

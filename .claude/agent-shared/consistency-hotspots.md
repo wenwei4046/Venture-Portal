@@ -4,7 +4,7 @@
 
 ## 1. loans.outstanding
 - Principal: dashboard waterfall (`loans_outstanding`)
-- Finance: `/fund-out` list + `/overdue` detector
+- Finance: `/fund-out` list + Reports › Loan Aging (`/reports/loan-aging`; the `/overdue` detector was removed in #360)
 - Reports: base-rate calculator
 - Source of truth: `loan_outstanding` view (`principal - SUM(repayments WHERE payment_type='principal')`)
 
@@ -17,7 +17,7 @@
 
 ## 3. Director Salary period total
 - HR + Principal: see per-director (`director_payouts.gross_amount`)
-- Finance: sees only 6-line aggregate via `get_director_payout_summary` RPC
+- Finance: sees only 6-line aggregate via `get_director_payout_summary` RPC — **gone from the UI (checked 2026-10-14):** Finance has no `director_salary` / `director_pool` permission since Director Pool v2 (2026-07-21) and no page calls that RPC, so check the Finance side of the invariant in SQL only
 - **Invariant**: SUM(HR per-director gross_amount) == Finance's `out_total_75_net + out_total_75_er + out_total_75_pcb + out_total_25_invoice + out_total_advance + out_total_saving`
 - **GL counterpart (post mig 201)**: 3 journal entries — Director Pool funding (3010→3080), 25% split (3080→3060), 5% saving (3080→3020)
 
@@ -27,20 +27,19 @@
 - **Invariant**: SUM(basic+statutory+allowance) per dept from HR view == Finance's lump-sum row
 
 ## 5. Payroll-run total_amount
-- HR: dashboard cycle board (step 3 total)
+- HR: `/hr-costing/payroll/[period]` (the dashboard's April cycle board is gone)
 - Principal: `/approvals/payroll-run/[id]`
 - Finance: `/payments/payroll-requests`
 - Source: `payroll_runs.total_amount`
 
 ## 6. hv_operating_fund / venture_pool balance
 - Principal + Finance: dashboard hero
-- Principal + Finance: `/operating-fund` page
+- Principal + Finance: `/venture-pool` page (was `/operating-fund`)
 - Source: `venture_pool_balance` view
 
 ## 7. Pending approvals count
 - Principal dashboard card (`pending_approvals_count`)
 - `/approvals` page actual row count
-- HR dashboard cycle step 5 status (if period payroll)
 - Finance dashboard "Awaiting your sign-off" list
 
 ## 8. Invoice Payout Pool balance

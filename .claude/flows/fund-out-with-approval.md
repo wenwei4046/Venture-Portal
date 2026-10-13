@@ -30,7 +30,7 @@ expected_duration_min: 5
 
 ### Step 2 — Principal approves combined group
 - Logout → login as `principal@venture.my / 123456`
-- Navigate `/approvals` → find the combined card (loan + voucher) → Approve
+- Navigate `/approvals` → find the combined row (loan + voucher — the queue shows a group as ONE row, `src/lib/approval-queue.ts`) → Approve
 
 **Assert (DB)**:
 - Both `approval_requests` rows flipped to `status='approved'`
@@ -59,7 +59,7 @@ SELECT jl.account_code, jl.debit, jl.credit
 |---|---|---|---|
 | `loans.principal` | dashboard `loans_outstanding` | `/fund-out` list | 0.00 |
 | Bank balance (post-approval) | dashboard | `/payments`, `/fund-out/{id}` | 0.00 |
-| Venture Pool balance | dashboard | `/operating-fund` | 0.00 |
+| Venture Pool balance | dashboard | `/venture-pool` (was `/operating-fund`) | 0.00 |
 
 ## Verdict mapping
 - 2-line JE lands with dr 1020 / cr 1010 = 100000 → 🟢 GREEN
