@@ -15,6 +15,7 @@ import { adsPerfVM } from "./adsperf";
 import { chatProgressVM } from "./chatprogress";
 import { chatVM } from "./chat";
 import { bookVM, customerFormVM, historyVM, noteVM } from "./extras";
+import { accessVM } from "./access";
 
 export function deskVM(ctx: DeskCtx) {
   const { ui, patch, data } = ctx;
@@ -59,7 +60,7 @@ export function deskVM(ctx: DeskCtx) {
     openNote: () => { if (ui.chat) patch({ menu: false, kind: "note" }); },
     editInfo: () => patch({ kind: "form", cform: null }),
     kBook: ui.kind === "book", kNote: ui.kind === "note", kForm: ui.kind === "form",
-    book: bookVM(ctx, cur), note: noteVM(ctx, cur), cform: customerFormVM(ctx, data.customers.find(c => c.id === (ui.infoId ?? ui.chat ?? ""))), history: historyVM(ctx),
+    book: bookVM(ctx, cur), note: noteVM(ctx, cur), cform: customerFormVM(ctx, data.customers.find(c => c.id === (ui.infoId ?? ui.chat ?? ""))), history: historyVM(ctx), access: accessVM(ctx),
     cyclePeriod: () => { const order = ["month", "week", "day"] as const, i = order.indexOf(ui.insPer as (typeof order)[number]); patch({ insPer: order[(i + 1) % order.length], insRange: null }); },
     periodOpts: (["day", "week", "month", "custom"] as const).map((k, i) => ({ label: ["Today", "This week", "This month", "Custom"][i], on: ui.insPer === k, off: ui.insPer !== k,
       pick: () => (k === "custom" ? patch({ insPer: "custom", insRange: ui.insRange ?? { a: new Date(ctx.now.getFullYear(), ctx.now.getMonth(), 1).getTime(), b: ctx.now.getTime() } }) : patch({ insPer: k, insRange: null })) })),

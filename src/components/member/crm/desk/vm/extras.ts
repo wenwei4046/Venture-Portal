@@ -139,7 +139,7 @@ export function customerFormVM(ctx: DeskCtx, c: CrmCustomer | undefined) {
 export function historyVM(ctx: DeskCtx) {
   const { ui, patch } = ctx;
   const rows = ui.history ?? [];
-  const AREA: Record<string, string> = { crm_showrooms: "Showrooms", crm_ad_assign: "Ads to teams", crm_fulltime_rules: "Full time lead allocation", crm_staff: "Member work type", crm_templates: "Cold lead templates", crm_forms: "Forms" };
+  const AREA: Record<string, string> = { crm_showrooms: "Showrooms", crm_ad_assign: "Ads to teams", crm_fulltime_rules: "Full time lead allocation", crm_staff: "Member work type", crm_templates: "Cold lead templates", crm_forms: "Forms", crm_access: "Permissions" };
   const f = ui.histF;
   const shown = rows.filter(r => f === "all" || r.table === f);
   return {

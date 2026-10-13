@@ -47,7 +47,8 @@ module.exports = [
   // ── Screens the design does not draw, in its style (desk/DeskExtras.tsx) ──
   ["{!!(v.kAlerts) && (<>", "{!!(v.kBook) && (<DeskBook v={v.book} />)}{!!(v.kNote) && (<DeskNote v={v.note} />)}{!!(v.kForm) && (<DeskCustomerForm v={v.cform} />)}{!!(v.kAlerts) && (<>",
     "Booking a visit, a note and editing a customer open in the pane (built in the design's style)."],
-  ["{!!(v.isMwtOp) && (<>", "{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isMwtOp) && (<>", "Settings › History (the owner, 2026-10-13): who changed which setting, when."],
+  ["{!!(v.isMwtOp) && (<>", "{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isAccessOp) && (<DeskAccess v={v.access} />)}{!!(v.isMwtOp) && (<>",
+    "Settings › History and Settings › Permissions (the owner, 2026-10-13)."],
   ...chatPatches("v.chatIn", "v.chatOut", "v.chatText", "v.chatTime", "v.chatReply", "v.msgs", "v.draft", "v.setDraft", "v.draftKey", "v.send", "v.micD", "v.attach", "v.photo", false),
   ...chatPatches("v.aw.inn", "v.aw.out", "v.aw.msg", "v.aw.clock", "v.aw.reply", "v.awMsgs", "v.awDraft", "v.awSetDraft", "v.awDraftKey", "v.awSend", "v.awMicD", "v.awAttach", "v.awPhoto", true),
   // Meta is not connected yet (PROPOSALS.md C, waiting for the owner): the line says so instead of the sample's

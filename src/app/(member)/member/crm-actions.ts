@@ -29,6 +29,8 @@ const CRM_WRITES = [
   "crm_save_template", "crm_template_on", "crm_delete_template",
   // CRM Desktop rev 1 (mig 20261013100000): reminders, deleted notifications, forms, notes.
   "crm_remind", "crm_delete_notifs", "crm_save_form", "crm_delete_form", "crm_add_note",
+  // The permissions console (mig 20261014010000): one person's CRM row, View / Edit / Manage.
+  "crm_set_access",
 ] as const;
 export type CrmWrite = (typeof CRM_WRITES)[number];
 
@@ -89,7 +91,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ad_rule", "crm_save_fulltime",
   "crm_save_team_shares", "crm_set_full_time", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
-  "crm_remind", "crm_save_form", "crm_delete_form",
+  "crm_remind", "crm_save_form", "crm_delete_form", "crm_set_access",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
@@ -464,14 +466,38 @@ export async function fetchCrmHistory(before?: number): Promise<{ ok: true; rows
   try {
     const db = await session();
     await requireCrm("manage");
-    const { data, error } = await db.rpc("audit_changes", { p_tables: HISTORY_TABLES, p_before: before ?? null, p_limit: 200 });
+    const [{ data, error }, access] = await Promise.all([
+      db.rpc("audit_changes", { p_tables: HISTORY_TABLES, p_before: before ?? null, p_limit: 200 }),
+      // Who changed whose CRM permissions (mig 20261014010000); none before it is applied.
+      Promise.resolve(db.rpc("crm_access_history", { p_limit: 200 })).then(r => (r.error ? [] : (r.data ?? [])) as AccessRow[], () => [] as AccessRow[]),
+    ]);
     if (error) throw new Error(error.message);
     type Row = { id: number; occurred_at: string; actor_name: string | null; actor_source: string; table_name: string; row_key: string | null; op: string; old_row: Record<string, unknown> | null; new_row: Record<string, unknown> | null; changed: string[] | null };
-    return { ok: true, rows: ((data ?? []) as Row[]).map(r => ({
+    type AccessRow = { id: number; occurred_at: string; actor_name: string | null; staff_name: string; op: string; old_row: Record<string, unknown> | null; new_row: Record<string, unknown> | null };
+    const rows: CrmHistoryRow[] = ((data ?? []) as Row[]).map(r => ({
       id: r.id, at: r.occurred_at, who: r.actor_name ?? (r.actor_source === "database" ? "The CRM" : "System"), table: r.table_name, op: r.op,
       key: r.row_key ?? "", before: r.old_row, after: r.new_row, changed: r.changed ?? [],
-    })) };
+    }));
+    for (const a of access) rows.push({ id: a.id, at: a.occurred_at, who: a.actor_name ?? "System", table: "crm_access", op: a.op, key: a.staff_name,
+      before: a.old_row, after: a.new_row, changed: ["scope"] });
+    return { ok: true, rows: rows.sort((x, y) => y.at.localeCompare(x.at)) };
   } catch (error) {
     return { ok: false, error: friendly(error, "History could not be read. Please try again.") };
+  }
+}
+
+/** One person's CRM row as the console shows it (crm_access_list): their title's cells, their own, and why it is locked. */
+export interface CrmAccessRow { staffId: string; name: string; userId: string | null; template: string | null; tpl: Record<string, string>; own: Record<string, string>; locked: string | null }
+
+/** Settings › Permissions (mig 20261014010000): everybody in the CRM and their CRM row. CRM · Manage only. */
+export async function fetchCrmAccess(): Promise<{ ok: true; rows: CrmAccessRow[] } | { ok: false; error: string }> {
+  try {
+    const db = await session();
+    await requireCrm("manage");
+    const { data, error } = await db.rpc("crm_access_list");
+    if (error) throw new Error(error.message);
+    return { ok: true, rows: (data ?? []) as CrmAccessRow[] };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "The permissions could not be read. Please try again.") };
   }
 }

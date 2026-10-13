@@ -8,7 +8,7 @@
  * writes (PROPOSALS.md B1–B6) — each a database function that asks who may, as every CRM write does.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { crmWrite, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
+import { crmWrite, fetchCrmAccess, fetchCrmHistory, saveCrmShowroomExtras, type CrmAccessRow } from "@/app/(member)/member/crm-actions";
 import type { CrmData, CrmEvent, CrmForm, CrmNote, CrmPerson } from "@/lib/member/crm-data";
 import type { PanelActions } from "../panel/actions";
 import type { Team } from "../panel/vm/common";
@@ -161,7 +161,16 @@ export default function DeskScreens(p: DeskScreensProps) {
     slotCounts, W: size.W, H: size.H, app: p.app, toMine: p.toMine, exit: p.exit,
   };
   const v = deskVM(ctx);
-  const histOn = !!v.isHistOp;
+  const histOn = !!v.isHistOp, accessOn = !!v.isAccessOp;
+
+  // Settings › Permissions reads everybody's CRM row when it opens and after each change (accessVM empties it).
+  useEffect(() => {
+    if (!accessOn || ui.access !== null) return;
+    let current = true;
+    if (!live) { patch({ access: demoAccess(data, p.me.id) }); return; }
+    void fetchCrmAccess().then(r => { if (current) patch(r.ok ? { access: r.rows } : { access: [], toast: r.error }); });
+    return () => { current = false; };
+  }, [accessOn, ui.access, live, patch, data, p.me.id]);
 
   // History reads the audit trail when it opens (Settings › History; picking it again reads it again).
   useEffect(() => {
@@ -205,4 +214,11 @@ export default function DeskScreens(p: DeskScreensProps) {
       <DeskApp v={v} />
     </div>
   );
+}
+
+/** The preview's console (no database): each person's CRM row as their role's template gives it. */
+function demoAccess(data: CrmData, me: string): CrmAccessRow[] {
+  const tpl = (role: string): Record<string, string> => (role === "hod" ? { view: "all", edit: "all", manage: "all" } : { view: "own", edit: "own" });
+  return data.people.map(x => ({ staffId: x.id, name: x.name, userId: x.id, template: x.role === "hod" ? "Revenue Director" : "Revenue Team",
+    tpl: tpl(x.role), own: {}, locked: x.id === me ? "Your own" : x.role === "boss" ? "Full access" : null }));
 }

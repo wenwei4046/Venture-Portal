@@ -35,6 +35,8 @@ export function lists(ctx: DeskCtx): Record<string, [string, string, string][]> 
     ],
     settings: [["Member work type", "", "briefcase"], ["Cold lead templates", "", "file"], ["Forms", "", "file"], ["Notifications", "", "bell"],
       // History (the owner, 2026-10-13: in Settings, not the sidebar) — not in the design; drawn as its siblings.
+      // Permissions (the owner, 2026-10-13): who may see and do what in the CRM — drawn as its siblings.
+      ["Permissions", "Who can see and do what in the CRM", "users"],
       ["History", "Who changed which setting, and when", "clock"]],
     showrooms: [["Showrooms", "", "store"]],
   };
@@ -122,7 +124,7 @@ export function frameVM(ctx: DeskCtx) {
   const opItem = (L[tab] ?? [])[opIdx] ?? ["", "", ""];
   const sc = SHEET_COPY[tab] ?? ["", "", ""];
   const sheetRows = (L[tab] ?? []).map(([title, sub, ic], i) => ({ title, sub, d: PHONE_IC[title] ?? LI[ic], badge: B[title] || null, bg: SOLID[i % 5], fg: "#FFFFFF",
-    pick: () => patch({ pick: i, stage: "op", ...(title === "History" ? { history: null } : {}), sendFor: null, awChat: null, ad: null, ftEdit: null, cpSel: null, frmOpen: false, cltEdit: null }) }));
+    pick: () => patch({ pick: i, stage: "op", ...(title === "History" ? { history: null } : title === "Permissions" ? { access: null } : {}), sendFor: null, awChat: null, ad: null, ftEdit: null, cpSel: null, frmOpen: false, cltEdit: null }) }));
 
   const closePane = () => {
     if (sheetMode) {
@@ -154,7 +156,7 @@ export function frameVM(ctx: DeskCtx) {
     showKicker: tab !== "showrooms", // The section pill ("All assignment ⌄") is gone (the owner, 2026-10-13): the right menu already switches sections.
     showOpChip: false,
     isAdsOp: opItem[0] === "Ads to teams", notAdsOp: opItem[0] !== "Ads to teams" && opItem[0] !== "Full time lead allocation",
-    isFtOp: opItem[0] === "Full time lead allocation", isMwtOp: opItem[0] === "Member work type", isHistOp: tab === "settings" && opItem[0] === "History", isSrOp: opItem[0] === "Showrooms", isCltOp: opItem[0] === "Cold lead templates",
+    isFtOp: opItem[0] === "Full time lead allocation", isMwtOp: opItem[0] === "Member work type", isHistOp: tab === "settings" && opItem[0] === "History", isAccessOp: tab === "settings" && opItem[0] === "Permissions", isSrOp: opItem[0] === "Showrooms", isCltOp: opItem[0] === "Cold lead templates",
     isCpOp: opItem[0] === "Chat progress", isFrmOp: opItem[0] === "Forms", isNtfOp: tab === "settings" && opItem[0] === "Notifications",
     plainOp: !["Ads to teams", "Full time lead allocation", "Member work type", "Cold lead templates", "Showrooms", "Forms"].includes(opItem[0]) && !(tab === "settings" && opItem[0] === "Notifications"),
     opItem: opItem[0],

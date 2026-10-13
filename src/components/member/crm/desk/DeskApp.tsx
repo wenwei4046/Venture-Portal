@@ -7,7 +7,7 @@
 import { Fragment } from "react";
 import type React from "react";
 import DH from "./desk-hover.module.css";
-import { DeskBook, DeskCardPicker, DeskCustomerForm, DeskHistory, DeskNote } from "./DeskExtras";
+import { DeskAccess, DeskBook, DeskCardPicker, DeskCustomerForm, DeskHistory, DeskNote } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
 /** The whole desktop CRM: the Revenue app's frame around it (sidebar, top bar), every page, pane, menu and the toast. */
@@ -879,7 +879,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </>)}
                 </div>
               </>)}
-              {!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isMwtOp) && (<>
+              {!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isAccessOp) && (<DeskAccess v={v.access} />)}{!!(v.isMwtOp) && (<>
                 <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", marginTop: "-10px" }}>
                   <span style={{ flex: "1", minWidth: "260px", fontSize: "14px", color: "#806B60" }}>Turned on here, they appear in Assignment › Full time lead allocation, where you pick their days.</span>
                   {!!(v.mwtSavedMsg) && (<>

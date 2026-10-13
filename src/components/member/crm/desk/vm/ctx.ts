@@ -107,6 +107,8 @@ export interface DeskUi {
   book: { room: number; day: number; slot: string | null; week: number; view?: "week" | "month"; monthOpen?: boolean; pickYear?: number } | null;
   cform: Record<string, string> | null;
   history: HistRow[] | null;
+  /** Settings › Permissions: everybody's CRM row (crm_access_list); null until read. */
+  access: import("@/app/(member)/member/crm-actions").CrmAccessRow[] | null;
   histF: string;
 }
 
@@ -137,7 +139,7 @@ export const initialDeskUi = (): DeskUi => ({
   cltF: "all", cltFOpen: false, cltEdit: null, cltDraft: null, cltDN: null, cltDC: null, cltIsNew: false, cltAsk: null, cltMore: false, cltVars: [],
   frmOpen: false, frmCur: null, frmDraft: null, frmName: null, frmIsNew: false, frmExp: null, frmOptIn: {},
   ntfTab: "unread", ntfCat: "all", ntfSel: false, ntfPick: {},
-  book: null, cform: null, history: null, histF: "all",
+  book: null, cform: null, history: null, access: null, histF: "all",
 });
 
 /** The Revenue app around the CRM: its sidebar pages, top bar and who is signed in. */

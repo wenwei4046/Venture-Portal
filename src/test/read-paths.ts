@@ -185,6 +185,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'crm_template_statuses', 'crm_template_submitted',
   // CRM Desktop rev 1 (mig 20261013100000): asks crm_manages().
   'crm_save_showroom_extras',
+  // The CRM's permissions console (mig 20261014010000): each asks crm_manages().
+  'crm_access_list', 'crm_access_history',
   'close_approvals_for_voided_voucher', 'create_loan_with_approval', 'create_payroll_disbursement_vouchers', 'save_director_salary_results',
   'bank_gl_codes', 'bridge_mirror_slices', 'bridge_ref_flags', 'build_hr_cost_submission_payload', 'bump_bank_balance',
   'bump_bank_for_paid_credit', 'calculate_dept_np', 'cancel_dept_payment_request', 'cancel_loan_and_approval',

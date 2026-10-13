@@ -7,6 +7,7 @@
  */
 import { Fragment } from "react";
 import type { bookVM, customerFormVM, historyVM, noteVM } from "./vm/extras";
+import type { accessVM } from "./vm/access";
 
 const BACK = { flex: "0 0 auto", display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", border: "0", borderBottom: "1px solid #EBDDD2", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "#BD4A19", cursor: "pointer", textAlign: "left" } as const;
 const BODY = { flex: "1", minHeight: "0", overflow: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: "16px", background: "#fff" } as const;
@@ -151,5 +152,45 @@ export function DeskCardPicker({ v }: { v: { insCardsToggle?: () => void; insCar
     <button type="button" onClick={v.insCardsToggle} style={{ alignSelf: "center", display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 12px", boxSizing: "border-box", borderRadius: "16px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "#3F2B22", cursor: "pointer", whiteSpace: "nowrap" }}>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#BD4A19" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"></path></svg>Metrics · {v.insCardsN}
     </button>
+  );
+}
+
+/**
+ * Settings › Permissions (the owner, 2026-10-13): one row a person — their name, title and team, then View · Edit ·
+ * Manage as the design's segmented pills (History's list and the Showrooms editor's switches). A choice saves at once;
+ * the title's own choice carries a dot; a changed row says so and offers "Reset to title"; a locked row says why.
+ */
+export function DeskAccess({ v }: { v: ReturnType<typeof accessVM> }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <span style={{ fontSize: "13.5px", color: "#806B60", lineHeight: "1.5" }}>
+        A choice saves at once and reaches their phone and computer within seconds. • marks what their title gives. The same as People › Permissions.
+      </span>
+      <div style={{ border: "1px solid #EBDDD2", borderRadius: "16px", overflow: "hidden", background: "#fff" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(200px, 1fr) 158px 158px 96px 110px", gap: "16px", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid #EBDDD2", fontSize: "11px", fontWeight: "700", letterSpacing: ".06em", color: "#806B60" }}>
+          <span>PERSON</span><span style={{ textAlign: "center" }}>VIEW</span><span style={{ textAlign: "center" }}>EDIT</span><span style={{ textAlign: "center" }}>MANAGE</span><span />
+        </div>
+        {v.loading && <div style={{ padding: "28px", textAlign: "center", fontSize: "14px", color: "#A08E82" }}>Loading the permissions…</div>}
+        {v.empty && <div style={{ padding: "28px", textAlign: "center", fontSize: "14px", color: "#A08E82" }}>Nobody in the CRM yet</div>}
+        {v.rows.map((r, i) => <div key={i} style={{ display: "grid", gridTemplateColumns: "minmax(200px, 1fr) 158px 158px 96px 110px", gap: "16px", alignItems: "center", padding: "12px 16px", borderTop: i ? "1px solid #F1E7DF" : "0", opacity: r.isLocked ? 0.62 : 1 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: "0" }}>
+            <span style={{ flex: "none", width: "34px", height: "34px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", fontSize: "12px", fontWeight: "700", display: "grid", placeItems: "center" }}>{r.ini}</span>
+            <span style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: "0" }}>
+              <strong style={{ fontSize: "14.5px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</strong>
+              <span style={{ fontSize: "12.5px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.sub}</span>
+              <span style={{ fontSize: "12px", fontWeight: "600", color: r.changed ? "#BD4A19" : "#A08E82" }}>{r.isLocked ? r.locked : r.note}</span>
+            </span>
+          </span>
+          {r.groups.map(g => <span key={g.label} style={{ justifySelf: "center", display: "flex", gap: "2px", padding: "2px", borderRadius: "16px", background: "#F5EBE3" }}>
+            {g.opts.map(o => <span key={o.label} onClick={o.pick} title={o.mark ? "What their title gives" : undefined} style={{ position: "relative", height: "28px", padding: "0 12px", whiteSpace: "nowrap", boxSizing: "border-box", borderRadius: "14px", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: o.on ? "650" : "550", background: o.bg, color: o.fg, boxShadow: o.sh, cursor: o.cur }}>
+              {o.label}{o.mark && <span style={{ position: "absolute", top: "3px", right: "4px", width: "4px", height: "4px", borderRadius: "50%", background: "#BD4A19" }} />}
+            </span>)}
+          </span>)}
+          <span style={{ textAlign: "right" }}>
+            {r.changed && !r.isLocked && <button type="button" onClick={r.reset} style={{ border: "0", background: "transparent", padding: "0", font: "inherit", fontSize: "13px", fontWeight: "650", color: "#BD4A19", cursor: "pointer", whiteSpace: "nowrap" }}>Reset to title</button>}
+          </span>
+        </div>)}
+      </div>
+    </div>
   );
 }
