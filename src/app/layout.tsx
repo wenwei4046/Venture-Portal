@@ -24,6 +24,18 @@ const newsreader = Newsreader({
   display: 'swap',
 })
 
+// Its true italic, for the sign-in page's two italic lines only — never
+// preloaded, so no other page downloads it (a slanted roman is what the
+// browser draws without it, and Georgia had a real italic).
+const newsreaderItalic = Newsreader({
+  subsets: ['latin'],
+  style: 'italic',
+  axes: ['opsz'],
+  variable: '--font-newsreader-italic',
+  display: 'swap',
+  preload: false,
+})
+
 const inter = Inter({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
@@ -93,7 +105,7 @@ export default function RootLayout({
   return (
     <html
       lang="en-MY"
-      className={`${inter.variable} ${newsreader.variable} ${chivoMono.variable} ${notoSansSc.variable}`}
+      className={`${inter.variable} ${newsreader.variable} ${newsreaderItalic.variable} ${chivoMono.variable} ${notoSansSc.variable}`}
       suppressHydrationWarning
     >
       <head>
