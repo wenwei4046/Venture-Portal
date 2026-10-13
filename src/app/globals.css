@@ -6157,6 +6157,10 @@ button.bil-month-label:hover:not(:disabled) { background: rgb(247 247 245); }
 .bil-month-grid button:hover { background: rgb(255 244 231); }
 .bil-month-grid button[data-now='true'] { border-color: rgb(117 100 86); }
 .bil-month-grid button[aria-pressed='true'] { border-color: #E99A53; background: #E99A53; font-weight: 600; }
+/* A month the page has something for (Statements, 2026-10-14): a walnut dot under it. */
+.bil-month-grid button[data-marked='true'] { position: relative; }
+.bil-month-grid button[data-marked='true']::after { content: ''; position: absolute; left: 50%; bottom: 4px; width: 4px; height: 4px; margin-left: -2px; border-radius: 9999px; background: rgb(117 100 86); }
+.bil-month-grid button[data-marked='true'][aria-pressed='true']::after { background: #000; }
 .bil-month-foot { display: flex; justify-content: flex-end; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgb(229 228 223); }
 .bil-month-foot button { border: 0; background: transparent; color: #96640C; font-size: 12px; font-weight: 500; cursor: pointer; }
 

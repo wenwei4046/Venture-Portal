@@ -262,6 +262,32 @@ try {
   await q(saveWeeks)
   check(Number(await one(`SELECT count(*) FROM public.bw_saves`)), 2, 'ticked, or nobody unticked anything for them: saved as before')
 
+  // ── The Overdue page is gone (mig 20261014010000): the registry seeded again, the box's ticks dropped ──
+  // The ticks' tables as mig 20261011010000 makes them (their columns only).
+  await db.exec(`
+    CREATE TABLE public.permission_template_tabs (template_id uuid NOT NULL, tab_id text NOT NULL, action text NOT NULL, PRIMARY KEY (template_id, tab_id, action));
+    CREATE TABLE public.user_permission_tabs (user_id uuid NOT NULL, tab_id text NOT NULL, action text NOT NULL, granted boolean NOT NULL, PRIMARY KEY (user_id, tab_id, action));
+    INSERT INTO public.permission_template_tabs VALUES
+      ('00000000-0000-4000-8000-0000000000a1', 'fin.overdue', 'view'), ('00000000-0000-4000-8000-0000000000a1', 'fin.overdue', 'create'),
+      ('00000000-0000-4000-8000-0000000000a1', 'fin.fund_out', 'view'), ('00000000-0000-4000-8000-0000000000a1', 'fin.fund_out', 'create');
+    INSERT INTO public.user_permission_tabs VALUES
+      ('00000000-0000-4000-8000-000000000001', 'fin.overdue', 'edit', false), ('00000000-0000-4000-8000-000000000001', 'fin.statements', 'edit', false);
+  `)
+  const pagesBefore = Number(await one(`SELECT count(*) FROM public.permission_page_tabs`))
+  check(Number(await one(`SELECT count(*) FROM public.permission_page_tabs WHERE page = '/overdue'`)), 1, 'the Overdue page is in the registry until then')
+  const overdueSql = (await readFile(new URL('20261014010000_overdue_page_gone.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(overdueSql)
+  await db.exec(overdueSql)
+  check(Number(await one(`SELECT count(*) FROM public.permission_page_tabs`)), pagesBefore - 1, 'one page fewer — run twice, seeded once')
+  check(Number(await one(`SELECT count(*) FROM public.permission_page_tabs WHERE page = '/overdue' OR tab_id = 'fin.overdue'`)), 0, 'no /overdue page, no Overdue tab')
+  check(Number(await one(`SELECT count(*) FROM public.permission_tab_cells WHERE tab_id = 'fin.overdue'`)), 0, 'the Overdue box opens nothing any more')
+  check(Number(await one(`SELECT count(*) FROM public.permission_tab_cells WHERE cell = 'treasury.create'`)), 8, 'the other eight treasury tabs keep Treasury · Create')
+  check(await q(`SELECT tab_id, action FROM public.permission_template_tabs ORDER BY tab_id, action`), [
+    { tab_id: 'fin.fund_out', action: 'create' },
+    { tab_id: 'fin.fund_out', action: 'view' },
+  ], 'a template’s Overdue ticks go, its other ticks stay')
+  check(await q(`SELECT tab_id FROM public.user_permission_tabs`), [{ tab_id: 'fin.statements' }], 'a person’s Overdue box goes, their others stay')
+
   console.log(`tab writes: ${checks} checks passed`)
 } finally {
   await db.close()

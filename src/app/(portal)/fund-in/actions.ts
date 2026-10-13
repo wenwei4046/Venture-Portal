@@ -547,7 +547,6 @@ export async function setFundSourceRepaymentStart(
 
   revalidatePath(`/fund-in/${id}`)
   revalidatePath('/fund-in')
-  revalidatePath('/overdue')
   revalidatePath('/dashboard')
   revalidatePath('/reports/loan-aging')
   revalidatePath('/reports/fund-summary')

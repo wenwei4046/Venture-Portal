@@ -9,7 +9,7 @@ import { financePageTitle, isFinanceDetailRoute, isFinanceView } from './finance
 
 describe('isFinanceView', () => {
   it('is Finance’s pages, for Finance and the Principal', () => {
-    for (const path of ['/payments', '/receipts/abc', '/statements', '/statements/monthly', '/invoices/i1', '/billing-allocator', '/daily-bank', '/fund-in/x1', '/ba', '/overdue', '/repayment-schedule', '/venture-pool', '/reconciliation/journal-entries/new', '/approvals']) {
+    for (const path of ['/payments', '/receipts/abc', '/statements', '/statements/monthly', '/invoices/i1', '/billing-allocator', '/daily-bank', '/fund-in/x1', '/ba', '/repayment-schedule', '/venture-pool', '/reconciliation/journal-entries/new', '/approvals']) {
       expect(isFinanceView(path, 'finance'), path).toBe(true)
       expect(isFinanceView(path, 'principal'), path).toBe(true)
     }

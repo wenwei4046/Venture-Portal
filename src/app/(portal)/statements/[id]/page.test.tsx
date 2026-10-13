@@ -13,7 +13,13 @@ vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermis
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/navigation', () => ({ notFound: mocks.notFound }))
 vi.mock('../actions', () => ({ issueStatement: vi.fn(), markStatementPaid: vi.fn() }))
-vi.mock('@/components/layout/ReturnLink', () => ({ default: (p: { href: string; children: React.ReactNode }) => <a href={p.href}>{p.children}</a> }))
+vi.mock('@/components/layout/ReturnLink', () => ({
+  default: (p: { href: string; alsoFrom?: string[]; children: React.ReactNode }) => (
+    <a href={p.href} data-also-from={(p.alsoFrom ?? []).join(' ')}>
+      {p.children}
+    </a>
+  ),
+}))
 
 import StatementDetailPage from './page'
 
@@ -52,7 +58,11 @@ describe('a statement on the sheet', () => {
   it('heads with the company, its status and the way back; three cards; two tables; the net summary', async () => {
     database()
     render(await page())
-    expect(screen.getByRole('link', { name: '← Back to Statements' })).toHaveAttribute('href', '/statements/monthly')
+    // The list shows one month at a time (2026-10-14): back to this statement's
+    // month — and Back when the reader came from the sidebar's bare list.
+    const back = screen.getByRole('link', { name: '← Back to Statements' })
+    expect(back).toHaveAttribute('href', '/statements/monthly?period=2026-09')
+    expect(back).toHaveAttribute('data-also-from', '/statements/monthly')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Carres')
     expect(document.querySelector('.page-head .chip')).toHaveTextContent('draft')
     expect(card('Net amount')).toHaveAttribute('data-tone', 'primary')

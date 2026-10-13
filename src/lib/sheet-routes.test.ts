@@ -60,7 +60,7 @@ describe('isSheetRoute', () => {
       '/payments', '/payments/new', '/payments/abc', '/payments/abc/edit', '/payments/payroll-requests',
       '/receipts', '/statements', '/statements/monthly', '/statements/abc',
       '/billing', '/billing/contracts/new', '/billing-allocator', '/invoice-pool',
-      '/daily-bank', '/fund-in', '/fund-in/abc', '/fund-out', '/fund-out/abc', '/ba', '/overdue', '/repayment-schedule',
+      '/daily-bank', '/fund-in', '/fund-in/abc', '/fund-out', '/fund-out/abc', '/ba', '/repayment-schedule',
       '/dept-pool', '/dept-pool/marketing', '/venture-pool', '/opex', '/my-billing',
       '/reports/ledger', '/reports/monthly-pnl', '/reports/company-statement',
       '/reconciliation', '/reconciliation/journal-entries', '/audit-log', '/settings',

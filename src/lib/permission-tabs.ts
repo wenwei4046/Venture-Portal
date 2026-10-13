@@ -148,7 +148,7 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('fin', 'fund_in', 'Fund IN', TREASURY_KEYS, TREASURY),
   tab('fin', 'fund_out', 'Fund OUT', TREASURY_KEYS, TREASURY),
   tab('fin', 'invoice_financing', 'Invoice Financing', TREASURY_KEYS, TREASURY),
-  tab('fin', 'overdue', 'Overdue', TREASURY_KEYS, TREASURY),
+  // Overdue went with its page (2026-10-14, mig 20261014010000) — its cells are every treasury tab's.
   tab('fin', 'repayment_schedule', 'Repayment Schedule', TREASURY_KEYS, TREASURY),
   tab('fin', 'statements', 'Statements', TREASURY_KEYS, TREASURY),
   shared('reports', tab('fin', 'reports', 'Reports', ['reports'], REPORTS)),

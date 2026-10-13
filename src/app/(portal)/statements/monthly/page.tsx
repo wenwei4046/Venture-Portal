@@ -4,16 +4,25 @@ import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
-import { statementsSummary } from '@/lib/billing-sheet'
+import { officeMonth } from '@/lib/office-time'
+import { fetchAllRowsAsWritten } from '@/lib/paginate'
+import { statementMonths, statementsMonth, statementsSummary } from '@/lib/billing-sheet'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import GenerateStatementsButton from '../_components/GenerateStatementsButton'
 import StatementsPeriodTable from '../_components/StatementsPeriodTable'
+import StatementsMonth from '../_components/StatementsMonth'
 import FinSwitch from '../_components/FinSwitch'
 
 // The monthly statements on the sheet (2026-10-07; the user approved the
-// Invoice / Statements sample): four summary cards, then each month as a
-// section over its table. Generating a statement and a statement's own page
-// are as they were.
+// Invoice / Statements sample): four summary cards, then the month's table.
+// Generating a statement and a statement's own page are as they were.
+//
+// ONE MONTH AT A TIME (2026-10-14, user: 在上面能够选择月份。我不要它把全部月份
+// 的 statement 都挤在一个 tab): "← September 2026 ▾ →" at the head picks the
+// month (?period=YYYY-MM), its grid dotting the months that have statements;
+// opened bare — the sidebar — it shows the newest of them. The first two cards,
+// the table and the Excel / PDF are that month's; Draft and All statements
+// stay every month's, so a draft left in another month still shows.
 
 /** "ALL DRAFT", or "1 ISSUED · 1 PAID" — what state a month's statements are in. */
 function statusMix(statements: Array<{ status: string }>): string {
@@ -26,40 +35,49 @@ function statusMix(statements: Array<{ status: string }>): string {
     .join(' · ')
 }
 
-export default async function MonthlyStatementsPage() {
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+const bare = (n: number) => formatMoney(n).replace('RM ', '')
+
+interface Props {
+  searchParams?: Promise<{ period?: string }>
+}
+
+export default async function MonthlyStatementsPage({ searchParams }: Props) {
   await requirePage('/statements/monthly')
   const user = await requirePermission('treasury')
   const supabase = await createClient()
+  const { period: asked } = (await searchParams) ?? {}
 
-  const [{ data: statements }, { data: companies }] = await Promise.all([
-    supabase
-      .from('monthly_statements')
-      .select('*')
-      .order('period_month', { ascending: false })
-      .order('created_at', { ascending: false }),
+  // Every month's statements (a few rows a month): the month grid's dots and
+  // the Draft / All statements cards need them all, the table its month.
+  const [statementList, { data: companies }] = await Promise.all([
+    fetchAllRowsAsWritten((page) => {
+      const q = supabase
+        .from('monthly_statements')
+        .select('id, period_month, company_id, status, total_invoice, total_contra, net_amount, created_at')
+        .order('period_month', { ascending: false })
+        .order('created_at', { ascending: false })
+      return page ? q.order('id').range(page.from, page.to) : q
+    }, 'monthly_statements'),
     supabase.from('companies').select('id, name, short_code'),
   ])
 
-  const statementList = statements ?? []
   const companyMap = new Map(
     (companies ?? []).map((c) => [c.id, { name: c.name, code: c.short_code }])
   )
 
-  // Group by period
-  const byPeriod = new Map<string, typeof statementList>()
-  for (const s of statementList) {
-    const period = s.period_month
-    const list = byPeriod.get(period) ?? []
-    list.push(s)
-    byPeriod.set(period, list)
-  }
-
-  const summary = statementsSummary(statementList)
-  const latestLabel = summary.latestPeriod ? dayjs(summary.latestPeriod).format('MMMM YYYY') : null
-  const latestMonth = summary.latestPeriod ? dayjs(summary.latestPeriod).format('MMMM') : null
-  const latestMix = summary.latestPeriod ? statusMix(byPeriod.get(summary.latestPeriod) ?? []).toLowerCase() : ''
+  const months = statementMonths(statementList)
+  const month = statementsMonth(asked, months, officeMonth())
+  const shown = statementList.filter((s) => String(s.period_month).slice(0, 7) === month)
+  const summary = statementsSummary(statementList, month)
+  const monthLabel = dayjs(`${month}-01`).format('MMMM YYYY')
+  const monthName = dayjs(`${month}-01`).format('MMMM')
+  // The grid's dots: each month that has statements, and how many.
+  const marked: Record<string, string> = {}
+  for (const m of months) marked[m] = plural(statementList.filter((s) => String(s.period_month).slice(0, 7) === m).length, 'statement', 'statements')
   // Generating raises the month's statements: Treasury · Create (2026-10-08, PR2).
   const canGenerate = canDo(user, 'treasury', 'create')
+  const exportHref = (format: 'xlsx' | 'pdf') => `/statements/monthly/export?format=${format}&period=${month}`
 
   return (
     <div>
@@ -72,27 +90,29 @@ export default async function MonthlyStatementsPage() {
           <h1 className="page-title">Statements</h1>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
+          {/* The month first, as on Service Billing's head (2026-10-14). */}
+          <StatementsMonth month={month} marked={marked} />
           {/* The handoff's order on the Finance view (2026-10-10): Excel, PDF,
               then Generate statements — the primary — last. */}
           <FinSwitch
             fin={
               <>
-                <Link href="/statements/monthly/export?format=xlsx" className="btn-quiet-sheet">
+                <Link href={exportHref('xlsx')} className="btn-quiet-sheet">
                   Excel
                 </Link>
-                <Link href="/statements/monthly/export?format=pdf" className="btn-quiet-sheet">
+                <Link href={exportHref('pdf')} className="btn-quiet-sheet">
                   PDF
                 </Link>
-                {canGenerate ? <GenerateStatementsButton /> : null}
+                {canGenerate ? <GenerateStatementsButton month={month} /> : null}
               </>
             }
             other={
               <>
-                {canGenerate ? <GenerateStatementsButton /> : null}
-                <Link href="/statements/monthly/export?format=xlsx" className="btn-quiet-sheet">
+                {canGenerate ? <GenerateStatementsButton month={month} /> : null}
+                <Link href={exportHref('xlsx')} className="btn-quiet-sheet">
                   Excel
                 </Link>
-                <Link href="/statements/monthly/export?format=pdf" className="btn-quiet-sheet">
+                <Link href={exportHref('pdf')} className="btn-quiet-sheet">
                   PDF
                 </Link>
               </>
@@ -105,27 +125,24 @@ export default async function MonthlyStatementsPage() {
       <StatCards label="Statements">
         <StatCard
           tone="primary"
-          label="Latest period"
-          value={latestLabel ?? '—'}
+          label={`Statements · ${monthName}`}
+          value={String(summary.count)}
           icon="calendar"
-          note={
-            summary.latestPeriod
-              ? `${summary.latestCount} ${summary.latestCount === 1 ? 'statement' : 'statements'} · ${latestMix}`
-              : 'No statements yet'
-          }
+          note={summary.count > 0 ? statusMix(shown).toLowerCase() : 'None generated'}
         />
         <StatCard
-          label={latestMonth ? `Net · ${latestMonth}` : 'Net'}
-          value={formatMoney(summary.latestNet)}
+          label={`Net · ${monthName}`}
+          value={formatMoney(summary.net)}
           icon="swap"
-          note={summary.latestPeriod ? `invoice ${formatMoney(summary.latestInvoice).replace('RM ', '')} − contra ${formatMoney(summary.latestContra).replace('RM ', '')}` : '—'}
+          note={summary.count > 0 ? `invoice ${bare(summary.invoice)} − contra ${bare(summary.contra)}` : '—'}
         />
-        {/* A draft waits on Finance itself, so it rests in the default tone (2026-10-09, the handoff). */}
+        {/* Every month's: a draft waits on Finance itself, so it rests in the
+            default tone (2026-10-09, the handoff). */}
         <StatCard
           label="Draft"
           value={String(summary.draft)}
           icon="clock"
-          note={summary.draft > 0 ? 'waiting to be issued' : 'none waiting'}
+          note={summary.draft > 0 ? `waiting to be issued${summary.draftMonths > 1 ? ` · ${summary.draftMonths} months` : ''}` : 'none waiting'}
         />
         <StatCard
           label="All statements"
@@ -135,39 +152,39 @@ export default async function MonthlyStatementsPage() {
         />
       </StatCards>
 
-      {/* ───────── Statements by period ───────── */}
+      {/* ───────── The month's statements ───────── */}
       {statementList.length === 0 ? (
         <EmptyState canGenerate={canGenerate} />
+      ) : shown.length === 0 ? (
+        <MonthEmpty label={monthLabel} newest={months[0]} />
       ) : (
-        Array.from(byPeriod.entries()).map(([period, periodStatements]) => (
-          <section key={period} className="mb-12">
-            <div className="sect-head">
-              <h2>{dayjs(period).format('MMMM YYYY')}</h2>
-              <span className="rule" aria-hidden />
-              <span className="count">
-                {periodStatements.length} {periodStatements.length === 1 ? 'STATEMENT' : 'STATEMENTS'} · {statusMix(periodStatements)}
-              </span>
-            </div>
+        <section className="mb-12">
+          <div className="sect-head">
+            <h2>{monthLabel}</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">
+              {shown.length} {shown.length === 1 ? 'STATEMENT' : 'STATEMENTS'} · {statusMix(shown)}
+            </span>
+          </div>
 
-            <div className="overflow-x-auto">
-              <StatementsPeriodTable
-                canSetDefault={canGenerate}
-                rows={periodStatements.map((s) => {
-                  const company = companyMap.get(s.company_id)
-                  return {
-                    id: s.id,
-                    companyName: company?.name ?? '—',
-                    companyCode: company?.code ?? '',
-                    totalInvoice: Number(s.total_invoice),
-                    totalContra: Number(s.total_contra),
-                    netAmount: Number(s.net_amount),
-                    status: s.status,
-                  }
-                })}
-              />
-            </div>
-          </section>
-        ))
+          <div className="overflow-x-auto">
+            <StatementsPeriodTable
+              canSetDefault={canGenerate}
+              rows={shown.map((s) => {
+                const company = companyMap.get(s.company_id)
+                return {
+                  id: s.id,
+                  companyName: company?.name ?? '—',
+                  companyCode: company?.code ?? '',
+                  totalInvoice: Number(s.total_invoice),
+                  totalContra: Number(s.total_contra),
+                  netAmount: Number(s.net_amount),
+                  status: s.status,
+                }
+              })}
+            />
+          </div>
+        </section>
       )}
     </div>
   )
@@ -190,6 +207,20 @@ function EmptyState({ canGenerate }: { canGenerate: boolean }) {
           <>Finance hasn&apos;t generated any statements yet.</>
         )}
       </p>
+    </div>
+  )
+}
+
+/** A month with none, while others have some: the way to the newest of them. */
+function MonthEmpty({ label, newest }: { label: string; newest: string | undefined }) {
+  return (
+    <div className="py-16 text-center border border-hairline rounded-md bg-surface">
+      <p className="font-serif italic text-graphite text-lg mb-4">No statements for {label}.</p>
+      {newest ? (
+        <Link href={`/statements/monthly?period=${newest}`} className="btn-quiet-sheet" title="The newest month with statements">
+          {dayjs(`${newest}-01`).format('MMMM YYYY')} →
+        </Link>
+      ) : null}
     </div>
   )
 }

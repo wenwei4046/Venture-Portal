@@ -27,7 +27,7 @@ This file keeps only what holds across the whole portal. What the portal decided
 |---|---|---|
 | Revenue | the Revenue Department's portal pages (Comm Cal, Staff Hierarchy, Rules, Department — HR runs them), the ERP feed, the Revenue app `/member` (Today, Insight, Quote, Arena, Profile, requests and claims), its Product List, the CRM, Member Services (the app's back office) | `.claude/rules/revenue/` — `comm-cal.md`, `revenue-app.md`, `product-list.md`, `crm.md` |
 | HR | HR Costing (Payroll, Payment, Billing Allocation, department mode), Director Salary, Director Pool, Claims, People (People Management, Hierarchy, employee codes), HR's view (its shell, the `components/hrv` kit), Meeting Rooms, the Guest Link (and its public `/g/<code>`), Documentation, Hiring, the HR phone app (`/hr-app`) | `.claude/rules/hr/` — `payroll.md`, `people.md`, `hr-view.md`, `rooms.md`, `documentation.md`, `hiring.md`, `hr-app.md` |
-| Finance | Payments, Receipts, Invoices, Billing, Fund IN / OUT, Overdue, Statements, Dept Pool, OPEX, Reports, Reconciliation | `.claude/rules/finance/` — `finance-view.md`; money rules in Key Business Rules below |
+| Finance | Payments, Receipts, Invoices, Billing, Fund IN / OUT, Statements, Dept Pool, OPEX, Reports, Reconciliation | `.claude/rules/finance/` — `finance-view.md`; money rules in Key Business Rules below |
 | Principal | Approvals, Settings, People › Permissions | `.claude/rules/portal-wide/permissions.md` |
 | Every tab | permissions and the database's guard rails, navigation speed, the installed app (PWA) | `.claude/rules/portal-wide/` — `permissions.md`, `speed.md`, `pwa.md`; summarised under Permissions and Coding Conventions below |
 
@@ -43,7 +43,6 @@ src/
 │   │   ├── dashboard/page.tsx      ← wired to dashboard_summary() RPC
 │   │   ├── fund-in/                ← list + new + detail + actions.ts
 │   │   ├── fund-out/                ← list + new + detail + actions.ts
-│   │   ├── overdue/                 ← list + actions.ts (detect/escalate/markPaid)
 │   │   ├── statements/              ← list + detail + actions.ts (generate/issue/markPaid)
 │   │   ├── approvals/               ← Principal queue + detail + approve/reject
 │   │   ├── dept-pool/               (Phase 2)
@@ -283,7 +282,7 @@ Six non-negotiable rules every new/amended page must follow:
 1. **Page header** — wrap top of page in `<div className="page-head">` containing `<div className="page-eyebrow"><em>I.</em> SECTION · NAME</div>` + `<h1 className="page-title">…</h1>`. Right side may hold an action button.
 2. **Money cells use `.num`** — `<td className="num">{formatMoney(x)}</td>`. Negatives get `<span className="neg">`. Hero figures use `text-num-ink` + `tabular` + `tracking-[-0.01em]`.
 3. **Data tables use `.ledger-table`** — `<table className="ledger-table">` with bare `<th>` / `<td>`. Class wires up surface bg, zebra rows, hover, hairline borders, padding, and right-aligned `.num`. Stop hand-rolling `<table className="w-full text-sm">…border-b…hover:bg-…`.
-4. **Section headings use `.sect-head`** — medium-weight upright sans title + hairline rule extending right + uppercase mono counter. See `src/app/(portal)/statements/page.tsx` for the canonical pattern.
+4. **Section headings use `.sect-head`** — medium-weight upright sans title + hairline rule extending right + uppercase mono counter. See `src/app/(portal)/statements/monthly/page.tsx` for the canonical pattern.
 5. **Colors via CSS variables only** — no hex outside `globals.css`. Use `text-ink` / `text-num-ink` / `text-graphite` / `bg-paper` / `bg-surface` / `border-hairline` / `text-accent` / `text-danger` / `text-ledger` / `text-alert` / `text-info`.
 6. **A new route folder with child routes gets a `loading.tsx`** that renders `RouteSkeleton` — see Navigation speed under Coding Conventions.
 7. **HR's view sits on the white sheet (2026-09-27, DESIGN.md › "Sheet theme").** Every route under `/dashboard` (all four roles' Overview), `/hr-costing`, `/director-salary`, `/director-pool`, `/revenue`, `/claims`, `/team` (People) and `/member-admin` — `lib/sheet-routes.ts` — is drawn by PortalFrame on one white sheet in Comm Cal's month's tone: black lettering, orange `#E99A53` only as a surface (buttons, active tab, markers — never text), walnut for the one primary figure. Open such a page with `StatCards`/`StatCard` (`components/sheet/StatCard.tsx`), not a hero or a figure strip; statuses are `.chip`s; a closing total goes in `<tfoot>`. Extending the tone to another section = add its prefix there and convert the page the same way. Reference: `src/app/(portal)/hr-costing/page.tsx`.
@@ -291,5 +290,5 @@ Six non-negotiable rules every new/amended page must follow:
 Canonical reference pages (copy these patterns when in doubt):
 - Page header + hero number + ledger table → `src/app/(portal)/fund-out/page.tsx`
 - Multi-column hero summary → `src/app/(portal)/payments/page.tsx`
-- Section-grouped tables → `src/app/(portal)/statements/page.tsx`, `src/app/(portal)/overdue/page.tsx`
+- Section-grouped tables → `src/app/(portal)/statements/[id]/page.tsx`, `src/app/(portal)/reports/loan-aging/page.tsx`
 - Sidebar (roman numerals + dot/bar markers) → `src/components/layout/Sidebar.tsx`

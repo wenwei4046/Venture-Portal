@@ -1,19 +1,25 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { officeTime } from '@/lib/office-time'
+import { useRouter } from 'next/navigation'
 import { generateStatements } from '../actions'
 
-export default function GenerateStatementsButton() {
+// 2026-10-14 — the page shows one month at a time: the dialog opens on the
+// month on show (`month`, YYYY-MM), and generating another month goes there,
+// the result beside the button on the month it was for.
+export default function GenerateStatementsButton({ month }: { month: string }) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [confirming, setConfirming] = useState(false)
-  const [period, setPeriod] = useState(officeTime().startOf('month').format('YYYY-MM-DD'))
+  const [period, setPeriod] = useState(`${month}-01`)
   const [result, setResult] = useState<{
     generated: number
     skipped: number
     errors?: string[]
+    period: string
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const shownResult = result && result.period.slice(0, 7) === month ? result : null
 
   function handleConfirm() {
     setError(null)
@@ -26,6 +32,8 @@ export default function GenerateStatementsButton() {
         const res = await generateStatements(formData)
         setResult(res)
         setConfirming(false)
+        const generated = res.period.slice(0, 7)
+        if (generated !== month) router.push(`/statements/monthly?period=${generated}`)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       }
@@ -87,22 +95,25 @@ export default function GenerateStatementsButton() {
 
   return (
     <div className="flex flex-col items-end gap-2">
-      {result ? (
+      {shownResult ? (
         <div className="text-right text-xs">
           <div className="font-serif italic text-ledger">
-            {result.generated} generated
-            {result.skipped > 0 ? `, ${result.skipped} skipped` : ''}
+            {shownResult.generated} generated
+            {shownResult.skipped > 0 ? `, ${shownResult.skipped} skipped` : ''}
           </div>
-          {result.errors && result.errors.length > 0 ? (
+          {shownResult.errors && shownResult.errors.length > 0 ? (
             <div className="font-serif italic text-danger mt-1">
-              {result.errors.length} error(s)
+              {shownResult.errors.length} error(s)
             </div>
           ) : null}
         </div>
       ) : null}
       <button
         type="button"
-        onClick={() => setConfirming(true)}
+        onClick={() => {
+          setPeriod(`${month}-01`)
+          setConfirming(true)
+        }}
         className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
       >
         Generate statements

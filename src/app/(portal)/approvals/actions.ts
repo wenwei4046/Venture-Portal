@@ -400,7 +400,6 @@ export async function approveRequest(formData: FormData) {
 
   revalidatePath('/approvals')
   revalidatePath('/fund-out')
-  revalidatePath('/overdue')
   revalidatePath('/invoice-pool')
   revalidatePath('/payments')
   revalidatePath('/dashboard')
@@ -503,7 +502,6 @@ export async function approveRequestsBulk(args: {
 
   revalidatePath('/approvals')
   revalidatePath('/fund-out')
-  revalidatePath('/overdue')
   revalidatePath('/invoice-pool')
   revalidatePath('/payments')
   revalidatePath('/dashboard')

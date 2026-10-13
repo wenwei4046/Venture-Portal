@@ -84,9 +84,9 @@ describe('Fund OUT on the sheet', () => {
     expect(card('Maturing in 30 days')).toHaveAttribute('data-tone', 'wait')
     expect(card('Maturing in 30 days')).toHaveTextContent('1')
     expect(card('Maturing in 30 days')).toHaveTextContent('RM 40,000.00')
-    // The Overdue card is the way to the Overdue page.
+    // The Overdue card opens the list's own Overdue tab (2026-10-14: the Overdue page is gone).
     const overdue = screen.getByRole('link', { name: 'Overdue' })
-    expect(overdue).toHaveAttribute('href', '/overdue')
+    expect(overdue).toHaveAttribute('href', '/fund-out?status=overdue')
     expect(overdue).toHaveAttribute('data-tone', 'danger')
     expect(overdue).toHaveTextContent('RM 12,333.34')
     expect(overdue).toHaveTextContent('1 loan · see Overdue')

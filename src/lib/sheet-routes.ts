@@ -54,7 +54,6 @@ export const SHEET_ROUTE_PREFIXES = [
   '/fund-in',
   '/fund-out',
   '/ba',
-  '/overdue',
   '/repayment-schedule',
   '/dept-pool',
   '/venture-pool',

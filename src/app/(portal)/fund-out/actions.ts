@@ -467,7 +467,6 @@ export async function setLoanRepaymentStart(
 
   revalidatePath(`/fund-out/${id}`)
   revalidatePath('/fund-out')
-  revalidatePath('/overdue')
   revalidatePath('/dashboard')
   revalidatePath('/reports/loan-aging')
   revalidatePath('/repayment-schedule')
