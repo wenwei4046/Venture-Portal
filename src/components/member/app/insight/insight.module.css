@@ -9,7 +9,7 @@
 .col20 { display: flex; flex-direction: column; gap: 20px; }
 
 .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.title { margin: 0; font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.2; }
+.title { margin: 0; font-family: var(--font-display-rv); font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.2; }
 .lede { margin: 6px 0 0; font-size: calc(14px * var(--rv-type)); color: var(--rv-sub); }
 
 /* the date chip (main: 36px; sub-pages: 34px) */
@@ -46,7 +46,7 @@
   font-size: calc(14.5px * var(--rv-type));
   font-weight: 600;
 }
-.subTitle { margin: 0; font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
+.subTitle { margin: 0; font-family: var(--font-display-rv); font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
 .brandTitle { margin: 6px 0 0; }
 
 /* Personal / My team */
@@ -70,7 +70,7 @@
 .cardLabel { font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
 .cardRight { font-size: calc(13px * var(--rv-type)); font-weight: 650; color: var(--rv-sub); }
 .cardRightAccent { color: var(--rv-accent); }
-.cardAmount { font-size: calc(30px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; margin: 4px 0 10px; font-variant-numeric: tabular-nums; }
+.cardAmount { font-family: var(--font-display-rv); font-size: calc(30px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; margin: 4px 0 10px; font-variant-numeric: tabular-nums; }
 .track { height: 8px; border-radius: 4px; background: var(--rv-sand); overflow: hidden; }
 .trackFill { height: 100%; background: var(--rv-accent); border-radius: 4px; }
 .cardFoot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
@@ -91,8 +91,8 @@
 .miniStatic { border: 1px solid var(--rv-line); border-radius: 18px; padding: 14px 16px; }
 .miniTop { display: flex; justify-content: space-between; align-items: center; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
 .miniLabel { font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
-.miniValue { font-size: calc(26px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; margin: 2px 0 6px; }
-.miniValueTeam { font-size: calc(26px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; margin-top: 2px; }
+.miniValue { font-family: var(--font-display-rv); font-size: calc(26px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; margin: 2px 0 6px; }
+.miniValueTeam { font-family: var(--font-display-rv); font-size: calc(26px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; margin-top: 2px; }
 .miniPill { font-size: calc(11.5px * var(--rv-type)); font-weight: 650; border-radius: 8px; padding: 2px 7px; }
 .miniSub { display: block; margin-top: 8px; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); }
 .miniSubAmber { color: var(--rv-amber); font-weight: 600; }
@@ -100,7 +100,7 @@
 
 .sectHead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 2px; }
 .sectHeadFlat { margin-bottom: 0; }
-.sectTitle { margin: 0; font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.02em; }
+.sectTitle { margin: 0; font-family: var(--font-display-rv); font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.02em; }
 .sectNote { font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
 
 .brandRow {
@@ -160,7 +160,7 @@
 .tileCountedOn { background: var(--rv-cream); box-shadow: inset 0 -3px 0 var(--rv-accent); }
 .tileWaitingOn { background: var(--rv-wait-bg); box-shadow: inset 0 -3px 0 var(--rv-gold); }
 .tileLabel { display: block; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); }
-.tileAmount { display: block; font-size: calc(22px * var(--rv-type)); font-weight: 750; letter-spacing: -.02em; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.tileAmount { display: block; font-family: var(--font-display-rv); font-size: calc(22px * var(--rv-type)); font-weight: 750; letter-spacing: -.02em; margin-top: 3px; font-variant-numeric: tabular-nums; }
 .tileAmountWait { color: var(--rv-amber); }
 .tileSub { display: block; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); margin-top: 2px; }
 
@@ -191,7 +191,7 @@
 .weekCard { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 18px; margin-bottom: 4px; }
 .weekCardTop { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .weekCardTitle { font-size: calc(16px * var(--rv-type)); font-weight: 700; }
-.weekCardTotal { font-size: calc(18px * var(--rv-type)); font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.weekCardTotal { font-family: var(--font-display-rv); font-size: calc(18px * var(--rv-type)); font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .weekCardPlace { font-size: calc(13px * var(--rv-type)); color: var(--rv-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .weekCardDates { font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); }
 .waitCard { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 18px; background: var(--rv-wait-bg); margin-bottom: 4px; }
@@ -226,7 +226,7 @@
 .kpiHeroOff { background: var(--rv-sand); }
 .kpiHeroTop { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .kpiHeroLabel { display: block; font-size: calc(13px * var(--rv-type)); color: var(--rv-green); font-weight: 600; }
-.kpiHeroValue { display: block; font-size: calc(44px * var(--rv-type)); font-weight: 800; letter-spacing: -.04em; line-height: 1.05; color: var(--rv-kpi-ink); }
+.kpiHeroValue { display: block; font-family: var(--font-display-rv); font-size: calc(44px * var(--rv-type)); font-weight: 800; letter-spacing: -.04em; line-height: 1.05; color: var(--rv-kpi-ink); }
 .kpiHeroPill { font-size: calc(12px * var(--rv-type)); font-weight: 700; color: var(--rv-white); background: var(--rv-green); border-radius: 9px; padding: 4px 9px; margin-bottom: 8px; }
 .kpiHeroPillOff { color: var(--rv-sub); background: var(--rv-white); }
 .kpiHeroPillTodo { color: var(--rv-green); background: var(--rv-white); }
@@ -248,11 +248,11 @@
 .kpiLegendName { min-width: 0; font-size: calc(13px * var(--rv-type)); line-height: 1.3; text-wrap: pretty; }
 .kpiLegendN { font-size: calc(13.5px * var(--rv-type)); font-weight: 700; font-variant-numeric: tabular-nums; }
 
-.weekTitle { margin: 0 0 10px; font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.02em; }
+.weekTitle { margin: 0 0 10px; font-family: var(--font-display-rv); font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.02em; }
 .kpiWeeks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .kpiWeek { border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .kpiWeekLabel { font-size: calc(12px * var(--rv-type)); font-weight: 750; }
-.kpiWeekN { font-size: calc(22px * var(--rv-type)); font-weight: 800; letter-spacing: -.03em; }
+.kpiWeekN { font-family: var(--font-display-rv); font-size: calc(22px * var(--rv-type)); font-weight: 800; letter-spacing: -.03em; }
 .kpiWeekBrand { font-size: calc(11px * var(--rv-type)); color: var(--rv-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpiOrderPill { font-size: calc(12.5px * var(--rv-type)); font-weight: 700; color: var(--rv-green); background: var(--rv-green-bg); border-radius: 8px; padding: 3px 9px; white-space: nowrap; }
 .kpiOrderBill { padding: 13px 2px; }
@@ -281,7 +281,7 @@
 .brandHero { border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
 .brandHeroTop { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .brandHeroLabel { display: block; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
-.brandHeroPct { display: block; font-size: calc(44px * var(--rv-type)); font-weight: 800; letter-spacing: -.04em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.brandHeroPct { display: block; font-family: var(--font-display-rv); font-size: calc(44px * var(--rv-type)); font-weight: 800; letter-spacing: -.04em; line-height: 1.05; font-variant-numeric: tabular-nums; }
 .brandHeroPill { font-size: calc(12px * var(--rv-type)); font-weight: 700; border-radius: 9px; padding: 4px 9px; margin-bottom: 8px; white-space: nowrap; }
 .mbar { position: relative; padding: 16px 0 18px; }
 .mbarZones { display: flex; height: 10px; border-radius: 5px; overflow: hidden; }
@@ -296,7 +296,7 @@
 .nextSub { display: block; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); margin-top: 3px; line-height: 1.45; }
 
 .tierSect { display: flex; flex-direction: column; gap: 10px; }
-.tierHead { margin: 0 0 6px; font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.02em; }
+.tierHead { margin: 0 0 6px; font-family: var(--font-display-rv); font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.02em; }
 .trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
 .trioCard {
   position: relative;
@@ -342,7 +342,7 @@
 /* ── sheets ───────────────────────────────────────────────────────────── */
 .datePanel { padding: 10px 20px 30px; display: flex; flex-direction: column; gap: 14px; }
 .sheetHead { display: flex; align-items: baseline; justify-content: space-between; }
-.sheetTitle { margin: 0; font-size: calc(20px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
+.sheetTitle { margin: 0; font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
 .sheetCtx { font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
 .dateSeg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; border-radius: 13px; background: var(--rv-sand); }
 .dateSegBtn { height: 36px; border: 0; border-radius: 10px; background: transparent; box-shadow: none; color: var(--rv-sub); font-size: calc(13.5px * var(--rv-type)); font-weight: 500; }
@@ -375,7 +375,7 @@
 .soPanel { padding: 10px 20px 30px; display: flex; flex-direction: column; gap: 16px; }
 .soHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .soNoWrap { min-width: 0; }
-.soNo { display: block; font-size: calc(22px * var(--rv-type)); font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.soNo { display: block; font-family: var(--font-display-rv); font-size: calc(22px * var(--rv-type)); font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .soWhere { display: block; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); margin-top: 3px; }
 .soStatus { flex: 0 0 auto; font-size: calc(11.5px * var(--rv-type)); font-weight: 700; border-radius: 8px; padding: 4px 8px; }
 .soCells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--rv-line); border-radius: 16px; }

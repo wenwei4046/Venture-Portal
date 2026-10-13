@@ -51,6 +51,57 @@ const config: Config = {
 
         // Chrome — shared by the two floating panels (sidebar rail, header).
         chrome: 'rgb(var(--chrome) / <alpha-value>)',
+
+        // The design system's semantic colours (2026-10-14, globals.css › the
+        // design system's tokens): `bg-ds-accent`, `text-ds-ink-2`,
+        // `border-ds-border` … draw HR's value by default and the Revenue
+        // app's inside [data-revenue-app]. Full colours, so no `/opacity`.
+        ds: {
+          page: 'var(--ds-page)',
+          surface: 'var(--ds-surface)',
+          'surface-2': 'var(--ds-surface-2)',
+          'surface-3': 'var(--ds-surface-3)',
+          zebra: 'var(--ds-zebra)',
+          ink: 'var(--ds-ink)',
+          'ink-2': 'var(--ds-ink-2)',
+          'ink-3': 'var(--ds-ink-3)',
+          'ink-4': 'var(--ds-ink-4)',
+          placeholder: 'var(--ds-placeholder)',
+          accent: 'var(--ds-accent)',
+          'accent-hover': 'var(--ds-accent-hover)',
+          'on-accent': 'var(--ds-on-accent)',
+          'accent-text': 'var(--ds-accent-text)',
+          link: 'var(--ds-link)',
+          'accent-soft': 'var(--ds-accent-soft)',
+          'accent-soft-ink': 'var(--ds-accent-soft-ink)',
+          'accent-soft-border': 'var(--ds-accent-soft-border)',
+          dark: 'var(--ds-dark)',
+          'on-dark': 'var(--ds-on-dark)',
+          'dark-sub': 'var(--ds-dark-sub)',
+          border: 'var(--ds-border)',
+          'border-strong': 'var(--ds-border-strong)',
+          'border-hover': 'var(--ds-border-hover)',
+          divider: 'var(--ds-divider)',
+          hover: 'var(--ds-hover)',
+          'row-hover': 'var(--ds-row-hover)',
+          selected: 'var(--ds-selected)',
+          'table-head': 'var(--ds-table-head)',
+          'table-head-rule': 'var(--ds-table-head-rule)',
+          disabled: 'var(--ds-disabled)',
+          success: 'var(--ds-success)',
+          'success-bg': 'var(--ds-success-bg)',
+          'success-border': 'var(--ds-success-border)',
+          warning: 'var(--ds-warning)',
+          'warning-bg': 'var(--ds-warning-bg)',
+          'warning-border': 'var(--ds-warning-border)',
+          danger: 'var(--ds-danger)',
+          'danger-bg': 'var(--ds-danger-bg)',
+          'danger-border': 'var(--ds-danger-border)',
+          info: 'var(--ds-info)',
+          'info-bg': 'var(--ds-info-bg)',
+          'info-border': 'var(--ds-info-border)',
+          scrim: 'var(--ds-scrim)',
+        },
       },
 
       // ─── Typography ──────────────────────────────────────────────────────
@@ -61,9 +112,15 @@ const config: Config = {
         // inline `italic` on those elements simply slants Inter.
         sans: ['var(--font-sans)', 'Inter', 'system-ui', 'sans-serif'],
         serif: ['var(--font-sans)', 'Inter', 'system-ui', 'sans-serif'],
-        display: ['Georgia', '"Times New Roman"', 'var(--font-cjk)', 'serif'],
+        // Newsreader, Georgia behind it (2026-10-14) — globals.css --font-display.
+        display: ['var(--font-display)'],
         mono: ['var(--font-mono)', '"Chivo Mono"', 'Menlo', 'monospace'],
         cjk: ['var(--font-cjk)', '"Noto Sans SC"', 'sans-serif'],
+        // The design system's faces, per theme: HR's body / Newsreader /
+        // Chivo Mono; the Revenue app's body / Inter Tight / Inter Tight.
+        'ds-body': ['var(--ds-font-body)'],
+        'ds-display': ['var(--ds-font-display)'],
+        'ds-num': ['var(--ds-font-num)'],
       },
 
       // Shared statement weight: medium emphasis throughout the portal.
@@ -87,11 +144,33 @@ const config: Config = {
         '3xl': ['40px', '44px'],
         hero: ['64px', { lineHeight: '1', letterSpacing: '-0.02em' }],
         'hero-lg': ['72px', { lineHeight: '1', letterSpacing: '-0.025em' }],
+        // The design system's scale, per theme (HR 36 / 17 / 13 / 12 / 10.5,
+        // Revenue 28 / 18 / 14 / 12.5 / 12).
+        'ds-title': 'var(--ds-title-size)',
+        'ds-h2': 'var(--ds-h2-size)',
+        'ds-body': 'var(--ds-body-size)',
+        'ds-small': 'var(--ds-small-size)',
+        'ds-label': 'var(--ds-label-size)',
       },
 
       // ─── Spacing ─────────────────────────────────────────────────────────
       spacing: {
         '18': '72px',
+      },
+      // The design system's control heights, paddings and gaps, per theme.
+      height: {
+        'ds-control': 'var(--ds-control-h)',
+        'ds-control-sm': 'var(--ds-control-h-sm)',
+        'ds-control-lg': 'var(--ds-control-h-lg)',
+      },
+      padding: {
+        'ds-control': 'var(--ds-control-px)',
+        'ds-page': 'var(--ds-pad)',
+      },
+      gap: {
+        ds: 'var(--ds-gap)',
+        'ds-lg': 'var(--ds-gap-lg)',
+        'ds-section': 'var(--ds-section-gap)',
       },
 
       // ─── Radius scale (2026-08-31) ────────────────────────────────────────
@@ -112,18 +191,44 @@ const config: Config = {
         control: '6px', // inputs, buttons — tighter than the default on purpose
         card: '12px', // cards, table wells
         panel: '16px', // modals, the sidebar rail
+        // The design system's radii, per theme (HR 6 / 10 / 12 / 16 …,
+        // Revenue 14 / 14 / 18 / 24 …).
+        'ds-control': 'var(--ds-r-control)',
+        'ds-field': 'var(--ds-r-field)',
+        'ds-card': 'var(--ds-r-card)',
+        'ds-panel': 'var(--ds-r-panel)',
+        'ds-chip': 'var(--ds-r-chip)',
+        'ds-row': 'var(--ds-r-row)',
+        'ds-sheet': 'var(--ds-r-sheet)',
+        'ds-tile': 'var(--ds-r-tile)',
       },
 
       // ─── Shadows (subtle, warm) ───────────────────────────────────────────
       boxShadow: {
         modal: '0 10px 40px rgb(var(--ink) / 0.15)',
         dropdown: '0 4px 12px rgb(var(--ink) / 0.08)',
+        'ds-card': 'var(--ds-shadow-card)',
+        'ds-menu': 'var(--ds-shadow-menu)',
+        'ds-overlay': 'var(--ds-shadow-overlay)',
+        'ds-button': 'var(--ds-shadow-button)',
       },
 
       // ─── Animation ────────────────────────────────────────────────────────
+      // The design system's one curve (`ease-ds`) and its durations by job
+      // (`duration-press` … `duration-drawer`).
+      transitionTimingFunction: {
+        ds: 'var(--ds-ease)',
+      },
       transitionDuration: {
         '120': '120ms',
         '250': '250ms',
+        press: 'var(--ds-dur-press)',
+        menu: 'var(--ds-dur-menu)',
+        dialog: 'var(--ds-dur-dialog)',
+        fade: 'var(--ds-dur-fade)',
+        slide: 'var(--ds-dur-slide)',
+        sheet: 'var(--ds-dur-sheet)',
+        drawer: 'var(--ds-dur-drawer)',
       },
     },
   },

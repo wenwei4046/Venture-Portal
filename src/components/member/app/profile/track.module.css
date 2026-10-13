@@ -40,7 +40,7 @@
 .queueYours { font-size: calc(11.5px * var(--rv-type)); font-weight: 650; color: var(--rv-accent); }
 .queueEmpty { margin: 6px 0; text-align: center; font-size: calc(14px * var(--rv-type)); color: var(--rv-sub); }
 
-.histHead { margin: 0 0 4px; font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.02em; }
+.histHead { margin: 0 0 4px; font-family: var(--font-display-rv); font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.02em; }
 .newLink {
   align-self: flex-start;
   padding: 0;
@@ -56,7 +56,7 @@
 .panel { display: flex; flex-direction: column; }
 .head { flex: 0 0 auto; padding: 10px 20px 12px; border-bottom: 1px solid var(--rv-rule); display: flex; flex-direction: column; gap: 10px; }
 .headRow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.title { display: block; font-size: calc(20px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
+.title { display: block; font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
 .code { display: block; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); margin-top: 3px; }
 .chip { flex: 0 0 auto; font-size: calc(11.5px * var(--rv-type)); font-weight: 650; border-radius: 8px; padding: 4px 9px; white-space: nowrap; }
 .body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; padding: 16px 20px 26px; display: flex; flex-direction: column; gap: 16px; }

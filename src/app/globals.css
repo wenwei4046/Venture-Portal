@@ -20,12 +20,17 @@
    Red / amber / green are load-bearing and can't move, which leaves blue.
    A *surface* is free to be any hue; a *signal* is not.
 
-   Typography — Georgia page titles, Inter body/headline amounts, and
-   Chivo Mono for dense table figures, dates and reference codes.
+   Typography — Newsreader page titles (Georgia behind it), Inter body and
+   headline amounts, Chivo Mono for dense table figures, dates and reference
+   codes; the Revenue app's titles and amounts in Inter Tight (2026-10-14,
+   the HOUZS Venture Design System — DESIGN.md › Type).
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
-  --font-display: Georgia, 'Times New Roman', var(--font-cjk), serif;
+  --font-display: var(--font-newsreader), Georgia, 'Times New Roman', var(--font-cjk), serif;
+  /* The Revenue app's display face. Inter here; Inter Tight inside the app,
+     whose layout loads it (the revenue block of the --ds-* tokens below). */
+  --font-display-rv: var(--font-sans), 'Inter', var(--font-cjk), system-ui, sans-serif;
   --paper: 242 239 234;
   --surface: 252 250 247;
   --surface-2: 235 230 223;
@@ -341,6 +346,244 @@
 }
 /* The Revenue app refreshes on its own pull (2026-10-06): the browser's pull-to-reload would load the whole page again. */
 html:has([data-revenue-app]) { overscroll-behavior-y: none; }
+
+/* ─── The design system's tokens (2026-10-14) ───
+   The Claude Design project "HOUZS Venture Design System" (DESIGN.md › The
+   design system) names what a screen needs once, as a semantic --ds-* token,
+   in two themes: HR — the formal ledger, the default, on :root — and Revenue —
+   the warm sales app, on [data-revenue-app] (the app's and the CRM's roots;
+   `data-theme` is light/dark mode in this codebase, so the design's
+   `data-theme="revenue"` is this attribute here). New work reads --ds-* (or
+   the Tailwind `ds` classes) rather than a palette value, and one class then
+   draws right in either view.
+   · HR's values are the sheet's own (.sheet-theme), restated as colours;
+     src/lib/design-system-tokens.test.ts holds the two equal.
+   · Revenue's point at the app's palette above wherever it has the same colour
+     under the same meaning; the rest are the design's own values.
+   · A themed token lives in BOTH blocks — the test refuses one that doesn't.
+   · Light only: the sheet and the Revenue app are light in either mode. */
+:root {
+  /* surfaces */
+  --ds-page: rgb(243 243 241);
+  --ds-surface: rgb(255 255 255);
+  --ds-surface-2: rgb(246 246 244);
+  --ds-surface-3: rgb(240 238 234);
+  --ds-zebra: rgb(250 250 249);
+  /* ink */
+  --ds-ink: rgb(0 0 0);
+  --ds-ink-2: rgb(90 78 68);
+  --ds-ink-3: rgb(117 100 86);
+  --ds-ink-4: rgb(152 142 130);
+  --ds-placeholder: rgb(117 117 117);
+  /* accent — in HR a marker (fills, bars, rings), never a text colour */
+  --ds-accent: rgb(233 154 83);
+  --ds-accent-hover: rgb(221 139 66);
+  --ds-on-accent: rgb(0 0 0);
+  --ds-accent-text: rgb(0 0 0);
+  --ds-link: rgb(0 0 0);
+  --ds-accent-soft: rgb(255 244 231);
+  --ds-accent-soft-ink: rgb(163 78 37);
+  --ds-accent-soft-border: rgb(233 154 83);
+  /* the one dark object */
+  --ds-dark: rgb(43 31 23);
+  --ds-on-dark: rgb(246 238 230);
+  --ds-dark-sub: rgb(214 202 188);
+  /* lines and states */
+  --ds-border: rgb(229 228 223);
+  --ds-border-strong: rgb(216 210 200);
+  --ds-border-hover: rgb(214 202 188);
+  --ds-divider: rgb(226 224 218);
+  --ds-hover: rgb(247 247 245);
+  --ds-row-hover: rgb(255 245 233);
+  --ds-selected: rgb(255 244 231);
+  --ds-table-head: rgb(235 231 224);
+  --ds-table-head-rule: rgb(207 197 183);
+  --ds-disabled: rgb(242 241 238);
+  /* meaning, fixed: success = done / paid / won · warning = needs someone ·
+     danger = overdue / lost / destructive · info = a neutral system state */
+  --ds-success: rgb(21 110 78);
+  --ds-success-bg: rgb(222 240 232);
+  --ds-success-border: rgb(180 215 198);
+  --ds-warning: rgb(150 100 12);
+  --ds-warning-bg: rgb(249 238 214);
+  --ds-warning-border: rgb(232 206 150);
+  --ds-danger: rgb(176 40 34);
+  --ds-danger-bg: rgb(250 228 224);
+  --ds-danger-border: rgb(236 190 184);
+  --ds-info: rgb(108 104 98);
+  --ds-info-bg: rgb(238 235 231);
+  --ds-info-border: rgb(222 218 212);
+  --ds-focus-ring: 0 0 0 3px rgb(233 154 83 / .18);
+  --ds-scrim: rgb(43 31 23 / .22);
+  /* type */
+  --ds-font-body: var(--font-sans), 'Inter', var(--font-cjk), system-ui, sans-serif;
+  --ds-font-display: var(--font-display);
+  --ds-font-num: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  --ds-font-num-display: var(--font-sans), 'Inter', system-ui, sans-serif;
+  --ds-chip-font: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  --ds-title-size: 36px;
+  --ds-title-weight: 400;
+  --ds-title-tracking: -.01em;
+  --ds-h2-size: 17px;
+  --ds-h2-weight: 500;
+  --ds-h2-tracking: 0;
+  --ds-h3-size: 15px;
+  --ds-h3-weight: 500;
+  --ds-body-size: 13px;
+  --ds-small-size: 12px;
+  --ds-label-size: 10.5px;
+  --ds-label-weight: 600;
+  --ds-label-tracking: .08em;
+  --ds-label-case: uppercase;
+  --ds-stat-label-size: 10px;
+  --ds-weight-strong: 600;
+  --ds-weight-medium: 500;
+  --ds-figure-weight: 600;
+  /* shape — round the container, never the rows */
+  --ds-r-control: 6px;
+  --ds-r-field: 10px;
+  --ds-r-card: 12px;
+  --ds-r-panel: 16px;
+  --ds-r-chip: 999px;
+  --ds-r-row: 8px;
+  --ds-r-sheet: 16px;
+  --ds-r-tile: 8px;
+  --ds-avatar-r: 7px;
+  /* controls and rhythm */
+  --ds-control-h: 34px;
+  --ds-control-h-sm: 28px;
+  --ds-control-h-lg: 40px;
+  --ds-control-px: 14px;
+  --ds-control-fs: 13px;
+  --ds-gap: 12px;
+  --ds-gap-lg: 20px;
+  --ds-pad: 24px;
+  --ds-section-gap: 28px;
+  /* depth and press */
+  --ds-shadow-card: 0 3px 12px rgb(90 62 43 / 5.5%);
+  --ds-shadow-menu: 0 14px 36px rgb(43 31 23 / .18), 0 2px 6px rgb(43 31 23 / .06);
+  --ds-shadow-overlay: 0 20px 60px rgb(43 31 23 / .25);
+  --ds-shadow-button: none;
+  --ds-press-scale: 1;
+}
+[data-revenue-app] {
+  /* Inter Tight where the app's layout loaded it (components/member/app/fonts.ts), Inter elsewhere. */
+  --font-display-rv: var(--font-inter-tight, var(--font-sans)), var(--font-sans), 'Inter', var(--font-cjk), system-ui, sans-serif;
+  /* surfaces */
+  --ds-page: var(--rv-white);
+  --ds-surface: var(--rv-white);
+  --ds-surface-2: var(--rv-paper-warm);
+  --ds-surface-3: var(--rv-sand);
+  --ds-zebra: var(--rv-paper-warm);
+  /* ink */
+  --ds-ink: var(--rv-ink);
+  --ds-ink-2: var(--rv-sub);
+  --ds-ink-3: var(--rv-sub);
+  --ds-ink-4: #A8968B;
+  --ds-placeholder: #A8968B;
+  /* accent — rust, and in Revenue the link and active colour too */
+  --ds-accent: var(--rv-accent);
+  --ds-accent-hover: #A8410F;
+  --ds-on-accent: var(--rv-white);
+  --ds-accent-text: var(--rv-accent);
+  --ds-link: var(--rv-accent);
+  --ds-accent-soft: var(--rv-peach-bg);
+  --ds-accent-soft-ink: var(--rv-accent);
+  --ds-accent-soft-border: var(--rv-rose);
+  /* the one dark object */
+  --ds-dark: var(--rv-brown);
+  --ds-on-dark: var(--rv-white);
+  --ds-dark-sub: var(--rv-blush);
+  /* lines and states */
+  --ds-border: var(--rv-line);
+  --ds-border-strong: var(--rv-line-strong);
+  --ds-border-hover: var(--rv-line-tan);
+  --ds-divider: var(--rv-rule);
+  --ds-hover: var(--rv-pill);
+  --ds-row-hover: var(--rv-cream);
+  --ds-selected: var(--rv-peach-bg);
+  --ds-table-head: var(--rv-paper-warm);
+  --ds-table-head-rule: var(--rv-line);
+  --ds-disabled: var(--rv-pill);
+  /* meaning */
+  --ds-success: var(--rv-green);
+  --ds-success-bg: var(--rv-green-bg);
+  --ds-success-border: #B7DBC7;
+  --ds-warning: var(--rv-amber);
+  --ds-warning-bg: var(--rv-amber-bg);
+  --ds-warning-border: #F3D27E;
+  --ds-danger: var(--rv-red);
+  --ds-danger-bg: var(--rv-red-bg);
+  --ds-danger-border: #F1C5B4;
+  --ds-info: #2F6FB5;
+  --ds-info-bg: #E6EFF8;
+  --ds-info-border: #C3D7EE;
+  --ds-focus-ring: 0 0 0 3px var(--rv-accent-18);
+  --ds-scrim: var(--rv-dim);
+  /* type */
+  --ds-font-body: var(--font-sans), 'Inter', var(--font-cjk), system-ui, sans-serif;
+  --ds-font-display: var(--font-display-rv);
+  --ds-font-num: var(--font-display-rv);
+  --ds-font-num-display: var(--font-display-rv);
+  --ds-chip-font: var(--font-sans), 'Inter', var(--font-cjk), system-ui, sans-serif;
+  --ds-title-size: 28px;
+  --ds-title-weight: 700;
+  --ds-title-tracking: -.03em;
+  --ds-h2-size: 18px;
+  --ds-h2-weight: 650;
+  --ds-h2-tracking: -.02em;
+  --ds-h3-size: 15px;
+  --ds-h3-weight: 650;
+  --ds-body-size: 14px;
+  --ds-small-size: 12.5px;
+  --ds-label-size: 12px;
+  --ds-label-weight: 600;
+  --ds-label-tracking: 0;
+  --ds-label-case: none;
+  --ds-stat-label-size: 11px;
+  --ds-weight-strong: 650;
+  --ds-weight-medium: 600;
+  --ds-figure-weight: 750;
+  /* shape */
+  --ds-r-control: 14px;
+  --ds-r-field: 14px;
+  --ds-r-card: 18px;
+  --ds-r-panel: 24px;
+  --ds-r-chip: 17px;
+  --ds-r-row: 12px;
+  --ds-r-sheet: 22px;
+  --ds-r-tile: 12px;
+  --ds-avatar-r: 50%;
+  /* controls and rhythm */
+  --ds-control-h: 48px;
+  --ds-control-h-sm: 36px;
+  --ds-control-h-lg: 52px;
+  --ds-control-px: 20px;
+  --ds-control-fs: 15px;
+  --ds-gap: 12px;
+  --ds-gap-lg: 24px;
+  --ds-pad: 20px;
+  --ds-section-gap: 24px;
+  /* depth and press */
+  --ds-shadow-card: 0 4px 14px var(--rv-ink-06);
+  --ds-shadow-menu: 0 14px 32px var(--rv-ink-20);
+  --ds-shadow-overlay: 0 -10px 40px var(--rv-ink-20);
+  --ds-shadow-button: 0 3px 9px var(--rv-accent-18);
+  --ds-press-scale: .97;
+}
+/* Shared by both themes: one easing curve, the durations by job, and the
+   figures' features (tabular, flagged 1, single-storey a). */
+:root {
+  --ds-ease: cubic-bezier(.2, .8, .2, 1);
+  --ds-dur-press: 120ms;
+  --ds-dur-menu: 160ms;
+  --ds-dur-dialog: 200ms;
+  --ds-dur-fade: 240ms;
+  --ds-dur-slide: 280ms;
+  --ds-dur-sheet: 320ms;
+  --ds-dur-drawer: 340ms;
+  --ds-num-features: "tnum", "cv01", "cv11";
+}
 
 /* Real devices supply these insets; simulated device chrome lives outside the iframe. */
 [data-arena-design] > [data-arena-chrome] {
@@ -1599,7 +1842,8 @@ h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *)), .page-title
   font-size: 36px;
   line-height: 1.18;
   color: rgb(var(--ink));
-  letter-spacing: -0.025em;
+  /* Newsreader's tracking (the design system's −.01em); Georgia's was −.025. */
+  letter-spacing: -0.01em;
 }
 .page-title { margin: 0; }
 .page-head p { font-size: 12px; font-weight: 400; font-style: normal; line-height: 1.5; }
@@ -4917,10 +5161,11 @@ table.ledger-table.st-fixed :is(th, td).st-nocut {
    what can be done to it.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* A page title that is a NUMBER. Page titles are Georgia, and Georgia's figures
-   are old-style — 3 4 5 7 9 hang below the line, 0 1 2 stop at x-height — which
-   is handsome in a sentence and reads as a fault in "HV-OR-202609-0443" (user:
-   "receipt 也是字体你看怪怪的"). A number is set in the figures' own face. */
+/* A page title that is a NUMBER. Page titles were Georgia, whose figures are
+   old-style — 3 4 5 7 9 hang below the line, 0 1 2 stop at x-height — which is
+   handsome in a sentence and reads as a fault in "HV-OR-202609-0443" (user:
+   "receipt 也是字体你看怪怪的"). A number is set in the figures' own face, and
+   stays so under Newsreader (2026-10-14): a reference is a code, not a title. */
 h1.title-number {
   font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
   font-size: 27px;
@@ -5053,7 +5298,7 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .fin-view .sheet-theme { --accent-hover: 201 116 31; }
 
 /* Page head: the eyebrow in the body face at the 0.05em cap; the title stays
-   Georgia, the sheet's display face. */
+   in the sheet's display face (Newsreader). */
 .fin-view .page-eyebrow {
   font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
   font-size: 11px;
@@ -5213,7 +5458,7 @@ table.ledger-table.audit-saves td { vertical-align: top; }
   border-radius: 7px;
   background: rgb(90 62 43);
   color: #fff;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-display);
   font-size: 13px;
 }
 .fin-topbar-text { display: flex; min-width: 0; flex-direction: column; line-height: 1.15; }

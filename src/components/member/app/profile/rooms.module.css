@@ -23,7 +23,7 @@
 }
 
 .headRow { display: flex; align-items: center; gap: 10px; margin-top: -6px; }
-.title { flex: 1; margin: 0; font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
+.title { flex: 1; margin: 0; font-family: var(--font-display-rv); font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
 .book {
   box-sizing: content-box;
   height: 38px;
@@ -78,7 +78,7 @@
 }
 .dayOn { border-color: var(--rv-accent); background: var(--rv-accent); color: var(--rv-white); }
 .dayWd { font-size: calc(11.9565px * var(--rv-type)); font-weight: 400; }
-.dayN { font-size: calc(18.4783px * var(--rv-type)); font-weight: 700; }
+.dayN { font-family: var(--font-display-rv); font-size: calc(18.4783px * var(--rv-type)); font-weight: 700; }
 
 /* By room: a card a room */
 .card { background: var(--rv-white); border: 1px solid var(--rv-line); border-radius: 20px; padding: 12px 16px; flex: none; }
@@ -169,7 +169,7 @@
 /* The sheets (the app's Sheet; the prototype's panel) */
 .sheet { padding: 8px 20px 26px; display: flex; flex-direction: column; gap: 12px; }
 .grab { align-self: center; width: 40px; height: 5px; border-radius: 3px; background: var(--rv-line); flex: none; }
-.sheetTitle { font-size: calc(20px * var(--rv-type)); font-weight: 700; }
+.sheetTitle { font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 700; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .label { display: block; font-size: calc(13.5px * var(--rv-type)); color: var(--rv-sub); font-weight: 600; }
 .input,

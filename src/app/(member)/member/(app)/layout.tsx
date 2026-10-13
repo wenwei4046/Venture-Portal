@@ -7,6 +7,7 @@ import { loadMemberData } from "@/lib/member/server";
 import { productListAccess } from "@/lib/member/product-access";
 import { appClosed } from "@/lib/member/app-pages";
 import RevenueApp from "@/components/member/app/RevenueApp";
+import { interTight } from "@/components/member/app/fonts";
 import { isPrincipalAccount } from "@/lib/view-as";
 import { loadMyNotices } from "@/lib/push/notices-server";
 import { loginIsPersonal } from "@/lib/account/personal-login";
@@ -40,7 +41,11 @@ export default async function MemberAppLayout({ children }: { children: ReactNod
     isPrincipalAccount(user) && !user.viewingAs ? loadMyMemos() : Promise.resolve(null)]);
   const crm = canDo(account, "crm", "view", "own");
   // The pages and sends their ticks close (2026-10-11): only what somebody unticked for them.
-  return <RevenueApp initialData={data} productList={products} crm={crm} closed={appClosed(user.closed)} notices={notices}
-    changePassword={password ? changeMyPassword : undefined}
-    own={own?.staffId ? { memos: own.memos.map(toMemberMemo) } : undefined}>{children}</RevenueApp>;
+  // The display face (2026-10-14): Inter Tight's variable on a wrapper that draws no box, so the
+  // app and its loading frame read it and the portal never downloads the font.
+  return <div className={interTight.variable} style={{ display: "contents" }}>
+    <RevenueApp initialData={data} productList={products} crm={crm} closed={appClosed(user.closed)} notices={notices}
+      changePassword={password ? changeMyPassword : undefined}
+      own={own?.staffId ? { memos: own.memos.map(toMemberMemo) } : undefined}>{children}</RevenueApp>
+  </div>;
 }

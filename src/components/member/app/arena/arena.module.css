@@ -24,7 +24,7 @@
 
 /* ── hub ───────────────────────────────────────────────────────────────── */
 .hub { padding: 14px 20px 32px; display: flex; flex-direction: column; gap: 18px; }
-.title { margin: 0; font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.2; }
+.title { margin: 0; font-family: var(--font-display-rv); font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.2; }
 .lede { margin: 6px 0 0; font-size: calc(14px * var(--rv-type)); color: var(--rv-sub); }
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; border-radius: 13px; background: var(--rv-sand); }
 .segBtn { height: 36px; border: 0; border-radius: 10px; background: transparent; box-shadow: none; color: var(--rv-sub); font-size: calc(13.5px * var(--rv-type)); font-weight: 500; }
@@ -53,8 +53,8 @@
 .cardLabel { display: block; font-size: calc(15px * var(--rv-type)); font-weight: 650; }
 .cardRank { display: flex; align-items: flex-end; gap: 8px; margin-top: 6px; }
 .rankNum { display: flex; align-items: flex-start; line-height: 1; font-variant-numeric: tabular-nums; }
-.cardNum { font-size: calc(44px * var(--rv-type)); font-weight: 800; letter-spacing: -.05em; }
-.cardSuf { font-size: calc(18px * var(--rv-type)); font-weight: 700; margin: 4px 0 0 2px; letter-spacing: -.01em; color: var(--b-sub); }
+.cardNum { font-family: var(--font-display-rv); font-size: calc(44px * var(--rv-type)); font-weight: 800; letter-spacing: -.05em; }
+.cardSuf { font-family: var(--font-display-rv); font-size: calc(18px * var(--rv-type)); font-weight: 700; margin: 4px 0 0 2px; letter-spacing: -.01em; color: var(--b-sub); }
 .cardOf { font-size: calc(13px * var(--rv-type)); color: var(--b-sub); padding-bottom: 4px; }
 .cardValue { display: block; font-size: calc(13px * var(--rv-type)); color: var(--b-sub); margin-top: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -95,7 +95,7 @@
   font-size: calc(14.5px * var(--rv-type));
   font-weight: 600;
 }
-.subTitle { margin: 0; font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
+.subTitle { margin: 0; font-family: var(--font-display-rv); font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
 .subLede { margin: 0; font-size: calc(14px * var(--rv-type)); color: var(--rv-sub); }
 
 .hall {
@@ -158,13 +158,13 @@
 .hallStep1 { height: 84px; }
 .hallStep2 { height: 60px; }
 .hallPlace { display: flex; align-items: flex-start; line-height: 1; }
-.hallNum { font-size: calc(26px * var(--rv-type)); font-weight: 800; letter-spacing: -.04em; }
+.hallNum { font-family: var(--font-display-rv); font-size: calc(26px * var(--rv-type)); font-weight: 800; letter-spacing: -.04em; }
 .hallNumFirst { font-size: calc(34px * var(--rv-type)); }
 .hallSuf { font-size: calc(12px * var(--rv-type)); font-weight: 700; margin: 2px 0 0 1px; }
 
 .myBest { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 16px; background: var(--rv-cream); }
 .myBestLabel { font-size: calc(14px * var(--rv-type)); color: var(--rv-accent); font-weight: 600; }
-.myBestAmt { font-size: calc(20px * var(--rv-type)); font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.myBestAmt { font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 
 .recRow {
   display: grid;
@@ -217,13 +217,13 @@
 }
 .heroTitleRow { display: flex; align-items: center; gap: 10px; }
 .heroIcon { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; background: var(--b-icon-bg); color: var(--b-ink); display: grid; place-items: center; }
-.heroTitle { margin: 0; font-size: calc(24px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
+.heroTitle { margin: 0; font-family: var(--font-display-rv); font-size: calc(24px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
 .heroRank { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .heroRankLeft { display: flex; align-items: flex-end; gap: 8px; }
-.heroNum { font-size: calc(56px * var(--rv-type)); font-weight: 800; letter-spacing: -.05em; }
-.heroSuf { font-size: calc(22px * var(--rv-type)); font-weight: 700; margin: 5px 0 0 2px; color: var(--b-sub); }
+.heroNum { font-family: var(--font-display-rv); font-size: calc(56px * var(--rv-type)); font-weight: 800; letter-spacing: -.05em; }
+.heroSuf { font-family: var(--font-display-rv); font-size: calc(22px * var(--rv-type)); font-weight: 700; margin: 5px 0 0 2px; color: var(--b-sub); }
 .heroOf { font-size: calc(14px * var(--rv-type)); color: var(--b-sub); padding-bottom: 6px; }
-.heroValue { font-size: calc(20px * var(--rv-type)); font-weight: 700; font-variant-numeric: tabular-nums; padding-bottom: 6px; }
+.heroValue { font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 700; font-variant-numeric: tabular-nums; padding-bottom: 6px; }
 .heroChase { display: flex; align-items: center; gap: 8px; font-size: calc(13.5px * var(--rv-type)); font-weight: 550; padding: 10px 12px; border-radius: 14px; background: var(--b-icon-bg); }
 .heroChaseText { min-width: 0; }
 .heroMedals { display: flex; gap: 5px; padding-bottom: 8px; }
@@ -277,7 +277,7 @@
 }
 .chipOn { border-color: var(--rv-accent); background: var(--rv-cream); color: var(--rv-accent); font-weight: 650; }
 
-.h2 { margin: 0 0 10px; font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.02em; }
+.h2 { margin: 0 0 10px; font-family: var(--font-display-rv); font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.02em; }
 .podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-items: end; }
 .podCol { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; text-align: center; }
 .podAv {
@@ -295,7 +295,7 @@
 .podAvFirst { width: 54px; height: 54px; }
 .podName { font-size: calc(12.5px * var(--rv-type)); font-weight: 600; line-height: 1.25; max-width: 100%; }
 .podValue { font-size: calc(12px * var(--rv-type)); font-weight: 650; color: var(--m-deep); font-variant-numeric: tabular-nums; }
-.podStep { width: 100%; height: 32px; border-radius: 12px 12px 0 0; background: var(--m-light); color: var(--m-deep); font-size: calc(20px * var(--rv-type)); font-weight: 700; display: grid; place-items: center; }
+.podStep { width: 100%; height: 32px; border-radius: 12px 12px 0 0; background: var(--m-light); color: var(--m-deep); font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 700; display: grid; place-items: center; }
 .podStep1 { height: 62px; }
 .podStep2 { height: 44px; }
 
@@ -325,7 +325,7 @@
 /* the full ranking */
 .listHead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 2px; }
 .listHeadFair { margin-bottom: 4px; }
-.listTitle { margin: 0; font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.02em; }
+.listTitle { margin: 0; font-family: var(--font-display-rv); font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.02em; }
 .listCount { font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
 .row {
   display: grid;
@@ -393,7 +393,7 @@
 .fairStep { width: 100%; height: 34px; border-radius: 12px 12px 0 0; background: var(--m-light); color: var(--m-deep); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
 .fairStep1 { height: 60px; }
 .fairStep2 { height: 46px; }
-.fairPlace { font-size: calc(20px * var(--rv-type)); font-weight: 800; line-height: 1; }
+.fairPlace { font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 800; line-height: 1; }
 .fairJoint { font-size: calc(10.5px * var(--rv-type)); font-weight: 650; }
 
 .fairsCard {
@@ -466,12 +466,12 @@
 /* ── sheets ────────────────────────────────────────────────────────────── */
 .sheetPanel { padding: 10px 20px 30px; display: flex; flex-direction: column; gap: 16px; }
 .sheetHead { display: flex; align-items: baseline; justify-content: space-between; }
-.sheetTitle { margin: 0; font-size: calc(20px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
+.sheetTitle { margin: 0; font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
 .sheetCtx { font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
 .fsMedals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .fsMedal { border-radius: 14px; background: var(--m-light); padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
 .fsMedalLabel { font-size: calc(12px * var(--rv-type)); font-weight: 650; color: var(--m-deep); }
-.fsMedalCount { font-size: calc(26px * var(--rv-type)); font-weight: 800; letter-spacing: -.03em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.fsMedalCount { font-family: var(--font-display-rv); font-size: calc(26px * var(--rv-type)); font-weight: 800; letter-spacing: -.03em; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .fsOther { font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); margin-top: -6px; }
 .fsRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--rv-rule); }
 .fsText { min-width: 0; }
@@ -484,7 +484,7 @@
 
 .csHead { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .csLabel { display: block; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
-.csValue { display: block; font-size: calc(30px * var(--rv-type)); font-weight: 800; letter-spacing: -.03em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.csValue { display: block; font-family: var(--font-display-rv); font-size: calc(30px * var(--rv-type)); font-weight: 800; letter-spacing: -.03em; margin-top: 2px; font-variant-numeric: tabular-nums; }
 .csPos { font-size: calc(14px * var(--rv-type)); font-weight: 650; color: var(--rv-accent); padding-bottom: 6px; }
 .csBar { display: flex; gap: 2px; height: 12px; border-radius: 6px; overflow: hidden; }
 .csRow { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--rv-rule); }
@@ -512,5 +512,5 @@
 .cardNumSkel { width: 60px; height: calc(38px * var(--rv-type)); margin: 4px 0; }
 .cardValueSkel { width: 70%; height: calc(12px * var(--rv-type)); margin-top: 8px; }
 /* Nothing on this board yet: said in words where the place would be. */
-.heroNone { font-size: calc(22px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; padding-bottom: 6px; }
+.heroNone { font-family: var(--font-display-rv); font-size: calc(22px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; padding-bottom: 6px; }
 .cardNone { font-size: calc(17px * var(--rv-type)); font-weight: 700; letter-spacing: -.01em; padding-bottom: 6px; }

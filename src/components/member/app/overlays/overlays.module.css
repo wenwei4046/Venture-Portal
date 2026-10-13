@@ -1,6 +1,6 @@
 /* Switch sub-department — RevenueApp.dc.html 1251–1268 */
 .sdPanel { padding: 10px 20px 34px; display: flex; flex-direction: column; gap: 16px; }
-.sdTitle { margin: 0; font-size: calc(20px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
+.sdTitle { margin: 0; font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
 .sdSub { margin: 4px 0 0; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
 .sdList { display: flex; flex-direction: column; gap: 8px; }
 .sdRow {
@@ -52,7 +52,7 @@
 /* Start a quote — 1321–1337 */
 .bpPanel { padding: 10px 20px 34px; display: flex; flex-direction: column; gap: 14px; }
 [data-platform="android"] .bpPanel { padding-bottom: 20px; }
-.bpTitle { margin: 0; font-size: calc(21px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
+.bpTitle { margin: 0; font-family: var(--font-display-rv); font-size: calc(21px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
 .bpSub { margin: 4px 0 0; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
 .bpList { display: flex; flex-direction: column; gap: 8px; }
 .bpRow {

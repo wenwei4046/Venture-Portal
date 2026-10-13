@@ -308,7 +308,7 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
           ) : null}
           <div className={s.headText}>
             {kicker ? <div className={s.kicker}>{kicker}</div> : null}
-            {/* A div, as the prototype's: the portal's global h1 rule would set it in Georgia. */}
+            {/* A div, as the prototype's: the portal's global h1 rule would set it in the display serif. */}
             <div className={s.title} role="heading" aria-level={1}>{title}</div>
           </div>
           {view === 'home' && !d.viewingAs ? (
