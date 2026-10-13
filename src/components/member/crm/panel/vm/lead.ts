@@ -14,6 +14,7 @@ import { infoRows } from "../../sales/vm/customer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
 import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
+import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
@@ -158,6 +159,9 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   return {
     inbox: on, viewOnly: false, draft, setDraft: (e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value; set(u => ({ ...u, pDraft: v })); },
     send: has ? () => void send() : () => void micTap(), sendBg: has ? "#BD4A19" : "#D9C7BA",
+    // The sticker button: an emoji sheet; each tap adds one to the reply.
+    emojiOpen: !!ui.pEmoji, openEmoji: () => patch({ pEmoji: true }), closeEmoji: () => patch({ pEmoji: false }),
+    emojis: CHAT_EMOJIS.map(e => ({ e, pick: () => set(u => ({ ...u, pDraft: withEmoji(u.pDraft, e) })) })),
     rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()), cancel: recStop(false), send: recStop(true) } : null,
     // + = a document, the camera = a photo (PanelScreens' hidden pickers); the typed text goes as the caption.
     attach: () => document.getElementById("crm-panel-file")?.click(),

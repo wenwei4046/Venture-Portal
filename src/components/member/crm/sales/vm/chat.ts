@@ -16,6 +16,7 @@ import { customerFormVM, infoRows } from "./customer";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
+import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { CHAT_WALL } from "../wall";
 
 const RUST = "#BD4A19", INK = "#3F2B22", SUB = "rgb(128 107 96)", BD = "#EBDDD2";
@@ -378,7 +379,8 @@ export function chatVM(ctx: SalesCtx) {
         : tpls.map(t => {
           const params = Array.from({ length: t.params }, (_, i) => (i === 0 ? first : ""));
           return { name: t.label ?? t.name.replace(/_/g, " ").replace(/^\w/, x => x.toUpperCase()), text: t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] || "…"),
-            send: async () => { if (await oneAtATime(`send:${c.id}`, () => act.sendTemplate(c.id, t, params))) { patch({ tpl: false }); scrollDown(); } } };
+            // Shows at once, like every send (2026-10-13): the sheet closes and the template is in the chat while it goes.
+            send: () => { patch({ tpl: false }); scrollDown(); void oneAtATime(`send:${c.id}:${t.name}`, () => act.sendTemplate(c.id, t, params)); } };
         });
   // The message shows at once and the box empties (2026-10-13: sending felt slow); a send that fails puts the words back
   // into an empty box. Sends of one chat go out in the order tapped (actions › inTurn), so a second tap sends the next.
@@ -438,6 +440,9 @@ export function chatVM(ctx: SalesCtx) {
       await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
     },
     openCamera: () => document.getElementById("crm-pick-camera")?.click(),
+    // The sticker button: an emoji sheet; each tap adds one to the reply, the sheet stays until closed.
+    emojiOpen: !!ui.emoji, openEmoji: () => patch({ emoji: true }), closeEmoji: () => patch({ emoji: false }),
+    emojis: CHAT_EMOJIS.map(e => ({ e, pick: () => set(u => ({ ...u, draft: { ...u.draft, [c.id]: withEmoji(u.draft[c.id] ?? "", e) } })) })),
     micTap: async () => {
       if (recOn) return;
       const why = await startVoice();
