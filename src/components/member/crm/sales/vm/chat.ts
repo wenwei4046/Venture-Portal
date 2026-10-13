@@ -454,7 +454,8 @@ export function chatVM(ctx: SalesCtx) {
       await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
     }),
     // The sticker button: an emoji sheet; each tap adds one to the reply, the sheet stays until closed.
-    emojiOpen: !!ui.emoji, openEmoji: () => patch({ emoji: true }), closeEmoji: () => patch({ emoji: false }),
+    // Open only in the chat it was opened in (user 2026-10-13: it came up on its own in the next chat).
+    emojiOpen: ui.emoji === c.id, openEmoji: () => patch({ emoji: c.id }), closeEmoji: () => patch({ emoji: null }),
     emojis: CHAT_EMOJIS.map(e => ({ e, pick: () => set(u => ({ ...u, draft: { ...u.draft, [c.id]: withEmoji(u.draft[c.id] ?? "", e) } })) })),
     micTap: async () => {
       if (recOn) return;

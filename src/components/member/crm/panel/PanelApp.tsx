@@ -148,22 +148,6 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
           </>)}
           <h2 style={{ flex: "none", margin: "4px 4px -10px", fontSize: "20px", fontWeight: "700", letterSpacing: "-.02em" }}>Needs your action</h2>
           <section style={{ flex: "none", padding: "4px 16px", borderRadius: "20px", background: "#fff", boxShadow: "0 1px 2px rgba(63,43,34,.04), 0 6px 18px rgba(63,43,34,.06)", display: "flex", flexDirection: "column" }}>
-            <div onClick={v.ov.goAssign} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "16px 0", borderBottom: "1px solid #EBDDD2", cursor: "pointer" }}>
-              <span style={{ flex: "none", width: "38px", height: "38px", borderRadius: "12px", background: "#FFF0E4", color: "#BD4A19", display: "grid", placeItems: "center" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 5h16v11H9l-5 4V5Zm4 4h8M8 12h5">
-                  </path>
-                </svg>
-              </span>
-              <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                <strong style={{ fontSize: "15px", fontWeight: "650" }}>Organic Leads</strong>
-              </span>
-              <em style={{ fontStyle: "normal", minWidth: "26px", height: "26px", padding: "0 8px", boxSizing: "border-box", borderRadius: "13px", background: "#BD4A19", color: "#fff", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "700" }}>{v.ov.waitingN}</em>
-              <svg style={{ color: "#806B60" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m9 6 6 6-6 6">
-                </path>
-              </svg>
-            </div>
             <div onClick={v.ov.openAtt} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "16px 0", cursor: "pointer" }}>
               <span style={{ flex: "none", width: "38px", height: "38px", borderRadius: "12px", background: "#FBE7E2", color: "#A3371A", display: "grid", placeItems: "center" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -1095,7 +1079,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                       </svg>
                     </div>
                     {!!(a.resNone) && (<>
-                      <span style={{ fontSize: "12px", color: "#A8968B" }}>Not assigned yet · leads wait in Organic Leads</span>
+                      <span style={{ fontSize: "12px", color: "#A8968B" }}>Not assigned yet · dealt evenly across teams</span>
                     </>)}
                     {!!(a.hasLeg) && (<>
                       <div style={{ display: "flex", height: "6px", borderRadius: "3px", overflow: "hidden", background: "#EEF3F9", gap: "2px" }}>

@@ -65,6 +65,10 @@ module.exports = [
   // Team inbox cards: a long press or a swipe left opens Send to (user 2026-10-13; vm/inbox.ts › gestures).
   ['<div onClick={r.open} style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "12px", borderRadius: "14px",',
     '<div onClick={r.open} onClickCapture={r.guard} onPointerDown={r.down} onPointerMove={r.move} onPointerUp={r.up} onPointerCancel={r.cancel} onContextMenu={r.noMenu} style={{ WebkitTouchCallout: "none", userSelect: "none", display: "flex", flexDirection: "column", gap: "6px", padding: "12px", borderRadius: "14px",'],
+  // No Organic Leads (the owner, 2026-10-13: "organic lead 直接給 director … 可以刪掉"): Insight's Needs your action loses its
+  // row, and an ad nobody set says what really happens to its leads.
+  [/<div onClick=\{v\.ov\.goAssign\}[\s\S]*?<\/div>\s*(<div onClick=\{v\.ov\.openAtt\})/, "$1"],
+  ["Not assigned yet · leads wait in Organic Leads", "Not assigned yet · dealt evenly across teams"],
   // Full time team editor: the people table keeps its rows full height and the page scrolls (user 2026-10-13: LAWRENCE's
   // title was cut — the scroller squeezed the table, whose overflow is hidden, to make room for the week below).
   [/<div style=\{\{ display: "flex", flexDirection: "column", borderRadius: "16px", background: "#fff", border: "1px solid #EBDDD2", overflow: "hidden" \}\}>(\s*<div style=\{\{ display: "grid", gridTemplateColumns: "minmax\(0, 1fr\) repeat\(7, 30px\)", alignItems: "center", gap: "4px", padding: "10px 12px 6px" \}\}>)/,

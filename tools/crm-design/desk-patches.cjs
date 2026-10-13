@@ -2,6 +2,8 @@
 // must match exactly once in the generated markup, so a regenerated design that moved it fails loudly here.
 // Every one is listed for the owner in docs/design/crm-desktop-rev1/BUILD-NOTES.md.
 module.exports = [
+  [`Not assigned yet · leads wait in Organic Leads</span>`, `Not assigned yet · dealt evenly across teams</span>`,
+    "No Organic Leads (the owner, 2026-10-13): an ad nobody set is dealt evenly across the teams; an enquiry from no ad goes to the Revenue Director."],
   // ── The Revenue app's own top bar: its real words and buttons (the prototype draws them as text) ──
   [`borderRadius: "14px", background: "#FFFFFF", fontFamily: "Inter, sans-serif", color: "#3F2B22", WebkitFontSmoothing: "antialiased", boxShadow: "0 1px 2px rgba(63,43,34,.08), 0 12px 40px rgba(63,43,34,.10)" }}`,
     `borderRadius: v.frameRadius, background: "#FFFFFF", fontFamily: "Inter, sans-serif", color: "#3F2B22", WebkitFontSmoothing: "antialiased", boxShadow: v.frameShadow }}`,
@@ -109,5 +111,5 @@ function chatPatches(inn, out, text, time, reply, list, draft, setDraft, draftKe
   return [
     [bubbles, loop, `The ${aw ? "Awaiting reply" : "pane's"} chat shows the whole conversation in the design's bubbles (it draws one).`],
     [composer, box, `The ${aw ? "Awaiting reply" : "pane's"} reply box can be typed in and sends; + and the camera attach.`],
-  ];
+];
 }

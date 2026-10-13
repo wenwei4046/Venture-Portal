@@ -67,7 +67,12 @@ export function profileVM(ctx: SalesCtx) {
     })),
     hasUpd: vis.some(n => !n.pending),
     notifUpd: vis.filter(n => !n.pending).map((n, k) => ({
-      unread: !isRead(n), weight: isRead(n) ? 500 : 650, fg: isRead(n) ? "#806B60" : "#3F2B22", open: () => { if (!isRead(n)) act.readNotifs([n.id]); },
+      // Tapped: read, and — when it is about one of their own customers — that chat opens (user 2026-10-13).
+      unread: !isRead(n), weight: isRead(n) ? 500 : 650, fg: isRead(n) ? "#806B60" : "#3F2B22", open: () => {
+        if (!isRead(n)) act.readNotifs([n.id]);
+        const to = n.customerId && ctx.mine.some(c => c.id === n.customerId) ? n.customerId : null;
+        if (to) { set(u => ({ ...u, profSub: null, tab: "inbox", chat: to, hist: [...u.hist, u.tab].slice(-20) })); act.openChat(to); }
+      },
       text: n.text, meta: n.lead ? `${n.lead} · ${n.at}` : n.at, rule: k ? "1px solid #EBDDD2" : "0",
       c: n.ok ? "#387557" : "#A3371A", bg: n.ok ? "#E4F1E8" : "#FBEAE6", icon: n.ok ? "m5 12 5 5 9-10" : "M6 6l12 12M18 6 6 18",
     })),

@@ -53,7 +53,7 @@ export interface PanelUi {
   /** A voice note being recorded in the chat: when it started (shared/voice.ts); pRecTick moves its clock. */
   pRec: number | null;
   /** The chat's emoji sheet. */
-  pEmoji?: boolean;
+  pEmoji?: string | null;
   /** Photos / videos picked in the chat, waiting on the preview with its HD switch. */
   pPick?: import("../shared/pick").Picked | null;
   pRecTick?: number;

@@ -20,6 +20,8 @@ export interface SalesNotif {
   ok: boolean;
   pending: boolean;
   inviteId?: string;
+  /** The customer it is about — tapping the update opens that chat (user 2026-10-13: 點了裡面的未讀訊息要有跳到該功能). */
+  customerId?: string;
 }
 
 const atLabel = (t: number, now: Date) => {
@@ -35,13 +37,13 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
     const t = new Date(i.decidedAt ?? i.createdAt).getTime();
     if (i.to === me && i.state === "pending") {
       const from = nameOf(i.from);
-      out.push({ id: i.id, kind: i.kind, from, ini: ini(from), lead: i.customerName, text: i.kind === "share" ? `${from} invited you to a chat` : `${from} wants to move a lead to you`, at: atLabel(t, now), time: t, ok: true, pending: true, inviteId: i.id });
+      out.push({ id: i.id, customerId: i.customerId, kind: i.kind, from, ini: ini(from), lead: i.customerName, text: i.kind === "share" ? `${from} invited you to a chat` : `${from} wants to move a lead to you`, at: atLabel(t, now), time: t, ok: true, pending: true, inviteId: i.id });
     } else if (i.from === me && i.state !== "pending") {
       const to = nameOf(i.to);
-      out.push({ id: i.id, kind: "status", from: to, ini: ini(to), lead: i.customerName, text: `${to} ${i.state} your ${i.kind === "share" ? "share invite" : "move request"}`, at: atLabel(t, now), time: t, ok: i.state === "accepted", pending: false });
+      out.push({ id: i.id, customerId: i.customerId, kind: "status", from: to, ini: ini(to), lead: i.customerName, text: `${to} ${i.state} your ${i.kind === "share" ? "share invite" : "move request"}`, at: atLabel(t, now), time: t, ok: i.state === "accepted", pending: false });
     } else if (i.to === me && i.state !== "pending") {
       const from = nameOf(i.from);
-      out.push({ id: i.id, kind: "status", from, ini: ini(from), lead: i.customerName, text: `You ${i.state} ${from}'s ${i.kind === "share" ? "invitation" : "move request"}`, at: atLabel(t, now), time: t, ok: i.state === "accepted", pending: false });
+      out.push({ id: i.id, customerId: i.customerId, kind: "status", from, ini: ini(from), lead: i.customerName, text: `You ${i.state} ${from}'s ${i.kind === "share" ? "invitation" : "move request"}`, at: atLabel(t, now), time: t, ok: i.state === "accepted", pending: false });
     }
   }
   // A reminder to reply, from the Control panel on a computer (CRM Desktop rev 1, B2): theirs, in the bell's own row.
@@ -49,13 +51,13 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
   for (const e of data.events) {
     if (e.kind !== "reminded" || e.owner !== me) continue;
     const from = nameOf(e.actor), t = new Date(e.at).getTime();
-    out.push({ id: "r" + e.id, kind: "status", from, ini: ini(from), lead: custOf(e.customerId), text: `${firstName(from)} reminded you to reply`, at: atLabel(t, now), time: t, ok: false, pending: false });
+    out.push({ id: "r" + e.id, customerId: e.customerId, kind: "status", from, ini: ini(from), lead: custOf(e.customerId), text: `${firstName(from)} reminded you to reply`, at: atLabel(t, now), time: t, ok: false, pending: false });
   }
   // Customers given to them (user 2026-10-09): a new enquiry the CRM dealt, or one someone assigned.
   for (const c of data.customers) {
     if (c.assignedTo !== me || !c.assignedAt) continue;
     const t = new Date(c.assignedAt).getTime(), by = c.assignedBy && c.assignedBy !== me ? nameOf(c.assignedBy) : "";
-    out.push({ id: "a" + c.id + t, kind: "status", from: by || c.name, ini: ini(by || c.name), lead: c.name, at: atLabel(t, now), time: t, ok: true, pending: false,
+    out.push({ id: "a" + c.id + t, customerId: c.id, kind: "status", from: by || c.name, ini: ini(by || c.name), lead: c.name, at: atLabel(t, now), time: t, ok: true, pending: false,
       text: by ? `${firstName(by)} assigned a customer to you` : c.adId ? `New enquiry for you · ${c.ad}` : "New enquiry for you" });
   }
   // About the people below them, only theirs.
@@ -65,7 +67,7 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
     for (const e of data.events) {
       if (!e.owner || !below.has(e.owner) || (e.kind !== "won" && e.kind !== "lost")) continue;
       const who = firstName(nameOf(e.owner)), t = new Date(e.at).getTime();
-      out.push({ id: "e" + e.id, kind: "status", from: who, ini: ini(nameOf(e.owner)), lead: custName(e.customerId), at: atLabel(t, now), time: t, pending: false,
+      out.push({ id: "e" + e.id, customerId: e.customerId, kind: "status", from: who, ini: ini(nameOf(e.owner)), lead: custName(e.customerId), at: atLabel(t, now), time: t, pending: false,
         ok: e.kind === "won", text: e.kind === "won" ? `${who} marked a customer as Won${typeof e.data.amount === "number" || typeof e.data.amount === "string" ? " · " + money(Number(e.data.amount)) : ""}` : `${who} marked a customer as Lost · ${reason(e.data.reason)}` });
     }
     for (const c of data.customers) {
@@ -73,7 +75,7 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
       const u = urgencyOf(c, now);
       if (u.level !== "overdue") continue;
       const who = firstName(nameOf(c.assignedTo)), t = now.getTime() - u.waitingMinutes * 60_000 + 9 * 3_600_000;
-      out.push({ id: "o" + c.id, kind: "status", from: who, ini: ini(nameOf(c.assignedTo)), lead: c.name, text: `${who}'s customer has waited ${Math.floor(u.waitingMinutes / 60)} h for a reply`, at: atLabel(t, now), time: t, ok: false, pending: false });
+      out.push({ id: "o" + c.id, customerId: c.id, kind: "status", from: who, ini: ini(nameOf(c.assignedTo)), lead: c.name, text: `${who}'s customer has waited ${Math.floor(u.waitingMinutes / 60)} h for a reply`, at: atLabel(t, now), time: t, ok: false, pending: false });
     }
   }
   return out.sort((a, b) => b.time - a.time);

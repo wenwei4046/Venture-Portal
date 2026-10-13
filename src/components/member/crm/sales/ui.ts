@@ -82,7 +82,7 @@ export interface SalesUi {
   /** A voice note being recorded: when it started (shared/voice.ts); recTick moves its clock. */
   rec: number | null;
   /** The emoji sheet (the composer's sticker button). */
-  emoji?: boolean;
+  emoji?: string | null;
   /** Photos / videos picked, waiting on the preview with its HD switch (shared/pick.ts). */
   pick?: import("../shared/pick").Picked | null;
   recTick?: number;

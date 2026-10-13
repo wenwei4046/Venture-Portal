@@ -26,8 +26,8 @@ export function lists(ctx: DeskCtx): Record<string, [string, string, string][]> 
   const held = data.customers.filter(c => c.held && !c.assignedTo).length;
   const ftTeams = ctx.teams.filter(t => data.ftRules.some(r => r.tlId === t.id && r.days.length)).length;
   return {
+    // No Organic Leads (the owner, 2026-10-13: an enquiry from no ad goes straight to the Revenue Director).
     assignment: [
-      ["Organic Leads", organic ? `${organic} to send` : "Nothing waiting", "sprout"],
       ["Ads to teams", `${adIds.length} ads · ` + (held ? `${held} ${held === 1 ? "lead" : "leads"} over the limit` : unset ? `${unset} on the default (evenly)` : "all set"), "megaphone"],
       ["Awaiting reply", waits.length ? `${waits.length} need a reply${overdue ? ` · ${overdue} overdue` : ""}` : "Everyone is answered", "clock"],
       ["Full time lead allocation", ftTeams ? `On for ${ftTeams} of ${ctx.teams.length} teams` : "Not set for any team", "users"],

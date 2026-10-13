@@ -161,7 +161,8 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     inbox: on, viewOnly: false, draft, setDraft: (e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value; set(u => ({ ...u, pDraft: v })); },
     send: has ? () => void send() : () => void micTap(), sendBg: has ? "#BD4A19" : "#D9C7BA",
     // The sticker button: an emoji sheet; each tap adds one to the reply.
-    emojiOpen: !!ui.pEmoji, openEmoji: () => patch({ pEmoji: true }), closeEmoji: () => patch({ pEmoji: false }),
+    // Open only in the chat it was opened in.
+    emojiOpen: !!c && ui.pEmoji === c.id, openEmoji: () => patch({ pEmoji: c?.id ?? null }), closeEmoji: () => patch({ pEmoji: null }),
     emojis: CHAT_EMOJIS.map(e => ({ e, pick: () => set(u => ({ ...u, pDraft: withEmoji(u.pDraft, e) })) })),
     rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()), cancel: recStop(false), send: recStop(true) } : null,
     // + = a document, the camera = a photo (PanelScreens' hidden pickers); the typed text goes as the caption.
