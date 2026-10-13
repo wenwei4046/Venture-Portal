@@ -22,9 +22,8 @@ do $$
 begin
   if not exists (select 1 from pg_namespace where nspname = 'storage') then return; end if;
   insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-  values ('crm-media', 'crm-media', false, 25 * 1024 * 1024,
-          array['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'video/mp4', 'video/quicktime', 'video/3gpp',
-                'audio/mp4', 'audio/aac', 'audio/mpeg', 'audio/ogg', 'audio/webm', 'audio/x-m4a', 'application/pdf'])
+  -- Any type (a document can be anything); the chat shows in place only what is safe to (lib/whatsapp/media.ts inlineType).
+  values ('crm-media', 'crm-media', false, 25 * 1024 * 1024, null)
   on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
   if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'crm media: read') then
     execute $p$create policy "crm media: read" on storage.objects for select to authenticated
