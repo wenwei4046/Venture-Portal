@@ -113,6 +113,14 @@ const PATCHES = {
     [/(<main style=\{\{ position: "relative", flex: "1 1 auto", minHeight: "0", boxSizing: "border-box", padding: )"6px 20px 8px"/, "$1\"16px 20px 8px\""],
     // 8.3 (round 2) No full-width "Book visit" bar above the composer: booking stays in ⋮ › Appointment.
     [/\{!!\(v\.notBooked\) && \(<>[\s\S]*?Book visit<\/span>\s*<\/div>\s*<\/>\)\}\s*/, ""],
+    // Assign to / Move (user 2026-10-13): a long list scrolls inside the sheet — the button stays at its foot — and each
+    // team's people sit under its heading (the Switch sheet's).
+    ['<div onClick={v.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "4px" }}>\n            <span style={{ alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2", marginBottom: "8px" }}>\n            </span>\n            <h2 style={{ margin: "0", fontSize: "20px", fontWeight: "700" }}>{v.hm.moveTitle}</h2>',
+     '<div onClick={v.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "4px", maxHeight: "88%", overflowY: "auto", scrollbarWidth: "none", boxSizing: "border-box" }}>\n            <span style={{ alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2", marginBottom: "8px" }}>\n            </span>\n            <h2 style={{ margin: "0", fontSize: "20px", fontWeight: "700" }}>{v.hm.moveTitle}</h2>'],
+    ['{(v.hm.people).map((p, p_i) => (<Fragment key={p_i}>\n              <div onClick={p.pick} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: "1px solid #EBDDD2", cursor: "pointer" }}>',
+     '{(v.hm.people).map((p, p_i) => (<Fragment key={p_i}>\n              {!!p.hasHead && (<span style={{ padding: "12px 0 4px", fontSize: "12px", fontWeight: "700", letterSpacing: ".08em", textTransform: "uppercase", color: "#806B60" }}>{p.head}</span>)}\n              <div onClick={p.pick} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: p.rule, cursor: "pointer" }}>'],
+    ['<span onClick={v.hm.confirm} style={{ marginTop: "10px", height: "50px", borderRadius: "25px",',
+     '<span onClick={v.hm.confirm} style={{ position: "sticky", bottom: "0", flex: "none", boxShadow: "0 0 0 10px #fff", marginTop: "10px", height: "50px", borderRadius: "25px",'],
     // 1.2 Every bubble lifts a little off the wallpaper.
     ["boxSizing: \"border-box\", borderRadius: m.radius, background: m.bg,", "boxSizing: \"border-box\", borderRadius: m.radius, boxShadow: \"0 1px 1px rgba(63,43,34,.10)\", background: m.bg,"]],
   // Switch to: a whole department's list scrolls inside the sheet instead of running off the screen (user 2026-10-09).

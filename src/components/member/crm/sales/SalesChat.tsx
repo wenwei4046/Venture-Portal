@@ -372,12 +372,13 @@ export default function SalesChat({ v }: { v: ChatVM }) {
       </>)}
       {!!(v.hm.moveOpen) && (<>
         <div onClick={v.hm.close} style={{ position: "absolute", inset: "0", zIndex: "6", background: "rgba(63,43,34,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeIn 200ms ease-out" }}>
-          <div onClick={v.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "4px" }}>
+          <div onClick={v.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "4px", maxHeight: "88%", overflowY: "auto", scrollbarWidth: "none", boxSizing: "border-box" }}>
             <span style={{ alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2", marginBottom: "8px" }}>
             </span>
             <h2 style={{ margin: "0", fontSize: "20px", fontWeight: "700" }}>{v.hm.moveTitle}</h2>
             {(v.hm.people).map((p, p_i) => (<Fragment key={p_i}>
-              <div onClick={p.pick} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: "1px solid #EBDDD2", cursor: "pointer" }}>
+              {!!p.hasHead && (<span style={{ padding: "12px 0 4px", fontSize: "12px", fontWeight: "700", letterSpacing: ".08em", textTransform: "uppercase", color: "#806B60" }}>{p.head}</span>)}
+              <div onClick={p.pick} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: p.rule, cursor: "pointer" }}>
                 <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650" }}>{p.ini}</span>
                 <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column" }}>
                   <strong style={{ fontSize: "15px", fontWeight: "650" }}>{p.name}</strong>
@@ -389,7 +390,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
                 </span>
               </div>
             </Fragment>))}
-            <span onClick={v.hm.confirm} style={{ marginTop: "10px", height: "50px", borderRadius: "25px", display: "grid", placeItems: "center", background: v.hm.cBg, color: "#fff", fontSize: "16px", fontWeight: "650", cursor: "pointer" }}>{v.hm.cLabel}</span>
+            <span onClick={v.hm.confirm} style={{ position: "sticky", bottom: "0", flex: "none", boxShadow: "0 0 0 10px #fff", marginTop: "10px", height: "50px", borderRadius: "25px", display: "grid", placeItems: "center", background: v.hm.cBg, color: "#fff", fontSize: "16px", fontWeight: "650", cursor: "pointer" }}>{v.hm.cLabel}</span>
           </div>
         </div>
       </>)}
