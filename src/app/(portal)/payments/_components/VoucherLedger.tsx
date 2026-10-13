@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
-import { canSeePayrollPayouts } from '@/lib/roles'
+import { canSeePayrollPayouts, listsPayrollByPerson } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
 import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
@@ -57,8 +57,11 @@ export default async function VoucherLedger({
 }) {
   const user = await requirePermission('treasury')
   // Without Payroll payouts (2026-10-02) payroll is one locked total per
-  // batch: its vouchers are folded here, on the server, and never sent on.
+  // batch, department by department (2026-10-13): its vouchers are folded
+  // here, on the server, and never sent on. The Finance view folds them too
+  // (lib/roles.ts listsPayrollByPerson); Payroll Requests stays the right's.
   const seesPayroll = canSeePayrollPayouts(user)
+  const byPerson = listsPayrollByPerson(user)
   const supabase = await createClient()
   const isReceipts = direction === 'credit'
   const statusFilter = params.status
@@ -136,7 +139,7 @@ export default async function VoucherLedger({
 
   // A locked payroll batch stands department by department (2026-10-13): the
   // names a voucher's text may give its department by (lib/payroll-vouchers).
-  const departmentsRead = seesPayroll || isReceipts ? null : startRead(supabase.from('departments').select('name'))
+  const departmentsRead = byPerson || isReceipts ? null : startRead(supabase.from('departments').select('name'))
 
   // Money that moved outside the voucher flow (extraRows below).
   const extraRowsRead = startRead(isReceipts ? fetchReceiptExtras(supabase) : fetchPaymentExtras(supabase))
@@ -199,13 +202,13 @@ export default async function VoucherLedger({
   // The rows this account may open, and the payroll batches it may only see
   // by department (2026-10-13). The summary above the table still counts every
   // voucher.
-  const open = seesPayroll ? all : all.filter((v) => !isPayrollReference(v.reference_type))
+  const open = byPerson ? all : all.filter((v) => !isPayrollReference(v.reference_type))
   const departmentNames = new Set<string>()
   if (departmentsRead) {
     const { data: depts } = await departmentsRead
     for (const d of (depts ?? []) as Array<{ name: string }>) departmentNames.add(d.name)
   }
-  const allLocked = seesPayroll ? [] : lockPayrollBatches(all.filter((v) => isPayrollReference(v.reference_type)), departmentNames)
+  const allLocked = byPerson ? [] : lockPayrollBatches(all.filter((v) => isPayrollReference(v.reference_type)), departmentNames)
   // The Payroll batches tab holds the salary batches only, as it does for the
   // vouchers themselves; it is not a status, so the batches pass it whole.
   const lockedSalary = allLocked.filter((b) => b.referenceType === 'payroll_disbursement')

@@ -10,8 +10,9 @@ type Filter = 'all' | 'in' | 'out'
 interface Props {
   deptId: string
   filter?: Filter
-  /** false = the viewer may not see one person's pay (canSeePayrollPayouts):
-   *  the rows payroll vouchers wrote fold into one line per batch per day. */
+  /** false = the viewer may not see one person's pay, or reads the Finance view
+   *  (lib/roles.ts listsPayrollByPerson): the rows payroll vouchers wrote fold
+   *  into one line per batch per day. */
   seesPayroll: boolean
 }
 

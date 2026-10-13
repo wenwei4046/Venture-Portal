@@ -127,7 +127,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   // sensitive fields — it edits as it does in its own view. To see the portal
   // exactly as somebody else does is View as a person, read-only.
   if (canSwitchView && (viewAs === 'hr' || viewAs === 'finance')) {
-    return { ...user, role: viewAs, actualRole: user.role, canSwitchView }
+    return { ...user, role: viewAs, actualRole: user.role, canSwitchView, lens: viewAs }
   }
 
   if (canSwitchView && viewAs && masked) {

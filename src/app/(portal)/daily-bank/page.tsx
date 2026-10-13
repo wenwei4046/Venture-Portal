@@ -12,7 +12,7 @@
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requirePermission, requirePage } from '@/lib/auth'
-import { canSeePayrollPayouts } from '@/lib/roles'
+import { listsPayrollByPerson } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
 import { fetchDailyBank } from '@/lib/daily-bank-data'
 import { officeToday } from '@/lib/office-time'
@@ -36,7 +36,7 @@ export default async function DailyBankPage({
   const date =
     rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) && dayjs(rawDate).isValid() ? rawDate : today
 
-  const data = await fetchDailyBank(supabase, date, { seesPayroll: canSeePayrollPayouts(user) })
+  const data = await fetchDailyBank(supabase, date, { seesPayroll: listsPayrollByPerson(user) })
 
   return <DailyBankView data={data} today={today} />
 }

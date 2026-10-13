@@ -31,8 +31,8 @@ const base = {
 }
 const VOUCHERS = [
   { ...base, id: 'v-tnb', voucher_no: 'HV-PV-202610-0450', amount: 1200, payee_name: 'TNB', payment_date: '2026-10-06' },
-  { ...base, id: 'v-aina', voucher_no: 'HV-PV-202610-0451', amount: 3200.5, payee_name: 'Aina binti Example', description: 'Payroll disbursement Sep 2026 — Aina binti Example', reference_type: 'payroll_disbursement', voucher_type: 'other' },
-  { ...base, id: 'v-bala', voucher_no: 'HV-PV-202610-0452', amount: 4100.25, payee_name: 'Bala Sample', description: 'Payroll disbursement Sep 2026 — Bala Sample', reference_type: 'payroll_disbursement', voucher_type: 'other' },
+  { ...base, id: 'v-aina', voucher_no: 'HV-PV-202610-0451', amount: 3200.5, payee_name: 'Aina binti Example', description: 'Payroll disbursement Sep 2026 — Aina binti Example (Marketing)', reference_type: 'payroll_disbursement', voucher_type: 'other' },
+  { ...base, id: 'v-bala', voucher_no: 'HV-PV-202610-0452', amount: 4100.25, payee_name: 'Bala Sample', description: 'Payroll disbursement Sep 2026 — Bala Sample (Marketing)', reference_type: 'payroll_disbursement', voucher_type: 'other' },
   { ...base, id: 'v-kwsp', voucher_no: 'HV-PV-202610-0453', amount: 1014, payee_name: 'KWSP', description: 'KWSP — Sep 2026 payroll (Zeta · 1 staff)', reference_type: 'payroll_statutory', payment_date: '2026-10-04' },
 ]
 
@@ -42,8 +42,11 @@ const get = (query = '') => GET(new Request(`http://localhost/payments/export?fo
 
 beforeEach(() => {
   vi.clearAllMocks()
-  const q = { select: () => q, order: () => q, then: (resolve: (v: { data: unknown[] }) => unknown) => Promise.resolve(resolve({ data: [] })) }
-  mocks.createClient.mockResolvedValue({ from: () => q })
+  const q = (data: unknown[]) => {
+    const chain = { select: () => chain, order: () => chain, then: (resolve: (v: { data: unknown[] }) => unknown) => Promise.resolve(resolve({ data })) }
+    return chain
+  }
+  mocks.createClient.mockResolvedValue({ from: (table: string) => q(table === 'departments' ? [{ name: 'Marketing' }, { name: 'Zeta' }] : []) })
   mocks.fetchAllRows.mockResolvedValue(VOUCHERS)
   mocks.exportXlsxResponse.mockReturnValue(new Response('xlsx'))
 })
@@ -56,17 +59,32 @@ describe('the Payments export', () => {
     expect(sheet().map((r) => r.payee_name)).toEqual(['TNB', 'Aina binti Example', 'Bala Sample', 'KWSP'])
   })
 
-  it('carries payroll as one total per batch for a treasury account without it', async () => {
+  // 2026-10-13: department by department, as the page lists it.
+  it('carries payroll by department for a treasury account without it', async () => {
     mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
     await get()
     expect(sheet().map((r) => [r.voucher_no, r.date, r.type, r.status, r.payee_name, r.amount])).toEqual([
       ['HV-PV-202610-0450', '06/10/2026', 'expense', 'paid', 'TNB', 1200],
-      [null, '05/10/2026', 'payroll', '2 paid', 'Payroll disbursement Sep 2026 (2 vouchers, total only)', 7300.75],
-      [null, '04/10/2026', 'payroll', '1 paid', 'KWSP Sep 2026 (1 voucher, total only)', 1014],
+      [null, '05/10/2026', 'payroll', '2 paid', 'Payroll disbursement Sep 2026 · Marketing (2 vouchers, department total)', 7300.75],
+      [null, '04/10/2026', 'payroll', '1 paid', 'KWSP Sep 2026 · Zeta (1 voucher, department total)', 1014],
     ])
-    for (const secret of ['Aina', 'Bala', 'Zeta', 'HV-PV-202610-0451', 'HV-PV-202610-0452']) {
+    for (const secret of ['Aina', 'Bala', 'HV-PV-202610-0451', 'HV-PV-202610-0452']) {
       expect(JSON.stringify(sheet())).not.toContain(secret)
     }
+  })
+
+  it('…and so on the Finance view, whatever the account may see', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', actualRole: 'principal', lens: 'finance', permissions: ['treasury', 'payroll_payouts', 'hr_costing'] })
+    await get()
+    expect(sheet().map((r) => r.payee_name)).toEqual([
+      'TNB', 'Payroll disbursement Sep 2026 · Marketing (2 vouchers, department total)', 'KWSP Sep 2026 · Zeta (1 voucher, department total)',
+    ])
+  })
+
+  it('the Payroll batches tab exports the salary batches only', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+    await get('&status=payroll')
+    expect(sheet().map((r) => r.payee_name)).toEqual(['Payroll disbursement Sep 2026 · Marketing (2 vouchers, department total)'])
   })
 
   it('…and a search for a person brings back no batch', async () => {
