@@ -3,8 +3,9 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SlidingTabs } from '@/components/motion/SlidingTabs'
 
-// Overdue (2026-10-09, the Finance revamp): an active loan with an open record
-// on the Overdue page.
+// Overdue (2026-10-09, the Finance revamp): an active loan with an instalment
+// past its day unpaid (read live since 2026-10-12). Since 2026-10-14, when the
+// Overdue page went, the Overdue card above opens this tab.
 const TABS = [
   { key: 'pending_approval', label: 'Pending' },
   { key: 'active', label: 'Active' },

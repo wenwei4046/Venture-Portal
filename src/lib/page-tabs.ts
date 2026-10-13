@@ -134,7 +134,6 @@ export const PAGE_TABS = {
   '/fund-out/new': FUND_OUT,
   '/ba': INVOICE_FINANCING,
   '/ba/[id]': INVOICE_FINANCING,
-  '/overdue': ['fin.overdue'],
   '/repayment-schedule': ['fin.repayment_schedule'],
   '/statements/[id]': STATEMENTS,
   '/statements/[id]/print': STATEMENTS,

@@ -184,7 +184,8 @@ export default async function FundOutPage({ searchParams }: Props) {
           label="Overdue"
           value={formatMoney(overdue.reduce((s, l) => s + (overdueBy.get(l.id)?.outstanding ?? 0), 0))}
           icon="alert"
-          href={overdue.length > 0 ? '/overdue' : undefined}
+          // The list's own Overdue tab (2026-10-14: the Overdue page is gone).
+          href={overdue.length > 0 ? '/fund-out?status=overdue' : undefined}
           note={overdue.length > 0 ? `${overdue.length} ${overdue.length === 1 ? 'loan' : 'loans'} · see Overdue` : 'None'}
         />
       </StatCards>

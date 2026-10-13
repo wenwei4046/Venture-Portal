@@ -121,9 +121,9 @@ describe('warmOnIntent', () => {
     vi.advanceTimersByTime(40)
     warmOnIntent(router, '/fund-out')
     vi.advanceTimersByTime(40)
-    warmOnIntent(router, '/overdue')
+    warmOnIntent(router, '/repayment-schedule')
     vi.advanceTimersByTime(INTENT_MS)
-    expect(prefetch.mock.calls).toEqual([['/overdue']])
+    expect(prefetch.mock.calls).toEqual([['/repayment-schedule']])
   })
 
   it('waits for a rail that is still sliding open', () => {
