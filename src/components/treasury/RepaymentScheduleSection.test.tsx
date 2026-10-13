@@ -6,9 +6,10 @@ import PrintSchedule from './PrintSchedule'
 
 // 2026-10-09 — the Repayment schedule on a fund source's and a loan's page
 // (the user's Claude Design handoff): No. / Date / Installment / Principal /
-// Interest / Balance / Outstanding / Remark, a foot of totals and a line on
-// how to read it; the payments themselves fold away under it. Print schedule
-// lays the same plan out on a page of its own.
+// Interest / Balance / Outstanding / Remark and a foot of totals; the payments
+// themselves fold away under it. The line on how to read it went 2026-10-12
+// (the user: the descriptions make the view too messy). Print schedule lays
+// the same plan out on a page of its own.
 
 const plan: RepaymentPlan = {
   kind: 'fixed',
@@ -47,7 +48,7 @@ describe('the Repayment schedule', () => {
     expect(foot).toHaveTextContent('Total')
     expect(foot).toHaveTextContent('33,600.00')
     expect(foot).toHaveTextContent('11,800.00')
-    expect(screen.getByText(/^Installment = principal ÷ 3/)).toBeInTheDocument()
+    expect(screen.queryByText(/^Installment = principal ÷ 3/)).toBeNull()
   })
 
   it('folds the payments themselves away under the schedule', () => {
@@ -62,7 +63,7 @@ describe('the Repayment schedule', () => {
   it('reads a deal with no fixed term month by month, and a cancelled one as no schedule', () => {
     const { unmount } = render(<RepaymentScheduleSection plan={{ ...plan, kind: 'open', months: null }} />)
     expect(head().querySelector('.count')).toHaveTextContent('NO FIXED TERM · 3 MONTHS TO DATE')
-    expect(screen.getByText(/^No fixed term: interest month by month/)).toBeInTheDocument()
+    expect(screen.queryByText(/^No fixed term: interest month by month/)).toBeNull()
     unmount()
     render(<RepaymentScheduleSection plan={{ ...plan, kind: 'none', rows: [] }} cancelled />)
     expect(screen.getByText('Cancelled — no schedule.')).toBeInTheDocument()

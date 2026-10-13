@@ -116,6 +116,11 @@ checks++
 await assert.rejects(() => q(`select public.crm_slot_check('t1', $1::timestamptz)`, ['2030-01-07 14:00+08']), /closed at that time/, '14:00 falls in 13:00–15:00'); checks++
 await assert.rejects(() => q(`select public.crm_slot_check('t1', $1::timestamptz)`, ['2030-01-08 10:00+08']), /closed that day/, 'a block with no hours closes the day'); checks++
 await assert.rejects(() => q(`select public.crm_slot_check('t1', $1::timestamptz)`, ['2030-01-07 11:00+08']), /does not take bookings/, 'slots still decide'); checks++
+// …and round 2's one-window closure (t1 / t2, the phone panel) counts the same (mig 20261013220000).
+await q(`update crm_showrooms set blocks = '[{"a":"2030-01-14","b":"2030-01-14","why":"Training","t1":"13:00","t2":"15:00"}]' where id = 't1'`)
+await q(`select public.crm_slot_check('t1', $1::timestamptz)`, ['2030-01-14 10:00+08'])
+checks++
+await assert.rejects(() => q(`select public.crm_slot_check('t1', $1::timestamptz)`, ['2030-01-14 14:00+08']), /closed at that time/, 't1 / t2 closes its hours, not the day'); checks++
 
 // B5 · Forms and Customer info's own answers.
 const sections = JSON.stringify([{ id: 's1', title: 'Customer', fields: [{ id: 'name', label: 'Name', type: 'Text', req: 1, locked: 1 }, { id: 'f_pets', label: 'Pets', type: 'Choice', req: 0, opts: ['Yes', 'No'] }] }])

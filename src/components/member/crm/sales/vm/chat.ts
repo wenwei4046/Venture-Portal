@@ -9,7 +9,7 @@
  * for quick replies, send; after the reply window, approved templates only.
  */
 import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, WheelEvent } from "react";
-import { DEFAULT_QUICK_REPLIES, type CrmChatMessage, type CrmCustomer, type CrmRoom, type CrmVisit } from "@/lib/member/crm-data";
+import { DEFAULT_QUICK_REPLIES, blockHours, type CrmChatMessage, type CrmCustomer, type CrmRoom, type CrmVisit } from "@/lib/member/crm-data";
 import { personOf, teamOf, teamName, downlineOf, jobTitle, titleOf } from "../../shared/people";
 import { BORDER, gb, CHANNEL, day0, DAY, daySep, dayLabel, firstName, ini, msgTime, money, stop, timeLabel, windowShut, type SalesCtx } from "./common";
 import { customerFormVM, infoRows } from "./customer";
@@ -31,14 +31,18 @@ export const slotAt = (day: number, label: string) => {
   const d = new Date(day); d.setHours((Number(m[1]) % 12) + (m[3] === "pm" ? 12 : 0), Number(m[2]), 0, 0); return d;
 };
 const iso = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-const onDay = (b: CrmRoom["blocks"][number], day: number) => iso(day) >= b.a && iso(day) <= (b.b || b.a);
-/** Closed that day: a weekly closure or a blocked date range — one closed only for some hours (CRM Desktop rev 1, B9) is not. */
-export const roomClosed = (r: CrmRoom | undefined, day: number) => !!r && (r.weekly.includes(new Date(day).getDay()) || r.blocks.some(b => !b.ranges?.length && onDay(b, day)));
-/** The room's slots open on that weekday (0 = Monday in the slot code), less those a closure for some hours takes (as crm_slot_check). */
-export const roomSlots = (r: CrmRoom | undefined, day: number) => !r ? [] : r.slots
-  .filter(s => !s.includes("@") || s.split("@")[1].includes(String((new Date(day).getDay() + 6) % 7)))
-  .filter(s => { const hm = s.split("@")[0]; return !r.blocks.some(b => onDay(b, day) && (b.ranges ?? []).some(g => hm >= g.f && hm < g.t)); })
-  .map(t12);
+const inBlock = (b: CrmRoom["blocks"][number], day: number) => iso(day) >= b.a && iso(day) <= (b.b || b.a);
+/** Closed that day: a weekly closure or a whole-day blocked date range (a block with set hours closes only those hours). */
+export const roomClosed = (r: CrmRoom | undefined, day: number) => !!r && (r.weekly.includes(new Date(day).getDay()) || r.blocks.some(b => !blockHours(b).length && inBlock(b, day)));
+/** Closed at that slot by a block with set hours (round 2's t1 / t2, the desktop's ranges): the date is inside it and the
+ * slot starts at or after a window's start and before its end — the same test as crm_slot_check. */
+export const slotBlocked = (r: CrmRoom | undefined, day: number, label: string) => {
+  if (!r) return false;
+  const at = slotAt(day, label), hm = `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
+  return r.blocks.some(b => inBlock(b, day) && blockHours(b).some(g => hm >= g.f && hm < g.t));
+};
+/** The room's slots open on that weekday (0 = Monday in the slot code). */
+export const roomSlots = (r: CrmRoom | undefined, day: number) => !r ? [] : r.slots.filter(s => !s.includes("@") || s.split("@")[1].includes(String((new Date(day).getDay() + 6) % 7))).map(t12);
 
 /** The system lines a chat shows between messages: visits, outcomes, invitations, takeovers. */
 function systemLines(ctx: SalesCtx, c: CrmCustomer): { at: string; text: string }[] {
@@ -249,14 +253,14 @@ export function chatVM(ctx: SalesCtx) {
       return n - own;
     };
     const taken = (day: number, label: string) => {
-      if (blocked(day) || !roomSlots(room, day).includes(label)) return true;
+      if (blocked(day) || !roomSlots(room, day).includes(label) || slotBlocked(room, day, label)) return true;
       const at = slotAt(day, label);
       if (at <= now) return true;
       return bookedAt(at) >= (room?.cap ?? 2);
     };
     // Under each time (rev 1010 §7.1): N left · Full · Passed, or Closed where the showroom does not offer it that day.
     const leftOf = (day: number, label: string) => {
-      if (blocked(day) || !roomSlots(room, day).includes(label)) return "Closed";
+      if (blocked(day) || !roomSlots(room, day).includes(label) || slotBlocked(room, day, label)) return "Closed";
       const at = slotAt(day, label), cap = room?.cap ?? 2, n = bookedAt(at);
       return at <= now ? "Passed" : n >= cap ? "Full" : `${cap - n} left`;
     };

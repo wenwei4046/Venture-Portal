@@ -207,9 +207,12 @@ describe('PersonContextMenu cascading membership actions', () => {
     const titles = screen.getByRole('menu', { name: 'Add Mei Ting to IR as' })
     expect(actions.addMember).not.toHaveBeenCalled()
     expect(titles).toHaveTextContent('No upline is copied. Set it in IR after adding.')
-    expect(within(titles).getByRole('menuitem', { name: 'Revenue Specialist' })).toHaveTextContent('Current title')
+    // One line a row (2026-10-12): "Current title" is the row's tooltip.
+    const specialist = within(titles).getByRole('menuitem', { name: 'Revenue Specialist' })
+    expect(specialist).toHaveAttribute('title', 'Current title')
+    expect(specialist).not.toHaveTextContent('Current title')
     const leader = within(titles).getByRole('menuitem', { name: 'Team Leader' })
-    expect(leader).not.toHaveTextContent('Current title')
+    expect(leader).not.toHaveAttribute('title', 'Current title')
     fireEvent.click(leader)
 
     await waitFor(() => expect(actions.addMember).toHaveBeenCalledOnce())
@@ -347,7 +350,7 @@ describe('PersonContextMenu cascading membership actions', () => {
   it.each([null, 'old-title'])('allows choosing a destination title when the current title is %s', async titleId => {
     const { onAdded } = setup([destination()], false, undefined, { ...person, titleId })
     const titles = openTitles()
-    expect(within(titles).queryByText('Current title')).not.toBeInTheDocument()
+    expect(titles.querySelector('[title="Current title"]')).toBeNull()
     const leader = within(titles).getByRole('menuitem', { name: 'Team Leader' })
     expect(leader).toBeEnabled()
     expect(actions.addMember).not.toHaveBeenCalled()
@@ -361,7 +364,7 @@ describe('PersonContextMenu cascading membership actions', () => {
     const { onAdded } = setup([destination({ titles: [{ id: 'other-specialist', name: 'Revenue Specialist' }] })])
     const titles = openTitles()
     const other = within(titles).getByRole('menuitem', { name: 'Revenue Specialist' })
-    expect(other).not.toHaveTextContent('Current title')
+    expect(other).not.toHaveAttribute('title', 'Current title')
     fireEvent.click(other)
     await waitFor(() => expect(onAdded).toHaveBeenCalledOnce())
     const payload = actions.addMember.mock.calls[0][0] as FormData
@@ -394,7 +397,7 @@ describe('PersonContextMenu current department title actions', () => {
     const titles = screen.getByRole('menu', { name: 'Change Mei Ting title in IR' })
     const current = within(titles).getByRole('menuitem', { name: 'Revenue Specialist' })
     expect(current).toBeDisabled()
-    expect(current).toHaveTextContent('Current title')
+    expect(current).toHaveAttribute('title', 'Current title')
     fireEvent.click(current)
     expect(actions.changeMemberTitle).not.toHaveBeenCalled()
     const leader = within(titles).getByRole('menuitem', { name: 'Team Leader' })
@@ -432,7 +435,9 @@ describe('PersonContextMenu current department title actions', () => {
     setup(destinations(), false, undefined, person, { schemeId: 'fair-scheme', name: 'Fair', isHome: true })
     const change = screen.getByRole('menuitem', { name: /Change title/ })
     expect(change).toBeDisabled()
-    expect(change).toHaveTextContent('Company title is managed in People Management.')
+    // Why it is shut is the row's tooltip, not a second line (2026-10-12).
+    expect(change).toHaveAttribute('title', 'Company title is managed in People Management.')
+    expect(change).not.toHaveTextContent('Company title is managed in People Management.')
     fireEvent.click(change)
     expect(screen.queryByRole('menu', { name: 'Change Mei Ting title in Fair' })).not.toBeInTheDocument()
     expect(actions.changeMemberTitle).not.toHaveBeenCalled()

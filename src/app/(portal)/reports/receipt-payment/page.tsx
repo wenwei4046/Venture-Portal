@@ -6,7 +6,7 @@
 // CNs (dept_invoice_settlements RPC), because "类似cash flow但还需要include
 // 还没收回的钱". dept_manager is RLS-locked to their own segment;
 // finance/principal use the standard segment rail (未收 needs a specific
-// segment — the consolidated view says so instead of guessing one).
+// segment — the consolidated view leaves it out instead of guessing one).
 
 import dayjs from 'dayjs'
 import { officeMonth } from '@/lib/office-time'
@@ -63,7 +63,7 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
   const consolidated = !isDeptMgr && !segment
   // ── 未收 To collect — the block Cash Flow doesn't have ────────────────────
   // dept_manager: RPC keys off their own segment. finance/principal: needs a
-  // concrete segment; the consolidated view shows a pointer row instead.
+  // concrete segment; the consolidated view has no 未收 block.
   const arSegment = isDeptMgr ? null : segment || null
   const showAr = isDeptMgr || !!arSegment
 
@@ -205,7 +205,6 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
               {segName.toUpperCase()} · {mon.toUpperCase()} {period.slice(0, 4)}
             </span>
           </div>
-          {!showAr ? <p className="fin-notice mb-3">Pick a segment to see its invoices still to collect under the statement.</p> : null}
           <GlReportView
             basePath="/reports/receipt-payment"
             period={period}
@@ -241,13 +240,6 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
       </div>
 
       <ReportViewToggle pair="receipt-payment" active="single" period={period} segment={segment || undefined} />
-
-      <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
-        跟 Cash Flow 一样按科目分组:实收 (money in)、支出 (money out)、净变动与期初/期末现金,
-        点 ▸ 看底下每一笔。最下面多一块 Cash Flow 没有的:<em>未收</em> — 所有月份还没收清的发票,
-        扣掉已收和 credit note 后的净额。
-        {!showAr ? ' (未收要选一个部门 segment 才会显示。)' : ''}
-      </p>
 
       <GlReportView
         basePath="/reports/receipt-payment"

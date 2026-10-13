@@ -247,8 +247,7 @@ export default async function ReconSessionPage({
           </div>
           <h1 className="page-title">{bank.bank_name}</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
-            {session.source_filename ?? ''} · statement vs GL {bank.gl_account_code} · amounts must
-            equal to match; name and date guide the pairing.
+            {session.source_filename ?? ''} · statement vs GL {bank.gl_account_code}
           </p>
         </div>
         <Link

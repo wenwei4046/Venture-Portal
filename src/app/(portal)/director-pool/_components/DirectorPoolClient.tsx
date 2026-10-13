@@ -689,11 +689,6 @@ function CalculatorTab(p: CalcProps) {
               <MoneyInput value={value} onCommit={(v) => commit(v ?? 0)} className="w-full py-1.5" />
             </div>
           ))}
-          <p className="sheet-notice">
-            Balance × {gb}% = Gross Balance (Director pay)
-            <br />
-            Balance × {r2(100 - gb)}% = Billing Invoice (statutory by user)
-          </p>
         </div>
         <div>
           <table className="ledger-table">
@@ -730,10 +725,6 @@ function CalculatorTab(p: CalcProps) {
 
       {/* ── Monthly input ── */}
       <SectHead n="NO. 02" title="Monthly Input" />
-      <p className="sheet-subtitle mb-3">
-        每个公司填写各自的 Salary / KPI / Allowance（RM）。Salary + KPI 需扣 Statutory（Billing Invoice
-        自己填）；Allowance 不扣 Statutory 但可抵消 Advance。
-      </p>
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <MonthTabs
           months={p.months}
@@ -816,13 +807,6 @@ function CalculatorTab(p: CalcProps) {
               />
               📥 Include Billing（25% Bill Invoice 算进 Total Pay）
             </label>
-            <span className="text-xs">
-              {m.fullPayout
-                ? 'This month: Balance (95%) fully paid out. No Billing Invoice.'
-                : m.includeBilling
-                  ? 'Total Pay = 75% GB + Allow Bal + 25% Bill Invoice'
-                  : 'Normal: 75% Gross Balance + 25% Billing Invoice (separate)'}
-            </span>
           </div>
 
           <div className="overflow-x-auto">
@@ -1099,13 +1083,6 @@ function CalculatorTab(p: CalcProps) {
                 </tfoot>
               </table>
             </div>
-            <div className="table-frame-foot">
-              <p className="leading-relaxed">
-                ★ {p.settings.savingPct}% Saving 适用于 Salary+KPI 和 Allowance（分开计算）。 ★ {gb}/{r2(100 - gb)} Split
-                两条流都切。 ★ Full Payout Month：100% Balance 直接给 Director，无 Billing Invoice。 ★ Advance：Total Pay
-                &lt; Fixed Salary → 差额累计；盈余先抵消累计 Advance；Adv Statutory 与 75% Allow Statutory 也加入欠款。
-              </p>
-            </div>
           </div>
 
           <HvPayoutSection
@@ -1162,10 +1139,6 @@ function HvPayoutSection({
   return (
     <>
       <SectHead n="NO. 04" title={`${company.name} Allowance · 15号过账`} />
-      <p className="sheet-subtitle mb-3">
-        月头那笔（Sal+KPI ＋ 其他公司 allowance）已经过了 —— 这里只算 <span className="font-semibold">{company.name}</span> 15
-        号进来的那笔，每个 director 要另外过多少。照常扣 {settings.savingPct}% saving，默认走 {gb}/{r2(100 - gb)} split。
-      </p>
 
       {/* HV's own Full Payout — independent of the month's flag (2026-09-18).
           The same chip toggle as the month's Full Payout above. */}
@@ -1241,24 +1214,6 @@ function HvPayoutSection({
                 </tr>
               </tfoot>
             </table>
-          </div>
-          <div className="table-frame-foot">
-            <p className="leading-relaxed">
-              ★ 这笔不进 Director Salary —— Director Salary 只记 Sal+KPI（2026-09-18 定）。 ★ 这笔<span className="font-semibold">不进
-              Total Pay</span>，所以 NO. 03 的 Vr KPI / Adv This Month / Accum. Advance 完全不受它影响 —— 跟没有这笔时一模一样。
-              ★ 但它有算进 NO. 03 的「{gb}% Allowance」和 Saving：月头过的 ＋ 这里 15 号过的 ＝ 那一栏的总数。
-              {hvFull ? (
-                <>
-                  ★ <span className="font-semibold">💯 Full Payout 开着</span> —— 这笔 {r2(100 - gb)}% Billing
-                  已经扣回出来，director 实收整条 {r2(100 - settings.savingPct)}% Balance，上面 Billing Invoice 那张卡也不含它。
-                </>
-              ) : (
-                <>
-                  ★ 右上角的「{r2(100 - gb)}% Bill Inv」<span className="font-semibold">已经算进</span> Billing Invoice 那张卡 ——
-                  过钱分两次，invoice 还是一个月一张。
-                </>
-              )}
-            </p>
           </div>
         </div>
       )}

@@ -84,8 +84,15 @@ export interface CrmVisit {
   remindedAt: string | null;
 }
 
-/** A closed stretch: whole days a → b, or (CRM Desktop rev 1, B9) only these times on those days, "HH:MM". */
-export interface CrmBlock { a: string; b: string; why: string; ranges?: { f: string; t: string }[] }
+/**
+ * A closure from a to b (YYYY-MM-DD). With hours, only those hours each day; without, the whole day. Hours come two
+ * ways and both count: t1 / t2 (one window — the phone panel's Blocked time slots, round 2) and ranges (several — the
+ * desktop's Showrooms editor, CRM Desktop rev 1). crm_slot_check reads both (mig 20261013220000); use blockHours().
+ */
+export interface CrmBlock { a: string; b: string; why: string; t1?: string; t2?: string; ranges?: { f: string; t: string }[] }
+/** A closure's hours, whichever way they were written; none = the whole day. */
+export const blockHours = (b: CrmBlock): { f: string; t: string }[] =>
+  [...(b.ranges ?? []).filter(g => g.f && g.t), ...(b.t1 && b.t2 ? [{ f: b.t1, t: b.t2 }] : [])];
 export interface CrmRoom {
   id: string;
   name: string;

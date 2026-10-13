@@ -38,26 +38,9 @@ const SECOND =
 const QUIET = 'deal-side-link font-sans text-[12.5px] transition-colors disabled:opacity-50'
 
 // 2026-10-10 — the handoff (pagePaymentDetail / pageReceiptDetail): on the
-// Finance view the panel speaks its English, and the status note is one navy
-// box with a dot in the status's colour (`pay-note`).
-const EN = {
-  draft: 'Still a draft — not submitted yet.',
-  pending: 'Waiting for Principal approval. You can still edit or void it until then.',
-  pendingOnly: 'Waiting for Principal approval.',
-  approved: 'Approved — ready to pay.',
-  paid: 'Paid.',
-  received: 'Received — bank, pool and GL are updated.',
-  voided: 'Voided.',
-}
-
-function StatusNote({ tone, children }: { tone: string; children: string }) {
-  return (
-    <p className="pay-note">
-      <span className="pay-note-dot" data-tone={tone} aria-hidden />
-      <span>{children}</span>
-    </p>
-  )
-}
+// Finance view the panel speaks its English. 2026-10-12 (the user: the
+// descriptions clutter the view): no status sentence under the buttons — the
+// panel's chip above says the status.
 
 export default function VoucherActions({
   voucherId,
@@ -141,15 +124,6 @@ export default function VoucherActions({
     const pendingLabel = fin ? (isReceipt ? 'Voiding…' : 'Reversing…') : isReceipt ? '作废中…' : '反转中…'
     return (
       <div className="mt-4 grid gap-2.5">
-        {fin ? (
-          <StatusNote tone={status}>{status === 'paid' ? (isReceipt ? EN.received : EN.paid) : EN.voided}</StatusNote>
-        ) : (
-          <p className={`${NOTE} ${status === 'paid' ? 'ok' : 'bad'}`}>
-            {status === 'paid'
-              ? `${isReceipt ? '已入账' : '已付款'}。银行、池、总账都已经记了。`
-              : '已作废。不再算进银行、池和总账。'}
-          </p>
-        )}
         {result}
         {canReverse ? (
           confirmAction === 'approve' ? (
@@ -194,7 +168,6 @@ export default function VoucherActions({
           to be blocked from Submit because no_self_approval left the card
           unapprovable (PV-0111, 2026-07-24) — mig 20260806000000 lifted that,
           so Principal may now submit and approve their own voucher. */}
-      {status === 'draft' ? fin ? <StatusNote tone="draft">{EN.draft}</StatusNote> : <p className={`${NOTE} plain`}>还是草稿，还没送批。</p> : null}
       {status === 'draft' ? (
         <>
           {can.create ? (
@@ -220,13 +193,11 @@ export default function VoucherActions({
         <>
           {can.approve && !confirmAction ? (
             <>
-              {/* Bank balance info for Principal */}
+              {/* Bank balance info for Principal — a payroll funding PV charges no
+                  bank now (cash leaves when staff are paid), and says so in a
+                  chip (2026-10-12: was a paragraph). */}
               {isNoCashPayroll ? (
-                <p className={`${NOTE} plain`}>
-                  Payroll funding — books the salary expense and draws the department pools; the bank is{' '}
-                  <strong>not</strong> charged now (cash leaves when staff are paid). Short pools go negative
-                  ({fin ? 'an advance' : '预支'}) — that&apos;s allowed.
-                </p>
+                <span className="deal-side-chip justify-self-start">Bank not charged</span>
               ) : bankBalance !== null && bankName ? (
                 <p className={`${NOTE} ${bankBalance < amount ? 'bad' : 'plain'}`}>
                   {bankName} balance:{' '}
@@ -288,7 +259,6 @@ export default function VoucherActions({
 
           {!can.approve && (can.edit || can.void) ? (
             <>
-              {fin ? <StatusNote tone="pending_approval">{EN.pending}</StatusNote> : <p className={NOTE}>等 Principal 批准。批准之前还可以改，或者作废。</p>}
               {can.edit ? (
                 // One under another on the Finance view, as the handoff stacks them.
                 <div className={`grid gap-2 ${returnToDraft && !fin ? 'grid-cols-2' : ''}`}>
@@ -335,14 +305,8 @@ export default function VoucherActions({
               ) : null}
             </div>
           ) : null}
-
-          {!can.approve && !can.edit && !can.void ? (
-            fin ? <StatusNote tone="pending_approval">{EN.pendingOnly}</StatusNote> : <p className={NOTE}>等 Principal 批准。</p>
-          ) : null}
         </>
       ) : null}
-
-      {status === 'approved' ? fin ? <StatusNote tone="approved">{EN.approved}</StatusNote> : <p className={`${NOTE} plain`}>已批准。</p> : null}
 
       {result}
     </div>

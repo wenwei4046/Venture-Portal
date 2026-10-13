@@ -124,11 +124,7 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
               <div className={`statement-amount ${balance < 0 ? 'text-danger' : 'text-num-ink'}`}>
                 {formatMoney(balance)}
               </div>
-              <div className="font-mono text-xs text-muted mt-2">
-                {balance === 0
-                  ? 'No NP or expenses booked yet'
-                  : 'Running balance — see History tab for full ledger'}
-              </div>
+              {balance === 0 ? <div className="font-mono text-xs text-muted mt-2">No NP or expenses booked yet</div> : null}
             </div>
 
             <div className="lg:col-span-5 space-y-2">
@@ -152,15 +148,6 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
               </div>
             </div>
           </div>
-
-          {canSubmitExpense ? (
-            <section className="border-t border-hairline pt-8">
-              <p className="font-serif italic text-graphite text-sm">
-                To request a vendor payment, use the <em>Request Payment</em> tab. To bill a
-                subsidiary, use <em>Request Credit</em>.
-              </p>
-            </section>
-          ) : null}
         </>
       ) : null}
 

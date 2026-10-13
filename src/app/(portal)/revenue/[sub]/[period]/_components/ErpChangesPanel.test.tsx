@@ -11,7 +11,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh, push }) }))
 const DROP: UpsaleView = {
   id: 'd1', staffId: 'ch', staffName: 'CHEA HUAN', kind: 'drop', source: 'erp', status: 'pending',
   erpDocNo: 'HC-SO-013911', settledAmount: 16_888, erpAmount: 14_800, originalPeriod: '2026-08-01',
-  erpReason: null, settledPeriod: null, settledBy: null,
+  erpReason: null, settledPeriod: null, settledBy: null, answeredByFeed: false, settledOrderId: null,
   periodMonth: '2026-09-01', amount: -2_088, soldOn: '2026-09-18', fairEventId: null, fairLabel: null,
   originalRef: 'HC13911', note: null,
 }
@@ -91,10 +91,13 @@ describe('ErpChangesPanel', () => {
     expect(window.confirm).toHaveBeenLastCalledWith("HC13911: let the ERP's figure stand and pay no drop?")
   })
 
+  // Why is the button's tooltip, not a notice above the table (2026-10-12).
   it('pays nothing into a month that is in payroll', () => {
     render(<ErpChangesPanel period="2026-09-01" pending={[DROP]} locked />)
-    expect(screen.getByText(/September 2026 is in payroll — open a later month to pay these\./)).toBeVisible()
+    expect(screen.queryByText(/is in payroll — open a later month/)).toBeNull()
     expect(screen.getByRole('button', { name: 'Pay in Sep 2026' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Pay in Sep 2026' }))
+      .toHaveAttribute('title', 'September 2026 is in payroll — open a later month to pay these')
     expect(screen.getByRole('button', { name: 'Not a change' })).toBeEnabled()
   })
 
@@ -102,8 +105,10 @@ describe('ErpChangesPanel', () => {
   // into it would never be paid at all.
   it('pays nothing into a month settled by hand', () => {
     render(<ErpChangesPanel period="2026-08-01" pending={[DROP]} locked={false} settledBefore="September 2026" />)
-    expect(screen.getByText(/August 2026 was settled by hand and takes no run — pay these in September 2026 or later/)).toBeVisible()
+    expect(screen.queryByText(/was settled by hand and takes no run/)).toBeNull()
     expect(screen.getByRole('button', { name: 'Pay in Aug 2026' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Pay in Aug 2026' }))
+      .toHaveAttribute('title', 'August 2026 was settled by hand and takes no run — pay these in September 2026 or later')
     expect(screen.getByRole('button', { name: 'Not a change' })).toBeEnabled()
   })
 
@@ -202,6 +207,23 @@ describe('ErpChangesPanel', () => {
       expect(push).toHaveBeenCalledWith(href)
       expect(within(trail).getByRole('row', { name: /HC-SO-2610-002/ })).toHaveTextContent('UpsellRM 2,000.00RM 2,500.00RM 500.00')
       expect(within(trail).getByRole('row', { name: /2 saves/ })).toHaveTextContent('RM (500.00)')
+    })
+
+    // 2026-10-13 — "want drop sales by share as well. Follow the share ratio";
+    // "取消的单 … just direct deduct".
+    it('names everybody a shared bill\'s change is split between, and a cancellation taken back directly', () => {
+      const DIRECT: UpsaleView = {
+        ...CANCELLED, id: 'x1', status: 'confirmed', answeredByFeed: true, periodMonth: '2026-09-01',
+      }
+      render(<ErpChangesPanel period="2026-09-01" pending={[CLOSED]} paid={[DIRECT]} locked={false}
+        holders={{ x1: 'MELVIN CHONG 50% · LUCAS 50%' }} />)
+      const paid = within(screen.getByRole('table', { name: 'Paid in September 2026' })).getByRole('row', { name: /HC8972/ })
+      expect(paid).toHaveTextContent('MELVIN CHONGSplit by share · MELVIN CHONG 50% · LUCAS 50%')
+      expect(paid).toHaveTextContent('RM (10,399.00)CancelledDeducted directly')
+      // A bill nobody shares: its seller alone, and a question is never "deducted".
+      const waiting = within(screen.getByRole('table', { name: 'Drops and upsells to answer' })).getByRole('row', { name: /HC14001/ })
+      expect(waiting).not.toHaveTextContent('Split by share')
+      expect(waiting).not.toHaveTextContent('Deducted directly')
     })
 
     it('says when no save moved money', () => {

@@ -80,11 +80,7 @@ export default function DocumentationView({
 
   return (
     <HvPage>
-      <PageHead
-        eyebrow="People · Documentation"
-        title="Documentation"
-        subtitle="Files HR shares by department, the letters kept on each person’s record, and memos and letters HR publishes."
-      />
+      <PageHead eyebrow="People · Documentation" title="Documentation" />
       <Tabs
         items={TABS}
         active={tab}

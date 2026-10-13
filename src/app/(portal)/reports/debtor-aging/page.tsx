@@ -100,7 +100,9 @@ export default async function DebtorAgingPage({ searchParams }: { searchParams: 
               <em>I.</em> REPORTS · DEBTOR AGING · AS AT {asAtLabel.toUpperCase()}
             </div>
             <h1 className="page-title">Debtor Aging</h1>
-            <p className="page-sub">Invoices billed out and not yet collected, by days since the invoice date.</p>
+            {/* A past As at lists what is still unpaid TODAY (finance-view.md ›
+                AS AT ON THE AGINGS) — said in a chip, not a sentence (2026-10-12). */}
+            {past ? <span className="chip alert mt-2"><span className="dot" />Unpaid as of today</span> : null}
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <a href={exportHref('xlsx', 'detail')} className="btn-quiet-sheet">
@@ -149,7 +151,6 @@ export default async function DebtorAgingPage({ searchParams }: { searchParams: 
               value: asAt.slice(0, 7),
               options: toChoices(nowYM).map((ym) => ({ value: ym, label: dayjs(`${ym}-01`).format('MMM YYYY') })),
             }}
-            note={past ? `Invoices dated on or before ${asAtLabel} that are still unpaid today, aged to ${asAtLabel}.` : undefined}
             empty={agingAt.totals.count === 0 ? (past ? `Nothing dated on or before ${asAtLabel} is still unpaid.` : 'Nothing outstanding — every issued invoice has been collected.') : undefined}
           />
         </section>
@@ -169,9 +170,7 @@ export default async function DebtorAgingPage({ searchParams }: { searchParams: 
             <em>III.</em> REPORTS · DEBTOR AGING
           </div>
           <h1 className="page-title">Debtor Aging</h1>
-          <p className="font-serif italic text-graphite text-base mt-2">
-            Invoices billed out but not yet collected · as of {dayjs(today).format('D MMM YYYY')}
-          </p>
+          <p className="font-serif italic text-graphite text-base mt-2">As of {dayjs(today).format('D MMM YYYY')}</p>
         </div>
         <div className="flex flex-col gap-1.5 shrink-0 text-right">
           {(['detail', 'summary'] as const).map((view) => (
@@ -212,7 +211,6 @@ export default async function DebtorAgingPage({ searchParams }: { searchParams: 
         <>
           <div className="flex items-baseline justify-between mb-3">
             <h2 className="font-serif text-lg text-ink">By customer</h2>
-            <span className="font-serif italic text-muted text-xs">Click a customer to see its invoices</span>
           </div>
           <AgingByCustomer byPayer={aging.byPayer} invoices={aging.invoices} totals={aging.totals} />
         </>

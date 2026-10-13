@@ -3,7 +3,7 @@
  * cancel a visit — the phone's own rules: the showroom's slots per weekday, its closures, its booking limit), Add note
  * (B6), Edit customer (the form the Principal / Director set, H3) and History (who changed which setting).
  */
-import type { CrmCustomer, CrmRoom } from "@/lib/member/crm-data";
+import { blockHours, type CrmCustomer, type CrmRoom } from "@/lib/member/crm-data";
 import { roomSlots, slotAt } from "../../sales/vm/chat";
 import type { DeskCtx, FormSection } from "./ctx";
 import { initials } from "./data";
@@ -17,7 +17,7 @@ const hmOf = (label: string) => { const m = label.match(/(\d+):(\d+) (am|pm)/); 
 export function slotClosed(r: CrmRoom, day: number, label: string): boolean {
   if (r.weekly.includes(new Date(day).getDay())) return true;
   const d = isoOf(day), hm = hmOf(label);
-  return r.blocks.some(b => d >= b.a && d <= (b.b || b.a) && (!b.ranges?.length || b.ranges.some(x => hm >= x.f && hm < x.t)));
+  return r.blocks.some(b => { const w = blockHours(b); return d >= b.a && d <= (b.b || b.a) && (!w.length || w.some(x => hm >= x.f && hm < x.t)); });
 }
 
 export function bookVM(ctx: DeskCtx, c: CrmCustomer | undefined) {

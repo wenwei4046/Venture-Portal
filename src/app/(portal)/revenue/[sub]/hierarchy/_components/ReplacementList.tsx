@@ -72,7 +72,6 @@ export default function ReplacementList({
         })}
         {list.length === 0 ? <div className={s.listEmpty}>No replacements for {subDeptName}.</div> : null}
       </GridTable>
-      <div className={s.hint}>Replacements are approved in Member services; this list shows each one and where it stands.</div>
 
       <Drawer
         open={open !== null}

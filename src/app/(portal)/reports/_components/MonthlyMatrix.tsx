@@ -208,9 +208,9 @@ export default function MonthlyMatrix({
                 </th>
               ))}
             </tr>
-            {/* cf: the unit lives in the page subtitle ("all amounts RM") — one
-                header row, as in the approved mock-up. The sub-row stays when
-                a % column needs its label (Monthly P&L). */}
+            {/* cf: one header row, as in the approved mock-up (the page
+                subtitle that said "all amounts RM" went on 2026-10-12). The
+                sub-row stays when a % column needs its label (Monthly P&L). */}
             {cf && !showPct ? null : (
               <tr className={cf ? '' : 'border-b border-hairline'}>
                 <th className={`sticky left-0 z-10 px-4 py-1.5 ${cf ? 'cf-th cf-th-sub' : 'bg-surface'}`} />

@@ -84,7 +84,6 @@ export default async function LedgerPage({ searchParams }: Props) {
             <em>I.</em> REPORTS · GENERAL LEDGER · {ledgerPeriodLabel(from, to).toUpperCase()}
           </div>
           <h1 className="page-title">Ledger</h1>
-          <p className="page-sub">Per-account journal lines with running balance over a period. Pick accounts, or leave empty for all.</p>
         </div>
         <div className="flex flex-wrap items-start justify-end gap-2">
           <LedgerPicker accounts={accounts} selectedCodes={codes} from={from} to={to} showZero={showZero} />

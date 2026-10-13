@@ -14,7 +14,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     {!!(v.topBar) && (<>
       <div style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", minHeight: "44px", padding: "4px 14px 0 20px" }}>
         {!!(v.hd.showHead) && (<>
-          <span onClick={v.hd.back} style={{ display: "flex", alignItems: "center", gap: "4px", height: "44px", color: "#BD4A19", fontSize: "14px", fontWeight: "600", whiteSpace: "nowrap", flex: "none", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <span onClick={v.hd.back} style={{ display: "flex", alignItems: "center", gap: "4px", height: "44px", color: "#BD4A19", fontSize: "14px", fontWeight: "600", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m15 6-6 6 6 6">
               </path>
             </svg>{v.hd.backLabel}</span>
@@ -23,11 +23,11 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
         </span>
         {!!(v.dirTop) && (<>
           <div style={{ flex: "none", display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "#F0E6DE" }}>
-            <span style={{ height: "28px", padding: "0 12px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: "#fff", color: "#3F2B22", boxShadow: "0 1px 3px rgba(63,43,34,.14)" }}>Team</span>
-            <span onClick={v.dirMine} style={{ height: "28px", padding: "0 12px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", color: "#806B60", cursor: "pointer" }}>Mine</span>
+            <span style={{ height: "28px", padding: "0 14px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: "#fff", color: "#3F2B22", boxShadow: "0 1px 3px rgba(63,43,34,.14)" }}>Team</span>
+            <span onClick={v.dirMine} style={{ height: "28px", padding: "0 14px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", color: "#806B60", cursor: "pointer" }}>Mine</span>
           </div>
         </>)}
-        {!!(v.bl.showBell) && (<>
+        {!!(v.bellTop) && (<>
           <span onClick={v.bl.openNotifs} title="Notifications" style={{ position: "relative", width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", color: "#3F2B22", cursor: "pointer" }} className={H.hov5}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4">
@@ -43,26 +43,21 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     {!!(v.show.ov) && (<>
       {!!(v.ov.onOverview) && (<>
         <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "10px 20px 36px", display: "flex", flexDirection: "column", gap: "22px" }}>
-          <div style={{ flex: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "10px", padding: "0 4px" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span onClick={v.ov.exitApp} title="Back to Revenue app" style={{ flex: "none", width: "38px", height: "38px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", color: "#BD4A19", display: "grid", placeItems: "center", cursor: "pointer" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m15 6-6 6 6 6">
-                  </path>
-                </svg>
-              </span>
-              <span style={{ display: "flex", flexDirection: "column" }}>
-                <span style={{ fontSize: "13px", fontWeight: "700", letterSpacing: ".16em", color: "#3F2B22" }}>HOUZS VENTURE</span>
-                <span style={{ fontSize: "12px", fontWeight: "650", color: "#BD4A19", marginTop: "2px" }}>CRM</span>
-              </span>
-            </span>
-            <span style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ width: "38px", height: "38px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "650" }}>{v.ov.meIni}</span>
-            </span>
-          </div>
-          <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "6px", padding: "4px 4px 0" }}>
+          <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "6px", padding: "0 4px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
-              <h1 style={{ margin: "0", fontSize: "26px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.15" }}>Hello, {v.ov.meFirst}</h1>
+              <h1 style={{ flex: "1", margin: "0", fontSize: "26px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.15" }}>Hello, {v.ov.meFirst}</h1>
+              {!!(v.bellIn) && (<>
+                <span onClick={v.bl.openNotifs} title="Notifications" style={{ position: "relative", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0">
+                    </path>
+                  </svg>
+                  {!!(v.bl.notifUnread) && (<>
+                    <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", background: "#BD4A19", border: "2px solid #fff", color: "#fff", display: "grid", placeItems: "center", fontSize: "10px", fontWeight: "700" }}>{v.bl.notifUnread}</span>
+                  </>)}
+                </span>
+              </>)}
+              <span style={{ flex: "none", width: "38px", height: "38px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "650" }}>{v.ov.meIni}</span>
             </div>
             <span style={{ fontSize: "13px", color: "#806B60" }}>{v.ov.todayLabel} · {v.ov.meTitle} · {v.accessLbl}</span>
           </div>
@@ -162,7 +157,6 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </span>
               <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
                 <strong style={{ fontSize: "15px", fontWeight: "650" }}>Organic Leads</strong>
-                <small style={{ fontSize: "12px", color: "#806B60" }}>You assign these</small>
               </span>
               <em style={{ fontStyle: "normal", minWidth: "26px", height: "26px", padding: "0 8px", boxSizing: "border-box", borderRadius: "13px", background: "#BD4A19", color: "#fff", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "700" }}>{v.ov.waitingN}</em>
               <svg style={{ color: "#806B60" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -215,7 +209,6 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                             </path>
                           </svg>
                         </>)}</strong>
-                      <small style={{ fontSize: "12px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.who}</small>
                     </span>
                   </span>
                   <span style={{ textAlign: "right", fontSize: "15px", fontWeight: "650", fontVariantNumeric: "tabular-nums" }}>{t.leads}</span>
@@ -321,22 +314,27 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     {!!(v.show.ib) && (<>
       {!!(v.ib.onInbox) && (<>
         <main style={{ flex: "1 1 auto", minHeight: "0", overflow: "hidden", scrollbarWidth: "none", padding: "10px 20px 14px", display: "flex", flexDirection: "column", gap: "14px" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "10px" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+            <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
               <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Inbox</h1>
+              <span style={{ fontSize: "13px", color: "#806B60" }}>{v.ib.inbSummary}</span>
             </div>
-            {!!(v.ibTM) && (<>
-              <div style={{ flex: "none", marginLeft: "auto", display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "#F0E6DE" }}>
-                <span style={{ height: "28px", padding: "0 12px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: "#fff", color: "#3F2B22", boxShadow: "0 1px 3px rgba(63,43,34,.14)" }}>Team</span>
-                <span onClick={v.dirMine} style={{ height: "28px", padding: "0 12px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", color: "#806B60", cursor: "pointer" }}>Mine</span>
-              </div>
-            </>)}
             <span onClick={v.ib.openPc} style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 14px", boxSizing: "border-box", borderRadius: "18px", border: "1px solid #3F2B22", background: "#3F2B22", color: "#fff", fontSize: "13px", fontWeight: "650", cursor: "pointer" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8">
                 </path>
               </svg>Contacts</span>
+            {!!(v.bellIn) && (<>
+              <span onClick={v.bl.openNotifs} title="Notifications" style={{ position: "relative", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer", marginLeft: "-2px" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0">
+                  </path>
+                </svg>
+                {!!(v.bl.notifUnread) && (<>
+                  <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", background: "#BD4A19", border: "2px solid #fff", color: "#fff", display: "grid", placeItems: "center", fontSize: "10px", fontWeight: "700" }}>{v.bl.notifUnread}</span>
+                </>)}
+              </span>
+            </>)}
           </div>
-          <span style={{ marginTop: "-12px", fontSize: "13px", color: "#806B60" }}>{v.ib.inbSummary}</span>
           {!!(v.ib.inbHasChips) && (<>
             <div style={{ flex: "none", display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", margin: "0 -20px", padding: "0 20px" }}>
               {(v.ib.inbChips).map((c, c_i) => (<Fragment key={c_i}>
@@ -498,10 +496,6 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </div>
               </Fragment>))}
             </div>
-            <span onClick={v.ld.lx.openBook} style={{ flex: "none", height: "44px", borderRadius: "22px", background: "#BD4A19", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "16px", fontWeight: "650", cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14">
-                </path>
-              </svg>Book visit</span>
             <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px" }}>
               <span onClick={v.ld.lx.attach} title="Send a file" style={{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: "#806B60" }}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
@@ -946,9 +940,22 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
       {!!(v.as.onAssign) && (<>
         <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "6px 20px 28px", display: "flex", flexDirection: "column", gap: "20px" }}>
           {!!(v.asx.onHome) && (<>
-            <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "2px" }}>
-              <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Assignment</h1>
-              <span style={{ fontSize: "13px", color: "#806B60" }}>Who gets each new enquiry</span>
+            <div style={{ flex: "none", display: "flex", alignItems: "flex-start", gap: "8px" }}>
+              <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
+                <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Assignment</h1>
+                <span style={{ fontSize: "13px", color: "#806B60" }}>Who gets each new enquiry</span>
+              </div>
+              {!!(v.bellIn) && (<>
+                <span onClick={v.bl.openNotifs} title="Notifications" style={{ position: "relative", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0">
+                    </path>
+                  </svg>
+                  {!!(v.bl.notifUnread) && (<>
+                    <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", background: "#BD4A19", border: "2px solid #fff", color: "#fff", display: "grid", placeItems: "center", fontSize: "10px", fontWeight: "700" }}>{v.bl.notifUnread}</span>
+                  </>)}
+                </span>
+              </>)}
             </div>
           </>)}
           {!!(v.asx.onHome) && (<>
@@ -1282,7 +1289,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                         </span>
                         <input type="range" min="0" max="100" step="5" value={r.v} onChange={r.set} style={{ width: "100%", margin: "0", accentColor: r.c }} />
                         <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "34px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9px", background: "#F4F8FC", border: "1px solid #DCE6F2" }}>
-                          <input type="text" inputMode="numeric" pattern="[0-9]*" value={r.v} onChange={r.setN} onFocus={r.selAll} style={{ width: "30px", border: "0", background: "transparent", textAlign: "center", font: "inherit", fontSize: "15px", fontWeight: "700", color: r.c, outline: "none", padding: "0" }} />
+                          <input type="text" inputMode="numeric" pattern="[0-9]*" value={r.v} onChange={r.setN} onFocus={r.selAll} data-num-step="1" enterKeyHint="next" onKeyDown={v.enterNext} style={{ width: "30px", border: "0", background: "transparent", textAlign: "center", font: "inherit", fontSize: "15px", fontWeight: "700", color: r.c, outline: "none", padding: "0" }} />
                           <span style={{ fontSize: "13px", fontWeight: "700", color: r.c }}>%</span>
                         </span>
                       </div>
@@ -1314,7 +1321,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                               <strong style={{ fontSize: "14px", lineHeight: "18px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</strong>
                               <small style={{ fontSize: "11px", lineHeight: "14px", color: p.noteFg, fontVariantNumeric: "tabular-nums" }}>{p.note}</small>
                             </span>
-                            <input value={p.v} onChange={p.set} onFocus={v.bp.selAll} inputMode="numeric" style={{ width: "46px", height: "34px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid #DCE6F2", background: "#F4F8FC", textAlign: "center", font: "inherit", fontSize: "15px", fontWeight: "700", color: "#3F2B22", outline: "none", padding: "0" }} />
+                            <input value={p.v} onChange={p.set} onFocus={v.bp.selAll} inputMode="numeric" data-num-step="1" enterKeyHint="next" onKeyDown={v.enterNext} style={{ width: "46px", height: "34px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid #DCE6F2", background: "#F4F8FC", textAlign: "center", font: "inherit", fontSize: "15px", fontWeight: "700", color: "#3F2B22", outline: "none", padding: "0" }} />
                             <span style={{ width: "30px", fontSize: "12px", fontWeight: "700", color: "#806B60" }}>{g.unit}</span>
                           </div>
                         </Fragment>))}
@@ -1325,6 +1332,10 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </>)}
               </div>
               <div style={{ flex: "none", padding: "12px 20px 26px", borderTop: "1px solid #EEF3F9", background: "#fff", display: "grid", gridTemplateColumns: "1fr 2fr", gap: "8px" }}>
+                <span onClick={v.as.ae.applyAll} style={{ gridColumn: "1 / -1", height: "44px", boxSizing: "border-box", borderRadius: "22px", border: `1px solid ${v.as.ae.applyBd}`, background: "#fff", color: v.as.ae.applyFg, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "14px", fontWeight: "650", cursor: v.as.ae.applyCur }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M8 8h11a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2zM16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3">
+                    </path>
+                  </svg>{v.as.ae.applyLabel}</span>
                 <span onClick={v.as.ae.close} style={{ height: "48px", boxSizing: "border-box", borderRadius: "24px", border: "1px solid #DCE6F2", color: "#3F2B22", display: "grid", placeItems: "center", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}>Cancel</span>
                 <span onClick={v.as.ae.save} style={{ height: "48px", borderRadius: "24px", background: v.as.ae.saveBg, color: "#fff", display: "grid", placeItems: "center", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}>Save</span>
               </div>
@@ -1378,6 +1389,10 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </div>
             </div>
             <div style={{ flex: "none", display: "grid", gridTemplateColumns: "1fr 2fr", gap: "10px", padding: "12px 16px 16px", background: "#fff", borderTop: "1px solid #EBDDD2" }}>
+              <span onClick={v.ftx.applyAll} style={{ gridColumn: "1 / -1", height: "44px", boxSizing: "border-box", borderRadius: "22px", border: `1px solid ${v.ftx.applyBd}`, background: "#fff", color: v.ftx.applyFg, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "14px", fontWeight: "650", cursor: v.ftx.applyCur }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 8h11a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2zM16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3">
+                  </path>
+                </svg>{v.ftx.applyLabel}</span>
               <span onClick={v.ftx.clear} style={{ height: "48px", boxSizing: "border-box", borderRadius: "24px", border: "1px solid #E2CFC1", display: "grid", placeItems: "center", fontSize: "15px", fontWeight: "600", color: "#3F2B22", cursor: "pointer" }}>Clear all</span>
               <span onClick={v.ftx.save} style={{ height: "48px", borderRadius: "24px", background: "#387557", color: "#fff", display: "grid", placeItems: "center", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}>Save</span>
             </div>
@@ -1388,8 +1403,8 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     {!!(v.show.cal) && (<>
       {!!(v.cal.onCal) && (<>
         <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "6px 20px 24px", display: "flex", flexDirection: "column", gap: "14px" }}>
-          <div style={{ flex: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "10px" }}>
-            <div style={{ minWidth: "0" }}>
+          <div style={{ flex: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+            <div style={{ flex: "1", minWidth: "0" }}>
               <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Calendar</h1>
               <span style={{ fontSize: "13px", color: "#806B60" }}>{v.cal.cRangeLabel}</span>
             </div>
@@ -1400,6 +1415,17 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 <path d="m6 9 6 6 6-6">
                 </path>
               </svg></span>
+            {!!(v.bellIn) && (<>
+              <span onClick={v.bl.openNotifs} title="Notifications" style={{ position: "relative", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0">
+                  </path>
+                </svg>
+                {!!(v.bl.notifUnread) && (<>
+                  <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", background: "#BD4A19", border: "2px solid #fff", color: "#fff", display: "grid", placeItems: "center", fontSize: "10px", fontWeight: "700" }}>{v.bl.notifUnread}</span>
+                </>)}
+              </span>
+            </>)}
           </div>
           <div data-drag-scroll="1" style={{ flex: "none", display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", margin: "0 -20px", padding: "0 20px" }}>
             {(v.cal.cTeams).map((c, c_i) => (<Fragment key={c_i}>
@@ -1709,8 +1735,19 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     {!!(v.show.pf) && (<>
       {!!(v.pf.onProfile) && (<>
         <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div style={{ borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)", border: "1px solid #EBDDD2", padding: "18px 16px 16px", display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div style={{ position: "relative", borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)", border: "1px solid #EBDDD2", padding: "18px 16px 16px", display: "flex", flexDirection: "column", gap: "16px" }}>
+            {!!(v.bellIn) && (<>
+              <span onClick={v.bl.openNotifs} title="Notifications" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer", position: "absolute", top: "14px", right: "14px" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0">
+                  </path>
+                </svg>
+                {!!(v.bl.notifUnread) && (<>
+                  <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", background: "#BD4A19", border: "2px solid #fff", color: "#fff", display: "grid", placeItems: "center", fontSize: "10px", fontWeight: "700" }}>{v.bl.notifUnread}</span>
+                </>)}
+              </span>
+            </>)}
+            <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "48px" }}>
               <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>
               <div style={{ minWidth: "0" }}>
                 <h1 style={{ margin: "0", fontSize: "24px", fontWeight: "700", letterSpacing: "-.02em" }}>{v.pf.meName}</h1>
@@ -1738,7 +1775,6 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </span>
               <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
                 <strong style={{ fontSize: "17px", fontWeight: "700" }}>View as a team member</strong>
-                <span style={{ fontSize: "14px", color: "#D9C7BA" }}>Pick anyone in the CRM</span>
               </span>
               <svg style={{ flex: "none", color: "#D9C7BA" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="m9 6 6 6-6 6">
@@ -1746,6 +1782,21 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </svg>
             </div>
           </>)}
+          <div onClick={v.exitCrm} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px", borderRadius: "22px", background: "#F5EBE3", color: "#3F2B22", cursor: "pointer" }} className={H.hov13}>
+            <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "14px", background: "#F6D9C4", color: "#BD4A19", display: "grid", placeItems: "center" }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 17l-5-5 5-5M5 12h11a4 4 0 0 1 4 4v3">
+                </path>
+              </svg>
+            </span>
+            <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
+              <strong style={{ fontSize: "17px", fontWeight: "700" }}>Back to Revenue app</strong>
+            </span>
+            <svg style={{ flex: "none", color: "#A8968B" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 6 6 6-6 6">
+              </path>
+            </svg>
+          </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <h2 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: "700", letterSpacing: "-.02em" }}>Your workspace</h2>
             <div onClick={v.pf.openNotifs} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", borderBottom: "1px solid #EBDDD2", cursor: "pointer" }}>
@@ -2062,8 +2113,14 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                     </span>
                   </span>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px", paddingTop: "14px", borderTop: "1px solid #EBDDD2" }}>
-                  <span style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "6px", padding: "14px", borderRadius: "16px", border: "1px solid #F3D9CE", background: "#FDF3EF" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ flex: "none", width: "28px", height: "28px", borderRadius: "8px", background: "#FBEAE6", color: "#A3371A", display: "grid", placeItems: "center" }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM4.9 4.9l14.2 14.2">
+                        </path>
+                      </svg>
+                    </span>
                     <strong style={{ fontSize: "15px", fontWeight: "700", color: "#3F2B22" }}>Blocked time slots</strong>
                   </span>
                   <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: ".06em", textTransform: "uppercase", color: "#A8968B" }}>Every week</span>
@@ -2132,6 +2189,44 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                         </Fragment>))}
                       </div>
                     </div>
+                  </>)}
+                  <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: ".06em", textTransform: "uppercase", color: "#A8968B" }}>Time</span>
+                  <div style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "12px", background: "#F5EBE3" }}>
+                    {(r.dBMode).map((m, m_i) => (<Fragment key={m_i}>
+                      <span onClick={m.pick} style={{ flex: "1", height: "32px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: m.w, background: m.bg, color: m.fg, boxShadow: m.sh, cursor: "pointer" }}>{m.label}</span>
+                    </Fragment>))}
+                  </div>
+                  {!!(r.dBHours) && (<>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span onClick={r.openT1} style={{ flex: "1", minWidth: "0", height: "44px", boxSizing: "border-box", padding: "0 12px", border: `1.5px solid ${r.dBT1bd}`, borderRadius: "12px", background: "#fff", display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                        <svg style={{ flex: "none", color: "#BD4A19" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z">
+                          </path>
+                        </svg>
+                        <strong style={{ fontSize: "14px", fontWeight: "650", color: r.dBT1fg, whiteSpace: "nowrap" }}>{r.dBT1txt}</strong>
+                      </span>
+                      <span style={{ flex: "none", color: "#A8968B" }}>–</span>
+                      <span onClick={r.openT2} style={{ flex: "1", minWidth: "0", height: "44px", boxSizing: "border-box", padding: "0 12px", border: `1.5px solid ${r.dBT2bd}`, borderRadius: "12px", background: "#fff", display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                        <svg style={{ flex: "none", color: "#BD4A19" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z">
+                          </path>
+                        </svg>
+                        <strong style={{ fontSize: "14px", fontWeight: "650", color: r.dBT2fg, whiteSpace: "nowrap" }}>{r.dBT2txt}</strong>
+                      </span>
+                    </div>
+                    {!!(r.dBTOpen) && (<>
+                      <div style={{ padding: "12px", borderRadius: "16px", border: "1px solid #EBDDD2", background: "#fff", boxShadow: "0 8px 20px rgba(63,43,34,.10)", display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <strong style={{ fontSize: "13px", fontWeight: "700", color: "#3F2B22" }}>{r.dBTTitle}</strong>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "6px" }}>
+                          {(r.dBTimes).map((o, o_i) => (<Fragment key={o_i}>
+                            <span onClick={o.pick} style={{ height: "36px", borderRadius: "10px", border: `1px solid ${o.bd}`, background: o.bg, color: o.fg, display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", whiteSpace: "nowrap", cursor: o.cur, fontVariantNumeric: "tabular-nums" }}>{o.t}</span>
+                          </Fragment>))}
+                        </div>
+                      </div>
+                    </>)}
+                    {!!(r.dBTimeErr) && (<>
+                      <span style={{ fontSize: "12px", color: "#A3371A" }}>End time must be after the start time.</span>
+                    </>)}
                   </>)}
                   <div style={{ display: "flex", gap: "6px" }}>
                     <input value={r.dBWhy} onChange={r.setBWhy} placeholder="Reason, e.g. Training" style={{ flex: "1", minWidth: "0", height: "44px", boxSizing: "border-box", padding: "0 12px", border: "1px solid #EBDDD2", borderRadius: "12px", outline: "none", font: "inherit", fontSize: "14px", color: "#3F2B22", background: "#fff" }} />

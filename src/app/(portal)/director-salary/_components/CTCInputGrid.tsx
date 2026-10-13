@@ -2,9 +2,13 @@
 
 import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { batchSaveCTC, type BatchCTCInput } from '../actions'
+import dayjs from 'dayjs'
+import { batchSaveCTC, type BatchCTCInput, type HvShareInput } from '../actions'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { officeTime } from '@/lib/office-time'
+import type { HvDepartment, HvDraftLine, HvShare } from '@/lib/director-hv-share'
+import HvSplitWindow, { type HvSplitConfirm } from './HvSplitWindow'
 
 interface Director {
   id: string
@@ -39,6 +43,11 @@ interface Props {
   companies: Company[]
   existingCTC: ExistingCTC[]
   period: string
+  /**
+   * HOUZS Venture's own row (2026-10-13): the month's share and every
+   * department that may pay it. Left out, the grid is the subsidiaries' alone.
+   */
+  hv?: { departments: HvDepartment[]; share: HvShare | null }
 }
 
 interface ERBreakdown {
@@ -52,6 +61,15 @@ const round2 = (n: number) => Math.round(n * 100) / 100
 
 const FIELD_LABEL = { basic: 'Basic', kpi: 'KPI', allowance: 'Allowance' } as const
 
+const ZERO_ER: ERBreakdown = { epf: 0, socso: 0, eis: 0, total: 0 }
+
+/** HOUZS Venture's row: keyed apart from every company id, one director head. */
+const HV_KEY = 'hv'
+const HV_ROW: Company = { id: HV_KEY, name: 'HOUZS Venture', short_code: 'HV', director_heads: 1 }
+
+/** An all-zero HV row clears a share HR had sent. */
+const CLEAR_HV: HvShareInput = { basic: 0, kpi: 0, allowance: 0, erManual: false, splitMode: 'amount', lines: [] }
+
 // One grid instance per month. The page reaches another month through
 // ?period= (DirectorPeriodPicker → router.push), and a navigation that only
 // changes the query string re-runs the Server Component with fresh props but
@@ -64,11 +82,16 @@ export default function CTCInputGrid(props: Props) {
   return <CTCInputGridBody key={props.period} {...props} />
 }
 
-function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) {
+function CTCInputGridBody({ directors, companies, existingCTC, period, hv }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<'idle' | 'saving' | 'done'>('idle')
+
+  const hvShare = hv?.share ?? null
+  // Transferred by Finance: the row is what moved, and changes once Finance undoes it.
+  const hvLocked = hvShare?.status === 'transferred'
+  const rows: Company[] = hv ? [HV_ROW, ...companies] : companies
 
   // Aggregate existing CTC by company (sum across all directors)
   const [values, setValues] = useState<Record<string, { basic: number; kpi: number; allowance: number }>>(() => {
@@ -80,6 +103,8 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
       map[key].kpi += ctc.kpi
       map[key].allowance += ctc.allowance
     }
+    const c = hvShare?.components
+    if (c) map[HV_KEY] = { basic: c.basic, kpi: c.kpi, allowance: c.allowance }
     return map
   })
 
@@ -94,6 +119,15 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
       map[key].eis += Number(ctc.employer_eis ?? 0)
       map[key].total = map[key].epf + map[key].socso + map[key].eis
     }
+    const c = hvShare?.components
+    if (c) {
+      map[HV_KEY] = {
+        epf: c.employerEpf,
+        socso: c.employerSocso,
+        eis: c.employerEis,
+        total: round2(c.employerEpf + c.employerSocso + c.employerEis),
+      }
+    }
     return map
   })
 
@@ -104,11 +138,16 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
     for (const ctc of existingCTC) {
       if (ctc.er_manual) map[ctc.company_id] = true
     }
+    if (hvShare?.components?.erManual) map[HV_KEY] = true
     return map
   })
 
   // Which company's ER editor popover is open.
   const [openEr, setOpenEr] = useState<string | null>(null)
+
+  // The departments window, open with HOUZS Venture's total for the month.
+  const [split, setSplit] = useState<{ total: number; er: ERBreakdown } | null>(null)
+  const [splitError, setSplitError] = useState<string | null>(null)
 
   // Use first director as the "pool input" director for DB storage
   const poolDirectorId = directors[0]?.id ?? ''
@@ -142,47 +181,53 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
     setStatus('idle')
   }
 
+  // The employer statutory of `bk` wages over `heads` directors: the JADUAL
+  // lookups the DB trigger runs, per head (SOCSO/EIS cap per person, so a
+  // 2-director company contributes 2 caps).
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+  async function lookupEr(bk: number, heads: number): Promise<ERBreakdown> {
+    if (bk <= 0) return ZERO_ER
+    if (!supabaseRef.current) supabaseRef.current = createClient()
+    const supabase = supabaseRef.current
+    const h = Math.max(1, heads)
+    const bkPerHead = bk / h
+    const [epfRes, socsoRes, eisRes] = await Promise.all([
+      supabase.rpc('lookup_epf', { p_wages: bkPerHead }),
+      supabase.rpc('lookup_socso', { p_wages: bkPerHead }),
+      supabase.rpc('lookup_eis', { p_wages: bkPerHead }),
+    ])
+    const epf = Number(epfRes.data?.[0]?.employer ?? 0) * h
+    const socso = Number(socsoRes.data?.[0]?.employer ?? 0) * h
+    const eis = Number(eisRes.data?.[0]?.employer ?? 0) * h
+    return { epf, socso, eis, total: epf + socso + eis }
+  }
+  const lookupRef = useRef(lookupEr)
+  lookupRef.current = lookupEr
+
   // Debounced live statutory lookup: when basic or kpi changes, fetch ER from
   // lookup_epf/socso/eis and update erByCompany. Uses same RPCs the DB trigger
   // uses, so preview matches the value that will be stored on save. Companies
-  // with a manual override keep their keyed values untouched.
-  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+  // with a manual override keep their keyed values untouched, and so does a
+  // transferred HV row (it shows what moved).
   useEffect(() => {
-    if (!supabaseRef.current) supabaseRef.current = createClient()
-    const supabase = supabaseRef.current
-
     const handle = setTimeout(async () => {
       const next: Record<string, ERBreakdown> = {}
-      for (const comp of companies) {
+      for (const comp of hv ? [HV_ROW, ...companies] : companies) {
         if (manualByCompany[comp.id]) continue // keep the keyed values
+        if (comp.id === HV_KEY && hvLocked) continue
         const bk = (values[comp.id]?.basic ?? 0) + (values[comp.id]?.kpi ?? 0)
-        if (bk <= 0) {
-          next[comp.id] = { epf: 0, socso: 0, eis: 0, total: 0 }
-          continue
-        }
-        // Per-head lookup: SOCSO/EIS cap per person, so a 2-director company
-        // contributes 2 caps. Heads is a company rule (companies.director_heads,
-        // HC = 2) — mirrors what batchSaveCTC stamps + the DB trigger computes.
-        const heads = Math.max(1, comp.director_heads ?? 1)
-        const bkPerHead = bk / heads
-        const [epfRes, socsoRes, eisRes] = await Promise.all([
-          supabase.rpc('lookup_epf', { p_wages: bkPerHead }),
-          supabase.rpc('lookup_socso', { p_wages: bkPerHead }),
-          supabase.rpc('lookup_eis', { p_wages: bkPerHead }),
-        ])
-        const epf = Number(epfRes.data?.[0]?.employer ?? 0) * heads
-        const socso = Number(socsoRes.data?.[0]?.employer ?? 0) * heads
-        const eis = Number(eisRes.data?.[0]?.employer ?? 0) * heads
-        next[comp.id] = { epf, socso, eis, total: epf + socso + eis }
+        // Heads is a company rule (companies.director_heads, HC = 2) — mirrors
+        // what batchSaveCTC stamps + the DB trigger computes.
+        next[comp.id] = await lookupRef.current(bk, comp.director_heads ?? 1)
       }
       setErByCompany(prev => ({ ...prev, ...next }))
     }, 300)
 
     return () => clearTimeout(handle)
-  }, [values, companies, manualByCompany])
+  }, [values, companies, manualByCompany, hv, hvLocked])
 
   // Totals
-  const companyRows = companies.map(c => ({
+  const companyRows = rows.map(c => ({
     ...c,
     basic: getValue(c.id, 'basic'),
     kpi: getValue(c.id, 'kpi'),
@@ -195,14 +240,10 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
   const totalER = companyRows.reduce((s, c) => s + c.er, 0)
   const grandTotal = totalBasic + totalKpi + totalAllow + totalER
 
-  function handleSave() {
-    setError(null)
-    setStatus('idle')
-    setOpenEr(null)
-
-    // Save all company entries under the pool director. Zero rows are sent
-    // too — the server treats an all-zero company as "clear this company's
-    // CTC for the period" (deletes the stale rows instead of skipping them).
+  // Save all company entries under the pool director. Zero rows are sent
+  // too — the server treats an all-zero company as "clear this company's
+  // CTC for the period" (deletes the stale rows instead of skipping them).
+  function companyRecords(): BatchCTCInput[] {
     const records: BatchCTCInput[] = []
     for (const comp of companies) {
       const er = erByCompany[comp.id]
@@ -223,22 +264,96 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
           : {}),
       })
     }
+    return records
+  }
 
+  function persist(hvInput: HvShareInput | null, fromWindow: boolean) {
+    const records = companyRecords()
     startTransition(async () => {
       try {
         setStatus('saving')
-        await batchSaveCTC(period, records)
+        const res = await batchSaveCTC(period, records, hvInput)
+        if (!res.ok) {
+          setStatus('idle')
+          if (fromWindow) setSplitError(res.reason)
+          else setError(res.reason)
+          return
+        }
+        setSplit(null)
         setStatus('done')
         // Staff-payroll-style flow: after saving, land on the Submission tab
         // where the Submit to Finance button is.
         router.push(`/director-salary?period=${period.slice(0, 7)}&tab=submission`)
         router.refresh()
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error')
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        if (fromWindow) setSplitError(message)
+        else setError(message)
         setStatus('idle')
       }
     })
   }
+
+  async function handleSave() {
+    setError(null)
+    setSplitError(null)
+    setStatus('idle')
+    setOpenEr(null)
+
+    if (!hv || hvLocked) return persist(null, false)
+    const b = getValue(HV_KEY, 'basic')
+    const k = getValue(HV_KEY, 'kpi')
+    const a = getValue(HV_KEY, 'allowance')
+    // HOUZS Venture pays nothing this month: a share HR had sent goes.
+    if (b + k + a <= 0) return persist(hvShare ? CLEAR_HV : null, false)
+
+    // It pays: which departments it comes out of, before anything is saved.
+    // The window's total is the one the database will keep — the employer
+    // statutory looked up now, not what the last debounce left on screen.
+    let er = erByCompany[HV_KEY] ?? ZERO_ER
+    if (!manualByCompany[HV_KEY]) {
+      try {
+        er = await lookupEr(b + k, HV_ROW.director_heads)
+      } catch {
+        setError('Could not look up HOUZS Venture’s employer statutory — try Save again')
+        return
+      }
+      setErByCompany(prev => ({ ...prev, [HV_KEY]: er }))
+    }
+    setSplit({ total: round2(b + k + a + er.total), er })
+  }
+
+  function confirmSplit({ mode, lines }: HvSplitConfirm) {
+    if (!split) return
+    setSplitError(null)
+    const manual = manualByCompany[HV_KEY] === true
+    persist(
+      {
+        basic: getValue(HV_KEY, 'basic'),
+        kpi: getValue(HV_KEY, 'kpi'),
+        allowance: getValue(HV_KEY, 'allowance'),
+        erManual: manual,
+        ...(manual ? { employerEpf: split.er.epf, employerSocso: split.er.socso, employerEis: split.er.eis } : {}),
+        splitMode: mode,
+        lines,
+      },
+      true,
+    )
+  }
+
+  // The window opens on the split HR sent last (its percentages, or its
+  // amounts — which say what is left when the total moved), else on one line
+  // of the whole total waiting for its department.
+  const splitStart: { mode: 'amount' | 'percent'; lines: HvDraftLine[] } =
+    hvShare && hvShare.lines.length > 0
+      ? {
+          mode: hvShare.splitMode,
+          lines: hvShare.lines.map(l => ({
+            departmentId: l.departmentId,
+            value: hvShare.splitMode === 'percent' ? String(l.pct ?? '') : l.amount.toFixed(2),
+          })),
+        }
+      : { mode: 'amount', lines: [{ departmentId: '', value: split ? split.total.toFixed(2) : '' }] }
 
   return (
     <div>
@@ -267,19 +382,24 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
             </tr>
           </thead>
           <tbody>
-            {companies.map(comp => {
+            {rows.map(comp => {
+              const isHv = comp.id === HV_KEY
+              const locked = isHv && hvLocked
               const b = getValue(comp.id, 'basic')
               const k = getValue(comp.id, 'kpi')
               const a = getValue(comp.id, 'allowance')
-              const er = erByCompany[comp.id] ?? { epf: 0, socso: 0, eis: 0, total: 0 }
+              const er = erByCompany[comp.id] ?? ZERO_ER
               const manual = manualByCompany[comp.id] === true
               const rowTotal = b + k + a + er.total
-              const editable = er.total > 0 || manual || b + k > 0
+              const editable = !locked && (er.total > 0 || manual || b + k > 0)
               const isOpen = openEr === comp.id
               return (
                 <tr key={comp.id}>
                   <td>
-                    <div className="font-medium">{comp.name}</div>
+                    <div className="font-medium flex flex-wrap items-center gap-2">
+                      {comp.name}
+                      {isHv && hvShare ? <HvShareChip share={hvShare} /> : null}
+                    </div>
                     <div className="font-mono text-[11px] mt-0.5">{comp.short_code}</div>
                   </td>
                   {(['basic', 'kpi', 'allowance'] as const).map(field => (
@@ -292,12 +412,15 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
                         value={getValue(comp.id, field) || ''}
                         onChange={e => setValue(comp.id, field, parseFloat(e.target.value) || 0)}
                         placeholder="0.00"
-                        className="w-28 px-2 py-1.5 bg-paper border border-hairline rounded-control text-[12px] font-mono tabular font-medium text-ink text-right focus:outline-none focus:border-accent-border"
+                        disabled={locked}
+                        className="w-28 px-2 py-1.5 bg-paper border border-hairline rounded-control text-[12px] font-mono tabular font-medium text-ink text-right focus:outline-none focus:border-accent-border disabled:opacity-60 disabled:cursor-not-allowed"
                       />
                     </td>
                   ))}
                   <td className="num">
-                    {editable ? (
+                    {locked ? (
+                      <span className="font-mono tabular font-medium text-ink">{formatMoneyBare(er.total)}</span>
+                    ) : editable ? (
                       <span className="inline-flex flex-col items-end justify-end">
                         <button
                           type="button"
@@ -399,19 +522,54 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <button
           onClick={handleSave}
-          disabled={isPending}
+          disabled={isPending || split !== null}
           className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {status === 'saving' ? 'Saving...' : 'Save'}
+          {status === 'saving' && split === null ? 'Saving...' : 'Save'}
         </button>
-        {status === 'done' && (
-          <span className="flex items-center gap-2 text-sm">
-            <span className="chip ledger"><span className="dot" />Saved</span>
-            submit to Finance on the Submission tab.
-          </span>
-        )}
+        {status === 'done' && <span className="chip ledger"><span className="dot" />Saved</span>}
         {error && <span className="text-sm text-danger">{error}</span>}
       </div>
+
+      {split && hv ? (
+        <HvSplitWindow
+          total={split.total}
+          periodLabel={dayjs(period).format('MMMM YYYY')}
+          departments={hv.departments}
+          initialMode={splitStart.mode}
+          initialLines={splitStart.lines}
+          busy={isPending}
+          error={splitError}
+          onCancel={() => {
+            setSplit(null)
+            setSplitError(null)
+          }}
+          onConfirm={confirmSplit}
+        />
+      ) : null}
     </div>
+  )
+}
+
+/** Where HOUZS Venture's share stands — with Finance, or transferred (by whom and when on hover). */
+function HvShareChip({ share }: { share: HvShare }) {
+  if (share.status === 'transferred') {
+    const when = share.transferDate ? dayjs(share.transferDate).format('D MMM YYYY') : ''
+    return (
+      <span
+        className="chip ledger"
+        title={`Transferred${when ? ` on ${when}` : ''}${share.transferredBy ? ` by ${share.transferredBy}` : ''} — Finance undoes it to change`}
+      >
+        <span className="dot" />
+        Transferred
+      </span>
+    )
+  }
+  const sent = share.submittedAt ? officeTime(share.submittedAt).format('D MMM YYYY HH:mm') : ''
+  return (
+    <span className="chip alert" title={`Sent${sent ? ` ${sent}` : ''}${share.submittedBy ? ` by ${share.submittedBy}` : ''}`}>
+      <span className="dot" />
+      With Finance
+    </span>
   )
 }

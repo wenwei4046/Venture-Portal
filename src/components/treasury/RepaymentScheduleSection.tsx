@@ -86,13 +86,9 @@ export default function RepaymentScheduleSection({
           </table>
         </div>
       )}
-      {plan.rows.length > 0 ? (
-        <p className="sched-note">
-          {open
-            ? 'No fixed term: interest month by month to date. Balance = principal still owed (a compounding deal adds an unpaid month’s interest to it).'
-            : `Installment = principal ÷ ${plan.months ?? plan.rows.length} + interest on the principal it is reckoned on. Balance = principal + interest still due by plan after this installment. Outstanding = what is unpaid on that installment; it clears to 0 once paid. Money received is set against the oldest installment first.`}
-        </p>
-      ) : null}
+      {/* No line under the table on how to read it (2026-10-12, the user: the
+          descriptions make the view too messy) — the head's count says a deal
+          has no fixed term. */}
       {recorded ? (
         <details className="sched-recorded">
           <summary>Repayments recorded · {recorded.count}</summary>

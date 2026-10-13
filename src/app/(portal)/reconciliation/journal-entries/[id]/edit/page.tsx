@@ -71,7 +71,6 @@ export default async function EditJournalVoucherPage({
             <em>I.</em> TREASURY · MANUAL VOUCHERS · EDIT
           </div>
           <h1 className="page-title">{entry.entry_no}</h1>
-          <p className="page-sub">Debits must equal credits. Press Ins to add a line.</p>
         </div>
       </div>
 

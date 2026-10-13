@@ -229,6 +229,16 @@ describe('what a change meant for commission', () => {
     expect(commissionNote(c, null)).toBe('Given (Closed · Sep 2026) — nothing to pay now')
   })
 
+  // 2026-10-13, the user: "取消的单 … just direct deduct".
+  it('a cancellation the feed took back by itself says so', () => {
+    const c = change({ kind: 'cancelled', settledBy: 'hand', settledPeriod: '2026-08-01' })
+    expect(commissionNote(c, { id: 'a1', status: 'confirmed', periodMonth: '2026-09-01', amount: -10399, answeredByFeed: true }))
+      .toBe('Given (Claim form · Aug 2026) — RM (10,399.00) deducted directly in Sep 2026')
+    // Sent back with Undo and paid by a person: an ordinary answer.
+    expect(commissionNote(c, { id: 'a1', status: 'confirmed', periodMonth: '2026-10-01', amount: -10399, answeredByFeed: false }))
+      .toBe('Given (Claim form · Aug 2026) — RM (10,399.00) paid in Oct 2026')
+  })
+
   // HC-SO-013335 on production: a save three minutes after the drop moved only
   // the fair's day — it is no part of the question the drop opened.
   it('a save that moved nothing that earns is no part of a question', () => {

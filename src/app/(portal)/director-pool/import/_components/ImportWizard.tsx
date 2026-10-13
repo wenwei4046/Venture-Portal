@@ -85,12 +85,6 @@ export default function ImportWizard() {
 
   return (
     <div className="max-w-2xl">
-      <p className="text-sm mb-6 leading-relaxed">
-        Upload the JSON file saved from the standalone HTML tool (💾 Save button —
-        <span className="font-mono text-xs"> SalaryPool_Data_*.json</span>). Everything carries over: months,
-        company inputs, keyed statutory, advance overrides, saving withdrawals and contra state.
-      </p>
-
       <div className="border border-hairline rounded-card bg-surface p-6 mb-6">
         <label className="block mb-4">
           <span className="block mb-2 text-[10px] font-semibold uppercase tracking-[0.06em]">

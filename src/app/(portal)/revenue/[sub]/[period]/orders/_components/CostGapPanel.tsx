@@ -86,10 +86,9 @@ export default function CostGapPanel({ subDepartmentId, period, rows, runLocked 
         <span className="count">{rows.length} CODES</span>
       </div>
 
+      {/* The counts only (2026-10-12) — the sentence on why one missing price blinds a bill went. */}
       <p className="text-sm mb-4 max-w-3xl">
-        A bill&apos;s margin is refused the moment one of its commissionable lines has no price, so
-        one unpriced product can blind dozens of bills. These are the codes this month has no price
-        for — {blinding.length} of them touch the margin, worth {formatMoney(blindingValue)}.
+        {blinding.length} of them touch the margin, worth {formatMoney(blindingValue)}.
         {pricedSince.length > 0 ? (
           <>
             {' '}
@@ -106,6 +105,7 @@ export default function CostGapPanel({ subDepartmentId, period, rows, runLocked 
           type="button"
           onClick={recost}
           disabled={pending || runLocked}
+          title={runLocked ? 'This month is in payroll, so the costs behind it cannot move' : undefined}
           className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40"
         >
           {pending ? 'Re-pricing…' : 'Recost the month from the Product List'}
@@ -113,11 +113,6 @@ export default function CostGapPanel({ subDepartmentId, period, rows, runLocked 
         <Link href={PRODUCT_LIST_PATH} className="text-sm text-accent hover:underline">
           Open the Product List →
         </Link>
-        {runLocked ? (
-          <span className="text-xs">
-            This month is in payroll, so the costs behind it cannot move.
-          </span>
-        ) : null}
       </div>
 
       {error ? <p className="text-danger text-sm mb-4">{error}</p> : null}
@@ -179,12 +174,6 @@ export default function CostGapPanel({ subDepartmentId, period, rows, runLocked 
           Show the other {rows.length - shown.length}
         </button>
       ) : null}
-
-      <p className="text-xs mt-3 max-w-3xl">
-        Greyed rows are lines outside a commissionable group — transport, disposal and the like.
-        Their cost never reached a margin, so they cost the month nothing; they are listed because a
-        code the portal cannot price is worth knowing about either way.
-      </p>
     </section>
   )
 }

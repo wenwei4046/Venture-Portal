@@ -2,10 +2,14 @@
 
 import { useMemo, useRef, useState, type DragEvent } from 'react'
 import { flash } from '@/components/hrv/toast'
-import { addDriveFolder, deleteDriveFile, deleteDriveFolder, openDriveFile, renameDriveFolder, saveDriveFile } from '@/lib/documentation/drive-actions'
 import {
-  ROOT, crumbs, folderCards, folderNameRefusal, parsePlace, personAt, placeExists, placeFiles, placeName,
-  searchDrive, sizeLabel, takesFolders, type Drive, type DriveFile, type FolderCard, type SearchHit,
+  addDriveFolder, deleteDriveFile, deleteDriveFolder, deleteDriveItemForever, emptyDriveBin, moveDriveFolder, openDriveFile, renameDriveFolder,
+  restoreDriveItem, saveDriveFile,
+} from '@/lib/documentation/drive-actions'
+import {
+  BIN, HV, ROOT, binDaysLeft, binFrom, binLeftLabel, binSections, crumbs, folderCards, folderNameRefusal, moveTargets, parentOf, parsePlace,
+  pathLine, personAt, placeExists, placeFiles, placeName, searchDrive, sizeLabel, takesFolders, type Drive, type DriveBinItem, type DriveFile,
+  type FolderCard, type SearchHit,
 } from '@/lib/documentation/drive'
 import { DOC_ACCEPT, dataCenterPeople, docShortDay, plural, type Documentation } from '@/lib/documentation/model'
 import { uploadDocumentationFile } from '@/lib/documentation/upload'
@@ -14,9 +18,11 @@ import type { PreviewTarget } from './PreviewDrawer'
 import { FileTile, FolderTile } from './drive/Cards'
 import FolderNameWindow from './drive/FolderNameWindow'
 import Menu, { type MenuItem } from './drive/Menu'
+import MoveWindow from './drive/MoveWindow'
 import PersonFolder from './drive/PersonFolder'
 import {
-  BinGlyph, ChevronGlyph, CompanyGlyph, DownGlyph, EyeGlyph, FolderGlyph, NewFolderGlyph, PersonGlyph, SearchGlyph, UploadGlyph,
+  BinGlyph, ChevronGlyph, CompanyGlyph, DownGlyph, EyeGlyph, FolderGlyph, NewFolderGlyph, PenGlyph, PersonGlyph, RestoreGlyph, SearchGlyph,
+  UploadGlyph,
 } from './drive/icons'
 import s from './drive/drive.module.css'
 
@@ -29,16 +35,6 @@ async function downloadDrive(id: string): Promise<string | null> {
 }
 
 /** What each place says under the path. */
-function hintOf(at: string, name: string): string {
-  const p = parsePlace(at)
-  if (!p) return ''
-  if (p.kind === 'root') return 'HOUZS Venture, its departments and its people come from People by themselves. Make a folder here for a subsidiary, and folders by department inside it.'
-  if (p.kind === 'company') return 'Each department’s people come from People. Publish & save files every copy into its person’s folder by itself.'
-  if (p.kind === 'dept') return `Everybody active in ${name} — each folder is their record.`
-  if (p.kind === 'folder') return 'Kept for HR — a file here is a record, sent to nobody.'
-  return ''
-}
-
 /**
  * Documentation › Data center as a Drive (2026-10-12 — the user: the people column "scroll 得很高"; "参考 Google
  * Drive 的做法 … 可以 create folder 的", company → department → the person; HR is centralized, so a subsidiary
@@ -47,6 +43,10 @@ function hintOf(at: string, name: string): string {
  * cards with a big preview. HOUZS Venture, its departments and their people are made by People (lib/documentation/
  * drive.ts); a person's folder is their record — the letters, the missing compulsory ones, Withdraw — as before.
  * Files can be dropped onto a folder HR made. The place is the page's address (`?in=`).
+ *
+ * The Talent Bank's rules since 2026-10-13 (the user: "Data center 也加 Bin 和 Move to…"): what HR deletes — a file
+ * it keeps, an empty folder it made — waits in the Bin (`?in=bin`) 30 days, its days counting down, for Restore or
+ * Delete forever; a folder HR made moves with Move to…, everything in it going along.
  */
 export default function DataCenterTab({
   data,
@@ -72,8 +72,14 @@ export default function DataCenterTab({
   const [showDeleted, setShowDeleted] = useState(false)
   const [dropping, setDropping] = useState(false)
   const [uploading, setUploading] = useState(0)
+  const [moving, setMoving] = useState<FolderCard | null>(null)
+  const [emptying, setEmptying] = useState(false)
+  // The Bin's days count from the server's read — fresh after every write; the page's first draw only when unknown.
+  const [drawnAt] = useState(() => Date.now())
+  const now = Date.parse(drive.readAt) || drawnAt
   const filePick = useRef<HTMLInputElement>(null)
 
+  const inBin = at === BIN
   const here = placeExists(at, data, drive) ? at : ROOT
   const place = parsePlace(here)
   const name = placeName(here, data, drive)
@@ -96,12 +102,14 @@ export default function DataCenterTab({
   const files = placeFiles(here, drive, showDeleted)
   const deletedHere = drive.files.filter(f => f.parent === here && f.deletedAt).length
   const hits = useMemo(() => searchDrive(query, data, drive), [query, data, drive])
-  const takesFiles = can.create && takesFolders(here)
+  const takesFiles = can.create && !inBin && takesFolders(here)
+  const bin = binSections(drive.bin)
 
   function open(next: string) {
     onAt(next)
     setQuery('')
     setShowDeleted(false)
+    setEmptying(false)
   }
 
   async function makeFolder(folderName: string) {
@@ -122,7 +130,7 @@ export default function DataCenterTab({
     const p = parsePlace(card.at)
     if (!p) return
     const res = await deleteDriveFolder(p.id)
-    flash(res.ok ? `${card.name} deleted` : res.reason)
+    flash(res.ok ? `${card.name} moved to the Bin` : res.reason)
   }
 
   async function uploadFiles(list: File[]) {
@@ -151,7 +159,24 @@ export default function DataCenterTab({
 
   async function removeFile(f: DriveFile) {
     const res = await deleteDriveFile(f.id)
-    flash(res.ok ? `${f.fileName} deleted` : res.reason)
+    flash(res.ok ? `${f.fileName} moved to the Bin` : res.reason)
+  }
+
+  // ── The Bin ──
+  async function restore(item: DriveBinItem) {
+    const res = await restoreDriveItem(item.id)
+    flash(res.ok ? `${item.name} restored to ${res.label}` : res.reason)
+  }
+
+  async function deleteForever(item: DriveBinItem) {
+    const res = await deleteDriveItemForever(item.id)
+    flash(res.ok ? `${item.name} deleted forever` : res.reason)
+  }
+
+  async function emptyBin() {
+    setEmptying(false)
+    const res = await emptyDriveBin()
+    flash(res.ok ? `Bin emptied · ${plural(res.count, 'item')} deleted forever` : res.reason)
   }
 
   async function download(f: DriveFile) {
@@ -183,9 +208,32 @@ export default function DataCenterTab({
       { key: 'view', label: 'View', icon: <EyeGlyph />, onSelect: () => onView({ kind: 'drive', id: f.id }) },
       { key: 'download', label: 'Download', icon: <DownGlyph />, onSelect: () => void download(f) },
     ]
-    if (can.edit) items.push('rule', { key: 'delete', label: 'Delete', confirm: 'Confirm delete', tone: 'danger', icon: <BinGlyph />, onSelect: () => void removeFile(f) })
+    if (can.edit) items.push('rule', { key: 'delete', label: 'Move to Bin', tone: 'danger', icon: <BinGlyph />, onSelect: () => void removeFile(f) })
     return items
   }
+
+  // A folder HR made: Rename, Move to… (with everything in it), Move to Bin. What People makes has no menu.
+  const folderItems = (card: FolderCard): Array<MenuItem | 'rule'> =>
+    card.own && can.edit
+      ? [
+          { key: 'rename', label: 'Rename', icon: <PenGlyph />, onSelect: () => setRenaming(card) },
+          { key: 'move', label: 'Move to…', icon: <FolderGlyph size={16} />, onSelect: () => setMoving(card) },
+          'rule',
+          { key: 'delete', label: 'Move to Bin', tone: 'danger', icon: <BinGlyph />, onSelect: () => void removeFolder(card) },
+        ]
+      : []
+
+  // Something in the Bin: Restore, or Delete forever (asked once more). Without Edit, nothing.
+  const binItems = (item: DriveBinItem): Array<MenuItem | 'rule'> =>
+    can.edit
+      ? [
+          { key: 'restore', label: 'Restore', icon: <RestoreGlyph />, onSelect: () => void restore(item) },
+          'rule',
+          { key: 'forever', label: 'Delete forever', confirm: 'Confirm delete forever', tone: 'danger', icon: <BinGlyph />, onSelect: () => void deleteForever(item) },
+        ]
+      : []
+  const inTheBin = (item: DriveBinItem) => () => flash(`${item.name} is in the Bin — restore it to open it.`)
+  const binLine = (item: DriveBinItem) => `${binFrom(item, data, drive)} · ${binLeftLabel(binDaysLeft(item, now))}`
 
   const onDragOver = (e: DragEvent) => {
     if (!takesFiles || !e.dataTransfer.types.includes('Files')) return
@@ -210,7 +258,7 @@ export default function DataCenterTab({
       onDrop={onDrop}
     >
       <div className={s.bar}>
-        {can.create ? (
+        {can.create && !inBin ? (
           <Menu
             label="New"
             side="left"
@@ -224,30 +272,59 @@ export default function DataCenterTab({
           />
         ) : null}
         <nav className={s.crumbs} aria-label="Folder path">
-          {path.map((c, i) =>
-            i === path.length - 1 ? (
-              <span key={c.at} className={s.crumbHere} aria-current="page">{c.name}</span>
-            ) : (
-              <span key={c.at} style={{ display: 'contents' }}>
-                <button type="button" className={s.crumb} onClick={() => open(c.at)}>{c.name}</button>
-                <span className={s.crumbSep} aria-hidden="true"><ChevronGlyph size={14} /></span>
-              </span>
-            ),
+          {inBin ? (
+            <>
+              <button type="button" className={s.crumb} onClick={() => open(ROOT)}>Data center</button>
+              <span className={s.crumbSep} aria-hidden="true"><ChevronGlyph size={14} /></span>
+              <span className={s.crumbHere} aria-current="page">Bin</span>
+            </>
+          ) : (
+            path.map((c, i) =>
+              i === path.length - 1 ? (
+                <span key={c.at} className={s.crumbHere} aria-current="page">{c.name}</span>
+              ) : (
+                <span key={c.at} style={{ display: 'contents' }}>
+                  <button type="button" className={s.crumb} onClick={() => open(c.at)}>{c.name}</button>
+                  <span className={s.crumbSep} aria-hidden="true"><ChevronGlyph size={14} /></span>
+                </span>
+              ),
+            )
           )}
         </nav>
-        <div className={s.searchWrap}>
-          <span className={s.searchIcon}><SearchGlyph size={15} /></span>
-          <input
-            className={s.search}
-            value={query}
-            placeholder="Search the Data center"
-            aria-label="Search the Data center"
-            onChange={e => setQuery(e.target.value)}
-          />
-          {query ? (
-            <button type="button" className={s.searchClear} onClick={() => setQuery('')} aria-label="Clear the search">×</button>
-          ) : null}
-        </div>
+        {inBin ? (
+          can.edit && drive.bin.length ? (
+            <button
+              type="button"
+              className={s.emptyBin}
+              data-armed={emptying ? 'true' : undefined}
+              onClick={() => (emptying ? void emptyBin() : setEmptying(true))}
+            >
+              <BinGlyph />
+              {emptying ? 'Confirm empty bin' : 'Empty bin'}
+            </button>
+          ) : null
+        ) : (
+          <>
+            <div className={s.searchWrap}>
+              <span className={s.searchIcon}><SearchGlyph size={15} /></span>
+              <input
+                className={s.search}
+                value={query}
+                placeholder="Search the Data center"
+                aria-label="Search the Data center"
+                onChange={e => setQuery(e.target.value)}
+              />
+              {query ? (
+                <button type="button" className={s.searchClear} onClick={() => setQuery('')} aria-label="Clear the search">×</button>
+              ) : null}
+            </div>
+            <button type="button" className={s.binBtn} onClick={() => open(BIN)}>
+              <BinGlyph />
+              Bin
+              {drive.bin.length ? <span className={s.binCount}>{drive.bin.length}</span> : null}
+            </button>
+          </>
+        )}
         <input
           ref={filePick}
           type="file"
@@ -264,7 +341,64 @@ export default function DataCenterTab({
 
       {driveError ? <div className={s.error} role="alert">{driveError}</div> : null}
 
-      {query.trim() ? (
+      {inBin ? (
+        drive.bin.length ? (
+          <>
+            {bin.folders.length ? (
+              <div className={s.sect}>
+                <div className={s.sectHead}>
+                  Folders <span className={s.sectCount}>{bin.folders.length}</span>
+                </div>
+                <div className={s.grid}>
+                  {bin.folders.map(item => (
+                    <FolderTile
+                      key={item.id}
+                      card={{ at: `${BIN}:${item.id}`, kind: 'folder', name: item.name, line: binLine(item), missing: 0, missingWhy: '', own: true }}
+                      canEdit={false}
+                      onOpen={inTheBin(item)}
+                      onRename={() => undefined}
+                      onDelete={() => undefined}
+                      items={binItems(item)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {bin.files.length ? (
+              <div className={s.sect}>
+                <div className={s.sectHead}>
+                  Files <span className={s.sectCount}>{bin.files.length}</span>
+                </div>
+                <div className={s.grid}>
+                  {bin.files.map(item => (
+                    <FileTile
+                      key={item.id}
+                      title={item.name}
+                      sub={binFrom(item, data, drive)}
+                      fileName={item.name}
+                      contentType={item.contentType}
+                      onView={inTheBin(item)}
+                      items={binItems(item)}
+                      meta={
+                        <>
+                          <span>{docShortDay(item.deletedAt)} · {item.deletedBy}</span>
+                          <span className={s.fileMetaGap} />
+                          <span>{binLeftLabel(binDaysLeft(item, now))}</span>
+                        </>
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className={s.empty}>
+            <div className={s.emptyTitle}>The Bin is empty.</div>
+            What is deleted in the Data center waits here for 30 days, then goes for good.
+          </div>
+        )
+      ) : query.trim() ? (
         <div className={s.sect}>
           <div className={s.sectHead}>
             Found <span className={s.sectCount}>{hits.length}</span>
@@ -297,7 +431,6 @@ export default function DataCenterTab({
         <PersonFolder data={data} person={person} can={can} onView={id => onView({ kind: 'letter', id })} onUpload={() => setLetterUpload(true)} />
       ) : (
         <>
-          {hintOf(here, name) ? <div className={s.hint}>{hintOf(here, name)}</div> : null}
           {sections.map(sect => (
             <div key={sect.title} className={s.sect}>
               <div className={s.sectHead}>
@@ -305,7 +438,15 @@ export default function DataCenterTab({
               </div>
               <div className={s.grid}>
                 {sect.cards.map(card => (
-                  <FolderTile key={card.at} card={card} canEdit={can.edit} onOpen={open} onRename={setRenaming} onDelete={c => void removeFolder(c)} />
+                  <FolderTile
+                    key={card.at}
+                    card={card}
+                    canEdit={can.edit}
+                    onOpen={open}
+                    onRename={setRenaming}
+                    onDelete={c => void removeFolder(c)}
+                    items={folderItems(card)}
+                  />
                 ))}
               </div>
             </div>
@@ -377,6 +518,21 @@ export default function DataCenterTab({
       ) : null}
       {person && letterUpload ? (
         <UploadLetterWindow person={{ id: person.id, name: person.name }} types={data.letterTypes} onClose={() => setLetterUpload(false)} />
+      ) : null}
+      {moving ? (
+        <MoveWindow
+          title={`Move ${moving.name}`}
+          now={`Now in ${pathLine(parentOf(moving.at, data, drive) ?? ROOT, data, drive)} — everything in it goes with it`}
+          targets={moveTargets(data, drive, moving.at)}
+          current={parentOf(moving.at, data, drive) ?? ROOT}
+          kindOf={at => (at === HV ? 'company' : 'folder')}
+          onMove={async to => {
+            const res = await moveDriveFolder(parsePlace(moving.at)?.id ?? '', to)
+            if (res.ok) flash(`${moving.name} moved to ${pathLine(to, data, drive)}`)
+            return res
+          }}
+          onClose={() => setMoving(null)}
+        />
       ) : null}
     </div>
   )

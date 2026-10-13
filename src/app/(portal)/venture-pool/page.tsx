@@ -175,10 +175,6 @@ export default async function VenturePoolPage() {
           ) : (
             <PoolLedgerTable lines={lines} canSetDefault={canDo(user, 'treasury', 'create')} />
           )}
-          <p className="text-xs text-graphite mt-3">
-            Every line, from the journal lines (corporate and treasury segments on HV bank accounts, reversal pairs left out). Export
-            adds the running balance.
-          </p>
         </section>
       </PoolSearchProvider>
     </div>

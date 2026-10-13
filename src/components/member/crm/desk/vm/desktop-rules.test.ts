@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { CrmCustomer, CrmForm, CrmRoom } from "@/lib/member/crm-data";
-import { roomClosed, roomSlots } from "../../sales/vm/chat";
+import { roomClosed, slotBlocked } from "../../sales/vm/chat";
 import { customerForm, formOf, infoRows } from "../../sales/vm/customer";
 import { historyRows, words } from "./history";
 
@@ -12,11 +12,13 @@ const room = (blocks: CrmRoom["blocks"]): CrmRoom => ({ id: "kl", name: "KL", ac
 const mon = new Date(2030, 0, 7).getTime();
 
 describe("a closure for some hours (B9)", () => {
-  it("takes only the slots inside its hours, and leaves the day open", () => {
-    const r = room([{ a: "2030-01-07", b: "2030-01-07", why: "Event", ranges: [{ f: "13:00", t: "15:00" }] }]);
-    expect(roomClosed(r, mon)).toBe(false);
-    expect(roomSlots(r, mon)).toEqual(["10:00 am", "4:00 pm"]);
-    expect(roomSlots(r, mon + 86_400_000)).toEqual(["10:00 am", "2:00 pm", "4:00 pm"]);
+  it("takes only the slots inside its hours, and leaves the day open — written either way", () => {
+    for (const b of [{ ranges: [{ f: "13:00", t: "15:00" }] }, { t1: "13:00", t2: "15:00" }]) {
+      const r = room([{ a: "2030-01-07", b: "2030-01-07", why: "Event", ...b }]);
+      expect(roomClosed(r, mon)).toBe(false);
+      expect(["10:00 am", "2:00 pm", "4:00 pm"].map(l => slotBlocked(r, mon, l))).toEqual([false, true, false]);
+      expect(slotBlocked(r, mon + 86_400_000, "2:00 pm")).toBe(false);
+    }
   });
   it("a closure with no hours closes the whole day, as before", () => {
     expect(roomClosed(room([{ a: "2030-01-07", b: "2030-01-07", why: "Closed" }]), mon)).toBe(true);

@@ -10,6 +10,7 @@ import {
   defaultSeat,
   effectiveWhen,
   filterRequests,
+  foodDaysLine,
   hasSignedForm,
   isOpen,
   memoLine,
@@ -120,6 +121,17 @@ describe('Request reviews · words and facts', () => {
       .toEqual(['Claim amount: RM 380.50', 'Invoice total: RM 380.50', 'Most for the stay: RM 440.00 · RM 220.00 a night × 2 nights'])
     // One stored before the limit (a fixed RM 65 × people × nights) has neither.
     expect(airbnb({ pax: 4, group: false, rate: 65, amount: 520 })).toEqual(['Claim amount: RM 520.00', 'Location: PENANG WATERFRONT', 'Stay: 24 Sep 2026 — 26 Sep 2026'])
+    // A food claim (2026-10-13): a month — its days, the fair of each weekend — at HR's rate a day.
+    const food = requestFacts(req({ kind: 'claim', detail: {
+      claimType: 'food', category: 'Food', month: '2026-09', monthLabel: 'Sep 2026',
+      weeks: [{ week: '2026-09-11', location: 'MID VALLEY', days: ['2026-09-11', '2026-09-12'] }, { week: '2026-09-18', location: 'IOI GECC', days: ['2026-09-20'] }],
+      days: ['2026-09-20', '2026-09-11', '2026-09-12'], dayCount: 3, rate: 20, amount: 60,
+    } }), { submittedBy: 'ANTHONY', original: null, successor: null, target: null, acceptedAt: null, events: [] }, { departments })
+    expect(food.map(r => `${r.l}: ${r.v}`)).toEqual([
+      'Claim category: Food', 'Claim amount: RM 60.00', 'Month: Sep 2026', 'Days: 11, 12, 20 Sep', 'Fairs: MID VALLEY 11, 12 Sep · IOI GECC 20 Sep',
+      'Rate a day: RM 20.00 × 3 days', 'Submitted by: ANTHONY',
+    ])
+    expect(foodDaysLine({ days: ['2026-11-01', '2026-10-30', '2026-10-31', 'x'] })).toBe('30, 31 Oct, 1 Nov')
   })
 
   it('says what HR does next', () => {

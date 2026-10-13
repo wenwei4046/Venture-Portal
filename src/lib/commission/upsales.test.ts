@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeCommissionRun } from './engine'
 import { releasedOrders, toEngineInput, toRunPayload, type RunSourceRows } from './run-payload'
-import { upsaleOrderNo, upsalesToOrders } from './upsales'
+import { sharesOfUpsales, upsaleBillId, upsaleOrderNo, upsalesToOrders } from './upsales'
 import type { CommissionScheme, EngineInput, Rank, SalesOrder } from './types'
 
 /**
@@ -228,5 +228,68 @@ describe('a drop', () => {
       "Staff yuny's commission comes to -146.16 this month — drops take back more than the month pays (DROP HC13911). Payroll cannot pay a negative commission: pay the drop in a month their sales cover it.",
       "Staff anthony's commission comes to -41.76 this month — drops take back more than the month pays. Payroll cannot pay a negative commission: pay the drop in a month their sales cover it.",
     ])
+  })
+})
+
+/**
+ * 2026-10-13, the user: "两人共享的单如果被 drop，扣的金额还是全部算在单主身上 …
+ * want drop sales by share as well. Follow the share ratio." A change follows
+ * the shares of the bill whose pay gave the commission — the claim-form row
+ * for August (ZNT5991: LUCAS CHOOI 50% · WEI PIN 50%, where the ERP's own row
+ * says ANTHONY alone).
+ */
+describe('a change of a shared bill', () => {
+  const SHARE = { order_id: 'bill-1', staff_id: 'anthony', share_pct: '0.5' }
+
+  it('follows the shares of the bill recorded on it, else of the document’s own bill', () => {
+    const docs = new Map([['HC-SO-1', 'bill-1'], ['HC-SO-2', 'bill-2']])
+    const recorded = { ...DROP, id: 'r1', erp_doc_no: 'HC-SO-2', settled_order_id: 'bill-1' }
+    const unrecorded = { ...DROP, id: 'r2', erp_doc_no: 'HC-SO-1' }
+    const byHand = { ...UPSALE, id: 'r3' }
+    expect(upsaleBillId(recorded, docs)).toBe('bill-1')
+    expect(upsaleBillId(unrecorded, docs)).toBe('bill-1')
+    expect(upsaleBillId(byHand, docs)).toBeNull()
+    expect(sharesOfUpsales([recorded, unrecorded, byHand], docs, [SHARE, { ...SHARE, order_id: 'bill-2', staff_id: 'zack' }]))
+      .toEqual([{ ...SHARE, order_id: 'r1' }, { ...SHARE, order_id: 'r2' }])
+  })
+
+  it('is paid to each holder in their part, at their own rate, up their own line', () => {
+    const rows: RunSourceRows = {
+      periodMonth: '2026-09-01',
+      scheme: {
+        id: 's', sub_department_id: 'fair', open_bill_basis: 'uplift_on_commission', override_includes_kpi: false,
+        deposit_threshold_pct: '0.3', default_rate_mode: 'fixed', enable_product_revenue: true, enable_kpi: false,
+        enable_open_bill: false, enable_override: true, enable_margin_penalty: false, enable_margin_incentive: false,
+      },
+      ranks: [], itemGroups: [], kpiItems: [], kpiThresholds: [], openBillRules: [], openBillTags: [],
+      marginBands: [], hierarchy: [], orders: [], releasedOrderNos: [], priorMonths: [],
+      upsales: [{ ...DROP, erp_doc_no: 'HC-SO-013911', settled_order_id: 'bill-1' }],
+      upsaleShares: sharesOfUpsales([{ ...DROP, settled_order_id: 'bill-1' }], new Map(), [SHARE]),
+    }
+    const parts = toEngineInput(rows).orders
+    expect(parts.map(o => [o.id, o.staffId, o.orderTotal])).toEqual([['d1', 'yuny', -1044], ['d1', 'anthony', -1044]])
+    expect(parts.every(o => o.upsale && o.orderNo === 'DROP HC13911')).toBe(true)
+
+    const s = statementsOf(input([bill({ periodMonth: '2026-09-01' }), ...parts], { periodMonth: '2026-09-01' }))
+    expect(s.get('yuny')!.productRevenue).toBe(8_956) // 10,000 − her half of 2,088
+    expect(s.get('yuny')!.productCommission).toBe(626.92) // 7% × 8,956
+    expect(s.get('anthony')!.productCommission).toBe(-93.96) // 9% × −1,044, his own rate
+    expect(s.get('anthony')!.overrideCommission).toBe(179.12) // 2% × 8,956 — only yuny's part climbs to him
+  })
+
+  it('a change of a bill nobody shares stays whole with its owner', () => {
+    const rows = { upsales: [DROP], upsaleShares: [] }
+    const eng = toEngineInput({
+      periodMonth: '2026-09-01',
+      scheme: {
+        id: 's', sub_department_id: 'fair', open_bill_basis: 'uplift_on_commission', override_includes_kpi: false,
+        deposit_threshold_pct: '0.3', default_rate_mode: 'fixed', enable_product_revenue: true, enable_kpi: false,
+        enable_open_bill: false, enable_override: true, enable_margin_penalty: false, enable_margin_incentive: false,
+      },
+      ranks: [], itemGroups: [], kpiItems: [], kpiThresholds: [], openBillRules: [], openBillTags: [],
+      marginBands: [], hierarchy: [], orders: [], releasedOrderNos: [], priorMonths: [],
+      ...rows,
+    })
+    expect(eng.orders.map(o => [o.staffId, o.orderTotal])).toEqual([['yuny', -2088]])
   })
 })

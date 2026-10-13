@@ -10,20 +10,24 @@ export type RequestFilter = "all" | RequestKindVM;
 
 const NEW: { kind: RequestKindVM; title: string; sub: string; d: string; tone: string }[] = [
   { kind: "claim", title: "Submit claim", sub: "Outstation and Airbnb stays", d: ICON.receipt, tone: s.newClaim },
+  { kind: "food", title: "Submit food claim", sub: "Meals on the days you worked a fair", d: ICON.food, tone: s.newFood },
   { kind: "replacement", title: "Submit replacement", sub: "Replacements, transfers and exits", d: ICON.team, tone: s.newRepl },
   { kind: "waiting", title: "Submit waiting list", sub: "Joining requests and allocation", d: ICON.calendar, tone: s.newWait },
 ];
 const FILTERS: { id: RequestFilter; label: string }[] = [
-  { id: "all", label: "All" }, { id: "claim", label: "Claim" }, { id: "replacement", label: "Replacement" }, { id: "waiting", label: "Waiting list" },
+  { id: "all", label: "All" }, { id: "claim", label: "Claim" }, { id: "food", label: "Food claim" }, { id: "replacement", label: "Replacement" },
+  { id: "waiting", label: "Waiting list" },
 ];
 
+/** The prototype's three; a food claim is offered only to whom HR opened it (Fair, a title HR picked — 2026-10-13). */
 const ALL_KINDS: readonly RequestKindVM[] = ["claim", "replacement", "waiting"];
 
 /**
- * Requests (lines 1081–1108): three ways to start one, then everything sent and where it is.
+ * Requests (lines 1081–1108): the ways to start one, then everything sent and where it is.
  * Each opens its form, in View as too — the form is where read-only shows (it sends nothing).
- * `kinds`: the ones they may send (2026-10-11) — a claim is this page's Create, a waiting list
- * or replacement Waiting list & replacements'.
+ * `kinds`: the ones they may send (2026-10-11) — a claim (and a food claim) is this page's
+ * Create, a waiting list or replacement Waiting list & replacements'. The Food claim filter
+ * shows only while a food claim is offered or one was sent.
  */
 export default function RequestsPage({ rows, filter, kinds = ALL_KINDS, onFilter, onBack, onNew, onOpen }: {
   rows: RequestRowVM[];
@@ -36,6 +40,7 @@ export default function RequestsPage({ rows, filter, kinds = ALL_KINDS, onFilter
 }) {
   const shown = rows.filter(r => filter === "all" || r.kind === filter);
   const starts = NEW.filter(n => kinds.includes(n.kind));
+  const filters = FILTERS.filter(f => f.id !== "food" || kinds.includes("food") || rows.some(r => r.kind === "food"));
   return (
     <div className={s.page}>
       <PageHead back="Profile" title="Requests" onBack={onBack} />
@@ -53,7 +58,7 @@ export default function RequestsPage({ rows, filter, kinds = ALL_KINDS, onFilter
       <section>
         <div className={s.sectHead}><h2 className={s.h2}>My requests</h2></div>
         <div className={s.filters}>
-          {FILTERS.map(f => (
+          {filters.map(f => (
             <button key={f.id} className={`${s.filter} ${filter === f.id ? s.filterOn : ""}`} onClick={() => onFilter(f.id)} aria-pressed={filter === f.id}>{f.label}</button>
           ))}
         </div>
@@ -64,7 +69,7 @@ export default function RequestsPage({ rows, filter, kinds = ALL_KINDS, onFilter
             <Svg d={ICON.chevronRight} size={14} sw={1.9} stroke="var(--rv-sub)" />
           </button>
         ))}
-        {!shown.length && <p className={s.empty}>{rows.length ? "No requests of this type." : starts.length === NEW.length ? "Nothing sent yet. Start a claim, a replacement or a waiting-list request above." : starts.length ? "Nothing sent yet. Start one above." : "Nothing sent yet."}</p>}
+        {!shown.length && <p className={s.empty}>{rows.length ? "No requests of this type." : ALL_KINDS.every(k => kinds.includes(k)) ? "Nothing sent yet. Start a claim, a replacement or a waiting-list request above." : starts.length ? "Nothing sent yet. Start one above." : "Nothing sent yet."}</p>}
       </section>
       <p className={s.note}>Each submission gets a request ID. HR approval, execution and payment are tracked separately.</p>
     </div>

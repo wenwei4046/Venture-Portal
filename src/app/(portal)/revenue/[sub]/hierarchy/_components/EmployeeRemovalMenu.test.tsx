@@ -157,8 +157,10 @@ describe('EmployeeRemovalMenu', () => {
     const removal = within(rootMenu()).getByRole('menuitem', { name: /^Remove from this department/ })
     expect(removal).toBeEnabled()
     // IR (2026-09-10) is older than Retail (2026-09-14), and it is the one the
-    // database moves the base to, so it is the one the menu may name.
-    expect(removal).toHaveTextContent('Their base moves to IR')
+    // database moves the base to, so it is the one the menu may name — in the
+    // row's tooltip since 2026-10-12 (one line a row).
+    expect(removal).toHaveAttribute('title', 'Their base moves to IR')
+    expect(removal).not.toHaveTextContent('Their base moves to IR')
     const choices = moveChoices()
     expect(within(choices).getByRole('menuitem', { name: 'IR' })).toBeEnabled()
     expect(within(choices).getByRole('menuitem', { name: 'Events' })).toBeEnabled()
@@ -174,8 +176,10 @@ describe('EmployeeRemovalMenu', () => {
     })
     const removal = within(rootMenu()).getByRole('menuitem', { name: /^Remove from this department/ })
     expect(removal).toBeDisabled()
-    expect(removal).toHaveTextContent('the only department Mei Ting works in')
-    expect(removal).toHaveTextContent('Terminate employee')
+    // Why it is shut is the row's tooltip (2026-10-12).
+    expect(removal).toHaveAttribute('title', expect.stringContaining('the only department Mei Ting works in'))
+    expect(removal).toHaveAttribute('title', expect.stringContaining('Terminate employee'))
+    expect(removal).toHaveTextContent(/^Remove from this department$/)
     expect(within(rootMenu()).getByRole('menuitem', { name: /^Terminate employee/ })).toBeEnabled()
     expectNoWrites()
   })

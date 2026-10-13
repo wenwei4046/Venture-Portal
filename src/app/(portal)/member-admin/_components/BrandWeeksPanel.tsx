@@ -96,7 +96,6 @@ export default function BrandWeeksPanel({ departments }: { departments: Array<{ 
     <section aria-labelledby="bw-title">
       <div className={s.bwHead}>
         <h2 id="bw-title" className={s.bwTitle}>Brand weeks</h2>
-        <span className={s.bwSub}>From the ERP&apos;s Sales Attending — change who attends a booth there.</span>
         <span className={s.spacer} />
         {departments.length > 1 ? (
           <Select
@@ -177,9 +176,7 @@ export default function BrandWeeksPanel({ departments }: { departments: Array<{ 
         </div>
       </div>
       <div className={s.foot}>
-        A solid chip is the booth the ERP lists the member at; that booth alone earns their Fair result points that week. A dashed one is a
-        weekend the ERP lists them nowhere — the booth with the most of their bills counts. Hover a chip for its booths and bills.
-        {snapshot?.erpReceivedAt ? ` Last sent by the ERP ${receivedOn(snapshot.erpReceivedAt)}.` : ' The ERP has not sent its Sales Attending yet.'}
+        {snapshot?.erpReceivedAt ? `Last sent by the ERP ${receivedOn(snapshot.erpReceivedAt)}.` : 'The ERP has not sent its Sales Attending yet.'}
         {unlisted.length ? ` Listed in the ERP but not matched to a member here: ${unlisted.join(', ')}.` : ''}
       </div>
     </section>

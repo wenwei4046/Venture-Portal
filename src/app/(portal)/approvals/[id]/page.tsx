@@ -397,11 +397,9 @@ export default async function ApprovalDetailPage({ params }: Props) {
       {/* ───────── Action buttons / read-only status ───────── */}
       {isPending ? (
         !verdict.may ? (
-          <div className="bg-surface border border-hairline rounded-md p-4 max-w-3xl">
-            <p className="font-serif italic text-graphite text-sm">
-              Awaiting sign-off. <em>You can track the status here.</em>
-            </p>
-          </div>
+          // Somebody who may not decide it: the state in a word, where the
+          // buttons would be (DESIGN.md v3.17).
+          <span className="chip alert"><span className="dot" />Awaiting sign-off</span>
         ) : (
           // Who decides goes by domain (2026-10-09): the Principal may approve
           // their own (user 2026-08-06), anybody else never their own.

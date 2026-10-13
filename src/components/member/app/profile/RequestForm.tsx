@@ -3,10 +3,13 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { ICON, Svg } from "../icons";
 import Sheet, { SheetHandle } from "../Sheet";
-import { dayRange, initials, rm2 } from "../format";
+import { dayList, dayRange, initials, klToday, monthShort, MONTHS_SHORT, rm2, shortDay, weekdayShort } from "../format";
 import type { ClaimWeek, FormOptions, RequestKindVM } from "./profile-vm";
 import StayCalendar from "./StayCalendar";
-import { airbnbCap, airbnbGroup, claimAmount, fairRegion, isOutstation, nightsBetween, stayProblem, stayWindow } from "@/lib/member/claim-rules";
+import {
+  airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairRegion, foodAmount, foodDayState, foodMonthOpensOn,
+  foodMonthOver, isOutstation, monthOfWeek, nightsBetween, stayProblem, stayWindow,
+} from "@/lib/member/claim-rules";
 import { applicationFormHtml, BUILTIN_FIELDS, FORM_KINDS, REPLACEMENT_BUILTIN_FIELDS, type WaitingField } from "@/lib/commission/waiting-form";
 import { answersFor, blankRequired, capacityLine, fillIn, priorAnswers } from "@/lib/member/waiting-answers";
 import s from "./profile.module.css";
@@ -26,6 +29,7 @@ export type FormLink = () => Promise<{ ok: true; data: { url: string; name: stri
 
 const TEXT: Record<RequestKindVM, [string, string, string, string]> = {
   claim: ["Submit claim", "Outstation or Airbnb stay for a fair", "Review & submit claim", "HR will check your claim. Payment is tracked in Requests."],
+  food: ["Submit food claim", "Meals on the days you worked a fair", "Review & submit claim", "HR will check your claim. Payment is tracked in Requests."],
   replacement: ["Submit replacement", "Replace, transfer or release a team member", "Review & submit", "HR reviews it, and the receiving department confirms if it is a transfer."],
   waiting: ["Submit waiting list", "Bring a new member into the team", "Review & submit", "HR matches the request to an open place by eligibility and start date."],
 };
@@ -98,6 +102,50 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   const [file, setFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [notes, setNotes] = useState(str("notes"));
+  // ── food (2026-10-13): a MONTH at a time (the user: "submit by total month … dont by week submit") — every brand
+  // week of it, each opened to its fair's days, every day they may claim ticked to start; sent once the month is over ──
+  const today = options.today ?? klToday();
+  const perDay = options.rates.food?.perDay ?? null;
+  // A month, and a day, another food claim of theirs holds is not offered again — this one's own, sent back by HR, still is.
+  const takenDays = useMemo(() => claimedFoodDays(options.foodClaims ?? [], revising?.id), [options.foodClaims, revising?.id]);
+  const takenMonths = useMemo(() => claimedFoodMonths(options.foodClaims ?? [], revising?.id), [options.foodClaims, revising?.id]);
+  const openDaysOf = (w: ClaimWeek) => fairDays(w, w.key).filter(d => foodDayState(d, today, takenDays) === "open");
+  // The months with a weekend they worked, newest first; the form opens on the newest that is over and not claimed.
+  const foodMonths = useMemo(() => [...new Set(options.weeks.filter(w => w.worked).map(w => monthOfWeek(w.key)))].sort().reverse(), [options.weeks]);
+  const [foodMonthPick, setFoodMonth] = useState(() => str("month"));
+  const foodMonth = foodMonthPick || foodMonths.find(m => foodMonthOver(m, today) && !takenMonths.has(m))
+    || foodMonths.find(m => foodMonthOver(m, today)) || foodMonths[0] || "";
+  const monthWeeks = options.weeks.filter(w => monthOfWeek(w.key) === foodMonth).sort((a, b) => a.key.localeCompare(b.key));
+  // The days ticked, a weekend at a time; a weekend not in it = every day of it still open, until the member taps one
+  // (a returned claim's weekends start as it was sent — one it left out, with none).
+  const [dayPick, setDayPick] = useState<Record<string, string[]>>(() => priorFoodDays(prior));
+  const revisingMonth = str("claimType") === "food" ? str("month") : "";
+  const [openWeeks, setOpenWeeks] = useState<ReadonlySet<string>>(() => new Set());
+  const daysOf = (w: ClaimWeek) => (!w.worked ? []
+    : (dayPick[w.key] ?? (monthOfWeek(w.key) === revisingMonth ? [] : openDaysOf(w)))
+      .filter(d => fairDays(w, w.key).includes(d) && foodDayState(d, today, takenDays) === "open").sort());
+  const foodWeeks = monthWeeks.map(w => ({ week: w, days: daysOf(w) }));
+  const foodDays = foodWeeks.flatMap(x => x.days).sort();
+  const foodTotal = foodAmount(perDay, foodDays.length);
+  const monthTaken = !!foodMonth && takenMonths.has(foodMonth);
+  const monthOver = !!foodMonth && foodMonthOver(foodMonth, today);
+  const pickFoodMonth = (m: string) => {
+    if (m === foodMonth) return;
+    setFoodMonth(m);
+    setOpenWeeks(new Set());
+    setError(null);
+  };
+  const toggleWeek = (key: string) => setOpenWeeks(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  });
+  const toggleDay = (w: ClaimWeek, day: string) => {
+    const now = daysOf(w);
+    setDayPick(prev => ({ ...prev, [w.key]: now.includes(day) ? now.filter(d => d !== day) : [...now, day].sort() }));
+    setError(null);
+  };
   // ── replacement ──
   const [member, setMember] = useState(() => str("originalStaffId") || options.initial?.member || "");
   const [dest, setDest] = useState<string>(() => ({ member_exit: "department_exit", resignation: "company_exit" } as Record<string, string>)[str("destination")] ?? (str("destination") || "department_exit"));
@@ -210,11 +258,23 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
     if (busy || readOnly) return;
     setError(null);
     const form = new FormData();
-    form.set("kind", kind);
+    // A food claim is a claim to the database (`claimType` food).
+    form.set("kind", kind === "food" ? "claim" : kind);
     form.set("subDepartmentId", options.departmentId);
     form.set("idempotencyKey", idem.current);
     if (revising) form.set("requestId", revising.id);
-    if (kind === "claim") {
+    if (kind === "food") {
+      // The month, its weekends and their days are all that is sent: the fairs, the rate and the amount are the database's.
+      if (!foodMonth) return setError("No fair weekends to claim food for yet.");
+      if (!monthOver) return setError(`Food for ${monthShort(foodMonth)} is claimed once the month is over, from ${shortDay(foodMonthOpensOn(foodMonth))}.`);
+      if (monthTaken) return setError(`Food for ${monthShort(foodMonth)} is already claimed${takenMonths.get(foodMonth) ? ` (${takenMonths.get(foodMonth)})` : ""}: a month is claimed once.`);
+      if (perDay === null || !(perDay > 0)) return setError("HR has not set the food claim's rate a day yet.");
+      if (!foodDays.length) return setError("Tick the days you worked at the fairs.");
+      form.set("claimType", "food");
+      form.set("month", foodMonth);
+      form.set("weeks", JSON.stringify(foodWeeks.filter(x => x.days.length).map(x => ({ week: x.week.key, days: x.days }))));
+      form.set("notes", notes.trim());
+    } else if (kind === "claim") {
       // The week is all that is sent: its fair, venue and region are the database's own records.
       if (!weekRow?.claimable) return setError("Choose one of your brand weeks. A claim is only for your own brand week.");
       form.set("claimType", cat);
@@ -318,13 +378,22 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
       const outcome = await onSubmit(form);
       if (outcome.ok) {
         setDone(outcome.code);
-        if (kind !== "claim" && signedName) setDoneFile(`Signed form attached · ${signedName}`);
-      } else setError(outcome.error);
+        if (kind !== "claim" && kind !== "food" && signedName) setDoneFile(`Signed form attached · ${signedName}`);
+      } else {
+        setError(outcome.error);
+        freshKey();
+      }
     } catch {
       setError("Could not send it. Check your connection and try again.");
+      freshKey();
     } finally {
       setBusy(false);
     }
+  };
+  // A food claim sent again after a refusal is a new submission: the days it holds may have changed, and a key
+  // already used for other days is refused. Sending twice cannot pay twice — a day is claimed once (the database).
+  const freshKey = () => {
+    if (kind === "food") idem.current = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
   };
 
   const point = (e: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -364,6 +433,73 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
         </div>
       </div>
       <div className={s.rfScroll} data-rq-form-scroll="1">
+        {kind === "food" && (
+          <>
+            <div className={s.field}><span className={s.fieldLabel}>Month</span>
+              <div className={s.pills}>
+                {foodMonths.map(m => (
+                  <button key={m} className={`${s.pill} ${m === foodMonth ? s.pillOn : ""}`} aria-pressed={m === foodMonth} onClick={() => pickFoodMonth(m)}>{monthShort(m)}</button>
+                ))}
+              </div>
+              {!foodMonths.length && <p className={s.local}>No fair weekends to claim food for yet.</p>}
+              {monthTaken
+                ? <p className={s.formNote}>{monthShort(foodMonth)} is already claimed{takenMonths.get(foodMonth) ? ` · ${takenMonths.get(foodMonth)}` : ""}.</p>
+                : foodMonth && !monthOver ? <p className={s.formNote}>Claimed once the month is over, from {shortDay(foodMonthOpensOn(foodMonth))}.</p> : null}
+            </div>
+            {foodMonth && (
+              <div className={s.field}><span className={s.fieldLabel}>Brand weeks</span>
+                <div className={s.weeks}>
+                  {foodWeeks.map(({ week: w, days }) => {
+                    const open = !!w.worked && openWeeks.has(w.key);
+                    return (
+                      <div key={w.key} className={`${s.foodWeek} ${days.length ? s.weekOn : ""} ${w.worked ? "" : s.weekOff}`}
+                        style={days.length ? { borderColor: w.color, background: w.tint } : undefined}>
+                        <button className={s.foodWeekHead} onClick={() => toggleWeek(w.key)} aria-expanded={open} disabled={!w.worked}>
+                          <span className={`${s.weekBadge} ${s.weekBadgeMonth}`} style={{ background: w.color }}><span className={s.weekMonth}>{w.month}</span>{w.n}</span>
+                          <span className={s.weekText}>
+                            <span className={s.weekTitle}>{w.brandWeek} · {w.dates}</span>
+                            <span className={s.weekWhere}>{w.worked ? [w.venue, w.org].filter(Boolean).join(" · ") || "Your booth that weekend" : "No booth that weekend"}</span>
+                          </span>
+                          {w.worked && <span className={s.foodWeekCount}>{days.length ? `${days.length} day${days.length === 1 ? "" : "s"}` : "None"}</span>}
+                          {w.worked && <span className={`${s.wlCaret} ${open ? s.wlCaretOpen : ""}`}><Svg d={ICON.chevronDown} size={16} sw={2} stroke="var(--rv-sub)" /></span>}
+                        </button>
+                        {open && (
+                          <div className={s.foodDays} role="group" aria-label={`Days of the ${w.brandWeek}, ${w.dates}`}>
+                            {fairDays(w, w.key).map(day => {
+                              const state = foodDayState(day, today, takenDays);
+                              const ticked = state === "open" && days.includes(day);
+                              return (
+                                <button key={day} className={`${s.foodDay} ${ticked ? s.foodDayOn : ""}`} disabled={state !== "open"} aria-pressed={ticked}
+                                  aria-label={`${weekdayShort(day)} ${Number(day.slice(8, 10))} ${MONTHS_SHORT[Number(day.slice(5, 7)) - 1]}${state === "claimed" ? ", claimed" : state === "ahead" ? ", not yet" : ""}`}
+                                  onClick={() => toggleDay(w, day)}>
+                                  <span className={s.foodDayWk}>{weekdayShort(day)}</span>
+                                  <span className={s.foodDayN}>{Number(day.slice(8, 10))}</span>
+                                  <span className={s.foodDayNote}>
+                                    {state === "claimed" ? "Claimed" : state === "ahead" ? "Not yet"
+                                      : ticked ? <Svg d={ICON.tick} size={13} sw={2.6} /> : MONTHS_SHORT[Number(day.slice(5, 7)) - 1]}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {!foodWeeks.length && <p className={s.local}>No fair weekends in {monthShort(foodMonth)}.</p>}
+                </div>
+              </div>
+            )}
+            <div className={s.sum}>
+              <div className={s.sumRow}><span className={s.sumLabel}>Month</span><span className={s.sumValue}>{foodMonth ? monthShort(foodMonth) : "—"}</span></div>
+              <div className={s.sumRow}><span className={s.sumLabel}>Days</span><span className={s.sumValue}>{foodDays.length ? `${foodDays.length} day${foodDays.length === 1 ? "" : "s"} · ${dayList(foodDays)}` : "—"}</span></div>
+              <div className={s.sumRow}><span className={s.sumLabel}>Rate a day</span><span className={s.sumValue}>{perDay !== null && perDay > 0 ? rm2(perDay) : "Not set"}</span></div>
+              <div className={s.sumTotal}><span className={s.sumTotalLabel}>Claim amount</span><span className={s.sumTotalValue}>{rm2(foodTotal)}</span></div>
+              <span className={s.sumNote}>Set by HR&apos;s rate a day. You can&apos;t edit the amount.</span>
+            </div>
+            <label className={s.field}><span className={s.fieldLabel}>Notes (optional)</span><textarea rows={2} className={`${s.input} ${s.textarea}`} placeholder="Anything HR should know" value={notes} onChange={e => setNotes(e.target.value)} maxLength={1500} /></label>
+          </>
+        )}
         {kind === "claim" && (
           <>
             <div className={s.field}><span className={s.fieldLabel}>Claim category</span>
@@ -633,6 +769,15 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
       </div>
     </>
   );
+}
+
+/** A returned food claim's weekends and their days, as it was sent (`detail.weeks`). */
+function priorFoodDays(prior: Record<string, unknown>): Record<string, string[]> {
+  if (prior.claimType !== "food" || !Array.isArray(prior.weeks)) return {};
+  return Object.fromEntries(prior.weeks.flatMap(w => {
+    const x = w && typeof w === "object" ? (w as Record<string, unknown>) : null;
+    return x && typeof x.week === "string" && Array.isArray(x.days) ? [[x.week, x.days.filter((d): d is string => typeof d === "string")]] : [];
+  }));
 }
 
 function rm0(n: number): string {

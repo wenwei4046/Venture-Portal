@@ -193,6 +193,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'create_payroll_statutory_selection', 'current_actions', 'current_permissions', 'current_sensitive_fields', 'current_tabs',
   'delete_manual_journal_voucher', 'delete_voucher_attachment', 'department_modes', 'department_set_cost_model',
   'dept_invoice_settlements', 'dept_request_pv_rejected', 'director_payroll_complete', 'director_payroll_uncomplete',
+  // HOUZS Venture's director share (mig 20261013170000): Director Salary · View / Edit, Treasury · View / Create / Void.
+  'director_hv_share_of', 'director_hv_share_queue', 'director_hv_share_save', 'director_hv_share_transfer', 'director_hv_share_undo',
   'director_private_fields', 'erp_feed_month_closed', 'erp_feed_secret', 'erp_link_drop_secret', 'erp_link_put_secret',
   'execute_fund_source_cancel', 'execute_loan_cancel', 'generate_invoices_from_request', 'generate_monthly_invoices',
   'generate_pv_for_dept_request', 'get_dept_opex_rows', 'get_director_ctc_by_company', 'get_hr_cost_submissions_list',
@@ -200,6 +202,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'get_payroll_funding_paid', 'get_staff_billing_allocation', 'get_staff_own_share_allocation', 'get_submitted_hr_summary',
   'hr_dashboard_summary', 'log_data_access', 'lookup_pcb', 'mark_journal_entry_reversed', 'member_admin_brand_weeks',
   'member_admin_claim_settings', 'member_admin_save_claim_settings',
+  // People › Member services › Food claim (mig 20261013150000): member_is_manager, and the save member.manage too.
+  'member_admin_food_claim', 'member_admin_save_food_claim',
   'member_capacity_of', 'member_process_all_queues',
   'member_sub_department_requests',
   // Sales Groups › Waiting list's flow (mig 20261010140000): each asks member_is_manager (the form also lets in member_requests).
@@ -223,6 +227,10 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // a file made Create, renamed or deleted Edit.
   'hr_drive', 'hr_drive_file', 'hr_drive_log', 'hr_drive_folder_add', 'hr_drive_folder_rename', 'hr_drive_folder_delete',
   'hr_drive_file_add', 'hr_drive_file_delete',
+  // …its Bin and Move to… (mig 20261013183000): Restore, Delete forever, Empty bin and a folder's move ask Edit; the
+  // hourly sweep's purge and its "File deleted" are the service role's (api/member-queue).
+  'hr_drive_bin_restore', 'hr_drive_bin_delete', 'hr_drive_bin_empty', 'hr_drive_folder_move', 'hr_drive_bin_purge',
+  'hr_drive_bin_files_gone',
   // The Revenue app's View as (mig 20261011110000): has_any_action(documentation.view).
   'member_documents_of',
   // A replacement runs itself on its date (mig 20261010170000): HR's two ask member_is_manager; the
@@ -241,8 +249,17 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'hiring_source_set_active', 'hiring_source_remove', 'hiring_talent_save', 'hiring_talent_invite', 'hiring_talent_update',
   'hiring_talent_remove', 'hiring_files_add', 'hiring_file_replace', 'hiring_file_remove', 'hiring_file_type_add', 'hiring_file_downloaded',
   'hiring_orphan_files', 'hiring_file_type_rename', 'hiring_file_type_set_active',
-  // The hourly sweep's (api/member-queue, the service role — mig 20261011210000): Hiring's day-old leftovers.
-  'hiring_leftovers',
+  // The Talent Bank as a Drive (mig 20261013030000): its read asks Hiring · View, a folder, a talent or a file added
+  // Create, renamed, deleted or moved Edit.
+  'hiring_bank', 'hiring_bank_folder_add', 'hiring_bank_folder_rename', 'hiring_bank_folder_delete', 'hiring_bank_move',
+  'hiring_bank_add_talent', 'hiring_bank_file_add', 'hiring_bank_file_delete', 'hiring_bank_folder_move', 'hiring_bank_move_all',
+  // …its Bin (mig 20261013061500): Restore, Delete forever and Empty bin ask Edit.
+  'hiring_bank_bin_restore', 'hiring_bank_bin_delete', 'hiring_bank_bin_empty',
+  // …and Admin › Guest Link's department rename, which takes the bank's people along (guest_link.edit).
+  'guest_link_rename_department',
+  // The hourly sweep's (api/member-queue, the service role — mig 20261011210000): Hiring's day-old leftovers, and
+  // (mig 20261013061500) what has waited 30 days in the Talent Bank's Bin.
+  'hiring_leftovers', 'hiring_bank_bin_purge',
   // View as a person (mig 20261011050000): each asks has_perm(view_switch).
   'view_as_person', 'view_as_people',
   // Admin › Meeting Rooms (mig 20261011090000): each asks has_any_action(rooms.*), a member's revenue_app.view:own.

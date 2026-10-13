@@ -109,7 +109,6 @@ export default async function BaseRateHistoryPage() {
             }))}
           />
           <p className="max-w-3xl mt-4 text-xs text-graphite">
-            Want to try a different rate?{' '}
             <Link href="/settings?tab=simulator" className="text-accent hover:text-accent-hover font-medium">
               Run the simulator in Settings →
             </Link>

@@ -169,6 +169,56 @@ Design reference: `rev 1011.dc.html` (one frame per screen; each runs the repo's
 
 ---
 
+## 8 · Round 2 (added after the first hand-off)
+
+Build these on top of what is already live. Items in order.
+
+- **Profile › Back to Revenue app card.**
+  - Where: `PanelProfile.tsx`, directly under the "View as a team member" card, above "Your workspace". Shown to everyone who opens the Control panel (Principal, Director, leaders in Team).
+  - Look: same shape as the View as card (padding 16px, radius 22px, 52×52 icon tile radius 14px) in warm sand: background #F5EBE3, no border, hover #EFE2D7; icon tile #F6D9C4 (peach, no border) with a rust #BD4A19 back arrow; title "Back to Revenue app" 17px/700 #3F2B22, no sub-line; chevron #A8968B.
+  - Tap → same action as the top bar's back to the Revenue app (`ctx.exitApp`).
+
+- **Showrooms › edit › Blocked time slots panel**. The section sits in its own box so it reads apart from Hours and Booking limit: replace the top hairline with margin-top 6px, padding 14px, radius 16px, border 1px #F3D9CE, background #FDF3EF. Title row gets a 28×28 tile (radius 8px, #FBEAE6) with a red #A3371A "ban" icon (16px) left of "Blocked time slots". Contents (Every week, Dates, Reason, +) unchanged.
+
+- **Showrooms › edit › Blocked time slots › Time**. Closed dates can be the whole day or set hours.
+  - Under the From / To dates: label "TIME", then a segmented control **All day | Set hours** (default All day; #F5EBE3 track, white active pill).
+  - Set hours → two buttons side by side, "From" – "To" (clock icon #BD4A19, 44px, 1.5px #EBDDD2 / #BD4A19 when open, radius 12px). Tapping one opens an inline card (same as the date calendar card: white, radius 16px, soft shadow) with a 4-column grid of time chips every 30 min, 8 am – 10 pm (36px, radius 10px; picked = #BD4A19 fill, white). Not the native select. After picking From it jumps to To; To chips at or before From are greyed (#FBF6F2 / #C9B5A8, not-allowed). End must be after start, otherwise a red line "End time must be after the start time." and + stays disabled.
+  - The saved row reads "12 Oct – 14 Oct · 2:00 pm – 5:00 pm · Training" (All day rows unchanged).
+  - Data: `CrmBlock` gains optional `t1`, `t2` ("HH:MM"). No `t1/t2` = whole day (today's behaviour).
+  - Booking: a slot is closed when its date is inside a block and, for a timed block, the slot start is ≥ t1 and < t2. Update `roomClosed` / slot checks in sales/vm/chat.ts (Book visit) and the SQL booking check together. Storage change → propose first.
+  - Acceptance: block Puchong 7 Oct 2:00–5:00 pm → Book visit on 7 Oct shows 11:00 and 1:00 pm and 5:00 pm open, 3:00 pm crossed out.
+
+- **Insight brand row removed**. Now that Profile has "Back to Revenue app", delete the Insight top row (`PanelOverview.tsx`: the ‹ back circle + "HOUZS VENTURE / CRM"). The initials avatar (38px, #4E2F20) moves to the right end of the "Hello, Peter" line; the greeting block's top padding goes to 0, so the page starts higher. Applies to Principal, Director and leaders (Team).
+
+- **Insight team rows: drop the sub-line**. In the Insight team breakdown (`PanelOverview.tsx`, team rows), remove the small grey line under each team name ("Own customers · Peter", "Senior TL Marcus Tan", …) on every team row. Only the team name (with its colour dot / chevron) stays; figures on the right unchanged. Also remove the sub-line "You assign these" under "Organic Leads".
+
+- **Chat: remove the Book visit bar**. In the Control panel chat (`PanelLead.tsx`), delete the full-width rust "Book visit" button above the composer. Booking stays reachable from the ⋮ menu (Appointment).
+
+- **Ad editor: "Save and apply to all N ads"** (same as the desktop Desk, `desk/vm/assign.ts › applyAll`).
+  - Where: ad editor footer (`PanelAssign.tsx`), a full-width outlined button above Cancel · Save: 44px, radius 22px, 1px #2F6FB5 border, #2F6FB5 text, copy icon (Lucide "copy"). Disabled (#C9D6E6 / #DCE6F2) while the draft isn't valid, same rule as Save.
+  - Tap → saves this ad's whole setting (Split across teams, plus every team's Inside mode and values) to **every** ad (each ad keeps its own name and its own taken counts), closes the editor, toast "Applied to all N ads · fine-tune any ad on its own" (3 s). Any waiting Over-the-limit leads of each ad are dealt by the new rule, as on Save.
+  - Then open any ad and change it on its own; Save on one ad only touches that ad.
+  - Write: one `crm_save_ad_assign` per ad (as the Desk does), or a batch RPC.
+
+- **Ad editor: Enter moves to the next number**. Every number box in the ad editor (Split across teams %, Inside each team By % / By max) gets `enterKeyHint="next"` (phone keyboard shows "Next") and on Enter focuses the next visible number box in order, selecting its value; on the last one, Enter closes the keyboard (blur). No submit on Enter.
+
+- **Full time editor: "Save and apply to all N teams"** (same as the desktop Desk, `desk/vm/assign.ts › ftApplyAll`).
+  - Where: Full time team editor footer, full-width outlined button above Clear all · Save: 44px, radius 22px, 1px #387557 border, #387557 text, Lucide "copy" icon. Disabled (#B5C4BA / #D8E3DC) when nobody in this team has a day ticked.
+  - Tap → this team is saved as edited; in every other team, **each full-time person** gets the day pattern of the first ticked person here (e.g. Fri · Sat · Sun). Teams with no full-time person are skipped. Closes the editor, toast "Applied to all N teams · fine-tune any team on its own" (3 s).
+  - Then open any team and change it on its own; Save there only touches that team.
+  - Write: one `crm_save_fulltime` per team.
+
+- **Top-bar "Back to Revenue app" link removed**. Profile's card is now the only way back. `panel/vm/head.ts`: `showHead` only on Ads Performance (its "‹ Profile" link stays); Assignment, Calendar and Profile no longer show the link. Chat keeps its own back arrow.
+- **Profile cards: no sub-lines.** Remove "Pick anyone in the CRM" under "View as a team member" and the sub-line under "Back to Revenue app".
+
+- **Control panel top bar removed for the Principal; pages move up** (same as RS). The top row (bell only, for the Principal) is not rendered on Insight, Inbox, Assignment, Calendar and Profile. The bell moves into each page's title row at the right end, same button as RS (40×40 circle, 1px #EBDDD2, white, soft shadow, 20px bell, rust badge top/right -4px): Insight after "Hello, Peter" (before the avatar), Inbox after the Contacts button, Assignment right of the title, Calendar after the date chip, Profile top-right corner of the profile card (name row padding-right 48px).
+  - The top bar stays where it still has something to hold: Ads Performance ("‹ Profile", bell at its right), and for the Director and leaders the "Team | Mine" switch. Their bell also moves to the title row, so that top bar holds only the switch.
+  - **If anything at the top is covered, move it down.** After building, open every page on an iPhone with a Dynamic Island (15/16 Pro) and in the iOS simulator. If the Team | Mine row, a title row, the bell or a sheet's top edge touches or sits under the camera / Dynamic Island / status bar, push it down: the first row of every page and overlay starts at `calc(env(safe-area-inset-top, 0px) + 8px)` at the least (raise the 8px if needed; never below the inset). Don't shrink or hide anything to make it fit. Fix it in `crm.module.css` (.app / overlay rules), not per page, and list the screens you checked.
+  - **Team | Mine always sits at the right end of its own top row**, on every page, on both sides (Control panel Team and RS Mine). RS Inbox: not in the title row left of All ads (supersedes header.ts › teamMineVM placement), but in the same right-aligned top row as every other page. Same segmented look everywhere (#F0E6DE track, white active pill, 28px tall).
+  - **Must keep** the root's `padding-top: env(safe-area-inset-top)` so the title rows sit below the Dynamic Island.
+
+---
+
 ## Also for RS
 
-Merged into `RS rev 1010 dev changes.md` › section 7 (slots left, chat top spacing, Team | Mine replacing Team | Me, safe areas). Build them from there.
+All merged into `RS rev 1010 dev changes.md` › section 7 (round 1) and section 8 (round 2). Build them from there.

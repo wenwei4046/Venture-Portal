@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { bankFromRow, type Bank } from './bank'
 import { boardFromJson } from './parse'
 import type { HiringBoard } from './types'
 
@@ -23,4 +24,21 @@ export async function loadHiringBoard(): Promise<BoardRead> {
     }
   }
   return { ok: true, board: boardFromJson(data) }
+}
+
+export type BankRead = { ok: true; bank: Bank } | { ok: false; reason: string }
+
+/**
+ * The Talent Bank as a Drive (mig 20261013030000): `hiring_bank()` asks Hiring · View itself and answers HOUZS
+ * Venture's departments, the guest link's companies, the folders and files HR keeps and where each talent is.
+ */
+export async function loadTalentBank(): Promise<BankRead> {
+  const supabase = (await createClient()) as unknown as SupabaseClient
+  const { data, error } = await supabase.rpc('hiring_bank')
+  const bank = error ? null : bankFromRow(data)
+  if (!bank) {
+    return { ok: false, reason: error?.code === '42501' ? 'Hiring needs Hiring · View.' : 'The Talent Bank’s folders could not be read. Please try again.' }
+  }
+  // The Bin counts its days from the read, not from when the page was first drawn (mig 20261013061500).
+  return { ok: true, bank: { ...bank, readAt: new Date().toISOString() } }
 }

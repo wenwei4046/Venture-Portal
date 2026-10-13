@@ -160,7 +160,6 @@ export default function RequestListing({ board, canApprove }: { board: HiringBoa
         })}
         {list.length === 0 ? <div className={s.listEmpty}>No requests here.</div> : null}
       </div>
-      <div className={s.listFoot}>Click a request for details and its audit trail. Right-click to acknowledge, mark filled or cancel.</div>
     </>
   )
 }

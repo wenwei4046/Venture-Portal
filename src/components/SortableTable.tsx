@@ -205,7 +205,6 @@ interface Props<T> {
 const WORDS = {
   zh: {
     open: '打开 →',
-    hint: (menu: boolean) => `双击一行打开${menu ? ' · 右键更多' : ''}`,
     search: '搜索值…',
     clear: 'Clear Filter',
     close: 'Close',
@@ -216,7 +215,6 @@ const WORDS = {
   },
   en: {
     open: 'Open →',
-    hint: (menu: boolean) => `Double-click to open${menu ? ' · right-click for more' : ''}`,
     search: 'Search…',
     clear: 'Clear filter',
     close: 'Close',
@@ -696,7 +694,9 @@ export default function SortableTable<T>({
 
   return (
     <div>
-      {ownSearch || toolbarRight || layoutOn || onAnyRowOpen ? (
+      {/* No "double-click to open · right-click for more" in the toolbar
+          (2026-10-12, the user: the descriptions make the view too messy). */}
+      {ownSearch || toolbarRight || layoutOn ? (
         <div className="mb-3 flex items-center gap-3 flex-wrap">
           {ownSearch ? (
             <>
@@ -713,9 +713,6 @@ export default function SortableTable<T>({
                 </span>
               ) : null}
             </>
-          ) : null}
-          {onAnyRowOpen ? (
-            <span className="hidden md:inline font-serif italic text-xs text-muted">{words.hint(!!onAnyRowContextMenu)}</span>
           ) : null}
           {toolbarRight ? <div className="ml-auto flex items-center gap-3 flex-wrap">{toolbarRight}</div> : null}
           {layoutOn ? (

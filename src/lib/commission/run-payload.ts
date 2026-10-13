@@ -225,6 +225,12 @@ export interface RunSourceRows {
   shares?: OrderShareRow[]
   /** `comm_upsales` recorded under this month. Absent = none. */
   upsales?: UpsaleRow[]
+  /**
+   * The shares of the bills those upsales and drops changed, keyed by the
+   * UPSALE's id (2026-10-13): a change to a shared bill is split as the bill
+   * is. Absent = nobody shares any of them.
+   */
+  upsaleShares?: OrderShareRow[]
   /** `comm_cost_ratios` of this scheme. Absent = every SKU at the default. */
   costRatios?: CostRatioRow[]
   /**
@@ -415,13 +421,14 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
 
   // A shared bill becomes one part per holder, each paid at its holder's rate
   // and climbing its holder's line (`lib/commission/shares.ts`). An upsale HR
-  // recorded joins as a one-line order of its own (`lib/commission/upsales.ts`).
+  // recorded joins as a one-line order of its own (`lib/commission/upsales.ts`)
+  // — split the same way when the bill it changed is shared (2026-10-13, the
+  // user: "want drop sales by share as well. Follow the share ratio").
+  const toShares = (list: OrderShareRow[] | undefined) =>
+    (list ?? []).map(r => ({ orderId: r.order_id, staffId: r.staff_id, pct: num(r.share_pct) }))
   const orders = [
-    ...splitOrdersByShares(
-      wholeOrders,
-      (rows.shares ?? []).map(r => ({ orderId: r.order_id, staffId: r.staff_id, pct: num(r.share_pct) })),
-    ),
-    ...upsalesToOrders(rows.upsales ?? [], rows.periodMonth),
+    ...splitOrdersByShares(wholeOrders, toShares(rows.shares)),
+    ...splitOrdersByShares(upsalesToOrders(rows.upsales ?? [], rows.periodMonth), toShares(rows.upsaleShares)),
   ]
 
   return {

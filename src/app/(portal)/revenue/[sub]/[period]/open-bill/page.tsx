@@ -144,14 +144,6 @@ export default async function OpenBillPage({ params }: PageProps) {
             <em>I.</em> REVENUE · {subDept.name.toUpperCase()} · OPEN BILL · {label(period).toUpperCase()}
           </div>
           <h1 className="page-title">Open Bill</h1>
-          <p className="text-sm mt-3">
-            The 1st, 2nd and 3rd bill of an event day earn{' '}
-            <strong>
-              +{Math.round((rates[1] ?? 0) * 100)} / {Math.round((rates[2] ?? 0) * 100)} /{' '}
-              {Math.round((rates[3] ?? 0) * 100)}%
-            </strong>{' '}
-            on top of that bill&apos;s commission, at the salesperson&apos;s current rate.
-          </p>
         </div>
         <Link
           href={revenuePath(subDept.slug, period)}

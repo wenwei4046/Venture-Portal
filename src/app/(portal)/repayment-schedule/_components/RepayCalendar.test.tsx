@@ -109,7 +109,7 @@ describe('the repayment calendar, per the handoff', () => {
     expect(item.querySelector('.sch-cal-who')?.nextElementSibling).toHaveTextContent('12,400.00')
   })
 
-  it('shows the status at the card’s top right, the day it is due, and what a click does', () => {
+  it('shows the status at the card’s top right and the day it is due — no usage hint', () => {
     render(<RepayCalendar month="2026-10" today="2026-10-09" events={EVENTS} />)
     fireEvent.mouseEnter(within(document.querySelector('[data-day="2026-10-15"]') as HTMLElement).getByRole('link'))
     const card = screen.getByRole('tooltip')
@@ -117,7 +117,8 @@ describe('the repayment calendar, per the handoff', () => {
     expect(top).toHaveTextContent('↓ We collect · Fund OUT')
     expect(top.lastElementChild).toHaveTextContent('part paid')
     expect(card).toHaveTextContent('Due 15 Oct 2026')
-    expect(card).toHaveTextContent('Click to open the full record')
+    // 2026-10-12 (the user: descriptions clutter the view): no "Click to open" foot.
+    expect(card).not.toHaveTextContent('Click to open the full record')
   })
 
   it('says on a phone what each item is, how short it is, and where it stands', () => {

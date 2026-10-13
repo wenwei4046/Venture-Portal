@@ -46,7 +46,7 @@ async function assertMonthOpen(supabase: SupabaseClient, subDepartmentId: string
  * paid in another month or dismissed. Refused once a run has paid it.
  */
 export async function reopenErpAdjustment(adjustmentId: string): Promise<void> {
-  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
+  const user = await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
   const supabase = await client()
 
   const { data: row, error: readError } = await supabase
@@ -87,9 +87,12 @@ export async function reopenErpAdjustment(adjustmentId: string): Promise<void> {
 
   await assertMonthOpen(supabase, subDepartmentId, period)
 
+  // Back to waiting, as an ordinary question (2026-10-13): a cancellation the
+  // feed deducted by itself and a person sent back stays asked — `decided_by`
+  // on a waiting row names who sent it back, and the feed leaves it be.
   const { error } = await supabase
     .from('comm_upsales')
-    .update({ status: 'pending', decided_by: null, decided_at: null })
+    .update({ status: 'pending', decided_by: user.id, decided_at: null, answered_by_feed: false })
     .eq('id', adjustmentId)
     .eq('status', 'confirmed')
   if (error) {

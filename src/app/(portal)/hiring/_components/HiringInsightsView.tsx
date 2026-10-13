@@ -33,7 +33,7 @@ export default function HiringInsightsView({ board, today }: { board: HiringBoar
 
   return (
     <HvPage>
-      <PageHead eyebrow="Hiring · Insights" title="Hiring insights" subtitle="How long each request takes, from submitted to acknowledged to filled." />
+      <PageHead eyebrow="Hiring · Insights" title="Hiring insights" />
 
       <div className={s.insBar}>
         <div className={s.periods} role="group" aria-label="Period">
@@ -191,7 +191,6 @@ export default function HiringInsightsView({ board, today }: { board: HiringBoar
 
       <div className={s.everyHead}>
         <span className={s.insSecTitle}>Every request</span>
-        <span className={s.insSecNote}>Scroll sideways for all columns →</span>
       </div>
       <div className={s.everyTable} role="table" aria-label="Every request">
         <div className={s.everyInner}>
@@ -239,7 +238,6 @@ export default function HiringInsightsView({ board, today }: { board: HiringBoar
           {ins.rows.length ? null : <div className={s.listEmpty}>No requests in this period.</div>}
         </div>
       </div>
-      <div className={s.listFoot}>A request is in the period if it was submitted or filled in it. Days come from each request&apos;s audit trail.</div>
 
       <Drawer
         open={!!picked}

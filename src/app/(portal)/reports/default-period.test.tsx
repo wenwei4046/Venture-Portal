@@ -106,7 +106,8 @@ describe("reports open on the office's month", () => {
 
   it("Debtor Aging: as of the office's today", async () => {
     render(await asTheServer(() => DebtorAgingPage({ searchParams: Promise.resolve({}) })))
-    expect(screen.getByText(/as of 1 Nov 2026/)).toBeInTheDocument()
+    // The subtitle is the date alone since 2026-10-12 ("As of …").
+    expect(screen.getByText(/As of 1 Nov 2026/)).toBeInTheDocument()
   })
 
   it("the CFO reports' month helpers, given no date, bound the office's month", async () => {

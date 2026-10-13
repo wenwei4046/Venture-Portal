@@ -3,13 +3,52 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.73 (the Revenue app's My brand weeks: a month to a fold — this month open, the two before a tap away — and per weekend a *W1* badge in the brand's two colours beside Brand / Venue / Organizer; no weekend after this week's) / v3.72 (Airbnb claims: the invoice up to a limit for every group, and the stay on one calendar that opens on the brand week — the day before the fair to the day after; Hiring's Candidates menus open above their button at the foot of the page) / v3.71 (Comm Cal: the ERP audit trail — a bill's page lists every save the ERP made of it; Drops & upsells says what the ERP changed for each question and what gave the commission, and lists the month's saves that moved money; a cancellation is called *Cancelled*) / v3.70 (a memo reaches its person in every view: the portal’s memo bell in every top bar, the HR app’s memo pages, the Revenue app’s file row; one memo card wherever it is read; Publish › Preview — *As they see it* and *Who has it*) / v3.69 (Documentation › Data center is a Drive: + New, the path, a search over everything; Companies → Departments → People made by People, folders HR makes for a subsidiary and its departments, files kept in them; folders as 58px cards, files as cards with a big preview) / v3.68 (the phone apps’ frames — the HR app’s and the Revenue app’s — are fixed to the screen, never `100dvh`: in the installed app on an Android phone with three buttons 100dvh came out a navigation bar taller than the screen, and the HR app’s tab bar opened under the phone’s buttons until the page was scrolled) / v3.67 (the guest link's Request manpower asks the picked company's own departments — Book a meeting room's list, always a dropdown, typed when the company lists none; Hiring › Insights' *Every request* gains a Company column) / v3.65 (Comm Cal: a shared bill's menu has *Cancel share with ANTHONY*, one line per holder; a move gives a share it took back when the bill leaves that person, and says so) / v3.64 (brand weeks come from the ERP's Sales Attending: My brand weeks and HR's Brand weeks grid only show them — solid for the ERP's booth, dashed for auto-located — and Today no longer asks to save them) / v3.63 (Comm Cal: right-click a bill › *Move to another salesperson…* — an adjacent panel to pick who and why, a notice with *Open NAME* and *Undo*, *Moved from ADRIAN* under the bill's number) / v3.62 (Comm Cal: a ledger row paid this month for another month's sale wears a cool wash with a ruled edge and says why in a first *Status* column — Top up deposit, Late key-in, Upsell, Drop sales; a double-click on a bill's row opens it; the bill menu is one line a row; the salary preview lists each upsell and drop as an add or a deduction) / v3.61 (Change password, for a login of the person's own only: Admin › Change password in both sidebars — one white card on the sheet, the three boxes, *Show passwords*, a wash for what went wrong or right — the HR app's More row and its sheet, the Revenue app's Profile › *Account* button and its sheet) / v3.60 (the Revenue app's Profile on a phone gains *Switch view* for an account that may switch views — Principal · Finance · HR · Revenue team, rows as Your workspace's with the module menu's dots on a sand circle, the current one *You are here*) / v3.59 (a phone notification's status-bar icon is the mark's tile in white with the H cut out — `badge-tile-96.png`; Android paints it white, no colour reaches the status bar) / v3.58 (the soft dropdown on a touch screen: its search box waits for a tap — no keyboard on opening — and the keyboard or the address bar moves the menu with its field instead of closing it) / v3.57 (on a phone, entering a page or coming back to the app shows the bottom bar; the HR app's pages open at their top and Back returns to where a page was left; a tapped notice opens in the installed app) / v3.56 (a phone notification's status-bar icon: the H alone, white on transparent, 96px — `badge-96.png`; the app tile stays its large icon) / v3.55 (the phone's bottom bars — the HR app's tabs, the Revenue app's nav, the portal's tab bar — tuck away on a scroll down of 24px and are back on a scroll up, near a page's top or on another page; the page grows into the space but for `--safe-bottom`, and what stands on the bar comes down with it, `--tabbar-h` on the portal) / v3.54 (Sales Groups › Waiting list's "+": the accent square first in the row, its window — the basics, Submitted by from the Revenue team, HR's own questions optional, the signed form as Form settings asks — and a row added this way: Added by, never Signed by) / v3.53 (People › Permissions: a *Select all* row atop each view's table — a box per column and one for the whole view, "–" while only some are — an amber line under a ticked tab whose page would not open, and *+ New template* as a window: the name, the views with their tab counts, the sensitive fields, what would not open yet) / v3.52 (the first open's question in both phone apps: a 340px white card at radius 22 over a .45 walnut scrim — a 52px bell disc (`255 240 228` / `189 74 25`), *Turn on notifications?* 18/700, the body 13.5 in `108 92 80`, a 46px orange **Allow notifications** at radius 14 and a 42px plain **Not now**; a reason in `176 40 34` above the buttons) / v3.51 (Meeting Rooms: the day's label opens a month card to pick a day from; the free half hour under the pointer lights with its time, and 19:30 books 19:30–20:00) / v3.50 (ONE app: the HR app is HR's view of the one install on a phone — no install, name or icon of its own; *More* gains the view switch — Principal · Finance · HR · Revenue team, a 10px dot on the 40px tile, *You are here* on the current — for an account that may switch; the portal's HR phone bar keeps only *总览*) / v3.49 (Documentation › Publish: *Withdraw* on a published memo — asked twice, the armed pink — and *Show withdrawn (n)* at the list's foot, greyed at .55 with its mono red line) / v3.48 (Hiring › Form settings › File types: each type's files, ✎ to rename in place, On / Off as the sources' switch, Résumé *Built in*; a type turned off leaves the picker) / v3.47 (notifications: the HR app's bell — a white 40px tile on Home's head with the count in the accent — and its *Notifications* page, *New* / *Earlier* in Review-style rows; the Revenue app's bell gains UPDATES, slate *Meeting* and walnut *Manpower request*; *Phone notifications* rows with a 38×22 switch in both apps) / v3.46 (hiring files: several per candidate and per talent, each with a type picked or named — the résumé row they replace, the type picker, the files drawer's pills, the talent page's Files card) / v3.45 (the user's answers on round 2: a booking made for somebody else reads *Grace (for Chea Huan)* on every schedule — portal, both apps, the guest page; Profile › Your workspace rows as the HR revamp's handoffs draw them — 52px circle, `--rv-rule`, 81px, no gap, stroke 1.8; the HR app's claim **Approve** asks *Request payment* or *Add to payroll*) / v3.44 (Documentation after the user's answers: Withdraw on a letter of the record — asked twice, the armed pink — *Show withdrawn (n)* greyed at .55, a red *Withdrawn* status chip, the preview of a deleted or withdrawn file on its trail) / v3.43 (round 2's Part 1, C: the Replacement list's own Upload form and Form settings, and Submit replacement on HR's form) / v3.42 (round 2's Part 1, B: every select on HR's pages is the soft dropdown — `bare` / `plain`, optgroup labels in the menu, the .18 focus ring kept) / v3.41 (round 2's changes to round 1's pages, part A: the HR sidebar's brand block 20/12/26/14 with no rule, the one-line sub-department switcher of portal-42, the waiting drawer's head without its place line) / v3.40 (the phone parity pass: fields in the browser's black, the soft menu above the field when it does not fit below, the HR app's sheet 86% of the screen between its bars) / v3.39 (Documentation's preview draws an Excel or CSV file as the handoff's sheet) / v3.38 (the HR phone app: /hr-app — Home, Review, Hiring, Rooms, More, its sheets and its own install) / v3.37 (the guest link's Request manpower: five steps, pills for short choices, the file, Check and send, and its Preview) / v3.36 (the Revenue app's Book a room and Documentation: By room / Timeline at 64px an hour, the book sheet, the files HR shares) / v3.35 (the Guest link: Admin › Guest Link, and the public /g page — phone first, a Preview column on a computer) / v3.34 (Meeting Rooms: a day's rooms side by side, the Book and booking drawers, rooms as cards) / v3.33 (Hiring › Insights and the Talent Bank: six cards against the month before, the days each fill took, by source and department, every request sideways; the bank's tree, table, panel and a talent's own page) / v3.32 (Hiring › Requests: the review inbox, the Listing and its right-click menu, Form settings, a request's page with its candidates, the résumé drawer) / v3.31 (Documentation: Documents, Data center, Letters, Publish and the 640px preview) / v3.30 (the HR revamp, round 2: the soft dropdown and the drawers' motion) / v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.81 (the food claim: People › Member services' fourth tab *Food claim* — *Fair only*, *Rate a day* in a box of its own, Fair's titles as Claim rates' table rows with *Can claim* boxes; the Revenue app's Requests gains *Submit food claim* (a fork and knife on sand) and a *Food claim* filter for whom HR opened it, its form a month at a time — *Month* pills, the month's brand weeks as cards with their day counts, each opened to its fair's days as tiles) / v3.80 (People › Documentation › Data center: the Talent Bank's Bin and Move to… — a file HR keeps or an empty folder HR made waits in the **Bin** 30 days, ⋮ Restore · Delete forever, Empty bin, then goes as a delete always did; a folder HR made moves with Move to…, the Talent Bank's window, now shared) / v3.78 (Director Salary's Pool Breakdown opens on a HOUZS Venture row; Save while it pays opens the departments window — every department, by amount or by %, Confirm once it adds up — and Payments › Dept Requests transfers it into the Director pool, with Undo) / v3.77 (Hiring › Talent Bank: a **Bin** — what is deleted there, a file, an empty folder, a person or a file off a person, waits 30 days with its days counting down; ⋮ Restore · Delete forever, Empty bin; then the hourly sweep deletes it) / v3.76 (Comm Cal › Drops & upsells: a shared bill's change names its holders — *Split by share · MELVIN CHONG 50% · LUCAS 50%* — and a cancellation the feed took back by itself reads *Deducted directly*) / v3.75 (no descriptions on the page: page subtitles, section ledes, explanatory notices, usage hints and menu rows' second lines are gone from every portal page and view; a state that only a notice showed is a 2–4 word chip — *Payout off this month*, *Unpaid as of today*, *Segment only · won’t balance*, *Bank not charged*) / v3.74 (Hiring › Talent Bank is a Drive, in the Data center's own parts: + New — New folder, Add talent, Upload files — the path and a search over the bank; Companies (HOUZS Venture and the guest link's list) → Departments → People, folders HR makes anywhere holding people and files; Move to… — a 440px window of every place — for a person, a folder with everything in it, and everybody in a department; Admin › Guest Link's department chips rename in place) / v3.73 (the Revenue app's My brand weeks: a month to a fold — this month open, the two before a tap away — and per weekend a *W1* badge in the brand's two colours beside Brand / Venue / Organizer; no weekend after this week's) / v3.72 (Airbnb claims: the invoice up to a limit for every group, and the stay on one calendar that opens on the brand week — the day before the fair to the day after; Hiring's Candidates menus open above their button at the foot of the page) / v3.71 (Comm Cal: the ERP audit trail — a bill's page lists every save the ERP made of it; Drops & upsells says what the ERP changed for each question and what gave the commission, and lists the month's saves that moved money; a cancellation is called *Cancelled*) / v3.70 (a memo reaches its person in every view: the portal’s memo bell in every top bar, the HR app’s memo pages, the Revenue app’s file row; one memo card wherever it is read; Publish › Preview — *As they see it* and *Who has it*) / v3.69 (Documentation › Data center is a Drive: + New, the path, a search over everything; Companies → Departments → People made by People, folders HR makes for a subsidiary and its departments, files kept in them; folders as 58px cards, files as cards with a big preview) / v3.68 (the phone apps’ frames — the HR app’s and the Revenue app’s — are fixed to the screen, never `100dvh`: in the installed app on an Android phone with three buttons 100dvh came out a navigation bar taller than the screen, and the HR app’s tab bar opened under the phone’s buttons until the page was scrolled) / v3.67 (the guest link's Request manpower asks the picked company's own departments — Book a meeting room's list, always a dropdown, typed when the company lists none; Hiring › Insights' *Every request* gains a Company column) / v3.65 (Comm Cal: a shared bill's menu has *Cancel share with ANTHONY*, one line per holder; a move gives a share it took back when the bill leaves that person, and says so) / v3.64 (brand weeks come from the ERP's Sales Attending: My brand weeks and HR's Brand weeks grid only show them — solid for the ERP's booth, dashed for auto-located — and Today no longer asks to save them) / v3.63 (Comm Cal: right-click a bill › *Move to another salesperson…* — an adjacent panel to pick who and why, a notice with *Open NAME* and *Undo*, *Moved from ADRIAN* under the bill's number) / v3.62 (Comm Cal: a ledger row paid this month for another month's sale wears a cool wash with a ruled edge and says why in a first *Status* column — Top up deposit, Late key-in, Upsell, Drop sales; a double-click on a bill's row opens it; the bill menu is one line a row; the salary preview lists each upsell and drop as an add or a deduction) / v3.61 (Change password, for a login of the person's own only: Admin › Change password in both sidebars — one white card on the sheet, the three boxes, *Show passwords*, a wash for what went wrong or right — the HR app's More row and its sheet, the Revenue app's Profile › *Account* button and its sheet) / v3.60 (the Revenue app's Profile on a phone gains *Switch view* for an account that may switch views — Principal · Finance · HR · Revenue team, rows as Your workspace's with the module menu's dots on a sand circle, the current one *You are here*) / v3.59 (a phone notification's status-bar icon is the mark's tile in white with the H cut out — `badge-tile-96.png`; Android paints it white, no colour reaches the status bar) / v3.58 (the soft dropdown on a touch screen: its search box waits for a tap — no keyboard on opening — and the keyboard or the address bar moves the menu with its field instead of closing it) / v3.57 (on a phone, entering a page or coming back to the app shows the bottom bar; the HR app's pages open at their top and Back returns to where a page was left; a tapped notice opens in the installed app) / v3.56 (a phone notification's status-bar icon: the H alone, white on transparent, 96px — `badge-96.png`; the app tile stays its large icon) / v3.55 (the phone's bottom bars — the HR app's tabs, the Revenue app's nav, the portal's tab bar — tuck away on a scroll down of 24px and are back on a scroll up, near a page's top or on another page; the page grows into the space but for `--safe-bottom`, and what stands on the bar comes down with it, `--tabbar-h` on the portal) / v3.54 (Sales Groups › Waiting list's "+": the accent square first in the row, its window — the basics, Submitted by from the Revenue team, HR's own questions optional, the signed form as Form settings asks — and a row added this way: Added by, never Signed by) / v3.53 (People › Permissions: a *Select all* row atop each view's table — a box per column and one for the whole view, "–" while only some are — an amber line under a ticked tab whose page would not open, and *+ New template* as a window: the name, the views with their tab counts, the sensitive fields, what would not open yet) / v3.52 (the first open's question in both phone apps: a 340px white card at radius 22 over a .45 walnut scrim — a 52px bell disc (`255 240 228` / `189 74 25`), *Turn on notifications?* 18/700, the body 13.5 in `108 92 80`, a 46px orange **Allow notifications** at radius 14 and a 42px plain **Not now**; a reason in `176 40 34` above the buttons) / v3.51 (Meeting Rooms: the day's label opens a month card to pick a day from; the free half hour under the pointer lights with its time, and 19:30 books 19:30–20:00) / v3.50 (ONE app: the HR app is HR's view of the one install on a phone — no install, name or icon of its own; *More* gains the view switch — Principal · Finance · HR · Revenue team, a 10px dot on the 40px tile, *You are here* on the current — for an account that may switch; the portal's HR phone bar keeps only *总览*) / v3.49 (Documentation › Publish: *Withdraw* on a published memo — asked twice, the armed pink — and *Show withdrawn (n)* at the list's foot, greyed at .55 with its mono red line) / v3.48 (Hiring › Form settings › File types: each type's files, ✎ to rename in place, On / Off as the sources' switch, Résumé *Built in*; a type turned off leaves the picker) / v3.47 (notifications: the HR app's bell — a white 40px tile on Home's head with the count in the accent — and its *Notifications* page, *New* / *Earlier* in Review-style rows; the Revenue app's bell gains UPDATES, slate *Meeting* and walnut *Manpower request*; *Phone notifications* rows with a 38×22 switch in both apps) / v3.46 (hiring files: several per candidate and per talent, each with a type picked or named — the résumé row they replace, the type picker, the files drawer's pills, the talent page's Files card) / v3.45 (the user's answers on round 2: a booking made for somebody else reads *Grace (for Chea Huan)* on every schedule — portal, both apps, the guest page; Profile › Your workspace rows as the HR revamp's handoffs draw them — 52px circle, `--rv-rule`, 81px, no gap, stroke 1.8; the HR app's claim **Approve** asks *Request payment* or *Add to payroll*) / v3.44 (Documentation after the user's answers: Withdraw on a letter of the record — asked twice, the armed pink — *Show withdrawn (n)* greyed at .55, a red *Withdrawn* status chip, the preview of a deleted or withdrawn file on its trail) / v3.43 (round 2's Part 1, C: the Replacement list's own Upload form and Form settings, and Submit replacement on HR's form) / v3.42 (round 2's Part 1, B: every select on HR's pages is the soft dropdown — `bare` / `plain`, optgroup labels in the menu, the .18 focus ring kept) / v3.41 (round 2's changes to round 1's pages, part A: the HR sidebar's brand block 20/12/26/14 with no rule, the one-line sub-department switcher of portal-42, the waiting drawer's head without its place line) / v3.40 (the phone parity pass: fields in the browser's black, the soft menu above the field when it does not fit below, the HR app's sheet 86% of the screen between its bars) / v3.39 (Documentation's preview draws an Excel or CSV file as the handoff's sheet) / v3.38 (the HR phone app: /hr-app — Home, Review, Hiring, Rooms, More, its sheets and its own install) / v3.37 (the guest link's Request manpower: five steps, pills for short choices, the file, Check and send, and its Preview) / v3.36 (the Revenue app's Book a room and Documentation: By room / Timeline at 64px an hour, the book sheet, the files HR shares) / v3.35 (the Guest link: Admin › Guest Link, and the public /g page — phone first, a Preview column on a computer) / v3.34 (Meeting Rooms: a day's rooms side by side, the Book and booking drawers, rooms as cards) / v3.33 (Hiring › Insights and the Talent Bank: six cards against the month before, the days each fill took, by source and department, every request sideways; the bank's tree, table, panel and a talent's own page) / v3.32 (Hiring › Requests: the review inbox, the Listing and its right-click menu, Form settings, a request's page with its candidates, the résumé drawer) / v3.31 (Documentation: Documents, Data center, Letters, Publish and the 640px preview) / v3.30 (the HR revamp, round 2: the soft dropdown and the drawers' motion) / v3.29 (the HR revamp's Permissions: a template ticked view by view and tab by tab, the person window's red dots) / v3.28 (the HR revamp's Waiting list & replacements in the Revenue app: the queue, the request sheet, Edit request → Update) / v3.27 (the HR revamp's Submit waiting list: HR's questions in order, the Application form box, the handoff's signature pad) / v3.26 (the HR revamp's Hierarchy: People & roles in title bands, Levels as chip rows) / v3.25 (the HR revamp's People: one roster grid with department bands, the person window, Invite user as a window) / v3.24 (the HR revamp's replacement review: Replaced by chips, the effective date, Scheduled · Completed) / v3.23 (the HR revamp's Member services: Request reviews, Brand weeks as chips, Claim rates, Publish memo) / v3.22 (the HR revamp's waiting list: Upload form, Form settings, Fail · Transfer and the employee form it opens) / v3.21 (the HR revamp's Sales Groups: the chart's one-row toolbar, the Members grid edited in place, Waiting list and Replacement list) / v3.20 (the HR revamp's Rules: a grouped side list, Scheme rules as switches, Ranks, Capacity) / v3.19 (the HR revamp: HR's own shell — sidebar of icon tiles, white greeting bar, the sheet scrolling in its frame — and the `components/hrv` kit; Revenue picks its sub-department on the page) / v3.18 (salary, NRIC and bank accounts read •••• without their tick) / v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
 ---
 
 ## Implementation rules — read this first
+
+### No descriptions on the page (v3.75, 2026-10-12) — overrides every subtitle, lede and hint described below
+
+The user, circling six of them on HR's pages: "find all this wording … like a
+description, i want delete it, cause this cause the view too messy". A page
+says what it is with its eyebrow and title, a section with its heading, a tab
+with its label, a menu row with its words — never a sentence under them that
+explains what the page or section is, how a tab works, what a rule means, why
+the screen looks as it does, or where to click. Gone from every portal page
+and every view (the phone apps — Revenue app, HR app — were not part of it):
+
+- **Page subtitles** — `PageHead subtitle`, `.page-sub`, a sentence under the
+  `page-title`. A subtitle stays only when it is live data (*Signed in as …*,
+  a voucher's own description, *{borrower} · {bank}*).
+- **Section, panel and tab ledes** — the line under a section heading or a tab
+  rail (`.subtitle`, `.sheet-subtitle`, report cards' one-line descriptions).
+- **Explanatory notices** — a box or a paragraph that explains a rule, a
+  setting's effect or a method (*Below 30% of the order total, so none of the
+  commission is released yet…*). A notice that was the only place a CURRENT
+  STATE showed becomes a 2–4 word chip beside what it concerns (*Payout off
+  this month* beside a tab's heading when its payout is switched off); a state
+  shown elsewhere on the page (a status bar, a chip, a disabled button) loses
+  the sentence outright.
+- **Usage hints** — *Right-click a row to remove it.*, *Shift + right-click
+  opens the browser's own menu.*, *Double-click to open · right-click for
+  more*, *· highlights only*. The behaviour stays; only the words went.
+- **A menu row's second line** — one line a row (the bill menu's rule of
+  2026-10-12, now every menu: `RowMenu`, `row-links`, the payroll row menu);
+  what it said — why a row is shut, who holds a bill, what a row does — is the
+  row's `title=` tooltip. A disabled row must still take the hover for that
+  tooltip to show.
+
+What stays: errors, and warnings that name a problem to fix (with its link or
+list); empty states; figures, dates, counts, chips, statuses and a stat card's
+short note; a row's own note on why it differs (*Moved from ADRIAN*, *Not open
+yet — …*); and everything inside a window, drawer, panel or form a click opens
+— those sentences say what a write will do. PDFs, CSVs and print are documents,
+not the view. A new page, or a prototype that brings a description with it,
+leaves the description out (`src/lib/no-page-descriptions.test.ts`).
 
 ### Sheet theme — the portal's new tone, HR's view first (v3.9–v3.10, 2026-09-27)
 
@@ -128,7 +167,8 @@ sheet `.sheet-theme` declares the Comm Cal month's tokens:
    holds. A month shown as a hero moves into the eyebrow/title; its status line
    becomes the primary card's note.
 3. Sections: `.sect-head` (17px/600 title over the same rule and mono count), or
-   `.sheet-heading` + `.sheet-subtitle` for a heading with one sentence.
+   `.sheet-heading`; a `.sheet-subtitle` under it only for a line of live
+   status or data, never a description (v3.75).
 4. Tables: every `.ledger-table` becomes the month's table automatically — a
    framed well (`216 210 200`, 10px radius), an uppercase 10px/600 header band
    (`235 231 224` over a `207 197 183` rule), white / `#F7F7F5` zebra, peach
@@ -188,8 +228,8 @@ disagree, the file wins; every value is the prototype's.**
 - **The kit** (`components/hrv/`: `kit.tsx` static pieces, `tabs.tsx`,
   `overlay.tsx`, `toast.tsx`, `icons.tsx`, one `hrv.module.css`; colours are
   the `--hv-*` tokens on `.sheet-theme`): the page head (10px/600/.18em eyebrow
-  behind a 2×10 orange bar — no roman numeral — Georgia 36/1.1, 13px subtitle,
-  the 64px orange segment; `bare` when tabs sit under it), tabs (8px tops,
+  behind a 2×10 orange bar — no roman numeral — Georgia 36/1.1, a 13px subtitle
+  only when it is live data (*Signed in as …*; v3.75), the 64px orange segment; `bare` when tabs sit under it), tabs (8px tops,
   peach + `inset 0 -2px 0` orange, 600; boxed counts), summary cards (the
   prototype's own sizes per page), chips (mono 11px word + 5px dot on a wash),
   grid tables (the prototype's tables are CSS grids: a `216 210 200` frame,
@@ -226,9 +266,9 @@ disagree, the file wins; every value is the prototype's.**
 - **Rules** (v3.20, 2026-10-10; `_components/rules/`): a 200px side list beside
   the section (`gap 28`), grouped *Pay structure · Item rules · Headcount ·
   Policy* (10px/600/.12em brown caps), each section a 13px row (7px 10px, 7px
-  radius; the open one peach, 600, `inset 3px 0 0` orange), a hairline and
-  "Item rules appear when their switch on Scheme rules is on." under them. A
-  section opens with its 20px/500 title and one 13px `90 78 68` line.
+  radius; the open one peach, 600, `inset 3px 0 0` orange) — no note under
+  them since v3.75. A section opens with its 20px/500 title alone (its one
+  13px line went in v3.75).
   **Scheme rules** = the eight components as rows of a 10px `216 210 200` box
   (44px toggle · 250px label · description; an off label in brown; a 6px
   orange dot on a switch changed since the save), what a component needs
@@ -246,7 +286,7 @@ disagree, the file wins; every value is the prototype's.**
   *Chart · Members N · Waiting list N · Replacement list N*. The chart's toolbar
   is one row — 12px figures; then a 28×16 toggle "Show IR alongside" (12.5px),
   a 180px Find, Tidy, `−` 40px mono zoom `+` — over a 520px `222 230 237` well
-  with a `200 212 222` rim and a white-.92 hint in its corner. Members: a
+  with a `200 212 222` rim (its corner hint went in v3.75). Members: a
   REPORTS TO caps label, director chips (999px, 5px 6px 5px 12px, a 20px round
   ×), a dashed "+ Add director" chip, an orange "+ Add member"; the grid
   `1.3fr 1.5fr 150px 170px 1.2fr 100px`, cells 9px 14px, the Rank (120px) /
@@ -273,9 +313,8 @@ disagree, the file wins; every value is the prototype's.**
   name once attached, a 26px × beside it); the first problem in red; Cancel ·
   orange *Add to the list*. A row added this way opens on **Added by** (who
   pressed it) and *Accepted · 11 Oct 2026 · added here* — never *Signed by* —
-  and its history step reads *Added to the waiting list*; the list's foot
-  reads *Applicants accepted in Member services or added here, in the order
-  they joined the list.*
+  and its history step reads *Added to the waiting list*; the list has no
+  foot sentence since v3.75.
   The applicant's 400px drawer opens on the name (19px/500) and the request
   number — round 2 took away the "#1 of 2 on Fair's waiting list" above them
   (README 18.5, v3.41) — and ends on a grey 12px note box and the footer
@@ -325,7 +364,12 @@ disagree, the file wins; every value is the prototype's.**
   title with its Save (`242 241 238` "Saved" until something differs), the
   `2fr 3fr` Outstation / Airbnb boxes, the regions grid `1.6fr 150px 140px
   150px 100px` (zebra rows, a 14px box for Flown to) and the venues grid.
-  Publish memo moved to People › Documentation › Publish (v3.31).
+  Publish memo moved to People › Documentation › Publish (v3.31). **Food claim** (v3.81, 2026-10-13):
+  Claim rates' card — the 17px / 600 title with a soft info chip *Fair only* beside it and the same Save —
+  then a 360px box (`--hv-hairline`, radius 10, 14px 16px) holding *Rate a day* RM and its 90px field,
+  then the titles grid `1.6fr 1fr 120px 150px` (Title · Level in `--hv-body-2` · *In Fair* as *5 people* in
+  mono, right · a *Can claim* box as Flown to's 14px box), zebra rows, the highest level first; the foot
+  says when it was last saved.
 - **Replacement review** (v3.24, 2026-10-10; `RequestReviews`): under the
   step "Approve and choose the replacement", a 12px "Replaced by · from
   People Management" label over a wrapping row of choice chips (6px 11px on a
@@ -448,7 +492,8 @@ disagree, the file wins; every value is the prototype's.**
   7px red dot (`--hv-danger`, white ring) on a changed box, Reset to title
   (7px 12px, hairline) and Save (7px 16px, accent) in the footer before Full
   page; above the matrix, in the legacy note's style, a line when their boxes
-  were saved over another template. Foot: 12px `--hv-brown` note, Save 7px 16px accent. Measured against
+  were saved over another template. Foot, for whoever may manage: *Unsaved changes to X* 12px `--hv-brown` while
+  there are edits (no note otherwise, no foot for a reader — v3.75), Save 7px 16px accent. Measured against
   the prototype (`states-pr8a.json`).
 - **Cross-check** with a measuring script that finds each element by its text
   on both and diffs computed font / colour / size / padding / border / radius
@@ -522,7 +567,7 @@ the quiet buttons have NO fill of their own — they sit on the white sheet.
   dashed file box (*No file chosen* · *PDF, Excel, Word or image*, Upload →
   Replace in a white 7px 14px button), department chips (6px 12px, radius 7,
   gap 6 — the ☑/☐ its own item; peach with an orange rim when on), Save (the
-  accent, 8px 18px), the 12px note. The list: a row per file — a 38px olive
+  accent, 8px 18px) — the 12px note under it went in v3.75. The list: a row per file — a 38px olive
   tile (`238 240 226` / `88 98 68`, mono 10px 500 extension), the name 500, a
   12px brown `file · day · who` line, department pills (1px 8px, radius 999,
   11px), View · Download (5px 10px, radius 6, unfilled, orange rim on hover)
@@ -564,12 +609,13 @@ the quiet buttons have NO fill of their own — they sit on the white sheet.
   brown line (`32 people`, `Team Leader · 2 letters`, `1 folder · 2 files`),
   a red 18px count of the people missing a compulsory letter (a person's "!"),
   and — only on a folder HR made, with Documentation · Edit — a round 32px ⋮
-  (Rename · Delete, Delete asked twice in the armed pink). Folders and files
+  (Rename · Move to… · Move to Bin since v3.80; until then Rename · Delete,
+  Delete asked twice in the armed pink). Folders and files
   sit in `repeat(auto-fill, minmax(232px, 1fr))`, gap 12 (160px on a phone).
   A file is a card of the same tone: a 20px badge in its kind's colour (PDF
   danger, a sheet ledger, Word blue, a picture the orange text tone, else
   walnut) with a glyph, the name 13px 500 (a letter: its type, the file under
-  it), the ⋮ (View · Download · Delete / Withdraw), a 128px white preview
+  it), the ⋮ (View · Download · Move to Bin — Delete until v3.80 — / Withdraw), a 128px white preview
   holding a 70×88 folded page with the extension in the kind's colour — no
   thumbnail, a file opens only by a press, which its trail records — and an
   11.5px line (`12 Oct · Amy · 2.3 MB`; a letter `Filed 12 Oct` and its
@@ -579,6 +625,23 @@ the quiet buttons have NO fill of their own — they sit on the white sheet.
   (n)* under them. Deleted files wait at .55 under *Show deleted (n)*. An
   empty folder says so in a dashed box; files dropped on the page go into the
   folder open (an accent dashed outline while dragging).
+  **The Bin and Move to… (v3.80, 2026-10-13 — the user: "Data center 也加 Bin
+  和 Move to…", the Talent Bank's v3.77 rules):** the Talent Bank's **Bin**
+  pill after the search (its count in mono) opens `?tab=data-center&in=bin` —
+  *Data center › Bin*, no + New, no search, **Empty bin** on the right (the
+  danger pill, asked twice); **Folders** and **Files** as a place draws them,
+  a folder's line *Data center · 29 days left* (where it was — through a
+  folder in the Bin too), a file's sub line where it was and its foot *12 Oct
+  2026 · Amy* … *29 days left*; ⋮ **Restore** · **Delete forever** (asked
+  twice). Moved to the Bin, a file is not under *Show deleted* — it reaches
+  there, greyed as before, once it leaves the Bin for good. A folder HR made
+  moves with **Move to…**, the Talent Bank's 440px window (shared since
+  v3.80, `drive/MoveWindow.tsx`): *Move Carres*, *Now in Data center —
+  everything in it goes with it*, the Data center, HOUZS Venture, its
+  departments and the folders HR made, top down, never a person, never itself
+  or what is inside it. Toasts: *… moved to the Bin*, *… restored to Carres*,
+  *… deleted forever*, *Bin emptied · 3 items deleted forever*, *Carres moved
+  to HOUZS Venture › Revenue*.
 - **Upload a letter**: the kit Window, 460px, scrim .22 — Letter type (the
   soft dropdown drawn as a full field; *+ Add a new letter type…* opens a name
   field), a dashed drop (`+` or the extension in a tile, *Choose a file* · *PDF,
@@ -732,7 +795,7 @@ Edit).
   right *View résumé* and **⋯** — Edit details, Change status ▸ (the five
   stages, the current one 600), Download résumé, Move to Talent Bank… / Open
   in Talent Bank. Both menus hang 6px under their button, and open 6px ABOVE it
-  when the sheet shows no room below (v3.72 — at the foot of a request the +
+  when the sheet shows no room below (v3.75 — at the foot of a request the +
   ran off the page, and an open menu's catcher keeps the wheel from scrolling
   the sheet; `menu-place.ts`, measured again when Change status opens). Right: **Pipeline** (3×2: Candidates, Shortlisted, Done
   appointment in alert, Offered, Hired in ledger, Not selected in danger;
@@ -766,8 +829,8 @@ The rest of **V. HIRING** (README §12–13; the handoff's `Revenue App.dc.html`
 lines 1145–1270, the drawers 1334–1364 and 1484–1497). Values in
 `hiring/_components/hiring.module.css`.
 
-- **Insights** (`/hiring/insights`, *How long each request takes, from
-  submitted to acknowledged to filled.*). The period bar: a white segmented
+- **Insights** (`/hiring/insights`; how long each request takes, from
+  submitted to acknowledged to filled — the page no longer says so, v3.75). The period bar: a white segmented
   box (3px, radius 10) — **This month** · **All time** · a 1px rule ·
   **Pick a month** (calendar and chevron; the picked one dark `43 31 23` on
   cream, 500) — then the range in words (`1 Oct 2026 – 31 Oct 2026`, 12.5px).
@@ -795,24 +858,65 @@ lines 1145–1270, the drawers 1334–1364 and 1484–1497). Values in
   band, its facts (`150px | 1fr`; budget, cost and start in clay 600), the
   Audit trail, **Close** and **View full →**. A request is in the period when
   it was submitted or filled in it.
-- **Talent Bank** (`/hiring/talent`, *Good candidates kept on file, ready to
-  invite when a role opens.*): `260px | 1fr`. The left card: *Search name or
-  notes*, **All talent** and each department with its count; a department
-  opens (its ▸ turns, `.2s`) to the positions under it, indented behind a
-  rule, in the tree's own 4px rhythm (an opened department with nobody in it
-  keeps its empty block); the picked row peach, 600 (a position's in clay). The right: the
-  heading (`Revenue Specialist`, `Revenue · 1 person`) and **+ Add talent**;
-  the table `1.2fr 1.1fr 1.8fr 110px 170px` — name 500 over *From HR-202* /
-  *Added directly*, what they fit over their department, the first line of
-  their notes cut with an ellipsis, the day saved (mono), *Interviewing ·
-  HR-203* (alert) or *Available* (ledger). A right-press: **Open**, **Remove
-  from Talent Bank** (danger). **+ Add talent** is a 520px drawer (*Add to
-  Talent Bank* · *Someone worth calling back when a role opens.*; name,
-  phone, email, what they fit, department, a résumé, why keep them; *Save
-  talent*). A row opens the **460px panel**: `T-103`, the name 19px, the
-  chip; their facts, *HR NOTES*, the résumé (a 36px olive tile, **View**),
-  *LATEST*; **Remove** (asks once more: *Confirm remove*), **Close**, **Full
-  page →**.
+- **Talent Bank** (`/hiring/talent`; no subtitle since v3.75) **is a Drive since v3.74** (2026-10-12 — the
+  user: "like google drive as well, can create new file, and name as well …
+  so when save or upload can detect and locate file"), drawn with the Data
+  center's own parts (*Data center as a Drive*, v3.69 — its bar, cards, ⋮
+  menus and *New folder* window, imported, not copied): **+ New** (*New
+  folder*, *Add talent* where people are kept, *Upload files*), the path
+  (`Talent Bank › Carres › Sales`), *Search the Talent Bank* (places, people
+  by name, what they fit, phone, email or notes, files — each with where it
+  is). The places: the bank shows **Companies** — HOUZS Venture and the
+  subsidiaries of Admin › Guest Link (one taken off that list stays while
+  something is in it, its line ending *· off the guest link*) — then the
+  **Folders** HR made there; a company its **Departments** (HOUZS Venture's
+  are Hiring › Form settings' Department by first part, a subsidiary's its
+  guest-link list) and its folders; a department or a folder its folders,
+  then **People** (the Data center's person card: name, *what they fit ·
+  Available* or *· Interviewing · HR-203*, a ⋮ with **Open**, **Move to…**,
+  **Remove from Talent Bank** asked twice), then **Files** (the Data
+  center's file cards; ⋮ View, Download, **Move to Bin** — once, since
+  v3.77). A folder HR made has a ⋮ of **Rename**, **Move to…** (with
+  everything in it) and **Move to Bin**; a department, while something is right in it, **Move everyone
+  to…**; a company none. (The grey hint under the path that said where each place's
+  folders come from went in v3.75.) Files may be dropped onto the page. **Move to…** is one
+  440px window for the three — *Move Nur Iman* / *Move Seniors* / *Move
+  everyone in Sales*, under it where it is now (*— everything in it goes
+  with it*; *2 people, 1 folder — now in …*), a finder, every company,
+  department and folder top down (indented 18px a level; for a folder the
+  bank itself first, never itself or what is inside it; the place it is in
+  *Here now* and greyed), **Move here**.
+  **+ Add talent** is the 520px drawer (*Add to Talent Bank* · *Someone
+  worth calling back when a role opens.*), opened in a place and keeping
+  them there — *Kept in Carres › Sales* at its top instead of a Department
+  field; name, phone, email, what they fit, their files, why keep them;
+  *Save talent*. A person opens the **460px panel**: `T-103`, the name
+  19px, the chip; their facts (*Good fit for*, **Kept in**, phone, email,
+  saved from, saved), *HR NOTES*, their files, *LATEST*; **Remove** (asks
+  once more: *Confirm remove*), **Move to…**, **Close**, **Full page →**.
+  The place is the page's address (`?in=dept:hv:Revenue`). *(Until v3.74 a
+  260px tree of departments and positions beside a table.)* On a request's
+  page, *Move to Talent Bank* says **Kept in Talent Bank › Carres › Sales**
+  above the files; a guest's candidate has no Department field (their
+  company's department is the request's), HOUZS Venture's keeps it.
+  **The Bin** (v3.77, 2026-10-13 — the user: "make a bin, then that bin
+  will last for 30 days"): a **Bin** pill after the search (the search's
+  40px `panel-3` pill, a 16px bin glyph, its count in 11px mono brown;
+  hover `row-hover`) opens `?in=bin` — the path *Talent Bank › Bin*, no
+  + New, no search, and on the right **Empty bin** (a white 40px pill,
+  `danger` text on a `danger-border` rim, the armed `danger-bg` for
+  *Confirm empty bin*). Its sections are a place's — **Folders**, **People**,
+  **Files** — drawn with the same cards: a folder's and a person's line
+  *HOUZS Venture › Revenue › Interns · 29 days left* (where it was, through
+  a folder in the Bin too), a file's sub line where it was (a person's file:
+  *IC · Joyce Tan*) and its foot *12 Oct 2026 · Grace Lim* … *29 days
+  left*. Each ⋮: **Restore** (a turning-back arrow) and **Delete forever**
+  (asked once more: *Confirm delete forever*); without Edit, no ⋮ and no
+  Empty bin. A card pressed says so in the toast (*… is in the Bin —
+  restore it to open it.*); empty, the dashed block *The Bin is empty.* ·
+  *What is deleted in the Talent Bank waits here for 30 days, then goes for
+  good.* Toasts: *… moved to the Bin*, *… restored to Carres › Sales*,
+  *… deleted forever*, *Bin emptied · 4 items deleted forever*.
 - **A talent's page** (`/hiring/talent/[id]`): *‹ Talent Bank*, `T-104`, the
   name 24px, *Good fit for … · saved 24 Sep 2026 by Grace Lim*, the chip;
   `1fr | 340px`. **Profile** tiles (`minmax(170px, 1fr)`, values 500), **HR
@@ -968,7 +1072,10 @@ canvas's 3a phone and 3c computer artboards). Values in
   every bookable room with a switch. Right: *Subsidiaries & departments* —
   a card per company: a 54px mono 600 uppercase code box (up to three), the
   name edited in place (13.5px 500), ×, then its departments as chips with ×
-  and a dashed *+ Department* box (Enter adds); **+ Add subsidiary**. Then
+  and a dashed *+ Department* box (Enter adds); a chip's name renames it in
+  place (v3.74: pressed, a field of its width under a 1px orange line; Enter
+  or leaving it keeps the new name, Esc the old — its people in the Talent
+  Bank go with it); **+ Add subsidiary**. Then
   *Booked through the link* (N upcoming): title, `Room · Sat, 10 Oct 2026 ·
   17:00–18:00 · 5 pax`, who, and **Open** — the Meeting Rooms booking drawer.
 - **The guest page** — warm paper `246 242 236`, Inter, black-brown ink; a
@@ -1792,7 +1899,7 @@ project memory. Everything below lives in `globals.css` under "Payroll grid".
 | `.pg-in.manual` (+ `.num.manual`, `.ro.manual`) | A statutory figure somebody typed over JADUAL: a 3.5px `--accent` dot in the field's top-left corner (clear of the right-aligned digits, inside the 6px radius), and a title saying it stays until *Reset statutory to JADUAL*. It survives `.dirty` and `:focus` (declared after both, whose `background` shorthand would wipe it). A row past draft shows the bare figure with the dot on its left, centred on the line. The legend above the well carries it as *typed over JADUAL* (`.pg-legend i.mn`) | Only a figure that overrides a computed default and stays until reset |
 | `.pg-band` (`.group-btn` in `td.group-cell`) | The roster's department band, with the Gross / Net subtotal sitting in the frozen block directly under the two columns it sums | Grouped money grids |
 | `td.pg-status` (the frozen **Status** column, `--w-status` 138px, since 2026-09-27) | Where each person's pay stands, as one chip: `Draft` (muted) · `Open on Comm Cal` / `On Director Salary` (muted — completed elsewhere) · `Completed 27 Sep` (ledger) · `Submitted #2` (alert — with Finance) · `Paid` (ledger) · `Resubmit · editing` / `Resubmit ready` (accent). The detail — when, by which batch, what happens next — is the cell's tooltip. The band's status cell says `3 sent · 2 ready`; the frozen offsets run `.l0`–`.l5` | Any grid whose rows move through a lifecycle |
-| `.icon-btn.more` + right-click | Every row's ⋯ — the only button at the end of the row besides a dirty row's Save; the paycheck ▾ that sat beside it went 2026-09-30, since the menu's *Open paycheck* and the name itself open the same window — and a right-click anywhere on the row open the same paper menu (`PayrollRowMenu`, on the hierarchy's `MenuPanel` — see "Bill context menu"): *Open paycheck* / *Open on Comm Cal* / *Open on Director Salary*, *Complete*, *Unlock*, *Reset statutory to JADUAL* (a draft whose statutory was typed or came from the InfoTech file; its line names the typed figures), **Resubmit…** (adjacent confirmation, then the row unlocks: amounts only go up, the next batch sends the difference) and *Put back as sent*. Shift + right-click keeps the browser's menu | Rows with more than one action |
+| `.icon-btn.more` + right-click | Every row's ⋯ — the only button at the end of the row besides a dirty row's Save; the paycheck ▾ that sat beside it went 2026-09-30, since the menu's *Open paycheck* and the name itself open the same window — and a right-click anywhere on the row open the same paper menu (`PayrollRowMenu`, on the hierarchy's `MenuPanel` — see "Bill context menu"): *Open paycheck* / *Open on Comm Cal* / *Open on Director Salary*, *Complete*, *Unlock*, *Reset statutory to JADUAL* (a draft whose statutory was typed or came from the InfoTech file; its tooltip names the typed figures), **Resubmit…** (adjacent confirmation, then the row unlocks: amounts only go up, the next batch sends the difference) and *Put back as sent*. Shift + right-click keeps the browser's menu | Rows with more than one action |
 | `.pg-win` + `.pg-scrim` | One person's paycheck as a floating window over a scrim (`--scrim` at .42): header with n / N, the month and department, ‹ › to step through people and × / Esc to close; a payslip-shaped body — Earnings; Deductions (unpaid leave, deduction, SKBBK, then EPF / SOCSO / EIS employee and PCB — *Withholding tax* read-only in its place when the People record says so); Employer (EPF / SOCSO / EIS) with *Reset to JADUAL* beneath while a clean draft has typed figures; then Computed (pro-rata, cost to company, gross, net to bank) — and a footer with Payslip and Save. It is a second view of the row's figures, never a copy — the inputs write the row's own edit state, so a change in either place shows in both. Opened by the name or the ⋯ menu; closing hands focus back to the name | Opening a row from a dense grid. The first inline version sat in the same paper tones as the table and read as part of it; the scrim is what makes it unmistakably in front |
 
 ### Payroll batches (2026-09-27 — HR › Payroll, the unified Payroll)
@@ -1837,27 +1944,29 @@ read-only, the name a link to Director Salary). The page's rules:
   resubmitted person reads as the remainder still to pay.
 - **Resubmit and Second payroll** (2026-09-27, later): the row menu offers both on
   somebody already sent, two adjacent items with their own inline
-  confirmations — *Resubmit…* (small: *A correction to what was sent*) and
-  *Second payroll…* (small: *A planned second payment for {month} (e.g. the
+  confirmations — *Resubmit…* (tooltip: *A correction to what was sent*) and
+  *Second payroll…* (tooltip: *A planned second payment for {month} (e.g. the
   15th)*). They unlock alike; only the words differ, and the status chip says
   which (*Second payroll · editing* / *Second payroll ready*). A row that can
-  take neither shows one disabled *Resubmit · Second payroll* item with the
-  reason.
+  take neither shows one disabled *Resubmit · Second payroll* item, the reason
+  its tooltip. The menu is one line a row like the bill menu (2026-10-12): its
+  head is the name · department over the status chip's word, the detail on
+  hover.
 - **Department mode** (2026-09-30): a department is a *Cost center* or
   *Centralized*. Its switch is `.dept-mode-switch` — a 30px pill holding a
   34×20 track and the current mode's name, on (accent track, accent wash) =
   Centralized. On a department's own page it sits in a `.dept-mode` strip right
-  under the page head: `HR · DEPARTMENT MODE` eyebrow, the switch, then one line
-  on what the mode means; in Settings › Departments it is the *Mode* column's
-  cell. Flipping it never acts at once — an inline `.dept-mode-ask` panel (accent
-  wash) says what will happen (*HR leaves Billing Allocation … 3 splits on
-  payroll still in draft will be cleared*) with *Switch to Centralized* and
-  *Cancel*. Somebody who may not switch sees it disabled and *Switched by the
-  Principal.*
+  under the page head: `HR · DEPARTMENT MODE` eyebrow and the switch (the line
+  on what the mode means went 2026-10-12 — no descriptions on the page); in
+  Settings › Departments it is the *Mode* column's cell. Flipping it never acts
+  at once — an inline `.dept-mode-ask` panel (accent wash) says what will happen
+  (*HR leaves Billing Allocation … 3 splits on payroll still in draft will be
+  cleared*) with *Switch to Centralized* and *Cancel*. Somebody who may not
+  switch sees it disabled, *Only the Principal can switch this* its tooltip.
 - **Billing Allocation follows the grid** (2026-09-30): one card per payroll row
   of a cost-center department, in the grid's order (centralized departments are
   named under the title instead — *Not listed: Marketing (12) and Revenue
-  Department (32) — centralized …*), with the status chip beside the name in the grid's words
+  Department (32) — centralized.*), with the status chip beside the name in the grid's words
   (`Draft` plain · `Completed 30 Sep` ledger · `With Finance` alert · `Paid`
   ledger · `Resubmit · editing` / `Resubmit ready` accent · `Closed for good`).
   Past draft a card is frozen — company selects and % inputs disabled, no
@@ -1866,6 +1975,44 @@ read-only, the name a link to Director Salary). The page's rules:
   (or *Reopen them on Comm Cal* / *Resubmit them on HR › Payroll*). The status
   line under the title counts them (`… · 3 locked with their payroll`), and
   *Copy from last month* hides once nobody can take a split.
+
+### HOUZS Venture's director share (v3.78, 2026-10-13 — Director Salary › Pool Breakdown; Payments › Dept Requests)
+
+HOUZS Venture pays a share of the directors' CTC of its own, out of its
+departments' pools — HR says which departments, Finance moves the money.
+
+- **The Pool Breakdown's first row is HOUZS Venture · HV**, above the
+  subsidiaries: the same Basic / KPI / Allowance boxes, ER cell and Total, its
+  figures in *Director Pool Total*. Beside its name a chip says where its share
+  is — `With Finance` (`chip alert`; sent when and by whom on hover) or
+  `Transferred` (`chip ledger`; the date, who, *Finance undoes it to change* on
+  hover). Transferred, its boxes are disabled and its ER cell is a plain figure.
+- **Save, while HV pays anything, opens the departments window first**
+  (`HvSplitWindow` — the kit's `Window`, 560px, scrim .28): the eyebrow
+  `HOUZS VENTURE · DECEMBER 2027` (mono 10.5, uppercase), the title *Deduct
+  RM 15,056.05 from* (17/600, the figure mono); the pills *By amount* · *By %*
+  (`hv.pill`, the picked one peach); a line a department — the soft dropdown of
+  every department (one picked on another line is greyed), the figure box (RM
+  before an amount, % after a percentage; mono, right-aligned), by % the line's
+  amount in mono beside it, and × (none while it is the only line); *+ Add
+  department* (`btn('dashed')`) adds a line holding what is left. The foot: the
+  state on the left — what is left or too much (*RM 1,500.00 left to place*,
+  *80% placed — 20% left*, *Marketing is picked twice*), else *RM 15,056.05 ·
+  2 departments*, a refusal from the database in `text-danger` — then *Cancel*
+  and *Confirm* (disabled until it adds up). It opens on the split last sent;
+  with none, one line of the whole total. HV at zero saves without it.
+- **The Submission tab** ends with *HOUZS Venture's Share*: its chip, then
+  Department · Share (by %) · Amount · Invoice · Receipt (once transferred; the
+  Director department's line reads *Stays in pool*), the total in `<tfoot>`.
+- **Payments › Dept Requests** opens with *HOUZS Venture's Director Share*
+  (`.sect-head`, count `N WAITING`): a card a month — the month and its total,
+  *13 Oct 2026 01:50 · HR Manager* (mono), the departments in a `ledger-table`
+  (the Director department's `Stays in pool` chip), *Transfer date* (today) and
+  **Transfer** (accent). Below it the last twelve transferred: the month, date ·
+  who, the amount, each department's invoice · receipt as links, and *Undo*
+  (outline; the first press arms it — *Undo — sure?* in danger — a blur
+  disarms). *Nothing waiting.* when none. The Payments head's *Dept Requests*
+  lights, `· N`, while any wait.
 
 ### Org chart canvas (v3.4, 2026-09-09 — Revenue › Staff Hierarchy)
 
@@ -1971,7 +2118,7 @@ On the ledger a shared bill is one row per holder, each their own part: under th
 
 **One line a row (2026-10-12, the user: "delete the description on the selection, make it clean and nice").** Every row of the bill menu is ONE line now — *Open bill*, *Open bill in new tab*, *Open link in new tab*, *Share this bill…*, *Don't count this bill…* / *Count this bill again*, *Brand for the margin…* — and the small lines described above under *Share*, *Don't count*, *Count again* and *Brand* are each row's tooltip instead: why a row is shut, who holds a shared bill, which brand was picked, who took a bill out, the link a right-click landed on. The *Shift + right-click…* hint at the panel's foot went. The panels a row opens (the confirmation, the brand buttons, the share form) keep their sentences.
 
-**A double-click opens the bill (2026-10-12).** On every table of bills on Comm Cal — a salesperson's Personal / Overriding / Below deposit, the month's Open Bill and Below deposit tabs, *Show not counted*, All bills and the Drops & upsells tab — a double-click on the row opens its bill, Ctrl / ⌘ in a new tab, as `SortableTable` opens a row elsewhere; a double-click on a link, button or field in the row is that control's. An upsell's or a drop's row opens the bill it changed. The tables' footers say so (*Double-click a bill to open it*).
+**A double-click opens the bill (2026-10-12).** On every table of bills on Comm Cal — a salesperson's Personal / Overriding / Below deposit, the month's Open Bill and Below deposit tabs, *Show not counted*, All bills and the Drops & upsells tab — a double-click on the row opens its bill, Ctrl / ⌘ in a new tab, as `SortableTable` opens a row elsewhere; a double-click on a link, button or field in the row is that control's. An upsell's or a drop's row opens the bill it changed. No footer says so since v3.75 (no usage hints on the page).
 
 **Move to another salesperson (2026-10-12, the user: "together with rightclick … can select move this order to other sales person").** A row of the bill menu, one line like the rest, between *Share this bill…* and *Don't count this bill…*, on every bill a menu opens on (never an upsell or a drop). It opens an adjacent form panel in the share form's paper: the heading *Move ORDER*, one sentence (whose bill it is — and, once moved, whom the ERP names; it becomes the new salesperson's: their sales, at their rate, with their upline's override, whatever the ERP sends next), **Move to** — a select of the sub-department's team, whoever has it never offered, somebody closed this month greyed *— closed for September 2026* (it starts with the focus) — **Why (optional)** — a text field, *e.g. keyed under the wrong name* — then Cancel and the peach primary **Move to ANTHONY** (just *Move* until somebody is chosen; Enter in *Why* moves too). On a bill already moved, a *Moved here* group adds *Give it back to ADRIAN*. A paid month, a bill that does not count, or anybody on it closed shows the row disabled with the reason as its tooltip. The table then says what happened above itself — *HC-SO-2609-070 is ANTHONY’s now — moved from ADRIAN.* — with **Open ANTHONY** (on Comm Cal: that ledger, the line kept) and *Undo* (`BillMoveNotice`; Undo moves it back and the line says so). On the ledger and All bills a moved bill carries a peach tag under its number, `Moved from ADRIAN` (`.shareNote`; the tooltip: who moved it, when, why); the bill's page reads *moved from ADRIAN on 12 Oct 2026* where it names the salesperson. On a shared bill (2026-10-12, later) the panel's sentence names the shares (*ADRIAN's bill, shared ADRIAN 50% · ANTHONY 50%.*) and the list marks a holder *ANTHONY — holds 50%* — moved to him, all of it is his; the notice adds *ANTHONY held 50% of it; all of it is theirs now.*, and when the bill leaves him again (Undo, *Give it back*, a move on) *ANTHONY's 50% share is back.* — or, where the shares held meanwhile leave no room, *ANTHONY's 50% share did not come back — … Share it again if it should be.*
 
@@ -2303,10 +2450,11 @@ Who changed what, when, before and after, for every table people change
 group — **Changes** (`/audit-log`) for anybody whose permissions open some
 area of the history, **Access** (`/audit-log/access`, who read what) for the
 Principal — never a tab rail between them. Each reader sees their own areas
-only; the page says so in its intro rather than hiding it.
+only; *Areas you read* and a value's *hidden from your title* say so (the
+intro that said it went in v3.75).
 
 - **Head**: `.page-head`, eyebrow *ADMIN · AUDIT LOG · CHANGES*, title
-  *Changes*, a `.sheet-subtitle` of what is shown and why some values are not.
+  *Changes* — no subtitle.
 - **Summary cards** (`StatCards`): *Saves today* (primary, *Last {time}*),
   *Changes · 7 days*, *People · 7 days*, *Areas you read* (*5 of 12* + the
   areas, links to the register fold).
@@ -2392,6 +2540,7 @@ The user: *"只要他开了单，任何改动只要一按 save 他的 sales orde
 - **A change's chip.** One vocabulary everywhere (`lib/commission/erp-changes.ts`): *Upsell* and *Reinstated* (`ledger` green), *Drop sales*, *Cancelled*, *Deleted in the ERP* (`danger` red), *On hold* / *Back to draft* (`alert` amber), *Changed* — a save that moved nothing that earns (`info` grey), *Opened* (green). A drop or upsell the ERP found says *Cancelled* (or *On hold*, *Reinstated*, *Not counted*) instead of *Drop sales* wherever it is named — the Drops & upsells tab's Difference, a ledger's Status chip, the Salary calculation's line.
 - **The bill's page** gains *ERP audit trail* after *Changed after it was settled* (a `.sect-head`, a mono count *N SAVES*, one sentence that ends with how far back the record goes): a `.ledger-table`, newest first — Saved (mono, the office's day and time) · Change (chip) · Earned before · Earns now · Difference (red brackets for less) · What changed (10.5px lines: *AKEMI ULTIMATE MATT (K): RM 16,388.00 → RM 8,194.00*, *Removed TRION (A)-(K) · RM 2,100.00*, *Status Confirmed → In production*, *Paid RM 2,600.00 · balance …*) · Commission (*Not given yet — Oct 2026 counts it as it is now*, *Given (Closed · Sep 2026) — RM (1,000.00) waiting for an answer*). Earned before and Commission fold away on a phone (`.m-hide`).
 - **Drops & upsells.** The questions' tables gain *What the ERP changed* — the chip, *Saved 30 Sep 2026 10:45* and the first two lines of what changed in the table's small text — and *Commission given* (*Claim form · Aug 2026*, *Closed · Sep 2026*, *Paid by run · Sep 2026*); a question whose commission was given this month keeps its *Pay in …* button shut, its tooltip naming the first month it may be paid in. Under them, *ERP audit trail · October 2026's bills · N* — a `.sect-head`-style heading in the tab's design, a sentence, and the tab's table: Saved · Bill (the paper under it) · Salesperson · Change · Earned before · Earns now · Difference · What changed · Commission, its foot *N saves* and the net of what earns. A double-click opens the bill, as on every bill list. Empty: one line in the tab's empty frame.
+- **A shared bill, and a cancellation taken back by itself** (v3.76, 2026-10-13 — the user: *"want drop sales by share as well. Follow the share ratio"*; *"取消的单 … just direct deduct"*). A row whose bill is shared names everybody it is split between under the seller, in the cell's small text: *Split by share · MELVIN CHONG 50% · LUCAS 50%* (the owner first, then the others A→Z — `holdersLine`, the bill menu's own words). A cancellation the feed deducted by itself sits under *Paid in {month}* like any drop, its Difference cell *RM (10,399.00)* / *Cancelled* / *Deducted directly* — the third line only on a deduction, never on a question; its Undo sends it back to be asked. The trail's Commission column: *Given (Claim form · Aug 2026) — RM (10,399.00) deducted directly in Oct 2026* — the current month (20261013060000). No sentence explains either (v3.75).
 
 ### ERP link card (2026-09-13 — Revenue › Comm Cal, Fair only)
 
@@ -2540,6 +2689,25 @@ VP's. The member C release above describes the screens this replaced.
   Every Airbnb stay keys its *Invoice total (RM)*; the summary says *Up to, per
   night* (a small group) or *Up to, per pax per night*, then *Most for this
   stay*; the category card reads *Up to RM 65 per pax per night*.
+- **A food claim** (v3.81, 2026-10-13, the user: claim all a weekend's days or
+  only some — then "submit by total month … dont by week submit") — Requests'
+  fourth row *Submit food claim*, "Meals on the days you worked a fair", a fork and
+  knife in `--rv-brown` on a `--rv-sand` circle, only for whom HR opened it; My
+  requests' *Food claim* chip after *Claim*. The form is a month at a time: *Month*
+  as the pills (`Sep 2026`, accent on cream when picked), a 12px `--rv-sub` line
+  under them when the month is not over (*Claimed once the month is over, from 1
+  Nov.*) or is claimed (*Sep 2026 is already claimed · RQ-2610-004.*); then *Brand
+  weeks* — the month's weekends first to last as the claim form's cards (radius 14,
+  the brand's colours while a day of it is ticked), each with its count at the
+  right (*3 days*, 12.5/650 `--rv-sub`; *None*) and a chevron that turns when the
+  card opens; an open card shows its fair's days as tiles in a
+  `repeat(auto-fill, minmax(62px, 1fr))` grid (gap 8, 2px 12px 12px): the weekday
+  11px caps in `--rv-sub`, the date 20/750 tabular, then a 14px line — the month,
+  or a tick when ticked; a ticked tile is `--rv-accent` 1.5px on `--rv-cream` in
+  the accent; *Claimed* and *Not yet* tiles at .45 and untappable; a weekend with
+  no booth greyed. The summary card: *Month*, *Days* (*5 days · 11, 12, 13, 18, 20
+  Sep*), *Rate a day*, *Claim amount*, then *Set by HR's rate a day. You can't edit
+  the amount.*
 - **Phone type one step smaller** (2026-10-06, user: on a phone the text read a
   size too big) — every font-size is the prototype's px times `--rv-type`: 1 on a
   desktop, .92 on a phone (`.screen` in `app/shell.module.css`), so 13px reads 12
@@ -3773,6 +3941,12 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-13 v3.81 (the food claim)** — the user: HR sets the food claim's amount a day and which titles may claim it (Revenue's, Fair only); a member claims the days of their brand weeks' fairs they worked — then "they will submit by total month, for every pax, dont by week submit". **People › Member services** gains a fourth tab, *Food claim*: Claim rates' card with a *Fair only* chip, *Rate a day* in a 360px box, and Fair's titles — level, how many hold each in Fair, a *Can claim* box — under one Save. **The Revenue app's Requests** gains *Submit food claim* (fourth row, a fork and knife on sand) and a *Food claim* filter, for a title HR ticked in Fair; its form is a month at a time — *Month* pills, the month's brand-week cards with their day counts, each opened to its fair's days as tiles (weekday, date, tick; *Claimed* / *Not yet* held back) — and a summary of days × the rate; a month is claimed once, from the 1st of the next. Request reviews shows a food claim's *Month*, *Days*, *Fairs* and *Rate a day*, and *View invoice* only for a claim sent with one. See *Member services* and *The Revenue app — built to the prototype* › *A food claim*.
+- **2026-10-13 v3.78 (HOUZS Venture's director share)** — the user, on Director Salary's Pool Breakdown: "i want add on houzs venture itself in this as well. but when press save, once detech venture itself got pay, will need to select the amount is deduct from which department. then can pick more than 2 department as well, by amount or percentage from the total amount. then confirm so that finance will get the submittion to make the inter transfer fund" — and "make sure all department, can be seleceted". The grid opens on a HOUZS Venture · HV row with its status chip; Save while it pays opens the departments window (every department, by amount or by %, Confirm once the lines make the total); the Submission tab ends with HOUZS Venture's Share; Payments › Dept Requests opens with the shares waiting — Transfer, and Undo on the transferred — and lights the head's *Dept Requests · N*. See HOUZS Venture's director share.
+- **2026-10-13 v3.77 (Hiring › Talent Bank: the Bin)** — told that a file deleted in the Talent Bank was gone at once, with no bin as Google Drive has, the user: "make a bin, then that bin will last for 30 days. file that last for more than 30days in bin, will auto delete". What is deleted in the Talent Bank — a file kept in a place, an empty folder HR made, a person (with their files), a file taken off a person — waits in its **Bin**: a pill after the search with its count, `?in=bin`, the Drive's own cards saying where each was and how many days are left, ⋮ **Restore** (back where it was, with the folder or person it was in) and **Delete forever** (asked twice), **Empty bin** (asked twice). A file's and a folder's ⋮ say **Move to Bin** and are no longer asked twice. After 30 days the hourly sweep deletes it for good. A request's candidate's files are not the Talent Bank's: deleted at once as before. See *Hiring › Insights and the Talent Bank* › Talent Bank › The Bin.
+- **2026-10-13 v3.80 (People › Documentation › Data center: the Bin and Move to…)** — asked whether the Data center keeps the Talent Bank's rules for folders, then told it does not, the user: "Data center 也加 Bin 和 Move to…" (a subsidiary's folders stay made by HR by hand — asked, "维持 HR 手动建"). A file HR keeps and an empty folder HR made go to the **Bin** for 30 days — the Talent Bank's pill, page, cards, ⋮ Restore · Delete forever and Empty bin — and leave it as a Data center delete always left them (a file greyed under *Show deleted*, its file out of the bucket). A folder HR made moves with **Move to…**, the Talent Bank's window, shared since. (v3.79 is held by another branch.) See *Documentation* › Data center as a Drive › The Bin and Move to….
+- **2026-10-12 v3.75 (No descriptions on the page)** — the user, circling six of them on HR's pages: "find all this wording … like a description, i want delete it, cause this cause the view too messy". Every portal page, in every view, loses the sentences under its title, its sections and its tabs: page subtitles (`PageHead subtitle`, `.page-sub`) unless they are live data, section and panel ledes, the report cards' one-line descriptions, notices that explain a rule or a method, usage hints (*Right-click a row to remove it.*, *Double-click to open · right-click for more*, *· highlights only*, the charts' corner hints) and a menu row's second line (`RowMenu`, `row-links`, the payroll and Sales Groups menus — what it said is the row's tooltip, and a disabled row now takes the hover so its tooltip shows). Where a notice was the only sign of a current state it became a chip: *Payout off this month* beside Comm Cal's Open Bill and KPI headings, *Unpaid as of today* on a past Debtor Aging, *Segment only · won’t balance* on one segment’s Balance Sheet, *Bank not charged* on a payroll-funding PV, *Awaiting sign-off* on an approval the reader cannot decide; the salesperson's *Not in payroll yet* went (the line shows only once the month is in payroll). Kept: errors and warnings with a fix, empty states, figures and card notes, a row's own note, and everything inside a window, drawer, panel or form. The phone apps were not part of it. See "No descriptions on the page" at the top of the implementation rules.
+- **2026-10-12 v3.74 (Hiring › Talent Bank is a Drive)** — the user: "talent bank need be like google drive as well, can create new file, and name as well. then the current venture same as well. so when save or upload can detect and locate file"; asked, they chose company › department › people, companies and departments both from Admin › Guest Link and from folders HR makes, and HR's folders holding people and files. The Talent Bank is drawn with the Data center's Drive (v3.69): **+ New** (New folder · Add talent · Upload files), the path, a search over the bank; HOUZS Venture and the guest link's companies with their departments by themselves, folders HR makes anywhere; people as the Data center's person cards with a ⋮ (Open · Move to… · Remove), files as its file cards. Somebody saved from a request's candidate lands in their company › department by itself (the database finds the place by name and makes what is missing); added from a place, they stay there; **Move to…** keeps them elsewhere. Then "change name, and move together": a folder's ⋮ › *Move to…* takes everything in it, a department's ⋮ › *Move everyone to…* takes its people, folders and files at once, and Admin › Guest Link's department chips rename in place — the department's people in the bank going with the new name. See *Hiring › Insights and the Talent Bank* › Talent Bank, and *Guest link*.
 - **2026-10-12 v3.73 (My brand weeks · month by month)** — the user, on the page's screenshot: show each weekend's brand, venue and organization directly, the months opened one at a time, and "they only view their current and previous assign, but not future". **The Revenue app's My brand weeks** lists this month and the two before it as folds on one hairline list (`--rv-line` above, between and below): a 56px head — the month 18/650, *2 fairs* / *1 fair* / *No fair* in 12.5px `--rv-sub`, an 18px chevron turning up when open; this month opens itself, the others on a tap. Each weekend under an open head is a 40px *W1* badge at radius 12 in the brand's two colours (the claim form's week badges: Akemi accent on peach, Ergotex green, Zanotti amber on gold tint, Dunlopillo brown on sand; none `--rv-sub` on sand), then its days 13/600 in `--rv-sub` (*This week* beside this week's, 11/650 accent on `--rv-orange-bg`), then a 76px label column — **Brand** (700), **Venue**, **Organizer** — values 14/600 ink that wrap, never truncate; rows ruled by `--rv-rule`. A weekend with no booth reads *Not assigned yet* (this week's) or *No fair* in 14px `--rv-sub`. No ERP notes, no solid / dashed chip (HR's Brand weeks grid keeps those), and nothing after this week's weekend.
 - **2026-10-12 v3.72 (Airbnb claims · a limit and one calendar; Hiring's menus at the page's foot)** — the user: the Airbnb rate a person a night is a limit, not a fixed amount ("per pax max cap is this amount"), unlike Outstation's spots — so every Airbnb stay keys its *Invoice total* and is paid it up to the most for the stay; Claim rates names its fields *Limit per person a night* and *Small group's limit a night*, and Request reviews shows *Invoice total* and *Most for the stay*. The claim's check-in and check-out are ONE calendar that opens on the brand week — only the day before the fair to the day after can be tapped — instead of two date boxes. And a request's Candidates menus (+, a candidate's ⋯) open above their button when the sheet has no room below. See *The Revenue app — built to the prototype* › *An Airbnb claim's stay on one calendar*, and *Hiring › Requests*.
 - **2026-10-13 v3.71 (Comm Cal · the ERP audit trail)** — the user: the ERP keeps no audit trail of an order changed before its processing date, yet commission is given from the day it is opened. The portal keeps its own: a bill's page lists every save the ERP made of it (*ERP audit trail* — when, the kind of change on what earns, what changed in words, what it meant for commission); the Drops & upsells tab says what the ERP changed for each question (chip, when, the first lines) and what gave the commission (*Closed · Sep 2026*), and lists every save that moved money on the month's bills. A cancellation is called *Cancelled*, not *Drop sales*. See "The ERP audit trail".

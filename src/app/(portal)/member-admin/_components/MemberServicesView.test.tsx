@@ -2,14 +2,16 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminMemberData } from '@/lib/member/server'
 
-// People › Member services (2026-10-10, the HR revamp): three tabs for whoever
+// People › Member services (2026-10-10, the HR revamp): the tabs for whoever
 // manages member requests — Publish memo moved to People › Documentation
-// (round 2, 2026-10-11); Brand weeks reads its month only when it is first
-// opened — never as the page's own Server Action — and a tab keeps its state.
+// (round 2, 2026-10-11), Food claim came after Claim rates (2026-10-13); Brand
+// weeks reads its month only when it is first opened — never as the page's own
+// Server Action — and a tab keeps its state.
 
 const fetchWeeks = vi.hoisted(() => vi.fn(() => new Promise(() => {})))
 vi.mock('../brand-weeks-actions', () => ({ fetchBrandWeeksAdmin: fetchWeeks, saveBrandWeeksAdmin: vi.fn() }))
 vi.mock('../claim-rates-actions', () => ({ saveClaimRatesAdmin: vi.fn() }))
+vi.mock('../food-claim-actions', () => ({ saveFoodClaimAdmin: vi.fn() }))
 vi.mock('@/app/(member)/member/actions', () => ({ adminMemberAction: vi.fn() }))
 vi.mock('@/components/hrv/toast', () => ({ flash: vi.fn() }))
 
@@ -22,7 +24,7 @@ const data: AdminMemberData = {
 }
 
 function show(over: Partial<AdminMemberData> = {}) {
-  return render(<MemberServicesView data={{ ...data, ...over }} facts={{}} claimRates={null} initialRequestId={null} />)
+  return render(<MemberServicesView data={{ ...data, ...over }} facts={{}} claimRates={null} foodClaim={null} initialRequestId={null} />)
 }
 
 beforeEach(() => {
@@ -31,10 +33,10 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('MemberServicesView', () => {
-  it('heads the page and offers the three tabs — Capacity, Product options and Publish memo are gone', () => {
+  it('heads the page and offers its tabs — Capacity, Product options and Publish memo are gone, Food claim is new', () => {
     show()
     expect(screen.getByRole('heading', { level: 1, name: 'Member services' })).toBeInTheDocument()
-    expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual(['Request reviews', 'Brand weeks', 'Claim rates'])
+    expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual(['Request reviews', 'Brand weeks', 'Claim rates', 'Food claim'])
     expect(screen.getByRole('tab', { name: 'Request reviews' })).toHaveAttribute('aria-selected', 'true')
   })
 

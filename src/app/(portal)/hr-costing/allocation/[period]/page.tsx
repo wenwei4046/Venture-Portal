@@ -143,19 +143,12 @@ export default async function AllocationPage({ params }: PageProps) {
                 {staffWithAlloc} of {staff.length} staff allocated
                 {lockedCount > 0 &&
                   ` · ${lockedCount === staff.length ? 'all' : lockedCount} locked with their payroll`}
-                {' · unallocated share stays with HV'}
               </>
             )}
           </p>
+          {/* Centralized departments are named here, not listed (2026-09-30). */}
           {notListed.length > 0 ? (
-            <p className="text-xs mt-1.5">
-              Not listed: {notListedLine} — centralized, they bill the subsidiaries by invoice from their
-              own pool. Switch a department in{' '}
-              <Link href="/settings?tab=departments" className="underline hover:text-accent">
-                Settings › Departments
-              </Link>
-              .
-            </p>
+            <p className="text-xs mt-1.5">Not listed: {notListedLine} — centralized.</p>
           ) : null}
         </div>
         <div className="flex flex-col items-end gap-3">

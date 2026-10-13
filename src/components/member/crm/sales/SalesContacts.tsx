@@ -5,15 +5,27 @@
 // ./vm/contacts.ts. To change the look, change the design and regenerate.
 import { Fragment } from "react";
 import type { ContactsVM } from "./vm/contacts";
+import type { ShellExtras } from "./vm/header";
 
 /** Contacts: A–Z, swipe to edit or delete, customer details and info sheets. */
-export default function SalesContacts({ v }: { v: ContactsVM }) {
+export default function SalesContacts({ v }: { v: ContactsVM & ShellExtras }) {
   return (<>
             
     <div style={{ position: "relative", flex: "1 1 auto", minHeight: "0", display: "flex", flexDirection: "column" }}>
       <main data-contacts-list="1" style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "10px 28px 24px 20px", display: "flex", flexDirection: "column", gap: "16px" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginRight: "-8px" }}>
           <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Contacts</h1>
+          {!!(v.tb) && (<>
+          <span onClick={v.tb.open} title="Notifications" style={{ position: "relative", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0">
+              </path>
+            </svg>
+            {!!(v.tb.has) && (<>
+              <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", background: "#BD4A19", border: "2px solid #fff", color: "#fff", display: "grid", placeItems: "center", fontSize: "10px", fontWeight: "700" }}>{v.tb.n}</span>
+            </>)}
+          </span>
+        </>)}
         </div>
         <label style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", height: "44px", padding: "0 14px", boxSizing: "border-box", borderRadius: "14px", background: "#F5EEE9", color: "#806B60" }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">

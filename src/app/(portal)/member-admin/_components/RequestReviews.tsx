@@ -313,7 +313,8 @@ function Detail({
           ...requestFacts(r, facts, data).map(f => f.l === 'Signed form' && hasSignedForm(r)
             ? { l: f.l, v: <>{f.v} <button type="button" className={s.linkish} disabled={busy} onClick={() => run({ label: 'View signed form', input: { action: 'signed_form', requestId: r.id }, done: '' })}>View ↗</button></> }
             : f),
-          ...(r.kind === 'claim' && r.claimId
+          // Only a claim sent with an invoice has one to open — a food claim and Outstation by road have none.
+          ...(r.kind === 'claim' && r.claimId && typeof r.detail.invoiceHash === 'string' && r.detail.invoiceHash
             ? [{ l: 'Invoice', v: <button type="button" className={s.linkish} style={{ marginLeft: 0 }} disabled={busy} onClick={() => run({ label: 'View invoice', input: { action: 'invoice', requestId: r.id }, done: '' })}>View invoice ↗</button> }]
             : []),
         ]}

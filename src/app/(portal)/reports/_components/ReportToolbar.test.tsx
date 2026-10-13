@@ -34,7 +34,9 @@ describe('the report control row', () => {
     expect(screen.getByRole('combobox', { name: 'To' })).toHaveValue('2023-05')
   })
 
-  it('reads the range From "to" To, and says Find only highlights', () => {
+  // 2026-10-12 — the user: descriptions make the view messy. Find is named,
+  // with no "· highlights only" hint beside it.
+  it('reads the range From "to" To, and names Find without a hint', () => {
     render(
       <ReportSearchProvider level={3}>
         <ReportToolbar from="2026-01" to="2026-10" fromOptions={['2026-01']} toOptions={MONTHS} segment="" segments={[]} />
@@ -42,7 +44,8 @@ describe('the report control row', () => {
     )
     const row = screen.getByRole('group', { name: 'Report controls' })
     expect(row.querySelector('.rpt-range')).toHaveTextContent(/to/)
-    expect(within(row).getByText('· highlights only')).toBeInTheDocument()
+    expect(within(row).getByText('Find account')).toBeInTheDocument()
+    expect(within(row).queryByText(/highlights only/)).toBeNull()
   })
 })
 

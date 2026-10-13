@@ -12,6 +12,7 @@ import type { assignVM } from "./assign";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], A7 = [0, 1, 2, 3, 4, 5, 6];
 type Mode = "even" | "pct" | "cnt";
+type CrmRuleIn = Parameters<PanelCtx["act"]["saveAdRule"]>[2];
 const dig = (e: ChangeEvent<HTMLInputElement>) => parseInt(String(e.target.value).replace(/\D/g, "")) || 0;
 
 /** Who is ticked on which weekday in a team's Full time days (any old Max / By % value above 0 counts as ticked). */
@@ -69,6 +70,8 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     people: [] as { name: string; sub: string; days: { title: string; icon: string; bg: string; fg: string; bd: string; toggle: () => void }[] }[],
     week: [] as { day: string; text: string; fg: string; weight: number; rule: string }[],
     clear: () => {}, save: () => {},
+    // Round 2 (rev 1011 §8): "Save and apply to all N teams" — off until somebody here has a day ticked.
+    applyLabel: "", applyFg: "#B5C4BA", applyBd: "#D8E3DC", applyCur: "default", applyAll: undefined as (() => void) | undefined,
     sum: teams.map(t => {
       const v = ticks(ctx, t.id), ps = ftPeople(t), on = A7.filter(d => who(ps, v, d).length);
       return { name: t.name, mode: on.length ? on.map(d => WKL[d]).join(", ") : "Off · follows Ads to teams", open: () => patch({ ftx: { tid: t.id, v: JSON.parse(JSON.stringify(v)) } }),
@@ -90,6 +93,23 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
       ps.forEach(p => { vals[p.id] = Object.fromEntries(A7.map(d => [d, (v[p.id] ?? []).includes(d) ? 1 : 0])); });
       void act.saveFtRule(ft.id, "turns", days, vals).then(ok => { if (ok) patch({ ftx: null, toast: ft.name + ": full time days saved" }); });
     };
+    // …and to every team: this team as edited; in each other team every full-time person gets the day pattern of the first
+    // ticked person here. A team with no full-time person is skipped. One crm_save_fulltime per team (the prototype's).
+    const pat = ps.map(p => v[p.id] ?? []).find(a => a.length) ?? [];
+    ftx.applyLabel = "Save and apply to all " + teams.length + " teams";
+    ftx.applyFg = pat.length ? "#387557" : "#B5C4BA"; ftx.applyBd = pat.length ? "#387557" : "#D8E3DC"; ftx.applyCur = pat.length ? "pointer" : "default";
+    ftx.applyAll = pat.length ? () => void (async () => {
+      for (const t of teams) {
+        const tps = ftPeople(t);
+        if (!tps.length) continue;
+        const vv: Record<string, number[]> = {};
+        tps.forEach(p => { vv[p.id] = t.id === ft.id ? (v[p.id] ?? []) : [...pat]; });
+        const days = A7.filter(d => who(tps, vv, d).length), vals: Record<string, Record<string, number>> = {};
+        tps.forEach(p => { vals[p.id] = Object.fromEntries(A7.map(d => [d, vv[p.id].includes(d) ? 1 : 0])); });
+        if (!(await act.saveFtRule(t.id, "turns", days, vals))) return;
+      }
+      patch({ ftx: null, toast: "Applied to all " + teams.length + " teams · fine-tune any team on its own" });
+    })() : undefined;
   }
 
   // ── By team, inside each team (§6.6): Evenly / By % (default, auto-balancing to 100) / By max (starts at 0).
@@ -99,6 +119,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
   const takenOf = (adId: string, pid: string) => data.customers.filter(c => c.adId === adId && c.assignedTo === pid).length;
   const bp = { selAll: (e: FocusEvent<HTMLInputElement> | MouseEvent<HTMLInputElement>) => (e.target as HTMLInputElement).select(), inner: [] as ReturnType<typeof innerOf>[] };
   let aeSave: { saveBg: string; save: (() => void) | undefined } | null = null;
+  let byTeamRule: CrmRuleIn | null = null;
   function innerOf(t: Team, B0: NonNullable<typeof B>, split: Record<string, number>) {
     const putB = (p: Partial<NonNullable<typeof B>>) => patch({ bp: { ...B0, ...p } });
     const mode: Mode = B0.tm[t.id] ?? "pct", ps = t.people, es = evenShare(ps.length || 1), custom = mode !== "even";
@@ -144,17 +165,39 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     const split = E.split;
     bp.inner = teams.filter(t => (split[t.id] || 0) > 0).map(t => innerOf(t, B, split));
     const tot = teams.reduce((x, t) => x + (split[t.id] || 0), 0), ok = tot === 100 && bp.inner.every(x => x.ok);
+    const tm: Record<string, Mode> = {}, pv: Record<string, number> = {};
+    teams.forEach(t => {
+      const m: Mode = B.tm[t.id] ?? "pct"; tm[t.id] = m; if (m === "even") return;
+      const es = evenShare(t.people.length || 1); t.people.forEach((p, k) => { pv[p.id] = B.pv[p.id] ?? (m === "pct" ? es(k) : 0); });
+    });
+    if (ok) byTeamRule = { mode: "split", split, pm: "pct", pp: pv, tm };
     aeSave = { saveBg: ok ? "#2F6FB5" : "#C9D6E6", save: ok ? () => {
-      const tm: Record<string, Mode> = {}, pv: Record<string, number> = {};
-      teams.forEach(t => {
-        const m: Mode = B.tm[t.id] ?? "pct"; tm[t.id] = m; if (m === "even") return;
-        const es = evenShare(t.people.length || 1); t.people.forEach((p, k) => { pv[p.id] = B.pv[p.id] ?? (m === "pct" ? es(k) : 0); });
-      });
       // Saving deals any lead waiting for this ad first, oldest first, inside the team it waits for (the database does it).
       void act.saveAdRule(E.id, E.label, { mode: "split", split, pm: "pct", pp: pv, tm }).then(ok => {
         if (ok) patch({ adEd: null, bp: null, toast: E.label + " saved" + (ok.dealt ? " · " + ok.dealt + " waiting lead" + (ok.dealt === 1 ? "" : "s") + " dealt" : "") });
       });
     } : undefined };
+  }
+
+  // Round 2 (rev 1011 §8): "Save and apply to all N ads" — this ad's whole setting (the split, every team's inside mode
+  // and values) saved to EVERY ad, each keeping its own name and taken counts; one crm_save_ad_assign per ad, each dealing
+  // its own waiting leads. Off while the draft is not valid (the Save rule). An ad left on the default is saved to none.
+  const aeApply = { applyLabel: "", applyFg: "#C9D6E6", applyBd: "#DCE6F2", applyCur: "default", applyAll: undefined as (() => void) | undefined };
+  if (E && asv?.ae) {
+    const mp = new Map<string, string>();
+    data.customers.forEach(c => { if (c.adId) mp.set(c.adId, c.ad); });
+    data.adRules.forEach(r => mp.set(r.adId, r.label));
+    mp.set(E.id, E.label);
+    const all = [...mp], okAll = isSp ? !!byTeamRule : !!asv.ae.save;
+    const ruleFor = (): CrmRuleIn | null => isSp ? byTeamRule : E.mode === "unset" ? null : { mode: "even", split: { ...E.split }, pm: E.pm, pp: { ...E.pp } };
+    Object.assign(aeApply, {
+      applyLabel: "Save and apply to all " + all.length + " ads", applyFg: okAll ? "#2F6FB5" : "#C9D6E6", applyBd: okAll ? "#2F6FB5" : "#DCE6F2", applyCur: okAll ? "pointer" : "default",
+      applyAll: okAll ? () => void (async () => {
+        const r = ruleFor();
+        if (r) for (const [id, label] of all) if (!(await act.saveAdRule(id, label, r))) return;
+        patch({ adEd: null, bp: null, toast: "Applied to all " + all.length + " ads · fine-tune any ad on its own" });
+      })() : undefined,
+    });
   }
 
   // The ad cards (compact): a legend per team, and "N waiting" when a full By max team holds leads of that ad.
@@ -183,5 +226,5 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     }),
   };
   void nameOf; void ini;
-  return { asx, ftx, bp, hl, adRows, aeSave };
+  return { asx, ftx, bp, hl, adRows, aeSave, aeApply };
 }

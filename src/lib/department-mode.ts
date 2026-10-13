@@ -34,13 +34,6 @@ export const COST_MODEL_LABEL: Record<CostModel, string> = {
   centralized: 'Centralized',
 }
 
-/** One line on what the mode means for this department. */
-export function costModelSummary(model: CostModel): string {
-  return model === 'centralized'
-    ? 'Bills the subsidiaries by invoice · runs its own pool · not on Billing Allocation'
-    : 'Its payroll is split across the subsidiaries on Billing Allocation · its pool should net to zero'
-}
-
 /** A department as the switch sees it (`department_modes()`). */
 export interface DepartmentMode {
   id: string

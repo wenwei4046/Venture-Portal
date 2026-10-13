@@ -5,6 +5,7 @@ import { Window } from '@/components/hrv/overlay'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { inviteHiringTalent, saveHiringTalent } from '@/lib/hiring/actions'
+import { savedIn } from '@/lib/hiring/bank'
 import { answerOf, departmentNames, pickRows } from '@/lib/hiring/view'
 import type { HiringBoard, HiringCandidate, HiringRequest } from '@/lib/hiring/types'
 import s from './hiring.module.css'
@@ -71,6 +72,9 @@ export function MoveToTalentWindow({
   onClose: () => void
 }) {
   const departments = departmentNames(board)
+  // A guest's candidate is kept in their company's department as the request names it (2026-10-12, the Talent Bank as a
+  // Drive) — HOUZS Venture's list is not theirs; HOUZS Venture's are kept in the department picked here.
+  const guest = r.source === 'guest' && !!r.requesterCompany?.trim()
   const files = c?.files ?? []
   const onlyResume = files.length === 1 && files[0].resume
   const [name, setName] = useState('')
@@ -89,7 +93,7 @@ export function MoveToTalentWindow({
     setEmail('')
     setPosition(answerOf(r, 'position'))
     const first = (answerOf(r, 'dept') || 'Revenue').split(' · ')[0]
-    setDept(departments.includes(first) ? first : departments[0] ?? first)
+    setDept(guest ? answerOf(r, 'dept') || first : departments.includes(first) ? first : departments[0] ?? first)
     setNotes(c.note)
     setErr('')
     // A fresh form for each candidate.
@@ -140,16 +144,18 @@ export function MoveToTalentWindow({
             <span className={s.labelText}>Email</span>
             <input className={s.input} value={email} onChange={e => setEmail(e.target.value)} />
           </label>
-          <label className={s.label}>
-            <span className={s.labelText}>Department *</span>
-            <Select bare className={s.select} value={dept} onChange={e => setDept(e.target.value)}>
-              {departments.map(d => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </Select>
-          </label>
+          {guest ? null : (
+            <label className={s.label}>
+              <span className={s.labelText}>Department *</span>
+              <Select bare className={s.select} value={dept} onChange={e => setDept(e.target.value)}>
+                {departments.map(d => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          )}
           <label className={`${s.label} ${s.full}`}>
             <span className={s.labelText}>Good fit for (position) *</span>
             <input className={s.input} value={position} onChange={e => setPosition(e.target.value)} />
@@ -159,6 +165,10 @@ export function MoveToTalentWindow({
           <span className={s.labelText}>Why keep them</span>
           <textarea className={s.textarea} rows={4} value={notes} onChange={e => setNotes(e.target.value)} />
         </label>
+        <div className={s.resumeRow}>
+          <span className={s.labelText}>Kept in</span>
+          <span className={s.resumeRowName}>{'Talent Bank › ' + savedIn(r, dept).label}</span>
+        </div>
         {/* Their one file a résumé, the row keeps the handoff's words (Résumé · CV.pdf); otherwise each with its type. */}
         <div className={s.resumeRow}>
           <span className={s.labelText}>{onlyResume ? 'Résumé' : 'Files'}</span>

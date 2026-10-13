@@ -194,14 +194,6 @@ export default async function CashFlowPage({ searchParams }: Props) {
 
       <ReportViewToggle pair="cash-flow" active="single" period={period} segment={segment || undefined} />
 
-      <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
-        Direct method from the general ledger: every bank movement is allocated to its
-        counter account and grouped by that account&apos;s cash-flow category (set in
-        Settings → Chart of Account). Bank↔bank internal transfers cancel out. Opening +
-        net change reconciles to closing cash. Click ▸ on a row to see the underlying
-        transactions.
-      </p>
-
       <GlReportView
         basePath="/reports/cash-flow"
         period={period}

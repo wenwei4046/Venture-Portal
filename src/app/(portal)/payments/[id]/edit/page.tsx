@@ -112,11 +112,6 @@ export default async function EditPaymentPage({ params }: Props) {
             <em>I.</em> TREASURY · {voucher.direction === 'credit' ? 'OFFICIAL RECEIPT' : 'PAYMENT VOUCHER'} · EDIT
           </div>
           <h1 className="page-title">Edit {voucher.voucher_no ?? 'draft'}</h1>
-          <p className="font-serif italic text-graphite text-sm mt-2">
-            {statutoryDetailsLocked || salaryDetailsLocked
-              ? 'Only payment date and notes can be edited. Payment details are recorded with this voucher.'
-              : 'Editing locked once Principal approves. Voucher type, direction, voucher number, and any linked invoice / loan / fund source are immutable.'}
-          </p>
         </div>
       </div>
 

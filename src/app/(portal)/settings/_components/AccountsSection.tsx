@@ -467,10 +467,6 @@ export default function AccountsSection({ accounts, head, intro }: Props) {
             </div>
           </div>
         )}
-        <p className="text-xs text-graphite mt-3 max-w-3xl">
-          Drag a row onto another account to make it a sub-account. Same type only; accounts with postings can&apos;t become parents.
-          Codes are allocated by type, and the cash flow category decides Operating / Investing / Financing on the Cash Flow Statement.
-        </p>
       </section>
     </>
   )

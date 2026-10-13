@@ -83,7 +83,6 @@ export default function ClaimRatesPanel({ initial }: { initial: ClaimRatesAdmin 
           {saving ? 'Saving…' : changed ? 'Save' : 'Saved'}
         </button>
       </div>
-      <p className={s.crSub}>What a member&apos;s fair claim is worked out from. Hover a field for how it&apos;s used.</p>
       {error || (changed && problems.length) ? (
         <p className={s.alert} role="alert">{error || problems[0]}</p>
       ) : null}
@@ -248,7 +247,7 @@ export default function ClaimRatesPanel({ initial }: { initial: ClaimRatesAdmin 
       </div>
       {saved.updatedAt ? (
         <div className={s.foot}>
-          Last saved {savedOn(saved.updatedAt)}{saved.updatedBy ? ` by ${saved.updatedBy}` : ''}. A claim keeps the amount it was sent with.
+          Last saved {savedOn(saved.updatedAt)}{saved.updatedBy ? ` by ${saved.updatedBy}` : ''}.
         </div>
       ) : null}
     </section>

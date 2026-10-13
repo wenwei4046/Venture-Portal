@@ -3,7 +3,6 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import dayjs from 'dayjs'
 import { deleteAllocTxn } from '../../actions'
 import { unwrap } from '../../_components/unwrap'
 
@@ -38,7 +37,6 @@ export default function RecordActions({
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const listHref = `/billing-allocator?period=${period}`
-  const monthLabel = dayjs(`${period}-01`).format('MMMM YYYY')
 
   const run = (fn: () => Promise<void>) => {
     setError(null)
@@ -83,11 +81,6 @@ export default function RecordActions({
             </button>
           </>
         )}
-        <span className="note">
-          {billed
-            ? 'Billed — each invoice carries its company’s share. To undo, delete the batch’s draft invoices on the Invoice page, or credit-note an issued one.'
-            : `Not billed yet. Generate invoices (above) raises one draft per company for every unbilled allocation of ${monthLabel}; correcting reloads this record in Calculate; deleting removes it before any invoice is made.`}
-        </span>
       </div>
 
       {error ? <div className="mt-3 bg-danger-bg border border-danger text-danger rounded-md p-3 text-sm font-sans">{error}</div> : null}

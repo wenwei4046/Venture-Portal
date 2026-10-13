@@ -128,7 +128,6 @@
 /* ── Brand weeks ── */
 .bwHead { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .bwTitle { font-size: 15px; font-weight: 500; margin: 0; }
-.bwSub { font-size: 12.5px; color: rgb(var(--hv-body-2)); }
 .spacer { flex: 1; }
 .subChip {
   padding: 6px 12px;
@@ -178,12 +177,11 @@
 
 /* ── Claim rates ── */
 .crCard { border: 1px solid rgb(var(--hv-hairline)); border-radius: 12px; padding: 20px; background: rgb(255 255 255); }
-.crHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 12px; }
+.crHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; }
 .crTitle { font-size: 17px; font-weight: 600; margin: 0; }
 .crSave { padding: 8px 18px; border: 0; border-radius: 6px; font: inherit; font-size: 13px; line-height: normal; cursor: pointer; background: rgb(var(--hv-accent)); color: rgb(var(--hv-ink)); }
 .crSave:hover:not(:disabled) { background: rgb(var(--hv-accent-hover)); }
 .crSave:disabled { background: rgb(var(--hv-disabled)); color: rgb(var(--hv-faint)); cursor: default; opacity: 1; }
-.crSub { font-size: 12.5px; color: rgb(var(--hv-body-2)); margin: -4px 0 16px; }
 .crCards { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 14px; margin-bottom: 18px; }
 .crBox { border: 1px solid rgb(var(--hv-hairline)); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .crBoxTitle { font-size: 13px; font-weight: 600; }
@@ -231,6 +229,10 @@
 .crVenueMeta { display: block; font-size: 11px; color: rgb(var(--hv-brown)); margin-top: 2px; }
 .crVenueSelect { margin: 6px 14px; max-width: 260px; padding: 7px 10px; border: 1px solid rgb(var(--hv-hairline)); border-radius: 6px; font: inherit; font-size: 13px; line-height: normal; background: rgb(255 255 255); color: rgb(var(--hv-ink)); }
 .crVenueSelect[data-unset='true'] { border-color: rgb(var(--hv-alert-border)); background: rgb(var(--hv-alert-bg)); }
+/* Food claim (2026-10-13): the title with its "Fair only" chip, the rate a day in a box of its own, then the titles. */
+.fcTitleRow { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.fcBox { width: min(360px, 100%); box-sizing: border-box; border: 1px solid rgb(var(--hv-hairline)); border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; }
+.fcLevel { padding: 0 14px; font-size: 12.5px; color: rgb(var(--hv-body-2)); }
 
 @media (max-width: 900px) {
   .reqGrid, .crCards { grid-template-columns: minmax(0, 1fr); }

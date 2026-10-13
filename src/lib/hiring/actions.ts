@@ -249,10 +249,11 @@ export async function setCandidateStage(candidate: string, stage: CandidateStage
 /**
  * A file, through a link that works for ten minutes — made at the press, never
  * kept in a page: a candidate's or a talent's résumé (`candidate` / `talent`,
- * their newest), any one of their files (`file`, by its id) or a request's
- * attachment. A candidate's file downloaded is a step of the request's trail.
+ * their newest), any one of their files (`file`, by its id), a request's
+ * attachment, or a file the Talent Bank keeps in a folder (`bank`, mig
+ * 20261013030000). A candidate's file downloaded is a step of the request's trail.
  */
-export async function hiringFileLink(kind: 'candidate' | 'talent' | 'file' | 'attachment', id: string, download = false): Promise<
+export async function hiringFileLink(kind: 'candidate' | 'talent' | 'file' | 'attachment' | 'bank', id: string, download = false): Promise<
   { ok: true; url: string; name: string; preview: 'pdf' | 'image' | 'none' } | { ok: false; reason: string }
 > {
   await requireActionOn(['/hiring/requests', '/hiring/talent'], 'hiring', 'view')
@@ -311,7 +312,10 @@ export async function replaceHiringFile(file: string, upload: { path: string; na
   return deleted ? { ok: true } : { ok: true, warning: LEFT_IN_STORAGE }
 }
 
-/** Remove: a file off its record, and out of the bucket once nobody else's record names it (Edit). */
+/**
+ * Remove: a file off its record (Edit). A Talent Bank person's waits in the Bin for 30 days (mig 20261013061500); a
+ * candidate's leaves the bucket once nobody else's record names it.
+ */
 export async function removeHiringFile(file: string): Promise<HiringOutcome> {
   await requireActionOn('/hiring/talent/[id]', 'hiring', 'edit')
   const supabase = await client()
@@ -380,13 +384,14 @@ export async function removeHiringSource(id: string): Promise<HiringOutcome> {
 // ── The Talent Bank ─────────────────────────────────────────────────────────
 
 /**
- * Add talent, or Move to Talent Bank… from a candidate (who brings all their
- * files). FormData: `name`, `phone`, `email`, `position`, `department`,
- * `notes`, `candidate` (from a request), `files` (JSON — the uploads to file,
- * `UploadedFile[]`).
+ * Move to Talent Bank… from a candidate (who brings all their files) — the
+ * database keeps them in their company › department (mig 20261013030000; the
+ * Talent Bank's own + Add talent is `addBankTalent`). FormData: `name`,
+ * `phone`, `email`, `position`, `department`, `notes`, `candidate` (from a
+ * request), `files` (JSON — the uploads to file, `UploadedFile[]`).
  */
 export async function saveHiringTalent(form: FormData): Promise<HiringIdOutcome> {
-  await requireActionOn(['/hiring/requests/[id]', '/hiring/talent'], 'hiring', 'create')
+  await requireActionOn('/hiring/requests/[id]', 'hiring', 'create')
   const candidate = text(form, 'candidate')
   if (!text(form, 'name').trim() || !text(form, 'position').trim()) {
     return { ok: false, reason: candidate ? 'Name and position are needed.' : 'Add a name and the position they fit.' }
@@ -413,6 +418,114 @@ export async function saveHiringTalent(form: FormData): Promise<HiringIdOutcome>
   return { ok: true, id: String(data) }
 }
 
+// ── The Talent Bank as a Drive (mig 20261013030000) ─────────────────────────
+
+/** + New › New folder: in the bank, a company, a department or another folder (Create). */
+export async function addBankFolder(parent: string, name: string): Promise<HiringIdOutcome> {
+  await requireActionOn('/hiring/talent', 'hiring', 'create')
+  if (!name.trim()) return { ok: false, reason: 'Name the folder.' }
+  const { data, error } = await (await client()).rpc('hiring_bank_folder_add', { p_parent: parent, p_name: name })
+  if (error) return { ok: false, reason: refusal(error, 'The folder could not be made. Please try again.') }
+  refresh()
+  return { ok: true, id: String(data) }
+}
+
+/** A folder's ⋮ › Rename (Edit). */
+export async function renameBankFolder(id: string, name: string): Promise<HiringOutcome> {
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
+  if (!name.trim()) return { ok: false, reason: 'Name the folder.' }
+  return call('hiring_bank_folder_rename', { p_id: id, p_name: name }, 'The folder could not be renamed. Please try again.')
+}
+
+/** A folder's ⋮ › Move to Bin — only an empty one; the Bin keeps it 30 days (Edit). */
+export async function deleteBankFolder(id: string): Promise<HiringOutcome> {
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
+  return call('hiring_bank_folder_delete', { p_id: id }, 'The folder could not be deleted. Please try again.')
+}
+
+/** A folder's Move to…: the folder and everything in it go together — into the bank, a company, a department or a folder (Edit). */
+export async function moveBankFolder(id: string, parent: string): Promise<HiringOutcome> {
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
+  return call('hiring_bank_folder_move', { p_id: id, p_parent: parent }, 'The folder could not be moved. Please try again.')
+}
+
+/** A department's Move everyone to…: its people, folders and files go to another place together (Edit). */
+export async function moveBankEveryone(from: string, to: string): Promise<
+  { ok: true; people: number; folders: number; files: number } | { ok: false; reason: string }
+> {
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
+  const { data, error } = await (await client()).rpc('hiring_bank_move_all', { p_from: from, p_to: to })
+  if (error) return { ok: false, reason: refusal(error, 'They could not be moved. Please try again.') }
+  refresh()
+  const n = (k: string) => Number((data as Record<string, unknown> | null)?.[k]) || 0
+  return { ok: true, people: n('people'), folders: n('folders'), files: n('files') }
+}
+
+/** A person's Move to…: a company, a department or a folder (Edit). On their History as Moved. */
+export async function moveBankTalent(talent: string, place: string): Promise<HiringOutcome> {
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
+  return call('hiring_bank_move', { p_talent: talent, p_place: place }, 'They could not be moved. Please try again.')
+}
+
+/**
+ * + New › Add talent, in the place it is pressed (Create). FormData: `name`, `phone`, `email`, `position`, `notes`,
+ * `files` (JSON — the uploads to file, `UploadedFile[]`).
+ */
+export async function addBankTalent(place: string, form: FormData): Promise<HiringIdOutcome> {
+  await requireActionOn('/hiring/talent', 'hiring', 'create')
+  if (!text(form, 'name').trim() || !text(form, 'position').trim()) return { ok: false, reason: 'Add a name and the position they fit.' }
+  const files = uploadsFrom(text(form, 'files'))
+  if (!files) return { ok: false, reason: 'The files are not in the right shape.' }
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('hiring_bank_add_talent', {
+    p_place: place,
+    p_name: text(form, 'name'),
+    p_phone: text(form, 'phone'),
+    p_email: text(form, 'email'),
+    p_position: text(form, 'position'),
+    p_notes: text(form, 'notes'),
+    p_files: files.length ? files : null,
+  })
+  if (error) {
+    await deleteObjects(supabase, files.map(f => f.path))
+    return { ok: false, reason: refusal(error, 'The talent could not be saved. Please try again.') }
+  }
+  if (files.length) await sweep(supabase)
+  refresh()
+  return { ok: true, id: String(data) }
+}
+
+/** + New › Upload files: one file the browser has put in the bucket, kept in a place of the bank (Create). */
+export async function saveBankFile(input: { place: string; path: string; name: string; type: string; size: number }): Promise<HiringOutcome> {
+  await requireActionOn('/hiring/talent', 'hiring', 'create')
+  const supabase = await client()
+  const { error } = await supabase.rpc('hiring_bank_file_add', {
+    p_place: input.place,
+    p_path: input.path,
+    p_name: input.name,
+    p_type: input.type,
+    p_size: Number.isFinite(input.size) ? Math.round(input.size) : null,
+  })
+  if (error) {
+    await deleteObjects(supabase, [input.path])
+    return { ok: false, reason: refusal(error, 'The file could not be kept. Please try again.') }
+  }
+  refresh()
+  return { ok: true }
+}
+
+/** A file's ⋮ › Move to Bin: off the bank, its object kept while the Bin keeps it — 30 days (Edit). */
+export async function deleteBankFile(id: string): Promise<HiringOutcome> {
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('hiring_bank_file_delete', { p_id: id })
+  if (error) return { ok: false, reason: refusal(error, 'The file could not be deleted. Please try again.') }
+  const deleted = await deleteObjects(supabase, orphansOf(data))
+  await sweep(supabase)
+  refresh()
+  return deleted ? { ok: true } : { ok: true, warning: LEFT_IN_STORAGE }
+}
+
 /** Pick from Talent Bank / Invite to interview: the talent joins a request as a shortlisted candidate. */
 export async function inviteHiringTalent(talent: string, request: string): Promise<HiringOutcome> {
   await requireActionOn(['/hiring/requests/[id]', '/hiring/talent/[id]'], 'hiring', 'create')
@@ -425,9 +538,9 @@ export async function saveTalentNotes(talent: string, notes: string): Promise<Hi
 }
 
 /**
- * Remove from Talent Bank: they leave the bank (their row stays for its
- * history) and their files come off — out of the bucket once nobody else's
- * record names them (a candidate they were may still).
+ * Remove from Talent Bank: they leave the bank for its Bin, their files with
+ * them, for 30 days (mig 20261013061500) — Restore brings them back; then the
+ * hourly sweep deletes the files (their row stays, removed, for its history).
  */
 export async function removeHiringTalent(talent: string): Promise<HiringOutcome> {
   await requireActionOn('/hiring/talent', 'hiring', 'edit')
@@ -438,4 +551,41 @@ export async function removeHiringTalent(talent: string): Promise<HiringOutcome>
   await sweep(supabase)
   refresh()
   return deleted ? { ok: true } : { ok: true, warning: LEFT_IN_STORAGE }
+}
+
+// ── The Talent Bank's Bin (mig 20261013061500) ──────────────────────────────
+
+/** Bin › Restore: back where it was — what it was in with it, when that is in the Bin too (Edit). Answers where, in words. */
+export async function restoreBankItem(id: string): Promise<{ ok: true; label: string } | { ok: false; reason: string }> {
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
+  const { data, error } = await (await client()).rpc('hiring_bank_bin_restore', { p_bin: id })
+  if (error) return { ok: false, reason: refusal(error, 'It could not be restored. Please try again.') }
+  refresh()
+  const label = data && typeof data === 'object' ? (data as { label?: unknown }).label : null
+  return { ok: true, label: typeof label === 'string' && label ? label : 'the Talent Bank' }
+}
+
+/** Bin › Delete forever: out of the Bin now, and out of the bucket once nobody else's record names it (Edit). */
+export async function deleteBankItemForever(id: string): Promise<HiringOutcome> {
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('hiring_bank_bin_delete', { p_bin: id })
+  if (error) return { ok: false, reason: refusal(error, 'It could not be deleted. Please try again.') }
+  const deleted = await deleteObjects(supabase, orphansOf(data))
+  await sweep(supabase)
+  refresh()
+  return deleted ? { ok: true } : { ok: true, warning: LEFT_IN_STORAGE }
+}
+
+/** Bin › Empty bin: everything in it, now (Edit). Answers how many went. */
+export async function emptyBankBin(): Promise<{ ok: true; count: number; warning?: string } | { ok: false; reason: string }> {
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('hiring_bank_bin_empty')
+  if (error) return { ok: false, reason: refusal(error, 'The Bin could not be emptied. Please try again.') }
+  const deleted = await deleteObjects(supabase, orphansOf(data))
+  await sweep(supabase)
+  refresh()
+  const count = Number((data as { count?: unknown } | null)?.count) || 0
+  return deleted ? { ok: true, count } : { ok: true, count, warning: LEFT_IN_STORAGE }
 }

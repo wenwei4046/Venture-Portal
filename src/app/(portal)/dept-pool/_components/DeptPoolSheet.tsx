@@ -361,11 +361,6 @@ export function DeptPoolCashSheet({
             </span>
           </div>
           <BalanceByBank perBank={perBank} canSetDefault={canSetDefault} />
-          <p className="text-xs text-graphite mt-3 max-w-3xl">
-            Each department&rsquo;s cash slice on each HV bank account, from the journal lines. Down a bank column = that bank&rsquo;s
-            balance; across a row = the department&rsquo;s total (as By department). Inter-billing recharges settle as an internal Hong
-            Leong transfer between departments.
-          </p>
         </section>
       ) : null}
 
@@ -414,12 +409,6 @@ export function DeptPoolCashSheet({
           </BalanceProvider>
         )}
       </section>
-
-      <p className="text-xs text-graphite max-w-3xl">
-        Dept Pools: invoices settled and P&amp;L in, payroll consolidation and expenses out. Venture (Office) = every journal entry
-        tagged corporate or treasury on an HV bank account. The total = every segment&rsquo;s allocation summed = the physical bank
-        balance.
-      </p>
     </div>
   )
 }
@@ -570,11 +559,6 @@ export function DeptPoolAccrualSheet({
           </div>
         )}
       </section>
-
-      <p className="text-xs text-graphite max-w-3xl">
-        Accrual basis, cumulative to date: billed revenue − cost − expense − inter-billing since inception, as at {asAt}. Cash shows the
-        actual pool movement.
-      </p>
     </div>
   )
 }

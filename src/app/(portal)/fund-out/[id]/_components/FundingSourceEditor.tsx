@@ -41,10 +41,6 @@ export default function FundingSourceEditor({ loanId, repaymentTerms }: Props) {
         </button>
         {saved && !isPending ? <span className="fin-saved">Saved ✓</span> : null}
       </div>
-      <p className="fin-hint">
-        Where this money came from — shows as the loan&apos;s SC tag on the list and the Company Statement. Save it empty to remove
-        the tag. Only this field changes; the terms stay as they are.
-      </p>
       {error ? <p className="fin-error">{error}</p> : null}
     </form>
   )

@@ -242,13 +242,7 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
             </div>
           )}
         </>
-      ) : (
-        <div className="mb-10 py-8 border border-hairline rounded-md bg-surface px-6 text-center">
-          <p className="font-serif italic text-graphite">
-            Finance sees the 4 OPEX totals above. Per-employee salary detail is restricted to Principal and HR (PDPA).
-          </p>
-        </div>
-      )}
+      ) : null}
     </div>
   )
 }

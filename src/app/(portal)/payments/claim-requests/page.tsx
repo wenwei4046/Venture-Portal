@@ -55,11 +55,6 @@ export default async function ClaimRequestsPage() {
             <em>I.</em> TREASURY · CLAIM REQUESTS
           </div>
           <h1 className="page-title">Claim requests</h1>
-          <p className="text-sm mt-3 max-w-2xl">
-            Claims approved to be paid by a voucher. Raise the voucher here; the
-            Principal approves it in Approvals, and the claim turns paid with it.
-            A claim paid with the salary never comes here.
-          </p>
         </div>
       </div>
 

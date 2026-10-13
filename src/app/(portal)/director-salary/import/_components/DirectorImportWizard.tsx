@@ -128,24 +128,6 @@ function DirectorImportWizardBody({ period }: Props) {
             Director-only InfoTech PayrollSummary
           </span>
         </label>
-        <div className="mt-5 text-xs space-y-1">
-          <p className="font-medium">
-            Everything is imported verbatim — the file is the source of truth:
-          </p>
-          <ul className="list-disc ml-5 space-y-0.5">
-            <li>
-              Rows are matched to directors by name; unmatched rows still import and are
-              flagged
-            </li>
-            <li>
-              <span className="font-mono">EPF / SOCSO / EIS</span> (ER + EE) ·{' '}
-              <span className="font-mono">PCB</span> · <span className="font-mono">Gross</span> ·{' '}
-              <span className="font-mono">NettWgs</span> → written exactly as exported, no
-              recompute
-            </li>
-            <li>Re-importing the same month overwrites by person — safe to repeat</li>
-          </ul>
-        </div>
         {error && <p className="mt-4 text-sm text-danger">{error}</p>}
       </div>
     )

@@ -80,8 +80,8 @@ import { editChanges, editProblem, revisionForm } from "@/lib/member/request-edi
 import type { WaitingQueue } from "@/lib/member/waiting-queue";
 import RequestForm, { type FormOptions, type SubmitOutcome } from "./profile/RequestForm";
 import MemosPage, { MemoSheet, type MemoTab } from "./profile/MemosPage";
-import { claimWeeks, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestRowsVM, teamVM, trackVM, vaGroupsVM, waitingChoices, type RequestEvent } from "./profile/profile-model";
-import type { ClaimRates } from "@/lib/member/claim-rules";
+import { claimWeeks, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestKindOf, requestRowsVM, teamVM, trackVM, vaGroupsVM, waitingChoices, type RequestEvent } from "./profile/profile-model";
+import { foodOpenTo, type ClaimRates } from "@/lib/member/claim-rules";
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
 import CrmApp from "../crm/CrmApp";
@@ -788,6 +788,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   }, [reqPick, fxp, cancelled, myRequests, history, nameOf, readOnlyView, queues, closed]);
   // A waiting list or replacement opens the handoff's sheet (Edit request → Update); a claim keeps its own.
   const reqKind = fxp ? (reqPick ? fxp.requests.rows.find(r => r.id === reqPick)?.kind ?? null : null) : myRequests.find(r => r.id === reqPick)?.kind ?? null;
+  // A claim's own sheet — a food claim's too (the app's `food`).
+  const reqIsClaim = reqKind === "claim" || reqKind === "food";
   const vaGroups = useMemo(() => (fxp
     ? protoVaGroups(fxp.va.people, fxp.va.departments, vaQuery, viewed?.id ?? "")
     : vaGroupsVM(data.memberships, vaQuery, viewed?.id ?? "")), [fxp, data.memberships, vaQuery, viewed?.id]);
@@ -897,7 +899,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     if (!r) return;
     setReqPick(null);
     setRevising({ id: r.id, detail: r.detail });
-    setReqForm(r.kind);
+    // A food claim sent back opens the food claim's own form (2026-10-13).
+    setReqForm(requestKindOf(r));
   }, [myRequests, reqPick]);
 
   // Team & capacity: the department's map, read when the page opens.
@@ -997,8 +1000,16 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       waitingList: waitingChoices(myRequests),
       waitingForm: waitingForm ?? null,
       replacementForm: replacementForm ?? null,
+      // The food claim (2026-10-13): a fair day still to come cannot be claimed, nor one another of theirs holds.
+      today,
+      foodClaims: myRequests,
     };
   }, [fxp, membership, arena, arenaNow, today, claimRates, team, data.departments, myRequests, waitingForm, replacementForm]);
+  // Requests' ways to start one: a food claim only in Fair, for a title HR picked (2026-10-13) — sent under the
+  // same Create as a claim. In View as, the viewed person's title decides.
+  const foodOpen = !fxp && foodOpenTo(claimRates, membership?.id, me.title);
+  const pageKinds = useMemo<RequestKindVM[]>(() => requestKinds.flatMap(k => (k === "claim" && foodOpen ? ["claim", "food"] as RequestKindVM[] : [k])),
+    [requestKinds, foodOpen]);
 
   // ── pull to refresh: the end of it ──
   // Every read above has started for this pull by now (effects run in order), so everybody's snapshot — the slowest
@@ -1203,7 +1214,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else if (pf === "team") {
       page = <TeamPage vm={teamView} onBack={back} onPerson={setPersonPick} />;
     } else if (pf === "requests") {
-      page = <RequestsPage rows={reqRows} filter={reqFilter} kinds={requestKinds} onFilter={setReqFilter} onBack={back}
+      page = <RequestsPage rows={reqRows} filter={reqFilter} kinds={pageKinds} onFilter={setReqFilter} onBack={back}
         onNew={k => { setRevising(null); setReqForm(k); }} onOpen={openRequest} />;
     } else if (pf === "track") {
       // A new one: on Requests, or — Requests closed to them — its form at once; neither when they may not send it.
@@ -1327,9 +1338,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
           {route.pf === "team" && <PersonSheet open={personPick !== null} vm={personPick ? teamView?.sheets[personPick] ?? null : null} onClose={() => setPersonPick(null)} />}
           {(route.pf === "requests" || route.pf === "track") && (
             <>
-              <RequestSheet open={reqPick !== null && reqKind === "claim"} vm={reqKind === "claim" ? reqDetail : null} busy={reqBusy} error={reqError}
+              <RequestSheet open={reqPick !== null && reqIsClaim} vm={reqIsClaim ? reqDetail : null} busy={reqBusy} error={reqError}
                 onCancel={() => void cancelRequest()} onUpdate={updateRequest} onClose={() => setReqPick(null)} />
-              <RequestInfoSheet open={reqPick !== null && reqKind !== null && reqKind !== "claim"} vm={reqKind !== "claim" ? reqDetail : null} busy={reqBusy} error={reqError}
+              <RequestInfoSheet open={reqPick !== null && reqKind !== null && !reqIsClaim} vm={!reqIsClaim ? reqDetail : null} busy={reqBusy} error={reqError}
                 onSave={editRequest} onCancel={() => void cancelRequest()} onClose={() => { setReqPick(null); setReqError(null); }} />
               <RequestForm kind={reqForm} options={formOptions} revising={revising} readOnly={readOnlyView} onSubmit={submitRequest}
                 formLink={fxp ? undefined : source.waitingFormLink} replFormLink={fxp ? undefined : source.replacementFormLink}

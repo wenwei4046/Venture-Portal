@@ -100,11 +100,7 @@ export default function MeetingRoomsView({
 
   return (
     <HvPage>
-      <PageHead
-        eyebrow="Admin · Meeting Rooms"
-        title="Meeting rooms"
-        subtitle="Every room’s bookings by day. Anyone can book; the person who booked can cancel."
-      />
+      <PageHead eyebrow="Admin · Meeting Rooms" title="Meeting rooms" />
       {canManage ? (
         <Tabs
           label="Meeting rooms"

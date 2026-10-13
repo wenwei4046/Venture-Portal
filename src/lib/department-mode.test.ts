@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   centralizedSplitMessage,
   costModelOf,
-  costModelSummary,
   hasMode,
   switchConsequence,
   switchedNote,
@@ -19,15 +18,6 @@ describe('costModelOf', () => {
     expect(costModelOf('cost_center')).toBe('cost_center')
     expect(costModelOf(undefined)).toBe('cost_center')
     expect(costModelOf('shared')).toBe('cost_center')
-  })
-})
-
-describe('costModelSummary', () => {
-  it('says what each mode means for the department', () => {
-    expect(costModelSummary('centralized')).toBe(
-      'Bills the subsidiaries by invoice · runs its own pool · not on Billing Allocation',
-    )
-    expect(costModelSummary('cost_center')).toContain('its pool should net to zero')
   })
 })
 

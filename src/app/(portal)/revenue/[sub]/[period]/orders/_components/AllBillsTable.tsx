@@ -380,9 +380,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
       </div>
       <div className={s.tableFooter}>
         <span>{visible.length} of {rows.length} bills
-          {lateCount > 0 && <> · <span className={s.otherMonthKey} aria-hidden />{lateCount} sold in another month</>}
-          {' · '}Double-click a bill to open it · Right-click for its menu · Scroll left / right to inspect the full sales line</span>
-        <span>Total commission stays visible →</span>
+          {lateCount > 0 && <> · <span className={s.otherMonthKey} aria-hidden />{lateCount} sold in another month</>}</span>
       </div>
     </div>
     {menu && <BillContextMenu

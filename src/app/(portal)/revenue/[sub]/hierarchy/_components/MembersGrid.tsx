@@ -298,11 +298,8 @@ export default function MembersGrid({
         </div>
       ) : null}
 
-      <div className={s.hint}>
-        {canEdit
-          ? `Change Rank, Rate mode or Withholding on a row; changed cells turn peach until you save. Right-click a person for their memberships. ${people.length} ${people.length === 1 ? 'person' : 'people'}.`
-          : `${people.length} ${people.length === 1 ? 'person' : 'people'}.`}
-      </div>
+      {/* The count only (2026-10-12) — the line on how to edit the grid went. */}
+      <div className={s.hint}>{`${people.length} ${people.length === 1 ? 'person' : 'people'}.`}</div>
 
       {menu ? (
         <PersonContextMenu

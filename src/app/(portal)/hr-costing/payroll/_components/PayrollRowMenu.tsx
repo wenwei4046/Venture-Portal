@@ -22,7 +22,6 @@ interface Props {
   row: PayrollRowData
   period: string
   anchor: RowMenuAnchor
-  byRightClick: boolean
   actions: RowActions
   status: StatusView
   /** Staff only: open their paycheck window. */
@@ -40,9 +39,11 @@ interface Props {
  * second payment, e.g. a sub-department that pays on the 15th. Either way the
  * amounts may only go up and the next batch sends only the difference. Each
  * write sits behind its own adjacent confirmation, like the bill menu's
- * (DESIGN.md › Membership context menu).
+ * (DESIGN.md › Membership context menu). One line a row, like the bill menu
+ * (2026-10-12): what a row's second line said is its tooltip, and the
+ * Shift + right-click hint at the foot went.
  */
-export default function PayrollRowMenu({ row, period, anchor, byRightClick, actions, status, onOpenPaycheck, onClose, onDone }: Props) {
+export default function PayrollRowMenu({ row, period, anchor, actions, status, onOpenPaycheck, onClose, onDone }: Props) {
   const router = useRouter()
   const boundary = useRef<HTMLDivElement>(null)
   const resubmitButton = useRef<HTMLButtonElement>(null)
@@ -132,7 +133,7 @@ export default function PayrollRowMenu({ row, period, anchor, byRightClick, acti
         onBack={close} onClose={close}>
         <div className={styles.menuHeading}>
           {row.staff_name} · {row.dept_name}
-          <span className="block text-[11px] mt-0.5">{status.label} — {status.detail}</span>
+          <span className="block text-[11px] mt-0.5" title={status.detail}>{status.label}</span>
         </div>
 
         {onOpenPaycheck ? (
@@ -142,10 +143,7 @@ export default function PayrollRowMenu({ row, period, anchor, byRightClick, acti
         ) : null}
         {sourceHref ? (
           <button type="button" role="menuitem" tabIndex={-1} disabled={pending} onClick={() => go(sourceHref, false)}>
-            <span className={styles.rowCopy}>
-              <span>Open on {where}</span>
-              <small>{row.origin === 'revenue' ? 'Close or reopen them there' : 'Keyed and Completed there'}</small>
-            </span>
+            Open on {where}
           </button>
         ) : null}
 
@@ -155,7 +153,7 @@ export default function PayrollRowMenu({ row, period, anchor, byRightClick, acti
               const r = await completePayrollRows(period, [row.id])
               return r.unchanged ? `${row.staff_name}: nothing changed — back as sent` : `${row.staff_name} completed — Submit to Finance when ready`
             })}>
-            <span className={styles.rowCopy}><span>Complete</span><small>The figures are checked — waits for the next batch</small></span>
+            Complete
           </button>
         ) : null}
         {actions.unlock ? (
@@ -164,19 +162,17 @@ export default function PayrollRowMenu({ row, period, anchor, byRightClick, acti
               await unlockPayrollRows(period, [row.id])
               return `${row.staff_name} unlocked — editable again`
             })}>
-            <span className={styles.rowCopy}><span>Unlock</span><small>Back to an editable draft</small></span>
+            Unlock
           </button>
         ) : null}
         {canReset ? (
           <button type="button" role="menuitem" tabIndex={-1} disabled={pending}
+            title={`${typedNames ? `Typed by hand: ${typedNames}` : 'From the InfoTech file'} — JADUAL works them out again`}
             onClick={() => run(async () => {
               await resetStaffStatutoryToLookup(row.id)
               return `${row.staff_name}: EPF, SOCSO, EIS and PCB are JADUAL's again`
             })}>
-            <span className={styles.rowCopy}>
-              <span>Reset statutory to JADUAL</span>
-              <small>{typedNames ? `Typed by hand: ${typedNames}` : 'From the InfoTech file'} — JADUAL works them out again</small>
-            </span>
+            Reset statutory to JADUAL
           </button>
         ) : null}
 
@@ -184,27 +180,21 @@ export default function PayrollRowMenu({ row, period, anchor, byRightClick, acti
           <>
             <button ref={resubmitButton} type="button" role="menuitem" tabIndex={-1} aria-haspopup="dialog"
               aria-expanded={confirm?.kind === 'resubmit'} aria-controls={confirm?.kind === 'resubmit' ? confirmId : undefined}
+              title="A correction to what was sent — only the difference goes"
               disabled={pending} onClick={() => ask('resubmit')}>
-              <span className={styles.rowCopy}>
-                <span>Resubmit…</span>
-                <small>A correction to what was sent — only the difference goes</small>
-              </span>
+              Resubmit…
             </button>
             <button ref={secondButton} type="button" role="menuitem" tabIndex={-1} aria-haspopup="dialog"
               aria-expanded={confirm?.kind === 'second_payroll'} aria-controls={confirm?.kind === 'second_payroll' ? confirmId : undefined}
+              title={`A planned second payment for ${month} (e.g. the 15th) — only the difference goes`}
               disabled={pending} onClick={() => ask('second_payroll')}>
-              <span className={styles.rowCopy}>
-                <span>Second payroll…</span>
-                <small>A planned second payment for {month} (e.g. the 15th) — only the difference goes</small>
-              </span>
+              Second payroll…
             </button>
           </>
         ) : (row.status === 'submitted' || row.status === 'paid') ? (
-          <button type="button" role="menuitem" tabIndex={-1} disabled>
-            <span className={styles.rowCopy}>
-              <span>Resubmit · Second payroll</span>
-              <small>{actions.hint === 'This month is closed for good' ? actions.hint : `Paid before batches existed — change it on ${where ?? 'its own page'}`}</small>
-            </span>
+          <button type="button" role="menuitem" tabIndex={-1} disabled
+            title={actions.hint === 'This month is closed for good' ? actions.hint : `Paid before batches existed — change it on ${where ?? 'its own page'}`}>
+            Resubmit · Second payroll
           </button>
         ) : null}
 
@@ -214,13 +204,12 @@ export default function PayrollRowMenu({ row, period, anchor, byRightClick, acti
               await cancelPayrollResubmit(period, row.scope, row.id)
               return `${row.staff_name} is back as sent`
             })}>
-            <span className={styles.rowCopy}><span>Put back as sent</span><small>Only while nothing has changed since</small></span>
+            Put back as sent
           </button>
         ) : null}
 
         {!confirm && pending ? <p role="status" className={styles.hint}>Saving…</p> : null}
         {!confirm && error ? <p role="alert" className={styles.error}>{error}</p> : null}
-        {byRightClick ? <p className={styles.hint}>Shift + right-click opens the browser&apos;s own menu.</p> : null}
       </MenuPanel>
 
       {confirm ? (

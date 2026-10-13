@@ -95,6 +95,28 @@ export async function saveGuestSubsidiary(input: { id: string | null; code: stri
   return { ok: true, sub }
 }
 
+/**
+ * Rename one of a subsidiary's departments (2026-10-12, the user: "change name, and move together"): it keeps its
+ * place in the list, and its people, folders and files in Hiring › Talent Bank go with the new name (mig
+ * 20261013030000 `guest_link_rename_department`) — taken off and added again, they would not.
+ */
+export async function renameGuestDepartment(sub: string, from: string, to: string): Promise<Done<{ sub: GuestSub }>> {
+  await requireActionOn('/admin/guest-link', 'guest_link', 'edit')
+  if (!isId(sub)) return { ok: false, reason: 'That subsidiary is no longer there.' }
+  if (!to.trim()) return { ok: false, reason: 'Name the department.' }
+  const { data, error } = await (await client()).rpc('guest_link_rename_department', {
+    p_sub: sub,
+    p_old: String(from ?? '').slice(0, 100),
+    p_new: String(to ?? '').slice(0, 100),
+  })
+  if (error) return { ok: false, reason: words(error, 'The department could not be renamed. Please try again.') }
+  const [row] = subsFromRows([data])
+  if (!row) return { ok: false, reason: 'The department could not be renamed. Please try again.' }
+  freshen()
+  revalidatePath('/hiring', 'layout')
+  return { ok: true, sub: row }
+}
+
 /** Take a subsidiary off the list (its bookings keep their company). */
 export async function removeGuestSubsidiary(id: string): Promise<Done<{ name: string }>> {
   await requireActionOn('/admin/guest-link', 'guest_link', 'edit')

@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatDate } from '@/lib/utils'
 import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
 import { buildRepaymentPlan } from '@/lib/repayment-plan'
-import { defaultStart, fundSourceStart } from '@/lib/repayment-start'
+import { fundSourceStart } from '@/lib/repayment-start'
 import { cancelFundSource } from '../actions'
 import { ConfirmButton } from './_components/ConfirmButton'
 import WithdrawButton from './_components/WithdrawButton'
@@ -213,7 +213,6 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
   // start date 应该要一样): the date the first instalment falls due — the
   // Expected repayment — and every instalment's day.
   const start = fundSourceStart(source)
-  const unsetStart = defaultStart(source.effective_date)
 
   // The Repayment schedule (2026-10-09): the plan by the terms, the money in
   // set against it oldest first.
@@ -413,7 +412,6 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
           <RepaymentStartEditor
             sourceId={source.id}
             current={start.set ? start.date : null}
-            defaultHint={unsetStart ? dateLong(unsetStart) : 'the month after receipt'}
             min={source.effective_date ?? undefined}
           />
           <MinPayInterestToggle sourceId={source.id} current={(source as { min_pay_interest?: boolean }).min_pay_interest === true} />
@@ -512,10 +510,10 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
             <span className="count">CANCELLATION PENDING</span>
           </div>
           <div className="fin-actions">
+            {/* Who asked and when; the heading says what is pending (2026-10-12). */}
             <span className="note">
-              ⏳ Cancellation pending Principal approval — requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} on{' '}
-              {officeTime(pendingCancel.created_at).format('D MMM YYYY HH:mm')}. The Principal approves it in Approvals; the deposit
-              reverses (bank, Venture Pool, GL) and is marked cancelled.
+              Requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} ·{' '}
+              {officeTime(pendingCancel.created_at).format('D MMM YYYY HH:mm')}
             </span>
           </div>
         </section>
@@ -533,10 +531,6 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
               </Link>
             ) : null}
             {canVoid ? <WithdrawButton id={source.id} /> : null}
-            <span className="note">
-              Fix typos, wrong amount, wrong rate, or wrong dates while the request is still pending. Locks once the Principal approves.
-              Submitted the whole thing by mistake? Withdraw it directly — no Principal needed.
-            </span>
           </div>
         </section>
       ) : canVoid && isActive ? (
@@ -555,7 +549,6 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
             >
               Request cancellation
             </ConfirmButton>
-            <span className="note">Submits a cancellation request for Principal approval. The fund source remains active until approved.</span>
           </div>
         </section>
       ) : null}

@@ -216,9 +216,6 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
       {creating ? (
         <NewTemplateWindow names={templates.map(t => t.name)} cellKeys={cellKeys} onClose={() => setCreating(false)} onCreated={onCreated} />
       ) : null}
-      <div className={p.lede}>
-        Everyone holding <b>{template.name}</b> gets these, unless their own Permissions tab overrides one.
-      </div>
 
       <TabMatrix
         ticks={ticks}
@@ -232,19 +229,15 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
         onAll={() => edit(d => ({ ...d, ticks: toggleView(d.ticks, view) }))}
       />
 
-      <div className={p.foot}>
-        <span className={p.footNote}>
-          {dirty ? `Unsaved changes to ${template.name}` : `Applies to everyone holding ${template.name}`}
-        </span>
-        {canManage ? (
+      {canManage ? (
+        <div className={p.foot}>
+          <span className={p.footNote}>{dirty ? `Unsaved changes to ${template.name}` : null}</span>
           <span className={p.footActions}>
             {dirty ? <button type="button" className={p.ghost} onClick={() => setDraft(null)} disabled={pending}>Discard</button> : null}
             <button type="button" className={p.primary} onClick={onSave} disabled={!dirty || pending}>{pending && dirty ? 'Saving…' : 'Save'}</button>
           </span>
-        ) : (
-          <span className={p.footNote}>Read-only — only whoever manages permissions changes a template.</span>
-        )}
-      </div>
+        </div>
+      ) : null}
 
       {warnings.length > 0 ? (
         <div className={p.warn}>
@@ -255,7 +248,6 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
       <section className={p.section}>
         <div className={p.sectHead}>
           <h2 className={p.h2}>Sensitive fields</h2>
-          <span className={p.sectNote}>Hidden as •••• unless ticked, on every page this template can open</span>
         </div>
         <div className={p.sensitive}>
           {SENSITIVE_FIELDS.map(f => (
@@ -279,7 +271,6 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
       {unassigned.length > 0 ? (
         <TitlesTable
           heading="Titles with no template yet"
-          note="Their holders still follow the role their account was created with. Pick a template to move them onto it."
           titles={unassigned}
           logins={logins}
           templates={templates}
@@ -296,7 +287,6 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
 
 function TitlesTable({
   heading,
-  note,
   titles,
   logins,
   templates,
@@ -305,7 +295,6 @@ function TitlesTable({
   onMove,
 }: {
   heading: string
-  note?: string
   titles: TemplateTitle[]
   logins: TemplateLogin[]
   templates: TemplateRecord[]
@@ -320,7 +309,6 @@ function TitlesTable({
         <h2 className={p.h2}>{heading}</h2>
         <span className={p.sectCount}>{people} {people === 1 ? 'PERSON' : 'PEOPLE'}</span>
       </div>
-      {note ? <p className={p.sectNote}>{note}</p> : null}
       {titles.length === 0 ? (
         <div className={hv.gtEmpty}>No title uses this template yet.</div>
       ) : (

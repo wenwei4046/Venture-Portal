@@ -192,7 +192,8 @@ export interface TeamVM {
 }
 
 // ── Requests ──
-export type RequestKindVM = "claim" | "replacement" | "waiting";
+/** `food` is a claim too (`claimType` food, 2026-10-13) — its own row on Requests, its own form and filter. */
+export type RequestKindVM = "claim" | "food" | "replacement" | "waiting";
 export interface RequestRowVM {
   id: string;
   kind: RequestKindVM;
@@ -297,6 +298,11 @@ export interface ClaimWeek {
   auto: boolean;
   /** A claim is only ever for the member's own brand week's fair (user 2026-10-06). */
   claimable: boolean;
+  /**
+   * They had a booth that weekend — the ERP's, or auto-located — so its days can take a food claim
+   * (2026-10-13), even before the portal has a fair for it (Outstation and Airbnb need the fair's venue).
+   */
+  worked?: boolean;
   /** The brand's colours: the badge, and the card when picked. */
   color: string;
   tint: string;
@@ -319,4 +325,8 @@ export interface FormOptions {
   waitingForm?: MemberWaitingForm | null;
   /** The replacement form HR set (2026-10-11, round 2's README 18.5) — the same, for a replacement. */
   replacementForm?: MemberWaitingForm | null;
+  /** The office's today (`YYYY-MM-DD`): a fair day after it cannot take a food claim yet (2026-10-13). */
+  today?: string;
+  /** The member's own food claims — a month (or a day) one of them holds is not offered again; its number says which. */
+  foodClaims?: { id: string; kind: string; status: string; detail: Record<string, unknown>; requestNo?: string | null }[];
 }

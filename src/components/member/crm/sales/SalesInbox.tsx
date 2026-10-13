@@ -5,21 +5,15 @@
 // ./vm/inbox.ts. To change the look, change the design and regenerate.
 import { Fragment } from "react";
 import type { InboxVM } from "./vm/inbox";
+import type { ShellExtras } from "./vm/header";
 
 /** Inbox: search, filter chips, rows (swipe for More), the More / Label sheets and the ad filter. */
-export default function SalesInbox({ v }: { v: InboxVM }) {
+export default function SalesInbox({ v }: { v: InboxVM & ShellExtras }) {
   return (<>
             
     <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-        <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Inbox</h1>
-        {!!(v.hasTM) && (<>
-        <div style={{ flex: "none", alignSelf: "center", marginLeft: "auto", display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "#F0E6DE" }}>
-          {(v.tmTabs).map((d, d_i) => (<Fragment key={d_i}>
-            <span onClick={d.pick} style={{ height: "28px", padding: "0 12px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: d.bg, color: d.fg, boxShadow: d.sh, cursor: "pointer" }}>{d.label}</span>
-          </Fragment>))}
-        </div>
-      </>)}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+        <h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Inbox</h1>
         <span onClick={v.openAd} style={{ flex: "0 0 auto", width: "max-content", maxWidth: "200px", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 12px 0 14px", boxSizing: "border-box", borderRadius: "20px", border: "1px solid #EBDDD2", background: "#fff", color: "#3F2B22", fontSize: "14px", fontWeight: "650", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
           <svg style={{ color: "#BD4A19" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Zm14-2a4 4 0 0 1 0 6">
@@ -31,6 +25,17 @@ export default function SalesInbox({ v }: { v: InboxVM }) {
             </path>
           </svg>
         </span>
+        {!!(v.tb) && (<>
+          <span onClick={v.tb.open} title="Notifications" style={{ position: "relative", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0">
+              </path>
+            </svg>
+            {!!(v.tb.has) && (<>
+              <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", background: "#BD4A19", border: "2px solid #fff", color: "#fff", display: "grid", placeItems: "center", fontSize: "10px", fontWeight: "700" }}>{v.tb.n}</span>
+            </>)}
+          </span>
+        </>)}
       </div>
       <label style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", height: "44px", padding: "0 14px", boxSizing: "border-box", borderRadius: "22px", background: "#F5EBE3", color: "#806B60" }}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">

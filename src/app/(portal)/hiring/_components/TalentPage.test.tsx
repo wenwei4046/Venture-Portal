@@ -65,6 +65,7 @@ describe('Hiring › Talent Bank › a talent', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm remove' }))
     await waitFor(() => expect(push).toHaveBeenCalledWith('/hiring/talent'))
     expect(actions.removeHiringTalent).toHaveBeenCalledWith('T-103')
+    expect(flash).toHaveBeenCalledWith('Joyce Tan moved to the Bin')
   })
 
   it('reads its history, newest last', () => {
@@ -94,13 +95,13 @@ describe('Hiring › Talent Bank › a talent’s files', () => {
     vi.unstubAllGlobals()
   })
 
-  it('Remove is asked twice and takes the file off', async () => {
+  it('Remove is asked twice and takes the file off — into the Talent Bank’s Bin', async () => {
     render(<TalentPage board={HIRING_BOARD} talent={talent('T-102')} can={{ create: true, edit: true }} />)
     fireEvent.click(files().getByRole('button', { name: 'Remove' }))
     expect(actions.removeHiringFile).not.toHaveBeenCalled()
     fireEvent.click(files().getByRole('button', { name: 'Confirm remove' }))
     await waitFor(() => expect(actions.removeHiringFile).toHaveBeenCalledWith('f-T-102'))
-    expect(flash).toHaveBeenCalledWith('Marcus_Wong_Resume.pdf removed')
+    expect(flash).toHaveBeenCalledWith('Marcus_Wong_Resume.pdf moved to the Bin')
   })
 
   it('says so when the bucket kept a removed file', async () => {

@@ -1,6 +1,5 @@
 /* People › Hierarchy (2026-10-10, the HR revamp handoff, variant A) — the prototype's, value for value. */
 
-.note { margin-top: 10px; font-size: 12px; color: rgb(var(--hv-brown)); max-width: 672px; line-height: 1.5; }
 .error { margin: 0 0 12px; color: rgb(var(--hv-danger)); font-size: 12.5px; }
 .warn {
   margin: 0 0 12px;

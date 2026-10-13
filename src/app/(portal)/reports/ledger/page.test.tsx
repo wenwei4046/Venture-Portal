@@ -62,11 +62,12 @@ const page = (sp: Record<string, string> = {}) => LedgerPage({ searchParams: Pro
 const section = (name: string) => screen.getByRole('heading', { level: 2, name }).closest('section') as HTMLElement
 
 describe('the General Ledger on the sheet', () => {
-  it('heads with the period, what it is, and Select accounts / Excel / PDF for all accounts', async () => {
+  // 2026-10-12 — no subtitle explaining the page (the user: too messy).
+  it('heads with the period and Select accounts / Excel / PDF for all accounts, with no subtitle', async () => {
     render(await page())
     expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · GENERAL LEDGER · 01 – 31 OCTOBER 2026')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Ledger')
-    expect(screen.getByText('Per-account journal lines with running balance over a period. Pick accounts, or leave empty for all.')).toBeInTheDocument()
+    expect(document.querySelector('.page-head .page-sub')).toBeNull()
     expect(screen.getByRole('button', { name: 'Select accounts…' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/reports/ledger/export?format=xlsx&from=2026-10-01&to=2026-10-31')
     expect(screen.getByRole('link', { name: 'PDF' })).toHaveAttribute('href', '/reports/ledger/export?format=pdf&from=2026-10-01&to=2026-10-31')

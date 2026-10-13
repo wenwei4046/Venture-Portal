@@ -10,8 +10,9 @@ import { DUE_TYPE_LABEL, dueTotals, type DueRow, type DueType } from './due-rows
 // "Due to collect" / "Due to pay" on the sheet (2026-10-10, the user's Claude
 // Design handoff): every deal due this month in one table — a Type chip, what
 // came in (or went out) this month, what is Short ("clear" when nothing is) —
-// with a Total and one note. A short row offers its deal's own record form; a
-// double-click opens the deal.
+// with a Total (the note under it went 2026-10-12: the descriptions clutter the
+// view). A short row offers its deal's own record form; a double-click opens
+// the deal.
 
 const TYPE: Record<DueType, { label: string; tone: string }> = {
   scheduled: { label: DUE_TYPE_LABEL.scheduled, tone: 'accent' },
@@ -19,9 +20,6 @@ const TYPE: Record<DueType, { label: string; tone: string }> = {
   rolled: { label: DUE_TYPE_LABEL.rolled, tone: 'alert' },
   open: { label: DUE_TYPE_LABEL.open, tone: '' },
 }
-
-const NOTE =
-  'Min interest = interest must be paid in full each month (principal can be repaid gradually). Rolled interest compounds into the balance. Open-ended has no maturity — interest only. Neither of those two is in the month’s cash, so neither is ever short.'
 
 const dash = <span className="text-graphite">—</span>
 const fig = (n: number) => (Math.abs(n) >= 0.005 ? formatMoneyBare(n) : dash)
@@ -223,7 +221,6 @@ export default function DueTable({
         />
         {links.menu}
       </div>
-      <p className="text-xs text-graphite mt-3 max-w-3xl">{NOTE}</p>
     </section>
   )
 }

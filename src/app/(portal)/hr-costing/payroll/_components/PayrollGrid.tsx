@@ -184,7 +184,7 @@ export default function PayrollGrid({ rows, period, monthClosed = false }: Props
   const [department, setDepartment] = useState('')
   const [folded, setFolded] = useState<Set<string>>(new Set())
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [menu, setMenu] = useState<{ rowId: string; anchor: RowMenuAnchor; byRightClick: boolean } | null>(null)
+  const [menu, setMenu] = useState<{ rowId: string; anchor: RowMenuAnchor } | null>(null)
   const [isPending, startTransition] = useTransition()
   const [actionError, setActionError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -334,25 +334,12 @@ export default function PayrollGrid({ rows, period, monthClosed = false }: Props
         </label>
         <span className="sheet-count ml-auto">{people(visibleRows.length)}</span>
       </div>
-      {showRevenueSplit && (
-        <p className="sheet-notice">
-          Revenue: Gross Commission is the total before allocations; Balance under Earnings is the remaining commission payment.
-          {' '}Net basic + Balance = Net to bank.
-          {' '}A salesperson completes here when they are closed on Comm Cal — right-click them to open their ledger.
-          {' '}Directors are keyed and Completed on Director Salary.
-        </p>
-      )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-3 min-h-[1.75rem]">
         {selected.size > 0 ? (
           <span className="text-xs font-bold">{selected.size} selected</span>
         ) : notice ? (
           <span className="chip ledger" role="status"><span className="dot" />{notice}</span>
-        ) : (
-          <p className="text-xs">
-            Tick people and Complete them when their figures are checked · right-click a row for more ·
-            Name, Status and the payout stay put, the working scrolls.
-          </p>
-        )}
+        ) : null}
         {selected.size > 0 ? (
           <div className="flex items-center gap-3 flex-wrap">
             {actionError && <span className="text-danger text-xs max-w-md" role="alert">{actionError}</span>}
@@ -388,9 +375,10 @@ export default function PayrollGrid({ rows, period, monthClosed = false }: Props
             </button>
           </div>
         ) : actionError ? (
-          <span className="text-danger text-xs max-w-md" role="alert">{actionError}</span>
+          <span className="text-danger text-xs max-w-md sm:ml-auto" role="alert">{actionError}</span>
         ) : (
-          <span className="pg-legend">
+          // The legend keeps the row's right end with nothing on its left.
+          <span className="pg-legend sm:ml-auto">
             <span><i className="in" aria-hidden />editable</span>
             <span><i className="mn" aria-hidden />typed over JADUAL</span>
             <span><i className="ro" aria-hidden />computed</span>
@@ -535,7 +523,7 @@ export default function PayrollGrid({ rows, period, monthClosed = false }: Props
                           onToggleSelect={() => toggleRow(r.id)}
                           selectDisabled={isPending || !selectable}
                           selectHint={selectable ? undefined : view.actions.hint ?? undefined}
-                          onMenu={(anchor, byRightClick) => setMenu({ rowId: r.id, anchor, byRightClick })}
+                          onMenu={anchor => setMenu({ rowId: r.id, anchor })}
                         />
                       )
                     })}
@@ -578,23 +566,12 @@ export default function PayrollGrid({ rows, period, monthClosed = false }: Props
         </div>
       </div>
 
-      <p className="text-xs mt-4">
-        Edit a draft in the row and click Save, or open a name for the paycheck — same figures either way.
-        EPF, SOCSO, EIS and PCB follow JADUAL until you type one; a typed figure keeps an accent dot and stays
-        {' '}when the pay changes, until <strong className="font-bold">Reset statutory to JADUAL</strong> in the row&apos;s ⋯ menu.
-        {' '}Tick people and <strong className="font-bold">Complete</strong> them when checked; <strong className="font-bold">Submit to Finance</strong>
-        {' '}sends everybody Completed as one batch, and can be pressed again for the next group. Right-click somebody already sent to
-        {' '}<strong className="font-bold">Resubmit</strong> them (a correction) or give them a <strong className="font-bold">Second payroll</strong>
-        {' '}(a planned second payment) — either way the next batch sends only the difference.
-      </p>
-
       {menu && menuRow && menuView && (
         <PayrollRowMenu
           key={menu.rowId}
           row={menuRow}
           period={period}
           anchor={menu.anchor}
-          byRightClick={menu.byRightClick}
           actions={menuView.actions}
           status={menuView.status}
           onOpenPaycheck={menuRow.scope === 'staff' ? () => setOpenId(menuRow.id) : undefined}

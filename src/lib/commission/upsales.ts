@@ -36,6 +36,44 @@ export interface UpsaleRow {
   sold_on: string
   original_ref: string | null
   kind?: UpsaleKind | null
+  /** The ERP document it changed. */
+  erp_doc_no?: string | null
+  /**
+   * The bill whose pay gave the commission it changes (2026-10-13): the
+   * document's own row, or the claim-form row of a month the claim form
+   * settled. Its shares split the change.
+   */
+  settled_order_id?: string | null
+}
+
+/**
+ * The bill a drop or an upsell is split by: the one recorded on it, else the
+ * ERP document's own bill (`billOfDoc`: document number → bill id). A change
+ * typed by hand follows none.
+ */
+export function upsaleBillId(
+  row: Pick<UpsaleRow, 'settled_order_id' | 'erp_doc_no'>,
+  billOfDoc: ReadonlyMap<string, string>,
+): string | null {
+  return row.settled_order_id ?? (row.erp_doc_no ? billOfDoc.get(row.erp_doc_no) ?? null : null)
+}
+
+/**
+ * A drop, an upsell or a cancellation of a SHARED bill follows the bill's
+ * shares (2026-10-13, the user: "want drop sales by share as well. Follow the
+ * share ratio"): the shares of its bill, keyed by the change's own id, so the
+ * run splits it exactly as it splits a bill — each holder's part at their own
+ * rate, climbing their own upline.
+ */
+export function sharesOfUpsales<S extends { order_id: string }>(
+  rows: readonly UpsaleRow[],
+  billOfDoc: ReadonlyMap<string, string>,
+  shares: readonly S[],
+): S[] {
+  return rows.flatMap(row => {
+    const bill = upsaleBillId(row, billOfDoc)
+    return bill ? shares.filter(share => share.order_id === bill).map(share => ({ ...share, order_id: row.id })) : []
+  })
 }
 
 /**

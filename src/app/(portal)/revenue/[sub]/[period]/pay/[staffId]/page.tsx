@@ -61,20 +61,13 @@ export default async function StaffPayPage({ params }: PageProps) {
   const row = board.rows.find(r => r.staffId === staffId)
   if (!row) notFound()
 
-  const [{ data: statementData }, { data: rulesData }, { data: rankRows }] = await Promise.all([
+  const [{ data: statementData }, { data: rankRows }] = await Promise.all([
     supabase
       .from('comm_statements')
       .select('id')
       .eq('run_id', board.runId ?? '')
       .eq('staff_id', staffId)
       .maybeSingle(),
-    subDept.schemeId
-      ? supabase
-          .from('comm_open_bill_rules')
-          .select('bill_rank, pct')
-          .eq('scheme_id', subDept.schemeId)
-          .order('bill_rank')
-      : Promise.resolve({ data: null }),
     subDept.schemeId
       ? supabase.from('comm_ranks').select('rank_key, label').eq('scheme_id', subDept.schemeId)
       : Promise.resolve({ data: null }),
@@ -90,7 +83,6 @@ export default async function StaffPayPage({ params }: PageProps) {
     : { data: null }
 
   const openBillLines = (lineData ?? []) as unknown as OpenBillLine[]
-  const rules = (rulesData ?? []) as Array<{ bill_rank: number; pct: number | string }>
   const ladder = (rankRows ?? []) as Array<{ rank_key: string; label: string }>
   const rankName = row.components?.rankKey
     ? (ladder.find(x => x.rank_key === row.components?.rankKey)?.label ?? row.components.rankKey)
@@ -270,14 +262,6 @@ export default async function StaffPayPage({ params }: PageProps) {
           <span className="rule" aria-hidden />
           <span className="count">{formatMoney(c?.openBillBonus ?? 0)}</span>
         </div>
-        <p className="text-sm mb-4 max-w-3xl">
-          The first bills of an event day earn an uplift on top of their ordinary commission —
-          {rules.length > 0
-            ? ` ${rules.map(r => `${ordinal(r.bill_rank)} +${Math.round(Number(r.pct) * 100)}%`).join(', ')}`
-            : ' no rates are configured'}
-          . The ERP&apos;s feed suggests which bill is which from the real time each was written; a pick made
-          by hand is never overwritten.
-        </p>
         {openBillLines.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="ledger-table">
@@ -397,17 +381,13 @@ export default async function StaffPayPage({ params }: PageProps) {
             </tfoot>
           </table>
         </div>
+        {/* The two salary lines' figures (2026-10-12 — the sentences on how they add up went). */}
         {pay.basicPayNet !== 0 ? (
           <p className="text-xs mt-3 max-w-3xl">
             Paid as two salary lines: net basic {formatMoney(pay.basicPayNet)} and a commission balance of{' '}
-            {formatMoney(pay.commissionBalance)}. The basic is carved out of the commission, not added to it,
-            so the two add back to the net above.
+            {formatMoney(pay.commissionBalance)}.
           </p>
-        ) : (
-          <p className="text-xs mt-3 max-w-3xl">
-            No basic is set on this record, so the whole net is the commission balance — one salary line.
-          </p>
-        )}
+        ) : null}
       </section>
 
       <section>
@@ -442,18 +422,9 @@ export default async function StaffPayPage({ params }: PageProps) {
             }
           />
         </dl>
-        <p className="text-xs mt-4 max-w-3xl">
-          Every contribution is a schedule lookup, never a percentage: EPF from the Third Schedule, SOCSO from
-          Act 4, EIS from Act 800, PCB from the Jadual. This page reads the same tables the payroll trigger
-          reads, so what it shows is what payroll will write.
-        </p>
       </section>
     </div>
   )
-}
-
-function ordinal(n: number): string {
-  return n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`
 }
 
 function Step({

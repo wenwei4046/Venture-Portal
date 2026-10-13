@@ -51,7 +51,7 @@ interface Props {
   /** Why the tick box is disabled (a submitted row, a salesperson, a director). */
   selectHint?: string
   /** Open this person's menu — right-click, or the ⋯ button. */
-  onMenu: (anchor: RowMenuAnchor, byRightClick: boolean) => void
+  onMenu: (anchor: RowMenuAnchor) => void
 }
 
 /**
@@ -296,7 +296,7 @@ export default function PayrollRow({
         onContextMenu={event => {
           if (event.shiftKey) return
           event.preventDefault()
-          onMenu({ left: event.clientX, top: event.clientY, bottom: event.clientY }, true)
+          onMenu({ left: event.clientX, top: event.clientY, bottom: event.clientY })
         }}
       >
         <td className="pg-st l0 pg-chk">
@@ -364,7 +364,7 @@ export default function PayrollRow({
             title="Actions — or right-click the row"
             onClick={event => {
               const r = event.currentTarget.getBoundingClientRect()
-              onMenu({ left: r.left, top: r.top, bottom: r.bottom }, false)
+              onMenu({ left: r.left, top: r.top, bottom: r.bottom })
             }}
           >
             ⋯

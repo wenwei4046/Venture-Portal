@@ -45,8 +45,6 @@ export interface GlReportViewProps {
   controls?: 'rail' | 'row'
   /** The period control's name — "As at" on the Balance Sheet. */
   periodLabel?: string
-  /** A line under the control row ('row' controls), e.g. the consolidated note. */
-  notice?: string
 }
 
 /** Collapse key for a headed section that is NOT a merged root (its own row
@@ -112,7 +110,6 @@ export default function GlReportView({
   skin = 'cf',
   controls = 'rail',
   periodLabel = 'Period',
-  notice,
 }: GlReportViewProps) {
   const router = useRouter()
   // A statement with layout (headed) sections opens folded to its category
@@ -313,7 +310,6 @@ export default function GlReportView({
           segment={segment}
           segments={segments}
         />
-        {notice ? <p className="rpt-cons">{notice}</p> : null}
         <SheetReport
           columns={[
             { key: 'cur', label: currentLabel, tone: 'now' },
@@ -438,11 +434,7 @@ export default function GlReportView({
                 </span>
               ) : null}
             </div>
-          ) : (
-            <p className="font-serif italic text-muted text-[11px] mt-1.5 leading-snug">
-              Highlights only — nothing is hidden, so every total still covers the full report.
-            </p>
-          )}
+          ) : null}
         </div>
 
         <div>

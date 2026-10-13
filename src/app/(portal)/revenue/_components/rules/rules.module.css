@@ -50,25 +50,17 @@
   box-shadow: inset 3px 0 0 rgb(var(--hv-accent));
 }
 .navItem:focus-visible { outline: 2px solid rgb(var(--hv-ink)); outline-offset: -2px; }
-.navNote {
-  margin-top: 14px;
-  padding: 10px;
-  border-top: 1px solid rgb(var(--hv-hairline));
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: rgb(var(--hv-brown));
-}
 
-/* A section's top: the title, its one line. */
+/* A section's top: the title and its action. Its one line under the title
+   went on 2026-10-12; the head keeps the room that line's margin gave. */
 .secHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 6px;
+  margin-bottom: 16px;
 }
 .secTitle { font-size: 20px; font-weight: 500; }
-.secDesc { font-size: 13px; color: rgb(var(--hv-body-2)); margin: 0 0 16px; }
 .save {
   padding: 8px 18px;
   border: 0;
@@ -257,7 +249,6 @@ select.paramValue { font-family: inherit; font-size: 13px; cursor: pointer; }
   .nav { position: static; }
   .navGroupWrap { flex-direction: row; flex-wrap: wrap; }
   .navGroup { width: 100%; padding: 8px 4px 2px; }
-  .navNote { display: none; }
   .swLine { grid-template-columns: 44px minmax(0, 1fr); }
   .swDesc { grid-column: 2; font-size: 12px; }
   .params { grid-template-columns: minmax(0, 1fr); padding-left: 14px; }

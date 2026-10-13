@@ -103,7 +103,7 @@ export default function RanksPanel({
 
   return (
     <>
-      <SectionTop title="Ranks" desc="The rates a title pays from, lettered from the top of the catalogue." />
+      <SectionTop title="Ranks" />
       {error ? <p className={s.saveError} role="alert">{error}</p> : null}
       <GridTable label="Ranks">
         <GridHead

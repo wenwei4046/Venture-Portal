@@ -5,16 +5,19 @@ import { HvPage, PageHead } from '@/components/hrv/kit'
 import { Tabs } from '@/components/hrv/tabs'
 import type { AdminMemberData } from '@/app/(member)/member/actions'
 import type { ClaimRatesAdmin } from '@/lib/member/claim-rates-admin'
+import type { FoodClaimAdmin } from '@/lib/member/food-claim-admin'
 import type { RequestFacts } from '@/lib/member/member-services'
 import RequestReviews from './RequestReviews'
 import BrandWeeksPanel from './BrandWeeksPanel'
 import ClaimRatesPanel from './ClaimRatesPanel'
+import FoodClaimPanel from './FoodClaimPanel'
 
-type Tab = 'requests' | 'weeks' | 'claims'
+type Tab = 'requests' | 'weeks' | 'claims' | 'food'
 
 /**
  * People › Member services (2026-10-10, the HR revamp handoff, variant A):
- * Request reviews · Brand weeks · Claim rates. The headcount limit went to
+ * Request reviews · Brand weeks · Claim rates · Food claim (2026-10-13: Fair's
+ * rate a day and the titles that may claim it). The headcount limit went to
  * Revenue › Rules › Capacity (PR2), Product options — only a pointer to the
  * Product List's Modular since 2026-09-24 — went with this redraw, and
  * Publish memo moved to People › Documentation › Publish (round 2,
@@ -30,15 +33,18 @@ export default function MemberServicesView({
   data,
   facts,
   claimRates,
+  foodClaim,
   initialRequestId,
 }: {
   data: AdminMemberData
   facts: Record<string, RequestFacts> | null
   claimRates: ClaimRatesAdmin | null
+  foodClaim: FoodClaimAdmin | null
   initialRequestId: string | null
 }) {
   const tabs: Array<{ key: Tab; label: string }> = data.canManageRequests
-    ? [{ key: 'requests', label: 'Request reviews' }, { key: 'weeks', label: 'Brand weeks' }, { key: 'claims', label: 'Claim rates' }]
+    ? [{ key: 'requests', label: 'Request reviews' }, { key: 'weeks', label: 'Brand weeks' }, { key: 'claims', label: 'Claim rates' },
+        { key: 'food', label: 'Food claim' }]
     : []
   const [tab, setTab] = useState<Tab>(tabs[0]?.key ?? 'requests')
   // A tab mounts when it is first opened and then stays, hidden, so what was
@@ -49,7 +55,7 @@ export default function MemberServicesView({
 
   return (
     <HvPage>
-      <PageHead eyebrow="People · Member services" title="Member services" subtitle="Manage HR requests, waiting lists and the member catalogue." />
+      <PageHead eyebrow="People · Member services" title="Member services" />
       {tabs.length > 1 ? (
         <Tabs
           items={tabs}
@@ -76,6 +82,11 @@ export default function MemberServicesView({
       {allowed('claims') && show('claims') ? (
         <div hidden={tab !== 'claims'}>
           <ClaimRatesPanel initial={claimRates} />
+        </div>
+      ) : null}
+      {allowed('food') && show('food') ? (
+        <div hidden={tab !== 'food'}>
+          <FoodClaimPanel initial={foodClaim} />
         </div>
       ) : null}
       {tabs.length === 0 ? <p>Member services needs HR request management access. Memos are published from People › Documentation.</p> : null}

@@ -142,11 +142,7 @@ function DirectorPinManager() {
 
   return (
     <div className="mt-6 pt-6 border-t border-hairline">
-      <h3 className="font-serif text-lg text-ink mb-1">Director Access PIN</h3>
-      <p className="font-serif italic text-graphite text-sm mb-4">
-        6-digit PIN required for Finance Manager to access Director Salary and Director Pool.
-        Only you (Principal) can set or change this PIN.
-      </p>
+      <h3 className="font-serif text-lg text-ink mb-4">Director Access PIN</h3>
       <div className="flex items-end gap-3">
         <div>
           <label className="block text-xs font-sans text-muted mb-1">New PIN (6 digits)</label>

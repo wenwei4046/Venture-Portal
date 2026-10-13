@@ -5,7 +5,7 @@
  * the Principal sets is what every salesperson's Book visit offers and what crm_slot_check allows — the control
  * panel's settings reach everybody (user 2026-10-13).
  */
-import type { CrmBlock, CrmRoom } from "@/lib/member/crm-data";
+import { blockHours, type CrmBlock, type CrmRoom } from "@/lib/member/crm-data";
 import { t12 } from "../../sales/vm/chat";
 import type { DeskCtx, SrBlk, SrBlock, SrDraft } from "./ctx";
 import { MON } from "./insight";
@@ -27,14 +27,18 @@ export function draftOf(r: CrmRoom | null): SrDraft {
     id: r?.id ?? null, dispName: r?.name ?? "", addr: r?.address ?? "", gmap: r?.mapGoogle ?? "", waze: r?.mapWaze ?? "", manual: !!(r?.mapGoogle || r?.mapWaze),
     photo: r?.photo ?? "", photoFile: null, limit: r?.cap ?? 2, times, off,
     weekDays: (r?.weekly ?? []).map(d => (d + 6) % 7).sort(),
-    blocks: (r?.blocks ?? []).map(b => ({ kind: "date" as const, from: b.a, to: b.b || b.a, allDay: !b.ranges?.length, ranges: (b.ranges ?? []).map(x => ({ f: t12(x.f), t: t12(x.t) })), reason: b.why })),
+    blocks: (r?.blocks ?? []).map(b => ({ kind: "date" as const, from: b.a, to: b.b || b.a, allDay: !blockHours(b).length, ranges: blockHours(b).map(x => ({ f: t12(x.f), t: t12(x.t) })), reason: b.why })),
   };
 }
 /** The editor's draft → the showroom the database keeps (the phone's format). */
 export function roomOf(d: SrDraft): Omit<CrmRoom, "id"> & { id: string | null } {
   const slots = d.times.map(label => { const days = DI.filter(di => !d.off[`${label}|${di}`]); return days.length === 7 ? hm(label) : days.length ? `${hm(label)}@${days.join("")}` : null; })
     .filter((x): x is string => !!x);
-  const blocks: CrmBlock[] = d.blocks.map(b => ({ a: b.from, b: b.to || b.from, why: b.reason.trim(), ...(b.allDay || !b.ranges.length ? {} : { ranges: b.ranges.map(x => ({ f: hm(x.f), t: hm(x.t) })) }) }));
+  const blocks: CrmBlock[] = d.blocks.map(b => ({ a: b.from, b: b.to || b.from, why: b.reason.trim(), ...(b.allDay || !b.ranges.length ? {} : (() => {
+    // Several windows as ranges; the first also as t1 / t2, which the phone panel's Blocked time slots reads (round 2).
+    const w = b.ranges.map(x => ({ f: hm(x.f), t: hm(x.t) }));
+    return { ranges: w, t1: w[0].f, t2: w[0].t };
+  })()) }));
   return { id: d.id, name: d.dispName.trim() || "Showroom", address: d.addr.trim(), active: true, slots, cap: d.limit, weekly: d.weekDays.map(di => (di + 1) % 7), blocks,
     photo: d.photo || null, mapGoogle: d.manual ? d.gmap.trim() || null : null, mapWaze: d.manual ? d.waze.trim() || null : null };
 }

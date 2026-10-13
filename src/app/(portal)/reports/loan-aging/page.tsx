@@ -209,12 +209,6 @@ export default async function LoanMonitorPage({ searchParams }: { searchParams: 
             <em>I.</em> REPORTS · LOAN AGING · AS AT {asAtLabel.toUpperCase()}
           </div>
           <h1 className="page-title">Loan Aging</h1>
-          <p className="page-sub">
-            Scheduled by the agreed start month: unpaid installments by days late
-            from each deal&apos;s own due day (settled months drop off) · Outstanding overview below ·
-            set the start month on each position&apos;s detail page; unset
-            defaults to the month after disbursement/receipt
-          </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <a href={exportHref('xlsx', 'aging')} className="btn-quiet-sheet">
@@ -263,7 +257,6 @@ export default async function LoanMonitorPage({ searchParams }: { searchParams: 
           value: asAt.slice(0, 7),
           options: toChoices(officeMonth()).map((ym) => ({ value: ym, label: dayjs(`${ym}-01`).format('MMM YYYY') })),
         }}
-        note={past ? `As at ${asAtLabel}: the deals live then, at what had been repaid by then.` : undefined}
       >
       <section className="mb-12">
         <div className="sect-head">

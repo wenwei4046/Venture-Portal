@@ -57,22 +57,6 @@ const COMPONENT_LABEL: Record<string, string> = {
   group_incentive: 'Group incentive',
 }
 
-const COMPONENT_NOTE: Record<string, string> = {
-  product_revenue:
-    'One line per bill, at the rank rate, already net of any below-margin penalty on that bill.',
-  kpi_item:
-    'A flat amount per KPI unit. Their revenue leaves the commission base — the allowance is what pays for them, which is the point when they are given away free.',
-  kpi_threshold: 'Uplift on the whole KPI base for clearing the quantity ladder.',
-  open_bill:
-    'The 1st / 2nd / 3rd bill of an event day, on top of that bill’s commission at the current rate.',
-  override:
-    'The differential between this person’s rate and the downline’s, on the downline’s penalty-weighted revenue. Equal rates compress to nothing.',
-  margin_incentive:
-    'Monthly, and judged brand by brand: every brand sold has to clear the tier. Incentive rungs stack.',
-  group_incentive:
-    'One fixed reward per qualifying direct-line group. Own sales may count in each group, together with that direct and its immediate reports. A group above target still earns one reward.',
-}
-
 interface StatementRow {
   id: string
   staff_id: string
@@ -319,9 +303,6 @@ export default async function CommissionStatementPage({ params }: PageProps) {
                   {runSynced ? 'Title raised to ' : 'Syncing this run raises their title to '}
                   <strong>{oneOf(s.promotes_to)?.name ?? 'a higher title'}</strong>
                 </span>
-                {run.status === 'applied'
-                  ? ' — and it stays there: a title only ever goes up.'
-                  : ' — the rank paid this month sits above the title they hold.'}
               </p>
             ) : null}
           </div>
@@ -329,8 +310,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
       </section>
 
       <PayrollAdjustmentPanel read={payrollAdjustments} periodLabel={label(period)}
-        staffNames={new Map([[staffId, me?.employee_name ?? staffId]])} statement
-        runSynced={run.status === 'applied' || run.status === 'locked'} />
+        staffNames={new Map([[staffId, me?.employee_name ?? staffId]])} statement />
 
       {/* The month's inputs to the statement. No card here is primary: the
           figure this page is opened for is the source commission in the
@@ -398,12 +378,6 @@ export default async function CommissionStatementPage({ params }: PageProps) {
               {s.margin_band_key ? s.margin_band_key.toUpperCase() : 'NO TIER CLEARED'}
             </span>
           </div>
-          <p className="text-sm mb-4 max-w-3xl">
-            The incentive is the highest tier that <strong>every</strong> brand they sold clears — three
-            weekends of one brand at Tier 2 and a fourth of another below it is a Tier 1 month. A
-            brand with no cost data, or no ladder, blocks the incentive entirely rather than paying
-            on the ones that can be judged.
-          </p>
           <div className="overflow-x-auto">
             <table className="ledger-table">
               <thead>
@@ -449,9 +423,6 @@ export default async function CommissionStatementPage({ params }: PageProps) {
             <span className="rule" aria-hidden />
             <span className="count">{s.group_breakdown.filter(g => g.qualifies).length} QUALIFIED</span>
           </div>
-          <p className="text-sm mb-4 max-w-3xl">
-            Your personal sales count in every direct group. Each group includes its direct and that person&apos;s immediate reports; deeper layers are excluded. These overlapping targets are assessed separately and should not be added together as actual revenue.
-          </p>
           <div className="overflow-x-auto">
             <table className="ledger-table">
               <thead><tr>
@@ -479,16 +450,17 @@ export default async function CommissionStatementPage({ params }: PageProps) {
               ))}</tbody>
             </table>
           </div>
+          {/* The state, and the step still owed when there is one (2026-10-12) — the rule's sentences went. */}
           {s.full_spec ? (
             <p className="text-sm mt-3">
               <span className="chip ledger">
                 <span className="dot" />
                 Full Spec achieved
-              </span>{' '}
-              three qualifying groups, each with three immediate reports. {Number(s.group_incentive) > 0 ? 'Syncing this package run permits opening a fourth line in this month. Each further line requires all existing groups to qualify in its opening month. Opened slots are retained; unused permission expires.' : 'The current manual percentage rank must be changed to the group package before the SDL qualification can be awarded.'}
+              </span>
+              {Number(s.group_incentive) > 0 ? null : ' The current manual percentage rank must be changed to the group package before the SDL qualification can be awarded.'}
             </p>
           ) : null}
-          {Number(s.group_subsidy_cap) > 0 ? <p className="text-sm mt-3">Car/property subsidy cap: <strong>{formatMoney(Number(s.group_subsidy_cap))}</strong>. This is a separate non-cash Claims benefit, subject to the registered instalment. It is excluded from the cash commission total.</p> : null}
+          {Number(s.group_subsidy_cap) > 0 ? <p className="text-sm mt-3">Car/property subsidy cap: <strong>{formatMoney(Number(s.group_subsidy_cap))}</strong></p> : null}
         </section>
       ) : null}
 
@@ -499,11 +471,6 @@ export default async function CommissionStatementPage({ params }: PageProps) {
             <span className="rule" aria-hidden />
             <span className="count">{formatMoney(group.subtotal)}</span>
           </div>
-          {COMPONENT_NOTE[group.component] ? (
-            <p className="text-sm mb-4 max-w-3xl">
-              {COMPONENT_NOTE[group.component]}
-            </p>
-          ) : null}
           <div className="overflow-x-auto">
             <table className="ledger-table">
               <thead>
@@ -565,11 +532,6 @@ export default async function CommissionStatementPage({ params }: PageProps) {
             </tfoot>
           </table>
         </div>
-        <p className="text-xs mt-3 max-w-3xl">
-          This sub-department&apos;s source commission forms part of the monthly payroll total.
-          Any payroll adjustment is shown in the monthly reconciliation above. Payroll deductions
-          are calculated there. Any car/property subsidy is handled separately through Claims.
-        </p>
       </section>
     </div>
   )

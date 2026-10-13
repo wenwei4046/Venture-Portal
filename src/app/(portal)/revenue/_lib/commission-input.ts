@@ -9,6 +9,7 @@ import { monthCommissionableValue, needsMonthValue } from '@/lib/commission/dire
 import { carriesInto } from '@/lib/commission/carry'
 import { officeToday } from '@/lib/office-time'
 import { loadMonthOrders } from './month-orders'
+import { loadBillsByDocNo } from './row-origins'
 import type {
   CostRatioRow,
   HierarchyRow,
@@ -26,7 +27,7 @@ import type {
   SchemeRow,
 } from '@/lib/commission/run-payload'
 import type { DirectorTerms, EngineInput } from '@/lib/commission/types'
-import type { UpsaleRow } from '@/lib/commission/upsales'
+import { sharesOfUpsales, upsaleBillId, type UpsaleRow } from '@/lib/commission/upsales'
 
 interface QueryResult {
   data: unknown[] | null
@@ -203,7 +204,7 @@ export async function loadCommissionInput(
     // Upsales and drops the run pays: CONFIRMED ones. A drop or upsell the ERP
     // revealed waits as pending until somebody answers it (2026-09-26).
     readRows<UpsaleRow>("the month's upsales and drops", (from, to) =>
-      supabase.from('comm_upsales').select('id, staff_id, amount, sold_on, original_ref, kind')
+      supabase.from('comm_upsales').select('id, staff_id, amount, sold_on, original_ref, kind, erp_doc_no, settled_order_id')
         .eq('sub_department_id', scheme.sub_department_id).eq('period_month', period)
         .eq('status', 'confirmed')
         .order('id').range(from, to)),
@@ -285,7 +286,19 @@ export async function loadCommissionInput(
   const orderIds = orderRows.map(order => order.id)
   const lookBack = Math.max(0, ...ranks.map(rank => (rank.consecutive_months ?? 1) - 1))
   const priorPeriods = Array.from({ length: lookBack }, (_, index) => monthsBefore(period, index + 1))
-  const [lines, openBillTags, shares, priorRuns] = await Promise.all([
+  // A drop, an upsell or a cancellation of a SHARED bill follows the shares of
+  // the bill whose pay gave the commission (2026-10-13, lib/commission/
+  // upsales.ts › sharesOfUpsales). One found before it was recorded follows
+  // the document's own bill.
+  const unrecorded = upsales.flatMap(row => !row.settled_order_id && row.erp_doc_no ? [row.erp_doc_no] : [])
+  const upsaleDocBills = unrecorded.length > 0
+    ? new Map([...await loadBillsByDocNo(supabase, scheme.sub_department_id, unrecorded)].map(([doc, bill]) => [doc, bill.orderId]))
+    : new Map<string, string>()
+  const upsaleBillIds = [...new Set(upsales.flatMap(row => {
+    const bill = upsaleBillId(row, upsaleDocBills)
+    return bill ? [bill] : []
+  }))]
+  const [lines, openBillTags, shares, priorRuns, upsaleBillShares] = await Promise.all([
     readByKeys<SalesLineRow & { order_id: string }>('sales order lines', orderIds, (chunk, from, to) =>
       supabase.from('sales_order_lines')
         .select('id, order_id, item_group, product_code, product_name, qty, line_amount, brand_code, cost_amount, option_charge_amount, description2, variants:raw->variants')
@@ -300,7 +313,11 @@ export async function loadCommissionInput(
       supabase.from('comm_runs').select('id, period_month')
         .eq('sub_department_id', scheme.sub_department_id).in('period_month', chunk)
         .order('id').range(from, to)),
+    readByKeys<OrderShareRow>('the shares of the bills drops and upsells changed', upsaleBillIds,
+      (chunk, from, to) => supabase.from('sales_order_shares').select('order_id, staff_id, share_pct')
+        .in('order_id', chunk).order('order_id').order('staff_id').range(from, to)),
   ])
+  const upsaleShares = sharesOfUpsales(upsales, upsaleDocBills, upsaleBillShares)
 
   const linesByOrder = new Map<string, SalesLineRow[]>()
   for (const line of lines) {
@@ -355,7 +372,7 @@ export async function loadCommissionInput(
   const sourceRows = {
     periodMonth: period, scheme: schemeForMonth, ranks, itemGroups, kpiItems, kpiThresholds,
     openBillRules, openBillTags, marginBands, hierarchy, orders: orderRows,
-    releasedOrderNos, priorMonths, shares, upsales, costRatios,
+    releasedOrderNos, priorMonths, shares, upsales, upsaleShares, costRatios,
     departmentHeadIds: heads.map(head => head.id),
     directors,
     monthCommissionableValue: monthValue,
@@ -363,7 +380,7 @@ export async function loadCommissionInput(
   const currentInput = toEngineInput({
     ...sourceRows, hierarchy: currentHierarchyRows, kpiItems: currentKpiItems,
     kpiThresholds: currentKpiThresholds, openBillRules: currentOpenBillRules,
-    orders: [], shares: [], upsales: [],
+    orders: [], shares: [], upsales: [], upsaleShares: [],
   })
   return {
     input: toEngineInput(sourceRows),

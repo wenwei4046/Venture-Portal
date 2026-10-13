@@ -12,11 +12,11 @@ const props = () => ({ voucherId: 'salary', amount: 4302.70, bankBalance: 10000,
   can: FINANCE, submitForApproval: vi.fn(), approveVoucher: vi.fn(), voidVoucher: vi.fn(),
   direction: 'debit', voucherType: 'other', reversePaidPayment: undefined })
 describe('salary PV actions without generic paid reversal', () => {
-  it('says the voucher is paid, without a reverse button', () => {
+  it('offers a paid salary PV no reverse button', () => {
     render(<VoucherActions {...props()} status="paid" />)
-    // The wording moved into the voucher page's panel on 2026-10-02; what this
-    // pins is unchanged — a paid salary PV says it is paid and offers nothing.
-    expect(screen.getByText(/已付款/)).toBeVisible()
+    // A paid salary PV offers nothing. Since 2026-10-12 the panel's chip alone
+    // says it is paid (the user: the descriptions clutter the view).
+    expect(screen.queryByText(/已付款/)).toBeNull()
     expect(screen.queryByRole('button', { name: /Reverse payment/ })).not.toBeInTheDocument()
     expect(screen.queryAllByRole('button')).toHaveLength(0)
   })
@@ -39,7 +39,6 @@ describe('what each state offers', () => {
 
   it('pending, to Finance: edit, back to draft, void — and no Approve', () => {
     render(<VoucherActions {...props()} status="pending_approval" returnToDraft={vi.fn()} />)
-    expect(screen.getByText(/等 Principal 批准/)).toBeVisible()
     expect(names()).toEqual(['退回 Draft', 'Void this voucher', 'Edit'])
   })
 
@@ -60,7 +59,6 @@ describe('what each state offers', () => {
   it('a paid receipt can be voided, after asking', () => {
     const voidPaidReceipt = vi.fn(async () => undefined)
     render(<VoucherActions {...props()} status="paid" direction="credit" voidPaidReceipt={voidPaidReceipt} />)
-    expect(screen.getByText(/已入账/)).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: /Void receipt/ }))
     expect(voidPaidReceipt).not.toHaveBeenCalled()
     expect(screen.getByText(/确认作废这张已付收据/)).toBeVisible()
@@ -85,43 +83,51 @@ describe('what each state offers', () => {
 
   it('a voided voucher offers nothing', () => {
     render(<VoucherActions {...props()} status="voided" />)
-    expect(screen.getByText(/已作废/)).toBeVisible()
     expect(names()).toEqual([])
+  })
+
+  it('a payroll funding PV says in a chip that the bank is not charged — no paragraph', () => {
+    render(<VoucherActions {...props()} status="pending_approval" can={PRINCIPAL} voucherType="payroll_bank_transfer" />)
+    expect(screen.getByText('Bank not charged')).toHaveClass('deal-side-chip')
+    expect(screen.queryByText(/books the salary expense/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled()
   })
 })
 
 // 2026-10-10 — the handoff (audit 2026-10-09 l, item 8): on the Finance view
-// the panel speaks the builders' English — a status note with a dot in the
-// status's colour, Return to draft, and Reverse payment / Void receipt as the
-// panel's secondary (navy) buttons rather than a red outline.
+// the panel speaks the builders' English — Return to draft, and Reverse
+// payment / Void receipt as the panel's secondary (navy) buttons rather than a
+// red outline. 2026-10-12 (the user: the descriptions clutter the view): no
+// status note under the buttons — the panel's chip says the status.
 describe('on the Finance view', () => {
   const fin = (ui: ReactElement) => render(<FinViewProvider value={true}>{ui}</FinViewProvider>)
   const names = () => [...screen.queryAllByRole('button'), ...screen.queryAllByRole('link')].map((el) => el.textContent)
-  const note = () => document.querySelector('.pay-note') as HTMLElement
+  const note = () => document.querySelector('.pay-note')
 
-  it('a draft: still a draft, with its dot — submit, edit, void', () => {
+  it('a draft: submit, edit, void — and no status note', () => {
     fin(<VoucherActions {...props()} status="draft" />)
-    expect(note()).toHaveTextContent('Still a draft — not submitted yet.')
-    expect(note().querySelector('.pay-note-dot')).toHaveAttribute('data-tone', 'draft')
+    expect(note()).toBeNull()
+    expect(screen.queryByText(/Still a draft/)).toBeNull()
     expect(names()).toEqual(['Submit for approval', 'Void', 'Edit'])
   })
 
-  it('pending, to Finance: waiting for the Principal — edit, return to draft, void', () => {
+  it('pending, to Finance: edit, return to draft, void — and no status note', () => {
     fin(<VoucherActions {...props()} status="pending_approval" returnToDraft={vi.fn()} />)
-    expect(note()).toHaveTextContent('Waiting for Principal approval. You can still edit or void it until then.')
-    expect(note().querySelector('.pay-note-dot')).toHaveAttribute('data-tone', 'pending_approval')
+    expect(note()).toBeNull()
+    expect(screen.queryByText(/Waiting for Principal approval/)).toBeNull()
     expect(names()).toEqual(['Return to draft', 'Void this voucher', 'Edit'])
   })
 
-  it('approved: ready to pay', () => {
+  it('approved: no status note', () => {
     fin(<VoucherActions {...props()} status="approved" />)
-    expect(note()).toHaveTextContent('Approved — ready to pay.')
+    expect(note()).toBeNull()
+    expect(screen.queryByText(/ready to pay/)).toBeNull()
   })
 
-  it('a paid payment says Paid, and is reversed from a secondary button, after asking', () => {
+  it('a paid payment is reversed from a secondary button, after asking', () => {
     const reversePaidPayment = vi.fn(async () => undefined)
     fin(<VoucherActions {...props()} status="paid" reversePaidPayment={reversePaidPayment} />)
-    expect(note()).toHaveTextContent(/^Paid\.$/)
+    expect(note()).toBeNull()
     const reverse = screen.getByRole('button', { name: 'Reverse payment' })
     expect(reverse).toHaveClass('deal-side-btn2')
     expect(reverse).not.toHaveClass('deal-side-danger')
@@ -131,10 +137,10 @@ describe('on the Finance view', () => {
     expect(reversePaidPayment).toHaveBeenCalledTimes(1)
   })
 
-  it('a paid receipt: received — bank, pool and GL updated — and Void receipt in the secondary style', () => {
+  it('a paid receipt: Void receipt in the secondary style', () => {
     const voidPaidReceipt = vi.fn(async () => undefined)
     fin(<VoucherActions {...props()} status="paid" direction="credit" voidPaidReceipt={voidPaidReceipt} />)
-    expect(note()).toHaveTextContent('Received — bank, pool and GL are updated.')
+    expect(note()).toBeNull()
     const voidIt = screen.getByRole('button', { name: 'Void receipt' })
     expect(voidIt).toHaveClass('deal-side-btn2')
     fireEvent.click(voidIt)
@@ -143,10 +149,9 @@ describe('on the Finance view', () => {
     expect(voidPaidReceipt).not.toHaveBeenCalled()
   })
 
-  it('voided: Voided, and nothing to do', () => {
+  it('voided: nothing to do, and no status note', () => {
     fin(<VoucherActions {...props()} status="voided" />)
-    expect(note()).toHaveTextContent(/^Voided\.$/)
-    expect(note().querySelector('.pay-note-dot')).toHaveAttribute('data-tone', 'voided')
+    expect(note()).toBeNull()
     expect(names()).toEqual([])
   })
 

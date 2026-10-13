@@ -59,9 +59,12 @@ export function appClosed(closed: readonly string[] | undefined): AppClosed {
   }
 }
 
-/** The page whose Create a request of this kind is sent under: a claim is Requests', a waiting list or replacement its own page's. */
+/**
+ * The page whose Create a request of this kind is sent under: a claim is Requests' — a food claim too (the app's
+ * `food`, a claim in the database; 2026-10-13) — a waiting list or replacement its own page's.
+ */
 export function requestPageOf(kind: string): 'requests' | 'track' {
-  return kind === 'claim' ? 'requests' : 'track'
+  return kind === 'claim' || kind === 'food' ? 'requests' : 'track'
 }
 
 /** Why a send is refused, said to whoever tried (a stale page or a hand-made request — the button is not drawn). */

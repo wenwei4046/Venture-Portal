@@ -82,9 +82,7 @@ export default function TrialBalanceView({
           </label>
         ) : null}
         <div className="rpt-field rpt-find">
-          <span>
-            Find account <span className="rpt-find-hint">· highlights only</span>
-          </span>
+          <span>Find account</span>
           <div className="rpt-find-box">
             <input
               type="search"

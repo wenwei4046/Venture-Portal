@@ -1,0 +1,9 @@
+/* Hiring › Talent Bank as a Drive (2026-10-12): what the Data center's Drive styles (team/documentation/_components/
+   drive/drive.module.css) do not have — a person's card status and the Add talent drawer's place. The Move to… list
+   and the Bin's pill and Empty bin moved there on 2026-10-13, when the Data center took them too. */
+
+.status { font-size: 10.5px; }
+
+/* The place a new talent goes, in the Add talent drawer. */
+.keptIn { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; color: rgb(var(--hv-brown)); }
+.keptInPath { color: rgb(var(--hv-ink)); font-weight: 500; }

@@ -308,16 +308,8 @@ export default function RecordsTab({
 
   return (
     <div className="alloc-sheet fin-queue">
-      {/* What still has to be billed — the handoff's notice; the head's
-          Generate invoices bills it. The month's billed batches are never
-          touched (only unbilled allocations go out). */}
-      {summary.toBillCount > 0 ? (
-        <div className="bil-notice">
-          To bill {formatMoney(summary.toBill)} across {summary.toBillTargets} {summary.toBillTargets === 1 ? 'company' : 'companies'} —
-          Generate invoices bills every company’s share in one go.
-        </div>
-      ) : null}
-
+      {/* What still has to be billed is the head's To bill card; the head's
+          Generate invoices bills it (2026-10-12: no notice repeating it). */}
       {error ? (
         <div className="mb-4 bg-danger-bg border border-danger text-danger rounded-md p-3 text-sm font-sans">{error}</div>
       ) : null}
