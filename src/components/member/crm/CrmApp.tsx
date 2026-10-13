@@ -30,6 +30,7 @@ import D from "./desk/desk.module.css";
 import { makePanelActions } from "./panel/actions";
 import { initialPanelUi, type PanelTab, type PanelUi } from "./panel/ui";
 import { teamsOf, type PanelCtx } from "./panel/vm/common";
+import { useSwipeToClose } from "./shared/swipe-close";
 
 /** Team | Mine keeps the page: one's CRM page → the Control panel's (it has no Contacts: its Inbox lists everybody's). */
 const TEAM_TAB: Record<SalesTab, PanelTab> = { inbox: "inbox", contacts: "inbox", calendar: "calendar", insight: "overview", profile: "profile" };
@@ -45,6 +46,8 @@ const demoViewer = () => (typeof window === "undefined" ? undefined : new URLSea
  */
 export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame }) {
   const [data, setData] = useState<CrmData | null>(() => (live ? null : crmDemoData(salesperson)));
+  // Any bottom sheet closes when pulled down (user 2026-10-13).
+  useSwipeToClose();
   const [problem, setProblem] = useState("");
   const [now, setNow] = useState(() => new Date());
   const [ui, setUi] = useState<SalesUi>(initialSalesUi);

@@ -164,7 +164,12 @@ export function chatVM(ctx: SalesCtx) {
   // The Principal / Director in someone's chat: Assign to anyone, beside Share and Move (user 2026-10-09: 3个功能都要有). Their Move goes to the owner's superior (crm_invite).
   // Offered only with CRM · Manage (CrmApp hands it over then).
   const assigner = ctx.embedded?.assignTo ?? null;
-  const assignList = assigner ? (ctx.embedded?.switchList ?? []).filter(p => p.role !== "boss") : [];
+  // Assign to (user 2026-10-13): the list grouped by team under a heading each, as the Switch sheet's — Director, each team,
+  // Others; teams in the order the list first names them.
+  const groupOf = (p: { id: string; role?: string }) => (p.role === "hod" ? "Director" : teamName(teamOf(p.id, data.people)) || "Others");
+  const assign0 = assigner ? (ctx.embedded?.switchList ?? []).filter(p => p.role !== "boss") : [];
+  const groupOrder = [...new Set(assign0.map(groupOf))];
+  const assignList = [...assign0].sort((a, b) => groupOrder.indexOf(groupOf(a)) - groupOrder.indexOf(groupOf(b)));
   const assigning = !!(assigner && hm.assign);
   const assignSel = assigning ? assignList.find(p => p.id === hm.sel) : undefined;
   const sNames = teamPeople.filter(p => ss.includes(p.id)).map(p => p.name);
@@ -206,8 +211,12 @@ export function chatVM(ctx: SalesCtx) {
       setTimeout(() => set(u => (u.hm?.toast ? { ...u, hm: null } : u)), 3000);
     } : undefined,
     moveOpen: !!(hm.move || assigning), moveTitle: `${assigning ? "Assign" : "Move"} ${c.name} to`,
-    people: assigning ? assignList.map(p => ({ name: p.id === c.assignedTo ? `${p.name} · now` : p.name, role: titleOf(p), ini: ini(p.name), ring: hm.sel === p.id ? RUST : "#D9C7BA", dot: hm.sel === p.id ? RUST : "transparent", pick: () => setHm({ sel: p.id }) }))
-      : superior ? [{ name: superior.name, role: jobTitle(superior), ini: ini(superior.name), ring: hm.sel === superior.id ? RUST : "#D9C7BA", dot: hm.sel === superior.id ? RUST : "transparent", pick: () => setHm({ sel: superior.id }) }] : [],
+    people: assigning ? assignList.map((p, k) => {
+      const g = groupOf(p), first = !k || groupOf(assignList[k - 1]) !== g;
+      return { name: p.id === c.assignedTo ? `${p.name} · now` : p.name, role: titleOf(p), ini: ini(p.name), ring: hm.sel === p.id ? RUST : "#D9C7BA", dot: hm.sel === p.id ? RUST : "transparent", pick: () => setHm({ sel: p.id }),
+        hasHead: first, head: first ? `${g} · ${assignList.filter(x => groupOf(x) === g).length}` : "", rule: first ? "0" : "1px solid #EBDDD2" };
+    })
+      : superior ? [{ name: superior.name, role: jobTitle(superior), ini: ini(superior.name), ring: hm.sel === superior.id ? RUST : "#D9C7BA", dot: hm.sel === superior.id ? RUST : "transparent", pick: () => setHm({ sel: superior.id }), hasHead: false, head: "", rule: "1px solid #EBDDD2" }] : [],
     cLabel: assigning ? (assignSel ? `Assign to ${assignSel.name}` : "Choose a person") : superior && hm.sel ? `Send move request to ${superior.name}` : "Choose a person", cBg: (assigning ? !!assignSel : !!(superior && hm.sel)) ? RUST : "#D9C7BA",
     confirm: assigning ? (assignSel && assignSel.id !== c.assignedTo ? async () => {
       if (!(await assigner?.(c.id, assignSel.id))) return;
