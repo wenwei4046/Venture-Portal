@@ -7,7 +7,8 @@
 import type { CrmCustomer } from "@/lib/member/crm-data";
 import { adsReportParam } from "@/lib/member/crm-ads-report";
 import type { DeskCtx } from "./ctx";
-import { MON } from "./insight";
+import { INS_CARDS, MON } from "./insight";
+import { columnSizer } from "./columns";
 import { ST_META } from "./tokens";
 
 type Fmt = "rm" | "rm2" | "n" | "pct" | "x" | "t";
@@ -20,7 +21,7 @@ export const METRICS: [string, string, [string, string, string, Fmt][]][] = [
   ["Video", "Meta Ads", [["v3", "3-second video plays", "Plays of at least 3 seconds", "n"], ["thru", "ThruPlays", "Played to the end or at least 15 seconds", "n"], ["cpthru", "Cost per ThruPlay", "Amount spent ÷ ThruPlays", "rm2"], ["v25", "Video plays at 25%", "Watched a quarter of the video", "n"], ["v50", "Video plays at 50%", "Watched half of the video", "n"], ["v75", "Video plays at 75%", "Watched three quarters of the video", "n"], ["v100", "Video plays at 100%", "Watched the whole video", "n"], ["hook", "Hook rate", "3-second plays ÷ impressions", "pct"]]],
   ["From this CRM", "Revenue app", [["leads", "Leads", "Chats that came in from the ad", "n"], ["cpl", "Cost per lead", "Amount spent ÷ leads", "rm2"], ["appt", "Appointments", "Leads who booked a visit", "n"], ["showup", "Showed up", "Visits marked as showed up", "n"], ["won", "Won", "Leads marked won", "n"], ["apptrate", "Appointment rate", "Appointments ÷ leads", "pct"], ["cpappt", "Cost per appointment", "Amount spent ÷ appointments", "rm2"], ["showrate", "Show-up rate", "Showed up ÷ appointments", "pct"], ["winrate", "Win rate", "Won ÷ leads", "pct"], ["cpwon", "Cost per won", "Amount spent ÷ won", "rm2"]]],
 ];
-const ALL = METRICS.flatMap(g => g[2]);
+export const ALL = METRICS.flatMap(g => g[2]);
 export const DEF = ["spend", "impr", "reach", "results", "cpr", "leads", "appt"];
 const COSTY = /^(cpr|cpm|cpc|cpl|spend|cpp|cpmsg|cpcall|cpe|cpthru|cpappt|cpwon|blocks)$/;
 const DAY = 86_400_000;
@@ -30,20 +31,26 @@ const dfmt = (iso: string) => { if (!iso) return ""; const [, m, d] = iso.split(
 const shown = (iso: string) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
 
 /** The CRM's own figures for one ad over a range (Meta's are null until connected). */
-function crmFigures(cs: CrmCustomer[], ctx: DeskCtx, a: number, b: number): Record<string, number | null> {
+export function crmFigures(cs: CrmCustomer[], ctx: DeskCtx, a: number, b: number): Record<string, number | null> {
   const inR = (iso: string) => { const t = new Date(iso).getTime(); return t >= a && t < b + DAY; };
   const leads = cs.filter(c => inR(c.createdAt)), ids = new Set(leads.map(c => c.id));
   const vs = ctx.data.visits.filter(v => ids.has(v.customerId) && v.state !== "cancelled");
   const appt = new Set(vs.map(v => v.customerId)).size, showup = vs.filter(v => v.state === "attended").length, won = leads.filter(c => c.status === "won").length;
   return { leads: leads.length, appt, showup, won, apptrate: leads.length ? (appt / leads.length) * 100 : null, showrate: appt ? (showup / appt) * 100 : null, winrate: leads.length ? (won / leads.length) * 100 : null };
 }
-const fmt = (v: number | null | undefined, t: Fmt) => (v == null ? "—" : t === "rm" ? Math.round(v).toLocaleString("en-MY") : t === "rm2" ? v.toFixed(2) : t === "pct" ? `${v.toFixed(2)}%` : t === "x" ? v.toFixed(2) : Math.round(v).toLocaleString("en-MY"));
+export const fmt = (v: number | null | undefined, t: Fmt) => (v == null ? "—" : t === "rm" ? Math.round(v).toLocaleString("en-MY") : t === "rm2" ? v.toFixed(2) : t === "pct" ? `${v.toFixed(2)}%` : t === "x" ? v.toFixed(2) : Math.round(v).toLocaleString("en-MY"));
 
 export function adsPerfVM(ctx: DeskCtx) {
   const { ui, set, patch, data, now } = ctx;
   const T = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const monthA = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const sel = ui.apSel ?? DEF, dsel = ui.mDraft ?? sel, q = ui.mq.toLowerCase();
+  // Customise metrics picks for Ads Performance's columns, or (ui.mFor "cards") Insight's ad cards — the same pane.
+  const forCards = ui.mFor === "cards";
+  const baseOf = (u: typeof ui) => (u.mFor === "cards" ? u.insCards ?? INS_CARDS : u.apSel ?? DEF);
+  const sel = ui.apSel ?? DEF, dsel = ui.mDraft ?? baseOf(ui), q = ui.mq.toLowerCase();
+  // Drag a header's right edge to size its column (the owner, 2026-10-13); double-click the edge to give it back.
+  const W = ui.apW;
+  const sz = columnSizer(set, "apW"), resizer = (k: string, min: number) => sz.resize(k, min === 220 ? 140 : 64), unsize = (k: string) => sz.reset(k)();
   const cols = sel.map(k => ALL.find(m => m[0] === k)).filter((x): x is NonNullable<typeof x> => !!x);
   const dcols = dsel.map(k => ALL.find(m => m[0] === k)).filter((x): x is NonNullable<typeof x> => !!x);
   // The range: five presets, or the date picker's (custom); the compare range is the period before, last month, last year, or picked.
@@ -127,11 +134,15 @@ export function adsPerfVM(ctx: DeskCtx) {
     apStOpen: ui.apStOpen, apStToggle: () => set(u => ({ ...u, apStOpen: !u.apStOpen })), apStCur: { label: ST_META[apStF][0], dot: ST_META[apStF][1], n: AD.length },
     apStOpts: (["all", "Running", "Paused", "Pending"] as const).map(k => { const on = apStF === k, n = k === "all" ? ads.length : ads.filter(a => status(a.id) === k).length;
       return { label: ST_META[k][0], dot: ST_META[k][1], n, bg: on ? ST_META[k][3] : "transparent", fg: on ? ST_META[k][4] : "#3F2B22", w: on ? 700 : 550, pick: () => patch({ apStF: k, apStOpen: false }) }; }),
-    apHead: cols.map(m => { const on = srt?.k === m[0]; return { label: m[1] + (m[3] === "rm" || m[3] === "rm2" ? " (RM)" : ""), arrow: on ? (srt?.dir === "asc" ? "▲" : "▼") : "↕", ac: on ? "#BD4A19" : "#C9B8AC", fg: on ? "#3F2B22" : "#806B60",
+    apHead: cols.map(m => { const on = srt?.k === m[0]; return { resize: resizer(m[0], 104), unsize: () => unsize(m[0]), label: m[1] + (m[3] === "rm" || m[3] === "rm2" ? " (RM)" : ""), arrow: on ? (srt?.dir === "asc" ? "▲" : "▼") : "↕", ac: on ? "#BD4A19" : "#C9B8AC", fg: on ? "#3F2B22" : "#806B60",
       sort: () => set(u => { const c = u.apSort; return { ...u, apSort: !c || c.k !== m[0] ? { k: m[0], dir: "desc" } : c.dir === "desc" ? { k: m[0], dir: "asc" } : null }; }) }; }),
     apNameArrow: srt?.k === "name" ? (srt.dir === "asc" ? "▲" : "▼") : "↕", apNameAc: srt?.k === "name" ? "#BD4A19" : "#C9B8AC",
     apSortName: () => set(u => { const c = u.apSort; return { ...u, apSort: !c || c.k !== "name" ? { k: "name", dir: "asc" } : c.dir === "asc" ? { k: "name", dir: "desc" } : null }; }),
-    apRows: rows, apNSel: cols.length, apCols: `minmax(220px, 1.6fr) repeat(${Math.max(cols.length, 1)}, minmax(104px, 1fr))`, apMinW: 260 + cols.length * 116,
+    apNameResize: resizer("name", 220), apNameUnsize: () => unsize("name"),
+    // A dragged column keeps its width; the others share what is left, as the design's.
+    apRows: rows, apNSel: cols.length,
+    apCols: [W.name ? `${W.name}px` : "minmax(220px, 1.6fr)", ...(cols.length ? cols : [null]).map(m => (m && W[m[0]] ? `${W[m[0]]}px` : "minmax(104px, 1fr)"))].join(" "),
+    apMinW: 40 + (W.name ?? 220) + cols.reduce((n, m) => n + (W[m[0]] ?? 104) + 12, 0),
     apRangeLabel: `${custom ? ui.apPreset || "Custom" : R[ui.apRange as number][0]} · ${rangeTxt(ra, rb)}`, apCmpOn: cmp, apMainShort: rangeTxt(ra, rb), apCmpShort: rangeTxt(ca, cb),
     apCmpLabel: cmp ? `vs ${(CM[cmode === "custom" ? 3 : typeof cmode === "number" ? cmode : 0] ?? CM[0])[1]}` : "Compare",
     apDlOpen: ui.apDlOpen, apToggleDl: () => set(u => ({ ...u, apDlOpen: !u.apDlOpen })),
@@ -144,25 +155,25 @@ export function adsPerfVM(ctx: DeskCtx) {
     dpSetDays: (e: { target: { value: string } }) => { const n = Math.max(1, parseInt(e.target.value, 10) || 1); upd({ days: n, preset: `Last ${n} days`, from: isoOf(T - (n - 1) * DAY), to: isoOf(T) }); },
     dpApply: () => set(u => (u.dp ? { ...u, apRange: "custom", apF: u.dp.from, apT: u.dp.to, apCF: u.dp.cf, apCT: u.dp.ct, apPreset: u.dp.preset, apCmp: u.dp.cmp, apCmpMode: "range", dp: { ...u.dp, open: false } } : u)),
     dp: dpVM,
-    openMetrics: () => patch({ pane: "docked", kind: "metrics", mDraft: null, mDrag: null }),
-    saveMetrics: () => set(u => ({ ...u, apSel: u.mDraft ?? u.apSel ?? DEF, mDraft: null, mDrag: null, pane: "closed" })),
-    mDirty: !!ui.mDraft && JSON.stringify(ui.mDraft) !== JSON.stringify(sel),
-    mq: ui.mq, setMq: (e: { target: { value: string } }) => patch({ mq: e.target.value }), resetMetrics: () => patch({ mDraft: [...DEF] }),
+    openMetrics: () => patch({ pane: "docked", kind: "metrics", mFor: "ads", mDraft: null, mDrag: null }),
+    saveMetrics: () => set(u => ({ ...u, ...(u.mFor === "cards" ? { insCards: (u.mDraft ?? baseOf(u)).length ? u.mDraft ?? baseOf(u) : INS_CARDS } : { apSel: u.mDraft ?? baseOf(u) }), mDraft: null, mDrag: null, pane: "closed" })),
+    mDirty: !!ui.mDraft && JSON.stringify(ui.mDraft) !== JSON.stringify(baseOf(ui)),
+    mq: ui.mq, setMq: (e: { target: { value: string } }) => patch({ mq: e.target.value }), resetMetrics: () => patch({ mDraft: [...(forCards ? INS_CARDS : DEF)] }),
     mFoldAllLabel: METRICS.every(g => ui.mFold[g[0]]) ? "Expand all" : "Collapse all",
     mFoldAll: () => set(u => { const all = METRICS.every(g => u.mFold[g[0]]); return { ...u, mFold: { ...u.mFold, ...Object.fromEntries(METRICS.map(g => [g[0], !all])) } }; }),
     mGroups: METRICS.map(([label, src, items]) => ({ label, src, open: !!q || !ui.mFold[label], rot: !!q || !ui.mFold[label] ? 0 : -90, nSel: `${items.filter(m => dsel.includes(m[0])).length} of ${items.length}`,
       fold: () => set(u => ({ ...u, mFold: { ...u.mFold, [label]: !u.mFold[label] } })),
       items: items.filter(m => !q || m[1].toLowerCase().includes(q)).map(m => { const on = dsel.includes(m[0]);
         return { label: m[1], hint: m[2], on, bg: on ? "#BD4A19" : "#fff", bd: on ? "#BD4A19" : "#CDBCAE",
-          toggle: () => set(u => { const c = u.mDraft ?? u.apSel ?? DEF; return { ...u, mDraft: c.includes(m[0]) ? c.filter(x => x !== m[0]) : [...c, m[0]] }; }) }; }) })).filter(g => g.items.length),
-    mOrder: dcols.map((m, i) => { const mvTo = (j: number) => set(u => { const c = [...(u.mDraft ?? u.apSel ?? DEF)].filter(k => ALL.some(x => x[0] === k)); const [x] = c.splice(i, 1); c.splice(j, 0, x); return { ...u, mDraft: c, mDrag: null }; });
+          toggle: () => set(u => { const c = u.mDraft ?? baseOf(u); return { ...u, mDraft: c.includes(m[0]) ? c.filter(x => x !== m[0]) : [...c, m[0]] }; }) }; }) })).filter(g => g.items.length),
+    mOrder: dcols.map((m, i) => { const mvTo = (j: number) => set(u => { const c = [...(u.mDraft ?? baseOf(u))].filter(k => ALL.some(x => x[0] === k)); const [x] = c.splice(i, 1); c.splice(j, 0, x); return { ...u, mDraft: c, mDrag: null }; });
       const dragging = ui.mDrag === i;
       return { n: i + 1, label: m[1], first: i === 0, last: i === dcols.length - 1, upC: i === 0 ? "#D8C9BE" : "#6B574C", dnC: i === dcols.length - 1 ? "#D8C9BE" : "#6B574C", bg: "#fff",
         sh: dragging ? "0 6px 18px rgba(63,43,34,.22)" : "none", bd: dragging ? "transparent" : "#F1E7DF", z: dragging ? 2 : 1,
         up: () => { if (i > 0) mvTo(i - 1); }, down: () => { if (i < dcols.length - 1) mvTo(i + 1); },
-        rm: () => set(u => ({ ...u, mDraft: (u.mDraft ?? u.apSel ?? DEF).filter(k => k !== m[0]) })),
+        rm: () => set(u => ({ ...u, mDraft: (u.mDraft ?? baseOf(u)).filter(k => k !== m[0]) })),
         dStart: (e: { dataTransfer: DataTransfer }) => { e.dataTransfer.effectAllowed = "move"; patch({ mDrag: i }); },
-        dOver: (e: { preventDefault(): void }) => { e.preventDefault(); const f = ui.mDrag; if (f == null || f === i) return; set(u => { const c = [...(u.mDraft ?? u.apSel ?? DEF)].filter(k => ALL.some(x => x[0] === k)); const [x] = c.splice(f, 1); c.splice(i, 0, x); return { ...u, mDraft: c, mDrag: i }; }); },
+        dOver: (e: { preventDefault(): void }) => { e.preventDefault(); const f = ui.mDrag; if (f == null || f === i) return; set(u => { const c = [...(u.mDraft ?? baseOf(u))].filter(k => ALL.some(x => x[0] === k)); const [x] = c.splice(f, 1); c.splice(i, 0, x); return { ...u, mDraft: c, mDrag: i }; }); },
         dDrop: (e: { preventDefault(): void }) => { e.preventDefault(); patch({ mDrag: null }); }, dEnd: () => patch({ mDrag: null }) }; }),
     mOrdOpen: !ui.mFold.__order, mOrdRot: ui.mFold.__order ? -90 : 0, mOrdFold: () => set(u => ({ ...u, mFold: { ...u.mFold, __order: !u.mFold.__order } })),
     syncedNote: "Not connected to Meta Ads yet",

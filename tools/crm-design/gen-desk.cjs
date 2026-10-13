@@ -37,7 +37,7 @@ ${apos ? "/* eslint-disable react/no-unescaped-entities -- generated from the de
 import { Fragment } from "react";
 import type React from "react";
 import DH from "./desk-hover.module.css";
-import { DeskBook, DeskCustomerForm, DeskHistory, DeskNote } from "./DeskExtras";
+import { DeskBook, DeskCardPicker, DeskCustomerForm, DeskHistory, DeskNote } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
 /** The whole desktop CRM: the Revenue app's frame around it (sidebar, top bar), every page, pane, menu and the toast. */

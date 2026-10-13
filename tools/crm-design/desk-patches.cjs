@@ -56,6 +56,18 @@ module.exports = [
     "$1v.metaDot$2{v.metaSync}", "Ads Performance (compact) says whether Meta is connected."],
   [/(<span style=\{\{ width: "7px", height: "7px", borderRadius: "50%", background: )"#3FA06B"( \}\}>\s*<\/span>)Synced from Meta Ads · 9:00 am/,
     "$1v.metaDot$2{v.metaSync}", "Ads Performance says whether Meta is connected."],
+  // Full time team editor: the people table and the week keep their full height and the pane scrolls (the owner,
+  // 2026-10-13: PEI FEN's row was cut — the scroller squeezed these boxes, whose overflow is hidden; #348 on the phone).
+  ['<div style={{ border: "1px solid #E3E8EF", borderRadius: "18px", overflow: "hidden" }}>', '<div style={{ flex: "none", border: "1px solid #E3E8EF", borderRadius: "18px", overflow: "hidden" }}>',
+    "The Full time editor's people table keeps its full height."],
+  [/<div style=\{\{ display: "flex", flexDirection: "column", gap: "0", border: "1px solid #EBDDD2", borderRadius: "16px", overflow: "hidden" \}\}>(\s*<span [^>]*>WHO GETS EACH DAY<\/span>)/,
+    '<div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "0", border: "1px solid #EBDDD2", borderRadius: "16px", overflow: "hidden" }}>$1', "…and so does its week."],
+  // Insight › Ads Performance: "+ Metrics · N" before View all picks the cards (the owner, 2026-10-13).
+  ['<button type="button" onClick={v.goAdsPerf}', '<DeskCardPicker v={v} />\n                  <button type="button" onClick={v.goAdsPerf}', "Insight's ad cards are picked as Ads Performance's columns are."],
+  // Ads Performance: drag a header's right edge to size its column (the owner, 2026-10-13) — resize-patches.cjs.
+  ...require("./resize-patches.cjs"),
+  // Insight › Ads Performance's table sorts and sizes as Ads Performance's (the owner, 2026-10-13) — insight-table-patches.cjs.
+  ...require("./insight-table-patches.cjs"),
 ];
 
 /**
@@ -65,6 +77,8 @@ module.exports = [
  * line in the bubble; the tick blue once read, grey before; the reply box an input (Enter sends), + and the camera
  * pick a file, and the voice button sends once something is typed (its icon an arrow then).
  */
+// A visit sent to the customer is the salesperson chat's visit card (the owner, 2026-10-13: 跟 RS 一樣).
+const CARD = require("./visit-card.cjs");
 function chatPatches(inn, out, text, time, reply, list, draft, setDraft, draftKey, send, micD, attach, photo, aw) {
   const e = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const NO = "(?:(?!<span title|\\{!!\\(v\\.)[\\s\\S])*?";
@@ -79,8 +93,8 @@ function chatPatches(inn, out, text, time, reply, list, draft, setDraft, draftKe
     `{(${list}).map((m, m_i) => (<Fragment key={m_i}>` +
     `{!!(m.day) && (<>${pill}{m.day}</span></>)}` +
     `{!!(m.sys) && (<><span style={${SYS}}>{!!(m.bell) && (<>${BELL}</>)}{m.sys}</span></>)}` +
-    `{!!(m.inn) && (<>${inDiv}{!!(m.text) && (<p style=${pSt}>{m.text}</p>)}{!!(m.media) && (<p style=${pSt}><a href={m.mediaHref || undefined} target="_blank" rel="noreferrer">{m.media}</a></p>)}<span style=${inTime}>{m.time}</span></div></>)}` +
-    `{!!(m.out) && (<>${outDiv}{!!(m.text) && (<p style=${pSt}>{m.text}</p>)}{!!(m.media) && (<p style=${pSt}><a href={m.mediaHref || undefined} target="_blank" rel="noreferrer">{m.media}</a></p>)}<span style=${outTime}>{m.time}{!!(m.hasTick) && (<svg ${svgA}stroke={m.tick}${svgB}>${svgIn}</svg>)}{!!(m.failed) && (<span style={{ color: "#A3371A", fontWeight: "600" }}>Not sent</span>)}</span></div></>)}` +
+    `{!!(m.inn) && (<>${inDiv}${CARD}{!!(m.text) && (<p style=${pSt}>{m.text}</p>)}{!!(m.media) && (<p style=${pSt}><a href={m.mediaHref || undefined} target="_blank" rel="noreferrer">{m.media}</a></p>)}<span style=${inTime}>{m.time}</span></div></>)}` +
+    `{!!(m.out) && (<>${outDiv}${CARD}{!!(m.text) && (<p style=${pSt}>{m.text}</p>)}{!!(m.media) && (<p style=${pSt}><a href={m.mediaHref || undefined} target="_blank" rel="noreferrer">{m.media}</a></p>)}<span style=${outTime}>{m.time}{!!(m.hasTick) && (<svg ${svgA}stroke={m.tick}${svgB}>${svgIn}</svg>)}{!!(m.failed) && (<span style={{ color: "#A3371A", fontWeight: "600" }}>Not sent</span>)}</span></div></>)}` +
     `</Fragment>))}`;
   const composer = new RegExp(
     `<span title="Send a file" style=(\\{\\{[^\\n]*?\\}\\})>(${NO})</span>(\\s*<span style=\\{\\{[^\\n]*?\\}\\}>\\s*)<span style=\\{\\{ flex: "1", minWidth: "0", fontSize: "15px", color: "#757575"[^\\n]*?\\}\\}>\\{${e(reply)}\\}</span>(${NO})` +
