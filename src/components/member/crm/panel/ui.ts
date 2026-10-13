@@ -52,6 +52,8 @@ export interface PanelUi {
   pDraft: string;
   /** A voice note being recorded in the chat: when it started (shared/voice.ts); pRecTick moves its clock. */
   pRec: number | null;
+  /** The chat's emoji sheet. */
+  pEmoji?: boolean;
   pRecTick?: number;
   toast: string;
   // Assignment

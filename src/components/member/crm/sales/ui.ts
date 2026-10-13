@@ -81,6 +81,8 @@ export interface SalesUi {
   sending: boolean;
   /** A voice note being recorded: when it started (shared/voice.ts); recTick moves its clock. */
   rec: number | null;
+  /** The emoji sheet (the composer's sticker button). */
+  emoji?: boolean;
   recTick?: number;
   // Calendar
   calView: "month" | "week" | "day";

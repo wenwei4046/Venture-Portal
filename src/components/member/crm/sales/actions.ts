@@ -291,9 +291,11 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
     },
     async sendTemplate(customerId, t, params) {
       if (!live) { addMessage(customerId, { id: uid(), from: "me", kind: "template", text: t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] ?? ""), at: new Date().toISOString(), status: "sent", by: me }); return true; }
-      const r = await sendCrmTemplate(customerId, t, params);
-      if (!r.ok) { toast(r.error); return false; }
-      addMessage(customerId, r.message);
+      const tempId = `sending-${uid()}`;
+      addMessage(customerId, { id: tempId, from: "me", kind: "template", text: t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] ?? ""), at: new Date().toISOString(), status: "sending", by: me });
+      const r = await inTurn(customerId, () => sendCrmTemplate(customerId, t, params));
+      if (!r.ok) { swapMessage(customerId, tempId, null); toast(r.error); return false; }
+      swapMessage(customerId, tempId, r.message);
       return true;
     },
     async sendMedia(customerId, file, caption) {

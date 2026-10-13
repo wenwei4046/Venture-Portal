@@ -496,7 +496,15 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </div>
               </Fragment>))}
             </div>
-            {!!(v.ld.lx.rec) && (<div style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px" }}>
+            {!!(v.ld.lx.emojiOpen) && (<div onClick={v.ld.lx.closeEmoji} style={{ position: "absolute", inset: "0", zIndex: "8", background: "rgba(63,43,34,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeIn 200ms ease-out" }}>
+        <div onClick={v.ol.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 16px 20px", display: "flex", flexDirection: "column", gap: "8px", maxHeight: "55%", overflowY: "auto", scrollbarWidth: "none", boxSizing: "border-box" }}>
+          <span style={{ flex: "none", alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2" }}></span>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(8, minmax(0, 1fr))", gap: "4px" }}>
+            {(v.ld.lx.emojis).map((e, e_i) => (<Fragment key={e_i}><span onClick={e.pick} style={{ height: "42px", display: "grid", placeItems: "center", fontSize: "26px", borderRadius: "10px", cursor: "pointer" }}>{e.e}</span></Fragment>))}
+          </div>
+        </div>
+      </div>)}
+      {!!(v.ld.lx.rec) && (<div style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px" }}>
               <span onClick={v.ld.lx.rec?.cancel} title="Cancel" style={{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: "#A3371A", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></span>
               <span style={{ flex: "1", minWidth: "0", height: "44px", boxSizing: "border-box", borderRadius: "22px", background: "#FBF1EC", display: "flex", alignItems: "center", gap: "10px", padding: "0 16px", fontSize: "15px", fontWeight: "600", color: "#3F2B22", fontVariantNumeric: "tabular-nums" }}><span style={{ flex: "none", width: "10px", height: "10px", borderRadius: "50%", background: "#D93025", animation: "fadeIn 700ms ease-in-out infinite alternate" }}></span>{v.ld.lx.rec?.time} · Recording…</span>
               <span onClick={v.ld.lx.rec?.send} title="Send voice note" style={{ flex: "none", width: "44px", height: "44px", borderRadius: "50%", background: "#BD4A19", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg></span>
@@ -510,7 +518,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </span>
               <span style={{ flex: "1", minWidth: "0", height: "44px", boxSizing: "border-box", padding: "0 6px 0 16px", borderRadius: "22px", border: "1px solid #EBDDD2", display: "flex", alignItems: "center", gap: "4px" }}>
                 <input value={v.ld.lx.draft} onChange={v.ld.lx.setDraft} placeholder={v.ld.lx.ph} style={{ flex: "1", minWidth: "0", border: "0", background: "transparent", font: "inherit", fontSize: "15px", color: "#3F2B22", outline: "none" }} />
-                <span style={{ flex: "none", width: "32px", height: "32px", display: "grid", placeItems: "center", color: "#806B60" }}>
+                <span onClick={v.ld.lx.openEmoji} title="Emoji" style={{ flex: "none", width: "32px", height: "32px", display: "grid", placeItems: "center", color: "#806B60" , cursor: "pointer" }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 13V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6l7-7Zm0 0h-4a3 3 0 0 0-3 3v4">
                     </path>

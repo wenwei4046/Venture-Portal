@@ -252,7 +252,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
             <textarea data-draft="1" value={v.draftVal} onChange={v.onDraft} placeholder={`Reply to ${v.cl.first}…`} rows={1} style={{ flex: "1", minWidth: "0", height: v.draftH, maxHeight: "154px", boxSizing: "border-box", margin: "0", padding: "11px 0", border: "0", outline: "none", resize: "none", background: "transparent", font: "inherit", fontSize: "16px", lineHeight: "22px", color: "#3F2B22", overflowY: "auto", scrollbarWidth: "thin" }}>
             </textarea>
             {!!(v.noDraft) && (<>
-              <span title="Stickers" style={{ width: "38px", height: "38px", display: "grid", placeItems: "center", color: "rgb(128 107 96)" }}>
+              <span onClick={v.openEmoji} title="Emoji" style={{ width: "38px", height: "38px", display: "grid", placeItems: "center", color: "rgb(128 107 96)", cursor: "pointer" }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 13V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6l7-7Zm0 0h-4a3 3 0 0 0-3 3v4">
                   </path>
@@ -414,6 +414,14 @@ export default function SalesChat({ v }: { v: ChatVM }) {
       {!!(v.hm.toast) && (<>
         <div style={{ position: "absolute", left: "20px", right: "20px", bottom: "90px", zIndex: "6", padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: "14px", fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{v.hm.toast}</div>
       </>)}
+      {!!(v.emojiOpen) && (<div onClick={v.closeEmoji} style={{ position: "absolute", inset: "0", zIndex: "8", background: "rgba(63,43,34,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeIn 200ms ease-out" }}>
+        <div onClick={v.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 16px 20px", display: "flex", flexDirection: "column", gap: "8px", maxHeight: "55%", overflowY: "auto", scrollbarWidth: "none", boxSizing: "border-box" }}>
+          <span style={{ flex: "none", alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2" }}></span>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(8, minmax(0, 1fr))", gap: "4px" }}>
+            {(v.emojis).map((e, e_i) => (<Fragment key={e_i}><span onClick={e.pick} style={{ height: "42px", display: "grid", placeItems: "center", fontSize: "26px", borderRadius: "10px", cursor: "pointer" }}>{e.e}</span></Fragment>))}
+          </div>
+        </div>
+      </div>)}
       {!!(v.menuOpen) && (<>
         <div onClick={v.closeMenu} style={{ position: "absolute", inset: "0", zIndex: "5", boxSizing: "border-box", padding: "24px 20px", background: "rgba(63,43,34,.32)", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: v.menuAlign, gap: "10px" }}>
           <div onClick={v.stop} style={{ display: "flex", alignItems: "center", gap: "2px", padding: "6px 8px", borderRadius: "28px", background: "#fff", boxShadow: "0 8px 24px rgba(63,43,34,.18)" }}>
