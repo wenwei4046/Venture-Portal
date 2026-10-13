@@ -15,6 +15,7 @@ import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
 import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
+import { pickedOf, pickVM } from "../../shared/pick";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
@@ -166,7 +167,17 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     // + = a document, the camera = a photo (PanelScreens' hidden pickers); the typed text goes as the caption.
     attach: () => document.getElementById("crm-panel-file")?.click(),
     photo: () => document.getElementById("crm-panel-photo")?.click(),
-    // Several photos and videos at once, each its own message; the typed words go with the first.
+    // Photos and videos (the camera button) wait on the preview with its HD switch; a document (+) goes at once.
+    pickVisual: (e: ChangeEvent<HTMLInputElement>) => {
+      const files = [...(e.target.files ?? [])]; e.target.value = "";
+      if (files.length) set(u => ({ ...u, pPick: pickedOf(files) }));
+    },
+    pk: c ? pickVM(ui.pPick, p => set(u => ({ ...u, pPick: p })), async files => {
+      const caption = draft.trim();
+      if (caption) set(u => ({ ...u, pDraft: "" }));
+      await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
+    }) : null,
+    // Several files at once, each its own message; the typed words go with the first.
     pickMedia: async (e: ChangeEvent<HTMLInputElement>) => {
       const files = [...(e.target.files ?? [])]; e.target.value = "";
       if (!files.length || !c) return;

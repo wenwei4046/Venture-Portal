@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { byteRange, mediaKindOf, mediaLimit, mediaPath } from "./crm-media";
+import { mediaKindOf, mediaLimit, mediaPath } from "./crm-media";
 import { voiceMime, recTime } from "@/components/member/crm/shared/voice";
 import { metaMediaUrl } from "@/lib/messenger/webhook";
 
@@ -21,14 +21,6 @@ describe("CRM photos, videos and voice notes", () => {
     const id = "11111111-2222-3333-4444-555555555555";
     expect(mediaPath(id, "IMG_8396.JPEG", "image/jpeg", 1700000000000, 0.5)).toMatch(/^11111111-2222-3333-4444-555555555555\/1700000000000-[a-z0-9]+\.jpeg$/);
     expect(mediaPath(id, "voice", "audio/mp4", 1, 0)).toMatch(/\.m4a$/);
-  });
-
-  it("answers the part of a video Safari asks for", () => {
-    expect(byteRange(null, 100)).toBeNull();
-    expect(byteRange("bytes=0-1", 100)).toEqual({ start: 0, end: 1 });
-    expect(byteRange("bytes=90-", 100)).toEqual({ start: 90, end: 99 });
-    expect(byteRange("bytes=-10", 100)).toEqual({ start: 90, end: 99 });
-    expect(byteRange("bytes=200-300", 100)).toBe("bad");
   });
 
   it("records voice notes in a format both channels play, when the browser can", () => {

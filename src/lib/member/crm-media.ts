@@ -1,6 +1,6 @@
 /**
  * Photos, videos and voice notes in the CRM's chats (2026-10-13). Pure rules shared by the browser (what a picked file
- * is, where it goes in the bucket) and the server (the range a video asks for, what each channel takes).
+ * is, where it goes in the bucket) and the server (what each channel takes).
  */
 
 export type CrmMediaKind = "image" | "video" | "audio" | "document";
@@ -27,15 +27,4 @@ export function mediaPath(contactId: string, name: string, mime: string, now = D
   const fromMime: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "video/mp4": "mp4", "video/quicktime": "mov", "audio/mp4": "m4a", "audio/ogg": "ogg", "audio/webm": "webm", "audio/mpeg": "mp3", "application/pdf": "pdf" };
   const ext = fromName ?? fromMime[mime.split(";")[0]] ?? "bin";
   return `${contactId}/${now}-${Math.floor(rand * 1e9).toString(36)}.${ext}`;
-}
-
-/** The part of a file a "Range: bytes=a-b" asks for; null = the whole file; "bad" = nothing of it. */
-export function byteRange(header: string | null, size: number): { start: number; end: number } | null | "bad" {
-  if (!header) return null;
-  const m = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
-  if (!m || (!m[1] && !m[2]) || size === 0) return "bad";
-  let start: number, end: number;
-  if (!m[1]) { const n = Number(m[2]); start = Math.max(0, size - n); end = size - 1; }
-  else { start = Number(m[1]); end = m[2] ? Math.min(Number(m[2]), size - 1) : size - 1; }
-  return start > end || start >= size ? "bad" : { start, end };
 }

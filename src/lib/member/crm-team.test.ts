@@ -331,8 +331,9 @@ describe("the dealer, rev 1011 (twin of crm_assign_contact)", () => {
     expect(officeWeekday(new Date(Date.UTC(2026, 9, 5, 16, 30)))).toBe(1); // Mon 16:30 UTC is Tue 00:30 in Kuala Lumpur
   });
 
-  it("an enquiry from no ad waits in Organic Leads; an ad nobody set goes evenly across the teams", () => {
-    expect(dealEnquiry(null, tuesday, undefined, {}, zero(), members)).toEqual({ teamId: null, memberId: null, by: "organic" });
+  it("an enquiry from no ad goes to the Revenue Director (Organic Leads only with none); an ad nobody set goes evenly across the teams", () => {
+    expect(dealEnquiry(null, tuesday, undefined, {}, zero(), members)).toEqual({ teamId: null, memberId: "hod", by: "organic_director" });
+    expect(dealEnquiry(null, tuesday, undefined, {}, zero(), members.filter(m => m.role !== "hod"))).toEqual({ teamId: null, memberId: null, by: "organic" });
     const { out } = deal(4, "AD-NONE", undefined);
     expect(out.map(d => d.teamId)).toEqual(["tla", "tlb", "tla", "tlb"]);
     expect(out.every(d => d.memberId && d.by === "default_even")).toBe(true);

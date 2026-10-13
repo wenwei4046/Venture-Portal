@@ -32,7 +32,7 @@ describe("fetching a customer's media", () => {
     expect([validMediaId("123456"), validMediaId("abc"), validMediaId(null)]).toEqual([true, false, false]);
   });
 
-  it("shows photos, videos and voice inline; anything else downloads", () => {
-    expect(["image/jpeg", "video/mp4", "audio/ogg; codecs=opus", "application/pdf", "image/svg+xml"].map(inlineType)).toEqual([true, true, true, false, false]);
+  it("shows photos, videos, voice and PDFs inline (2026-10-13: a PDF opened blank); anything else downloads", () => {
+    expect(["image/jpeg", "video/mp4", "audio/ogg; codecs=opus", "application/pdf", "image/svg+xml"].map(inlineType)).toEqual([true, true, true, true, false]);
   });
 });

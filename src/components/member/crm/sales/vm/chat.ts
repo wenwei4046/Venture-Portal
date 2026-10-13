@@ -17,6 +17,7 @@ import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
+import { pickedOf, pickVM } from "../../shared/pick";
 import { CHAT_WALL } from "../wall";
 
 const RUST = "#BD4A19", INK = "#3F2B22", SUB = "rgb(128 107 96)", BD = "#EBDDD2";
@@ -176,8 +177,9 @@ export function chatVM(ctx: SalesCtx) {
   const assigner = ctx.embedded?.assignTo ?? null;
   // Assign to (user 2026-10-13): the list grouped by team under a heading each, as the Switch sheet's — Director, each team,
   // Others; teams in the order the list first names them.
-  const groupOf = (p: { id: string; role?: string }) => (p.role === "hod" ? "Director" : teamName(teamOf(p.id, data.people)) || "Others");
-  const assign0 = assigner ? (ctx.embedded?.switchList ?? []).filter(p => p.role !== "boss") : [];
+  // The Principal is on it too since 2026-10-13 (their Mine), first.
+  const groupOf = (p: { id: string; role?: string }) => (p.role === "boss" ? "Principal" : p.role === "hod" ? "Director" : teamName(teamOf(p.id, data.people)) || "Others");
+  const assign0 = assigner ? [...data.people.filter(p => p.role === "boss"), ...(ctx.embedded?.switchList ?? []).filter(p => p.role !== "boss")] : [];
   const groupOrder = [...new Set(assign0.map(groupOf))];
   const assignList = [...assign0].sort((a, b) => groupOrder.indexOf(groupOf(a)) - groupOrder.indexOf(groupOf(b)));
   const assigning = !!(assigner && hm.assign);
@@ -440,6 +442,17 @@ export function chatVM(ctx: SalesCtx) {
       await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
     },
     openCamera: () => document.getElementById("crm-pick-camera")?.click(),
+    // Photos and videos (the + sheet's Photos, the camera) wait on the preview with its HD switch; a document goes at once.
+    pickVisual: (e: ChangeEvent<HTMLInputElement>) => {
+      const files = [...(e.target.files ?? [])]; e.target.value = "";
+      if (files.length) set(u => ({ ...u, pick: pickedOf(files) }));
+    },
+    pk: pickVM(ui.pick, p => set(u => ({ ...u, pick: p })), async files => {
+      const caption = draft.trim();
+      if (caption) setDraft("");
+      scrollDown();
+      await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
+    }),
     // The sticker button: an emoji sheet; each tap adds one to the reply, the sheet stays until closed.
     emojiOpen: !!ui.emoji, openEmoji: () => patch({ emoji: true }), closeEmoji: () => patch({ emoji: false }),
     emojis: CHAT_EMOJIS.map(e => ({ e, pick: () => set(u => ({ ...u, draft: { ...u.draft, [c.id]: withEmoji(u.draft[c.id] ?? "", e) } })) })),

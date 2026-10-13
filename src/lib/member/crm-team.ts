@@ -349,7 +349,7 @@ export interface CrmDeal {
   teamId: string | null;
   memberId: string | null;
   held?: boolean;
-  by: "organic" | "even" | "full_time" | "percent" | "max" | "over_the_limit" | `default_${"even" | "full_time"}`;
+  by: "organic" | "organic_director" | "even" | "full_time" | "percent" | "max" | "over_the_limit" | `default_${"even" | "full_time"}`;
 }
 
 /** The weekday in Kuala Lumpur, 0 = Monday — as the database counts it. */
@@ -385,7 +385,11 @@ export function pickInside(teamId: string, mode: CrmInsideMode, people: Record<s
 export function dealEnquiry(ad: string | null, at: Date, rule: CrmDealRule | undefined, fullTime: Record<string, CrmDealFullTime>,
   counts: CrmDealCounts, members: CrmMember[]): CrmDeal {
   const organic: CrmDeal = { teamId: null, memberId: null, by: "organic" };
-  if (!ad) return organic;
+  // No ad: to the Revenue Director (2026-10-13; the SQL takes the first active HOD by id); with none, Organic Leads.
+  if (!ad) {
+    const director = members.filter(m => m.role === "hod").map(m => m.id).sort()[0];
+    return director ? { teamId: null, memberId: director, by: "organic_director" } : organic;
+  }
   const tls = allTeams(members).map(t => t.id);
   if (!rule) {
     const teamId = fewest(tls, id => counts.team[id] ?? 0);

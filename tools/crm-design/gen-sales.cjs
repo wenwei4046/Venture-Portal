@@ -28,6 +28,8 @@ function balanced(s, start, tag, what) {
   while ((m = re.exec(s))) { depth += m[1] ? -1 : 1; if (!depth) return s.slice(at, s.indexOf(">", m.index) + 1); }
   throw new Error(what + ": unbalanced " + start.slice(0, 60));
 }
+const { PICK_SHEET } = require("./pick-sheet.cjs");
+const { EMOJI_PANEL } = require("./emoji-panel.cjs");
 const once = (text, from, to) => { if (text.split(from).length !== 2) throw new Error("not exactly once: " + from.slice(0, 60)); return text.replace(from, to); };
 // rev 1010 §5 Insight: the three hero figures open lists, the list sheet and Customer info with ‹ back.
 const insightFrag = (() => {
@@ -136,7 +138,9 @@ const PATCHES = {
     // 2026-10-13: the sticker button opens the emoji sheet (shared/emoji.ts), a tap adds one to the reply.
     ['<span title="Stickers" style={{ width: "38px", height: "38px", display: "grid", placeItems: "center", color: "rgb(128 107 96)" }}>',
      '<span onClick={v.openEmoji} title="Emoji" style={{ width: "38px", height: "38px", display: "grid", placeItems: "center", color: "rgb(128 107 96)", cursor: "pointer" }}>'],
-    ['{!!(v.menuOpen) && (<>', "{!!(v.emojiOpen) && (<div onClick={v.closeEmoji} style={{ position: \"absolute\", inset: \"0\", zIndex: \"8\", background: \"rgba(63,43,34,.32)\", display: \"flex\", flexDirection: \"column\", justifyContent: \"flex-end\", animation: \"fadeIn 200ms ease-out\" }}>\n        <div onClick={v.stop} style={{ animation: \"sheetUp 320ms cubic-bezier(.2,.8,.2,1)\", background: \"#fff\", borderRadius: \"24px 24px 0 0\", padding: \"10px 16px 20px\", display: \"flex\", flexDirection: \"column\", gap: \"8px\", maxHeight: \"55%\", overflowY: \"auto\", scrollbarWidth: \"none\", boxSizing: \"border-box\" }}>\n          <span style={{ flex: \"none\", alignSelf: \"center\", width: \"36px\", height: \"4px\", borderRadius: \"2px\", background: \"#EBDDD2\" }}></span>\n          <div style={{ display: \"grid\", gridTemplateColumns: \"repeat(8, minmax(0, 1fr))\", gap: \"4px\" }}>\n            {(v.emojis).map((e, e_i) => (<Fragment key={e_i}><span onClick={e.pick} style={{ height: \"42px\", display: \"grid\", placeItems: \"center\", fontSize: \"26px\", borderRadius: \"10px\", cursor: \"pointer\" }}>{e.e}</span></Fragment>))}\n          </div>\n        </div>\n      </div>)}\n      " + '{!!(v.menuOpen) && (<>'],
+    ['{!!(v.hm.apptOpen) && (<>', EMOJI_PANEL("v", "v.emojiOpen && v.chatWarm", 'margin: "0 -20px", ') + '{!!(v.hm.apptOpen) && (<>'],
+    // 2026-10-13: picked photos / videos wait on a preview with an HD switch (shared/pick.ts).
+    ['{!!(v.hm.toast) && (<>', PICK_SHEET("v.pk") + '{!!(v.hm.toast) && (<>'],
     // 1.2 Every bubble lifts a little off the wallpaper.
     ["boxSizing: \"border-box\", borderRadius: m.radius, background: m.bg,", "boxSizing: \"border-box\", borderRadius: m.radius, boxShadow: \"0 1px 1px rgba(63,43,34,.10)\", background: m.bg,"]],
   // Switch to: a whole department's list scrolls inside the sheet instead of running off the screen (user 2026-10-09).
@@ -159,6 +163,11 @@ for (const n of ["SalesChat", "SalesContacts", "SalesCalendar", "SalesInsight", 
 // Round 2 (rev 1010 §8.2): the bell moves into each page's title row, at its right end — the Control panel prototype's
 // round button (40×40, 1px #EBDDD2, white, soft shadow, 20 px bell, rust badge top/right -4px).
 const BELL = "{!!(v.tb) && (<>\n          <span onClick={v.tb.open} title=\"Notifications\" style={{ position: \"relative\", flex: \"none\", width: \"40px\", height: \"40px\", boxSizing: \"border-box\", borderRadius: \"50%\", border: \"1px solid #EBDDD2\", background: \"#fff\", display: \"grid\", placeItems: \"center\", color: \"#3F2B22\", boxShadow: \"0 2px 8px rgba(63,43,34,.06)\", cursor: \"pointer\" }}>\n            <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.8\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\n              <path d=\"M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0\">\n              </path>\n            </svg>\n            {!!(v.tb.has) && (<>\n              <span style={{ position: \"absolute\", top: \"-4px\", right: \"-4px\", minWidth: \"18px\", height: \"18px\", padding: \"0 5px\", boxSizing: \"border-box\", borderRadius: \"9px\", background: \"#BD4A19\", border: \"2px solid #fff\", color: \"#fff\", display: \"grid\", placeItems: \"center\", fontSize: \"10px\", fontWeight: \"700\" }}>{v.tb.n}</span>\n            </>)}\n          </span>\n        </>)}";
+// Inbox rows: a long press opens More (user 2026-10-13); scrolling (pointer cancel) stops it, and the phone's own text
+// callout stays away.
+PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []),
+  ['<div onClick={l.open} onPointerDown={l.down} onPointerUp={l.up} style={{ position: "relative",',
+   '<div onClick={l.open} onPointerDown={l.down} onPointerUp={l.up} onPointerCancel={l.cancel} onContextMenu={l.noMenu} style={{ WebkitTouchCallout: "none", position: "relative",']];
 // Inbox: after All ads, 8 px apart (the title takes the room, so All ads and the bell sit right). Team | Mine left the title
 // row for its own top row (§8.4, superseding 2026-10-11's place beside All ads).
 PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []),

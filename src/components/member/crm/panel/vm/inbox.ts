@@ -1,16 +1,39 @@
 /**
- * Inbox (design 1a): every member's chats on one status board — Needs a
+ * Inbox (design 1a): every member's chats on one status board — New · Needs a
  * reply · Follow up · Appointment · Won · Lost — filtered by team (Director,
  * each team) and then by member. A chat opens in its owner's own CRM, where
  * the Principal / Director can answer. Contacts is the same people A–Z.
  */
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, MouseEvent, PointerEvent } from "react";
 import type { CrmCustomer } from "@/lib/member/crm-data";
 import { STATUS_LABEL, lastChat, lastReal, urgencyOf } from "../../sales/vm/common";
 import { phoneLabel, telHref } from "../../sales/vm/customer";
 import { first, ini, NO_SEAT, seatOf, type PanelCtx } from "./common";
 
 const UC = { urgent: "#A46312", soon: "#806B60", overdue: "#A3371A", none: "#806B60" } as const;
+
+/**
+ * A card's long press, or a swipe to the left, opens Send to — assigning that customer (user 2026-10-13: "咨詢名單進來，按
+ * 久久跳出功能鍵（可assign）, inbox的咨詢左滑也能assign"). Only for whoever may assign (CRM · Manage). One gesture at a
+ * time, held here; the tap that ends a gesture does not also open the chat.
+ */
+const g: { x: number; y: number; t?: ReturnType<typeof setTimeout>; done?: number } = { x: 0, y: 0 };
+function gestures(ctx: PanelCtx, c: CrmCustomer) {
+  if (!ctx.data.can.manage) return { down: undefined, move: undefined, up: undefined, cancel: undefined, guard: undefined, noMenu: undefined };
+  const assign = () => { clearTimeout(g.t); g.done = Date.now(); navigator.vibrate?.(10); ctx.patch({ sendFor: c.id, sdSel: null }); };
+  return {
+    down: (e: PointerEvent<HTMLElement>) => { g.x = e.clientX; g.y = e.clientY; g.done = undefined; clearTimeout(g.t); g.t = setTimeout(assign, 500); },
+    move: (e: PointerEvent<HTMLElement>) => {
+      const dx = e.clientX - g.x, dy = e.clientY - g.y;
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) clearTimeout(g.t);
+      if (!g.done && dx < -60 && Math.abs(dx) > Math.abs(dy) * 1.5) assign();
+    },
+    up: () => clearTimeout(g.t),
+    cancel: () => clearTimeout(g.t),
+    guard: (e: MouseEvent<HTMLElement>) => { if (g.done && Date.now() - g.done < 600) { e.stopPropagation(); e.preventDefault(); } },
+    noMenu: (e: MouseEvent<HTMLElement>) => e.preventDefault(),
+  };
+}
 
 /** One chat as the panel lists it: who has it, its state, its last line. */
 function chatRow(ctx: PanelCtx, c: CrmCustomer) {
@@ -25,7 +48,17 @@ function chatRow(ctx: PanelCtx, c: CrmCustomer) {
     // rev 1011 §1.1: a chat opens here, as the Principal / Director, whoever has it (as Calendar and Awaiting reply do);
     // acting as a salesperson is Profile › View as only.
     open: () => ctx.patch({ lead: c.id, pick: "", toast: "" }),
+    ...gestures(ctx, c),
   };
+}
+
+/**
+ * New (user 2026-10-13: "新進，新被分配，尚未回復的咨詢都放在這裡"): an enquiry nobody of ours has answered since it was
+ * given to its present person (or since it came, while it waits in a team) — a fresh one, or one just handed on.
+ */
+export function isNewChat(c: CrmCustomer): boolean {
+  const since = c.assignedAt && c.assignedAt > c.createdAt ? c.assignedAt : c.createdAt;
+  return !c.messages.some(m => m.from === "me" && !m.auto && m.at >= since);
 }
 
 /** The chats the panel shows: everyone's, and those waiting in a team. Organic Leads are Assignment's. */
@@ -40,7 +73,7 @@ export function inboxVM(ctx: PanelCtx) {
   const chipDefs: [string, string, string][] = [["", "All", "transparent"], ...(me.role === "hod" ? [] : ctx.directors.length ? [["hod", "Director", "#387557"] as [string, string, string]] : []), ...ctx.teams.map(t => [t.id, t.name, t.c] as [string, string, string])];
   const tSel = f && f !== "hod" ? ctx.teams.find(t => t.id === f) : null;
   const need = list.filter(r => r.needs);
-  const col = (r: typeof all[number]) => (r.needs ? "need" : r.c.status === "appointment" ? "appt" : r.c.status === "won" ? "won" : r.c.status === "lost" ? "lost" : "fup");
+  const col = (r: typeof all[number]) => (isNewChat(r.c) ? "new" : r.needs ? "need" : r.c.status === "appointment" ? "appt" : r.c.status === "won" ? "won" : r.c.status === "lost" ? "lost" : "fup");
   return {
     onInbox: ui.tab === "inbox" && !ui.lead,
     inbSummary: `${list.length} chats · ${need.length} need a reply`,
@@ -52,7 +85,7 @@ export function inboxVM(ctx: PanelCtx) {
       const on = who === id;
       return { label, n: all.filter(r => r.seat.id === f && (!id || r.c.assignedTo === id)).length, bg: on ? "#3F2B22" : "transparent", fg: on ? "#fff" : "#806B60", bd: on ? "#3F2B22" : "#E2CFC1", pick: () => set(u => ({ ...u, inbWho: id })) };
     }) : [],
-    inbCols: ([["need", "Needs a reply", "#A3371A", "#FBE4DE"], ["fup", "Follow up", "#A46312", "#FBF1E3"], ["appt", "Appointment", "#387557", "#E4F1E8"], ["won", "Won", "#2F6FB5", "#E4EDF8"], ["lost", "Lost", "#806B60", "#F2EDE9"]] as const)
+    inbCols: ([["new", "New", "#BD4A19", "#FFF0E4"], ["need", "Needs a reply", "#A3371A", "#FBE4DE"], ["fup", "Follow up", "#A46312", "#FBF1E3"], ["appt", "Appointment", "#387557", "#E4F1E8"], ["won", "Won", "#2F6FB5", "#E4EDF8"], ["lost", "Lost", "#806B60", "#F2EDE9"]] as const)
       .map(([k, title, c, bg]) => { const rows = list.filter(r => col(r) === k); return { title, c, bg, n: rows.length, rows, empty: !rows.length }; }),
     openPc: () => set(u => ({ ...u, pcOpen: true })),
   };

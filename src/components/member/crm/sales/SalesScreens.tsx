@@ -47,8 +47,8 @@ export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: (
     {chat && (<>
       <SalesChat v={chat} />
       {/* The + sheet's Photos (several photos and videos at once) and Document, and the camera (a photo or a video), open these. */}
-      <input id="crm-pick-photo" type="file" accept="image/*,video/*" multiple onChange={chat.pickMedia} style={{ display: "none" }} />
-      <input id="crm-pick-camera" type="file" accept="image/*,video/*" capture="environment" onChange={chat.pickMedia} style={{ display: "none" }} />
+      <input id="crm-pick-photo" type="file" accept="image/*,video/*" multiple onChange={chat.pickVisual} style={{ display: "none" }} />
+      <input id="crm-pick-camera" type="file" accept="image/*,video/*" capture="environment" onChange={chat.pickVisual} style={{ display: "none" }} />
       <input id="crm-pick-file" type="file" onChange={chat.pickMedia} style={{ display: "none" }} />
     </>)}
     {!chat && <SalesNav v={navVM(ctx)} />}

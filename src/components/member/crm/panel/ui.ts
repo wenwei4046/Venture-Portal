@@ -54,6 +54,8 @@ export interface PanelUi {
   pRec: number | null;
   /** The chat's emoji sheet. */
   pEmoji?: boolean;
+  /** Photos / videos picked in the chat, waiting on the preview with its HD switch. */
+  pPick?: import("../shared/pick").Picked | null;
   pRecTick?: number;
   toast: string;
   // Assignment

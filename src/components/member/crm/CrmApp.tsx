@@ -77,7 +77,9 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   // cannot put back what that change just replaced.
   useEffect(() => {
     if (!live) return;
-    let busy = false, stopped = false;
+    // A read that brings back exactly what the last one did changes nothing on screen (user 2026-10-13: "整個畫面要順化
+    // 一點" — every 5 s the whole CRM was drawn again for nothing).
+    let busy = false, stopped = false, lastRead = "";
     const pull = async () => {
       if (busy || stopped || document.visibilityState !== "visible") return;
       busy = true;
@@ -85,7 +87,12 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       try {
         // The desktop also reads every customer's journey (Chat progress, CRM Desktop rev 1).
         const r = await fetchCrmData({ journey: desk });
-        if (!stopped && r.ok && started >= (refs.localAt ?? 0)) setData(prev => keepSending(prev, r.data));
+        if (!stopped && r.ok && started >= (refs.localAt ?? 0)) {
+          const sig = JSON.stringify(r.data);
+          if (sig === lastRead) return;
+          lastRead = sig;
+          setData(prev => keepSending(prev, r.data));
+        }
       } finally { busy = false; }
     };
     const t = setInterval(() => void pull(), 5_000);
@@ -148,8 +155,9 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   // Whoever holds CRM · View at All sees everyone: the Control panel, and anyone's own CRM from it
   // (2026-10-10: the permission matrix decides — the Principal and the Revenue Director by their templates).
   const full = data.can.viewAll;
-  // Everybody in the CRM sells but the Boss: somebody with the Control panel who sells has My CRM beside it.
-  const sells = me.role !== "boss";
+  // Everybody in the CRM has their own CRM beside the Control panel — the Principal too since 2026-10-13 (the user:
+  // "Principal 也要有 mine 的功能"): Mine is the customers given to the CEO's own record, answered and booked there.
+  const sells = true;
   // A leader (STL / TL / TA with a downline, rev 1011): the Control panel scoped to their whole downline — the database
   // already gives them only their line — beside their own CRM.
   const leads = !full && data.people.some(p => p.uplineId === me.id);

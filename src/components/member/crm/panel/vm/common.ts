@@ -211,6 +211,9 @@ export function pickGroups(ctx: PanelCtx, o: { skip?: string | null; sel?: strin
     return { id: p.id, label: p.name, c, sub: subLine(p), on, ring: on ? "#BD4A19" : "#D9C7BA", dot: on ? "#BD4A19" : "transparent", bg: on ? "#FFF8F2" : "transparent", r: "12px", pick: () => o.pick(p.id) };
   };
   const groups: PickGroup[] = [];
+  // The Principal can be given a customer too since 2026-10-13 (their Mine); listed first, only where CRM · Manage sends.
+  const boss = ctx.data.can.manage ? ctx.data.people.filter(p => p.role === "boss" && p.id !== o.skip).map(p => row(p, "#4E2F20")) : [];
+  if (boss.length) groups.push({ name: "Principal", c: "#4E2F20", n: boss.length, people: boss });
   const dirs = ctx.directors.filter(d => d.id !== o.skip).map(d => row(d, DIRECTOR.c));
   if (dirs.length) groups.push({ name: o.hodLabel ?? "HOD", c: DIRECTOR.c, n: dirs.length, people: dirs });
   for (const t of ctx.teams) {

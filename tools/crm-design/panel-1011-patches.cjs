@@ -1,3 +1,5 @@
+const { PICK_SHEET } = require("./pick-sheet.cjs");
+const { EMOJI_PANEL } = require("./emoji-panel.cjs");
 // Live-data patches on the rev 1011 Control panel markup (each must match exactly once). Kept short on purpose: the
 // markup is the prototype's; a patch is only where the live app must differ, and says why.
 module.exports = [
@@ -56,7 +58,13 @@ module.exports = [
   // 2026-10-13: the sticker button in the reply box opens the emoji sheet; a tap adds one to the reply.
   [/<span (style=\{\{ flex: "none", width: "32px", height: "32px", display: "grid", placeItems: "center", color: "#806B60" )\}\}>(\s*<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1\.65" strokeLinecap="round" strokeLinejoin="round">\s*<path d="M20 13V7a3 3 0 0 0-3-3H7)/,
     '<span onClick={v.ld.lx.openEmoji} title="Emoji" $1, cursor: "pointer" }}>$2'],
-  ['{!!(v.ld.lx.rec) && (<div', "{!!(v.ld.lx.emojiOpen) && (<div onClick={v.ld.lx.closeEmoji} style={{ position: \"absolute\", inset: \"0\", zIndex: \"8\", background: \"rgba(63,43,34,.32)\", display: \"flex\", flexDirection: \"column\", justifyContent: \"flex-end\", animation: \"fadeIn 200ms ease-out\" }}>\n        <div onClick={v.ol.stop} style={{ animation: \"sheetUp 320ms cubic-bezier(.2,.8,.2,1)\", background: \"#fff\", borderRadius: \"24px 24px 0 0\", padding: \"10px 16px 20px\", display: \"flex\", flexDirection: \"column\", gap: \"8px\", maxHeight: \"55%\", overflowY: \"auto\", scrollbarWidth: \"none\", boxSizing: \"border-box\" }}>\n          <span style={{ flex: \"none\", alignSelf: \"center\", width: \"36px\", height: \"4px\", borderRadius: \"2px\", background: \"#EBDDD2\" }}></span>\n          <div style={{ display: \"grid\", gridTemplateColumns: \"repeat(8, minmax(0, 1fr))\", gap: \"4px\" }}>\n            {(v.ld.lx.emojis).map((e, e_i) => (<Fragment key={e_i}><span onClick={e.pick} style={{ height: \"42px\", display: \"grid\", placeItems: \"center\", fontSize: \"26px\", borderRadius: \"10px\", cursor: \"pointer\" }}>{e.e}</span></Fragment>))}\n          </div>\n        </div>\n      </div>)}\n      " + '{!!(v.ld.lx.rec) && (<div'],
+  // …the emoji panel sits under the reply box like a keyboard (user 2026-10-13: a sheet over it hid what was typed).
+  [/(<path d=\{v\.ld\.lx\.sendIcon\}>\s*<\/path>\s*<\/svg>\s*<\/span>\s*<\/div>)/, "$1\n            " + EMOJI_PANEL("v.ld.lx", "v.ld.lx.emojiOpen", "")],
+  // 2026-10-13: picked photos / videos wait on a preview with an HD switch (shared/pick.ts).
+  ['{!!(v.ld.lx.rec) && (<div', PICK_SHEET("v.ld.lx.pk") + '{!!(v.ld.lx.rec) && (<div'],
+  // Team inbox cards: a long press or a swipe left opens Send to (user 2026-10-13; vm/inbox.ts › gestures).
+  ['<div onClick={r.open} style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "12px", borderRadius: "14px",',
+    '<div onClick={r.open} onClickCapture={r.guard} onPointerDown={r.down} onPointerMove={r.move} onPointerUp={r.up} onPointerCancel={r.cancel} onContextMenu={r.noMenu} style={{ WebkitTouchCallout: "none", userSelect: "none", display: "flex", flexDirection: "column", gap: "6px", padding: "12px", borderRadius: "14px",'],
   // Full time team editor: the people table keeps its rows full height and the page scrolls (user 2026-10-13: LAWRENCE's
   // title was cut — the scroller squeezed the table, whose overflow is hidden, to make room for the week below).
   [/<div style=\{\{ display: "flex", flexDirection: "column", borderRadius: "16px", background: "#fff", border: "1px solid #EBDDD2", overflow: "hidden" \}\}>(\s*<div style=\{\{ display: "grid", gridTemplateColumns: "minmax\(0, 1fr\) repeat\(7, 30px\)", alignItems: "center", gap: "4px", padding: "10px 12px 6px" \}\}>)/,

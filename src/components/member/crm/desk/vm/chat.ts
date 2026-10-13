@@ -18,7 +18,7 @@ const dayLabel = (iso: string, now: Date) => { const d = day0(new Date(iso)), T 
 
 /** A visit card (the salesperson chat's m.ev): the visit's day, time and showroom; tapping it opens the Calendar. */
 export interface VisitCard { kind: string; title: string; wk: string; dn: string; mon: string; time: string; room: string; addr: string; bg: string; fg: string; deco: string; go: () => void }
-export interface Msg { day: string; sys: string; bell: boolean; inn: boolean; out: boolean; text: string; time: string; tick: string; hasTick: boolean; media: string; mediaHref: string; failed: boolean; ev: VisitCard | null }
+export interface Msg { day: string; sys: string; bell: boolean; inn: boolean; out: boolean; text: string; time: string; tick: string; hasTick: boolean; media: string; mediaHref: string; img: string; vid: string; aud: string; failed: boolean; ev: VisitCard | null }
 
 /** The conversation, oldest first, with the CRM's own lines between the messages. */
 export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
@@ -35,9 +35,11 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
     .sort((a, b) => a.at.localeCompare(b.at));
   let prev = "";
   return its.map(it => { const d = dayLabel(it.at, now), day = d !== prev ? d : ""; prev = d;
-    if (it.sys) return { day, sys: it.sys, bell: it.sys.includes("a reminder to reply"), inn: false, out: false, text: "", time: "", tick: "", hasTick: false, media: "", mediaHref: "", failed: false, ev: null };
+    if (it.sys) return { day, sys: it.sys, bell: it.sys.includes("a reminder to reply"), inn: false, out: false, text: "", time: "", tick: "", hasTick: false, media: "", mediaHref: "", img: "", vid: "", aud: "", failed: false, ev: null };
     const m = it.m!, mine = m.from === "me";
-    const media = m.media ? (m.media.kind === "image" ? "📷 Photo" : `📄 ${m.media.name ?? "Document"}`) : "";
+    // A photo, video or voice note is drawn as itself (2026-10-13); a file is its name, opened in a tab.
+    const mk = m.media?.kind, url = m.media ? `/member/crm-media/${m.id}` : "";
+    const media = mk === "file" ? `📄 ${m.media?.name ?? "Document"}` : "";
     const card = m.card, cd = card ? new Date(card.start) : null;
     const ev: VisitCard | null = card && cd ? {
       kind: card.kind, title: "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()),
@@ -46,7 +48,7 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
       go: () => patch({ tab: "calendar", pane: "closed", calView: "month" }),
     } : null;
     return { day, sys: "", bell: false, inn: !mine, out: mine, text: m.card ? "" : m.text ?? "", time: time(m.at), tick: m.status === "read" ? "#3B8FD9" : "#A8968B", hasTick: mine && m.status !== "failed",
-      media, mediaHref: m.media ? `/member/crm-media/${m.id}` : "", failed: m.status === "failed", ev };
+      media, mediaHref: mk === "file" ? url : "", img: mk === "image" ? url : "", vid: mk === "video" ? url : "", aud: mk === "audio" ? url : "", failed: m.status === "failed", ev };
   });
 }
 

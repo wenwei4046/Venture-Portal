@@ -395,6 +395,8 @@ export async function sendCrmMedia(input: { contact: string; path: string; name:
     if (got.error || !got.data) throw new Error("The file did not arrive. Try again.");
     const file = got.data;
     let kind = mediaKindOf(mime);
+    // An HD photo past WhatsApp's 5 MB for images goes as a document — the customer gets it at its full size.
+    if (contact.channel === "whatsapp" && kind === "image" && file.size > mediaLimit("whatsapp", "image")) kind = "document";
     if (file.size > mediaLimit(contact.channel, kind)) {
       throw new Error(`${kind === "image" ? "A photo" : kind === "video" ? "A video" : kind === "audio" ? "A voice note" : "A file"} can be up to ${Math.round(mediaLimit(contact.channel, kind) / 1048576)} MB on ${contact.channel === "messenger" ? "Messenger" : "WhatsApp"}.`);
     }
