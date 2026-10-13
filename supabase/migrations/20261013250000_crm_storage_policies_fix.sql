@@ -7,10 +7,15 @@
 --    through crm_my_can() (granted to authenticated; 'manage' = crm_can('manage', 'all')).
 -- 2. "crm media: read" (mig 20261013240000) wrote storage.foldername(name) inside a subquery over crm_contacts, which has
 --    its own `name` column — so it read the CONTACT's name and never matched. It names the object's column now.
--- ALTER POLICY only: nothing is dropped.
-alter policy "crm showroom photos: in" on storage.objects
-  with check (bucket_id = 'crm-showrooms' and coalesce(((select public.crm_my_can()) ->> 'manage')::boolean, false));
-alter policy "crm showroom photos: out" on storage.objects
-  using (bucket_id = 'crm-showrooms' and coalesce(((select public.crm_my_can()) ->> 'manage')::boolean, false));
-alter policy "crm media: read" on storage.objects
-  using (bucket_id = 'crm-media' and exists (select 1 from public.crm_contacts c where c.id::text = (storage.foldername(objects.name))[1]));
+-- ALTER POLICY only: nothing is dropped. Skipped where there is no storage schema (the PGlite checks), as the policies'
+-- own migrations are.
+do $$
+begin
+  if not exists (select 1 from pg_namespace where nspname = 'storage') then return; end if;
+  execute $p$alter policy "crm showroom photos: in" on storage.objects
+    with check (bucket_id = 'crm-showrooms' and coalesce(((select public.crm_my_can()) ->> 'manage')::boolean, false))$p$;
+  execute $p$alter policy "crm showroom photos: out" on storage.objects
+    using (bucket_id = 'crm-showrooms' and coalesce(((select public.crm_my_can()) ->> 'manage')::boolean, false))$p$;
+  execute $p$alter policy "crm media: read" on storage.objects
+    using (bucket_id = 'crm-media' and exists (select 1 from public.crm_contacts c where c.id::text = (storage.foldername(objects.name))[1]))$p$;
+end $$;
