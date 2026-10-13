@@ -135,7 +135,7 @@ export interface GlRefs {
  *  voucher's lines by batch and department — no name reaches a drill-down. */
 export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPerson?: boolean } = {}): Promise<GlRefs> {
   const foldPayroll = opts.payrollByPerson === false
-  const [invoices, { data: companies }, { data: departments }, vouchers, creditNotes] =
+  const [invoices, { data: companies }, { data: departments }, vouchers, creditNotes, salaryVouchers] =
     await Promise.all([
       fetchAllRows(
         (from, to) =>
@@ -155,7 +155,7 @@ export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPer
         (from, to) =>
           supabase
             .from('payment_vouchers')
-            .select(foldPayroll ? 'id, payee_name, invoice_id, reference_type, description, payment_date' : 'id, payee_name, invoice_id')
+            .select('id, payee_name, invoice_id')
             .order('id', { ascending: true })
             .range(from, to),
         'fetchGlRefs vouchers',
@@ -166,6 +166,20 @@ export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPer
       fetchAllRows((from, to) =>
         supabase.from('credit_notes').select('id, invoice_id').order('id', { ascending: true }).range(from, to),
       ).catch(() => [] as Array<{ id: string; invoice_id: string }>),
+      // The salary vouchers — their batch and department — only for a reader
+      // who sees payroll by department (2026-10-13).
+      foldPayroll
+        ? fetchAllRows(
+            (from, to) =>
+              supabase
+                .from('payment_vouchers')
+                .select('id, reference_type, description, payment_date')
+                .eq('reference_type', 'payroll_disbursement')
+                .order('id', { ascending: true })
+                .range(from, to),
+            'fetchGlRefs salary vouchers',
+          )
+        : Promise.resolve([]),
     ])
 
   const coById = new Map((companies ?? []).map((c) => [c.id as string, (c.short_code as string | null) ?? (c.name as string)]))
@@ -176,7 +190,7 @@ export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPer
   if (foldPayroll) {
     const names = new Set((departments ?? []).map((d) => d.name as string))
     payrollByDepartment = new Map()
-    for (const v of (vouchers ?? []) as Array<PayrollVoucherText & { id: string }>) {
+    for (const v of salaryVouchers as Array<PayrollVoucherText & { id: string }>) {
       const fold = payrollFoldOf(v, names)
       if (fold) payrollByDepartment.set(v.id, fold)
     }

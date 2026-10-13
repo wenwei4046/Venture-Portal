@@ -27,8 +27,9 @@ export default function StatutoryRows({ rows, today, busy, staffFunded, onGenera
           <td className={due < today && !allPaid && total > 0 ? 'pay-change-notable' : undefined}>{shortDate(due)}</td>
           <td><span className={`chip${allPaid ? ' ledger' : pending ? ' alert' : ''}`}><span className="dot" />{status}</span>{vouchers.length > 0 ? <small><button type="button" className="pay-text-button" onClick={() => onOpen(body.key)}>{vouchers.length} PV{vouchers.length === 1 ? '' : 's'} ↗</button></small> : null}</td>
           <td><div className="pay-row-actions">{remaining > 0 ? <>
-            <button type="button" className="pay-btn sec" disabled={busy != null || !staffFunded} title={!staffFunded ? 'Payroll funding is not complete yet' : undefined} onClick={() => onGenerate(body.key, 'department')}>Generate by Department</button>
-            <button type="button" className="pay-btn sec" disabled={busy != null || !staffFunded} title={!staffFunded ? 'Payroll funding is not complete yet' : undefined} onClick={() => onGenerate(body.key, 'employee')}>Manual generate</button>
+            {/* By department is the way, as on Salary (2026-10-13); one person's PV is the exception. */}
+            <button type="button" className="pay-btn pri" disabled={busy != null || !staffFunded} title={!staffFunded ? 'Payroll funding is not complete yet' : undefined} onClick={() => onGenerate(body.key, 'department')}>Generate by Department</button>
+            <button type="button" className="pay-btn text" disabled={busy != null || !staffFunded} title={!staffFunded ? 'Payroll funding is not complete yet' : 'One PV per person — for an exception'} onClick={() => onGenerate(body.key, 'employee')}>Manual generate</button>
           </> : <button type="button" className="pay-text-button" onClick={() => onOpen(body.key)}>View details ↗</button>}</div></td>
         </tr>
       })}</tbody>
