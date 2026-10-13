@@ -69,13 +69,16 @@ export const whatsappCardText = (card: CrmCard) => visitCardText(card, true).sli
  * free inside the 24-hour window; one button only): the card's words and
  * Waze as the button (user 2026-10-11: WhatsApp links Waze; it was Google Maps since 2026-10-09).
  */
-export function whatsappVisitMessage(to: string, card: CrmCard) {
+/** The showroom's own map links, typed by the Principal / Director over the address's (CRM Desktop rev 1, B4). */
+export interface OwnMapLinks { google?: string | null; waze?: string | null }
+
+export function whatsappVisitMessage(to: string, card: CrmCard, own: OwnMapLinks = {}) {
   return {
     to, type: "interactive",
     interactive: {
       type: "cta_url",
       body: { text: whatsappCardText(card) },
-      action: { name: "cta_url", parameters: { display_text: "Waze", url: mapLinks(card.addr).waze } },
+      action: { name: "cta_url", parameters: { display_text: "Waze", url: own.waze || mapLinks(card.addr).waze } },
     },
   };
 }
@@ -84,7 +87,7 @@ export function whatsappVisitMessage(to: string, card: CrmCard) {
 export const messengerCardText = (card: CrmCard) => visitCardText(card, false).slice(0, 640);
 
 /** Messenger's button template: the words and Google Maps · Waze, each through /nav.html on `base`. */
-export function messengerVisitMessage(card: CrmCard, base: string) {
+export function messengerVisitMessage(card: CrmCard, base: string, own: OwnMapLinks = {}) {
   return {
     attachment: {
       type: "template",
@@ -92,8 +95,8 @@ export function messengerVisitMessage(card: CrmCard, base: string) {
         template_type: "button",
         text: messengerCardText(card),
         buttons: [
-          { type: "web_url", url: navLink(base, "google", card.addr), title: "Google Maps" },
-          { type: "web_url", url: navLink(base, "waze", card.addr), title: "Waze" },
+          { type: "web_url", url: own.google || navLink(base, "google", card.addr), title: "Google Maps" },
+          { type: "web_url", url: own.waze || navLink(base, "waze", card.addr), title: "Waze" },
         ],
       },
     },

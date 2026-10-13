@@ -12,6 +12,7 @@ import ArenaDesignReview from "@/components/member/design-preview/ArenaDesignRev
 import ArenaDesignPreview from "@/components/member/design-preview/ArenaDesignPreview";
 import type { AdminMemberData } from "@/lib/member/server";
 import RevenueApp from "@/components/member/app/RevenueApp";
+import DeskProto from "@/components/member/crm/desk/DeskProto";
 import AppError from "@/components/member/app/shell/AppError";
 import AppLoading from "@/components/member/app/shell/AppLoading";
 import { protoData, protoFixture } from "@/components/member/app/fixtures/proto";
@@ -69,6 +70,14 @@ export default async function MemberPreview({
   const params = await searchParams;
   // The rebuilt app on the prototype's own content, drawn in the prototype's
   // device frame — laid over a screenshot of the prototype to compare.
+  // The CRM desktop on the prototype's own logic and data (CRM Desktop rev 1), drawn exactly where the prototype draws
+  // a frame: its props are the frame's (w, variant, tab, role, pane, kind, toast, collapsed, flow, stage).
+  if (params.app === "desk-proto") {
+    const raw = await searchParams as unknown as Record<string, string | undefined>;
+    const props = Object.fromEntries(Object.entries(raw).filter(([k]) => k !== "app")
+      .map(([k, v]) => [k, v === "true" ? true : v === "false" ? false : v])) as Record<string, string | boolean | undefined>;
+    return <div style={{ padding: 0, margin: 0, background: "#EFE8E2", minHeight: "100vh" }}><DeskProto props={props} /></div>;
+  }
   if (params.app === "proto") {
     const device = params.device === "android" || params.device === "desktop" ? params.device : "ios";
     const search = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => typeof e[1] === "string")).toString();

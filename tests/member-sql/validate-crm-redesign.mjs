@@ -9,6 +9,8 @@ import { readFile, readdir } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
 import { CRM_PERMISSION_STANDIN } from './crm-permission-standin.mjs'
 
+// What the phone lists (2026-10-13: the desktop's journey events — assigned, first reply, visits, status — sit beside them).
+const PHONE_KINDS = ['won', 'lost', 'moved', 'shared', 'share_declined', 'move_declined']
 const db = new PGlite()
 const q = async (sql, params = []) => (await db.query(sql, params)).rows
 let checks = 0
@@ -102,7 +104,7 @@ await denied('ben', `select public.crm_visit_outcome($1, true, 'follow_up')`, [a
 await as('ann', `select public.crm_visit_outcome($1, true, 'won', 3200)`, [annVisit])
 check(await row(`select status, won_amount::text from crm_contacts where id = $1`, [c.ann]), { status: 'won', won_amount: '3200.00' }, 'Show up → Won keeps the amount')
 check(await row(`select state, outcome from crm_appointments where id = $1`, [annVisit]), { state: 'attended', outcome: 'won' }, 'the visit is attended, outcome won')
-check((await q(`select kind, (data->>'amount')::numeric::text as amount, owner = $2 as own from crm_events where contact_id = $1`, [c.ann, id('s', 'ann')])),
+check((await q(`select kind, (data->>'amount')::numeric::text as amount, owner = $2 as own from crm_events where contact_id = $1 and kind = any ($3)`, [c.ann, id('s', 'ann'), PHONE_KINDS])),
   [{ kind: 'won', amount: '3200.00', own: true }], 'Won is an event with its amount, under Ann')
 await refused('ann', `select public.crm_visit_outcome($1, true, 'follow_up')`, [annVisit], /already marked/, 'a marked visit is not marked again')
 const amirVisit = await apptOf('amir')
@@ -110,7 +112,7 @@ await refused('amir', `select public.crm_visit_outcome($1, false, 'won', 100)`, 
 await as('amir', `select public.crm_visit_outcome($1, false, 'lost', null, 'no_response')`, [amirVisit])
 check(await row(`select status, lost_reason from crm_contacts where id = $1`, [c.amir]), { status: 'lost', lost_reason: 'no_response' }, 'No show → Lost · Unreachable')
 check((await row(`select state from crm_appointments where id = $1`, [amirVisit])).state, 'no_show', 'the visit stays as a No show')
-check((await q(`select kind from crm_events where contact_id = $1`, [c.amir])).map(r => r.kind), ['lost'], 'Lost is an event')
+check((await q(`select kind from crm_events where contact_id = $1 and kind = any ($2)`, [c.amir, PHONE_KINDS])).map(r => r.kind), ['lost'], 'Lost is an event')
 
 // 3. Customer details.
 await as('ann', `select public.crm_save_details($1, 'Mr. Lim', '012-345 6789', 'Condo', '3R 2R', 'Mont Kiara', 'Full renovation', '50,000')`, [c.ann])
@@ -149,7 +151,7 @@ await as('amir', `select public.crm_answer_invite($1, true)`, [share.id])
 check(await as('amir', `select count(*)::int as n from crm_contacts where id = $1`, [c.ann]), [{ n: 1 }], 'after accepting, Amir reads Ann’s customer')
 check((await as('amir', `select public.crm_can_reply($1) as ok`, [c.ann]))[0].ok, true, '…and may reply')
 await refused('amir', `select public.crm_answer_invite($1, true)`, [share.id], /already answered/, 'an answered invitation stays answered')
-check((await q(`select kind from crm_events where contact_id = $1 order by id`, [c.ann])).map(r => r.kind), ['won', 'shared'], 'the share is an event')
+check((await q(`select kind from crm_events where contact_id = $1 and kind = any ($2) order by id`, [c.ann, PHONE_KINDS])).map(r => r.kind), ['won', 'shared'], 'the share is an event')
 await refused('ann', `select public.crm_invite('move', $1, $2)`, [c.ann, id('s', 'tla')], /direct superior/, 'a move goes to the direct superior only')
 const move = (await as('ben', `select public.crm_invite('move', $1, $2)`, [c.ben, id('s', 'tlb')]))[0].crm_invite
 check((await row(`select assigned_to = $2 as still from crm_contacts where id = $1`, [c.ben, id('s', 'ben')])).still, true, 'nothing moves before the TL accepts')

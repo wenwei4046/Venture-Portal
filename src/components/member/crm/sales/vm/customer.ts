@@ -3,8 +3,8 @@
  * customer info rows — shared by Chat and Contacts.
  */
 import type { ChangeEvent } from "react";
-import type { CrmCustomer } from "@/lib/member/crm-data";
-import type { CrmData } from "@/lib/member/crm-data";
+import type { ChangeEvent as InputEvent } from "react";
+import type { CrmCustomer, CrmData, CrmForm, CrmFormField } from "@/lib/member/crm-data";
 import type { CustomerForm } from "../ui";
 import { CHANNEL, STATUS_LABEL, day0, ini, lastReal, stop, timeLabel, type SalesCtx } from "./common";
 
@@ -23,7 +23,26 @@ export const telHref = (raw: string) => {
 
 const p2 = (n: number) => String(n).padStart(2, "0");
 
-export function infoRows(c: CrmCustomer) {
+/** The built-in questions, by the id the Control panel's Forms gives them (CRM Desktop rev 1, B5). */
+export const BUILT_IN = ["name", "phone", "type", "size", "loc", "req", "budget"] as const;
+type BuiltIn = (typeof BUILT_IN)[number];
+const isBuiltIn = (id: string): id is BuiltIn => (BUILT_IN as readonly string[]).includes(id);
+
+/**
+ * The form Customer info follows: the Control panel's first form (Settings › Forms), or none — then the design's own
+ * questions, as before. `has` = which built-in questions it keeps; `extra` = its own questions, by section.
+ */
+export function formOf(data: Pick<CrmData, "forms">) {
+  const form: CrmForm | undefined = data.forms?.[0];
+  const ids = new Set(form?.sections.flatMap(s => s.fields.map(f => f.id)) ?? BUILT_IN);
+  const has = Object.fromEntries(BUILT_IN.map(k => [k, k === "name" || ids.has(k)])) as Record<BuiltIn, boolean>;
+  const extra = (form?.sections ?? []).map(s => ({ title: s.title, fields: s.fields.filter(f => !isBuiltIn(f.id)) })).filter(s => s.fields.length);
+  return { has, extra };
+}
+
+export function infoRows(c: CrmCustomer, data?: Pick<CrmData, "forms">) {
+  const f = data ? formOf(data) : null;
+  const dropped: Record<string, BuiltIn> = { "Property type": "type", "Unit size": "size", Location: "loc", Requirement: "req", Budget: "budget" };
   // First contact and Last chat in one format, dd/mm/yyyy, h:mm am (rev 1010 §4); Last chat = the newest message either side, as Inbox.
   const dmy = (d: Date) => `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}, ${timeLabel(d)}`;
   const last = lastReal(c);
@@ -34,7 +53,10 @@ export function infoRows(c: CrmCustomer) {
     ["Platform", CHANNEL[c.channel].name], ["Ad", c.ad], ["Status", STATUS_LABEL[c.status]],
     ["Property type", c.details.type || "—"], ["Unit size", c.details.size || "—"], ["Location", c.details.loc || "—"],
     ["Requirement", c.details.req || "—"], ["Budget", c.details.budget ? "RM " + c.details.budget : "—"],
-  ] as [string, string][]).map(([k, v], n) => ({ k, v, rule: n ? "1px solid #EBDDD2" : "0", vFg: v === "—" ? "#B5A398" : "#3F2B22" }));
+    // The form's own questions, after the built-in ones (CRM Desktop rev 1, B5).
+    ...(f?.extra ?? []).flatMap(s => s.fields.map(q => [q.label, c.extra?.[q.id] || "—"])),
+  ] as [string, string][]).filter(([k]) => !f || !dropped[k] || f.has[dropped[k]])
+    .map(([k, v], n) => ({ k, v, rule: n ? "1px solid #EBDDD2" : "0", vFg: v === "—" ? "#B5A398" : "#3F2B22" }));
 }
 
 const SIZES = ["3R 2R", "2R 1R", "2R 2R", "3R 3R", "4R 2R", "4R 3R", "4R 4R"];
@@ -62,6 +84,7 @@ export function customerForm({ form: f, data, saveDetails, setForm, onSaved }: {
     stop, cfOpen: false, cfClose: () => {}, cfStep: "", cfName: "", cfSetName: (_: ChangeEvent<HTMLInputElement>) => {}, cfPhone: "", cfSetPhone: (_: ChangeEvent<HTMLInputElement>) => {},
     cfType: [] as Chip[], cfSize: [] as Chip[], cfLoc: "", cfSetLoc: (_: ChangeEvent<HTMLInputElement>) => {}, cfReq: "", cfSetReq: (_: ChangeEvent<HTMLTextAreaElement>) => {},
     cfReqPh: "", cfBudget: "", cfSetBudget: (_: ChangeEvent<HTMLInputElement>) => {}, cfSave: undefined as undefined | (() => void), cfSaveBg: "#D9C7BA", cfSaveLabel: "",
+    cfHas: formOf({}).has, cfExtra: [] as ExtraSection[],
   };
   const v = (k: "name" | "phone" | "type" | "size" | "loc" | "req" | "budget") => {
     if (f[k] !== undefined) return f[k] as string;
@@ -74,8 +97,15 @@ export function customerForm({ form: f, data, saveDetails, setForm, onSaved }: {
     const on = v(k) === o;
     return { label: o, pick: () => put({ [k]: on ? "" : o }), bg: on ? "#3F2B22" : "#fff", fg: on ? "#fff" : "#3F2B22", bd: on ? "#3F2B22" : "#EBDDD2" };
   });
-  const ok = !!v("name").trim();
+  // The form's own questions (CRM Desktop rev 1, B5): typed into the form, else what the customer already has.
+  const { has, extra } = formOf(data);
+  const ans = (id: string) => f.extra?.[id] ?? c.extra?.[id] ?? "";
+  const putX = (id: string, val: string) => setForm(x => ({ ...x, extra: { ...(x.extra ?? {}), [id]: val } }));
+  const cfExtra: ExtraSection[] = extra.map(s => ({ title: s.title, fields: s.fields.map(q => extraField(q, ans(q.id), val => putX(q.id, val))) }));
+  const missing = extra.some(s => s.fields.some(q => q.req && !ans(q.id).trim()));
+  const ok = !!v("name").trim() && !missing;
   return {
+    cfHas: has, cfExtra,
     stop, cfOpen: true, cfClose: () => setForm(null),
     cfStep: f.edit ? "" : "Step 1 of 2",
     cfName: v("name"), cfSetName: (e: ChangeEvent<HTMLInputElement>) => put({ name: e.target.value }),
@@ -86,7 +116,8 @@ export function customerForm({ form: f, data, saveDetails, setForm, onSaved }: {
     cfBudget: v("budget"), cfSetBudget: (e: ChangeEvent<HTMLInputElement>) => put({ budget: e.target.value.replace(/[^\d,.\s–-]/g, "") }),
     cfSaveBg: ok ? "#BD4A19" : "#D9C7BA", cfSaveLabel: f.edit ? "Save" : "Save & choose a time",
     cfSave: ok ? async () => {
-      const saved = await saveDetails(c.id, { name: v("name"), phone: v("phone"), type: v("type"), size: v("size"), loc: v("loc"), req: v("req"), budget: v("budget") });
+      const answers = f.extra ? Object.fromEntries(Object.entries(f.extra).map(([k, x]) => [k, x.trim() || null])) : undefined;
+      const saved = await saveDetails(c.id, { name: v("name"), phone: v("phone"), type: v("type"), size: v("size"), loc: v("loc"), req: v("req"), budget: v("budget"), ...(answers ? { extra: answers } : {}) });
       if (saved) onSaved(c, f.edit);
     } : undefined,
   };
@@ -99,9 +130,27 @@ export function contactInfoVM(ctx: SalesCtx) {
   const ci = ui.cInfo ? data.customers.find(c => c.id === ui.cInfo) : undefined;
   return {
     ctOpen: !!ci, ctClose: () => patch({ cInfo: null }), ctName: ci?.name ?? "", ctIni: ci ? ini(ci.name) : "",
-    ctRows: ci ? infoRows(ci) : [],
+    ctRows: ci ? infoRows(ci, data) : [],
     ctChat: () => { if (!ci) return; set(u => ({ ...u, tab: "inbox", chat: ci.id, cInfo: null, hist: [...u.hist, u.tab].slice(-20) })); act.openChat(ci.id); },
     ctEdit: () => { if (!ci) return; set(u => ({ ...u, cform: { customerId: ci.id, edit: true }, cInfo: null })); },
   };
 }
 interface Chip { label: string; pick: () => void; bg: string; fg: string; bd: string }
+
+/** One of the form's own questions, in the design's controls: a field, a box (Long text) or pills (Choice). */
+export interface ExtraField {
+  label: string; req: boolean; value: string; ph: string; isInput: boolean; isLong: boolean; isChoice: boolean;
+  inputType: "text" | "date"; mode: "text" | "numeric" | "tel"; chips: Chip[];
+  set: (e: InputEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+}
+export interface ExtraSection { title: string; fields: ExtraField[] }
+export function extraField(q: CrmFormField, value: string, put: (v: string) => void): ExtraField {
+  const choice = q.type === "Choice", long = q.type === "Long text";
+  return {
+    label: q.label, req: !!q.req, value, ph: q.ph ?? "", isInput: !choice && !long, isLong: long, isChoice: choice,
+    inputType: q.type === "Date" ? "date" : "text", mode: q.type === "Number" ? "numeric" : q.type === "Phone" ? "tel" : "text",
+    chips: choice ? (q.opts ?? []).map(o => { const on = value === o;
+      return { label: o, pick: () => put(on ? "" : o), bg: on ? "#3F2B22" : "#fff", fg: on ? "#fff" : "#3F2B22", bd: on ? "#3F2B22" : "#EBDDD2" }; }) : [],
+    set: e => put(e.target.value),
+  };
+}

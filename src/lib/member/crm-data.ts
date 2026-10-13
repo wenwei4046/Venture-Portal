@@ -65,6 +65,8 @@ export interface CrmCustomer {
   createdAt: string;
   unread: number;
   details: CrmDetails;
+  /** CRM Desktop rev 1 (B5): answers to the fields the Principal / Director added to the Customer info form. */
+  extra?: Record<string, string>;
   /** Book visit's customer form was saved once (then a booking goes straight to the time). */
   detailsSaved: boolean;
   messages: CrmChatMessage[];
@@ -82,8 +84,15 @@ export interface CrmVisit {
   remindedAt: string | null;
 }
 
-/** A closure from a to b (YYYY-MM-DD). With t1 / t2 ("HH:MM") only those hours each day (round 2); without, the whole day. */
-export interface CrmBlock { a: string; b: string; why: string; t1?: string; t2?: string }
+/**
+ * A closure from a to b (YYYY-MM-DD). With hours, only those hours each day; without, the whole day. Hours come two
+ * ways and both count: t1 / t2 (one window — the phone panel's Blocked time slots, round 2) and ranges (several — the
+ * desktop's Showrooms editor, CRM Desktop rev 1). crm_slot_check reads both (mig 20261013220000); use blockHours().
+ */
+export interface CrmBlock { a: string; b: string; why: string; t1?: string; t2?: string; ranges?: { f: string; t: string }[] }
+/** A closure's hours, whichever way they were written; none = the whole day. */
+export const blockHours = (b: CrmBlock): { f: string; t: string }[] =>
+  [...(b.ranges ?? []).filter(g => g.f && g.t), ...(b.t1 && b.t2 ? [{ f: b.t1, t: b.t2 }] : [])];
 export interface CrmRoom {
   id: string;
   name: string;
@@ -95,6 +104,10 @@ export interface CrmRoom {
   /** Closed every week: 0 = Sunday … 6 = Saturday (Date.getDay). */
   weekly: number[];
   blocks: CrmBlock[];
+  /** CRM Desktop rev 1 (B4): the showroom's photo (a signed link) and map links typed over the address's own. */
+  photo?: string | null;
+  mapGoogle?: string | null;
+  mapWaze?: string | null;
 }
 
 export interface CrmPrefs { pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinnedMessageId: string | null }
@@ -122,7 +135,9 @@ export interface CrmInvite {
 export interface CrmShare { customerId: string; staffId: string; invitedBy: string | null; joinedAt: string }
 export interface CrmEvent {
   id: number;
-  kind: "won" | "lost" | "moved" | "shared" | "share_declined" | "move_declined";
+  kind: "won" | "lost" | "moved" | "shared" | "share_declined" | "move_declined"
+    // CRM Desktop rev 1 (B1 / B2, mig 20261013100000): a customer's journey, and the Control panel's reminders.
+    | "assigned" | "first_reply" | "appt_booked" | "appt_changed" | "appt_cancelled" | "visit" | "status" | "reminded";
   customerId: string;
   actor: string | null;
   owner: string | null;
@@ -197,7 +212,18 @@ export interface CrmData {
   ftRules: CrmFtRule[];
   /** Cold lead templates (rev 1011, mig 20261011140000): every one for the Control panel, Approved + On for everybody else. */
   templates?: CrmTemplate[];
+  /** CRM Desktop rev 1 (B3): notifications this person deleted (their own; keys as notifRead's). */
+  notifDeleted?: string[];
+  /** CRM Desktop rev 1 (B5): the Customer info form the Principal / Director set — every salesperson's Customer info follows it. */
+  forms?: CrmForm[];
+  /** CRM Desktop rev 1 (B6): notes on customers, newest first. */
+  notes?: CrmNote[];
 }
+
+/** A form's field (CRM Desktop rev 1, H3). `id` of a built-in field is the customer's own column (name, phone, type, size, loc, req, budget). */
+export interface CrmFormField { id: string; label: string; type: "Text" | "Long text" | "Choice" | "Number" | "Phone" | "Date"; req: 0 | 1; locked?: 1; ph?: string; opts?: string[]; isNew?: 1 }
+export interface CrmForm { id: string; name: string; sections: { id: string; title: string; fields: CrmFormField[] }[]; base?: boolean }
+export interface CrmNote { id: string; customerId: string; by: string | null; text: string; at: string }
 
 /** A cold lead template. `body` writes the customer's first name as {name}; `metaName` is what Meta keeps it by. */
 export interface CrmTemplate {
@@ -239,6 +265,8 @@ export interface CrmContactRowX extends CrmContactRow {
   assigned_by?: string | null;
   /** rev 1011: "limit" while it waits Over the limit in its team (mig 20261011130000). */
   held_reason?: string | null;
+  /** CRM Desktop rev 1 (B5): answers to the form's own questions. */
+  extra?: Record<string, string> | null;
 }
 export interface CrmMessageRowX extends CrmMessageRow {
   reply_to?: string | null;
@@ -252,6 +280,8 @@ export interface CrmVisitRow {
 export interface CrmRoomRow {
   id: string; name: string; active: boolean; sort_order: number;
   address?: string | null; slots?: string[] | null; cap?: number | null; weekly?: number[] | null; blocks?: CrmBlock[] | null;
+  /** CRM Desktop rev 1 (B4): the photo's signed link (made by the read), the map links typed over the address's own. */
+  photo_url?: string | null; map_google?: string | null; map_waze?: string | null;
 }
 export interface CrmPrefRow { contact_id: string; pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinned_message_id: string | null }
 export interface CrmInviteRow {
@@ -275,7 +305,10 @@ export interface CrmDataRows {
   invites: CrmInviteRow[];
   shares: { contact_id: string; staff_id: string; invited_by: string | null; joined_at: string }[];
   events: CrmEventRow[];
-  staffPrefs: { notifs_seen_at: string | null; notif_read?: string[] | null }[];
+  staffPrefs: { notifs_seen_at: string | null; notif_read?: string[] | null; notif_deleted?: string[] | null }[];
+  /** CRM Desktop rev 1 (B5 / B6): absent where the database has none yet. */
+  forms?: { id: string; name: string; sections: CrmForm["sections"] | null; sort_order: number }[];
+  notes?: { id: string; contact_id: string; body: string; author: string | null; created_at: string }[];
   adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string; team_modes?: Record<string, "even" | "pct" | "cnt"> | null }[];
   ftRules: { tl_id: string; mode: CrmFtRule["mode"]; days: number[] | null; vals: Record<string, Record<string, number>> | null }[];
   templates?: { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null }[];
@@ -341,6 +374,7 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
       type: row.property_type ?? "", size: row.unit_size ?? "", loc: row.unit_location ?? "",
       req: row.requirement ?? "", budget: row.budget ?? "",
     },
+    ...(row.extra && Object.keys(row.extra).length ? { extra: row.extra } : {}),
     detailsSaved: !!row.details_at,
     messages: messages.filter(m => m.contact_id === row.id).sort((a, b) => a.sent_at.localeCompare(b.sent_at)).map(chatMessage),
   };
@@ -349,6 +383,7 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
 export const roomFromRow = (r: CrmRoomRow): CrmRoom => ({
   id: r.id, name: r.name, active: r.active, address: r.address ?? "",
   slots: r.slots ?? [], cap: r.cap ?? 2, weekly: r.weekly ?? [], blocks: Array.isArray(r.blocks) ? r.blocks : [],
+  ...(r.photo_url ? { photo: r.photo_url } : {}), ...(r.map_google ? { mapGoogle: r.map_google } : {}), ...(r.map_waze ? { mapWaze: r.map_waze } : {}),
 });
 
 export const visitFromRow = (a: CrmVisitRow): CrmVisit => ({
@@ -389,9 +424,12 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     events: rows.events.map(e => ({ id: e.id, kind: e.kind, customerId: e.contact_id, actor: e.actor, owner: e.owner, data: e.data ?? {}, at: e.at })),
     notifsSeenAt: rows.staffPrefs[0]?.notifs_seen_at ?? null,
     notifRead: rows.staffPrefs[0]?.notif_read ?? [],
+    notifDeleted: rows.staffPrefs[0]?.notif_deleted ?? [],
     adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at, ...(r.team_modes ? { tm: r.team_modes } : {}) })),
     ftRules: rows.ftRules.map(r => ({ tlId: r.tl_id, mode: r.mode, days: r.days ?? [], vals: r.vals ?? {} })),
     templates: (rows.templates ?? []).map(t => ({ id: t.id, name: t.name, ch: t.channel, st: t.status, body: t.body, on: t.is_on, metaName: t.meta_name, language: t.language, reason: t.reject_reason })),
+    forms: [...(rows.forms ?? [])].sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [] })),
+    notes: (rows.notes ?? []).map(n => ({ id: n.id, customerId: n.contact_id, by: n.author, text: n.body, at: n.created_at })).sort((a, b) => b.at.localeCompare(a.at)),
   };
 }
 

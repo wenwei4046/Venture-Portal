@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { PERMISSIONS } from '@/lib/permissions'
 import { AUDIT_AREAS } from './changes'
-import { AUDIT_READ_KEYS } from './read-keys'
+import { AUDIT_READ_KEYS, IN_APP_HISTORY_KEYS } from './read-keys'
 
 // Every table of the app has a line in `audit_tables` (2026-10-08): recorded,
 // recorded for people's changes only, or not recorded with a reason. A
@@ -95,6 +95,7 @@ describe('the audit register', () => {
   it('puts Audit Log › Changes in the sidebar of exactly the keys that open some history', () => {
     const used = new Set<string>(['audit_log'])
     for (const r of registered.values()) for (const key of r.read) used.add(key)
+    for (const key of IN_APP_HISTORY_KEYS) used.delete(key)
     expect([...AUDIT_READ_KEYS].sort()).toEqual([...used].sort())
   })
 })

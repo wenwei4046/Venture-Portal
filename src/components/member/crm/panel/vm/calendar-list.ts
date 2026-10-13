@@ -42,7 +42,7 @@ export function calendarInfoVM(ctx: PanelCtx) {
     Open: !!c, hasBack: true, stop,
     // ‹ back closes the sheet and returns to where it was opened (the list, or the Calendar); the backdrop does the same.
     Back: () => patch({ calInfo: null }), Close: () => patch({ calInfo: null }),
-    Name: c?.name ?? "", Ini: c ? ini(c.name) : "", Rows: c ? infoRows(c) : [],
+    Name: c?.name ?? "", Ini: c ? ini(c.name) : "", Rows: c ? infoRows(c, data) : [],
     Chat: () => { if (c) patch({ calInfo: null, cLs: false, lead: c.id, pick: "", toast: "" }); },
     // Edit: the customer form, over that customer's chat (as the prototype).
     Edit: () => { if (c) patch({ calInfo: null, lead: c.id, pForm: { customerId: c.id, edit: true } }); },

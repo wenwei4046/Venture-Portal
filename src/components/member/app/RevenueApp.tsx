@@ -1227,7 +1227,12 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       page = <DocsPage docs={docs.docs} message={docs.message} opening={docs.opening} onBack={back} onOpen={docs.open} />;
     } else if (pf === "crm" && crm) {
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
-      page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} onExit={back} />;
+      // On a computer the Control panel draws the app's frame itself (CRM Desktop rev 1): its greeting, bell and links are these.
+      page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} onExit={back} desk={desk} deskApp={desk ? {
+        greeting: fixture?.greeting ?? greeting(), subName: membership?.name ?? "", dateLine: `${longDayLabel(today)} · ${quarterLabel(today)}`,
+        bellUnread: nfCount > 0 || nf.items.some(n => n.unread), notifCount: nfCount,
+        go: screen => goScreen(screen), openNotifications: openNotif, openBell: toggleNotif, openSubDept: () => openSheet("sd"), signOut,
+      } : undefined} />;
     } else if (pf === "memos") {
       page = <MemosPage memos={memoVMs} tab={memoTab} onTab={setMemoTab} onBack={back} onOpen={openMemo} />;
     } else if (pf === "brandWeeks") {
@@ -1246,6 +1251,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   } else {
     page = <Pending screen={route.screen} />;
   }
+  // The CRM on a computer takes the whole column, as the Product List does (2026-10-12).
+  const deskCrm = desk && route.screen === "account" && route.pf === "crm" && !!crm;
 
   const screen = (
     <div className={`${s.screen} ${live ? s.screenLive : s.screenFramed} ${rail ? s.rail : ""}`} style={screenVars} data-platform={android ? "android" : "ios"}>
@@ -1266,7 +1273,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
           onProfile={() => goScreen("account")} />
       )}
       <PullRefresh target={mainRef} enabled={pullable} refreshing={refreshing || bootOverKept} failed={refreshFailed} onRefresh={pullRefresh} />
-      <main ref={mainRef} className={`${s.main} ${onProducts ? s.mainProducts : ""}`} onScroll={e => { const t = e.currentTarget.scrollTop; const v = t > 4, c = t > 110; if (v !== scrolled) setScrolled(v); if (c !== compact) setCompact(c); }}>
+      <main ref={mainRef} className={`${s.main} ${onProducts ? s.mainProducts : ""} ${deskCrm ? s.mainCrm : ""}`} onScroll={e => { const t = e.currentTarget.scrollTop; const v = t > 4, c = t > 110; if (v !== scrolled) setScrolled(v); if (c !== compact) setCompact(c); }}>
         {page}
       </main>
       {route.screen === "quote" && quote.catalog && quoteSends && (

@@ -86,19 +86,53 @@ function styleObj(s, scope) {
 const ATTR = { "stroke-width": "strokeWidth", "stroke-linecap": "strokeLinecap", "stroke-linejoin": "strokeLinejoin", "fill-rule": "fillRule", "clip-rule": "clipRule", inputmode: "inputMode", autofocus: "autoFocus", readonly: "readOnly", viewbox: "viewBox", "stroke-dasharray": "strokeDasharray", class: "className", for: "htmlFor", tabindex: "tabIndex", maxlength: "maxLength" };
 const NUMERIC = new Set(["rows", "cols", "tabIndex", "maxLength"]);
 
+/** auto: the CSS-module import name generated hover / focus classes are read from (null = the fixed crm.module.css list). */
+const opts = { auto: null };
+const autoHover = new Map(), autoFocus = new Map();
+/** The generated classes as CSS (each declaration !important: the element's own inline style would win otherwise). */
+function autoCss() {
+  const decl = (s, k) => { let j = 0; return s.replace(/\{\{\}\}/g, () => `var(--${k}-${j++})`).split(";").map(d => d.trim()).filter(Boolean).map(d => `${d} !important;`).join(" "); };
+  return [...[...autoHover].map(([s, k]) => `.${k}:hover { ${decl(s, k)} }`), ...[...autoFocus].map(([s, k]) => `.${k}:focus { ${decl(s, k)} }`)].join("\n") + "\n";
+}
+
 function attrs(n, scope) {
-  const out = []; let hover = null;
+  const out = []; let hover = null, focus = null;
   for (const [a0, val] of n.attrs) {
     if (a0.startsWith("hint-placeholder")) continue;
     if (a0 === "style-hover") { hover = val; continue; }
+    if (a0 === "style-focus") { focus = val; continue; }
     const a = ATTR[a0] || ATTR[a0.toLowerCase()] || a0;
     if (val == null) { out.push(a); continue; }
-    if (a === "style") { out.push(`style={${styleObj(val, scope)}}`); continue; }
+    // A whole style object bound at once (style="{{ paneStyle }}") goes through as it is.
+    if (a === "style") { const w = val.match(/^\s*\{\{([^}]+)\}\}\s*$/); out.push(w ? `style={${expr(w[1], scope)}}` : `style={${styleObj(val, scope)}}`); continue; }
     const r = interp(val, scope);
     if (/^on[A-Z]/.test(a)) { out.push(`${a}={${r.whole ? r.code : "undefined"}}`); continue; }
     if (a === "autoFocus") { out.push(r.whole ? `autoFocus={${r.code}}` : "autoFocus"); continue; }
     if (NUMERIC.has(a) && r.lit && /^\d+$/.test(val)) { out.push(`${a}={${val}}`); continue; }
     out.push(r.lit ? `${a}=${JSON.stringify(val)}` : `${a}={${r.code}}`);
+  }
+  if (opts.auto && (hover || focus)) {
+    // Generated classes (CRM desktop, 2026-10-13): each distinct style-hover / style-focus becomes a class of the
+    // generator's own stylesheet, so a new hover in the design needs no hand-made class. A bound value ({{ t.tint }})
+    // becomes a custom property the class reads and the element sets in its own style.
+    const names = [], vars = [];
+    const cls = (map, s, p) => {
+      const tpl = s.replace(/\{\{([^}]+)\}\}/g, "{{}}");
+      if (!map.has(tpl)) map.set(tpl, `${p}${map.size + 1}`);
+      const k = map.get(tpl); let j = 0;
+      s.replace(/\{\{([^}]+)\}\}/g, (_, x) => { vars.push([`--${k}-${j++}`, expr(x, scope)]); return ""; });
+      names.push(k);
+    };
+    if (hover) cls(autoHover, hover, "h");
+    if (focus) cls(autoFocus, focus, "f");
+    out.push(`className={${names.map(n => `${opts.auto}.${n}`).join(' + " " + ')}}`);
+    if (vars.length) {
+      const extra = vars.map(([k, e]) => `${JSON.stringify(k)}: ${e}`).join(", ");
+      const si = out.findIndex(x => x.startsWith("style={"));
+      if (si >= 0) out[si] = out[si].replace(/ \}\}$/, `, ${extra} } as React.CSSProperties}`).replace(/^style=\{\{ /, "style={{ ");
+      else out.push(`style={{ ${extra} } as React.CSSProperties}`);
+    }
+    return out.length ? " " + out.join(" ") : "";
   }
   if (hover) {
     // The design's hover styles, by fixed name (crm.module.css has each).
@@ -154,4 +188,4 @@ if (require.main === module) {
   process.stdout.write(convert(lines.join("\n")));
   process.stderr.write("\nHOVER " + JSON.stringify([...hoverClasses]) + "\n");
 }
-module.exports = { convert, hoverClasses };
+module.exports = { convert, hoverClasses, opts, autoCss };

@@ -27,6 +27,8 @@ const CRM_WRITES = [
   "crm_send_to", "crm_save_ad_assign", "crm_save_fulltime", "crm_read_notifs",
   // Cold lead templates (mig 20261011140000); submitting to Meta is submitCrmTemplate.
   "crm_save_template", "crm_template_on", "crm_delete_template",
+  // CRM Desktop rev 1 (mig 20261013100000): reminders, deleted notifications, forms, notes.
+  "crm_remind", "crm_delete_notifs", "crm_save_form", "crm_delete_form", "crm_add_note",
 ] as const;
 export type CrmWrite = (typeof CRM_WRITES)[number];
 
@@ -87,10 +89,12 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ad_rule", "crm_save_fulltime",
   "crm_save_team_shares", "crm_set_full_time", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
+  "crm_remind", "crm_save_form", "crm_delete_form",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
   "crm_visit_outcome", "crm_save_details", "crm_invite", "crm_answer_invite", "crm_mark_reminded",
+  "crm_add_note",
 ]);
 const friendly = (error: unknown, fallback: string) => {
   const message = error instanceof Error ? error.message : fallback;
@@ -101,7 +105,11 @@ const friendly = (error: unknown, fallback: string) => {
  * Everything one person's CRM reads, under their own session. Contacts and
  * messages are paged (PostgREST stops at 1,000 rows without a word).
  */
-export async function fetchCrmData(): Promise<{ ok: true; data: CrmData } | { ok: false; error: string }> {
+/** What the phone lists of crm_events; the desktop also reads a customer's journey (CRM Desktop rev 1, B1). */
+const LISTED_EVENTS = ["won", "lost", "moved", "shared", "share_declined", "move_declined", "reminded"];
+const JOURNEY_EVENTS = ["assigned", "first_reply", "appt_booked", "appt_changed", "appt_cancelled", "visit", "status"];
+
+export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ ok: true; data: CrmData } | { ok: false; error: string }> {
   try {
     const db = await session();
     await requireCrm("view");
@@ -130,19 +138,62 @@ export async function fetchCrmData(): Promise<{ ok: true; data: CrmData } | { ok
       read<CrmDataRows["autoReplies"]>(db.from("crm_auto_replies").select("settings")),
       read<CrmDataRows["invites"]>(db.from("crm_invites").select("id, kind, contact_id, contact_name, from_staff, to_staff, state, created_at, decided_at").order("created_at", { ascending: false }).limit(200)),
       read<CrmDataRows["shares"]>(db.from("crm_contact_shares").select("contact_id, staff_id, invited_by, joined_at")),
-      read<CrmDataRows["events"]>(db.from("crm_events").select("id, kind, contact_id, actor, owner, data, at").order("at", { ascending: false }).limit(500)),
+      read<CrmDataRows["events"]>(db.from("crm_events").select("id, kind, contact_id, actor, owner, data, at").in("kind", LISTED_EVENTS).order("at", { ascending: false }).limit(500)),
       read<CrmDataRows["staffPrefs"]>(db.from("crm_staff_prefs").select("notifs_seen_at, notif_read")),
       read<CrmDataRows["adRules"]>(db.from("crm_ad_assign").select("ad_source_id, ad_label, mode, team_split, people_mode, people, started_at, team_modes")),
       read<CrmDataRows["ftRules"]>(db.from("crm_fulltime_rules").select("tl_id, mode, days, vals")),
       // Every template for the Control panel; Approved + On for everybody else (the row policy decides).
       read<NonNullable<CrmDataRows["templates"]>>(db.from("crm_templates").select("id, name, channel, body, status, is_on, meta_name, language, reject_reason").order("created_at")),
     ]);
-    return { ok: true, data: crmDataFromRows({ people, can, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs, adRules, ftRules, templates }) };
+    const more = await desktopRows(db, !!opts.journey);
+    const extra = new Map(more.extras.map(x => [x.id, x.extra]));
+    const roomX = new Map(more.rooms.map(r => [r.id, r]));
+    return { ok: true, data: crmDataFromRows({
+      people, can, messages, visits, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, adRules, ftRules, templates,
+      contacts: extra.size ? contacts.map(c => (extra.has(c.id) ? { ...c, extra: extra.get(c.id) } : c)) : contacts,
+      rooms: rooms.map(r => {
+        const x = roomX.get(r.id);
+        return x ? { ...r, photo_url: x.photo_path ? `/member/crm-room-photo/${encodeURIComponent(r.id)}?v=${encodeURIComponent(x.photo_path)}` : null, map_google: x.map_google, map_waze: x.map_waze } : r;
+      }),
+      events: more.journey.length ? [...events, ...more.journey] : events,
+      staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted }] : staffPrefs,
+      forms: more.forms, notes: more.notes,
+    }) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The CRM could not be loaded. Please try again.";
     return { ok: false, error: /schema cache|does not exist|could not find|permission denied for/i.test(message)
       ? "The CRM is not set up for this account yet. Ask your administrator." : message.slice(0, 250) };
   }
+}
+
+/**
+ * CRM Desktop rev 1's columns and tables (mig 20261013100000): forms, notes, the form's own answers, a showroom's
+ * photo and map links, deleted notifications, and — for the desktop — every customer's journey. Each read on its own
+ * and empty when the database has none yet, so the CRM keeps opening before the migration and after it.
+ */
+async function desktopRows(db: Db, journey: boolean) {
+  const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
+    try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
+  };
+  const [forms, notes, extras, rooms, prefs, events] = await Promise.all([
+    soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order")),
+    soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
+    soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
+    soft<{ id: string; photo_path: string | null; map_google: string | null; map_waze: string | null }[]>(db.from("crm_showrooms").select("id, photo_path, map_google, map_waze")),
+    soft<{ notif_deleted: string[] | null }[]>(db.from("crm_staff_prefs").select("notif_deleted")),
+    journey ? soft<CrmDataRows["events"]>(db.from("crm_events").select("id, kind, contact_id, actor, owner, data, at").in("kind", JOURNEY_EVENTS).order("at", { ascending: false }).limit(5000)) : Promise.resolve([] as CrmDataRows["events"]),
+  ]);
+  return { forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events };
+}
+
+/** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */
+async function roomMapLinks(db: Db, room: string): Promise<{ google?: string | null; waze?: string | null }> {
+  try {
+    const { data } = await db.from("crm_showrooms").select("map_google, map_waze").eq("name", room).eq("active", true).limit(1).maybeSingle();
+    const r = data as { map_google: string | null; map_waze: string | null } | null;
+    const ok = (u: string | null | undefined) => (u && /^https:\/\//i.test(u) ? u : null);
+    return r ? { google: ok(r.map_google), waze: ok(r.map_waze) } : {};
+  } catch { return {}; }
 }
 
 interface Reachable { id: string; channel: "whatsapp" | "messenger"; account_id: string; external_id: string; assigned_to: string | null; last_customer_at: string | null }
@@ -193,18 +244,19 @@ export async function sendCrmMessage(contactId: string, text: string, opts: { re
       quote = (q.external_id as string | null) ?? null;
     }
     let externalId: string;
+    const own = cardHasWay(opts.card) ? await roomMapLinks(db, opts.card.room) : {};
     if (contact.channel === "messenger") {
       const pageAccess = await pageToken(contact.account_id, token);
       if (!pageAccess) throw new Error("This Facebook Page is not connected to the CRM. Ask your administrator.");
       // A visit card: WhatsApp's layout without bold, and Google Maps · Waze as buttons (through our /nav.html) when there is an address.
-      const message = cardHasWay(opts.card) ? messengerVisitMessage(opts.card, await siteBase())
+      const message = cardHasWay(opts.card) ? messengerVisitMessage(opts.card, await siteBase(), own)
         : opts.card ? { text: messengerCardText(opts.card) } : undefined;
       const sent = await sendMessengerText({ pageId: contact.account_id, psid: contact.external_id, body: clean.text, token: pageAccess, window: window as "open" | "human_agent", message });
       if (!sent.ok) throw new Error(sent.error);
       externalId = sent.mid;
     } else {
       // A visit card: WhatsApp's own layout (bold labels), and Google Maps as the one button it allows when there is an address.
-      const message = cardHasWay(opts.card) ? whatsappVisitMessage(contact.external_id, opts.card)
+      const message = cardHasWay(opts.card) ? whatsappVisitMessage(contact.external_id, opts.card, own)
         : textMessage(contact.external_id, opts.card ? whatsappCardText(opts.card) : clean.text, quote);
       const sent = await sendWhatsApp({ phoneNumberId: contact.account_id, token, message });
       if (!sent.ok) throw new Error(sent.error);
@@ -354,5 +406,72 @@ export async function sendCrmMedia(form: FormData): Promise<{ ok: true; message:
     return { ok: true, message };
   } catch (error) {
     return { ok: false, error: friendly(error, "The file could not be sent.") };
+  }
+}
+
+/* ── CRM Desktop rev 1 (2026-10-13) ─────────────────────────────────────── */
+
+const ROOM_PHOTO_BYTES = 4 * 1024 * 1024;
+const ROOM_PHOTO_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+/**
+ * A showroom's photo and map links (B4): the photo into the private bucket crm-showrooms under the member's own
+ * session (its policy asks CRM · Manage), then crm_save_showroom_extras, which asks again. The old photo goes once
+ * the new one is saved.
+ */
+export async function saveCrmShowroomExtras(form: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const roomId = String(form.get("room") ?? ""), remove = form.get("removePhoto") === "1";
+    const gmap = String(form.get("gmap") ?? "").trim(), waze = String(form.get("waze") ?? "").trim();
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(roomId)) throw new Error("Choose a showroom first.");
+    const db = await session();
+    await requireCrm("manage");
+    const { data: room, error: readError } = await db.from("crm_showrooms").select("photo_path").eq("id", roomId).maybeSingle();
+    if (readError) throw new Error(readError.message);
+    if (!room) throw new Error("That showroom is not on the list.");
+    const old = (room as { photo_path: string | null }).photo_path;
+    let path: string | null = remove ? null : old;
+    const file = form.get("photo");
+    if (file instanceof Blob && file.size > 0) {
+      const ext = ROOM_PHOTO_TYPES[file.type];
+      if (!ext) throw new Error("A showroom photo is a JPG, PNG or WebP.");
+      if (file.size > ROOM_PHOTO_BYTES) throw new Error("A showroom photo can be up to 4 MB.");
+      path = `${roomId}/${Date.now()}.${ext}`;
+      const { error } = await db.storage.from("crm-showrooms").upload(path, file, { contentType: file.type, upsert: false });
+      if (error) throw new Error(error.message);
+    }
+    const { error } = await db.rpc("crm_save_showroom_extras", { p_id: roomId, p_photo_path: path, p_map_google: gmap, p_map_waze: waze });
+    if (error) {
+      if (path && path !== old) await db.storage.from("crm-showrooms").remove([path]);
+      throw new Error(error.message);
+    }
+    if (old && old !== path) await db.storage.from("crm-showrooms").remove([old]);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "The showroom could not be saved. Please try again.") };
+  }
+}
+
+/** The CRM's settings tables History reads (B8), and what each is called there. */
+const HISTORY_TABLES = ["crm_showrooms", "crm_ad_assign", "crm_fulltime_rules", "crm_staff", "crm_templates", "crm_forms", "crm_settings"];
+export interface CrmHistoryRow { id: number; at: string; who: string; table: string; op: string; key: string; before: Record<string, unknown> | null; after: Record<string, unknown> | null; changed: string[] }
+
+/**
+ * History (B8): who changed which CRM setting, when, before → after — the portal's own audit trail
+ * (audit_changes), which shows a reader only what their permissions open: CRM · Manage reads these tables.
+ */
+export async function fetchCrmHistory(before?: number): Promise<{ ok: true; rows: CrmHistoryRow[] } | { ok: false; error: string }> {
+  try {
+    const db = await session();
+    await requireCrm("manage");
+    const { data, error } = await db.rpc("audit_changes", { p_tables: HISTORY_TABLES, p_before: before ?? null, p_limit: 200 });
+    if (error) throw new Error(error.message);
+    type Row = { id: number; occurred_at: string; actor_name: string | null; actor_source: string; table_name: string; row_key: string | null; op: string; old_row: Record<string, unknown> | null; new_row: Record<string, unknown> | null; changed: string[] | null };
+    return { ok: true, rows: ((data ?? []) as Row[]).map(r => ({
+      id: r.id, at: r.occurred_at, who: r.actor_name ?? (r.actor_source === "database" ? "The CRM" : "System"), table: r.table_name, op: r.op,
+      key: r.row_key ?? "", before: r.old_row, after: r.new_row, changed: r.changed ?? [],
+    })) };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "History could not be read. Please try again.") };
   }
 }

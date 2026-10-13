@@ -9,7 +9,7 @@
  * for quick replies, send; after the reply window, approved templates only.
  */
 import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, WheelEvent } from "react";
-import { DEFAULT_QUICK_REPLIES, type CrmChatMessage, type CrmCustomer, type CrmRoom, type CrmVisit } from "@/lib/member/crm-data";
+import { DEFAULT_QUICK_REPLIES, blockHours, type CrmChatMessage, type CrmCustomer, type CrmRoom, type CrmVisit } from "@/lib/member/crm-data";
 import { personOf, teamOf, teamName, downlineOf, jobTitle, titleOf } from "../../shared/people";
 import { BORDER, gb, CHANNEL, day0, DAY, daySep, dayLabel, firstName, ini, msgTime, money, stop, timeLabel, windowShut, type SalesCtx } from "./common";
 import { customerFormVM, infoRows } from "./customer";
@@ -33,13 +33,13 @@ export const slotAt = (day: number, label: string) => {
 const iso = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const inBlock = (b: CrmRoom["blocks"][number], day: number) => iso(day) >= b.a && iso(day) <= (b.b || b.a);
 /** Closed that day: a weekly closure or a whole-day blocked date range (a block with set hours closes only those hours). */
-export const roomClosed = (r: CrmRoom | undefined, day: number) => !!r && (r.weekly.includes(new Date(day).getDay()) || r.blocks.some(b => !(b.t1 && b.t2) && inBlock(b, day)));
-/** Closed at that slot by a block with set hours (round 2): the date is inside it and the slot starts at or after t1 and
- * before t2 — the same test as crm_slot_check. */
+export const roomClosed = (r: CrmRoom | undefined, day: number) => !!r && (r.weekly.includes(new Date(day).getDay()) || r.blocks.some(b => !blockHours(b).length && inBlock(b, day)));
+/** Closed at that slot by a block with set hours (round 2's t1 / t2, the desktop's ranges): the date is inside it and the
+ * slot starts at or after a window's start and before its end — the same test as crm_slot_check. */
 export const slotBlocked = (r: CrmRoom | undefined, day: number, label: string) => {
   if (!r) return false;
   const at = slotAt(day, label), hm = `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
-  return r.blocks.some(b => !!b.t1 && !!b.t2 && inBlock(b, day) && hm >= b.t1 && hm < b.t2);
+  return r.blocks.some(b => inBlock(b, day) && blockHours(b).some(g => hm >= g.f && hm < g.t));
 };
 /** The room's slots open on that weekday (0 = Monday in the slot code). */
 export const roomSlots = (r: CrmRoom | undefined, day: number) => !r ? [] : r.slots.filter(s => !s.includes("@") || s.split("@")[1].includes(String((new Date(day).getDay() + 6) % 7))).map(t12);
@@ -191,7 +191,7 @@ export function chatVM(ctx: SalesCtx) {
     apptChange: () => { if (!nextVisit) return; const d = new Date(nextVisit.start); set(u => ({ ...u, hm: null, book: { customerId: c.id, room: Math.max(0, rooms.findIndex(r => r.id === nextVisit.showroomId)), day: day0(d), slot: timeLabel(d), visitId: nextVisit.id } })); },
     apptCancel: () => { if (nextVisit) set(u => ({ ...u, hm: null, cancelAsk: nextVisit.id })); },
     apptBook: goBook,
-    infoOpen: !!hm.info, edit: () => set(u => ({ ...u, hm: null, cform: { customerId: c.id, edit: true } })), rows: infoRows(c),
+    infoOpen: !!hm.info, edit: () => set(u => ({ ...u, hm: null, cform: { customerId: c.id, edit: true } })), rows: infoRows(c, data),
     shareOpen: !!hm.share,
     groups: [{ name: myTeam ? teamName(myTeam) : "My team", c: RUST, n: teamPeople.length, people: teamPeople.map(p => {
       const done = already.has(p.id), on = done || ss.includes(p.id);
