@@ -68,6 +68,9 @@ module.exports = [
   ...require("./resize-patches.cjs"),
   // Insight › Ads Performance's table sorts and sizes as Ads Performance's (the owner, 2026-10-13) — insight-table-patches.cjs.
   ...require("./insight-table-patches.cjs"),
+  // Customise metrics: drag a row with the pointer (the owner, 2026-10-13: the browser's drag did not move the rows).
+  ['<div draggable="true" onDragStart={o.dStart} onDragOver={o.dOver} onDrop={o.dDrop} onDragEnd={o.dEnd} style={{ position: "relative",',
+    '<div data-morder="1" onPointerDown={o.pDown} style={{ touchAction: "none", userSelect: "none", position: "relative",', "Column order drags with the pointer."],
 ];
 
 /**

@@ -2971,7 +2971,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     {!!(v.mOrdOpen) && (<>
                       <div style={{ display: "flex", flexDirection: "column", margin: "0 8px 8px", border: "1px solid #EBDDD2", borderRadius: "12px", padding: "4px" }}>
                         {(v.mOrder).map((o, o_i) => (<Fragment key={o_i}>
-                          <div draggable="true" onDragStart={o.dStart} onDragOver={o.dOver} onDrop={o.dDrop} onDragEnd={o.dEnd} style={{ position: "relative", zIndex: o.z, display: "flex", alignItems: "center", gap: "12px", height: "44px", padding: "0 8px 0 10px", borderBottom: `1px solid ${o.bd}`, background: o.bg, boxShadow: o.sh, borderRadius: "6px", cursor: "grab" }} className={DH.h14}>
+                          <div data-morder="1" onPointerDown={o.pDown} style={{ touchAction: "none", userSelect: "none", position: "relative", zIndex: o.z, display: "flex", alignItems: "center", gap: "12px", height: "44px", padding: "0 8px 0 10px", borderBottom: `1px solid ${o.bd}`, background: o.bg, boxShadow: o.sh, borderRadius: "6px", cursor: "grab" }} className={DH.h14}>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B574C" strokeWidth="2.2" strokeLinecap="round">
                               <path d="M5 9h14M5 15h14">
                               </path>
