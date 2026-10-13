@@ -4,8 +4,9 @@
 .pnp.js
 .yarn/install-state.gz
 
-# Next.js build
-/.next/
+# Next.js build — also the one-off dist dirs a check build leaves behind
+# (.next-member-preview/, .next-payroll-check/ …)
+/.next*/
 /out/
 
 # Production
