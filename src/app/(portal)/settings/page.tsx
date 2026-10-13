@@ -4,10 +4,9 @@ import { canDo } from '@/lib/permission-actions'
 import { seesAllSettings } from '@/lib/surfaces'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/paginate'
-import type { TreasuryConfig, OverdueConfig, Company } from '@/types'
+import type { TreasuryConfig, Company } from '@/types'
 import type { AccountType, CashFlowCategory } from '@/lib/coa'
 import TreasuryConfigSection from './_components/TreasuryConfigSection'
-import OverdueStagesSection from './_components/OverdueStagesSection'
 import RentSplitSection from './_components/RentSplitSection'
 import UtilitySplitSection from './_components/UtilitySplitSection'
 import DirectorSalarySection from './_components/DirectorSalarySection'
@@ -21,7 +20,9 @@ import PeriodsSection from './_components/PeriodsSection'
 import SettingsTabs, { type SettingsTab } from './_components/SettingsTabs'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
-const VALID_TABS: SettingsTab[] = ['treasury', 'overdue', 'splits', 'directors', 'companies', 'departments', 'banks', 'accounts', 'periods', 'simulator']
+// Overdue left with the Overdue page (2026-10-14, user: 一起拿掉) — its stages and
+// penalty rates fed nothing; overdue_config keeps its rows.
+const VALID_TABS: SettingsTab[] = ['treasury', 'splits', 'directors', 'companies', 'departments', 'banks', 'accounts', 'periods', 'simulator']
 function isValidTab(s: string | undefined): s is SettingsTab {
   return !!s && (VALID_TABS as string[]).includes(s)
 }
@@ -64,7 +65,6 @@ export default async function SettingsPage({ searchParams }: Props) {
 
   const [
     { data: treasuryRows },
-    { data: overdueRows },
     { data: companyRows },
     { data: rentRows },
     { data: utilityRows },
@@ -77,7 +77,6 @@ export default async function SettingsPage({ searchParams }: Props) {
     { data: departmentRows },
   ] = await Promise.all([
     supabase.from('treasury_config').select('*'),
-    supabase.from('overdue_config').select('*'),
     supabase.from('companies').select('*').order('short_code'),
     supabase.from('rent_splits').select('id, company_id, is_hv_share, split_pct'),
     supabase.from('utility_splits').select('id, company_id, is_hv_share, split_pct'),
@@ -105,7 +104,6 @@ export default async function SettingsPage({ searchParams }: Props) {
     activeTabResolved === 'departments' ? await loadDepartmentModes().catch(() => []) : []
 
   const treasury = (treasuryRows ?? []) as TreasuryConfig[]
-  const overdueStages = (overdueRows ?? []) as OverdueConfig[]
   const companies = (companyRows ?? []) as Company[]
   const rentSplits = ((rentRows ?? []) as SplitRow[]).map((r) => ({
     id: r.id,
@@ -176,10 +174,6 @@ export default async function SettingsPage({ searchParams }: Props) {
           opMargin={opMargin}
           savingRate={savingRate}
         />
-      )}
-
-      {activeTabResolved === 'overdue' && (
-        <OverdueStagesSection stages={overdueStages} />
       )}
 
       {activeTabResolved === 'splits' && (

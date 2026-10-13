@@ -61,7 +61,7 @@ src/
 │   │   │                              the ERP feed, fairs), Staff Hierarchy, Rules,
 │   │   │                              Department. → .claude/rules/revenue/comm-cal.md
 │   │   ├── reports/                 (Phase 3)
-│   │   └── settings/                ← 8 tabs: treasury / overdue / splits / directors / companies / banks / periods / simulator
+│   │   └── settings/                ← 9 tabs: treasury / splits / directors / companies / departments / banks / accounts / periods / simulator
 │   ├── (member)/member/            ← the Revenue app (Today / Insight / Quote / Arena /
 │   │                                  Profile), its Product List and the CRM — not the
 │   │                                  portal. → .claude/rules/revenue/revenue-app.md,
