@@ -26,15 +26,48 @@ export function DeskBook({ v }: { v: ReturnType<typeof bookVM> }) {
       <div style={{ display: "inline-flex", alignSelf: "flex-start", background: "#F5EBE3", borderRadius: "11px", padding: "3px", gap: "2px", flexWrap: "wrap" }}>
         {v.rooms.map((r, i) => <span key={i} onClick={r.pick} style={{ height: "28px", lineHeight: "28px", padding: "0 12px", borderRadius: "8px", background: r.bg, color: r.fg, fontSize: "13px", fontWeight: "650", boxShadow: r.sh, cursor: "pointer", whiteSpace: "nowrap" }}>{r.label}</span>)}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <span style={{ ...LABEL, flex: "1" }}>Day · {v.weekLabel}</span>
-        <button type="button" onClick={v.prev} style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1px solid #E2CFC1", background: "#fff", cursor: "pointer", display: "grid", placeItems: "center", color: "#806B60" }}><Chev /></button>
-        <button type="button" onClick={v.next} style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1px solid #E2CFC1", background: "#fff", cursor: "pointer", display: "grid", placeItems: "center", color: "#806B60", transform: "scaleX(-1)" }}><Chev /></button>
+      {/* Day: the month chip and Week | Month, as the salesperson's sheet (the owner, 2026-10-13). */}
+      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "8px" }}>
+        <span style={{ ...LABEL, flex: "none" }}>Day</span>
+        <span onClick={v.toggleMonth} title="Choose month" style={{ flex: "none", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: "4px", minHeight: "32px", padding: "0 10px 0 12px", boxSizing: "border-box", borderRadius: "16px", border: "1px solid #EBDDD2", fontSize: "13px", fontWeight: "600", color: "#3F2B22", cursor: "pointer" }}>
+          {v.monthLabel}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+        </span>
+        {v.monthOpen && <>
+          <div onClick={v.toggleMonth} style={{ position: "fixed", inset: "0", zIndex: 2 }} />
+          <div style={{ position: "absolute", top: "38px", left: "0", zIndex: 3, width: "268px", padding: "12px", boxSizing: "border-box", borderRadius: "16px", background: "#fff", boxShadow: "0 8px 24px rgba(63,43,34,.18)", display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span onClick={v.yPrev} style={{ width: "36px", height: "36px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: v.yPrevFg, cursor: "pointer" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6"></path></svg></span>
+              <strong style={{ fontSize: "16px", fontWeight: "700", color: "#3F2B22", fontVariantNumeric: "tabular-nums" }}>{v.pickYear}</strong>
+              <span onClick={v.yNext} style={{ width: "36px", height: "36px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: v.yNextFg, cursor: "pointer" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6"></path></svg></span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "6px" }}>
+              {v.ymonths.map(mo => <span key={mo.label} onClick={mo.pick} style={{ height: "40px", borderRadius: "12px", display: "grid", placeItems: "center", fontSize: "14px", fontWeight: mo.weight, background: mo.bg, color: mo.fg, cursor: mo.cur }}>{mo.label}</span>)}
+            </div>
+          </div>
+        </>}
+        <span style={{ flex: "1" }} />
+        <span style={{ display: "flex", gap: "2px", padding: "2px", borderRadius: "16px", background: "#F5EBE3" }}>
+          <span onClick={v.viewWeek} style={{ height: "28px", padding: "0 10px", whiteSpace: "nowrap", boxSizing: "border-box", borderRadius: "14px", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "600", background: v.viewWeekBg, boxShadow: v.viewWeekSh, cursor: "pointer" }}>Week</span>
+          <span onClick={v.viewMonth} style={{ height: "28px", padding: "0 10px", whiteSpace: "nowrap", boxSizing: "border-box", borderRadius: "14px", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "600", background: v.viewMonthBg, boxShadow: v.viewMonthSh, cursor: "pointer" }}>Month</span>
+        </span>
+        {v.isWeek && <>
+          <button type="button" onClick={v.prev} style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1px solid #E2CFC1", background: "#fff", cursor: "pointer", display: "grid", placeItems: "center", color: "#806B60" }}><Chev /></button>
+          <button type="button" onClick={v.next} style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1px solid #E2CFC1", background: "#fff", cursor: "pointer", display: "grid", placeItems: "center", color: "#806B60", transform: "scaleX(-1)" }}><Chev /></button>
+        </>}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: "6px" }}>
-        {v.days.map((d, i) => <span key={i} onClick={d.pick} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", padding: "8px 0", borderRadius: "12px", border: `1px solid ${d.bd}`, background: d.bg, color: d.fg, cursor: d.closed ? "not-allowed" : "pointer", textDecoration: d.deco }}>
-          <small style={{ fontSize: "11px", fontWeight: "600" }}>{d.wk}</small><strong style={{ fontSize: "16px", fontWeight: "700" }}>{d.dn}</strong></span>)}
-      </div>
+      {v.isWeek ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: "6px" }}>
+          {v.days.map((d, i) => <span key={i} onClick={d.pick} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", padding: "8px 0", borderRadius: "12px", border: `1px solid ${d.bd}`, background: d.bg, color: d.fg, cursor: d.closed ? "not-allowed" : "pointer", textDecoration: d.deco }}>
+            <small style={{ fontSize: "11px", fontWeight: "600" }}>{d.wk}</small><strong style={{ fontSize: "16px", fontWeight: "700" }}>{d.dn}</strong></span>)}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: "4px", padding: "10px", border: "1px solid #EBDDD2", borderRadius: "14px" }}>
+          {["M", "T", "W", "T", "F", "S", "S"].map((w, i) => <span key={`w${i}`} style={{ textAlign: "center", fontSize: "11px", fontWeight: "700", color: "#806B60", paddingBottom: "4px" }}>{w}</span>)}
+          {v.mCells.map((c, i) => <span key={i} onClick={c.pick} style={{ height: "34px", borderRadius: "10px", display: "grid", placeItems: "center", fontSize: "14px", fontWeight: "600", background: c.bg, color: c.fg, textDecoration: c.deco, cursor: c.cur, fontVariantNumeric: "tabular-nums" }}>{c.n}</span>)}
+        </div>
+      )}
       <span style={LABEL}>Time</span>
       {v.noSlots ? <span style={{ fontSize: "13px", color: "#A08E82" }}>No visit times on this day</span> : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" }}>
@@ -104,5 +137,19 @@ export function DeskHistory({ v }: { v: ReturnType<typeof historyVM> }) {
         </div>)}
       </div>
     </div>
+  );
+}
+
+/**
+ * Insight › Ads Performance: "+ Metrics · N" (the owner, 2026-10-13) — opens Ads Performance's own Customise metrics
+ * pane for the cards: tick, drag into order, Apply. Ads Performance's button, small.
+ */
+export function DeskCardPicker({ v }: { v: { insCardsToggle?: () => void; insCardsN?: number } }) {
+  // The prototype (DeskProto, the pixel comparison) has no such button.
+  if (!v.insCardsToggle) return null;
+  return (
+    <button type="button" onClick={v.insCardsToggle} style={{ alignSelf: "center", display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 12px", boxSizing: "border-box", borderRadius: "16px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "#3F2B22", cursor: "pointer", whiteSpace: "nowrap" }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#BD4A19" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"></path></svg>Metrics · {v.insCardsN}
+    </button>
   );
 }

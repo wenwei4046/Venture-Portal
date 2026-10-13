@@ -25,6 +25,8 @@ apMinW
 apNSel
 apNameAc
 apNameArrow
+apNameResize
+apNameUnsize
 apRangeLabel
 apRows
 apSortName
@@ -205,6 +207,9 @@ history
 infoBack
 infoBackLabel
 infoChat
+insAdCols
+insAdMinW
+insHead
 isAdsOp
 isCenter
 isCltOp

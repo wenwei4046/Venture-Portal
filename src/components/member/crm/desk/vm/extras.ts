@@ -5,6 +5,7 @@
  */
 import { blockHours, type CrmCustomer, type CrmRoom } from "@/lib/member/crm-data";
 import { roomSlots, slotAt } from "../../sales/vm/chat";
+import { dayLabel, timeLabel } from "../../sales/vm/common";
 import type { DeskCtx, FormSection } from "./ctx";
 import { initials } from "./data";
 import { BASE_FORM } from "./settings";
@@ -20,12 +21,52 @@ export function slotClosed(r: CrmRoom, day: number, label: string): boolean {
   return r.blocks.some(b => { const w = blockHours(b); return d >= b.a && d <= (b.b || b.a) && (!w.length || w.some(x => hm >= x.f && hm < x.t)); });
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+type Book = NonNullable<DeskCtx["ui"]["book"]>;
+
+/**
+ * Appointment's Week | Month and its month chooser, as the salesperson's sheet (the owner, 2026-10-13: 跟 RS 一樣):
+ * the chip names the shown month and opens a year of months (this month to twelve ahead); Month shows that month's
+ * days, a past or closed one struck out. Picking a day keeps the 7-day page in step with it.
+ */
+function monthOf(b: Book, T: number, room: CrmRoom | undefined, put: (p: Partial<Book>) => void) {
+  const now = new Date(T), d = new Date(b.day), y = d.getFullYear(), m = d.getMonth();
+  const weekOf = (t: number) => Math.max(0, Math.floor((t - T) / (7 * DAY)));
+  const shut = (t: number) => t < T || !room || roomSlots(room, t).every(l => slotClosed(room, t, l));
+  const firstOpen = (yy: number, mm: number) => { for (let t = Math.max(T, new Date(yy, mm, 1).getTime()); new Date(t).getMonth() === mm; t += DAY) if (!shut(t)) return t; return Math.max(T, new Date(yy, mm, 1).getTime()); };
+  const lead = (new Date(y, m, 1).getDay() + 6) % 7, len = new Date(y, m + 1, 0).getDate();
+  const py = b.pickYear ?? y, lastYM = now.getFullYear() * 12 + now.getMonth() + 12;
+  const mon = b.view === "month";
+  return {
+    monthLabel: `${MONTHS[m]} ${y}`, monthOpen: !!b.monthOpen, toggleMonth: () => put({ monthOpen: !b.monthOpen, pickYear: undefined }),
+    pickYear: py,
+    yPrev: () => { if (py > now.getFullYear()) put({ pickYear: py - 1 }); }, yPrevFg: py > now.getFullYear() ? "#3F2B22" : "#D9C7BA",
+    yNext: () => { if (py < now.getFullYear() + 1) put({ pickYear: py + 1 }); }, yNextFg: py < now.getFullYear() + 1 ? "#3F2B22" : "#D9C7BA",
+    ymonths: MONTHS.map((label, i) => { const ym = py * 12 + i, ok = ym >= now.getFullYear() * 12 + now.getMonth() && ym <= lastYM, on = py === y && i === m;
+      return { label, bg: on ? "#BD4A19" : "transparent", fg: on ? "#fff" : ok ? "#3F2B22" : "#D9C7BA", weight: on ? 700 : 550, cur: ok ? "pointer" : "default",
+        pick: () => { if (!ok) return; const t = firstOpen(py, i); put({ day: t, week: weekOf(t), slot: null, monthOpen: false, pickYear: undefined }); } }; }),
+    isMonth: mon, isWeek: !mon,
+    viewWeek: () => put({ view: "week", week: weekOf(b.day) }), viewMonth: () => put({ view: "month" }),
+    viewWeekBg: mon ? "transparent" : "#fff", viewMonthBg: mon ? "#fff" : "transparent", viewWeekSh: mon ? "none" : "0 1px 3px rgba(63,43,34,.14)", viewMonthSh: mon ? "0 1px 3px rgba(63,43,34,.14)" : "none",
+    mCells: [...Array.from({ length: lead }, () => null), ...Array.from({ length: len }, (_, k) => new Date(y, m, k + 1).getTime())].map(t => {
+      if (t == null) return { n: "", bg: "transparent", fg: "transparent", deco: "none", cur: "default", pick: () => {} };
+      const off = shut(t), on = t === b.day;
+      return { n: String(new Date(t).getDate()), bg: on ? "#BD4A19" : "transparent", fg: on ? "#fff" : off ? "#C9B8AC" : "#3F2B22", deco: off ? "line-through" : "none", cur: off ? "not-allowed" : "pointer",
+        pick: () => { if (!off) put({ day: t, week: weekOf(t), slot: null }); } };
+    }),
+  };
+}
+
 export function bookVM(ctx: DeskCtx, c: CrmCustomer | undefined) {
   const { ui, set, patch, data, now, act } = ctx;
   const rooms = data.rooms.filter(r => r.active);
   const T = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const visit = c ? data.visits.filter(v => v.customerId === c.id && v.state === "booked" && new Date(v.start) > now).sort((a, b) => a.start.localeCompare(b.start))[0] : undefined;
-  const b = ui.book ?? { room: visit ? Math.max(0, rooms.findIndex(r => r.id === visit.showroomId)) : 0, day: visit ? new Date(new Date(visit.start).getFullYear(), new Date(visit.start).getMonth(), new Date(visit.start).getDate()).getTime() : T + DAY, slot: null, week: 0 };
+  // As the salesperson's sheet (rev 1010 apptChange): a booked visit opens on its own showroom, day and time.
+  const vd = visit ? new Date(visit.start) : null, vDay = vd ? new Date(vd.getFullYear(), vd.getMonth(), vd.getDate()).getTime() : 0;
+  const b = ui.book ?? (vd
+    ? { room: Math.max(0, rooms.findIndex(r => r.id === visit!.showroomId)), day: vDay, slot: timeLabel(vd), week: Math.max(0, Math.floor((vDay - T) / (7 * DAY))) }
+    : { room: 0, day: T + DAY, slot: null, week: 0 });
   const room = rooms[b.room] ?? rooms[0];
   const put = (p: Partial<typeof b>) => patch({ book: { ...b, ...p } });
   const counts = ctx.slotCounts;
@@ -46,7 +87,9 @@ export function bookVM(ctx: DeskCtx, c: CrmCustomer | undefined) {
     rooms: rooms.map((r, i) => ({ label: r.name, on: i === b.room, bg: i === b.room ? "#fff" : "transparent", fg: i === b.room ? "#3F2B22" : "#806B60", sh: i === b.room ? "0 1px 3px rgba(63,43,34,.14)" : "none", pick: () => put({ room: i, slot: null }) })),
     weekLabel: `${new Date(days[0] ? T + b.week * 7 * DAY : T).toLocaleDateString("en-MY", { day: "numeric", month: "short" })} – ${new Date(T + (b.week * 7 + 6) * DAY).toLocaleDateString("en-MY", { day: "numeric", month: "short" })}`,
     prev: () => put({ week: Math.max(0, b.week - 1) }), next: () => put({ week: Math.min(12, b.week + 1) }), days, slots, noSlots: !slots.length,
-    saveLabel: visit ? "Change visit" : "Book visit", saveBg: ok ? "#BD4A19" : "#D9C6B8", saveCur: ok ? "pointer" : "not-allowed",
+    ...monthOf(b, T, room, put),
+    // The salesperson's words: "Change to Tue 13 Oct, 5:00 pm" / "Book …", "Pick a time" until there is one.
+    saveLabel: ok ? `${visit ? "Change to" : "Book"} ${dayLabel(new Date(b.day))}, ${b.slot}` : "Pick a time", saveBg: ok ? "#BD4A19" : "#D9C6B8", saveCur: ok ? "pointer" : "not-allowed",
     save: () => { if (!ok || !c || !room || !b.slot) return; const at = slotAt(b.day, b.slot).toISOString();
       void (visit ? act.moveVisit(visit.id, room.id, at) : act.book(c.id, room.id, at)).then(r => { if (r) patch({ kind: "chat", book: null, toast: `${visit ? "Visit changed" : "Visit booked"} for ${c.name}` }); }); },
     cancel: () => { if (visit) void act.cancelVisit(visit.id).then(r => { if (r) patch({ kind: "chat", book: null, toast: `Visit cancelled for ${c?.name ?? ""}` }); }); },

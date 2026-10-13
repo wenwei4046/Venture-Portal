@@ -26,6 +26,13 @@
 | 19 | **補畫面：History**（在 **Settings** 裡，最後一項），誰、何時、改了哪個設定、改前→改後 | 你 2026-10-13 要求（原放側欄，依你指示移進 Settings） |
 | — | Assignment 各頁標題旁的「All assignment ⌄」拿掉 | 你 2026-10-13 要求；右邊選單本來就能切換 |
 | — | 視窗小於 1280 × 800 時整頁捲動，不再把清單擠成 0 高 | Chat progress 的列表、Full time 的人員表在小視窗看不到（你 2026-10-13 截圖） |
+| — | Insight 的 Ads Performance 卡片旁加「+ Metrics · N」，打開跟 Ads Performance 同一個 Customise metrics 面板：勾選、拖拉排順序、Save 套用（CRM 的數字照 Insight 期間計算，Meta 的「—」） | 你 2026-10-13 要求 |
+| — | Insight 的廣告表格跟 Ads Performance 一樣：點表頭排序（▼ ▲ 取消）、拖拉表頭右邊調欄寬、雙擊恢復 | 你 2026-10-13 要求 |
+| — | 聊天裡的預約訊息畫成 RS 的預約卡片（日期、時間、showroom、地址；點一下開 Calendar） | 你 2026-10-13：跟 RS 一樣 |
+| — | Appointment 打開時已選好目前的 showroom、日期和時間；按鈕寫「Change to Tue 13 Oct, 5:00 pm」／「Pick a time」 | 你 2026-10-13：跟 RS 一樣（原本沒選時間，按鈕是灰的） |
+| — | Full time 編輯框的人員表和「Who gets each day」保持完整高度，面板捲動 | 你 2026-10-13：人員被切掉（手機端同樣的修正是 #348） |
+| — | Ads Performance 表格欄位可拖拉表頭右邊調寬窄，雙擊恢復；表頭每欄之間有淺色豎線 | 你 2026-10-13 要求 |
+| — | Appointment 加 RS 的月份選擇（「Oct 2026 ⌄」選月份）和 Week｜Month 切換（Month 是整月日曆，過去或關閉的日子劃掉） | 你 2026-10-13：跟 RS 一樣 |
 | 20–23 | 聊天顯示整段對話（設計稿只畫一則）；輸入框可以打字送出；＋和相機可以傳檔；打字時麥克風變成送出 | 真功能 |
 | 24–25 | Ads Performance 的「Synced from Meta Ads · 9:00 am」改成「Meta Ads not connected yet」（灰點） | Meta 還沒接（等你確認），不能假裝已同步 |
 | — | 回覆框的提示字顏色 #757575 | portal 的全域樣式會把它變灰藍，已改回設計稿的顏色 |

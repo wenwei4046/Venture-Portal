@@ -5,6 +5,8 @@
  * (panel/vm/common.ts numbersOf) over the chosen period.
  */
 import type { CrmCustomer } from "@/lib/member/crm-data";
+import { ALL, crmFigures, fmt } from "./adsperf";
+import { columnSizer } from "./columns";
 import { numbersOf, pct, periodRange } from "../../panel/vm/common";
 import { isCold, urgencyOf } from "../../sales/vm/common";
 import type { DeskCtx } from "./ctx";
@@ -73,12 +75,27 @@ export function insightVM(ctx: DeskCtx) {
     return { name: ad, channel: ch, chFg: ch === "WhatsApp" ? "#387557" : "#2F6FB5", status: "—", stDot: "#C9B8AC", stInk: st[4], spend: "—", reach: "—", clicks: "—", ctr: "—",
       leads: String(m.leads), cpl: "—", cplColor: "#3F2B22", appt: String(m.booked), _n: m.leads };
   }).filter(a => a._n > 0).sort((a, b) => b._n - a._n);
+  // Sorted and sized as Ads Performance's table (the owner, 2026-10-13): a header sorts ▼ ▲ off; its edge drags the width.
+  const IH: [string, string][] = [["name", "Ad"], ["spend", "Spend (RM)"], ["reach", "Reach"], ["clicks", "Clicks"], ["ctr", "CTR"], ["leads", "Leads"], ["cpl", "Cost / lead (RM)"], ["appt", "Appt"]];
+  const srt = ctx.ui.insSort, IW = ctx.ui.insW, sz = columnSizer(ctx.set, "insW");
+  const num = (v: string) => (v === "—" ? -Infinity : Number(v.replace(/[^\d.-]/g, "")));
+  if (srt) adPerf.sort((x, y) => { const p = x[srt.k as keyof typeof x], q = y[srt.k as keyof typeof y];
+    const d = srt.k === "name" ? String(p).localeCompare(String(q)) : num(String(p)) - num(String(q)); return srt.dir === "asc" ? d : -d; });
+  const insHead = IH.map(([k, label], i) => { const on = srt?.k === k;
+    return { label, align: (i ? "center" : "left") as "center" | "left", justify: i ? "center" : "flex-start", fg: on ? "#3F2B22" : "#806B60",
+      arrow: on ? (srt?.dir === "asc" ? "▲" : "▼") : "↕", ac: on ? "#BD4A19" : "#C9B8AC",
+      sort: () => ctx.set(u => { const c = u.insSort, first = k === "name" ? "asc" : "desc", second = first === "asc" ? "desc" : "asc";
+        return { ...u, insSort: !c || c.k !== k ? { k, dir: first } : c.dir === first ? { k, dir: second } : null }; }),
+      resize: sz.resize(k, i ? 64 : 140), unsize: sz.reset(k) }; });
+  const insAdCols = [IW.name ? `${IW.name}px` : "minmax(220px, 1.6fr)", ...IH.slice(1).map(([k]) => (IW[k] ? `${IW[k]}px` : "minmax(72px, 1fr)"))].join(" ");
+  const insAdMinW = Math.max(820, 40 + (IW.name ?? 220) + IH.slice(1).reduce((n, [k]) => n + (IW[k] ?? 72) + 12, 0));
   const lt = adPerf.reduce((a, x) => a + x._n, 0), at = adPerf.reduce((a, x) => a + Number(x.appt), 0);
   return {
     kInsight: ctx.ui.tab === "insight",
     hero, heroStats, teams: teamsOut, leadStatus,
+    insHead, insAdCols, insAdMinW,
     adPerf, adTot: { n: adPerf.length, spend: "—", reach: "—", clicks: "—", ctr: "—", leads: String(lt), cpl: "—", appt: String(at) },
-    adTotals: [[`Spend · ${name}`, "—"], ["Reach", "—"], ["Clicks", "—"], ["Cost / lead", "—"]].map(([label, value]) => ({ label, value })),
+    ...adCardsVM(ctx, r, name),
     goAdsPerf: () => patch({ tab: "adsperf", pane: "closed", toast: "" }),
   };
 }
@@ -138,5 +155,27 @@ export function clistVM(ctx: DeskCtx) {
     infoBack: !!ui.infoId && ui.kind === "info" && !ui.visit, infoBackLabel: `${key} · all customers`, backToList: () => patch({ kind: "clist", infoId: null }),
     teamNameOf: (id: string | null) => teamNameOf(ctx, id),
     isCold: (c: CrmCustomer) => isCold(c, now), urgency: (c: CrmCustomer) => urgencyOf(c, now),
+  };
+}
+
+/** The cards the design draws: Spend, Reach, Clicks, Cost / lead. */
+export const INS_CARDS = ["spend", "reach", "clicks", "cpl"];
+const CARD_LABEL: Record<string, string> = { clicks: "Clicks", cpl: "Cost / lead" };
+
+/**
+ * Insight's Ads Performance cards (the owner, 2026-10-13: "+" to add metrics, as Ads Performance's): the metrics picked
+ * from Ads Performance's own list, over Insight's period — the CRM's own figures counted, Meta's "—" until Meta is
+ * connected. The picker ticks and unticks; at least one card stays.
+ */
+export function adCardsVM(ctx: DeskCtx, r: { a: number; b: number }, name: string) {
+  const { ui, patch, data } = ctx;
+  const sel = ui.insCards ?? INS_CARDS;
+  const figs = crmFigures(data.customers.filter(c => !!c.adId), ctx, r.a, r.b);
+  return {
+    adTotals: sel.map(k => ALL.find(m => m[0] === k)).filter((m): m is NonNullable<typeof m> => !!m).map(([k, label, , t], i) => ({
+      label: i === 0 && k === "spend" ? `Spend · ${name}` : CARD_LABEL[k] ?? label, value: fmt(figs[k] ?? null, t) })),
+    // The same Customise metrics pane as Ads Performance's: tick, drag into order, Apply (the owner, 2026-10-13).
+    insCardsToggle: () => patch({ pane: "docked", kind: "metrics", mFor: "cards", mDraft: null, mDrag: null }),
+    insCardsN: sel.length,
   };
 }

@@ -29,7 +29,7 @@ export function deskVM(ctx: DeskCtx) {
     alerts: { avatar: "", title: "CRM alerts", sub: "Move · Share · Won · Lost · Overdue 9 h+", subColor: "#806B60", menu: false },
     section: { avatar: "", title: op, sub: ui.tab === "assignment" ? "Assignment · CRM · Manage" : "Settings · CRM · Manage", subColor: "#806B60", menu: false },
     assign: { avatar: "", title: "Assign to", sub: cur ? `${cur.name} · ${cur.ad}` : "", subColor: "#806B60", menu: false },
-    metrics: { avatar: "", title: "Customise metrics", sub: "Pick the columns for Ads Performance", subColor: "#806B60", menu: false },
+    metrics: { avatar: "", title: "Customise metrics", sub: ui.mFor === "cards" ? "Pick the cards for Insight" : "Pick the columns for Ads Performance", subColor: "#806B60", menu: false },
     clist: { avatar: "", ...clist.clistHead, subColor: "#806B60", menu: false },
     info: { avatar: "", ...info.infoHead, subColor: "#806B60", menu: false },
     team: { avatar: "", ...team.teamHead, subColor: "#806B60", menu: false },

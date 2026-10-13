@@ -45,6 +45,10 @@ export interface DeskUi {
   insPer: "day" | "week" | "month" | "custom";
   insRange: { a: number; b: number } | null;
   insOpen: boolean;
+  /** Insight's Ads Performance cards: the metrics picked with + Metrics (the owner, 2026-10-13), in order. */
+  insCards: string[] | null;
+  /** What Customise metrics is picking for: Ads Performance's columns, or Insight's ad cards. */
+  mFor: "ads" | "cards";
   // Inbox
   whoSel: string[];
   whoOpen: boolean;
@@ -74,7 +78,12 @@ export interface DeskUi {
   rangeOpen: boolean;
   // Ads Performance
   apSel: string[] | null; mDraft: string[] | null; mDrag: number | null; mq: string; mFold: Record<string, boolean>;
-  apStF: string; apStOpen: boolean; apSort: { k: string; dir: "asc" | "desc" } | null; apDlOpen: boolean;
+  apStF: string;
+  /** Ads Performance's column widths, dragged at a header's right edge (the owner, 2026-10-13); "name" is the Ad column. */
+  apW: Record<string, number>;
+  /** Insight's ad table: its sort and dragged column widths (as Ads Performance's). */
+  insSort: { k: string; dir: "asc" | "desc" } | null;
+  insW: Record<string, number>; apStOpen: boolean; apSort: { k: string; dir: "asc" | "desc" } | null; apDlOpen: boolean;
   apRange: number | "custom"; apF: string; apT: string; apCF: string; apCT: string; apCmp: boolean; apCmpMode: number | "range" | "custom" | null; apPreset: string;
   dp: { open: boolean; from: string; to: string; cf: string; ct: string; preset: string; cmp: boolean; days: number; step: number; target: "main" | "cmp"; month: number; year: number; txt: Record<string, string> } | null;
   // Showrooms
@@ -94,7 +103,8 @@ export interface DeskUi {
   frmOpen: boolean; frmCur: string | null; frmDraft: FormSection[] | null; frmName: string | null; frmIsNew: boolean; frmExp: string | null; frmOptIn: Record<string, string>;
   ntfTab: "unread" | "read"; ntfCat: string; ntfSel: boolean; ntfPick: Record<string, boolean>;
   // Screens the design does not draw (BUILD-NOTES.md)
-  book: { room: number; day: number; slot: string | null; week: number } | null;
+  /** Appointment: showroom, day, time and the 7-day page; as RS's sheet also Week | Month and the month chooser (2026-10-13). */
+  book: { room: number; day: number; slot: string | null; week: number; view?: "week" | "month"; monthOpen?: boolean; pickYear?: number } | null;
   cform: Record<string, string> | null;
   history: HistRow[] | null;
   histF: string;
@@ -115,12 +125,12 @@ export type FormSection = CrmForm["sections"][number];
 export const initialDeskUi = (): DeskUi => ({
   tab: "insight", pane: "closed", kind: "chat", collapsed: false, fold: {}, stage: "menu", pick: null, menu: false, toast: "", undo: null,
   chat: null, fromTeam: false, fromList: false, fromInfo: false, infoId: null, visit: null, clist: "Leads", clSort: "Last chat", clSortOpen: false, team: null, person: null, draft: {},
-  insPer: "month", insRange: null, insOpen: false,
+  insPer: "month", insRange: null, insOpen: false, insCards: null, mFor: "ads",
   whoSel: [], whoOpen: false, inbF: "All",
   sendFor: null, awChat: null, awMenuOpen: false, ad: null, adMode: "team", tm: {}, mv: {}, split: null, adSt: "Running", stOpen: false, ftEdit: null, ftDraft: null,
   cpF: "All", cpT: "This month", cpFrom: "", cpTo: "", cpSort: "Latest update", cpMine: false, cpP: null, cpPOpen: false, cpSel: null,
   calView: "upcoming", calTeam: "all", calShowroom: "all", calWho: [], calWhoOpen: false, calRange: null, rangeOpen: false,
-  apSel: null, mDraft: null, mDrag: null, mq: "", mFold: {}, apStF: "all", apStOpen: false, apSort: null, apDlOpen: false,
+  apSel: null, mDraft: null, mDrag: null, mq: "", mFold: {}, apStF: "all", apW: {}, insSort: null, insW: {}, apStOpen: false, apSort: null, apDlOpen: false,
   apRange: 0, apF: "", apT: "", apCF: "", apCT: "", apCmp: false, apCmpMode: null, apPreset: "", dp: null,
   srEdit: null, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
   mwt: null, mwtSaved: false,

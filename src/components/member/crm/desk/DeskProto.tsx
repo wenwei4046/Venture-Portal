@@ -34,6 +34,10 @@ function protoChats(p: Record<string, unknown>) {
     setDraft: noop, awSetDraft: noop, draftKey: noop, awDraftKey: noop, send: noop, awSend: noop, attach: noop, awAttach: noop, photo: noop, awPhoto: noop,
     awInfo: noop, awBook: noop, openNote: noop, editInfo: noop, cyclePeriod: noop, openInfo: noop, openBook: noop, freeLabel: "Free · 2 per slot",
     kBook: false, kNote: false, kForm: false,
+    // Insight's ad table header as the design writes it (the live one sorts and sizes — BUILD-NOTES.md).
+    insHead: ["AD", "SPEND (RM)", "REACH", "CLICKS", "CTR", "LEADS", "COST / LEAD (RM)", "APPT"].map((label, i) => ({ label, align: i ? "center" : "left", justify: i ? "center" : "flex-start",
+      fg: "#806B60", arrow: "", ac: "#C9B8AC", sort: noop, resize: noop, unsize: noop })),
+    insAdCols: "minmax(220px, 1.6fr) repeat(7, minmax(72px, 1fr))", insAdMinW: 820,
   };
 }
 type ProtoState = Record<string, unknown>;

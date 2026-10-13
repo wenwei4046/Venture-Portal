@@ -16,11 +16,13 @@ const time = (iso: string) => new Date(iso).toLocaleTimeString("en-MY", { hour: 
 const dayLabel = (iso: string, now: Date) => { const d = day0(new Date(iso)), T = day0(now);
   return d === T ? "Today" : d === T - DAY ? "Yesterday" : T - d < 7 * DAY ? new Date(iso).toLocaleDateString("en-MY", { weekday: "long" }) : new Date(iso).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", month: "short" }); };
 
-export interface Msg { day: string; sys: string; bell: boolean; inn: boolean; out: boolean; text: string; time: string; tick: string; hasTick: boolean; media: string; mediaHref: string; failed: boolean }
+/** A visit card (the salesperson chat's m.ev): the visit's day, time and showroom; tapping it opens the Calendar. */
+export interface VisitCard { kind: string; title: string; wk: string; dn: string; mon: string; time: string; room: string; addr: string; bg: string; fg: string; deco: string; go: () => void }
+export interface Msg { day: string; sys: string; bell: boolean; inn: boolean; out: boolean; text: string; time: string; tick: string; hasTick: boolean; media: string; mediaHref: string; failed: boolean; ev: VisitCard | null }
 
 /** The conversation, oldest first, with the CRM's own lines between the messages. */
 export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
-  const { data, nameOf, now } = ctx;
+  const { data, nameOf, now, patch } = ctx;
   type It = { at: string; m?: CrmChatMessage; sys?: string };
   const its: It[] = [...c.messages.filter(m => !data.hiddenMessages.includes(m.id)).map(m => ({ at: m.at, m })),
     ...data.events.filter(e => e.customerId === c.id).map(e => { const to = nameOf(String(e.data.to ?? e.owner ?? "")), k = e.kind as string;
@@ -33,11 +35,18 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
     .sort((a, b) => a.at.localeCompare(b.at));
   let prev = "";
   return its.map(it => { const d = dayLabel(it.at, now), day = d !== prev ? d : ""; prev = d;
-    if (it.sys) return { day, sys: it.sys, bell: it.sys.includes("a reminder to reply"), inn: false, out: false, text: "", time: "", tick: "", hasTick: false, media: "", mediaHref: "", failed: false };
+    if (it.sys) return { day, sys: it.sys, bell: it.sys.includes("a reminder to reply"), inn: false, out: false, text: "", time: "", tick: "", hasTick: false, media: "", mediaHref: "", failed: false, ev: null };
     const m = it.m!, mine = m.from === "me";
-    const media = m.media ? (m.media.kind === "image" ? "📷 Photo" : `📄 ${m.media.name ?? "Document"}`) : m.card ? `📅 ${m.card.kind} · ${new Date(m.card.start).toLocaleString("en-MY", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} · ${m.card.room}` : "";
+    const media = m.media ? (m.media.kind === "image" ? "📷 Photo" : `📄 ${m.media.name ?? "Document"}`) : "";
+    const card = m.card, cd = card ? new Date(card.start) : null;
+    const ev: VisitCard | null = card && cd ? {
+      kind: card.kind, title: "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()),
+      mon: cd.toLocaleDateString("en-GB", { month: "short" }).replace("Sept", "Sep"), time: time(card.start), room: card.room, addr: card.addr,
+      bg: card.kind === "Cancelled" ? "#F5EBE3" : "#FFF0E4", fg: card.kind === "Cancelled" ? "#806B60" : "#BD4A19", deco: card.kind === "Cancelled" ? "line-through" : "none",
+      go: () => patch({ tab: "calendar", pane: "closed", calView: "month" }),
+    } : null;
     return { day, sys: "", bell: false, inn: !mine, out: mine, text: m.card ? "" : m.text ?? "", time: time(m.at), tick: m.status === "read" ? "#3B8FD9" : "#A8968B", hasTick: mine && m.status !== "failed",
-      media, mediaHref: m.media ? `/member/crm-media/${m.id}` : "", failed: m.status === "failed" };
+      media, mediaHref: m.media ? `/member/crm-media/${m.id}` : "", failed: m.status === "failed", ev };
   });
 }
 
