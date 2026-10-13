@@ -37,8 +37,8 @@ export function canSeePayrollPayouts(u: PermissionHolder): boolean {
  * own page, its print, Payroll Requests, the bank file and Approvals still ask
  * the right alone: the lens keeps the account's power ("Approvals 照旧给你看明细").
  */
-export function listsPayrollByPerson(u: PermissionHolder & { lens?: 'hr' | 'finance' }): boolean {
-  return canSeePayrollPayouts(u) && u.lens !== 'finance'
+export function listsPayrollByPerson(u: (PermissionHolder & { lens?: 'hr' | 'finance' }) | null | undefined): boolean {
+  return !!u && canSeePayrollPayouts(u) && u.lens !== 'finance'
 }
 
 export function canAccessBilling(u: PermissionHolder): boolean {

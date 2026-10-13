@@ -39,6 +39,8 @@ const get = (query: string) => GET(new Request(`http://localhost/reports/ledger/
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Somebody who reads payroll person by person, unless a test says otherwise.
+  mocks.requireActionOn.mockResolvedValue({ role: 'finance', permissions: ['reports', 'payroll_payouts'] })
   mocks.createClient.mockResolvedValue({})
   mocks.buildXlsxBuffer.mockImplementation((args: unknown) => args)
   mocks.exportXlsxResponse.mockReturnValue(new Response('xlsx'))
@@ -49,14 +51,14 @@ describe('the ledger export', () => {
   it('still exports one account by ?code=', async () => {
     mocks.fetchLedger.mockResolvedValue(ledger('1010', 'Cash at Bank', 1))
     await get('format=xlsx&code=1010')
-    expect(mocks.fetchLedger).toHaveBeenCalledWith({}, { code: '1010', from: '2026-10-01', to: '2026-10-31' })
+    expect(mocks.fetchLedger).toHaveBeenCalledWith({}, { code: '1010', from: '2026-10-01', to: '2026-10-31', payrollByPerson: true })
     expect(mocks.exportXlsxResponse.mock.calls[0][0].filename).toBe('ledger-1010-2026-10-01-2026-10-31')
   })
 
   it('exports the accounts picked, each block in turn', async () => {
     mocks.fetchLedgers.mockResolvedValue([ledger('1010', 'Cash at Bank', 1), ledger('2010', 'Loans Receivable', 2)])
     await get('format=xlsx&codes=1010,2010')
-    expect(mocks.fetchLedgers).toHaveBeenCalledWith({}, { codes: ['1010', '2010'], from: '2026-10-01', to: '2026-10-31' })
+    expect(mocks.fetchLedgers).toHaveBeenCalledWith({}, { codes: ['1010', '2010'], from: '2026-10-01', to: '2026-10-31', payrollByPerson: true })
     const cells = firstCells()
     expect(cells.filter((c) => typeof c === 'string' && c.startsWith('Acc. No.:'))).toEqual(['Acc. No.: 1010 · Cash at Bank', 'Acc. No.: 2010 · Loans Receivable'])
     expect(cells.filter((c) => typeof c === 'string' && c.endsWith('— total'))).toHaveLength(2)
@@ -66,9 +68,21 @@ describe('the ledger export', () => {
   it('exports every account with activity when none is picked', async () => {
     mocks.fetchLedgers.mockResolvedValue([ledger('1010', 'Cash at Bank', 1), ledger('1999', 'Dormant', 0), ledger('2010', 'Loans Receivable', 0, 500)])
     await get('format=xlsx')
-    expect(mocks.fetchLedgers).toHaveBeenCalledWith({}, { codes: [], from: '2026-10-01', to: '2026-10-31' })
+    expect(mocks.fetchLedgers).toHaveBeenCalledWith({}, { codes: [], from: '2026-10-01', to: '2026-10-31', payrollByPerson: true })
     expect(firstCells().filter((c) => typeof c === 'string' && c.startsWith('Acc. No.:'))).toEqual(['Acc. No.: 1010 · Cash at Bank', 'Acc. No.: 2010 · Loans Receivable'])
     expect(mocks.exportXlsxResponse.mock.calls[0][0].filename).toBe('ledger-all-2026-10-01-2026-10-31')
+  })
+
+  // 2026-10-13 — the user: on the Finance view payroll reads "按部门，跟 Finance 一样".
+  it('exports the salary lines by department for whoever reads payroll that way', async () => {
+    mocks.fetchLedgers.mockResolvedValue([ledger('1010', 'Cash at Bank', 1)])
+    mocks.fetchLedger.mockResolvedValue(ledger('1010', 'Cash at Bank', 1))
+    mocks.requireActionOn.mockResolvedValue({ role: 'finance', actualRole: 'principal', lens: 'finance', permissions: ['reports', 'payroll_payouts', 'hr_costing'] })
+    await get('format=xlsx')
+    expect(mocks.fetchLedgers.mock.calls[0][1]).toMatchObject({ payrollByPerson: false })
+    mocks.requireActionOn.mockResolvedValue({ role: 'finance', permissions: ['reports'] })
+    await get('format=xlsx&code=1010')
+    expect(mocks.fetchLedger.mock.calls[0][1]).toMatchObject({ payrollByPerson: false })
   })
 
   it('keeps the dormant ones with showZero, and makes a PDF of them', async () => {

@@ -6,6 +6,7 @@ import {
   lockPayrollBatches,
   payrollBatchLabel,
   payrollDepartmentOf,
+  payrollFoldOf,
   poolRowVoucherNo,
   type LedgerFilters,
   type PayrollVoucherLike,
@@ -114,6 +115,19 @@ describe('payrollDepartmentOf', () => {
     expect(dept({ description: 'Payroll net Sep 2026 — Aina binti Example' })).toBe('Other')
     expect(dept({ reference_type: 'payroll_statutory', description: 'EPF top-up — Bala' })).toBe('Other')
     expect(dept({ reference_type: 'loan', description: 'Payroll net Sep 2026 — Aina (HR)' })).toBe('Other')
+  })
+})
+
+describe('payrollFoldOf', () => {
+  it('a salary voucher: its batch and department, for a ledger to fold its lines into', () => {
+    expect(payrollFoldOf(pv({ description: 'Payroll net Sep 2026 — Aina (Marketing)' }), DEPTS)).toEqual({ label: 'Payroll net Sep 2026', department: 'Marketing' })
+    expect(payrollFoldOf(pv({ description: 'Director salary Sep 2026 — A Director' }), DEPTS)).toEqual({ label: 'Director salary Sep 2026', department: 'Directors' })
+  })
+
+  it('a statutory or funding voucher is already a department’s — it stands as it is', () => {
+    expect(payrollFoldOf(pv({ reference_type: 'payroll_statutory', description: 'KWSP — Aug 2026 payroll (HR · 3 people)' }), DEPTS)).toBeNull()
+    expect(payrollFoldOf(pv({ reference_type: 'payroll_payment_request', description: 'Payroll bank transfer — Aug 2026' }), DEPTS)).toBeNull()
+    expect(payrollFoldOf(pv({ reference_type: null, description: 'Office rack' }), DEPTS)).toBeNull()
   })
 })
 

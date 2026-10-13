@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
+import { listsPayrollByPerson } from '@/lib/roles'
 import { fetchLedgers, type Ledger } from '@/lib/cfo-reports'
 import { type AccountType } from '@/lib/coa'
 import LedgerPicker from './_components/LedgerPicker'
@@ -31,7 +32,7 @@ function parseCodes(codes: string | undefined, code: string | undefined): string
 
 export default async function LedgerPage({ searchParams }: Props) {
   await requirePage('/reports/ledger')
-  await requirePermission('reports')
+  const user = await requirePermission('reports')
   const supabase = await createClient()
 
   const params = await searchParams
@@ -54,7 +55,8 @@ export default async function LedgerPage({ searchParams }: Props) {
       .eq('is_active', true)
       .order('code'),
   )
-  const ledgersRead = fetchLedgers(supabase, { codes, from, to, coa: coaRead })
+  // Salary lines by department for whoever reads payroll that way (2026-10-13).
+  const ledgersRead = fetchLedgers(supabase, { codes, from, to, coa: coaRead, payrollByPerson: listsPayrollByPerson(user) })
   // LedgerBody awaits it — and shows its error — only after this page has
   // rendered; until then a failure must not count as an unhandled rejection.
   ledgersRead.catch(() => {})

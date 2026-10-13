@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { applyGlRefs, fetchAllJournalLines, fetchGlRefs, type GlLine } from './gl-reports'
+import { applyGlRefs, buildCashFlow, fetchAllJournalLines, fetchGlRefs, type GlLine } from './gl-reports'
+import type { AccountType } from './coa'
 import { classifyRows, fetchIncomeStatement, fetchLedgers, fetchTrialBalance, type RawPvSourceRow } from './cfo-reports'
 import { fetchInterBillingCashFlow } from './inter-billing-cash-flow'
 import { fetchInterBillingElimination } from './consolidation'
@@ -613,6 +614,106 @@ describe('fetchGlRefs — every invoice, voucher and credit note', () => {
     await expect(
       fetchGlRefs(pocketPostgrest(books(), { fail: (r) => (r.table === 'invoices' ? 'TypeError: fetch failed' : null) }).client),
     ).rejects.toThrow(/^fetchGlRefs invoices: TypeError: fetch failed$/)
+  })
+})
+
+// 2026-10-13 — the user: "就算能看到 pv，应该也是看到 by 整个部门才对". Whoever
+// reads payroll by department (the Finance view; no Payroll payouts) gets each
+// salary voucher's journal lines folded by batch, department and day: the same
+// balances, the same cash flow, and no name anywhere in what is sent.
+describe('salary lines by department', () => {
+  const PAYROLL_COA: Row[] = [
+    { code: '3010', name: 'Bank (Alliance)', type: 'asset', parent_code: null, is_active: true, cash_flow_category: 'operating' },
+    { code: '4070', name: 'Salary payable', type: 'liability', parent_code: null, is_active: true, cash_flow_category: 'operating' },
+    { code: '9010', name: 'Rent', type: 'expense', parent_code: null, is_active: true, cash_flow_category: 'operating' },
+  ]
+  const NAMES = /Aina Example|Balakrishnan|Chong Kah Wai|HV-PV-202610-049/
+
+  function payrollBooks() {
+    const people = [['Aina Example', 'Marketing', 3200.5], ['Balakrishnan', 'Marketing', 4100.25], ['Chong Kah Wai', 'IT', 5000]] as const
+    const entries: Row[] = []
+    const lines: Row[] = []
+    const vouchers: Row[] = []
+    people.forEach(([name, dept, amount], i) => {
+      const pv: Row = {
+        id: `pv${i}`, voucher_no: `HV-PV-202610-049${i}`, direction: 'debit', reference_type: 'payroll_disbursement',
+        description: `Payroll net Sep 2026 — ${name} (${dept})`, payee_name: name, invoice_id: null, payment_date: '2026-10-06',
+      }
+      vouchers.push(pv)
+      const entry: Row = {
+        id: `e${i}`, entry_no: `JE-202610-088${i}`, transaction_date: '2026-10-06', description: `PV ${pv.voucher_no}: ${pv.description}`,
+        segment: 'hr', is_reversed: false, reference_type: 'payment_voucher', reference_id: pv.id,
+      }
+      entries.push(entry)
+      lines.push(
+        { id: `l${2 * i}`, entry_id: entry.id, account_code: '4070', debit: amount, credit: 0, description: `other - ${name} (4070)`, journal_entries: entry },
+        { id: `l${2 * i + 1}`, entry_id: entry.id, account_code: '3010', debit: 0, credit: amount, description: `Bank payment - ${pv.voucher_no}`, journal_entries: entry },
+      )
+    })
+    // A rent voucher the same day, which stays as it is.
+    vouchers.push({ id: 'pv-rent', voucher_no: 'HV-PV-202610-0500', direction: 'debit', reference_type: null, description: 'October rent', payee_name: 'Landlord', invoice_id: null, payment_date: '2026-10-06' })
+    const rent: Row = {
+      id: 'e-rent', entry_no: 'JE-202610-0890', transaction_date: '2026-10-06', description: 'PV HV-PV-202610-0500: October rent',
+      segment: 'corporate', is_reversed: false, reference_type: 'payment_voucher', reference_id: 'pv-rent',
+    }
+    entries.push(rent)
+    lines.push(
+      { id: 'l-r1', entry_id: 'e-rent', account_code: '9010', debit: 900, credit: 0, description: null, journal_entries: rent },
+      { id: 'l-r2', entry_id: 'e-rent', account_code: '3010', debit: 0, credit: 900, description: null, journal_entries: rent },
+    )
+    return {
+      journal_entries: entries, journal_lines: lines, payment_vouchers: vouchers, chart_of_accounts: PAYROLL_COA,
+      departments: [{ id: 'd-m', name: 'Marketing', is_internal: false }, { id: 'd-it', name: 'IT', is_internal: false }],
+      invoices: [], companies: [], credit_notes: [],
+    }
+  }
+
+  it('the ledger: one line per batch, department and day — the same balances, no name', async () => {
+    const args = { codes: ['3010', '4070'], from: '2026-10-01', to: '2026-10-31' }
+    const byPerson = await fetchLedgers(pocketPostgrest(payrollBooks()).client, args)
+    const byDepartment = await fetchLedgers(pocketPostgrest(payrollBooks()).client, { ...args, payrollByPerson: false })
+    expect(JSON.stringify(byPerson)).toMatch(NAMES) // whoever reads payroll by person, as before
+    expect(JSON.stringify(byDepartment)).not.toMatch(NAMES)
+    const bank = byDepartment.find((l) => l.code === '3010')!
+    expect(bank.lines.map((l) => [l.description, l.debit, l.credit, l.ref, l.entryNo])).toEqual([
+      ['BALANCE B/F', 0, 0, '', ''],
+      ['Payroll net Sep 2026 · Marketing · 2 vouchers', 0, 7300.75, '', ''],
+      ['Payroll net Sep 2026 · IT · 1 voucher', 0, 5000, '', ''],
+      ['October rent', 0, 900, 'HV-PV-202610-0500', 'JE-202610-0890'],
+    ])
+    expect(bank.lines.map((l) => l.runningBalance)).toEqual([0, -7300.75, -12300.75, -13200.75])
+    for (const code of ['3010', '4070']) {
+      const a = byPerson.find((l) => l.code === code)!
+      const b = byDepartment.find((l) => l.code === code)!
+      expect(b.closingBalance).toBe(a.closingBalance)
+      expect(b.periodTotals).toEqual(a.periodTotals)
+    }
+  })
+
+  it('the statements: each department’s lines as one entry — the same cash flow, no name in a drill-down', async () => {
+    const tables = payrollBooks()
+    const lines = await fetchAllJournalLines(pocketPostgrest(tables).client)
+    const refsByPerson = await fetchGlRefs(pocketPostgrest(tables).client)
+    const refsByDepartment = await fetchGlRefs(pocketPostgrest(tables).client, { payrollByPerson: false })
+    expect(refsByPerson.payrollByDepartment).toBeUndefined()
+    const asPerson = applyGlRefs(lines, refsByPerson)
+    const asDepartment = applyGlRefs(lines, refsByDepartment)
+    expect(JSON.stringify(asPerson)).toMatch(NAMES)
+    expect(JSON.stringify(asDepartment)).not.toMatch(NAMES)
+    expect(asDepartment.filter((l) => l.ref_type === 'payroll_department').map((l) => [l.entry_description, l.account_code, l.debit, l.credit, l.party])).toEqual([
+      ['Payroll net Sep 2026 · Marketing · 2 vouchers', '4070', 7300.75, 0, 'Marketing'],
+      ['Payroll net Sep 2026 · Marketing · 2 vouchers', '3010', 0, 7300.75, 'Marketing'],
+      ['Payroll net Sep 2026 · IT · 1 voucher', '4070', 5000, 0, 'IT'],
+      ['Payroll net Sep 2026 · IT · 1 voucher', '3010', 0, 5000, 'IT'],
+    ])
+    // The rent voucher keeps its payee.
+    expect(asDepartment.find((l) => l.entry_id === 'e-rent')).toMatchObject({ party: 'Landlord' })
+    const coa = PAYROLL_COA.map((a) => ({ code: String(a.code), name: String(a.name), type: a.type as AccountType, parent_code: null, cash_flow_category: 'operating' as const }))
+    const filter = { current: { from: '2026-10-01', to: '2026-10-31' }, previous: { from: '2026-09-01', to: '2026-09-30' } }
+    const a = buildCashFlow(asPerson, coa, filter, new Set(['3010']))
+    const b = buildCashFlow(asDepartment, coa, filter, new Set(['3010']))
+    expect([b.netChange, b.closingCash, b.check, b.operating.current]).toEqual([a.netChange, a.closingCash, a.check, a.operating.current])
+    expect(JSON.stringify(b)).not.toMatch(NAMES)
   })
 })
 

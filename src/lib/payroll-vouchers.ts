@@ -62,6 +62,11 @@ export interface PayrollVoucherLike {
   created_at: string
 }
 
+/** What the helpers that read a voucher's text need of it (a ledger's source row has no status or amount). */
+export type PayrollVoucherText = Pick<PayrollVoucherLike, 'reference_type' | 'description' | 'payment_date'> & {
+  created_at?: string | null
+}
+
 /**
  * The batch a payroll voucher folds into: what it is and which month — never
  * who, and never which department.
@@ -73,7 +78,7 @@ export interface PayrollVoucherLike {
  * Everything after the dash is dropped except a leading month: the batch is
  * the month's, and its departments are lines inside it (payrollDepartmentOf).
  */
-export function payrollBatchLabel(v: PayrollVoucherLike): string {
+export function payrollBatchLabel(v: PayrollVoucherText): string {
   const kind = v.reference_type ?? ''
   const description = v.description ?? ''
   const dash = description.indexOf(' — ')
@@ -135,7 +140,7 @@ const lastBracket = (text: string) => /\(([^()]+)\)$/.exec(text)?.[1]
  *
  * Anything else is "Other" — never the text itself.
  */
-export function payrollDepartmentOf(v: PayrollVoucherLike, departments: ReadonlySet<string>): string {
+export function payrollDepartmentOf(v: PayrollVoucherText, departments: ReadonlySet<string>): string {
   const kind = v.reference_type ?? ''
   const description = (v.description ?? '').trim()
   const dash = description.indexOf(' — ')
@@ -166,6 +171,18 @@ export function payrollDepartmentOf(v: PayrollVoucherLike, departments: Readonly
     return knownDepartment(lastBracket(tail), departments) ?? ALL_DEPARTMENTS
   }
   return OTHER_DEPARTMENT
+}
+
+/**
+ * A salary voucher as a ledger reads it for an account that may not see one
+ * person's pay (2026-10-13): its batch and its department — the journal lines
+ * it posted fold into one line per department per day. Only the salary
+ * vouchers: a statutory or funding voucher is already one department's (or the
+ * month's) and stands as it is. null for anything else.
+ */
+export function payrollFoldOf(v: PayrollVoucherText, departments: ReadonlySet<string>): { label: string; department: string } | null {
+  if (v.reference_type !== 'payroll_disbursement') return null
+  return { label: payrollBatchLabel(v), department: payrollDepartmentOf(v, departments) }
 }
 
 /** What a set of payroll vouchers comes to: how many, how much, where they stand. */

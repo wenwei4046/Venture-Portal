@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { classifyRows, buildTrialBalance, fetchTrialBalance, buildLedger, resolveSourceDescriptions, groupRevenueByAccount, isCalendarDay } from './cfo-reports'
-import type { RawPvSourceRow, RawInvoiceRow, RawTreasury, CoaLeafAccount, RawLedgerLine } from './cfo-reports'
+import { classifyRows, buildTrialBalance, fetchTrialBalance, buildLedger, foldPayrollLedgerLines, resolveSourceDescriptions, groupRevenueByAccount, isCalendarDay } from './cfo-reports'
+import type { RawPvSourceRow, RawInvoiceRow, RawTreasury, CoaLeafAccount, RawLedgerLine, FoldableLedgerLine } from './cfo-reports'
 
 const pv = (o: Partial<RawPvSourceRow>): RawPvSourceRow => ({
   voucherId: 'v1', voucherType: 'expense', direction: 'debit',
@@ -435,6 +435,30 @@ describe('buildLedger', () => {
     expect(led.lines[2].runningBalance).toBe(70)
     expect(led.lines[3].runningBalance).toBe(120)
     expect(led.closingBalance).toBe(120)
+  })
+})
+
+// 2026-10-13 — the user: "就算能看到 pv，应该也是看到 by 整个部门才对".
+describe('foldPayrollLedgerLines', () => {
+  const line = (id: string, over: Partial<FoldableLedgerLine> = {}): FoldableLedgerLine => ({
+    id, entryNo: `JE-${id}`, entryDate: '2026-10-06', description: `Payroll net Sep 2026 — Person ${id} (Marketing)`,
+    journalType: 'PAYMENT', ref: `HV-PV-${id}`, segment: 'hr', debit: 0, credit: 100,
+    fold: { label: 'Payroll net Sep 2026', department: 'Marketing' }, ...over,
+  })
+
+  it('puts a day’s salary lines of one department together where the first stood — no entry, no voucher, no name', () => {
+    const rent = line('r', { description: 'October rent', ref: 'HV-PV-0500', fold: undefined, credit: 900 })
+    const out = foldPayrollLedgerLines([line('1', { credit: 3200.5 }), rent, line('2', { credit: 4100.25 }), line('3', { fold: { label: 'Payroll net Sep 2026', department: 'IT' } })])
+    expect(out.map((l) => [l.description, l.entryNo, l.ref, l.credit])).toEqual([
+      ['Payroll net Sep 2026 · Marketing · 2 vouchers', '', '', 7300.75],
+      ['October rent', 'JE-r', 'HV-PV-0500', 900],
+      ['Payroll net Sep 2026 · IT · 1 voucher', '', '', 100],
+    ])
+    expect(JSON.stringify(out.filter((l) => l !== rent))).not.toMatch(/Person|HV-PV-|JE-/)
+  })
+
+  it('keeps one day apart from the next', () => {
+    expect(foldPayrollLedgerLines([line('1'), line('2', { entryDate: '2026-10-07' })])).toHaveLength(2)
   })
 })
 

@@ -93,7 +93,8 @@ describe("reports open on the office's month", () => {
 
   it("Ledger export: from the office month's 1st to the office's today", async () => {
     await asTheServer(() => exportLedger(new Request('https://portal.test/reports/ledger/export?code=3000')))
-    expect(mocks.fetchLedger).toHaveBeenCalledWith(expect.anything(), { code: '3000', from: '2026-11-01', to: '2026-11-01' })
+    // A reports reader without Payroll payouts reads the salary lines by department (2026-10-13).
+    expect(mocks.fetchLedger).toHaveBeenCalledWith(expect.anything(), { code: '3000', from: '2026-11-01', to: '2026-11-01', payrollByPerson: false })
   })
 
   it("Trial Balance and its export: as at the office's today when no day is named", async () => {

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn } from '@/lib/auth'
+import { listsPayrollByPerson } from '@/lib/roles'
 import { fetchLedger, fetchLedgers } from '@/lib/cfo-reports'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildLedgerXlsx, buildLedgersXlsx } from './_format/xlsx'
@@ -8,7 +9,9 @@ import { hasLedgerActivity } from '@/lib/ledger-view'
 import { officeTime, officeToday } from '@/lib/office-time'
 
 export async function GET(req: Request) {
-  await requireActionOn('/reports/ledger', 'reports', 'export')
+  const user = await requireActionOn('/reports/ledger', 'reports', 'export')
+  // Salary lines as the page lists them: by department for whoever reads payroll that way (2026-10-13).
+  const payrollByPerson = listsPayrollByPerson(user)
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const code = url.searchParams.get('code')
@@ -30,7 +33,7 @@ export async function GET(req: Request) {
     const showZero = url.searchParams.get('showZero') === '1'
     let ledgers
     try {
-      ledgers = await fetchLedgers(supabase, { codes, from, to })
+      ledgers = await fetchLedgers(supabase, { codes, from, to, payrollByPerson })
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'unknown error'
       return Response.json({ error: msg }, { status: 400 })
@@ -43,7 +46,7 @@ export async function GET(req: Request) {
   }
   let led
   try {
-    led = await fetchLedger(supabase, { code, from, to })
+    led = await fetchLedger(supabase, { code, from, to, payrollByPerson })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown error'
     return Response.json({ error: msg }, { status: 400 })

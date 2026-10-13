@@ -8,6 +8,7 @@ import dayjs from 'dayjs'
 import { officeMonth } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
+import { listsPayrollByPerson } from '@/lib/roles'
 import {
   applyGlRefs,
   buildBalanceSheet,
@@ -32,7 +33,7 @@ interface Props {
 
 export default async function BalanceSheetPage({ searchParams }: Props) {
   await requirePage('/reports/balance-sheet')
-  await requirePermission('reports')
+  const user = await requirePermission('reports')
   const supabase = await createClient()
 
   const params = await searchParams
@@ -44,7 +45,8 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
   const [rawLines, accounts, glRefs] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
-    fetchGlRefs(supabase),
+    // Salary lines by department for whoever reads payroll that way (2026-10-13).
+    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user) }),
   ])
   const lines = applyGlRefs(rawLines, glRefs)
 

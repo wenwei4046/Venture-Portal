@@ -9,6 +9,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ACCOUNT_TYPES, type AccountType, type CashFlowCategory, defaultCashFlowCategoryFor, rangeFor } from './coa'
 import { fetchAllRows, fetchAllRowsParallel } from './paginate'
+import { payrollFoldOf, type PayrollVoucherText } from './payroll-vouchers'
 
 function r2(n: number): number {
   return Math.round(n * 100) / 100
@@ -114,6 +115,10 @@ export interface GlRefs {
   /** credit note id → the parent invoice's bill-to (CN v2, 2026-08-20) —
    *  optional so hand-built refs (tests) stay valid. */
   creditNoteParties?: Map<string, string>
+  /** Set only for a reader who sees payroll by department (2026-10-13,
+   *  fetchGlRefs `payrollByPerson: false`): salary voucher id → the batch and
+   *  department its lines fold into (applyGlRefs). */
+  payrollByDepartment?: Map<string, { label: string; department: string }>
 }
 
 /** Reference lookups for enriching drill-down rows: invoice number /
@@ -123,8 +128,13 @@ export interface GlRefs {
  *  (2026-10-08): an unranged read stops at PostgREST's 1000 rows without a
  *  word, and the rows past it would simply lose their invoice number and
  *  counterparty in every drill-down. Each answer only feeds a Map by id, so
- *  the pages' `id` order changes nothing else. */
-export async function fetchGlRefs(supabase: SupabaseClient): Promise<GlRefs> {
+ *  the pages' `id` order changes nothing else.
+ *
+ *  `payrollByPerson: false` (lib/roles.ts listsPayrollByPerson, 2026-10-13):
+ *  the refs carry `payrollByDepartment`, and applyGlRefs folds each salary
+ *  voucher's lines by batch and department — no name reaches a drill-down. */
+export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPerson?: boolean } = {}): Promise<GlRefs> {
+  const foldPayroll = opts.payrollByPerson === false
   const [invoices, { data: companies }, { data: departments }, vouchers, creditNotes] =
     await Promise.all([
       fetchAllRows(
@@ -137,14 +147,15 @@ export async function fetchGlRefs(supabase: SupabaseClient): Promise<GlRefs> {
         'fetchGlRefs invoices',
       ),
       supabase.from('companies').select('id, name, short_code'),
-      // is_internal=false — the 'Venture Office' pseudo-dept is never a billable
-      // party; keep it out of the id→name resolver too.
-      supabase.from('departments').select('id, name').eq('is_internal', false),
+      // Every department: a salary voucher may name any of them (2026-10-13).
+      // The internal ones (Venture Office) are kept out of the bill-to resolver
+      // below — never a billable party.
+      supabase.from('departments').select('id, name, is_internal'),
       fetchAllRows(
         (from, to) =>
           supabase
             .from('payment_vouchers')
-            .select('id, payee_name, invoice_id')
+            .select(foldPayroll ? 'id, payee_name, invoice_id, reference_type, description, payment_date' : 'id, payee_name, invoice_id')
             .order('id', { ascending: true })
             .range(from, to),
         'fetchGlRefs vouchers',
@@ -158,7 +169,18 @@ export async function fetchGlRefs(supabase: SupabaseClient): Promise<GlRefs> {
     ])
 
   const coById = new Map((companies ?? []).map((c) => [c.id as string, (c.short_code as string | null) ?? (c.name as string)]))
-  const deptById = new Map((departments ?? []).map((d) => [d.id as string, d.name as string]))
+  const deptById = new Map(
+    (departments ?? []).filter((d) => d.is_internal === false).map((d) => [d.id as string, d.name as string]),
+  )
+  let payrollByDepartment: GlRefs['payrollByDepartment']
+  if (foldPayroll) {
+    const names = new Set((departments ?? []).map((d) => d.name as string))
+    payrollByDepartment = new Map()
+    for (const v of (vouchers ?? []) as Array<PayrollVoucherText & { id: string }>) {
+      const fold = payrollFoldOf(v, names)
+      if (fold) payrollByDepartment.set(v.id, fold)
+    }
+  }
 
   const billToOf = (i: {
     company_id: string | null
@@ -201,14 +223,77 @@ export async function fetchGlRefs(supabase: SupabaseClient): Promise<GlRefs> {
         return billTo ? [[cn.id as string, billTo] as [string, string]] : []
       }),
     ),
+    ...(payrollByDepartment ? { payrollByDepartment } : {}),
   }
+}
+
+/**
+ * The journal lines salary vouchers posted, put together by batch, department
+ * and day (2026-10-13 — the user: "就算能看到 pv，应该也是看到 by 整个部门才对"):
+ * each group stands as ONE entry (`payroll:<day|segment|batch|department>`, no
+ * entry number), with one line per account, so every builder reads it as it
+ * read each of its vouchers — the cash flow splits an entry's bank leg across
+ * its other legs. Named "Payroll net Sep 2026 · Marketing · 12 vouchers", the
+ * department as its party. Every other line passes through, in order; a group
+ * stands where its first line stood.
+ */
+export function foldPayrollGlLines(lines: GlLine[], byVoucher: ReadonlyMap<string, { label: string; department: string }>): GlLine[] {
+  const out: GlLine[] = []
+  const merged = new Map<string, GlLine>()
+  const members = new Map<string, Set<string>>()
+  for (const l of lines) {
+    const isVoucher = l.ref_type === 'payment_voucher' || l.ref_type === 'payment_voucher_void'
+    const fold = isVoucher && l.ref_id ? byVoucher.get(l.ref_id) : undefined
+    if (!fold) {
+      out.push(l)
+      continue
+    }
+    const entry = `payroll:${l.date}|${l.segment}|${fold.label}|${fold.department}${l.ref_type === 'payment_voucher_void' ? '|void' : ''}`
+    let ids = members.get(entry)
+    if (!ids) {
+      ids = new Set()
+      members.set(entry, ids)
+    }
+    ids.add(l.entry_id)
+    const key = `${entry}|${l.account_code}`
+    const line = merged.get(key)
+    if (line) {
+      line.debit = r2(line.debit + l.debit)
+      line.credit = r2(line.credit + l.credit)
+      continue
+    }
+    const first: GlLine = {
+      account_code: l.account_code,
+      debit: l.debit,
+      credit: l.credit,
+      description: null,
+      entry_id: entry,
+      date: l.date,
+      entry_no: null,
+      entry_description: `${fold.label} · ${fold.department}`,
+      segment: l.segment,
+      ref_type: 'payroll_department',
+      ref_id: null,
+      party: fold.department,
+    }
+    merged.set(key, first)
+    out.push(first)
+  }
+  for (const line of merged.values()) {
+    const n = members.get(line.entry_id)?.size ?? 1
+    line.entry_description = `${line.entry_description} · ${n} ${n === 1 ? 'voucher' : 'vouchers'}`
+  }
+  return out
 }
 
 /** Enrich drill-down lines: invoice JEs get "invoice_no · description" plus the
  *  bill-to company as the counterparty; voucher JEs (PV/OR) get the payee as
- *  the counterparty (pay-out to / received from). Pure — returns new objects. */
+ *  the counterparty (pay-out to / received from). Pure — returns new objects.
+ *  With `refs.payrollByDepartment` (a reader who sees payroll by department)
+ *  the salary vouchers' lines are folded first: no name is ever looked up. */
 export function applyGlRefs(lines: GlLine[], refs: GlRefs): GlLine[] {
-  return lines.map((l) => {
+  const source = refs.payrollByDepartment ? foldPayrollGlLines(lines, refs.payrollByDepartment) : lines
+  return source.map((l) => {
     if (!l.ref_id) return l
     if (l.ref_type === 'invoice') {
       const ref = refs.invoices.get(l.ref_id)

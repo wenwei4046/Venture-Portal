@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   applyGlRefs,
+  foldPayrollGlLines,
   buildPnl,
   buildBalanceSheet,
   buildCashFlow,
@@ -244,6 +245,41 @@ describe('applyGlRefs', () => {
       ref_id: 'x',
     }
     expect(applyGlRefs([line], refs)[0].party).toBeUndefined()
+  })
+})
+
+// 2026-10-13 — the user: "就算能看到 pv，应该也是看到 by 整个部门才对".
+describe('foldPayrollGlLines', () => {
+  const salary = (id: string, date: string, amount: number, refType = 'payment_voucher', segment = 'hr'): GlLine[] => [
+    { account_code: '4070', debit: amount, credit: 0, description: `other - Person ${id} (4070)`, entry_id: `e-${id}`, date, entry_no: `JE-${id}`, entry_description: `PV HV-PV-${id}: Payroll net Sep 2026 — Person ${id} (Marketing)`, segment, ref_type: refType, ref_id: `pv-${id}`, party: `Person ${id}` },
+    { account_code: '3010', debit: 0, credit: amount, description: `Bank payment - HV-PV-${id}`, entry_id: `e-${id}`, date, entry_no: `JE-${id}`, entry_description: `PV HV-PV-${id}: Payroll net Sep 2026 — Person ${id} (Marketing)`, segment, ref_type: refType, ref_id: `pv-${id}`, party: `Person ${id}` },
+  ]
+  const fold = { label: 'Payroll net Sep 2026', department: 'Marketing' }
+  const byVoucher = new Map([['pv-1', fold], ['pv-2', fold], ['pv-3', fold], ['pv-4', fold]])
+
+  it('a day’s vouchers of one batch and department stand as one entry, one line per account', () => {
+    const out = foldPayrollGlLines([...salary('1', '2026-10-06', 100), ...salary('2', '2026-10-06', 250.5)], byVoucher)
+    expect(out.map((l) => [l.entry_id, l.account_code, l.debit, l.credit, l.entry_description, l.party, l.entry_no])).toEqual([
+      ['payroll:2026-10-06|hr|Payroll net Sep 2026|Marketing', '4070', 350.5, 0, 'Payroll net Sep 2026 · Marketing · 2 vouchers', 'Marketing', null],
+      ['payroll:2026-10-06|hr|Payroll net Sep 2026|Marketing', '3010', 0, 350.5, 'Payroll net Sep 2026 · Marketing · 2 vouchers', 'Marketing', null],
+    ])
+    expect(JSON.stringify(out)).not.toMatch(/Person|HV-PV-/)
+  })
+
+  it('keeps a day apart from the next, a segment from another, and a void from what it voids', () => {
+    const out = foldPayrollGlLines([
+      ...salary('1', '2026-10-06', 100),
+      ...salary('2', '2026-10-07', 200),
+      ...salary('3', '2026-10-06', 300, 'payment_voucher', 'director'),
+      ...salary('4', '2026-10-06', 400, 'payment_voucher_void'),
+    ], byVoucher)
+    expect(new Set(out.map((l) => l.entry_id)).size).toBe(4)
+    expect(out.filter((l) => l.account_code === '4070').map((l) => l.debit)).toEqual([100, 200, 300, 400])
+  })
+
+  it('every other line passes through as it was', () => {
+    const rent: GlLine = { ...entry('2026-10-06', [['9000', 900, 0]])[0], ref_type: 'payment_voucher', ref_id: 'pv-rent' }
+    expect(foldPayrollGlLines([rent], byVoucher)).toEqual([rent])
   })
 })
 

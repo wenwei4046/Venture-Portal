@@ -31,6 +31,7 @@ import type { AccountType, CashFlowCategory } from './coa'
 import { CASH_FLOW_CATEGORIES } from './coa'
 import type { Database } from './supabase/database.types'
 import { accountFamily } from './ar-accounts'
+import { payrollFoldOf } from './payroll-vouchers'
 
 type GlSegment = Database['public']['Enums']['gl_segment']
 
@@ -1838,11 +1839,62 @@ export function buildLedger(args: {
   }
 }
 
+/** A ledger line that may belong to a salary voucher (fetchLedgers). */
+export interface FoldableLedgerLine {
+  id: string
+  entryNo: string
+  entryDate: string
+  description: string
+  journalType: string
+  ref: string
+  segment: string
+  debit: number
+  credit: number
+  /** Set on a salary voucher's line: the batch and department it folds into. */
+  fold?: { label: string; department: string }
+}
+
+/**
+ * One account's ledger lines, each salary voucher's put together by batch,
+ * department and day (2026-10-13 — the user: "就算能看到 pv，应该也是看到 by
+ * 整个部门才对"): "Payroll net Sep 2026 · Marketing · 12 vouchers", no entry or
+ * voucher number, the amounts summed, standing where the first of them stood.
+ * The lines arrive sorted and the running balance is worked out after them, so
+ * every balance still ties.
+ */
+export function foldPayrollLedgerLines<T extends FoldableLedgerLine>(lines: readonly T[]): T[] {
+  const out: T[] = []
+  const groups = new Map<string, { line: T; label: string; department: string; count: number }>()
+  for (const l of lines) {
+    if (!l.fold) {
+      out.push(l)
+      continue
+    }
+    const key = `${l.entryDate}|${l.segment}|${l.fold.label}|${l.fold.department}`
+    const group = groups.get(key)
+    if (group) {
+      group.line.debit += l.debit
+      group.line.credit += l.credit
+      group.count += 1
+      continue
+    }
+    const line: T = { ...l, id: `payroll:${key}`, entryNo: '', ref: '', journalType: 'PAYMENT', fold: undefined }
+    groups.set(key, { line, label: l.fold.label, department: l.fold.department, count: 1 })
+    out.push(line)
+  }
+  for (const g of groups.values()) {
+    g.line.debit = r2(g.line.debit)
+    g.line.credit = r2(g.line.credit)
+    g.line.description = `${g.label} · ${g.department} · ${g.count} ${g.count === 1 ? 'voucher' : 'vouchers'}`
+  }
+  return out
+}
+
 export async function fetchLedger(
   supabase: SupabaseClient,
-  args: { code: string; from: string; to: string },
+  args: { code: string; from: string; to: string; payrollByPerson?: boolean },
 ): Promise<Ledger> {
-  const ledgers = await fetchLedgers(supabase, { codes: [args.code], from: args.from, to: args.to })
+  const ledgers = await fetchLedgers(supabase, { codes: [args.code], from: args.from, to: args.to, payrollByPerson: args.payrollByPerson })
   if (ledgers.length === 0) {
     throw new Error(`fetchLedger: account ${args.code} not found`)
   }
@@ -1889,6 +1941,8 @@ interface LedgerSourceRow {
   invoice_no?: string | null
   voucher_no?: string | null
   direction?: string | null
+  reference_type?: string | null
+  payment_date?: string | null
 }
 
 interface LedgerSourceRows {
@@ -1900,7 +1954,9 @@ const SOURCE_DESCRIPTION_COLUMNS = { invoices: 'id, description', vouchers: 'id,
 const SOURCE_META_COLUMNS = { invoices: 'id, invoice_no', vouchers: 'id, voucher_no, direction' }
 const LEDGER_SOURCE_COLUMNS = {
   invoices: 'id, description, invoice_no',
-  vouchers: 'id, description, voucher_no, direction',
+  // reference_type + payment_date: which vouchers are salary ones, and their
+  // batch, for a reader who sees payroll by department (2026-10-13).
+  vouchers: 'id, description, voucher_no, direction, reference_type, payment_date',
 }
 
 async function readLedgerSourceRows(
@@ -2028,9 +2084,23 @@ export async function fetchLedgers(
      *  columns and filter as the read below; its order does not matter, the
      *  accounts are sorted here. */
     coa?: PromiseLike<{ data: LedgerCoaRow[] | null; error: { message: string } | null }>
+    /** false = the reader sees payroll by department (lib/roles.ts
+     *  listsPayrollByPerson, 2026-10-13): a salary voucher's lines fold into
+     *  one line per batch, department and day — no name, no voucher number.
+     *  Absent: person by person, as before. */
+    payrollByPerson?: boolean
   },
 ): Promise<Ledger[]> {
   const { codes, from, to } = args
+  const foldPayroll = args.payrollByPerson === false
+  // The names a salary voucher's text may give its department by.
+  const departmentsRead = foldPayroll
+    ? startedEarly(
+        Promise.resolve(supabase.from('departments').select('name')).then(({ data }) =>
+          new Set(((data ?? []) as Array<{ name: string }>).map((d) => d.name)),
+        ),
+      )
+    : null
 
   // ── 3 (started first): Period JEs with metadata for the description
   //    override — they need nothing from the accounts. ──
@@ -2157,10 +2227,27 @@ export async function fetchLedgers(
   const sourceRows = await sourcesRead
   const descOverrides = sourceDescriptionsFrom(sourceRows)
   const srcMeta = sourceMetaFrom(sourceRows)
+  // Salary vouchers, by the batch and department their lines fold into.
+  const foldByVoucher = new Map<string, { label: string; department: string }>()
+  if (departmentsRead) {
+    const departments = await departmentsRead
+    for (const v of sourceRows.vouchers) {
+      const fold = payrollFoldOf(v, departments)
+      if (fold) foldByVoucher.set(`payment_voucher:${v.id}`, fold)
+    }
+  }
 
   const jeById = new Map<
     string,
-    { entryNo: string; transactionDate: string; description: string; journalType: string; ref: string; segment: string }
+    {
+      entryNo: string
+      transactionDate: string
+      description: string
+      journalType: string
+      ref: string
+      segment: string
+      fold?: { label: string; department: string }
+    }
   >()
   for (const j of periodJes2) {
     const fallback = (j.description as string) ?? ''
@@ -2178,6 +2265,7 @@ export async function fetchLedgers(
         'JOURNAL',
       ref: meta?.ref || (j.entry_no as string),
       segment: (j.segment as string | null) ?? '',
+      fold: refKey ? foldByVoucher.get(refKey) : undefined,
     })
   }
 
@@ -2193,6 +2281,7 @@ export async function fetchLedgers(
     segment: string
     debit: number
     credit: number
+    fold?: { label: string; department: string }
   }
   const linesByCode = new Map<string, LineWithMeta[]>()
   for (const c of leafCodes) linesByCode.set(c, [])
@@ -2215,6 +2304,7 @@ export async function fetchLedgers(
         segment: je.segment,
         debit: Number(l.debit ?? 0),
         credit: Number(l.credit ?? 0),
+        fold: je.fold,
       })
     }
   }
@@ -2222,12 +2312,13 @@ export async function fetchLedgers(
   // ── 6: Build a Ledger per account. ──
   const out: Ledger[] = []
   for (const account of accounts) {
-    const rawByCode = linesByCode.get(account.code) ?? []
-    rawByCode.sort((a, b) => {
+    const sorted = linesByCode.get(account.code) ?? []
+    sorted.sort((a, b) => {
       if (a.entryDate !== b.entryDate) return a.entryDate.localeCompare(b.entryDate)
       if (a.entryNo !== b.entryNo) return (a.entryNo ?? '').localeCompare(b.entryNo ?? '')
       return a.id.localeCompare(b.id)
     })
+    const rawByCode = foldPayroll ? foldPayrollLedgerLines(sorted) : sorted
     const rawLines: RawLedgerLine[] = rawByCode.map((l) => ({
       entryDate: l.entryDate,
       entryNo: l.entryNo,
