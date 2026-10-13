@@ -33,6 +33,7 @@
 | — | Full time 編輯框的人員表和「Who gets each day」保持完整高度，面板捲動 | 你 2026-10-13：人員被切掉（手機端同樣的修正是 #348） |
 | — | Ads Performance 表格欄位可拖拉表頭右邊調寬窄，雙擊恢復；表頭每欄之間有淺色豎線 | 你 2026-10-13 要求 |
 | — | Appointment 加 RS 的月份選擇（「Oct 2026 ⌄」選月份）和 Week｜Month 切換（Month 是整月日曆，過去或關閉的日子劃掉） | 你 2026-10-13：跟 RS 一樣 |
+| — | **補畫面：Settings › Permissions**：每人一列，View（None/Own/All）、Edit（None/Own/All）、Manage（Off/On），選了立即生效；• 標出職稱預設；改過的人顯示「Changed for this person」和「Reset to title」；自己、Boss、full access 帳號鎖住。寫的是 People › Permissions 同一份個人權限，只動 CRM 那一列。變更記在 Settings › History。 | 你 2026-10-13 要求（Principal 和 Director 都能改） |
 | 20–23 | 聊天顯示整段對話（設計稿只畫一則）；輸入框可以打字送出；＋和相機可以傳檔；打字時麥克風變成送出 | 真功能 |
 | 24–25 | Ads Performance 的「Synced from Meta Ads · 9:00 am」改成「Meta Ads not connected yet」（灰點） | Meta 還沒接（等你確認），不能假裝已同步 |
 | — | 回覆框的提示字顏色 #757575 | portal 的全域樣式會把它變灰藍，已改回設計稿的顏色 |
@@ -69,6 +70,8 @@ Principal 和 Director 看到的是同一份設定（同一個資料庫，每 5 
 - `crm_slot_check`、`crm_save_details`、權限守門 trigger 都是從**正式環境的函式內容**改寫（md5 已核對）。
 - 本機 PGlite 測試：`tests/member-sql/validate-crm-desktop.mjs`（33 項），其他 CRM 測試全部通過。
 - 程式在 migration 套用前也能正常開（新欄位/新表讀不到就當作空的）。
+
+- **權限控制台**（`supabase/migrations/20261014010000_crm_access_console.sql`）：`crm_access_list`、`crm_set_access`、`crm_access_history`，都要 CRM · Manage；只寫 `user_permission_cells` 的 `crm` 列；不能改自己、Boss、Principal 範本的人。
 
 ## 5. 還沒接 / 等你
 

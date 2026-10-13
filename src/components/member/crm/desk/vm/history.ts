@@ -39,8 +39,17 @@ export function words(field: string, v: unknown, nameOf: (id: string) => string)
   return String(v);
 }
 
+const ACCESS_WORD: Record<string, string> = { own: "Own", all: "All" };
+/** A permission change (crm_access_history): the person, and the CRM action from → to; no row = follows the title. */
+const accessRow = (r: CrmHistoryRow): HistRow => {
+  const action = String((r.after ?? r.before ?? {}).action ?? ""), w = (row: Record<string, unknown> | null) => (!row ? "Title" : ACCESS_WORD[String(row.scope)] ?? "None");
+  return { at: r.at, who: r.who, table: r.table, op: r.op, what: r.key || "—",
+    changes: [{ field: `CRM · ${action.charAt(0).toUpperCase()}${action.slice(1)}`, from: w(r.op === "INSERT" ? null : r.before), to: w(r.op === "DELETE" ? null : r.after) }] };
+};
+
 export function historyRows(rows: CrmHistoryRow[], nameOf: (id: string) => string): HistRow[] {
   return rows.map(r => {
+    if (r.table === "crm_access") return accessRow(r);
     const row = r.after ?? r.before ?? {};
     const label = (row.name ?? row.ad_label ?? (row.staff_id ? nameOf(String(row.staff_id)) : row.tl_id ? `${nameOf(String(row.tl_id))}'s team` : null) ?? r.key) as string;
     const fields = r.op === "UPDATE" ? r.changed : Object.keys(row);

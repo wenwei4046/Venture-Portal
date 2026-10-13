@@ -1,5 +1,6 @@
 H
 W
+access
 ad
 adByTeam
 adCards
@@ -210,6 +211,7 @@ infoChat
 insAdCols
 insAdMinW
 insHead
+isAccessOp
 isAdsOp
 isCenter
 isCltOp

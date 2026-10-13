@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for the CRM desktop (CRM Desktop rev 1, 2026-10-13, mig 20261013100000).
+// Local PostgreSQL regression for the CRM desktop (CRM Desktop rev 1, 2026-10-13, migs 20261013100000 / 20261014010000).
 // Every CRM migration runs VERBATIM; under test: the journey events, reminders, deleted notifications,
 // showroom photo and map links, closures for some hours, forms, Customer info answers and notes,
 // each asking who may. No live I/O.
@@ -23,7 +23,15 @@ await db.exec(`
   grant usage on schema auth to anon, authenticated, service_role;
   grant execute on function auth.uid() to anon, authenticated, service_role;
   create table public.users (id uuid primary key, is_active boolean not null default true, role text);
-  create table public.titles (id uuid primary key, name text);
+  create table public.titles (id uuid primary key, name text, template_id uuid);
+  -- The permission matrix, as far as the CRM's console reads and writes it (mig 20261014010000).
+  create table public.permission_templates (id uuid primary key, name text, base_role text);
+  create table public.permission_template_grants (template_id uuid, function_key text, action text, scope text);
+  create table public.user_permission_cells (user_id uuid, function_key text, action text, scope text, updated_at timestamptz default now(), updated_by uuid,
+    primary key (user_id, function_key, action));
+  create function public.permission_cell_is_valid(p_function text, p_action text, p_scope text) returns boolean language sql stable as $$
+    select p_function = 'crm' and p_action in ('view', 'edit', 'manage') and (p_scope is null or p_scope in ('own', 'all')) $$;
+  create table public.audit_events (id bigserial primary key, occurred_at timestamptz default now(), actor_id uuid, table_name text, op text, old_row jsonb, new_row jsonb);
   create table public.hr_staff_costs (
     id uuid primary key, employee_name text, user_id uuid references public.users(id),
     title_id uuid references public.titles(id), reports_to uuid references public.hr_staff_costs(id), status text not null default 'active');
@@ -145,5 +153,28 @@ await as('ann', `select public.crm_add_note($1, 'Wants a sofa bed')`, [cA])
 await as('boss', `select public.crm_add_note($1, 'Call after 6')`, [cA])
 check((await as('tla', `select body from crm_notes`)).map(r => r.body).sort(), ['Call after 6', 'Wants a sofa bed'], 'her TL reads them')
 check((await as('ben', `select count(*)::int as n from crm_notes`))[0].n, 0, 'Ben does not')
+
+// The permissions console (mig 20261014010000): CRM · Manage changes another person's CRM row, never their own,
+// the Boss's or a Principal template's; only the CRM's cells.
+await q(`insert into permission_templates values ('00000000-0000-4000-8000-0000000000a1', 'Revenue Team', 'revenue_member'), ('00000000-0000-4000-8000-0000000000a2', 'Ultimate full access', 'principal')`)
+await q(`update titles set template_id = '00000000-0000-4000-8000-0000000000a1' where name in ('rs', 'tl', 'ta', 'hod')`)
+await q(`update titles set template_id = '00000000-0000-4000-8000-0000000000a2' where name = 'boss'`)
+await q(`insert into permission_template_grants values ('00000000-0000-4000-8000-0000000000a1', 'crm', 'view', 'own'), ('00000000-0000-4000-8000-0000000000a1', 'crm', 'edit', 'own')`)
+await q(`insert into user_permission_cells (user_id, function_key, action, scope) values ($1, 'treasury', 'view', 'all')`, [id('u', 'ann')])
+const cellsOf = async who => q(`select function_key, action, scope from user_permission_cells where user_id = $1 order by function_key, action`, [id('u', who)])
+await refused('ann', `select public.crm_set_access($1, 'all', 'own', 'none')`, [S('ben')], /may not/, 'a salesperson may not change permissions')
+await refused('hod', `select public.crm_set_access($1, 'all', 'all', 'all')`, [S('hod')], /Your own/, 'never on oneself')
+await refused('hod', `select public.crm_set_access($1, 'none', 'none', 'none')`, [S('boss')], /Full access/, 'never on the Boss')
+await refused('hod', `select public.crm_set_access($1, 'all', 'own', 'own')`, [S('ann')], /Choose title, none, own or all/, 'Manage is none or all')
+await as('hod', `select public.crm_set_access($1, 'all', 'title', 'none')`, [S('ann')])
+check(await cellsOf('ann'),
+  [{ function_key: 'crm', action: 'manage', scope: null }, { function_key: 'crm', action: 'view', scope: 'all' }, { function_key: 'treasury', action: 'view', scope: 'all' }],
+  'View all and Manage taken away for Ann; Edit follows her title; her other cells untouched')
+await as('boss', `select public.crm_set_access($1, 'title', 'title', 'title')`, [S('ann')])
+check((await cellsOf('ann')).map(r => r.function_key), ['treasury'], 'back to her title')
+const list = (await as('boss', `select public.crm_access_list() as l`))[0].l
+const row = who => list.find(r => r.staffId === S(who))
+check([row('ann')?.locked ?? null, row('ann')?.tpl, row('boss')?.locked], [null, { view: 'own', edit: 'own' }, 'Your own'], 'the list: the title cells, and who is locked')
+await refused('tla', `select public.crm_access_list()`, [], /may not/, 'a team leader does not see the console')
 
 console.log(`crm desktop: ${checks} checks passed`)
