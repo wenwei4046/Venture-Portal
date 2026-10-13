@@ -4,14 +4,17 @@
 // person or narrows down to one:
 //
 //   payroll_disbursement      one per person — the payee and their net pay
+//                             (HR Payment's "Manual generate"; "Generate by
+//                             Department" makes one per department)
 //   payroll_statutory         one per body per department — "KWSP — Sep 2026
 //                             payroll (IT · 1 staff)"
 //   payroll_payment_request   the transfer that funds a department's payroll
 //
 // An account without `payroll_payouts` (lib/roles.ts canSeePayrollPayouts)
-// gets them as totals: one line per batch, which does not open. The folding
-// happens on the SERVER — a page takes these vouchers out of what it sends and
-// puts the lines in their place — so no member reaches the browser.
+// gets them as totals: one line per batch, and inside it one line per
+// department (2026-10-13) — none of which opens. The folding happens on the
+// SERVER — a page takes these vouchers out of what it sends and puts the lines
+// in their place — so no member reaches the browser.
 //
 // (user 2026-10-02: "我现在有 finance executive 了，我不希望他看到 payroll
 // detail，也就是每个人的 payout".)
@@ -67,8 +70,8 @@ export interface PayrollVoucherLike {
  *   "KWSP — Sep 2026 payroll (HR · 3 staff)"        → "KWSP Sep 2026"
  *   "Payroll bank transfer — Aug 2026 (Marketing)"  → "Payroll bank transfer Aug 2026"
  *
- * Everything after the dash is dropped except a leading month, so a
- * department with one person in it does not get a line of its own.
+ * Everything after the dash is dropped except a leading month: the batch is
+ * the month's, and its departments are lines inside it (payrollDepartmentOf).
  */
 export function payrollBatchLabel(v: PayrollVoucherLike): string {
   const kind = v.reference_type ?? ''
@@ -85,10 +88,88 @@ export function payrollBatchLabel(v: PayrollVoucherLike): string {
   return month ? `${head} ${month}` : head
 }
 
-/** One payroll batch as an account without `payroll_payouts` sees it. */
-export interface LockedBatch {
-  /** "Payroll disbursement Sep 2026" — unique, so also the React key. */
-  label: string
+// ── By department (2026-10-13) ──────────────────────────────────────────────
+//
+// The user, looking at the salary vouchers one by one: "他们本来是不能看到这些员工
+// salary 的。现在他们就算能看到 pv，应该也是看到 by 整个部门才对". So a locked batch
+// is not one bare total: inside it stands one line per department — its total,
+// how many vouchers, where they stand. Never who.
+//
+// Where each voucher's money went is read off the text the payroll RPCs write,
+// and a name is used only when the departments table knows it: whatever else
+// stands in that place may be part of a person's name.
+
+/** Payroll's own groups beside the departments table's names. */
+export const DIRECTORS = 'Directors'
+const WHOLE_PAYROLL: Record<string, string> = {
+  staff: 'All staff',
+  directors: DIRECTORS,
+  'staff + directors': 'All staff + directors',
+}
+/** A department the text does not name in a shape known here. */
+export const OTHER_DEPARTMENT = 'Other'
+/** A funding transfer for the month as a whole. */
+export const ALL_DEPARTMENTS = 'All departments'
+
+function knownDepartment(candidate: string | undefined, departments: ReadonlySet<string>): string | null {
+  const c = candidate?.trim()
+  if (!c) return null
+  if (departments.has(c)) return c
+  if (c === DIRECTORS) return DIRECTORS
+  return WHOLE_PAYROLL[c.toLowerCase()] ?? null
+}
+
+/** "… (HR · 3 people)" → "HR · 3 people"; the last bracket, so a person's own bracket never counts. */
+const lastBracket = (text: string) => /\(([^()]+)\)$/.exec(text)?.[1]
+
+/**
+ * The department a payroll voucher paid, by what its own text says:
+ *
+ *   "Payroll net Sep 2026 — <person> (Marketing)"                → Marketing
+ *   "Payroll disbursement Sep 2026 — Marketing · net · 12 staff"  → Marketing
+ *   "Director salary Sep 2026 — <person>"                        → Directors
+ *   "KWSP — Aug 2026 payroll (HR · 3 people)"                    → HR
+ *   "KWSP (EPF) — Jun 2026 payroll — Finance"                    → Finance
+ *   "SOCSO — Jul 2026 payroll (staff + directors)"               → All staff + directors
+ *   "Payroll bank transfer — Aug 2026"                           → All departments
+ *
+ * Anything else is "Other" — never the text itself.
+ */
+export function payrollDepartmentOf(v: PayrollVoucherLike, departments: ReadonlySet<string>): string {
+  const kind = v.reference_type ?? ''
+  const description = (v.description ?? '').trim()
+  const dash = description.indexOf(' — ')
+  const head = dash > 0 ? description.slice(0, dash).trim() : description
+  const tail = dash > 0 ? description.slice(dash + 3).trim() : ''
+  if (kind === 'payroll_disbursement') {
+    if (/^Director salar(?:y|ies)\b/.test(head)) return DIRECTORS
+    if (!tail) return OTHER_DEPARTMENT
+    // One person's voucher names their department last; a department's
+    // voucher ("Generate by Department") starts with it.
+    return (
+      knownDepartment(lastBracket(tail), departments) ??
+      knownDepartment(tail.includes(' · ') ? tail.split(' · ')[0] : undefined, departments) ??
+      OTHER_DEPARTMENT
+    )
+  }
+  if (kind === 'payroll_statutory') {
+    if (!tail) return OTHER_DEPARTMENT
+    const lastDash = tail.lastIndexOf(' — ')
+    return (
+      knownDepartment(lastBracket(tail)?.split(' · ')[0], departments) ??
+      knownDepartment(lastDash >= 0 ? tail.slice(lastDash + 3) : undefined, departments) ??
+      OTHER_DEPARTMENT
+    )
+  }
+  if (kind === 'payroll_payment_request') {
+    if (/^Director salary\b/.test(head)) return DIRECTORS
+    return knownDepartment(lastBracket(tail), departments) ?? ALL_DEPARTMENTS
+  }
+  return OTHER_DEPARTMENT
+}
+
+/** What a set of payroll vouchers comes to: how many, how much, where they stand. */
+export interface PayrollTally {
   count: number
   /** Of the vouchers that are not voided. */
   total: number
@@ -96,8 +177,25 @@ export interface LockedBatch {
   latest: string
   /** "26 paid" · "20 paid · 6 pending approval". */
   statusText: string
-  // What the ledger's filters ask of a batch:
+  /** How many in each status — summed again when lines are put together. */
+  statusCounts: Record<string, number>
   statuses: string[]
+}
+
+/** One department's line inside a locked batch. */
+export interface DepartmentLine extends PayrollTally {
+  department: string
+}
+
+/** One payroll batch as an account without `payroll_payouts` sees it. */
+export interface LockedBatch extends PayrollTally {
+  /** "Payroll disbursement Sep 2026" — unique, so also the React key. */
+  label: string
+  /** The kind of voucher it holds (payroll_disbursement for the Payroll batches tab). */
+  referenceType: string
+  /** Department by department, the largest total first. */
+  departments: DepartmentLine[]
+  // What the ledger's filters ask of a batch:
   voucherType: string
   firstCreated: string
   lastCreated: string
@@ -105,8 +203,36 @@ export interface LockedBatch {
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
-/** Fold payroll vouchers into their batches, newest first. */
-export function lockPayrollBatches(vouchers: PayrollVoucherLike[]): LockedBatch[] {
+/** "12 paid · 1 pending approval" — the most first, then by name. */
+export function statusTextOf(counts: Record<string, number>, word: (status: string) => string = (s) => s.replace('_', ' ')): string {
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([s, n]) => `${n} ${word(s)}`)
+    .join(' · ')
+}
+
+function tally(members: PayrollVoucherLike[]): PayrollTally {
+  const statusCounts: Record<string, number> = {}
+  for (const m of members) statusCounts[m.status] = (statusCounts[m.status] ?? 0) + 1
+  return {
+    count: members.length,
+    total: r2(members.filter((m) => m.status !== 'voided').reduce((s, m) => s + Number(m.amount), 0)),
+    latest: members.reduce((d, m) => {
+      const at = m.payment_date ?? m.created_at
+      return at > d ? at : d
+    }, ''),
+    statusText: statusTextOf(statusCounts),
+    statusCounts,
+    statuses: Object.keys(statusCounts),
+  }
+}
+
+/**
+ * Fold payroll vouchers into their batches, newest first, each with its
+ * departments. `departments` is every department's name (the departments
+ * table) — a department the text names that is not in it stands as "Other".
+ */
+export function lockPayrollBatches(vouchers: PayrollVoucherLike[], departments: ReadonlySet<string> = new Set()): LockedBatch[] {
   const byLabel = new Map<string, PayrollVoucherLike[]>()
   for (const v of vouchers) {
     const label = payrollBatchLabel(v)
@@ -115,22 +241,21 @@ export function lockPayrollBatches(vouchers: PayrollVoucherLike[]): LockedBatch[
     else byLabel.set(label, [v])
   }
   const batches = [...byLabel.entries()].map(([label, members]): LockedBatch => {
-    const counts = new Map<string, number>()
-    for (const m of members) counts.set(m.status, (counts.get(m.status) ?? 0) + 1)
     const created = members.map((m) => m.created_at).sort()
+    const byDepartment = new Map<string, PayrollVoucherLike[]>()
+    for (const m of members) {
+      const department = payrollDepartmentOf(m, departments)
+      const list = byDepartment.get(department)
+      if (list) list.push(m)
+      else byDepartment.set(department, [m])
+    }
     return {
       label,
-      count: members.length,
-      total: r2(members.filter((m) => m.status !== 'voided').reduce((s, m) => s + Number(m.amount), 0)),
-      latest: members.reduce((d, m) => {
-        const at = m.payment_date ?? m.created_at
-        return at > d ? at : d
-      }, ''),
-      statusText: [...counts.entries()]
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .map(([s, n]) => `${n} ${s.replace('_', ' ')}`)
-        .join(' · '),
-      statuses: [...counts.keys()],
+      ...tally(members),
+      referenceType: members[0].reference_type ?? '',
+      departments: [...byDepartment.entries()]
+        .map(([department, inIt]): DepartmentLine => ({ department, ...tally(inIt) }))
+        .sort((a, b) => b.total - a.total || a.department.localeCompare(b.department)),
       voucherType: members[0].voucher_type ?? '',
       firstCreated: created[0],
       lastCreated: created[created.length - 1],

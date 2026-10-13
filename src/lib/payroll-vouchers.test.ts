@@ -5,11 +5,15 @@ import {
   isPayrollReference,
   lockPayrollBatches,
   payrollBatchLabel,
+  payrollDepartmentOf,
   poolRowVoucherNo,
   type LedgerFilters,
   type PayrollVoucherLike,
   type PoolRowLike,
 } from './payroll-vouchers'
+
+/** The departments table's names (production, 2026-10-13). */
+const DEPTS = new Set(['Director', 'Director Office', 'Finance', 'HR', 'IT', 'Marketing', 'Revenue Department', 'Venture Office'])
 
 const pv = (over: Partial<PayrollVoucherLike>): PayrollVoucherLike => ({
   reference_type: 'payroll_disbursement',
@@ -64,6 +68,55 @@ describe('payrollBatchLabel', () => {
   })
 })
 
+describe('payrollDepartmentOf', () => {
+  const dept = (over: Partial<PayrollVoucherLike>) => payrollDepartmentOf(pv(over), DEPTS)
+
+  it('one person’s salary voucher: the department it names last — never the person', () => {
+    expect(dept({ description: 'Payroll net Sep 2026 — Aina binti Example (Marketing)' })).toBe('Marketing')
+    expect(dept({ description: 'Payroll disbursement Aug 2026 — Bala (Director Office)' })).toBe('Director Office')
+    expect(dept({ description: 'Payroll commission Sep 2026 — Chong (Revenue Department)' })).toBe('Revenue Department')
+    // A bracket of the person's own is not a department.
+    expect(dept({ description: 'Payroll net Sep 2026 — Tan Ah Kow (Kelvin) (IT)' })).toBe('IT')
+    expect(dept({ description: 'Payroll net Sep 2026 — Tan Ah Kow (Kelvin)' })).toBe('Other')
+  })
+
+  it('a department’s own voucher (Generate by Department)', () => {
+    expect(dept({ description: 'Payroll disbursement Sep 2026 — Marketing · net · 12 staff' })).toBe('Marketing')
+    expect(dept({ description: 'Payroll disbursement Sep 2026 — IT · commission · 1 staff' })).toBe('IT')
+  })
+
+  it('directors are one group, however their vouchers were made', () => {
+    expect(dept({ description: 'Director salary Sep 2026 — A Director' })).toBe('Directors')
+    expect(dept({ description: 'Director salaries Sep 2026 — Directors · net · 4 directors' })).toBe('Directors')
+  })
+
+  it('a statutory voucher: its department, in each shape it has been written', () => {
+    const statutory = (description: string) => dept({ reference_type: 'payroll_statutory', description })
+    expect(statutory('KWSP — Aug 2026 payroll (HR · 3 people)')).toBe('HR')
+    expect(statutory('EIS — Aug 2026 payroll (Directors · 4 people)')).toBe('Directors')
+    expect(statutory('KWSP (EPF) — Jun 2026 payroll — Director Office')).toBe('Director Office')
+    expect(statutory('SOCSO — Jun 2026 payroll (staff)')).toBe('All staff')
+    expect(statutory('LHDN (PCB) — Jun 2026 payroll (directors)')).toBe('Directors')
+    expect(statutory('SKBBK — Jul 2026 payroll (staff + directors)')).toBe('All staff + directors')
+  })
+
+  it('a funding transfer: the whole month, or the directors’', () => {
+    const transfer = (description: string) => dept({ reference_type: 'payroll_payment_request', description })
+    expect(transfer('Payroll bank transfer — Aug 2026')).toBe('All departments')
+    expect(transfer('Payroll bank transfer — Jun 2026 (partial)')).toBe('All departments')
+    expect(transfer('Payroll bank transfer — Sep 2026 (IT)')).toBe('IT')
+    expect(transfer('Director salary bank transfer — Aug 2026')).toBe('Directors')
+  })
+
+  it('text in no known shape is "Other" — never the text, which may be the only place a name is', () => {
+    expect(dept({ description: 'Salary for Aina binti Example' })).toBe('Other')
+    expect(dept({ description: null })).toBe('Other')
+    expect(dept({ description: 'Payroll net Sep 2026 — Aina binti Example' })).toBe('Other')
+    expect(dept({ reference_type: 'payroll_statutory', description: 'EPF top-up — Bala' })).toBe('Other')
+    expect(dept({ reference_type: 'loan', description: 'Payroll net Sep 2026 — Aina (HR)' })).toBe('Other')
+  })
+})
+
 describe('lockPayrollBatches', () => {
   it('one line per batch: how many, how much, and where they stand', () => {
     const batches = lockPayrollBatches([
@@ -93,17 +146,46 @@ describe('lockPayrollBatches', () => {
     expect(batch.statusText).toBe('1 paid · 1 voided')
   })
 
-  it('departments of one body and month fold together, so a one-person department has no line of its own', () => {
+  it('departments of one body and month fold into one batch, with a line for each department inside it', () => {
     const kwsp = { reference_type: 'payroll_statutory', voucher_type: 'expense', payment_date: '2026-09-15' }
     const batches = lockPayrollBatches([
       pv({ ...kwsp, description: 'KWSP — Sep 2026 payroll (IT · 1 staff)', amount: 1014 }),
       pv({ ...kwsp, description: 'KWSP — Sep 2026 payroll (HR · 3 staff)', amount: 3081 }),
       pv({ ...kwsp, description: 'SOCSO — Sep 2026 payroll (IT · 1 staff)', amount: 95.6 }),
-    ])
+    ], DEPTS)
     expect(batches.map((b) => [b.label, b.count, b.total])).toEqual([
       ['KWSP Sep 2026', 2, 4095],
       ['SOCSO Sep 2026', 1, 95.6],
     ])
+    expect(batches[0].departments.map((d) => [d.department, d.count, d.total])).toEqual([
+      ['HR', 1, 3081],
+      ['IT', 1, 1014],
+    ])
+  })
+
+  // 2026-10-13 — the user: "就算能看到 pv，应该也是看到 by 整个部门才对".
+  it('inside a salary batch, one line per department — the largest first, and nobody’s name', () => {
+    const [batch] = lockPayrollBatches([
+      pv({ description: 'Payroll net Sep 2026 — Aina binti Example (Marketing)', amount: 3000 }),
+      pv({ description: 'Payroll net Sep 2026 — Bala (Marketing)', amount: '2500.50', status: 'pending_approval', payment_date: null }),
+      pv({ description: 'Payroll net Sep 2026 — Chong (IT)', amount: 4000 }),
+      pv({ description: 'Payroll net Sep 2026 — Devi (IT)', amount: 900, status: 'voided' }),
+    ], DEPTS)
+    expect(batch).toMatchObject({ label: 'Payroll net Sep 2026', count: 4, total: 9500.5, referenceType: 'payroll_disbursement' })
+    expect(batch.departments.map((d) => [d.department, d.count, d.total, d.statusText])).toEqual([
+      ['Marketing', 2, 5500.5, '1 paid · 1 pending approval'],
+      ['IT', 2, 4000, '1 paid · 1 voided'],
+    ])
+    expect(batch.departments[0].statusCounts).toEqual({ paid: 1, pending_approval: 1 })
+    expect(JSON.stringify(batch)).not.toMatch(/Aina|Bala|Chong|Devi/)
+  })
+
+  it('directors are one line of their own', () => {
+    const [batch] = lockPayrollBatches([
+      pv({ description: 'Director salary Sep 2026 — A Director', amount: 10000 }),
+      pv({ description: 'Director salary Sep 2026 — B Director', amount: 12000 }),
+    ], DEPTS)
+    expect(batch.departments.map((d) => [d.department, d.count, d.total])).toEqual([['Directors', 2, 22000]])
   })
 
   it('newest batch first', () => {
