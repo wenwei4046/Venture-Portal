@@ -33,7 +33,7 @@ function fmt(n: number): string {
   return n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function poolLabel(key: string): string {
+function poolLabel(key: string, deptName?: string): string {
   switch (key) {
     case 'dept_pool_hr':
       return 'HR Department Pool'
@@ -46,7 +46,10 @@ function poolLabel(key: string): string {
     case 'dept_pool_director':
       return 'Director Department Pool'
     default:
-      return key
+      // A department HR picked for HOUZS Venture's director share (IT, Revenue
+      // Department, Venture Office …) — named by the department the row reads.
+      if (!deptName) return key
+      return /department$/i.test(deptName) ? `${deptName} Pool` : `${deptName} Department Pool`
   }
 }
 
@@ -225,7 +228,7 @@ export default function GeneratePvForm({
                   className={'border-b border-hairline last:border-0 ' + (done ? 'opacity-60' : '')}
                 >
                   <td className="py-2 px-3">
-                    <div className="font-serif text-ink">{poolLabel(row.pool_key)}</div>
+                    <div className="font-serif text-ink">{poolLabel(row.pool_key, row.dept_name)}</div>
                     <div className="font-mono text-[10px] text-muted uppercase tracking-wider">
                       {row.dept_name}
                       {overdrawKeys.has(row.pool_key) ? (
@@ -304,7 +307,7 @@ export default function GeneratePvForm({
       {summary.overCommitRows.length > 0 ? (
         <div className="font-serif italic text-danger text-xs">
           Can&apos;t fund more than a department still owes:{' '}
-          {summary.overCommitRows.map(r => poolLabel(r.pool_key)).join(', ')}.
+          {summary.overCommitRows.map(r => poolLabel(r.pool_key, r.dept_name)).join(', ')}.
         </div>
       ) : null}
       {summary.sumInput > summary.remainingBefore + 0.005 ? (
@@ -314,7 +317,7 @@ export default function GeneratePvForm({
       ) : null}
       {summary.overCommitRows.length === 0 && summary.overdrawRows.length > 0 ? (
         <div className="font-serif italic text-alert text-xs">
-          {summary.overdrawRows.map(r => poolLabel(r.pool_key)).join(', ')} will go negative (预支) —
+          {summary.overdrawRows.map(r => poolLabel(r.pool_key, r.dept_name)).join(', ')} will go negative (预支) —
           allowed; the pool is topped up later by billing.
         </div>
       ) : null}

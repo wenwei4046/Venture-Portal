@@ -74,9 +74,11 @@ export interface BatchCTCInput {
 
 /**
  * HOUZS Venture's own row of the Pool Breakdown (2026-10-13) and the
- * departments that pay it — director_hv_share_save keeps both and puts the
- * share with Finance. All zero clears the month's share; `null` leaves it as
- * it is (nothing typed, or Finance has transferred it).
+ * departments that pay it — director_hv_share_save keeps both; the payroll
+ * batch that carries the month's directors carries the share too (its funding
+ * asks those departments' pools, its accruals book their parts). All zero
+ * clears the month's share; `null` leaves it as it is (nothing typed, or a
+ * batch carries it).
  */
 export interface HvShareInput {
   basic: number
@@ -112,8 +114,8 @@ export async function batchSaveCTC(
   }
 
   // HOUZS Venture's share first: its refusals are the ones HR acts on (a split
-  // that does not add up, a transfer Finance has to undo first), and nothing of
-  // the subsidiaries' is written until it stands.
+  // that does not add up, a batch Finance has to send back first), and nothing
+  // of the subsidiaries' is written until it stands.
   if (hv) {
     const money = (n: number | undefined) => Math.round(Number(n ?? 0) * 100) / 100
     const { error: hvErr } = await supabase.rpc('director_hv_share_save', {
@@ -133,8 +135,6 @@ export async function batchSaveCTC(
       ),
     })
     if (hvErr) return { ok: false, reason: hvErr.message }
-    revalidatePath('/payments/dept-requests')
-    revalidatePath('/payments')
   }
 
   // An all-zero row is an explicit "this company has no CTC this month" —

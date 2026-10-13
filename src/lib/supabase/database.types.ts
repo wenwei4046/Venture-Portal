@@ -8301,7 +8301,6 @@ export type Database = {
         Args: { p_period: string }
         Returns: Json
       }
-      director_hv_share_queue: { Args: never; Returns: Json }
       director_hv_share_save: {
         Args: {
           p_period: string
@@ -8315,14 +8314,6 @@ export type Database = {
           p_split_mode: string
           p_lines: Json
         }
-        Returns: Json
-      }
-      director_hv_share_transfer: {
-        Args: { p_share_id: string; p_date: string }
-        Returns: Json
-      }
-      director_hv_share_undo: {
-        Args: { p_share_id: string }
         Returns: Json
       }
       get_payroll_accrual_totals_for: {

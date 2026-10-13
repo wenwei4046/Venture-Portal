@@ -13,7 +13,14 @@
 // rounding leaves goes to the biggest percentage (the first of equals).
 
 export type HvSplitMode = 'amount' | 'percent'
-export type HvShareStatus = 'with_finance' | 'transferred'
+/**
+ * open: HR's, waiting for the payroll batch that carries the month's directors.
+ * in_payroll: carried by that batch (2026-10-13 — "直接变成 payroll … 由正常的
+ * HR payroll 那边去进行"): its funding asks the departments' pools for their
+ * parts, its accruals book them in their segments; locked until Finance sends
+ * the batch back.
+ */
+export type HvShareStatus = 'open' | 'in_payroll'
 
 export interface HvDepartment {
   id: string
@@ -30,11 +37,6 @@ export interface HvShareLine {
   amount: number
   /** The percentage HR typed, when the split was by percentage. */
   pct: number | null
-  /** What Finance's transfer wrote for this department (none for the Director department's own line). */
-  invoiceId: string | null
-  invoiceNo: string | null
-  voucherId: string | null
-  voucherNo: string | null
 }
 
 export interface HvShareComponents {
@@ -55,11 +57,12 @@ export interface HvShare {
   status: HvShareStatus
   submittedAt: string | null
   submittedBy: string | null
-  transferredAt: string | null
-  transferDate: string | null
-  transferredBy: string | null
+  /** The payroll batch that carries it, once it does. */
+  batchId: string | null
+  batchNo: number | null
+  batchSubmittedAt: string | null
   lines: HvShareLine[]
-  /** HR's grid reads them; Finance's list carries the total only. */
+  /** The Basic / KPI / Allowance and employer statutory HR keyed. */
   components: HvShareComponents | null
 }
 
@@ -98,10 +101,6 @@ export function readHvShare(raw: unknown): HvShare | null {
           stays: l.stays === true,
           amount: num(l.amount),
           pct: l.pct == null ? null : num(l.pct),
-          invoiceId: str(l.invoice_id),
-          invoiceNo: str(l.invoice_no),
-          voucherId: str(l.voucher_id),
-          voucherNo: str(l.voucher_no),
         }]
       })
     : []
@@ -110,12 +109,12 @@ export function readHvShare(raw: unknown): HvShare | null {
     periodMonth: str(o.period_month) ?? '',
     totalCtc: num(o.total_ctc),
     splitMode: o.split_mode === 'percent' ? 'percent' : 'amount',
-    status: o.status === 'transferred' ? 'transferred' : 'with_finance',
+    status: o.status === 'in_payroll' ? 'in_payroll' : 'open',
     submittedAt: str(o.submitted_at),
     submittedBy: str(o.submitted_by),
-    transferredAt: str(o.transferred_at),
-    transferDate: str(o.transfer_date),
-    transferredBy: str(o.transferred_by),
+    batchId: str(o.batch_id),
+    batchNo: o.batch_no == null ? null : num(o.batch_no),
+    batchSubmittedAt: str(o.batch_submitted_at),
     lines,
     components: 'basic' in o
       ? {

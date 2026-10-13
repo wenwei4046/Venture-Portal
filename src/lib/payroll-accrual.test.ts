@@ -1,5 +1,20 @@
 import { describe, it, expect } from 'vitest'
-import { batchAccrualSums, buildAccrualLines, sumPayrollRows, accrualTotal, type AccrualSums } from './payroll-accrual'
+import { batchAccrualSums, buildAccrualLines, sumPayrollRows, accrualTotal, segmentLabel, type AccrualSums } from './payroll-accrual'
+
+// HOUZS Venture's director share puts Venture Office's part in segment
+// 'corporate' (mig 20261013233000); the E2E of 2026-10-13 posted it as
+// "corporate Salary - Dec'27 · batch #1" before Venture Office had a label.
+describe('segmentLabel', () => {
+  it('names every segment a payroll batch books, Venture Office’s included', () => {
+    expect(['hr', 'finance', 'marketing', 'director_office', 'director', 'it', 'revenue_department', 'corporate'].map(segmentLabel)).toEqual([
+      'HR', 'Finance', 'Marketing', 'Director Office', 'Director', 'IT', 'Revenue Department', 'Venture Office',
+    ])
+  })
+
+  it('keeps a segment it does not know as it is', () => {
+    expect(segmentLabel('treasury')).toBe('treasury')
+  })
+})
 
 // June Finance — the known-good fixture, verified to the sen against the
 // manually-booked JE-202606-0228.

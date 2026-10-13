@@ -1,21 +1,28 @@
-// Local PostgreSQL regression for 20261013170000 (2026-10-13, Director Salary:
-// HOUZS Venture's own share — the user: "i want add on houzs venture itself in
-// this as well. but when press save, once detech venture itself got pay, will
-// need to select the amount is deduct from which department. then can pick more
-// than 2 department as well, by amount or percentage from the total amount.
-// then confirm so that finance will get the submittion to make the inter
-// transfer fund" — "make sure all department, can be seleceted"). The migration
-// runs VERBATIM over stand-ins for what it reads and writes — the roster, the
-// departments, the invoices, receipts and their source rows, the dept pools,
-// the journal, the statutory lookups, the permission check and the tab guard;
-// the triggers and helpers it leans on are production's bodies (read off
-// pg_proc on 2026-10-13). What is under test: HR's save (by amount, by
-// percentage with the rounding on the biggest line, every refusal), Finance's
-// transfer (per paying department an invoice dated the payroll month's last
-// day, its two journals, a receipt by netting, the pools), the Director
-// department's line moving nothing, HR's lock after a transfer, Undo (voided,
-// reversed in pairs, the pools back), the locked months, and who may call
-// what. No live I/O.
+// Local PostgreSQL regression for HOUZS Venture's own share of the directors'
+// CTC (Director Salary's Pool Breakdown, 2026-10-13): 20261013170000 as it
+// first shipped, then 20261013233000, which makes the share PAYROLL — the user,
+// the same day: "应该是直接转出去，就是 payout 出去 payroll 才对 … 不是转入 direct
+// pool，而是直接变成 payroll。当然，这个 payroll 是由正常的 HR payroll 那边去进行，
+// 它不会去到 finance 那边", and, shown October's figures (Director pool RM 85,750 ·
+// Marketing RM 7,500 · Revenue RM 4,500 · Venture Office RM 2,250, no invoice,
+// no transfer, each department's part on its own P&L): "对，就是这样".
+//
+// Both migrations run VERBATIM over stand-ins for what they read and write —
+// the roster, the departments, the invoices and receipts 170000 still names,
+// the dept pools, the journal, the statutory lookups, the permission checks,
+// the payroll's batches, their lines and funding requests; the three functions
+// 233000 swaps a statement of are production's bodies, loaded from the
+// migrations that hold them as production runs them (md5 checked). What is
+// under test: a transferred share stops the migration and an open one waits
+// again; HR's save (by percentage with the rounding on the biggest line, by
+// amount, every refusal); the batch that carries the month's directors
+// carrying the share (not a staff-only batch, not a top-up, never more than
+// the directors' payroll), HR's lock while it does, Finance's funding
+// breakdown (each department HR picked, the Director pool that much less),
+// the accrual figures a segment (each part's CTC exact, every JV balanced,
+// nothing lost), the pools drained — Venture Office's by its name —, Finance
+// sending the batch back, the directors gone without it, the locked months,
+// and who may call what. No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
@@ -25,7 +32,8 @@ const migrations = new URL('../../supabase/migrations/', import.meta.url)
 const q = async (sql, params = []) => (await db.query(sql, params)).rows
 const one = async (sql, params = []) => Object.values((await q(sql, params))[0])[0]
 const id = v => `00000000-0000-4000-8000-${String(v).padStart(12, '0')}`
-const load = async f => db.exec((await readFile(new URL(f, migrations), 'utf8')).replace(/\r\n/g, '\n'))
+const lf = text => text.replace(/\r\n/g, '\n')
+const load = async f => db.exec(lf(await readFile(new URL(f, migrations), 'utf8')))
 
 let checks = 0
 const check = (actual, expected, what) => {
@@ -37,6 +45,16 @@ const reject = async (sql, params, pattern, what) => {
   checks++
 }
 
+// A function as a migration file holds it — CREATE … through its closing tag.
+async function productionFunction(migration, name) {
+  const sql = lf(await readFile(new URL(`${migration}.sql`, migrations), 'utf8'))
+  const match = new RegExp(`create (?:or replace )?function (?:public\\.)?${name}\\([\\s\\S]*?\\bas\\s+(\\$\\w*\\$)`, 'i').exec(sql)
+  assert(match, `Missing production function ${name}`)
+  const end = sql.indexOf(`${match[1]};`, match.index + match[0].length)
+  assert(end >= 0, `Missing function end ${name}`)
+  await db.exec(sql.slice(match.index, end + match[1].length + 1))
+}
+
 const HR_USER = id(1)
 const FIN_USER = id(2)
 const DIR = id(21)
@@ -45,14 +63,13 @@ const REV = id(23)
 const VO = id(24)
 const IT = id(25)
 
-/** Sign in as somebody holding these actions (the stand-in has_any_action reads them). */
+/** Sign in as somebody holding these actions (the stand-in has_any_action and has_perm read them). */
 async function as(user, actions) {
   await db.exec(`SELECT set_config('request.jwt.claim.sub', '${user ?? ''}', false), set_config('test.actions', '${actions.join(',')}', false)`)
 }
-const HR_EDIT = ['director_salary.view', 'director_salary.edit']
+const HR_EDIT = ['director_salary.view', 'director_salary.edit', 'hr_costing.view']
 const HR_VIEW = ['director_salary.view']
-const FINANCE = ['treasury.view', 'treasury.create', 'treasury.void']
-const FIN_VIEW = ['treasury.view']
+const FINANCE = ['treasury.view', 'treasury.create', 'payroll_payouts.view']
 
 const SAVE = `SELECT public.director_hv_share_save($1::date, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb) AS r`
 const save = (period, [b, k, a], mode, lines, er = null) =>
@@ -60,6 +77,8 @@ const save = (period, [b, k, a], mode, lines, er = null) =>
 const pools = async () =>
   Object.fromEntries((await q(`SELECT d.name, coalesce(b.balance, 0)::float AS balance FROM departments d
     LEFT JOIN dept_pool_balances b ON b.department_id = d.id ORDER BY d.name`)).map(r => [r.name, r.balance]))
+const shareOf = period => q(`SELECT s.status, b.batch_no FROM director_hv_shares s LEFT JOIN payroll_batches b ON b.id = s.batch_id
+  WHERE s.period_month = $1`, [period]).then(r => r[0] ?? null)
 
 try {
   await db.exec(`
@@ -308,38 +327,95 @@ try {
 
   await load('20261013170000_director_hv_share.sql')
 
-  // ── Who may call what ─────────────────────────────────────────────────────
-  for (const fn of ['director_hv_share_of(date)', 'director_hv_share_queue()', 'director_hv_share_transfer(uuid, date)',
-    'director_hv_share_undo(uuid)', 'director_hv_share_save(date, numeric, numeric, numeric, boolean, numeric, numeric, numeric, text, jsonb)']) {
+  // What 20261013233000 reads besides: the payroll's batches, their lines and funding requests.
+  await db.exec(`
+    -- Production's module check: any action on that module among those handed in.
+    CREATE FUNCTION public.has_perm(p_module text) RETURNS boolean LANGUAGE sql STABLE AS $$
+      SELECT EXISTS (SELECT 1 FROM unnest(string_to_array(current_setting('test.actions', true), ',')) a
+                      WHERE split_part(a, '.', 1) = p_module)
+    $$;
+    CREATE TYPE hv_fund_txn_type AS ENUM ('fund_out', 'expense_out', 'loan_repayment_in', 'profit_in');
+    CREATE TABLE payroll_runs(id uuid PRIMARY KEY, period_month date NOT NULL);
+    CREATE TABLE payroll_batches(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), run_id uuid, period_month date NOT NULL,
+      batch_no integer NOT NULL, status text NOT NULL DEFAULT 'submitted', legacy boolean NOT NULL DEFAULT false,
+      submitted_at timestamptz NOT NULL DEFAULT now());
+    CREATE TABLE payroll_batch_lines(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), batch_id uuid NOT NULL REFERENCES payroll_batches(id),
+      employee_name text NOT NULL, department_id uuid, department_name text NOT NULL, bucket text NOT NULL, segment_key text NOT NULL,
+      is_topup boolean NOT NULL DEFAULT false, gross numeric NOT NULL DEFAULT 0, net numeric NOT NULL DEFAULT 0,
+      epf_er numeric NOT NULL DEFAULT 0, epf_ee numeric NOT NULL DEFAULT 0, socso_er numeric NOT NULL DEFAULT 0,
+      socso_ee numeric NOT NULL DEFAULT 0, eis_er numeric NOT NULL DEFAULT 0, eis_ee numeric NOT NULL DEFAULT 0,
+      pcb numeric NOT NULL DEFAULT 0, withholding_tax numeric NOT NULL DEFAULT 0, skbbk numeric NOT NULL DEFAULT 0,
+      non_statutory_allowance numeric NOT NULL DEFAULT 0,
+      ctc numeric GENERATED ALWAYS AS (gross + epf_er + socso_er + eis_er) STORED);
+    CREATE TABLE payroll_payment_requests(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), payroll_run_id uuid REFERENCES payroll_runs(id),
+      requested_by uuid NOT NULL, amount numeric NOT NULL, target_pool text NOT NULL DEFAULT 'dept_pool_hr',
+      status text NOT NULL DEFAULT 'submitted', period_month date, batch_id uuid REFERENCES payroll_batches(id));
+    CREATE TABLE director_monthly_payroll(period_month date NOT NULL, director_id uuid NOT NULL, status text NOT NULL DEFAULT 'draft');
+  `)
+  // Production's bodies of the three functions 233000 swaps a statement of.
+  await productionFunction('20261006040000_drifted_functions_as_live', 'get_payroll_breakdown_by_pool')
+  await productionFunction('20261006040000_drifted_functions_as_live', 'apply_pool_adjustment')
+  await productionFunction('20260927061000_unified_payroll', 'payroll_batch_accrual_sums')
+  check(Object.fromEntries((await q(`SELECT proname, md5(prosrc) AS m FROM pg_proc
+      WHERE proname IN ('get_payroll_breakdown_by_pool', 'apply_pool_adjustment', 'payroll_batch_accrual_sums')`)).map(r => [r.proname, r.m])), {
+    get_payroll_breakdown_by_pool: '2aa983c9b754c3757ebaf895c65d3abc',
+    apply_pool_adjustment: 'd56823837d79e886393ce7b30056d66f',
+    payroll_batch_accrual_sums: '3e911acea1d3d123f28044312c42b2cc',
+  }, 'production’s bodies, as 233000 was written against them (read off pg_proc on 2026-10-13)')
+
+  // ── Before 20261013233000: the share went to Finance ──────────────────────
+  // Basic 10,000 + KPI 2,000 + Allowance 1,500; ER on 12,000 at one head:
+  // EPF 1,440.00 + SOCSO 104.15 + EIS 11.90 → 15,056.05.
+  await as(HR_USER, HR_EDIT)
+  const PCT_LINES = [{ department_id: MKT, pct: 50 }, { department_id: REV, pct: 30 }, { department_id: VO, pct: 15 }, { department_id: DIR, pct: 5 }]
+  check((await save('2026-09-01', [10000, 2000, 1500], 'percent', PCT_LINES)).status, 'with_finance', 'under 170000 a saved share waited for Finance')
+  // One Finance had transferred stops the migration — undo it first.
+  await q(`UPDATE director_hv_shares SET status = 'transferred', transferred_at = now(), transfer_date = '2026-09-30'`)
+  await assert.rejects(() => load('20261013233000_director_hv_share_in_payroll.sql'),
+    /A HOUZS Venture share was transferred by Finance — undo it before this migration/, 'a transferred share stops it')
+  checks++
+  check(await one(`SELECT to_regprocedure('public.director_hv_share_transfer(uuid, date)') IS NOT NULL`), true, 'and nothing of it took')
+  await q(`UPDATE director_hv_shares SET status = 'with_finance', transferred_at = NULL, transfer_date = NULL`)
+
+  await load('20261013233000_director_hv_share_in_payroll.sql')
+
+  // ── The shape ─────────────────────────────────────────────────────────────
+  for (const fn of ['director_hv_share_transfer(uuid, date)', 'director_hv_share_undo(uuid)', 'director_hv_share_queue()']) {
+    check(await one(`SELECT to_regprocedure($1) IS NULL`, [`public.${fn}`]), true, `${fn}: gone — nothing goes through Finance`)
+  }
+  check(await q(`SELECT column_name AS c FROM information_schema.columns WHERE table_name = 'director_hv_shares'
+      AND column_name IN ('batch_id', 'transferred_by', 'transferred_at', 'transfer_date')`).then(r => r.map(x => x.c)), ['batch_id'],
+    'a share holds the batch that carries it, nothing of a transfer')
+  check(await q(`SELECT column_name FROM information_schema.columns WHERE table_name = 'director_hv_share_lines'
+      AND column_name IN ('invoice_id', 'voucher_id')`), [], 'its lines hold no documents')
+  check(await shareOf('2026-09-01'), { status: 'open', batch_no: null }, 'the share HR had sent waits for the payroll instead')
+  for (const fn of ['director_hv_share_of(date)', 'director_hv_share_save(date, numeric, numeric, numeric, boolean, numeric, numeric, numeric, text, jsonb)']) {
     check(await one(`SELECT has_function_privilege('anon', 'public.${fn}', 'EXECUTE')`), false, `${fn}: not the publishable key's`)
     check(await one(`SELECT has_function_privilege('authenticated', 'public.${fn}', 'EXECUTE')`), true, `${fn}: a signed-in session's`)
   }
-  for (const fn of ['director_hv_share_json(uuid, boolean)', 'director_hv_share_departments()']) {
+  for (const fn of ['director_hv_share_json(uuid, boolean)', 'director_hv_share_departments()', 'payroll_batch_pool_parts(uuid)',
+    'payroll_batch_segment_sums(uuid)', 'director_hv_share_follows_batch()', 'director_hv_share_back_with_batch()']) {
+    check(await one(`SELECT has_function_privilege('anon', 'public.${fn}', 'EXECUTE')`), false, `${fn}: not the publishable key's`)
     check(await one(`SELECT has_function_privilege('authenticated', 'public.${fn}', 'EXECUTE')`), false, `${fn}: its functions' helper only`)
   }
   for (const t of ['director_hv_shares', 'director_hv_share_lines']) {
     check(await one(`SELECT has_table_privilege('authenticated', 'public.${t}', 'SELECT')`), false, `${t}: read through its functions only`)
   }
 
-  // ── HR keeps HV's share — by percentage, four departments ─────────────────
-  // Basic 10,000 + KPI 2,000 + Allowance 1,500; ER on 12,000 at one head:
-  // EPF 1,440.00 + SOCSO 104.15 + EIS 11.90 → 15,056.05.
+  // ── HR keeps October's share — by percentage, four departments ────────────
   await as(HR_USER, HR_EDIT)
-  const PCT_LINES = [{ department_id: MKT, pct: 50 }, { department_id: REV, pct: 30 }, { department_id: VO, pct: 15 }, { department_id: DIR, pct: 5 }]
-  const saved = await save('2026-10-01', [10000, 2000, 1500], 'percent', PCT_LINES)
-  check(saved.status, 'with_finance', 'sent to Finance')
-  check(saved.total, 15056.05, 'the total with its employer statutory')
   // 7,528.025 → 7,528.03, 4,516.815 → 4,516.82, 2,258.4075 → 2,258.41, 752.8025 → 752.80:
   // a sen too many, taken back from the biggest percentage.
-  check(saved.amounts, [7528.02, 4516.82, 2258.41, 752.8], 'each its percentage to the sen, the rounding on the biggest')
-  const of = await one(`SELECT public.director_hv_share_of('2026-10-01')`)
-  check(of.departments.map(d => d.name), ['Director', 'IT', 'Marketing', 'Revenue Department', 'Venture Office'], 'every department to pick from, Venture Office last')
+  check(await save('2026-10-01', [10000, 2000, 1500], 'percent', PCT_LINES),
+    { status: 'open', total: 15056.05, amounts: [7528.02, 4516.82, 2258.41, 752.8] }, 'each its percentage to the sen, the rounding on the biggest')
+  let of = await one(`SELECT public.director_hv_share_of('2026-10-01')`)
+  check(of.departments.map(d => d.name), ['Director', 'IT', 'Marketing', 'Revenue Department', 'Venture Office'], 'every department to pick from')
+  check([of.share.status, of.share.batch_id, of.share.batch_no], ['open', null, null], 'waiting for the directors’ payroll')
   check([of.share.basic, of.share.kpi, of.share.allowance, of.share.employer_epf, of.share.employer_socso, of.share.employer_eis],
     [10000, 2000, 1500, 1440, 104.15, 11.9], 'HR reads its components')
   check(of.share.lines.map(l => [l.department, l.amount, l.pct, l.stays]), [
     ['Marketing', 7528.02, 50, false], ['Revenue Department', 4516.82, 30, false], ['Venture Office', 2258.41, 15, false], ['Director', 752.8, 5, true],
-  ], 'the lines in order; the Director department stays in its pool')
-  const SHARE = of.share.id
+  ], 'the lines in order; the Director department’s own stays in its pool')
 
   // The refusals.
   await reject(SAVE, ['2026-10-01', 10000, 2000, 1500, false, 0, 0, 0, 'percent', JSON.stringify(PCT_LINES.slice(0, 2))],
@@ -352,144 +428,180 @@ try {
     /Pick a department on every line/, 'no such department')
   await reject(SAVE, ['2026-10-01', 10000, 2000, 1500, false, 0, 0, 0, 'amount', '[]'], /Pick the departments/, 'nobody pays')
   await reject(SAVE, ['2026-10-15', 10000, 2000, 1500, false, 0, 0, 0, 'amount', '[]'], /first day/, 'a month is its first day')
-  check(await one(`SELECT total_ctc::float FROM director_hv_shares WHERE id = $1`, [SHARE]), 15056.05, 'a refusal changed nothing')
+  await reject(SAVE, ['2026-10-01', -1, 0, 0, false, 0, 0, 0, 'amount', '[]'], /cannot be below zero/, 'nothing below zero')
+  check(await one(`SELECT total_ctc::float FROM director_hv_shares WHERE period_month = '2026-10-01'`), 15056.05, 'a refusal changed nothing')
 
   // By amount, with the employer statutory keyed by hand: 9,000 + 0 + 1,000 + 500 + 50 + 10 = 10,560.
-  const manual = await save('2026-11-01', [9000, 0, 1000], 'amount',
-    [{ department_id: IT, amount: 6000 }, { department_id: VO, amount: 4560 }], [500, 50, 10])
-  check([manual.status, manual.total, manual.amounts], ['with_finance', 10560, [6000, 4560]], 'by amount, the ER as keyed')
+  check(await save('2026-11-01', [9000, 0, 1000], 'amount', [{ department_id: IT, amount: 6000 }, { department_id: VO, amount: 4560 }], [500, 50, 10]),
+    { status: 'open', total: 10560, amounts: [6000, 4560] }, 'by amount, the ER as keyed')
 
   // Who may.
   await as(HR_USER, HR_VIEW)
   await reject(SAVE, ['2026-10-01', 1, 0, 0, false, 0, 0, 0, 'amount', '[]'], /needs Director Salary · Edit/, 'View alone does not save')
-  check((await one(`SELECT public.director_hv_share_of('2026-10-01')`)).share.id, SHARE, 'View reads the grid')
-  await reject(`SELECT public.director_hv_share_queue()`, [], /needs Treasury · View/, 'HR does not read Finance’s list')
-  await reject(`SELECT public.director_hv_share_transfer($1, '2026-10-20')`, [SHARE], /needs Treasury · Create/, 'HR does not transfer')
+  check((await one(`SELECT public.director_hv_share_of('2026-10-01')`)).share.total_ctc, 15056.05, 'View reads the grid')
   await as(FIN_USER, FINANCE)
   await reject(`SELECT public.director_hv_share_of('2026-10-01')`, [], /needs Director Salary · View/, 'Finance does not read the grid')
   await reject(SAVE, ['2026-10-01', 1, 0, 0, false, 0, 0, 0, 'amount', '[]'], /needs Director Salary · Edit/, 'Finance does not save')
 
-  // ── Finance's list ───────────────────────────────────────────────────────
-  await as(FIN_USER, FIN_VIEW)
-  const queue = await one(`SELECT public.director_hv_share_queue()`)
-  check(queue.pending.map(s => [s.period_month, s.total_ctc, s.submitted_by]), [['2026-10-01', 15056.05, 'HR Manager'], ['2026-11-01', 10560, 'HR Manager']],
-    'what HR sent, month by month')
-  check('basic' in queue.pending[0], false, 'the total only — no components on Finance’s list')
-  await reject(`SELECT public.director_hv_share_transfer($1, '2026-10-20')`, [SHARE], /needs Treasury · Create/, 'View does not transfer')
+  // ── October's payroll: HR › Payroll's Submit to Finance ───────────────────
+  // The pools before: what each department holds.
+  await q(`INSERT INTO dept_pools (department_id, transaction_type, amount, description) VALUES
+    ($1, 'np_in', 100000, 'opening'), ($2, 'np_in', 20000, 'opening'), ($3, 'np_in', 10000, 'opening'),
+    ($4, 'np_in', 5000, 'opening'), ($5, 'np_in', 1000, 'opening')`, [DIR, MKT, REV, VO, IT])
+  const RUN = id(41)
+  await q(`INSERT INTO payroll_runs VALUES ($1, '2026-10-01')`, [RUN])
+  // A director as September's: 14,400 gross; CTC 14,400 + 1,728 + 104.15 + 11.90 = 16,244.05.
+  const director = (name, topup = false) => ({ name, dept: null, deptName: 'Director', bucket: 'director', seg: 'director', topup,
+    gross: 14400, net: 10700.55, epf_er: 1728, epf_ee: 1584, socso_er: 104.15, socso_ee: 29.75, eis_er: 11.9, eis_ee: 11.9, pcb: 2029.15, skbbk: 44.65 })
+  // A Marketing staff member: CTC 5,000 + 650 + 86.65 + 9.90 = 5,746.55.
+  const marketer = { name: 'MKT STAFF', dept: MKT, deptName: 'Marketing', bucket: 'marketing', seg: 'marketing', topup: false,
+    gross: 5000, net: 4300, epf_er: 650, epf_ee: 550, socso_er: 86.65, socso_ee: 24.75, eis_er: 9.9, eis_ee: 9.9, pcb: 115.35, skbbk: 0 }
+  const DIRECTORS = ['CHAI MENG KEAT', 'LIM WEI LIANG', 'LIM WEI SIANG', 'LOO WEN WEI'].map(n => director(n))
+  async function submit(month, no, lines) {
+    const batch = await one(`INSERT INTO payroll_batches (run_id, period_month, batch_no) VALUES ($1, $2, $3) RETURNING id`, [RUN, month, no])
+    for (const l of lines) {
+      await q(`INSERT INTO payroll_batch_lines (batch_id, employee_name, department_id, department_name, bucket, segment_key, is_topup,
+          gross, net, epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, skbbk)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+        [batch, l.name, l.dept, l.deptName, l.bucket, l.seg, l.topup, l.gross, l.net, l.epf_er, l.epf_ee, l.socso_er, l.socso_ee, l.eis_er, l.eis_ee, l.pcb, l.skbbk])
+    }
+    return batch
+  }
+  // Its funding request, as payroll_submit_batch files it — the batch's whole CTC.
+  const fund = (month, batch) => one(`INSERT INTO payroll_payment_requests (payroll_run_id, requested_by, amount, period_month, batch_id)
+    SELECT $1, $2, sum(ctc), $3, $4 FROM payroll_batch_lines WHERE batch_id = $4 RETURNING id`, [RUN, HR_USER, month, batch])
 
-  // ── Transfer ─────────────────────────────────────────────────────────────
-  // A receipt numbered elsewhere already holds the next count: the transfer takes the next free one.
-  await q(`INSERT INTO payment_vouchers (voucher_no, voucher_type, status, amount, payee_name, description, created_by, direction)
-    VALUES ('HV-OR-202610-0002', 'other', 'draft', 1, 'Someone', 'numbered elsewhere', $1, 'credit')`, [FIN_USER])
+  const OCT1 = await submit('2026-10-01', 1, [...DIRECTORS, marketer])
+  check(await shareOf('2026-10-01'), { status: 'open', batch_no: null }, 'the lines alone carry nothing')
+  const REQ1 = await fund('2026-10-01', OCT1)
+  check(await one(`SELECT amount::float FROM payroll_payment_requests WHERE id = $1`, [REQ1]), 70722.75, 'the request is the batch’s whole CTC, as ever')
+  check(await shareOf('2026-10-01'), { status: 'in_payroll', batch_no: 1 }, 'the batch that carries the month’s directors carries the share')
+  await as(HR_USER, HR_EDIT)
+  of = await one(`SELECT public.director_hv_share_of('2026-10-01')`)
+  check([of.share.status, of.share.batch_no, typeof of.share.batch_submitted_at], ['in_payroll', 1, 'string'], 'the grid reads which batch, and when')
+
+  // HR meets the lock: the same figures are nothing to do, new ones wait for the batch to come back.
+  check(await save('2026-10-01', [10000, 2000, 1500], 'amount', []), { status: 'in_payroll', total: 15056.05 }, 'saving the grid again changes nothing')
+  await reject(SAVE, ['2026-10-01', 9000, 2000, 1500, false, 0, 0, 0, 'amount', '[]'],
+    /HOUZS Venture's share for October 2026 went to Finance with payroll batch #1 — it changes once that batch is sent back/, 'a change waits')
+  await reject(SAVE, ['2026-10-01', 0, 0, 0, false, 0, 0, 0, 'amount', '[]'], /went to Finance with payroll batch #1/, 'nor can it be cleared')
+  check(await one(`SELECT count(*)::int FROM director_hv_share_lines l JOIN director_hv_shares s ON s.id = l.share_id
+    WHERE s.period_month = '2026-10-01'`), 4, 'its lines as they were')
+
+  // ── Finance › Payroll Requests: what each pool funds ──────────────────────
+  await as(FIN_USER, FINANCE)
+  const breakdown = await q(`SELECT pool_key, dept_name, required_amount::float AS req, pool_balance::float AS bal
+    FROM public.get_payroll_breakdown_by_pool($1)`, [REQ1])
+  check(breakdown, [
+    // 64,976.20 of directors less the 14,303.25 HR put on the departments (the Director department's 752.80 stays).
+    { pool_key: 'dept_pool_director', dept_name: 'Director', req: 50672.95, bal: 100000 },
+    // The marketer's 5,746.55 and Marketing's 7,528.02.
+    { pool_key: 'dept_pool_marketing', dept_name: 'Marketing', req: 13274.57, bal: 20000 },
+    { pool_key: 'dept_pool_revenue_department', dept_name: 'Revenue Department', req: 4516.82, bal: 10000 },
+    { pool_key: 'dept_pool_venture_office', dept_name: 'Venture Office', req: 2258.41, bal: 5000 },
+  ], 'each department HR picked funds its part, the Director pool that much less')
+  check(Math.round(breakdown.reduce((a, r) => a + r.req, 0) * 100) / 100, 70722.75, 'and the parts make the request')
+  await as(HR_USER, HR_EDIT)
+  await reject(`SELECT * FROM public.get_payroll_breakdown_by_pool($1)`, [REQ1], /payroll payouts are not yours to read/, 'Payroll Requests’ own gate, as ever')
+
+  // ── The accrual JVs a segment (HR's Submit posts them) ────────────────────
+  const sums = await q(`SELECT segment, gross::float, non_statutory_allowance::float AS nsa, epf_er::float, epf_ee::float, socso_er::float,
+      socso_ee::float, eis_er::float, eis_ee::float, pcb::float, withholding_tax::float AS wht, net::float, skbbk::float
+    FROM public.payroll_batch_accrual_sums($1) ORDER BY segment`, [OCT1])
+  const r2 = n => Math.round(n * 100) / 100
+  const ctcOf = s => r2(s.gross + s.epf_er + s.socso_er + s.eis_er)
+  check(sums.map(s => [s.segment, ctcOf(s)]), [
+    ['corporate', 2258.41], ['director', 50672.95], ['marketing', 13274.57], ['revenue_department', 4516.82],
+  ], 'each part’s CTC exactly what HR gave it — Venture Office’s in corporate — and the Director’s the rest')
+  check(sums.filter(s => r2(s.gross - s.net - s.epf_ee - s.socso_ee - s.eis_ee - s.pcb - s.wht - s.skbbk) !== 0).map(s => s.segment), [],
+    'every JV balances: gross = net + the employee’s statutory + PCB + WHT + SKBBK')
+  // As production's dry-run of the same month gave (2026-10-13).
+  check(sums.filter(s => s.segment !== 'marketing').map(s => [s.segment, s.gross, s.epf_er, s.socso_er, s.eis_er, s.net, s.pcb, s.skbbk]), [
+    ['corporate', 2002.04, 240.24, 14.48, 1.65, 1487.71, 282.11, 6.21],
+    ['director', 44920.47, 5390.46, 324.89, 37.13, 33380.12, 6329.89, 139.28],
+    ['revenue_department', 4004.06, 480.49, 28.96, 3.31, 2975.38, 564.23, 12.42],
+  ], 'every other figure the same proportion of the directors’, to the sen')
+  const lineTotals = await q(`SELECT sum(gross)::float AS gross, sum(epf_er)::float AS epf_er, sum(epf_ee)::float AS epf_ee,
+      sum(socso_er)::float AS socso_er, sum(socso_ee)::float AS socso_ee, sum(eis_er)::float AS eis_er, sum(eis_ee)::float AS eis_ee,
+      sum(pcb)::float AS pcb, sum(net)::float AS net, sum(skbbk)::float AS skbbk FROM payroll_batch_lines WHERE batch_id = $1`, [OCT1])
+  check(Object.fromEntries(Object.keys(lineTotals[0]).map(k => [k, r2(sums.reduce((a, s) => a + s[k], 0))])), lineTotals[0],
+    'nothing made or lost: the segments add up to the batch’s lines, figure by figure')
+  check(await q(`SELECT * FROM public.payroll_batch_segment_sums($1) ORDER BY 1`, [OCT1]).then(r => r.length), 4, 'the helper the batch reads')
+  await as(FIN_USER, ['treasury.view'])
+  await reject(`SELECT * FROM public.payroll_batch_accrual_sums($1)`, [OCT1], /not permitted/, 'the sums are HR costing’s, as ever')
+
+  // ── Finance funds it; the Principal approves: each pool pays its part ─────
   const before = await pools()
-  await as(FIN_USER, FINANCE)
-  await db.exec(`TRUNCATE guard_calls`)
-  const moved = await one(`SELECT public.director_hv_share_transfer($1, '2026-10-20')`, [SHARE])
-  check(moved, { invoices: ['HV-INV-202610-0001', 'HV-INV-202610-0002', 'HV-INV-202610-0003'], receipts: ['HV-OR-202610-0003', 'HV-OR-202610-0004', 'HV-OR-202610-0005'] },
-    'an invoice and a receipt a paying department — none for the Director department')
-  check(await q(`SELECT pages, wants FROM guard_calls`), [{ pages: ['/payments/dept-requests'], wants: ['treasury.create'] }], 'it asks Dept Requests’ page first')
-  check(await q(`SELECT i.invoice_no, i.status::text, i.total_amount::float AS total, i.invoice_date::text, i.billing_mode::text, d.name
-      FROM invoices i JOIN departments d ON d.id = i.billable_to_department_id ORDER BY i.invoice_no`), [
-    { invoice_no: 'HV-INV-202610-0001', status: 'paid', total: 7528.02, invoice_date: '2026-10-31', billing_mode: 'director_attribution', name: 'Marketing' },
-    { invoice_no: 'HV-INV-202610-0002', status: 'paid', total: 4516.82, invoice_date: '2026-10-31', billing_mode: 'director_attribution', name: 'Revenue Department' },
-    { invoice_no: 'HV-INV-202610-0003', status: 'paid', total: 2258.41, invoice_date: '2026-10-31', billing_mode: 'director_attribution', name: 'Venture Office' },
-  ], 'invoices to the departments’ pools, dated the payroll month’s last day, paid by their receipts')
-  check(await q(`SELECT l.description, l.category_code FROM invoice_lines l JOIN invoices i ON i.id = l.invoice_id ORDER BY i.invoice_no`).then(r => r.map(x => [x.description, x.category_code])),
-    [["Director salary (HV share) - Oct'26", '5050'], ["Director salary (HV share) - Oct'26", '5050'], ["Director salary (HV share) - Oct'26", '5050']],
-    'one line on Salary Income')
-  check(await q(`SELECT je.transaction_date::text AS d, je.segment::text AS seg, jl.account_code AS acct, coalesce(jl.debit, 0)::float AS dr, coalesce(jl.credit, 0)::float AS cr
-      FROM journal_entries je JOIN journal_lines jl ON jl.entry_id = je.id ORDER BY je.entry_no, jl.account_code`).then(r => r.map(x => `${x.d} ${x.seg} ${x.acct} ${x.dr}/${x.cr}`)), [
-    '2026-10-31 director 3073 7528.02/0', '2026-10-31 director 5050 0/7528.02',
-    '2026-10-31 marketing 3073 0/7528.02', '2026-10-31 marketing 9030 7528.02/0',
-    '2026-10-31 director 3073 4516.82/0', '2026-10-31 director 5050 0/4516.82',
-    '2026-10-31 revenue_department 3073 0/4516.82', '2026-10-31 revenue_department 9030 4516.82/0',
-    '2026-10-31 director 3073 2258.41/0', '2026-10-31 director 5050 0/2258.41',
-    '2026-10-31 corporate 3073 0/2258.41', '2026-10-31 corporate 9030 2258.41/0',
-  ], 'each invoice issued as an inter-billing: the Director’s income, the department’s salary cost (Venture Office: corporate)')
-  check(await q(`SELECT voucher_no, voucher_type::text AS t, status::text AS s, payment_method AS m, payment_date::text AS d, amount::float AS a,
-      target_pool AS tp, bank_account_id IS NULL AS no_bank FROM payment_vouchers WHERE invoice_id IS NOT NULL ORDER BY voucher_no`).then(r =>
-      r.map(x => `${x.voucher_no} ${x.t} ${x.s} ${x.m} ${x.d} ${x.a} ${x.tp} ${x.no_bank}`)), [
-    'HV-OR-202610-0003 billing_payment paid netting 2026-10-20 7528.02 dept_pool_director true',
-    'HV-OR-202610-0004 billing_payment paid netting 2026-10-20 4516.82 dept_pool_director true',
-    'HV-OR-202610-0005 billing_payment paid netting 2026-10-20 2258.41 dept_pool_director true',
-  ], 'received by netting on the transfer date, no bank')
-  check(await q(`SELECT s.pool, s.account_code AS acct, s.role, s.amount::float AS a FROM payment_voucher_sources s
-      JOIN payment_vouchers v ON v.id = s.voucher_id ORDER BY v.voucher_no, s.role DESC`).then(r => r.map(x => `${x.pool} ${x.acct} ${x.role} ${x.a}`)), [
-    'dept_pool_director 3073 primary 7528.02', 'dept_pool_marketing 9030 mirror 7528.02',
-    'dept_pool_director 3073 primary 4516.82', 'dept_pool_revenue_department 9030 mirror 4516.82',
-    'dept_pool_director 3073 primary 2258.41', 'dept_pool_venture_office 9030 mirror 2258.41',
-  ], 'the primary rows the Director pool’s, the mirror rows the paying departments’')
-  check(await q(`SELECT d.name, dp.transaction_type::text AS t, dp.amount::float AS a, dp.description LIKE 'PV HV-OR-202610-%: %' AS ref
-      FROM dept_pools dp JOIN departments d ON d.id = dp.department_id
-     ORDER BY substring(dp.description FROM 'HV-OR-[0-9]+-[0-9]+'), d.name <> 'Director'`).then(r => r.map(x => `${x.name} ${x.t} ${x.a} ${x.ref}`)), [
-    'Director np_in 7528.02 true', 'Marketing inter_billing_out 7528.02 true',
-    'Director np_in 4516.82 true', 'Revenue Department inter_billing_out 4516.82 true',
-    'Director np_in 2258.41 true', 'Venture Office inter_billing_out 2258.41 true',
-  ], 'each pair under its receipt — the cash-flow bridge pairs them by it')
+  const APPROVAL = id(51)
+  for (const row of breakdown) {
+    await q(`SELECT public.apply_pool_adjustment($1, 'out', $2, $3, $4, $5, now())`,
+      [row.pool_key, row.req, `PV HV-PV-202610-0001: ${row.dept_name}`, FIN_USER, APPROVAL])
+  }
   const after = await pools()
-  check(Object.fromEntries(Object.keys(after).map(k => [k, Math.round((after[k] - before[k]) * 100) / 100])),
-    { Director: 14303.25, IT: 0, Marketing: -7528.02, 'Revenue Department': -4516.82, 'Venture Office': -2258.41 },
-    'the departments down, the Director pool up — all but the Director department’s own 752.80')
-  const done = await one(`SELECT public.director_hv_share_queue()`)
-  check([done.pending.length, done.transferred.map(s => [s.period_month, s.transfer_date, s.transferred_by])],
-    [1, [['2026-10-01', '2026-10-20', 'Finance Manager']]], 'transferred, by whom and when')
-  check(done.transferred[0].lines.map(l => [l.department, l.invoice_no, l.voucher_no]), [
-    ['Marketing', 'HV-INV-202610-0001', 'HV-OR-202610-0003'], ['Revenue Department', 'HV-INV-202610-0002', 'HV-OR-202610-0004'],
-    ['Venture Office', 'HV-INV-202610-0003', 'HV-OR-202610-0005'], ['Director', null, null],
-  ], 'each department’s documents')
-  await reject(`SELECT public.director_hv_share_transfer($1, '2026-10-20')`, [SHARE], /transferred already/, 'not twice')
+  check(Object.fromEntries(Object.keys(after).map(k => [k, r2(after[k] - before[k])])),
+    { Director: -50672.95, IT: 0, Marketing: -13274.57, 'Revenue Department': -4516.82, 'Venture Office': -2258.41 },
+    'the departments pay their part of the directors — Venture Office found by its name, having no segment')
+  await reject(`SELECT public.apply_pool_adjustment('dept_pool_nowhere', 'out', 1, 'x', $1, $2, now())`, [FIN_USER, APPROVAL],
+    /unknown dept_pool identifier dept_pool_nowhere/, 'a pool no department answers to is still refused')
 
-  // HR meets the lock: the same figures are nothing to do, new ones wait for Undo.
+  // ── Finance sends the batch back: the share is HR's again ─────────────────
+  await q(`UPDATE payroll_batches SET status = 'submitted' WHERE id = $1`, [OCT1])
+  check(await shareOf('2026-10-01'), { status: 'in_payroll', batch_no: 1 }, 'a status saved again moves nothing')
+  await q(`UPDATE payroll_batches SET status = 'sent_back' WHERE id = $1`, [OCT1])
+  check(await shareOf('2026-10-01'), { status: 'open', batch_no: null }, 'sent back, it waits for the next batch')
   await as(HR_USER, HR_EDIT)
-  check(await save('2026-10-01', [10000, 2000, 1500], 'amount', []), { status: 'transferred', total: 15056.05 }, 'saving the grid again changes nothing')
-  await reject(SAVE, ['2026-10-01', 9000, 2000, 1500, false, 0, 0, 0, 'amount', '[]'], /Finance has transferred HOUZS Venture's share for October 2026/, 'a change waits for Undo')
-  await reject(SAVE, ['2026-10-01', 0, 0, 0, false, 0, 0, 0, 'amount', '[]'], /Finance has transferred/, 'nor can it be cleared')
-
-  // ── Undo ─────────────────────────────────────────────────────────────────
-  await as(FIN_USER, ['treasury.view', 'treasury.create'])
-  await reject(`SELECT public.director_hv_share_undo($1)`, [SHARE], /needs Treasury · Void/, 'Create does not undo')
-  await q(`INSERT INTO period_locks VALUES ('2026-10-01', true)`)
+  check(await save('2026-10-01', [10000, 2000, 1500], 'amount', [{ department_id: MKT, amount: 10000 }, { department_id: DIR, amount: 5056.05 }]),
+    { status: 'open', total: 15056.05, amounts: [10000, 5056.05] }, 'HR may change it now')
+  const OCT2 = await submit('2026-10-01', 2, [...DIRECTORS, marketer])
+  const REQ2 = await fund('2026-10-01', OCT2)
+  check(await shareOf('2026-10-01'), { status: 'in_payroll', batch_no: 2 }, 'the next batch carries it')
   await as(FIN_USER, FINANCE)
-  await reject(`SELECT public.director_hv_share_undo($1)`, [SHARE], /accounting period October 2026 is locked/, 'not in a locked month')
-  await q(`DELETE FROM period_locks`)
-  await db.exec(`TRUNCATE guard_calls`)
-  const undone = await one(`SELECT public.director_hv_share_undo($1)`, [SHARE])
-  check(undone, { invoices: ['HV-INV-202610-0001', 'HV-INV-202610-0002', 'HV-INV-202610-0003'], receipts: ['HV-OR-202610-0003', 'HV-OR-202610-0004', 'HV-OR-202610-0005'] },
-    'every document taken back')
-  check(await q(`SELECT pages, wants FROM guard_calls`), [{ pages: ['/payments/dept-requests'], wants: ['treasury.void'] }], 'Undo asks the page too')
-  check(await q(`SELECT DISTINCT status::text FROM invoices`).then(r => r.map(x => x.status)), ['voided'], 'the invoices voided')
-  check(await q(`SELECT DISTINCT status::text FROM payment_vouchers WHERE invoice_id IS NOT NULL`).then(r => r.map(x => x.status)), ['voided'], 'the receipts voided')
-  check(await q(`SELECT count(*)::int AS n, count(*) FILTER (WHERE is_reversed)::int AS rev,
-      (SELECT sum(coalesce(debit, 0) - coalesce(credit, 0))::float FROM journal_lines) AS net FROM journal_entries`), [{ n: 12, rev: 12, net: 0 }],
-    'every journal reversed in a pair')
-  check(await pools(), before, 'every pool where it was')
-  check(await one(`SELECT status FROM director_hv_shares WHERE id = $1`, [SHARE]), 'with_finance', 'the share waits again')
-  check(await one(`SELECT count(*)::int FROM director_hv_share_lines WHERE invoice_id IS NOT NULL OR voucher_id IS NOT NULL`), 0, 'its lines hold no documents')
-  await reject(`SELECT public.director_hv_share_undo($1)`, [SHARE], /is not transferred/, 'nothing to undo twice')
+  check(await q(`SELECT dept_name, required_amount::float AS req FROM public.get_payroll_breakdown_by_pool($1)`, [REQ2]), [
+    { dept_name: 'Director', req: 54976.2 }, { dept_name: 'Marketing', req: 15746.55 },
+  ], 'with its new split — the Director department’s own 5,056.05 still in the Director pool')
 
-  // HR may change it again — and clear it.
+  // ── Batches that carry nothing ────────────────────────────────────────────
+  // November: a staff-only batch, then a top-up of a director, then the directors.
+  const NOV1 = await submit('2026-11-01', 1, [marketer])
+  await fund('2026-11-01', NOV1)
+  check(await shareOf('2026-11-01'), { status: 'open', batch_no: null }, 'a batch with no directors carries nothing')
+  const NOV2 = await submit('2026-11-01', 2, [director('LOO WEN WEI', true)])
+  await fund('2026-11-01', NOV2)
+  check(await shareOf('2026-11-01'), { status: 'open', batch_no: null }, 'nor a top-up of one')
+  const NOV3 = await submit('2026-11-01', 3, [director('CHAI MENG KEAT')])
+  await fund('2026-11-01', NOV3)
+  check(await shareOf('2026-11-01'), { status: 'in_payroll', batch_no: 3 }, 'the directors’ own batch does')
+
+  // December: never more on the departments than the directors' payroll in the batch.
+  // 18,000 + 2,000 + EPF 2,160 + SOCSO 104.15 + EIS 11.90 = 22,276.05 against one director's 16,244.05.
   await as(HR_USER, HR_EDIT)
-  check((await save('2026-10-01', [8000, 0, 0], 'amount', [{ department_id: MKT, amount: 8000 + 960 + 104.15 + 11.9 }])).total, 9076.05, 'changed again')
-  check(await save('2026-10-01', [0, 0, 0], 'amount', []), { status: 'none', total: 0 }, 'all zero: no share')
-  check(await one(`SELECT count(*)::int FROM director_hv_share_lines WHERE share_id = $1`, [SHARE]), 0, 'its lines go with it')
+  check((await save('2026-12-01', [18000, 0, 2000], 'amount', [{ department_id: IT, amount: 22276.05 }])).total, 22276.05, 'December’s share')
+  const DEC1 = await submit('2026-12-01', 1, [director('CHAI MENG KEAT')])
+  await reject(`INSERT INTO payroll_payment_requests (payroll_run_id, requested_by, amount, period_month, batch_id) VALUES ($1, $2, 16244.05, '2026-12-01', $3)`,
+    [RUN, HR_USER, DEC1], /puts RM 22,276\.05 on its departments — more than the directors' payroll of RM 16,244\.05 in this batch/,
+    'the submit is refused')
+  check(await shareOf('2026-12-01'), { status: 'open', batch_no: null }, 'and the share waits')
+  // The Director department's own line moves nothing, so it may hold the rest.
+  await save('2026-12-01', [18000, 0, 2000], 'amount', [{ department_id: IT, amount: 12276.05 }, { department_id: DIR, amount: 10000 }])
+  await fund('2026-12-01', DEC1)
+  check(await shareOf('2026-12-01'), { status: 'in_payroll', batch_no: 1 }, 'within the directors’ payroll, carried')
 
-  // ── The locked months refuse the transfer ─────────────────────────────────
-  const NOV = (await one(`SELECT id FROM director_hv_shares WHERE period_month = '2026-11-01'`))
-  await as(FIN_USER, FINANCE)
-  await q(`INSERT INTO period_locks VALUES ('2026-11-01', true)`)
-  await reject(`SELECT public.director_hv_share_transfer($1, '2026-12-03')`, [NOV], /period November 2026 is locked — its invoices are dated 30 Nov 2026/, 'the payroll month locked')
-  await db.exec(`DELETE FROM period_locks; INSERT INTO period_locks VALUES ('2026-12-01', true)`)
-  await reject(`SELECT public.director_hv_share_transfer($1, '2026-12-03')`, [NOV], /period December 2026 is locked — pick another transfer date/, 'the transfer date’s month locked')
-  await q(`DELETE FROM period_locks`)
-  const nov = await one(`SELECT public.director_hv_share_transfer($1, '2026-12-03')`, [NOV])
-  check([nov.invoices, nov.receipts.length], [['HV-INV-202611-0001', 'HV-INV-202611-0002'], 2], 'IT and Venture Office, with the hand-keyed ER total')
-  check(await q(`SELECT je.segment::text FROM journal_entries je WHERE je.period_month = '2026-11-01' ORDER BY je.entry_no`).then(r => r.map(x => x.segment)),
-    ['director', 'it', 'director', 'corporate'], 'IT’s cost in its own segment')
+  // ── The directors went to Finance without it ─────────────────────────────
+  await q(`INSERT INTO director_monthly_payroll VALUES ('2027-01-01', $1, 'submitted'), ('2027-01-01', $2, 'paid')`, [id(31), id(32)])
+  await reject(SAVE, ['2027-01-01', 5000, 0, 0, false, 0, 0, 0, 'amount', JSON.stringify([{ department_id: MKT, amount: 5000 }])],
+    /The directors of January 2027 are with Finance already — HOUZS Venture's share goes with them, so their batch is sent back first/,
+    'no batch would carry it')
+  check(await save('2027-01-01', [0, 0, 0], 'amount', []), { status: 'none', total: 0 }, 'nothing paid by HV is nothing to refuse')
+
+  // ── The locked months ─────────────────────────────────────────────────────
+  await q(`INSERT INTO period_locks VALUES ('2027-02-01', true)`)
+  await reject(SAVE, ['2027-02-01', 5000, 0, 0, false, 0, 0, 0, 'amount', JSON.stringify([{ department_id: MKT, amount: 5000 }])],
+    /The accounting period February 2027 is locked/, 'not in a locked month')
 
   // Nobody signed in calls nothing.
   await as(null, [])
-  await reject(`SELECT public.director_hv_share_transfer($1, '2026-12-03')`, [NOV], /needs Treasury · Create/, 'no sign-in, no transfer')
   await reject(SAVE, ['2026-10-01', 1, 0, 0, false, 0, 0, 0, 'amount', '[]'], /needs Director Salary · Edit/, 'no sign-in, no save')
+  await reject(`SELECT public.director_hv_share_of('2026-10-01')`, [], /needs Director Salary · View/, 'no sign-in, no read')
 
   console.log(`director HV share: ${checks} checks passed`)
 } finally {

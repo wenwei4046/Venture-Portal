@@ -54,8 +54,11 @@ export async function generatePvFromRequest(
   if (!Array.isArray(sources) || sources.length === 0) {
     throw new Error('At least one source pool allocation is required')
   }
-  if (sources.length > 5) {
-    throw new Error('Too many source pools — the voucher supports at most 5')
+  // Every department can pay a share of the directors (HOUZS Venture's own
+  // share, mig 20261013233000), so one batch may draw on all eight department
+  // pools at once. The database's old five-source cap is long gone.
+  if (sources.length > 12) {
+    throw new Error('Too many source pools — the voucher supports at most 12')
   }
   for (const s of sources) {
     if (!s.pool || typeof s.pool !== 'string') throw new Error('Invalid source pool')

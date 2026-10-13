@@ -104,9 +104,14 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
   ])
 
   // Unreadable (an older database, a refused read) → the grid is the subsidiaries' alone.
+  // The share rides the directors' payroll batch: once they are with Finance it is fixed.
   const hvRead = hvError ? null : (hvRaw as { departments?: unknown; share?: unknown } | null)
   const hv = hvRead
-    ? { departments: readHvDepartments(hvRead.departments), share: readHvShare(hvRead.share) }
+    ? {
+        departments: readHvDepartments(hvRead.departments),
+        share: readHvShare(hvRead.share),
+        directorsSent: (actualPayrollRows ?? []).some(r => r.status === 'submitted' || r.status === 'paid'),
+      }
     : undefined
   const hvShare = hv?.share ?? null
 
@@ -403,7 +408,7 @@ function SubmissionTab({
   // Where the billing-vs-payroll difference went. Derived on the fly from the
   // figures already on this tab — nothing is written to the database.
   // HOUZS Venture's own share is in the pool with the subsidiaries': its
-  // departments pay it into the Director pool (2026-10-13).
+  // departments pay it through the directors' payroll (2026-10-13).
   const hv = hvShare?.components ?? null
   const gap =
     totals && (byCompany.length > 0 || hv)
@@ -764,15 +769,14 @@ function SubmissionTab({
       </section>
 
       {/* HOUZS Venture's own share (2026-10-13): no invoice to a subsidiary —
-          the departments HR picked pay it into the Director pool when Finance
-          transfers it (Payments › Dept Requests). */}
-      {hvShare ? <HvShareSection share={hvShare} /> : null}
+          it is payroll its departments pay, carried by the directors' batch. */}
+      {hvShare ? <HvShareSection share={hvShare} directorsSent={state.withFinance > 0} /> : null}
     </div>
   )
 }
 
-function HvShareSection({ share }: { share: HvShare }) {
-  const transferred = share.status === 'transferred'
+function HvShareSection({ share, directorsSent }: { share: HvShare; directorsSent: boolean }) {
+  const carried = share.status === 'in_payroll'
   return (
     <section className="mt-12">
       <div className="sect-head">
@@ -783,15 +787,21 @@ function HvShareSection({ share }: { share: HvShare }) {
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        {transferred ? (
+        {carried ? (
           <span className="chip ledger">
             <span className="dot" />
-            Transferred{share.transferDate ? ` ${dayjs(share.transferDate).format('D MMM YYYY')}` : ''}
+            In payroll #{share.batchNo ?? '?'}
+            {share.batchSubmittedAt ? ` · ${officeTime(share.batchSubmittedAt).format('D MMM YYYY')}` : ''}
+          </span>
+        ) : directorsSent ? (
+          <span className="chip">
+            <span className="dot" />
+            Directors sent
           </span>
         ) : (
           <span className="chip alert">
             <span className="dot" />
-            With Finance
+            Waits for payroll
           </span>
         )}
       </div>
@@ -803,22 +813,24 @@ function HvShareSection({ share }: { share: HvShare }) {
                 <th>Department</th>
                 {share.splitMode === 'percent' ? <th className="right">Share</th> : null}
                 <th className="right">Amount</th>
-                {transferred ? <th className="m-hide">Invoice · Receipt</th> : null}
               </tr>
             </thead>
             <tbody>
               {share.lines.map(l => (
                 <tr key={l.departmentId}>
-                  <td className="font-medium">{l.department}</td>
+                  <td>
+                    <span className="font-medium">{l.department}</span>
+                    {l.stays ? (
+                      <span className="chip ml-2" title="The Director pool pays this part with the rest of the directors' pay">
+                        <span className="dot" />
+                        Director pool
+                      </span>
+                    ) : null}
+                  </td>
                   {share.splitMode === 'percent' ? (
                     <td className="num">{l.pct == null ? '—' : `${Number(l.pct.toFixed(4))}%`}</td>
                   ) : null}
                   <td className="num">{formatMoney(l.amount)}</td>
-                  {transferred ? (
-                    <td className="m-hide font-mono text-[12px]">
-                      {l.stays ? 'Stays in pool' : l.invoiceNo && l.voucherNo ? `${l.invoiceNo} · ${l.voucherNo}` : '—'}
-                    </td>
-                  ) : null}
                 </tr>
               ))}
             </tbody>
@@ -827,7 +839,6 @@ function HvShareSection({ share }: { share: HvShare }) {
                 <td className="font-bold">Total</td>
                 {share.splitMode === 'percent' ? <td className="num">100%</td> : null}
                 <td className="num font-bold">{formatMoney(share.totalCtc)}</td>
-                {transferred ? <td className="m-hide" /> : null}
               </tr>
             </tfoot>
           </table>
