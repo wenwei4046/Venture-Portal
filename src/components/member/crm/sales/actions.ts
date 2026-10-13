@@ -13,6 +13,7 @@ import type { WaTemplate } from "@/lib/whatsapp/send";
 import { createClient } from "@/lib/supabase/client";
 import { withMapLinks } from "@/lib/member/crm-maps";
 import { mediaKindOf, mediaPath } from "@/lib/member/crm-media";
+import { rememberLocalMedia } from "../shared/pending";
 import { dayLabel, timeLabel, windowShut } from "./vm/common";
 
 export interface SalesActions {
@@ -316,7 +317,8 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
         return sendCrmMedia({ contact: customerId, path, name: file.name || "file", mime, caption });
       });
       if (!r.ok) { swapMessage(customerId, draft.id, null); toast(r.error); return false; }
-      // Keep showing the phone's own copy until the chat is read again (no second download right after sending).
+      // Keep showing the phone's own copy, through every later read too (shared/pending.ts) — no second download.
+      if (r.message.media && local) rememberLocalMedia(r.message.id, local);
       swapMessage(customerId, draft.id, r.message.media && local ? { ...r.message, media: { ...r.message.media, url: local } } : r.message);
       return true;
     },

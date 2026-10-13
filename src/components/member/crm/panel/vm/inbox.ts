@@ -52,14 +52,8 @@ function chatRow(ctx: PanelCtx, c: CrmCustomer) {
   };
 }
 
-/**
- * New (user 2026-10-13: "新進，新被分配，尚未回復的咨詢都放在這裡"): an enquiry nobody of ours has answered since it was
- * given to its present person (or since it came, while it waits in a team) — a fresh one, or one just handed on.
- */
-export function isNewChat(c: CrmCustomer): boolean {
-  const since = c.assignedAt && c.assignedAt > c.createdAt ? c.assignedAt : c.createdAt;
-  return !c.messages.some(m => m.from === "me" && !m.auto && m.at >= since);
-}
+export { isNewChat } from "../../shared/new-chat";
+import { isNewChat } from "../../shared/new-chat";
 
 /** The chats the panel shows: everyone's, and those waiting in a team. Organic Leads are Assignment's. */
 const listed = (ctx: PanelCtx) => ctx.data.customers.filter(c => c.assignedTo || c.teamId);
@@ -76,7 +70,7 @@ export function inboxVM(ctx: PanelCtx) {
   const col = (r: typeof all[number]) => (isNewChat(r.c) ? "new" : r.needs ? "need" : r.c.status === "appointment" ? "appt" : r.c.status === "won" ? "won" : r.c.status === "lost" ? "lost" : "fup");
   return {
     onInbox: ui.tab === "inbox" && !ui.lead,
-    inbSummary: `${list.length} chats · ${need.length} need a reply`,
+    inbSummary: `${list.length} chats · ${need.length} need attention`,
     inbHasChips: chipDefs.length > 1,
     inbChips: chipDefs.map(([id, label, dot]) => ({ label, dot, n: all.filter(r => !id || r.seat.id === id).length,
       bg: f === id ? "#BD4A19" : "#fff", fg: f === id ? "#fff" : "#3F2B22", bd: f === id ? "#BD4A19" : "#EBDDD2", pick: () => set(u => ({ ...u, inbTeam: id, inbWho: "" })) })),
@@ -85,7 +79,7 @@ export function inboxVM(ctx: PanelCtx) {
       const on = who === id;
       return { label, n: all.filter(r => r.seat.id === f && (!id || r.c.assignedTo === id)).length, bg: on ? "#3F2B22" : "transparent", fg: on ? "#fff" : "#806B60", bd: on ? "#3F2B22" : "#E2CFC1", pick: () => set(u => ({ ...u, inbWho: id })) };
     }) : [],
-    inbCols: ([["new", "New", "#BD4A19", "#FFF0E4"], ["need", "Needs a reply", "#A3371A", "#FBE4DE"], ["fup", "Follow up", "#A46312", "#FBF1E3"], ["appt", "Appointment", "#387557", "#E4F1E8"], ["won", "Won", "#2F6FB5", "#E4EDF8"], ["lost", "Lost", "#806B60", "#F2EDE9"]] as const)
+    inbCols: ([["new", "New", "#BD4A19", "#FFF0E4"], ["need", "Attention", "#A3371A", "#FBE4DE"], ["fup", "Follow up", "#A46312", "#FBF1E3"], ["appt", "Appointment", "#387557", "#E4F1E8"], ["won", "Won", "#2F6FB5", "#E4EDF8"], ["lost", "Lost", "#806B60", "#F2EDE9"]] as const)
       .map(([k, title, c, bg]) => { const rows = list.filter(r => col(r) === k); return { title, c, bg, n: rows.length, rows, empty: !rows.length }; }),
     openPc: () => set(u => ({ ...u, pcOpen: true })),
   };

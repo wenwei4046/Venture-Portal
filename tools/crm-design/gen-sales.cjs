@@ -141,6 +141,8 @@ const PATCHES = {
     ['{!!(v.hm.apptOpen) && (<>', EMOJI_PANEL("v", "v.emojiOpen && v.chatWarm", 'margin: "0 -20px", ') + '{!!(v.hm.apptOpen) && (<>'],
     // 2026-10-13: picked photos / videos wait on a preview with an HD switch (shared/pick.ts).
     ['{!!(v.hm.toast) && (<>', PICK_SHEET("v.pk") + '{!!(v.hm.toast) && (<>'],
+    // 2026-10-13: a message that did not reach the customer says why under it (vm/chat.ts › failNote), not only a red tick.
+    [/(<path d=\{m\.tickPath\}>\s*<\/path>\s*<\/svg>\s*<\/>\)\}<\/span>)/, '$1{!!(m.failNote) && (<span style={{ display: "block", marginTop: "3px", fontSize: "11px", lineHeight: "1.35", color: "#A3371A" }}>{m.failNote}</span>)}'],
     // 1.2 Every bubble lifts a little off the wallpaper.
     ["boxSizing: \"border-box\", borderRadius: m.radius, background: m.bg,", "boxSizing: \"border-box\", borderRadius: m.radius, boxShadow: \"0 1px 1px rgba(63,43,34,.10)\", background: m.bg,"]],
   // Switch to: a whole department's list scrolls inside the sheet instead of running off the screen (user 2026-10-09).

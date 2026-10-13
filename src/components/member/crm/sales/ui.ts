@@ -4,7 +4,7 @@
  * CrmData; this is only what the person is doing on screen.
  */
 export type SalesTab = "inbox" | "contacts" | "calendar" | "insight" | "profile";
-export type InboxFilter = { type: "status" | "urgency" | "cold" | "label"; v: string } | null;
+export type InboxFilter = { type: "status" | "urgency" | "cold" | "label" | "new"; v: string } | null;
 
 export interface OutcomeAsk {
   visitId: string;
