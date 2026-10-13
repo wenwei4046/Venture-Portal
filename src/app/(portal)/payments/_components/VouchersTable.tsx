@@ -7,6 +7,7 @@ import SortableTable, { type SortableColumn } from '@/components/SortableTable'
 import { useRowLinks } from '@/components/row-links'
 import { useFinView } from '@/components/layout/fin-view'
 import { SheetIcon } from '@/components/sheet/SheetIcon'
+import { statusTextOf } from '@/lib/payroll-vouchers'
 import AmendRepaymentButton from './AmendRepaymentButton'
 import AmendDateButton from './AmendDateButton'
 import TotalFoot from './TotalFoot'
@@ -40,13 +41,15 @@ export interface VoucherRow {
   batchKey?: string
   /** The bank a receipt came into (2026-10-09, the receipt side's Bank column). */
   bankLabel?: string
-  /** A payroll batch standing as its total, for an account that may not see
-   *  one person's pay (2026-10-02 — lib/payroll-vouchers.ts). The server sends
-   *  this row INSTEAD of the batch's vouchers; it opens nothing. */
+  /** One department of a payroll batch, standing as its total, for an account
+   *  that may not see one person's pay (2026-10-02; by department 2026-10-13 —
+   *  lib/payroll-vouchers.ts). The server sends these rows INSTEAD of the
+   *  batch's vouchers, under the batch's `batchKey`; they open nothing. */
   locked?: boolean
-  /** A locked batch's count and statuses ("26 paid"), for the Finance view to
-   *  say in English (2026-10-10) — `description` keeps the Chinese line. */
-  lockedNote?: { count: number; statusText: string }
+  /** A locked line's count and statuses ("26 paid"), for the Finance view to
+   *  say in English (2026-10-10) — `description` keeps the Chinese line — and
+   *  for its batch to count the vouchers its departments stand for. */
+  lockedNote?: { count: number; statusText: string; statusCounts?: Record<string, number> }
 }
 
 // The status as a chip (2026-10-09, the Finance revamp): pending waits in
@@ -77,11 +80,16 @@ const onPhone = () => typeof window !== 'undefined' && typeof window.matchMedia 
 interface Batch {
   key: string
   members: VoucherRow[]
+  /** The vouchers it holds — a locked department line stands for several. */
+  count: number
   total: number
   latest: string
   /** e.g. "26 paid" or "20 paid · 6 pending approval". */
   statusText: string
 }
+
+/** How many vouchers a row stands for: one, or a locked department line's count. */
+const vouchersIn = (r: VoucherRow) => r.lockedNote?.count ?? 1
 
 function groupBatches(rows: VoucherRow[], word: (status: string) => string = (s) => s.replace('_', ' ')): { plain: VoucherRow[]; batches: Batch[] } {
   const plain: VoucherRow[] = []
@@ -96,17 +104,17 @@ function groupBatches(rows: VoucherRow[], word: (status: string) => string = (s)
     byKey.set(r.batchKey, list)
   }
   const batches: Batch[] = [...byKey.entries()].map(([key, members]) => {
-    const counts = new Map<string, number>()
-    for (const m of members) counts.set(m.status, (counts.get(m.status) ?? 0) + 1)
+    const counts: Record<string, number> = {}
+    for (const m of members) {
+      for (const [s, n] of Object.entries(m.lockedNote?.statusCounts ?? { [m.status]: 1 })) counts[s] = (counts[s] ?? 0) + n
+    }
     return {
       key,
       members,
+      count: members.reduce((n, m) => n + vouchersIn(m), 0),
       total: Math.round(members.reduce((s, m) => s + m.amount, 0) * 100) / 100,
       latest: members.reduce((d, m) => (m.paymentOrCreatedDate > d ? m.paymentOrCreatedDate : d), ''),
-      statusText: [...counts.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .map(([s, n]) => `${n} ${word(s)}`)
-        .join(' · '),
+      statusText: statusTextOf(counts, word),
     }
   })
   batches.sort((a, b) => (a.latest < b.latest ? 1 : -1))
@@ -166,10 +174,11 @@ export default function VouchersTable({
   })
   const word = (status: string) => statusWord(status, fin)
   const money = (n: number) => formatMoney(n).replace('RM ', '')
-  // A locked batch's line, in English on the Finance view (2026-10-10).
+  // A locked department line, in English on the Finance view (2026-10-10):
+  // its batch — the line's own name is the department — how many, their status.
   const describe = (v: VoucherRow): string | null =>
     fin && v.lockedNote
-      ? `${v.lockedNote.count} ${v.lockedNote.count === 1 ? 'voucher' : 'vouchers'} · ${v.lockedNote.statusText} · total only`
+      ? `${v.batchKey ? `${v.batchKey} · ` : ''}${v.lockedNote.count} ${v.lockedNote.count === 1 ? 'voucher' : 'vouchers'} · ${v.lockedNote.statusCounts ? statusTextOf(v.lockedNote.statusCounts, word) : v.lockedNote.statusText}`
       : v.description
   // 2026-10-10 — the handoff: on the Finance view a date is written in full
   // ("06 Oct 2026"), a batch's "05 Sep".
@@ -276,7 +285,7 @@ export default function VouchersTable({
         v.locked ? (
           // The name is the whole of what this row says, month last: it wraps
           // rather than being cut at the column's width.
-          <span className="whitespace-normal" title={`${v.payee_name} · ${fin ? 'this account sees the batch’s total only' : '这个帐号看不到里面每个人的明细'}`}>
+          <span className="whitespace-normal" title={`${v.payee_name} · ${fin ? 'department total — this account does not see each person’s pay' : '部门总数 — 这个帐号看不到里面每个人的明细'}`}>
             <span className="inline-block w-3 mr-1.5 align-[-1px] text-muted [&>svg]:w-3 [&>svg]:h-3">
               <SheetIcon name="lock" />
             </span>
@@ -382,7 +391,7 @@ export default function VouchersTable({
               <span className="pay-batch-title">
                 <span className="pay-batch-name">{b.key}</span>
                 <span className="pay-batch-meta">
-                  {b.members.length} {b.members.length === 1 ? 'voucher' : 'vouchers'} · {b.statusText}
+                  {b.count} {b.count === 1 ? 'voucher' : 'vouchers'} · {b.statusText}
                 </span>
               </span>
               <span className="pay-batch-amt">−{money(b.total)}</span>
@@ -391,25 +400,44 @@ export default function VouchersTable({
             </button>
             {open ? (
               <ul className="pay-batch-list" aria-label={b.key}>
-                {b.members.map((m) => (
-                  <li
-                    key={m.id}
-                    className="pay-batch-row"
-                    tabIndex={0}
-                    title="Double-click to open · right-click for more"
-                    onDoubleClick={() => links.onRowOpen(m)}
-                    onClick={() => onPhone() && links.onRowOpen(m)}
-                    onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && links.onRowOpen(m)}
-                    onContextMenu={(e) => links.onRowContextMenu(m, e)}
-                  >
-                    <span className="pay-batch-no">{m.voucher_no ?? '—'}</span>
-                    <span className="pay-batch-who">{m.payee_name}</span>
-                    <span className="pay-batch-sum">{money(m.amount)}</span>
-                    <span className="pay-bpill" data-tone={STATUS_TONE[m.status] || undefined}>
-                      {word(m.status)}
-                    </span>
-                  </li>
-                ))}
+                {b.members.map((m) =>
+                  m.locked ? (
+                    // A department's total (2026-10-13): nothing in it opens.
+                    <li key={m.id} className="pay-batch-row" title="Department total · this account does not see each person’s pay">
+                      <span className="pay-batch-no">
+                        {vouchersIn(m)} {vouchersIn(m) === 1 ? 'voucher' : 'vouchers'}
+                      </span>
+                      <span className="pay-batch-who">
+                        <span className="inline-block w-3 mr-1.5 align-[-1px] text-muted [&>svg]:w-3 [&>svg]:h-3">
+                          <SheetIcon name="lock" />
+                        </span>
+                        {m.payee_name}
+                      </span>
+                      <span className="pay-batch-sum">{money(m.amount)}</span>
+                      <span className="pay-bpill" data-tone={STATUS_TONE[m.status] || undefined}>
+                        {m.lockedNote?.statusCounts && m.status === 'mixed' ? statusTextOf(m.lockedNote.statusCounts, word) : word(m.status)}
+                      </span>
+                    </li>
+                  ) : (
+                    <li
+                      key={m.id}
+                      className="pay-batch-row"
+                      tabIndex={0}
+                      title="Double-click to open · right-click for more"
+                      onDoubleClick={() => links.onRowOpen(m)}
+                      onClick={() => onPhone() && links.onRowOpen(m)}
+                      onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && links.onRowOpen(m)}
+                      onContextMenu={(e) => links.onRowContextMenu(m, e)}
+                    >
+                      <span className="pay-batch-no">{m.voucher_no ?? '—'}</span>
+                      <span className="pay-batch-who">{m.payee_name}</span>
+                      <span className="pay-batch-sum">{money(m.amount)}</span>
+                      <span className="pay-bpill" data-tone={STATUS_TONE[m.status] || undefined}>
+                        {word(m.status)}
+                      </span>
+                    </li>
+                  ),
+                )}
               </ul>
             ) : null}
           </div>
@@ -439,7 +467,7 @@ export default function VouchersTable({
                       <span className="font-mono text-xs text-muted w-3 shrink-0">{open ? '▾' : '▸'}</span>
                       <span className="font-serif text-[15px] text-ink truncate">{b.key}</span>
                       <span className="font-mono text-xs text-muted whitespace-nowrap">
-                        {b.members.length} 张 · {b.statusText}
+                        {b.count} 张 · {b.statusText}
                       </span>
                     </span>
                     <span className="flex items-baseline gap-4 shrink-0">

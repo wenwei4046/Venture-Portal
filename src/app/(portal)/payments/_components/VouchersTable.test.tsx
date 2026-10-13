@@ -220,6 +220,27 @@ describe('a locked payroll batch', () => {
     expect(screen.queryByRole('button', { name: /Payroll disbursement/ })).toBeNull()
     expect(screen.getByRole('table')).toBeVisible()
   })
+
+  // 2026-10-13: the server sends a batch department by department, under the
+  // batch's key — it unfolds to its departments, none of which opens.
+  it('sent by department, it unfolds to its departments — counted by the vouchers they stand for', () => {
+    const dept = (department: string, amount: number, count: number): VoucherRow => ({
+      ...locked, id: `locked-Payroll disbursement Sep 2026|${department}`, payee_name: department, amount,
+      description: `Payroll disbursement Sep 2026 · ${count} 张 · ${count} paid`, batchKey: 'Payroll disbursement Sep 2026',
+      lockedNote: { count, statusText: `${count} paid`, statusCounts: { paid: count } },
+    })
+    render(<VouchersTable rows={[voucher, dept('Marketing', 60000, 20), dept('HR', 26420, 6)]} />)
+    const head = screen.getByRole('button', { name: /Payroll disbursement Sep 2026/ })
+    expect(head).toHaveTextContent('26 张 · 26 paid')
+    expect(head).toHaveTextContent('−86,420.00')
+    fireEvent.click(head)
+    const marketing = rowOf('Marketing')
+    expect(marketing).toHaveTextContent('Payroll disbursement Sep 2026 · 20 张 · 20 paid')
+    fireEvent.doubleClick(screen.getByText('Marketing'))
+    fireEvent.keyDown(marketing, { key: 'Enter' })
+    expect(push).not.toHaveBeenCalled()
+    expect(marketing.getAttribute('tabindex')).toBeNull()
+  })
 })
 
 // 2026-10-08 (production): a voucher not yet paid is dated by the moment it
@@ -408,18 +429,49 @@ describe('the handoff’s list on the Finance view', () => {
     expect(screen.getByRole('menu', { name: 'Actions for HV-PV-202609-0300 · paid' })).toBeInTheDocument()
   })
 
-  it('a locked payroll batch reads in English: how many, their status, total only', () => {
+  it('a locked department line reads in English: its batch, how many, their status', () => {
     const locked: VoucherRow = {
-      id: 'locked-Payroll disbursement Sep 2026', voucher_no: null, direction: 'debit', amount: 86420,
-      payee_name: 'Payroll disbursement Sep 2026', status: 'paid', catLabel: 'Payroll', poolLabel: '—',
-      description: '26 张 · 26 paid · 只显示总数', paymentOrCreatedDate: '2026-10-05', locked: true,
-      lockedNote: { count: 26, statusText: '26 paid' },
+      id: 'locked-Payroll net Sep 2026|Marketing', voucher_no: null, direction: 'debit', amount: 36420,
+      payee_name: 'Marketing', status: 'mixed', catLabel: 'Payroll', poolLabel: '—',
+      description: 'Payroll net Sep 2026 · 12 张 · 11 paid · 1 pending approval', paymentOrCreatedDate: '2026-10-05', locked: true,
+      batchKey: 'Payroll net Sep 2026', lockedNote: { count: 12, statusText: '11 paid · 1 pending approval', statusCounts: { paid: 11, pending_approval: 1 } },
     }
-    fin(<VouchersTable rows={[locked]} />)
+    // Laid flat, as a search lays it.
+    fin(<VouchersTable rows={[locked]} collapseBatches={false} />)
     const row = document.querySelector('tbody tr') as HTMLElement
-    expect(cell(row, 'description')).toHaveTextContent('26 vouchers · 26 paid · total only')
+    // Cut to the cell's width; whole on hover.
+    expect(cell(row, 'description')).toHaveTextContent('Payroll net Sep 2026 · 12 vouchers · 11 paid')
+    expect(cell(row, 'description').querySelector('[title]')).toHaveAttribute('title', 'Payroll net Sep 2026 · 12 vouchers · 11 paid · 1 pending')
+    expect(cell(row, 'payee_name')).toHaveTextContent('Marketing')
     // The cells this table draws (the phone's chevron cell is SortableTable's own).
     for (const td of Array.from(row.querySelectorAll(':scope > td:not(.lt-toggle)'))) expect(td.innerHTML).not.toMatch(/[㐀-鿿]/)
+  })
+
+  // 2026-10-13 — the user: "就算能看到 pv，应该也是看到 by 整个部门才对".
+  it('a locked payroll batch: its vouchers counted whole, and opened, one line per department that opens nothing', () => {
+    const line = (department: string, amount: number, count: number, statusCounts: Record<string, number>): VoucherRow => ({
+      id: `locked-Payroll net Sep 2026|${department}`, voucher_no: null, direction: 'debit', amount,
+      payee_name: department, status: Object.keys(statusCounts).length === 1 ? Object.keys(statusCounts)[0] : 'mixed',
+      catLabel: 'Payroll', poolLabel: '—', description: null, paymentOrCreatedDate: '2026-10-06', locked: true,
+      batchKey: 'Payroll net Sep 2026',
+      lockedNote: { count, statusText: Object.entries(statusCounts).map(([s, n]) => `${n} ${s.replace('_', ' ')}`).join(' · '), statusCounts },
+    })
+    fin(<VouchersTable rows={[line('Marketing', 36420, 12, { paid: 11, pending_approval: 1 }), line('IT', 7250.4, 2, { paid: 2 })]} />)
+    const head = screen.getByRole('button', { name: /Payroll net Sep 2026/ })
+    expect(head).toHaveTextContent('14 vouchers · 13 paid · 1 pending')
+    expect(head.querySelector('.pay-batch-amt')).toHaveTextContent('−43,670.40')
+    fireEvent.click(head)
+    const items = within(screen.getByRole('list', { name: 'Payroll net Sep 2026' })).getAllByRole('listitem')
+    expect(items.map((li) => Array.from(li.children).map((c) => c.textContent))).toEqual([
+      ['12 vouchers', 'Marketing', '36,420.00', '11 paid · 1 pending'],
+      ['2 vouchers', 'IT', '7,250.40', 'paid'],
+    ])
+    fireEvent.doubleClick(within(items[0]).getByText('Marketing'))
+    fireEvent.click(items[1])
+    fireEvent.contextMenu(items[0])
+    expect(push).not.toHaveBeenCalled()
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(items[0].getAttribute('tabindex')).toBeNull()
   })
 
   it('searches by the side’s own words', () => {
