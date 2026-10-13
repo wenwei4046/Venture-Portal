@@ -127,6 +127,10 @@ export default function SalesChat({ v }: { v: ChatVM }) {
                     </div>
                   </div>
                 </>)}
+                {!!(m.img) && (<a href={m.img} target="_blank" rel="noreferrer" style={{ display: "block", margin: "-2px -4px 4px" }}><img src={m.img} alt="Photo" style={{ display: "block", width: "100%", maxWidth: "240px", maxHeight: "300px", objectFit: "cover", borderRadius: "12px" }} /></a>)}
+                {!!(m.vid) && (<video src={m.vid} controls playsInline preload="metadata" style={{ display: "block", width: "240px", maxWidth: "100%", margin: "-2px -4px 4px", borderRadius: "12px", background: "#000" }} />)}
+                {!!(m.aud) && (<audio src={m.aud} controls preload="metadata" style={{ display: "block", width: "240px", maxWidth: "100%", height: "40px", margin: "0 0 2px" }} />)}
+                {!!(m.file) && (<a href={m.file} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginBottom: "2px", fontSize: "13px", fontWeight: "650", color: "#BD4A19" }}>Open file</a>)}
                 <p style={{ display: m.pDisp, margin: "0", whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: m.size, lineHeight: "1.45", fontStyle: m.textStyle, color: m.textColor }}>
                   {(m.parts).map((pt, pt_i) => (<Fragment key={pt_i}>
                     <span style={{ fontWeight: pt.w }}>{pt.t}</span>
@@ -136,7 +140,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
                     <span style={{ fontStyle: "italic", opacity: ".85" }}>Sent by {m.by} ·</span>
                   </>)}{m.at}{!!(m.tick) && (<>
                     <svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke={m.tickColor} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-label={m.tickLabel}>
-                      <path d="M1 6l3 3 6-7M7 8.5l.5.5 6-7">
+                      <path d={m.tickPath}>
                       </path>
                     </svg>
                   </>)}</span>
@@ -223,7 +227,20 @@ export default function SalesChat({ v }: { v: ChatVM }) {
             </svg>Send template message</span>
         </div>
       </>)}
-      {!!(v.chatWarm) && (<>
+      {!!(v.chatWarm && v.rec) && (<>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 0" }}>
+          <span onClick={v.rec?.cancel} title="Cancel" style={{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid rgb(235 221 210)", display: "grid", placeItems: "center", color: "#A3371A", cursor: "pointer" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg>
+          </span>
+          <span style={{ flex: "1", minWidth: "0", height: "44px", boxSizing: "border-box", borderRadius: "22px", background: "#FBF1EC", display: "flex", alignItems: "center", gap: "10px", padding: "0 16px", fontSize: "15px", fontWeight: "600", color: "#3F2B22", fontVariantNumeric: "tabular-nums" }}>
+            <span style={{ flex: "none", width: "10px", height: "10px", borderRadius: "50%", background: "#D93025", animation: "fadeIn 700ms ease-in-out infinite alternate" }}></span>{v.rec?.time} · Recording…
+          </span>
+          <span onClick={v.rec?.send} title="Send voice note" style={{ flex: "none", width: "44px", height: "44px", borderRadius: "50%", display: "grid", placeItems: "center", background: "#BD4A19", color: "#fff", cursor: "pointer" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12 20 4l-4 16-4-7-8-1Zm8 1 8-9"></path></svg>
+          </span>
+        </div>
+      </>)}
+      {!!(v.chatWarm && !v.rec) && (<>
         <div style={{ display: "flex", alignItems: "flex-end", gap: "6px", padding: "8px 0" }}>
           <span onClick={v.openAtt} title="Attach" style={{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid rgb(235 221 210)", display: "grid", placeItems: "center", color: "rgb(128 107 96)", cursor: "pointer" }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
@@ -244,7 +261,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
             </>)}
           </span>
           {!!(v.noDraft) && (<>
-            <span style={{ flex: "none", width: "40px", height: "44px", display: "grid", placeItems: "center", color: "rgb(128 107 96)" }}>
+            <span onClick={v.openCamera} title="Camera" style={{ flex: "none", width: "40px", height: "44px", display: "grid", placeItems: "center", color: "rgb(128 107 96)" , cursor: "pointer" }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 8h3l2-3h6l2 3h3v11H4V8Zm8 3a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z">
                 </path>
@@ -252,7 +269,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
             </span>
           </>)}
           {!!(v.noDraft) && (<>
-            <span style={{ flex: "none", width: "44px", height: "44px", borderRadius: "50%", display: "grid", placeItems: "center", background: "#BD4A19", color: "#fff" }}>
+            <span onClick={v.micTap} title="Voice note" style={{ flex: "none", width: "44px", height: "44px", borderRadius: "50%", display: "grid", placeItems: "center", background: "#BD4A19", color: "#fff" , cursor: "pointer" }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-7 9a7 7 0 0 0 14 0M12 19v3">
                 </path>

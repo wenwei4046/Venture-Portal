@@ -46,6 +46,10 @@ export interface CrmMessageRow {
   sent_at: string;
   /** Meta's media id: the file is fetched by our route, never by the browser from Meta. */
   media_id?: string | null;
+  /** A file we sent, in the private bucket crm-media (mig 20261013240000). */
+  media_path?: string | null;
+  /** Messenger's address for a customer's attachment (its own CDN). */
+  media_url?: string | null;
   status?: "received" | "sent" | "delivered" | "read" | "failed" | null;
   error?: string | null;
 }
@@ -110,7 +114,7 @@ const ATTACHMENT_KIND: Record<string, CrmAttachment["kind"]> = { image: "image",
 
 export function messageFromRow(row: CrmMessageRow, owner: string | null): CrmMessage {
   const media = MEDIA_LABEL[row.kind];
-  const shown = row.media_id ? ATTACHMENT_KIND[row.kind] : undefined;
+  const shown = row.media_id || row.media_path || row.media_url ? ATTACHMENT_KIND[row.kind] : undefined;
   // With the file shown, the caption is the text; without it, the label says what it was.
   const text = shown ? row.body ?? "" : media ? (row.body ? `${media} · ${row.body}` : media) : row.body ?? "";
   return {

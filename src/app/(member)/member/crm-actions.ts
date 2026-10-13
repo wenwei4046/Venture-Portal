@@ -9,6 +9,7 @@ import { cleanText, fetchWhatsAppTemplateStatuses, fillTemplate, mediaMessage, m
 import { messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from "@/lib/messenger/send";
 import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText, whatsappVisitMessage } from "@/lib/member/crm-maps";
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
+import { mediaKindOf, mediaLimit } from "@/lib/member/crm-media";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
 /**
@@ -53,7 +54,6 @@ export async function crmWrite(name: CrmWrite, args: Record<string, unknown>): P
 
 type Db = SupabaseClient;
 /** The largest photo or file a member sends from the CRM (the client checks the same). */
-const CRM_MEDIA_BYTES = 4 * 1024 * 1024;
 /** This site, as the request reached it: where a Messenger map button sends the customer (/nav.html). */
 const siteBase = async () => {
   const h = await headers();
@@ -126,7 +126,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
         .select("id, channel, account_id, external_id, name, phone, ad_source_id, ad_headline, status, lost_reason, lost_note, previous_status, assigned_to, team_id, last_customer_at, unread, created_at, property_type, unit_size, unit_location, requirement, budget, won_amount, details_at, assigned_at, assigned_by, held_reason", withCount ? { count: "exact" } : undefined)
         .order("created_at").order("id").range(from, to), "crm contacts"),
       fetchAllRowsParallel<CrmDataRows["messages"][number]>((from, to, withCount) => db.from("crm_messages")
-        .select("id, contact_id, direction, kind, body, media_id, auto, sent_by, sent_at, status, error, reply_to, my_reaction, card", withCount ? { count: "exact" } : undefined)
+        .select("id, contact_id, direction, kind, body, media_id, media_path, media_url, auto, sent_by, sent_at, status, error, reply_to, my_reaction, card", withCount ? { count: "exact" } : undefined)
         .order("sent_at").order("id").range(from, to), "crm messages"),
       read<CrmDataRows["visits"]>(db.from("crm_appointments").select("id, contact_id, showroom, start_at, minutes, state, outcome, reminded_at")),
       read<CrmDataRows["rooms"]>(db.from("crm_showrooms").select("id, name, active, sort_order, address, slots, cap, weekly, blocks")),
@@ -201,7 +201,11 @@ interface Reachable { id: string; channel: "whatsapp" | "messenger"; account_id:
 /** The customer as the sender needs them — read under RLS, then asked may-you-reply, then Meta's window. */
 async function reachable(db: Db, contactId: string, freeText: boolean): Promise<{ contact: Reachable; token: string; window: "open" | "human_agent" | "shut" }> {
   if (!/^[0-9a-f-]{36}$/i.test(contactId)) throw new Error("Choose a customer first.");
-  const { data: contact, error } = await db.from("crm_contacts").select("id, channel, account_id, external_id, assigned_to, last_customer_at").eq("id", contactId).maybeSingle();
+  // The customer and may-I-reply are asked side by side: each send waited for one, then the other.
+  const [{ data: contact, error }, { data: allowed, error: checkError }] = await Promise.all([
+    db.from("crm_contacts").select("id, channel, account_id, external_id, assigned_to, last_customer_at").eq("id", contactId).maybeSingle(),
+    db.rpc("crm_can_reply", { p_contact: contactId }),
+  ]);
   if (error) throw new Error(error.message);
   if (!contact) throw new Error("That customer is not in your CRM.");
   const c = contact as Reachable;
@@ -211,7 +215,6 @@ async function reachable(db: Db, contactId: string, freeText: boolean): Promise<
       ? "More than 7 days since the customer's last message — Messenger no longer allows a reply."
       : "More than 24 hours since the customer's last message — WhatsApp only allows an approved template now.");
   }
-  const { data: allowed, error: checkError } = await db.rpc("crm_can_reply", { p_contact: contactId });
   if (checkError) throw new Error(checkError.message);
   if (allowed !== true) throw new Error("You may not reply to this customer.");
   const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
@@ -235,8 +238,7 @@ export async function sendCrmMessage(contactId: string, text: string, opts: { re
     const clean = cleanText(text);
     if (!clean.ok) throw new Error(clean.error);
     const db = await session();
-    await requireCrm("edit");
-    const { contact, token, window } = await reachable(db, contactId, true);
+    const [, { contact, token, window }] = await Promise.all([requireCrm("edit"), reachable(db, contactId, true)]);
     let quote: string | null = null;
     if (opts.replyTo) {
       const { data: q } = await db.from("crm_messages").select("id, external_id, contact_id").eq("id", opts.replyTo).maybeSingle();
@@ -375,35 +377,55 @@ export async function sendCrmTemplate(contactId: string, template: { name: strin
 }
 
 /** A photo or document from the chat's + sheet. */
-export async function sendCrmMedia(form: FormData): Promise<{ ok: true; message: CrmChatMessage } | { ok: false; error: string }> {
+/**
+ * Send a photo, video, voice note or document (2026-10-13). The browser has put the file in the private bucket crm-media
+ * under the member's own session (its policy: only into a customer they may reply to), so a file is no longer held to
+ * the 4 MB a Server Action carries. Here: read it back under the same session, send it to the customer — WhatsApp by an
+ * uploaded media id, Messenger as an attachment — record the message and give it its file (crm_set_out_media), so both
+ * sides see the picture. An iPhone video (QuickTime) goes to WhatsApp as MP4, which is what it holds; if WhatsApp still
+ * refuses a video or a voice note, it goes as a document so the customer gets it either way.
+ */
+export async function sendCrmMedia(input: { contact: string; path: string; name: string; mime: string; caption?: string }): Promise<{ ok: true; message: CrmChatMessage } | { ok: false; error: string }> {
   try {
-    const contactId = String(form.get("contact") ?? ""), caption = String(form.get("caption") ?? "").trim();
-    const file = form.get("file");
-    if (!(file instanceof Blob) || file.size === 0) throw new Error("Choose a file first.");
-    const filename = (file as File).name || "file";
-    const kind: "image" | "document" = ["image/jpeg", "image/png"].includes(file.type) ? "image" : "document";
-    // Vercel takes ~4.5 MB in one request (next.config.ts bodySizeLimit 4 MB): a larger file never reaches here.
-    if (file.size > CRM_MEDIA_BYTES) throw new Error("A photo or file can be up to 4 MB.");
+    const contactId = input.contact, caption = (input.caption ?? "").trim(), mime = input.mime.split(";")[0].trim().toLowerCase();
+    if (!new RegExp(`^${contactId.replace(/[^0-9a-f-]/gi, "")}/[A-Za-z0-9._-]{1,120}$`).test(input.path)) throw new Error("Choose the file again.");
+    const filename = (input.name || "file").replace(/[^\w.\- ]+/g, "_").slice(0, 120) || "file";
     const db = await session();
-    await requireCrm("edit");
-    const { contact, token, window } = await reachable(db, contactId, true);
+    const [, { contact, token, window }, got] = await Promise.all([requireCrm("edit"), reachable(db, contactId, true), db.storage.from("crm-media").download(input.path)]);
+    if (got.error || !got.data) throw new Error("The file did not arrive. Try again.");
+    const file = got.data;
+    let kind = mediaKindOf(mime);
+    if (file.size > mediaLimit(contact.channel, kind)) {
+      throw new Error(`${kind === "image" ? "A photo" : kind === "video" ? "A video" : kind === "audio" ? "A voice note" : "A file"} can be up to ${Math.round(mediaLimit(contact.channel, kind) / 1048576)} MB on ${contact.channel === "messenger" ? "Messenger" : "WhatsApp"}.`);
+    }
     let externalId: string;
     if (contact.channel === "messenger") {
       const pageAccess = await pageToken(contact.account_id, token);
       if (!pageAccess) throw new Error("This Facebook Page is not connected to the CRM. Ask your administrator.");
-      const sent = await sendMessengerAttachment({ pageId: contact.account_id, psid: contact.external_id, token: pageAccess, window: window as "open" | "human_agent", kind: kind === "image" ? "image" : "file", file, filename });
+      const typed = new Blob([await file.arrayBuffer()], { type: mime });
+      const sent = await sendMessengerAttachment({ pageId: contact.account_id, psid: contact.external_id, token: pageAccess, window: window as "open" | "human_agent", kind: kind === "document" ? "file" : kind, file: typed, filename });
       if (!sent.ok) throw new Error(sent.error);
       externalId = sent.mid;
     } else {
-      const up = await uploadWhatsAppMedia({ phoneNumberId: contact.account_id, token, file, filename });
-      if (!up.ok) throw new Error(up.error);
-      const sent = await sendWhatsApp({ phoneNumberId: contact.account_id, token, message: mediaMessage(contact.external_id, kind, up.id, caption, filename) });
+      const sendAs = async (k: typeof kind) => {
+        const type = k === "video" && mime === "video/quicktime" ? "video/mp4" : k === "document" ? (mime || "application/octet-stream") : mime;
+        const name = k === "video" && mime === "video/quicktime" ? filename.replace(/\.mov$/i, "") + ".mp4" : filename;
+        const up = await uploadWhatsAppMedia({ phoneNumberId: contact.account_id, token, file: new Blob([await file.arrayBuffer()], { type }), filename: name });
+        if (!up.ok) return up;
+        return sendWhatsApp({ phoneNumberId: contact.account_id, token, message: mediaMessage(contact.external_id, k, up.id, caption, name) });
+      };
+      let sent = await sendAs(kind);
+      if (!sent.ok && (kind === "video" || kind === "audio")) { kind = "document"; sent = await sendAs("document"); }
       if (!sent.ok) throw new Error(sent.error);
-      externalId = sent.wamid;
+      externalId = (sent as { wamid: string }).wamid;
     }
-    const message = await recorded(db, { contact: contactId, externalId, kind, body: caption || filename });
+    // crm_record_out knows image and document; crm_set_out_media then names the kind from the file and keeps the caption.
+    const message = await recorded(db, { contact: contactId, externalId, kind: kind === "image" ? "image" : "document", body: caption || filename });
     if (!message) return { ok: false, error: "Sent to the customer, but it could not be saved here. Reload before sending again." };
-    return { ok: true, message };
+    const { error: mediaError } = await db.rpc("crm_set_out_media", { p_message: message.id, p_path: input.path, p_mime: mime || "application/octet-stream", p_caption: caption });
+    if (mediaError) return { ok: true, message };
+    const shown = kind === "document" ? "file" : kind;
+    return { ok: true, message: { ...message, kind, text: kind === "document" ? message.text : caption, media: { kind: shown, url: `/member/crm-media/${message.id}`, ...(shown === "file" ? { name: filename } : {}) } } };
   } catch (error) {
     return { ok: false, error: friendly(error, "The file could not be sent.") };
   }

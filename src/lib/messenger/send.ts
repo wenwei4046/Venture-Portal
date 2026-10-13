@@ -106,7 +106,7 @@ export async function sendMessengerText(
 
 /** A photo or file through the Send API (uploaded with the message); same windows as text. */
 export async function sendMessengerAttachment(
-  opts: { pageId: string; psid: string; token: string; window: Exclude<MessengerWindow, "shut">; kind: "image" | "file"; file: Blob; filename: string },
+  opts: { pageId: string; psid: string; token: string; window: Exclude<MessengerWindow, "shut">; kind: "image" | "video" | "audio" | "file"; file: Blob; filename: string },
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ ok: true; mid: string } | { ok: false; error: string }> {
   const form = new FormData();

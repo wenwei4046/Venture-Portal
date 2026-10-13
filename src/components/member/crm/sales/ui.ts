@@ -79,6 +79,9 @@ export interface SalesUi {
   /** The WhatsApp Business Account's approved templates, read when the sheet first opens. */
   templates: import("@/lib/whatsapp/send").WaTemplate[] | null;
   sending: boolean;
+  /** A voice note being recorded: when it started (shared/voice.ts); recTick moves its clock. */
+  rec: number | null;
+  recTick?: number;
   // Calendar
   calView: "month" | "week" | "day";
   calSel: number | null;
@@ -107,7 +110,7 @@ export const initialSalesUi = (): SalesUi => ({
   q: "", filter: null, adSel: [], adSheet: null, swipe: null, moreLead: null, moreView: "main", labelForm: null, toast: "",
   cq: "", cSwipe: null, rename: null, cInfo: null,
   hover: null, menu: null, reply: null, draft: {}, att: false, qr: false, qrPage: null, qrNew: { s: "", m: "" }, qrEditIdx: null,
-  hm: null, cform: null, book: null, cancelAsk: null, tpl: false, templates: null, sending: false,
+  hm: null, cform: null, book: null, cancelAsk: null, tpl: false, templates: null, sending: false, rec: null,
   calView: "month", calSel: null, calYM: null, outcomeAsk: null, celebrate: null, rebookFor: null,
   insPeriod: "month", insRange: null, insSheet: null, insList: null, insInfo: null, nTab: "unread",
   profSub: null, teamOpen: false, swOpen: false, tp: null,
