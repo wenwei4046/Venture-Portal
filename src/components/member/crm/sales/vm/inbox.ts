@@ -46,7 +46,7 @@ export function inboxVM(ctx: SalesCtx) {
   const chipDefs: [string, NonNullable<InboxFilter>["type"] | null, string | null, number][] = [
     ["All", null, null, warm.length],
     // New (2026-10-13): not answered by them since it came or was handed to them — shared/new-chat.ts.
-    ["New", "new", "#BD4A19", warm.filter(isNewChat).length],
+    ["New", "new", "#7A4FB0", warm.filter(isNewChat).length],
     ["Attention", "urgency", "#A3371A", warm.filter(c => urgencyOf(c, now).level !== "none").length],
     ...([["Follow up", "#A46312"], ["Appointment", "#387557"], ["Won", "#2F6FB5"], ["Lost", "#806B60"]] as const)
       .map(([s, dot]): [string, "status", string, number] => [s, "status", dot, warm.filter(c => STATUS_LABEL[c.status] === s).length]),
