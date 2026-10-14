@@ -217,6 +217,8 @@ export interface CrmData {
   templates?: CrmTemplate[];
   /** CRM Desktop rev 1 (B3): notifications this person deleted (their own; keys as notifRead's). */
   notifDeleted?: string[];
+  /** The chat composer's Recents (mig 20261014251500): this person's recent emoji, most recent first. */
+  recentEmoji?: string[];
   /** CRM Desktop rev 1 (B5): the Customer info form the Principal / Director set — every salesperson's Customer info follows it. */
   forms?: CrmForm[];
   /** CRM Desktop rev 1 (B6): notes on customers, newest first. */
@@ -310,7 +312,7 @@ export interface CrmDataRows {
   invites: CrmInviteRow[];
   shares: { contact_id: string; staff_id: string; invited_by: string | null; joined_at: string }[];
   events: CrmEventRow[];
-  staffPrefs: { notifs_seen_at: string | null; notif_read?: string[] | null; notif_deleted?: string[] | null }[];
+  staffPrefs: { notifs_seen_at: string | null; notif_read?: string[] | null; notif_deleted?: string[] | null; recent_emoji?: string[] | null }[];
   /** CRM Desktop rev 1 (B5 / B6): absent where the database has none yet. */
   forms?: { id: string; name: string; sections: CrmForm["sections"] | null; sort_order: number }[];
   notes?: { id: string; contact_id: string; body: string; author: string | null; created_at: string }[];
@@ -432,6 +434,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     notifsSeenAt: rows.staffPrefs[0]?.notifs_seen_at ?? null,
     notifRead: rows.staffPrefs[0]?.notif_read ?? [],
     notifDeleted: rows.staffPrefs[0]?.notif_deleted ?? [],
+    recentEmoji: rows.staffPrefs[0]?.recent_emoji ?? [],
     adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at, ...(r.team_modes ? { tm: r.team_modes } : {}) })),
     ftRules: rows.ftRules.map(r => ({ tlId: r.tl_id, mode: r.mode, days: r.days ?? [], vals: r.vals ?? {} })),
     templates: (rows.templates ?? []).map(t => ({ id: t.id, name: t.name, ch: t.channel, st: t.status, body: t.body, on: t.is_on, metaName: t.meta_name, language: t.language, reason: t.reject_reason })),

@@ -59,8 +59,9 @@ export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: (
     {!!ui.toast && ui.tab !== "inbox" && !chat && (
       <div style={{ position: "absolute", left: "20px", right: "20px", bottom: "96px", zIndex: 30, padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: typePx(14), fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{ui.toast}</div>
     )}
+    {/* In a chat, where the composer's own toast stands (the composer handoff): 16px in, just above the bar. */}
     {!!ui.toast && chat && !ui.hm?.toast && (
-      <div style={{ position: "absolute", left: "20px", right: "20px", bottom: "90px", zIndex: 30, padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: typePx(14), fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{ui.toast}</div>
+      <div style={{ position: "absolute", left: "16px", right: "16px", bottom: "calc(74px + var(--safe-bottom, 0px))", zIndex: 30, padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: typePx(14), fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{ui.toast}</div>
     )}
   </>);
 }

@@ -24,7 +24,7 @@ import {
 } from '@/components/treasury/DealFormShell'
 
 interface Props {
-  companies: Company[]
+  companies: Array<Pick<Company, 'id' | 'name' | 'short_code'>>
   baseRate: { rate: number; quarter: string }
   bsAccounts: BsAccountOption[]
   banks: { id: string; bank_name: string; account_number: string; current_balance: number; is_primary: boolean }[]

@@ -13,6 +13,7 @@ import {
   newQuestionId,
   templateContentType,
   templateObjectPath,
+  templateIcon,
   templateRefusal,
   templateView,
   waitingFormRefusal,
@@ -147,6 +148,15 @@ describe('View — how HR’s file is drawn', () => {
     expect(templateView('form.html')).toBe('html')
     expect(templateView('form.doc')).toBe('none')
     expect(templateView('form')).toBe('none')
+  })
+
+  it('names the icon the chip wears — Word for .doc as well, whatever the case', () => {
+    expect(templateIcon('Revenue_Team_Waiting_List_Form_04.09.2026 (2).docx')).toBe('word')
+    expect(templateIcon('OLD.DOC')).toBe('word')
+    expect(templateIcon('form.pdf')).toBe('pdf')
+    expect(templateIcon('scan.jpeg')).toBe('image')
+    expect(templateIcon('form.html')).toBe('html')
+    expect(templateIcon('form')).toBe('file')
   })
 
   it('puts a Word file’s words on a white page, its title escaped', () => {

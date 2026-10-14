@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import type { ReactNode } from 'react'
 import { officeTime } from '@/lib/office-time'
 import AmendDateButton from '../../_components/AmendDateButton'
 import type { VoucherDetail } from '../../_lib/voucher-detail'
@@ -8,7 +7,8 @@ import ReassignGlAccountButton from './ReassignGlAccountButton'
 import FullPageSteps from './FullPageSteps'
 import FullPageFiles from './FullPageFiles'
 import CopyAsDraft from './CopyAsDraft'
-import s from './full.module.css'
+import s from '@/components/finv/full.module.css'
+import { FullAudit, FullCard as Card, FullFact as Fact, FullPanelRow as PanelRow, FullRow as Row, FullTrail } from '@/components/finv/FullParts'
 
 // A payment voucher's full page (2026-10-14, the Finance revamp v2 — D06 of
 // `.design/fin-r2/handoff`): "← Payments" and the crumb; the number, its
@@ -184,45 +184,11 @@ export default function FinanceVoucherPage({ detail: v, extras, canCopy }: { det
           </Card>
 
           <Card n={++n} title="Trail" aside={`${done} / ${v.trail.length} steps`}>
-            <div className={s.trail}>
-              {v.trail.map((t, i) => (
-                <div key={i} className={s.step} data-state={t.state}>
-                  <div className={s.stepRail}>
-                    <span className={s.stepDot} />
-                    <span className={s.stepLine} data-on={v.trail[i + 1] && v.trail[i + 1].state !== 'todo' ? 'true' : undefined} />
-                  </div>
-                  <span className={s.stepLabel}>{t.label}</span>
-                  <span className={s.stepBy}>
-                    {t.by ?? (t.state === 'todo' ? '' : '—')}
-                    <br />
-                    {t.at ? stamp(t.at) : (t.note ?? '')}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <FullTrail steps={v.trail.map((t) => ({ label: t.label, by: t.by, when: t.at ? stamp(t.at) : (t.note ?? null), state: t.state }))} />
           </Card>
 
           <Card n={++n} title="Audit log" aside={plural(extras.audit.length, 'EVENT', 'EVENTS')}>
-            {extras.audit.length === 0 ? (
-              <p className={s.none}>No change on record.</p>
-            ) : (
-              <div className={s.table}>
-                <div className={s.tHead}>
-                  <span className={s.aWhen}>When</span>
-                  <span className={s.aWho}>Who</span>
-                  <span className={s.aWhat}>What changed</span>
-                </div>
-                {extras.audit.map((a, i) => (
-                  <div key={i} className={s.aRow}>
-                    <span className={s.aWhen}>{a.at}</span>
-                    <span className={s.aWho} title={a.who}>
-                      {a.who}
-                    </span>
-                    <span className={s.aWhat}>{a.what}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <FullAudit rows={extras.audit} />
           </Card>
         </div>
 
@@ -264,52 +230,3 @@ export default function FinanceVoucherPage({ detail: v, extras, canCopy }: { det
   )
 }
 
-function Fact({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <span className={s.fact}>
-      <span className={s.factLabel}>{label}</span>
-      <span className={s.factValue} data-mono={mono ? 'true' : undefined}>
-        {value}
-      </span>
-    </span>
-  )
-}
-
-function Card({ n, title, aside, extra, children }: { n: number; title: string; aside?: string; extra?: ReactNode; children: ReactNode }) {
-  return (
-    <section className={s.card} aria-label={title}>
-      <div className={s.cardHead}>
-        <span className={s.cardN}>{n}</span>
-        <span className={s.cardTitle}>{title}</span>
-        <span className={s.grow} />
-        {extra}
-        {aside ? <span className={s.cardAside}>{aside}</span> : null}
-      </div>
-      <div className={s.cardBody}>{children}</div>
-    </section>
-  )
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <>
-      <dt className={s.dt}>{label}</dt>
-      <dd className={s.dd}>{value}</dd>
-    </>
-  )
-}
-
-function PanelRow({ label, value, sub, mono = false, after }: { label: string; value: string; sub?: string | null; mono?: boolean; after?: ReactNode }) {
-  return (
-    <div className={s.pRow}>
-      <span className={s.pRowLabel}>{label}</span>
-      <span className={s.pRowValue}>
-        <span className={s.pRowV} data-mono={mono ? 'true' : undefined}>
-          {value}
-        </span>
-        {sub ? <span className={s.pRowSub}>{sub}</span> : null}
-        {after}
-      </span>
-    </div>
-  )
-}

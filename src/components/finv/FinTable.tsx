@@ -46,8 +46,8 @@ export interface FinColumn<R> {
   /** What the cell says — and what its filter lists. */
   text: (r: R) => string
   chip?: (r: R) => { text: string; tone: ChipTone } | null
-  /** A figure's colour: money in, green (a receipt's +RM). */
-  tone?: (r: R) => 'ledger' | null
+  /** A figure's colour: money in, green (a receipt's +RM); money out, red (Fund OUT's −). */
+  tone?: (r: R) => 'ledger' | 'danger' | null
 }
 
 type Sort = { key: string; dir: 'asc' | 'desc' } | null

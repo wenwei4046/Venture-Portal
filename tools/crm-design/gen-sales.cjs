@@ -225,6 +225,10 @@ PATCHES.SalesInbox = [...PATCHES.SalesInbox,
   // …its two icons keep their size.
   ['<svg style={{ color: "#BD4A19" }} width="16" height="16"', '<svg style={{ flex: "none", color: "#BD4A19" }} width="16" height="16"'],
   ['<svg style={{ color: "#806B60" }} width="14" height="14"', '<svg style={{ flex: "none", color: "#806B60" }} width="14" height="14"']];
+// The chat composer handoff (2026-10-14, the owner's "Typing bar UI mobile chat design" — docs/design/chat-composer): the
+// chat's header and list as its prototype stands them, the composer (ChatComposer) in place of the reply box and its rows.
+// Last: it reads the chat as the patches above leave it.
+PATCHES.SalesChat = [...PATCHES.SalesChat, ...require("./chat-composer-patches.cjs")()];
 // (Contacts, Calendar, Insight and Profile are as the prototypes draw them: the round buttons are the Inbox's alone since
 // 2026-10-14. Round 2 had put the bell — and #400 / #410 the house and Team | Mine — in their title rows and Profile's card.)
 // The Inbox reads the bell, the house and Team | Mine beside its own view model: header.ts › ShellExtras.
@@ -250,7 +254,7 @@ ${apos ? "/* eslint-disable react/no-unescaped-entities -- generated from the de
 // GENERATED from docs/design_handoff_crm_roles/CRM Revenue View.dc.html (3b) by the
 // design converter — markup and styles exactly as designed. Behaviour lives in
 // ./vm/${vmFile}.ts. To change the look, change the design and regenerate.
-${usesFragment ? 'import { Fragment } from "react";\n' : ""}${usesH ? 'import H from "../crm.module.css";\n' : ""}${body.includes("<PickEditor") ? 'import { PickEditor } from "../shared/pick-editor";\n' : ""}${body.includes("<MediaAlbum") ? 'import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";\n' : ""}import type { ${vm} } from "./vm/${vmFile}";${extras ? '\nimport type { ShellExtras } from "./vm/header";' : ""}
+${usesFragment ? 'import { Fragment } from "react";\n' : ""}${usesH ? 'import H from "../crm.module.css";\n' : ""}${body.includes("<ChatComposer") ? 'import ChatComposer from "./ChatComposer";\n' : ""}${body.includes("<PickEditor") ? 'import { PickEditor } from "../shared/pick-editor";\n' : ""}${body.includes("<MediaAlbum") ? 'import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";\n' : ""}import type { ${vm} } from "./vm/${vmFile}";${extras ? '\nimport type { ShellExtras } from "./vm/header";' : ""}
 
 /** ${doc} */
 export default function ${name}({ v }: { v: ${vm}${extras ? " & ShellExtras" : ""} }) {

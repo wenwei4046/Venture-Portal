@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { DialogConfirm, FinDialog } from '@/components/finv/Dialog'
 import { copyPaymentVoucher } from '../../actions'
-import s from './full.module.css'
+import s from '@/components/finv/full.module.css'
 
 // The full page's Copy (2026-10-14, the Finance revamp v2 — D06): asked in the
 // design's dialog, then the copy opens on its edit page as a new draft.

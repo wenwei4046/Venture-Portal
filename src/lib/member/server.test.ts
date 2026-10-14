@@ -156,6 +156,18 @@ describe('Principal Revenue View server boundary', () => {
     expect(mocks.adminRpc).toHaveBeenCalledWith('member_quote_cost_rules', { p_scheme: schemeId })
   })
 
+  // 2026-10-14: the keypad works every price out from this answer (components/member/app/quote/reprice.ts) —
+  // with nothing added to it for that (the user: "make sure they can't find it out from 浏览器的开发工具").
+  it('answers a quote with exactly the fields it always had — no cost, no sums for the keypad', async () => {
+    mocks.rpc.mockResolvedValue({ data: { bands: [band] }, error: null })
+    const result = await calculateMemberQuote(quote)
+    if (!result.ok) throw new Error(result.error)
+    expect(Object.keys(result.data).sort()).toEqual([
+      'addOnAmount', 'boundary', 'customerPays', 'customerText', 'delivery', 'inputKey', 'kpiAmount', 'kpiItems', 'label', 'margin',
+      'multiplier', 'nextPrice', 'nextThreshold', 'optionCharge', 'optionCharges', 'price', 'suggestions', 'tone', 'valid', 'version',
+    ])
+  })
+
   it('keeps a real member quotation on the member membership authorization path', async () => {
     mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_quote'] }))
     mocks.rpc.mockResolvedValue({ data: { bands: [band] }, error: null })

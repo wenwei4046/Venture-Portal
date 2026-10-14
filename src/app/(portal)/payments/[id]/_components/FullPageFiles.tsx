@@ -6,7 +6,7 @@ import { HrIcon } from '@/components/hrv/icons'
 import { flash } from '@/components/hrv/toast'
 import { deleteVoucherAttachment, getAttachmentSignedUrl, uploadVoucherAttachment } from '../../actions'
 import type { DetailFile } from '../../_lib/voucher-detail'
-import s from './full.module.css'
+import s from '@/components/finv/full.module.css'
 
 // The full page's Attachments card (2026-10-14, the Finance revamp v2 — D06):
 // each file opens by a signed link; a dashed button adds more (a late one once

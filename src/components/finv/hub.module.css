@@ -537,6 +537,8 @@
 .cell[data-kind='name'] { font-size: 13.5px; color: var(--ds-ink); }
 .cell[data-kind='amount'] { text-align: right; font-family: var(--font-mono), 'Chivo Mono', monospace; font-weight: 500; color: var(--ds-ink); }
 .cell[data-kind='amount'][data-tone='ledger'] { color: rgb(var(--fv-chip-ledger-ink)); }
+/* Money out (Fund OUT, D12): the figure in the danger red, a minus before it. */
+.cell[data-kind='amount'][data-tone='danger'] { color: var(--ds-danger); }
 .cell[data-kind='amount'][data-faint='true'] { color: var(--ds-ink-4); }
 .cell[data-kind='no'] { font-family: var(--font-mono), 'Chivo Mono', monospace; font-weight: 500; color: var(--ds-ink); }
 .cell[data-kind='date'] { font-family: var(--font-mono), 'Chivo Mono', monospace; }
@@ -691,6 +693,9 @@ button.member:hover .memberWho { text-decoration: underline; }
 .itemValue { flex: none; width: 140px; text-align: right; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 13.5px; color: var(--ds-ink); }
 .itemValue[data-tone='danger'] { color: var(--ds-danger); }
 .itemValue[data-tone='ledger'] { color: rgb(var(--fv-chip-ledger-ink)); }
+/* The Billing Allocator's lists (D11): *to bill …* in the alert gold, a word of state (off, inactive) quiet. */
+.itemValue[data-tone='alert'] { color: rgb(var(--fv-chip-alert-ink)); }
+.itemValue[data-tone='muted'] { color: rgb(var(--hvs-muted)); }
 .itemAct {
   flex: none;
   display: inline-flex;

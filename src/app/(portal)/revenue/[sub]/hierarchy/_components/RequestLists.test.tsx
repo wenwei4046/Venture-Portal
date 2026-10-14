@@ -98,7 +98,7 @@ describe('the Replacement list’s own form (round 2, README 18.5)', () => {
     })
     expect(actions.uploadReplacementFormTemplate).toHaveBeenCalledTimes(1)
     expect(actions.uploadWaitingFormTemplate).not.toHaveBeenCalled()
-    expect(screen.getByText('Form: Replacement.pdf')).toBeInTheDocument()
+    expect(screen.getByLabelText('Form: Replacement.pdf').closest('label')).toHaveAttribute('title', 'Replacement.pdf')
     expect(flash).toHaveBeenCalledWith('Replacement form uploaded — Revenue members now download Replacement.pdf')
   })
 
@@ -160,7 +160,7 @@ describe('the Replacement list’s own form (round 2, README 18.5)', () => {
     actions.viewFormTemplate.mockResolvedValue({ ok: false, reason: 'The form could not be opened. Please try again.' })
     actions.removeFormTemplate.mockResolvedValue({ ok: true, form: { ...R1, version: 3 }, fileDeleted: true })
     show({ ok: true, form: { ...R1, version: 2, templatePath: PATH, templateName: 'Replacement.pdf' } })
-    fireEvent.contextMenu(screen.getByText('Form: Replacement.pdf').closest('label')!)
+    fireEvent.contextMenu(screen.getByLabelText('Form: Replacement.pdf').closest('label')!)
     await act(async () => {
       fireEvent.click(screen.getByRole('menuitem', { name: 'View' }))
     })
@@ -168,7 +168,7 @@ describe('the Replacement list’s own form (round 2, README 18.5)', () => {
     const drawer = screen.getByRole('dialog', { name: 'Replacement.pdf' })
     expect(drawer).toHaveTextContent('Replacement list · Uploaded form')
     fireEvent.click(within(drawer).getByRole('button', { name: 'Close' }))
-    fireEvent.contextMenu(screen.getByText('Form: Replacement.pdf').closest('label')!)
+    fireEvent.contextMenu(screen.getByLabelText('Form: Replacement.pdf').closest('label')!)
     fireEvent.click(screen.getByRole('menuitem', { name: 'Remove…' }))
     await act(async () => {
       fireEvent.click(within(screen.getByRole('dialog', { name: 'Remove Replacement.pdf' })).getByRole('button', { name: 'Remove' }))

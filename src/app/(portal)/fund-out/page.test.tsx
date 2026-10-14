@@ -1,108 +1,123 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import dayjs from 'dayjs'
+import { render } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
+import type { FundRecord } from '@/lib/fund-hub'
 
-// 2026-10-09 — Fund OUT per the user's Claude Design handoff (Phase 3 of the
-// Finance revamp): five cards — what is lent out, the weighted rate, the
-// spread over the cost of funds, what matures within 30 days, what is
-// overdue — and the status tabs counted, an Overdue tab among them. Overdue
-// (2026-10-12) is an active loan with an instalment past its day unpaid, read
-// from its repayment plan as the Overdue page reads it — no record to detect.
+// Fund OUT's page (2026-10-15, the Finance revamp v2 — D12): it reads every
+// loan — its borrower, what is still owed, whether an instalment is past its
+// day unpaid (OVERDUE IS READ LIVE, its repayment plan), who made and approved
+// it, a pending one's request and whether this reader decides it — and hands
+// them to the hub with the card asked for (?status=, the old tabs' words too)
+// and what the reader may use: Create fund out, Loan aging, Export CSV.
 
-const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn() }))
+const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), hub: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
-vi.mock('@/lib/office-time', () => ({ officeToday: () => '2026-10-09', officeTime: (at?: string) => dayjs(at), officeMonth: () => '2026-10' }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
-vi.mock('./_components/LoansTable', () => ({
-  default: (p: { rows: Array<{ companyName: string; overdue?: boolean }> }) => (
-    <pre data-testid="table">{p.rows.map((r) => `${r.companyName}${r.overdue ? '!' : ''}`).join(',')}</pre>
-  ),
+vi.mock('@/lib/office-time', () => ({ officeToday: () => '2026-10-09', officeMonth: () => '2026-10' }))
+vi.mock('./_components/FundOutHub', () => ({
+  default: (p: Record<string, unknown>) => {
+    mocks.hub(p)
+    return null
+  },
 }))
-vi.mock('./_components/ExportCSVButton', () => ({ default: () => <button type="button">Export CSV</button> }))
 
 import FundOutPage from './page'
 
 const loan = (id: string, company_id: string, status: string, principal: number, effective_rate: number, over: Record<string, unknown> = {}) => ({
-  id, company_id, status, principal, effective_rate, base_rate: 0.005, risk_premium: effective_rate - 0.005, tenure_months: 12,
-  disbursement_date: '2026-01-05', repayment_terms: 'EMI 分期', created_at: '2026-01-02T03:00:00Z', ...over,
+  id, company_id, status, principal, effective_rate, tenure_months: 12, disbursement_date: '2026-01-05', repayment_terms: 'EMI 分期 · 资金来源: HC',
+  compound_interest: false, min_pay_interest: false, created_by: 'u-fin', created_at: '2026-01-02T03:00:00Z', approved_by: 'u-pr', approved_at: '2026-01-05T03:00:00Z', ...over,
 })
-// l1 repays from November (nothing due yet); l2 from August, on the 20th —
-// August and September unpaid: 2 x 6,166.67.
+// l1 repays from November (nothing due yet); l2 from August, on the 20th — August and September unpaid: 2 x 6,166.67.
 const LOANS = [
   loan('l1', 'co-car', 'active', 100000, 0.02, { repayment_start_month: '2026-11-01' }),
-  loan('l2', 'co-hk', 'active', 50000, 0.04, { disbursement_date: '2025-10-20', repayment_start_month: '2026-08-01' }), // matures 20 Oct 2026
-  loan('l3', 'co-car', 'pending_approval', 30000, 0.02),
+  loan('l2', 'co-hk', 'active', 50000, 0.04, { disbursement_date: '2025-10-20', repayment_start_month: '2026-08-01' }),
+  loan('l3', 'co-car', 'pending_approval', 30000, 0.02, { approved_by: null, approved_at: null }),
   loan('l4', 'co-hk', 'fully_repaid', 20000, 0.02),
+  loan('l5', 'co-2990', 'cancelled', 10000, 0.02),
 ]
 
 function database() {
   const tables: Record<string, unknown[]> = {
     loans: LOANS,
-    companies: [{ id: 'co-car', name: 'Carres', short_code: 'CAR' }, { id: 'co-hk', name: 'Hookka', short_code: 'HK' }],
+    companies: [{ id: 'co-car', name: 'Carres', short_code: 'CAR' }, { id: 'co-hk', name: 'Hookka', short_code: 'HK' }, { id: 'co-2990', name: '2990', short_code: '2990' }],
     loan_outstanding: [
-      { loan_id: 'l1', outstanding: 80000, total_principal_paid: 20000, total_interest_paid: 4000 },
-      { loan_id: 'l2', outstanding: 40000, total_principal_paid: 10000, total_interest_paid: 2000 },
+      { loan_id: 'l1', outstanding: 80000, total_principal_paid: 20000 },
+      { loan_id: 'l2', outstanding: 40000, total_principal_paid: 10000 },
     ],
     repayments: [],
-    fund_sources: [{ amount: 200000, cost_rate: 0.01 }],
+    approval_requests: [
+      { id: 'req-3', reference_id: 'l3', request_type: 'new_loan', submitted_by: 'u-fin' },
+      { id: 'req-c', reference_id: 'l1', request_type: 'loan_cancel', submitted_by: 'u-fin' },
+    ],
+    users: [{ id: 'u-fin', name: 'Aina' }, { id: 'u-pr', name: 'Principal' }],
   }
   mocks.createClient.mockResolvedValue({
     from: (table: string) => {
       const result = { data: tables[table] ?? [], error: null }
       const q: Record<string, unknown> = {}
-      for (const m of ['select', 'eq', 'order', 'in', 'range']) q[m] = () => q
+      for (const m of ['select', 'eq', 'order', 'in', 'range', 'is', 'not']) q[m] = () => q
       q.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve(result).then(res, rej)
       return q
     },
   })
 }
 
-const card = (name: string) => screen.getByRole('group', { name })
+type HubProps = { records: FundRecord[]; initialCard: string; can: Record<string, boolean>; month: string; today: string; canCreate: boolean; canLoanAging: boolean; canExport: boolean; canSetDefault: boolean }
 const page = (status?: string) => FundOutPage({ searchParams: Promise.resolve({ status }) })
+const props = () => mocks.hub.mock.calls.at(-1)![0] as HubProps
+const rec = (id: string) => props().records.find((r) => r.id === id)!
+
+const FINANCE = withActions({ id: 'u-fin', role: 'finance', permissions: ['treasury', 'reports'] })
+const PRINCIPAL = withActions({ id: 'u-pr', role: 'principal', permissions: ['treasury', 'override', 'approvals', 'reports'] })
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
+  mocks.requirePermission.mockResolvedValue(FINANCE)
   database()
 })
 
-describe('Fund OUT on the sheet', () => {
-  it('sums the book in five cards', async () => {
+describe('Fund OUT', () => {
+  it('hands the hub every loan as a deal: its borrower, what is owed, the live overdue, the trail’s names', async () => {
     render(await page())
-    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('TREASURY · CAPITAL OUT')
-    expect(card('Total outstanding')).toHaveAttribute('data-tone', 'primary')
-    expect(card('Total outstanding')).toHaveTextContent('RM 120,000.00')
-    expect(card('Total outstanding')).toHaveTextContent('2 active · 1 overdue · 1 repaid · 1 pending approval')
-    // (80k × 2% + 40k × 4%) ÷ 120k = 2.667%; income 1,600 + 1,600.
-    expect(card('Weighted effective rate')).toHaveTextContent('2.667% /mo')
-    expect(card('Weighted effective rate')).toHaveTextContent('Monthly interest income RM 3,200.00')
-    expect(card('Net spread')).toHaveAttribute('data-tone', 'ledger')
-    expect(card('Net spread')).toHaveTextContent('1.667% /mo')
-    expect(card('Net spread')).toHaveTextContent('Over 1.000% cost of funds')
-    expect(card('Maturing in 30 days')).toHaveAttribute('data-tone', 'wait')
-    expect(card('Maturing in 30 days')).toHaveTextContent('1')
-    expect(card('Maturing in 30 days')).toHaveTextContent('RM 40,000.00')
-    // The Overdue card opens the list's own Overdue tab (2026-10-14: the Overdue page is gone).
-    const overdue = screen.getByRole('link', { name: 'Overdue' })
-    expect(overdue).toHaveAttribute('href', '/fund-out?status=overdue')
-    expect(overdue).toHaveAttribute('data-tone', 'danger')
-    expect(overdue).toHaveTextContent('RM 12,333.34')
-    expect(overdue).toHaveTextContent('1 loan · see Overdue')
-    expect(screen.getByRole('link', { name: 'Record new loan' })).toHaveAttribute('href', '/fund-out/new')
+    expect(props().month).toBe('2026-10')
+    expect(props().today).toBe('2026-10-09')
+    expect(props().records.map((r) => [r.id, r.party, r.status, r.amount, r.outstanding])).toEqual([
+      ['l1', 'Carres (CAR)', 'active', 100000, 80000],
+      ['l2', 'Hookka (HK)', 'active', 50000, 40000],
+      ['l3', 'Carres (CAR)', 'pending_approval', 30000, null],
+      ['l4', 'Hookka (HK)', 'repaid', 20000, null],
+      // A company named by its code is named once.
+      ['l5', '2990', 'cancelled', 10000, null],
+    ])
+    expect(rec('l1').overdue).toBeNull()
+    expect(rec('l2').overdue).toEqual({ amount: 12333.34, since: '2026-08-20', days: 50 })
+    expect(rec('l1')).toMatchObject({ createdBy: 'Aina', approvedBy: 'Principal', fundingSource: 'HC', repaid: 20000, maturity: '2027-01-05', months: 12, cancelPending: true })
+    expect(rec('l3').approval).toEqual({ id: 'req-3', submittedBy: 'u-fin' })
   })
 
-  it('counts the tabs, Overdue among them, and lists the overdue loans on it', async () => {
+  it('lets the Principal decide a pending loan — Finance, who raised it, may not', async () => {
+    render(await page())
+    expect(rec('l3').decidable).toBe(false)
+    mocks.requirePermission.mockResolvedValue(PRINCIPAL)
+    render(await page())
+    expect(rec('l3').decidable).toBe(true)
+  })
+
+  it('opens on the card asked for, the old tabs’ words too', async () => {
     render(await page('overdue'))
-    const count = (name: RegExp) => screen.getByRole('button', { name }).querySelector('[data-tab-count]')?.textContent
-    expect(count(/^Pending/)).toBe('1')
-    expect(count(/^Active/)).toBe('2')
-    expect(count(/^Overdue/)).toBe('1')
-    expect(count(/^Repaid/)).toBe('1')
-    expect(count(/^All/)).toBe('4')
-    expect(screen.getByTestId('table')).toHaveTextContent('Hookka!')
-    expect(screen.getByTestId('table')).not.toHaveTextContent('Carres')
-    expect(document.querySelector('.sect-head .count')).toHaveTextContent('1 OVERDUE')
+    expect(props().initialCard).toBe('overdue')
+    render(await page('fully_repaid'))
+    expect(props().initialCard).toBe('repaid')
+    render(await page('nonsense'))
+    expect(props().initialCard).toBe('all')
+  })
+
+  it('offers each head button and step to whoever may use it', async () => {
+    render(await page())
+    expect(props()).toMatchObject({ canCreate: true, canLoanAging: true, canExport: true, canSetDefault: true })
+    expect(props().can).toEqual({ edit: true, void: true, amend: false })
+    mocks.requirePermission.mockResolvedValue(withActions({ id: 'u-v', role: 'staff', permissions: [] }))
+    render(await page())
+    expect(props()).toMatchObject({ canCreate: false, canLoanAging: false, canExport: false })
   })
 })

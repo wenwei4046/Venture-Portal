@@ -94,11 +94,17 @@
    a bottom sheet lifts above the home indicator; a full-screen page (slideIn) starts below the status bar. */
 .app > [style*="absolute"] > [style*="sheetUp"] { border-bottom: var(--safe-bottom) solid transparent; }
 .app > [style*="slideIn"] { border-top: var(--crm-top) solid transparent; border-bottom: var(--safe-bottom) solid transparent; }
-/* The reply box's hint stays on one line ("Reply to Hakimi…"), cut with an ellipsis, and the box shows no scrollbar. */
-.app textarea[data-draft]::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The reply box's hint stays on one line ("Reply to Hakimi…"), cut with an ellipsis, in the composer handoff's muted
+   brown (its textarea::placeholder, 2026-10-14), and the box shows no scrollbar. */
+.app textarea[data-draft]::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #A8968B; }
 .app textarea[data-draft] { scrollbar-width: none; }
 /* A message bubble: an up / down drag scrolls the chat, a sideways one is ours: swipe right to reply (shared/msg-menu.tsx, 2026-10-14). */
 .app [data-msg] { touch-action: pan-y; }
 .app [data-chat-list] { overflow-x: hidden; }
 /* An inbox row off screen skips its layout and paint, so a long list scrolls as the chat does (2026-10-14). */
 .app [data-inbox-row] { content-visibility: auto; contain-intrinsic-size: auto 86px; }
+/* The chat composer (the composer handoff, 2026-10-14): asked for less motion, its panels appear and its keys press
+   without moving, as the prototype's do. */
+@media (prefers-reduced-motion: reduce) {
+  .app [data-composer], .app [data-composer] *, .app [data-composer-toast] { animation: none !important; transition: none !important; }
+}

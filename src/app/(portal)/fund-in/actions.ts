@@ -13,6 +13,7 @@ import type { Json } from '@/lib/supabase/database.types'
 import { buildTermsSegments, currentSegment, principalPaidSince, segmentRemainingPeriods, termsChanged } from '@/lib/treasury-terms'
 import { fetchTermsHistory, termsForFundSource } from '@/lib/treasury-terms-data'
 import { remainingPeriods } from '@/lib/loan-monitor'
+import { loadNewSourceOptions, type NewSourceOptions } from './_lib/new-source-options'
 
 // ─── Amend an ACTIVE fund source (Principal — self-service, direct apply) ─────
 // Principal is the top approval authority, so edits apply immediately via the
@@ -146,6 +147,41 @@ const VALID_TYPES: FundSourceType[] = ['subsidiary', 'director_loan', 'departmen
 
 export async function createFundSource(formData: FormData) {
   const user = await requireActionOn('/fund-in', 'treasury', 'create')
+  const id = await createFundSourceInner(formData, user.id)
+  sourceCreated()
+  redirect(`/fund-in/${id}`)
+}
+
+/**
+ * The hub's *Record fund in* (2026-10-15, the Finance revamp v2 — D12): the
+ * same fund source as the form page's, every rule its own
+ * (createFundSourceInner), answered in words instead of a redirect.
+ */
+export async function createFundSourceFromDialog(formData: FormData): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+  const user = await requireActionOn('/fund-in', 'treasury', 'create')
+  try {
+    const id = await createFundSourceInner(formData, user.id)
+    sourceCreated()
+    return { ok: true, id }
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : 'The fund source could not be saved. Try again.' }
+  }
+}
+
+/** What *Record fund in* chooses from — the form page's lists, read when the dialog opens (Treasury · Create). */
+export async function openRecordFundIn(): Promise<NewSourceOptions> {
+  await requireActionOn('/fund-in', 'treasury', 'create')
+  return loadNewSourceOptions(await createClient())
+}
+
+function sourceCreated() {
+  revalidatePath('/fund-in')
+  revalidatePath('/approvals')
+  revalidatePath('/dashboard')
+}
+
+/** Every rule of a new fund source: it checks, files it pending, and queues its approval request. Throws a refusal. */
+async function createFundSourceInner(formData: FormData, userId: string): Promise<string> {
   const supabase = await createClient()
 
   const raw: CreateFundSourceInput = {
@@ -272,7 +308,7 @@ export async function createFundSource(formData: FormData) {
     // and posts the Venture Pool credit + bank balance bump.
     status: 'pending_approval' as const,
     notes: raw.notes ?? null,
-    created_by: user.id,
+    created_by: userId,
   }
 
   // Polymorphic "from" slot based on type — see source_has_from CHECK constraint
@@ -331,7 +367,7 @@ export async function createFundSource(formData: FormData) {
       request_type: 'new_fund_source' as const,
       reference_id: data.id,
       reference_table: 'fund_sources',
-      submitted_by: user.id,
+      submitted_by: userId,
       description: `New fund source: ${typeLabel} — RM ${raw.amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${raw.cost_rate_percent}%/mo`,
       amount: raw.amount,
       status: 'pending' as const,
@@ -344,10 +380,7 @@ export async function createFundSource(formData: FormData) {
     throw new Error(`Failed to queue approval: ${approvalError.message}`)
   }
 
-  revalidatePath('/fund-in')
-  revalidatePath('/approvals')
-  revalidatePath('/dashboard')
-  redirect(`/fund-in/${data.id}`)
+  return data.id as string
 }
 
 // ─── Update Fund Source (Finance, only pending_approval) ────────────────────
@@ -508,7 +541,8 @@ export async function withdrawFundSource(id: string): Promise<{ error: string } 
   const { error } = await supabase.rpc('withdraw_pending_fund_source' as never, {
     p_fund_source_id: id,
   } as never)
-  if (error) return { error: `撤回失败: ${error.message}` }
+  // In English, as the page around it is (2026-10-15 — it read 撤回失败).
+  if (error) return { error: `The fund source was not withdrawn: ${error.message}` }
 
   revalidatePath('/fund-in')
   revalidatePath(`/fund-in/${id}`)
@@ -606,9 +640,26 @@ export async function setFundSourceNotes(
 
 export async function cancelFundSource(formData: FormData) {
   const user = await requireActionOn('/fund-in', 'treasury', 'void')
-  const supabase = await createClient()
+  await fileFundSourceCancel(formData.get('id') as string, user.id)
+}
 
-  const id = formData.get('id') as string
+/**
+ * The full page's *Request cancellation* (2026-10-15, the Finance revamp v2 —
+ * D06's panel): cancelFundSource's request, answered in words, never thrown.
+ */
+export async function requestFundSourceCancel(id: string): Promise<{ error: string } | undefined> {
+  const user = await requireActionOn('/fund-in', 'treasury', 'void')
+  try {
+    await fileFundSourceCancel(id, user.id)
+    return undefined
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'The cancellation was not filed. Try again.' }
+  }
+}
+
+/** Files an active fund source's cancellation for the Principal (a tier_change request — the type it has always used). Throws a refusal. */
+async function fileFundSourceCancel(id: string, userId: string) {
+  const supabase = await createClient()
   if (!id) throw new Error('Fund source id is required')
 
   // Fetch fund source for description
@@ -628,7 +679,7 @@ export async function cancelFundSource(formData: FormData) {
       request_type: 'tier_change' as const, // reuse existing type for now; semantically "fund source cancel"
       reference_id: id,
       reference_table: 'fund_sources',
-      submitted_by: user.id,
+      submitted_by: userId,
       description: `Cancel fund source: ${source.source_type.replace('_', ' ')} — RM ${Number(source.amount).toLocaleString('en-MY', { minimumFractionDigits: 2 })}`,
       amount: Number(source.amount),
       status: 'pending' as const,

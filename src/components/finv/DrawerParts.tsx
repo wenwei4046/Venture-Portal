@@ -59,8 +59,8 @@ export function DrawerLine({
   value: ReactNode
   sub?: string
   mono?: boolean
-  /** A figure's colour: money in green, what is left to collect in the wait blue. */
-  tone?: 'ledger' | 'wait'
+  /** A figure's colour: money in green, what is left to collect in the wait blue, what is kept (HV's own share) quiet. */
+  tone?: 'ledger' | 'wait' | 'muted'
 }) {
   return (
     <div className={d.line}>
