@@ -1,6 +1,6 @@
 # DESIGN.md — HOUZS Venture Portal
 
-**Version 4.2 · 2026-10-14** — the single design doc for every screen: the portal, the Revenue app and the HR phone app. Version history: Part IV.
+**Version 4.4 · 2026-10-14** — the single design doc for every screen: the portal, the Revenue app and the HR phone app. Version history: Part IV.
 
 **The design system.** The visual source is the Claude Design project **HOUZS Venture Design System** (https://claude.ai/design/p/1fecd655-db12-4974-abf4-3d7434e41386, synced from `main` on 2026-10-13). It holds the tokens, the foundation cards, the core and view components and four templates. This file says how the code does it — which token, class or component a page uses today — and holds the rules the code enforces. Where the project and this file disagree, this file is the code's truth. Change either one on purpose, never by drift.
 
@@ -1339,6 +1339,8 @@ The Claude Design handoff *Revenue app refresh* (`CRM switch button proposals.zi
 - **A board's hero is its bank card** (margin 6 12 0, radius 22, padding 10 18 16, gap 14, shadow `0 8px 20px` glow): *‹ Arena* and the date chip (white .2); the board 16/650 with your figure 20/700 under it, beside a 40px icon circle; your place 56/800 with its suffix 22/700 and *of 9* 14 (white .88); the chase on white .18; the period on white .18, the picked one white with ink. A board is its own page: no app header over it (there is none on the Arena).
 - **Motion — the handoff's, on the one curve:** a board's hero rises 12px and fades in over 320ms, the page under it fades in 240ms after 60ms; *‹ Arena* fades the hero out over 200ms first. A period switch moves the pill 220ms and cross-fades the place and the figure 160ms (`arena/CrossFade.tsx`), never a count. Tabs and brand chips 160ms. A brand week's days open 200ms (height and opacity, `profile/Reveal.tsx`), its caret turns in 180ms, a day's tile 160ms. Reduced motion: nothing moves.
 - **Every sheet of the app closes when pulled down** past 90px (`Sheet.tsx`), as the CRM's do; a field keeps its own touch.
+- **The bell moves by itself too** (v4.4): a meeting booked for them, a memo for them, a request HR moved — its figure and its list follow the moment the database says so (Realtime, the member's own private channel), silently: no dot, nothing else on the screen read again. Opened, what it counted leaves the figure and stays marked new in the list until it opens again; one coming in after that counts again.
+- **The CRM's way back** (v4.4): every CRM page has the Revenue app's home left of its bell, where Today has the CRM's chat button left of its own — the bell's round button (40, 1px `#EBDDD2`, white, the soft shadow), a rust house 20px, stroke 1.8; 8px apart, the two one group at the title row's right end (the Control panel's Overview: 10, its row's gap); on Profile beside the card's bell, the name keeping 96px clear. Profile's *Back to Revenue app* card stays. On a narrow phone the Inbox's ad name gives way (…), never the title.
 - **The food claim's summary:** *Month* and *Days* in their own figures, the day list wrapping right-aligned.
 - **Deliberate differences from the refresh prototype:** the header is Today's alone (the prototype draws it over the Arena hub too); badges in Inter (the prototype's buttons fell back to Arial); Top 3's avatars keep their ring outside 46 / 54px as the first prototype drew them (the refresh one draws it inside, 2px shorter); inputs stay 16px.
 
@@ -1392,6 +1394,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.4** · 2026-10-14 · The Revenue app's bell moves by itself (Realtime, silently); every CRM page has the Revenue app's home beside its bell → The Revenue app — the refresh
 - **v4.3** · 2026-10-14 · Finance's view wears its own shell: the sidebar in Daily / Fund / Report / Department, the account menu, Edit profile; both views' sidebars 212px → Finance's view — its own shell
 - **v4.2** · 2026-10-14 · The Revenue app's refresh: Today's CRM chat button (live unread), income as a statement, Arena bank cards and board heroes, the 10px type floor, sheets close when pulled down → The Revenue app — the refresh
 - **v4.1** · 2026-10-14 · A Revenue Director in the Revenue app: the sub-departments they direct, *All of Fair*, *ANNA leads* → The Revenue app (#381)

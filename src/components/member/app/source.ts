@@ -20,6 +20,8 @@ import { bookMemberRoom, cancelMemberBooking, type MemberBookInput, type fetchMe
 import type { MemberRoomsData } from "./profile/rooms-model";
 import { openMemberDoc, type fetchMemberDocuments } from "@/app/(member)/member/docs-actions";
 import type { fetchMemberCrmUnread } from "@/app/(member)/member/chat-badge-actions";
+import type { fetchMemberNotices } from "@/app/(member)/member/bell-actions";
+import type { Notices } from "@/lib/push/notices";
 import type { MemberDocument } from "@/lib/documentation/member";
 import { createReadBatcher } from "./read-batch";
 import { createReadMemory, idbStore, readKey, type ReadStore } from "./read-memory";
@@ -71,6 +73,7 @@ export const ask = {
   rooms: (from: string, to: string): MemberRead => ({ kind: "rooms", from, to }),
   documents: (context?: { staffId: string }): MemberRead => (context ? { kind: "documents", staffId: context.staffId } : { kind: "documents" }),
   crmUnread: (): MemberRead => ({ kind: "crmUnread" }),
+  notices: (): MemberRead => ({ kind: "notices" }),
 };
 
 /**
@@ -135,6 +138,8 @@ export interface RevenueSource {
   openDocument?(id: string, context?: { staffId: string }): Promise<Outcome<{ url: string; fileName: string }>>;
   /** Today's CRM chat button (2026-10-14): the unread messages of the account's own chats. */
   crmUnread?(): Promise<Outcome<number>>;
+  /** The bell (2026-10-14, live): the account's own notifications, read again — the layout hands the open's. */
+  notices?(): Promise<Outcome<Notices>>;
   /**
    * What the phone kept from an earlier open (the live app only, 2026-10-08):
    * the last answer to a read (`ask.*`), shown while it is read again.
@@ -220,6 +225,8 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     documents: context => go<Answer<typeof fetchMemberDocuments>>(ask.documents(context)),
     openDocument: (id, context) => openMemberDoc(id, context?.staffId),
     crmUnread: () => go<Answer<typeof fetchMemberCrmUnread>>(ask.crmUnread()),
+    // Never kept on the phone: every open has the layout's own, fresh.
+    notices: () => read<Answer<typeof fetchMemberNotices>>(ask.notices()),
     ...(memory ? {
       peek: <T,>(request: MemberRead) => memory.get<T>(readKey(request)),
       ready: memory.ready,
