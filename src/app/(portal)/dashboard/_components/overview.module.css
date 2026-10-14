@@ -12,7 +12,7 @@
 /* HR's sheet pads 24px (20 under 1000px); the HR Overview's prototype pads its
    scroller 24 / 28 / 48 as Finance's does. Only this page takes it. */
 @media (min-width: 768px) {
-  :global(.hrv-sheet.sheet):has(> .hrRoot) { padding: 24px 28px 48px; }
+  :global(.hrv-sheet.sheet):has(> .hrRoot) { padding: 24px 28px 48px; scrollbar-width: auto; scrollbar-color: auto; }
 }
 
 /* ── The head: the date, the greeting, the 64px segment; the actions right ── */
