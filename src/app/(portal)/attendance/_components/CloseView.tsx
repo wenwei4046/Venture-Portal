@@ -12,7 +12,7 @@ import { closeMonth, decideDay, reopenMonth } from '@/lib/attendance/actions'
 import { closeLabel, closeNodes, dayLine, dueLine, kindLabel, waitingAt, waitingIn, whenLabel } from '@/lib/attendance/close'
 import { daysToDecide, dayMon, monthDays, monthLabel, monthName, registerOf, trackedPeople, type Ctx } from '@/lib/attendance/engine'
 import type { AttConfig, AttMonth, AttRequest } from '@/lib/attendance/types'
-import { Avatar, Label, NodeTrack, Pill } from './bits'
+import { Avatar, NodeTrack, Pill } from './bits'
 
 /**
  * HR › Attendance › Month close (2026-10-15, the handoff's `isClose`): freeze
@@ -47,7 +47,8 @@ export default function CloseView({ config, month, requests, today, now }: { con
   const undecided = days.filter(d => !decisionOf(d.person.id, d.day, d.decision)).length
   const wt = waiting.length
   const left = undecided + wt
-  const blocked = closed || left > 0 || !config.canEdit
+  // An empty month (nobody clocks yet) is not frozen: it would only block its corrections later.
+  const blocked = closed || left > 0 || !config.canEdit || people === 0
   const closedAt = month.close?.closedAt ? `${dayMon(month.close.closedAt.slice(0, 10))} · ${month.close.closedAt.slice(11, 16)}` : null
   const nodes = closeNodes(wt, undecided, closed, closedAt)
   const curI = nodes.findIndex(n => !n.done)
@@ -93,12 +94,12 @@ export default function CloseView({ config, month, requests, today, now }: { con
 
   return (
     <HvPage>
-      <PageHead eyebrow="Attendance" title="Month close" right={<Button variant="secondary" onClick={() => { window.location.href = `/attendance/close/register?m=${m.slice(0, 7)}` }} disabled={!closed}>Export</Button>} />
+      <PageHead eyebrow="Attendance" title="Month close" right={<Button variant="secondary" onClick={() => { window.location.href = `/attendance/close/register?m=${m.slice(0, 7)}` }}>Export</Button>} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 18 }}>
         <div style={{ ...card, padding: '18px 22px 20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
             <div>
-              <Label style={{ display: 'block' }}>Closing</Label>
+              <div style={{ fontSize: 10.5, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--ds-ink-3)' }}>Closing</div>
               <div style={{ fontSize: 22, fontWeight: 500, marginTop: 4 }}>{monthLabel(m)}</div>
               <div style={{ fontSize: 12.5, color: 'var(--ds-ink-2)', marginTop: 3 }}>{dueLine(m)}</div>
             </div>
