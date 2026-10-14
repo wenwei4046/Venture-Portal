@@ -1,6 +1,6 @@
 # DESIGN.md — HOUZS Venture Portal
 
-**Version 4.16 · 2026-10-14** — the single design doc for every screen: the portal, the Revenue app and the HR phone app. Version history: Part IV.
+**Version 4.20 · 2026-10-14** — the single design doc for every screen: the portal, the Revenue app and the HR phone app. Version history: Part IV.
 
 **The design system.** The visual source is the Claude Design project **HOUZS Venture Design System** (https://claude.ai/design/p/1fecd655-db12-4974-abf4-3d7434e41386, synced from `main` on 2026-10-13). It holds the tokens, the foundation cards, the core and view components and four templates. This file says how the code does it — which token, class or component a page uses today — and holds the rules the code enforces. Where the project and this file disagree, this file is the code's truth. Change either one on purpose, never by drift.
 
@@ -1058,7 +1058,7 @@ No test button: the ERP's own page proves the key.
 
 **The tools above the list:** **"+"** (v3.54, Member services · Edit only), *Upload form* (it reads *Form: name* once uploaded), *Form settings*.
 
-- **Form: name** (2026-10-14) — a click replaces the file; a right-click (Shift + F10 from the keys) opens its paper menu, `FormFileMenu` on `MenuPanel`: the file's name, *View*, *Remove…*. Shift + right-click keeps the browser's.
+- **Form: name** (v4.20) — a click replaces the file; a right-click (Shift + F10 from the keys) opens its paper menu, `FormFileMenu` on `MenuPanel`: the file's name, *View*, *Remove…*. Shift + right-click keeps the browser's.
   - *View* opens a 640px drawer (`FormFileViewer`, Documentation's preview drawer): a PDF in the browser's viewer, a picture as it is, a Word .docx read in the browser, an HTML form as its page — those two in a sandboxed frame. An old .doc reads *No preview for .doc files.* beside *Download*.
   - *Remove…* asks beside it (Cancel · **Remove**, the danger one). The chip reads *Upload form* again; a refusal stays in the panel.
 
@@ -1460,6 +1460,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.20** · 2026-10-14 · Sales Groups: the uploaded form's chip has a right-click menu — *View* (a 640px drawer: a PDF, a picture, a Word .docx read in the browser, an HTML form) and *Remove…* (asked beside it; the file is deleted too) → Waiting list flow (#418)
 - **v4.19** · 2026-10-14 · The invoice's other dialogs in the kit's sheet — + Credit note, Change account, Generate Marketing invoices, Generate payroll invoices, Reconcile payroll, Own-share → Venture (Office) — on the hub and the invoice's page; a credit note the system refuses drawn shut → Finance's view — Create payment
 - **v4.18** · 2026-10-14 · Invoice's dialogs: Create invoice (the design's seven fields, Cancel / Save draft; several companies, a split across billing modes, the month, a reference behind the small buttons; HR's figures fill a recharge) and Multi-line invoice, which also edits an invoice; the form's selects 32px with their edge, the lines card in the kit → Finance's view — Create payment
 - **v4.17** · 2026-10-14 · Invoice's hub: *Create invoice ▾* / *Payroll ▾* / *Export ▾*, *Invoiced · N invoices* with the month pill, the cards All invoices … Voided, Credit notes, Marketing projects, Non-billable, the table's *Select* and the dark bar that settles one payer's invoices, the invoice's drawer, the settle dialog → Finance's view — the hubs
