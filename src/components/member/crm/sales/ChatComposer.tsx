@@ -170,7 +170,9 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
   useLayoutEffect(() => { refit.current(); }, [shown]);
   // …and the chat's list pads itself by the composer in that frame too, so the newest message never slips under a panel
   // or a growing reply box (a ResizeObserver alone would answer a frame later: the list sits beside the composer).
-  useLayoutEffect(() => { putInsets.current(); }, [shown, taH, capH, kbH, v.reply, v.slash, v.rec, v.warm]);
+  // (What changes its height, not every keystroke's new objects.)
+  const hasReply = !!v.reply, slashRows = v.slash ? v.slash.list.length : -1, recording = !!v.rec;
+  useLayoutEffect(() => { putInsets.current(); }, [shown, taH, capH, kbH, hasReply, slashRows, recording, v.warm]);
 
   // A panel waiting for the keyboard goes anyway if none comes (a computer, a hardware keyboard).
   useEffect(() => {
