@@ -131,6 +131,14 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('hr', 'hiring_requests', 'Hiring requests', ['hiring'], HIRING),
   tab('hr', 'hiring_insights', 'Hiring insights', ['hiring'], { view: ['hiring.view'] }),
   tab('hr', 'talent_bank', 'Talent Bank', ['hiring'], { view: ['hiring.view'], create: ['hiring.create'], edit: ['hiring.edit'] }),
+  // HR › Attendance (2026-10-15, mig 20261015030000): one tab a page.
+  tab('hr', 'att_today', 'Attendance today', ['attendance'], { view: ['attendance.view'] }),
+  tab('hr', 'att_records', 'Attendance records', ['attendance'], { view: ['attendance.view'], edit: ['attendance.edit'] }),
+  tab('hr', 'att_requests', 'Attendance requests', ['attendance'], { view: ['attendance.view'], create: ['attendance.create'], approve: ['attendance.approve'] }),
+  tab('hr', 'att_balances', 'Leave balances', ['attendance'], { view: ['attendance.view'], create: ['attendance.create'], edit: ['attendance.edit'] }),
+  tab('hr', 'att_close', 'Month close', ['attendance'], { view: ['attendance.view'], edit: ['attendance.edit'] }),
+  tab('hr', 'att_settings', 'Attendance settings', ['attendance'], { view: ['attendance.view'], edit: ['attendance.edit'] }),
+  tab('hr', 'att_ready', 'Readiness', ['attendance'], { view: ['attendance.view'] }),
   // Every view books a room (the user, 2026-10-11): one page, a tab in each.
   shared('meeting_rooms', tab('hr', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS)),
   tab('hr', 'guest_link', 'Guest Link', ['guest_link'], { view: ['guest_link.view'], edit: ['guest_link.edit'] }),

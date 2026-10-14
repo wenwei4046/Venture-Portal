@@ -64,6 +64,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'team_org_chart', 'venue_event_organiser_for_order', 'view_as_people',
   // Admin › Meeting Rooms (mig 20261011090000):
   'meeting_rooms_range', 'meeting_rooms_booking', 'meeting_rooms_rooms', 'meeting_rooms_people',
+  // HR › Attendance (mig 20261015030200):
+  'att_config', 'att_month', 'att_requests_list', 'att_ledger',
   // Admin › Guest Link (mig 20261011091000):
   'guest_link_admin', 'guest_link_legend',
   // VOLATILE, read to write nothing:

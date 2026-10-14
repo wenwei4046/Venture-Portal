@@ -27,6 +27,7 @@ export default function HrSidebar({
       sections={sections}
       initialCollapsed={initialCollapsed}
       footerSub={user.actualRole ? 'Viewing as HR' : 'HR view'}
+      wide
     />
   )
 }

@@ -60,6 +60,8 @@ export const PERMISSIONS = [
   'meeting_rooms',
   'meeting_rooms_manage',
   'guest_link',
+  // HR › Attendance (2026-10-15, mig 20261015030000): Attendance · View opens it.
+  'attendance',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
