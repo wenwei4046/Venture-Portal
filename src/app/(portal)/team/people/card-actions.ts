@@ -10,13 +10,12 @@ import { readDirectory, readOrgChart, readsStaffTable } from '@/lib/team-directo
 import { navLabelByPath } from '@/components/layout/nav-config'
 import { describeActivity, type ActivityRow } from '@/lib/activity'
 import { ladderAllows, nextRung, type LadderTitle, type Rung } from '@/lib/ladder'
-import { offersVariablePay, type TitleRow } from '@/lib/staff-form'
+import { offersVariablePay, type StaffRow, type TitleRow } from '@/lib/staff-form'
 import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
 import { readStaffPrivate } from '@/lib/private-fields'
 import { onFile, sees } from '@/lib/sensitive'
 import { listSubDepartments } from '../../revenue/_lib/sub-departments'
 import { loadPersonAccess, type PersonAccessData } from '../_lib/person-permissions'
-import type { StaffRow } from './_components/EditStaffForm'
 
 export interface CardActivityLine {
   /** ISO timestamp — formatted on the client so it can show "2h ago". */

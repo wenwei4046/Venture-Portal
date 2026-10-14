@@ -1,0 +1,115 @@
+/* A person's full page, edited where it stands (2026-10-14). Each fact's row
+   holds its field in the value's place; one bar at the sheet's foot saves.
+   Colours are the kit's --hv-* (on .sheet-theme); the soft dropdown draws the
+   selects (radius 10, its chevron and ring), so the text fields match it. */
+
+.input,
+.select,
+.locked {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 340px;
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  color: rgb(var(--hv-ink));
+}
+
+.input {
+  display: block;
+  padding: 7px 10px;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 10px;
+  background: rgb(255 255 255);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input:hover { border-color: rgb(var(--hv-frame)); }
+.input::placeholder { color: rgb(var(--hv-brown) / 0.7); }
+.area { resize: vertical; min-height: 52px; }
+.mono { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 12.5px; }
+
+/* A changed field turns peach — the Members grid's changed cell. */
+.input[data-dirty='true'],
+.select[data-dirty='true'],
+.name[data-dirty='true'] {
+  background-color: rgb(var(--hv-peach));
+}
+.input[data-dirty='true'],
+.select[data-dirty='true'] { border-color: rgb(var(--hv-accent)); }
+
+/* A value this editor may not change: the reader's own words (•••• when on
+   file) in a quiet box with no field behind it. */
+.locked {
+  display: block;
+  padding: 7px 10px;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 10px;
+  background: rgb(var(--hv-panel-2));
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 12.5px;
+  cursor: default;
+}
+
+/* EPF: the part and the Exempt tick on one line. */
+.pair { display: flex; align-items: center; gap: 12px; max-width: 340px; }
+.pair .select { flex: 1 1 auto; min-width: 0; }
+.tick { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.check { width: 15px; height: 15px; margin: 0; accent-color: rgb(var(--hv-accent)); cursor: pointer; }
+
+/* The name in the title's place and face — the line under it says it edits. */
+.name {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 0 0 -6px;
+  padding: 0 6px 2px;
+  border: 0;
+  border-bottom: 1px dashed rgb(var(--hv-frame));
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  outline: none;
+}
+.name:hover { border-bottom-color: rgb(var(--hv-brown)); }
+.name:focus { border-bottom: 1px solid rgb(var(--hv-accent)); }
+
+/* The save bar: the kit's peach bar, at the foot of the sheet while the page
+   scrolls under it. */
+.bar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+  margin-bottom: 24px;
+  padding: 10px 12px 10px 16px;
+  background: rgb(var(--hv-peach));
+  border: 1px solid rgb(var(--hv-frame));
+  border-top-color: rgb(var(--hv-accent));
+  border-radius: 10px;
+  line-height: normal;
+}
+.barText { font-size: 12.5px; min-width: 0; }
+.barText b { font-weight: 500; }
+.barError { color: rgb(var(--hv-danger)); }
+.barActions { display: flex; gap: 8px; flex-shrink: 0; }
+
+@media (max-width: 767px) {
+  .input,
+  .select,
+  .locked,
+  .pair { max-width: none; }
+  .bar { flex-wrap: wrap; }
+  .barText { flex-basis: 100%; }
+  .barActions { margin-left: auto; }
+  /* Outside HR's frame the portal's phone tab bar lies over the scroller's
+     foot (HR's frame already stands clear of it). */
+  :global(.sheet-frame) .bar { bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 10px); }
+}

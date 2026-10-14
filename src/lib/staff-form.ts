@@ -231,6 +231,52 @@ export interface TitleRow extends TitleOption {
 }
 
 /**
+ * A person's record as the edit fields start from it (a person's full page,
+ * `team/people/[id]`). NRIC and the account numbers arrive as their reader
+ * gave them — •••• for an editor whose title does not tick them — and the
+ * pay figures as 0 to a reader who may not see salaries.
+ */
+export interface StaffRow {
+  id: string
+  employee_name: string
+  designation: string | null
+  department_id: string
+  department_name: string
+  /** True in a department the commission engine pays (`payroll_source = 'commission'`). */
+  commission_dept: boolean
+  /** True in the Director department (`segment_key = 'director'`) — the one
+   *  that offers "Variable pay" in place of the pay fields. */
+  director_dept: boolean
+  /** Authoritative since 2026-09-01; `designation` is the text it mirrors. */
+  title_id: string | null
+  basic_salary: number
+  allowances: number
+  non_statutory_allowance: number | null
+  employee_code: string | null
+  /** InfoTech's own employee number — what the imports match on (2026-09-12). */
+  infotech_code?: string | null
+  hire_date: string | null
+  resignation_date: string | null
+  epf_category: string
+  socso_category: string
+  is_epf_exempt: boolean
+  pcb_category: string
+  children_count: number
+  employment_type: string
+  bank_name: string | null
+  bank_account_no: string | null
+  bank_name_2?: string | null
+  bank_account_no_2?: string | null
+  nric: string | null
+  contact_number: string | null
+  email: string | null
+  address: string | null
+  emergency_contact_name: string | null
+  emergency_contact_phone: string | null
+  emergency_contact_relationship: string | null
+}
+
+/**
  * The name `hr_staff_costs.designation` mirrors for a chosen title — or the
  * reason the choice cannot stand. `title_id` is authoritative since
  * 2026-09-01; the free-text column stays because the InfoTech import writes

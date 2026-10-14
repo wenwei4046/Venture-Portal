@@ -125,15 +125,45 @@ export async function addStaff(formData: FormData) {
   revalidatePath('/revenue', 'layout')
 }
 
-export async function updateStaff(id: string, formData: FormData) {
-  const editor = await requireActionOn('/team/people/[id]/edit', 'team', 'edit')
-  const supabase = await createClient()
+/**
+ * What a save of a person's record answers (2026-10-14). A refusal comes back
+ * in words: production hands a thrown message to the browser only as a
+ * digest, and the person's page shows the reason in its save bar.
+ */
+export type StaffSaveOutcome = { ok: true } | { ok: false; reason: string }
+
+/**
+ * Saving a person's record — edited where it stands on their full page since
+ * 2026-10-14, which is the page this write belongs to.
+ */
+export async function updateStaff(id: string, formData: FormData): Promise<StaffSaveOutcome> {
+  const editor = await requireActionOn('/team/people/[id]', 'team', 'edit')
 
   // The form writes pay, so it is an editor whose title ticks Salary amounts
   // (2026-10-09, PR4) — anybody else was never shown the figures it saves.
   if (!sees(editor, 'salary')) {
-    throw new Error('Editing a person needs Salary amounts ticked for your title — the form saves their pay.')
+    return { ok: false, reason: 'Editing a person needs Salary amounts ticked for your title — the form saves their pay.' }
   }
+
+  try {
+    await writeStaff(editor, id, formData)
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : 'Could not save. Please try again.' }
+  }
+
+  revalidatePath('/hr-costing')
+  // The org chart draws the title, the ladder rung it stands on and the rank —
+  // all three can change here, so the graph is stale until this runs. Its
+  // absence was why a title edited on People did not show on Hierarchy until
+  // the next hard reload. `/team` holds the person's own page too.
+  revalidatePath('/team', 'layout')
+  revalidatePath('/revenue', 'layout')
+  return { ok: true }
+}
+
+/** The save itself: every refusal a sentence for whoever is at the screen. */
+async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, id: string, formData: FormData) {
+  const supabase = await createClient()
 
   // NRIC and the bank accounts are written only by an editor whose title
   // ticks them, and only when the form carried them (2026-10-09, PR4). An
@@ -253,15 +283,6 @@ export async function updateStaff(id: string, formData: FormData) {
   // database does the assigning: `hr_staff_costs_one_line_sync` raises the
   // commission rank to the new title's floor (never lowers it) in the same
   // statement as the title write. Nothing to call, nothing to report.
-
-  revalidatePath('/hr-costing')
-  revalidatePath(`/team/people/${id}/edit`)
-  // The org chart draws the title, the ladder rung it stands on and the rank —
-  // all three can change here, so the graph is stale until this runs. Its
-  // absence was why a title edited on People did not show on Hierarchy until
-  // the next hard reload.
-  revalidatePath('/team', 'layout')
-  revalidatePath('/revenue', 'layout')
 }
 
 /**
@@ -279,7 +300,8 @@ export async function updateStaff(id: string, formData: FormData) {
  * until the next hard reload.
  */
 async function setEmployment(id: string, status: 'active' | 'inactive') {
-  await requireActionOn('/team/people/[id]/edit', 'team', 'edit')
+  // Its buttons are on the person's full page (PersonChanges › Employment).
+  await requireActionOn('/team/people/[id]', 'team', 'edit')
   const supabase = await createClient()
 
   const { error } = await supabase.from('hr_staff_costs').update({ status }).eq('id', id)
