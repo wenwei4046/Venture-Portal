@@ -207,9 +207,15 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     pickMedia: async (e: ChangeEvent<HTMLInputElement>) => {
       const files = [...(e.target.files ?? [])]; e.target.value = "";
       if (!files.length || !c) return;
-      const caption = draft.trim();
+      // A photo or video picked here too waits on the editor (caption, HD, edits) — the Team chat's + is this picker, and
+      // a photo chosen through it went straight out (the owner, 2026-10-14: "點勾選後就直接發送了"); only a document goes at once.
+      const isVisual = (f: File) => f.type.startsWith("image/") || f.type.startsWith("video/");
+      const visual = files.filter(isVisual), docs = files.filter(f => !isVisual(f));
+      if (visual.length) set(u => ({ ...u, pPick: { ...pickedOf(visual), caption: draft } }));
+      if (!docs.length) return;
+      const caption = visual.length ? "" : draft.trim();
       if (caption) set(u => ({ ...u, pDraft: "" }));
-      await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
+      await Promise.all(docs.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
     },
     ph: c ? `Reply to ${first(c.name)}…` : "", sendIcon: has ? "M5 12h14m-6-6 6 6-6 6" : "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0m7 7v3", sendTitle: has ? "Send" : "Voice note",
     chC: c?.channel === "messenger" ? "#2F6FB5" : "#1F7A4D", menuOpen: on && ui.pMenu, toggleMenu: () => set(u => ({ ...u, pMenu: !u.pMenu })),
