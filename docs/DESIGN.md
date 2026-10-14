@@ -1057,6 +1057,10 @@ No test button: the ERP's own page proves the key.
 
 **The tools above the list:** **"+"** (v3.54, Member services · Edit only), *Upload form* (it reads *Form: name* once uploaded), *Form settings*.
 
+- **Form: name** (2026-10-14) — a click replaces the file; a right-click (Shift + F10 from the keys) opens its paper menu, `FormFileMenu` on `MenuPanel`: the file's name, *View*, *Remove…*. Shift + right-click keeps the browser's.
+  - *View* opens a 640px drawer (`FormFileViewer`, Documentation's preview drawer): a PDF in the browser's viewer, a picture as it is, a Word .docx read in the browser, an HTML form as its page — those two in a sandboxed frame. An old .doc reads *No preview for .doc files.* beside *Download*.
+  - *Remove…* asks beside it (Cancel · **Remove**, the danger one). The chip reads *Upload form* again; a refusal stays in the panel.
+
 - **"+"** opens a 460px window: name, phone, joining date (a day, or the *Any time ready* tick under it — the day then empty and disabled; 2026-10-14), *Submitted by*, HR's questions, the signed form (optional or required), then *Add to the list*. The row then shows **Added by** — never *Signed by*.
 - **The applicant drawer** (400px) holds *Fail* (asks Keep · Fail), Close, and *Transfer*. Transfer is disabled while the place is full and links to Rules › Capacity.
 - **Form settings** (a 600px drawer) holds reorderable question cards and *Save as vN*.
