@@ -169,16 +169,17 @@ export default function PersonRecord({
     wasEditing.current = editing
   }, [editing])
 
-  // Unsaved changes hold a reload or a closed tab.
+  // Unsaved changes hold a reload or a closed tab (saved ones waiting for the
+  // fresh record do not).
   useEffect(() => {
-    if (!editing || count === 0) return
+    if (!editing || count === 0 || settling) return
     const hold = (event: BeforeUnloadEvent) => {
       event.preventDefault()
       event.returnValue = ''
     }
     window.addEventListener('beforeunload', hold)
     return () => window.removeEventListener('beforeunload', hold)
-  }, [editing, count])
+  }, [editing, count, settling])
 
   // A field changed: count again, and a refusal said about the last try goes.
   function edited() {
