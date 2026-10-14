@@ -173,6 +173,25 @@ export function adsPerfVM(ctx: DeskCtx) {
         up: () => { if (i > 0) mvTo(i - 1); }, down: () => { if (i < dcols.length - 1) mvTo(i + 1); },
         rm: () => set(u => ({ ...u, mDraft: (u.mDraft ?? baseOf(u)).filter(k => k !== m[0]) })),
         dStart: (e: { dataTransfer: DataTransfer }) => { e.dataTransfer.effectAllowed = "move"; patch({ mDrag: i }); },
+        // Drag to reorder with the pointer (the owner, 2026-10-13: "無法拖動" — the browser's drag events outran the
+        // screen and swapped rows back): the row follows the pointer over the rows' middles, from where it now is.
+        pDown: (e: { button: number; clientY: number; target: EventTarget | null; currentTarget: HTMLElement; preventDefault(): void }) => {
+          if (e.button !== 0 || (e.target as HTMLElement | null)?.closest("button")) return;
+          e.preventDefault();
+          const list = e.currentTarget.parentElement?.parentElement;
+          let from = i;
+          patch({ mDrag: i });
+          const move = (ev: PointerEvent) => {
+            const rows = list ? [...list.querySelectorAll<HTMLElement>("[data-morder]")] : [];
+            let to = rows.findIndex(r => { const b = r.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
+            if (to < 0) to = rows.length - 1;
+            if (to === from || to < 0) return;
+            const f0 = from; from = to;
+            set(u => { const c = [...(u.mDraft ?? baseOf(u))].filter(k => ALL.some(x => x[0] === k)); const [x] = c.splice(f0, 1); c.splice(to, 0, x); return { ...u, mDraft: c, mDrag: to }; });
+          };
+          const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); document.body.style.cursor = ""; patch({ mDrag: null }); };
+          window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); document.body.style.cursor = "grabbing";
+        },
         dOver: (e: { preventDefault(): void }) => { e.preventDefault(); const f = ui.mDrag; if (f == null || f === i) return; set(u => { const c = [...(u.mDraft ?? baseOf(u))].filter(k => ALL.some(x => x[0] === k)); const [x] = c.splice(f, 1); c.splice(i, 0, x); return { ...u, mDraft: c, mDrag: i }; }); },
         dDrop: (e: { preventDefault(): void }) => { e.preventDefault(); patch({ mDrag: null }); }, dEnd: () => patch({ mDrag: null }) }; }),
     mOrdOpen: !ui.mFold.__order, mOrdRot: ui.mFold.__order ? -90 : 0, mOrdFold: () => set(u => ({ ...u, mFold: { ...u.mFold, __order: !u.mFold.__order } })),
