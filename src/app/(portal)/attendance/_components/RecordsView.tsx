@@ -274,7 +274,7 @@ export default function RecordsView({ config, month, ledger }: { config: AttConf
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
               <span style={{ fontWeight: 500 }}>{popTitle}</span>
-              <button type="button" onClick={closeBar} aria-label="Close" style={{ border: 0, background: 'none', fontSize: 18, lineHeight: 1, color: 'var(--ds-ink-3)', cursor: 'pointer' }}>×</button>
+              <button type="button" onClick={closeBar} aria-label="Close" style={{ border: 0, background: 'none', fontSize: 18, lineHeight: 1, color: 'var(--ds-ink-3)', cursor: 'pointer', padding: '1px 6px', fontFamily: 'Arial, sans-serif' }}>×</button>
             </div>
             {bar === 'cols' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

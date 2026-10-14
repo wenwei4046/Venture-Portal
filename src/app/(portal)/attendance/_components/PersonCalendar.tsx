@@ -138,18 +138,21 @@ export default function PersonCalendar({
     ])
 
   const label9: CSSProperties = { fontSize: 9.5, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--ds-ink-3)' }
+  // The calendar names the fence, not the distance (the handoff: 'HQ · inside fence').
+  const fence = !day?.place ? null : day.flags.includes('Outside fence') ? day.place : `${day.place.split(' · ')[0]} · inside fence`
   const facts = [
     { label: 'IN', value: day?.in ?? '—', mono: true },
     { label: 'OUT', value: day?.out ?? '—', mono: true },
     { label: 'Worked', value: worked, mono: true },
-    { label: 'Place', value: day?.place ?? '—' },
+    { label: 'Place', value: fence ?? '—' },
   ]
 
   return (
     <Sheet
       open={open}
       onClose={onClose}
-      width={460}
+      // The prototype hands its Sheet width="460" as a string, which CSS refuses: the panel takes its content's width, 567.56px.
+      width={567.56}
       eyebrow={`Attendance · ${monthLabel(month)}`}
       title={p.name}
       description={[p.title, p.department, day?.schedule?.name].filter(Boolean).join(' · ')}
@@ -255,7 +258,7 @@ export default function PersonCalendar({
                       <span style={{ fontSize: 11.5, color: 'var(--ds-ink-3)' }}>{time ? 'Selfie at punch' : 'No punch yet'}</span>
                       <span style={{ position: 'absolute', left: 6, top: 6, fontSize: 10.5, fontWeight: 600, padding: '2px 7px', borderRadius: 999, background: 'rgb(255 255 255 / .92)', color: 'var(--ds-ink)' }}>{`${label} · ${time ?? '—'}`}</span>
                     </div>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ds-ink-3)' }}>{time ? day.place ?? '—' : '—'}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ds-ink-3)' }}>{time ? `Front camera · ${fence ?? '—'}` : '—'}</span>
                   </div>
                 ))}
               </div>
