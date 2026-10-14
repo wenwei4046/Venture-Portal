@@ -90,9 +90,10 @@ export function changesLabel(count: number): string {
 
 /**
  * The named fields of a form whose value is not the one it was drawn with —
- * the browser keeps that first value (`defaultValue`, `defaultChecked`, an
- * option's `defaultSelected`), so a field typed back to what it was counts
- * as unchanged. Hidden fields ride along with a choice that counts itself.
+ * the value a form reset would put back (`defaultValue`, `defaultChecked`;
+ * for a select its `defaultSelected` option, else its first), so a field
+ * typed back to what it was counts as unchanged. Hidden fields ride along
+ * with a choice that counts itself.
  */
 export function changedFields(form: HTMLFormElement): Set<string> {
   const out = new Set<string>()
@@ -104,7 +105,10 @@ export function changedFields(form: HTMLFormElement): Set<string> {
     } else if (el instanceof HTMLTextAreaElement) {
       if (el.name && !el.disabled && el.value !== el.defaultValue) out.add(el.name)
     } else if (el instanceof HTMLSelectElement) {
-      if (el.name && !el.disabled && Array.from(el.options).some(o => o.selected !== o.defaultSelected)) out.add(el.name)
+      if (!el.name || el.disabled || el.multiple) continue
+      const options = Array.from(el.options)
+      const drawn = options.find(o => o.defaultSelected === true) ?? options.find(o => !o.disabled)
+      if ((drawn?.value ?? '') !== el.value) out.add(el.name)
     }
   }
   return out

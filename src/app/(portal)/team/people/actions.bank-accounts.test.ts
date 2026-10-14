@@ -67,7 +67,8 @@ describe('staff bank account server actions', () => {
 
   it('refuses incomplete, invalid or duplicate Account 2 before a database write', async () => {
     for (const second of [{ bank: 'CIMB', number: '' }, { bank: '', number: '1234' }, { bank: 'CIMB', number: 'invalid' }, { bank: 'maybank', number: '0012-345678' }]) {
-      await expect(updateStaff('staff', staffForm(second))).rejects.toThrow(/Account 2/)
+      // The save answers in words — production hides a thrown message (2026-10-14).
+      await expect(updateStaff('staff', staffForm(second))).resolves.toEqual({ ok: false, reason: expect.stringMatching(/Account 2/) })
       await expect(addStaff(staffForm(second))).rejects.toThrow(/Account 2/)
     }
     expect(insert).not.toHaveBeenCalled()
@@ -76,10 +77,27 @@ describe('staff bank account server actions', () => {
   })
 })
 
+describe('a person is saved from their own page (2026-10-14, edited where it stands)', () => {
+  it('names the full page as the write’s page, and answers ok', async () => {
+    await expect(updateStaff('staff', staffForm())).resolves.toEqual({ ok: true })
+    expect(gate).toHaveBeenCalledWith('/team/people/[id]', 'team', 'edit')
+  })
+
+  it('answers a refusal from the database in words, not a thrown digest', async () => {
+    const q = query as { error: unknown }
+    q.error = { code: '23505', message: 'duplicate key value violates unique constraint "idx_hr_staff_employee_code_active"' }
+    try {
+      await expect(updateStaff('staff', staffForm())).resolves.toEqual({ ok: false, reason: 'Employee code already used by another active staff' })
+    } finally {
+      q.error = null
+    }
+  })
+})
+
 describe('NRIC and bank accounts are written only where ticked (2026-10-09, PR4)', () => {
   it('refuses the edit to somebody whose title does not tick Salary amounts', async () => {
     gate.mockResolvedValue(NO_TICKS)
-    await expect(updateStaff('staff', staffForm())).rejects.toThrow(/Salary amounts/)
+    await expect(updateStaff('staff', staffForm())).resolves.toEqual({ ok: false, reason: expect.stringMatching(/Salary amounts/) })
     expect(update).not.toHaveBeenCalled()
   })
 
@@ -112,7 +130,7 @@ describe('NRIC and bank accounts are written only where ticked (2026-10-09, PR4)
   it('refuses •••• — a hidden number is never saved back as itself', async () => {
     const form = staffForm()
     form.set('bank_account_no', '••••')
-    await expect(updateStaff('staff', form)).rejects.toThrow(/hidden from you/)
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: false, reason: expect.stringMatching(/hidden from you/) })
     expect(update).not.toHaveBeenCalled()
   })
 
