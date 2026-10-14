@@ -1,13 +1,15 @@
 import { requirePage } from '@/lib/auth'
-import VoucherLedger, { type LedgerSearchParams } from '../payments/_components/VoucherLedger'
+import ReceiptsHub from './_components/ReceiptsHub'
+import type { LedgerParams } from '../payments/_lib/hub-ledger'
 
-// Receipt side: credit vouchers (HV-OR-*) only — same tabs/filters/table as
-// /payments. Split per user 2026-06-12.
+// Receipt side: credit vouchers (HV-OR-*) only — split from /payments per user
+// 2026-06-12. Since 2026-10-14 the Finance revamp v2's hub (D09): the cards
+// beside the list, the drawer a row opens — Payments' parts, read as receipts.
 export default async function ReceiptsPage({
   searchParams,
 }: {
-  searchParams: Promise<LedgerSearchParams>
+  searchParams: Promise<LedgerParams>
 }) {
   await requirePage('/receipts')
-  return <VoucherLedger direction="credit" params={await searchParams} />
+  return <ReceiptsHub params={await searchParams} />
 }

@@ -233,3 +233,17 @@ describe('a batch’s words', () => {
     expect(batchStatusText({ paid: 3 }, true)).toBe('all received')
   })
 })
+
+describe('Receipt’s hub (D09)', () => {
+  const receipt = { ...VOUCHERS[0], id: 'or1', voucher_no: 'HV-OR-202610-0522', direction: 'credit', status: 'paid', reference_type: null, target_pool: 'venture_pool', payment_date: '2026-10-10' }
+  const ledger = buildHubLedger(input({ direction: 'credit', vouchers: [receipt], extras: [] }))
+
+  it('has no payroll card — All receipts, Draft, Pending, Approved, Received, Voided', () => {
+    expect(ledger.receipts).toBe(true)
+    expect(ledger.cards.map((c) => c.key)).toEqual(['all', 'draft', 'pending_approval', 'approved', 'paid', 'voided'])
+  })
+
+  it('totals the month’s money received', () => {
+    expect(ledger.hero.label).toBe('Total received · October 2026')
+  })
+})

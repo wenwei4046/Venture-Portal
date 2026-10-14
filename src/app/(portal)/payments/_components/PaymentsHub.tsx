@@ -21,6 +21,7 @@ export default async function PaymentsHub({ params }: { params: LedgerParams }) 
   const supabase = await createClient()
   const seesPayroll = canSeePayrollPayouts(user)
   const canCreate = canDo(user, 'treasury', 'create')
+  const canSetDefault = user.role === 'finance' || user.role === 'principal'
 
   const ledgerRead = startRead(loadHubLedger(supabase, user, 'debit', params))
   const deptRead = startRead(
@@ -101,7 +102,7 @@ export default async function PaymentsHub({ params }: { params: LedgerParams }) 
       ledger={ledger}
       canCreate={canCreate}
       create={canCreate ? { prefix: `HV-PV-${officeMonth().replace('-', '')}`, today: officeToday(), open: params.new === '1', initial: createRead ? await createRead : null } : null}
-      canSetDefault={user.role === 'finance' || user.role === 'principal'}
+      canSetDefault={canSetDefault}
       dept={dept}
       payroll={payroll}
       claims={claims}
