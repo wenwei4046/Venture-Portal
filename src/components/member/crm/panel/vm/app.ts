@@ -55,16 +55,19 @@ export function panelAppVM(ctx: PanelCtx) {
   const x = assignExtraVM(ctx, as0);
   const as = as0 ? { ...as0, adRows: x.adRows, ae: { ...as0.ae, ...x.aeApply, ...(x.aeSave ?? {}) } } : undefined;
   const cal = show.cal ? calendarVM(ctx) : undefined;
-  // The top bar shows only for a back link ("‹ Profile" on Ads Performance, "‹ Assignment" in a section); the bell sits in
-  // each page's title row, or in the top bar beside a back link — the prototype's bellIn / bellTop. Team | Mine (rev 1011:
-  // the Director, and leaders with a downline) is one round button left of the house in the title row (2026-10-14,
-  // shared/team-mine.ts); it had a top row of its own on every page (round 2, §8). Never in a chat.
+  // The top bar shows only for a back link ("‹ Profile" on Ads Performance, "‹ Assignment" in a section). The bell — the
+  // prototype's bellIn / bellTop — with the house and Team | Mine left of it, sits on Insight alone, the first page of the
+  // bottom bar, as the Revenue app keeps its header to Today (2026-10-14, the owner: "principal view … 只存在于 Insight 界面";
+  // it was in every page's title row, and the top bar beside a back link). Team | Mine (rev 1011: the Director, and leaders
+  // with a downline) goes to Mine's first page, the Inbox (shared/team-mine.ts); it had a top row of its own on every page
+  // (round 2, §8). Never in a chat.
+  const toMine = ctx.toMyCrm;
   return {
     show, hd, bl, cf,
     topBar: !!hd.showHead,
-    tm: teamMineSwap("team", lead ? undefined : ctx.toMyCrm),
-    bellIn: !!bl.showBell && !hd.showHead, bellTop: !!bl.showBell && hd.showHead,
-    // The house left of the bell on every page (switch-back.cjs, 2026-10-14); Profile's card is gone.
+    tm: teamMineSwap("team", lead || !toMine ? undefined : () => toMine("inbox")),
+    bellIn: !!bl.showBell && show.ov, bellTop: false,
+    // The house left of the bell (switch-back.cjs, 2026-10-14); Profile's card is gone.
     exitCrm: () => ctx.exitApp(), enterNext,
     // The Insight line: "All access" for whoever sees everybody, else their team (a leader on the Team side).
     accessLbl: ctx.data.can.viewAll ? "All access" : teamName(teamOf(ctx.me.id, ctx.data.people)) || "My team",

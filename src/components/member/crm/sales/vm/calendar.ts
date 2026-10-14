@@ -140,8 +140,6 @@ export function calendarVM(ctx: SalesCtx) {
   return {
     // stop comes with the customer form below
     calTitle: first.toLocaleDateString("en-GB", ym[0] === now.getFullYear() ? { month: "long" } : { month: "long", year: "numeric" }),
-    // …and its short name, which a narrow phone shows when the long one would be cut beside the round buttons (fit-rows.ts).
-    calShort: gb(first, ym[0] === now.getFullYear() ? { month: "short" } : { month: "short", year: "numeric" }),
     calToday: (e: MouseEvent<HTMLElement>) => {
       const main = e.currentTarget.closest("main");
       patch({ calYM: [now.getFullYear(), now.getMonth()], calSel: T });

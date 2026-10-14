@@ -10,6 +10,7 @@ import { formatIntlDate } from "@/lib/utils";
 import { downlineOf, jobTitle, ROLE_ORDER, teamName, titleOf, titleShort } from "../../shared/people";
 import type { PanelActions } from "../actions";
 import type { PanelUi, Period, Range } from "../ui";
+import type { SalesTab } from "../../sales/ui";
 
 export const DAY = 86_400_000;
 export const day0 = (d: Date | number) => { const x = new Date(d); return new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); };
@@ -45,8 +46,8 @@ export interface PanelCtx {
   teamOfStaff: (id: string | null | undefined) => Team | undefined;
   /** Open someone's own CRM (View as / a tapped chat): the salesperson screens, on their customers. */
   openCrmOf: (staffId: string, customerId?: string) => void;
-  /** The Director: Control panel ⇄ My CRM. */
-  toMyCrm?: () => void;
+  /** The Director: Control panel ⇄ My CRM — on `tab` (the phone's round button: Mine's first page), else the same page. */
+  toMyCrm?: (tab?: SalesTab) => void;
   exitApp: () => void;
   slotCounts: Record<string, number>;
 }

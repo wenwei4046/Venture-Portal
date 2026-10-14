@@ -8,6 +8,7 @@ import { prepareImage } from "./image-prep";
 import { captionOf, pickedOf, type PickedItem, type PickVM } from "./pick";
 import { STANDARD_VIDEO_MAX } from "./video-fit";
 import { saveToDevice } from "./viewer";
+import { typePx } from "./type";
 
 /**
  * The preview as WhatsApp's editor, full screen (the owner, 2026-10-14, with WhatsApp's photo and video editors beside
@@ -78,7 +79,7 @@ function frameOf(it: PickedItem): Promise<ImageBitmap | null> {
 
 function Btn({ path, label, on, onClick, text }: { path?: string; label: string; on?: boolean; onClick: () => void; text?: string }) {
   return (
-    <button type="button" onClick={onClick} aria-label={label} title={label} style={{ flex: "none", width: "40px", height: "40px", borderRadius: "20px", border: 0, background: on ? "#fff" : "rgba(40,40,40,.72)", color: on ? "#111" : "#fff", display: "grid", placeItems: "center", cursor: "pointer", fontSize: text === "HD" ? "11px" : "16px", fontWeight: 800, letterSpacing: text === "HD" ? ".04em" : 0, padding: 0 }}>
+    <button type="button" onClick={onClick} aria-label={label} title={label} style={{ flex: "none", width: "40px", height: "40px", borderRadius: "20px", border: 0, background: on ? "#fff" : "rgba(40,40,40,.72)", color: on ? "#111" : "#fff", display: "grid", placeItems: "center", cursor: "pointer", fontSize: typePx(text === "HD" ? 11 : 16), fontWeight: 800, letterSpacing: text === "HD" ? ".04em" : 0, padding: 0 }}>
       {text ?? <svg width="19" height="19" viewBox="0 0 24 24" {...ICON}><path d={path} /></svg>}
     </button>
   );
@@ -123,7 +124,7 @@ export function PickEditor({ pk }: { pk: PickVM }) {
         </>)}
         {(mode === "draw" || mode === "arrange") && (<>
           {mode === "draw" && <Btn path={P.undo} label="Undo" onClick={() => setEdits({ ...edits, strokes: edits.strokes.slice(0, -1) })} />}
-          <button type="button" onClick={() => setMode("")} style={{ height: "40px", padding: "0 16px", borderRadius: "20px", border: 0, background: "#fff", color: "#111", fontWeight: 700, fontSize: "15px" }}>Done</button>
+          <button type="button" onClick={() => setMode("")} style={{ height: "40px", padding: "0 16px", borderRadius: "20px", border: 0, background: "#fff", color: "#111", fontWeight: 700, fontSize: typePx(15) }}>Done</button>
         </>)}
       </div>
       {it.video && mode === ""
@@ -144,7 +145,7 @@ export function PickEditor({ pk }: { pk: PickVM }) {
           <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxHeight: "50%", overflowY: "auto", background: "#1f1f1f", borderRadius: "18px 18px 0 0", padding: "14px 10px calc(var(--safe-bottom, 0px) + 14px)", display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: "4px", touchAction: "pan-y" }}>
             {CHAT_EMOJIS.map(e => (
               <button key={e} type="button" onClick={() => { setEdits({ ...edits, labels: [...edits.labels, { id: uid(), kind: "sticker", text: e, color: "#000", x: 0.5, y: 0.45, size: 0.16 }] }); setMode(it.video ? "arrange" : ""); }}
-                style={{ height: "44px", border: 0, background: "transparent", fontSize: "28px", cursor: "pointer", padding: 0 }}>{e}</button>
+                style={{ height: "44px", border: 0, background: "transparent", fontSize: typePx(28), cursor: "pointer", padding: 0 }}>{e}</button>
             ))}
           </div>
         </div>
@@ -154,7 +155,7 @@ export function PickEditor({ pk }: { pk: PickVM }) {
           {(
             <div style={{ display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", touchAction: "pan-x" }}>
               {/* More photos or videos, ticked several at a time (the owner: "可以勾選多張圖片一起發送"). */}
-              <label aria-label="Add more" style={{ flex: "none", width: "52px", height: "52px", borderRadius: "8px", border: "2px dashed rgba(255,255,255,.5)", display: "grid", placeItems: "center", cursor: "pointer", fontSize: "26px", fontWeight: 300 }}>+
+              <label aria-label="Add more" style={{ flex: "none", width: "52px", height: "52px", borderRadius: "8px", border: "2px dashed rgba(255,255,255,.5)", display: "grid", placeItems: "center", cursor: "pointer", fontSize: typePx(26), fontWeight: 300 }}>+
                 <input type="file" accept="image/*,video/*" multiple style={{ display: "none" }} onChange={e => { const fs = [...(e.target.files ?? [])]; e.target.value = ""; if (fs.length) set({ ...p, items: [...p.items, ...pickedOf(fs).items], at: p.items.length }); }} />
               </label>
               {p.items.map((x, i) => (
@@ -165,13 +166,13 @@ export function PickEditor({ pk }: { pk: PickVM }) {
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <input value={captionOf(p, at)} onChange={e => update({ caption: e.target.value })} placeholder={p.items.length > 1 ? `Add a caption to ${it.video ? "this video" : "this photo"}…` : "Add a caption…"} style={{ flex: "1", minWidth: 0, height: "46px", padding: "0 16px", borderRadius: "23px", border: "1px solid rgba(255,255,255,.25)", background: "rgba(30,30,30,.85)", color: "#fff", fontSize: "16px", outline: "none", userSelect: "text", WebkitUserSelect: "text" }} />
+            <input value={captionOf(p, at)} onChange={e => update({ caption: e.target.value })} placeholder={p.items.length > 1 ? `Add a caption to ${it.video ? "this video" : "this photo"}…` : "Add a caption…"} style={{ flex: "1", minWidth: 0, height: "46px", padding: "0 16px", borderRadius: "23px", border: "1px solid rgba(255,255,255,.25)", background: "rgba(30,30,30,.85)", color: "#fff", fontSize: typePx(16), outline: "none", userSelect: "text", WebkitUserSelect: "text" }} />
             <button type="button" onClick={pk.send} aria-label={pk.sendLabel} style={{ flex: "none", width: "50px", height: "50px", borderRadius: "25px", border: 0, background: "#BD4A19", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer", position: "relative" }}>
               <svg width="22" height="22" viewBox="0 0 24 24" {...ICON}><path d={P.send} /></svg>
-              {p.items.length > 1 && <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "20px", height: "20px", borderRadius: "10px", background: "#fff", color: "#BD4A19", fontSize: "12px", fontWeight: 800, display: "grid", placeItems: "center" }}>{p.items.length}</span>}
+              {p.items.length > 1 && <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "20px", height: "20px", borderRadius: "10px", background: "#fff", color: "#BD4A19", fontSize: typePx(12), fontWeight: 800, display: "grid", placeItems: "center" }}>{p.items.length}</span>}
             </button>
           </div>
-          <span style={{ fontSize: "12px", color: "rgba(255,255,255,.75)" }}>{pk.note}</span>
+          <span style={{ fontSize: typePx(12), color: "rgba(255,255,255,.75)" }}>{pk.note}</span>
         </div>
       )}
     </div>,
@@ -342,12 +343,12 @@ function PhotoStage({ it, base, edits, setEdits, mode, setMode, color, setColor,
       )}
       {cropping && (
         <div style={{ flex: "none", zIndex: 3, padding: "12px 16px calc(var(--safe-bottom, 0px) + 14px)", display: "flex", alignItems: "center", gap: "10px" }}>
-          <button type="button" onClick={() => setMode("")} style={{ height: "42px", padding: "0 16px", borderRadius: "21px", border: 0, background: "transparent", color: "#fff", fontSize: "15px", fontWeight: 600 }}>Cancel</button>
+          <button type="button" onClick={() => setMode("")} style={{ height: "42px", padding: "0 16px", borderRadius: "21px", border: 0, background: "transparent", color: "#fff", fontSize: typePx(15), fontWeight: 600 }}>Cancel</button>
           <span style={{ flex: "1" }} />
           <Btn path={P.turn} label="Turn" onClick={() => { setEdits({ ...edits, turn: ((edits.turn + 3) % 4) as PhotoEdits["turn"], crop: { ...FULL } }); setCrop({ ...FULL }); }} />
-          <button type="button" onClick={() => setCrop({ ...FULL })} style={{ height: "42px", padding: "0 14px", borderRadius: "21px", border: 0, background: "transparent", color: "#fff", fontSize: "15px", fontWeight: 600 }}>Reset</button>
+          <button type="button" onClick={() => setCrop({ ...FULL })} style={{ height: "42px", padding: "0 14px", borderRadius: "21px", border: 0, background: "transparent", color: "#fff", fontSize: typePx(15), fontWeight: 600 }}>Reset</button>
           <span style={{ flex: "1" }} />
-          <button type="button" onClick={() => { setEdits({ ...edits, crop }); setMode(""); }} style={{ height: "42px", padding: "0 20px", borderRadius: "21px", border: 0, background: "#fff", color: "#111", fontSize: "15px", fontWeight: 700 }}>Done</button>
+          <button type="button" onClick={() => { setEdits({ ...edits, crop }); setMode(""); }} style={{ height: "42px", padding: "0 20px", borderRadius: "21px", border: 0, background: "#fff", color: "#111", fontSize: typePx(15), fontWeight: 700 }}>Done</button>
         </div>
       )}
     </>
@@ -361,10 +362,10 @@ function TextSheet({ value, onChange, onDone }: { value: { id: string | null; te
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 6, background: "rgba(0,0,0,.6)", display: "flex", flexDirection: "column", padding: "calc(env(safe-area-inset-top, 0px) + 12px) 16px 16px", gap: "14px" }}>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button type="button" onClick={onDone} style={{ height: "40px", padding: "0 18px", borderRadius: "20px", border: 0, background: "#fff", color: "#111", fontWeight: 700, fontSize: "15px" }}>Done</button>
+        <button type="button" onClick={onDone} style={{ height: "40px", padding: "0 18px", borderRadius: "20px", border: 0, background: "#fff", color: "#111", fontWeight: 700, fontSize: typePx(15) }}>Done</button>
       </div>
       <textarea ref={ref} value={value.text} onChange={e => onChange({ ...value, text: e.target.value })} rows={3} placeholder="Type something"
-        style={{ width: "100%", border: 0, outline: "none", background: "transparent", color: value.color, fontSize: "30px", fontWeight: 700, textAlign: "center", resize: "none", fontFamily: "inherit", userSelect: "text", WebkitUserSelect: "text", textShadow: value.color === "#FFFFFF" ? "0 0 4px rgba(0,0,0,.6)" : "0 0 4px rgba(255,255,255,.8)" }} />
+        style={{ width: "100%", border: 0, outline: "none", background: "transparent", color: value.color, fontSize: typePx(30), fontWeight: 700, textAlign: "center", resize: "none", fontFamily: "inherit", userSelect: "text", WebkitUserSelect: "text", textShadow: value.color === "#FFFFFF" ? "0 0 4px rgba(0,0,0,.6)" : "0 0 4px rgba(255,255,255,.8)" }} />
       <div style={{ display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap" }}>
         {COLORS.map(c => <button key={c} type="button" aria-label={c} onClick={() => onChange({ ...value, color: c })} style={{ width: "28px", height: "28px", borderRadius: "14px", border: c === value.color ? "3px solid #fff" : "2px solid rgba(255,255,255,.6)", background: c, padding: 0, cursor: "pointer" }} />)}
       </div>
@@ -408,13 +409,13 @@ function VideoStage({ it, hd, update, edits }: { it: PickedItem; hd: boolean; up
           {(["start", "end"] as const).map(w => (
             <span key={w} onPointerDown={e => { drag.current = w; (e.currentTarget.parentElement as HTMLElement).setPointerCapture(e.pointerId); }}
               style={{ position: "absolute", top: 0, bottom: 0, left: pct(w === "start" ? cut.start : end), width: "22px", marginLeft: "-11px", display: "grid", placeItems: "center", touchAction: "none", cursor: "ew-resize" }}>
-              <span style={{ width: "10px", height: "44px", borderRadius: "4px", background: "#fff", color: "#111", fontSize: "11px", fontWeight: 800, display: "grid", placeItems: "center" }}>{w === "start" ? "‹" : "›"}</span>
+              <span style={{ width: "10px", height: "44px", borderRadius: "4px", background: "#fff", color: "#111", fontSize: typePx(11), fontWeight: 800, display: "grid", placeItems: "center" }}>{w === "start" ? "‹" : "›"}</span>
             </span>
           ))}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <Btn path={cut.mute ? P.mute : P.sound} label={cut.mute ? "Sound off" : "Sound on"} on={cut.mute} onClick={() => update({ cut: { ...cut, end, mute: !cut.mute } })} />
-          <span style={{ padding: "6px 10px", borderRadius: "8px", background: "rgba(40,40,40,.72)", fontSize: "13px", fontWeight: 600 }}>{clock(kept)} · {hd ? "" : "up to "}{mb(est)}</span>
+          <span style={{ padding: "6px 10px", borderRadius: "8px", background: "rgba(40,40,40,.72)", fontSize: typePx(13), fontWeight: 600 }}>{clock(kept)} · {hd ? "" : "up to "}{mb(est)}</span>
         </div>
       </div>
       <div style={{ flex: "1", minHeight: 0, display: "grid", placeItems: "center", paddingTop: "150px", position: "relative" }}>
@@ -436,7 +437,7 @@ function VideoStage({ it, hd, update, edits }: { it: PickedItem; hd: boolean; up
           </span>
         )}
         </span>
-        {turned && <span style={{ position: "absolute", left: "50%", bottom: "8px", transform: "translateX(-50%)", padding: "5px 10px", borderRadius: "10px", background: "rgba(40,40,40,.8)", fontSize: "12px", fontWeight: 600 }}>Turned or cropped · shown once sent</span>}
+        {turned && <span style={{ position: "absolute", left: "50%", bottom: "8px", transform: "translateX(-50%)", padding: "5px 10px", borderRadius: "10px", background: "rgba(40,40,40,.8)", fontSize: typePx(12), fontWeight: 600 }}>Turned or cropped · shown once sent</span>}
       </div>
     </>
   );

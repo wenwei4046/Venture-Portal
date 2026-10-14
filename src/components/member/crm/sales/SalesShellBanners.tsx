@@ -13,8 +13,8 @@ export default function SalesShellBanners({ v }: { v: ShellVM }) {
     {!!(v.rdX) && (<>
       <div style={{ flex: "none", display: "flex", padding: "0 20px 6px" }}>
         <div style={{ display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "#F0E6DE" }}>
-          <span onClick={v.toPanelX} style={{ height: "30px", padding: "0 12px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "650", color: "#806B60", cursor: "pointer" }}>Control panel</span>
-          <span style={{ height: "30px", padding: "0 12px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "650", background: "#fff", color: "#3F2B22", boxShadow: "0 1px 3px rgba(63,43,34,.14)" }}>My CRM</span>
+          <span onClick={v.toPanelX} style={{ height: "30px", padding: "0 12px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "#806B60", cursor: "pointer" }}>Control panel</span>
+          <span style={{ height: "30px", padding: "0 12px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", background: "#fff", color: "#3F2B22", boxShadow: "0 1px 3px rgba(63,43,34,.14)" }}>My CRM</span>
         </div>
       </div>
     </>)}
@@ -24,14 +24,14 @@ export default function SalesShellBanners({ v }: { v: ShellVM }) {
           <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z">
           </path>
         </svg>
-        <span style={{ flex: "1", minWidth: "0", fontSize: "13px", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Viewing {v.asNameX}'s CRM</span>
+        <span style={{ flex: "1", minWidth: "0", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Viewing {v.asNameX}'s CRM</span>
         {!!(v.canSwitchX) && (<>
-          <span onClick={v.openSwX} style={{ flex: "none", height: "30px", padding: "0 12px", borderRadius: "15px", background: "#F6B48A", color: "#3F2B22", display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "13px", fontWeight: "650", cursor: "pointer" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <span onClick={v.openSwX} style={{ flex: "none", height: "30px", padding: "0 12px", borderRadius: "15px", background: "#F6B48A", color: "#3F2B22", display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3">
               </path>
             </svg>Switch</span>
         </>)}
-        <span onClick={v.exitAsX} style={{ flex: "none", height: "30px", padding: "0 12px", borderRadius: "15px", background: "#fff", color: "#3F2B22", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "650", cursor: "pointer" }}>Exit</span>
+        <span onClick={v.exitAsX} style={{ flex: "none", height: "30px", padding: "0 12px", borderRadius: "15px", background: "#fff", color: "#3F2B22", display: "grid", placeItems: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}>Exit</span>
       </div>
     </>)}
     {!!(v.swOpenX) && (<>
@@ -39,16 +39,16 @@ export default function SalesShellBanners({ v }: { v: ShellVM }) {
         <div onClick={v.stopTeam} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 26px", display: "flex", flexDirection: "column", gap: "4px", maxHeight: "88%", overflowY: "auto", scrollbarWidth: "none", boxSizing: "border-box" }}>
           <span style={{ alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2" }}>
           </span>
-          <h2 style={{ margin: "6px 0 8px", fontSize: "20px", fontWeight: "700", letterSpacing: "-.02em" }}>Switch to</h2>
+          <h2 style={{ margin: "6px 0 8px", fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>Switch to</h2>
           {(v.swList).map((p, p_i) => (<Fragment key={p_i}>
-            {!!p.hasHead && (<span style={{ padding: "8px 0 4px", fontSize: "12px", fontWeight: "700", letterSpacing: ".08em", textTransform: "uppercase", color: "#806B60" }}>{p.head}</span>)}
+            {!!p.hasHead && (<span style={{ padding: "8px 0 4px", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".08em", textTransform: "uppercase", color: "#806B60" }}>{p.head}</span>)}
             <div onClick={p.go} style={{ display: "flex", alignItems: "center", gap: "12px", minHeight: "58px", borderTop: p.rule, cursor: "pointer" }}>
-              <span style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: "#F5EBE3", color: "#4E2F20", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "700" }}>{p.ini}</span>
+              <span style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: "#F5EBE3", color: "#4E2F20", display: "grid", placeItems: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "700" }}>{p.ini}</span>
               <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
-                <strong style={{ fontSize: "15px", fontWeight: "650" }}>{p.name}</strong>
-                <small style={{ fontSize: "12px", color: "#806B60" }}>{p.title}</small>
+                <strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650" }}>{p.name}</strong>
+                <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "#806B60" }}>{p.title}</small>
               </span>
-              <span style={{ fontSize: "13px", fontWeight: "650", color: p.fg }}>{p.act}</span>
+              <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: p.fg }}>{p.act}</span>
             </div>
           </Fragment>))}
         </div>

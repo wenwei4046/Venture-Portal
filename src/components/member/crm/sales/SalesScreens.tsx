@@ -26,6 +26,7 @@ import type { SalesCtx } from "./vm/common";
 import { useFollowNewest } from "../shared/stick";
 import { useCloseOnOutside } from "./outside";
 import { DOC_ACCEPT, PICKER_AT } from "../shared/attach-sheet";
+import { typePx } from "../shared/type";
 
 export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: () => void }) {
   const { ui } = ctx;
@@ -33,17 +34,18 @@ export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: (
   useFollowNewest(ui.chat, ctx.data.customers.find(c => c.id === ui.chat)?.messages.length ?? 0);
   const { set } = ctx;
   useCloseOnOutside(!!ui.hm?.menu, useCallback(() => set(u => ({ ...u, hm: null })), [set]));
-  // Each page's title row: Team | Mine (whoever has a Team side), the house back to the Revenue app, the bell.
+  // The Inbox's title row — the first page's alone (2026-10-14): Team | Mine (whoever has a Team side), the house back to
+  // the Revenue app, the bell.
   const x = { tb: titleBellVM(ctx), exitCrm: onExit, tm: teamMineVM(ctx) };
   return (<>
     <SalesShellBanners v={shellVM(ctx)} />
     {!chat && (<>
       <SalesHeader v={headerVM(ctx)} />
       {ui.tab === "inbox" && <SalesInbox v={{ ...inboxVM(ctx), ...x }} />}
-      {ui.tab === "contacts" && <SalesContacts v={{ ...contactsVM(ctx), ...x }} />}
-      {ui.tab === "calendar" && <SalesCalendar v={{ ...calendarVM(ctx), ...x }} />}
-      {ui.tab === "insight" && <SalesInsight v={{ ...insightVM(ctx), ...x }} />}
-      {ui.tab === "profile" && <SalesProfile v={{ ...profileVM(ctx), ...x }} />}
+      {ui.tab === "contacts" && <SalesContacts v={contactsVM(ctx)} />}
+      {ui.tab === "calendar" && <SalesCalendar v={calendarVM(ctx)} />}
+      {ui.tab === "insight" && <SalesInsight v={insightVM(ctx)} />}
+      {ui.tab === "profile" && <SalesProfile v={profileVM(ctx)} />}
     </>)}
     {chat && (<>
       <SalesChat v={chat} />
@@ -55,10 +57,10 @@ export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: (
     {!chat && <SalesNav v={navVM(ctx)} />}
     {/* What happened, wherever the person is (the Inbox and a chat show it in their own place). */}
     {!!ui.toast && ui.tab !== "inbox" && !chat && (
-      <div style={{ position: "absolute", left: "20px", right: "20px", bottom: "96px", zIndex: 30, padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: "14px", fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{ui.toast}</div>
+      <div style={{ position: "absolute", left: "20px", right: "20px", bottom: "96px", zIndex: 30, padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: typePx(14), fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{ui.toast}</div>
     )}
     {!!ui.toast && chat && !ui.hm?.toast && (
-      <div style={{ position: "absolute", left: "20px", right: "20px", bottom: "90px", zIndex: 30, padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: "14px", fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{ui.toast}</div>
+      <div style={{ position: "absolute", left: "20px", right: "20px", bottom: "90px", zIndex: 30, padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: typePx(14), fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{ui.toast}</div>
     )}
   </>);
 }

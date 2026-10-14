@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { typePx } from "./type";
 
 /**
  * A document other than a PDF, opened in the viewer (the owner, 2026-10-14: "文件功能目前雙方都能打開 pdf，但是其他文件類型
@@ -108,10 +109,10 @@ export function FilePreview({ file, kind }: { file: File | null; kind: PreviewKi
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
 
   if (file && file.size > previewLimit(kind)) {
-    return <p style={{ color: "#fff", textAlign: "center", marginTop: "40px", fontSize: "15px", padding: "0 24px", lineHeight: 1.5 }}>This file is {Math.round(file.size / 1048576)} MB — too big to open here. Use Download to open it in Numbers, Excel or Files.</p>;
+    return <p style={{ color: "#fff", textAlign: "center", marginTop: "40px", fontSize: typePx(15), padding: "0 24px", lineHeight: 1.5 }}>This file is {Math.round(file.size / 1048576)} MB — too big to open here. Use Download to open it in Numbers, Excel or Files.</p>;
   }
-  const wait = <p style={{ color: "#fff", opacity: 0.8, textAlign: "center", marginTop: "40px", fontSize: "15px" }}>Opening…</p>;
-  if (failed) return <p style={{ color: "#fff", textAlign: "center", marginTop: "40px", fontSize: "15px", padding: "0 20px" }}>This file could not be opened here. Use Download to open it in another app.</p>;
+  const wait = <p style={{ color: "#fff", opacity: 0.8, textAlign: "center", marginTop: "40px", fontSize: typePx(15) }}>Opening…</p>;
+  if (failed) return <p style={{ color: "#fff", textAlign: "center", marginTop: "40px", fontSize: typePx(15), padding: "0 20px" }}>This file could not be opened here. Use Download to open it in another app.</p>;
   const box = { flex: "1", minHeight: 0, overflow: "auto", background: "#fff", color: "#222", touchAction: "pan-x pan-y pinch-zoom", WebkitOverflowScrolling: "touch" } as const;
 
   if (kind === "sheet") {
@@ -121,22 +122,22 @@ export function FilePreview({ file, kind }: { file: File | null; kind: PreviewKi
       <div style={{ flex: "1", minHeight: 0, display: "flex", flexDirection: "column" }}>
         {sheets.length > 1 && (
           <div style={{ flex: "none", display: "flex", gap: "6px", overflowX: "auto", padding: "8px 10px", background: "#2a211d" }}>
-            {sheets.map((x, i) => <button key={x.name} type="button" onClick={() => setAt(i)} style={{ flex: "none", height: "30px", padding: "0 12px", borderRadius: "15px", border: 0, background: i === at ? "#fff" : "rgba(255,255,255,.15)", color: i === at ? "#201814" : "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>{x.name}</button>)}
+            {sheets.map((x, i) => <button key={x.name} type="button" onClick={() => setAt(i)} style={{ flex: "none", height: "30px", padding: "0 12px", borderRadius: "15px", border: 0, background: i === at ? "#fff" : "rgba(255,255,255,.15)", color: i === at ? "#201814" : "#fff", fontSize: typePx(13), fontWeight: 600, cursor: "pointer" }}>{x.name}</button>)}
           </div>
         )}
         <div style={box}>
-          <table style={{ borderCollapse: "collapse", fontSize: "13px", fontFamily: "Inter, -apple-system, sans-serif" }}>
+          <table style={{ borderCollapse: "collapse", fontSize: typePx(13), fontFamily: "Inter, -apple-system, sans-serif" }}>
             <tbody>
               {s?.rows.map((r, i) => (
                 <tr key={i} style={{ background: i === 0 ? "#F5EBE3" : i % 2 ? "#fff" : "#FBF7F3" }}>
-                  <td style={{ padding: "6px 8px", border: "1px solid #E6DDD5", color: "#A8968B", fontSize: "11px", textAlign: "right", position: "sticky", left: 0, background: "inherit" }}>{i + 1}</td>
+                  <td style={{ padding: "6px 8px", border: "1px solid #E6DDD5", color: "#A8968B", fontSize: typePx(11), textAlign: "right", position: "sticky", left: 0, background: "inherit" }}>{i + 1}</td>
                   {r.map((c, j) => <td key={j} style={{ padding: "6px 10px", border: "1px solid #E6DDD5", whiteSpace: "pre-wrap", maxWidth: "260px", fontWeight: i === 0 ? 650 : 400, verticalAlign: "top" }}>{c}</td>)}
                 </tr>
               ))}
             </tbody>
           </table>
-          {s?.more && <p style={{ margin: "10px", color: "#806B60", fontSize: "13px" }}>Showing the first {MAX_ROWS} rows. Download to see the rest.</p>}
-          {!s?.rows.length && <p style={{ margin: "16px", color: "#806B60", fontSize: "14px" }}>This sheet is empty.</p>}
+          {s?.more && <p style={{ margin: "10px", color: "#806B60", fontSize: typePx(13) }}>Showing the first {MAX_ROWS} rows. Download to see the rest.</p>}
+          {!s?.rows.length && <p style={{ margin: "16px", color: "#806B60", fontSize: typePx(14) }}>This sheet is empty.</p>}
         </div>
       </div>
     );
@@ -151,15 +152,15 @@ export function FilePreview({ file, kind }: { file: File | null; kind: PreviewKi
     if (!slides) return wait;
     return (
       <div style={{ ...box, background: "#3a302b", padding: "10px" }}>
-        {!slides.length && <p style={{ color: "#fff", fontSize: "14px", margin: "16px" }}>No slides could be read. Use Download to open it in Keynote or PowerPoint.</p>}
+        {!slides.length && <p style={{ color: "#fff", fontSize: typePx(14), margin: "16px" }}>No slides could be read. Use Download to open it in Keynote or PowerPoint.</p>}
         {slides.map((sl, i) => (
           <div key={i} style={{ background: "#fff", borderRadius: "10px", padding: "14px", marginBottom: "10px", boxShadow: "0 1px 4px rgba(0,0,0,.3)" }}>
-            <div style={{ fontSize: "11px", fontWeight: 700, color: "#A8968B", marginBottom: "6px" }}>Slide {i + 1}</div>
-            {sl.lines.map((t, j) => <p key={j} style={{ margin: "0 0 6px", fontSize: j === 0 ? "17px" : "14px", fontWeight: j === 0 ? 700 : 400, color: "#222", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{t}</p>)}
+            <div style={{ fontSize: typePx(11), fontWeight: 700, color: "#A8968B", marginBottom: "6px" }}>Slide {i + 1}</div>
+            {sl.lines.map((t, j) => <p key={j} style={{ margin: "0 0 6px", fontSize: typePx(j === 0 ? 17 : 14), fontWeight: j === 0 ? 700 : 400, color: "#222", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{t}</p>)}
             {sl.pics.map((u, j) => <img key={j} src={u} alt="" style={{ display: "block", maxWidth: "100%", maxHeight: "260px", margin: "8px auto 0", objectFit: "contain" }} />)}
           </div>
         ))}
-        <p style={{ color: "rgba(255,255,255,.75)", fontSize: "12px", margin: "4px 4px 12px" }}>A preview of the words and pictures on each slide. Download to see the slides as designed.</p>
+        <p style={{ color: "rgba(255,255,255,.75)", fontSize: typePx(12), margin: "4px 4px 12px" }}>A preview of the words and pictures on each slide. Download to see the slides as designed.</p>
       </div>
     );
   }
@@ -167,14 +168,14 @@ export function FilePreview({ file, kind }: { file: File | null; kind: PreviewKi
     if (!entries) return wait;
     return (
       <div style={box}>
-        <p style={{ margin: "12px 14px 6px", fontSize: "13px", fontWeight: 700, color: "#806B60" }}>{entries.length} file{entries.length === 1 ? "" : "s"} inside</p>
-        {entries.map(n => <div key={n} style={{ padding: "8px 14px", borderTop: "1px solid #F0E6DE", fontSize: "14px", overflowWrap: "anywhere" }}>{n}</div>)}
+        <p style={{ margin: "12px 14px 6px", fontSize: typePx(13), fontWeight: 700, color: "#806B60" }}>{entries.length} file{entries.length === 1 ? "" : "s"} inside</p>
+        {entries.map(n => <div key={n} style={{ padding: "8px 14px", borderTop: "1px solid #F0E6DE", fontSize: typePx(14), overflowWrap: "anywhere" }}>{n}</div>)}
       </div>
     );
   }
   if (kind === "text") {
     if (text == null) return wait;
-    return <div style={box}><pre style={{ margin: 0, padding: "14px", fontSize: "13px", lineHeight: 1.5, whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontFamily: "ui-monospace, Menlo, monospace" }}>{text}</pre></div>;
+    return <div style={box}><pre style={{ margin: 0, padding: "14px", fontSize: typePx(13), lineHeight: 1.5, whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontFamily: "ui-monospace, Menlo, monospace" }}>{text}</pre></div>;
   }
   if (!url) return wait;
   if (kind === "image") return <div style={{ flex: "1", minHeight: 0, display: "grid", placeItems: "center", overflow: "auto" }}><img src={url} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} /></div>;

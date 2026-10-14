@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { drawPage, openPdf } from "./pdf";
+import { typePx } from "./type";
 
 /**
  * A PDF read in the viewer, every page (the owner, 2026-10-14: "我發送的是 25 頁的 pdf 檔案，手機版打開只看到一頁，並且從
@@ -42,11 +43,11 @@ export function PdfPages({ url }: { url: string }) {
 
   return (
     <div ref={box} onScroll={onScroll} style={{ flex: "1", minHeight: 0, overflowY: "auto", background: "#525659", padding: "8px", position: "relative", touchAction: "pan-x pan-y pinch-zoom", WebkitOverflowScrolling: "touch" }}>
-      {failed && <p style={{ color: "#fff", textAlign: "center", marginTop: "40px", fontSize: "15px" }}>This PDF could not be opened here. Use Download to open it.</p>}
-      {!doc && !failed && <p style={{ color: "#fff", textAlign: "center", marginTop: "40px", fontSize: "15px", opacity: 0.8 }}>Opening…</p>}
+      {failed && <p style={{ color: "#fff", textAlign: "center", marginTop: "40px", fontSize: typePx(15) }}>This PDF could not be opened here. Use Download to open it.</p>}
+      {!doc && !failed && <p style={{ color: "#fff", textAlign: "center", marginTop: "40px", fontSize: typePx(15), opacity: 0.8 }}>Opening…</p>}
       {doc && sizes.map((h, i) => <Page key={i} doc={doc} n={i + 1} width={width.current} height={h} root={box} />)}
       {doc && sizes.length > 1 && (
-        <span style={{ position: "sticky", bottom: "calc(var(--safe-bottom, 0px) + 8px)", display: "block", width: "fit-content", margin: "0 auto", padding: "6px 12px", borderRadius: "14px", background: "rgba(0,0,0,.7)", color: "#fff", fontSize: "13px", fontWeight: 600 }}>{at} / {sizes.length}</span>
+        <span style={{ position: "sticky", bottom: "calc(var(--safe-bottom, 0px) + 8px)", display: "block", width: "fit-content", margin: "0 auto", padding: "6px 12px", borderRadius: "14px", background: "rgba(0,0,0,.7)", color: "#fff", fontSize: typePx(13), fontWeight: 600 }}>{at} / {sizes.length}</span>
       )}
     </div>
   );

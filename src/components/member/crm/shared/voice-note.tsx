@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { typePx } from "./type";
 
 /**
  * A voice note drawn as WhatsApp draws one (the owner, 2026-10-14, WhatsApp's voice message beside our audio player):
@@ -58,7 +59,7 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
         onEnded={() => { setPlaying(false); setAt(0); }} style={{ display: "none" }} />
       {started
         ? <button type="button" onClick={faster} aria-label={`Speed ${speedLabel(speed)}`} title="Playback speed"
-            style={{ flex: "none", width: "40px", height: "24px", borderRadius: "12px", border: 0, background: mine ? "#8A5A3C" : "#6B7B8C", color: "#fff", fontSize: "11px", fontWeight: 700, display: "grid", placeItems: "center", cursor: "pointer", padding: 0, fontVariantNumeric: "tabular-nums" }}>{speedLabel(speed)}</button>
+            style={{ flex: "none", width: "40px", height: "24px", borderRadius: "12px", border: 0, background: mine ? "#8A5A3C" : "#6B7B8C", color: "#fff", fontSize: typePx(11), fontWeight: 700, display: "grid", placeItems: "center", cursor: "pointer", padding: 0, fontVariantNumeric: "tabular-nums" }}>{speedLabel(speed)}</button>
         : <span style={{ position: "relative", flex: "none", width: "40px", height: "40px", borderRadius: "20px", background: mine ? "#F3B9A0" : "#D9E2EA", display: "grid", placeItems: "center", color: mine ? "#B2452A" : "#4E6478" }}>
             <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0v1H5v-1Z" /></svg>
             <span style={{ position: "absolute", right: "-3px", bottom: "-2px", color: ink, display: "grid" }}>
@@ -75,7 +76,7 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
           ))}
           <span style={{ position: "absolute", left: `calc(${done * 100}% - 5px)`, top: "50%", width: "10px", height: "10px", marginTop: "-5px", borderRadius: "5px", background: ink }} />
         </span>
-        <span style={{ fontSize: "11px", color: ink, fontVariantNumeric: "tabular-nums" }}>{clock(playing || at ? at : dur)}</span>
+        <span style={{ fontSize: typePx(11), color: ink, fontVariantNumeric: "tabular-nums" }}>{clock(playing || at ? at : dur)}</span>
       </span>
     </span>
   );

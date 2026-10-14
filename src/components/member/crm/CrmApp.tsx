@@ -31,7 +31,6 @@ import { makePanelActions } from "./panel/actions";
 import { initialPanelUi, type PanelTab, type PanelUi } from "./panel/ui";
 import { teamsOf, type PanelCtx } from "./panel/vm/common";
 import { useSwipeToClose } from "./shared/swipe-close";
-import { useFitRows } from "./shared/fit-rows";
 import { keepSending } from "./shared/pending";
 import { MediaViewer } from "./shared/viewer";
 import { loadSnapshot, saveSnapshot } from "./shared/snapshot";
@@ -46,8 +45,10 @@ import { crmChatTag } from "@/lib/push/notices";
 /** Where a tapped phone notice opens the CRM (2026-10-14, lib/push/notices noticeUrl): a customer's chat, or the notifications. */
 export type CrmOpen = { chat: string } | { notifs: true };
 
-/** Team | Mine keeps the page: one's CRM page → the Control panel's (it has no Contacts: its Inbox lists everybody's). */
-const TEAM_TAB: Record<SalesTab, PanelTab> = { inbox: "inbox", contacts: "inbox", calendar: "calendar", insight: "overview", profile: "profile" };
+/**
+ * The desktop's Mine keeps the page: the Control panel's page → one's CRM page. (The phone's round Team | Mine button sits
+ * on each side's first page alone since 2026-10-14 and goes first page ⇄ first page: Mine's Inbox ⇄ Team's Insight.)
+ */
 const MINE_TAB: Record<PanelTab, SalesTab> = { overview: "insight", inbox: "inbox", calendar: "calendar", profile: "profile", assign: "inbox", ads: "insight" };
 
 /** On demo data (/member/preview) the Control panel is looked at with ?crmAs=boss or ?crmAs=hod. */
@@ -62,8 +63,6 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   const [data, setData] = useState<CrmData | null>(() => (live ? null : crmDemoData(salesperson)));
   // Any bottom sheet closes when pulled down (user 2026-10-13).
   useSwipeToClose();
-  // A title row beside Team | Mine, the house and the bell keeps its title whole on a narrow phone (2026-10-14).
-  useFitRows();
   const [problem, setProblem] = useState("");
   const [now, setNow] = useState(() => new Date());
   const [ui, setUi] = useState<SalesUi>(initialSalesUi);
@@ -266,10 +265,10 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       directors: wide ? data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) : [],
       teamOfStaff: id => { const tl = id ? teams.find(t => t.id === id || t.people.some(p => p.id === id)) : undefined; return tl; },
       openCrmOf,
-      // Mine: one's own CRM — or, viewing somebody, back to theirs.
-      // …and Mine comes back to the same page.
-      toMyCrm: panelFor.id !== me.id ? () => { setTeamAs(null); setUi(u => ({ ...u, tab: MINE_TAB[panelUi.tab], chat: null, profSub: null })); }
-        : sells ? () => { openCrmOf(me.id); setUi(u => ({ ...u, tab: MINE_TAB[panelUi.tab] })); } : undefined,
+      // Mine: one's own CRM — or, viewing somebody, back to theirs — on `tab` (the phone's button: Mine's Inbox), else the
+      // same page (the desktop).
+      toMyCrm: panelFor.id !== me.id ? (tab?: SalesTab) => { setTeamAs(null); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab], chat: null, profSub: null })); }
+        : sells ? (tab?: SalesTab) => { openCrmOf(me.id); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab] })); } : undefined,
       exitApp: onExit, slotCounts,
     };
     // On a computer, whoever holds View at All (the Principal and the Director — user 2026-10-12) gets the desktop
@@ -313,9 +312,10 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       toPanel: () => { setHodMode("panel"); setViewing(null); },
       // Team | Mine (rev 1010 §7.3): the Director to the Control panel.
       // Viewing somebody who leads: their Team, as they see it (user 2026-10-11).
-      // Team opens on the same page, team-wide (user 2026-10-11: from Inbox / Calendar / Contacts it landed on Insight).
-      toTeam: owner.id !== me.id ? (hasTeamSide(owner) ? from => { setTeamAs(owner.id); setPanelUi({ ...initialPanelUi(), tab: TEAM_TAB[from] }); } : undefined)
-        : (full && sells) || leads ? from => { setHodMode("panel"); setViewing(null); setPanelUi(u => ({ ...u, tab: TEAM_TAB[from], lead: null })); } : undefined,
+      // On Team's first page, Insight: the button is on Mine's first page alone and goes first page ⇄ first page (2026-10-14,
+      // the owner: the three round buttons only on the first page — it kept the page while it was on every page).
+      toTeam: owner.id !== me.id ? (hasTeamSide(owner) ? () => { setTeamAs(owner.id); setPanelUi(initialPanelUi()); } : undefined)
+        : (full && sells) || leads ? () => { setHodMode("panel"); setViewing(null); setPanelUi(u => ({ ...u, tab: "overview", lead: null })); } : undefined,
       switchList,
       // Assign to somebody: assignment is CRM · Manage's.
       assignTo: data.can.manage ? (customerId, staffId) => panelAct.sendTo(customerId, staffId) : undefined,

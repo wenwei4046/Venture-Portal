@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cachedFacts, pdfFacts, sizeLabel, type PdfFacts } from "./pdf";
 import { keepImage, keepPoster, useKeptSrc } from "./media-cache";
+import { typePx } from "./type";
 export { VoiceNote } from "./voice-note";
 
 /**
@@ -31,10 +32,10 @@ export function PdfCard({ src, name, onOpen }: { src: string; name: string; onOp
         {facts && <img src={facts.img} alt="" style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />}
       </span>
       <span style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 10px" }}>
-        <span style={{ flex: "none", width: "30px", height: "36px", borderRadius: "5px", background: "#C8402A", color: "#fff", display: "grid", placeItems: "center", fontSize: "9px", fontWeight: 700 }}>PDF</span>
+        <span style={{ flex: "none", width: "30px", height: "36px", borderRadius: "5px", background: "#C8402A", color: "#fff", display: "grid", placeItems: "center", fontSize: typePx(9), fontWeight: 700 }}>PDF</span>
         <span style={{ flex: "1", minWidth: 0, display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}>
-          <strong style={{ fontSize: "14px", fontWeight: 600, lineHeight: 1.3, color: "#3F2B22", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{name}</strong>
-          <small style={{ fontSize: "12px", color: "#806B60" }}>{line}</small>
+          <strong style={{ fontSize: typePx(14), fontWeight: 600, lineHeight: 1.3, color: "#3F2B22", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{name}</strong>
+          <small style={{ fontSize: typePx(12), color: "#806B60" }}>{line}</small>
         </span>
       </span>
     </span>
@@ -57,7 +58,7 @@ export function MediaAlbum({ items, more }: { items: AlbumTile[]; more: number }
             </span>
           )}
           {more > 0 && i === items.length - 1 && (
-            <span style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.45)", color: "#fff", display: "grid", placeItems: "center", fontSize: "30px", fontWeight: 500 }}>+{more}</span>
+            <span style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.45)", color: "#fff", display: "grid", placeItems: "center", fontSize: typePx(30), fontWeight: 500 }}>+{more}</span>
           )}
         </span>
       ))}

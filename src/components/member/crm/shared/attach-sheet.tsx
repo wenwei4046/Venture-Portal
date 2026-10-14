@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { typePx } from "./type";
 
 /**
  * A chat's + sheet (the owner, 2026-10-14: "在 + 號中的功能，相冊（用於選照片，影片）、document / file、quick reply、auto
@@ -72,7 +73,7 @@ export function AttachSheetHost() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", padding: "6px 0 4px" }}>
             {TILE.filter(([k]) => (k === "camera" ? !!s.camera : k === "photos" ? !!s.photos : k === "document" ? !!s.document : true)).map(([k, label, icon, color]) => (
               <button key={k} type="button" onClick={() => { if (k === "quick" || k === "auto") { setView(k); return; } close(); (k === "camera" ? s.camera : k === "photos" ? s.photos : s.document)?.(); }}
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "7px", border: 0, background: "transparent", cursor: "pointer", padding: "4px 0", color: "#3F2B22", fontSize: "12px", fontWeight: 600 }}>
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "7px", border: 0, background: "transparent", cursor: "pointer", padding: "4px 0", color: "#3F2B22", fontSize: typePx(12), fontWeight: 600 }}>
                 <span style={{ width: "54px", height: "54px", borderRadius: "27px", background: color, color: "#fff", display: "grid", placeItems: "center" }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={icon} /></svg>
                 </span>
@@ -83,16 +84,16 @@ export function AttachSheetHost() {
         ) : (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <button type="button" onClick={() => setView("")} aria-label="Back" style={{ border: 0, background: "transparent", color: "#806B60", fontSize: "20px", cursor: "pointer", padding: "0 4px" }}>‹</button>
-              <strong style={{ flex: "1", fontSize: "17px", color: "#3F2B22" }}>{view === "quick" ? "Quick replies" : "Auto replies"}</strong>
+              <button type="button" onClick={() => setView("")} aria-label="Back" style={{ border: 0, background: "transparent", color: "#806B60", fontSize: typePx(20), cursor: "pointer", padding: "0 4px" }}>‹</button>
+              <strong style={{ flex: "1", fontSize: typePx(17), color: "#3F2B22" }}>{view === "quick" ? "Quick replies" : "Auto replies"}</strong>
             </div>
             <div style={{ overflowY: "auto", minHeight: 0 }}>
-              {!list.length && <p style={{ margin: "6px 2px 12px", color: "#806B60", fontSize: "14px", lineHeight: 1.45 }}>{view === "quick" ? "No quick replies yet. Add them in Profile › Quick replies." : "No auto replies with words yet. Set them in Profile › Auto-reply."}</p>}
+              {!list.length && <p style={{ margin: "6px 2px 12px", color: "#806B60", fontSize: typePx(14), lineHeight: 1.45 }}>{view === "quick" ? "No quick replies yet. Add them in Profile › Quick replies." : "No auto replies with words yet. Set them in Profile › Auto-reply."}</p>}
               {list.map((c, i) => (
                 <button key={i} type="button" onClick={() => { close(); s.pick(c.text); }}
                   style={{ width: "100%", display: "flex", flexDirection: "column", gap: "3px", padding: "11px 4px", border: 0, borderTop: i ? "1px solid #F3E9E1" : 0, background: "transparent", textAlign: "left", cursor: "pointer" }}>
-                  <strong style={{ fontSize: "13px", fontWeight: 650, color: "#BD4A19" }}>{c.label}</strong>
-                  <span style={{ fontSize: "14px", color: "#3F2B22", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "pre-wrap" }}>{c.text}</span>
+                  <strong style={{ fontSize: typePx(13), fontWeight: 650, color: "#BD4A19" }}>{c.label}</strong>
+                  <span style={{ fontSize: typePx(14), color: "#3F2B22", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "pre-wrap" }}>{c.text}</span>
                 </button>
               ))}
             </div>
