@@ -4172,6 +4172,13 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   display: flex;
   position: relative;
 }
+/* The sheet sits right under the greeting bar (2026-10-14, the Finance revamp
+   v2 — both its views' prototypes draw the sheet `margin: 0 10px 10px` under
+   the bar's 70px): no ground between them on a computer. The kit's drawers
+   and scrims start at the frame's top to match (hrv.module.css). */
+@media (min-width: 768px) {
+  .hrv-frame { padding-top: 0; }
+}
 .hrv-sheet.sheet {
   flex: 1 1 auto;
   min-width: 0;
