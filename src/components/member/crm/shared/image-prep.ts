@@ -23,6 +23,8 @@ export const jpegName = (name: string) => (name.replace(/\.[A-Za-z0-9]{1,5}$/, "
 /** Photos already made ready (the preview's Send): the send does not draw them again (and an HD one stays HD). */
 const ready = new WeakSet<File>();
 export const isPrepared = (f: File) => ready.has(f);
+/** A photo made ready elsewhere (the editor's render, shared/edit-render.ts). */
+export const markPrepared = (f: File) => { ready.add(f); return f; };
 
 /**
  * A JPEG's EXIF orientation (1–8) and its stored size, read from its first bytes. The camera writes the pixels as the

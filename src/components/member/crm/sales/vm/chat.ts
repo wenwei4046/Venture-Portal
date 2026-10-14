@@ -460,11 +460,11 @@ export function chatVM(ctx: SalesCtx) {
     // Photos and videos (the + sheet's Photos, the camera) wait on the preview with its HD switch; a document goes at once.
     pickVisual: (e: ChangeEvent<HTMLInputElement>) => {
       const files = [...(e.target.files ?? [])]; e.target.value = "";
-      if (files.length) set(u => ({ ...u, pick: pickedOf(files) }));
+      if (files.length) set(u => ({ ...u, pick: { ...pickedOf(files), caption: draft } }));
     },
-    pk: pickVM(ui.pick, p => set(u => ({ ...u, pick: p })), async files => {
-      const caption = draft.trim();
-      if (caption) setDraft("");
+    // The editor's caption starts as what was typed in the reply box, and takes its place once sent.
+    pk: pickVM(ui.pick, p => set(u => ({ ...u, pick: p })), async (files, caption) => {
+      if (draft) setDraft("");
       scrollDown();
       await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
     }),

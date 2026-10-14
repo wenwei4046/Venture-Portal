@@ -173,11 +173,10 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     // Photos and videos (the camera button) wait on the preview with its HD switch; a document (+) goes at once.
     pickVisual: (e: ChangeEvent<HTMLInputElement>) => {
       const files = [...(e.target.files ?? [])]; e.target.value = "";
-      if (files.length) set(u => ({ ...u, pPick: pickedOf(files) }));
+      if (files.length) set(u => ({ ...u, pPick: { ...pickedOf(files), caption: draft } }));
     },
-    pk: c ? pickVM(ui.pPick, p => set(u => ({ ...u, pPick: p })), async files => {
-      const caption = draft.trim();
-      if (caption) set(u => ({ ...u, pDraft: "" }));
+    pk: c ? pickVM(ui.pPick, p => set(u => ({ ...u, pPick: p })), async (files, caption) => {
+      if (draft) set(u => ({ ...u, pDraft: "" }));
       await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
     }) : null,
     // Several files at once, each its own message; the typed words go with the first.

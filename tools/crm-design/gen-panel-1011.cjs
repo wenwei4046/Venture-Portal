@@ -29,6 +29,7 @@ ${apos ? "/* eslint-disable react/no-unescaped-entities -- generated from the de
 // change the design and regenerate.
 import { Fragment } from "react";
 import H from "../crm.module.css";
+import { PickEditor } from "../shared/pick-editor";
 import type { PanelAppVM } from "./vm/app";
 
 /** The whole Control panel: the top bar, every tab, every sheet and page, the toast and the bottom bar. */

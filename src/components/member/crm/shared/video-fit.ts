@@ -17,6 +17,11 @@ const standard = new WeakSet<File>();
 export const markStandard = (f: File) => { standard.add(f); return f; };
 export const STANDARD_VIDEO_MAX = 8 * MB;
 
+/** A video trimmed or muted on the preview's editor (2026-10-14): the part kept, in seconds, and whether its sound goes. */
+export type VideoCut = { start: number; end: number; mute: boolean };
+const cuts = new WeakMap<File, VideoCut>();
+export const markCut = (f: File, c: VideoCut) => { cuts.set(f, c); return f; };
+
 /** The video bitrate and the long side that make `seconds` of video fit in `maxBytes` (a tenth kept for the container). */
 export function videoPlan(maxBytes: number, seconds: number, hd = true): { bps: number; side: number } | null {
   if (!(seconds > 0)) return null;
@@ -45,26 +50,42 @@ export async function fitVideo(file: File, channelMax: number, channelName: stri
     const input = new mb.Input({ source: new mb.BlobSource(file), formats: mb.ALL_FORMATS });
     const track = await input.getPrimaryVideoTrack();
     if (!track) return file.size <= channelMax ? { ok: true, file } : { ok: false, error: `${tooBig}.` };
-    if (track.codec === "avc" && file.size <= maxBytes) return { ok: true, file };
-    const seconds = await input.computeDuration();
+    const cut = cuts.get(file);
+    if (!cut && track.codec === "avc" && file.size <= maxBytes) return { ok: true, file };
+    const full = await input.computeDuration();
+    const start = cut ? Math.max(0, Math.min(cut.start, full)) : 0, end = cut ? Math.max(start + 0.2, Math.min(cut.end, full)) : full;
+    const seconds = end - start;
+    const trim = cut ? { trim: { start, end } } : {}, audio = cut?.mute ? { audio: { discard: true } } : {};
+    // Trimmed or muted, an H.264 video that then fits is cut without being encoded again (quick, no loss).
+    if (cut && track.codec === "avc" && full > 0 && (file.size * seconds) / full <= maxBytes * 0.95) {
+      const out = await convert(mb, input, file, { ...trim, ...audio }, onProgress);
+      if (out && out.size <= maxBytes) return { ok: true, file: out };
+    }
     const plan = videoPlan(maxBytes, seconds, hd) ?? (hd ? null : videoPlan(channelMax, seconds, true));
     if (!plan) return { ok: false, error: `${tooBig} — this one is too long to fit. Trim it and send it again.` };
     const w = track.displayWidth, h = track.displayHeight;
     const k = Math.min(1, plan.side / Math.max(w, h, 1));
     const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
-    const output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: "in-memory" }), target: new mb.BufferTarget() });
-    const conversion = await mb.Conversion.init({
-      input, output, showWarnings: false,
+    const out = await convert(mb, input, file, {
+      ...trim, ...audio,
       video: { ...(w >= h ? { width: even(w * k) } : { height: even(h * k) }), codec: "avc", quality: new mb.Quality(plan.bps), forceTranscode: true },
-    });
-    if (!conversion.isValid) return { ok: false, error: `${tooBig}, and this phone cannot make this one smaller. Trim it and send it again.` };
-    if (onProgress) conversion.onProgress = p => onProgress(p);
-    await conversion.execute();
-    const buf = output.target.buffer;
-    if (!buf) return { ok: false, error: "The video could not be prepared. Try again." };
-    const out = new File([buf], (file.name.replace(/\.[A-Za-z0-9]{1,5}$/, "") || "video") + ".mp4", { type: "video/mp4" });
+    }, onProgress);
+    if (!out) return { ok: false, error: `${tooBig}, and this phone cannot make this one smaller. Trim it and send it again.` };
     return out.size <= channelMax ? { ok: true, file: out } : { ok: false, error: `${tooBig} — this one is too long to fit. Trim it and send it again.` };
   } catch {
     return file.size <= channelMax ? { ok: true, file } : { ok: false, error: "The video could not be prepared. Try again, or trim it first." };
   }
+}
+
+type Mb = typeof import("mediabunny");
+type ConvOpts = Omit<Parameters<Mb["Conversion"]["init"]>[0], "input" | "output">;
+/** One run of mediabunny into an MP4 in memory; null when this phone cannot make it. */
+async function convert(mb: Mb, input: InstanceType<Mb["Input"]>, file: File, opts: ConvOpts, onProgress?: (p: number) => void): Promise<File | null> {
+  const output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: "in-memory" }), target: new mb.BufferTarget() });
+  const conversion = await mb.Conversion.init({ input, output, showWarnings: false, ...opts });
+  if (!conversion.isValid) return null;
+  if (onProgress) conversion.onProgress = p => onProgress(p);
+  await conversion.execute();
+  const buf = output.target.buffer;
+  return buf ? new File([buf], (file.name.replace(/\.[A-Za-z0-9]{1,5}$/, "") || "video") + ".mp4", { type: "video/mp4" }) : null;
 }
