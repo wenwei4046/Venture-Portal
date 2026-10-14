@@ -91,6 +91,14 @@ describe("parsing a delivery", () => {
     ]);
   });
 
+  it("names a document by its file when it has no caption, and keeps a caption when it has one", () => {
+    const d = parseDelivery(delivery({ ...base, messages: [
+      { id: "wamid.4", from: "601", timestamp: "1790000003", type: "document", document: { id: "MEDIA3", mime_type: "application/pdf", filename: "DC Shoplot Proposal_ 8 Oct.pdf" } },
+      { id: "wamid.5", from: "601", timestamp: "1790000004", type: "document", document: { id: "MEDIA4", mime_type: "application/pdf", filename: "quote.pdf", caption: "The quote" } },
+    ] }));
+    expect(d.messages.map(m => [m.kind, m.body])).toEqual([["document", "DC Shoplot Proposal_ 8 Oct.pdf"], ["document", "The quote"]]);
+  });
+
   it("reads button replies and locations as text, and anything new as 'other'", () => {
     const d = parseDelivery(delivery({ ...base, messages: [
       { id: "a", from: "601", type: "interactive", interactive: { button_reply: { title: "Yes, Saturday" } } },
