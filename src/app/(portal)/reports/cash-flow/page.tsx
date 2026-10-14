@@ -9,29 +9,12 @@ import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
-import { listsPayrollByPerson } from '@/lib/roles'
-import {
-  applyGlRefs,
-  buildCashFlow,
-  fetchAllJournalLines,
-  fetchCoaAccounts,
-  fetchGlRefs,
-  monthPeriod,
-} from '@/lib/gl-reports'
-import { cashFlowBlocks } from '@/lib/gl-report-blocks'
-import { buildCashFlowSideSections } from '@/lib/cash-flow-sections'
-import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
-import {
-  fetchInterBillingCashFlow,
-  interBillTransferAccount,
-  payrollCustodyAccount,
-} from '@/lib/inter-billing-cash-flow'
 import GlReportView from '../_components/GlReportView'
-import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
+import { REPORT_SEGMENTS } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import ExportLinks from '../_components/ExportLinks'
 import ReportViewToggle from '../_components/ReportViewToggle'
-import { reportsCompanyWide } from '@/lib/surfaces'
+import { readCashFlowStatement } from '../_lib/statement-reads'
 import { formatMoney } from '@/lib/utils'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import ReportModeSwitch from '../_components/ReportModeSwitch'
@@ -51,61 +34,11 @@ export default async function CashFlowPage({ searchParams }: Props) {
   const period = params.period ?? officeMonth()
   // Comparison is OPT-IN (user 2026-06-11): default is a clean single-month view.
   const compare = params.compare ?? ''
-  // Dept managers see ONLY their own segment (RLS on journal_lines) — force the
-  // filter empty + hide the picker (a hand-typed ?segment= returns empty).
-  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
-  const segment = isDeptMgr ? '' : (params.segment ?? '')
-  // The bridge lines are a pure INTERNAL reallocation (one dept −X, another +X)
-  // that exists so a single segment's cash ties to its Dept Pool. Consolidated
-  // = every segment at once, where they cancel — and the 收/出 gross split would
-  // otherwise surface both halves as real money moving (user 2026-07-30:
-  // "inter billing 在 all segment 不应该出现"). Dept managers have no segment
-  // param but ARE a single segment (RLS), so they keep the bridge.
-  const consolidated = !isDeptMgr && !segment
-
-  // Every read starts at once (2026-10-08). The bridge and the layouts used to
-  // wait on the journal read and then on each other — eight round trips in a
-  // row. The bridge needs the bank codes only to build its lines, so it is
-  // handed the pending read. Consolidated drops the bridge's lines and its two
-  // accounts are constants, so there the bridge is not read at all.
-  //
-  // bank GL codes via RPC (dept_managers are RLS-blocked from bank_accounts) —
-  // codes only, no balances. Promise.resolve: sent ONCE, awaited twice.
-  const bankCodesRead = Promise.resolve(supabase.rpc('bank_gl_codes' as never)).then(
-    ({ data: banks }) => new Set((banks ?? []) as unknown as string[]),
-  )
-  const [rawLines, accounts, glRefs, bankCodes, ib, inLayoutRaw, outLayoutRaw] = await Promise.all([
-    fetchAllJournalLines(supabase),
-    fetchCoaAccounts(supabase),
-    // Salary lines by department for whoever reads payroll that way (2026-10-13).
-    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user) }),
-    bankCodesRead,
-    // Fold inter-billing settles (dept_pools-only, no GL) in as synthetic
-    // transfer lines so each segment's closing cash ties to its Dept Pool.
-    consolidated ? null : fetchInterBillingCashFlow(supabase, bankCodesRead),
-    // User-arranged sections per side (Edit layout). Unsaved → one section
-    // each, i.e. the plain COA tree.
-    readReportLayout(supabase, 'cash_flow_in'),
-    readReportLayout(supabase, 'cash_flow_out'),
-  ])
-  const lines = [...applyGlRefs(rawLines, glRefs), ...(ib ? ib.lines : [])]
-
-  const cf = buildCashFlow(
-    lines,
-    [...accounts, interBillTransferAccount, payrollCustodyAccount],
-    {
-      current: monthPeriod(period),
-      previous: monthPeriod(compare || period),
-      segment: segmentFilterFor(segment),
-    },
-    bankCodes,
-  )
-
-  const coaWithSynthetic = [...accounts, interBillTransferAccount, payrollCustodyAccount]
-  const blocks = cashFlowBlocks(cf, {
-    inflow: buildCashFlowSideSections(cf.inflowLeaves, coaWithSynthetic, inLayoutRaw as ReportLayout | null, '现金流入 · Money in', 'in'),
-    outflow: buildCashFlowSideSections(cf.outflowLeaves, coaWithSynthetic, outLayoutRaw as ReportLayout | null, '现金流出 · Money out', 'out'),
-  })
+  // Dept managers see ONLY their own segment (RLS on journal_lines) — the read
+  // forces the filter empty and the page hides the picker (a hand-typed
+  // ?segment= returns empty). The read is the Finance phone app's Cash Flow's
+  // too (`_lib/statement-reads`).
+  const { cf, blocks, isDeptMgr, segment } = await readCashFlowStatement(supabase, user, { period, compare, segment: params.segment ?? '' })
   const periodLabel = dayjs(`${period}-01`).format('MMMM YYYY')
 
   // Whoever reads the reports company-wide (2026-10-09, the user's Claude

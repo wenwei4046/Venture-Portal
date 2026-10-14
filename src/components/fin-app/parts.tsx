@@ -14,20 +14,28 @@ import s from './fin-app.module.css'
 // lines of a list that opens nothing, and the note for a screen with nothing
 // to show.
 
-/** The hub's total, centred (Chivo 30/600), its label, and a month pill under it. */
+/** The hub's total, centred (Chivo 30/600), its label, a state in a word (a report's chip), and a month pill under it. */
 export function BankHero({
   value,
   label,
   month,
+  chip,
 }: {
   value: string
   label: string
   month?: { label: string; prev: () => void; next: () => void; canPrev?: boolean; canNext?: boolean } | null
+  /** *Unpaid as of today*, *Segment only · won't balance* — the desktop page's chip. */
+  chip?: string | null
 }) {
   return (
     <div className={s.bankHero}>
       <span className={s.bankValue}>{value}</span>
       <span className={s.bankLabel}>{label}</span>
+      {chip ? (
+        <span className={s.itemChip} data-tone="alert">
+          {chip}
+        </span>
+      ) : null}
       {month ? (
         <div className={s.pill}>
           <button type="button" className={s.pillBtn} onClick={month.prev} disabled={month.canPrev === false} aria-label="Previous month">

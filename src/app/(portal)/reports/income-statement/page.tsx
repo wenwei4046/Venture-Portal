@@ -9,16 +9,12 @@ import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
-import { listsPayrollByPerson } from '@/lib/roles'
-import { applyGlRefs, buildPnl, fetchAllJournalLines, fetchCoaAccounts, fetchGlRefs, monthPeriod } from '@/lib/gl-reports'
-import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/consolidation'
-import { pnlBlocks } from '@/lib/gl-report-blocks'
 import GlReportView from '../_components/GlReportView'
-import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
+import { REPORT_SEGMENTS } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import ExportLinks from '../_components/ExportLinks'
 import ReportViewToggle from '../_components/ReportViewToggle'
-import { reportsCompanyWide } from '@/lib/surfaces'
+import { readPnlStatement } from '../_lib/statement-reads'
 import { formatMoney } from '@/lib/utils'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import ReportModeSwitch from '../_components/ReportModeSwitch'
@@ -39,32 +35,10 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
   // Comparison is OPT-IN (user 2026-06-11): default is a clean single-month view.
   const compare = params.compare ?? ''
   // Dept managers see ONLY their own segment (RLS-enforced on journal_lines);
-  // force the filter empty + hide the segment picker so the report is theirs
-  // and a hand-typed ?segment= can't select another dept (it just returns empty).
-  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
-  const segment = isDeptMgr ? '' : (params.segment ?? '')
-
-  // Consolidated = the true all-segments view (finance/principal, no segment
-  // picked). Dept managers' empty segment is their OWN view via RLS — never
-  // eliminate for them.
-  const consolidated = !isDeptMgr && !segment
-  const [rawLines, accounts, glRefs, elim] = await Promise.all([
-    fetchAllJournalLines(supabase),
-    fetchCoaAccounts(supabase),
-    // Salary lines by department for whoever reads payroll that way (2026-10-13).
-    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user) }),
-    consolidated ? fetchInterBillingElimination(supabase) : Promise.resolve(null),
-  ])
-  let lines = applyGlRefs(rawLines, glRefs)
-  if (elim) lines = eliminateInterBilling(lines, elim)
-
-  const pnl = buildPnl(lines, accounts, {
-    current: monthPeriod(period),
-    previous: monthPeriod(compare || period),
-    segment: segmentFilterFor(segment),
-  })
-
-  const blocks = pnlBlocks(pnl)
+  // the read forces the filter empty and the page hides the segment picker, so
+  // the report is theirs and a hand-typed ?segment= can't select another dept.
+  // The read is the Finance phone app's P&L's too (`_lib/statement-reads`).
+  const { pnl, blocks, isDeptMgr, segment } = await readPnlStatement(supabase, user, { period, compare, segment: params.segment ?? '' })
   const periodLabel = dayjs(`${period}-01`).format('MMMM YYYY')
 
   // Whoever reads the reports company-wide (2026-10-09, the user's Claude

@@ -8,18 +8,10 @@ import dayjs from 'dayjs'
 import { officeMonth } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
-import { listsPayrollByPerson } from '@/lib/roles'
-import {
-  applyGlRefs,
-  buildBalanceSheet,
-  fetchAllJournalLines,
-  fetchCoaAccounts,
-  fetchGlRefs,
-  monthPeriod,
-} from '@/lib/gl-reports'
-import { balanceSheetBlocks } from '@/lib/gl-report-blocks'
+import { monthPeriod } from '@/lib/gl-reports'
 import GlReportView from '../_components/GlReportView'
-import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
+import { REPORT_SEGMENTS } from '../_components/report-segments'
+import { readBalanceSheet } from '../_lib/statement-reads'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import ExportLinks from '../_components/ExportLinks'
 import { formatMoney } from '@/lib/utils'
@@ -42,21 +34,8 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
   const compare = params.compare ?? ''
   const segment = params.segment ?? ''
 
-  const [rawLines, accounts, glRefs] = await Promise.all([
-    fetchAllJournalLines(supabase),
-    fetchCoaAccounts(supabase),
-    // Salary lines by department for whoever reads payroll that way (2026-10-13).
-    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user) }),
-  ])
-  const lines = applyGlRefs(rawLines, glRefs)
-
-  const bs = buildBalanceSheet(lines, accounts, {
-    current: monthPeriod(period),
-    previous: monthPeriod(compare || period),
-    segment: segmentFilterFor(segment),
-  })
-
-  const blocks = balanceSheetBlocks(bs, segment || undefined)
+  // The read is the Finance phone app's Balance Sheet's too (`_lib/statement-reads`).
+  const { bs, blocks } = await readBalanceSheet(supabase, user, { period, compare, segment })
   const asAt = (ym: string) => dayjs(monthPeriod(ym).to).format('D MMM YYYY')
 
   // On the sheet (2026-10-09, the user's Claude Design handoff): the date in

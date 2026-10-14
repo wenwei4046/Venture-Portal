@@ -110,7 +110,21 @@ export default function AppScreen({
   useChrome({ root, bar: bar.length > 0 && !bulk, bulk: !!bulk })
 
   const scroller = useRef<HTMLDivElement>(null)
+  const tabsRow = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
+
+  // The current top tab stands in view (Report's fifth, Balance sheet, is past a phone's width): the row is
+  // scrolled itself — never scrollIntoView, which would scroll the frame as well.
+  const currentTab = topTabs?.find((t) => t.current)?.key ?? null
+  useLayoutEffect(() => {
+    const row = tabsRow.current
+    const tab = row?.querySelector<HTMLElement>('[aria-current="page"]')
+    if (!row || !tab) return
+    const left = tab.offsetLeft - row.offsetLeft
+    const right = left + tab.offsetWidth
+    if (left < row.scrollLeft) row.scrollLeft = Math.max(0, left - 10)
+    else if (right > row.scrollLeft + row.clientWidth) row.scrollLeft = right - row.clientWidth + 10
+  }, [currentTab])
   const [anim, setAnim] = useState<Anim>(() => peekIntent() ?? 'none')
   // The move it was first drawn with — kept, because React may run the first effect twice (StrictMode) and the
   // second run would find the move already used up and leave the screen invisible, waiting to play in.
@@ -217,7 +231,7 @@ export default function AppScreen({
         >
           {topTabs ? (
             <div className={s.topTabs}>
-              <div className={s.topTabsRow} role="tablist">
+              <div className={s.topTabsRow} role="tablist" ref={tabsRow}>
                 {topTabs.map((t) => (
                   <Link key={t.key} href={t.href} className={s.topTab} aria-current={t.current ? 'page' : undefined} onClick={t.onPress}>
                     {t.label}
