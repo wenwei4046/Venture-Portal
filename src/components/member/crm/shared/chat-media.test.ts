@@ -53,11 +53,14 @@ describe("photos sent together are one album, as on WhatsApp", () => {
     expect(m.albumMore).toBe(1);
     expect(m.img).toBe("");
   });
-  it("leaves three, a caption, the other side or a long pause as they are", () => {
-    expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2)]).lead.size).toBe(0);
-    expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2, "me", "look"), pic("d", 3)]).lead.size).toBe(0);
-    expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2, "lead"), pic("d", 3)]).lead.size).toBe(0);
-    expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2), pic("d", 500)]).lead.size).toBe(0);
+  it("makes two or three an album too, the first one's words its caption; keeps out later words, the other side, a long pause", () => {
+    // 17:05:29 (with "photo"), :32, :36 — three, the first captioned: one album (2026-10-14).
+    expect(albumsOf([pic("a", 0, "me", "photo"), pic("b", 3), pic("c", 7)]).lead.get("a")?.length).toBe(3);
+    expect(albumsOf([pic("a", 0), pic("b", 1)]).lead.size).toBe(1);
+    expect(albumsOf([pic("a", 0), pic("b", 1, "me", "look")]).lead.size).toBe(0);
+    expect(albumsOf([pic("a", 0), pic("b", 1, "lead")]).lead.size).toBe(0);
+    expect(albumsOf([pic("a", 0), pic("b", 100)]).lead.size).toBe(0);
+    expect(albumsOf([pic("a", 0)]).lead.size).toBe(0);
     // 16:11:12 – 16:11:21 four photos, then a video at 16:13:09: the album is the four; the video stands alone.
     const vid = { id: "v", from: "me" as const, at: new Date(Date.UTC(2026, 9, 14, 2, 0, 9 + 108)).toISOString(), text: "", media: { kind: "video" as const, url: "/m/v" } };
     const r = albumsOf([pic("a", 0), pic("b", 3), pic("c", 6), pic("d", 9), vid]);
@@ -96,6 +99,12 @@ describe("documents other than a PDF open in the app (2026-10-14)", () => {
     expect(previewKind("Proposal.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")).toBe("word");
     expect(previewKind("notes.txt", "text/plain")).toBe("text");
     expect(previewKind("IMG_1.jpg", "image/jpeg")).toBe("image");
-    expect(previewKind("deck.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")).toBeNull();
+    expect(previewKind("deck.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")).toBe("slides");
+    expect(previewKind("pack.zip", "application/zip")).toBe("zip");
+    expect(previewKind("old.doc", "application/msword")).toBeNull();
+    const { previewLimit } = await import("./file-preview");
+    // The customer's 76 MB spreadsheet opens (its first 500 rows); a Word file stays at 20 MB.
+    expect(previewLimit("sheet")).toBeGreaterThan(76 * 1024 * 1024);
+    expect(previewLimit("word")).toBe(20 * 1024 * 1024);
   });
 });

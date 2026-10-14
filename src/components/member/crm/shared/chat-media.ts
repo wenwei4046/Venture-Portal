@@ -48,18 +48,21 @@ export function galleryOf(messages: Msg[]): ViewerItem[] {
 }
 
 /**
- * Albums (WhatsApp's): four or more photos / videos in a row from the same side, without words of their own, each within
- * 20 seconds of the one before — sent together (it was two minutes, which swallowed a video sent after an album, 2026-10-14).
+ * Albums (WhatsApp's): photos / videos in a row from the same side (2026-10-14: two or more, the first may carry the
+ * caption, each within 60 s of the one before — two minutes had swallowed a video sent after an album).
  * The first message carries the album; the others are not drawn (`hidden`).
  */
 export function albumsOf(messages: Msg[]): { lead: Map<string, Msg[]>; hidden: Set<string> } {
   const lead = new Map<string, Msg[]>(), hidden = new Set<string>();
   let run: Msg[] = [];
-  const close = () => { if (run.length >= 4) { lead.set(run[0].id, run); run.slice(1).forEach(m => hidden.add(m.id)); } run = []; };
+  // Two or more make an album (the owner, 2026-10-14: "這樣對方才能知道我是發多張照片給他" — 3 photos, the first with words,
+  // showed one by one); the FIRST may carry words (its caption, shown under the album, as a send gives it the reply box's
+  // words), the others none; each within 60 s of the one before (a batch of HD photos goes one after another).
+  const close = () => { if (run.length >= 2) { lead.set(run[0].id, run); run.slice(1).forEach(m => hidden.add(m.id)); } run = []; };
   for (const m of messages) {
     const prev = run[run.length - 1];
-    const joins = visual(m) && !m.text && (!prev || (prev.from === m.from && Math.abs(new Date(m.at ?? 0).getTime() - new Date(prev.at ?? 0).getTime()) <= 20_000));
-    if (!joins) { close(); if (visual(m) && !m.text) run = [m]; continue; }
+    const joins = !!prev && visual(m) && !m.text && prev.from === m.from && Math.abs(new Date(m.at ?? 0).getTime() - new Date(prev.at ?? 0).getTime()) <= 60_000;
+    if (!joins) { close(); if (visual(m)) run = [m]; continue; }
     run.push(m);
   }
   close();
@@ -69,7 +72,7 @@ export function albumsOf(messages: Msg[]): { lead: Map<string, Msg[]>; hidden: S
 export function mediaOf(m: Msg, gallery: ViewerItem[], album?: Msg[]): typeof NO_MEDIA {
   const voiceMine = m.from === "me";
   const open = (url: string) => () => openViewer(gallery, Math.max(0, gallery.findIndex(g => g.url === url)));
-  if (album && album.length >= 4) {
+  if (album && album.length >= 2) {
     return {
       ...NO_MEDIA, voiceMine, pad: "3px 3px 5px", inPad: "0 7px",
       album: album.slice(0, 4).map(a => ({ src: a.media!.url, video: a.media!.kind === "video", view: open(a.media!.url) })),

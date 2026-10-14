@@ -9,15 +9,19 @@ import { useEffect, useState } from "react";
  * - a Word document (docx) through mammoth, drawn in a sandboxed frame (no script runs);
  * - plain text (txt, csv already above, json, md, log, xml);
  * - a photo, video or sound sent as a file, as itself.
- * Anything else (PowerPoint, zip …) has no reader a web page can carry; it keeps Download, which hands it to the
+ * Since the same day: a PowerPoint (pptx) as its slides' words and pictures, a zip as its list of files. Anything else (old
+ * .doc / .ppt, …) has no reader a web page can carry; it keeps Download, which hands it to the
  * phone to open in Numbers, Excel, Keynote or Files.
  */
-export type PreviewKind = "sheet" | "word" | "text" | "image" | "video" | "audio" | null;
+export type PreviewKind = "sheet" | "word" | "slides" | "zip" | "text" | "image" | "video" | "audio" | null;
 
 export function previewKind(name = "", mime = ""): PreviewKind {
   const ext = (/\.([a-z0-9]{1,5})$/i.exec(name)?.[1] ?? "").toLowerCase(), m = mime.toLowerCase();
   if (["xlsx", "xls", "xlsm", "ods", "csv"].includes(ext) || m.includes("spreadsheet") || m.includes("excel") || m === "text/csv") return "sheet";
   if (ext === "docx" || m.includes("wordprocessingml")) return "word";
+  // A PowerPoint's slides (their words and pictures) and a zip's file list (the owner: "其他的 file 類型有沒有可能直接打開 / 或至少打開預覽").
+  if (ext === "pptx" || m.includes("presentationml")) return "slides";
+  if (ext === "zip" || m === "application/zip" || m === "application/x-zip-compressed") return "zip";
   if (["txt", "json", "md", "log", "xml"].includes(ext) || m.startsWith("text/") || m === "application/json") return "text";
   if (m.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "heic"].includes(ext)) return "image";
   if (m.startsWith("video/") || ["mp4", "mov", "m4v"].includes(ext)) return "video";
@@ -26,8 +30,17 @@ export function previewKind(name = "", mime = ""): PreviewKind {
 }
 
 const MAX_ROWS = 500, MAX_COLS = 40;
+const unxml = (t: string) => t.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
 /** Past this a phone's browser may run out of memory reading it (a customer's spreadsheet with pictures was 76 MB): Download. */
 export const PREVIEW_MAX = 20 * 1024 * 1024;
+/**
+ * Each reader's own limit. A spreadsheet reads only its first rows and none of its pictures — the customer's 76 MB one
+ * took 0.75 s and ~95 MB of memory — so it opens up to 100 MB; a zip only lists; slides read their words and a few pictures.
+ */
+export function previewLimit(kind: PreviewKind): number {
+  const MB = 1024 * 1024;
+  return kind === "sheet" || kind === "zip" ? 100 * MB : kind === "slides" ? 60 * MB : kind === "image" || kind === "video" || kind === "audio" ? Infinity : PREVIEW_MAX;
+}
 
 export function FilePreview({ file, kind }: { file: File | null; kind: PreviewKind }) {
   const [sheets, setSheets] = useState<{ name: string; rows: string[][]; more: boolean }[] | null>(null);
@@ -36,16 +49,19 @@ export function FilePreview({ file, kind }: { file: File | null; kind: PreviewKi
   const [text, setText] = useState<string | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [slides, setSlides] = useState<{ lines: string[]; pics: string[] }[] | null>(null);
+  const [entries, setEntries] = useState<string[] | null>(null);
+  useEffect(() => () => { slides?.forEach(sl => sl.pics.forEach(u => URL.revokeObjectURL(u))); }, [slides]);
 
   useEffect(() => {
-    if (!file || !kind || (file.size > PREVIEW_MAX && kind !== "image" && kind !== "video" && kind !== "audio")) return;
+    if (!file || !kind || file.size > previewLimit(kind)) return;
     let on = true;
     setFailed(false);
     (async () => {
       try {
         if (kind === "sheet") {
           const XLSX = await import("xlsx");
-          const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+          const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true, sheetRows: MAX_ROWS + 1, dense: true, cellStyles: false });
           const list = wb.SheetNames.map(name => {
             const all = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, raw: false, defval: "" }) as unknown[][];
             return { name, rows: all.slice(0, MAX_ROWS).map(r => r.slice(0, MAX_COLS).map(c => String(c ?? ""))), more: all.length > MAX_ROWS };
@@ -55,6 +71,29 @@ export function FilePreview({ file, kind }: { file: File | null; kind: PreviewKi
           const mammoth = await import("mammoth");
           const r = await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() });
           if (on) setHtml(r.value);
+        } else if (kind === "slides" || kind === "zip") {
+          const JSZip = (await import("jszip")).default;
+          const zip = await JSZip.loadAsync(await file.arrayBuffer());
+          if (kind === "zip") {
+            if (on) setEntries(Object.values(zip.files).filter(e => !e.dir).slice(0, 500).map(e => e.name));
+          } else {
+            const num = (n: string) => Number(/(\d+)\.xml$/.exec(n)?.[1] ?? 0);
+            const names = Object.keys(zip.files).filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n)).sort((a, b) => num(a) - num(b)).slice(0, 80);
+            const out: { lines: string[]; pics: string[] }[] = [];
+            for (const n of names) {
+              const xml = await zip.file(n)!.async("string");
+              const lines = xml.split("</a:p>").map(p => [...p.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map(x => unxml(x[1])).join("")).filter(t => t.trim());
+              const rels = await zip.file(n.replace("slides/", "slides/_rels/") + ".rels")?.async("string") ?? "";
+              const pics: string[] = [];
+              for (const r of [...rels.matchAll(/Type="[^"]*\/image"[^>]*Target="([^"]+)"|Target="([^"]+)"[^>]*Type="[^"]*\/image"/g)].slice(0, 2)) {
+                const target = (r[1] ?? r[2]).replace(/^\.\.\//, "ppt/");
+                const img = zip.file(target);
+                if (img) { const b = await img.async("blob"); if (b.size < 6 * 1024 * 1024) pics.push(URL.createObjectURL(new Blob([b], { type: /\.png$/i.test(target) ? "image/png" : /\.gif$/i.test(target) ? "image/gif" : "image/jpeg" }))); }
+              }
+              out.push({ lines, pics });
+            }
+            if (on) setSlides(out);
+          }
         } else if (kind === "text") {
           const t = await file.text();
           if (on) setText(t.length > 400_000 ? t.slice(0, 400_000) + "\n…" : t);
@@ -68,7 +107,7 @@ export function FilePreview({ file, kind }: { file: File | null; kind: PreviewKi
   }, [file, kind]);
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
 
-  if (file && file.size > PREVIEW_MAX && kind !== "image" && kind !== "video" && kind !== "audio") {
+  if (file && file.size > previewLimit(kind)) {
     return <p style={{ color: "#fff", textAlign: "center", marginTop: "40px", fontSize: "15px", padding: "0 24px", lineHeight: 1.5 }}>This file is {Math.round(file.size / 1048576)} MB — too big to open here. Use Download to open it in Numbers, Excel or Files.</p>;
   }
   const wait = <p style={{ color: "#fff", opacity: 0.8, textAlign: "center", marginTop: "40px", fontSize: "15px" }}>Opening…</p>;
@@ -107,6 +146,31 @@ export function FilePreview({ file, kind }: { file: File | null; kind: PreviewKi
     const doc = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:15px/1.55 -apple-system,Inter,sans-serif;color:#222;margin:16px;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{border-collapse:collapse;max-width:100%}td,th{border:1px solid #ddd;padding:4px 6px}</style>${html}`;
     // sandbox="" : the document's HTML is drawn, nothing in it can run or reach the app.
     return <iframe title="Document" sandbox="" srcDoc={doc} style={{ flex: "1", minHeight: 0, width: "100%", border: 0, background: "#fff" }} />;
+  }
+  if (kind === "slides") {
+    if (!slides) return wait;
+    return (
+      <div style={{ ...box, background: "#3a302b", padding: "10px" }}>
+        {!slides.length && <p style={{ color: "#fff", fontSize: "14px", margin: "16px" }}>No slides could be read. Use Download to open it in Keynote or PowerPoint.</p>}
+        {slides.map((sl, i) => (
+          <div key={i} style={{ background: "#fff", borderRadius: "10px", padding: "14px", marginBottom: "10px", boxShadow: "0 1px 4px rgba(0,0,0,.3)" }}>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: "#A8968B", marginBottom: "6px" }}>Slide {i + 1}</div>
+            {sl.lines.map((t, j) => <p key={j} style={{ margin: "0 0 6px", fontSize: j === 0 ? "17px" : "14px", fontWeight: j === 0 ? 700 : 400, color: "#222", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{t}</p>)}
+            {sl.pics.map((u, j) => <img key={j} src={u} alt="" style={{ display: "block", maxWidth: "100%", maxHeight: "260px", margin: "8px auto 0", objectFit: "contain" }} />)}
+          </div>
+        ))}
+        <p style={{ color: "rgba(255,255,255,.75)", fontSize: "12px", margin: "4px 4px 12px" }}>A preview of the words and pictures on each slide. Download to see the slides as designed.</p>
+      </div>
+    );
+  }
+  if (kind === "zip") {
+    if (!entries) return wait;
+    return (
+      <div style={box}>
+        <p style={{ margin: "12px 14px 6px", fontSize: "13px", fontWeight: 700, color: "#806B60" }}>{entries.length} file{entries.length === 1 ? "" : "s"} inside</p>
+        {entries.map(n => <div key={n} style={{ padding: "8px 14px", borderTop: "1px solid #F0E6DE", fontSize: "14px", overflowWrap: "anywhere" }}>{n}</div>)}
+      </div>
+    );
   }
   if (kind === "text") {
     if (text == null) return wait;

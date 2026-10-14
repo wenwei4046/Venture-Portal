@@ -33,6 +33,7 @@
     "bcryptjs": "^3.0.3",
     "dayjs": "^1.11.13",
     "html-to-image": "^1.11.13",
+    "jszip": "3.10.2",
     "mammoth": "1.12.3",
     "mediabunny": "1.59.1",
     "next": "^15.0.0",

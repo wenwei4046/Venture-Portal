@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cachedFacts, pdfFacts, sizeLabel, type PdfFacts } from "./pdf";
+import { keepImage, keepPoster, useKeptSrc } from "./media-cache";
 export { VoiceNote } from "./voice-note";
 
 /**
@@ -43,12 +44,13 @@ export function PdfCard({ src, name, onOpen }: { src: string; name: string; onOp
 export type AlbumTile = { src: string; video: boolean; view: () => void };
 export function MediaAlbum({ items, more }: { items: AlbumTile[]; more: number }) {
   return (
-    <span style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px", width: "240px", maxWidth: "100%" }}>
+    // Two side by side; three as one wide on top and two under it; four or more as 2 × 2 with +N on the last.
+    <span style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px", width: "240px", maxWidth: "100%", borderRadius: "12px", overflow: "hidden" }}>
       {items.map((t, i) => (
-        <span key={t.src} onClick={t.view} style={{ position: "relative", display: "block", aspectRatio: "1", overflow: "hidden", borderRadius: i === 0 ? "12px 3px 3px 3px" : i === 1 ? "3px 12px 3px 3px" : i === 2 ? "3px 3px 3px 12px" : "3px 3px 12px 3px", background: "#000", cursor: "pointer" }}>
+        <span key={t.src} onClick={t.view} style={{ position: "relative", display: "block", aspectRatio: items.length === 3 && i === 0 ? "2 / 1" : "1", gridColumn: items.length === 3 && i === 0 ? "1 / span 2" : undefined, overflow: "hidden", borderRadius: "3px", background: "#000", cursor: "pointer" }}>
           {t.video
-            ? <video src={t.src.startsWith("blob:") ? t.src : `${t.src}#t=0.1`} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
-            : <img src={t.src} alt="Photo" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
+            ? <ChatVideo src={t.src.startsWith("blob:") ? t.src : `${t.src}#t=0.1`} base={t.src} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+            : <ChatImg src={t.src} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
           {t.video && !(more && i === items.length - 1) && (
             <span style={{ position: "absolute", left: "50%", top: "50%", width: "36px", height: "36px", margin: "-18px 0 0 -18px", borderRadius: "18px", background: "rgba(0,0,0,.45)", display: "grid", placeItems: "center" }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z" /></svg>
@@ -60,5 +62,25 @@ export function MediaAlbum({ items, more }: { items: AlbumTile[]; more: number }
         </span>
       ))}
     </span>
+  );
+}
+
+/**
+ * A chat's photo and video, drawn from the phone's kept copy when there is one (shared/media-cache.ts, 2026-10-14:
+ * "我看到的還是上次的畫面"), else from the network — and kept once shown. Same props as the plain elements they replace.
+ */
+export function ChatImg({ src, onClick, onLoad, style, alt = "Photo", loading }: { src: string; onClick?: () => void; onLoad?: React.ReactEventHandler<HTMLImageElement>; style?: React.CSSProperties; alt?: string; loading?: "lazy" | "eager" }) {
+  const kept = useKeptSrc(src);
+  return (
+    <img onClick={onClick} alt={alt} loading={loading} style={style} {...(kept.src ? { src: kept.src } : {})}
+      onLoad={e => { onLoad?.(e); if (!kept.kept && kept.src === src) keepImage(src); }} />
+  );
+}
+
+export function ChatVideo({ src, base, onLoadedMetadata, style }: { src: string; base: string; onLoadedMetadata?: React.ReactEventHandler<HTMLVideoElement>; style?: React.CSSProperties }) {
+  const poster = useKeptSrc(base, true);
+  return (
+    <video src={src} poster={poster.src ?? undefined} muted playsInline preload="metadata" style={style}
+      onLoadedMetadata={onLoadedMetadata} onLoadedData={e => { if (!poster.kept) keepPoster(base, e.currentTarget); }} />
   );
 }
