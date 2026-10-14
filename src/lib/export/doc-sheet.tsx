@@ -17,7 +17,9 @@ import { officeDay, officeTime } from '@/lib/office-time'
 // "map Inter → Helvetica if you don't embed Inter"), 600 to Helvetica-Bold.
 // Only width, margin, padding, border, flexGrow and `flex: 1` set the layout —
 // what `src/lib/export/pdf.test.ts` proves survives (no height, no gap, no
-// numeric flexBasis, no auto margin).
+// numeric flexBasis, no auto margin). A text whose size is not the page's
+// 9.5pt names its own line height: react-pdf hands the page's 1.45 down as
+// points (13.8pt), which squeezes a 22pt title and pads an 8pt caption.
 
 const INK = '#000000'
 const BODY = '#1a1a1a'
@@ -29,7 +31,23 @@ const WALNUT = '#5A3E2B'
 const CREAM = '#F7EFE6'
 const px = (n: number) => n * 0.75
 
-/** The issuer's block: the company, then its line of work (the design's; the email waits until the user names it — finance-view.md). */
+/** Words are never split across lines — react-pdf hyphenates by default ("Al-lowances", "AD-VANCE"). */
+const whole = (word: string) => [word]
+function T(props: React.ComponentProps<typeof Text>) {
+  return <Text hyphenationCallback={whole} {...props} />
+}
+// The footer is placed from the TOP of the A4 page (841.89pt): react-pdf lays a
+// fixed text that is drawn per page (`render`) out before its words exist, so
+// anchored by `bottom` — or inside a box anchored so — it lands far above the
+// page (found 2026-10-15). Its rule sits 34px over the edge, under 10px of room
+// and one 7.5pt line.
+const FOOTER_TOP = 841.89 - px(34) - 7.5 * 1.45 - px(10) - px(1)
+
+/**
+ * The issuer's block: the company, then its line of work — the invoice says
+ * both lines, the receipt, the voucher and the credit note the first (the
+ * design's; its email waits until the user names it — finance-view.md).
+ */
 export const ISSUER = {
   name: 'HOUZS Venture Holdings Sdn. Bhd.',
   lines: ['Internal banking · Shared services', 'Director salary distribution'],
@@ -55,7 +73,7 @@ const s = StyleSheet.create({
     paddingBottom: px(34) + 30,
   },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  title: { fontFamily: 'Helvetica-Bold', fontSize: 22, letterSpacing: -0.22, color: INK, lineHeight: 1.2 },
+  title: { fontFamily: 'Helvetica-Bold', fontSize: 22, lineHeight: 1.45, letterSpacing: -0.22, color: INK },
   tile: { width: px(36), paddingTop: px(10), paddingBottom: px(10), borderRadius: px(9), backgroundColor: WALNUT, alignItems: 'center' },
   tileText: { fontFamily: 'Helvetica-Bold', fontSize: px(16), lineHeight: 1, color: CREAM },
   meta: { marginTop: px(16) },
@@ -67,10 +85,10 @@ const s = StyleSheet.create({
   party: { flex: 1 },
   partyGap: { width: px(32) },
   soft: { color: SOFT },
-  headline: { marginTop: px(34), fontFamily: 'Helvetica-Bold', fontSize: 15, letterSpacing: -0.15, color: INK, lineHeight: 1.25 },
+  headline: { marginTop: px(34), fontFamily: 'Helvetica-Bold', fontSize: 15, lineHeight: 1.45, letterSpacing: -0.15, color: INK },
   summary: { marginTop: px(6), color: SOFT },
   items: { marginTop: px(28) },
-  itemsHead: { flexDirection: 'row', paddingBottom: px(6), borderBottomWidth: px(1), borderBottomColor: BODY, borderBottomStyle: 'solid', fontSize: 8, color: LABEL },
+  itemsHead: { flexDirection: 'row', paddingBottom: px(6), borderBottomWidth: px(1), borderBottomColor: BODY, borderBottomStyle: 'solid', fontSize: 8, lineHeight: 1.45, color: LABEL },
   itemRow: { flexDirection: 'row', paddingTop: px(10), paddingBottom: px(10), borderBottomWidth: px(1), borderBottomColor: RULE, borderBottomStyle: 'solid' },
   groupRow: { flexDirection: 'row', paddingTop: px(10), paddingBottom: px(4) },
   grow: { flex: 1 },
@@ -89,22 +107,33 @@ const s = StyleSheet.create({
   signs: { flexDirection: 'row', marginBottom: px(22) },
   sign: { flex: 1 },
   signLine: { paddingTop: px(36), borderBottomWidth: px(1), borderBottomColor: BODY, borderBottomStyle: 'solid' },
-  signCaption: { marginTop: px(6), fontSize: 8, color: LABEL },
+  signCaption: { marginTop: px(6), fontSize: 8, lineHeight: 1.45, color: LABEL },
   footer: {
     position: 'absolute',
     left: px(56),
     right: px(56),
-    bottom: px(34),
+    top: FOOTER_TOP,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingTop: px(10),
     borderTopWidth: px(1),
     borderTopColor: RULE,
     borderTopStyle: 'solid',
     fontSize: 7.5,
+    lineHeight: 1.45,
     color: FAINT,
   },
-  footerLeft: { flex: 1, marginRight: px(16) },
+  // Room on the right for *Page N of M*.
+  footerLeft: { flex: 1, marginRight: 64 },
+  pageCount: {
+    position: 'absolute',
+    left: px(56),
+    right: px(56),
+    top: FOOTER_TOP + px(1) + px(10),
+    fontSize: 7.5,
+    lineHeight: 1.45,
+    color: FAINT,
+    textAlign: 'right',
+  },
 })
 
 export const docStyles = s
@@ -158,21 +187,35 @@ export function docOfficeDay(at: string | null | undefined): string | null {
 
 // ── The parts ──
 
-/** One document's page: its title and the H, what goes between, the footer on every page it runs to. */
-export function DocPage({ title, footer, children }: { title: string; footer: string; children: React.ReactNode }) {
+/**
+ * One document's page: its title and the H, what goes between, the footer on
+ * every page it runs to. A `head` repeats on every page with the title — a
+ * detail appendix's meta and column heads over its long list.
+ */
+export function DocPage({ title, footer, head, children }: { title: string; footer: string; head?: React.ReactNode; children: React.ReactNode }) {
+  const top = (
+    <View style={s.top}>
+      <T style={s.title}>{title}</T>
+      <View style={s.tile}>
+        <T style={s.tileText}>H</T>
+      </View>
+    </View>
+  )
   return (
     <Page size="A4" style={s.page}>
-      <View style={s.top}>
-        <Text style={s.title}>{title}</Text>
-        <View style={s.tile}>
-          <Text style={s.tileText}>H</Text>
+      {head ? (
+        <View fixed>
+          {top}
+          {head}
         </View>
-      </View>
+      ) : (
+        top
+      )}
       {children}
       <View style={s.footer} fixed>
-        <Text style={s.footerLeft}>{footer}</Text>
-        <Text render={({ subPageNumber, subPageTotalPages }) => `Page ${subPageNumber} of ${subPageTotalPages}`} />
+        <T style={s.footerLeft}>{footer}</T>
       </View>
+      <T style={s.pageCount} fixed render={({ subPageNumber, subPageTotalPages }) => `Page ${subPageNumber} of ${subPageTotalPages}`} />
     </Page>
   )
 }
@@ -187,13 +230,13 @@ export interface DocLine {
 }
 
 /** A label column (110px) beside its values — the meta list, the payment details, the approval list. */
-export function DocList({ lines, style }: { lines: DocLine[]; style?: object }) {
+export function DocList({ lines, style }: { lines: DocLine[]; style?: React.ComponentProps<typeof View>['style'] }) {
   return (
     <View style={style}>
       {lines.map((l, i) => (
         <View key={i} style={s.metaRow}>
-          <Text style={s.metaLabel}>{l.label}</Text>
-          <Text style={l.strong ? s.strong : l.faint ? s.faint : s.metaValue}>{l.value}</Text>
+          <T style={s.metaLabel}>{l.label}</T>
+          <T style={l.strong ? s.strong : l.faint ? s.faint : s.metaValue}>{l.value}</T>
         </View>
       ))}
     </View>
@@ -205,25 +248,25 @@ export function DocMeta({ lines }: { lines: DocLine[] }) {
   return <DocList lines={lines} style={s.meta} />
 }
 
-/** The issuer beside the counter-party: a bold first line, the rest soft. */
-export function DocParties({ counter }: { counter: { heading: string; lines: string[] } }) {
+/** The issuer beside the counter-party: a bold first line, the rest soft. `full` — the invoice's two lines of work. */
+export function DocParties({ counter, full = false }: { counter: { heading: string; lines: string[] }; full?: boolean }) {
   return (
     <View style={s.parties}>
       <View style={s.party}>
-        <Text style={s.strong}>{ISSUER.name}</Text>
-        {ISSUER.lines.map((l) => (
-          <Text key={l} style={s.soft}>
+        <T style={s.strong}>{ISSUER.name}</T>
+        {(full ? ISSUER.lines : ISSUER.lines.slice(0, 1)).map((l) => (
+          <T key={l} style={s.soft}>
             {l}
-          </Text>
+          </T>
         ))}
       </View>
       <View style={s.partyGap} />
       <View style={s.party}>
-        <Text style={s.strong}>{counter.heading}</Text>
+        <T style={s.strong}>{counter.heading}</T>
         {counter.lines.filter(Boolean).map((l, i) => (
-          <Text key={i} style={s.soft}>
+          <T key={i} style={s.soft}>
             {l}
-          </Text>
+          </T>
         ))}
       </View>
     </View>
@@ -234,8 +277,8 @@ export function DocParties({ counter }: { counter: { heading: string; lines: str
 export function DocHeadline({ headline, summary }: { headline: string; summary?: string | null }) {
   return (
     <View>
-      <Text style={s.headline}>{headline}</Text>
-      {summary ? <Text style={s.summary}>{summary}</Text> : null}
+      <T style={s.headline}>{headline}</T>
+      {summary ? <T style={s.summary}>{summary}</T> : null}
     </View>
   )
 }
@@ -251,52 +294,60 @@ export interface DocRow {
   /** One value a column; the first may carry a second grey line. */
   cells: string[]
   second?: string | null
-  /** The last cell in ink (the amount). */
-  key?: string
 }
 
-/** The items: the grey header over a 1pt black rule, a row each with a hairline under it. */
-export function DocItems({ columns, rows, groups }: { columns: DocColumn[]; rows?: DocRow[]; groups?: Array<{ label: string; rows: DocRow[]; subtotal: DocRow }> }) {
-  const cell = (c: DocColumn, i: number) => [i === 0 ? s.grow : { width: px(c.width ?? 0) }, i > 0 ? s.col : {}, c.align === 'right' ? s.right : {}]
-  const line = (r: DocRow, k: string | number) => (
-    <View key={k} style={s.itemRow} wrap={false}>
+const cellStyle = (c: DocColumn, i: number) => [i === 0 ? s.grow : { width: px(c.width ?? 0) }, i > 0 ? s.col : {}, c.align === 'right' ? s.right : {}]
+
+/** The items' header: 8pt grey over a 1pt black rule. */
+export function DocItemsHead({ columns, first = true }: { columns: DocColumn[]; first?: boolean }) {
+  return (
+    <View style={[s.itemsHead, first ? s.items : {}]}>
+      {columns.map((c, i) => (
+        <T key={i} style={cellStyle(c, i)}>
+          {c.label}
+        </T>
+      ))}
+    </View>
+  )
+}
+
+/** One item: its cells (the amount in ink), a hairline under it; the first cell may carry a grey second line. */
+export function DocItemRow({ columns, row, strong = false }: { columns: DocColumn[]; row: DocRow; strong?: boolean }) {
+  return (
+    <View style={s.itemRow} wrap={false}>
       {columns.map((c, i) =>
         i === 0 ? (
-          <View key={i} style={cell(c, i)}>
-            <Text style={{ color: INK }}>{r.cells[0]}</Text>
-            {r.second ? <Text style={s.second}>{r.second}</Text> : null}
+          <View key={i} style={cellStyle(c, i)}>
+            <T style={strong ? s.strong : { color: INK }}>{row.cells[0]}</T>
+            {row.second ? <T style={s.second}>{row.second}</T> : null}
           </View>
         ) : (
-          <Text key={i} style={[...cell(c, i), i === columns.length - 1 ? { color: INK } : {}]}>
-            {r.cells[i] ?? ''}
-          </Text>
+          <T key={i} style={[...cellStyle(c, i), i === columns.length - 1 ? (strong ? s.strong : { color: INK }) : {}]}>
+            {row.cells[i] ?? ''}
+          </T>
         ),
       )}
     </View>
   )
+}
+
+/** The items: the header, a row each — or groups, a department's rows under its name with its subtotal. */
+export function DocItems({ columns, rows, groups }: { columns: DocColumn[]; rows?: DocRow[]; groups?: Array<{ label: string; rows: DocRow[]; subtotal: DocRow }> }) {
   return (
-    <View style={s.items}>
-      <View style={s.itemsHead}>
-        {columns.map((c, i) => (
-          <Text key={i} style={cell(c, i)}>
-            {c.label}
-          </Text>
-        ))}
-      </View>
-      {rows?.map((r, i) => line(r, i))}
+    <View>
+      <DocItemsHead columns={columns} />
+      {rows?.map((r, i) => (
+        <DocItemRow key={i} columns={columns} row={r} />
+      ))}
       {groups?.map((g) => (
         <View key={g.label}>
           <View style={s.groupRow} wrap={false}>
-            <Text style={[s.grow, s.strong]}>{g.label}</Text>
+            <T style={[s.grow, s.strong]}>{g.label}</T>
           </View>
-          {g.rows.map((r, i) => line(r, `${g.label}:${i}`))}
-          <View style={s.itemRow} wrap={false}>
-            {columns.map((c, i) => (
-              <Text key={i} style={[...cell(c, i), i === 0 || i === columns.length - 1 ? s.strong : {}]}>
-                {g.subtotal.cells[i] ?? ''}
-              </Text>
-            ))}
-          </View>
+          {g.rows.map((r, i) => (
+            <DocItemRow key={i} columns={columns} row={r} />
+          ))}
+          <DocItemRow columns={columns} row={g.subtotal} strong />
         </View>
       ))}
     </View>
@@ -310,8 +361,8 @@ export function DocTotals({ lines }: { lines: Array<{ label: string; value: stri
       <View style={s.totals}>
       {lines.map((l, i) => (
         <View key={i} style={i === lines.length - 1 ? s.totalLast : s.totalRow}>
-          <Text>{l.label}</Text>
-          <Text>{l.value}</Text>
+          <T>{l.label}</T>
+          <T>{l.value}</T>
         </View>
       ))}
       </View>
@@ -323,9 +374,9 @@ export function DocTotals({ lines }: { lines: Array<{ label: string; value: stri
 export function DocBlock({ title, lines, note, first = false }: { title: string; lines: DocLine[]; note?: string; first?: boolean }) {
   return (
     <View style={[s.block, first ? { marginTop: px(26) } : {}]} wrap={false}>
-      <Text style={s.strong}>{title}</Text>
+      <T style={s.strong}>{title}</T>
       <DocList lines={lines} style={s.blockList} />
-      {note ? <Text style={s.note}>{note}</Text> : null}
+      {note ? <T style={s.note}>{note}</T> : null}
     </View>
   )
 }
@@ -340,7 +391,7 @@ export function DocSignatures({ captions }: { captions: string[] }) {
         {captions.map((c, i) => (
           <View key={i} style={[s.sign, i > 0 ? { marginLeft: gap } : {}]}>
             <View style={s.signLine} />
-            <Text style={s.signCaption}>{c}</Text>
+            <T style={s.signCaption}>{c}</T>
           </View>
         ))}
       </View>

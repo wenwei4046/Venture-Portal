@@ -11,7 +11,7 @@ function voucher(id: string, referenceType: string | null) {
   return { id, voucher_no: `TEST-${id}`, voucher_type: 'payment', direction: 'debit', status: 'pending_approval', amount: 600.60, payment_date: '2026-09-15', created_at: '2026-09-11T00:00:00Z', payee_name: 'KWSP', payee_company_id: null, bank_account_id: null, description: 'Contribution test', notes: null, payment_reference: null, target_pool: null, reference_type: referenceType }
 }
 
-function mockDatabase(vouchers: ReturnType<typeof voucher>[], coverageError: object | null = null, salaryError: object | null = null) {
+function mockDatabase(vouchers: ReturnType<typeof voucher>[], coverageError: object | null = null, salaryError: object | null = null, extra: Record<string, unknown[]> = {}) {
   const calls: Array<{ table: string; column: string; values: unknown }> = []
   const coverage = ['Amy', 'Cara', 'Ezra'].map((name, i) => ({ id: `line-${i}`, voucher_id: 'stat', scope: 'staff', payroll_row_id: `row-${name}`, employee_name: name, employee_code: `T${i}`, department_name: 'Original Finance', period_month: '2026-08-01', scheme: 'KWSP', amount: `${(i + 1) * 100}.20` }))
   const salary = ['basic', 'commission'].map((component, i) => ({ id: `salary-${i}`, voucher_id: 'salary', scope: 'staff', payroll_row_id: 'salary-row', employee_name: 'Recorded Salary Employee', employee_code: 'SAL001', department_name: 'Original Revenue', period_month: '2026-09-01', salary_component: component, recipient_account: i ? 'account_2' : 'account_1', bank_name: i ? 'Recorded CIMB' : 'Recorded Maybank', bank_account_no: i ? '0098765432' : '0012345678', net: i ? '4253.45' : '4302.70' }))
@@ -19,7 +19,7 @@ function mockDatabase(vouchers: ReturnType<typeof voucher>[], coverageError: obj
     const result = table === 'payment_vouchers' ? { data: vouchers, error: null }
       : table === 'payroll_statutory_voucher_lines' ? { data: coverageError ? null : coverage, error: coverageError }
         : table === 'payroll_voucher_lines' ? { data: salaryError ? null : salary, error: salaryError }
-        : { data: [], error: null }
+        : { data: extra[table] ?? [], error: null }
     const query = {
       select: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
       eq: vi.fn((column: string, values: unknown) => { calls.push({ table, column, values }); return query }),
@@ -58,6 +58,54 @@ describe('voucher PDF statutory coverage', () => {
     expect(docs[0].statutory_coverage.map((line: { department_name: string }) => line.department_name)).toEqual(['Original Finance', 'Original Finance', 'Original Finance'])
     expect(docs[0].statutory_coverage.reduce((total: number, line: { amount: number }) => total + line.amount, 0)).toBeCloseTo(600.60)
     expect(docs[1].statutory_coverage).toEqual([])
+  })
+
+  // The Finance revamp v2's sheet (2026-10-15, P03): its approval step by step, the bank and the payee in words.
+  it('reads who made, sent, approved and paid it, the bank it moves through, the account by its code', async () => {
+    const pv = {
+      ...voucher('pv', null), status: 'paid', created_by: 'u-aina', approved_by: 'u-loo', approved_at: '2026-10-06T06:08:00Z', executed_by: 'u-loo', executed_at: '2026-10-06T06:08:00Z',
+      payment_method: 'bank_transfer', payee_company_id: 'co-hb', bank_account_id: 'b1',
+    }
+    mockDatabase([pv as unknown as ReturnType<typeof voucher>], null, null, {
+      users: [{ id: 'u-aina', name: 'Aina' }, { id: 'u-loo', name: 'Loo K.W.' }],
+      approval_requests: [{ reference_id: 'pv', submitted_by: 'u-aina', created_at: '2026-10-06T01:30:00Z' }],
+      companies: [{ id: 'co-hb', name: 'HOUZS Bedding', short_code: 'HB' }],
+      bank_accounts: [{ id: 'b1', bank_name: 'Hong Leong Bank', account_number: '5123-0098-77' }],
+      payment_voucher_sources: [{ voucher_id: 'pv', pool: 'dept_pool_marketing', amount: '600.60', account_code: '6100', chart_of_accounts: { name: 'Advertising' } }],
+    })
+    await GET(new Request('http://localhost/payments/voucher-doc?id=pv'))
+    const [doc] = mocks.exportPdfResponse.mock.calls[0][0].element.props.vouchers
+    expect(doc.approval).toEqual({
+      created: { by: 'Aina', at: '2026-09-11T00:00:00Z' },
+      submitted: { by: 'Aina', at: '2026-10-06T01:30:00Z' },
+      approved: { by: 'Loo K.W.', at: '2026-10-06T06:08:00Z' },
+      paid: { by: 'Loo K.W.', at: '2026-10-06T06:08:00Z' },
+    })
+    expect(doc).toMatchObject({ payee_kind: 'Group company', method: 'Bank transfer', bank: { name: 'Hong Leong Bank', number: '5123-0098-77' } })
+    expect(doc.sources[0].account_label).toBe('6100 · Advertising')
+    // The user's pool names (2026-04-18): "XX Department Pool".
+    expect(doc.sources[0].pool_label).toBe('Marketing Department Pool')
+  })
+
+  it('names every pool the user’s way — a department’s by its department', async () => {
+    mockDatabase([voucher('pv', null)], null, null, {
+      payment_voucher_sources: ['venture_pool', 'dept_pool_director', 'dept_pool_hr', 'dept_pool_revenue_department', 'invoice_payout_pool'].map((pool) => ({
+        voucher_id: 'pv', pool, amount: '1.00', account_code: null, chart_of_accounts: null,
+      })),
+    })
+    await GET(new Request('http://localhost/payments/voucher-doc?id=pv'))
+    const [doc] = mocks.exportPdfResponse.mock.calls[0][0].element.props.vouchers
+    expect(doc.sources.map((s: { pool_label: string }) => s.pool_label)).toEqual([
+      'Venture Pool', 'Director Pool', 'HR Department Pool', 'Revenue Department Pool', 'Invoice Payout Pool',
+    ])
+  })
+
+  it('a draft has not been sent: its Submitted step stays open', async () => {
+    mockDatabase([{ ...voucher('draft', null), status: 'draft' }])
+    await GET(new Request('http://localhost/payments/voucher-doc?id=draft'))
+    const [doc] = mocks.exportPdfResponse.mock.calls[0][0].element.props.vouchers
+    expect(doc.approval.submitted).toBeNull()
+    expect(doc.approval.approved).toBeNull()
   })
 
   it('refuses to print an incomplete statutory PDF if its stored coverage cannot be read', async () => {

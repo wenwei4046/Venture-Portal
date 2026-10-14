@@ -1,49 +1,41 @@
 import React from 'react'
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
-import dayjs from 'dayjs'
-import { officeDay, officeTime } from '@/lib/office-time'
+import { Document } from '@react-pdf/renderer'
+import {
+  DocBlock,
+  DocHeadline,
+  DocItems,
+  DocItemsHead,
+  DocItemRow,
+  DocMeta,
+  DocPage,
+  DocParties,
+  DocSignatures,
+  DocTotals,
+  docDay,
+  docMoney,
+  docMonth,
+  docStamp,
+  type DocColumn,
+  type DocLine,
+} from '@/lib/export/doc-sheet'
 import { recipientAccountLabel, salaryPaymentLabel } from '@/lib/payroll-voucher-display'
 
-// Per-voucher document PDF. Each voucher starts on an A4 portrait page. Mirrors the
-// invoice document layout (HV letterhead + meta + party + per-source table).
-// Used for single download (?id=) and batch (?ids=) printing of payment
-// vouchers (debit) / official receipts (credit).
-
-const styles = StyleSheet.create({
-  page: { fontFamily: 'Helvetica', fontSize: 10, padding: 48, color: '#1a1a1a' },
-  letterhead: { borderBottom: '1pt solid #1a1a1a', paddingBottom: 12, marginBottom: 24 },
-  brand: { fontFamily: 'Helvetica-Bold', fontSize: 16 },
-  brandSub: { fontFamily: 'Helvetica-Oblique', fontSize: 9, color: '#555', marginTop: 2 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  docTitle: { fontFamily: 'Helvetica-Bold', fontSize: 20, letterSpacing: 1 },
-  metaBlock: { textAlign: 'right' },
-  metaLine: { fontSize: 9, marginBottom: 2 },
-  metaLabel: { color: '#777', fontFamily: 'Helvetica' },
-  metaValue: { color: '#1a1a1a', fontFamily: 'Helvetica-Bold' },
-  sectionLabel: {
-    fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#777',
-    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4,
-  },
-  block: { marginBottom: 16 },
-  primary: { fontSize: 12, fontFamily: 'Helvetica-Bold', marginBottom: 2 },
-  sub: { fontSize: 9, color: '#555' },
-  descText: { fontSize: 10, lineHeight: 1.4 },
-  amountTable: { borderTop: '0.5pt solid #1a1a1a', borderBottom: '0.5pt solid #1a1a1a', marginTop: 8 },
-  amountRow: { flexDirection: 'row', paddingVertical: 6 },
-  amountValue: { width: 120, textAlign: 'right', fontFamily: 'Courier', fontSize: 10, paddingRight: 4 },
-  totalRow: { flexDirection: 'row', paddingVertical: 8, borderTop: '0.5pt solid #aaa' },
-  totalLabel: { flex: 1, fontFamily: 'Helvetica-Bold', fontSize: 11, paddingLeft: 4 },
-  totalValue: { width: 120, textAlign: 'right', fontFamily: 'Courier-Bold', fontSize: 12, paddingRight: 4 },
-  footerNote: { marginTop: 28, fontSize: 9, color: '#555' },
-  footerLine: { marginBottom: 2 },
-  pageFooter: {
-    position: 'absolute', fontSize: 7.5, bottom: 24, left: 48, right: 48,
-    textAlign: 'center', color: '#999', fontFamily: 'Courier',
-  },
-})
+// A voucher's document (2026-10-15, the Finance revamp v2 — README §3, P02 and
+// P03; credit = a receipt). A payment voucher: *Payment voucher* and the H;
+// Voucher number · Payment date · Pay from · Status; HOUZS Venture beside *Pay
+// to*; *RM 25,000.00 to pay on 6 October 2026* (*paid on* once paid) over its
+// description; Deducted from · Account · Amount; Total; the Approval list
+// (Created · Submitted · Approved · Paid — *Not yet* until it is); Prepared by ·
+// Approved by · Received by. A receipt: *Receipt*; Receipt number · Date paid ·
+// Payment method · Reference; *Received from*; *RM 150,000.00 paid on 7
+// October 2026*; Description · Credited to · Amount; Total · Amount paid;
+// Received by · Company stamp. A salary or statutory voucher keeps its detail
+// pages after it (whom it pays, into which account; whose contribution), drawn
+// to the same rules.
 
 export interface VoucherSourceData {
   pool_label: string
+  /** "6100 · Advertising". */
   account_label: string | null
   amount: number
 }
@@ -58,28 +50,6 @@ export interface StatutoryCoverageData {
   period_month: string
   scheme: string
   amount: number
-}
-
-export interface VoucherDocData {
-  id: string
-  voucher_no: string | null
-  voucher_type: string
-  direction: string
-  status: string
-  amount: number
-  payment_date: string | null
-  created_at: string
-  payee_name: string
-  payee_sub: string | null
-  bank_label: string | null
-  description: string | null
-  notes: string | null
-  payment_reference: string | null
-  sources: VoucherSourceData[]
-  /** Immutable contribution snapshots for this statutory PV; absent for legacy vouchers. */
-  statutory_coverage?: StatutoryCoverageData[]
-  /** Recorded salary components and receiving accounts; legacy bank snapshots may be absent. */
-  salary_payments?: SalaryPaymentData[]
 }
 
 export interface SalaryPaymentData {
@@ -97,203 +67,215 @@ export interface SalaryPaymentData {
   bank_account_no: string | null
 }
 
-function fmtMoney(v: number): string {
-  if (v === 0) return '—'
-  const abs = Math.abs(v).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  return v < 0 ? `(${abs})` : abs
+/** A step of its approval: who, when — none yet. */
+export interface VoucherStep {
+  by: string | null
+  at: string | null
 }
 
-function VoucherPage({ v }: { v: VoucherDocData }) {
-  const generatedAt = officeTime().format('YYYY-MM-DD HH:mm')
-  const isCredit = v.direction === 'credit'
-  const title = isCredit ? 'OFFICIAL RECEIPT' : 'PAYMENT VOUCHER'
+export interface VoucherDocData {
+  id: string
+  voucher_no: string | null
+  voucher_type: string
+  direction: string
+  /** draft · pending_approval · approved · paid · voided */
+  status: string
+  amount: number
+  payment_date: string | null
+  created_at: string
+  payee_name: string
+  /** "Group company" — a payee the system knows as a company. */
+  payee_kind: string | null
+  /** "Bank transfer" / "Netting". */
+  method: string | null
+  /** The bank it moves through. */
+  bank: { name: string; number: string | null } | null
+  description: string | null
+  notes: string | null
+  payment_reference: string | null
+  sources: VoucherSourceData[]
+  /** The pool a receipt with no source lines is credited to. */
+  target_pool_label?: string | null
+  /** Its approval, step by step (a payment voucher's). */
+  approval?: { created: VoucherStep; submitted: VoucherStep | null; approved: VoucherStep | null; paid: VoucherStep | null }
+  /** Immutable contribution snapshots for this statutory PV; absent for legacy vouchers. */
+  statutory_coverage?: StatutoryCoverageData[]
+  /** Recorded salary components and receiving accounts; legacy bank snapshots may be absent. */
+  salary_payments?: SalaryPaymentData[]
+}
+
+const STATUS_WORD: Record<string, string> = { draft: 'Draft', pending_approval: 'Pending approval', approved: 'Approved', paid: 'Paid', voided: 'Voided' }
+const r2 = (n: number) => Math.round(n * 100) / 100
+const firstLine = (s: string | null | undefined) => (s ?? '').split(/\r?\n/)[0].trim()
+const step = (s: VoucherStep | null | undefined, open = 'Not yet'): Pick<DocLine, 'value' | 'faint'> =>
+  s && (s.by || s.at) ? { value: [s.by, docStamp(s.at)].filter(Boolean).join(' · ') } : { value: open, faint: true }
+
+/** The headline: what it pays (or paid, or received) and when. */
+export function voucherHeadline(v: Pick<VoucherDocData, 'direction' | 'status' | 'amount' | 'payment_date'>): string {
+  const amount = docMoney(v.amount)
+  const day = docDay(v.payment_date)
+  if (v.status === 'voided') return `${amount} voided`
+  if (v.direction === 'credit' || v.status === 'paid') return day ? `${amount} paid on ${day}` : `${amount} paid`
+  return day ? `${amount} to pay on ${day}` : `${amount} to pay`
+}
+
+function ReceiptPage({ v }: { v: VoucherDocData }) {
+  const no = v.voucher_no ?? v.id.slice(0, 8)
+  const headline = voucherHeadline(v)
+  const meta: DocLine[] = [
+    { label: 'Receipt number', value: no, strong: true },
+    { label: 'Date paid', value: docDay(v.payment_date) ?? '—' },
+    // "Bank transfer · Alliance Bank 1200-4410-0091" (the design's receipt joins the bank and its number with a space).
+    { label: 'Payment method', value: [v.method, v.bank ? [v.bank.name, v.bank.number].filter(Boolean).join(' ') : null].filter(Boolean).join(' · ') || '—' },
+  ]
+  if (v.payment_reference) meta.push({ label: 'Reference', value: v.payment_reference })
+  if (v.status === 'voided') meta.push({ label: 'Status', value: 'Voided' })
+  const what = firstLine(v.description) || 'Received'
+  const rows =
+    v.sources.length > 0
+      ? v.sources.map((s) => ({ cells: [what, s.pool_label, docMoney(s.amount)], second: s.account_label }))
+      : [{ cells: [what, v.target_pool_label ?? '—', docMoney(v.amount)], second: null }]
   return (
-    <Page size="A4" style={styles.page}>
-      <View style={styles.letterhead}>
-        <Text style={styles.brand}>HOUZS Venture Holdings Sdn. Bhd.</Text>
-        <Text style={styles.brandSub}>Internal banking · Shared services · Director salary distribution</Text>
-      </View>
+    <DocPage title="Receipt" footer={`${no} · ${headline}`}>
+      <DocMeta lines={meta} />
+      <DocParties counter={{ heading: 'Received from', lines: [v.payee_name, v.payee_kind ?? ''] }} />
+      <DocHeadline headline={headline} summary={v.description?.trim() || null} />
+      <DocItems columns={[{ label: 'Description' }, { label: 'Credited to', width: 170 }, { label: 'Amount', width: 110, align: 'right' }]} rows={rows} />
+      <DocTotals
+        lines={[
+          { label: 'Total', value: docMoney(v.amount) },
+          { label: 'Amount paid', value: docMoney(v.status === 'voided' ? 0 : v.amount) },
+        ]}
+      />
+      <DocSignatures captions={[v.approval?.created.by ? `Received by · ${v.approval.created.by}` : 'Received by', 'Company stamp']} />
+    </DocPage>
+  )
+}
 
-      <View style={styles.headerRow}>
-        <Text style={styles.docTitle}>{title}</Text>
-        <View style={styles.metaBlock}>
-          <Text style={styles.metaLine}>
-            <Text style={styles.metaLabel}>No.  </Text>
-            <Text style={styles.metaValue}>{v.voucher_no ?? v.id.slice(0, 8)}</Text>
-          </Text>
-          <Text style={styles.metaLine}>
-            <Text style={styles.metaLabel}>Date  </Text>
-            <Text style={styles.metaValue}>
-              {officeDay(v.payment_date ?? v.created_at).format('DD MMM YYYY')}
-            </Text>
-          </Text>
-          <Text style={styles.metaLine}>
-            <Text style={styles.metaLabel}>Type  </Text>
-            <Text style={styles.metaValue}>{v.voucher_type.replace(/_/g, ' ')}</Text>
-          </Text>
-          <Text style={styles.metaLine}>
-            <Text style={styles.metaLabel}>Status  </Text>
-            <Text style={styles.metaValue}>{v.status.toUpperCase()}</Text>
-          </Text>
-        </View>
-      </View>
+function PaymentVoucherPage({ v }: { v: VoucherDocData }) {
+  const no = v.voucher_no ?? v.id.slice(0, 8)
+  const headline = voucherHeadline(v)
+  const meta: DocLine[] = [
+    { label: 'Voucher number', value: no, strong: true },
+    { label: 'Payment date', value: docDay(v.payment_date) ?? '—' },
+    { label: 'Pay from', value: v.bank ? [v.bank.name, v.bank.number].filter(Boolean).join(' · ') : '—' },
+    { label: 'Status', value: STATUS_WORD[v.status] ?? v.status },
+  ]
+  if (v.payment_reference) meta.push({ label: 'Reference', value: v.payment_reference })
+  const rows =
+    v.sources.length > 0
+      ? v.sources.map((s) => ({ cells: [s.pool_label, s.account_label ?? '—', docMoney(s.amount)] }))
+      : [{ cells: ['—', '—', docMoney(v.amount)] }]
+  const a = v.approval
+  const approval: DocLine[] = [
+    { label: 'Created', ...step(a?.created) },
+    { label: 'Submitted', ...step(a?.submitted) },
+    { label: 'Approved', ...step(a?.approved) },
+    { label: 'Paid', ...step(a?.paid) },
+  ]
+  const summary = [v.description?.trim(), v.notes?.trim() ? `Notes: ${v.notes.trim()}` : null].filter(Boolean).join('\n') || null
+  return (
+    <DocPage title="Payment voucher" footer={`${no} · ${docMoney(v.amount)} to ${v.payee_name}`}>
+      <DocMeta lines={meta} />
+      <DocParties counter={{ heading: 'Pay to', lines: [v.payee_name, [v.payee_kind, v.method].filter(Boolean).join(' · ')] }} />
+      <DocHeadline headline={headline} summary={summary} />
+      <DocItems columns={[{ label: 'Deducted from' }, { label: 'Account', width: 170 }, { label: 'Amount', width: 110, align: 'right' }]} rows={rows} />
+      <DocTotals lines={[{ label: 'Total', value: docMoney(v.amount) }]} />
+      <DocBlock title="Approval" lines={approval} first />
+      <DocSignatures
+        captions={[
+          a?.created.by ? `Prepared by · ${a.created.by}` : 'Prepared by',
+          a?.approved?.by ? `Approved by · ${a.approved.by}` : 'Approved by',
+          'Received by',
+        ]}
+      />
+    </DocPage>
+  )
+}
 
-      <View style={styles.block}>
-        <Text style={styles.sectionLabel}>{isCredit ? 'Received from' : 'Pay to'}</Text>
-        <Text style={styles.primary}>{v.payee_name}</Text>
-        {v.payee_sub ? <Text style={styles.sub}>{v.payee_sub}</Text> : null}
-      </View>
-
-      {v.bank_label ? (
-        <View style={styles.block}>
-          <Text style={styles.sectionLabel}>{isCredit ? 'Receive into' : 'Pay from'}</Text>
-          <Text style={styles.descText}>{v.bank_label}</Text>
-        </View>
-      ) : null}
-
-      <View style={styles.block}>
-        <Text style={styles.sectionLabel}>Description</Text>
-        <Text style={styles.descText}>{v.description ?? '—'}</Text>
-      </View>
-
-      <View>
-        <Text style={styles.sectionLabel}>{isCredit ? 'Credited to' : 'Deducted from'}</Text>
-        <View style={styles.amountTable}>
-          <View style={[styles.amountRow, { backgroundColor: '#eee', borderBottom: '0.5pt solid #aaa' }]}>
-            <Text style={{ flex: 1, paddingLeft: 4, fontFamily: 'Helvetica-Bold', fontSize: 8.5 }}>POOL / DEPARTMENT</Text>
-            <Text style={{ width: 150, fontFamily: 'Helvetica-Bold', fontSize: 8.5 }}>ACCOUNT</Text>
-            <Text style={[styles.amountValue, { fontFamily: 'Helvetica-Bold', fontSize: 8.5 }]}>AMOUNT (RM)</Text>
-          </View>
-          {v.sources.length > 0 ? v.sources.map((s, i) => (
-            <View key={i} style={[styles.amountRow, { borderBottom: '0.5pt solid #ddd' }]}>
-              <Text style={{ flex: 1, paddingLeft: 4, fontSize: 10 }}>{s.pool_label}</Text>
-              <Text style={{ width: 150, fontSize: 9, color: '#555' }}>{s.account_label ?? '—'}</Text>
-              <Text style={styles.amountValue}>{fmtMoney(s.amount)}</Text>
-            </View>
-          )) : (
-            <View style={[styles.amountRow, { borderBottom: '0.5pt solid #ddd' }]}>
-              <Text style={{ flex: 1, paddingLeft: 4, fontSize: 10 }}>{isCredit ? 'Received' : 'Paid'}</Text>
-              <Text style={{ width: 150 }}> </Text>
-              <Text style={styles.amountValue}>{fmtMoney(v.amount)}</Text>
-            </View>
-          )}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>TOTAL (RM)</Text>
-            <Text style={styles.totalValue}>{fmtMoney(v.amount)}</Text>
-          </View>
-        </View>
-      </View>
-
-      {v.payment_reference || v.notes ? (
-        <View style={styles.footerNote}>
-          {v.payment_reference ? (
-            <Text style={styles.footerLine}>
-              <Text style={styles.metaLabel}>Reference: </Text>
-              <Text>{v.payment_reference}</Text>
-            </Text>
-          ) : null}
-          {v.notes ? (
-            <Text style={styles.footerLine}>
-              <Text style={styles.metaLabel}>Notes: </Text>
-              <Text>{v.notes}</Text>
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      <Text style={styles.pageFooter} fixed>
-        HOUZS Venture Holdings Sdn. Bhd. · Generated {generatedAt} · {v.voucher_no ?? ''}
-      </Text>
-    </Page>
+/** A detail appendix: its title, the voucher it belongs to, the column heads on every page, the rows, its total. */
+function DetailPages({
+  v,
+  title,
+  meta,
+  columns,
+  rows,
+  total,
+}: {
+  v: VoucherDocData
+  title: string
+  meta: DocLine[]
+  columns: DocColumn[]
+  rows: Array<{ cells: string[]; second?: string | null }>
+  total: { label: string; value: string }
+}) {
+  const no = v.voucher_no ?? v.id.slice(0, 8)
+  return (
+    <DocPage
+      title={title}
+      footer={`${no} · ${title}`}
+      head={
+        <>
+          <DocMeta lines={meta} />
+          <DocItemsHead columns={columns} />
+        </>
+      }
+    >
+      {rows.map((r, i) => (
+        <DocItemRow key={i} columns={columns} row={r} />
+      ))}
+      <DocTotals lines={[total]} />
+    </DocPage>
   )
 }
 
 function StatutoryCoveragePages({ v }: { v: VoucherDocData }) {
   const lines = v.statutory_coverage ?? []
   const people = new Set(lines.map((line) => `${line.scope}:${line.payroll_row_id}`)).size
-  const periods = Array.from(new Set(lines.map((line) => dayjs(line.period_month).format('MMMM YYYY')))).join(' / ')
+  const periods = [...new Set(lines.map((line) => docMonth(line.period_month) ?? line.period_month))].join(' / ')
   return (
-    <Page size="A4" style={styles.page}>
-      <View fixed>
-        <View style={[styles.letterhead, { marginBottom: 16 }]}>
-          <Text style={styles.brand}>HOUZS Venture Holdings Sdn. Bhd.</Text>
-          <Text style={[styles.primary, { marginTop: 12 }]}>Statutory contribution details</Text>
-          <Text style={styles.sub}>{v.voucher_no ?? v.id.slice(0, 8)} - {v.payee_name} - {periods}</Text>
-          <Text style={[styles.sub, { marginTop: 4 }]}>{people} {people === 1 ? 'person' : 'people'} - recorded when this PV was generated</Text>
-        </View>
-        <View style={[styles.amountRow, { backgroundColor: '#eee', borderTop: '0.5pt solid #aaa', borderBottom: '0.5pt solid #aaa' }]}>
-          <Text style={{ width: '40%', paddingLeft: 4, fontFamily: 'Helvetica-Bold', fontSize: 8 }}>EMPLOYEE</Text>
-          <Text style={{ width: '25%', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>DEPARTMENT</Text>
-          <Text style={{ width: '12%', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>SCHEME</Text>
-          <Text style={{ width: '23%', paddingRight: 4, textAlign: 'right', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>CONTRIBUTION (RM)</Text>
-        </View>
-      </View>
-      {lines.map((line) => (
-        <View key={line.id} wrap={false} style={[styles.amountRow, { borderBottom: '0.5pt solid #ddd' }]}>
-          <View style={{ width: '40%', paddingLeft: 4, paddingRight: 8 }}>
-            <Text style={{ fontSize: 9, lineHeight: 1.3 }}>{line.employee_name}</Text>
-            {line.employee_code ? <Text style={{ fontSize: 8, color: '#777', marginTop: 2 }}>{line.employee_code}</Text> : null}
-          </View>
-          <Text style={{ width: '25%', paddingRight: 8, fontSize: 9, lineHeight: 1.3 }}>{line.department_name}</Text>
-          <Text style={{ width: '12%', fontSize: 9 }}>{line.scheme}</Text>
-          <Text style={{ width: '23%', textAlign: 'right', paddingRight: 4, fontFamily: 'Courier', fontSize: 9 }}>{fmtMoney(line.amount)}</Text>
-        </View>
-      ))}
-      <View wrap={false} style={styles.totalRow}>
-        <Text style={styles.totalLabel}>TOTAL CONTRIBUTION (RM)</Text>
-        <Text style={styles.totalValue}>{fmtMoney(lines.reduce((sum, line) => sum + line.amount, 0))}</Text>
-      </View>
-      <Text style={styles.pageFooter} fixed render={({ pageNumber, totalPages }) => `${v.voucher_no ?? ''} - Statutory contribution details - ${pageNumber} / ${totalPages}`} />
-    </Page>
+    <DetailPages
+      v={v}
+      title="Statutory contribution details"
+      meta={[
+        { label: 'Voucher number', value: v.voucher_no ?? v.id.slice(0, 8), strong: true },
+        { label: 'Paid to', value: v.payee_name },
+        { label: 'Period', value: periods || '—' },
+        { label: 'People', value: `${people} ${people === 1 ? 'person' : 'people'} · recorded when this PV was generated` },
+      ]}
+      columns={[{ label: 'Employee' }, { label: 'Department', width: 170 }, { label: 'Scheme', width: 60 }, { label: 'Contribution', width: 100, align: 'right' }]}
+      rows={lines.map((line) => ({ cells: [line.employee_name, line.department_name, line.scheme, docMoney(line.amount)], second: line.employee_code }))}
+      total={{ label: 'Total contribution', value: docMoney(r2(lines.reduce((sum, line) => sum + line.amount, 0))) }}
+    />
   )
 }
 
 function SalaryPaymentPages({ v }: { v: VoucherDocData }) {
   const lines = v.salary_payments ?? []
-  const people = new Set(lines.map(line => `${line.scope}:${line.payroll_row_id}`)).size
-  const periods = Array.from(new Set(lines.map(line => dayjs(line.period_month).format('MMMM YYYY')))).join(' / ')
+  const people = new Set(lines.map((line) => `${line.scope}:${line.payroll_row_id}`)).size
+  const periods = [...new Set(lines.map((line) => docMonth(line.period_month) ?? line.period_month))].join(' / ')
+  // The bank and the number, which of the person's accounts under it.
+  const account = (line: SalaryPaymentData) => {
+    const which = recipientAccountLabel(line.recipient_account)
+    const where = line.bank_name && line.bank_account_no ? `${line.bank_name} ${line.bank_account_no}` : 'Bank details not recorded'
+    return which ? `${where}\n${which}` : where
+  }
   return (
-    <Page size="A4" style={styles.page}>
-      <View fixed>
-        <View style={[styles.letterhead, { marginBottom: 16 }]}>
-          <Text style={styles.brand}>HOUZS Venture Holdings Sdn. Bhd.</Text>
-          <Text style={[styles.primary, { marginTop: 12 }]}>Salary payment details</Text>
-          <Text style={styles.sub}>{v.voucher_no ?? v.id.slice(0, 8)} - {periods}</Text>
-          <Text style={[styles.sub, { marginTop: 4 }]}>{people} {people === 1 ? 'person' : 'people'} - receiving accounts recorded when this PV was generated</Text>
-        </View>
-        <View style={[styles.amountRow, { backgroundColor: '#eee', borderTop: '0.5pt solid #aaa', borderBottom: '0.5pt solid #aaa' }]}>
-          <Text style={{ width: '34%', paddingLeft: 4, fontFamily: 'Helvetica-Bold', fontSize: 8 }}>EMPLOYEE / DEPARTMENT</Text>
-          <Text style={{ width: '22%', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>PAYMENT</Text>
-          <Text style={{ width: '27%', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>RECEIVING ACCOUNT</Text>
-          <Text style={{ width: '17%', paddingRight: 4, textAlign: 'right', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>AMOUNT (RM)</Text>
-        </View>
-      </View>
-      {lines.map(line => (
-        <View key={line.id} wrap={false} style={[styles.amountRow, { borderBottom: '0.5pt solid #ddd' }]}>
-          <View style={{ width: '34%', paddingLeft: 4, paddingRight: 8 }}>
-            <Text style={{ fontSize: 9, lineHeight: 1.3 }}>{line.employee_name}</Text>
-            {line.employee_code ? <Text style={{ fontSize: 8, color: '#777', marginTop: 2 }}>{line.employee_code}</Text> : null}
-            <Text style={{ fontSize: 8, color: '#555', marginTop: 2 }}>{line.department_name ?? '-'}</Text>
-          </View>
-          <Text style={{ width: '22%', paddingRight: 8, fontSize: 9, lineHeight: 1.3 }}>{salaryPaymentLabel(line.salary_component)}</Text>
-          <View style={{ width: '27%', paddingRight: 8 }}>
-            {recipientAccountLabel(line.recipient_account) ? <Text style={{ fontSize: 8, color: '#777', marginBottom: 2 }}>{recipientAccountLabel(line.recipient_account)}</Text> : null}
-            {line.bank_name && line.bank_account_no ? (
-              <>
-                <Text style={{ fontSize: 9, lineHeight: 1.3 }}>{line.bank_name}</Text>
-                <Text style={{ fontSize: 8, fontFamily: 'Courier', marginTop: 2 }}>{line.bank_account_no}</Text>
-              </>
-            ) : <Text style={{ fontSize: 8, color: '#777' }}>Bank details not recorded</Text>}
-          </View>
-          <Text style={{ width: '17%', textAlign: 'right', paddingRight: 4, fontFamily: 'Courier', fontSize: 9 }}>{fmtMoney(line.net)}</Text>
-        </View>
-      ))}
-      <View wrap={false} style={styles.totalRow}>
-        <Text style={styles.totalLabel}>TOTAL SALARY PAYMENT (RM)</Text>
-        <Text style={styles.totalValue}>{fmtMoney(lines.reduce((sum, line) => sum + line.net, 0))}</Text>
-      </View>
-      <Text style={styles.pageFooter} fixed render={({ pageNumber, totalPages }) => `${v.voucher_no ?? ''} - Salary payment details - ${pageNumber} / ${totalPages}`} />
-    </Page>
+    <DetailPages
+      v={v}
+      title="Salary payment details"
+      meta={[
+        { label: 'Voucher number', value: v.voucher_no ?? v.id.slice(0, 8), strong: true },
+        { label: 'Period', value: periods || '—' },
+        { label: 'People', value: `${people} ${people === 1 ? 'person' : 'people'} · receiving accounts recorded when this PV was generated` },
+      ]}
+      columns={[{ label: 'Employee' }, { label: 'Payment', width: 110 }, { label: 'Receiving account', width: 170 }, { label: 'Amount', width: 90, align: 'right' }]}
+      rows={lines.map((line) => ({
+        cells: [line.employee_name, salaryPaymentLabel(line.salary_component), account(line), docMoney(line.net)],
+        second: [line.employee_code, line.department_name ?? '-'].filter(Boolean).join(' · '),
+      }))}
+      total={{ label: 'Total salary payment', value: docMoney(r2(lines.reduce((sum, line) => sum + line.net, 0))) }}
+    />
   )
 }
 
@@ -302,7 +284,7 @@ export function VoucherDocPdf({ vouchers }: { vouchers: VoucherDocData[] }): Rea
     <Document>
       {vouchers.map((v) => (
         <React.Fragment key={v.id}>
-          <VoucherPage v={v} />
+          {v.direction === 'credit' ? <ReceiptPage v={v} /> : <PaymentVoucherPage v={v} />}
           {v.statutory_coverage?.length ? <StatutoryCoveragePages v={v} /> : null}
           {v.salary_payments?.length ? <SalaryPaymentPages v={v} /> : null}
         </React.Fragment>

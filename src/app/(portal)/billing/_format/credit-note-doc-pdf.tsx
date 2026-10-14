@@ -20,7 +20,7 @@ export interface CreditNoteDocData {
   reason: string
   /** When it was issued: approved, or made (a draft). */
   issued_at: string | null
-  /** "5020 · Salary Income". */
+  /** Its category's name ("Salary Income") — a customer's document shows no GL code. */
   category_label: string | null
   credit_to: { name: string; kind: string }
   invoice_no: string | null
@@ -29,7 +29,7 @@ export interface CreditNoteDocData {
   invoice_summary: string | null
   invoice_total: number
   /** The invoice's OTHER approved credit notes. */
-  earlier_credits: number
+  other_credits: number
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100
@@ -57,9 +57,9 @@ function CreditNotePage({ cn }: { cn: CreditNoteDocData }) {
   // Only an approved credit changes the invoice.
   const counts = cn.status === 'approved' ? cn.amount : 0
   const totals = [{ label: 'Original invoice', value: docMoney(cn.invoice_total) }]
-  if (cn.earlier_credits > 0.004) totals.push({ label: 'Earlier credit notes', value: docMoney(-cn.earlier_credits) })
+  if (cn.other_credits > 0.004) totals.push({ label: 'Other credit notes', value: docMoney(-cn.other_credits) })
   totals.push({ label: 'This credit', value: docMoney(-cn.amount) })
-  totals.push({ label: 'Revised amount', value: docMoney(r2(cn.invoice_total - cn.earlier_credits - counts)) })
+  totals.push({ label: 'Revised amount', value: docMoney(r2(cn.invoice_total - cn.other_credits - counts)) })
 
   return (
     <DocPage
