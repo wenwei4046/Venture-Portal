@@ -63,7 +63,7 @@ export function panelAppVM(ctx: PanelCtx) {
     show, hd, bl, cf,
     topBar: !!(hd.showHead || dirTop), dirTop, dirMine: () => ctx.toMyCrm?.(),
     bellIn: !!bl.showBell && !hd.showHead, bellTop: !!bl.showBell && hd.showHead,
-    // Profile › Back to Revenue app (round 2): the only way back now.
+    // The house left of the bell on every page (switch-back.cjs, 2026-10-14); Profile's card is gone.
     exitCrm: () => ctx.exitApp(), enterNext,
     // The Insight line: "All access" for whoever sees everybody, else their team (a leader on the Team side).
     accessLbl: ctx.data.can.viewAll ? "All access" : teamName(teamOf(ctx.me.id, ctx.data.people)) || "My team",
