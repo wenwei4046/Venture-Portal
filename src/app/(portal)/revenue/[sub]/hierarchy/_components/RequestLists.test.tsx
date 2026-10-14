@@ -18,6 +18,8 @@ const actions = vi.hoisted(() => ({
   saveReplacementForm: vi.fn(),
   waitingFormTemplateLink: vi.fn(),
   replacementFormTemplateLink: vi.fn(),
+  viewFormTemplate: vi.fn(),
+  removeFormTemplate: vi.fn(),
 }))
 vi.mock('../../../waiting-actions', () => actions)
 
@@ -150,5 +152,29 @@ describe('the Replacement list’s own form (round 2, README 18.5)', () => {
     expect(html).toContain('&#9744; Leave the company')
     expect(html).toContain('Handover done?')
     expect(actions.replacementFormTemplateLink).not.toHaveBeenCalled()
+  })
+
+  // The uploaded form's right-click menu (2026-10-14): the same View and Remove, on its own form.
+  it('right-click › View and Remove act on the replacement list’s own form', async () => {
+    const PATH = 'templates/x/Replacement.pdf'
+    actions.viewFormTemplate.mockResolvedValue({ ok: false, reason: 'The form could not be opened. Please try again.' })
+    actions.removeFormTemplate.mockResolvedValue({ ok: true, form: { ...R1, version: 3 }, fileDeleted: true })
+    show({ ok: true, form: { ...R1, version: 2, templatePath: PATH, templateName: 'Replacement.pdf' } })
+    fireEvent.contextMenu(screen.getByText('Form: Replacement.pdf').closest('label')!)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'View' }))
+    })
+    expect(actions.viewFormTemplate).toHaveBeenCalledExactlyOnceWith('replacement')
+    const drawer = screen.getByRole('dialog', { name: 'Replacement.pdf' })
+    expect(drawer).toHaveTextContent('Replacement list · Uploaded form')
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Close' }))
+    fireEvent.contextMenu(screen.getByText('Form: Replacement.pdf').closest('label')!)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove…' }))
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Remove Replacement.pdf' })).getByRole('button', { name: 'Remove' }))
+    })
+    expect(actions.removeFormTemplate).toHaveBeenCalledExactlyOnceWith('replacement', PATH)
+    expect(screen.getByText('Upload form').closest('label')).toHaveAttribute('title', 'Upload the replacement form Revenue members download')
+    expect(flash).toHaveBeenCalledWith('Replacement.pdf removed — members download the built form')
   })
 })

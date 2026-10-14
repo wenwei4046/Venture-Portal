@@ -14,10 +14,12 @@ import {
   templateContentType,
   templateObjectPath,
   templateRefusal,
+  templateView,
   waitingFormRefusal,
   withOption,
   withType,
   withoutOption,
+  wordPage,
   type WaitingField,
   type WaitingForm,
 } from './waiting-form'
@@ -131,6 +133,28 @@ describe('Upload form', () => {
   it('files each upload in a folder of its own under templates/', () => {
     expect(templateObjectPath('HOUZS Waiting list (v2).pdf', 'abc')).toBe('templates/abc/HOUZS Waiting list -v2-.pdf')
     expect(templateObjectPath('../../etc', 'abc')).toBe('templates/abc/etc')
+  })
+})
+
+// View, on the uploaded form's right-click menu (2026-10-14).
+describe('View — how HR’s file is drawn', () => {
+  it('draws every kind the bucket takes, and says an old .doc cannot be', () => {
+    expect(templateView('Form.PDF')).toBe('pdf')
+    expect(templateView('scan.png')).toBe('image')
+    expect(templateView('scan.JPG')).toBe('image')
+    expect(templateView('scan.jpeg')).toBe('image')
+    expect(templateView('Revenue_Team_Waiting_List_Form_04.09.2026 (2).docx')).toBe('word')
+    expect(templateView('form.html')).toBe('html')
+    expect(templateView('form.doc')).toBe('none')
+    expect(templateView('form')).toBe('none')
+  })
+
+  it('puts a Word file’s words on a white page, its title escaped', () => {
+    const page = wordPage('<p>REVENUE TEAM WAITING LIST FORM</p><table><tr><td>Name</td></tr></table>', 'A & B <form>.docx')
+    expect(page).toMatch(/^<!doctype html>/)
+    expect(page).toContain('<title>A &amp; B &lt;form&gt;.docx</title>')
+    expect(page).toContain('<body><p>REVENUE TEAM WAITING LIST FORM</p><table><tr><td>Name</td></tr></table></body>')
+    expect(page).toContain('td,th{border:1px solid rgb(0 0 0)')
   })
 })
 
