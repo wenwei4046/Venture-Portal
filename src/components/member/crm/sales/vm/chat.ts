@@ -5,8 +5,10 @@
  * they accept) · Move (direct superior, they accept) · Customer info ·
  * Appointment. Book visit: customer details (step 1 of 2), then showroom, day
  * (week strip or month) and the showroom's own slots — closed days and full
- * slots struck through. Composer: + (Photos · Document · Quick replies), "/"
- * for quick replies, send; after the reply window, approved templates only.
+ * slots struck through. Composer (the chat composer handoff, 2026-10-14 —
+ * vm/composer.ts): Sticker · the reply box · Attach (Photos · Document · Quick
+ * replies · Auto replies) · Camera in one pill, the mic held to record or Send;
+ * "/" for quick replies; after the reply window, approved templates only.
  */
 import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, WheelEvent } from "react";
 import { DEFAULT_QUICK_REPLIES, blockHours, type CrmChatMessage, type CrmCustomer, type CrmRoom, type CrmVisit } from "@/lib/member/crm-data";
@@ -16,13 +18,13 @@ import { customerFormVM, infoRows } from "./customer";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
-import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, INLINE_TIME, mediaOf, mediaWord, NO_MEDIA } from "../../shared/chat-media";
 import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { typePx } from "../../shared/type";
+import { dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "./composer";
 
 const NO_PRESS: Partial<ReturnType<typeof pressToOpen>> = {};
 import { CHAT_WALL } from "../wall";
@@ -246,7 +248,8 @@ export function chatVM(ctx: SalesCtx) {
   };
   const firstOpenDay = (ri: number, from: number) => { for (let k = 0; k < 60; k++) { const d = from + k * DAY; if (!roomClosed(rooms[ri], d)) return d; } return from; };
   const hmVM = {
-    open: !!hm.menu, btnBg: hm.menu ? "#F5EBE3" : "#fff", toggle: () => setHm({ menu: !hm.menu }), close: () => patch({ hm: null }), toast: hm.toast ?? "",
+    // The ⋮ button has no ring of its own (the composer handoff's header): a tint only while its menu is open.
+    open: !!hm.menu, btnBg: hm.menu ? "#F5EBE3" : "transparent", toggle: () => setHm({ menu: !hm.menu }), close: () => patch({ hm: null }), toast: hm.toast ?? "",
     items: ([
       ...(assigner ? [["Assign to", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, assign: true, sel: null }), ctx.embedded?.assignTo ? "Give this customer to anyone" : "Give to someone in your team", "#E4EDF8", "#2F6FB5"]] : []),
       ["Share", "M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v12m-8-4 4-4 4 4", () => setHm({ menu: false, share: true, ssel: [] }), "Invite a teammate", "#FFF0E4", "#BD4A19"],
@@ -449,47 +452,70 @@ export function chatVM(ctx: SalesCtx) {
     const ok = await act.send(c.id, text, replyTo);
     if (!ok) set(u => ({ ...u, draft: { ...u.draft, [c.id]: u.draft[c.id] ? u.draft[c.id] : text } }));
   };
-  // Voice notes: tap the mic to record, then Send or Cancel; the time ticks on screen.
+  // Voice notes: the mic is held to record (the composer, 2026-10-14) — let go and it goes, let go on the bin and it is
+  // thrown away; the time ticks on screen.
   const recOn = ui.rec != null;
-  const recStop = (send: boolean) => async () => {
+  const recStop = async (send: boolean) => {
     clearInterval(recTimer); recTimer = undefined;
     set(u => ({ ...u, rec: null }));
     if (!send) { cancelVoice(); return; }
     const file = await stopVoice();
     if (file && (await act.sendMedia(c.id, file, ""))) scrollDown();
   };
+  // The composer (the chat composer handoff, 2026-10-14 — vm/composer.ts): its state is the screen's (ui.cmp), its
+  // words this chat's draft, its sends the chat's own.
+  const setCmp = (f: (s: ComposerState) => ComposerState) => set(u => ({ ...u, cmp: f(u.cmp ?? initialComposer()) }));
+  const tile = (label: TileLabel) => {
+    if (label === "Photos") document.getElementById("crm-pick-photo")?.click();
+    else if (label === "Document") document.getElementById("crm-pick-file")?.click();
+    else if (label === "Quick replies") patch({ qr: true });
+    // Auto replies: one's saved welcome / after-hours / keyword replies, into the reply box to send by hand.
+    else openAttach({ view: "auto", quick: [], auto: autoChoices(data.autoReplies), pick: text => setDraft(text) });
+  };
+  const cmp: ComposerIn = {
+    key: c.id, state: ui.cmp ?? initialComposer(), set: setCmp,
+    placeholder: `Reply to ${first}…`, draft, setDraft, canSend: !!draft.trim() && !ui.sending, send: () => void sendDraft(),
+    warm: !shut,
+    openTpl: () => void openTpl(),
+    reply: ui.reply ? { who: ui.reply.from === "me" ? "You" : c.name, text: plain(ui.reply.text) } : null,
+    cancelReply: () => patch({ reply: null }),
+    slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid #EBDDD2" : "0", pick: () => setDraft(q.message) })) } : null,
+    qrEdit: () => patch({ qr: false, qrPage: "list" }),
+    rec: recOn ? { time: recTime(ui.rec as number, ui.recTick && ui.recTick > (ui.rec as number) ? ui.recTick : Date.now()) } : null,
+    voiceStart: async () => {
+      if (ui.rec != null) return true;
+      const why = await startVoice();
+      if (why) { act.toast(why); return false; }
+      set(u => ({ ...u, rec: Date.now() }));
+      clearInterval(recTimer);
+      recTimer = setInterval(() => set(u => (u.rec != null ? { ...u, recTick: Date.now() } : u)), 500);
+      return true;
+    },
+    voiceStop: send => void recStop(send),
+    camera: () => document.getElementById("crm-pick-camera")?.click(),
+    tile,
+    // One's recent emoji: picked ones show at once (ui.recents) and are kept on the server a moment later.
+    recents: ui.recents ?? data.recentEmoji ?? [],
+    saveRecents: list => { patch({ recents: list }); act.saveRecentEmoji(list); },
+  };
+  // Loading templates for a cold chat's button (also the ⋮ flow's).
+  async function openTpl() { patch({ tpl: true }); if (c!.channel === "whatsapp" && ui.templates == null) { const t = await act.loadTemplates(); patch({ templates: t ?? [] }); } }
 
   return {
     cl: { name: c.name, ad: c.ad, first, ini: ini(c.name), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon },
     wallBg: CHAT_WALL.bg, wallImg: CHAT_WALL.img, wallSize: CHAT_WALL.size,
-    // Leaving a chat folds the emoji panel away, so the next chat opens tidy (the owner, 2026-10-13).
-    closeChat: () => set(u => ({ ...u, chat: null, menu: null, book: null, tpl: false, qr: false, att: false, hm: null, reply: null, emoji: null, pick: null })),
+    // Leaving a chat folds the composer's panel away, so the next chat opens tidy (the owner, 2026-10-13).
+    closeChat: () => set(u => ({ ...u, chat: null, menu: null, book: null, tpl: false, qr: false, hm: null, reply: null, cmp: null, pick: null })),
+    cmp,
+    // A tap on the messages closes the keyboard and any panel (the composer handoff).
+    dismiss: () => { setCmp(dismissComposer); (document.activeElement as HTMLElement | null)?.blur?.(); },
     hm: hmVM, msgs3b, // stop comes with the customer form below
     pinText: pinned ? plain(pinned.text) : "", unpin: () => void act.setPref(c.id, { pinnedMessageId: null }),
     chatCold: shut, chatWarm: !shut,
     coldMsg: c.channel === "messenger" ? "the 7-day Messenger reply window has closed. Only template messages can be sent until the customer writes again." : "the 24 h WhatsApp window has closed. Only template messages can be sent until the customer writes again.",
     simReplyShow: !live, simReply: () => act.toast("Demo: the customer's reply arrives through WhatsApp on the live CRM."),
     notBooked: !nextVisit, openBook: goBook,
-    editText: "", cancelEdit: () => {},
-    replyText: ui.reply ? plain(ui.reply.text) : "", replyWho: ui.reply ? (ui.reply.from === "me" ? "You" : c.name) : "", cancelReply: () => patch({ reply: null }),
-    slashOpen: !!slash, slashQ: "/" + sq, slashEmpty: !!slash && !hits.length,
-    slashList: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid #EBDDD2" : "0", pick: () => setDraft(q.message) })),
     qrEdit: () => patch({ qr: false, qrPage: "list" }),
-    draftVal: draft, onDraft: (e: ChangeEvent<HTMLTextAreaElement>) => setDraft(e.target.value), hasDraft: !!draft.trim() && !ui.sending, noDraft: !draft,
-    draftBorder: draft ? RUST : "rgb(235 221 210)",
-    // Height from text: ~22 characters a line, explicit line breaks; six lines, then it scrolls.
-    draftH: `${Math.min(154, 22 + 22 * Math.max(1, draft.split("\n").reduce((n, ln) => n + Math.max(1, Math.ceil(ln.length / 22)), 0)))}px`,
-    sendDraft,
-    openAtt: () => patch({ att: true }), attOpen: ui.att, closeAtt: () => patch({ att: false }),
-    attTiles: ([
-      // Camera · Photos · Document (2026-10-14, "有幾個功能是重複的"): Document picks files only (DOC_ACCEPT).
-      ["Camera", "M3 8h4l2-3h6l2 3h4v12H3V8Zm9 9a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z", "#C8402A", () => { patch({ att: false }); document.getElementById("crm-pick-camera")?.click(); }],
-      ["Photos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "#2F8FD8", () => { patch({ att: false }); document.getElementById("crm-pick-photo")?.click(); }],
-      ["Document", "M7 3h7l5 5v13H7V3Zm7 0v5h5", "#BD4A19", () => { patch({ att: false }); document.getElementById("crm-pick-file")?.click(); }],
-      ["Quick replies", "M13 2 4 14h7l-1 8 9-12h-7l1-8Z", "#A46312", () => patch({ att: false, qr: true })],
-      // Auto replies (2026-10-14): one's saved welcome / after-hours / keyword replies, into the reply box to send by hand.
-      ["Auto replies", "M12 8v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", "#387557", () => { patch({ att: false }); openAttach({ view: "auto", quick: [], auto: autoChoices(data.autoReplies), pick: text => setDraft(text) }); }],
-    ] as [string, string, string, () => void][]).map(([label, icon, color, go]) => ({ label, icon, color, go })),
     /** The chat's hidden file pickers (Photos · Document) send what is chosen, the draft as its caption. */
     // Photos (several at once), the camera's photo or video, a document: each goes as its own message, in order; the
     // typed words go with the first as its caption.
@@ -507,8 +533,7 @@ export function chatVM(ctx: SalesCtx) {
       scrollDown();
       await Promise.all(docs.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
     },
-    openCamera: () => document.getElementById("crm-pick-camera")?.click(),
-    // Photos and videos (the + sheet's Photos, the camera) wait on the preview with its HD switch; a document goes at once.
+    // Photos and videos (the Attach panel's Photos, the camera) wait on the preview with its HD switch; a document goes at once.
     pickVisual: (e: ChangeEvent<HTMLInputElement>) => {
       const files = [...(e.target.files ?? [])]; e.target.value = "";
       if (files.length) set(u => ({ ...u, pick: { ...pickedOf(files), caption: draft } }));
@@ -519,18 +544,6 @@ export function chatVM(ctx: SalesCtx) {
       scrollDown();
       await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, captions[i] ?? "")));
     }),
-    // The sticker button: an emoji sheet; each tap adds one to the reply, the sheet stays until closed.
-    // Open only in the chat it was opened in (user 2026-10-13: it came up on its own in the next chat).
-    emojiOpen: ui.emoji === c.id, openEmoji: () => patch({ emoji: c.id }), closeEmoji: () => patch({ emoji: null }),
-    emojis: CHAT_EMOJIS.map(e => ({ e, pick: () => set(u => ({ ...u, draft: { ...u.draft, [c.id]: withEmoji(u.draft[c.id] ?? "", e) } })) })),
-    micTap: async () => {
-      if (recOn) return;
-      const why = await startVoice();
-      if (why) { set(u => ({ ...u, toast: why })); return; }
-      set(u => ({ ...u, rec: Date.now() }));
-      recTimer = setInterval(() => set(u => (u.rec != null ? { ...u, recTick: Date.now() } : u)), 500);
-    },
-    rec: recOn ? { time: recTime(ui.rec as number, ui.recTick && ui.recTick > (ui.rec as number) ? ui.recTick : Date.now()), cancel: recStop(false), send: recStop(true) } : null,
     qrOpen: ui.qr, closeQR: () => patch({ qr: false }),
     qrList: qrs.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid #EBDDD2" : "0",
       pick: () => set(u => ({ ...u, qr: false, draft: { ...u.draft, [c.id]: q.message } })),
@@ -557,7 +570,7 @@ export function chatVM(ctx: SalesCtx) {
       pick: (ev: MouseEvent) => { ev.stopPropagation(); if (!mu) return; close(); void act.react(mu.msgId, muMsg?.myReaction === e ? "" : e); } })),
     menuItems,
     tplOpen: ui.tpl, closeTpl: () => patch({ tpl: false }), tplList,
-    openTpl: async () => { patch({ tpl: true }); if (c.channel === "whatsapp" && ui.templates == null) { const t = await act.loadTemplates(); patch({ templates: t ?? [] }); } },
+    openTpl,
     cancelAskOpen: !!cancelVisit, cancelAskNo: () => patch({ cancelAsk: null }),
     cancelAskText: cancelVisit ? `${roomOf(cancelVisit.showroomId)?.name ?? "Showroom"}, ${dayLabel(new Date(cancelVisit.start))}, ${timeLabel(new Date(cancelVisit.start))}.` : "",
     cancelAskYes: async () => { if (!cancelVisit) return; patch({ cancelAsk: null }); await act.cancelVisit(cancelVisit.id); scrollDown(); },

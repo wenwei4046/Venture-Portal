@@ -6,6 +6,7 @@
 // ./vm/chat.ts. To change the look, change the design and regenerate.
 import { Fragment } from "react";
 import H from "../crm.module.css";
+import ChatComposer from "./ChatComposer";
 import { PickEditor } from "../shared/pick-editor";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import type { ChatVM } from "./vm/chat";
@@ -14,29 +15,26 @@ import type { ChatVM } from "./vm/chat";
 export default function SalesChat({ v }: { v: ChatVM }) {
   return (<>
             
-    <main style={{ position: "relative", flex: "1 1 auto", minHeight: "0", boxSizing: "border-box", padding: "16px 20px 8px", display: "flex", flexDirection: "column", gap: "12px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", paddingBottom: "12px", borderBottom: "1px solid rgb(235 221 210)" }}>
-        <span onClick={v.closeChat} style={{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid rgb(235 221 210)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
+    <main data-chat-screen="" style={{ position: "relative", flex: "1 1 auto", minHeight: "0" }}>
+      <div data-chat-head="" style={{ position: "absolute", left: "0", right: "0", top: "0", zIndex: "3", background: "rgba(255,255,255,.96)", borderBottom: "1px solid rgb(235 221 210)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "2px 16px 12px" }}>
+        <span onClick={v.closeChat} style={{ flex: "none", width: "40px", height: "40px", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5m6-6-6 6 6 6">
             </path>
           </svg>
         </span>
         <span title={v.cl.chanName} style={{ flex: "none", position: "relative", width: "40px", height: "40px" }}>
           <span style={{ width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", background: "#FFF0E4", color: "#BD4A19", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650" }}>{v.cl.ini}</span>
-          <span style={{ position: "absolute", right: "-3px", bottom: "-3px", width: "18px", height: "18px", boxSizing: "border-box", borderRadius: "50%", border: "2px solid #fff", background: v.cl.chanFg, color: "#fff", display: "grid", placeItems: "center" }}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-              <path d={v.cl.chanIcon}>
-              </path>
-            </svg>
+          <span style={{ position: "absolute", right: "-3px", bottom: "-3px", width: "18px", height: "18px", boxSizing: "border-box", borderRadius: "50%", border: "2px solid #fff", background: "#387557" }}>
           </span>
         </span>
         <div style={{ display: "flex", flexDirection: "column", flex: "1", minWidth: "0" }}>
           <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.cl.name}</strong>
           <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "#387557", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.cl.ad}</span>
         </div>
-        <span style={{ flex: "none", position: "relative" }}>
-          <span data-hm-toggle="1" onClick={v.hm.toggle} title="More" style={{ width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid rgb(235 221 210)", background: v.hm.btnBg, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+        <span style={{ flex: "none", position: "relative", display: "flex" }}>
+          <span data-hm-toggle="1" onClick={v.hm.toggle} title="More" style={{ width: "40px", height: "40px", borderRadius: "50%", background: v.hm.btnBg, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="12" cy="5" r="1.8">
               </circle>
@@ -47,7 +45,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
             </svg>
           </span>
           {!!(v.hm.open) && (<>
-            <div data-hm-menu="1" style={{ position: "absolute", top: "52px", right: "0", zIndex: "7", width: "264px", padding: "6px", boxSizing: "border-box", borderRadius: "20px", background: "#fff", border: "1px solid #F0E4DA", boxShadow: "0 16px 36px rgba(63,43,34,.16), 0 2px 6px rgba(63,43,34,.06)", display: "flex", flexDirection: "column", gap: "2px", animation: "fadeIn 140ms ease-out" }}>
+            <div data-hm-menu="1" style={{ position: "absolute", top: "48px", right: "0", zIndex: "7", width: "264px", padding: "6px", boxSizing: "border-box", borderRadius: "20px", background: "#fff", border: "1px solid #F0E4DA", boxShadow: "0 16px 36px rgba(63,43,34,.16), 0 2px 6px rgba(63,43,34,.06)", display: "flex", flexDirection: "column", gap: "2px", animation: "fadeIn 140ms ease-out" }}>
               {(v.hm.items).map((it, it_i) => (<Fragment key={it_i}>
                 <div onClick={it.go} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 10px", borderRadius: "14px", cursor: "pointer" }} className={H.hov2}>
                   <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "11px", background: it.bg, color: it.fg, display: "grid", placeItems: "center" }}>
@@ -67,7 +65,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
         </span>
       </div>
       {!!(v.pinText) && (<>
-        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px", borderRadius: "12px", background: "#F5EBE3", fontSize: "calc(13px * var(--rv-type, 1))", color: "#3F2B22" }}>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", margin: "0 16px 12px", padding: "8px 12px", borderRadius: "12px", background: "#F5EBE3", fontSize: "calc(13px * var(--rv-type, 1))", color: "#3F2B22" }}>
           <svg style={{ flex: "none", color: "#806B60" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z">
             </path>
@@ -82,12 +80,13 @@ export default function SalesChat({ v }: { v: ChatVM }) {
         </div>
       </>)}
       {!!(v.chatCold) && (<>
-        <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", padding: "10px 12px", borderRadius: "12px", background: "#E3EAF1", color: "#2E4760" }}>
+        <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", margin: "0 16px 12px", padding: "10px 12px", borderRadius: "12px", background: "#E3EAF1", color: "#2E4760" }}>
           <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600" }}>Cold lead · {v.coldMsg}</span>
           {!!v.simReplyShow && (<span onClick={v.simReply} style={{ alignSelf: "flex-start", height: "30px", padding: "0 12px", boxSizing: "border-box", borderRadius: "15px", border: "1px dashed #3E5C7A", display: "grid", placeItems: "center", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", cursor: "pointer" }}>Demo: customer replies</span>)}
         </div>
       </>)}
-      <div data-chat-list="1" style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "10px", margin: "0 -20px", padding: "10px 20px", backgroundColor: v.wallBg, backgroundImage: v.wallImg, backgroundSize: v.wallSize }}>
+      </div>
+      <div data-chat-list="1" onClick={v.dismiss} style={{ position: "absolute", left: "0", right: "0", top: "0", bottom: "calc(0px - var(--safe-bottom, 0px))", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", boxSizing: "border-box", padding: "calc(var(--chat-top, 55px) + 25px) 16px calc(var(--chat-foot, 64px) + 6px)", backgroundColor: v.wallBg, backgroundImage: v.wallImg, backgroundSize: v.wallSize }}><div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "10px" }}>
         {(v.msgs3b).map((m, m_i) => (<Fragment key={m_i}>
           {!!(m.sep) && (<>
             <span style={{ alignSelf: "center", margin: "6px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "#FFFFFF", boxShadow: "0 1px 1px rgba(63,43,34,.10)", color: "#4E2F20", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600" }}>{m.sep}</span>
@@ -168,132 +167,8 @@ export default function SalesChat({ v }: { v: ChatVM }) {
             </div>
           </>)}
         </Fragment>))}
-      </div>
-      {!!(v.editText) && (<>
-        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", padding: "8px 8px 8px 12px", borderRadius: "12px", background: "#F5EBE3" }}>
-          <svg style={{ flex: "none", color: "#BD4A19" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4">
-            </path>
-          </svg>
-          <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-            <strong style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "650", color: "#BD4A19" }}>Edit message</strong>
-            <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.editText}</span>
-          </div>
-          <span onClick={v.cancelEdit} title="Cancel edit" style={{ flex: "none", width: "32px", height: "32px", display: "grid", placeItems: "center", color: "#806B60", cursor: "pointer" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="m6 6 12 12M6 18 18 6">
-              </path>
-            </svg>
-          </span>
-        </div>
-      </>)}
-      {!!(v.replyText) && (<>
-        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", padding: "8px 8px 8px 12px", borderRadius: "12px", background: "#F5EBE3" }}>
-          <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-            <strong style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "650", color: "#BD4A19" }}>{v.replyWho}</strong>
-            <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.replyText}</span>
-          </div>
-          <span onClick={v.cancelReply} title="Cancel reply" style={{ flex: "none", width: "32px", height: "32px", display: "grid", placeItems: "center", color: "#806B60", cursor: "pointer" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="m6 6 12 12M6 18 18 6">
-              </path>
-            </svg>
-          </span>
-        </div>
-      </>)}
-      {!!(v.slashOpen) && (<>
-        <div style={{ flex: "none", maxHeight: "232px", overflowY: "auto", scrollbarWidth: "none", borderRadius: "16px", border: "1px solid #EBDDD2", background: "#fff", boxShadow: "0 6px 18px rgba(63,43,34,.10)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px 4px" }}>
-            <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", color: "#806B60" }}>Quick replies</span>
-            <span onClick={v.qrEdit} style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }}>Edit</span>
-          </div>
-          {(v.slashList).map((q, q_i) => (<Fragment key={q_i}>
-            <div onClick={q.pick} style={{ display: "flex", flexDirection: "column", gap: "2px", padding: "10px 14px", borderTop: q.rule, cursor: "pointer" }} className={H.hov3}>
-              <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "#4E2F20" }}>/{q.title}</span>
-              <span style={{ fontSize: "calc(14px * var(--rv-type, 1))", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{q.text}</span>
-            </div>
-          </Fragment>))}
-          {!!(v.slashEmpty) && (<>
-            <p style={{ margin: "0", padding: "10px 14px 14px", fontSize: "calc(14px * var(--rv-type, 1))", color: "#806B60" }}>No quick reply matches “{v.slashQ}”.</p>
-          </>)}
-        </div>
-      </>)}
-      {!!(v.chatCold) && (<>
-        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "8px 0" }}>
-          <span onClick={v.openTpl} style={{ flex: "1", height: "48px", borderRadius: "24px", background: "#3E5C7A", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 5h16v11H8l-4 4V5Zm4 4h8M8 12h5">
-              </path>
-            </svg>Send template message</span>
-        </div>
-      </>)}
-      {!!(v.chatWarm && v.rec) && (<>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 0" }}>
-          <span onClick={v.rec?.cancel} title="Cancel" style={{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid rgb(235 221 210)", display: "grid", placeItems: "center", color: "#A3371A", cursor: "pointer" }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg>
-          </span>
-          <span style={{ flex: "1", minWidth: "0", height: "44px", boxSizing: "border-box", borderRadius: "22px", background: "#FBF1EC", display: "flex", alignItems: "center", gap: "10px", padding: "0 16px", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "600", color: "#3F2B22", fontVariantNumeric: "tabular-nums" }}>
-            <span style={{ flex: "none", width: "10px", height: "10px", borderRadius: "50%", background: "#D93025", animation: "fadeIn 700ms ease-in-out infinite alternate" }}></span>{v.rec?.time} · Recording…
-          </span>
-          <span onClick={v.rec?.send} title="Send voice note" style={{ flex: "none", width: "44px", height: "44px", borderRadius: "50%", display: "grid", placeItems: "center", background: "#BD4A19", color: "#fff", cursor: "pointer" }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12 20 4l-4 16-4-7-8-1Zm8 1 8-9"></path></svg>
-          </span>
-        </div>
-      </>)}
-      {!!(v.chatWarm && !v.rec) && (<>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: "6px", padding: "8px 0" }}>
-          <span onClick={v.openAtt} title="Attach" style={{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid rgb(235 221 210)", display: "grid", placeItems: "center", color: "rgb(128 107 96)", cursor: "pointer" }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 5v14M5 12h14">
-              </path>
-            </svg>
-          </span>
-          <span style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "flex-end", minHeight: "44px", boxSizing: "border-box", padding: "0 4px 0 16px", borderRadius: "22px", border: `1px solid ${v.draftBorder}`, background: "#fff" }}>
-            <textarea data-draft="1" value={v.draftVal} onChange={v.onDraft} placeholder={`Reply to ${v.cl.first}…`} rows={1} style={{ flex: "1", minWidth: "0", height: v.draftH, maxHeight: "154px", boxSizing: "border-box", margin: "0", padding: "11px 0", border: "0", outline: "none", resize: "none", background: "transparent", font: "inherit", fontSize: "calc(16px * var(--rv-type, 1))", lineHeight: "22px", color: "#3F2B22", overflowY: "auto", scrollbarWidth: "thin" }}>
-            </textarea>
-            {!!(v.noDraft) && (<>
-              <span onClick={v.openEmoji} title="Emoji" style={{ width: "38px", height: "38px", display: "grid", placeItems: "center", color: "rgb(128 107 96)", cursor: "pointer" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 13V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6l7-7Zm0 0h-4a3 3 0 0 0-3 3v4">
-                  </path>
-                </svg>
-              </span>
-            </>)}
-          </span>
-          {!!(v.noDraft) && (<>
-            <span onClick={v.openCamera} title="Camera" style={{ flex: "none", width: "40px", height: "44px", display: "grid", placeItems: "center", color: "rgb(128 107 96)" , cursor: "pointer" }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 8h3l2-3h6l2 3h3v11H4V8Zm8 3a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z">
-                </path>
-              </svg>
-            </span>
-          </>)}
-          {!!(v.noDraft) && (<>
-            <span onClick={v.micTap} title="Voice note" style={{ flex: "none", width: "44px", height: "44px", borderRadius: "50%", display: "grid", placeItems: "center", background: "#BD4A19", color: "#fff" , cursor: "pointer" }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-7 9a7 7 0 0 0 14 0M12 19v3">
-                </path>
-              </svg>
-            </span>
-          </>)}
-          {!!(v.hasDraft) && (<>
-            <span onClick={v.sendDraft} title="Send" style={{ flex: "none", width: "44px", height: "44px", borderRadius: "50%", display: "grid", placeItems: "center", background: "#BD4A19", color: "#fff", cursor: "pointer" }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 12 20 4l-4 16-4-7-8-1Zm8 1 8-9">
-                </path>
-              </svg>
-            </span>
-          </>)}
-        </div>
-      </>)}
-      {!!(v.emojiOpen && v.chatWarm) && (<div style={{ flex: "none", margin: "0 -20px", padding: "8px 12px 6px", borderTop: "1px solid #EBDDD2", background: "#FBF7F3", display: "flex", flexDirection: "column", gap: "6px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".06em", color: "#806B60" }}>EMOJI</span>
-          <span onClick={v.closeEmoji} style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }}>Done</span>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(8, minmax(0, 1fr))", gap: "2px", maxHeight: "196px", overflowY: "auto", scrollbarWidth: "none" }}>
-          {(v.emojis).map((e, e_i) => (<Fragment key={e_i}><span onClick={e.pick} style={{ height: "40px", display: "grid", placeItems: "center", fontSize: "calc(26px * var(--rv-type, 1))", borderRadius: "10px", cursor: "pointer" }}>{e.e}</span></Fragment>))}
-        </div>
-      </div>)}
+      </div></div>
+      <ChatComposer key={v.cmp.key} v={v.cmp} />
       {!!(v.hm.apptOpen) && (<>
         <div onClick={v.hm.close} style={{ position: "absolute", inset: "0", zIndex: "8", background: "rgba(63,43,34,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeIn 200ms ease-out" }}>
           <div onClick={v.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "14px" }}>
@@ -421,7 +296,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
       </>)}
       {!!(v.pk) && (<PickEditor pk={v.pk} />)}
       {!!(v.hm.toast) && (<>
-        <div style={{ position: "absolute", left: "20px", right: "20px", bottom: "90px", zIndex: "6", padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{v.hm.toast}</div>
+        <div style={{ position: "absolute", left: "16px", right: "16px", bottom: "74px", zIndex: "6", padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{v.hm.toast}</div>
       </>)}
       {!!(v.menuOpen) && (<>
         <div onClick={v.closeMenu} style={{ position: "absolute", inset: "0", zIndex: "5", boxSizing: "border-box", padding: "24px 20px", background: "rgba(63,43,34,.32)", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: v.menuAlign, gap: "10px" }}>
@@ -648,27 +523,6 @@ export default function SalesChat({ v }: { v: ChatVM }) {
               </div>
             </div>
             <span onClick={v.confirmBook} style={{ minHeight: "48px", borderRadius: "24px", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px", background: v.confirmBg, color: "#fff", fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650", textAlign: "center", cursor: "pointer" }}>{v.confirmLabel}</span>
-          </div>
-        </div>
-      </>)}
-      {!!(v.attOpen) && (<>
-        <div onClick={v.closeAtt} style={{ position: "absolute", inset: "0", zIndex: "6", background: "rgba(63,43,34,.32)", animation: "fadeIn 200ms ease-out", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-          <div onClick={v.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", boxShadow: "0 -8px 24px rgba(63,43,34,.12)", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "12px", maxHeight: "80%", boxSizing: "border-box", overflowY: "auto", scrollbarWidth: "none" }}>
-            <span style={{ alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2" }}>
-            </span>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "8px", padding: "6px 0 4px" }}>
-              {(v.attTiles).map((t, t_i) => (<Fragment key={t_i}>
-                <div onClick={t.go} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", cursor: "pointer" }}>
-                  <span style={{ width: "60px", height: "60px", borderRadius: "50%", background: "#F5EBE3", display: "grid", placeItems: "center", color: t.color }}>
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d={t.icon}>
-                      </path>
-                    </svg>
-                  </span>
-                  <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "500", color: "#3F2B22", textAlign: "center", whiteSpace: "nowrap" }}>{t.label}</span>
-                </div>
-              </Fragment>))}
-            </div>
           </div>
         </div>
       </>)}
