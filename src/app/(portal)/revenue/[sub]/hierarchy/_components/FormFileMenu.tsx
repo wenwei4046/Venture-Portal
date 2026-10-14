@@ -22,6 +22,7 @@ export default function FormFileMenu({
   onView,
   onRemove,
   onClose,
+  onKeyClose,
 }: {
   name: string
   anchor: MenuAnchor
@@ -31,6 +32,8 @@ export default function FormFileMenu({
   onView: () => void
   onRemove: () => void
   onClose: () => void
+  /** Closed from the keys (Esc, ←, Tab): focus goes back to the chip. */
+  onKeyClose?: () => void
 }) {
   const boundary = useRef<HTMLDivElement>(null)
   const removeButton = useRef<HTMLButtonElement>(null)
@@ -40,7 +43,9 @@ export default function FormFileMenu({
   const confirmId = useId()
 
   function close() {
-    if (!removing) onClose()
+    if (removing) return
+    onClose()
+    onKeyClose?.()
   }
 
   useEffect(() => {

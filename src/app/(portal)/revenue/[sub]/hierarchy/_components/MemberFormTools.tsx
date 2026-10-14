@@ -103,12 +103,15 @@ export default function MemberFormTools({
     })
   }
 
+  // The chip takes focus back when its menu goes — never a menu that is gone (the drawer, too, gives focus back to
+  // what had it).
+  const focusChip = useCallback(() => fileRef.current?.focus({ preventScroll: true }), [])
+
   function view() {
     if (!menu) return
     const name = menu.name
     closeMenu()
-    // The drawer gives focus back to what had it: the chip, not a menu that is gone.
-    fileRef.current?.focus({ preventScroll: true })
+    focusChip()
     setViewing(name)
   }
 
@@ -124,6 +127,7 @@ export default function MemberFormTools({
     }
     setForm(done.form)
     closeMenu()
+    focusChip()
     flash(
       done.fileDeleted
         ? `${menu.name} removed — members download the built form`
@@ -177,6 +181,7 @@ export default function MemberFormTools({
           onView={view}
           onRemove={() => void remove()}
           onClose={closeMenu}
+          onKeyClose={focusChip}
         />
       ) : null}
       {viewing ? <FormFileViewer kind={kind} name={viewing} onClose={() => setViewing(null)} /> : null}
