@@ -30,6 +30,7 @@ function balanced(s, start, tag, what) {
 }
 const { PICK_SHEET } = require("./pick-sheet.cjs");
 const { EMOJI_PANEL } = require("./emoji-panel.cjs");
+const CHAT_MEDIA = require("./chat-media.cjs");
 const once = (text, from, to) => { if (text.split(from).length !== 2) throw new Error("not exactly once: " + from.slice(0, 60)); return text.replace(from, to); };
 // rev 1010 §5 Insight: the three hero figures open lists, the list sheet and Customer info with ‹ back.
 const insightFrag = (() => {
@@ -124,7 +125,11 @@ const PATCHES = {
     ['<span onClick={v.hm.confirm} style={{ marginTop: "10px", height: "50px", borderRadius: "25px",',
      '<span onClick={v.hm.confirm} style={{ position: "sticky", bottom: "0", flex: "none", boxShadow: "0 0 0 10px #fff", marginTop: "10px", height: "50px", borderRadius: "25px",'],
     // 2026-10-13: a photo, video or voice note shows as itself in the bubble (the customer's and ours), a file opens.
-    ['<p style={{ display: m.pDisp, margin: "0", whiteSpace: "pre-wrap",', "{!!(m.img) && (<a href={m.img} target=\"_blank\" rel=\"noreferrer\" style={{ display: \"block\", margin: \"-2px -4px 4px\" }}><img src={m.img} alt=\"Photo\" style={{ display: \"block\", width: \"100%\", maxWidth: \"240px\", maxHeight: \"300px\", objectFit: \"cover\", borderRadius: \"12px\" }} /></a>)}\n                {!!(m.vid) && (<video src={m.vid} controls playsInline preload=\"metadata\" style={{ display: \"block\", width: \"240px\", maxWidth: \"100%\", margin: \"-2px -4px 4px\", borderRadius: \"12px\", background: \"#000\" }} />)}\n                {!!(m.aud) && (<audio src={m.aud} controls preload=\"metadata\" style={{ display: \"block\", width: \"240px\", maxWidth: \"100%\", height: \"40px\", margin: \"0 0 2px\" }} />)}\n                {!!(m.file) && (<a href={m.file} target=\"_blank\" rel=\"noreferrer\" style={{ display: \"inline-block\", marginBottom: \"2px\", fontSize: \"13px\", fontWeight: \"650\", color: \"#BD4A19\" }}>Open file</a>)}\n                " + '<p style={{ display: m.pDisp, margin: "0", whiteSpace: "pre-wrap",'],
+    // 2026-10-14: drawn by tools/crm-design/chat-media.cjs (shared/chat-media.ts) — its final size before it loads, the in-app
+    // viewer on a tap, a document as a tile with its name; a photo, video or document sits 3 px inside its bubble (m.pad / m.inPad).
+    ['<p style={{ display: m.pDisp, margin: "0", whiteSpace: "pre-wrap",', CHAT_MEDIA + '\n                <p style={{ display: m.pDisp, margin: "0", padding: m.inPad, whiteSpace: "pre-wrap",'],
+    ['minWidth: "0", padding: "10px 13px", boxSizing: "border-box", borderRadius: m.radius,', 'minWidth: "0", padding: m.pad, boxSizing: "border-box", borderRadius: m.radius,'],
+    ['gap: "3px", marginTop: "4px", fontSize: "11px", color: m.timeColor', 'gap: "3px", marginTop: "4px", padding: m.inPad, fontSize: "11px", color: m.timeColor'],
     // …a message being sent shows a small clock instead of the ticks.
     ['<path d="M1 6l3 3 6-7M7 8.5l.5.5 6-7">', '<path d={m.tickPath}>'],
     // The camera takes a photo or a video; the mic records a voice note (they were drawn only); while recording, the

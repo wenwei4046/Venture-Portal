@@ -84,6 +84,8 @@ export function panelAppVM(ctx: PanelCtx) {
     // In the prototype the chat keeps a toast of its own (ld.toast); here both read ui.toast, so with a chat open only the
     // chat's shows — not the same words twice (user 2026-10-11).
     toast: show.ld && ld?.onLead ? "" : ui.toast, toastBottom: lead ? "92px" : "78px",
+    // A chat open has no bottom bar, as Mine's (the owner, 2026-10-14).
+    navOn: !lead,
   };
 }
 export type PanelAppVM = ReturnType<typeof panelAppVM>;

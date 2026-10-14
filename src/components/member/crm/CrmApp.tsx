@@ -32,6 +32,7 @@ import { initialPanelUi, type PanelTab, type PanelUi } from "./panel/ui";
 import { teamsOf, type PanelCtx } from "./panel/vm/common";
 import { useSwipeToClose } from "./shared/swipe-close";
 import { keepSending } from "./shared/pending";
+import { MediaViewer } from "./shared/viewer";
 import { answerOnScreen, closeNotices } from "@/components/pwa/notice-screen";
 import { crmChatTag } from "@/lib/push/notices";
 
@@ -186,6 +187,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     <div className={extra ? `${H.app} ${extra}` : H.app} data-revenue-app="">
       <style>{KEYFRAMES}</style>
       {body}
+      <MediaViewer />
     </div>
   );
   // A line instead of the CRM (loading, not in it): on a computer in the page, not in a phone-sized box.
