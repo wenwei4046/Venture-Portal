@@ -10,6 +10,7 @@ import { Tabs } from '@/components/hrv/tabs'
 import { initialsOf } from '@/lib/people-roster'
 import { MASKED } from '@/lib/sensitive'
 import { isFullyCommissionBased, isVariablePay } from '@/lib/staff-form'
+import { BASIC_FROM_COMMISSION } from '@/lib/person-record'
 import PersonAccess from '../../_components/PersonAccess'
 import { getPersonCard, type PersonCardData } from '../card-actions'
 import s from './people.module.css'
@@ -200,5 +201,7 @@ export function detailFields(p: PersonCardData): Array<{ l: string; v: string; m
 function employmentType(st: PersonCardData['staff']): string {
   if (isFullyCommissionBased(st)) return 'Commission'
   if (isVariablePay(st)) return 'Variable pay'
+  // A basic in a commission department is paid out of the commission (2026-10-14).
+  if (st.commission_dept && st.employment_type === 'salaried') return BASIC_FROM_COMMISSION
   return st.employment_type === 'commission_eligible' ? 'Commission-eligible' : 'Salaried'
 }

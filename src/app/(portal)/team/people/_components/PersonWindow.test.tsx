@@ -60,6 +60,8 @@ describe('the person window', () => {
     expect(f.map(x => x.v)).toEqual(['Team Leader', 'Revenue', 'HV008', 'Commission', '2 Mar 2026', '012-345 6789', 'a@houzs.my', 'Maybank · ••••'])
     expect(detailFields(card({}, { employment_type: 'variable', commission_dept: false }))[3].v).toBe('Variable pay')
     expect(detailFields(card({}, { employment_type: 'salaried', commission_dept: false }))[3].v).toBe('Salaried')
+    // A basic in a commission department is paid out of the commission (2026-10-14).
+    expect(detailFields(card({}, { employment_type: 'salaried', commission_dept: true }))[3].v).toBe('Basic from commission')
     expect(personLine({ code: null, title: 'Revenue Specialist', department: 'Revenue' })).toBe('REVENUE SPECIALIST · Revenue')
   })
 

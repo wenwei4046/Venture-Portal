@@ -56,6 +56,8 @@
 .pair .select { flex: 1 1 auto; min-width: 0; }
 .tick { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; cursor: pointer; }
 .check { width: 15px; height: 15px; margin: 0; accent-color: rgb(var(--hv-accent)); cursor: pointer; }
+/* The Basic from commission tick, changed: the peach of a changed field. */
+.tick[data-dirty='true'] { background: rgb(var(--hv-peach)); border-radius: 6px; box-shadow: 0 0 0 4px rgb(var(--hv-peach)); }
 
 /* The name in the title's place and face — the line under it says it edits,
    and runs as long as the name (a browser without field-sizing draws it at

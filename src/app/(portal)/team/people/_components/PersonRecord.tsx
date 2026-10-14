@@ -21,7 +21,7 @@ import { flash } from '@/components/hrv/toast'
 import { EPF_PARTS, PCB_CATEGORIES, SOCSO_CATEGORIES, type StaffRow, type TitleRow } from '@/lib/staff-form'
 import {
   EPF_LABELS,
-  PAY_MODE_LABEL,
+  BASIC_FROM_COMMISSION,
   PCB_LABELS,
   SOCSO_LABELS,
   asksPay,
@@ -29,7 +29,9 @@ import {
   changedFields,
   changedFormData,
   changesLabel,
+  choosesByTick,
   payModeChoices,
+  payModeLabel,
   payModeFields,
   payModeOf,
   type PayMode,
@@ -63,6 +65,8 @@ export interface PersonRecordView {
   emergency: { name: string | null; relationship: string | null; phone: string | null }
   bank: { name1: string | null; no1: string | null; name2: string | null; no2: string | null }
   payMode: PayMode
+  /** A department the commission engine pays (Revenue): a basic there is paid out of the commission. */
+  commissionDept: boolean
   /** Formatted, or •••• where the viewer's title does not tick Salary amounts. */
   pay: { basic: string; allowances: string; nonStatutory: string }
   statutory: { epf: string; socso: string; pcb: string; children: string }
@@ -224,6 +228,24 @@ export default function PersonRecord({
   }, [editor])
 
   const shownMode = ed ? mode : view.payMode
+  // Revenue's people: one tick on the Salary section, Basic from commission
+  // (2026-10-14) — not the Employment Type select.
+  const byTick = editor !== null && choosesByTick(editor.staff, initialMode)
+  const basisRow = (checked: boolean) =>
+    byTick
+      ? () => (
+          <label className={s.tick} data-dirty={mode !== initialMode ? 'true' : undefined}>
+            <input
+              id={fieldId('basic_from_commission')}
+              type="checkbox"
+              checked={checked}
+              onChange={event => setMode(event.target.checked ? 'salaried' : 'full_commission')}
+              className={s.check}
+            />
+            {BASIC_FROM_COMMISSION}
+          </label>
+        )
+      : undefined
 
   const head = (
     <div className="page-head">
@@ -348,8 +370,9 @@ export default function PersonRecord({
         <Row
           label="Employment Type"
           field="employment_mode"
-          value={PAY_MODE_LABEL[view.payMode]}
-          edit={e => (
+          value={payModeLabel(shownMode, { commission_dept: view.commissionDept })}
+          // A commission department answers it with the Salary section's tick.
+          edit={byTick ? undefined : e => (
             // Not a field of its own: a new basis is sent as the old form's
             // ticks or its select (payModeFields), which updateStaff reads.
             <Select
@@ -361,7 +384,7 @@ export default function PersonRecord({
             >
               {payModeChoices(e.staff, initialMode).map(m => (
                 <option key={m} value={m}>
-                  {PAY_MODE_LABEL[m]}
+                  {payModeLabel(m, e.staff)}
                 </option>
               ))}
             </Select>
@@ -482,12 +505,18 @@ export default function PersonRecord({
           then leaves the categories as they were (payPatchForUpdate). */}
       {shownMode === 'full_commission' ? (
         <Section title="Salary">
-          <Row label="Pay basis" value="Fully commission based" />
+          <Row label="Pay basis" value="Fully commission based" edit={basisRow(false)} />
           <Row label="Basic" value="None — 100% of pay is commission" />
         </Section>
       ) : (
         <>
           <Section title="Salary">
+            {/* A basic in a commission department is paid out of the month's
+                commission (lib/revenue-payroll.ts); each new month's payroll
+                row starts from it (Comm Cal's close copies the basic). */}
+            {view.commissionDept && shownMode === 'salaried' ? (
+              <Row label="Pay basis" value={BASIC_FROM_COMMISSION} edit={basisRow(true)} />
+            ) : null}
             {asksPay(shownMode) ? (
               <>
                 <Row
@@ -495,7 +524,18 @@ export default function PersonRecord({
                   field="basic_salary"
                   value={view.pay.basic}
                   mono
-                  edit={e => <TextField name="basic_salary" type="number" step="0.01" min="0" required defaultValue={e.staff.basic_salary} mono />}
+                  edit={e => (
+                    <TextField
+                      name="basic_salary"
+                      type="number"
+                      step="0.01"
+                      // Out of commission it has to be something: a basic of 0 is Fully commission based.
+                      min={byTick ? '0.01' : '0'}
+                      required
+                      defaultValue={e.staff.basic_salary}
+                      mono
+                    />
+                  )}
                 />
                 <Row
                   label="Statutory Allowance"

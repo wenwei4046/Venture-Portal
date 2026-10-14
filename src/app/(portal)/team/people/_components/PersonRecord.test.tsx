@@ -27,6 +27,7 @@ const view = (over: Partial<PersonRecordView> = {}): PersonRecordView => ({
   emergency: { name: null, relationship: null, phone: null },
   bank: { name1: 'Maybank', no1: '0012345678', name2: 'CIMB', no2: '0098765432' },
   payMode: 'salaried',
+  commissionDept: false,
   pay: { basic: 'RM 2,500.00', allowances: 'RM 0.00', nonStatutory: 'RM 0.00' },
   statutory: { epf: 'Part A (Citizen, under 60)', socso: 'First', pcb: 'KA1 (Single)', children: '0' },
   ...over,
@@ -239,31 +240,63 @@ describe('Edit — each value becomes its field where it stands', () => {
 })
 
 describe('Employment Type — one row for the pay basis', () => {
-  it('fully commission based: no basic, no statutory; Salaried brings both back and is sent as the old select', async () => {
-    const e = editor({ department_name: 'Revenue', commission_dept: true, employment_type: 'commission_eligible', basic_salary: 0 })
-    openEditor(view({ department: 'Revenue', payMode: 'full_commission' }), e)
-    const type = screen.getByLabelText('Employment Type') as HTMLSelectElement
-    expect(type).toHaveValue('full_commission')
-    expect(Array.from(type.options).map(o => o.text)).toEqual(['Fully commission based', 'Salaried'])
+  // Revenue (2026-10-14, the user, on CHEA HUAN: "他要给 basic，然后从他薪水扣"
+  // — a tick on People, then his basic): the Salary section's one tick.
+  const revenue = { department: 'Revenue', commissionDept: true } as const
+  const revenueStaff = { department_name: 'Revenue', commission_dept: true } as const
+
+  it('Revenue: Basic from commission is one tick on Salary; on, it asks a basic above 0 and brings Statutory', async () => {
+    const e = editor({ ...revenueStaff, employment_type: 'commission_eligible', basic_salary: 0 })
+    openEditor(view({ ...revenue, payMode: 'full_commission' }), e)
+    // No Employment Type select in a commission department: the tick answers it.
+    expect(screen.queryByLabelText('Employment Type')).toBeNull()
+    const tick = screen.getByLabelText('Basic from commission') as HTMLInputElement
+    expect(tick).not.toBeChecked()
+    expect(screen.getByText('None — 100% of pay is commission')).toBeInTheDocument()
     expect(screen.queryByLabelText('Basic')).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Statutory' })).toBeNull()
 
-    fireEvent.change(type, { target: { value: 'salaried' } })
-    expect(screen.getByLabelText('Basic')).toBeRequired()
+    fireEvent.click(tick)
+    expect(screen.getByLabelText('Basic from commission')).toBeChecked()
+    const basic = screen.getByLabelText('Basic')
+    expect(basic).toBeRequired()
+    expect(basic).toHaveAttribute('min', '0.01')
+    expect(screen.getByLabelText('Statutory Allowance')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Statutory' })).toBeInTheDocument()
-    expect(type).toHaveAttribute('data-dirty', 'true')
+    expect(screen.getAllByText('Basic from commission').length).toBeGreaterThan(0)
     expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Basic'), { target: { value: '1800' } })
-    expect(await save()).toEqual({ employment_type: 'salaried', basic_salary: '1800' })
+
+    fireEvent.change(basic, { target: { value: '7000' } })
+    expect(await save()).toEqual({ employment_type: 'salaried', basic_salary: '7000' })
   })
 
-  it('back to fully commission based is sent as the old tick, and nothing of the pay it leaves', async () => {
-    openEditor(view({ department: 'Revenue', payMode: 'salaried' }), editor({ department_name: 'Revenue', commission_dept: true }))
+  it('Revenue with a basic: untick, and it is Fully commission based again — nothing of the pay it leaves is sent', async () => {
+    openEditor(
+      view({ ...revenue, payMode: 'salaried', pay: { basic: 'RM 7,000.00', allowances: 'RM 0.00', nonStatutory: 'RM 0.00' } }),
+      editor({ ...revenueStaff, basic_salary: 7000 }),
+    )
+    expect(screen.getByLabelText('Basic from commission')).toBeChecked()
+    expect(screen.getByLabelText('Basic')).toHaveValue(7000)
     fireEvent.change(screen.getByLabelText('Basic'), { target: { value: '9999' } })
-    fireEvent.change(screen.getByLabelText('Employment Type'), { target: { value: 'full_commission' } })
+    fireEvent.click(screen.getByLabelText('Basic from commission'))
     expect(screen.queryByLabelText('Basic')).toBeNull()
+    expect(screen.getByText('None — 100% of pay is commission')).toBeInTheDocument()
     expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
     expect(await save()).toEqual({ full_commission: 'on' })
+  })
+
+  it('Revenue with a basic reads as Basic from commission', () => {
+    render(
+      <PersonRecord
+        view={view({ ...revenue, payMode: 'salaried', pay: { basic: 'RM 7,000.00', allowances: 'RM 0.00', nonStatutory: 'RM 0.00' } })}
+        editor={null}
+        inviteHref={null}
+      />,
+    )
+    // Employment Type and the Salary section's pay basis both say so.
+    expect(screen.getAllByText('Basic from commission')).toHaveLength(2)
+    expect(screen.getByText('RM 7,000.00')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Statutory' })).toBeInTheDocument()
   })
 
   it('variable pay: the pay fields go, statutory stays, sent as the old tick', async () => {

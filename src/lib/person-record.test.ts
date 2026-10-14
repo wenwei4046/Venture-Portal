@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { payPatchForUpdate } from './staff-form'
-import { PAY_MODE_LABEL, asksPay, asksStatutory, changedFields, changedFormData, changesLabel, payModeChoices, payModeFields, payModeOf, type PayMode } from './person-record'
+import { BASIC_FROM_COMMISSION, PAY_MODE_LABEL, asksPay, asksStatutory, changedFields, changedFormData, changesLabel, choosesByTick, payModeChoices, payModeFields, payModeLabel, payModeOf, type PayMode } from './person-record'
 
 // A person's full page, edited where it stands (2026-10-14). The Employment
 // Type row is one select now, where the old Edit page had a tick in a
@@ -26,6 +26,25 @@ describe('the pay basis a record reads as', () => {
       salaried: 'Salaried',
       commission_eligible: 'Commission-eligible',
     })
+  })
+})
+
+describe('a basic in a commission department (2026-10-14)', () => {
+  // The user, on CHEA HUAN (Revenue): "他要给 basic，然后从他薪水扣" — the
+  // payroll pays a Revenue basic out of the commission, so that is what it reads as.
+  it('reads as Basic from commission there, and as itself anywhere else', () => {
+    expect(payModeLabel('salaried', commission)).toBe(BASIC_FROM_COMMISSION)
+    expect(payModeLabel('full_commission', commission)).toBe('Fully commission based')
+    expect(payModeLabel('salaried', office)).toBe('Salaried')
+    expect(payModeLabel('salaried', director)).toBe('Salaried')
+  })
+
+  it('is chosen by one tick in a commission department — any other basis keeps the select', () => {
+    expect(choosesByTick(commission, 'full_commission')).toBe(true)
+    expect(choosesByTick(commission, 'salaried')).toBe(true)
+    expect(choosesByTick(commission, 'variable')).toBe(false)
+    expect(choosesByTick(office, 'salaried')).toBe(false)
+    expect(choosesByTick(director, 'variable')).toBe(false)
   })
 })
 
