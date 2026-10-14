@@ -55,6 +55,12 @@ export function canStepBack(): boolean {
   return depth > 0
 }
 
+/** Into another page of the app, over this one (a tile, a row): it plays in from the right, and Back steps back to here. */
+export function pushIntent() {
+  setIntent('push')
+  stepped()
+}
+
 let lastPop: Event | null = null
 
 /**

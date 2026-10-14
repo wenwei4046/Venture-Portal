@@ -367,7 +367,7 @@ export default function CreatePaymentDialog({
   })
 
   return (
-    <FinDialog open={open} onClose={close} title="Create payment" sub={`New payment voucher · ${prefix}`} locked={busy !== null}>
+    <FinDialog open={open} onClose={close} title="Create payment" sub={`New payment voucher · ${prefix}`} locked={busy !== null} tall>
       <DialogForm
         buttons={
           <>

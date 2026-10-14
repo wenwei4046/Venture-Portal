@@ -144,7 +144,7 @@ export default function CreateReceiptDialog({ open, onClose, prefix, today }: { 
 
   const accounts = opts?.accounts ?? []
   return (
-    <FinDialog open={open} onClose={close} title="Create receipt" sub={`Official receipt · ${prefix}`} locked={busy}>
+    <FinDialog open={open} onClose={close} title="Create receipt" sub={`Official receipt · ${prefix}`} locked={busy} tall>
       <DialogForm
         buttons={
           <>

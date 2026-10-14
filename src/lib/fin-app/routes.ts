@@ -102,20 +102,15 @@ export function hubOf(pathname: string): HubKey | null {
   return null
 }
 
-/** The tab an address belongs to. A page of its own sits over the tab its row is in (`group`, the sidebar's section). */
-export function tabOf(pathname: string, pageGroup?: AppTab | null): AppTab {
+/**
+ * The tab an address belongs to. A page of its own (`/fin-app/page/…`) is
+ * pushed over whatever tab it was opened from, with the tab bar away, so it
+ * names none of its own: the Overview's.
+ */
+export function tabOf(pathname: string): AppTab {
   if (pathname.startsWith('/fin-app/daily')) return 'daily'
   if (pathname.startsWith('/fin-app/fund')) return 'fund'
   if (pathname.startsWith('/fin-app/report')) return 'report'
   if (pathname.startsWith('/fin-app/profile')) return 'profile'
-  if (pathname.startsWith('/fin-app/page/')) return pageGroup ?? 'home'
-  return 'home'
-}
-
-/** The sidebar's section a row sits in → the tab a screen of its own is pushed over. */
-export function tabOfSection(label: string | null): AppTab {
-  if (label === 'Daily') return 'daily'
-  if (label === 'Fund') return 'fund'
-  if (label === 'Report') return 'report'
   return 'home'
 }

@@ -2,15 +2,15 @@
 
 import { useMemo, useState, useEffect, type MouseEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import type { HrIconName } from '@/components/hrv/icons'
 import RowMenu, { type RowMenuAnchor, type RowMenuItem } from '@/components/RowMenu'
-import { BatchList, HeadButton, HubCards, HubHead, hubStyles as hs, type CardTone, type ChipTone } from '@/components/finv/Hub'
+import { BatchList, HeadButton, HubCards, HubHead, hubStyles as hs, type ChipTone } from '@/components/finv/Hub'
 import { FinTable, type FinColumn } from '@/components/finv/FinTable'
 import { DialogMenu, FinDialog, type DialogMenuItem } from '@/components/finv/Dialog'
 import AmendDateButton from './AmendDateButton'
 import AmendRepaymentButton from './AmendRepaymentButton'
 import { VoucherDrawer, fd } from './VoucherDrawer'
 import { statusWord, type HubCardKey, type HubLedger, type HubRow } from '../_lib/hub-ledger'
+import { CARD, cardLook, hubCards, plural, rm } from '../_lib/hub-cards'
 
 // The hub Payments and Receipt are drawn with (2026-10-14, the Finance revamp v2 — D02–D05 of
 // `.design/fin-r2/handoff`): the head (Create payment, Dept · N, Payroll · N,
@@ -30,24 +30,8 @@ export interface RequestItem {
 }
 
 const f2 = (n: number) => (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const rm = (n: number) => `RM ${f2(n)}`
 
-const CARD: Record<HubCardKey, { label: string; tone: CardTone; icon: HrIconName; title: string }> = {
-  all: { label: 'All vouchers', tone: 'all', icon: 'doc', title: 'All vouchers' },
-  draft: { label: 'Draft', tone: 'draft', icon: 'doc', title: 'Draft' },
-  pending_approval: { label: 'Pending approval', tone: 'pending_approval', icon: 'calendar', title: 'Pending approval' },
-  approved: { label: 'Approved', tone: 'approved', icon: 'approve', title: 'Approved' },
-  paid: { label: 'Paid', tone: 'paid', icon: 'payroll', title: 'Paid' },
-  voided: { label: 'Voided', tone: 'quiet', icon: 'fileAlert', title: 'Voided' },
-  payroll: { label: 'Payroll batches', tone: 'payroll', icon: 'payroll', title: 'Payroll batches' },
-}
-// Receipt's own words for two of them.
-const RECEIPT_CARD: Partial<Record<HubCardKey, { label: string; title: string }>> = {
-  all: { label: 'All receipts', title: 'All receipts' },
-  paid: { label: 'Received', title: 'Received' },
-}
 const CHIP: Record<string, ChipTone> = { draft: 'def', pending_approval: 'wait', approved: 'accent', paid: 'ledger', voided: 'info', mixed: 'def' }
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
 const COLUMNS: FinColumn<HubRow>[] = [
   { key: 'name', label: 'Name', kind: 'name', fixed: true, width: 180, min: 120, value: (r) => r.name.toLowerCase(), text: (r) => r.name },
@@ -134,19 +118,8 @@ export default function VoucherHub({
   )
 
   const receipts = ledger.receipts
-  const look = (k: HubCardKey) => ({ ...CARD[k], ...(receipts ? RECEIPT_CARD[k] : null) })
-  const [one, many] = receipts ? ['receipt', 'receipts'] : ['voucher', 'vouchers']
-  const cards = ledger.cards.map((c) => ({
-    key: c.key,
-    tone: CARD[c.key].tone,
-    icon: CARD[c.key].icon,
-    label: look(c.key).label,
-    sub:
-      c.key === 'payroll'
-        ? `${plural(c.count, 'batch', 'batches')} · ${plural(ledger.batches.reduce((n, b) => n + b.count, 0), 'voucher', 'vouchers')}`
-        : `${plural(c.count, one, many)}${c.other > 0 ? ` · ${c.other} other` : ''}`,
-    value: receipts ? `+${rm(c.amount)}` : rm(c.amount),
-  }))
+  const look = (k: HubCardKey) => cardLook(k, receipts)
+  const cards = hubCards(ledger)
 
   const openRow = (r: HubRow) => {
     if (r.kind === 'voucher') setDrawer(r.id)

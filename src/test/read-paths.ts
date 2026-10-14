@@ -71,6 +71,13 @@ export const BRANCHES: Readonly<Record<string, Readonly<Record<Want, readonly st
     // A department sees only its own dept_expense requests: no loan, no voucher.
     'dept_pool.view:dept': ['approval_requests'],
   },
+  // The Finance phone app's Overview (2026-10-15, M01) — the desktop Overview's counts
+  // (loadFinanceOverviewCounts): the vouchers only for the treasury, the invoices and
+  // this month's allocations only for Billing (canAccessTreasury / canAccessBilling).
+  'src/app/(fin-app)/fin-app/page.tsx#FinAppOverview': {
+    'treasury.view': ['payment_vouchers'],
+    'billing.view': ['alloc_txns', 'invoices'],
+  },
 }
 
 /** from(<chosen at run time>), by `file#function` → the tables it may name. */

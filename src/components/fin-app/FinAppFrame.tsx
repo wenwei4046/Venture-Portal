@@ -8,6 +8,7 @@ import { useCurrentToast } from '@/components/hrv/toast'
 import { FinSurface, type FinPlatform } from '@/components/finv/surface'
 import { useTuckOnScroll } from '@/components/pwa/tuck'
 import RouteFreshener from '@/components/layout/RouteFreshener'
+import { FinViewProvider } from '@/components/layout/fin-view'
 import { HUB_HREF, tabHubs, tabOf, type AppTab, type HubKey } from '@/lib/fin-app/routes'
 import { notePop, setIntent } from './nav'
 import s from './fin-app.module.css'
@@ -137,6 +138,8 @@ export default function FinAppFrame({ platform, rows, children }: { platform: Fi
   return (
     <Frame.Provider value={ctx}>
       <FinSurface.Provider value={surface}>
+        {/* It is the Finance view: the shared parts speak English and wear the revamp (layout/fin-view.tsx). */}
+        <FinViewProvider value>
         <div className={s.app} data-fin-kit="" data-fin-app="" data-platform={platform} style={style}>
           {/* A screen shown from the router's memory is read again behind itself, as the portal's (speed.md). */}
           <RouteFreshener />
@@ -183,6 +186,7 @@ export default function FinAppFrame({ platform, rows, children }: { platform: Fi
             })}
           </nav>
         </div>
+        </FinViewProvider>
       </FinSurface.Provider>
     </Frame.Provider>
   )

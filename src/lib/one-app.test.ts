@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { isPhone, opensHrApp, opensHrAppOnPhone } from './one-app'
+import { isPhone, opensFinApp, opensHrApp, opensHrAppOnPhone } from './one-app'
 
 // ONE app for everybody (2026-10-11 — the user: "他们都是一个 app … 我要的就是 portal app").
 
@@ -45,6 +45,14 @@ describe('which face of the app opens on a phone', () => {
   })
   it('nobody signed in: nothing', () => {
     expect(opensHrAppOnPhone(null)).toBe(false)
+  })
+})
+
+describe('the Finance app (2026-10-15, the Finance revamp v2’s phone)', () => {
+  it('opens for Finance’s view — the finance kind, or the Principal’s Finance lens — and nobody else', () => {
+    expect(opensFinApp({ role: 'finance' })).toBe(true)
+    for (const role of ['principal', 'hr', 'staff', 'dept_manager', 'revenue_member']) expect(opensFinApp({ role })).toBe(false)
+    expect(opensFinApp(null)).toBe(false)
   })
 })
 

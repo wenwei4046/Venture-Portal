@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { useChrome, useFrame } from './FinAppFrame'
 import { keepScroll, peekIntent, scrollOf, takeIntent, type Intent } from './nav'
 import s from './fin-app.module.css'

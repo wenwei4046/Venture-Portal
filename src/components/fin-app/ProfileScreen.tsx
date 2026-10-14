@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { HrIcon, type HrIconName } from '@/components/hrv/icons'
 import { ChangePasswordDialog, EditProfileDialog, SignOutDialog } from '@/components/layout/AccountMenu'
 import AppScreen from './AppScreen'
-import { setIntent } from './nav'
+import { pushIntent } from './nav'
 import s from './fin-app.module.css'
 
 // The Finance app's Profile (2026-10-15, the Finance revamp v2's phone — M17,
@@ -96,7 +96,7 @@ export default function ProfileScreen({
             </div>
             <div className={s.menu}>
               {admin.map((a) => (
-                <Link key={a.key} href={a.href} className={s.menuRow} onClick={() => setIntent('push')}>
+                <Link key={a.key} href={a.href} className={s.menuRow} onClick={pushIntent}>
                   <span className={`${s.menuIcon} ${s.walnut}`}>
                     <HrIcon name={a.icon} size={16} />
                   </span>

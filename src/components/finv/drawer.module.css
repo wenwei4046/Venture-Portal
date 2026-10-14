@@ -297,6 +297,36 @@
 
 .error { margin: 12px 16px 0; padding: 10px 12px; border-radius: 10px; background: rgb(var(--fv-chip-danger)); color: var(--ds-danger); font-size: 12.5px; }
 
+/* A file's chevron: the phone's row draws one (M04), the drawer does not. */
+.fileChev { display: none; }
+
+/* The audit log — on the phone's voucher screen, which is the voucher's page there (the full page's log, in the drawer's hand). */
+.audit { margin: 0 16px; background: var(--ds-surface); border: 1px solid var(--ds-border); border-radius: 12px; overflow: hidden; }
+.auditRow { display: flex; flex-direction: column; gap: 2px; padding: 11px 14px; border-top: 1px solid var(--ds-border); }
+.auditRow:first-child { border-top: 0; }
+.auditWhat { font-size: 13.5px; color: var(--ds-ink); overflow-wrap: anywhere; }
+.auditMeta { font-size: 11.5px; color: rgb(var(--hvs-muted)); }
+
+/* ── The Finance phone app's record screen (2026-10-15, M04): the drawer's parts at the phone's sizes ── */
+[data-fin-app] .hero { margin: 14px 16px 0; }
+[data-fin-app] .line { padding: 12px 14px; }
+[data-fin-app] .lineV { font-size: 14px; }
+[data-fin-app] .foot { padding: 12px 14px; }
+[data-fin-app] .footV { font-size: 14.5px; }
+[data-fin-app] .groupEmpty { padding: 16px 14px; }
+[data-fin-app] .file { padding: 10px 12px; border-radius: 12px; }
+[data-fin-app] .file:hover { border-color: var(--ds-border); }
+[data-fin-app] .fileIcon { width: 34px; height: 34px; border-radius: 9px; }
+[data-fin-app] .fileName { font-size: 14px; }
+[data-fin-app] .fileChev { display: inline; flex: none; font-size: 18px; color: rgb(var(--hvs-quiet)); }
+[data-fin-app] .add { min-height: 44px; border-radius: 12px; font-size: 13.5px; }
+[data-fin-app] .stepLine { min-height: 22px; }
+[data-fin-app] .stepText { padding-bottom: 12px; }
+[data-fin-app] .stepLabel { font-size: 14px; }
+[data-fin-app] .auditRow { padding: 12px 14px; }
+[data-fin-app] .auditWhat { font-size: 14px; }
+[data-fin-app] .loading { padding: 28px 20px; }
+
 @media (prefers-reduced-motion: reduce) {
   .scrim, .panel, .barBtn { transition: none; }
 }

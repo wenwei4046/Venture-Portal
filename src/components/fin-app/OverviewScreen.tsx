@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { HrIcon, type HrIconName } from '@/components/hrv/icons'
 import type { HrNavTone } from '@/components/layout/hr-nav'
 import AppScreen from './AppScreen'
-import { setIntent } from './nav'
+import { pushIntent, setIntent } from './nav'
 import s from './fin-app.module.css'
 
 // The Finance app's Overview (2026-10-15, the Finance revamp v2's phone — M01
@@ -69,7 +69,7 @@ export default function OverviewScreen({
           </div>
           <div className={s.quick}>
             {quick.map((q) => (
-              <Link key={q.key} href={q.href} className={s.qTile} onClick={() => setIntent(q.how)}>
+              <Link key={q.key} href={q.href} className={s.qTile} onClick={() => (q.how === 'push' ? pushIntent() : setIntent('tab'))}>
                 <span className={`${s.qIcon} ${s[quickTone[q.key] ?? 'clay']}`}>
                   <HrIcon name={q.icon} size={22} />
                   {q.badge && q.badge > 0 ? <span className={s.badge}>{q.badge}</span> : null}
@@ -93,7 +93,7 @@ export default function OverviewScreen({
           </div>
           <div className={s.catCard}>
             {c.tiles.map((t) => (
-              <Link key={t.key} href={t.href} className={s.cTile} onClick={() => setIntent(t.how)}>
+              <Link key={t.key} href={t.href} className={s.cTile} onClick={() => (t.how === 'push' ? pushIntent() : setIntent('tab'))}>
                 <span className={`${s.cIcon} ${s[c.tone]}`}>
                   <HrIcon name={t.icon} size={18} />
                 </span>
