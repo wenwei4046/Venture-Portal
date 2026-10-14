@@ -55,7 +55,7 @@ describe('Readiness (the Attendance handoff)', () => {
         leaveTypes: [{ id: 'al', code: 'AL', name: 'Annual leave', groups: [], rules: '', route: 'upline_only', counts: 'working', accrues: true, unpaid: false, drawsFrom: null }],
         holidays: [{ id: 'h', day: '2027-12-25', name: 'Christmas', kind: 'chosen', states: 'All' }, { id: 'h2', day: '2027-01-02', name: 'X', kind: 'chosen', states: 'All' }],
       }),
-      { ...ledger, entries: [{ id: 'e', ref: 'OB-1', staffId: 'p2', code: 'AL', kind: 'opening', days: 2, date: '2026-01-01', note: 'Carried', detail: {}, by: 'HR', at: '' }] },
+      { ...ledger, entries: [{ id: 'e', ref: 'OB-1', staffId: 'p2', code: 'AL', kind: 'opening', days: 2, date: '2026-01-01', note: 'Carried', detail: {}, by: 'HR', at: '', events: [] }] },
       '2026-11-03',
     )
     const by = Object.fromEntries(rows.map(r => [r.key, r]))
