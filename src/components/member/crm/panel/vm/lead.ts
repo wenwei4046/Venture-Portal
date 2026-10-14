@@ -63,7 +63,7 @@ export function leadVM(ctx: PanelCtx) {
     const md = m.media, mk = md?.kind, shows = mk === "image" || mk === "video" || mk === "audio";
     const star = stars.has(m.id) ? "★ " : "";
     return { sep: !k || daySep(arr[k - 1].at, now) !== sep ? sep : "", time: star + msgTime(m.at), mine, text: m.text || (md && !shows ? (md.name ?? "File") : ""), at: star + msgTime(m.at),
-      ...mediaOf(m, gallery, al.lead.get(m.id)), vis: al.hidden.has(m.id) ? "none" : undefined,
+      ...mediaOf(m, gallery, al.lead.get(m.id)), ...(by ? { timeTop: "4px" } : {}), vis: al.hidden.has(m.id) ? "none" : undefined,
       // The message menu, as in Mine's chat (shared/msg-menu.tsx): a long press — reactions, Reply, Copy, Delete for me.
       reaction: m.myReaction ?? "", rxGap: m.myReaction ? "14px" : "0", rxSide: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto",
       quote: (() => { const q = m.replyTo ? c?.messages.find(x => x.id === m.replyTo) : undefined; return q ? { who: q.from === "me" ? "You" : c?.name ?? "", text: q.text || mediaWord(q) } : null; })(),

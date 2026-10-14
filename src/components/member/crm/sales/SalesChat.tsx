@@ -135,7 +135,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
                     <span style={{ fontWeight: pt.w }}>{pt.t}</span>
                   </Fragment>))}
                 </p>
-                <span style={{ display: "flex", alignItems: "center", justifyContent: m.timeJustify, gap: "3px", marginTop: "4px", padding: m.inPad, fontSize: "11px", color: m.timeColor }}>{!!(m.by) && (<>
+                <span style={{ display: "flex", alignItems: "center", justifyContent: m.timeJustify, gap: "3px", marginTop: m.timeTop, padding: m.inPad, fontSize: "11px", color: m.timeColor }}>{!!(m.by) && (<>
                     <span style={{ fontStyle: "italic", opacity: ".85" }}>Sent by {m.by} ·</span>
                   </>)}{m.at}{!!(m.tick) && (<>
                     <svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke={m.tickColor} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-label={m.tickLabel}>
