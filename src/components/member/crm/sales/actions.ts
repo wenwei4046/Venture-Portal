@@ -6,7 +6,7 @@
  */
 import type { Dispatch, SetStateAction } from "react";
 import {
-  crmWrite, fetchCrmTemplates, reactToMessage, sendCrmMedia, sendCrmMessage, sendCrmTemplate, type CrmWrite,
+  crmWrite, fetchCrmTemplates, reactToMessage, forwardCrmMessage, sendCrmMedia, sendCrmMessage, sendCrmTemplate, type CrmWrite,
 } from "@/app/(member)/member/crm-actions";
 import type { CrmAutoReplySet, CrmCard, CrmChatMessage, CrmData, CrmLabel, CrmPrefs, CrmQuickReply, CrmVisit } from "@/lib/member/crm-data";
 import type { WaTemplate } from "@/lib/whatsapp/send";
@@ -46,6 +46,8 @@ export interface SalesActions {
   loadTemplates(): Promise<WaTemplate[] | null>;
   sendTemplate(customerId: string, t: WaTemplate, params: string[]): Promise<boolean>;
   sendMedia(customerId: string, file: File, caption: string): Promise<boolean>;
+  /** Forward a message to another customer (the message menu, 2026-10-14). */
+  forward(messageId: string, toCustomerId: string): Promise<boolean>;
   slotCounts(roomId: string, from: Date, to: Date): Promise<Record<string, number>>;
   /** Say something on screen (the design's dark toast). */
   toast(text: string): void;
@@ -339,6 +341,22 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       // Keep showing the phone's own copy, through every later read too (shared/pending.ts) — no second download.
       if (r.message.media && local) rememberLocalMedia(r.message.id, local);
       swapMessage(customerId, draft.id, r.message.media && local ? { ...r.message, media: { ...r.message.media, url: local } } : r.message);
+      return true;
+    },
+    async forward(messageId, toCustomerId) {
+      const to = data().customers.find(c => c.id === toCustomerId), name = to?.name ?? "the customer";
+      if (!live) {
+        const src = data().customers.flatMap(c => c.messages).find(m => m.id === messageId);
+        if (!src) return false;
+        addMessage(toCustomerId, { ...src, id: uid(), from: "me", at: new Date().toISOString(), status: "sent", by: me, replyTo: undefined, myReaction: undefined });
+        toast(`Forwarded to ${name}`);
+        return true;
+      }
+      toast(`Forwarding to ${name}…`);
+      const r = await inTurn(toCustomerId, () => forwardCrmMessage(messageId, toCustomerId));
+      if (!r.ok) { toast(r.error); return false; }
+      addMessage(toCustomerId, r.message);
+      toast(`Forwarded to ${name}`);
       return true;
     },
     async slotCounts(roomId, from, to) {

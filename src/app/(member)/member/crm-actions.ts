@@ -9,7 +9,8 @@ import { cleanText, fetchWhatsAppTemplateStatuses, fillTemplate, mediaMessage, m
 import { messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from "@/lib/messenger/send";
 import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText, whatsappVisitMessage } from "@/lib/member/crm-maps";
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
-import { mediaKindOf, mediaLimit } from "@/lib/member/crm-media";
+import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
+import { fetchWhatsAppMedia, messengerMediaAddress } from "@/lib/whatsapp/media";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
 /**
@@ -514,5 +515,57 @@ export async function fetchCrmHistory(before?: number): Promise<{ ok: true; rows
     })) };
   } catch (error) {
     return { ok: false, error: friendly(error, "History could not be read. Please try again.") };
+  }
+}
+
+/**
+ * Forward a message to another customer (the owner, 2026-10-14: WhatsApp's long-press menu — "Forward、Info、Star 也加上去").
+ * The message is read under the member's own session (row level security decides whether they may see it); words go as a
+ * new message (sendCrmMessage), a photo, video, voice note or file is copied into the other customer's folder of the
+ * private bucket — from our bucket, from WhatsApp by its media id (with the token, on the server), or from Messenger's
+ * CDN — and sent by sendCrmMedia, which asks crm_can_reply for that customer and keeps every rule a send keeps.
+ */
+export async function forwardCrmMessage(messageId: string, toContact: string): Promise<{ ok: true; message: CrmChatMessage } | { ok: false; error: string }> {
+  try {
+    if (!/^[0-9a-f-]{36}$/i.test(messageId) || !/^[0-9a-f-]{36}$/i.test(toContact)) throw new Error("Choose the message again.");
+    const db = await session();
+    await requireCrm("edit");
+    const { data: m } = await db.from("crm_messages").select("id, kind, body, media_id, media_path, media_url, media_mime").eq("id", messageId).maybeSingle();
+    if (!m) throw new Error("That message is not there any more.");
+    const hasFile = !!(m.media_id || m.media_path || m.media_url);
+    if (!hasFile) {
+      const text = String(m.body ?? "").trim();
+      if (!text) throw new Error("There is nothing in that message to forward.");
+      return sendCrmMessage(toContact, text);
+    }
+    let blob: Blob | null = null, mime = String(m.media_mime ?? "").split(";")[0].trim() || "application/octet-stream";
+    if (m.media_path) {
+      const got = await db.storage.from("crm-media").download(m.media_path as string);
+      blob = got.data ?? null;
+    } else if (m.media_id) {
+      const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
+      if (!token) throw new Error("WhatsApp is not connected on this server.");
+      const got = await fetchWhatsAppMedia(m.media_id as string, token);
+      if (!got.ok) throw new Error(got.error);
+      blob = await new Response(got.body).blob();
+      mime = got.type.split(";")[0].trim() || mime;
+    } else {
+      const address = messengerMediaAddress(m.media_url as string);
+      if (!address) throw new Error("Messenger no longer has this file.");
+      const r = await fetch(address);
+      if (!r.ok) throw new Error("Messenger no longer has this file.");
+      blob = await r.blob();
+      mime = (r.headers.get("content-type") ?? mime).split(";")[0].trim();
+    }
+    if (!blob) throw new Error("The file could not be read. Try again.");
+    if (blob.size > 25 * 1024 * 1024) throw new Error("A file can be forwarded up to 25 MB.");
+    const kind = mediaKindOf(mime);
+    const name = kind === "document" ? (String(m.body ?? "").trim() || "file") : `${kind}`;
+    const path = mediaPath(toContact, name, mime);
+    const up = await db.storage.from("crm-media").upload(path, blob, { contentType: mime, upsert: false });
+    if (up.error) throw new Error("You cannot send to that customer.");
+    return sendCrmMedia({ contact: toContact, path, name, mime, caption: kind === "document" || kind === "audio" ? "" : String(m.body ?? "") });
+  } catch (error) {
+    return { ok: false, error: friendly(error, "The message could not be forwarded.") };
   }
 }

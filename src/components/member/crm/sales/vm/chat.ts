@@ -20,6 +20,7 @@ import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, mediaOf, mediaWord, NO_MEDIA } from "../../shared/chat-media";
 import { MENU_ICON, openMsgMenu, pressToOpen } from "../../shared/msg-menu";
+import { forwardChats, messageInfo } from "../../shared/msg-info";
 
 const NO_PRESS: Partial<ReturnType<typeof pressToOpen>> = {};
 import { CHAT_WALL } from "../wall";
@@ -171,9 +172,13 @@ export function chatVM(ctx: SalesCtx) {
         const pinnedNow = prefs?.pinnedMessageId === key;
         openMsgMenu({
           mine, preview: m.text ? plain(m.text) : m.media ? mediaWord(m) : "", reaction: m.myReaction ?? "", react: e => void act.react(key, e),
+          forward: { chats: forwardChats(data.customers, c.id, nameOf), send: toId => void act.forward(key, toId) },
+          info: messageInfo(m, c, nameOf),
           actions: [
             { label: "Reply", icon: MENU_ICON.reply, run: () => patch({ reply: { msgId: key, from: m.from, text: m.text || (m.media ? mediaWord(m) : "") }, menu: null, hover: null }) },
+            { label: "Forward", icon: MENU_ICON.forward, run: () => {} },
             ...(m.text ? [{ label: "Copy", icon: MENU_ICON.copy, run: () => { void navigator.clipboard?.writeText(plain(m.text)).catch(() => {}); } }] : []),
+            { label: "Info", icon: MENU_ICON.info, run: () => {} },
             { label: pinnedNow ? "Unpin" : "Pin", icon: MENU_ICON.pin, run: () => void act.setPref(c.id, { pinnedMessageId: pinnedNow ? null : key }) },
             { label: "Delete for me", icon: MENU_ICON.del, danger: true, run: () => void act.hideMessage(key) },
           ],
