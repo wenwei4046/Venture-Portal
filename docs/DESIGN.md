@@ -1,6 +1,6 @@
 # DESIGN.md — HOUZS Venture Portal
 
-**Version 4.22 · 2026-10-15** — the single design doc for every screen: the portal, the Revenue app and the HR phone app. Version history: Part IV.
+**Version 4.30 · 2026-10-15** — the single design doc for every screen: the portal, the Revenue app and the HR phone app. Version history: Part IV.
 
 **The design system.** The visual source is the Claude Design project **HOUZS Venture Design System** (https://claude.ai/design/p/1fecd655-db12-4974-abf4-3d7434e41386, synced from `main` on 2026-10-13). It holds the tokens, the foundation cards, the core and view components and four templates. This file says how the code does it — which token, class or component a page uses today — and holds the rules the code enforces. Where the project and this file disagree, this file is the code's truth. Change either one on purpose, never by drift.
 
@@ -1497,6 +1497,8 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.30** · 2026-10-15 · The Team side's chat (the Control panel — the Principal and the Director) is Mine's chat: the same header, layers and composer; whose customer it is and a reassignment's line ride in the header under its row; a cold chat's note and template button, each template with the words it sends → The CRM chat — the composer (#431)
+- **v4.29** · 2026-10-15 · The CRM chat's composer, the owner's Claude Design handoff: one pill (Sticker · the reply box · Attach · Camera), the mic held to record, the Sticker panel (Emoji alone — GIF and Sticker wait) and the Attach panel in the keyboard's place at its measured height, the header as the design's (40px buttons with no ring, a green dot) floating over the full-bleed wallpaper, Recents kept per person → The CRM chat — the composer (#425)
 - **v4.28** · 2026-10-15 · An invoice's full page in D06's hand — *← Invoices* and the crumb, the number with its status, Amount · To · Created by, PDF and Copy; the cards (Line items, Receipts in green, Credit notes, the description when it says more, the trail, the audit log) beside the dark panel with Balance, Billing and the drawer's steps → Finance's view — a voucher's full page
 - **v4.27** · 2026-10-15 · A loan's and a fund source's full page in D06's hand — the crumb, the party with its status, four facts, Print; the cards (the schedule, the terms over time, the settings, Record repayment, the trail, the audit log) beside the dark panel with the steps; the full page's parts in the kit (`FullParts`) → Finance's view — a voucher's full page
 - **v4.26** · 2026-10-15 · Create fund out and Record fund in as the design's dialogs on their hubs — the design's fields, then the rate (and a loan's account) the system asks, the term, the funding source, the account and the interest switches behind the small buttons; *Submit for approval* → Finance's view — Create payment
