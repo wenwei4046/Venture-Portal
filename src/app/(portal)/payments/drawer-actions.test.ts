@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { withActions } from '@/test/with-actions'
 
 // The hub's drawer reads one voucher (2026-10-14, the Finance revamp v2 — D05):
-// what the voucher page asks — the treasury, a page of Payments' tabs open, a
+// what the voucher page asks — the treasury, a page of Payments' (or, since
+// Receipt's hub, Receipt's) tabs open, a
 // salary voucher only with Payroll payouts — refused in words, never a throw.
 
 const mocks = vi.hoisted(() => ({ user: null as unknown, rows: {} as Record<string, unknown> }))
@@ -67,9 +68,14 @@ describe('openVoucherDrawer', () => {
     }
   })
 
-  it('refuses where no page of Payments’ tabs opens', async () => {
-    mocks.user = { ...withActions({ id: 'f', role: 'finance', permissions: ['treasury'] }), tabs: ['fin.receipt'] }
+  it('refuses where no page of Payments’ or Receipt’s tabs opens', async () => {
+    mocks.user = { ...withActions({ id: 'f', role: 'finance', permissions: ['treasury'] }), tabs: ['fin.invoice.view'] }
     expect(await openVoucherDrawer('v1')).toEqual({ ok: false, reason: 'closed' })
+  })
+
+  it('opens from Receipt’s hub too (D09) — its tab alone is enough', async () => {
+    mocks.user = { ...withActions({ id: 'f', role: 'finance', permissions: ['treasury'] }), tabs: ['fin.receipt.view'] }
+    expect((await openVoucherDrawer('v1')).ok).toBe(true)
   })
 
   it('a salary voucher opens only with Payroll payouts', async () => {

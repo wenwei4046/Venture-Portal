@@ -10,10 +10,10 @@ import { filterLockedBatches, isPayrollReference, lockPayrollBatches, type Locke
 import type { User } from '@/types'
 import type { VoucherRow } from '../_components/VouchersTable'
 
-// Payments' hub (2026-10-14, the Finance revamp v2 — D02–D05 of
-// `.design/fin-r2/handoff`): the ledger's rows read ONCE, every card's list
-// worked out here, the card picked in the browser. The rules are the ledger's
-// (VoucherLedger, which Receipt keeps until its own hub): payroll read by
+// Payments' and Receipt's hubs (2026-10-14, the Finance revamp v2 — D02–D05,
+// D09 of `.design/fin-r2/handoff`): the ledger's rows read ONCE, every card's
+// list worked out here, the card picked in the browser. The rules are the old
+// ledger's (VoucherLedger, retired with Receipt's hub): payroll read by
 // department never leaves the server as one person's voucher; a salary batch
 // folds under its name; money that moved outside the voucher flow stands in
 // All and Paid; an old ?type= / ?pool= / ?from= / ?to= / ?min= / ?max= link
