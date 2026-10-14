@@ -15,7 +15,7 @@ type Act = { ok: true } | { ok: false; reason: string }
 /**
  * One's own profile, for Edit profile (2026-10-14, the Finance revamp v2's account menu): the
  * name, the sign-in email, the phone on their People record. The database answers for the caller
- * only (`my_profile()`, mig 20261014150000) — the roster is closed to most logins. Null when it
+ * only (`my_profile()`, mig 20261014210000) — the roster is closed to most logins. Null when it
  * could not be read, while viewing as somebody, and for a shared login (nothing to edit there).
  */
 export async function loadMyProfile(): Promise<MyProfile | null> {

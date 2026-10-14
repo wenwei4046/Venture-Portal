@@ -4,7 +4,7 @@ import path from 'node:path'
 import { NAME_MAX, PHONE_MAX, profileOf, profileProblem } from './profile'
 
 // Edit profile (2026-10-14): what a change must satisfy, in the words the
-// database refuses with too (update_my_profile, mig 20261014150000).
+// database refuses with too (update_my_profile, mig 20261014210000).
 
 describe('a profile change', () => {
   it('needs a name', () => {
@@ -30,7 +30,7 @@ describe('a profile change', () => {
   })
 
   it('says the same as the database’s function', () => {
-    const sql = fs.readFileSync(path.resolve(process.cwd(), 'supabase/migrations/20261014150000_my_profile.sql'), 'utf8')
+    const sql = fs.readFileSync(path.resolve(process.cwd(), 'supabase/migrations/20261014210000_my_profile.sql'), 'utf8')
     for (const words of ['Enter your full name.', 'Enter a phone number like 012-338 4127.', `at most ${NAME_MAX} characters`]) {
       expect(sql).toContain(words)
     }

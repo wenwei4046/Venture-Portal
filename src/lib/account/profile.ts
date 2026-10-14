@@ -1,7 +1,7 @@
 // Edit profile (2026-10-14, the Finance revamp v2's account menu — the user: a login of one's own only, as
 // Change password; the name and the phone change, the email is the sign-in and only shows). What a change
 // must satisfy before the database is asked — the same words `update_my_profile()` refuses with
-// (mig 20261014150000), so the dialog and the server say one thing.
+// (mig 20261014210000), so the dialog and the server say one thing.
 
 export interface MyProfile {
   name: string
