@@ -135,7 +135,7 @@ export function StaffDialog({
         buttons={
           <>
             {person ? (
-              <DialogButton kind="danger" disabled={busy} onClick={() => setConfirming(true)} className={a.pushLeft}>
+              <DialogButton disabled={busy} onClick={() => setConfirming(true)} className={a.undo}>
                 Remove
               </DialogButton>
             ) : null}
@@ -151,17 +151,15 @@ export function StaffDialog({
         <Field label="Name" htmlFor="alloc-staff-name">
           <Input id="alloc-staff-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" />
         </Field>
-        <div className={fm.duo}>
-          <Field label="Department" htmlFor="alloc-staff-dept">
-            <Input id="alloc-staff-dept" value={department} onChange={(e) => setDepartment(e.target.value)} list="alloc-staff-depts" placeholder="e.g. Marketing" />
-          </Field>
-          <Field label="Status" htmlFor="alloc-staff-status">
-            <Select id="alloc-staff-status" round={12} className={fm.select} value={status} onChange={(e) => setStatus(e.target.value as 'active' | 'inactive')}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </Select>
-          </Field>
-        </div>
+        <Field label="Department" htmlFor="alloc-staff-dept">
+          <Input id="alloc-staff-dept" value={department} onChange={(e) => setDepartment(e.target.value)} list="alloc-staff-depts" placeholder="e.g. Marketing" />
+        </Field>
+        <Field label="Status" htmlFor="alloc-staff-status">
+          <Select id="alloc-staff-status" round={12} className={fm.select} value={status} onChange={(e) => setStatus(e.target.value as 'active' | 'inactive')}>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+        </Field>
         <datalist id="alloc-staff-depts">
           {known.map((k) => (
             <option key={k} value={k} />

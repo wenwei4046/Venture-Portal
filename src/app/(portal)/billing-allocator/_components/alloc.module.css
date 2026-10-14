@@ -116,8 +116,11 @@
 .footLabel { flex: 1; font-size: 13px; font-weight: 500; }
 .footValue { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 14px; font-weight: 600; }
 
-/* A dialog's undoing button (Remove, Delete) stands apart, at the left of the foot. */
-.pushLeft { margin-right: auto; }
+/* A dialog's undoing button (Remove, Delete) stands apart at the left of the
+   foot, in the drawer's quiet danger — red words on white, a red edge; the
+   red fill is its confirm's. */
+button.undo { margin-right: auto; border-color: rgb(var(--fv-chip-danger-ink) / 0.4); color: var(--ds-danger); }
+button.undo:hover:not(:disabled) { background: rgb(var(--fv-chip-danger)); }
 
 /* A saved snapshot's list: a row a person — the name, then their department and splits; an inactive one faint. */
 .snapRow {

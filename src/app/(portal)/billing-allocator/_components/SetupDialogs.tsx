@@ -94,7 +94,7 @@ export function CategoryDialog({
         buttons={
           <>
             {category ? (
-              <DialogButton kind="danger" disabled={busy} onClick={() => setConfirming(true)} className={a.pushLeft}>
+              <DialogButton disabled={busy} onClick={() => setConfirming(true)} className={a.undo}>
                 Delete
               </DialogButton>
             ) : null}
@@ -206,7 +206,7 @@ export function TemplateDialog({
         buttons={
           <>
             {template ? (
-              <DialogButton kind="danger" disabled={busy} onClick={() => setConfirming(true)} className={a.pushLeft}>
+              <DialogButton disabled={busy} onClick={() => setConfirming(true)} className={a.undo}>
                 Delete
               </DialogButton>
             ) : null}
@@ -222,20 +222,18 @@ export function TemplateDialog({
         <Field label="Name" htmlFor="alloc-tpl-name">
           <Input id="alloc-tpl-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Office Rental" />
         </Field>
-        <div className={fm.duo}>
-          <Field label="Method" htmlFor="alloc-tpl-method">
-            <Select id="alloc-tpl-method" round={12} className={fm.select} value={method} onChange={(e) => setMethod(e.target.value as AllocMethod)}>
-              {METHODS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Default RM" htmlFor="alloc-tpl-amount">
-            <Input id="alloc-tpl-amount" mono align="right" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
-          </Field>
-        </div>
+        <Field label="Default RM" htmlFor="alloc-tpl-amount">
+          <Input id="alloc-tpl-amount" mono align="right" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+        </Field>
+        <Field label="Method" htmlFor="alloc-tpl-method">
+          <Select id="alloc-tpl-method" round={12} className={fm.select} value={method} onChange={(e) => setMethod(e.target.value as AllocMethod)}>
+            {METHODS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <Field label="Category" htmlFor="alloc-tpl-cat">
           <Select id="alloc-tpl-cat" round={12} className={fm.select} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
             <option value="">No category</option>
