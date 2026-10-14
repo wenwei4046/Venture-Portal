@@ -19,6 +19,7 @@ import { readMemberBatch, type MemberRead } from "@/app/(member)/member/batch-ac
 import { bookMemberRoom, cancelMemberBooking, type MemberBookInput, type fetchMemberRooms } from "@/app/(member)/member/rooms-actions";
 import type { MemberRoomsData } from "./profile/rooms-model";
 import { openMemberDoc, type fetchMemberDocuments } from "@/app/(member)/member/docs-actions";
+import type { fetchMemberCrmUnread } from "@/app/(member)/member/chat-badge-actions";
 import type { MemberDocument } from "@/lib/documentation/member";
 import { createReadBatcher } from "./read-batch";
 import { createReadMemory, idbStore, readKey, type ReadStore } from "./read-memory";
@@ -69,6 +70,7 @@ export const ask = {
   catalogue: (): MemberRead => ({ kind: "catalogue" }),
   rooms: (from: string, to: string): MemberRead => ({ kind: "rooms", from, to }),
   documents: (context?: { staffId: string }): MemberRead => (context ? { kind: "documents", staffId: context.staffId } : { kind: "documents" }),
+  crmUnread: (): MemberRead => ({ kind: "crmUnread" }),
 };
 
 /**
@@ -131,6 +133,8 @@ export interface RevenueSource {
   documents?(context?: { staffId: string }): Promise<Outcome<MemberDocument[]>>;
   /** A file's short link, made at the tap (never kept). */
   openDocument?(id: string, context?: { staffId: string }): Promise<Outcome<{ url: string; fileName: string }>>;
+  /** Today's CRM chat button (2026-10-14): the unread messages of the account's own chats. */
+  crmUnread?(): Promise<Outcome<number>>;
   /**
    * What the phone kept from an earlier open (the live app only, 2026-10-08):
    * the last answer to a read (`ask.*`), shown while it is read again.
@@ -215,6 +219,7 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     cancelBooking: id => cancelMemberBooking(id),
     documents: context => go<Answer<typeof fetchMemberDocuments>>(ask.documents(context)),
     openDocument: (id, context) => openMemberDoc(id, context?.staffId),
+    crmUnread: () => go<Answer<typeof fetchMemberCrmUnread>>(ask.crmUnread()),
     ...(memory ? {
       peek: <T,>(request: MemberRead) => memory.get<T>(readKey(request)),
       ready: memory.ready,

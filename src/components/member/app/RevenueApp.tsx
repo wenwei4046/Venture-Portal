@@ -36,6 +36,7 @@ import { ask, createLiveSource, demoSource, settleRead, type RevenueSource, type
 import type { MemberWaitingForm } from "@/lib/member/server";
 import { useKeyedRead } from "./useKeyedRead";
 import { BottomNav, DeskAside, DeskHeader, MobileHeader, ViewingAsBar, type Me, type ModuleId } from "./shell/Chrome";
+import { useCrmUnread } from "./shell/useCrmUnread";
 import PullRefresh from "./shell/PullRefresh";
 import { RETURN_REFRESH_MS, isStaleAppError, reloader } from "./shell/pull-refresh";
 import StatusBar from "./shell/StatusBar";
@@ -448,6 +449,13 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   }, [unseenNotices]);
   const settledMonth = settled ? monthName(settled.period) : null;
 
+  // ── Today's CRM chat button (2026-10-14, the refresh handoff §2): the account's own chats' unread messages, live ──
+  // Read with the open and every pull, and between them whenever a customer's row changes (Realtime, silently) — the
+  // phone's header only: the desktop draws none.
+  const onCrm = route.screen === "account" && route.pf === "crm";
+  const crmUnread = useCrmUnread({ enabled: crm && !desk, live: live && !data.demo && !fixture, ready: memoryReady, source, gen, track,
+    account, onCrm, fixture: fixture?.crmUnread });
+
   // ── the Quote's catalogue (2026-10-08): no longer in the snapshot every open waited for ──
   // Read when the Quote or its brand list opens — what the phone kept shows at once — and once in the
   // background when the phone has none yet, so the first tap on Quote is not a wait. A server render of
@@ -595,6 +603,17 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     setCrmOpen(chat ? { chat } : { notifs: true });
   }, []);
   const openSheet = useCallback((next: Sheet) => { setNfOpen(false); setSheet(next); }, []);
+  // The CRM from Today's chat button (2026-10-14) opens as Profile › My leads & appointments does, and its way back
+  // leads to where it was opened; any other way out of the CRM forgets that.
+  const [crmFrom, setCrmFrom] = useState<Screen | null>(null);
+  const openCrm = useCallback(() => {
+    const from = route.screen;
+    goScreen("account", { pf: "crm" });
+    setCrmFrom(from);
+  }, [route.screen, goScreen]);
+  useEffect(() => {
+    if (!onCrm && crmFrom) setCrmFrom(null);
+  }, [onCrm, crmFrom]);
 
   const todo = (t: TodayTodo) => {
     if (t.target === "memos") goScreen("account", { pf: "memos" });
@@ -1106,9 +1125,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel || profilePanel;
   // A pull only from the page itself — never while a sheet is up — and never on the preview's fixtures,
   // nor on the Product List, which holds its edits until Save.
-  // Nor in the CRM, which reads itself every 5 s and scrolls inside its own lists: a pull listener there (a non-passive
+  // Nor in the CRM (`onCrm`), which reads itself every 5 s and scrolls inside its own lists: a pull listener there (a non-passive
   // touchmove) made every scroll in it wait for the page's script (the owner, 2026-10-14: "在 revenue app 很順滑，在 crm 就卡").
-  const onCrm = route.screen === "account" && route.pf === "crm";
   const pullable = !data.demo && !fixture && !anyPanel && !nfOpen && !vaOpen && !onProducts && !onCrm;
   // A reload for a newer release loses nothing: no sheet or form open.
   reloadable.current = pullable;
@@ -1250,7 +1268,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else if (pf === "crm" && crm) {
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       // On a computer the Control panel draws the app's frame itself (CRM Desktop rev 1): its greeting, bell and links are these.
-      page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} onExit={back} desk={desk} open={crmOpen} deskApp={desk ? {
+      page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} desk={desk} open={crmOpen}
+        onExit={crmFrom ? () => { const to = crmFrom; setCrmFrom(null); goScreen(to); } : back} deskApp={desk ? {
         greeting: fixture?.greeting ?? greeting(), subName: membership?.name ?? "", dateLine: `${longDayLabel(today)} · ${quarterLabel(today)}`,
         bellUnread: nfCount > 0 || nf.items.some(n => n.unread), notifCount: nfCount,
         go: screen => goScreen(screen), openNotifications: openNotif, openBell: toggleNotif, openSubDept: () => openSheet("sd"), signOut,
@@ -1291,6 +1310,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       {live && !principal && !data.demo && !fixture ? <PushAsk app="revenue" save={savePushSubscription} trouble={reportPushTrouble} /> : null}
       {showHeader && (
         <MobileHeader ruled={scrolled} back={route.screen === "calc"} subName={membership?.name ?? ""} count={nfCount} me={me}
+          crm={crm && route.screen !== "calc" ? { unread: crmUnread ?? 0, onOpen: openCrm } : null}
           onLogo={() => goScreen(home)} onBack={() => goScreen("quote")} onSubDept={() => openSheet("sd")} onBell={openNotif}
           onProfile={() => goScreen("account")} />
       )}

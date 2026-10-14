@@ -56,6 +56,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'hiring_board', 'hiring_file_path', 'hiring_bank',
   // HOUZS Venture's director share — the grid's month (mig 20261013170000): STABLE.
   'director_hv_share_of',
+  // The Revenue app's CRM chat button — one's own chats' unread (mig 20261014120000): STABLE.
+  'crm_my_unread',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',
   'revenue_costing_gaps', 'revenue_fair_calendar', 'revenue_fair_calendar_moves', 'revenue_month_orders', 'revenue_payroll_adjustments',
   'revenue_possible_double_claims', 'revenue_uncosted_products', 'rnp_invoice_events', 'staff_private_fields', 'team_directory',

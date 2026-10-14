@@ -116,6 +116,8 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   comm_set_first_paid_month: ['comm_cutovers', 'comm_runs', 'users'],
   commission_order_period_locked: ['comm_order_releases', 'comm_runs'],
   commit_sales_import_batch: ['comm_order_releases', 'comm_runs', 'sales_import_batches', 'sales_order_open_bill_tags', 'sales_orders'],
+  // Today's CRM chat button (mig 20261014120000): one's own chats' unread, under crm_contacts' own row policy.
+  crm_my_unread: ['crm_contact_prefs', 'crm_contacts'],
   dashboard_summary: [
     'approval_requests', 'bank_accounts', 'base_rate_history', 'companies', 'departments', 'dept_pools', 'director_payouts',
     'fund_source_repayments', 'fund_sources', 'hr_staff_costs', 'invoice_payout_pool', 'invoices', 'journal_entries',

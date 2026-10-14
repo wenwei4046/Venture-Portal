@@ -369,6 +369,30 @@
   box-shadow: 0 0 0 2px var(--rv-white);
 }
 .capsuleAvatar { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; border: 0; padding: 1px 6px; background: var(--rv-brown); color: var(--rv-white); font-size: calc(12px * var(--rv-type)); font-weight: 650; }
+/* The CRM chat button (2026-10-14, the refresh handoff §2): rust, so it reads apart from the brown bell; Fair ▾ gives
+   up 2px on its right and the bell 4px of its width to make room, the bell's badge moving in to its edge. */
+.capsuleWithCrm .capsuleSd { padding-right: 6px; }
+.capsuleCrm {
+  position: relative;
+  width: 40px;
+  height: 44px;
+  padding: 0 0 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--rv-accent);
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+.capsuleCrm .capsuleBadge { right: -4px; }
+.capsuleWithCrm .capsuleBell { width: 42px; }
+.capsuleWithCrm .capsuleBell .capsuleBadge { right: 0; }
+/* A press: .6 for 120ms, every button of the capsule alike (the handoff: "same as other capsule buttons"). */
+.capsuleSd, .capsuleCrm, .capsuleBell, .capsuleAvatar { transition: opacity 120ms cubic-bezier(.2,.8,.2,1); }
+.capsuleSd:active, .capsuleCrm:active, .capsuleBell:active, .capsuleAvatar:active { opacity: .6; }
+@media (prefers-reduced-motion: reduce) {
+  .capsuleSd, .capsuleCrm, .capsuleBell, .capsuleAvatar { transition: none; }
+}
 
 /* ── the page ── */
 .main {
