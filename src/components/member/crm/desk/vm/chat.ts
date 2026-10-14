@@ -17,6 +17,7 @@ import { albumsOf, galleryOf, mediaOf, mediaWord, NO_MEDIA } from "../../shared/
 import { MENU_ICON, REACTIONS, openMsgView, openStarred } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { ATTACH_TILES, autoChoices, DOC_ACCEPT } from "../../shared/attach-sheet";
+import { CATS, ICON as CMP_ICON, emojiView, pushRecent } from "../../sales/vm/composer";
 
 const DAY = 86_400_000;
 const day0 = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -132,7 +133,17 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
       patch({ attachOpen: false });
       if (k === "camera") pick("image/*,video/*", false, true); else if (k === "photos") pick("image/*,video/*", true); else pick(DOC_ACCEPT, true);
     } }));
+  // The emoji panel: the phone's Sticker panel's Emoji tab (its categories, Recents and search), as a popover over the
+  // sticker icon; a pick goes into the reply box and to the front of one's Recents.
+  const emo = ui.emo, mine = ui.recents ?? data.recentEmoji ?? [], ev = emo ? emojiView(emo, mine) : null;
+  const emoSet = (o: Partial<NonNullable<typeof emo>>) => patch({ emo: { ...(emo ?? { ecat: "recent", searching: false, q: "" }), ...o } });
   return {
+    emojiOpen: !!emo, emojiFg: emo ? "#BD4A19" : "#806B60",
+    emojiToggle: () => patch({ emo: emo ? null : { ecat: "recent", searching: false, q: "" }, attachOpen: false, attachView: "" }),
+    emoji: { label: ev?.label ?? "", searching: !!emo?.searching, q: emo?.q ?? "", close: () => patch({ emo: null }),
+      setQ: (e: { target: { value: string } }) => emoSet({ q: e.target.value }), toggleSearch: () => emoSet({ searching: !emo?.searching, q: "" }),
+      cats: CATS.map(([id, label, icon]) => ({ label, d: CMP_ICON[icon], on: !emo?.searching && emo?.ecat === id, pick: () => emoSet({ ecat: id, searching: false, q: "" }) })),
+      list: (ev?.list ?? []).map(e => ({ e, pick: () => { setD(draft + e); const r = pushRecent(mine, e); patch({ recents: r }); ctx.deskAct.saveRecents(r); } })) },
     c, msgs, firstDay, draft,
     setDraft: (e: { target: { value: string } }) => setD(e.target.value),
     draftKey: (e: { key: string; shiftKey: boolean; preventDefault(): void }) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } },

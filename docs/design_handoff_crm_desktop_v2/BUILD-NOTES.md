@@ -25,14 +25,14 @@ What was built from this handoff, what was decided along the way, where the buil
 | Channels link / unlink decides whether Inbox receives messages; only Principal / Director may change it | `crm_set_channel` asks `crm_manages()`. The ingest functions skip a message from an unlinked asset (migration below). |
 | ⋮ Mark unread / Mute / Pin show in the Inbox list | Inbox rows: unread dot or count, mute icon, pinned first with a pin icon (`inbox.ts`, patches in `desk-patches.cjs`). |
 
-## Database (migration `20261015100000_crm_desktop_v2.sql` — written, NOT applied)
+## Database (migration `20261015100000_crm_desktop_v2.sql` — applied to production 2026-10-15, on the owner's yes)
 
 - New table `crm_channels`: kind, external_id, name, linked, is_default, saved (jsonb), updated_at / updated_by. Read with `crm_sees_all()`; written only through the functions below. Audit-registered.
 - `crm_set_channel(kind, external_id, name, linked, is_default)` and `crm_note_channel_save(kind, external_id, what)`. Both ask `crm_manages()`.
 - `crm_ingest_whatsapp` / `crm_ingest_messenger`: one statement swapped into production's own body (md5 checked first). A message to a number or Page marked unlinked is counted as ignored, not stored.
 - `crm_save_form` accepts the answer type `Range`.
 - PGlite: `tests/member-sql/validate-crm-desktop-v2.mjs` (15 checks).
-- Until it is applied, the app reads softly: Channels shows every asset as linked, and nothing is gated.
+- Production md5 after: `crm_ingest_whatsapp` b5db8dab…, `crm_ingest_messenger` 3a51446c…, `crm_save_form` 495571bc…. No row was written: every asset stays linked until someone unlinks it.
 
 ## What I filled in or decided
 
@@ -43,14 +43,14 @@ What was built from this handoff, what was decided along the way, where the buil
 3. **Ad performance:** Spend, Reach, Clicks and the costs are "—" until the Meta Marketing API (ads_read) is connected. Leads and Appointments are real. The Custom range picks any month, not only October.
 4. **Ad audit log:** from `crm_ad_assign`'s history and the ad's first lead.
 5. **Full time:** opening a team with no rule ticks Mon–Fri, as the prototype's own code does. (Screenshot 07 shows none ticked, but the prototype draws Mon–Fri — we follow the prototype.)
-6. **Member work type:** the launch default "everyone Part time" was **not** applied to production data. Today's choices stay until someone changes them.
+6. **Member work type:** the launch default "everyone Part time" — production already had it on 2026-10-15 (all 7 Part time, no Full time days ticked), so no data was changed.
 7. **Chat:**
    - Text bubbles follow v2 (time under the words), not the phone's WhatsApp-style inline time.
    - The visit card is v2's reminder card.
    - The message menu has **Forward** and **Info** beside v2's Reply · Copy · Star · Pin · Delete for me, as the phone has since 2026-10-14.
    - A quote shows inside a bubble that answers one.
    - The + menu lists Quick replies and Auto replies inside the popover, with a Back row.
-   - The mic sends text and does not record on a computer. The sticker icon does nothing yet. The phone's new Sticker panel with Recents (#425, merged the same day) is not on the desktop.
+   - The mic sends text and does not record on a computer. The sticker icon opens the phone's emoji panel (#425: its Emoji tab, Recents kept on the server through `crm_save_recent_emoji`, the keyword search) as one of the README's popovers — the design drew the icon alone (`DeskEmoji`, `desk-chat-v2.cjs` › EMOJI).
 8. **Move / Share:** a Director's Move goes to the Principal (`crm_send_to`, 30 s Undo). Share for the Principal and Director lists everybody in the CRM — Edit · All in the permission matrix.
 9. **Calendar:** for a Director, the extra "Revenue Director" chip pushes the view switch onto a second row.
 10. **Customer form:**
@@ -84,10 +84,8 @@ What was built from this handoff, what was decided along the way, where the buil
 
 ## Open — decisions for the owner
 
-1. **Apply migration `20261015100000`** to production. Asked first; not done.
-2. **Meta App Review:**
+1. **Meta App Review:**
    - `ads_read` / `ads_management` for spend, reach, clicks, budgets and Running / Paused.
    - Human Agent for Messenger after 24 h.
    - Embedded Signup to link new assets from the CRM.
-3. Member work type's launch default ("everyone Part time") — apply it to production data or not?
-4. The salesperson's (RS / TL) desktop is not built; it was not in this handoff's scope.
+2. The salesperson's (RS / TL) desktop is not built; it was not in this handoff's scope.

@@ -280,6 +280,10 @@ dragPane
 dragPerf
 dragSheet
 editInfo
+emoji
+emojiFg
+emojiOpen
+emojiToggle
 emptyHint
 emptyIcon
 emptyText

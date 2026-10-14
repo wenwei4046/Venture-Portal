@@ -172,6 +172,11 @@ export default function DeskScreens(p: DeskScreensProps) {
       async setChannel(kind, id, name, linked, isDefault) {
         return !!(await call("crm_set_channel", { p_kind: kind, p_external: id, p_name: name, p_linked: linked, p_default: isDefault }));
       },
+      saveRecents: (() => {
+        // A burst of picks is one write, as the phone's (sales/actions.ts).
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        return (list: string[]) => { if (timer) clearTimeout(timer); timer = setTimeout(() => { timer = null; void call("crm_save_recent_emoji", { p_emoji: list }); }, 1200); };
+      })(),
       async saveMeta(s) {
         if (!live) { patch({ toast: "The preview does not send anything to Meta" }); return false; }
         const r = await saveCrmChannel(s);

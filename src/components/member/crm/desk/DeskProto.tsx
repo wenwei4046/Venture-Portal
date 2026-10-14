@@ -40,7 +40,7 @@ function protoChats(p: Record<string, unknown>) {
     firstDay: "Today", pinText: String(p.chatText ?? ""), replyText: String(p.chatText ?? ""), msgs: [msg, ...appt],
     // Inbox rows: the time's colour as the design writes it (live: rust while unread).
     chats: ((p.chats ?? []) as Record<string, unknown>[]).map(c => ({ ...c, timeFg: "#A8968B" })),
-    draft: "", micD: MIC, sendTitle: "Voice note",
+    draft: "", micD: MIC, emojiOpen: false, emojiFg: "#806B60", emojiToggle: noop, emoji: null, sendTitle: "Voice note",
     setDraft: noop, draftKey: noop, send: noop, photo: noop,
     awInfo: noop, awBook: noop, openNote: noop, editInfo: noop, cyclePeriod: noop, openInfo: noop, openBook: noop, freeLabel: "Free · 2 per slot",
     kBook: false, kNote: false, kForm: false,

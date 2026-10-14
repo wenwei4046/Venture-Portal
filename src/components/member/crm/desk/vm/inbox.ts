@@ -40,7 +40,7 @@ export function inboxVM(ctx: DeskCtx) {
       pinned: !!p?.pinned, muted: !!p?.muted, unreadN: n > 0 ? (n > 99 ? "99+" : String(n)) : "", unreadDot: dot,
       timeFg: n > 0 || dot ? "#BD4A19" : "#A8968B", timeW: n > 0 || dot ? 650 : undefined,
       canSend: false, send: () => {}, sendBg: "#fff",
-      open: () => patch({ pane: "docked", kind: "chat", chat: x.id, fromTeam: false, menu: false, msgMenu: null, replyTo: null, attachOpen: false }) }; });
+      open: () => patch({ pane: "docked", kind: "chat", chat: x.id, fromTeam: false, menu: false, msgMenu: null, replyTo: null, attachOpen: false, emo: null }) }; });
 
   // Everyone: people grouped by team in team colours, whole teams, several at once (C1).
   const opt = (label: string, val: string | null, n: number, grp: [string, string] | null, av: [string, string] | null) => {

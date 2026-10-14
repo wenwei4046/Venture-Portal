@@ -85,10 +85,16 @@ const COMPOSER = [
   "The reply box can be typed in (Enter sends); the camera picks a photo; the round button sends what is typed.",
 ];
 
+const EMOJI = [
+  /(<input data-draft="1"[^\n]*\/>\s*)<span style=\{\{ flex: "0 0 auto", width: "32px", height: "32px", display: "grid", placeItems: "center", color: "#806B60" \}\}>(\s*<svg width="18" height="18"[^\n]*>\s*<path d="M20 13V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6l7-7Zm0 0h-4a3 3 0 0 0-3 3v4">\s*<\/path>\s*<\/svg>)/,
+  '$1<span title="Emoji" onClick={v.emojiToggle} style={{ position: "relative", flex: "0 0 auto", width: "32px", height: "32px", display: "grid", placeItems: "center", color: v.emojiFg, cursor: "pointer" }}>$2{!!(v.emojiOpen) && (<DeskEmoji v={v.emoji} />)}',
+  "The sticker icon opens the phone's emoji panel (its Emoji tab, Recents and search — #425) as a popover; the design drew the icon alone.",
+];
+
 const REPLY_QUOTE = [
   /(\{!!\(v\.replyOn\) && \(<>[\s\S]*?\{v\.replyWho\}<\/strong>\s*<span style=\{\{[^\n]*?\}\}>)\{v\.chatText\}/,
   "$1{v.replyText}",
   "The quote over the reply box is the message being answered (the design shows its one sample message).",
 ];
 
-module.exports = [CHAT, COMPOSER, REPLY_QUOTE];
+module.exports = [CHAT, COMPOSER, EMOJI, REPLY_QUOTE];

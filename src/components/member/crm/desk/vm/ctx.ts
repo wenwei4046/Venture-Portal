@@ -113,6 +113,8 @@ export interface DeskUi {
   meMenu: boolean;
   // The chat: + menu, the message menu (the message's id), the message under the pointer, the reply's quote.
   attachOpen: boolean; attachView: "" | "quick" | "auto"; msgMenu: string | null; msgHov: string | null; replyTo: string | null;
+  // The composer's emoji panel (the phone's Sticker panel, #425) and one's Recents as picked here.
+  emo: { ecat: string; searching: boolean; q: string } | null; recents: string[] | null;
   // Assignment
   applyChk: boolean; ftApplyChk: boolean; evOpen: Record<string, boolean>;
   adPer: "Today" | "This week" | "This month" | "Custom"; adPerOpen: boolean; adCal: boolean;
@@ -163,7 +165,7 @@ export const initialDeskUi = (): DeskUi => ({
   ntfTab: "unread", ntfCat: "all", ntfSel: false, ntfPick: {},
   book: null, cform: null, history: null, histF: "all",
   ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, paneW: null, sheetW: null, menuW: null, perfW: null, mwtLogW: null, auditW: null,
-  adLog: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null,
+  adLog: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null,
   applyChk: false, ftApplyChk: false, evOpen: {}, adPer: "This month", adPerOpen: false, adCal: false, adCust: null, adCustT: null,
   calBy: "team",
   ppF: {}, ppBy: "type", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,
@@ -201,6 +203,8 @@ export interface DeskActions {
   saveShowroomExtras(roomId: string, x: { photo: File | null; removePhoto: boolean; gmap: string; waze: string }): Promise<boolean>;
   /** Channels (v2): link / unlink an asset, its default (crm_set_channel); send a tab to Meta (saveCrmChannel). */
   setChannel(kind: "page" | "wa", id: string, name: string, linked: boolean, isDefault: boolean): Promise<boolean>;
+  /** One's emoji Recents, kept on the server as the phone keeps them (crm_save_recent_emoji). */
+  saveRecents(list: string[]): void;
   saveMeta(s: Parameters<typeof import("@/app/(member)/member/crm-channels-actions").saveCrmChannel>[0]): Promise<boolean>;
 }
 

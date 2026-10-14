@@ -150,4 +150,4 @@ Read this before changing anything it covers, and again in every full scan of su
 - Move goes to the direct upline only (the Principal has none); Share stays inside the team chain.
 - The ⋮ menu's unread, mute and pin show in the Inbox list.
 **Channels** read and write Meta from the server (`crm-channels-actions.ts`, `lib/meta/channels.ts`); the token is never shown. Linking a NEW asset happens in Meta. Link / Unlink here decides what the Inbox takes in.
-Mig `20261015100000_crm_desktop_v2` (`crm_channels`, `crm_set_channel`, `crm_note_channel_save`, the ingest gate, Range in `crm_save_form`; PGlite `validate-crm-desktop-v2.mjs`) — written, applied only on the owner's yes.
+Mig `20261015100000_crm_desktop_v2` (`crm_channels`, `crm_set_channel`, `crm_note_channel_save`, the ingest gate, Range in `crm_save_form`; PGlite `validate-crm-desktop-v2.mjs`) — applied to production 2026-10-15 on the owner's yes (md5 before / after: whatsapp 2d6e1268… → b5db8dab…, messenger 0008ed81… → 3a51446c…, save_form a5f52e73… → 495571bc…). The composer's sticker icon opens the phone's emoji panel (#425's Emoji tab and Recents, `crm_save_recent_emoji`) as a popover (`DeskEmoji`).

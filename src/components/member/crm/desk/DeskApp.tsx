@@ -8,7 +8,7 @@ import { Fragment } from "react";
 import type React from "react";
 import DH from "./desk-hover.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
-import { DeskBook, DeskCardPicker, DeskCustomerForm, DeskHistory, DeskNote } from "./DeskExtras";
+import { DeskBook, DeskCardPicker, DeskCustomerForm, DeskEmoji, DeskHistory, DeskNote } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
 /** The whole desktop CRM: the Revenue app's frame around it (sidebar, top bar), every page, pane, menu and the toast. */
@@ -4516,11 +4516,11 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     </span>
                     <span style={{ flex: "1", minWidth: "0", height: "44px", boxSizing: "border-box", padding: "0 6px 0 16px", borderRadius: "22px", border: "1px solid #EBDDD2", display: "flex", alignItems: "center", gap: "4px" }}>
                       <input data-draft="1" value={v.draft} onChange={v.setDraft} onKeyDown={v.draftKey} placeholder={v.chatReply} style={{ flex: "1", minWidth: "0", fontSize: "15px", color: "#3F2B22", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", border: "0", outline: "none", background: "transparent", padding: "0", margin: "0", fontFamily: "inherit" }} />
-                      <span style={{ flex: "0 0 auto", width: "32px", height: "32px", display: "grid", placeItems: "center", color: "#806B60" }}>
+                      <span title="Emoji" onClick={v.emojiToggle} style={{ position: "relative", flex: "0 0 auto", width: "32px", height: "32px", display: "grid", placeItems: "center", color: v.emojiFg, cursor: "pointer" }}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M20 13V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6l7-7Zm0 0h-4a3 3 0 0 0-3 3v4">
                           </path>
-                        </svg>
+                        </svg>{!!(v.emojiOpen) && (<DeskEmoji v={v.emoji} />)}
                       </span>
                     </span>
                     <span title="Send a photo" onClick={v.photo} style={{ flex: "0 0 auto", width: "38px", height: "44px", display: "grid", placeItems: "center", color: "#806B60", cursor: "pointer" }}>
