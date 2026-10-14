@@ -7,7 +7,7 @@ import { requireActionOn } from '@/lib/auth'
 import { fetchByKeys } from '@/lib/paginate'
 import { formatMoney } from '@/lib/utils'
 import { closeSnapshots, totalsThatMoved } from '@/lib/commission/closes'
-import { buildCommissionWorkbench } from '@/lib/commission/workbench'
+import { buildCommissionWorkbench, workbenchStaffIds } from '@/lib/commission/workbench'
 import { loadCommissionInput } from './_lib/commission-input'
 
 /**
@@ -80,7 +80,7 @@ export async function closeSalespeople(request: CloseRequest): Promise<CloseResu
   const runId = (run as { id: string } | null)?.id
 
   const { input } = await loadCommissionInput(period, subDepartmentId, supabase, { replayRunId: runId })
-  const staffIds = [...new Set([...input.hierarchy.map(n => n.staffId), ...input.orders.map(o => o.staffId), ...seen])]
+  const staffIds = [...new Set([...workbenchStaffIds(input), ...seen])]
   const names = await fetchByKeys<{ id: string; employee_name: string }, string>(staffIds, keys =>
     supabase.from('hr_staff_costs').select('id, employee_name').in('id', keys))
   const board = buildCommissionWorkbench(input, {
