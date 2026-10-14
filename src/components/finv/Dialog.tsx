@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useEscape } from '@/components/hrv/overlay'
 import { usePresence } from './presence'
@@ -36,18 +36,22 @@ export function FinDialog({
 }) {
   const id = useId()
   const { mounted, shown } = usePresence(open, EXIT_MS)
+  // Drawn only once the page is the browser's: a dialog open from the first render (`/payments?new=1`)
+  // has no <body> to portal to on the server, and drawing it during hydration would not match.
+  const [client, setClient] = useState(false)
+  useEffect(() => setClient(true), [])
   const close = () => {
     if (!locked) onClose()
   }
   useEscape(open, close)
   const panel = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (!open) return
+    if (!open || !client) return
     const before = document.activeElement as HTMLElement | null
     panel.current?.focus({ preventScroll: true })
     return () => before?.focus?.({ preventScroll: true })
-  }, [open])
-  if (!mounted || typeof document === 'undefined') return null
+  }, [open, client])
+  if (!mounted || !client || typeof document === 'undefined') return null
   return createPortal(
     <div className={s.dialogRoot} data-shown={shown ? 'true' : 'false'} data-fin-dialog="" data-fin-kit="">
       <div className={s.dialogScrim} onClick={close} aria-hidden="true" />

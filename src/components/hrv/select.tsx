@@ -22,8 +22,12 @@ import s from './select.module.css'
 // moves the menu with its field instead of closing it, unless the field has
 // left the screen.
 
-/** `group`: the label of the <optgroup> it sits in — drawn over the first of its options. */
-type Option = { value: string; text: string; disabled: boolean; group: string | null }
+/**
+ * `group`: the label of the <optgroup> it sits in — drawn over the first of its options. `search`: words the
+ * search box also matches though the row does not show them — an option's `data-search` (an account's code
+ * beside its name, 2026-10-14).
+ */
+type Option = { value: string; text: string; disabled: boolean; group: string | null; search: string }
 
 export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   /** The field's radius: 10, or 12 on the guest page. */
@@ -105,6 +109,7 @@ function SoftMenu({ select, onClose }: { select: HTMLSelectElement; onClose: () 
       text: o.text,
       disabled: o.disabled,
       group: o.parentElement instanceof HTMLOptGroupElement ? o.parentElement.label : null,
+      search: o.getAttribute('data-search') ?? '',
     })),
   )
   const [query, setQuery] = useState('')
@@ -113,7 +118,7 @@ function SoftMenu({ select, onClose }: { select: HTMLSelectElement; onClose: () 
   const [touch] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches)
   const current = select.value
   const searchable = options.length > 8
-  const shown = query ? options.filter(o => o.text.toLowerCase().includes(query.trim().toLowerCase())) : options
+  const shown = query ? options.filter(o => `${o.text} ${o.search}`.toLowerCase().includes(query.trim().toLowerCase())) : options
 
   const close = useCallback(() => onClose(), [onClose])
   const pick = useCallback(

@@ -54,7 +54,7 @@ export default function FinanceOverview({ user, navData, counts }: { user: User;
         </div>
         <div className={s.actions}>
           {canDo(user, 'treasury', 'create') ? (
-            <Link href="/payments/new" className={s.btn} data-kind="primary">
+            <Link href="/payments?new=1" className={s.btn} data-kind="primary">
               Create payment
             </Link>
           ) : null}

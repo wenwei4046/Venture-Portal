@@ -16,6 +16,18 @@ vi.mock('@/lib/supabase/client', () => ({
     },
   }),
 }))
+// The dialog's own behaviour is CreatePaymentDialog.test.tsx's; here, only that the hub opens and closes it.
+vi.mock('./CreatePaymentDialog', () => ({
+  default: ({ open, onClose, prefix }: { open: boolean; onClose: () => void; prefix: string }) =>
+    open ? (
+      <div data-testid="create-dialog">
+        {prefix}
+        <button type="button" onClick={onClose}>
+          Close dialog
+        </button>
+      </div>
+    ) : null,
+}))
 vi.mock('./VoucherDrawer', async (orig) => {
   const real = await orig<typeof import('./VoucherDrawer')>()
   return { ...real, VoucherDrawer: ({ id }: { id: string | null }) => (mocks.drawer(id), id ? <div data-testid="drawer">{id}</div> : null) }
@@ -96,6 +108,7 @@ const draw = (over: Partial<Parameters<typeof PaymentsHubClient>[0]> = {}) =>
       dept={[{ key: 'd1', label: 'Marketing · FB ads top-up', sub: 'RM 25,000.00 · requested 05 Oct' }]}
       payroll={[]}
       claims={[]}
+      create={{ prefix: 'HV-PV-202610', today: '2026-10-14', open: false, initial: null }}
       {...over}
     />,
   )
@@ -112,7 +125,7 @@ describe('the head', () => {
     draw()
     await act(async () => undefined)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Payments')
-    expect(screen.getByRole('link', { name: 'Create payment' })).toHaveAttribute('href', '/payments/new')
+    expect(screen.getByRole('button', { name: 'Create payment' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Dept · 1' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Payroll' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Claims' })).toBeInTheDocument()
@@ -122,7 +135,26 @@ describe('the head', () => {
     draw({ payroll: null, canCreate: false })
     await act(async () => undefined)
     expect(screen.queryByRole('button', { name: /^Payroll( · \d+)?$/ })).toBeNull()
-    expect(screen.queryByRole('link', { name: 'Create payment' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Create payment' })).toBeNull()
+  })
+
+  it('Create payment opens the dialog at once, on the page', async () => {
+    draw()
+    await act(async () => undefined)
+    expect(screen.queryByTestId('create-dialog')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Create payment' }))
+    expect(screen.getByTestId('create-dialog')).toHaveTextContent('HV-PV-202610')
+    expect(mocks.push).not.toHaveBeenCalled()
+  })
+
+  it('arrives with it open from the Overview (?new=1), and closing it leaves the URL', async () => {
+    window.history.replaceState(null, '', '/payments?new=1')
+    draw({ create: { prefix: 'HV-PV-202610', today: '2026-10-14', open: true, initial: null } })
+    await act(async () => undefined)
+    expect(screen.getByTestId('create-dialog')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
+    expect(screen.queryByTestId('create-dialog')).toBeNull()
+    expect(window.location.search).toBe('')
   })
 
   it('opens Dept Requests as a menu of what waits, each going to its page', async () => {
