@@ -112,3 +112,5 @@
 .app [data-tight] [data-fit-word], .app [data-tight] [data-fit-icon], .app [data-tight] [data-fit-long] { display: none !important; }
 .app [data-tight] [data-fit-ctl="icon"] { width: 40px !important; height: 40px !important; padding: 0 !important; gap: 0 !important; justify-content: center !important; border-radius: 50% !important; }
 .app [data-tight] [data-fit-ctl="words"] { padding: 0 12px !important; }
+/* …and Profile's card: a name that would take more lines than it may beside the corner buttons sits under them, full width. */
+.app [data-tight] [data-fit-pad] { padding-right: 0 !important; padding-top: 44px !important; }

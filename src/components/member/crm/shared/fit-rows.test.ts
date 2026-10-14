@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fitRows, titleCut } from "./fit-rows";
 
 // A title row beside Team | Mine, the house and the bell (2026-10-14): tight only when its title would be cut. The test
@@ -34,5 +34,18 @@ describe("fitting a title row", () => {
 
   it("a pixel of rounding is not a cut", () => {
     expect(titleCut(row({ scroll: 121, client: 120 }))).toBe(false);
+  });
+
+  it("a title that may wrap is cut only past the lines it may take (Profile's name: one)", () => {
+    const card = row({ scroll: 94, client: 94 });
+    card.querySelector("h1")!.setAttribute("data-fit-lines", "1");
+    const lines = (n: number) => vi.spyOn(document, "createRange").mockReturnValue({
+      selectNodeContents: () => {}, getClientRects: () => Array.from({ length: n * 2 }, (_, i) => ({ top: 10 + Math.floor(i / 2) * 29 })),
+    } as unknown as Range);
+    lines(1);
+    expect(titleCut(card)).toBe(false);
+    lines(3); // "LOO / WEN / WEI" beside three round buttons
+    expect(titleCut(card)).toBe(true);
+    vi.restoreAllMocks();
   });
 });
