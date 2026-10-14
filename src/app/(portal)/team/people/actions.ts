@@ -3,9 +3,12 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn } from '@/lib/auth'
-import { validateStaffForm, designationForTitle, payFieldsForUpdate } from '@/lib/staff-form'
+import { validateStaffForm, designationForTitle, payPatchForUpdate } from '@/lib/staff-form'
+import { asksPay, payModeOf } from '@/lib/person-record'
+import { readStaffPrivate } from '@/lib/private-fields'
 import { validateSecondaryStaffBankAccount } from '@/lib/staff-bank-accounts'
 import { isMasked, sees } from '@/lib/sensitive'
+import type { TablesUpdate } from '@/lib/supabase/database.types'
 
 function trimOrNull(v: FormDataEntryValue | null): string | null {
   if (typeof v !== 'string') return null
@@ -125,118 +128,160 @@ export async function addStaff(formData: FormData) {
   revalidatePath('/revenue', 'layout')
 }
 
-export async function updateStaff(id: string, formData: FormData) {
-  const editor = await requireActionOn('/team/people/[id]/edit', 'team', 'edit')
-  const supabase = await createClient()
+/**
+ * What a save of a person's record answers (2026-10-14). A refusal comes back
+ * in words: production hands a thrown message to the browser only as a
+ * digest, and the person's page shows the reason in its save bar.
+ */
+export type StaffSaveOutcome = { ok: true } | { ok: false; reason: string }
+
+/**
+ * Saving a person's record — edited where it stands on their full page since
+ * 2026-10-14, which is the page this write belongs to.
+ */
+export async function updateStaff(id: string, formData: FormData): Promise<StaffSaveOutcome> {
+  const editor = await requireActionOn('/team/people/[id]', 'team', 'edit')
 
   // The form writes pay, so it is an editor whose title ticks Salary amounts
   // (2026-10-09, PR4) — anybody else was never shown the figures it saves.
   if (!sees(editor, 'salary')) {
-    throw new Error('Editing a person needs Salary amounts ticked for your title — the form saves their pay.')
+    return { ok: false, reason: 'Editing a person needs Salary amounts ticked for your title — the form saves their pay.' }
   }
+
+  try {
+    await writeStaff(editor, id, formData)
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : 'Could not save. Please try again.' }
+  }
+
+  revalidatePath('/hr-costing')
+  // The org chart draws the title, the ladder rung it stands on and the rank —
+  // all three can change here, so the graph is stale until this runs. Its
+  // absence was why a title edited on People did not show on Hierarchy until
+  // the next hard reload. `/team` holds the person's own page too.
+  revalidatePath('/team', 'layout')
+  revalidatePath('/revenue', 'layout')
+  return { ok: true }
+}
+
+/**
+ * The save itself — only the fields the page sent, which are the ones that
+ * changed (2026-10-14): a field left out is not touched, so a save never
+ * writes back what somebody else changed after the page was opened (another
+ * HR, or the same shared login on another computer). Every refusal is a
+ * sentence for whoever is at the screen.
+ */
+async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, id: string, formData: FormData) {
+  const supabase = await createClient()
+  const sent = (key: string) => formData.has(key)
+  const text = (key: string) => (formData.get(key) as string | null) ?? ''
 
   // NRIC and the bank accounts are written only by an editor whose title
   // ticks them, and only when the form carried them (2026-10-09, PR4). An
   // editor without the tick was shown •••• and sent nothing; the save must
   // leave them exactly as they were — before, a form without the field wrote
   // NULL over it.
-  const writesNric = sees(editor, 'nric') && formData.has('nric')
-  const writesBank = sees(editor, 'bank') && (formData.has('bank_name') || formData.has('bank_account_no'))
+  const writesNric = sees(editor, 'nric') && sent('nric')
+  const writesBank1 = sees(editor, 'bank') && (sent('bank_name') || sent('bank_account_no'))
+  const writesBank2 = sees(editor, 'bank') && (sent('bank_name_2') || sent('bank_account_no_2'))
   for (const key of ['nric', 'bank_account_no', 'bank_account_no_2']) {
-    if (isMasked(((formData.get(key) as string | null) ?? '').trim())) {
+    if (isMasked(text(key).trim())) {
       throw new Error('That number is hidden from you, so it cannot be saved — leave it as it is.')
     }
   }
 
-  const hireDate = (formData.get('hire_date') as string) || null
-  const resignDate = (formData.get('resignation_date') as string) || null
-  const employeeCode = ((formData.get('employee_code') as string) || '').trim() || null
-  // InfoTech's own number (2026-09-12). Only a form that carries the field
-  // may change it; blank clears it — unlike the HV code, it is not ours to
-  // keep, and a wrong one would match the wrong file row.
-  const infotech = formData.has('infotech_code')
-    ? { infotech_code: ((formData.get('infotech_code') as string) || '').trim() || null }
-    : {}
-  const bankName = ((formData.get('bank_name') as string) || '').trim() || null
-  const bankAccountNo = ((formData.get('bank_account_no') as string) || '').trim() || null
-  // Older clients and imports that only carry Account 1 must not clear Account 2.
-  const secondBank = writesBank && (formData.has('bank_name_2') || formData.has('bank_account_no_2'))
-    ? validateSecondaryStaffBankAccount({
-        bankName, bankAccountNo,
-        bankName2: str(formData, 'bank_name_2'),
-        bankAccountNo2: str(formData, 'bank_account_no_2'),
-      })
-    : null
-  const nric = ((formData.get('nric') as string) || '').replace(/[-\s]/g, '') || null
-
-  // Pay and statutory. lib/staff-form.ts decides what a save writes: the
-  // "Fully commission based" tick writes the four columns that say so and
-  // leaves the categories alone (they were not on the form); the "Variable
-  // pay" tick writes the three amounts as 0 and the categories with them;
-  // otherwise every field is on the form, and every one is checked before it
-  // is written.
-  const pay = payFieldsForUpdate({
-    fullCommission: formData.get('full_commission') === 'on',
-    variablePay: formData.get('variable_pay') === 'on',
-    employmentType: str(formData, 'employment_type'),
-    basicSalary: str(formData, 'basic_salary'),
-    allowances: str(formData, 'allowances'),
-    nonStatutoryAllowance: str(formData, 'non_statutory_allowance'),
-    epfCategory: str(formData, 'epf_category'),
-    socsoCategory: str(formData, 'socso_category'),
-    isEpfExempt: formData.get('is_epf_exempt') === 'on',
-    pcbCategory: str(formData, 'pcb_category'),
-    childrenCount: str(formData, 'children_count'),
-  })
-
-  // The title dropdown. Department is fixed on this form, so the row says
-  // which department a title has to fit. An unchanged title is left alone: a
-  // title deactivated while somebody held it is still theirs (deactivating
-  // is what the roles page offers instead of deleting one out from under its
-  // holders), and re-saving their record must not fail on it.
   const { data: current } = await supabase
     .from('hr_staff_costs')
-    .select('department_id, title_id')
+    .select('department_id, title_id, employment_type, bank_name, departments(payroll_source)')
     .eq('id', id)
     .maybeSingle()
   if (!current) throw new Error('That person is no longer on the roster')
 
-  const titleId = trimOrNull(formData.get('title_id'))
-  let titleChange: { title_id: string | null; designation: string | null } | Record<string, never> = {}
-  if (titleId !== (current.title_id ?? null)) {
-    if (titleId) {
-      const { data: title } = await supabase
-        .from('titles')
-        .select('id, name, department_id, is_active')
-        .eq('id', titleId)
-        .maybeSingle()
-      titleChange = { title_id: titleId, designation: designationForTitle(title, current.department_id) }
-    } else {
-      titleChange = { title_id: null, designation: null }
+  const patch: TablesUpdate<'hr_staff_costs'> = {}
+
+  if (sent('name')) {
+    const name = text('name').trim()
+    if (!name) throw new Error('A name is required')
+    patch.employee_name = name
+  }
+
+  // The title dropdown. Department is fixed here, so the row says which
+  // department a title has to fit. An unchanged title is left alone: a title
+  // deactivated while somebody held it is still theirs (deactivating is what
+  // the roles page offers instead of deleting one out from under its
+  // holders), and saving their record must not fail on it.
+  if (sent('title_id')) {
+    const titleId = trimOrNull(formData.get('title_id'))
+    if (titleId !== (current.title_id ?? null)) {
+      if (titleId) {
+        const { data: title } = await supabase
+          .from('titles')
+          .select('id, name, department_id, is_active')
+          .eq('id', titleId)
+          .maybeSingle()
+        Object.assign(patch, { title_id: titleId, designation: designationForTitle(title, current.department_id) })
+      } else {
+        Object.assign(patch, { title_id: null, designation: null })
+      }
     }
   }
 
-  const { error } = await supabase
-    .from('hr_staff_costs')
-    .update({
-      employee_name: formData.get('name') as string,
-      ...titleChange,
-      ...pay,
-      employee_code: employeeCode,
-      ...infotech,
-      hire_date: hireDate,
-      resignation_date: resignDate,
-      ...(writesBank ? { bank_name: bankName, bank_account_no: bankAccountNo } : {}),
-      ...(secondBank ? { bank_name_2: secondBank.bankName2, bank_account_no_2: secondBank.bankAccountNo2 } : {}),
-      ...(writesNric ? { nric } : {}),
-      contact_number: trimOrNull(formData.get('contact_number')),
-      email: trimOrNull(formData.get('email')),
-      address: trimOrNull(formData.get('address')),
-      emergency_contact_name: trimOrNull(formData.get('emergency_contact_name')),
-      emergency_contact_phone: trimOrNull(formData.get('emergency_contact_phone')),
-      emergency_contact_relationship: trimOrNull(formData.get('emergency_contact_relationship')),
+  // Pay and statutory (lib/staff-form.ts): a new pay basis writes what it
+  // means — the old Edit form's ticks or its select — and each amount or
+  // category sent is checked before it is written. Amounts without a new
+  // basis must land on a fixed pay as the record has it NOW.
+  const dept = current.departments as { payroll_source?: string | null } | null
+  Object.assign(
+    patch,
+    payPatchForUpdate({
+      mode: formData.get('full_commission') === 'on' ? 'full_commission' : formData.get('variable_pay') === 'on' ? 'variable' : str(formData, 'employment_type'),
+      fixedPayNow: asksPay(payModeOf({ employment_type: current.employment_type, commission_dept: dept?.payroll_source === 'commission' })),
+      basicSalary: sent('basic_salary') ? text('basic_salary') : undefined,
+      allowances: sent('allowances') ? text('allowances') : undefined,
+      nonStatutoryAllowance: sent('non_statutory_allowance') ? text('non_statutory_allowance') : undefined,
+      epfCategory: sent('epf_category') ? text('epf_category') : undefined,
+      socsoCategory: sent('socso_category') ? text('socso_category') : undefined,
+      isEpfExempt: sent('is_epf_exempt') ? formData.get('is_epf_exempt') === 'on' : undefined,
+      pcbCategory: sent('pcb_category') ? text('pcb_category') : undefined,
+      childrenCount: sent('children_count') ? text('children_count') : undefined,
+    }),
+  )
+
+  // A blank HV code keeps the one they have (the code trigger, 2026-09-12).
+  if (sent('employee_code')) patch.employee_code = text('employee_code').trim() || null
+  // InfoTech's own number (2026-09-12): blank clears it — unlike the HV code,
+  // it is not ours to keep, and a wrong one would match the wrong file row.
+  if (sent('infotech_code')) patch.infotech_code = text('infotech_code').trim() || null
+  if (sent('hire_date')) patch.hire_date = text('hire_date') || null
+  if (sent('resignation_date')) patch.resignation_date = text('resignation_date') || null
+  if (writesNric) patch.nric = text('nric').replace(/[-\s]/g, '') || null
+  for (const key of ['contact_number', 'email', 'address', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'] as const) {
+    if (sent(key)) patch[key] = trimOrNull(formData.get(key))
+  }
+
+  // A bank account is its bank and its number, sent together. Account 2,
+  // when sent, is checked against Account 1 as the record will hold it —
+  // the one sent beside it, or the one on file.
+  const bankName = writesBank1 ? trimOrNull(formData.get('bank_name')) : current.bank_name
+  const bankAccountNo = writesBank1
+    ? trimOrNull(formData.get('bank_account_no'))
+    : writesBank2
+      ? ((await readStaffPrivate(supabase, editor, [id])).get(id)?.bank_account_no ?? null)
+      : null
+  if (writesBank1) Object.assign(patch, { bank_name: bankName, bank_account_no: bankAccountNo })
+  if (writesBank2) {
+    const second = validateSecondaryStaffBankAccount({
+      bankName,
+      bankAccountNo,
+      bankName2: str(formData, 'bank_name_2'),
+      bankAccountNo2: str(formData, 'bank_account_no_2'),
     })
-    .eq('id', id)
+    Object.assign(patch, { bank_name_2: second.bankName2, bank_account_no_2: second.bankAccountNo2 })
+  }
+
+  if (Object.keys(patch).length === 0) return
+
+  const { error } = await supabase.from('hr_staff_costs').update(patch).eq('id', id)
 
   if (error) {
     if (error.code === '23505') {
@@ -253,15 +298,6 @@ export async function updateStaff(id: string, formData: FormData) {
   // database does the assigning: `hr_staff_costs_one_line_sync` raises the
   // commission rank to the new title's floor (never lowers it) in the same
   // statement as the title write. Nothing to call, nothing to report.
-
-  revalidatePath('/hr-costing')
-  revalidatePath(`/team/people/${id}/edit`)
-  // The org chart draws the title, the ladder rung it stands on and the rank —
-  // all three can change here, so the graph is stale until this runs. Its
-  // absence was why a title edited on People did not show on Hierarchy until
-  // the next hard reload.
-  revalidatePath('/team', 'layout')
-  revalidatePath('/revenue', 'layout')
 }
 
 /**
@@ -279,7 +315,8 @@ export async function updateStaff(id: string, formData: FormData) {
  * until the next hard reload.
  */
 async function setEmployment(id: string, status: 'active' | 'inactive') {
-  await requireActionOn('/team/people/[id]/edit', 'team', 'edit')
+  // Its buttons are on the person's full page (PersonChanges › Employment).
+  await requireActionOn('/team/people/[id]', 'team', 'edit')
   const supabase = await createClient()
 
   const { error } = await supabase.from('hr_staff_costs').update({ status }).eq('id', id)

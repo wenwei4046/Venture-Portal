@@ -1160,6 +1160,13 @@ The dense kit for lists of short strings, never money. It now serves the payroll
 - **The grid** — a band per department ("· N incomplete" in amber), then rows of: tile (an orange rim when they can sign in), name, title + L-level, rank chip, code, status, Last seen. Right-click opens the row menu.
 - **The person window** (760px; 900 on a login's Permissions) — Details and History tabs, "missing" in amber, then *Esc closes.* · Full page.
 - **Invite user** (466px) — Email, Password with Regenerate, Role, then *Send invite*.
+- **The full page edits where it stands** (v4.10; `PersonRecord`, `person-record.module.css`). *Edit* opens no other page: each row's value becomes its field in the same section.
+  - Title, Employment Type and the statutory categories are soft dropdowns; the text fields match them (radius 10, white, hairline). The name is edited in the title's place and face, over a dashed line as long as the name. On a phone each label stands over its field, and the name keeps the title's size over the 16px field rule.
+  - Department, Account and Role read as they did. An unticked NRIC or bank account is a quiet box with no field behind it (A hidden value).
+  - Employment Type is one select of the department's choices: *Fully commission based* / *Salaried* in a commission department, *Variable pay* / *Salaried* in the Director department, *Salaried* / *Commission-eligible* elsewhere. The salary and statutory rows follow it as they read.
+  - A changed field turns peach. The kit's peach save bar sticks to the sheet's foot (above the phone's tab bar outside HR's frame): *Editing · N changes* · *Cancel* · *Save changes*, off until something changed. A refusal replaces the count in red until the next edit.
+  - *Save changes* sends only the changed fields (a bank account whole), so it never puts back a value somebody changed after the page was opened. The bar reads *Saving…* until the fresh record is in, then the page reads it with the kit's toast — never the old values in between.
+  - No example values in empty fields — on a record they read as data on file. The old `/team/people/[id]/edit` opens this page with its fields out (`?edit=1`).
 
 ### Hierarchy (v3.26, 2026-10-10)
 
@@ -1428,6 +1435,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.10** · 2026-10-14 · A person's full page edits where it stands: *Edit* turns each value into its field, Employment Type one select, the peach save bar at the sheet's foot, a save sends only what changed; the Edit page sends here → People
 - **v4.9** · 2026-10-14 · A payment voucher's full page: the crumb, the number with its status and four facts, the numbered cards (Pay to, Deducted from, the files, the trail across, the audit log) beside the sticky dark panel → Finance's view — a voucher's full page
 - **v4.8** · 2026-10-14 · Payments' hub: the status cards beside the list, the table's column tools (sort, filter, move, widen, Columns), the payroll batches, the right drawer a row opens → Finance's view — the hubs
 - **v4.7** · 2026-10-14 · The CRM Profile's *Back to Revenue app* card is gone: the house beside the bell is the way back → The Revenue app — the refresh
