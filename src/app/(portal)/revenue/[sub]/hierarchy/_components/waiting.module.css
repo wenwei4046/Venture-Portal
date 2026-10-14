@@ -318,3 +318,27 @@
 .mustUpload:focus-visible { outline: 2px solid rgb(var(--hv-ink)); outline-offset: 3px; border-radius: 4px; }
 .formError { margin: 0; font-size: 12.5px; color: rgb(var(--hv-danger)); align-self: center; margin-right: auto; }
 .save { padding: 8px 16px; }
+
+/* ── The uploaded form's View (2026-10-14): Documentation's preview drawer, the file alone ── */
+.viewHead { display: flex; align-items: flex-start; gap: 12px; padding: 18px 22px 16px; border-bottom: 1px solid rgb(var(--hv-hairline)); }
+.viewWho { flex: 1; min-width: 0; }
+.viewKicker { font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(var(--hv-brown)); }
+.viewTitle { font-size: 17px; font-weight: 500; margin-top: 6px; overflow-wrap: anywhere; }
+.viewDownload {
+  flex: none;
+  padding: 7px 12px;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: normal;
+  background: transparent;
+  color: rgb(var(--hv-ink));
+}
+.viewDownload:hover { border-color: rgb(var(--hv-accent)); }
+.viewDownload:focus-visible { outline: 2px solid rgb(var(--hv-ink)); outline-offset: 2px; }
+.viewBody { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: 20px; background: rgb(var(--hv-panel)); }
+.viewFrame { flex: 1; width: 100%; min-height: 560px; border: 0; background: rgb(255 255 255); box-shadow: 0 1px 3px rgb(var(--hv-dark) / 0.12); }
+.viewImg { width: 100%; height: auto; background: rgb(255 255 255); box-shadow: 0 1px 3px rgb(var(--hv-dark) / 0.12); }
+.viewNone { margin: auto; text-align: center; color: rgb(var(--hv-body-2)); font-size: 13px; line-height: 1.6; }

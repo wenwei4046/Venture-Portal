@@ -36,6 +36,10 @@ import { loadMemberForm } from './_lib/waiting-form'
  * "+" (2026-10-11) puts somebody straight onto the list: `addToWaitingList`,
  * the page's own action gate (Member services · Edit) and the same key.
  *
+ * The uploaded form's right-click menu (2026-10-14): View (`viewFormTemplate`)
+ * and Remove (`removeFormTemplate` — the next version without the file, then
+ * the file out of the bucket), under the same key as Upload form.
+ *
  * Refusals come back as `{ ok: false, reason }`: a thrown message never
  * reaches the browser in production.
  */
@@ -165,25 +169,71 @@ export async function uploadReplacementFormTemplate(formData: FormData): Promise
   return uploadTemplate('replacement', formData)
 }
 
-async function templateLink(kind: MemberFormKind): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
+export type FormFileLink = { ok: true; url: string; name: string } | { ok: false; reason: string }
+
+async function templateLink(kind: MemberFormKind, view = false): Promise<FormFileLink> {
   if (!(await manages())) return { ok: false, reason: kind === 'replacement' ? NO_ACCESS_REPLACEMENT : NO_ACCESS }
   const current = await loadMemberForm(kind)
   if (!current.ok) return current
   if (!current.form.templatePath) return { ok: false, reason: 'No form has been uploaded — the built form is the one members download.' }
+  // A download hands the file over under its name; a view opens it where it is, for five minutes.
   const { data, error } = await (await client()).storage
     .from(BUCKET)
-    .createSignedUrl(current.form.templatePath, 60, { download: current.form.templateName })
+    .createSignedUrl(current.form.templatePath, view ? 300 : 60, view ? undefined : { download: current.form.templateName })
   if (error || !data) return { ok: false, reason: 'The form could not be opened. Please try again.' }
-  return { ok: true, url: data.signedUrl }
+  return { ok: true, url: data.signedUrl, name: current.form.templateName }
 }
 
 /** Download of HR's uploaded form: a link that works for a minute. */
-export async function waitingFormTemplateLink(): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
+export async function waitingFormTemplateLink(): Promise<FormFileLink> {
   return templateLink('waiting')
 }
 
-export async function replacementFormTemplateLink(): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
+export async function replacementFormTemplateLink(): Promise<FormFileLink> {
   return templateLink('replacement')
+}
+
+const isFormKind = (kind: unknown): kind is MemberFormKind => kind === 'waiting' || kind === 'replacement'
+
+/**
+ * View, on the uploaded form's right-click menu (2026-10-14, the user: "right
+ * click 然后按 view"): a link that opens the file itself, not a download — the
+ * page draws it.
+ */
+export async function viewFormTemplate(kind: MemberFormKind): Promise<FormFileLink> {
+  if (!isFormKind(kind)) return { ok: false, reason: 'Reload the page and try again.' }
+  return templateLink(kind, true)
+}
+
+export type RemoveFormOutcome = { ok: true; form: WaitingForm; fileDeleted: boolean } | { ok: false; reason: string }
+
+/**
+ * Remove, on the same menu (the user: "如果我 upload 错的话，我需要 remove 掉",
+ * and the file with it — "连档案一起删掉"): the next version of the form
+ * without HR's file, so members download the form built from the questions
+ * again; then the file itself leaves the bucket under this session (mig
+ * 20261014244500: a manager deletes a template no form uses now). `path` is
+ * the file the page showed — when the form has changed since, nothing is done.
+ */
+export async function removeFormTemplate(kind: MemberFormKind, path: string): Promise<RemoveFormOutcome> {
+  if (!isFormKind(kind) || typeof path !== 'string' || !path) return { ok: false, reason: 'Reload the page and try again.' }
+  if (!(await manages())) return { ok: false, reason: kind === 'replacement' ? NO_ACCESS_REPLACEMENT : NO_ACCESS }
+  const current = await loadMemberForm(kind)
+  if (!current.ok) return current
+  if (current.form.templatePath !== path) {
+    return {
+      ok: false,
+      reason: current.form.templatePath
+        ? 'Another form was uploaded in the meantime. Reload the page.'
+        : 'This form has been removed already. Reload the page.',
+    }
+  }
+  const supabase = await client()
+  const saved = await saveVersion(supabase, kind, current.form.fields, current.form.requireUpload, null, FORM_KINDS[kind].formName)
+  if (!saved.ok) return saved
+  // The Storage API answers a refused delete with nothing deleted, not an error.
+  const { data, error } = await supabase.storage.from(BUCKET).remove([path])
+  return { ok: true, form: saved.form, fileDeleted: !error && (data?.length ?? 0) > 0 }
 }
 
 export type WaitingAddOutcome = { ok: true; requestNo: string | null } | { ok: false; reason: string }

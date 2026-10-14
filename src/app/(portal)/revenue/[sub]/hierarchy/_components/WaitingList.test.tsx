@@ -20,8 +20,13 @@ const actions = vi.hoisted(() => ({
   uploadWaitingFormTemplate: vi.fn(),
   saveWaitingForm: vi.fn(),
   waitingFormTemplateLink: vi.fn(),
+  replacementFormTemplateLink: vi.fn(),
+  viewFormTemplate: vi.fn(),
+  removeFormTemplate: vi.fn(),
 }))
 vi.mock('../../../waiting-actions', () => actions)
+const convertToHtml = vi.hoisted(() => vi.fn())
+vi.mock('mammoth', () => ({ convertToHtml }))
 
 import WaitingList from './WaitingList'
 
@@ -78,9 +83,13 @@ function show(over: Partial<Parameters<typeof WaitingList>[0]> = {}) {
 beforeEach(() => {
   push.mockReset()
   flash.mockReset()
+  convertToHtml.mockReset()
   for (const fn of Object.values(actions)) fn.mockReset()
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
 describe('the list', () => {
   it('numbers the accepted applicants in the order they were accepted — nobody failed or still pending', () => {
@@ -336,6 +345,149 @@ describe('Upload form', () => {
     })
     expect(actions.uploadWaitingFormTemplate).not.toHaveBeenCalled()
     expect(flash).toHaveBeenCalledWith('Upload a PDF, Word, HTML, PNG or JPEG file.')
+  })
+})
+
+// The uploaded form's right-click menu (2026-10-14, the user: "right click 然后按 view，同时也可以按
+// remove。因为如果我 upload 错的话，我需要 remove 掉" — and the file with it).
+describe('the uploaded form’s right-click menu', () => {
+  const DOCX = 'templates/0b3fb828/Revenue_Team_Waiting_List_Form.docx'
+  const uploaded = (name = 'Revenue_Team_Waiting_List_Form.docx', path = DOCX): WaitingForm => ({ ...V1, version: 2, templatePath: path, templateName: name })
+  const chip = (name = 'Revenue_Team_Waiting_List_Form.docx') => screen.getByText(`Form: ${name}`).closest('label')!
+  const openMenu = (name?: string) => fireEvent.contextMenu(chip(name))
+
+  it('opens on the uploaded form with its name, View and Remove…', () => {
+    show({ form: { ok: true, form: uploaded() } })
+    expect(openMenu()).toBe(false) // the browser's own menu stays shut
+    const menu = screen.getByRole('menu', { name: 'Uploaded form Revenue_Team_Waiting_List_Form.docx' })
+    expect(menu).toHaveTextContent('Revenue_Team_Waiting_List_Form.docx')
+    expect(within(menu).getAllByRole('menuitem').map(b => b.textContent)).toEqual(['View', 'Remove…'])
+  })
+
+  it('has no menu while nothing is uploaded, and Shift + right-click keeps the browser’s', () => {
+    show()
+    expect(fireEvent.contextMenu(screen.getByText('Upload form').closest('label')!)).toBe(true)
+    expect(screen.queryByRole('menu')).toBeNull()
+    cleanup()
+    show({ form: { ok: true, form: uploaded() } })
+    expect(fireEvent.contextMenu(chip(), { shiftKey: true })).toBe(true)
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('asks before Remove; Cancel goes back to the menu', () => {
+    show({ form: { ok: true, form: uploaded() } })
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove…' }))
+    const ask = screen.getByRole('dialog', { name: 'Remove Revenue_Team_Waiting_List_Form.docx' })
+    expect(ask).toHaveTextContent('Remove this form?')
+    expect(ask).toHaveTextContent('Members download the built form until another is uploaded. Revenue_Team_Waiting_List_Form.docx is deleted.')
+    fireEvent.click(within(ask).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    expect(actions.removeFormTemplate).not.toHaveBeenCalled()
+  })
+
+  it('Remove takes the file off the form and out of the bucket, and the button reads Upload form again', async () => {
+    actions.removeFormTemplate.mockResolvedValue({ ok: true, form: { ...V1, version: 3 }, fileDeleted: true })
+    show({ form: { ok: true, form: uploaded() } })
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove…' }))
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }))
+    })
+    expect(actions.removeFormTemplate).toHaveBeenCalledExactlyOnceWith('waiting', DOCX)
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(screen.getByText('Upload form')).toBeInTheDocument()
+    expect(screen.queryByText(/^Form: /)).toBeNull()
+    expect(flash).toHaveBeenCalledWith('Revenue_Team_Waiting_List_Form.docx removed — members download the built form')
+  })
+
+  it('says so when the form is off but its file stayed in the bucket', async () => {
+    actions.removeFormTemplate.mockResolvedValue({ ok: true, form: { ...V1, version: 3 }, fileDeleted: false })
+    show({ form: { ok: true, form: uploaded() } })
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove…' }))
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }))
+    })
+    expect(flash).toHaveBeenCalledWith(
+      'Revenue_Team_Waiting_List_Form.docx is off the form — members download the built form, but the file could not be deleted',
+    )
+  })
+
+  it('a refused Remove says why in the menu and keeps the form', async () => {
+    actions.removeFormTemplate.mockResolvedValue({ ok: false, reason: 'Another form was uploaded in the meantime. Reload the page.' })
+    show({ form: { ok: true, form: uploaded() } })
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove…' }))
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }))
+    })
+    expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('Another form was uploaded in the meantime. Reload the page.')
+    expect(chip()).toBeInTheDocument()
+    expect(flash).not.toHaveBeenCalled()
+  })
+
+  it('View opens a PDF in the browser’s own viewer', async () => {
+    // A data: link, so the test frame loads nothing from the network.
+    actions.viewFormTemplate.mockResolvedValue({ ok: true, url: 'data:application/pdf;base64,JVBERi0xLjQK', name: 'Form.pdf' })
+    show({ form: { ok: true, form: uploaded('Form.pdf', 'templates/x/Form.pdf') } })
+    openMenu('Form.pdf')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'View' }))
+    })
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(actions.viewFormTemplate).toHaveBeenCalledExactlyOnceWith('waiting')
+    const drawer = screen.getByRole('dialog', { name: 'Form.pdf' })
+    expect(drawer).toHaveTextContent('Waiting list · Uploaded form')
+    expect(drawer.querySelector('iframe')).toHaveAttribute('src', 'data:application/pdf;base64,JVBERi0xLjQK')
+  })
+
+  it('View reads a Word file here and draws it in a frame where nothing runs', async () => {
+    actions.viewFormTemplate.mockResolvedValue({ ok: true, url: 'https://files.test/sign/form.docx?token=t', name: 'Revenue_Team_Waiting_List_Form.docx' })
+    const fetched = vi.fn(async () => new Response(new Uint8Array([80, 75, 3, 4])))
+    vi.stubGlobal('fetch', fetched)
+    convertToHtml.mockResolvedValue({ value: '<p>REVENUE TEAM WAITING LIST FORM</p><table><tr><td>Name</td></tr></table>', messages: [] })
+    show({ form: { ok: true, form: uploaded() } })
+    openMenu()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'View' }))
+    })
+    const drawer = screen.getByRole('dialog', { name: 'Revenue_Team_Waiting_List_Form.docx' })
+    await waitFor(() => expect(drawer.querySelector('iframe')).not.toBeNull())
+    expect(fetched).toHaveBeenCalledWith('https://files.test/sign/form.docx?token=t', expect.anything())
+    expect((convertToHtml.mock.calls[0][0] as { arrayBuffer: ArrayBuffer }).arrayBuffer.byteLength).toBe(4)
+    const frame = drawer.querySelector('iframe')!
+    expect(frame).toHaveAttribute('sandbox', '')
+    expect(frame.getAttribute('srcdoc')).toContain('<p>REVENUE TEAM WAITING LIST FORM</p><table><tr><td>Name</td></tr></table>')
+  })
+
+  it('an old .doc cannot be drawn: Download', async () => {
+    actions.viewFormTemplate.mockResolvedValue({ ok: true, url: 'https://files.test/sign/form.doc?token=t', name: 'Form.doc' })
+    actions.waitingFormTemplateLink.mockResolvedValue({ ok: false, reason: 'The form could not be opened. Please try again.' })
+    show({ form: { ok: true, form: uploaded('Form.doc', 'templates/x/Form.doc') } })
+    openMenu('Form.doc')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'View' }))
+    })
+    const drawer = screen.getByRole('dialog', { name: 'Form.doc' })
+    expect(drawer).toHaveTextContent('No preview for .doc files.Download it to open.')
+    expect(drawer.querySelector('iframe')).toBeNull()
+    await act(async () => {
+      fireEvent.click(within(drawer).getByRole('button', { name: 'Download' }))
+    })
+    expect(actions.waitingFormTemplateLink).toHaveBeenCalledTimes(1)
+    expect(flash).toHaveBeenCalledWith('The form could not be opened. Please try again.')
+  })
+
+  it('says why when the file cannot be opened', async () => {
+    actions.viewFormTemplate.mockResolvedValue({ ok: false, reason: 'No form has been uploaded — the built form is the one members download.' })
+    show({ form: { ok: true, form: uploaded() } })
+    openMenu()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'View' }))
+    })
+    expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('No form has been uploaded — the built form is the one members download.')
   })
 })
 

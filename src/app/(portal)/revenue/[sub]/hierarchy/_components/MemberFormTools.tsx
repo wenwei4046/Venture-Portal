@@ -1,16 +1,20 @@
 'use client'
 
-import { useRef, useState, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { flash } from '@/components/hrv/toast'
 import { TEMPLATE_ACCEPT, templateRefusal, type MemberFormKind, type WaitingForm } from '@/lib/commission/waiting-form'
-import { uploadReplacementFormTemplate, uploadWaitingFormTemplate } from '../../../waiting-actions'
+import { removeFormTemplate, uploadReplacementFormTemplate, uploadWaitingFormTemplate } from '../../../waiting-actions'
+import type { MenuAnchor } from './ContextMenuPanel'
+import FormFileMenu from './FormFileMenu'
+import FormFileViewer from './FormFileViewer'
 import WaitingFormSettings from './WaitingFormSettings'
 import w from './waiting.module.css'
 
 // Above the Waiting list (2026-10-10) and, since round 2 (2026-10-11, README
 // 18.5), the Replacement list: Upload form — HR's own form, the one Revenue
 // members download — and Form settings, the questions they answer. Each list
-// has its own versions; the tools are the same.
+// has its own versions; the tools are the same. Once a form is uploaded its
+// chip ("Form: name") has a right-click menu (2026-10-14): View and Remove.
 
 const WORDS: Readonly<Record<MemberFormKind, { title: string; uploaded: (name: string) => string }>> = {
   waiting: {
@@ -52,6 +56,14 @@ export default function MemberFormTools({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [menu, setMenu] = useState<{ anchor: MenuAnchor; path: string; name: string } | null>(null)
+  const [viewing, setViewing] = useState<string | null>(null)
+  const [removing, setRemoving] = useState(false)
+  const [removeError, setRemoveError] = useState<string | null>(null)
+  const closeMenu = useCallback(() => {
+    setMenu(null)
+    setRemoveError(null)
+  }, [])
 
   async function upload(file: File | undefined) {
     if (!file || uploading) return
@@ -76,6 +88,53 @@ export default function MemberFormTools({
 
   const uploaded = form?.templatePath ? form.templateName : null
 
+  // A right-click on an uploaded form's chip opens its menu where the pointer is (from the keys —
+  // Shift + F10, the menu key — under the chip). Shift + right-click keeps the browser's own.
+  function openMenu(event: MouseEvent<HTMLLabelElement>) {
+    if (event.shiftKey || !form?.templatePath || uploading) return
+    event.preventDefault()
+    const chip = event.currentTarget.getBoundingClientRect()
+    const atPointer = event.clientX !== 0 || event.clientY !== 0
+    setRemoveError(null)
+    setMenu({
+      anchor: atPointer ? { left: event.clientX, top: event.clientY, bottom: event.clientY } : { left: chip.left, top: chip.bottom, bottom: chip.bottom },
+      path: form.templatePath,
+      name: form.templateName,
+    })
+  }
+
+  // The chip takes focus back when its menu goes — never a menu that is gone (the drawer, too, gives focus back to
+  // what had it).
+  const focusChip = useCallback(() => fileRef.current?.focus({ preventScroll: true }), [])
+
+  function view() {
+    if (!menu) return
+    const name = menu.name
+    closeMenu()
+    focusChip()
+    setViewing(name)
+  }
+
+  async function remove() {
+    if (!menu || removing) return
+    setRemoving(true)
+    setRemoveError(null)
+    const done = await removeFormTemplate(kind, menu.path)
+    setRemoving(false)
+    if (!done.ok) {
+      setRemoveError(done.reason)
+      return
+    }
+    setForm(done.form)
+    closeMenu()
+    focusChip()
+    flash(
+      done.fileDeleted
+        ? `${menu.name} removed — members download the built form`
+        : `${menu.name} is off the form — members download the built form, but the file could not be deleted`,
+    )
+  }
+
   return (
     <>
       <div className={w.toolbar}>
@@ -85,6 +144,7 @@ export default function MemberFormTools({
           data-uploaded={uploaded ? 'true' : undefined}
           data-busy={uploading ? 'true' : undefined}
           title={formMissing ?? (uploaded ? 'Click to replace — Revenue members download this file' : WORDS[kind].title)}
+          onContextMenu={openMenu}
         >
           {uploading ? 'Uploading…' : uploaded ? `Form: ${uploaded}` : 'Upload form'}
           <input
@@ -110,6 +170,21 @@ export default function MemberFormTools({
           onSaved={setForm}
         />
       ) : null}
+
+      {menu ? (
+        <FormFileMenu
+          key={`${menu.anchor.left}:${menu.anchor.top}`}
+          name={menu.name}
+          anchor={menu.anchor}
+          removing={removing}
+          error={removeError}
+          onView={view}
+          onRemove={() => void remove()}
+          onClose={closeMenu}
+          onKeyClose={focusChip}
+        />
+      ) : null}
+      {viewing ? <FormFileViewer kind={kind} name={viewing} onClose={() => setViewing(null)} /> : null}
     </>
   )
 }

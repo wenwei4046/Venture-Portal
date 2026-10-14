@@ -292,10 +292,39 @@ export function templateRefusal(file: { name: string; size: number }): string | 
   return null
 }
 
-/** `templates/<id>/<name>` — each upload its own folder, so an old version keeps its file. */
+/** `templates/<id>/<name>` — each upload its own folder, so an old version keeps its file (until Remove deletes it). */
 export function templateObjectPath(name: string, id: string): string {
   const base = name.trim().replace(/[^A-Za-z0-9._ -]+/g, '-').replace(/\s+/g, ' ').replace(/^[-. ]+/, '').slice(-120) || 'form'
   return `templates/${id}/${base}`
+}
+
+// ── View, on the uploaded form's right-click menu (2026-10-14) ────────────
+
+/**
+ * How View draws HR's file: a PDF or a picture as it is, a Word .docx read in
+ * the browser (mammoth), an HTML form as its page — the last two in a frame
+ * where nothing runs. An old Word .doc has no reader a page can carry: Download.
+ */
+export type TemplateView = 'pdf' | 'image' | 'word' | 'html' | 'none'
+
+export function templateView(name: string): TemplateView {
+  const ext = name.toLowerCase().split('.').pop() ?? ''
+  if (ext === 'pdf') return 'pdf'
+  if (ext === 'png' || ext === 'jpg' || ext === 'jpeg') return 'image'
+  if (ext === 'docx') return 'word'
+  if (ext === 'html') return 'html'
+  return 'none'
+}
+
+/** A Word file as mammoth reads it (its words, tables and pictures) on a white page, for the frame's `srcDoc`. */
+export function wordPage(body: string, title: string): string {
+  return (
+    '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(title) + '</title><style>' +
+    'body{margin:0;padding:40px 48px;background:rgb(255 255 255);color:rgb(0 0 0);font:14px/1.55 Arial,Helvetica,sans-serif;overflow-wrap:anywhere}' +
+    'h1,h2,h3{line-height:1.3;margin:0 0 12px}p{margin:0 0 10px}img{max-width:100%;height:auto}' +
+    'table{border-collapse:collapse;width:100%;margin:0 0 12px}td,th{border:1px solid rgb(0 0 0);padding:6px 8px;vertical-align:top;text-align:left}' +
+    '</style></head><body>' + body + '</body></html>'
+  )
 }
 
 // ── The built application form (the handoff's waitform.js) ────────────────
