@@ -848,7 +848,9 @@ export async function createCreditNote(formData: FormData) {
   if (error) throw new Error(`Failed to create credit note: ${error.message}`)
 
   revalidatePath('/billing')
-  return data.id
+  revalidatePath('/statements')
+  // Its number too (2026-10-14): the credit-note dialog says which it saved.
+  return { id: data.id, credit_note_no: creditNoteNo as string }
 }
 
 // ─── 作废已开发票 · Void ISSUED invoices (Finance, 2026-09-15) ────────────────
@@ -2786,7 +2788,7 @@ export async function reassignInvoiceGlAccount(
       } as never)
       if (error) {
         return changed > 0
-          ? { error: `${changed} 条改好了，然后停在 ${old ?? '自动侦测'}：${error.message}` }
+          ? { error: `${changed} ${changed === 1 ? 'line' : 'lines'} moved, then it stopped at ${old ?? 'the account it found'}: ${error.message}` }
           : { error: error.message }
       }
       const res = (data ?? {}) as { changed?: number; old_account?: string }

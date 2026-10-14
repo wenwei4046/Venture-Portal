@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { toHubInvoice, type HubCreditNote, type InvoiceContext, type InvoiceHubData, type InvoiceRowIn } from '../_lib/invoice-model'
-import type { InvoiceCan } from './InvoiceDrawer'
+import { invoiceSteps, type InvoiceCan } from './InvoiceDrawer'
 
 // Invoice's hub (2026-10-14, the Finance revamp v2 — D10): the head's three
 // menus, the month's total with its month pill, a card a list, the table with
@@ -341,8 +341,22 @@ describe('the drawer', () => {
     draw()
     fireEvent.click(rowOf('HOUZS Century', '1,250.00'))
     expect(within(drawer()).getAllByRole('button').map((b) => b.textContent)).toEqual(['×', 'Refund', '+ Credit note', '⋯'])
+    expect(drawer()).toHaveTextContent('Paid. Refund it if something was billed wrong.')
     fireEvent.click(within(drawer()).getByRole('button', { name: 'Refund' }))
     expect(mocks.push).toHaveBeenCalledWith('/payments/new?mode=refund&invoice_id=pd1&return_to=/statements')
+  })
+
+  // CN v2 (2026-08-19): a credit note nets what an ISSUED invoice still owes — the system refuses one on a
+  // paid invoice (refund it) and on a consolidated payroll invoice; the design's button stays, shut, saying why.
+  it('a credit note the system would refuse is drawn shut, with why', () => {
+    draw()
+    fireEvent.click(rowOf('HOUZS Century', '1,250.00'))
+    const cn = within(drawer()).getByRole('button', { name: '+ Credit note' })
+    expect(cn).toBeDisabled()
+    expect(cn).toHaveAttribute('title', 'A credit note nets what is still owed — a paid invoice is refunded instead')
+    const inv = toHubInvoice(row({ id: 'pc1', invoice_no: 'HV-INV-202610-0020', billing_mode: 'payroll_consolidated' }), ctx)
+    const { more } = invoiceSteps(inv, ALL)
+    expect(more.find((s) => s.key === 'credit_note')?.off).toBe('A consolidated payroll invoice settles in full — no credit note')
   })
 
   it('Void asks for a reason before it voids', async () => {

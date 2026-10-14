@@ -234,6 +234,30 @@ select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
 .addLine:hover { text-decoration: underline; }
 .addLine:disabled { opacity: 0.45; cursor: default; text-decoration: none; }
 
+/* Ticks on a white card (Change account's accounts): a row a choice — its box,
+   its words, a figure at its end — the box the kit's accent when ticked. */
+.checks {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--ds-border);
+  font-size: 13px;
+  cursor: pointer;
+}
+.check:first-child { border-top: 0; }
+.check:hover { background: rgb(var(--fv-menu-hover)); }
+.check input { width: 15px; height: 15px; margin: 0; accent-color: var(--ds-accent); cursor: pointer; }
+.checkCode { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; color: rgb(var(--hvs-muted)); }
+.checkName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.checkValue { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 12.5px; white-space: nowrap; }
+
 /* Two fields side by side (a party's phone and email). */
 .duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .duo > * { min-width: 0; }

@@ -6,12 +6,14 @@ import {
   approveInvoice,
   approveInvoicesForPeriod,
   copyInvoice,
+  createCreditNote,
   createManualInvoice,
   createMultiLineInvoice,
   deleteCreditNote,
   deleteDraftInvoice,
   fetchDirectorCtcByCompany,
   fetchStaffAllocationByCompany,
+  reassignInvoiceGlAccount,
   settleInvoicesConsolidated,
   updateDraftInvoiceFull,
   updateIssuedInvoiceFull,
@@ -245,6 +247,55 @@ export async function hubUpdateInvoice(
     if (payload.issued) return (await updateIssuedInvoiceFull({ ...body, reason: payload.reason ?? '' })).entryNo
     await updateDraftInvoiceFull(body)
     return null
+  })
+}
+
+/**
+ * + Credit note: one draft credit note against an issued invoice — a billing
+ * mode, a category, an amount and the reason (Service Billing's own, every
+ * rule of it: issued only, within what is still owed). Its number back.
+ */
+export async function hubCreateCreditNote(payload: {
+  invoiceId: string
+  mode: string
+  category: string
+  amount: number
+  reason: string
+}): Promise<HubResult<string>> {
+  await requireActionOn('/invoices/[id]', 'billing', 'create')
+  return attempt(async () => {
+    const fd = new FormData()
+    fd.set('invoice_id', payload.invoiceId)
+    fd.set('amount', payload.amount.toFixed(2))
+    fd.set('reason', payload.reason.trim())
+    fd.set('billing_mode', payload.mode)
+    fd.set('category_code', payload.category)
+    return (await createCreditNote(fd)).credit_note_no
+  })
+}
+
+/**
+ * Change account: the posted lines of an issued or paid invoice move to
+ * another account — the same entry, amounts and day; the invoice's category
+ * follows and the GL keeps a note. `from`: the accounts to move (several when
+ * it posted to several), or none to let the entry say which.
+ */
+export async function hubChangeAccount(payload: {
+  invoiceId: string
+  from: string[]
+  to: string
+  reason: string
+}): Promise<HubResult<{ changed: number; from: string | null }>> {
+  await requireActionOn('/invoices/[id]', 'billing', 'edit')
+  return attempt(async () => {
+    const fd = new FormData()
+    fd.set('id', payload.invoiceId)
+    fd.set('old_account', payload.from.join(','))
+    fd.set('new_account', payload.to)
+    fd.set('reason', payload.reason.trim())
+    const res = await reassignInvoiceGlAccount(fd)
+    if (res.error) throw new Error(res.error)
+    return { changed: res.changed ?? 0, from: res.oldAccount ?? null }
   })
 }
 

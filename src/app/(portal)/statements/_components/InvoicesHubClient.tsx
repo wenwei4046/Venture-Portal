@@ -11,8 +11,6 @@ import { FinTable, type FinColumn } from '@/components/finv/FinTable'
 import { DialogConfirm, DialogMenu, Field, FinDialog, Input, type DialogMenuItem } from '@/components/finv/Dialog'
 import { fd } from '@/components/finv/DrawerParts'
 import { officeTime } from '@/lib/office-time'
-import CreateCreditNoteButton from '../../billing/_components/CreateCreditNoteButton'
-import ReassignInvoiceGlButton from '../../billing/_components/ReassignInvoiceGlButton'
 import GenerateInvoicesButton from '../../billing/_components/GenerateInvoicesButton'
 import GenerateConsolidatedInvoicesButton from '../../billing/_components/GenerateConsolidatedInvoicesButton'
 import ReconcilePayrollBillingButton from '../../billing/_components/ReconcilePayrollBillingButton'
@@ -21,6 +19,8 @@ import { InvoiceDrawer, invoiceSteps, statusText, statusTone, type InvoiceCan, t
 import SettleDialog from './SettleDialog'
 import CreateInvoiceDialog from './CreateInvoiceDialog'
 import InvoiceLinesDialog from './InvoiceLinesDialog'
+import CreditNoteDialog, { type CreditNoteInvoice } from './CreditNoteDialog'
+import ChangeAccountDialog from './ChangeAccountDialog'
 import PayrollBasisDrawer from './PayrollBasisDrawer'
 import {
   hubApproveCreditNote,
@@ -414,7 +414,7 @@ export default function InvoicesHubClient({
   const rowMenuItems = (inv: HubInvoice): RowMenuItem[] => {
     const { bar, more } = invoiceSteps(inv, can)
     const steps = [...bar, ...more]
-    const item = (s: InvoiceStep): RowMenuItem => ({ key: s.key, label: s.label, hint: s.sub, danger: s.kind === 'danger', onSelect: () => onStep(s.key, inv) })
+    const item = (s: InvoiceStep): RowMenuItem => ({ key: s.key, label: s.label, hint: s.off ?? s.sub, danger: s.kind === 'danger', disabled: !!s.off, onSelect: () => onStep(s.key, inv) })
     const items: RowMenuItem[] = [
       { key: 'open', label: 'Open', onSelect: () => setDrawerId(inv.id) },
       { key: 'new-tab', label: 'Open in new tab', onSelect: () => window.open(`/invoices/${inv.id}`, '_blank', 'noopener,noreferrer') },
@@ -569,6 +569,20 @@ export default function InvoicesHubClient({
   const dialogDone = (message: string) => {
     flash(message)
     router.refresh()
+  }
+  // What a credit note may still take: the total less what came in and its credit notes not voided (drafts hold theirs).
+  const creditNoteInvoice = (inv: HubInvoice): CreditNoteInvoice => {
+    const cats = new Set(inv.editLines.map((l) => l.category_code ?? ''))
+    return {
+      id: inv.id,
+      no: inv.no,
+      party: inv.party.name,
+      total: inv.total,
+      received: inv.received,
+      credited: r2(inv.creditNotes.filter((c) => c.status !== 'voided').reduce((s, c) => s + c.amount, 0)),
+      mode: inv.modeKey,
+      category: inv.edit.category_code ?? (cats.size === 1 ? [...cats][0] || null : null),
+    }
   }
   const postedAccounts = (inv: HubInvoice) => {
     const by = new Map<string, number>()
@@ -785,8 +799,9 @@ export default function InvoicesHubClient({
           items={(moreFor ? invoiceSteps(moreFor, can).more : []).map((s) => ({
             key: s.key,
             label: s.label,
-            sub: s.sub,
+            sub: s.off ?? s.sub,
             danger: s.kind === 'danger',
+            disabled: !!s.off,
             onClick: () => moreFor && onStep(s.key, moreFor),
           }))}
         />
@@ -894,27 +909,23 @@ export default function InvoicesHubClient({
           }}
         />
       ) : dialog?.kind === 'credit_note' && dialogInvoice ? (
-        <CreateCreditNoteButton
+        <CreditNoteDialog
           key={dialog.nonce}
-          autoOpen
-          hideTrigger
-          invoiceId={dialogInvoice.id}
-          invoiceNo={dialogInvoice.no}
-          invoiceTotal={dialogInvoice.total}
-          payeeLabel={dialogInvoice.party.name}
+          open={dialog.open}
+          onClose={closeDialog}
+          onDone={dialogDone}
+          invoice={creditNoteInvoice(dialogInvoice)}
           categories={hub.categories}
           extraModes={hub.extraModes}
         />
       ) : dialog?.kind === 'reassign' && dialogInvoice ? (
-        <ReassignInvoiceGlButton
+        <ChangeAccountDialog
           key={dialog.nonce}
-          autoOpen
-          hideTrigger
-          invoiceId={dialogInvoice.id}
-          invoiceNo={dialogInvoice.no}
-          currentCategory={dialogInvoice.edit.category_code}
-          categories={hub.categories.map((c) => ({ code: c.code, label: c.label }))}
-          postedAccounts={postedAccounts(dialogInvoice)}
+          open={dialog.open}
+          onClose={closeDialog}
+          onDone={dialogDone}
+          invoice={{ id: dialogInvoice.id, no: dialogInvoice.no, category: dialogInvoice.edit.category_code, posted: postedAccounts(dialogInvoice) }}
+          categories={hub.categories}
         />
       ) : null}
     </div>
