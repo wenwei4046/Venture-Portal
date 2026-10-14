@@ -34,13 +34,21 @@ function draw(vm: CalcVM) {
 }
 
 describe("step 2's card keeps one size", () => {
-  it.each(STATES)("draws the next-tier line and the room for the tallest state with %s", (_name, vm) => {
+  it.each(STATES)("draws the next-tier line and, invisible beside each changing part, everything it can say — with %s", (_name, vm) => {
     const { container } = draw(vm);
     const rows = container.querySelectorAll('[class*="nextRow"]');
     expect(rows).toHaveLength(1);
     const rooms = [...container.querySelectorAll('[aria-hidden="true"]')].map(el => el.textContent);
-    expect(rooms).toContain("Reach Incentive Tier 1 (36%) at RM 999,999.99Use price");
-    expect(rooms.some(text => text?.includes("Below margin Tier 1") && text.includes("Commission × 0.5"))).toBe(true);
+    expect(rooms).toEqual(expect.arrayContaining([
+      ...["Incentive Tier 2", "Incentive Tier 1", "Standard margin", "Low margin", "Below margin Tier 1", "Below margin Tier 3", "Enter a price", "Calculating", "Cost pending"],
+      "Commission × 0.5", "No commission",
+      "Reach Incentive Tier 1 (36%) at RM 999,999.99Use price", "Reach Incentive Tier 2 (43%) at RM 999,999.99Use price",
+    ]));
+    // The chip on show stacks with the invisible ones, laid out alike (a chip in a line of text and one in
+    // a grid differ by the line's strut — a few px).
+    const chip = container.querySelector('[class*="tierChip"]:not([aria-hidden])')!;
+    expect(chip.parentElement!.className).toMatch(/steady/);
+    expect(chip.className).toMatch(/layer/);
   });
 
   it("says what each state says on the line", () => {
