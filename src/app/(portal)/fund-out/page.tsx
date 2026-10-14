@@ -6,20 +6,18 @@ import { canAccessReports } from '@/lib/roles'
 import { opensPath } from '@/lib/page-tabs'
 import { createClient } from '@/lib/supabase/server'
 import { OUT_CARDS, type FundCardKey } from '@/lib/fund-hub'
-import { HeadButton } from '@/components/finv/Hub'
-import FundHub from '@/components/treasury/FundHub'
-import ExportCSVButton from './_components/ExportCSVButton'
+import FundOutHub from './_components/FundOutHub'
 import { loadLoanHub } from './_lib/loan-hub'
-import { cancelPendingLoan } from './actions'
 
 // Fund OUT (2026-10-15, the Finance revamp v2 — D12 of `.design/fin-r2/handoff`):
-// the design's hub for every reader of it — the head (Create fund out, Loan
-// aging; Export CSV ours), *Fund out · {Month YYYY}* (what was disbursed this
-// office month), the cards the user chose (2026-10-14: All, Active, Overdue,
-// Pending approval, Repaid, Cancelled — the loans' own status; Overdue read
-// live, an instalment past its day unpaid), the list beside them, a loan's
-// drawer on a press. A loan's own page (/fund-out/[id]) keeps its schedule,
-// its repayments and the rest of what it always did.
+// the design's hub for every reader of it — the head (Create fund out, its
+// dialog on the page; Loan aging; Export CSV ours), *Fund out · {Month YYYY}*
+// (what was disbursed this office month), the cards the user chose
+// (2026-10-14: All, Active, Overdue, Pending approval, Repaid, Cancelled — the
+// loans' own status; Overdue read live, an instalment past its day unpaid),
+// the list beside them, a loan's drawer on a press. A loan's own page
+// (/fund-out/[id]) keeps its schedule, its repayments and the rest of what it
+// always did.
 
 interface Props {
   searchParams: Promise<{ status?: string }>
@@ -45,26 +43,16 @@ export default async function FundOutPage({ searchParams }: Props) {
   const canRaise = canDo(user, 'treasury', 'create')
 
   return (
-    <FundHub
-      side="out"
+    <FundOutHub
       records={records}
       month={officeMonth()}
       today={today}
       initialCard={initialCard}
       canSetDefault={canRaise}
       can={{ edit: canDo(user, 'treasury', 'edit'), void: canDo(user, 'treasury', 'void'), amend: canDo(user, 'treasury', 'approve') }}
-      onWithdraw={cancelPendingLoan}
-      head={
-        <>
-          {canRaise ? (
-            <HeadButton primary href="/fund-out/new">
-              Create fund out
-            </HeadButton>
-          ) : null}
-          {canAccessReports(user) && opensPath(user.tabs, '/reports/loan-aging') ? <HeadButton href="/reports/loan-aging">Loan aging</HeadButton> : null}
-          {canDo(user, 'treasury', 'export') ? <ExportCSVButton /> : null}
-        </>
-      }
+      canCreate={canRaise}
+      canLoanAging={canAccessReports(user) && opensPath(user.tabs, '/reports/loan-aging')}
+      canExport={canDo(user, 'treasury', 'export')}
     />
   )
 }

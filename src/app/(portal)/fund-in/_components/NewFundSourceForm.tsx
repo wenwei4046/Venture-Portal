@@ -28,7 +28,7 @@ interface Department {
 }
 
 interface Props {
-  companies: Company[]
+  companies: Array<Pick<Company, 'id' | 'name' | 'short_code'>>
   departments: Department[]
   /** Liability / equity accounts the fund-in can be tagged with (mig 247). */
   liabilityAccounts: AccountOption[]

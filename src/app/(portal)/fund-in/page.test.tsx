@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import { render } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
 import type { FundRecord } from '@/lib/fund-hub'
 
@@ -15,11 +14,10 @@ const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.f
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/office-time', () => ({ officeToday: () => '2026-10-09', officeMonth: () => '2026-10' }))
-vi.mock('./actions', () => ({ withdrawFundSource: vi.fn() }))
-vi.mock('@/components/treasury/FundHub', () => ({
-  default: (p: { records: FundRecord[]; head: ReactNode; initialCard: string; can: unknown; side: string; today: string }) => {
+vi.mock('./_components/FundInHub', () => ({
+  default: (p: Record<string, unknown>) => {
     mocks.hub(p)
-    return <div data-testid="head">{p.head}</div>
+    return null
   },
 }))
 
@@ -66,8 +64,9 @@ function database() {
   })
 }
 
+type HubProps = { records: FundRecord[]; initialCard: string; can: Record<string, boolean>; today: string; month: string; canCreate: boolean }
 const page = (status?: string) => FundInPage({ searchParams: Promise.resolve({ status }) })
-const props = () => mocks.hub.mock.calls.at(-1)![0] as { records: FundRecord[]; initialCard: string; can: Record<string, boolean>; side: string; today: string }
+const props = () => mocks.hub.mock.calls.at(-1)![0] as HubProps
 const rec = (id: string) => props().records.find((r) => r.id === id)!
 
 beforeEach(() => {
@@ -79,8 +78,8 @@ beforeEach(() => {
 describe('Fund IN', () => {
   it('hands the hub every fund source: who, its type, what is owed back, where it came in and is booked', async () => {
     render(await page())
-    expect(props().side).toBe('in')
     expect(props().today).toBe('2026-10-09')
+    expect(props().month).toBe('2026-10')
     expect(props().records.map((r) => [r.id, r.party, r.typeLabel, r.outstanding])).toEqual([
       ['a', 'HOUZS Century (HC)', 'Subsidiary', 250000],
       // Free text before the director the row also names (Item 4).
@@ -120,12 +119,12 @@ describe('Fund IN', () => {
     expect(props().initialCard).toBe('all')
   })
 
-  it('heads it with Record fund in for whoever may record one', async () => {
+  it('offers Record fund in and the steps to whoever may', async () => {
     render(await page())
-    expect(screen.getByRole('link', { name: 'Record fund in' })).toHaveAttribute('href', '/fund-in/new')
+    expect(props().canCreate).toBe(true)
     expect(props().can).toEqual({ edit: true, void: true, amend: false })
     mocks.requirePermission.mockResolvedValue(withActions({ id: 'u-v', role: 'staff', permissions: [] }))
     render(await page())
-    expect(screen.getAllByTestId('head').at(-1)).toBeEmptyDOMElement()
+    expect(props().canCreate).toBe(false)
   })
 })

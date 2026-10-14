@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import { render } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
 import type { FundRecord } from '@/lib/fund-hub'
 
@@ -9,18 +8,16 @@ import type { FundRecord } from '@/lib/fund-hub'
 // day unpaid (OVERDUE IS READ LIVE, its repayment plan), who made and approved
 // it, a pending one's request and whether this reader decides it — and hands
 // them to the hub with the card asked for (?status=, the old tabs' words too)
-// and the head the reader may use: Create fund out, Loan aging, Export CSV.
+// and what the reader may use: Create fund out, Loan aging, Export CSV.
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), hub: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/office-time', () => ({ officeToday: () => '2026-10-09', officeMonth: () => '2026-10' }))
-vi.mock('./actions', () => ({ cancelPendingLoan: vi.fn() }))
-vi.mock('./_components/ExportCSVButton', () => ({ default: () => <button type="button">Export CSV</button> }))
-vi.mock('@/components/treasury/FundHub', () => ({
-  default: (p: { records: FundRecord[]; head: ReactNode; initialCard: string; can: unknown; month: string; side: string }) => {
+vi.mock('./_components/FundOutHub', () => ({
+  default: (p: Record<string, unknown>) => {
     mocks.hub(p)
-    return <div data-testid="head">{p.head}</div>
+    return null
   },
 }))
 
@@ -36,12 +33,13 @@ const LOANS = [
   loan('l2', 'co-hk', 'active', 50000, 0.04, { disbursement_date: '2025-10-20', repayment_start_month: '2026-08-01' }),
   loan('l3', 'co-car', 'pending_approval', 30000, 0.02, { approved_by: null, approved_at: null }),
   loan('l4', 'co-hk', 'fully_repaid', 20000, 0.02),
+  loan('l5', 'co-2990', 'cancelled', 10000, 0.02),
 ]
 
 function database() {
   const tables: Record<string, unknown[]> = {
     loans: LOANS,
-    companies: [{ id: 'co-car', name: 'Carres', short_code: 'CAR' }, { id: 'co-hk', name: 'Hookka', short_code: 'HK' }],
+    companies: [{ id: 'co-car', name: 'Carres', short_code: 'CAR' }, { id: 'co-hk', name: 'Hookka', short_code: 'HK' }, { id: 'co-2990', name: '2990', short_code: '2990' }],
     loan_outstanding: [
       { loan_id: 'l1', outstanding: 80000, total_principal_paid: 20000 },
       { loan_id: 'l2', outstanding: 40000, total_principal_paid: 10000 },
@@ -64,8 +62,9 @@ function database() {
   })
 }
 
+type HubProps = { records: FundRecord[]; initialCard: string; can: Record<string, boolean>; month: string; today: string; canCreate: boolean; canLoanAging: boolean; canExport: boolean; canSetDefault: boolean }
 const page = (status?: string) => FundOutPage({ searchParams: Promise.resolve({ status }) })
-const props = () => mocks.hub.mock.calls.at(-1)![0] as { records: FundRecord[]; initialCard: string; can: Record<string, boolean>; month: string; side: string }
+const props = () => mocks.hub.mock.calls.at(-1)![0] as HubProps
 const rec = (id: string) => props().records.find((r) => r.id === id)!
 
 const FINANCE = withActions({ id: 'u-fin', role: 'finance', permissions: ['treasury', 'reports'] })
@@ -80,13 +79,15 @@ beforeEach(() => {
 describe('Fund OUT', () => {
   it('hands the hub every loan as a deal: its borrower, what is owed, the live overdue, the trail’s names', async () => {
     render(await page())
-    expect(props().side).toBe('out')
     expect(props().month).toBe('2026-10')
+    expect(props().today).toBe('2026-10-09')
     expect(props().records.map((r) => [r.id, r.party, r.status, r.amount, r.outstanding])).toEqual([
       ['l1', 'Carres (CAR)', 'active', 100000, 80000],
       ['l2', 'Hookka (HK)', 'active', 50000, 40000],
       ['l3', 'Carres (CAR)', 'pending_approval', 30000, null],
       ['l4', 'Hookka (HK)', 'repaid', 20000, null],
+      // A company named by its code is named once.
+      ['l5', '2990', 'cancelled', 10000, null],
     ])
     expect(rec('l1').overdue).toBeNull()
     expect(rec('l2').overdue).toEqual({ amount: 12333.34, since: '2026-08-20', days: 50 })
@@ -111,19 +112,12 @@ describe('Fund OUT', () => {
     expect(props().initialCard).toBe('all')
   })
 
-  it('heads it with the design’s two buttons and our Export CSV, each for whoever may', async () => {
+  it('offers each head button and step to whoever may use it', async () => {
     render(await page())
-    expect(screen.getByRole('link', { name: 'Create fund out' })).toHaveAttribute('href', '/fund-out/new')
-    expect(screen.getByRole('link', { name: 'Loan aging' })).toHaveAttribute('href', '/reports/loan-aging')
-    expect(screen.getByRole('button', { name: 'Export CSV' })).toBeInTheDocument()
+    expect(props()).toMatchObject({ canCreate: true, canLoanAging: true, canExport: true, canSetDefault: true })
     expect(props().can).toEqual({ edit: true, void: true, amend: false })
-  })
-
-  it('leaves out what the reader may not use', async () => {
     mocks.requirePermission.mockResolvedValue(withActions({ id: 'u-v', role: 'staff', permissions: [] }))
     render(await page())
-    expect(screen.queryByRole('link', { name: 'Create fund out' })).toBeNull()
-    expect(screen.queryByRole('link', { name: 'Loan aging' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Export CSV' })).toBeNull()
+    expect(props()).toMatchObject({ canCreate: false, canLoanAging: false, canExport: false })
   })
 })
