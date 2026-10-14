@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { PdfPages } from "./pdf-pages";
+import { FilePreview, previewKind } from "./file-preview";
 
 /**
  * A chat's photos, videos and documents open INSIDE the app (the owner, 2026-10-14: "打開圖片後，沒有返回鍵能回到聊天室
@@ -257,6 +258,8 @@ export function MediaViewer() {
       {doc ? (
         isPdf(it)
           ? <PdfPages url={it.url} />
+          : previewKind(it.name, it.mime)
+          ? <FilePreview file={ready[it.url] ?? null} kind={previewKind(it.name, it.mime)} />
           : <div style={{ flex: "1", display: "grid", placeItems: "center", padding: "24px", textAlign: "center" }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px" }}>
                 <span style={{ width: "64px", height: "76px", borderRadius: "8px", background: "#BD4A19", display: "grid", placeItems: "center", fontSize: "15px", fontWeight: 700 }}>{docLabel(it.name, it.mime)}</span>

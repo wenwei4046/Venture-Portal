@@ -18,9 +18,10 @@ import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
-import { albumsOf, galleryOf, mediaOf, mediaWord, NO_MEDIA } from "../../shared/chat-media";
+import { albumsOf, galleryOf, INLINE_TIME, mediaOf, mediaWord, NO_MEDIA } from "../../shared/chat-media";
 import { MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
+import { autoChoices, openAttach } from "../../shared/attach-sheet";
 
 const NO_PRESS: Partial<ReturnType<typeof pressToOpen>> = {};
 import { CHAT_WALL } from "../wall";
@@ -159,8 +160,8 @@ export function chatVM(ctx: SalesCtx) {
         go: () => set(u => ({ ...u, chat: null, tab: "calendar", calView: "month", calSel: day0(cd), calYM: [cd.getFullYear(), cd.getMonth()], hist: [...u.hist, u.tab].slice(-20) })),
       } : null,
       // A document is its tile (name and type), never its name again under it (2026-10-14).
-      ...mediaOf(m, gallery, al.lead.get(key)), ...(by ? { timeTop: "4px" } : {}),
-      pDisp: card || mk === "file" || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: "14px", textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : mk === "file" ? "📄 " + m.text : m.text),
+      ...mediaOf(m, gallery, al.lead.get(key)), ...(by ? { timeTop: "4px" } : {}), ...(!md && !card && m.text ? INLINE_TIME : {}),
+      pDisp: !md && !card && m.text ? "inline" : card || mk === "file" || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: "14px", textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : mk === "file" ? "📄 " + m.text : m.text),
       // A starred message shows ★ by its time (the message menu's Star, 2026-10-14).
       timeJustify: "flex-end", timeColor: mine ? "#806B60" : SUB, by, at: (stars.has(key) ? "★ " : "") + msgTime(m.at),
       failNote: mine && m.status === "failed" ? failNote(m.error) : "",
@@ -469,9 +470,11 @@ export function chatVM(ctx: SalesCtx) {
     sendDraft,
     openAtt: () => patch({ att: true }), attOpen: ui.att, closeAtt: () => patch({ att: false }),
     attTiles: ([
-      ["Photos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "#2F8FD8", () => { patch({ att: false }); document.getElementById("crm-pick-photo")?.click(); }],
+      ["Photos & videos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "#2F8FD8", () => { patch({ att: false }); document.getElementById("crm-pick-photo")?.click(); }],
       ["Document", "M7 3h7l5 5v13H7V3Zm7 0v5h5", "#BD4A19", () => { patch({ att: false }); document.getElementById("crm-pick-file")?.click(); }],
       ["Quick replies", "M13 2 4 14h7l-1 8 9-12h-7l1-8Z", "#A46312", () => patch({ att: false, qr: true })],
+      // Auto replies (2026-10-14): one's saved welcome / after-hours / keyword replies, into the reply box to send by hand.
+      ["Auto replies", "M12 8v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", "#387557", () => { patch({ att: false }); openAttach({ view: "auto", quick: [], auto: autoChoices(data.autoReplies), pick: text => setDraft(text) }); }],
     ] as [string, string, string, () => void][]).map(([label, icon, color, go]) => ({ label, icon, color, go })),
     /** The chat's hidden file pickers (Photos · Document) send what is chosen, the draft as its caption. */
     // Photos (several at once), the camera's photo or video, a document: each goes as its own message, in order; the

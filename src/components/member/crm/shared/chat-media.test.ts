@@ -58,6 +58,11 @@ describe("photos sent together are one album, as on WhatsApp", () => {
     expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2, "me", "look"), pic("d", 3)]).lead.size).toBe(0);
     expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2, "lead"), pic("d", 3)]).lead.size).toBe(0);
     expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2), pic("d", 500)]).lead.size).toBe(0);
+    // 16:11:12 – 16:11:21 four photos, then a video at 16:13:09: the album is the four; the video stands alone.
+    const vid = { id: "v", from: "me" as const, at: new Date(Date.UTC(2026, 9, 14, 2, 0, 9 + 108)).toISOString(), text: "", media: { kind: "video" as const, url: "/m/v" } };
+    const r = albumsOf([pic("a", 0), pic("b", 3), pic("c", 6), pic("d", 9), vid]);
+    expect(r.lead.get("a")?.length).toBe(4);
+    expect(r.hidden.has("v")).toBe(false);
   });
   it("draws a PDF as its card and a voice note as a voice bubble", () => {
     expect(mediaOf({ id: "p", media: { kind: "file", url: "/m/p", name: "x.pdf", mime: "application/pdf" } }, []).isPdf).toBe(true);
@@ -71,5 +76,26 @@ describe("a voice note's speed (2026-10-14)", () => {
     expect([1, 1.25, 1.5, 2].map(nextSpeed)).toEqual([1.25, 1.5, 2, 1]);
     expect(speedLabel(1.25)).toBe("1.25×");
     expect(mediaOf({ id: "v", media: { kind: "audio", url: "/m/v" } }, []).pad).toBe("6px 9px 5px");
+  });
+});
+
+describe("the + sheet's auto replies (2026-10-14)", () => {
+  it("lists the saved auto replies that have words", async () => {
+    const { autoChoices } = await import("./attach-sheet");
+    expect(autoChoices({ welcome: { text: "Hi, thanks!" }, after: { text: "" }, kws: [{ words: "price", text: "Our prices…" }, { words: "x", text: " " }] }))
+      .toEqual([{ label: "Welcome", text: "Hi, thanks!" }, { label: "Keyword · price", text: "Our prices…" }]);
+    expect(autoChoices(null)).toEqual([]);
+  });
+});
+
+describe("documents other than a PDF open in the app (2026-10-14)", () => {
+  it("knows which reader opens a file", async () => {
+    const { previewKind } = await import("./file-preview");
+    expect(previewKind("Shop Office for rent - carress.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).toBe("sheet");
+    expect(previewKind("list.csv", "text/csv")).toBe("sheet");
+    expect(previewKind("Proposal.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")).toBe("word");
+    expect(previewKind("notes.txt", "text/plain")).toBe("text");
+    expect(previewKind("IMG_1.jpg", "image/jpeg")).toBe("image");
+    expect(previewKind("deck.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")).toBeNull();
   });
 });

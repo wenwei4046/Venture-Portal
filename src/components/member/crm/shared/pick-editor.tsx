@@ -18,6 +18,9 @@ import { saveToDevice } from "./viewer";
  */
 // "arrange": a video's text and stickers moved on its still frame (a playing video takes no finger).
 type Mode = "" | "crop" | "draw" | "text" | "sticker" | "arrange";
+/** The pen's three thicknesses, a share of the picture's shorter side (the owner, 2026-10-14: "edit 的顏色筆可以選粗度"). */
+const PENS = [{ w: 0.005, dot: 6, label: "Thin" }, { w: 0.012, dot: 10, label: "Medium" }, { w: 0.026, dot: 16, label: "Thick" }] as const;
+let lastPen: number = PENS[1].w;
 const COLORS = ["#FFFFFF", "#111111", "#E53935", "#FB8C00", "#FDD835", "#43A047", "#1E88E5", "#8E24AA"];
 const ICON = { stroke: "currentColor", fill: "none", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 const P = {
@@ -185,6 +188,7 @@ function PhotoStage({ it, base, edits, setEdits, mode, setMode, color, setColor,
   const [area, setArea] = useState({ w: 0, h: 0 });
   const [bmp, setBmp] = useState<ImageBitmap | null>(null);
   const [live, setLive] = useState<Stroke | null>(null);
+  const [pen, setPen] = useState(lastPen);
   const [crop, setCrop] = useState<Rect>(edits.crop);
   const [moving, setMoving] = useState<{ id: string; x: number; y: number; trash: boolean } | null>(null);
   const drag = useRef<{ kind: "label" | "crop"; id?: string; handle?: string; x0: number; y0: number; r0: Rect | { x: number; y: number }; moved: boolean } | null>(null);
@@ -225,7 +229,7 @@ function PhotoStage({ it, base, edits, setEdits, mode, setMode, color, setColor,
   const u = Math.min(W, H);
 
   // Drawing: a finger leaves a line in the chosen colour.
-  const drawDown = (e: RPointerEvent) => { if (mode !== "draw") return; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); setLive({ color, width: 0.012, pts: [local(e)] }); };
+  const drawDown = (e: RPointerEvent) => { if (mode !== "draw") return; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); setLive({ color, width: pen, pts: [local(e)] }); };
   const drawMove = (e: RPointerEvent) => { if (live) setLive({ ...live, pts: [...live.pts, local(e)] }); };
   const drawUp = () => { if (live) { setEdits({ ...edits, strokes: [...edits.strokes, live] }); setLive(null); } };
 
@@ -327,6 +331,13 @@ function PhotoStage({ it, base, edits, setEdits, mode, setMode, color, setColor,
       {mode === "draw" && (
         <div style={{ position: "absolute", right: "12px", top: "calc(env(safe-area-inset-top, 0px) + 64px)", zIndex: 3, display: "flex", flexDirection: "column", gap: "8px" }}>
           {COLORS.map(c => <button key={c} type="button" aria-label={c} onClick={() => setColor(c)} style={{ width: "26px", height: "26px", borderRadius: "13px", border: c === color ? "3px solid #fff" : "2px solid rgba(255,255,255,.6)", background: c, padding: 0, cursor: "pointer" }} />)}
+          <span style={{ height: "1px", margin: "2px 3px", background: "rgba(255,255,255,.35)" }} />
+          {PENS.map(p => (
+            <button key={p.label} type="button" aria-label={`${p.label} pen`} title={`${p.label} pen`} onClick={() => { lastPen = p.w; setPen(p.w); }}
+              style={{ width: "26px", height: "26px", borderRadius: "13px", border: pen === p.w ? "2px solid #fff" : "2px solid transparent", background: "rgba(40,40,40,.72)", display: "grid", placeItems: "center", padding: 0, cursor: "pointer" }}>
+              <span style={{ width: `${p.dot}px`, height: `${p.dot}px`, borderRadius: "50%", background: color }} />
+            </button>
+          ))}
         </div>
       )}
       {cropping && (

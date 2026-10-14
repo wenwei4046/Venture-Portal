@@ -94,7 +94,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
           </>)}
           {!!(m.plain) && (<>
             <div {...m.press} onMouseEnter={m.enter} onMouseLeave={m.leave} style={{ WebkitTouchCallout: "none", position: "relative", alignSelf: m.align, maxWidth: m.max, display: "flex", flexDirection: m.rowDir, alignItems: "center", gap: "6px", marginBottom: m.rxGap }}>
-              <div style={{ position: "relative", minWidth: "0", padding: m.pad, boxSizing: "border-box", borderRadius: m.radius, boxShadow: "0 1px 1px rgba(63,43,34,.10)", background: m.bg, border: `1px ${m.borderStyle} ${m.border}`, textAlign: m.textAlign, color: m.fg }}>
+              <div style={{ position: "relative", minWidth: "0", display: "flow-root", padding: m.pad, boxSizing: "border-box", borderRadius: m.radius, boxShadow: "0 1px 1px rgba(63,43,34,.10)", background: m.bg, border: `1px ${m.borderStyle} ${m.border}`, textAlign: m.textAlign, color: m.fg }}>
                 {!!(m.quote) && (<>
                   <div style={{ margin: "-3px -6px 6px", padding: "6px 10px", borderRadius: "8px", borderLeft: "3px solid #BD4A19", background: "rgba(63,43,34,.06)", display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}>
                     <strong style={{ fontSize: "13px", fontWeight: "650", color: "#BD4A19" }}>{m.quote.who}</strong>
@@ -135,7 +135,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
                     <span style={{ fontWeight: pt.w }}>{pt.t}</span>
                   </Fragment>))}
                 </p>
-                <span style={{ display: "flex", alignItems: "center", justifyContent: m.timeJustify, gap: "3px", marginTop: m.timeTop, padding: m.inPad, fontSize: "11px", color: m.timeColor }}>{!!(m.by) && (<>
+                <span style={{ display: m.tDisp, float: m.tFloat, marginLeft: m.tML, marginBottom: m.tMB, alignItems: "center", justifyContent: m.timeJustify, gap: "3px", marginTop: m.timeTop, padding: m.inPad, fontSize: "11px", color: m.timeColor }}>{!!(m.by) && (<>
                     <span style={{ fontStyle: "italic", opacity: ".85" }}>Sent by {m.by} ·</span>
                   </>)}{m.at}{!!(m.tick) && (<>
                     <svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke={m.tickColor} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-label={m.tickLabel}>

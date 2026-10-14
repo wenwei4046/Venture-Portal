@@ -98,9 +98,11 @@ function chatPatches(inn, out, text, time, reply, list, draft, setDraft, draftKe
   // 2026-10-14 (the owner, WhatsApp's computer app beside ours: "電腦端的聊天邊框再小一些"): a photo, video, album or
   // document sits 3 px inside its bubble, its words and time 7 px in (mediaOf's m.pad / m.inPad, as on the phone).
   const tight = (_m, pill, inDiv, pSt, inTime, outDiv, outTime, ...rest) => loop0(_m, pill,
-    inDiv.replace('padding: "10px 13px"', "padding: m.pad"), pSt.replace(/^\{\{ /, "{{ padding: m.inPad, "),
-    inTime.replace('marginTop: "4px",', 'marginTop: m.timeTop, padding: m.inPad,'),
-    outDiv.replace('padding: "10px 13px"', "padding: m.pad"), outTime.replace('marginTop: "4px",', 'marginTop: m.timeTop, padding: m.inPad,'), ...rest);
+    // …and a text message's time floats beside its words, as WhatsApp's (shared/chat-media.ts › INLINE_TIME, 2026-10-14).
+    inDiv.replace('padding: "10px 13px"', "padding: m.pad").replace("{{ ", '{{ display: "flow-root", '), pSt.replace(/^\{\{ /, "{{ display: m.pShow, padding: m.inPad, "),
+    floatTime(inTime.replace('marginTop: "4px",', 'marginTop: m.timeTop, padding: m.inPad,')),
+    outDiv.replace('padding: "10px 13px"', "padding: m.pad").replace("{{ ", '{{ display: "flow-root", '), floatTime(outTime.replace('marginTop: "4px",', 'marginTop: m.timeTop, padding: m.inPad,')), ...rest);
+  const floatTime = s => s.replace('display: "flex",', "display: m.tDisp, float: m.tFloat, marginLeft: m.tML, marginBottom: m.tMB,");
   const loop = (...a) => tight(...a);
   const loop0 = (_m, pill, inDiv, pSt, inTime, outDiv, outTime, svgA, svgB, svgIn) =>
     `{(${list}).map((m, m_i) => (<Fragment key={m_i}>` +

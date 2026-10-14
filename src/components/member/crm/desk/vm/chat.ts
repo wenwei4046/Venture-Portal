@@ -9,7 +9,7 @@ import type { CrmChatMessage, CrmCustomer } from "@/lib/member/crm-data";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { first, initials } from "./data";
 import type { DeskCtx } from "./ctx";
-import { albumsOf, galleryOf, mediaOf, NO_MEDIA } from "../../shared/chat-media";
+import { albumsOf, galleryOf, INLINE_TIME, mediaOf, NO_MEDIA } from "../../shared/chat-media";
 
 const DAY = 86_400_000;
 const day0 = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -56,7 +56,7 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
     // An album's other photos are drawn in its first message (shared/chat-media.ts › albumsOf).
     const hide = al.hidden.has(m.id);
     return { day: hide ? "" : day, sys: "", bell: false, inn: !mine && !hide, out: mine && !hide, text: m.card || mk === "file" ? "" : m.text ?? "", time: time(m.at), tick: m.status === "read" ? "#3B8FD9" : "#A8968B", hasTick: mine && m.status !== "failed",
-      media: "", mediaHref: "", ...mediaOf(withUrl(m), gallery, al.lead.get(m.id)), failed: m.status === "failed", ev };
+      media: "", mediaHref: "", ...mediaOf(withUrl(m), gallery, al.lead.get(m.id)), ...(!mk && !m.card && m.text ? INLINE_TIME : {}), failed: m.status === "failed", ev };
   });
 }
 
