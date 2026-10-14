@@ -103,6 +103,14 @@ export function failNote(error: string | null | undefined): string {
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
 
+/** Who a TL / STL may give this customer to in their own CRM: their downline in the customer's team (none otherwise). */
+export function leaderAssignees(ctx: SalesCtx, c: CrmCustomer | undefined) {
+  const { owner, data } = ctx;
+  if (!c || !c.teamId || ctx.viewingOther || ctx.embedded?.assignTo || (owner.role !== "tl" && owner.role !== "stl")) return [];
+  return downlineOf(owner.id, data.people).map(id => personOf(id, data.people)!)
+    .filter(p => p && p.id !== c.assignedTo && ["stl", "tl", "ta", "rs"].includes(p.role) && teamOf(p.id, data.people)?.id === c.teamId);
+}
+
 export function chatVM(ctx: SalesCtx) {
   const { ui, set, patch, data, now, act, refs, owner, nameOf, live } = ctx;
   const c = ui.chat ? data.customers.find(x => x.id === ui.chat) : undefined;
@@ -216,12 +224,15 @@ export function chatVM(ctx: SalesCtx) {
   const ss = hm.ssel ?? [];
   // The Principal / Director in someone's chat: Assign to anyone, beside Share and Move (user 2026-10-09: 3个功能都要有). Their Move goes to the owner's superior (crm_invite).
   // Offered only with CRM · Manage (CrmApp hands it over then).
-  const assigner = ctx.embedded?.assignTo ?? null;
+  // A TL / STL in their own CRM assigns their team's customer to someone in that team (the owner, 2026-10-14: "只有上級能
+  //給自己的下級"; crm_assign_member asks the same) — their downline in the customer's team.
+  const leaderList = leaderAssignees(ctx, c);
+  const assigner = ctx.embedded?.assignTo ?? (leaderList.length ? (cid: string, sid: string) => act.assignMember(cid, sid) : null);
   // Assign to (user 2026-10-13): the list grouped by team under a heading each, as the Switch sheet's — Director, each team,
   // Others; teams in the order the list first names them.
   // The Principal is on it too since 2026-10-13 (their Mine), first.
   const groupOf = (p: { id: string; role?: string }) => (p.role === "boss" ? "Principal" : p.role === "hod" ? "Director" : teamName(teamOf(p.id, data.people)) || "Others");
-  const assign0 = assigner ? [...data.people.filter(p => p.role === "boss"), ...(ctx.embedded?.switchList ?? []).filter(p => p.role !== "boss")] : [];
+  const assign0 = ctx.embedded?.assignTo ? [...data.people.filter(p => p.role === "boss"), ...(ctx.embedded?.switchList ?? []).filter(p => p.role !== "boss")] : leaderList;
   const groupOrder = [...new Set(assign0.map(groupOf))];
   const assignList = [...assign0].sort((a, b) => groupOrder.indexOf(groupOf(a)) - groupOrder.indexOf(groupOf(b)));
   const assigning = !!(assigner && hm.assign);
@@ -236,7 +247,7 @@ export function chatVM(ctx: SalesCtx) {
   const hmVM = {
     open: !!hm.menu, btnBg: hm.menu ? "#F5EBE3" : "#fff", toggle: () => setHm({ menu: !hm.menu }), close: () => patch({ hm: null }), toast: hm.toast ?? "",
     items: ([
-      ...(assigner ? [["Assign to", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, assign: true, sel: null }), "Give this customer to anyone", "#E4EDF8", "#2F6FB5"]] : []),
+      ...(assigner ? [["Assign to", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, assign: true, sel: null }), ctx.embedded?.assignTo ? "Give this customer to anyone" : "Give to someone in your team", "#E4EDF8", "#2F6FB5"]] : []),
       ["Share", "M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v12m-8-4 4-4 4 4", () => setHm({ menu: false, share: true, ssel: [] }), "Invite a teammate", "#FFF0E4", "#BD4A19"],
       // Move only when there is somebody to hand over to (rev 1010 §1.5): no upline → no Move. Never by title.
       ...(superior ? [["Move", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, move: true, sel: null }), `Hand over to ${firstName(superior.name)}`, "#E4EDF8", "#2F6FB5"]] : []),

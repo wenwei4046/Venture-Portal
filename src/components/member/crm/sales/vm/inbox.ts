@@ -11,6 +11,7 @@ import { BORDER, CHANNEL, dayLabel, firstName, ini, INK, isCold, lastChat, lastR
 import type { InboxFilter } from "../ui";
 import { isNewChat } from "../../shared/new-chat";
 import { mediaWord } from "../../shared/chat-media";
+import { leaderAssignees } from "./chat";
 
 /** One row's preview: a card we sent reads as what it was; ours start "You: ". */
 export function previewOf(c: CrmCustomer): string {
@@ -71,6 +72,57 @@ export function inboxVM(ctx: SalesCtx) {
     .filter(c => (!ui.adSel.length || ui.adSel.includes(c.ad)) && match(c) && (!q || `${c.name} ${previewOf(c)} ${c.ad}`.toLowerCase().includes(q)))
     .sort((a, b) => Number(pinned(b)) - Number(pinned(a)) || lastAt(b) - lastAt(a));
 
+  // ── Row swipes ──
+  const W = 84;
+  const canAssign = (c: CrmCustomer) => !!ctx.embedded?.assignTo || leaderAssignees(ctx, c).length > 0;
+  const canRead = (c: CrmCustomer) => c.unread > 0 && c.assignedTo === owner.id && !ctx.viewingOther;
+  const nRight = (c: CrmCustomer) => (canAssign(c) ? 2 : 1), nLeft = (c: CrmCustomer) => (canRead(c) ? 2 : 1);
+  const goAssign = (c: CrmCustomer) => { set(u => ({ ...u, swipe: null, swipeR: null, moreLead: null, moreView: "main", chat: c.id, hm: { assign: true, sel: null } })); act.openChat(c.id); };
+  /** Puts a row dragged by hand where React will draw it (its inline style), with the glide back on. */
+  const settleRow = (px?: number) => {
+    const s = refs.rowSw; refs.rowSw = null;
+    if (!s) return;
+    s.el.style.transition = s.tr;
+    s.el.style.transform = `translateX(${px ?? s.base}px)`;
+  };
+  const rowSwipe = (c: CrmCustomer, nR: number, nL: number) => {
+    const base = ui.swipe === c.id ? -W * nR : ui.swipeR === c.id ? W * nL : 0;
+    return {
+      tx: `${base}px`,
+      // A long press opens More (user 2026-10-13: "按久久跳出功能鍵").
+      down: (e: PEvent) => {
+        refs.ls = { x: e.clientX, y: e.clientY };
+        const el = e.currentTarget as HTMLElement;
+        refs.rowSw = { el, base, drag: false, x: base, tr: el.style.transition };
+        clearTimeout(refs.lp);
+        refs.lp = setTimeout(() => { refs.ls = null; refs.rowSw = null; refs.lsT = Date.now(); navigator.vibrate?.(10); patch({ swipe: null, swipeR: null, moreLead: c.id, moreView: "main" }); }, 500);
+      },
+      move: (e: PEvent) => {
+        const s = refs.ls, r = refs.rowSw;
+        if (!s || !r) return;
+        const dx = e.clientX - s.x, dy = e.clientY - s.y;
+        if (!r.drag) {
+          if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { clearTimeout(refs.lp); refs.ls = null; refs.rowSw = null; return; }
+          if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+          r.drag = true; clearTimeout(refs.lp);
+          try { r.el.setPointerCapture((e as unknown as PointerEvent).pointerId); } catch { /* fine */ }
+          r.el.style.transition = "none";
+        }
+        r.x = Math.max(-W * nR - 24, Math.min(W * nL + 24, r.base + dx));
+        r.el.style.transform = `translateX(${r.x}px)`;
+      },
+      up: () => {
+        clearTimeout(refs.lp);
+        const r = refs.rowSw; refs.ls = null;
+        if (!r) return;
+        if (!r.drag) { refs.rowSw = null; return; }
+        refs.lsT = Date.now();
+        const side = r.x < -W * nR / 2 ? "L" : r.x > W * nL / 2 ? "R" : "";
+        settleRow(side === "L" ? -W * nR : side === "R" ? W * nL : 0);
+        patch({ swipe: side === "L" ? c.id : null, swipeR: side === "R" ? c.id : null });
+      },
+    };
+  };
   const ownerColor = new Map<string, string>();
   const leadsView = view.map((c, n) => {
     const p = data.prefs[c.id], mu = !!p?.muted, pi = !!p?.pinned, cold = isCold(c, now), u = urgencyOf(c, now), ch = CHANNEL[c.channel];
@@ -86,23 +138,17 @@ export function inboxVM(ctx: SalesCtx) {
       firstVisit: firstMarked ? `${dayLabel(new Date(firstMarked.start))}, ${timeLabel(new Date(firstMarked.start))}` : "",
       tags: labelsOf(c).map(l => ({ t: l.name, c: l.color })),
       rule: n ? `1px solid ${BORDER}` : "0", isMuted: mu, isPinned: pi, iconRight: c.unread ? "28px" : "0px", padR: `${32 + (mu ? 22 : 0) + (pi ? 22 : 0)}px`,
-      // Swipe left reveals More; a tap opens the chat (or closes an open swipe).
-      tx: ui.swipe === c.id ? "-84px" : "0px", moreOp: ui.swipe === c.id ? 1 : 0,
-      // A long press opens More (user 2026-10-13: "按久久跳出功能鍵"), where Assign to is for whoever may assign.
-      down: (e: PEvent) => {
-        refs.ls = { x: e.clientX, y: e.clientY };
-        clearTimeout(refs.lp);
-        refs.lp = setTimeout(() => { refs.ls = null; refs.lsT = Date.now(); navigator.vibrate?.(10); patch({ swipe: null, moreLead: c.id, moreView: "main" }); }, 500);
-      },
-      cancel: () => { clearTimeout(refs.lp); refs.ls = null; },
+      // Swipe as WhatsApp's (the owner, 2026-10-14: "往左滑很慢"): the row follows the finger and lets go open or shut.
+      // Left: Assign (a TL / STL, their team's customer) · More. Right: Read (an unread chat of one's own) · Pin / Unpin.
+      // A tap opens the chat (or closes an open swipe).
+      ...rowSwipe(c, nRight(c), nLeft(c)),
+      moreOp: 1,
+      canAssign: canAssign(c), assign: (e: PEvent | MouseEvent) => { e.stopPropagation(); goAssign(c); },
+      canRead: canRead(c), read: (e: PEvent | MouseEvent) => { e.stopPropagation(); patch({ swipeR: null }); act.openChat(c.id); },
+      pinLabel: pi ? "Unpin" : "Pin", pin: (e: PEvent | MouseEvent) => { e.stopPropagation(); patch({ swipeR: null }); void act.setPref(c.id, { pinned: !pi }); },
+      cancel: () => { clearTimeout(refs.lp); refs.ls = null; settleRow(); },
       noMenu: (e: MouseEvent) => e.preventDefault(),
-      up: (e: PEvent) => {
-        clearTimeout(refs.lp);
-        const s = refs.ls; refs.ls = null; if (!s) return;
-        const dx = e.clientX - s.x, dy = e.clientY - s.y;
-        if (Math.abs(dx) > 30 && Math.abs(dx) > Math.abs(dy)) { refs.lsT = Date.now(); patch({ swipe: dx < 0 ? c.id : null }); }
-      },
-      open: () => { if (refs.lsT && Date.now() - refs.lsT < 300) return; if (ui.swipe != null) { patch({ swipe: null }); return; } open(); },
+      open: () => { if (refs.lsT && Date.now() - refs.lsT < 300) return; if (ui.swipe != null || ui.swipeR) { patch({ swipe: null, swipeR: null }); return; } open(); },
       more: (e: PEvent | MouseEvent) => { e.stopPropagation(); patch({ swipe: null, moreLead: c.id, moreView: "main" }); },
     };
   });
@@ -147,7 +193,7 @@ export function inboxVM(ctx: SalesCtx) {
       [mine2.length ? `Label · ${mine2.join(", ")}` : "Label", "M3 12V4h8l10 10-8 8L3 12Zm5-4h.01", () => patch({ moreView: "labels" })],
       // Assign to (user 2026-10-13): for whoever may assign (the Principal / Director in someone's CRM) — the chat's own
       // Assign to sheet, opened over the chat.
-      ...(ctx.embedded?.assignTo ? [["Assign to", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => { if (!ml) return; set(u => ({ ...u, moreLead: null, moreView: "main", chat: ml.id, hm: { assign: true, sel: null } })); act.openChat(ml.id); }] as [string, string, () => void]] : []),
+      ...(ml && canAssign(ml) ? [["Assign to", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => { if (!ml) return; set(u => ({ ...u, moreLead: null, moreView: "main", chat: ml.id, hm: { assign: true, sel: null } })); act.openChat(ml.id); }] as [string, string, () => void]] : []),
     ] as [string, string, () => void][]).map(([label, icon, go], k) => ({ label, icon, go, rule: k ? "1px solid #EBDDD2" : "0" })),
     // Block: off this person's Inbox and Contacts (the customer stays in the CRM; WhatsApp itself is not told).
     moreBlockLabel: ml ? `Block ${ml.name}` : "",

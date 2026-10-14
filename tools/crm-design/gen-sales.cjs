@@ -179,6 +179,19 @@ const BELL = "{!!(v.tb) && (<>\n          <span onClick={v.tb.open} title=\"Noti
 PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []),
   ['<div onClick={l.open} onPointerDown={l.down} onPointerUp={l.up} style={{ position: "relative",',
    '<div onClick={l.open} onPointerDown={l.down} onPointerUp={l.up} onPointerCancel={l.cancel} onContextMenu={l.noMenu} style={{ WebkitTouchCallout: "none", position: "relative",']];
+// Inbox rows swipe as WhatsApp's (the owner, 2026-10-14: "往左滑很慢"): the row follows the finger (onPointerMove); left
+// shows Assign (a TL / STL their team's customer; the Principal / Director in someone's CRM) beside More, right shows Read
+// (an unread chat of one's own) and Pin / Unpin. Each row skips its layout while off screen (data-inbox-row →
+// content-visibility, crm.module.css), so a long list scrolls as the chat does.
+const ROW_ACT = (side, off, bg, click, label, icon) => '<span onClick={' + click + '} style={{ position: "absolute", top: "0", bottom: "0", ' + side + ': ' + off + ', width: "84px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", background: "' + bg + '", color: "#fff", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round"><path d="' + icon + '" /></svg>' + label + '</span>';
+PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []),
+  ['<div style={{ position: "relative", overflow: "hidden", borderTop: l.rule }}>',
+   '<div data-inbox-row="1" style={{ position: "relative", overflow: "hidden", borderTop: l.rule }}>\n            '
+   + '{!!(l.canRead) && (' + ROW_ACT("left", '"0"', "#2F8FD8", "l.read", "Read", "M3 7l9 6 9-6M3 7v10h18V7M3 7l9-4 9 4") + ')}\n            '
+   + ROW_ACT("left", 'l.canRead ? "84px" : "0"', "#A8968B", "l.pin", "{l.pinLabel}", "M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z") + '\n            '
+   + '{!!(l.canAssign) && (' + ROW_ACT("right", '"84px"', "#2F6FB5", "l.assign", "Assign", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3") + ')}'],
+  ['<div onClick={l.open} onPointerDown={l.down} onPointerUp={l.up} onPointerCancel={l.cancel}', '<div onClick={l.open} onPointerDown={l.down} onPointerMove={l.move} onPointerUp={l.up} onPointerCancel={l.cancel}'],
+];
 // Inbox: after All ads, 8 px apart (the title takes the room, so All ads and the bell sit right). Team | Mine left the title
 // row for its own top row (§8.4, superseding 2026-10-11's place beside All ads).
 PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []),
