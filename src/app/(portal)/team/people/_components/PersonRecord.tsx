@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -109,8 +110,15 @@ export default function PersonRecord({
   const editButton = useRef<HTMLButtonElement>(null)
   const wasEditing = useRef(editing)
 
+  // Saved, and waiting for the page to read itself again: the fresh record
+  // lands a moment after the save answers, and in that moment the page would
+  // read the old values back as if nothing was saved (seen 2026-10-14).
+  const [settling, setSettling] = useState(false)
+  const savedFrom = useRef<PersonRecordView | null>(null)
+
   const ed = editing ? editor : null
   const count = changed.size + (ed && mode !== initialMode ? 1 : 0)
+  const busy = saving || settling
 
   function enter() {
     setMode(initialMode)
@@ -119,7 +127,7 @@ export default function PersonRecord({
     setEditing(true)
   }
 
-  function leave() {
+  const leave = useCallback(() => {
     setEditing(false)
     setChanged(new Set())
     setError(null)
@@ -129,7 +137,26 @@ export default function PersonRecord({
       url.searchParams.delete('edit')
       window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
     }
-  }
+  }, [])
+
+  // The fresh record has arrived: read it, and say it was saved.
+  useEffect(() => {
+    if (!settling || view === savedFrom.current) return
+    setSettling(false)
+    leave()
+    flash('Saved')
+  }, [settling, view, leave])
+
+  // …and should it never come, the page reads anyway.
+  useEffect(() => {
+    if (!settling) return
+    const late = setTimeout(() => {
+      setSettling(false)
+      leave()
+      flash('Saved')
+    }, 6000)
+    return () => clearTimeout(late)
+  }, [settling, leave])
 
   // A pay basis that adds or takes away rows: count again over the rows now drawn.
   useLayoutEffect(() => {
@@ -161,7 +188,7 @@ export default function PersonRecord({
 
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!editor || saving) return
+    if (!editor || busy) return
     if (count === 0) {
       leave()
       return
@@ -175,8 +202,8 @@ export default function PersonRecord({
       try {
         const outcome = await updateStaff(editor.staff.id, data)
         if (outcome.ok) {
-          leave()
-          flash('Saved')
+          savedFrom.current = view
+          setSettling(true)
         } else {
           setError(outcome.reason)
         }
@@ -582,11 +609,11 @@ export default function PersonRecord({
               )}
             </span>
             <span className={s.barActions}>
-              <button type="button" className={btn('outline')} onClick={leave} disabled={saving}>
+              <button type="button" className={btn('outline')} onClick={leave} disabled={busy}>
                 Cancel
               </button>
-              <button type="submit" className={btn('primary')} disabled={saving || count === 0}>
-                {saving ? 'Saving…' : 'Save changes'}
+              <button type="submit" className={btn('primary')} disabled={busy || count === 0}>
+                {busy ? 'Saving…' : 'Save changes'}
               </button>
             </span>
           </div>

@@ -126,9 +126,10 @@ describe('Edit — each value becomes its field where it stands', () => {
     expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull()
   })
 
-  it('counts and marks a change, and saves the record through updateStaff', async () => {
+  it('counts and marks a change, saves it, and reads again once the fresh record is in', async () => {
     mocks.updateStaff.mockResolvedValue({ ok: true })
-    openEditor()
+    const { rerender } = render(<PersonRecord view={view()} editor={editor()} inviteHref={null} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
     const phone = screen.getAllByLabelText('Phone')[0]
     fireEvent.change(phone, { target: { value: '012-999 0000' } })
     expect(phone).toHaveAttribute('data-dirty', 'true')
@@ -144,10 +145,38 @@ describe('Edit — each value becomes its field where it stands', () => {
     // Only what changed goes — the rest of the record is not written back
     // (2026-10-14: a whole-page save put old values over changes made since).
     expect(Object.fromEntries(data.entries())).toEqual({ contact_number: '012-999 0000' })
-    // Saved: the page reads again, and says so.
+    // Saved — but the page does not read its old values back while the fresh
+    // record is on its way (seen 2026-10-14): the bar says Saving…
+    expect(screen.getByRole('form')).toBeInTheDocument()
+    expect(within(bar()).getByRole('button', { name: 'Saving…' })).toBeDisabled()
+    expect(mocks.flash).not.toHaveBeenCalled()
+
+    // The server's fresh read arrives: the page reads it, and says it saved.
+    rerender(<PersonRecord view={view({ contact: { phone: '012-999 0000', email: 'test@example.com', address: null } })} editor={editor({ contact_number: '012-999 0000' })} inviteHref={null} />)
     expect(screen.queryByRole('form')).toBeNull()
+    expect(screen.getByText('012-999 0000')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
     expect(mocks.flash).toHaveBeenCalledWith('Saved')
+  })
+
+  it('reads anyway if the fresh record never comes', async () => {
+    vi.useFakeTimers()
+    try {
+      mocks.updateStaff.mockResolvedValue({ ok: true })
+      openEditor()
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'other@example.com' } })
+      await act(async () => {
+        fireEvent.submit(form())
+      })
+      expect(screen.getByRole('form')).toBeInTheDocument()
+      await act(async () => {
+        vi.advanceTimersByTime(6000)
+      })
+      expect(screen.queryByRole('form')).toBeNull()
+      expect(mocks.flash).toHaveBeenCalledWith('Saved')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('a field typed back to what it was is no change', () => {
