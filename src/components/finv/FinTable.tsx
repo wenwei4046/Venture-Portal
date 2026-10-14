@@ -46,6 +46,8 @@ export interface FinColumn<R> {
   /** What the cell says — and what its filter lists. */
   text: (r: R) => string
   chip?: (r: R) => { text: string; tone: ChipTone } | null
+  /** A figure's colour: money in, green (a receipt's +RM). */
+  tone?: (r: R) => 'ledger' | null
 }
 
 type Sort = { key: string; dir: 'asc' | 'desc' } | null
@@ -496,6 +498,7 @@ export function FinTable<R>({
                           style={fx(c).style}
                           data-kind={c.kind}
                           data-faint={c.kind === 'amount' && faint?.(r) ? 'true' : undefined}
+                          data-tone={c.tone?.(r) ?? undefined}
                           title={c.kind === 'desc' || c.kind === 'name' ? c.text(r) : undefined}
                         >
                           {chip ? <Chip tone={chip.tone}>{chip.text}</Chip> : c.text(r)}

@@ -457,6 +457,7 @@
 }
 .cell[data-kind='name'] { font-size: 13.5px; color: var(--ds-ink); }
 .cell[data-kind='amount'] { text-align: right; font-family: var(--font-mono), 'Chivo Mono', monospace; font-weight: 500; color: var(--ds-ink); }
+.cell[data-kind='amount'][data-tone='ledger'] { color: rgb(var(--fv-chip-ledger-ink)); }
 .cell[data-kind='amount'][data-faint='true'] { color: var(--ds-ink-4); }
 .cell[data-kind='no'] { font-family: var(--font-mono), 'Chivo Mono', monospace; font-weight: 500; color: var(--ds-ink); }
 .cell[data-kind='date'] { font-family: var(--font-mono), 'Chivo Mono', monospace; }

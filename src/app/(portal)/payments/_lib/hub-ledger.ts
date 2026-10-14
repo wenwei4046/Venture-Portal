@@ -394,12 +394,17 @@ export function buildHubLedger(input: HubLedgerInput): HubLedger {
   const cards: HubCardFigure[] = [
     figure('all'),
     ...STATUS_CARDS.map((s) => figure(s)),
-    {
-      key: 'payroll',
-      count: batches.length,
-      other: 0,
-      amount: r2(batches.reduce((s, b) => s + b.total, 0)),
-    },
+    // Receipt's hub has no payroll card (D09: All / Draft / Pending / Approved / Received / Voided).
+    ...(receipts
+      ? []
+      : [
+          {
+            key: 'payroll' as const,
+            count: batches.length,
+            other: 0,
+            amount: r2(batches.reduce((s, b) => s + b.total, 0)),
+          },
+        ]),
   ]
 
   // ── The hero: this month's money moved — every voucher (payroll too) and the money outside the flow. ──
