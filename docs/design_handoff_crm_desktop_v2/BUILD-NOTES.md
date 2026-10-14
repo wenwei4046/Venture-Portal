@@ -9,9 +9,9 @@ What was built from this handoff, what was decided along the way, where the buil
 - **Check against the prototype:** `npm run dev`, then:
   - `ALSO1280=1 node tools/crm-design/compare-desk.mjs <dir>` draws every canvas frame at 1440 × 900 and again at 1280 × 800, and compares the prototype with the app pixel by pixel.
   - `SCENES=tools/crm-design/scenes/desk-v2.json` adds the interaction states. These are 39 scenes (menus, popovers, hover, the ⋮ menu, the message menu, attach, alerts, the date range, Contacts' filters / sort / + column, every Channels tab, Unlink, Add a number, By team, the ad's audit log, Full time, Member work type, Customer form, Audit log filters). Each is played with real mouse events on both.
-- **Result on 2026-10-15:**
-  - 52 frames: 0 px apart, except 8 where 3 px differ — the antialiasing of a pill's corner on Insight.
-  - 78 interaction shots: 0 px apart, except the same 3 px and one blinking text cursor.
+- **Result on 2026-10-15, after merging main (#425–#429):**
+  - 56 frames: 0 px apart, except 10 where 3 px differ — the antialiasing of a pill's corner on Insight.
+  - 78 interaction shots: 0 px apart, except 12 with the same 3 px.
 
 ## Linked rules (the owner: "规则要连通")
 
@@ -50,7 +50,7 @@ What was built from this handoff, what was decided along the way, where the buil
    - The message menu has **Forward** and **Info** beside v2's Reply · Copy · Star · Pin · Delete for me, as the phone has since 2026-10-14.
    - A quote shows inside a bubble that answers one.
    - The + menu lists Quick replies and Auto replies inside the popover, with a Back row.
-   - The mic sends text and does not record on a computer. The sticker icon does nothing yet.
+   - The mic sends text and does not record on a computer. The sticker icon does nothing yet. The phone's new Sticker panel with Recents (#425, merged the same day) is not on the desktop.
 8. **Move / Share:** a Director's Move goes to the Principal (`crm_send_to`, 30 s Undo). Share for the Principal and Director lists everybody in the CRM — Edit · All in the permission matrix.
 9. **Calendar:** for a Director, the extra "Revenue Director" chip pushes the view switch onto a second row.
 10. **Customer form:**
