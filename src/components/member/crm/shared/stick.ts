@@ -16,7 +16,18 @@ import { useEffect, useLayoutEffect, useRef } from "react";
  * The photos' boxes are drawn at their final size anyway (shared/chat-media.ts), so there is little left to move.
  */
 const LISTS = "[data-chat-list]";
-const toBottom = () => document.querySelectorAll<HTMLElement>(LISTS).forEach(el => { el.scrollTop = el.scrollHeight; });
+/** The chats on screen: the phone's lists, and on the desktop the scroller around a conversation's end marker. */
+function chatLists(): HTMLElement[] {
+  const out = new Set<HTMLElement>(document.querySelectorAll<HTMLElement>(LISTS));
+  document.querySelectorAll<HTMLElement>("[data-chat-end]").forEach(end => {
+    for (let el = end.parentElement; el && el !== document.body; el = el.parentElement) {
+      const y = getComputedStyle(el).overflowY;
+      if (y === "auto" || y === "scroll") { el.dataset.chatList = "1"; out.add(el); break; }
+    }
+  });
+  return [...out];
+}
+const toBottom = () => chatLists().forEach(el => { el.scrollTop = el.scrollHeight; });
 
 export function useFollowNewest(chatId: string | null | undefined, count: number) {
   const last = useRef<{ id: string | null | undefined; n: number }>({ id: undefined, n: 0 });
@@ -35,14 +46,16 @@ export function useFollowNewest(chatId: string | null | undefined, count: number
     if (!chatId || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(() => { if (atBottom.current) toBottom(); });
     const seen = new WeakSet<Element>();
-    const watch = () => document.querySelectorAll<HTMLElement>(LISTS).forEach(list => {
+    const watch = () => chatLists().forEach(list => {
       if (!seen.has(list)) { seen.add(list); ro.observe(list); }
       for (const child of Array.from(list.children)) if (!seen.has(child)) { seen.add(child); ro.observe(child); }
     });
     watch();
-    const mo = new MutationObserver(watch);
+    // Looked again at most once a frame, however many nodes changed.
+    let raf = 0;
+    const mo = new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; watch(); }); });
     mo.observe(document.body, { childList: true, subtree: true });
-    return () => { ro.disconnect(); mo.disconnect(); };
+    return () => { ro.disconnect(); mo.disconnect(); cancelAnimationFrame(raf); };
   }, [chatId]);
 
   useLayoutEffect(() => {

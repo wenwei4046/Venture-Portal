@@ -86,7 +86,9 @@ function chatPatches(inn, out, text, time, reply, list, draft, setDraft, draftKe
   const NO = "(?:(?!<span title|\\{!!\\(v\\.)[\\s\\S])*?";
   const SYS = `{ alignSelf: "center", display: "inline-flex", alignItems: "center", gap: "6px", maxWidth: "86%", margin: "4px 0", padding: "6px 12px", borderRadius: "10px", background: "rgba(107,100,90,.12)", color: "#6B645A", fontSize: "12px", fontWeight: "600", textAlign: "center" }`;
   // 2026-10-13 (the user: a voice note, photo or video came as a document to open): shown as itself, as on the phone.
-  const MEDIA = `{!!(m.img) && (<a href={m.img} target="_blank" rel="noreferrer" style={{ display: "block", margin: "-2px -4px 4px" }}><img src={m.img} alt="Photo" style={{ display: "block", width: "100%", maxWidth: "280px", maxHeight: "320px", objectFit: "cover", borderRadius: "12px" }} /></a>)}{!!(m.vid) && (<video src={m.vid} controls playsInline preload="metadata" style={{ display: "block", width: "300px", maxWidth: "100%", margin: "-2px -4px 4px", borderRadius: "12px", background: "#000" }} />)}{!!(m.aud) && (<audio src={m.aud} controls preload="metadata" style={{ display: "block", width: "280px", maxWidth: "100%", height: "40px", margin: "0 0 2px" }} />)}`;
+  // 2026-10-14: the phone chats' markup (chat-media.cjs) — a box its final size before it loads, a tap opens the in-app viewer
+  // (photos, videos, a PDF read in place), a document as a tile with its name.
+  const MEDIA = require("./chat-media.cjs");
   const BELL = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto" }}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"></path></svg>`;
   const bubbles = new RegExp(
     `(<span style=\\{\\{ alignSelf: "center", margin: "4px 0 2px"[^\\n]*?\\}\\}>)(?:Today|\\{v\\.aw\\.time\\})</span>\\s*` +
@@ -99,7 +101,9 @@ function chatPatches(inn, out, text, time, reply, list, draft, setDraft, draftKe
     `{!!(m.sys) && (<><span style={${SYS}}>{!!(m.bell) && (<>${BELL}</>)}{m.sys}</span></>)}` +
     `{!!(m.inn) && (<>${inDiv}${CARD}{!!(m.text) && (<p style=${pSt}>{m.text}</p>)}${MEDIA}{!!(m.media) && (<p style=${pSt}><a href={m.mediaHref || undefined} target="_blank" rel="noreferrer">{m.media}</a></p>)}<span style=${inTime}>{m.time}</span></div></>)}` +
     `{!!(m.out) && (<>${outDiv}${CARD}{!!(m.text) && (<p style=${pSt}>{m.text}</p>)}${MEDIA}{!!(m.media) && (<p style=${pSt}><a href={m.mediaHref || undefined} target="_blank" rel="noreferrer">{m.media}</a></p>)}<span style=${outTime}>{m.time}{!!(m.hasTick) && (<svg ${svgA}stroke={m.tick}${svgB}>${svgIn}</svg>)}{!!(m.failed) && (<span style={{ color: "#A3371A", fontWeight: "600" }}>Not sent</span>)}</span></div></>)}` +
-    `</Fragment>))}`;
+    `</Fragment>))}` +
+    // The end of the conversation: shared/stick.ts finds the list by it and opens the chat on its newest message (2026-10-14).
+    `<span data-chat-end="1" style={{ display: "none" }}></span>`;
   const composer = new RegExp(
     `<span title="Send a file" style=(\\{\\{[^\\n]*?\\}\\})>(${NO})</span>(\\s*<span style=\\{\\{[^\\n]*?\\}\\}>\\s*)<span style=\\{\\{ flex: "1", minWidth: "0", fontSize: "15px", color: "#757575"[^\\n]*?\\}\\}>\\{${e(reply)}\\}</span>(${NO})` +
     `<span title="Send a photo" style=(\\{\\{[^\\n]*?\\}\\})>(${NO})</span>(\\s*)<span title="Voice note" style=(\\{\\{[^\\n]*?\\}\\})>(${NO})<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0m7 7v3">`);

@@ -482,5 +482,9 @@
   .main.mainCrm { position: relative; overflow: hidden; padding-left: 0; padding-right: 0; }
 }
 
+/* The CRM on a phone is a fixed layer over the page (crm.module.css .app) that scrolls inside its own lists: the page
+   under it holds still, so a list that reaches its end does not hand the scroll on to a page nobody sees (2026-10-14). */
+.mainHeld { overflow: hidden; overscroll-behavior: none; }
+
 /* The Product List page scrolls inside itself: the column is its frame. */
 .mainProducts { position: relative; overflow: hidden; padding-left: 0; padding-right: 0; }

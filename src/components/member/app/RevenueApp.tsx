@@ -1098,7 +1098,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel || profilePanel;
   // A pull only from the page itself — never while a sheet is up — and never on the preview's fixtures,
   // nor on the Product List, which holds its edits until Save.
-  const pullable = !data.demo && !fixture && !anyPanel && !nfOpen && !vaOpen && !onProducts;
+  // Nor in the CRM, which reads itself every 5 s and scrolls inside its own lists: a pull listener there (a non-passive
+  // touchmove) made every scroll in it wait for the page's script (the owner, 2026-10-14: "在 revenue app 很順滑，在 crm 就卡").
+  const onCrm = route.screen === "account" && route.pf === "crm";
+  const pullable = !data.demo && !fixture && !anyPanel && !nfOpen && !vaOpen && !onProducts && !onCrm;
   // A reload for a newer release loses nothing: no sheet or form open.
   reloadable.current = pullable;
   // View as takes the page column's place too (the prototype's `vaPE` opens the rail). The Product List
@@ -1284,7 +1287,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
           onProfile={() => goScreen("account")} />
       )}
       <PullRefresh target={mainRef} enabled={pullable} refreshing={refreshing || bootOverKept} failed={refreshFailed} onRefresh={pullRefresh} />
-      <main ref={mainRef} className={`${s.main} ${onProducts ? s.mainProducts : ""} ${deskCrm ? s.mainCrm : ""}`} onScroll={e => { const t = e.currentTarget.scrollTop; const v = t > 4, c = t > 110; if (v !== scrolled) setScrolled(v); if (c !== compact) setCompact(c); }}>
+      <main ref={mainRef} className={`${s.main} ${onProducts ? s.mainProducts : ""} ${deskCrm ? s.mainCrm : ""} ${onCrm ? s.mainHeld : ""}`} onScroll={e => { const t = e.currentTarget.scrollTop; const v = t > 4, c = t > 110; if (v !== scrolled) setScrolled(v); if (c !== compact) setCompact(c); }}>
         {page}
       </main>
       {route.screen === "quote" && quote.catalog && quoteSends && (

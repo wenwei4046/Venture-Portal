@@ -18,6 +18,7 @@ import { deskVM } from "./vm/app";
 import { initialDeskUi, type DeskActions, type DeskApp as DeskAppFrame, type DeskUi } from "./vm/ctx";
 import { historyRows } from "./vm/history";
 import { useDeskPlace, withSavedPlace } from "./nav";
+import { useFollowNewest } from "../shared/stick";
 
 export interface DeskScreensProps {
   data: CrmData;
@@ -44,6 +45,10 @@ export default function DeskScreens(p: DeskScreensProps) {
   // A refresh opens where this tab was; Back steps through the clicks (./nav.ts, user 2026-10-13).
   const [ui, setUi] = useState<DeskUi>(() => withSavedPlace(initialDeskUi()));
   useDeskPlace(ui, setUi);
+  // A chat opens on its newest message and follows the next ones, as on the phone (the owner, 2026-10-14: "電腦版打開聊天時
+  // 看的是最新消息，而不是從上面慢慢滑到下面").
+  const msgCount = (id: string | null) => (id ? data.customers.find(c => c.id === id)?.messages.length ?? 0 : 0);
+  useFollowNewest(ui.chat || ui.awChat ? `${ui.tab}:${ui.chat ?? ""}:${ui.awChat ?? ""}` : null, msgCount(ui.chat) + msgCount(ui.awChat));
   const patch = useCallback((x: Partial<DeskUi>) => setUi(u => ({ ...u, ...x })), []);
   const [size, setSize] = useState({ W: 1440, H: 900 });
   const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});

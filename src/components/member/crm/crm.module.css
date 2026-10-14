@@ -82,6 +82,11 @@
   --crm-top: calc(env(safe-area-inset-top, 0px) + min(8px, env(safe-area-inset-top, 0px)));
   padding: var(--crm-top) env(safe-area-inset-right, 0px) var(--safe-bottom) env(safe-area-inset-left, 0px);
 }
+/* Smooth scrolling (the owner, 2026-10-14: "在 revenue app 很順滑，在 crm 就卡 … 我要整個畫面都順滑"): every list scrolls on
+   its own and never hands a scroll on at its end (no chaining, no page bounce behind it). */
+.app { overscroll-behavior: none; }
+.app [style*="overflow-y:auto"], .app [style*="overflow:auto"], .app [style*="overflow-x:auto"],
+.app [style*="overflow-y: auto"], .app [style*="overflow: auto"], .app [style*="overflow-x: auto"] { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .app.panel { background: linear-gradient(#FBF7F3, #FBF7F3) top / 100% calc(100% - var(--safe-bottom)) no-repeat, #FFFFFF; }
 .app.panel:has(main [data-chat-list]) { background: #FFFFFF; }
 /* A layer positioned against .app spans its padding, so it keeps its own content clear of the insets
