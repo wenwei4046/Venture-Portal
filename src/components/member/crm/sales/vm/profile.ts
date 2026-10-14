@@ -7,7 +7,9 @@
 import type { ChangeEvent } from "react";
 import { DEFAULT_QUICK_REPLIES, type CrmAutoReplySet } from "@/lib/member/crm-data";
 import { downlineOf, jobTitle, titleOf } from "../../shared/people";
-import { firstName, ini, stop, type SalesCtx } from "./common";
+import { CHANNEL, firstName, ini, stop, type SalesCtx } from "./common";
+import { openSummary } from "../../shared/notif-summary";
+import { lastWordsOf, summaryFor } from "../../shared/notif-summary-data";
 import { isReadNotif, salesNotifs } from "./notifs";
 
 const swv = (on: boolean) => ({ Bg: on ? "#387557" : "#D9C7BA", X: on ? "21px" : "3px" });
@@ -15,9 +17,19 @@ const to12 = (hhmm: string) => { const [H, M] = hhmm.split(":").map(Number); ret
 const lbl = (hhmm: string) => { const t = to12(hhmm); return `${t.h}:${String(t.m).padStart(2, "0")} ${t.ap}`; };
 
 export function profileVM(ctx: SalesCtx) {
-  const { ui, set, patch, data, owner, viewingOther, act, embedded } = ctx;
+  const { ui, set, patch, data, owner, viewingOther, act, embedded, nameOf } = ctx;
   // Unread | Read (rev 1010 §6): an update is read once tapped; an invitation stays unread until answered.
   const notifs = salesNotifs(ctx), isRead = (n: (typeof notifs)[number]) => isReadNotif(n, data);
+  // A notification's point at a glance, and its summary on a tap (the owner, 2026-10-14: "在 notification 裡，我看不到重點，
+  // 幫我類似做 summary，我點進去看到更多才去 chat"): the customer's channel and ad on the row with their latest words,
+  // and a card with their status, whose they are, the latest messages and the next visit — Open chat from there.
+  const custOf = (id?: string) => (id ? data.customers.find(c => c.id === id) : undefined);
+  const lastWords = (id?: string) => lastWordsOf(data, id);
+  const summaryOf = (n: (typeof notifs)[number]) => {
+    const c = custOf(n.customerId);
+    openSummary(summaryFor({ data, nameOf, me: owner.id }, { title: n.text, when: n.at, customerId: n.customerId, lead: n.lead },
+      c && ctx.mine.some(x => x.id === c.id) ? () => { set(u => ({ ...u, profSub: null, tab: "inbox", chat: c.id, hist: [...u.hist, u.tab].slice(-20) })); act.openChat(c.id); } : undefined));
+  };
   const unread = notifs.filter(n => !isRead(n)).length, nTab = ui.nTab;
   const vis = notifs.filter(n => (nTab === "unread") === !isRead(n));
   const team = viewingOther ? [] : downlineOf(owner.id, data.people).map(id => data.people.find(p => p.id === id)!).filter(Boolean);
@@ -70,10 +82,11 @@ export function profileVM(ctx: SalesCtx) {
       // Tapped: read, and — when it is about one of their own customers — that chat opens (user 2026-10-13).
       unread: !isRead(n), weight: isRead(n) ? 500 : 650, fg: isRead(n) ? "#806B60" : "#3F2B22", open: () => {
         if (!isRead(n)) act.readNotifs([n.id]);
-        const to = n.customerId && ctx.mine.some(c => c.id === n.customerId) ? n.customerId : null;
-        if (to) { set(u => ({ ...u, profSub: null, tab: "inbox", chat: to, hist: [...u.hist, u.tab].slice(-20) })); act.openChat(to); }
+        summaryOf(n);
       },
-      text: n.text, meta: n.lead ? `${n.lead} · ${n.at}` : n.at, rule: k ? "1px solid #EBDDD2" : "0",
+      text: n.text, rule: k ? "1px solid #EBDDD2" : "0",
+      meta: (() => { const c = custOf(n.customerId); return [n.lead, c ? CHANNEL[c.channel].name : "", n.at].filter(Boolean).join(" · "); })(),
+      sum: lastWords(n.customerId),
       c: n.ok ? "#387557" : "#A3371A", bg: n.ok ? "#E4F1E8" : "#FBEAE6", icon: n.ok ? "m5 12 5 5 9-10" : "M6 6l12 12M18 6 6 18",
     })),
     qrRows: qrs.map((q, i) => ({

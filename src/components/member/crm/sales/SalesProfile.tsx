@@ -227,6 +227,7 @@ export default function SalesProfile({ v }: { v: ProfileVM & ShellExtras }) {
                   <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
                     <span style={{ fontSize: "14px", fontWeight: u.weight, lineHeight: "1.3", color: u.fg }}>{u.text}</span>
                     <span style={{ fontSize: "12px", color: "#806B60" }}>{u.meta}</span>
+                    {!!(u.sum) && (<span style={{ fontSize: "13px", color: "#3F2B22", lineHeight: "1.35", marginTop: "2px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{u.sum}</span>)}
                   </span>
                   {!!(u.unread) && (<>
                     <span style={{ flex: "none", width: "9px", height: "9px", borderRadius: "50%", background: "#BD4A19" }}>
