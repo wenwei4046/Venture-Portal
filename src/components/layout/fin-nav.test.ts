@@ -9,8 +9,8 @@ import type { NavData, NavViewer } from './nav-config'
 
 // Finance's sidebar (2026-10-14, the Finance revamp v2 — `Finance Desktop.dc.html`):
 // Overview, then Daily · Fund · Report · Department in that order, Admin in the
-// footer's account menu; Approvals and Claims only for whoever holds them
-// (the user's call); no Overdue (its page is gone).
+// footer's account menu; Approvals only for whoever holds it (the user's call);
+// no Overdue (its page is gone); no Claims (the user took it out, 2026-10-15).
 
 const login = (email: string, extra: Partial<NavViewer> = {}): NavViewer => {
   const f = PROD_LOGINS.find((l) => l.email === email)!
@@ -23,13 +23,13 @@ const data: NavData = { revenueSubDepts: [], deptPoolDepts: statementDepts([]) }
 const labels = (v: NavViewer) => visibleHrNav(finNavSections(data), v).map((s) => [s.roman, s.label, s.items.map((i) => i.label)])
 
 describe("Finance's sidebar", () => {
-  it('lists finance@’s rows in the design’s order, Claims last in Department', () => {
+  it('lists finance@’s rows in the design’s order', () => {
     expect(labels(finance)).toEqual([
       [null, null, ['Overview']],
       ['I.', 'Daily', ['Payments', 'Receipt', 'Invoice', 'Billing Allocator', 'Daily Bank', 'Reconciliation', 'Journal Entries']],
       ['II.', 'Fund', ['Fund IN', 'Fund OUT', 'Invoice Financing', 'Repayment', 'Statements']],
       ['III.', 'Report', ['General Ledger', 'P&L', 'Cash Flow', 'Receipt & Payment', 'Balance Sheet', 'Trial Balance', 'Debtor Aging', 'Loan Aging', 'Company Statement', 'Chart of Account', 'Base Rate History']],
-      ['IV.', 'Department', ['Dept Pool', 'Venture', 'Marketing', 'Finance', 'HR', 'Director Office', 'Venture Pool', 'Claims']],
+      ['IV.', 'Department', ['Dept Pool', 'Venture', 'Marketing', 'Finance', 'HR', 'Director Office', 'Venture Pool']],
     ])
   })
 
@@ -37,6 +37,12 @@ describe("Finance's sidebar", () => {
     const all = finNavSections(data).flatMap((s) => s.items)
     expect(all.map((i) => i.label)).not.toContain('Overdue')
     expect(all.map((i) => i.href)).not.toContain('/overdue')
+  })
+
+  it('has no Claims — the user took it out on 2026-10-15 (its page stays)', () => {
+    const all = finNavSections(data).flatMap((s) => s.items)
+    expect(all.map((i) => i.label)).not.toContain('Claims')
+    expect(all.map((i) => i.href)).not.toContain('/claims')
   })
 
   it('puts Approvals first in Daily for whoever may decide (the Principal’s Finance lens)', () => {
@@ -49,7 +55,7 @@ describe("Finance's sidebar", () => {
     const sections = visibleHrNav(finNavSections(data), carrie)
     expect(sections.map((s) => s.label)).toEqual([null, 'Daily', 'Fund', 'Department'])
     expect(sections.find((s) => s.label === 'Department')?.roman).toBe('III.')
-    expect(sections.find((s) => s.label === 'Department')?.items.map((i) => i.label)).toEqual(['Venture Pool', 'Claims'])
+    expect(sections.find((s) => s.label === 'Department')?.items.map((i) => i.label)).toEqual(['Venture Pool'])
   })
 
   it('lists the departments the registry hands in (IT, Revenue Department …)', () => {

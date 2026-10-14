@@ -11,16 +11,16 @@
 //
 // and Admin is no category: Audit Log, Departments and Meeting Rooms sit in the
 // footer's account menu with Edit profile and Change password (finAccountMenu).
-// The user's calls (2026-10-14): Approvals and Claims, which the design leaves
-// out, show to whoever holds them — Approvals first in Daily, Claims last in
-// Department; Overdue, which the design lists under Fund, stays gone (its page
-// went the same day).
+// The user's calls (2026-10-14): Approvals, which the design leaves out, shows
+// to whoever holds it — first in Daily; Overdue, which the design lists under
+// Fund, stays gone (its page went the same day). Claims stood last in
+// Department until the user took it out (2026-10-15: "delete the claim tab") —
+// its page stays, the Principal's own sidebar still lists it.
 
 import { opensPath } from '@/lib/page-tabs'
 import { statementDepts, statementPath } from '@/lib/dept-statements'
 import {
   canAccessCategories,
-  canAccessClaims,
   canAccessDeptPool,
   canAccessDeptReports,
   canAccessMeetingRooms,
@@ -127,7 +127,6 @@ export function finNavSections(data: NavData): HrNavSection[] {
           ),
         ),
         link('venture-pool', 'Venture Pool', 'in', '/venture-pool', canAccessVenturePool),
-        link('claims', 'Claims', 'receipt', '/claims', canAccessClaims),
       ],
     },
   ]
