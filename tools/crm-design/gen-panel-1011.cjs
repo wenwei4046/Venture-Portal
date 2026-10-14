@@ -21,7 +21,9 @@ for (const [a, b] of PATCHES) {
   if (n !== 1) throw new Error(`PanelApp: patch matched ${n} times: ${a}`);
   body = body.replace(a, b);
 }
-// The Revenue app's type scale on every size (2026-10-14 — type-scale.cjs), after the patches, which match the prototype's px.
+// Profile's main page in the Revenue app Profile's sizes (2026-10-14 — profile-type.cjs), then the Revenue app's type scale on
+// every size (type-scale.cjs) — both after the patches, which match the prototype's px.
+body = require("./profile-type.cjs")(body, "{!!(v.pf.onProfile) && (<>");
 body = require("./type-scale.cjs")(body);
 const apos = /[>}][^<>{}]*'[^<>{}]*[<{]/.test(body.replace(/"[^"]*"/g, '""'));
 const code = `"use client";

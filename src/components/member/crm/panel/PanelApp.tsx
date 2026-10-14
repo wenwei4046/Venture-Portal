@@ -1731,20 +1731,20 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </span>
             </>)}
             <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "650" }}>{v.pf.meIni}</span>
+              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(18px * var(--rv-type, 1))", fontWeight: "650" }}>{v.pf.meIni}</span>
               <div style={{ minWidth: "0" }}>
-                <h1 style={{ margin: "0", fontSize: "calc(24px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>{v.pf.meName}</h1>
-                <p style={{ margin: "2px 0 0", fontSize: "calc(14px * var(--rv-type, 1))", color: "#806B60" }}>HOUZS Venture · CRM</p>
+                <h1 style={{ margin: "0", fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>{v.pf.meName}</h1>
+                <p style={{ margin: "2px 0 0", fontSize: "calc(13px * var(--rv-type, 1))", color: "#806B60" }}>HOUZS Venture · CRM</p>
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #EBDDD2", borderRadius: "16px", background: "#fff" }}>
               <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: "2px" }}>
-                <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", color: "#806B60" }}>Title</span>
-                <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700" }}>{v.pf.meTitle}</strong>
+                <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "#806B60" }}>Title</span>
+                <strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "700" }}>{v.pf.meTitle}</strong>
               </div>
               <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: "2px", borderLeft: "1px solid #EBDDD2" }}>
-                <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", color: "#806B60" }}>Access</span>
-                <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700" }}>{v.pf.meAccess}</strong>
+                <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "#806B60" }}>Access</span>
+                <strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "700" }}>{v.pf.meAccess}</strong>
               </div>
             </div>
           </div>
@@ -1757,7 +1757,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </svg>
               </span>
               <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                <strong style={{ fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "700" }}>View as a team member</strong>
+                <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700" }}>View as a team member</strong>
               </span>
               <svg style={{ flex: "none", color: "#D9C7BA" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="m9 6 6 6-6 6">
@@ -1766,7 +1766,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
             </div>
           </>)}
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <h2 style={{ margin: "0 0 4px", fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>Your workspace</h2>
+            <h2 style={{ margin: "0 0 4px", fontSize: "calc(18px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>Your workspace</h2>
             <div onClick={v.pf.openNotifs} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", borderBottom: "1px solid #EBDDD2", cursor: "pointer" }}>
               <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "#E4EDF8", color: "#2F6FB5", display: "grid", placeItems: "center" }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -1775,10 +1775,10 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </svg>
               </span>
               <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                <strong style={{ fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "700" }}>Notifications</strong>
+                <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700" }}>Notifications</strong>
               </span>
               {!!(v.pf.notifUnread) && (<>
-                <span style={{ flex: "none", minWidth: "22px", height: "22px", padding: "0 7px", boxSizing: "border-box", borderRadius: "11px", background: "#BD4A19", color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700" }}>{v.pf.notifUnread}</span>
+                <span style={{ flex: "none", minWidth: "22px", height: "22px", padding: "0 7px", boxSizing: "border-box", borderRadius: "11px", background: "#BD4A19", color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700" }}>{v.pf.notifUnread}</span>
               </>)}
               <svg style={{ flex: "none", color: "#806B60" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="m9 6 6 6-6 6">
@@ -1794,7 +1794,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                   </svg>
                 </span>
                 <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <strong style={{ fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "700" }}>Member work type</strong>
+                  <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700" }}>Member work type</strong>
                 </span>
                 <svg style={{ flex: "none", color: "#806B60" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m9 6 6 6-6 6">
@@ -1809,7 +1809,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                   </svg>
                 </span>
                 <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <strong style={{ fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "700" }}>Showrooms</strong>
+                  <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700" }}>Showrooms</strong>
                 </span>
                 <svg style={{ flex: "none", color: "#806B60" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m9 6 6 6-6 6">
@@ -1824,7 +1824,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                   </svg>
                 </span>
                 <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <strong style={{ fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "700" }}>Cold lead templates</strong>
+                  <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700" }}>Cold lead templates</strong>
                 </span>
                 <svg style={{ flex: "none", color: "#806B60" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m9 6 6 6-6 6">
@@ -1839,7 +1839,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                   </svg>
                 </span>
                 <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <strong style={{ fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "700" }}>Ads Performance</strong>
+                  <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700" }}>Ads Performance</strong>
                 </span>
                 <svg style={{ flex: "none", color: "#806B60" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m9 6 6 6-6 6">

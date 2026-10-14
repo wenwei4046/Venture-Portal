@@ -3,6 +3,7 @@
 const fs = require("fs"), path = require("path");
 const { convert, hoverClasses } = require("./dc2jsx.cjs");
 const scaleType = require("./type-scale.cjs");
+const profileType = require("./profile-type.cjs");
 const repo = path.resolve(__dirname, "../..");
 const src = fs.readFileSync(path.join(repo, "docs/design_handoff_crm_roles/CRM Revenue View.dc.html"), "utf8").split(/\r?\n/);
 const out = path.join(repo, "src/components/member/crm/sales");
@@ -198,6 +199,10 @@ PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []),
    + '{!!(l.canAssign) && (' + ROW_ACT("right", '"84px"', "#2F6FB5", "l.assign", "Assign", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3") + ')}'],
   ['<div onClick={l.open} onPointerDown={l.down} onPointerUp={l.up} onPointerCancel={l.cancel}', '<div onClick={l.open} onPointerDown={l.down} onPointerMove={l.move} onPointerUp={l.up} onPointerCancel={l.cancel}'],
 ];
+// The card's Rank is a fact as its Title is — the same size (the prototype drew it a step bigger); profile-type.cjs then
+// puts both at the Revenue app's 15 (2026-10-14).
+PATCHES.SalesProfile = [...(PATCHES.SalesProfile ?? []),
+  ['<strong style={{ fontSize: "17px", fontWeight: "700" }}>{v.meRankX}</strong>', '<strong style={{ fontSize: "16px", fontWeight: "700" }}>{v.meRankX}</strong>']];
 // A notification's row shows the customer's latest words under its line (2026-10-14: "在 notification 裡，我看不到重點").
 PATCHES.SalesProfile = [...(PATCHES.SalesProfile ?? []),
   ['<span style={{ fontSize: "12px", color: "#806B60" }}>{u.meta}</span>',
@@ -231,7 +236,9 @@ for (const [name, vm, frag, doc, vmOverride] of parts) {
     if (n !== 1) throw new Error(`${name}: patch matched ${n} times: ${a}`);
     body = body.replace(a, b);
   }
-  // The Revenue app's type scale on every size (2026-10-14 — type-scale.cjs), after the patches, which match the prototype's px.
+  // Profile's main page in the Revenue app Profile's sizes (2026-10-14 — profile-type.cjs), then the Revenue app's type scale
+  // on every size (type-scale.cjs) — both after the patches, which match the prototype's px.
+  if (name === "SalesProfile") body = profileType(body, "{!!(v.profMain) && (<>");
   body = scaleType(body);
   // Text with an apostrophe ("doesn't") renders as written; lint is told so on that file only.
   const apos = /[>}][^<>{}]*'[^<>{}]*[<{]/.test(body.replace(/"[^"]*"/g, '""'));
