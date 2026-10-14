@@ -81,6 +81,19 @@ export function anchorOf(answer: QuoteResult, bands: readonly MemberBand[]): Anc
   return { answer, ladder };
 }
 
+/**
+ * The first incentive and the price that reaches it, before a price is typed (2026-10-15): the
+ * cart's answer at a sen above its free KPI items — a margin below every tier. Null without a ladder.
+ */
+export function firstTier(anchor: Anchor): { price: number; threshold: number } | null {
+  const sums = sumsOf(anchor.answer);
+  if (!sums) return null;
+  const at = atPrice(sums, anchor.ladder, sums.gift + 1, 0);
+  return at.ok && at.quote.nextPrice !== null && at.quote.nextThreshold !== null
+    ? { price: at.quote.nextPrice, threshold: at.quote.nextThreshold }
+    : null;
+}
+
 /** The quote at the input's price and fee, from its cart's anchor: what the server would answer. Null for a price it cannot read. */
 export function repriced(anchor: Anchor, input: QuoteInput): Outcome<QuoteResult> | null {
   const price = cents(input.price), delivery = cents(input.delivery || "0");

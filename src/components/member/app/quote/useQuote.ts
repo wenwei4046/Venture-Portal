@@ -5,7 +5,7 @@ import type { MemberBand, QuoteInput, QuoteResult } from "@/lib/member/types";
 import type { Outcome } from "../source";
 import { calcVM, press as pressKey, quoteCart, quoteInput, type CalcVM } from "./calc-model";
 import { EMPTY_BOOK, NOT_REACHED, confirmedAnswer, nextAsk, recordAnswer, shownAnswer, type QuoteBook } from "./quote-book";
-import { cartKey } from "./reprice";
+import { cartKey, firstTier } from "./reprice";
 import {
   EMPTY_MEMORY, NO_SOFA_BUILD, addLines, bump as bumpLine, defaultSize, firstFrame, itemCount, layoutFits, layoutKey, remember, sheetLines, sofaBuildOf,
   sofaBuildToSend, sofaCartCharge, sofaPick,
@@ -235,6 +235,10 @@ export function useQuote(args: UseQuoteArgs) {
     return () => window.clearTimeout(timer);
   }, [ask, calc]);
   const shown = useMemo(() => shownAnswer(book, { cartId, input, inputKey }), [book, cartId, input, inputKey]);
+  // Before a price is typed (2026-10-15): the first incentive's price, and the cart's own refusal.
+  const anchor = book.anchors.get(cartId);
+  const first = useMemo(() => (anchor ? firstTier(anchor) : null), [anchor]);
+  const refused = book.refused.get(cartId) ?? null;
 
   const kpiLines = cart.filter(l => l.kind === "kpi");
   const kpiAmount = kpiLines.reduce((a, l) => a + (catalog?.kpis.find(k => k.key === l.key)?.price ?? 0) * l.qty, 0);
@@ -249,9 +253,11 @@ export function useQuote(args: UseQuoteArgs) {
     result: shown.result,
     error: shown.error,
     pending: shown.pending,
+    first,
+    refused,
     kpi: { qty: kpiLines.reduce((a, l) => a + l.qty, 0), amount: kpiAmount },
     options: optionCharge,
-  }), [price, items, brandBands, fee, shown, kpiLines, kpiAmount, optionCharge]);
+  }), [price, items, brandBands, fee, shown, first, refused, kpiLines, kpiAmount, optionCharge]);
   /** The customer's quote, once the price on screen has been confirmed by the calculator. */
   const confirmed = confirmedAnswer(book, inputKey);
   const applyNext = useCallback(() => { if (vm.next) setPrice(vm.next.value.toFixed(2)); }, [vm.next]);

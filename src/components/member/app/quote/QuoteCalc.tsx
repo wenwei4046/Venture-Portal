@@ -58,19 +58,42 @@ export default function QuoteCalc({ vm, brandName, cart, fee, kpiEach, onPress, 
             <span className={s.priceHint}>{vm.hint}</span>
           </div>
           <div className={s.marginCell} style={{ background: tone.bg }}>
-            <span className={s.cellLabel}>Margin</span>
-            <div className={s.marginNum} style={{ color: tone.ink }}>{vm.marginText}</div>
-            <span className={s.tierChip} style={{ color: tone.ink }}>{vm.tierLabel}</span>
-            {vm.penalty && <span className={s.penalty} style={{ color: tone.ink }}>{vm.penalty}</span>}
+            {/* The card keeps the size of its tallest state from the start, so a price typed never moves
+                the keypad under the member's thumb (2026-10-15): an invisible copy of that state shares
+                each changing part's place. */}
+            <div className={s.steady}>
+              <div className={s.layer}>
+                <span className={s.cellLabel}>Margin</span>
+                <div className={s.marginNum} style={{ color: tone.ink }}>{vm.marginText}</div>
+                <span className={s.tierChip} style={{ color: tone.ink }}>{vm.tierLabel}</span>
+                {vm.penalty && <span className={s.penalty} style={{ color: tone.ink }}>{vm.penalty}</span>}
+              </div>
+              <div className={`${s.layer} ${s.room}`} aria-hidden>
+                <span className={s.cellLabel}>Margin</span>
+                <div className={s.marginNum}>{vm.marginText}</div>
+                <span className={s.tierChip}>{vm.room.tier}</span>
+                {vm.room.penalty && <span className={s.penalty}>{vm.room.penalty}</span>}
+              </div>
+            </div>
           </div>
         </div>
-        {vm.next && cart.length > 0 && (
-          <div className={s.nextRow}>
-            <span className={s.nextText}>Reach <strong>{vm.next.tier}</strong> at <strong>{vm.next.price}</strong></span>
-            <button className={s.usePrice} onClick={onNext}>Use price</button>
+        <div className={s.nextRow}>
+          <div className={s.steady}>
+            <div className={`${s.layer} ${s.nextLine}`}>
+              {vm.note ? <span className={s.noteText}>{vm.note}</span>
+                : vm.next && cart.length > 0 ? (
+                  <>
+                    <span className={s.nextText}>Reach <strong>{vm.next.tier}</strong> at <strong>{vm.next.price}</strong></span>
+                    <button className={s.usePrice} onClick={onNext}>Use price</button>
+                  </>
+                ) : vm.reached ? <span className={s.nextText}><strong>{vm.reached}</strong> reached</span> : null}
+            </div>
+            <div className={`${s.layer} ${s.nextLine} ${s.room}`} aria-hidden>
+              <span className={s.nextText}>Reach <strong>{vm.room.reach.tier}</strong> at <strong>{vm.room.reach.price}</strong></span>
+              <span className={s.usePrice}>Use price</span>
+            </div>
           </div>
-        )}
-        {vm.note && <div className={s.noteRow}>{vm.note}</div>}
+        </div>
         {vm.pay && (
           <div className={s.kpiBox}>
             {vm.kpi && <div className={s.kpiLine}><span><strong>{vm.kpi.label}</strong> · fixed, not in margin</span><span className={s.kpiAmt}>+ {vm.kpi.total}</span></div>}

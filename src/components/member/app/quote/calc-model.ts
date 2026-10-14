@@ -23,7 +23,16 @@ export interface CalcVM {
   tierLabel: string;
   tone: Tone;
   penalty: string | null;
+  /** The next incentive and the price that reaches it — the first one already before a price is typed. */
   next: { tier: string; price: string; value: number } | null;
+  /** The top incentive the price has reached, when none is left above it: `Incentive Tier 2 (43%)`. */
+  reached: string | null;
+  /**
+   * The tallest the card gets — its longest tier name, its longest penalty line, the next-tier line at
+   * its widest — made room for from the start, so no price typed moves the keypad under the member's
+   * thumb (2026-10-15).
+   */
+  room: { tier: string; penalty: string | null; reach: { tier: string; price: string } };
   /** KPI items on top of the price: `2 KPI items` · `+ RM 500`. */
   kpi: { label: string; total: string } | null;
   /** The options charged on top (2026-10-05; every option since 2026-10-06): `+ RM 120`. */
@@ -117,7 +126,13 @@ function sofaQuoteBuild(build: SofaBuild): QuoteBuild | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
-const NONE = { marginText: "—", tone: "none" as Tone, penalty: null, next: null };
+const NONE = { marginText: "—", tone: "none" as Tone, penalty: null, next: null, reached: null };
+
+/** The labels the chip shows when no row of the ladder does. */
+const STATE_LABELS = ["Add products", "Enter a price", "Calculating", "Cost pending", "Not calculated", "No brand rules", "Below cost"];
+const longest = (texts: string[]) => texts.reduce((a, b) => (b.length > a.length ? b : a), "");
+/** The widest price a next-tier line is drawn for. */
+const WIDE_PRICE = 999999.99;
 
 export function calcVM(args: {
   price: string;
@@ -127,6 +142,10 @@ export function calcVM(args: {
   error: string | null;
   /** The cart has just changed and the server has not priced it yet. */
   pending?: boolean;
+  /** Before a price is typed: the first incentive and the price that reaches it, for the cart. */
+  first?: { price: number; threshold: number } | null;
+  /** The cart's own refusal, whatever the price — said before one is typed. */
+  refused?: string | null;
   /** The cart's KPI items: count and amount, RM. */
   kpi?: { qty: number; amount: number };
   /** What the cart's options are charged, RM. */
@@ -137,30 +156,44 @@ export function calcVM(args: {
   const typed = Number(price) || 0;
   const kpiAmount = args.kpi && args.kpi.qty > 0 ? args.kpi.amount : 0;
   const options = args.options && args.options > 0 ? args.options : 0;
+  const ladder = brandLadder(bands);
+  const nextOf = (threshold: number, value: number) => {
+    const band = ladder.incentives.find(i => Math.abs(i.threshold - threshold) < 1e-9);
+    return { tier: `${band?.label ?? "the next tier"} (${pctText(threshold)}%)`, price: rm2(value), value };
+  };
+  const top = ladder.incentives[ladder.incentives.length - 1];
+  const widest = longest(ladder.incentives.map(i => `${i.label} (${pctText(i.threshold)}%)`)) || "Incentive Tier 1 (36%)";
   const base = {
     priceText: priceText(price),
     hint: items ? "Next: enter your selling price" : "Choose a model to continue",
     kpi: args.kpi && args.kpi.qty > 0 ? { label: `${args.kpi.qty} KPI item${args.kpi.qty > 1 ? "s" : ""}`, total: rm(args.kpi.amount) } : null,
     options: options > 0 ? { total: rm(options) } : null,
     pay: kpiAmount + options > 0 ? rm(typed + kpiAmount + options + (Number(args.fee) || 0)) : null,
+    room: {
+      tier: longest([...ladder.rows.map(r => r.label), ...STATE_LABELS]),
+      penalty: longest(ladder.rows.filter(r => r.kind === "penalty").map(r => r.effect)) || null,
+      reach: { tier: widest, price: rm2(WIDE_PRICE) },
+    },
   };
+  const said = (text: string) => ({ ...base, ...NONE, tierLabel: /cost/i.test(text) ? "Cost pending" : "Not calculated", note: text });
   if (!items) return { ...base, ...NONE, tierLabel: "Add products", note: null };
-  if (!(typed > 0)) return { ...base, ...NONE, tierLabel: "Enter a price", note: null };
+  if (!(typed > 0)) {
+    if (args.refused) return said(args.refused);
+    return { ...base, ...NONE, tierLabel: "Enter a price", note: null, next: args.first ? nextOf(args.first.threshold, args.first.price) : null };
+  }
   if (args.pending) return { ...base, ...NONE, tierLabel: "Calculating", note: null };
-  if (error) return { ...base, ...NONE, tierLabel: /cost/i.test(error) ? "Cost pending" : "Not calculated", note: error };
+  if (error) return said(error);
   if (!result || result.margin === null) return { ...base, ...NONE, tierLabel: "Enter a price", note: null };
-  const ladder = brandLadder(bands);
   const row = rowFor(result.margin, ladder);
-  const nextBand = result.nextThreshold !== null ? ladder.incentives.find(i => Math.abs(i.threshold - result.nextThreshold!) < 1e-9) : undefined;
+  const next = result.nextPrice !== null && result.nextThreshold !== null ? nextOf(result.nextThreshold, result.nextPrice) : null;
   return {
     ...base,
     marginText: result.margin.toFixed(1) + "%",
     tierLabel: row?.label ?? result.label,
     tone: row?.tone ?? (result.margin < 0 ? "bad" : "neutral"),
     penalty: row?.kind === "penalty" ? row.effect : null,
-    next: result.nextPrice !== null && result.nextThreshold !== null
-      ? { tier: `${nextBand?.label ?? "the next tier"} (${pctText(result.nextThreshold)}%)`, price: rm2(result.nextPrice), value: result.nextPrice }
-      : null,
+    next,
+    reached: !next && top && row?.kind === "incentive" && Math.abs(row.threshold - top.threshold) < 1e-9 ? `${top.label} (${pctText(top.threshold)}%)` : null,
     note: null,
   };
 }
