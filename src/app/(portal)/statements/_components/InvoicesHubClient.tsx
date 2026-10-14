@@ -11,16 +11,13 @@ import { FinTable, type FinColumn } from '@/components/finv/FinTable'
 import { DialogConfirm, DialogMenu, Field, FinDialog, Input, type DialogMenuItem } from '@/components/finv/Dialog'
 import { fd } from '@/components/finv/DrawerParts'
 import { officeTime } from '@/lib/office-time'
-import GenerateInvoicesButton from '../../billing/_components/GenerateInvoicesButton'
-import GenerateConsolidatedInvoicesButton from '../../billing/_components/GenerateConsolidatedInvoicesButton'
-import ReconcilePayrollBillingButton from '../../billing/_components/ReconcilePayrollBillingButton'
-import GenerateOwnShareInvoiceButton from '../../billing/_components/GenerateOwnShareInvoiceButton'
 import { InvoiceDrawer, invoiceSteps, statusText, statusTone, type InvoiceCan, type InvoiceStep, type InvoiceStepKey } from './InvoiceDrawer'
 import SettleDialog from './SettleDialog'
 import CreateInvoiceDialog from './CreateInvoiceDialog'
 import InvoiceLinesDialog from './InvoiceLinesDialog'
 import CreditNoteDialog, { type CreditNoteInvoice } from './CreditNoteDialog'
 import ChangeAccountDialog from './ChangeAccountDialog'
+import { MarketingDialog, OwnShareDialog, PayrollInvoicesDialog, ReconcileDialog } from './GenerateDialogs'
 import PayrollBasisDrawer from './PayrollBasisDrawer'
 import {
   hubApproveCreditNote,
@@ -880,13 +877,13 @@ export default function InvoicesHubClient({
           extraModes={hub.extraModes}
         />
       ) : dialog?.kind === 'marketing' ? (
-        <GenerateInvoicesButton key={dialog.nonce} autoOpen hideTrigger currentPeriod={hub.period} modes={['marketing_project']} label="Generate Marketing invoices" />
+        <MarketingDialog key={dialog.nonce} open={dialog.open} onClose={closeDialog} onDone={dialogDone} period={hub.period} />
       ) : dialog?.kind === 'consolidated' ? (
-        <GenerateConsolidatedInvoicesButton key={dialog.nonce} autoOpen hideTrigger currentPeriod={hub.period} categories={hub.categories} />
+        <PayrollInvoicesDialog key={dialog.nonce} open={dialog.open} onClose={closeDialog} onDone={dialogDone} period={hub.period} categories={hub.categories} />
       ) : dialog?.kind === 'reconcile' ? (
-        <ReconcilePayrollBillingButton key={dialog.nonce} autoOpen hideTrigger currentPeriod={hub.period} />
+        <ReconcileDialog key={dialog.nonce} open={dialog.open} onClose={closeDialog} onDone={dialogDone} period={hub.period} />
       ) : dialog?.kind === 'own-share' ? (
-        <GenerateOwnShareInvoiceButton key={dialog.nonce} autoOpen hideTrigger currentPeriod={hub.period} categories={hub.categories} />
+        <OwnShareDialog key={dialog.nonce} open={dialog.open} onClose={closeDialog} onDone={dialogDone} period={hub.period} categories={hub.categories} />
       ) : dialog?.kind === 'edit' && dialogInvoice ? (
         <InvoiceLinesDialog
           key={dialog.nonce}

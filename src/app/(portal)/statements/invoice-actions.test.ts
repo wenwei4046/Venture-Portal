@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   updateIssuedInvoiceFull: vi.fn(),
   fetchStaffAllocationByCompany: vi.fn(),
   fetchDirectorCtcByCompany: vi.fn(),
+  createCreditNote: vi.fn(),
+  reassignInvoiceGlAccount: vi.fn(),
   approveInvoice: vi.fn(),
   approveInvoicesForPeriod: vi.fn(),
   deleteDraftInvoice: vi.fn(),
@@ -41,13 +43,17 @@ vi.mock('../billing/actions', () => ({
   updateIssuedInvoiceFull: mocks.updateIssuedInvoiceFull,
   fetchStaffAllocationByCompany: mocks.fetchStaffAllocationByCompany,
   fetchDirectorCtcByCompany: mocks.fetchDirectorCtcByCompany,
+  createCreditNote: mocks.createCreditNote,
+  reassignInvoiceGlAccount: mocks.reassignInvoiceGlAccount,
 }))
 
 import {
   hubApproveCreditNote,
   hubApproveInvoice,
   hubApproveMonth,
+  hubChangeAccount,
   hubCopyInvoice,
+  hubCreateCreditNote,
   hubCreateInvoice,
   hubCreateLinesInvoice,
   hubHrFigures,
@@ -200,5 +206,25 @@ describe('the invoice dialogs', () => {
   it('a refusal is its sentence', async () => {
     mocks.createManualInvoice.mockRejectedValue(new Error('Period 2026-09 is closed'))
     expect(await hubCreateInvoice({ billKind: 'subsidiary', companyId: 'co-hc', ...head, category: '9091', amount: 10 })).toEqual({ ok: false, reason: 'Period 2026-09 is closed' })
+  })
+})
+
+// The credit note and Change account (2026-10-14): Service Billing's own, in words.
+describe('the credit note and the account', () => {
+  it('a credit note: Billing · Create, the form the old dialog sent, its number back', async () => {
+    mocks.createCreditNote.mockResolvedValue({ id: 'cn9', credit_note_no: 'HV-CN-202610-0003' })
+    const res = await hubCreateCreditNote({ invoiceId: 'hc1', mode: 'hr_attribution', category: '5020', amount: 200, reason: ' Overbilled ' })
+    expect(res).toEqual({ ok: true, value: 'HV-CN-202610-0003' })
+    expect(mocks.requireActionOn).toHaveBeenCalledWith('/invoices/[id]', 'billing', 'create')
+    expect(sent(mocks.createCreditNote)).toEqual({ invoice_id: 'hc1', amount: '200.00', reason: 'Overbilled', billing_mode: 'hr_attribution', category_code: '5020' })
+  })
+
+  it('change account: Billing · Edit, the accounts as one list; its refusal is its sentence', async () => {
+    mocks.reassignInvoiceGlAccount.mockResolvedValue({ changed: 2, oldAccount: '3051, 3056' })
+    expect(await hubChangeAccount({ invoiceId: 'i40', from: ['3051', '3056'], to: '5011', reason: 'wrong account' })).toEqual({ ok: true, value: { changed: 2, from: '3051, 3056' } })
+    expect(mocks.requireActionOn).toHaveBeenCalledWith('/invoices/[id]', 'billing', 'edit')
+    expect(sent(mocks.reassignInvoiceGlAccount)).toEqual({ id: 'i40', old_account: '3051,3056', new_account: '5011', reason: 'wrong account' })
+    mocks.reassignInvoiceGlAccount.mockResolvedValue({ error: 'The period 2026-09 is closed' })
+    expect(await hubChangeAccount({ invoiceId: 'i40', from: [], to: '5011', reason: 'x' })).toEqual({ ok: false, reason: 'The period 2026-09 is closed' })
   })
 })

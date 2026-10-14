@@ -224,6 +224,9 @@ describe('Edit', () => {
     expect(within(dialog()).getByRole('button', { name: 'Remove line 1' })).toBeDisabled()
     expect(within(dialog()).getByRole('button', { name: 'Period' })).toBeDisabled()
     expect(hint()[0]).toMatch(/^Money has come in against it/)
+    // The words are still the reader's to change.
+    expect(screen.getByLabelText('Line 1 description')).not.toHaveAttribute('readonly')
+    expect(screen.getByLabelText('Description')).not.toBeDisabled()
   })
 
   it('a simple invoice is its one line: the total and the header’s category', () => {

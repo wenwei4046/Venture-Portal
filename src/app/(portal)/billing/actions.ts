@@ -2111,7 +2111,8 @@ function groupOwnShareAllocation(
     if (!seg) continue
     if (billBack && !billBack.has(seg)) continue
     groups.push({
-      deptLabel: PAYROLL_SEGMENT_LABEL[seg as PayrollSegment],
+      // A department the payroll labels do not name (Marketing's own share, 2026-10-14) by its own name.
+      deptLabel: PAYROLL_SEGMENT_LABEL[seg as PayrollSegment] ?? r.department_name,
       segment: seg as PayrollSegment,
       components: {
         salary: Number(r.salary_amount ?? 0),

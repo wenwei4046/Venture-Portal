@@ -11,8 +11,15 @@ import {
   createMultiLineInvoice,
   deleteCreditNote,
   deleteDraftInvoice,
+  fetchConsolidatedPayrollPreview,
   fetchDirectorCtcByCompany,
+  fetchOwnShareInvoicePreview,
+  fetchPayrollBillingDelta,
   fetchStaffAllocationByCompany,
+  generateConsolidatedPayrollInvoices,
+  generateMonthlyInvoices,
+  generateOwnShareInvoice,
+  generatePayrollAdjustmentInvoices,
   reassignInvoiceGlAccount,
   settleInvoicesConsolidated,
   updateDraftInvoiceFull,
@@ -20,11 +27,14 @@ import {
   voidCreditNote,
   voidIssuedInvoices,
   type BillableToKind,
+  type ConsolidatedCompanyPreview,
   type CreateInvoiceMode,
   type DirectorCtcRow,
   type InvoiceLineInput,
+  type OwnShareInvoicePreview,
   type StaffAllocationCompanyRow,
 } from '../billing/actions'
+import type { CompanyBillingDelta } from '@/lib/payroll-billing-delta'
 
 // Invoice's hub steps, in words (2026-10-14, the Finance revamp v2 — D10). The
 // hub's drawer, its bulk bar and its credit notes call Service Billing's own
@@ -297,6 +307,56 @@ export async function hubChangeAccount(payload: {
     if (res.error) throw new Error(res.error)
     return { changed: res.changed ?? 0, from: res.oldAccount ?? null }
   })
+}
+
+// ── The generators (Create invoice ▾ › Generate Marketing invoices; Payroll ▾) ──
+
+/** The month's marketing invoices, drafts, from the active projects — issued ones kept. */
+export async function hubGenerateMarketing(month: string): Promise<HubResult<{ generated: number; kept: number }>> {
+  await requireActionOn('/invoices/[id]', 'billing', 'create')
+  return attempt(async () => {
+    const fd = new FormData()
+    fd.set('period_month', `${month}-01`)
+    fd.set('modes', 'marketing_project')
+    const res = await generateMonthlyInvoices(fd)
+    return { generated: res.generated, kept: res.skipped }
+  })
+}
+
+/** What the payroll invoices would bill: a company each, its departments, their parts (HR's allocation). */
+export async function hubPayrollPreview(month: string): Promise<HubResult<ConsolidatedCompanyPreview[]>> {
+  await requirePermission('billing')
+  return attempt(() => fetchConsolidatedPayrollPreview(`${month}-01`))
+}
+
+/** One consolidated payroll invoice a company, drafts, on one category. */
+export async function hubGeneratePayrollInvoices(month: string, category: string): Promise<HubResult<{ generated: number; companies: string[] }>> {
+  await requireActionOn('/invoices/[id]', 'billing', 'create')
+  return attempt(() => generateConsolidatedPayrollInvoices(`${month}-01`, category.trim() || null))
+}
+
+/** Payroll now against the month's issued payroll invoices, a company each. */
+export async function hubPayrollDelta(month: string): Promise<HubResult<CompanyBillingDelta[]>> {
+  await requirePermission('billing')
+  return attempt(() => fetchPayrollBillingDelta(`${month}-01`))
+}
+
+/** The gaps under-billed, one adjustment draft a company. */
+export async function hubTopUpPayroll(month: string): Promise<HubResult<{ generated: string[]; overBilled: string[]; missingInvoice: string[] }>> {
+  await requireActionOn('/invoices/[id]', 'billing', 'create')
+  return attempt(() => generatePayrollAdjustmentInvoices(`${month}-01`))
+}
+
+/** HV's own share of payroll, each department's, and which bill back by default. */
+export async function hubOwnSharePreview(month: string): Promise<HubResult<OwnShareInvoicePreview>> {
+  await requirePermission('billing')
+  return attempt(() => fetchOwnShareInvoicePreview(`${month}-01`))
+}
+
+/** The one Venture (Office) invoice for the departments ticked — this run only. */
+export async function hubGenerateOwnShare(month: string, category: string, segments: string[]): Promise<HubResult<{ generated: number; total: number }>> {
+  await requireActionOn('/invoices/[id]', 'billing', 'create')
+  return attempt(() => generateOwnShareInvoice(`${month}-01`, category.trim() || null, segments))
 }
 
 /** HR's figures a recharge bills, per company: a shared-services department's staff, or the directors' CTC. */

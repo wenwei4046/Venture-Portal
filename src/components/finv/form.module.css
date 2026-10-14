@@ -125,6 +125,33 @@ select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
   background: rgb(var(--fv-peach));
   border-top: 1px solid var(--ds-border);
 }
+/* A card's head row (a company, its total) and the parts under a row (Salary 933.20 · EPF 121.32 …). */
+.summaryRow[data-head='true'] { background: rgb(var(--hvs-ground)); }
+.summaryRow[data-head='true'] .summaryLabel,
+.summaryRow[data-head='true'] .summaryValue { font-weight: 600; }
+.summaryParts {
+  padding: 0 14px 9px;
+  margin-top: -4px;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgb(var(--hvs-muted));
+}
+/* A few words of state beside a name (matches ✓, not invoiced, under-billed …). */
+.tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--ds-border);
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+.tag[data-tone='ledger'] { color: var(--ds-success); }
+.tag[data-tone='alert'] { color: var(--ds-warning); }
+.tag[data-tone='danger'] { color: var(--ds-danger); }
 .summaryTotalLabel { font-size: 13px; font-weight: 500; }
 .summaryTotalValue { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 14px; font-weight: 600; }
 
