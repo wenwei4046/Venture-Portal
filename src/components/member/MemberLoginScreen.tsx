@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import MemberLoginForm from "./MemberLoginForm";
 import { forgetReads } from "./app/read-memory";
+import { forgetMedia } from "./crm/shared/media-cache";
 import LoginInstallCard from "@/components/pwa/LoginInstallCard";
 import s from "./MemberLogin.module.css";
 
@@ -28,7 +29,7 @@ export default function MemberLoginScreen({
   // Every sign-out ends here: the Revenue app's figures kept on this phone go with the session (2026-10-08),
   // so a phone handed to somebody else shows nobody's.
   useEffect(() => {
-    if (!preview) void forgetReads();
+    if (!preview) { void forgetReads(); void forgetMedia(); }
   }, [preview]);
   return (
     <div className={s.screen} lang="en-MY">

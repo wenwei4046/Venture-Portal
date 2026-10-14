@@ -33,6 +33,7 @@ import { teamsOf, type PanelCtx } from "./panel/vm/common";
 import { useSwipeToClose } from "./shared/swipe-close";
 import { keepSending } from "./shared/pending";
 import { MediaViewer } from "./shared/viewer";
+import { loadSnapshot, saveSnapshot } from "./shared/snapshot";
 import { MessageMenu } from "./shared/msg-menu";
 import { AttachSheetHost } from "./shared/attach-sheet";
 import { answerOnScreen, closeNotices } from "@/components/pwa/notice-screen";
@@ -72,11 +73,21 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   const dataRef = useRef<CrmData | null>(data);
   dataRef.current = data;
 
+  // The last answer is kept on the phone (2026-10-14, the owner: "當我進入時，我看到的還是上次的畫面，那你的後台系統可以再
+  // 計算"): the CRM opens on it at once and the read below replaces it when it lands — the Revenue app's own store
+  // (read-memory.ts), which /login forgets with everything else, so a phone handed on keeps nobody's chats.
+  const snapKey = desk ? "desk" : "phone";
+  useEffect(() => {
+    if (!live) return;
+    let current = true;
+    void loadSnapshot(snapKey).then(d => { if (current && d) setData(prev => prev ?? d); });
+    return () => { current = false; };
+  }, [live, snapKey]);
   // Live: read once on opening, under the member's own session.
   useEffect(() => {
     if (!live) return;
     let current = true;
-    void fetchCrmData({ journey: desk }).then(r => { if (current) { if (r.ok) setData(r.data); else setProblem(r.error); } });
+    void fetchCrmData({ journey: desk }).then(r => { if (current) { if (r.ok) { setData(r.data); saveSnapshot(snapKey, r.data); } else setProblem(r.error); } });
     return () => { current = false; };
   }, [live, desk]);
   // Live: new messages arrive without a reload (user 2026-10-09: 我發送 receive 但是 crm inbox 收不到 —
@@ -100,6 +111,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
           if (sig === lastRead) return;
           lastRead = sig;
           setData(prev => keepSending(prev, r.data));
+          saveSnapshot(desk ? "desk" : "phone", r.data);
         }
       } finally { busy = false; }
     };

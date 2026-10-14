@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { withMapLinks } from "@/lib/member/crm-maps";
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
 import { rememberLocalMedia } from "../shared/pending";
+import { keepSent } from "../shared/media-cache";
 import { isPrepared, prepareImage } from "../shared/image-prep";
 import { fitVideo, fitVoice, VIDEO_PICK_MAX } from "../shared/video-fit";
 import { dayLabel, timeLabel, windowShut } from "./vm/common";
@@ -349,6 +350,8 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       if (!r.ok) { swapMessage(customerId, draft.id, null); toast(r.error); return false; }
       // Keep showing the phone's own copy, through every later read too (shared/pending.ts) — no second download.
       if (r.message.media && local) rememberLocalMedia(r.message.id, local);
+      // …and on the phone for the next open (shared/media-cache.ts): the photo as sent, a video's first frame.
+      if (r.message.media) keepSent(r.message.id, file);
       swapMessage(customerId, draft.id, r.message.media && local ? { ...r.message, media: { ...r.message.media, url: local } } : r.message);
       return true;
     },

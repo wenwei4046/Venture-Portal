@@ -37,7 +37,7 @@ ${apos ? "/* eslint-disable react/no-unescaped-entities -- generated from the de
 import { Fragment } from "react";
 import type React from "react";
 import DH from "./desk-hover.module.css";
-import { MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
+import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import { DeskBook, DeskCardPicker, DeskCustomerForm, DeskHistory, DeskNote } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
