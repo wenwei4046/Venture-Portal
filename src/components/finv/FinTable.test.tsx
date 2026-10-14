@@ -146,3 +146,55 @@ describe('the hub table', () => {
     expect(screen.getByRole('button', { name: 'Filter Name' })).toBeInTheDocument()
   })
 })
+
+// Invoice's Select (2026-10-14, D10): a 44px column of boxes, a press on a row
+// ticks it, the head's box ticks every row on show that can be.
+describe('the table’s Select', () => {
+  function drawSelecting(selected: Set<string>, onToggle = vi.fn(), onToggleAll = vi.fn()) {
+    return render(
+      <FinTable
+        layoutId="test.table"
+        title="All invoices"
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        columns={COLUMNS}
+        amountOf={(r) => r.amount}
+        onRowClick={() => undefined}
+        emptyText="No invoices here."
+        countLabel={(n) => `${n} · Oct 2026`}
+        tools={<button type="button">Select</button>}
+        select={{ on: true, isSelected: (r) => selected.has(r.id), canSelect: (r) => r.status === 'pending', onToggle, onToggleAll }}
+      />,
+    )
+  }
+
+  it('counts the list its own way and puts the page’s buttons after Columns', async () => {
+    drawSelecting(new Set())
+    await act(async () => undefined)
+    expect(screen.getByText('3 · Oct 2026')).toBeInTheDocument()
+    const toolbar = screen.getByRole('button', { name: 'Columns' }).parentElement as HTMLElement
+    expect(within(toolbar).getAllByRole('button').map((b) => b.textContent)).toEqual(['Columns', 'Select'])
+  })
+
+  it('a press on a row ticks it instead of opening it; a row that cannot be ticked is faint', async () => {
+    const onToggle = vi.fn()
+    drawSelecting(new Set(['2']), onToggle)
+    await act(async () => undefined)
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows[1]).toHaveAttribute('aria-selected', 'true')
+    expect(rows[1]).toHaveAttribute('data-active', 'true')
+    expect(rows[0].querySelector('[data-faint="true"]')).not.toBeNull()
+    fireEvent.click(rows[2])
+    expect(onToggle).toHaveBeenCalledWith(ROWS[2])
+  })
+
+  it('the head’s box ticks the rows that can be — half ticked, it shows a dash', async () => {
+    const onToggleAll = vi.fn()
+    drawSelecting(new Set(['2']), vi.fn(), onToggleAll)
+    await act(async () => undefined)
+    const box = screen.getByRole('button', { name: 'Select every row that can be' })
+    expect(box).toHaveTextContent('–')
+    fireEvent.click(box)
+    expect(onToggleAll).toHaveBeenCalledWith([ROWS[1], ROWS[2]])
+  })
+})

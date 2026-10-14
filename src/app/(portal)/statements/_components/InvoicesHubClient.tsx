@@ -147,8 +147,11 @@ export default function InvoicesHubClient({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [drawerId, setDrawerId] = useState<string | null>(null)
   const [menu, setMenu] = useState<'create' | 'payroll' | 'export' | 'bulk' | null>(null)
+  // The ⋯ menus keep what they were opened for while they play out.
   const [moreFor, setMoreFor] = useState<HubInvoice | null>(null)
+  const [moreOpen, setMoreOpen] = useState(false)
   const [cnMenu, setCnMenu] = useState<HubCreditNote | null>(null)
+  const [cnOpen, setCnOpen] = useState(false)
   const [dialog, setDialog] = useState<{ kind: DialogKind; id?: string; nonce: number } | null>(null)
   const [settleIds, setSettleIds] = useState<string[]>([])
   const [ask, setAsk] = useState<Ask | null>(null)
@@ -261,7 +264,7 @@ export default function InvoicesHubClient({
 
   const onStep = (key: InvoiceStepKey, inv: HubInvoice) => {
     setError(null)
-    setMoreFor(null)
+    setMoreOpen(false)
     setRowMenu(null)
     const open = (kind: DialogKind) => setDialog({ kind, id: inv.id, nonce: Date.now() })
     switch (key) {
@@ -442,7 +445,10 @@ export default function InvoicesHubClient({
         : can.docExport
           ? { label: 'PDF', href: `/billing/credit-note-doc?id=${cn.id}`, newTab: true }
           : null,
-    onOpen: () => setCnMenu(cn),
+    onOpen: () => {
+      setCnMenu(cn)
+      setCnOpen(true)
+    },
   }))
   const datesOf = (c: HubContract) => {
     const s = c.start ? fd(c.start) : null
@@ -713,7 +719,10 @@ export default function InvoicesHubClient({
         busy={busy}
         error={ask || settleIds.length > 0 ? null : error}
         onStep={onStep}
-        onMore={(inv) => setMoreFor(inv)}
+        onMore={(inv) => {
+          setMoreFor(inv)
+          setMoreOpen(true)
+        }}
       />
       <PayrollBasisDrawer open={basisOpen} onClose={() => setBasisOpen(false)} month={monthLong} basis={hub.basis} department={hub.department} />
 
@@ -762,7 +771,7 @@ export default function InvoicesHubClient({
           ]}
         />
       </FinDialog>
-      <FinDialog open={!!moreFor} onClose={() => setMoreFor(null)} title={moreFor?.no ?? 'Draft'}>
+      <FinDialog open={moreOpen} onClose={() => setMoreOpen(false)} title={moreFor?.no ?? 'Draft'}>
         <DialogMenu
           items={(moreFor ? invoiceSteps(moreFor, can).more : []).map((s) => ({
             key: s.key,
@@ -773,20 +782,20 @@ export default function InvoicesHubClient({
           }))}
         />
       </FinDialog>
-      <FinDialog open={!!cnMenu} onClose={() => setCnMenu(null)} title={cnMenu?.no ?? 'Draft credit note'} sub={cnMenu ? `${cnMenu.party} · ${cnMenu.status}` : undefined}>
+      <FinDialog open={cnOpen} onClose={() => setCnOpen(false)} title={cnMenu?.no ?? 'Draft credit note'} sub={cnMenu ? `${cnMenu.party} · ${cnMenu.status}` : undefined}>
         <DialogMenu
           items={
             cnMenu
               ? [
                   menuItem('open', `Open ${cnMenu.invoiceNo ?? 'its invoice'}`, () => {
-                    setCnMenu(null)
+                    setCnOpen(false)
                     setDrawerId(cnMenu.invoiceId)
                   }),
                   ...(can.docExport ? [menuItem('pdf', 'PDF', () => window.open(`/billing/credit-note-doc?id=${cnMenu.id}`, '_blank', 'noopener,noreferrer'))] : []),
                   ...(cnMenu.status === 'draft' && can.approveCn ? [menuItem('approve', 'Approve', () => setAsk({ kind: 'cn-approve', cn: cnMenu }))] : []),
                   ...(cnMenu.status === 'draft' && can.edit ? [{ ...menuItem('delete', 'Delete draft', () => setAsk({ kind: 'cn-delete', cn: cnMenu })), danger: true }] : []),
                   ...(cnMenu.status === 'approved' && can.void ? [{ ...menuItem('void', 'Void credit note', () => setAsk({ kind: 'cn-void', cn: cnMenu })), danger: true }] : []),
-                ].map((m) => ({ ...m, onClick: () => { setCnMenu(null); m.onClick() } }))
+                ].map((m) => ({ ...m, onClick: () => { setCnOpen(false); m.onClick() } }))
               : []
           }
         />
