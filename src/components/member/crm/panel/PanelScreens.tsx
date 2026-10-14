@@ -6,11 +6,13 @@
  * countdown, the toast's 3 seconds, the chat following its newest message, and the file pickers the chat's + and camera
  * open.
  */
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import PanelApp from "./PanelApp";
 import { panelAppVM } from "./vm/app";
 import type { PanelCtx } from "./vm/common";
 import { useFollowNewest } from "../shared/stick";
+import { useCloseOnOutside } from "../sales/outside";
+import { DOC_ACCEPT } from "../shared/attach-sheet";
 
 export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
   const { ui, set } = ctx;
@@ -29,6 +31,8 @@ export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
     return () => clearTimeout(t);
   }, [toast, set]);
   useFollowNewest(ui.lead, ctx.data.customers.find(c => c.id === ui.lead)?.messages.length ?? 0);
+  // The chat's ⋮ menu closes on a tap outside it, as Mine's (2026-10-14).
+  useCloseOnOutside(!!ui.lead && !!ui.pMenu, useCallback(() => set(u => ({ ...u, pMenu: false })), [set]));
   const v = panelAppVM(ctx);
   return (<>
     <PanelApp v={v} />
@@ -36,7 +40,7 @@ export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
     {!!ui.lead && (<>
       <input id="crm-panel-photo" type="file" accept="image/*,video/*" multiple onChange={v.ld.lx.pickVisual} style={{ display: "none" }} />
       <input id="crm-panel-camera" type="file" accept="image/*,video/*" capture="environment" onChange={v.ld.lx.pickVisual} style={{ display: "none" }} />
-      <input id="crm-panel-file" type="file" multiple onChange={v.ld.lx.pickMedia} style={{ display: "none" }} />
+      <input id="crm-panel-file" type="file" accept={DOC_ACCEPT} multiple onChange={v.ld.lx.pickMedia} style={{ display: "none" }} />
     </>)}
   </>);
 }

@@ -97,3 +97,6 @@
 /* The reply box's hint stays on one line ("Reply to Hakimi…"), cut with an ellipsis, and the box shows no scrollbar. */
 .app textarea[data-draft]::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app textarea[data-draft] { scrollbar-width: none; }
+/* A message bubble: an up / down drag scrolls the chat, a sideways one is ours: swipe right to reply (shared/msg-menu.tsx, 2026-10-14). */
+.app [data-msg] { touch-action: pan-y; }
+.app [data-chat-list] { overflow-x: hidden; }

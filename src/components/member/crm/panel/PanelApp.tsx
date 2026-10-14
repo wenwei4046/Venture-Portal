@@ -389,7 +389,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 <strong style={{ fontSize: "16px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.name}</strong>
                 <small style={{ fontSize: "12px", color: "#387557", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.ad}</small>
               </span>
-              <span onClick={v.ld.lx.toggleMenu} title="More" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: "#3F2B22", cursor: "pointer" }}>
+              <span data-hm-toggle="1" onClick={v.ld.lx.toggleMenu} title="More" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: "#3F2B22", cursor: "pointer" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                   <circle cx="12" cy="5" r="1.7">
                   </circle>
@@ -400,7 +400,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </svg>
               </span>
               {!!(v.ld.lx.menuOpen) && (<>
-                <div style={{ position: "absolute", top: "48px", right: "0", zIndex: "7", width: "240px", padding: "6px", boxSizing: "border-box", borderRadius: "20px", background: "#fff", border: "1px solid #F0E4DA", boxShadow: "0 16px 36px rgba(63,43,34,.16)", display: "flex", flexDirection: "column", gap: "2px", animation: "fadeIn 140ms ease-out" }}>
+                <div data-hm-menu="1" style={{ position: "absolute", top: "48px", right: "0", zIndex: "7", width: "240px", padding: "6px", boxSizing: "border-box", borderRadius: "20px", background: "#fff", border: "1px solid #F0E4DA", boxShadow: "0 16px 36px rgba(63,43,34,.16)", display: "flex", flexDirection: "column", gap: "2px", animation: "fadeIn 140ms ease-out" }}>
                   {(v.ld.lx.menu).map((it, it_i) => (<Fragment key={it_i}>
                     <div onClick={it.go} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 10px", borderRadius: "14px", cursor: "pointer" }} className={H.hov2}>
                       <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "11px", background: it.bg, color: it.fg, display: "grid", placeItems: "center" }}>

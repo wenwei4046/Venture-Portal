@@ -36,6 +36,7 @@ import { MediaViewer } from "./shared/viewer";
 import { loadSnapshot, saveSnapshot } from "./shared/snapshot";
 import { MessageMenu } from "./shared/msg-menu";
 import { AttachSheetHost } from "./shared/attach-sheet";
+import { ActionSheetHost } from "./shared/action-sheet";
 import { answerOnScreen, closeNotices } from "@/components/pwa/notice-screen";
 import { crmChatTag } from "@/lib/push/notices";
 
@@ -204,6 +205,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       <MediaViewer />
       <MessageMenu />
       <AttachSheetHost />
+      <ActionSheetHost />
     </div>
   );
   // A line instead of the CRM (loading, not in it): on a computer in the page, not in a phone-sized box.

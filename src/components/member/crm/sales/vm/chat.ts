@@ -19,7 +19,7 @@ import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice"
 import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, INLINE_TIME, mediaOf, mediaWord, NO_MEDIA } from "../../shared/chat-media";
-import { MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
+import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
 
@@ -187,7 +187,7 @@ export function chatVM(ctx: SalesCtx) {
             { label: "Delete for me", icon: MENU_ICON.del, danger: true, run: () => void act.hideMessage(key) },
           ],
         });
-      }) },
+      }, () => { patch({ reply: { msgId: key, from: m.from, text: m.text || (m.media ? mediaWord(m) : "") }, menu: null, hover: null }); focusDraft(); }) },
       openReact: () => patch({ menu: { msgId: key, full: false, from: m.from, text: m.text } }),
       reaction: m.myReaction ?? "", rxLeft: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto", rbLeft: mine ? "-38px" : "auto", rbRight: mine ? "auto" : "-38px",
     };
@@ -470,7 +470,9 @@ export function chatVM(ctx: SalesCtx) {
     sendDraft,
     openAtt: () => patch({ att: true }), attOpen: ui.att, closeAtt: () => patch({ att: false }),
     attTiles: ([
-      ["Photos & videos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "#2F8FD8", () => { patch({ att: false }); document.getElementById("crm-pick-photo")?.click(); }],
+      // Camera · Photos · Document (2026-10-14, "有幾個功能是重複的"): Document picks files only (DOC_ACCEPT).
+      ["Camera", "M3 8h4l2-3h6l2 3h4v12H3V8Zm9 9a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z", "#C8402A", () => { patch({ att: false }); document.getElementById("crm-pick-camera")?.click(); }],
+      ["Photos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "#2F8FD8", () => { patch({ att: false }); document.getElementById("crm-pick-photo")?.click(); }],
       ["Document", "M7 3h7l5 5v13H7V3Zm7 0v5h5", "#BD4A19", () => { patch({ att: false }); document.getElementById("crm-pick-file")?.click(); }],
       ["Quick replies", "M13 2 4 14h7l-1 8 9-12h-7l1-8Z", "#A46312", () => patch({ att: false, qr: true })],
       // Auto replies (2026-10-14): one's saved welcome / after-hours / keyword replies, into the reply box to send by hand.

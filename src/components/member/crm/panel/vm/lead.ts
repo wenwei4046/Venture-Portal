@@ -17,9 +17,10 @@ import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice"
 import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, INLINE_TIME, mediaOf, mediaWord } from "../../shared/chat-media";
-import { MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
+import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
+import { openActions } from "../../shared/action-sheet";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
@@ -82,7 +83,7 @@ export function leadVM(ctx: PanelCtx) {
           { label: stars.has(m.id) ? "Unstar" : "Star", icon: MENU_ICON.star, run: () => void ctx.act.star(m.id, !stars.has(m.id)) },
           { label: "Delete for me", icon: MENU_ICON.del, danger: true, run: () => void ctx.act.hideMessage(m.id) },
         ],
-      })) },
+      }), () => { patch({ pReply: { msgId: m.id, who: mine ? "You" : c?.name ?? "", text: m.text || mediaWord(m) } }); focusDraft(); }) },
       tickC: m.status === "read" ? "#2F8FD8" : m.status === "failed" ? "#A3371A" : "#A8968B",
       tickPath: m.status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1" : "M1 6l3 3 6-7M7 8.5l.5.5 6-7",
       by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? "#FCD6B8" : "#fff", bd: mine ? "#FCD6B8" : "#fff", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
@@ -119,6 +120,24 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   const toBook = (id: string) => patch({ pMenu: false, pInfo: false, pForm: null, pBook: { customerId: id, room: 0, day: T + DAY, slot: null, view: "month" } });
   // A first booking asks for the customer's details first (step 1 of 2), as the salesperson's does.
   const openBook = () => { if (!c) return; if (c.detailsSaved) toBook(c.id); else patch({ pMenu: false, pInfo: false, pForm: { customerId: c.id, edit: false } }); };
+  // ⋮ › Appointment with a visit booked (2026-10-14, "成功 book visit 之後 … 無法修改 & cancel 預約"): the visit with
+  // Change (the booking sheet on its showroom, day and time; Book moves it — crm_move_appointment) and Cancel visit
+  // (asked again; crm_set_appointment_state), as Mine's chat. No visit booked: Book visit, as before.
+  const nextVisit = c ? data.visits.filter(v => v.customerId === c.id && v.state === "booked").sort((a, b) => a.start.localeCompare(b.start))[0] : undefined;
+  const appointment = () => {
+    if (!c || !nextVisit) { openBook(); return; }
+    patch({ pMenu: false });
+    const v = nextVisit, d = new Date(v.start), rm = data.rooms.find(r => r.id === v.showroomId);
+    const where = `${(rm?.name ?? "Showroom").replace(/ showroom$/i, "")} · ${dayLabel(d)}, ${timeLabel(d)}`;
+    openActions({ title: "Appointment", sub: where, actions: [
+      { label: "Change", primary: true, run: () => patch({ pBook: { customerId: c.id, room: Math.max(0, rooms.findIndex(r => r.id === v.showroomId)), day: day0(d), slot: timeLabel(d), view: "month", visitId: v.id } }) },
+      { label: "Cancel visit", danger: true, run: () => openActions({ title: "Cancel this visit?", sub: `${where}. ${c.name} is told it is cancelled.`, actions: [
+        { label: "Yes, cancel visit", danger: true, run: () => { void oneAtATime(`book:${c.id}`, () => act.cancelVisit(v.id)).then(ok => { if (ok) act.toast(`Visit cancelled for ${c.name}`); }); } },
+        { label: "Keep it", run: () => {} },
+      ] }) },
+      { label: "Close", run: () => {} },
+    ] });
+  };
   const setB = (p: Partial<NonNullable<typeof B>>) => set(u => (u.pBook ? { ...u, pBook: { ...u.pBook, ...p } } : u));
   // Shows at once and the box empties (2026-10-13); a failed send puts the words back into an empty box.
   const send = async () => {
@@ -146,7 +165,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     if (file && c) await act.sendMedia(c.id, file, "");
   };
   const room = B ? rooms[B.room] ?? rooms[0] : undefined;
-  const taken = (start: Date) => data.visits.filter(v => v.showroomId === room?.id && v.state === "booked" && new Date(v.start).getTime() === start.getTime()).length;
+  const taken = (start: Date) => data.visits.filter(v => v.id !== B?.visitId && v.showroomId === room?.id && v.state === "booked" && new Date(v.start).getTime() === start.getTime()).length;
   const cell = (d: Date): Cell => {
     const t = day0(d), past = t < T, blk = !past && roomClosed(room, t), sel = !!B && B.day === t && !blk, ok = !past && !blk;
     return { n: d.getDate(), pick: ok ? () => setB({ day: t, slot: null }) : undefined, cur: ok ? "pointer" : "default", deco: blk ? "line-through" : "none", w: sel || t === T ? 700 : 500,
@@ -171,10 +190,11 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
         return { t, left: past ? "Passed" : shut ? "Closed" : full ? "Full" : `${cap - n} left`, hasLeft: true, pick: ok ? () => setB({ slot: t }) : undefined, cur: ok ? "pointer" : "not-allowed", deco: ok ? "none" : "line-through",
           bg: sel ? "#BD4A19" : ok ? "#fff" : "#F8F3EF", fg: sel ? "#fff" : ok ? "#3F2B22" : "#C9B8AC", bd: sel ? "#BD4A19" : ok ? "#EBDDD2" : "#F8F3EF" };
       }),
-      bookLabel: B.slot ? `Book ${dayLabel(new Date(B.day))}, ${B.slot}` : "Pick a time", bookBg: B.slot ? "#BD4A19" : "#D9C7BA",
+      bookLabel: B.slot ? `${B.visitId ? "Move to" : "Book"} ${dayLabel(new Date(B.day))}, ${B.slot}` : "Pick a time", bookBg: B.slot ? "#BD4A19" : "#D9C7BA",
       confirm: B.slot && c && room ? () => {
         const name = c.name;
-        void oneAtATime(`book:${c.id}`, () => act.book(c.id, room.id, slotAt(B.day, B.slot!).toISOString())).then(ok => { if (ok) { patch({ pBook: null }); act.toast(`Visit booked for ${name}`); } });
+        const at = slotAt(B.day, B.slot!).toISOString(), moving = B.visitId;
+        void oneAtATime(`book:${c.id}`, () => (moving ? act.moveVisit(moving, room.id, at) : act.book(c.id, room.id, at))).then(ok => { if (ok) { patch({ pBook: null }); act.toast(`Visit ${moving ? "moved" : "booked"} for ${name}`); } });
       } : undefined,
     };
   })() : null;
@@ -197,6 +217,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     // + = a document, the camera = a photo (PanelScreens' hidden pickers); the typed text goes as the caption.
     // + : Photos & videos · Document · Quick replies · Auto replies (the owner, 2026-10-14) — it picked any file and sent it.
     attach: () => openAttach({
+      camera: () => document.getElementById("crm-panel-camera")?.click(),
       photos: () => document.getElementById("crm-panel-photo")?.click(), document: () => document.getElementById("crm-panel-file")?.click(),
       quick: ctx.data.quickReplies.map(q => ({ label: q.shortcut ? `/${q.shortcut}` : "Quick reply", text: q.message })), auto: autoChoices(ctx.data.autoReplies),
       pick: text => set(u => ({ ...u, pDraft: text })),
@@ -231,7 +252,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     menu: [
       { label: "Assign to", icon: "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", bg: "#E4EDF8", fg: "#2F6FB5", go: () => patch({ pMenu: false, reSheet: true }) },
       { label: "Customer info", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", bg: "#E4F1E8", fg: "#387557", go: () => patch({ pMenu: false, pInfo: true }) },
-      { label: "Appointment", icon: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", bg: "#F3E8EF", fg: "#8E4B6E", go: openBook },
+      { label: "Appointment", icon: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", bg: "#F3E8EF", fg: "#8E4B6E", go: appointment },
       // One's own starred messages in this chat (the message menu's Star, 2026-10-14).
       { label: "Starred messages", icon: "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", bg: "#FBF1D9", fg: "#A46312", go: () => { patch({ pMenu: false }); if (c) openStarred(c.messages.filter(x => (ctx.data.starredMessages ?? []).includes(x.id)).map(x => ({ id: x.id, who: x.from === "me" ? "You" : c.name, text: x.text || (x.media ? mediaWord(x) : ""), at: msgTime(x.at) }))); } },
     ],
