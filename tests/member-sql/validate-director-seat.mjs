@@ -185,7 +185,7 @@ try {
     goods_revenue, margin_pct, kpi_qty, cleared, order_date, source_period, recognition_month) VALUES ($1, $2, $3, $4, 'AKEMI', $5, $5, 0.4, 1, $6, $7, $7, $7)`,
   [id(400 + n), `HC-${n}`, s, scheme, revenue, cleared, month])
   await bill(1, ANNA, 10000); await bill(2, BEN, 5000); await bill(3, CARL, 7000); await bill(4, DORA, 3000, false)
-  await bill(5, EVE, 2000); await bill(6, PETER, 1000); await bill(7, IRMA, 4000, true, S_IR)
+  await bill(5, EVE, 2000); await bill(6, PETER, 1000); await bill(7, IRMA, 4000, true, S_IR); await bill(8, KRIS, 500)
 
   await q(`INSERT INTO member_memos(id, title, body, sender, kind) VALUES ($1, 'Fair memo', 'x', 'HR', 'Memo'), ($2, 'IR memo', 'x', 'HR', 'Memo'),
     ($3, 'Letter', 'x', 'HR', 'Letter')`, [M_FAIR, M_IR, M_OUT])
@@ -292,12 +292,18 @@ try {
     'PETER: a block for each sub-department he directs — his title, his own rung where it has one, no next rung')
   const fair = blocks[0]
   check([Number(fair.me.sales), fair.downline.length, fair.orders.map(o => o.number)], [1000, 5, ['HC-6']], 'his own bills, everybody below him')
+  const all = t => [t.sales, t.held, t.orders, t.kpiQty, t.marginRevenue, t.marginCost, t.blindOrders].map(Number)
+  check(all(fair.team), [25500, 3000, 6, 6, 25500, 15300, 0],
+    'All of Fair: every bill of the month — the members’, PETER’s own and KRIS’s, which nobody’s downline holds')
   check(fair.boards[0].rows.map(r => [r.name, r.self]), [['ANNA', false], ['CARL', false], ['BEN', false], ['EVE', false], ['DORA', false]],
     'Fair’s board lists the members, the director on none')
   check((await one('SELECT member_insight_for_staff($1, NULL, $2, true)', [PETER, IR])).blocks.map(b => b.department), ['IR'], 'one sub-department when asked for one')
-  check((await one('SELECT member_insight_for_staff($1, NULL, NULL, true)', [KRIS])).blocks.map(b => b.department), ['Fair'], 'KRIS: Fair only')
+  const krisBlocks = (await one('SELECT member_insight_for_staff($1, NULL, NULL, true)', [KRIS])).blocks
+  check(krisBlocks.map(b => b.department), ['Fair'], 'KRIS: Fair only')
+  check(all(krisBlocks[0].team), all(fair.team), 'and the same All of Fair as PETER')
   const anna = (await one('SELECT member_insight_for_staff($1, NULL, NULL, true)', [ANNA])).blocks
-  check(anna.map(b => [b.department, b.director, b.rank, b.downline.map(d => d.name)]), [['Fair', false, 'Rank A', ['BEN']]], 'a member’s block, as before')
+  check(anna.map(b => [b.department, b.rank, b.downline.map(d => d.name), 'director' in b, 'team' in b]), [['Fair', 'Rank A', ['BEN'], false, false]],
+    'a member’s block, as before — not even a new key')
   check((await one('SELECT member_insight_for_staff($1, NULL, NULL, true)', [OUT])).blocks, [], 'somebody with no seat has none')
 
   // ── Memos ───────────────────────────────────────────────────────────────────────────────────────────────────

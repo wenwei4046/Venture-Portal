@@ -18,7 +18,9 @@
 --     bills, KPI, My income (`member_income_context` asks `member_insight_scheme`), honours and the Quote open;
 --   * everybody in the sub-department is under them: the top of every tree (upline NULL, or an upline with no
 --     seat there) reports to the director in `member_downline_board`, `member_insight_range_for_staff` and
---     `member_tree_json`, and Insight's block for a director has no next rung (`target` NULL);
+--     `member_tree_json`; Insight's block for a director has no next rung (`target` NULL) and carries `director`
+--     and `team` — the month's every bill of the sub-department, the directors' own included, so two directors
+--     of Fair read the same "All of Fair" on Today (a member's block is exactly as before: no new keys);
 --   * the team map marks the sub-departments they direct as theirs; memos to those sub-departments reach them;
 --   * nobody else's income or commission — the reads never gave that to a member, and do not to a director.
 -- The Arena still ranks members only (its roster leaves heads out, as Comm Cal does): a director is not on a board.
@@ -183,7 +185,6 @@ BEGIN
    'title',coalesce(t.name,'Title not configured'),
    'rank',coalesce(r.label,CASE WHEN h.director THEN '' ELSE 'Rank not configured' END),
    'rankSort',coalesce(r.sort_order,0),
-   'director',h.director,
 
    -- What the caller has done this month.
    'me',jsonb_build_object(
@@ -254,7 +255,11 @@ BEGIN
     FROM public.member_downline_board(c.id,v_staff,v_period) p),
 
    'orders',public.member_insight_orders(c.id,v_staff,v_period)
-  ) AS block
+  )||CASE WHEN h.director THEN jsonb_build_object('director',true,'team',(
+    SELECT jsonb_build_object('sales',coalesce(sum(t.sales),0),'held',coalesce(sum(t.held),0),'orders',coalesce(sum(t.order_count),0),
+     'kpiQty',coalesce(sum(t.kpi_qty),0),'marginRevenue',coalesce(sum(t.margin_revenue),0),'marginCost',coalesce(sum(t.margin_cost),0),
+     'blindOrders',coalesce(sum(t.blind_orders),0))
+    FROM public.member_scoreboard(c.id,v_period) t)) ELSE '{}'::jsonb END AS block
   FROM (
    SELECT x.scheme_id,x.staff_id,x.title_id,x.rank_id,x.effective_from,x.effective_to,false AS director
    FROM public.comm_hierarchy x WHERE x.staff_id=v_staff

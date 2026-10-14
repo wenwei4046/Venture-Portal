@@ -184,6 +184,70 @@ describe("loading is never mistaken for no sales", () => {
   });
 });
 
+describe("todayModel — a Revenue Director (2026-10-14: the top of the sub-departments they direct)", () => {
+  const row = (staffId: string, depth: number, over: Partial<MemberInsightBlock["me"]> = {}) => ({
+    staffId, name: staffId.toUpperCase(), title: "Revenue Specialist", uplineId: depth === 1 ? "peter" : "anna", depth,
+    sales: 0, held: 0, orders: 0, kpiQty: 0, marginRevenue: 0, marginCost: 0, blindOrders: 0, lastOrder: null, ...over,
+  });
+  const directed: MemberInsightBlock = {
+    ...block({ staffId: "peter", name: "PETER", sales: 1_000, marginRevenue: 1_000, marginCost: 600, kpiQty: 1 }, null),
+    title: "Revenue Director", rank: "Rank SS", director: true, target: null,
+    downline: [row("anna", 1, { sales: 600_000, marginRevenue: 500_000, marginCost: 300_000, kpiQty: 10 }),
+      row("ben", 2, { sales: 400_000, marginRevenue: 400_000, marginCost: 260_000, kpiQty: 5, blindOrders: 1 })],
+  };
+  const peter: TodayInput = { ...base, first: "PETER", title: "Revenue Director", rank: "Rank SS", team: "Fair", insight: directed };
+
+  const team = (over: Partial<NonNullable<MemberInsightBlock["team"]>> = {}) => ({
+    sales: 0, held: 0, orders: 0, kpiQty: 0, marginRevenue: 0, marginCost: 0, blindOrders: 0, ...over,
+  });
+  const kpiOn = { schemeId: "s", period: "2026-10", asOf: "", enabled: true, items: [], total: 1, threshold: 30, hit: false };
+
+  it("Sales / Margin / KPI are the whole sub-department's: every bill of the month, the other director's too", () => {
+    // Fair, October 2026: 170 bills, RM 930,294 — RM 23,348 of it KRIS's own, which nobody's downline holds.
+    const all = { ...directed, team: team({ sales: 930_294, marginRevenue: 900_000, marginCost: 560_000, kpiQty: 37 }) };
+    const m = todayModel({ ...peter, insight: all, kpi: kpiOn });
+    expect(m.metrics.map(x => [x.label, x.value, x.tag])).toEqual([
+      ["Sales", "RM 930.3k", "All of Fair"],
+      ["Margin", "37.8%", "All of Fair"],
+      ["KPI", "37", "All of Fair"],
+    ]);
+  });
+  it("without the block's total: their own and everybody under them; a million in millions", () => {
+    const m = todayModel({ ...peter, kpi: kpiOn });
+    expect(m.metrics.map(x => [x.label, x.value, x.tag])).toEqual([
+      ["Sales", "RM 1.00M", "All of Fair"],
+      // (1,000 + 500,000 + 400,000) margin revenue, (600 + 300,000 + 260,000) cost
+      ["Margin", "37.8%", "All of Fair"],
+      ["KPI", "16", "All of Fair"],
+    ]);
+  });
+  it("KPI off says so; no costed sales says why", () => {
+    const m = todayModel({ ...peter, insight: { ...directed, team: team({ sales: 906_946, blindOrders: 2 }) },
+      kpi: { schemeId: "s", period: "2026-10", asOf: "", enabled: false, items: [], total: 0, threshold: null, hit: null } });
+    expect(m.metrics.map(x => [x.value, x.tag])).toEqual([["RM 906.9k", "All of Fair"], ["—", "Cost pending"], ["—", "Not counted"]]);
+    expect(todayModel({ ...peter, insight: { ...directed, team: team() } }).metrics[1]).toMatchObject({ value: "—", tag: "No sales yet" });
+  });
+  it("the Arena's cards name who leads — a director is on no board", () => {
+    const people = [score({ id: "anna", name: "ANNA TAN", sales: 600_000, marginRevenue: 500_000, marginCost: 300_000, kpiQty: 10 }),
+      score({ id: "ben", name: "BEN", sales: 400_000, marginRevenue: 400_000, marginCost: 200_000, kpiQty: 12 })];
+    const m = todayModel({ ...peter, arena: arena(people, { selfId: "peter" }) }, null, "BEN LIM");
+    expect(m.boards.map(b => [b.id, b.state, b.leader])).toEqual([
+      ["sales", "lead", "ANNA TAN"], ["margin", "lead", "BEN"], ["kpi", "lead", "BEN"], ["champ", "lead", "BEN LIM"],
+    ]);
+    expect(todayModel({ ...peter, arena: arena([], { selfId: "peter" }) }).boards.map(b => b.leader)).toEqual([undefined, undefined, undefined, undefined]);
+  });
+  it("no week card: a director works no booth of their own; the income stays their own", () => {
+    const m = todayModel({ ...peter, arena: arena([], { selfId: "peter" }), salary: 3_000, income: { period: "2026-10", status: "computed", total: 35_000 } });
+    expect(m.week).toBeNull();
+    expect([m.heroLabel, m.heroAmount]).toEqual(["October · Estimated income", "RM 38,000.00"]);
+    expect(m.helloSub).toContain("Revenue Director · Rank SS");
+  });
+  it("a member's Today is unchanged", () => {
+    const m = todayModel({ ...base, insight: block({ sales: 35_000 }, 70_000) });
+    expect(m.metrics[0]).toMatchObject({ value: "50%", tag: "of RM 70k" });
+  });
+});
+
 describe("todayModel — a Principal viewing nobody", () => {
   it("names the department's commission as the department's, not as somebody's income", () => {
     const income = { period: "2026-10", status: "computed", total: 89460.99 };

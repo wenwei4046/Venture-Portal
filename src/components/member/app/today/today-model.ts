@@ -3,7 +3,7 @@ import type { MemberOrderBook } from "@/lib/member/order-book";
 import { marginStanding } from "../insight/insight-model";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import { arenaIncentive, arenaMonthFridays, arenaRankings, arenaWeekFriday, type ArenaMetric, type MemberArenaSnapshot } from "@/lib/member/arena";
-import { dayLabel, dayRange, monthName, ordinalSuffix, rm2 } from "../format";
+import { dayLabel, dayRange, firstName, monthName, ordinalSuffix, rm2 } from "../format";
 import { ICON } from "../icons";
 
 /**
@@ -30,6 +30,14 @@ export interface TodayInput {
    * commission, named so — it is nobody's income.
    */
   department?: string;
+  /**
+   * A Revenue Director (2026-10-14, the user's choice): the sub-department they
+   * lead. The income stays their own; Sales / Margin / KPI are the whole
+   * sub-department's — every bill of the month, the Insight block's `team` —
+   * the Arena's cards name who leads (a director is on no board), and there is
+   * no week of their own.
+   */
+  team?: string;
   hidden: boolean;
   /** This month's Insight block for this sub-department. */
   insight?: MemberInsightBlock;
@@ -62,9 +70,13 @@ export interface TodayTodo {
 export interface TodayMetric { key: "sales" | "margin" | "kpi"; label: string; value: string; tag: string; tagTone: "sub" | "good"; loading?: boolean }
 /**
  * `ranked` shows the place; `unranked` says so in words (nothing on that board yet); `loading` is a placeholder;
- * `off` is KPI not counted this period — nobody will ever have a place there.
+ * `off` is KPI not counted this period — nobody will ever have a place there; `lead` (a director, on no board) names
+ * who leads it (`leader`, absent while nobody is placed).
  */
-export interface TodayBoard { id: "sales" | "margin" | "kpi" | "champ"; label: string; rankNum: string; rankSuf: string; state: "ranked" | "unranked" | "loading" | "off" }
+export interface TodayBoard {
+  id: "sales" | "margin" | "kpi" | "champ"; label: string; rankNum: string; rankSuf: string;
+  state: "ranked" | "unranked" | "loading" | "off" | "lead"; leader?: string;
+}
 export interface TodayWeek { title: string; dates: string; venue: string | null; org: string | null }
 export interface TodayModel {
   hello: string;
@@ -97,6 +109,36 @@ export function shortTier(label: string): string {
 
 /** The Friday of the fair weekend this week belongs to (Mon–Sun) — My brand weeks cuts at the same one. */
 export const weekFriday = arenaWeekFriday;
+
+/**
+ * A director's figures: the whole sub-department — the block's `team`, every bill of the month, the directors' own
+ * included (side review 2026-10-14: their own and everybody under them left out the other director's bills, so PETER
+ * and KRIS read two different "All of Fair"); without it, their own and everybody under them.
+ */
+function groupScore(insight: MemberInsightBlock | undefined) {
+  if (insight?.team) return insight.team;
+  const rows = insight ? [insight.me, ...insight.downline] : [];
+  const sum = (key: "sales" | "marginRevenue" | "marginCost" | "kpiQty" | "blindOrders") => rows.reduce((a, r) => a + (Number(r[key]) || 0), 0);
+  return { sales: sum("sales"), marginRevenue: sum("marginRevenue"), marginCost: sum("marginCost"), kpiQty: sum("kpiQty"), blindOrders: sum("blindOrders") };
+}
+
+/** `RM 906.9k`, and `RM 1.24M` past a million — a whole sub-department's month. */
+function teamAmount(n: number): string {
+  return n >= 1_000_000 ? `RM ${(Math.round(n / 10_000) / 100).toFixed(2)}M` : `RM ${thousands(n)}`;
+}
+
+function teamMetrics(input: TodayInput, team: string): TodayMetric[] {
+  const g = groupScore(input.insight);
+  const tag = `All of ${team}`;
+  const margin = g.marginRevenue > 0 ? ((g.marginRevenue - g.marginCost) / g.marginRevenue) * 100 : null;
+  const kpiOff = !!input.kpi && !input.kpi.enabled;
+  return [
+    { key: "sales", label: "Sales", value: teamAmount(g.sales), tag, tagTone: "sub" },
+    { key: "margin", label: "Margin", value: margin === null ? "—" : `${margin.toFixed(1)}%`,
+      tag: margin === null ? (g.blindOrders > 0 ? "Cost pending" : "No sales yet") : tag, tagTone: "sub" },
+    { key: "kpi", label: "KPI", value: kpiOff ? "—" : String(g.kpiQty), tag: kpiOff ? "Not counted" : tag, tagTone: "sub" },
+  ];
+}
 
 function salesMetric(input: TodayInput): TodayMetric {
   const sales = input.insight?.me.sales ?? 0;
@@ -166,7 +208,8 @@ function todos(input: TodayInput): TodayTodo[] {
 
 function thisWeek(input: TodayInput): TodayWeek | null {
   const arena = input.arena;
-  if (!arena) return null;
+  // A director works no booth of their own.
+  if (!arena || input.team) return null;
   const friday = weekFriday(input.today);
   const fridays = arenaMonthFridays(friday.slice(0, 7));
   const index = fridays.indexOf(friday);
@@ -191,11 +234,15 @@ const BOARDS: { id: TodayBoard["id"]; label: string; metric?: ArenaMetric }[] = 
   { id: "champ", label: "Championship" },
 ];
 
-function boards(input: TodayInput, championRank: number | null): TodayBoard[] {
+function boards(input: TodayInput, championRank: number | null, championLeader: string | null): TodayBoard[] {
   return BOARDS.map(({ id, label, metric }) => {
     if (input.arenaLoading && !input.arena) return { id, label, rankNum: "", rankSuf: "", state: "loading" as const };
     if (id === "kpi" && input.kpi && !input.kpi.enabled) return { id, label, rankNum: "—", rankSuf: "", state: "off" as const };
     const people = input.arena?.people ?? [];
+    if (input.team) {
+      const leader = metric ? arenaRankings(people, metric).find(row => row.position === 1)?.name ?? null : championLeader;
+      return { id, label, rankNum: "", rankSuf: "", state: "lead" as const, ...(leader ? { leader: firstName(leader) } : {}) };
+    }
     const position = metric ? arenaRankings(people, metric).find(row => row.self)?.position ?? null : championRank;
     return position
       ? { id, label, rankNum: String(position), rankSuf: ordinalSuffix(position), state: "ranked" as const }
@@ -221,7 +268,7 @@ export function hideIncome<T extends Pick<TodayModel, "heroAmount" | "heroLoadin
   return { ...model, heroAmount: HIDDEN_AMOUNT, heroLoading: false, heroSplit: HIDDEN_SPLIT };
 }
 
-export function todayModel(input: TodayInput, championRank: number | null = null): TodayModel {
+export function todayModel(input: TodayInput, championRank: number | null = null, championLeader: string | null = null): TodayModel {
   const income = input.income;
   const commission = income?.total ?? null;
   const fixed = input.salary ?? 0;
@@ -241,9 +288,10 @@ export function todayModel(input: TodayInput, championRank: number | null = null
       : dept ? `Everybody in ${dept}, before salaries · View as a member for their own`
       : commission === null ? `Fixed salary ${rm2(fixed)} · commission shows once ${month} is computed`
       : `Fixed salary ${rm2(fixed)} + commission ${rm2(commission)}`,
-    metrics: input.metricsLoading && !input.insight ? LOADING_METRICS : [salesMetric(input), marginMetric(input), kpiMetric(input)],
+    metrics: input.metricsLoading && !input.insight ? LOADING_METRICS
+      : input.team ? teamMetrics(input, input.team) : [salesMetric(input), marginMetric(input), kpiMetric(input)],
     todo: todos(input),
     week: thisWeek(input),
-    boards: boards(input, championRank),
+    boards: boards(input, championRank, championLeader),
   };
 }

@@ -46,6 +46,17 @@ describe("schemeVM", () => {
     expect(vm.note).not.toMatch(/cost/i);
   });
 
+  // A Revenue Director (2026-10-14) is paid their rung's rate on their own bills — never a brand's ladder.
+  it("for a director: their rung's rate, no ladders, and where the rest of their pay is", () => {
+    const fair: MemberMembership = { ...membership, title: "Revenue Director", rank: "Rank SS", rate: 0.12, director: true };
+    const vm = schemeVM({ name: "PETER", ini: "PE", title: "Revenue Director", rank: "Rank SS", membership: fair, salary: 3000, bands, hidden: false });
+    expect([vm.role, vm.stats[0].value, vm.brands]).toEqual(["Revenue Director · Rank SS", "12.0%", []]);
+    expect(vm.note).toBe("Your own bills pay at your rank's rate. Your fixed amount and incentive are on My income; your payslip confirms it.");
+    expect(vm.note).not.toMatch(/cost/i);
+    const ir = schemeVM({ name: "PETER", ini: "PE", title: "Revenue Director", rank: "", membership: { ...fair, rank: "", rate: 0 }, salary: 3000, bands, hidden: false });
+    expect([ir.role, ir.stats[0].value]).toEqual(["Revenue Director", "—"]);
+  });
+
   it("keeps the salary out of a view that may not see it, and hides it on request", () => {
     expect(schemeVM({ ...who, membership, salary: undefined, bands: [], hidden: false }).stats[1].value).toBe("—");
     expect(schemeVM({ ...who, membership, salary: 3000, bands: [], hidden: true }).stats[1].value).toBe("RM ••••");
