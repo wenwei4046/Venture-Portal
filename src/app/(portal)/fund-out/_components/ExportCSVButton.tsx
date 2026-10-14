@@ -1,15 +1,18 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useTransition } from 'react'
+import { flash } from '@/components/hrv/toast'
+import { HeadButton } from '@/components/finv/Hub'
 import { exportLoansCSV } from '../actions'
 import { officeToday } from '@/lib/office-time'
 
+// 2026-10-15 — the Finance revamp v2 (D12): one of the hub head's white
+// buttons, ours kept beside the design's two; a refusal is the toast's.
 export default function ExportCSVButton() {
   const [isPending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
 
   function handleExport() {
-    setError(null)
+    if (isPending) return
     startTransition(async () => {
       try {
         const csv = await exportLoansCSV()
@@ -21,18 +24,10 @@ export default function ExportCSVButton() {
         a.click()
         URL.revokeObjectURL(url)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Export failed')
+        flash(err instanceof Error ? err.message : 'Export failed')
       }
     })
   }
 
-  // 2026-10-10 — the handoff: one of the head's sheet buttons.
-  return (
-    <>
-      <button type="button" onClick={handleExport} disabled={isPending} className="btn-quiet-sheet">
-        {isPending ? 'Exporting…' : 'Export CSV'}
-      </button>
-      {error && <span className="text-xs text-danger ml-2">{error}</span>}
-    </>
-  )
+  return <HeadButton onClick={handleExport}>{isPending ? 'Exporting…' : 'Export CSV'}</HeadButton>
 }

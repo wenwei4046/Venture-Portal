@@ -508,7 +508,8 @@ export async function withdrawFundSource(id: string): Promise<{ error: string } 
   const { error } = await supabase.rpc('withdraw_pending_fund_source' as never, {
     p_fund_source_id: id,
   } as never)
-  if (error) return { error: `撤回失败: ${error.message}` }
+  // In English, as the page around it is (2026-10-15 — it read 撤回失败).
+  if (error) return { error: `The fund source was not withdrawn: ${error.message}` }
 
   revalidatePath('/fund-in')
   revalidatePath(`/fund-in/${id}`)
