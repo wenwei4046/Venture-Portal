@@ -14,9 +14,11 @@ module.exports = () => {
       "every layer of the chat stands on <main> as the prototype's stand on its phone: the list, the header and the composer each absolute"],
     // The header: the prototype's block (white at 96% over the wallpaper, its hairline) and row (2px 16px 12px); the phone's own
     // status bar stands for the prototype's drawn 44px one. The pinned message and the cold-lead note ride in it, under the row.
+    // One step above the composer (the prototype's 3): the ⋮ menu lives inside the header, and with the keyboard or a panel
+    // up on a small phone it reaches down past the bar's top — at the composer's 3, the composer would cover its last rows.
     ['<div style={{ display: "flex", alignItems: "center", gap: "10px", paddingBottom: "12px", borderBottom: "1px solid rgb(235 221 210)" }}>',
-      '<div data-chat-head="" style={{ position: "absolute", left: "0", right: "0", top: "0", zIndex: "3", background: "rgba(255,255,255,.96)", borderBottom: "1px solid rgb(235 221 210)" }}>\n      <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "2px 16px 12px" }}>',
-      "the header floats over the wallpaper (the prototype's header block and row)"],
+      '<div data-chat-head="" style={{ position: "absolute", left: "0", right: "0", top: "0", zIndex: "4", background: "rgba(255,255,255,.96)", borderBottom: "1px solid rgb(235 221 210)" }}>\n      <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "2px 16px 12px" }}>',
+      "the header floats over the wallpaper (the prototype's header block and row), above the composer for its ⋮ menu"],
     [/<span onClick=\{v\.closeChat\} style=\{\{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid rgb\(235 221 210\)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" \}\}>(\s*)<svg width="20" height="20"/,
       '<span onClick={v.closeChat} style={{ flex: "none", width: "40px", height: "40px", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>$1<svg width="22" height="22"',
       "back: 40×40 with no ring, the arrow 22 (the prototype)"],
@@ -42,9 +44,15 @@ module.exports = () => {
       '\n      </div>\n      <div data-chat-list="1" onClick={v.dismiss} style={{ position: "absolute", left: "0", right: "0", top: "0", bottom: "calc(0px - var(--safe-bottom, 0px))", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", boxSizing: "border-box", padding: "calc(var(--chat-top, 55px) + 25px) 16px calc(var(--chat-foot, 64px) + 6px)", backgroundColor: v.wallBg, backgroundImage: v.wallImg, backgroundSize: v.wallSize }}><div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "10px" }}>',
       "the header block ends here; the list is the prototype's, full bleed under the header and the composer"],
     // The composer: everything the chat drew under its list — the edit / reply rows, "/" quick replies, the template button,
-    // the recording row, the reply box with its +, camera and mic, the emoji panel — is the composer's now.
+    // the recording row, the reply box with its +, camera and mic, the emoji panel — is the composer's now. Exactly those
+    // blocks: anything else found there (a later design's, an earlier patch's) stops the generator instead of vanishing.
     [/        <\/Fragment>\)\)\}\n      <\/div>\n      \{!!\(v\.editText\) && \(<>[\s\S]*?(\{!!\(v\.hm\.apptOpen\) && \(<>)/,
-      '        </Fragment>))}\n      </div></div>\n      <ChatComposer key={v.cmp.key} v={v.cmp} />\n      $1',
+      (span, sheet) => {
+        const blocks = [...span.slice(0, span.length - sheet.length).matchAll(/\n      \{!!\(([^)]*(?:\([^)]*\))?[^)]*)\) && \(/g)].map(m => m[1]);
+        const want = ["v.editText", "v.replyText", "v.slashOpen", "v.chatCold", "v.chatWarm && v.rec", "v.chatWarm && !v.rec", "v.emojiOpen && v.chatWarm"];
+        if (JSON.stringify(blocks) !== JSON.stringify(want)) throw new Error(`SalesChat: the composer's place holds ${JSON.stringify(blocks)}, not ${JSON.stringify(want)}`);
+        return `        </Fragment>))}\n      </div></div>\n      <ChatComposer key={v.cmp.key} v={v.cmp} />\n      ${sheet}`;
+      },
       "the composer (sales/ChatComposer.tsx) takes the place of the reply rows, the reply box and the emoji panel"],
     [/\{!!\(v\.attOpen\) && \(<>[\s\S]*?\n      <\/>\)\}\n      /, "",
       "the + sheet is the composer's Attach panel now (in the keyboard's place)"],

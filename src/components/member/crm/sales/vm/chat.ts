@@ -24,7 +24,7 @@ import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "..
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { typePx } from "../../shared/type";
-import { dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "./composer";
+import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "./composer";
 
 const NO_PRESS: Partial<ReturnType<typeof pressToOpen>> = {};
 import { CHAT_WALL } from "../wall";
@@ -464,7 +464,8 @@ export function chatVM(ctx: SalesCtx) {
   };
   // The composer (the chat composer handoff, 2026-10-14 — vm/composer.ts): its state is the screen's (ui.cmp), its
   // words this chat's draft, its sends the chat's own.
-  const setCmp = (f: (s: ComposerState) => ComposerState) => set(u => ({ ...u, cmp: f(u.cmp ?? initialComposer()) }));
+  // This chat's own: another chat's state (left by any way out) is never this one's.
+  const setCmp = (f: (s: ComposerState) => ComposerState) => set(u => ({ ...u, cmp: { ...f(composerOf(u.cmp, c.id) ?? initialComposer()), chat: c.id } }));
   const tile = (label: TileLabel) => {
     if (label === "Photos") document.getElementById("crm-pick-photo")?.click();
     else if (label === "Document") document.getElementById("crm-pick-file")?.click();
@@ -473,7 +474,7 @@ export function chatVM(ctx: SalesCtx) {
     else openAttach({ view: "auto", quick: [], auto: autoChoices(data.autoReplies), pick: text => setDraft(text) });
   };
   const cmp: ComposerIn = {
-    key: c.id, state: ui.cmp ?? initialComposer(), set: setCmp,
+    key: c.id, state: composerOf(ui.cmp, c.id) ?? initialComposer(), set: setCmp,
     placeholder: `Reply to ${first}…`, draft, setDraft, canSend: !!draft.trim() && !ui.sending, send: () => void sendDraft(),
     warm: !shut,
     openTpl: () => void openTpl(),

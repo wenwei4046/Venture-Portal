@@ -25,6 +25,10 @@ export interface ComposerState {
   toast: string;
 }
 export const initialComposer = (): ComposerState => ({ panel: null, kb: false, prevKb: false, searching: false, q: "", ecat: "recent", toast: "" });
+/** The composer state on screen (SalesUi.cmp) if it is this chat's: a chat left any way (the Calendar, Assign, a switch)
+ *  never hands its panel to the next. */
+export const composerOf = (s: (ComposerState & { chat: string }) | null | undefined, chat: string): ComposerState | null =>
+  (s && s.chat === chat ? s : null);
 
 // ── The prototype's content ──
 
@@ -199,6 +203,8 @@ export interface ComposerDom {
   mainDown: (e: RPointerEvent<HTMLElement>) => void;
   /** The main button tapped while a recording runs that no finger holds (Send). */
   recTap: () => void;
+  /** The bin tapped: the recording is thrown away, and the press it belonged to is over. */
+  recCancel: () => void;
   delKey: () => void;
 }
 
@@ -244,6 +250,6 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
     replyText: v.reply?.text ?? "", replyWho: v.reply?.who ?? "", cancelReply: () => v.cancelReply(),
     slashOpen: !!v.slash, slashQ: v.slash ? `/${v.slash.q}` : "", slashEmpty: !!v.slash?.empty, slashList: v.slash?.list ?? [], qrEdit: () => v.qrEdit(),
     openTpl: () => v.openTpl(),
-    recTime: v.rec?.time ?? "", recCancel: () => v.voiceStop(false), trashRef: d.trashRef,
+    recTime: v.rec?.time ?? "", recCancel: () => d.recCancel(), trashRef: d.trashRef,
   };
 }

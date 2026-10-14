@@ -68,8 +68,10 @@ export interface SalesUi {
   menu: { msgId: string; full: boolean; from: "lead" | "me"; text: string } | null;
   reply: { msgId: string; from: "lead" | "me"; text: string } | null;
   draft: Record<string, string>;
-  /** The composer: its panel (Sticker / Attach), emoji search and category, toast (vm/composer.ts; null = as it opens). */
-  cmp?: import("./vm/composer").ComposerState | null;
+  /** The composer of the chat it was opened in (`chat`): its panel (Sticker / Attach), emoji search and category, toast
+   *  (vm/composer.ts). Another chat's — or none — opens as new: a chat left any way (the Calendar, Assign, a switch)
+   *  never hands its panel to the next. */
+  cmp?: (import("./vm/composer").ComposerState & { chat: string }) | null;
   /** Emoji picked in this visit, most recent first — shown at once, kept on the server a moment later (crm_staff_prefs). */
   recents?: string[];
   qr: boolean;

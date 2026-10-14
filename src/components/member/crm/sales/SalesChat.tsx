@@ -16,7 +16,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
   return (<>
             
     <main data-chat-screen="" style={{ position: "relative", flex: "1 1 auto", minHeight: "0" }}>
-      <div data-chat-head="" style={{ position: "absolute", left: "0", right: "0", top: "0", zIndex: "3", background: "rgba(255,255,255,.96)", borderBottom: "1px solid rgb(235 221 210)" }}>
+      <div data-chat-head="" style={{ position: "absolute", left: "0", right: "0", top: "0", zIndex: "4", background: "rgba(255,255,255,.96)", borderBottom: "1px solid rgb(235 221 210)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "2px 16px 12px" }}>
         <span onClick={v.closeChat} style={{ flex: "none", width: "40px", height: "40px", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">

@@ -59,6 +59,8 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
   /** Until when a panel that just took the keyboard's place keeps the screen where it was. */
   const swapUntil = useRef(0);
   const refit = useRef<() => void>(() => {});
+  const putInsets = useRef<() => void>(() => {});
+  const alive = useRef(true);
 
   useEffect(() => { setKbH(storedKbH()); }, []);
 
@@ -83,8 +85,10 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
       main.style.setProperty("--chat-foot", `${stack.offsetHeight}px`);
       if (head) main.style.setProperty("--chat-top", `${head.offsetHeight}px`);
     };
+    putInsets.current = put;
     put();
     if (typeof ResizeObserver === "undefined") return;
+    // A size change of either that the composer did not make (the header's pinned message, a font arriving).
     const ro = new ResizeObserver(put);
     ro.observe(stack);
     if (head) ro.observe(head);
@@ -103,9 +107,18 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
       fitted = false;
       for (const p of ["top", "bottom"]) app.style.removeProperty(p);
       app.style.removeProperty("--safe-bottom");
-      setCapH(null);
     };
-    const fit = () => {
+    // A panel never runs past the header (a phone on its side, a search over the keyboard): it gives way, the bar and the
+    // header both stay on the screen, 24px of the chat between them.
+    const capPanel = () => {
+      const main = stack.closest("main"), panel = stack.querySelector<HTMLElement>("[data-panel]");
+      if (!main || !panel) return;
+      const head = main.querySelector<HTMLElement>("[data-chat-head]")?.offsetHeight ?? 0;
+      const strip = (stack.lastElementChild as HTMLElement | null)?.offsetHeight ?? 0;
+      const rest = stack.offsetHeight - panel.offsetHeight - strip;
+      setCapH(Math.max(160, Math.round(main.clientHeight - head - rest - 24)));
+    };
+    const place = () => {
       const ae = document.activeElement;
       const inBox = ae === taRef.current, inSearch = !!ae && ae.tagName === "INPUT" && stack.contains(ae);
       // Another field (a sheet's form) keeps the browser's own way with the keyboard; so does a zoomed page.
@@ -134,13 +147,8 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
       app.style.top = `${pan}px`;
       app.style.bottom = `${Math.round(window.innerHeight - pan - (toKb ? vv.height : window.innerHeight))}px`;
       if (toKb) app.style.setProperty("--safe-bottom", "0px"); else app.style.removeProperty("--safe-bottom");
-      // Searching over the keyboard: the panel gives way so the bar and the header both stay on the screen.
-      if (inSearch && up) {
-        const head = stack.closest("main")?.querySelector<HTMLElement>("[data-chat-head]")?.offsetHeight ?? 0;
-        const bar = stack.offsetHeight - (stack.querySelector<HTMLElement>("[data-panel]")?.offsetHeight ?? 0);
-        setCapH(Math.max(160, Math.round(vv.height - head - bar - 48)));
-      } else setCapH(null);
     };
+    const fit = () => { place(); capPanel(); };
     refit.current = fit;
     fit();
     vv.addEventListener("resize", fit);
@@ -158,8 +166,11 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
       clear();
     };
   }, []);
-  // The panel on screen changed (a swap, a keyboard arriving): the screen follows at once.
-  useEffect(() => { refit.current(); }, [shown]);
+  // The panel on screen changed (a swap, a keyboard arriving): the screen follows in the same frame.
+  useLayoutEffect(() => { refit.current(); }, [shown]);
+  // …and the chat's list pads itself by the composer in that frame too, so the newest message never slips under a panel
+  // or a growing reply box (a ResizeObserver alone would answer a frame later: the list sits beside the composer).
+  useLayoutEffect(() => { putInsets.current(); }, [shown, taH, capH, kbH, v.reply, v.slash, v.rec, v.warm]);
 
   // A panel waiting for the keyboard goes anyway if none comes (a computer, a hardware keyboard).
   useEffect(() => {
@@ -192,6 +203,8 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
     latest.current.set(focusBox);
   }, []);
   const onBlurBox = useCallback(() => {
+    // The window itself lost focus (another app, another window): the box keeps its focus, and the state its keyboard.
+    if (document.activeElement === taRef.current) return;
     latest.current.set(s => (s.kb ? { ...s, kb: false } : s));
   }, []);
 
@@ -215,58 +228,83 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
   }, []);
 
   // ── Holding the mic ──
-  const hold = useRef<{ id: number; timer: ReturnType<typeof setTimeout> | null; starting: boolean; recording: boolean; done: boolean; at: number } | null>(null);
+  type Hold = { id: number; timer: ReturnType<typeof setTimeout> | null; starting: boolean; recording: boolean; done: boolean; at: number; up: (ev: PointerEvent) => void };
+  const hold = useRef<Hold | null>(null);
+  /** When the last press ended: the click a browser sends after it is not a second Send. */
+  const releasedAt = useRef(0);
+  /** The press is over, whichever way it ended: its listeners and its timer go, and the next press may start. */
+  const finish = useCallback((h: Hold) => {
+    window.removeEventListener("pointerup", h.up);
+    window.removeEventListener("pointercancel", h.up);
+    if (h.timer) { clearTimeout(h.timer); h.timer = null; }
+    h.done = true;
+    if (hold.current === h) hold.current = null;
+    releasedAt.current = Date.now();
+  }, []);
   const mainDown = useCallback((e: RPointerEvent<HTMLElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     if (hold.current) return;
     e.preventDefault();
-    const h = { id: e.pointerId, timer: null as ReturnType<typeof setTimeout> | null, starting: false, recording: false, done: false, at: 0 };
+    const h: Hold = { id: e.pointerId, timer: null, starting: false, recording: false, done: false, at: 0, up: () => {} };
     hold.current = h;
-    const tap = () => { hold.current = null; latest.current.set(s => flash(s, HOLD_HINT)); };
+    const hint = () => { if (alive.current) latest.current.set(s => flash(s, HOLD_HINT)); };
     h.timer = setTimeout(async () => {
       h.timer = null;
       h.starting = true;
       taRef.current?.blur();
       const ok = await latest.current.voiceStart();
       h.starting = false;
-      if (!ok) { hold.current = null; return; }
-      // Let go while the microphone was starting: nothing to send.
-      if (h.done) { latest.current.voiceStop(false); tap(); return; }
+      if (!ok) { finish(h); return; }
+      // Let go (or the chat left) while the microphone was starting: nothing to send.
+      if (h.done) { latest.current.voiceStop(false); hint(); return; }
       h.recording = true;
       h.at = Date.now();
     }, HOLD_MS);
-    const up = (ev: PointerEvent) => {
+    h.up = (ev: PointerEvent) => {
       if (ev.pointerId !== h.id) return;
-      window.removeEventListener("pointerup", up);
-      window.removeEventListener("pointercancel", up);
-      h.done = true;
-      if (h.timer) { clearTimeout(h.timer); h.timer = null; tap(); return; }
-      if (h.starting) return;
-      hold.current = null;
-      if (!h.recording) return;
+      const tap = !!h.timer, starting = h.starting, recording = h.recording;
+      finish(h);
+      if (tap) { hint(); return; }
+      // Still starting: the start's own answer settles it (h.done is set).
+      if (starting || !recording) return;
       const bin = trashRef.current?.getBoundingClientRect();
       const thrown = ev.type === "pointercancel" || (!!bin && ev.clientX <= bin.right + 12);
-      if (!thrown && Date.now() - h.at < MIN_VOICE_MS) { latest.current.voiceStop(false); latest.current.set(s => flash(s, HOLD_HINT)); return; }
+      if (!thrown && Date.now() - h.at < MIN_VOICE_MS) { latest.current.voiceStop(false); hint(); return; }
       latest.current.voiceStop(!thrown);
     };
-    window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", up);
-  }, []);
-  // Leaving the chat while holding: the recording goes nowhere.
-  useEffect(() => () => {
+    window.addEventListener("pointerup", h.up);
+    window.addEventListener("pointercancel", h.up);
+  }, [finish]);
+  // Leaving the chat while holding (or with a recording no finger holds): the press ends and the recording goes nowhere —
+  // the phone's microphone never stays on behind a closed chat. Set again on mount: React's development double mount.
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      const h = hold.current, recording = !!h?.recording || !!latest.current.rec;
+      if (h) finish(h);
+      if (recording) latest.current.voiceStop(false);
+    };
+  }, [finish]);
+  // The bin, tapped: the recording is thrown away and any press it belonged to is over.
+  const recCancel = useCallback(() => {
     const h = hold.current;
-    if (!h) return;
-    if (h.timer) clearTimeout(h.timer);
-    h.done = true;
-    if (h.recording) latest.current.voiceStop(false);
-  }, []);
-  // A recording no finger holds any more (its release was lost): Send sends it.
-  const recTap = useCallback(() => { if (!hold.current) latest.current.voiceStop(true); }, []);
+    if (h) finish(h);
+    latest.current.voiceStop(false);
+  }, [finish]);
+  // Send, tapped while a recording runs that no finger holds any more (its release was lost): it goes. Not the click a
+  // browser sends right after the release that already sent it.
+  const recTap = useCallback(() => {
+    if (Date.now() - releasedAt.current < 500) return;
+    const h = hold.current;
+    if (h) finish(h);
+    latest.current.voiceStop(true);
+  }, [finish]);
 
   const base = kbH ?? PANEL_H;
   const p = composerVM(v, {
     taH, panelH: Math.round(capH != null ? Math.min(base, capH) : base), taRef, trashRef, shown,
-    focusBox: onFocusBox, blurBox: onBlurBox, swap, mainDown, recTap, delKey,
+    focusBox: onFocusBox, blurBox: onBlurBox, swap, mainDown, recTap, recCancel, delKey,
   });
   return (<>
     {/* Where this composer is in the chat (the stack and the screen are found from it). */}

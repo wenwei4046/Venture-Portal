@@ -192,4 +192,57 @@ describe("the mic is held to record", () => {
     expect(voice.cancel).toHaveBeenCalledTimes(1);
     expect(voice.stop).not.toHaveBeenCalled();
   });
+
+  it("the click a browser sends right after the release is not a second send", async () => {
+    await openChat();
+    const mic = byTitle("Voice note")!;
+    fireEvent.pointerDown(mic);
+    await act(async () => { await new Promise(r => setTimeout(r, 1050)); });
+    // In one go, before React draws again: the click still finds the recording's Send.
+    act(() => {
+      fireEvent.pointerUp(window, { clientX: 300 });
+      fireEvent.click(mic);
+    });
+    await act(async () => {});
+    expect(voice.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("the bin tapped (the release lost) throws it away and ends the press: the next press records again", async () => {
+    await openChat();
+    fireEvent.pointerDown(byTitle("Voice note")!);
+    await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+    await tap(byTitle("Cancel"));
+    expect(voice.cancel).toHaveBeenCalledTimes(1);
+    // The lost release, arriving late, belongs to a press that is over.
+    fireEvent.pointerUp(window, { clientX: 300 });
+    await act(async () => {});
+    expect(voice.stop).not.toHaveBeenCalled();
+    expect(screen.queryByText(HOLD_HINT)).toBeNull();
+    fireEvent.pointerDown(byTitle("Voice note")!);
+    await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+    expect(voice.start).toHaveBeenCalledTimes(2);
+    expect(composer().textContent).toContain("Recording…");
+  });
+
+  it("leaving the chat while recording turns the microphone off", async () => {
+    await openChat();
+    fireEvent.pointerDown(byTitle("Voice note")!);
+    await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+    await tap(document.querySelector('[data-chat-head] span[style*="width: 40px"]'));
+    expect(document.querySelector("[data-composer]")).toBeNull();
+    expect(voice.cancel).toHaveBeenCalledTimes(1);
+    expect(voice.stop).not.toHaveBeenCalled();
+  });
+});
+
+describe("the keyboard", () => {
+  it("stays the reply box's when the window itself loses focus (another app, another window)", async () => {
+    await openChat();
+    await act(async () => { box().focus(); });
+    expect(document.activeElement).toBe(box());
+    // The box's blur while it is still the focused element: the window lost focus, not the box.
+    fireEvent.blur(box());
+    await act(async () => {});
+    expect(document.activeElement).toBe(box());
+  });
 });

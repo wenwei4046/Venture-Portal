@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  CATS, ICON, NAMES, PANEL_H, RECENT_MAX, TABS, TILES, afterSend, dismiss, dropLast, emojiView, flash, focusBox, graphemes, homeBg, initialComposer,
+  CATS, ICON, NAMES, PANEL_H, RECENT_MAX, TABS, TILES, afterSend, composerOf, dismiss, dropLast, emojiView, flash, focusBox, graphemes, homeBg, initialComposer,
   pickCat, pushRecent, recentList, toggleSearch, togglePanel, type ComposerState,
 } from "./composer";
 import { readFileSync } from "node:fs";
@@ -110,5 +110,12 @@ describe("the prototype's state changes", () => {
   });
   it("the strip takes the colour of what is above it", () => {
     expect([homeBg("sticker"), homeBg("attach"), homeBg(null)]).toEqual(["#fff", "#FBF7F3", "transparent"]);
+  });
+  it("a chat's composer state is its own: another chat (reached any way) opens with nothing open", () => {
+    const a = { ...s0({ panel: "sticker", searching: true, q: "bed" }), chat: "lead-a" };
+    expect(composerOf(a, "lead-a")).toBe(a);
+    expect(composerOf(a, "lead-b")).toBeNull();
+    expect(composerOf(null, "lead-a")).toBeNull();
+    expect(composerOf(undefined, "lead-a")).toBeNull();
   });
 });
