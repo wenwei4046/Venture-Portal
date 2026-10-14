@@ -383,7 +383,8 @@ export function RepaymentStartSheet({
     onDone('Repayment start saved')
   }
   return (
-    <FinDialog open={open} onClose={close} title="Repayment starts" locked={w.busy}>
+    // Tall, as a form's sheet is: the calendar opens below its field (a short sheet cut it off above).
+    <FinDialog open={open} onClose={close} title="Repayment starts" locked={w.busy} tall>
       <DialogForm
         onSubmit={() => void save()}
         buttons={
