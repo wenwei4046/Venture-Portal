@@ -97,12 +97,12 @@ describe("the Team chat is Mine's", () => {
   it("Attach: Photos opens the photo picker; Quick replies and Auto replies open their lists", async () => {
     await openTeamChat();
     await tap(byTitle("Attach"));
-    const panel = composer().querySelector<HTMLElement>("[data-panel]")!;
+    const panel = composer().querySelector<HTMLElement>("[data-attach]")!;
     expect([...panel.querySelectorAll(":scope > div > span")].map(t => t.textContent)).toEqual(["Photos", "Document", "Quick replies", "Auto replies"]);
     const photo = document.getElementById("crm-panel-photo")!, click = vi.spyOn(photo, "click");
     await tap(screen.getByText("Photos"));
     expect(click).toHaveBeenCalledTimes(1);
-    expect(composer().querySelector("[data-panel]")).toBeNull();
+    expect(composer().querySelector("[data-attach]")).toBeNull();
     await tap(byTitle("Attach"));
     await tap(screen.getByText("Auto replies"));
     const sheet = screen.getByRole("dialog", { name: "Attach" });

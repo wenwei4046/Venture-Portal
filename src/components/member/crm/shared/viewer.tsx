@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { PdfPages } from "./pdf-pages";
 import { FilePreview, previewKind } from "./file-preview";
@@ -132,7 +132,16 @@ export function MediaViewer() {
   const [ready, setReady] = useState<Record<string, File | null>>({});
   const [saving, setSaving] = useState("");
   const [note, setNote] = useState("");
-  const start = useRef<{ x: number; y: number; axis: "" | "x" | "y" | "pan"; zx: number; zy: number } | null>(null);
+  const start = useRef<{ x: number; y: number; t: number; dx: number; axis: "" | "x" | "y" | "pan"; zx: number; zy: number } | null>(null);
+  /**
+   * Left / right as a strip — the previous, this and the next photo side by side (the owner, 2026-10-15: "點入照片時，左右
+   * 滑動要很順，現在會卡頓"): the finger moves the strip itself, written straight to its style (no render a move), and let
+   * go it slides on to the neighbour, already drawn and loaded; the step happens once the slide is over. It used to
+   * re-render the viewer at every move and load the next photo only after the step — a blank, then a jump.
+   */
+  const stripRef = useRef<HTMLDivElement>(null);
+  const sliding = useRef(false);
+  const goRef = useRef<(d: 1 | -1) => void>(() => {});
   const pinch = useRef<{ d0: number; s0: number } | null>(null);
   const lastTap = useRef(0);
   const mouse = useRef<{ x: number; y: number; zx: number; zy: number } | null>(null);
@@ -149,14 +158,19 @@ export function MediaViewer() {
     const onPop = () => { pushed.current = false; closeViewer(); };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
-      else if (e.key === "ArrowLeft") stepViewer(-1);
-      else if (e.key === "ArrowRight") stepViewer(1);
+      else if (e.key === "ArrowLeft") goRef.current(-1);
+      else if (e.key === "ArrowRight") goRef.current(1);
     };
     window.addEventListener("popstate", onPop);
     window.addEventListener("keydown", onKey);
     return () => { window.removeEventListener("popstate", onPop); window.removeEventListener("keydown", onKey); };
   }, [open]);
   const cur = s ? s.items[s.i] : null;
+  // A new photo in the middle: the strip back on it, at once (the slide that brought it is over).
+  useLayoutEffect(() => {
+    const el = stripRef.current;
+    if (el) { el.style.transition = "none"; el.style.transform = `translate3d(${-window.innerWidth}px,0,0)`; }
+  }, [cur]);
   // Each item: back to its whole picture, and its file fetched for Download.
   useEffect(() => {
     setDrag({ x: 0, y: 0 }); setZoom(Z0); setNote("");
@@ -176,12 +190,30 @@ export function MediaViewer() {
   const clamp = (z: Zoom): Zoom => (z.s <= 1.02 ? Z0 : z);
   const toggleZoom = () => setZoom(z => (z.s > 1 ? Z0 : { s: 2.5, x: 0, y: 0 }));
 
+  /** The strip at `x` px from this photo (0 = this one), sliding there when `glide`. */
+  const setStrip = (x: number, glide: boolean) => {
+    const el = stripRef.current;
+    if (!el) return;
+    el.style.transition = glide ? "transform 260ms cubic-bezier(.2,.8,.2,1)" : "none";
+    el.style.transform = `translate3d(${x - window.innerWidth}px,0,0)`;
+  };
+  /** On to the next (1) or the previous (-1) photo: the strip slides, then the step. Back to this one at either end. */
+  const go = (d: 1 | -1) => {
+    const now = snapshot();
+    if (!now || sliding.current) return;
+    if (now.i + d < 0 || now.i + d >= now.items.length) { setStrip(0, true); return; }
+    sliding.current = true;
+    setZoom(Z0);
+    setStrip(d > 0 ? -window.innerWidth : window.innerWidth, true);
+    setTimeout(() => { sliding.current = false; stepViewer(d); }, 260);
+  };
+  goRef.current = go;
   const dist = (t: React.TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
   const onTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2 && zoomable) { pinch.current = { d0: dist(e.touches) || 1, s0: zoomRef.current.s }; start.current = null; return; }
     if (e.touches.length !== 1) { start.current = null; return; }
     const z = zoomRef.current;
-    start.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, axis: z.s > 1 ? "pan" : "", zx: z.x, zy: z.y };
+    start.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, axis: z.s > 1 ? "pan" : "", zx: z.x, zy: z.y };
   };
   const onTouchMove = (e: React.TouchEvent) => {
     if (pinch.current && e.touches.length === 2) {
@@ -197,7 +229,11 @@ export function MediaViewer() {
       if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
       st.axis = Math.abs(dy) > Math.abs(dx) ? "y" : "x";
     }
-    setDrag(st.axis === "y" ? { x: 0, y: Math.max(0, dy) } : { x: many ? dx : dx / 4, y: 0 });
+    if (st.axis === "y") { setDrag({ x: 0, y: Math.max(0, dy) }); return; }
+    // Sideways: the strip follows the finger; past either end it gives a quarter as much.
+    const atEnd = (dx > 0 && s.i === 0) || (dx < 0 && s.i === s.items.length - 1);
+    st.dx = atEnd ? dx / 4 : dx;
+    if (!sliding.current) setStrip(st.dx, false);
   };
   const onTouchEnd = (e: React.TouchEvent) => {
     if (pinch.current) {
@@ -215,7 +251,12 @@ export function MediaViewer() {
     }
     const d = dragRef.current;
     if (st.axis === "y" && d.y > 110) { close(); return; }
-    if (st.axis === "x" && Math.abs(d.x) > 60) stepViewer(d.x < 0 ? 1 : -1);
+    if (st.axis === "x") {
+      // A third of the screen, or a flick.
+      const fast = Math.abs(st.dx) > 24 && Math.abs(st.dx) / Math.max(1, Date.now() - st.t) > 0.45;
+      if (Math.abs(st.dx) > window.innerWidth / 3 || fast) go(st.dx < 0 ? 1 : -1); else setStrip(0, true);
+      return;
+    }
     setDrag({ x: 0, y: 0 });
   };
   // A computer: the wheel zooms, a double click zooms in / out, and a zoomed photo is dragged around.
@@ -271,19 +312,29 @@ export function MediaViewer() {
       ) : (
         <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}
           onWheel={onWheel} onDoubleClick={zoomable ? toggleZoom : undefined} onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
-          onClick={e => { if (e.target === e.currentTarget && zoom.s === 1 && !("ontouchstart" in window)) close(); }}
+          onClick={e => { if (!(e.target as HTMLElement).closest("img, video") && zoom.s === 1 && !("ontouchstart" in window)) close(); }}
           style={{ flex: "1", minHeight: 0, display: "grid", placeItems: "center", overflow: "hidden", cursor: zoom.s > 1 ? "grab" : "default" }}>
-          <div style={{ transform: `translate(${drag.x + zoom.x}px, ${drag.y + zoom.y}px) scale(${zoom.s * (drag.y ? Math.max(0.8, 1 - drag.y / 1600) : 1)})`, transition: moving ? "none" : "transform 200ms ease", display: "grid", placeItems: "center", width: "100vw", height: "100%", pointerEvents: "none" }}>
-            {it.kind === "image"
-              ? <img key={it.url} src={it.url} alt="Photo" draggable={false} style={{ maxWidth: "100vw", maxHeight: "100%", objectFit: "contain", userSelect: "none", WebkitUserSelect: "none" }} />
-              : <video key={it.url} src={it.url} controls autoPlay playsInline style={{ width: "100vw", maxHeight: "100%", background: "#000", pointerEvents: "auto" }} />}
+          <div ref={stripRef} style={{ display: "flex", width: "300vw", height: "100%", transform: "translate3d(-100vw,0,0)", willChange: "transform" }}>
+            {[s.items[s.i - 1], it, s.items[s.i + 1]].map((m, k) => (
+              <div key={m ? m.url : k === 0 ? "none-before" : "none-after"} style={{ flex: "none", width: "100vw", height: "100%", display: "grid", placeItems: "center", overflow: "hidden" }}>
+                {m && (k === 1
+                  ? <div style={{ transform: `translate(${zoom.x}px, ${drag.y + zoom.y}px) scale(${zoom.s * (drag.y ? Math.max(0.8, 1 - drag.y / 1600) : 1)})`, transition: moving ? "none" : "transform 200ms ease", display: "grid", placeItems: "center", width: "100vw", height: "100%", pointerEvents: "none" }}>
+                      {m.kind === "image"
+                        ? <img src={m.url} alt="Photo" draggable={false} style={{ maxWidth: "100vw", maxHeight: "100%", objectFit: "contain", userSelect: "none", WebkitUserSelect: "none" }} />
+                        : <video key={m.url + ":on"} src={m.url} controls autoPlay playsInline style={{ width: "100vw", maxHeight: "100%", background: "#000", pointerEvents: "auto" }} />}
+                    </div>
+                  : m.kind === "image"
+                  ? <img src={m.url} alt="" draggable={false} style={{ maxWidth: "100vw", maxHeight: "100%", objectFit: "contain", userSelect: "none", WebkitUserSelect: "none", pointerEvents: "none" }} />
+                  : <video src={`${m.url}#t=0.1`} muted playsInline preload="metadata" style={{ width: "100vw", maxHeight: "100%", background: "#000", pointerEvents: "none" }} />)}
+              </div>
+            ))}
           </div>
         </div>
       )}
       {!doc && many && zoom.s === 1 && (<>
-        {s.i > 0 && (<button type="button" onClick={() => stepViewer(-1)} aria-label="Previous" style={{ ...btn, position: "absolute", left: "8px", top: "50%", width: "40px", height: "40px", marginTop: "-20px", opacity: fade }}>
+        {s.i > 0 && (<button type="button" onClick={() => go(-1)} aria-label="Previous" style={{ ...btn, position: "absolute", left: "8px", top: "50%", width: "40px", height: "40px", marginTop: "-20px", opacity: fade }}>
           <svg width="20" height="20" viewBox="0 0 24 24" {...ICON}><path d="M15 5l-7 7 7 7" /></svg></button>)}
-        {s.i < s.items.length - 1 && (<button type="button" onClick={() => stepViewer(1)} aria-label="Next" style={{ ...btn, position: "absolute", right: "8px", top: "50%", width: "40px", height: "40px", marginTop: "-20px", opacity: fade }}>
+        {s.i < s.items.length - 1 && (<button type="button" onClick={() => go(1)} aria-label="Next" style={{ ...btn, position: "absolute", right: "8px", top: "50%", width: "40px", height: "40px", marginTop: "-20px", opacity: fade }}>
           <svg width="20" height="20" viewBox="0 0 24 24" {...ICON}><path d="M9 5l7 7-7 7" /></svg></button>)}
       </>)}
     </div>,

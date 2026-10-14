@@ -196,12 +196,14 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
     return () => clearTimeout(t);
   }, [v.state.toast]);
 
-  const touch = () => typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
-
-  /** The reply box took focus: the keyboard comes up over whatever panel was open. */
+  /**
+   * The reply box took focus: the panel goes and the screen fits the keyboard at once (the owner, 2026-10-15, a screenshot
+   * with the bar behind the keyboard: "我點 keyboard 變成這樣了"). A panel kept drawn while the keyboard rose over it waited
+   * for the keyboard to reach its last measured height; one that stopped shorter (another keyboard, its strip) left the
+   * screen at full height, the bar under the keyboard.
+   */
   const onFocusBox = useCallback(() => {
-    const s = latest.current.state;
-    if (s.panel && touch()) setRising(s.panel);
+    setRising(null);
     latest.current.set(focusBox);
   }, []);
   const onBlurBox = useCallback(() => {
@@ -214,7 +216,7 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
   const swap = useCallback((p: Exclude<ComposerPanel, null>) => {
     const s = latest.current.state, next = togglePanel(s, p), ta = taRef.current;
     if (next.kb) {
-      if (s.panel && touch()) setRising(s.panel);
+      setRising(null);
       latest.current.set(() => next);
       ta?.focus({ preventScroll: true });
     } else {
