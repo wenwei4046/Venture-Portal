@@ -20,6 +20,9 @@ import { useFinView } from '@/components/layout/fin-view'
 import { officeDate } from '@/lib/office-clock'
 import { amendVoucherDate } from '../actions'
 import { amendRepaymentDate } from '../../fund-out/actions'
+import { DialogButton, DialogForm, Field, FinDialog, Hint, Input } from '@/components/finv/Dialog'
+import { DateField } from '@/components/finv/DateField'
+import { useFinSurface } from '@/components/finv/surface'
 
 // What the dialog says — in English on the Finance view (2026-10-10, the
 // handoff: its row menu already says "Change date").
@@ -95,6 +98,8 @@ export default function AmendDateButton({
   const [isPending, startTransition] = useTransition()
   const today = officeDate()
   const w = useFinView() ? WORDS.en : WORDS.zh
+  // In the Finance phone app the window is the kit's, rising as a sheet (2026-10-15).
+  const sheet = useFinSurface() !== null
 
   function submit() {
     setError(null)
@@ -135,7 +140,37 @@ export default function AmendDateButton({
         </button>
       )}
 
-      {open ? (
+      {sheet ? (
+        <FinDialog open={open} onClose={() => !isPending && setOpen(false)} title={`${w.trigger} — ${label}`} locked={isPending}>
+          <DialogForm
+            onSubmit={submit}
+            buttons={
+              <>
+                <DialogButton onClick={() => setOpen(false)} disabled={isPending}>
+                  {done ? 'Close' : 'Cancel'}
+                </DialogButton>
+                {done ? null : (
+                  <DialogButton type="submit" kind="primary" disabled={isPending}>
+                    {isPending ? w.saving : w.confirm}
+                  </DialogButton>
+                )}
+              </>
+            }
+          >
+            <Field label={w.now} htmlFor="amend-date-now">
+              <Input id="amend-date-now" mono value={plainDate(currentDate)} readOnly disabled />
+            </Field>
+            <Field label={w.correct}>
+              <DateField value={date} onChange={setDate} today={today} label={w.correct} />
+            </Field>
+            <Field label={w.reason} htmlFor="amend-date-reason">
+              <Input id="amend-date-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={w.reasonHint} />
+            </Field>
+            <Hint>{w.scope}</Hint>
+            {error ? <Hint danger>{error}</Hint> : done ? <Hint>{done}</Hint> : null}
+          </DialogForm>
+        </FinDialog>
+      ) : open ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 p-4"
           {...backdropDismiss(() => !isPending && setOpen(false))}

@@ -68,6 +68,15 @@ describe('canonical sign-in routing', () => {
     }
   })
 
+  it('returns to the Finance app it was sent from (2026-10-15), and to none of its insides', async () => {
+    mocks.profile.mockResolvedValue({ data: { is_active: true, role: 'finance' } })
+    await expect(submit({ next: '/fin-app' })).rejects.toThrow('REDIRECT:/fin-app')
+    for (const next of ['/fin-app/../payments', '/fin-app/daily/payments', '/fin-appx']) {
+      mocks.redirect.mockClear()
+      await expect(submit({ next })).rejects.toThrow('REDIRECT:/dashboard')
+    }
+  })
+
   it.each([null, { is_active: false, role: 'revenue_member' }])('signs out a missing or inactive profile', async data => {
     mocks.profile.mockResolvedValue({ data })
     await expect(submit()).resolves.toEqual({ error: 'Your account is not active. Please contact HR.' })

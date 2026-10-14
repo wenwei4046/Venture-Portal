@@ -1304,11 +1304,12 @@ html[data-nav-pending] .route-surface {
 
 /* ───────── Motion: input focus glow ─────────
    Not on the phone surfaces drawn to their prototypes — the Revenue app, the HR
-   app, the guest page — nor in the soft dropdown's menu (portaled to <body>),
-   which keep their prototypes' own focus (2026-10-11). */
-input:not([type="checkbox"]):not([type="radio"]):focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-guest-page] *, [data-soft-menu] *)),
-textarea:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-guest-page] *, [data-soft-menu] *)),
-select:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-guest-page] *, [data-soft-menu] *)) {
+   app, the Finance app and its sheets (2026-10-15), the guest page — nor in the
+   soft dropdown's menu (portaled to <body>), which keep their prototypes' own
+   focus (2026-10-11). */
+input:not([type="checkbox"]):not([type="radio"]):focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)),
+textarea:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)),
+select:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)) {
   border-color: rgb(var(--accent));
   box-shadow: 0 0 0 3px rgb(var(--accent) / 0.12);
   outline: none;
@@ -2146,10 +2147,10 @@ table.ledger-table tr.lt-detail {
   textarea {
     font-size: 16px !important;
   }
-  /* The Revenue app, the HR phone app, the guest page and the soft dropdown's menu keep their prototypes' own control heights. */
-  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(:where([data-revenue-app] *, [data-hr-app] *, [data-guest-page] *, [data-soft-menu] *)),
-  select:not(:where([data-revenue-app] *, [data-hr-app] *, [data-guest-page] *, [data-soft-menu] *)),
-  textarea:not(:where([data-revenue-app] *, [data-hr-app] *, [data-guest-page] *, [data-soft-menu] *)) {
+  /* The Revenue app, the HR phone app, the Finance phone app and its sheets (2026-10-15), the guest page and the soft dropdown's menu keep their prototypes' own control heights. */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)),
+  select:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)),
+  textarea:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)) {
     min-height: 44px;
   }
   /* Checkboxes stay small but get a bigger hit area via padding on the label
@@ -2159,7 +2160,7 @@ table.ledger-table tr.lt-detail {
     width: 18px;
     height: 18px;
   }
-  textarea:not(:where([data-revenue-app] *, [data-hr-app] *, [data-guest-page] *, [data-soft-menu] *)) {
+  textarea:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)) {
     min-height: 88px;
   }
   /* Money inputs inside a folded table panel are laid out by width utility

@@ -38,7 +38,16 @@ const rm = (n: number) => `RM ${f2(n)}`
 
 export function useVoucherSteps(
   v: VoucherDetail | null,
-  { onDone, onFilesChanged }: { onDone: () => void; onFilesChanged: () => void },
+  {
+    onDone,
+    onFilesChanged,
+    extraMore = [],
+  }: {
+    onDone: () => void
+    onFilesChanged: () => void
+    /** More rows for the ⋯ menu — the phone app's record screen carries the full page's Copy, Change date, Change GL account there. */
+    extraMore?: DialogMenuItem[]
+  },
 ): {
   steps: VoucherStep[]
   busy: boolean
@@ -128,6 +137,8 @@ export function useVoucherSteps(
     } else if (st === 'paid' && v.can.void && (v.credit || v.reversible)) {
       steps.push({ key: 'reverse', label: v.credit ? 'Void receipt' : 'Reverse payment', kind: 'danger', onClick: () => setConfirm('reverse') })
     }
+    // Before the danger rows, as a menu reads (Copy · Change date … then Void).
+    more.unshift(...extraMore)
     if (more.length > 0) steps.push({ key: 'more', label: '⋯', kind: 'more', onClick: () => setConfirm('more') })
   }
 

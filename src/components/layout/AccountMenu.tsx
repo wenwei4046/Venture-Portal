@@ -118,7 +118,18 @@ export function SignOutDialog({ open, onClose }: { open: boolean; onClose: () =>
 }
 
 /** Edit profile: the name and the phone; the email is the sign-in and shows only (the user, 2026-10-14). */
-export function EditProfileDialog({ open, onClose, user }: { open: boolean; onClose: () => void; user: User }) {
+export function EditProfileDialog({
+  open,
+  onClose,
+  user,
+  onSaved,
+}: {
+  open: boolean
+  onClose: () => void
+  user: Pick<User, 'name' | 'email'>
+  /** After a save (the phone app's Profile reads the name and phone again). */
+  onSaved?: () => void
+}) {
   const [name, setName] = useState(user.name ?? '')
   const [email, setEmail] = useState(user.email ?? '')
   const [phone, setPhone] = useState('')
@@ -159,6 +170,7 @@ export function EditProfileDialog({ open, onClose, user }: { open: boolean; onCl
         return
       }
       onClose()
+      onSaved?.()
       flash('Profile saved')
     })
   }

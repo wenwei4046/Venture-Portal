@@ -120,7 +120,7 @@ export default function LoanRepaymentDialog({ open, onClose, today }: { open: bo
   }
 
   return (
-    <FinDialog open={open} onClose={close} title="Loan repayment received" sub="Recorded on the loan · Fund OUT" locked={busy}>
+    <FinDialog open={open} onClose={close} title="Loan repayment received" sub="Recorded on the loan · Fund OUT" locked={busy} tall>
       <DialogForm
         buttons={
           <>

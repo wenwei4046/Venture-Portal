@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useEscape } from '@/components/hrv/overlay'
 import { usePresence } from './presence'
+import { useFinSurface } from './surface'
 import s from './finv.module.css'
 
 // The Finance view's dialog (2026-10-14, the Finance revamp v2 — the
@@ -12,8 +13,18 @@ import s from './finv.module.css'
 // before it unmounts. Esc and the scrim close it, except while `locked` (a
 // write in flight). Its bodies: a menu (DialogMenu), a confirm
 // (DialogConfirm), or a form (DialogForm + Field / Input + DialogButton).
+//
+// Inside the Finance phone app (2026-10-15, `FinSurface`) the same window is
+// the design's bottom sheet (README § Motion, M05–M08, M18): from the foot,
+// translateY(105%) → 0 over .32s on a .28 walnut scrim, the grab bar over a
+// 20px title, iOS's round × (Android has none — the scrim and Back close it),
+// a form's sheet 92% of the screen (`tall`), a menu's rows 52px with iOS's
+// Cancel under them — one window, every feature, in each place.
 
 const EXIT_MS = 320
+
+/** What a body inside a window may ask of it: to close, and how it is drawn. */
+const DialogCtx = createContext<{ close: () => void; sheet: boolean; ios: boolean } | null>(null)
 
 export function FinDialog({
   open,
@@ -22,6 +33,7 @@ export function FinDialog({
   sub,
   label,
   locked = false,
+  tall = false,
   children,
 }: {
   open: boolean
@@ -32,9 +44,14 @@ export function FinDialog({
   /** The dialog's name for a screen reader, when the title is not words. */
   label?: string
   locked?: boolean
+  /** A form's sheet on the phone stands 92% of the screen (the prototype's `h: '92%'`); the desktop ignores it. */
+  tall?: boolean
   children: ReactNode
 }) {
   const id = useId()
+  const surface = useFinSurface()
+  const sheet = surface !== null
+  const ios = surface?.platform === 'ios'
   const { mounted, shown } = usePresence(open, EXIT_MS)
   // Drawn only once the page is the browser's: a dialog open from the first render (`/payments?new=1`)
   // has no <body> to portal to on the server, and drawing it during hydration would not match.
@@ -53,7 +70,14 @@ export function FinDialog({
   }, [open, client])
   if (!mounted || !client || typeof document === 'undefined') return null
   return createPortal(
-    <div className={s.dialogRoot} data-shown={shown ? 'true' : 'false'} data-fin-dialog="" data-fin-kit="">
+    <div
+      className={s.dialogRoot}
+      data-shown={shown ? 'true' : 'false'}
+      data-fin-dialog=""
+      data-fin-kit=""
+      data-sheet={sheet ? '' : undefined}
+      data-platform={surface?.platform}
+    >
       <div className={s.dialogScrim} onClick={close} aria-hidden="true" />
       <div
         ref={panel}
@@ -63,17 +87,35 @@ export function FinDialog({
         aria-label={label}
         aria-labelledby={label ? undefined : `${id}-title`}
         className={s.dialog}
+        data-tall={sheet && tall ? '' : undefined}
       >
-        <div className={s.dialogHead}>
-          <div className={s.dialogHeadText}>
-            <div id={`${id}-title`} className={s.dialogTitle}>{title}</div>
-            {sub ? <div className={s.dialogSub}>{sub}</div> : null}
+        {sheet ? (
+          <div className={s.sheetHead}>
+            <span className={s.grab} aria-hidden="true" />
+            <div className={s.sheetHeadRow}>
+              <div className={s.dialogHeadText}>
+                <div id={`${id}-title`} className={s.dialogTitle}>{title}</div>
+                {sub ? <div className={s.dialogSub}>{sub}</div> : null}
+              </div>
+              {ios ? (
+                <button type="button" className={s.sheetClose} onClick={close} disabled={locked} aria-label="Close">
+                  ×
+                </button>
+              ) : null}
+            </div>
           </div>
-          <button type="button" className={s.dialogClose} onClick={close} disabled={locked} aria-label="Close">
-            ×
-          </button>
-        </div>
-        {children}
+        ) : (
+          <div className={s.dialogHead}>
+            <div className={s.dialogHeadText}>
+              <div id={`${id}-title`} className={s.dialogTitle}>{title}</div>
+              {sub ? <div className={s.dialogSub}>{sub}</div> : null}
+            </div>
+            <button type="button" className={s.dialogClose} onClick={close} disabled={locked} aria-label="Close">
+              ×
+            </button>
+          </div>
+        )}
+        <DialogCtx.Provider value={{ close, sheet, ios }}>{children}</DialogCtx.Provider>
       </div>
     </div>,
     document.body,
@@ -89,8 +131,9 @@ export interface DialogMenuItem {
   onClick: () => void
 }
 
-/** A menu's rows on a white card (Dept · 2, Create invoice ▾, a row's ⋯). */
+/** A menu's rows on a white card (Dept · 2, Create invoice ▾, a row's ⋯) — on an iPhone's sheet, Cancel under it. */
 export function DialogMenu({ items }: { items: DialogMenuItem[] }) {
+  const ctx = useContext(DialogCtx)
   return (
     <div className={s.menuBody}>
       <div className={s.menuCard} role="menu">
@@ -101,6 +144,11 @@ export function DialogMenu({ items }: { items: DialogMenuItem[] }) {
           </button>
         ))}
       </div>
+      {ctx?.sheet && ctx.ios ? (
+        <button type="button" className={s.menuCancel} onClick={ctx.close}>
+          Cancel
+        </button>
+      ) : null}
     </div>
   )
 }
