@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { CHAT_EMOJIS } from "./emoji";
 import { clampCrop, drawBase, FULL, noEdits, renderEdited, turnedSize, type Label, type PhotoEdits, type Rect, type Stroke } from "./edit-render";
 import { prepareImage } from "./image-prep";
-import { pickedOf, type PickedItem, type PickVM } from "./pick";
+import { captionOf, pickedOf, type PickedItem, type PickVM } from "./pick";
 import { STANDARD_VIDEO_MAX } from "./video-fit";
 import { saveToDevice } from "./viewer";
 
@@ -16,7 +16,8 @@ import { saveToDevice } from "./viewer";
  * between, the caption, Send. What is done here is kept on the item (shared/pick.ts) and drawn into what is sent
  * (shared/edit-render.ts, shared/video-fit.ts).
  */
-type Mode = "" | "crop" | "draw" | "text" | "sticker";
+// "arrange": a video's text and stickers moved on its still frame (a playing video takes no finger).
+type Mode = "" | "crop" | "draw" | "text" | "sticker" | "arrange";
 const COLORS = ["#FFFFFF", "#111111", "#E53935", "#FB8C00", "#FDD835", "#43A047", "#1E88E5", "#8E24AA"];
 const ICON = { stroke: "currentColor", fill: "none", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 const P = {
@@ -43,6 +44,31 @@ function uprightOf(file: File): Promise<ImageBitmap | null> {
   if (!p) {
     p = prepareImage(file, false).then(f => createImageBitmap(f)).catch(() => null);
     uprights.set(file, p);
+  }
+  return p;
+}
+
+/** A video's frame where its kept part starts, to draw on and arrange text over (the owner: "選好的影片也有能編輯"). */
+const frames = new Map<string, Promise<ImageBitmap | null>>();
+function frameOf(it: PickedItem): Promise<ImageBitmap | null> {
+  const at = Math.max(0, it.cut?.start ?? 0) + 0.05, key = it.url + "@" + at.toFixed(2);
+  let p = frames.get(key);
+  if (!p) {
+    p = new Promise<ImageBitmap | null>(resolve => {
+      const v = document.createElement("video");
+      v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = it.url;
+      const fail = () => resolve(null);
+      v.onerror = fail;
+      v.onloadeddata = () => { v.currentTime = Math.min(at, Math.max(0, (v.duration || at) - 0.05)); };
+      v.onseeked = () => {
+        const c = document.createElement("canvas");
+        c.width = v.videoWidth || 2; c.height = v.videoHeight || 2;
+        c.getContext("2d")?.drawImage(v, 0, 0, c.width, c.height);
+        createImageBitmap(c).then(resolve, fail);
+      };
+      setTimeout(fail, 8000);
+    });
+    frames.set(key, p);
   }
   return p;
 }
@@ -85,21 +111,21 @@ export function PickEditor({ pk }: { pk: PickVM }) {
         {mode === "" && (<>
           <Btn path={P.save} label={saving ? "Saving…" : "Save"} onClick={() => void save()} />
           <Btn label="HD" text="HD" on={p.hd} onClick={pk.toggleHd} />
-          {!it.video && (<>
+          {(<>
             <Btn path={P.crop} label="Crop and turn" onClick={() => setMode("crop")} />
             <Btn path={P.sticker} label="Sticker" onClick={() => setMode("sticker")} />
             <Btn label="Text" text="Aa" onClick={() => { setMode("text"); setTextEd({ id: null, text: "", color }); }} />
             <Btn path={P.draw} label="Draw" onClick={() => setMode("draw")} />
           </>)}
         </>)}
-        {mode === "draw" && (<>
-          <Btn path={P.undo} label="Undo" onClick={() => setEdits({ ...edits, strokes: edits.strokes.slice(0, -1) })} />
+        {(mode === "draw" || mode === "arrange") && (<>
+          {mode === "draw" && <Btn path={P.undo} label="Undo" onClick={() => setEdits({ ...edits, strokes: edits.strokes.slice(0, -1) })} />}
           <button type="button" onClick={() => setMode("")} style={{ height: "40px", padding: "0 16px", borderRadius: "20px", border: 0, background: "#fff", color: "#111", fontWeight: 700, fontSize: "15px" }}>Done</button>
         </>)}
       </div>
-      {it.video
-        ? <VideoStage key={it.url} it={it} hd={p.hd} update={update} />
-        : <PhotoStage key={it.url} it={it} edits={edits} setEdits={setEdits} mode={mode} setMode={setMode} color={color} setColor={setColor}
+      {it.video && mode === ""
+        ? <VideoStage key={it.url} it={it} hd={p.hd} update={update} edits={edits} />
+        : <PhotoStage key={it.url + (it.video ? ":still" : "")} it={it} base={it.video ? () => frameOf(it) : undefined} edits={edits} setEdits={setEdits} mode={mode} setMode={setMode} color={color} setColor={setColor}
             onEditText={l => { setMode("text"); setTextEd({ id: l.id, text: l.text, color: l.color }); }} />}
       {mode === "text" && textEd && (
         <TextSheet value={textEd} onChange={setTextEd} onDone={() => {
@@ -107,14 +133,14 @@ export function PickEditor({ pk }: { pk: PickVM }) {
           const labels = edits.labels.filter(l => l.id !== textEd.id);
           const old = edits.labels.find(l => l.id === textEd.id);
           if (t) labels.push({ id: textEd.id ?? uid(), kind: "text", text: t, color: textEd.color, x: old?.x ?? 0.5, y: old?.y ?? 0.45, size: old?.size ?? 0.075 });
-          setEdits({ ...edits, labels }); setColor(textEd.color); setTextEd(null); setMode("");
+          setEdits({ ...edits, labels }); setColor(textEd.color); setTextEd(null); setMode(it.video && t ? "arrange" : "");
         }} />
       )}
       {mode === "sticker" && (
         <div onClick={() => setMode("")} style={{ position: "absolute", inset: 0, zIndex: 4, background: "rgba(0,0,0,.35)", display: "flex", alignItems: "flex-end" }}>
           <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxHeight: "50%", overflowY: "auto", background: "#1f1f1f", borderRadius: "18px 18px 0 0", padding: "14px 10px calc(var(--safe-bottom, 0px) + 14px)", display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: "4px", touchAction: "pan-y" }}>
             {CHAT_EMOJIS.map(e => (
-              <button key={e} type="button" onClick={() => { setEdits({ ...edits, labels: [...edits.labels, { id: uid(), kind: "sticker", text: e, color: "#000", x: 0.5, y: 0.45, size: 0.16 }] }); setMode(""); }}
+              <button key={e} type="button" onClick={() => { setEdits({ ...edits, labels: [...edits.labels, { id: uid(), kind: "sticker", text: e, color: "#000", x: 0.5, y: 0.45, size: 0.16 }] }); setMode(it.video ? "arrange" : ""); }}
                 style={{ height: "44px", border: 0, background: "transparent", fontSize: "28px", cursor: "pointer", padding: 0 }}>{e}</button>
             ))}
           </div>
@@ -136,7 +162,7 @@ export function PickEditor({ pk }: { pk: PickVM }) {
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <input value={p.caption ?? ""} onChange={e => set({ ...p, caption: e.target.value })} placeholder="Add a caption…" style={{ flex: "1", minWidth: 0, height: "46px", padding: "0 16px", borderRadius: "23px", border: "1px solid rgba(255,255,255,.25)", background: "rgba(30,30,30,.85)", color: "#fff", fontSize: "16px", outline: "none", userSelect: "text", WebkitUserSelect: "text" }} />
+            <input value={captionOf(p, at)} onChange={e => update({ caption: e.target.value })} placeholder={p.items.length > 1 ? `Add a caption to ${it.video ? "this video" : "this photo"}…` : "Add a caption…"} style={{ flex: "1", minWidth: 0, height: "46px", padding: "0 16px", borderRadius: "23px", border: "1px solid rgba(255,255,255,.25)", background: "rgba(30,30,30,.85)", color: "#fff", fontSize: "16px", outline: "none", userSelect: "text", WebkitUserSelect: "text" }} />
             <button type="button" onClick={pk.send} aria-label={pk.sendLabel} style={{ flex: "none", width: "50px", height: "50px", borderRadius: "25px", border: 0, background: "#BD4A19", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer", position: "relative" }}>
               <svg width="22" height="22" viewBox="0 0 24 24" {...ICON}><path d={P.send} /></svg>
               {p.items.length > 1 && <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "20px", height: "20px", borderRadius: "10px", background: "#fff", color: "#BD4A19", fontSize: "12px", fontWeight: 800, display: "grid", placeItems: "center" }}>{p.items.length}</span>}
@@ -151,8 +177,8 @@ export function PickEditor({ pk }: { pk: PickVM }) {
 }
 
 /* ── A photo: the canvas, what is drawn on it, and the crop frame ─────────────────────────────────────────────────── */
-function PhotoStage({ it, edits, setEdits, mode, setMode, color, setColor, onEditText }: {
-  it: PickedItem; edits: PhotoEdits; setEdits: (e: PhotoEdits) => void; mode: Mode; setMode: (m: Mode) => void;
+function PhotoStage({ it, base, edits, setEdits, mode, setMode, color, setColor, onEditText }: {
+  it: PickedItem; base?: () => Promise<ImageBitmap | null>; edits: PhotoEdits; setEdits: (e: PhotoEdits) => void; mode: Mode; setMode: (m: Mode) => void;
   color: string; setColor: (c: string) => void; onEditText: (l: Label) => void;
 }) {
   const box = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
@@ -163,7 +189,7 @@ function PhotoStage({ it, edits, setEdits, mode, setMode, color, setColor, onEdi
   const [moving, setMoving] = useState<{ id: string; x: number; y: number; trash: boolean } | null>(null);
   const drag = useRef<{ kind: "label" | "crop"; id?: string; handle?: string; x0: number; y0: number; r0: Rect | { x: number; y: number }; moved: boolean } | null>(null);
 
-  useEffect(() => { let on = true; void uprightOf(it.file).then(b => { if (on) setBmp(b); }); return () => { on = false; }; }, [it.file]);
+  useEffect(() => { let on = true; void (base ? base() : uprightOf(it.file)).then(b => { if (on) setBmp(b); }); return () => { on = false; }; }, [it.file]); // eslint-disable-line react-hooks/exhaustive-deps -- one picture per item
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -336,7 +362,9 @@ function TextSheet({ value, onChange, onDone }: { value: { id: string | null; te
 }
 
 /* ── A video: the player, the part kept, its sound ───────────────────────────────────────────────────────────────── */
-function VideoStage({ it, hd, update }: { it: PickedItem; hd: boolean; update: (p: Partial<PickedItem>) => void }) {
+function VideoStage({ it, hd, update, edits }: { it: PickedItem; hd: boolean; update: (p: Partial<PickedItem>) => void; edits: PhotoEdits }) {
+  const [vbox, setVbox] = useState({ w: 0, h: 0 });
+  const turned = edits.turn !== 0 || edits.crop.x !== 0 || edits.crop.y !== 0 || edits.crop.w !== 1 || edits.crop.h !== 1;
   const video = useRef<HTMLVideoElement>(null), bar = useRef<HTMLDivElement>(null);
   const dur = it.seconds ?? 0;
   const cut = it.cut ?? { start: 0, end: dur, mute: false };
@@ -378,10 +406,26 @@ function VideoStage({ it, hd, update }: { it: PickedItem; hd: boolean; update: (
           <span style={{ padding: "6px 10px", borderRadius: "8px", background: "rgba(40,40,40,.72)", fontSize: "13px", fontWeight: 600 }}>{clock(kept)} · {hd ? "" : "up to "}{mb(est)}</span>
         </div>
       </div>
-      <div style={{ flex: "1", minHeight: 0, display: "grid", placeItems: "center", paddingTop: "150px" }}>
+      <div style={{ flex: "1", minHeight: 0, display: "grid", placeItems: "center", paddingTop: "150px", position: "relative" }}>
+        <span style={{ position: "relative", display: "inline-block", lineHeight: 0, maxWidth: "100%", maxHeight: "100%" }}>
         <video ref={video} src={it.url} playsInline controls onTimeUpdate={onTime}
+          onResize={e => setVbox({ w: e.currentTarget.clientWidth, h: e.currentTarget.clientHeight })}
+          onLoadedData={e => setVbox({ w: e.currentTarget.clientWidth, h: e.currentTarget.clientHeight })}
           onLoadedMetadata={e => { const d = e.currentTarget.duration; if (Number.isFinite(d) && d > 0 && !it.seconds) update({ seconds: d, cut: it.cut ?? { start: 0, end: d, mute: false } }); }}
-          style={{ maxWidth: "100%", maxHeight: "100%", background: "#000" }} />
+          style={{ maxWidth: "100%", maxHeight: "calc(100vh - 330px)", background: "#000" }} />
+        {/* What was drawn, typed or stuck on shows over the video as it plays; a turn or crop shows once sent. */}
+        {!turned && vbox.w > 0 && (edits.strokes.length > 0 || edits.labels.length > 0) && (
+          <span style={{ position: "absolute", left: 0, top: 0, width: vbox.w + "px", height: vbox.h + "px", pointerEvents: "none" }}>
+            <svg width={vbox.w} height={vbox.h} style={{ position: "absolute", inset: 0 }}>
+              {edits.strokes.map((s, i) => <polyline key={i} points={s.pts.map(([x, y]) => `${x * vbox.w},${y * vbox.h}`).join(" ")} fill="none" stroke={s.color} strokeWidth={s.width * Math.min(vbox.w, vbox.h)} strokeLinecap="round" strokeLinejoin="round" />)}
+            </svg>
+            {edits.labels.map(l => (
+              <span key={l.id} style={{ position: "absolute", left: `${l.x * 100}%`, top: `${l.y * 100}%`, transform: "translate(-50%, -50%)", fontSize: `${l.size * Math.min(vbox.w, vbox.h)}px`, lineHeight: 1.2, fontWeight: l.kind === "text" ? 700 : 400, color: l.color, whiteSpace: "pre", textAlign: "center" }}>{l.text}</span>
+            ))}
+          </span>
+        )}
+        </span>
+        {turned && <span style={{ position: "absolute", left: "50%", bottom: "8px", transform: "translateX(-50%)", padding: "5px 10px", borderRadius: "10px", background: "rgba(40,40,40,.8)", fontSize: "12px", fontWeight: 600 }}>Turned or cropped · shown once sent</span>}
       </div>
     </>
   );

@@ -7,6 +7,8 @@
  * fit at a watchable quality is refused with the reason, never sent broken.
  */
 
+import { drawOver, isEdited, turnedSize, type PhotoEdits } from "./edit-render";
+
 const MB = 1024 * 1024;
 /** The most a video may weigh before it is shrunk (what the phone can still read in), and the least bitrate worth sending. */
 export const VIDEO_PICK_MAX = 400 * MB;
@@ -21,6 +23,10 @@ export const STANDARD_VIDEO_MAX = 8 * MB;
 export type VideoCut = { start: number; end: number; mute: boolean };
 const cuts = new WeakMap<File, VideoCut>();
 export const markCut = (f: File, c: VideoCut) => { cuts.set(f, c); return f; };
+/** A video turned, cropped, drawn on, with text or stickers on the editor (the owner: "選好的影片也有能編輯"): drawn into
+ * every frame as it is encoded (shared/edit-render.ts, the photo's own drawing). */
+const looks = new WeakMap<File, PhotoEdits>();
+export const markVideoEdits = (f: File, e: PhotoEdits) => { looks.set(f, e); return f; };
 
 /** The video bitrate and the long side that make `seconds` of video fit in `maxBytes` (a tenth kept for the container). */
 export function videoPlan(maxBytes: number, seconds: number, hd = true): { bps: number; side: number } | null {
@@ -54,14 +60,14 @@ export async function fitVideo(file: File, channelMax: number, channelName: stri
     const track = await input.getPrimaryVideoTrack();
     if (!track) return { ok: false, error: "This video has no picture to send." };
     const isMp4 = (await input.getFormat()).name === "MP4";
-    const cut = cuts.get(file);
+    const cut = cuts.get(file), look = isEdited(looks.get(file)) ? looks.get(file)! : null;
     const full = await input.computeDuration();
     const start = cut ? Math.max(0, Math.min(cut.start, full)) : 0, end = cut ? Math.max(start + 0.2, Math.min(cut.end, full)) : full;
     const seconds = end - start;
     const trim = cut ? { trim: { start, end } } : {}, audio = cut?.mute ? { audio: { discard: true as const } } : {};
     const estimate = full > 0 ? (file.size * seconds) / full : file.size;
     // H.264 that fits: as it is when it is already a plain MP4, else copied into one (trimmed / muted on the way).
-    if (track.codec === "avc" && estimate <= maxBytes * 0.97) {
+    if (!look && track.codec === "avc" && estimate <= maxBytes * 0.97) {
       if (!cut && isMp4) return { ok: true, file };
       const copy = await convert(mb, input, file, { ...trim, ...audio }, onProgress);
       if (copy.file && copy.file.size <= maxBytes) return { ok: true, file: copy.file };
@@ -71,12 +77,16 @@ export async function fitVideo(file: File, channelMax: number, channelName: stri
     }
     const plan = videoPlan(maxBytes, seconds, hd) ?? (hd ? null : videoPlan(channelMax, seconds, true));
     if (!plan) return { ok: false, error: `${tooBig} — this one is too long to fit. Trim it and send it again.` };
-    const w = track.displayWidth, h = track.displayHeight;
+    // Turned and cropped first (the editor's order); the size that fits is the cropped picture's.
+    const t = turnedSize(track.displayWidth, track.displayHeight, look?.turn ?? 0);
+    const ev = (n: number) => Math.max(0, Math.round(n / 2) * 2);
+    const crop = look ? { left: ev(look.crop.x * t.w), top: ev(look.crop.y * t.h), width: Math.max(2, ev(look.crop.w * t.w)), height: Math.max(2, ev(look.crop.h * t.h)) } : null;
+    const w = crop?.width ?? t.w, h = crop?.height ?? t.h;
     const k = Math.min(1, plan.side / Math.max(w, h, 1));
     const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
     const out = await convert(mb, input, file, {
       ...trim, ...audio,
-      video: { width: even(w * k), height: even(h * k), fit: "contain", codec: "avc", quality: new mb.Quality(plan.bps), forceTranscode: true },
+      video: { width: even(w * k), height: even(h * k), fit: "contain", codec: "avc", quality: new mb.Quality(plan.bps), forceTranscode: true, ...(look ? drawn(look, crop!, even(w * k), even(h * k)) : {}) },
     }, onProgress);
     if (!out.file) return { ok: false, error: track.codec === "avc" ? `${tooBig}, and this phone cannot make this one smaller. Trim it and send it again.` : HEVC };
     return out.file.size <= channelMax ? { ok: true, file: out.file } : { ok: false, error: `${tooBig} — this one is too long to fit. Trim it and send it again.` };
@@ -117,6 +127,23 @@ export async function fitVoice(file: File, channel: "whatsapp" | "messenger"): P
     }
   } catch { /* sent as recorded */ }
   return file;
+}
+
+/** The editor's turn and crop for mediabunny, and each frame drawn with the drawing, text and stickers on top. */
+function drawn(look: PhotoEdits, crop: { left: number; top: number; width: number; height: number }, W: number, H: number) {
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const g = canvas.getContext("2d")!;
+  return {
+    rotate: (look.turn * 90) as 0 | 90 | 180 | 270, crop,
+    processedWidth: W, processedHeight: H,
+    process: (sample: { draw: (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) => void }) => {
+      g.clearRect(0, 0, W, H);
+      sample.draw(g, 0, 0, W, H);
+      drawOver(g, look, W, H);
+      return canvas;
+    },
+  };
 }
 
 type Mb = typeof import("mediabunny");

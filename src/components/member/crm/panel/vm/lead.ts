@@ -175,9 +175,9 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
       const files = [...(e.target.files ?? [])]; e.target.value = "";
       if (files.length) set(u => ({ ...u, pPick: { ...pickedOf(files), caption: draft } }));
     },
-    pk: c ? pickVM(ui.pPick, p => set(u => ({ ...u, pPick: p })), async (files, caption) => {
+    pk: c ? pickVM(ui.pPick, p => set(u => ({ ...u, pPick: p })), async (files, captions) => {
       if (draft) set(u => ({ ...u, pDraft: "" }));
-      await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
+      await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, captions[i] ?? "")));
     }) : null,
     // Several files at once, each its own message; the typed words go with the first.
     pickMedia: async (e: ChangeEvent<HTMLInputElement>) => {
