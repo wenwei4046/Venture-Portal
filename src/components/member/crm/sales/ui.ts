@@ -51,6 +51,8 @@ export interface SalesUi {
   adSel: string[];
   adSheet: { sel: string[] } | null;
   swipe: string | null;
+  /** The row swiped RIGHT (Read · Pin, 2026-10-14). */
+  swipeR?: string | null;
   moreLead: string | null;
   moreView: "main" | "labels" | "labelEdit";
   /** key: the label being edited (its id, or "name:…" for a design default not yet saved); null = a new one. */
@@ -123,6 +125,8 @@ export const initialSalesUi = (): SalesUi => ({
 /** Pointer bookkeeping for swipes and drags (the prototype's this._ls, this._sw …) — not state, never rendered. */
 export interface SalesRefs {
   ls?: { x: number; y: number } | null;
+  /** An inbox row being dragged sideways: the row, where it started, whether it is a drag yet, where it is. */
+  rowSw?: { el: HTMLElement; base: number; drag: boolean; x: number; tr: string } | null;
   lsT?: number;
   /** A row's long press (opens More). */
   lp?: ReturnType<typeof setTimeout>;

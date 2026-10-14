@@ -21,6 +21,8 @@ import { dayLabel, timeLabel, windowShut } from "./vm/common";
 
 export interface SalesActions {
   openChat(customerId: string): void;
+  /** A TL / STL gives their team's customer to someone in that team (crm_assign_member, 2026-10-14). */
+  assignMember(customerId: string, staffId: string): Promise<boolean>;
   send(customerId: string, text: string, replyTo?: string | null): Promise<boolean>;
   react(messageId: string, emoji: string): Promise<void>;
   hideMessage(messageId: string): Promise<void>;
@@ -123,6 +125,11 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
 
   return {
     toast,
+    async assignMember(customerId, staffId) {
+      if (!(await write("crm_assign_member", { p_contact: customerId, p_member: staffId })).ok) return false;
+      patchCustomer(customerId, c => ({ ...c, assignedTo: staffId }));
+      return true;
+    },
     openChat(customerId) {
       const c = data().customers.find(x => x.id === customerId);
       if (!c || c.assignedTo !== me || c.unread === 0) return;
