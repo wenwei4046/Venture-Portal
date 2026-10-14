@@ -4154,6 +4154,46 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   /* The Finance revamp v2 (2026-10-14): a tile's edge and the quietest glyph (a row's chevron). */
   --hvs-tile-border: 232 225 216;
   --hvs-quiet: 170 160 150;
+  /* …its hubs (D02–D06): the status cards' fills, the table's navy head band,
+     the tick boxes, the full page's strips, the dark hero and its words, the
+     list chips' tones and the hero chip's lights. */
+  --fv-card-draft: 117 104 92;
+  --fv-card-pending: 28 24 21;
+  --fv-card-payroll: 134 102 76;
+  --fv-card-quiet: 236 231 223;
+  --fv-band: 226 231 239;
+  --fv-band-line: 205 213 225;
+  --fv-band-ink: 29 43 74;
+  --fv-band-glyph: 120 132 152;
+  --fv-band-rule: 190 200 214;
+  --fv-box: 207 197 183;
+  --fv-box-fixed: 214 206 196;
+  --fv-strip: 250 249 247;
+  --fv-strip-head: 235 231 224;
+  --fv-notice: 245 243 240;
+  --fv-dark: 43 31 23;
+  --fv-dark-label: 201 186 170;
+  --fv-dark-note: 214 202 188;
+  --fv-dark-to: 236 226 214;
+  --fv-dot-ink: 180 101 31;
+  --fv-chip-def: 247 247 245;
+  --fv-chip-wait: 230 238 247;
+  --fv-chip-wait-ink: 46 92 138;
+  --fv-chip-ledger: 222 240 232;
+  --fv-chip-ledger-ink: 21 110 78;
+  --fv-chip-info: 238 235 231;
+  --fv-chip-info-ink: 108 104 98;
+  --fv-chip-danger: 250 228 224;
+  --fv-chip-danger-ink: 176 40 34;
+  --fv-chip-alert: 249 238 214;
+  --fv-chip-alert-ink: 150 100 12;
+  --fv-chip-accent: 255 244 231;
+  --fv-light-ledger: 134 214 170;
+  --fv-light-danger: 240 150 140;
+  --fv-light-wait: 150 190 230;
+  --fv-light-alert: 232 196 120;
+  --fv-light-accent: 240 180 120;
+  --fv-light-info: 200 192 182;
   --hvs-top: 255 255 255;
   --hvs-top-border: 229 228 223;
   --hvs-top-ink: 43 31 23;
