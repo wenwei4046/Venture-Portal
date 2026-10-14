@@ -861,6 +861,32 @@ export async function cancelPendingLoan(id: string): Promise<{ error: string } |
   return undefined
 }
 
+// ─── Request an active loan's cancellation, from its full page ──────────────
+// (2026-10-15, the Finance revamp v2 — D06's panel): the same RPC as the old
+// page's *Request cancellation (needs Principal)* — it files the approval and
+// refuses once a repayment is recorded — answered in words, never thrown
+// (production would read a thrown message as a digest).
+
+export async function requestLoanCancel(id: string, reason: string): Promise<{ error: string } | undefined> {
+  await requireActionOn('/fund-out', 'treasury', 'void')
+  const supabase = await createClient()
+  const why = (reason ?? '').trim()
+  if (!id) return { error: 'Which loan? Open it again.' }
+  if (!why) return { error: 'Say why it is cancelled — the Principal reads it.' }
+
+  const { data: loan } = await supabase.from('loans').select('status').eq('id', id).maybeSingle()
+  if (!loan) return { error: 'This loan is not there any more.' }
+  if ((loan as { status: string }).status !== 'active') return { error: 'Only an active loan’s cancellation is requested — a pending one is cancelled at once.' }
+
+  const { error } = await supabase.rpc('request_loan_cancel', { p_loan_id: id, p_reason: why.slice(0, 200) })
+  if (error) return { error: `The cancellation was not filed: ${error.message}` }
+
+  revalidatePath(`/fund-out/${id}`)
+  revalidatePath('/fund-out')
+  revalidatePath('/approvals')
+  return undefined
+}
+
 // ─── List loans payable via debit voucher (Finance) — Phase 7 Step 12b ──────
 //
 // Active loans with outstanding > 0 + enriched with current-period overdue
