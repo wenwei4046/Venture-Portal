@@ -6386,23 +6386,6 @@ button.bil-month-label:hover:not(:disabled) { background: rgb(247 247 245); }
 .bil-month-foot { display: flex; justify-content: flex-end; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgb(229 228 223); }
 .bil-month-foot button { border: 0; background: transparent; color: #96640C; font-size: 12px; font-weight: 500; cursor: pointer; }
 
-/* Buttons: a quiet white one, the orange primary, a red-edged danger. */
-.bil-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: #fff; color: #000; font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 12px; font-style: normal; font-weight: 400; line-height: 1.2; white-space: nowrap; text-decoration: none; cursor: pointer; }
-.bil-btn:hover:not(:disabled) { background: rgb(247 247 245); }
-.bil-btn.primary { border-color: #E99A53; background: #E99A53; font-weight: 500; }
-.bil-btn.primary:hover:not(:disabled) { border-color: #DD8B42; background: #DD8B42; }
-.bil-btn.danger { border-color: rgb(176 40 34 / 0.4); color: #B02822; }
-.bil-btn.danger:hover:not(:disabled) { background: #FAE4E0; }
-.bil-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* The allocator's Generate invoices on a record's own page, and what it made. */
-.bil-gen { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-.bil-gen > .bil-btn.primary { padding: 8px 16px; font-size: 13px; }
-.bil-gen-result { max-width: 360px; padding: 8px 12px; border: 1px solid rgb(229 228 223); border-radius: 8px; background: #fff; font-size: 12px; line-height: 1.5; text-align: left; }
-@media (max-width: 767px) {
-  .bil-gen { align-items: stretch; }
-}
-
 /* ── fund: Daily Bank · Fund IN / OUT · Invoice Financing · print schedule
    (2026-10-10, the user's Claude Design handoff — audit l fixes). Every rule
    hangs off a fund- class; nothing else is touched. ── */

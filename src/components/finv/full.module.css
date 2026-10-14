@@ -1,6 +1,7 @@
-/* A payment voucher's full page (2026-10-14, the Finance revamp v2 — D06 of
-   `.design/fin-r2/handoff`): the way back and the crumb, the number with its
-   status and four facts, Print and Copy; then the numbered cards beside a
+/* A record's full page (2026-10-14, the Finance revamp v2 — D06 of
+   `.design/fin-r2/handoff`; a payment voucher's first, an allocation's since
+   D11 — moved into the kit then): the way back and the crumb, the number with
+   its status and four facts, Print and Copy; then the numbered cards beside a
    sticky dark panel — one column, the panel first, when narrow. Every value is
    the prototype's own; colours through the shell's and the design system's
    tokens (the root carries `data-fin-kit`). */
@@ -75,6 +76,8 @@
 .pill[data-tone='accent'] { --chip-bg: rgb(var(--fv-chip-accent)); --chip-fg: var(--ds-ink); --chip-bd: var(--ds-accent); }
 .pill[data-tone='ledger'] { --chip-bg: rgb(var(--fv-chip-ledger)); --chip-fg: rgb(var(--fv-chip-ledger-ink)); --chip-bd: rgb(var(--fv-chip-ledger-ink) / 0.4); }
 .pill[data-tone='danger'] { --chip-bg: rgb(var(--fv-chip-danger)); --chip-fg: rgb(var(--fv-chip-danger-ink)); --chip-bd: rgb(var(--fv-chip-danger-ink) / 0.4); }
+/* An allocation still to bill (D11): the list's alert gold. */
+.pill[data-tone='alert'] { --chip-bg: rgb(var(--fv-chip-alert)); --chip-fg: rgb(var(--fv-chip-alert-ink)); --chip-bd: rgb(var(--fv-chip-alert-ink) / 0.4); }
 .facts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; }
 .fact { display: flex; flex-direction: column; gap: 2px; }
 .factLabel { font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: rgb(var(--hvs-muted)); }
@@ -260,6 +263,7 @@
 .panel[data-light='danger'] { --light: rgb(var(--fv-light-danger)); }
 .panel[data-light='wait'] { --light: rgb(var(--fv-light-wait)); }
 .panel[data-light='accent'] { --light: rgb(var(--fv-light-accent)); }
+.panel[data-light='alert'] { --light: rgb(var(--fv-light-alert)); }
 .pAmount { margin-top: 8px; font-size: 30px; font-weight: 600; letter-spacing: -0.02em; color: var(--ds-surface); font-variant-numeric: tabular-nums; }
 .pTo { margin: 2px 0 14px; font-size: 13.5px; color: rgb(var(--fv-dark-note)); overflow-wrap: anywhere; }
 .pGroup {

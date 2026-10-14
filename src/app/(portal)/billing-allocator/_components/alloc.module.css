@@ -116,6 +116,9 @@
 .footLabel { flex: 1; font-size: 13px; font-weight: 500; }
 .footValue { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 14px; font-weight: 600; }
 
+/* The full page's split: one width for the amounts, so the shares line up. */
+span.amount { min-width: 112px; }
+
 /* A dialog's undoing button (Remove, Delete) stands apart at the left of the
    foot, in the drawer's quiet danger — red words on white, a red edge; the
    red fill is its confirm's. */

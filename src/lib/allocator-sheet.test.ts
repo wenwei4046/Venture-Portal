@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allocatorSummary, batchLabel, byCompanyRows, methodLabel, recordLine, shareLine, splitSummary, type SheetTxn } from './allocator-sheet'
+import { allocationChangeLine, allocatorSummary, batchLabel, byCompanyRows, methodLabel, recordLine, shareLine, splitSummary, type SheetTxn } from './allocator-sheet'
 
 // 2026-10-07 — the Billing Allocator on the sheet; 2026-10-09 — the user's
 // Claude Design handoff (照设计档): the split is one column of text, and a
@@ -110,6 +110,21 @@ describe('recordLine', () => {
     expect(recordLine(TXNS[0])).toBe('Headcount split · ALC-202609')
     expect(recordLine(TXNS[2])).toBe('Percentage split · not billed')
     expect(methodLabel('equal')).toBe('Equal')
+  })
+})
+
+describe('allocationChangeLine', () => {
+  const update = (old_row: Record<string, unknown>, new_row: Record<string, unknown>, changed: string[]) => allocationChangeLine({ op: 'UPDATE', old_row, new_row, changed })
+  it('says what each change did, in the full page’s audit log', () => {
+    expect(allocationChangeLine({ op: 'INSERT', old_row: null, new_row: { txn_no: 'ALC-202609-001', amount: 9535.48, description: 'Office Rental' }, changed: null })).toBe('Recorded ALC-202609-001 · RM 9,535.48 · Office Rental')
+    expect(update({ billed_ref: null }, { billed_ref: 'ALC-202609' }, ['billed_ref'])).toBe('Billed under ALC-202609')
+    expect(update({ billed_ref: 'ALC-202609-4' }, { billed_ref: 'ALC-202609-5' }, ['billed_ref'])).toBe('Billed again under ALC-202609-5')
+    expect(update({ amount: 100, method: 'headcount', hc_period: null }, { amount: 120, method: 'percentage', hc_period: '2026-08-01' }, ['amount', 'method', 'hc_period'])).toBe(
+      'Amount RM 100.00 → RM 120.00 · Method Headcount → Percentage · Headcount current list → Aug 2026 snapshot',
+    )
+    expect(update({}, {}, ['description', 'category_id'])).toBe('Description changed · Category changed')
+    expect(update({}, {}, [])).toBe('Corrected — the split worked out again')
+    expect(allocationChangeLine({ op: 'DELETE', old_row: {}, new_row: null, changed: null })).toBe('Deleted')
   })
 })
 

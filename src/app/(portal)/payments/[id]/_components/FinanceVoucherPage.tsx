@@ -8,7 +8,7 @@ import ReassignGlAccountButton from './ReassignGlAccountButton'
 import FullPageSteps from './FullPageSteps'
 import FullPageFiles from './FullPageFiles'
 import CopyAsDraft from './CopyAsDraft'
-import s from './full.module.css'
+import s from '@/components/finv/full.module.css'
 
 // A payment voucher's full page (2026-10-14, the Finance revamp v2 — D06 of
 // `.design/fin-r2/handoff`): "← Payments" and the crumb; the number, its

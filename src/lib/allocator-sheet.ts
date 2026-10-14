@@ -171,6 +171,31 @@ export function recordLine(t: Pick<SheetTxn, 'method' | 'billedRef' | 'locked'>)
   return `${methodLabel(t.method)} split · ${batchLabel(t)}`
 }
 
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const money = (v: unknown) => (v == null || v === '' ? '—' : `RM ${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+const hcList = (v: unknown) => (v ? `${MON[Number(String(v).slice(5, 7)) - 1]} ${String(v).slice(0, 4)} snapshot` : 'current list')
+
+/** One change to an allocation (`alloc_txns`, as `audit_changes()` gives it), in a line — its full page's audit log (D06). */
+export function allocationChangeLine(c: { op: 'INSERT' | 'UPDATE' | 'DELETE'; old_row: Record<string, unknown> | null; new_row: Record<string, unknown> | null; changed: string[] | null }): string {
+  const after = c.new_row ?? {}
+  const before = c.old_row ?? {}
+  if (c.op === 'INSERT') return `Recorded ${after.txn_no ?? 'the allocation'} · ${money(after.amount)} · ${after.description ?? ''}`.trim()
+  if (c.op === 'DELETE') return 'Deleted'
+  const parts: string[] = []
+  for (const key of c.changed ?? []) {
+    if (key === 'billed_ref') parts.push(after.billed_ref ? (before.billed_ref ? `Billed again under ${after.billed_ref}` : `Billed under ${after.billed_ref}`) : `Released from ${before.billed_ref}`)
+    else if (key === 'amount') parts.push(`Amount ${money(before.amount)} → ${money(after.amount)}`)
+    else if (key === 'method') parts.push(`Method ${methodLabel(String(before.method ?? ''))} → ${methodLabel(String(after.method ?? ''))}`)
+    else if (key === 'hc_period') parts.push(`Headcount ${hcList(before.hc_period)} → ${hcList(after.hc_period)}`)
+    else if (key === 'description') parts.push('Description changed')
+    else if (key === 'category_id') parts.push('Category changed')
+    else if (key === 'updated_at') continue
+    else parts.push(`${key.replace(/_id$/, '').replace(/_/g, ' ')} changed`.replace(/^./, (ch) => ch.toUpperCase()))
+  }
+  // A correction saved the same figures: its split was worked out again all the same.
+  return parts.length > 0 ? parts.join(' · ') : 'Corrected — the split worked out again'
+}
+
 /** A share in words (the design's preview, *5 staff · 19.4%*): the heads
  *  behind a headcount share, an equal share as such, else its part of the
  *  amount. `detail` is the engine's — "Head: 3.25/16.75 (2026-09)",
