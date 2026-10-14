@@ -22,3 +22,41 @@ export function columnSizer(set: DeskCtx["set"], field: Widths) {
   const reset = (k: string) => () => set(u => { const w = { ...(u[field] as Record<string, number>) }; delete w[k]; return { ...u, [field]: w } as DeskUi; });
   return { resize, reset };
 }
+
+/**
+ * A side pane's or column's edge, dragged (v2, the prototype's ibDrag): the width follows the pointer between lo and hi,
+ * `dir` -1 for an edge on the left of what it sizes. Kept in the screen's state under `key`; a double-click on the edge
+ * sets it back to null (the default).
+ */
+type WidthKey = "ibListW" | "ibInfoW" | "ibCpW" | "paneW" | "sheetW" | "menuW" | "perfW" | "mwtLogW" | "auditW";
+export function edgeDrag(set: DeskCtx["set"], key: WidthKey, w0: number, dir: 1 | -1, lo: number, hi: number) {
+  return (e: Down) => {
+    e.preventDefault();
+    const host = e.currentTarget.parentElement, sc = host ? host.getBoundingClientRect().width / (host.offsetWidth || 1) || 1 : 1, x0 = e.clientX;
+    const move = (ev: PointerEvent) => { const w = Math.round(Math.min(hi, Math.max(lo, w0 + (dir * (ev.clientX - x0)) / sc))); set(u => ({ ...u, [key]: w }) as DeskUi); };
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); document.body.style.cursor = ""; };
+    document.body.style.cursor = "col-resize"; window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+  };
+}
+
+/** A table's columns as one array of widths (Contacts' PP columns, Audit log's three), each dragged at its edge. */
+export function arrayDrag(set: DeskCtx["set"], key: "auCols", w0: number[], min: number[], max: number) {
+  return (i: number) => (e: Down) => {
+    e.preventDefault();
+    const host = e.currentTarget.parentElement, sc = host ? host.getBoundingClientRect().width / (host.offsetWidth || 1) || 1 : 1, x0 = e.clientX, start = [...w0];
+    const move = (ev: PointerEvent) => { const n = [...start]; n[i] = Math.round(Math.min(max, Math.max(min[i], start[i] + (ev.clientX - x0) / sc))); set(u => ({ ...u, [key]: n }) as DeskUi); };
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); document.body.style.cursor = ""; };
+    document.body.style.cursor = "col-resize"; window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+  };
+}
+
+/** One named width in a map (Contacts' table: each column by its key). */
+export function mapDrag(set: DeskCtx["set"], key: "ppCW", w0: number, k: string, lo: number, hi: number) {
+  return (e: Down) => {
+    e.preventDefault();
+    const host = e.currentTarget.parentElement, sc = host ? host.getBoundingClientRect().width / (host.offsetWidth || 1) || 1 : 1, x0 = e.clientX;
+    const move = (ev: PointerEvent) => { const n = Math.round(Math.min(hi, Math.max(lo, w0 + (ev.clientX - x0) / sc))); set(u => ({ ...u, [key]: { ...(u[key] as Record<string, number>), [k]: n } }) as DeskUi); };
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); document.body.style.cursor = ""; };
+    document.body.style.cursor = "col-resize"; window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+  };
+}

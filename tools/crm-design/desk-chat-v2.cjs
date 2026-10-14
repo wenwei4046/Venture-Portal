@@ -85,4 +85,10 @@ const COMPOSER = [
   "The reply box can be typed in (Enter sends); the camera picks a photo; the round button sends what is typed.",
 ];
 
-module.exports = [CHAT, COMPOSER];
+const REPLY_QUOTE = [
+  /(\{!!\(v\.replyOn\) && \(<>[\s\S]*?\{v\.replyWho\}<\/strong>\s*<span style=\{\{[^\n]*?\}\}>)\{v\.chatText\}/,
+  "$1{v.replyText}",
+  "The quote over the reply box is the message being answered (the design shows its one sample message).",
+];
+
+module.exports = [CHAT, COMPOSER, REPLY_QUOTE];

@@ -37,8 +37,18 @@ module.exports = [
   ["{!!(v.kAlerts) && (<>", "{!!(v.kBook) && (<DeskBook v={v.book} />)}{!!(v.kNote) && (<DeskNote v={v.note} />)}{!!(v.kForm) && (<DeskCustomerForm v={v.cform} />)}{!!(v.kAlerts) && (<>",
     "Booking a visit, a note and editing a customer open in the pane (built in the design's style)."],
   ["{!!(v.isMwtOp) && (<>", "{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isMwtOp) && (<>", "Settings › History (the owner, 2026-10-13): who changed which setting, when."],
+  // ── Inbox's rows show the ⋮ menu's marks (README › Inbox, "To build"): pinned first with a pin, a muted bell, the unread
+  // count (a dot when only marked unread) — the CRM alerts badge's look, the time in rust while unread, as the phone's.
+  [`<small style={{ fontSize: "12px", color: "#A8968B", whiteSpace: "nowrap" }}>{c.time}</small>`,
+    `{!!(c.muted) && (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A8968B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto", alignSelf: "center" }}><path d="M13.7 21a2 2 0 0 1-3.4 0M18.6 13A17.9 17.9 0 0 1 18 8M6.3 6.3A5.9 5.9 0 0 0 6 8c0 7-3 9-3 9h14M18 8a6 6 0 0 0-9.3-5M2 2l20 20"></path></svg>)}{!!(c.pinned) && (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A8968B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto", alignSelf: "center" }}><path d="M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></svg>)}<small style={{ fontSize: "12px", color: c.timeFg, fontWeight: c.timeW, whiteSpace: "nowrap" }}>{c.time}</small>`,
+    "An Inbox row shows the chat's pin and mute (the ⋮ menu's Pin chat and Mute, README › To build)."],
+  [`<span style={{ fontSize: "13.5px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.msg}</span>`,
+    `<span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: "0" }}><span style={{ flex: "1", minWidth: "0", fontSize: "13.5px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.msg}</span>{!!(c.unreadN) && (<span style={{ flex: "0 0 auto", minWidth: "20px", height: "20px", padding: "0 6px", boxSizing: "border-box", borderRadius: "10px", background: "#BD4A19", color: "#fff", fontSize: "11px", fontWeight: "700", display: "inline-grid", placeItems: "center" }}>{c.unreadN}</span>)}{!!(c.unreadDot) && (<span style={{ flex: "0 0 auto", width: "10px", height: "10px", borderRadius: "50%", background: "#BD4A19" }}></span>)}</span>`,
+    "…and its unread messages (Mark as unread: a dot), README › To build."],
   // v2's chat, every message in its markup (desk-chat-v2.cjs). Awaiting reply's chat left the menu in v2 (unreachable; unpatched).
   ...require("./desk-chat-v2.cjs"),
+  // Channels: its sample facts as the real ones; what Meta keeps to itself opens Meta (desk-channels.cjs).
+  ...require("./desk-channels.cjs"),
   // Meta is not connected yet (PROPOSALS.md C, waiting for the owner): the line says so instead of the sample's
   // "Synced from Meta Ads · 9:00 am". The compact page's first, then the full page's (the only one left).
   [/(>Ads Performance<\/strong>\s*<span [^>]*><span style=\{\{ width: "7px", height: "7px", borderRadius: "50%", background: )"#3FA06B"( \}\}>\s*<\/span>)Synced from Meta Ads · 9:00 am/,

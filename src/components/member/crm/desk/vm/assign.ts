@@ -78,12 +78,21 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     const detail = m === "pct" ? mem.map(p => `${shortName(p.name, mem.map(x => x.name))} ${val(p.id)}%`).join(" · ") : m === "max" ? mem.map(p => `${shortName(p.name, mem.map(x => x.name))} ${val(p.id)}`).join(" · ") : "";
     return { color: t.color, pct: r.split[t.id], label: `${t.name.replace(/^Team /, "")} ${r.split[t.id]}%${m === "max" ? ` · max ${mem.reduce((s, p) => s + val(p.id), 0)}` : m === "pct" ? " · by %" : " · evenly"}`, detail: detail || null };
   }) : [];
+  // An ad with 3+ leads and not one visit booked is flagged (v2: "No appointments"; its cost per lead is Meta's, not known yet).
+  const noAppt = (a: { id: string; leads: number }) => a.leads >= 3 && !data.visits.some(v => v.state !== "cancelled" && data.customers.some(c => c.id === v.customerId && c.adId === a.id));
   const adCards = shownAds.map(a => { const r = ruleOf(a.id), sel = ui.ad === a.id, st = statusOf(a.id), segs = segsOf(r);
     return { name: a.label, channel: a.wa ? "WhatsApp" : "Messenger", leads: String(a.leads), chBg: a.wa ? "#E8F3ED" : "#E4EDF8", chFg: a.wa ? "#387557" : "#2F6FB5",
       segs, set: !!r && r.mode !== null, unset: !r, status: st ?? "—", stColor: st ? ST_META[st][1] : "#C9B8AC", stTint: st ? ST_META[st][3] : "#F5EBE3",
       tag: null as string | null, noTag: true, tagBg: "#F5EBE3", tagFg: "#6B574C",
       mode: r ? (r.mode === "even" ? "Evenly · each team 1/3" : "By team") : "Not set · evenly by default", cta: r ? "Edit split" : "Set up",
       bd: sel ? "#BD4A19" : "#EBDDD2", ring: sel ? "0 0 0 3px #FFF0E4" : "none",
+      // v2's list row: the split as a bar (faint while on the default), its note, the leads, a flag when something is off.
+      rowBg: sel ? "#FFF5EC" : "#fff",
+      segs2: (r && r.mode === "split" ? T.filter(t => (r.split[t.id] ?? 0) > 0).map(t => ({ color: t.color, pct: r.split[t.id], op: 1, label: t.name.replace(/^Team /, ""), pctS: `${r.split[t.id]}%` }))
+        : T.map(t => ({ color: t.color, pct: Math.round(100 / (T.length || 1)), op: r ? 1 : 0.4, label: t.name.replace(/^Team /, ""), pctS: `${Math.round(100 / (T.length || 1))}%` }))),
+      splitNote: r ? (r.mode === "even" ? "Evenly · each team an equal share" : "Custom split") : "Evenly by default", noteC: "#806B60",
+      metricV: String(a.leads), metricL: "leads",
+      flag: noAppt(a) ? "No appointments" : null as string | null, hasFlag: noAppt(a),
       open: () => { const rule = ruleOf(a.id);
         set(u => ({ ...u, ad: a.id, stage: "op", adMode: rule?.mode === "even" ? "evenly" : "team",
           tm: Object.fromEntries(T.map(t => [t.id, fromDb(rule?.tm?.[t.id])])), mv: rule ? Object.fromEntries(Object.entries(rule.pp).map(([pid, n]) => [pid, n])) : {},

@@ -2759,9 +2759,9 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                           <span style={{ fontSize: "12.5px", color: "#387557", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.ad}</span>
                           <span style={{ flex: "1" }}>
                           </span>
-                          <small style={{ fontSize: "12px", color: "#A8968B", whiteSpace: "nowrap" }}>{c.time}</small>
+                          {!!(c.muted) && (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A8968B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto", alignSelf: "center" }}><path d="M13.7 21a2 2 0 0 1-3.4 0M18.6 13A17.9 17.9 0 0 1 18 8M6.3 6.3A5.9 5.9 0 0 0 6 8c0 7-3 9-3 9h14M18 8a6 6 0 0 0-9.3-5M2 2l20 20"></path></svg>)}{!!(c.pinned) && (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A8968B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto", alignSelf: "center" }}><path d="M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></svg>)}<small style={{ fontSize: "12px", color: c.timeFg, fontWeight: c.timeW, whiteSpace: "nowrap" }}>{c.time}</small>
                         </span>
-                        <span style={{ fontSize: "13.5px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.msg}</span>
+                        <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: "0" }}><span style={{ flex: "1", minWidth: "0", fontSize: "13.5px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.msg}</span>{!!(c.unreadN) && (<span style={{ flex: "0 0 auto", minWidth: "20px", height: "20px", padding: "0 6px", boxSizing: "border-box", borderRadius: "10px", background: "#BD4A19", color: "#fff", fontSize: "11px", fontWeight: "700", display: "inline-grid", placeItems: "center" }}>{c.unreadN}</span>)}{!!(c.unreadDot) && (<span style={{ flex: "0 0 auto", width: "10px", height: "10px", borderRadius: "50%", background: "#BD4A19" }}></span>)}</span>
                         <span style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "3px" }}>
                           <span style={{ fontSize: "12px", color: "#806B60" }}>{c.owner}</span>
                           <span style={{ height: "20px", lineHeight: "20px", padding: "0 8px", borderRadius: "10px", background: c.stBg, color: c.stFg, fontSize: "11.5px", fontWeight: "700", whiteSpace: "nowrap" }}>{c.status}</span>
@@ -2993,8 +2993,8 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                           <strong style={{ flex: "1", fontSize: "14px", fontWeight: "650" }}>API access</strong>
                           <button type="button" onClick={v.chRefresh} style={{ height: "30px", padding: "0 12px", borderRadius: "15px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#3F2B22", cursor: "pointer", whiteSpace: "nowrap" }}>Refresh</button>
                         </div>
-                        <span style={{ fontSize: "12.5px", color: "#806B60" }}>System user token · renews in 42 days</span>
-                        <span style={{ fontSize: "12px", color: "#A08E82", fontFamily: "ui-monospace, monospace" }}>EAAG••••••••••••••••3fQ</span>
+                        <span style={{ fontSize: "12.5px", color: "#806B60" }}>{v.chTokenLine}</span>
+                        <span style={{ fontSize: "12px", color: "#A08E82", fontFamily: "ui-monospace, monospace" }}>{v.chTokenMask}</span>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "16px 18px", border: "1px solid #EBDDD2", borderRadius: "14px", background: "#fff" }}>
                         <div style={{ display: "flex", alignItems: "center" }}>
@@ -3002,14 +3002,14 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                           <button type="button" onClick={v.chTestHook} style={{ height: "30px", padding: "0 12px", borderRadius: "15px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#3F2B22", cursor: "pointer", whiteSpace: "nowrap" }}>Send test</button>
                         </div>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "#387557", fontWeight: "650" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#387557" }}>
-                          </span>Receiving · last event 2 min ago</span>
-                        <span style={{ fontSize: "12px", color: "#A08E82", fontFamily: "ui-monospace, monospace" }}>https://crm.houzs.my/api/meta/webhook</span>
+                          </span>{v.chHookLine}</span>
+                        <span style={{ fontSize: "12px", color: "#A08E82", fontFamily: "ui-monospace, monospace" }}>{v.chHookUrl}</span>
                       </div>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", border: "1px solid #EBDDD2", borderRadius: "14px", background: "#fff" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "14px 18px", borderBottom: "1px solid #F1E7DF" }}>
                         <strong style={{ flex: "1", fontSize: "14px", fontWeight: "650" }}>What the CRM may do on Meta</strong>
-                        <button type="button" style={{ height: "32px", padding: "0 14px", borderRadius: "16px", border: "1px solid #BD4A19", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }}>Reconnect</button>
+                        <button type="button" onClick={v.chReconnect} style={{ height: "32px", padding: "0 14px", borderRadius: "16px", border: "1px solid #BD4A19", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }}>Reconnect</button>
                       </div>
                       {(v.chPerms).map((p, p_i) => (<Fragment key={p_i}>
                         <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "11px 18px", borderTop: "1px solid #F5EEE8" }}>
@@ -3049,10 +3049,10 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "18px", border: "1px solid #EBDDD2", borderRadius: "14px", background: "#fff" }}>
                           <strong style={{ fontSize: "14px", fontWeight: "650" }}>Profile picture and cover</strong>
-                          <div style={{ position: "relative", height: "120px", borderRadius: "10px", background: "repeating-linear-gradient(45deg, #F5EEE8 0 10px, #FBF6F2 10px 20px)", display: "grid", placeItems: "center", fontSize: "12px", color: "#806B60" }}>Cover photo · 1640 × 624<span style={{ position: "absolute", left: "14px", bottom: "-22px", width: "64px", height: "64px", borderRadius: "50%", border: "3px solid #fff", background: "#FFF0E4", color: "#BD4A19", fontSize: "18px", fontWeight: "700", display: "grid", placeItems: "center" }}>H</span></div>
+                          <div style={{ position: "relative", height: "120px", borderRadius: "10px", background: "repeating-linear-gradient(45deg, #F5EEE8 0 10px, #FBF6F2 10px 20px)", display: "grid", placeItems: "center", fontSize: "12px", color: "#806B60" }}>Cover photo · 1640 × 624<span style={{ position: "absolute", left: "14px", bottom: "-22px", width: "64px", height: "64px", borderRadius: "50%", border: "3px solid #fff", background: "#FFF0E4", color: "#BD4A19", fontSize: "18px", fontWeight: "700", display: "grid", placeItems: "center" }}>{v.chPageIni}</span></div>
                           <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", paddingTop: "6px" }}>
-                            <button type="button" style={{ height: "32px", padding: "0 12px", borderRadius: "16px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#3F2B22", cursor: "pointer" }}>Change picture</button>
-                            <button type="button" style={{ height: "32px", padding: "0 12px", borderRadius: "16px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#3F2B22", cursor: "pointer" }}>Change cover</button>
+                            <button type="button" onClick={v.chOpenPage} style={{ height: "32px", padding: "0 12px", borderRadius: "16px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#3F2B22", cursor: "pointer" }}>Change picture</button>
+                            <button type="button" onClick={v.chOpenPage} style={{ height: "32px", padding: "0 12px", borderRadius: "16px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#3F2B22", cursor: "pointer" }}>Change cover</button>
                           </div>
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", padding: "14px 18px", border: "1px solid #EBDDD2", borderRadius: "14px", background: "#fff" }}>
@@ -3121,8 +3121,8 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       <div style={{ position: "sticky", top: "0", display: "flex", flexDirection: "column", gap: "10px", padding: "16px", borderRadius: "14px", background: "#F0F2F5" }}>
                         <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "#65676B" }}>MESSENGER PREVIEW</span>
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "10px 0" }}>
-                          <span style={{ width: "52px", height: "52px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", fontWeight: "700", display: "grid", placeItems: "center" }}>H</span>
-                          <strong style={{ fontSize: "14px" }}>HOUZS Venture</strong>
+                          <span style={{ width: "52px", height: "52px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", fontWeight: "700", display: "grid", placeItems: "center" }}>{v.chPageIni}</span>
+                          <strong style={{ fontSize: "14px" }}>{v.chPageName}</strong>
                         </div>
                         <div style={{ alignSelf: "flex-start", maxWidth: "90%", padding: "10px 12px", borderRadius: "16px", background: "#fff", fontSize: "13px", lineHeight: "1.4", color: "#050505" }}>{v.chGreet.val}</div>
                         <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end" }}>
@@ -3194,7 +3194,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                                   <strong style={{ fontSize: "13.5px", fontWeight: "650" }}>Profile picture</strong>
                                   <span style={{ fontSize: "12.5px", color: "#806B60", textWrap: "pretty" }}>Shown on your business profile</span>
                                 </span>
-                                <button type="button" style={{ height: "32px", padding: "0 14px", borderRadius: "16px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#3F2B22", cursor: "pointer", whiteSpace: "nowrap", alignSelf: "flex-start" }}>Choose file</button>
+                                <button type="button" onClick={v.chOpenWaManager} style={{ height: "32px", padding: "0 14px", borderRadius: "16px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#3F2B22", cursor: "pointer", whiteSpace: "nowrap", alignSelf: "flex-start" }}>Choose file</button>
                               </div>
                               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                                 <span style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
@@ -3318,7 +3318,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                             <div style={{ position: "sticky", top: "0", display: "flex", flexDirection: "column", gap: "8px", padding: "14px", borderRadius: "14px", background: "#F0F2F5" }}>
                               <div style={{ display: "flex", flexDirection: "column", borderRadius: "12px", background: "#fff", overflow: "hidden" }}>
                                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "18px 14px 14px" }}>
-                                  <span style={{ width: "72px", height: "72px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", fontSize: "22px", fontWeight: "700", display: "grid", placeItems: "center" }}>H</span>
+                                  <span style={{ width: "72px", height: "72px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", fontSize: "22px", fontWeight: "700", display: "grid", placeItems: "center" }}>{v.waIni}</span>
                                   <strong style={{ fontSize: "15px", textAlign: "center" }}>{v.wn.disp}</strong>
                                   <span style={{ fontSize: "12.5px", color: "#3F2B22" }}>{v.wn.name}</span>
                                 </div>
@@ -3479,7 +3479,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     <div style={{ display: "flex", flexDirection: "column", border: "1px solid #EBDDD2", borderRadius: "14px", background: "#fff" }}>
                       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) 110px 70px 120px 150px", gap: "12px", padding: "10px 18px", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "#806B60", borderBottom: "1px solid #F1E7DF" }}>
                         <span>AD</span>
-                        <span>SPEND · OCT</span>
+                        <span>SPEND · {v.chMonth}</span>
                         <span>LEADS</span>
                         <span>DAILY BUDGET</span>
                         <span>STATUS</span>
@@ -4479,7 +4479,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "10px", padding: "8px 16px", background: "#fff", borderTop: "1px solid #EBDDD2" }}>
                       <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px", paddingLeft: "10px", borderLeft: "3px solid #BD4A19" }}>
                         <strong style={{ fontSize: "12px", fontWeight: "650", color: "#BD4A19" }}>{v.replyWho}</strong>
-                        <span style={{ fontSize: "13px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.chatText}</span>
+                        <span style={{ fontSize: "13px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.replyText}</span>
                       </span>
                       <button type="button" onClick={v.cancelReply} title="Cancel reply" style={{ width: "32px", height: "32px", border: "0", background: "transparent", color: "#806B60", display: "grid", placeItems: "center", cursor: "pointer" }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

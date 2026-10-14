@@ -276,7 +276,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     if (desk && full && panelFor.id === me.id && deskApp) {
       return (
         <DeskScreens data={data} me={me} now={now} live={live} act={panelAct} setData={setDataSafe} teams={teams} directors={pctx.directors}
-          nameOf={nameOf} app={deskApp} exit={onExit} toMine={pctx.toMyCrm} problem={problem} />
+          nameOf={nameOf} app={deskApp} exit={onExit} toMine={pctx.toMyCrm} problem={problem} actToast={panelUi.toast} />
       );
     }
     // Viewing somebody's Team: the same "Viewing X's CRM · Switch · Exit" banner their own CRM has (user 2026-10-11).

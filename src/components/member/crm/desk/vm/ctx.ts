@@ -8,9 +8,9 @@ import type { CrmData, CrmForm, CrmFormField, CrmPerson } from "@/lib/member/crm
 import type { PanelActions } from "../../panel/actions";
 import type { Team } from "../../panel/vm/common";
 
-export type DeskTab = "insight" | "inbox" | "assignment" | "calendar" | "adsperf" | "showrooms" | "settings";
+export type DeskTab = "insight" | "inbox" | "assignment" | "calendar" | "adsperf" | "showrooms" | "settings" | "people" | "forms" | "channels" | "auditlog";
 export type PaneMode = "closed" | "empty" | "docked" | "overlay" | "wide" | "wideEmpty";
-export type PaneKind = "chat" | "alerts" | "section" | "info" | "clist" | "metrics" | "team" | "assign" | "book" | "note" | "form";
+export type PaneKind = "chat" | "alerts" | "section" | "info" | "clist" | "metrics" | "team" | "assign" | "book" | "note" | "form" | "move" | "share";
 
 /** The screen's own state. Every key is the prototype's (same name, same meaning) unless it says otherwise. */
 export interface DeskUi {
@@ -105,13 +105,37 @@ export interface DeskUi {
   // Screens the design does not draw (BUILD-NOTES.md)
   /** Appointment: showroom, day, time and the 7-day page; as RS's sheet also Week | Month and the month chooser (2026-10-13). */
   book: { room: number; day: number; slot: string | null; week: number; view?: "week" | "month"; monthOpen?: boolean; pickYear?: number } | null;
+  // ── v2 (CrmFrame v2.dc.html): every column, pane and editor is dragged to size, double-click gives it back.
+  ibListW: number | null; ibInfoW: number | null; ibCpW: number | null; ibCp: boolean | null;
+  paneW: number | null; sheetW: number | null; menuW: number | null; perfW: number | null; mwtLogW: number | null; auditW: number | null;
+  /** The audit logs' rails (closed by default, closed again on another ad or page). */
+  adLog: boolean; mwtLog: boolean;
+  meMenu: boolean;
+  // The chat: + menu, the message menu (the message's id), the message under the pointer, the reply's quote.
+  attachOpen: boolean; attachView: "" | "quick" | "auto"; msgMenu: string | null; msgHov: string | null; replyTo: string | null;
+  // Assignment
+  applyChk: boolean; ftApplyChk: boolean; evOpen: Record<string, boolean>;
+  adPer: "Today" | "This week" | "This month" | "Custom"; adPerOpen: boolean; adCal: boolean;
+  adCust: { a: number; b: number } | null; adCustT: { a: number; b: number; step: number } | null;
+  // Calendar
+  calBy: "team" | "room";
+  // Contacts
+  ppF: Record<string, string | null>; ppBy: string; ppQ: string; ppOpen: string | null; ppVis: string[] | null;
+  ppSort: { k: string | null; dir: 1 | -1 }; ppCW: Record<string, number>; ppAdd: boolean;
+  // Audit log
+  auCat: "chat" | "marketing" | "management"; auPer: "today" | "7d" | "month"; auWho: string; auQ: string; auCols: number[] | null;
+  // Customer form (the page): its draft, the preview's device
+  cfDraft: import("./form").FormSectionV2[] | null; cfDev: "phone" | "desktop"; cfNew: Record<string, string>; cfType: string | null;
+  // Channels
+  chTab: "conn" | "page" | "msgr" | "wa" | "tpl" | "ads"; chWaTab: string; chDraft: Record<string, unknown>; chDirty: Record<string, boolean>;
+  chDlg: { kind: string; id: string } | null; chNewOpen: boolean; chNew: { name: string; cat: string; lang: string; body: string } | null; chWaNum: string | null;
   cform: Record<string, string> | null;
   history: HistRow[] | null;
   histF: string;
 }
 
 /** One change to a CRM setting (audit_changes). */
-export interface HistRow { at: string; who: string; table: string; op: string; what: string; changes: { field: string; from: string; to: string }[] }
+export interface HistRow { at: string; who: string; table: string; op: string; what: string; changes: { field: string; from: string; to: string }[]; /** The row as it was after (or before, when removed). */ row: Record<string, unknown>; before: Record<string, unknown> | null; after: Record<string, unknown> | null }
 
 export interface SrDraft {
   id: string | null; dispName: string; addr: string; gmap: string; waze: string; manual: boolean; photo: string; photoFile: File | null;
@@ -127,7 +151,7 @@ export const initialDeskUi = (): DeskUi => ({
   chat: null, fromTeam: false, fromList: false, fromInfo: false, infoId: null, visit: null, clist: "Leads", clSort: "Last chat", clSortOpen: false, team: null, person: null, draft: {},
   insPer: "month", insRange: null, insOpen: false, insCards: null, mFor: "ads",
   whoSel: [], whoOpen: false, inbF: "All",
-  sendFor: null, awChat: null, awMenuOpen: false, ad: null, adMode: "team", tm: {}, mv: {}, split: null, adSt: "Running", stOpen: false, ftEdit: null, ftDraft: null,
+  sendFor: null, awChat: null, awMenuOpen: false, ad: null, adMode: "team", tm: {}, mv: {}, split: null, adSt: "all", stOpen: false, ftEdit: null, ftDraft: null,
   cpF: "All", cpT: "This month", cpFrom: "", cpTo: "", cpSort: "Latest update", cpMine: false, cpP: null, cpPOpen: false, cpSel: null,
   calView: "upcoming", calTeam: "all", calShowroom: "all", calWho: [], calWhoOpen: false, calRange: null, rangeOpen: false,
   apSel: null, mDraft: null, mDrag: null, mq: "", mFold: {}, apStF: "all", apW: {}, insSort: null, insW: {}, apStOpen: false, apSort: null, apDlOpen: false,
@@ -138,6 +162,14 @@ export const initialDeskUi = (): DeskUi => ({
   frmOpen: false, frmCur: null, frmDraft: null, frmName: null, frmIsNew: false, frmExp: null, frmOptIn: {},
   ntfTab: "unread", ntfCat: "all", ntfSel: false, ntfPick: {},
   book: null, cform: null, history: null, histF: "all",
+  ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, paneW: null, sheetW: null, menuW: null, perfW: null, mwtLogW: null, auditW: null,
+  adLog: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null,
+  applyChk: false, ftApplyChk: false, evOpen: {}, adPer: "This month", adPerOpen: false, adCal: false, adCust: null, adCustT: null,
+  calBy: "team",
+  ppF: {}, ppBy: "type", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,
+  auCat: "chat", auPer: "7d", auWho: "all", auQ: "", auCols: null,
+  cfDraft: null, cfDev: "phone", cfNew: {}, cfType: null,
+  chTab: "conn", chWaTab: "prof", chDraft: {}, chDirty: {}, chDlg: null, chNewOpen: false, chNew: null, chWaNum: null,
 });
 
 /** The Revenue app around the CRM: its sidebar pages, top bar and who is signed in. */
@@ -167,6 +199,9 @@ export interface DeskActions {
   saveForm(form: { id: string | null; name: string; sections: FormSection[] }): Promise<string | false>;
   deleteForm(id: string): Promise<boolean>;
   saveShowroomExtras(roomId: string, x: { photo: File | null; removePhoto: boolean; gmap: string; waze: string }): Promise<boolean>;
+  /** Channels (v2): link / unlink an asset, its default (crm_set_channel); send a tab to Meta (saveCrmChannel). */
+  setChannel(kind: "page" | "wa", id: string, name: string, linked: boolean, isDefault: boolean): Promise<boolean>;
+  saveMeta(s: Parameters<typeof import("@/app/(member)/member/crm-channels-actions").saveCrmChannel>[0]): Promise<boolean>;
 }
 
 export interface DeskCtx {
@@ -193,4 +228,6 @@ export interface DeskCtx {
   toMine?: () => void;
   /** Leave the CRM (the sidebar's other pages). */
   exit(): void;
+  /** Channels: what Meta answered (read when Channels opens). */
+  meta: import("./channels").MetaState;
 }

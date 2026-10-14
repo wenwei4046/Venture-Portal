@@ -80,7 +80,20 @@ export function chatProgressVM(ctx: DeskCtx, opItem: string) {
   const teamList = [...(ctx.directors.length ? [{ name: DIRECTOR_TEAM, c: DIRECTOR_C }] : []), ...teams.map((t, k) => ({ name: t.name, c: teamColours(k) }))];
   const colourOf = (name: string | null) => teamList.find(t => t.name === name)?.c ?? (["#806B60", "#F5EBE3"] as [string, string]);
   const cmp = open;
+  // Inbox's fourth column (v2): the open chat's journey — its five steps, a rail of dots when shut, the timeline.
+  const ibR = ui.chat ? rows.find(r => r.c.id === ui.chat) : undefined;
+  const ibSteps = ibR ? strip(ibR, true) : ["New", "F/up", "Appt", "Visit", "Won/Lost"].map(l => ({ label: l, date: "—", dot: "#fff", ring: "#DCCBBF", size: 10, lab: "#A8968B", w: 500, lL: "#EBDDD2", lR: "#EBDDD2" }));
+  const evRows = (r: (typeof rows)[number], gap: string) => r.ev.slice().reverse().map((e, i, R) => { const k = KD[e.kind] ?? KD.status, showD = !i || dShort(R[i - 1].at) !== dShort(e.at);
+    return { date: showD ? dShort(e.at) : "", time: new Date(e.at).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" }), who: e.who ? (e.who === me.id ? "You" : nameOf(e.who)) : "",
+      text: e.text, fg: k[0], bg: k[1], d: k[2], hasSt: !!e.st, st: e.st ?? "", stbg: e.st ? SC[e.st][0] : "#fff", stfg: e.st ? SC[e.st][1] : "#000",
+      hasNote: !!e.note, note: e.note ?? "", line: i === R.length - 1 ? "transparent" : "#EBDDD2", pt: showD && i ? gap : "0" }; });
+  const ibCp = { has: !!ibR, none: !ibR, status: ibR?.cur ?? "", sbg: ibR ? SC[ibR.cur][0] : "#fff", sfg: ibR ? SC[ibR.cur][1] : "#000",
+    owner: ibR ? `${ibR.c.assignedTo ? nameOf(ibR.c.assignedTo) : "No one yet"}${ibR.c.assignedTo && teamOf(ibR.c.assignedTo) ? ` · ${teamOf(ibR.c.assignedTo)}` : ""}` : "",
+    steps: ibSteps.map((s, i) => ({ ...s, lL: i === 0 ? "transparent" : s.lL, lR: i === 4 ? "transparent" : s.lR })),
+    rail: ibSteps.map((s, i) => ({ dot: s.dot, ring: s.ring, size: s.size, tip: `${s.label} · ${s.date}`, gap: i === 4 ? "transparent" : "#EBDDD2" })),
+    ev: ibR ? evRows(ibR, "12px") : [] };
   return {
+    ibCp,
     cpOpen: open, isCpOp: opItem === "Chat progress",
     cpChips: ["All", ...ORD].map(k => { const on = f === k, pr = rows.filter(hasP), n = k === "All" ? pr.length : pr.filter(r => r.cur === k).length;
       return { label: k, n, bg: on ? "#3F2B22" : "#fff", fg: on ? "#fff" : "#3F2B22", bd: on ? "#3F2B22" : "#E2CFC1", nfg: on ? "#E9DCD2" : "#806B60", pick: () => patch({ cpF: k }) }; }),

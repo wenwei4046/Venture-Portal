@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { crmWrite, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
+import { fetchCrmChannels, saveCrmChannel, type MetaChannels } from "@/app/(member)/member/crm-channels-actions";
 import type { CrmData, CrmEvent, CrmForm, CrmNote, CrmPerson } from "@/lib/member/crm-data";
 import type { PanelActions } from "../panel/actions";
 import type { Team } from "../panel/vm/common";
@@ -19,6 +20,8 @@ import { initialDeskUi, type DeskActions, type DeskApp as DeskAppFrame, type Des
 import { historyRows } from "./vm/history";
 import { useDeskPlace, withSavedPlace } from "./nav";
 import { useFollowNewest } from "../shared/stick";
+import { MediaViewer } from "../shared/viewer";
+import { MessageMenu } from "../shared/msg-menu";
 
 export interface DeskScreensProps {
   data: CrmData;
@@ -35,6 +38,8 @@ export interface DeskScreensProps {
   toMine?: () => void;
   /** A read that failed (the last one's words), shown as the toast. */
   problem?: string;
+  /** What a shared action (send, star, forward …) said — the phone panel's toast — shown here as the desktop's toast. */
+  actToast?: string;
 }
 
 const TOAST_MS = 3_000;
@@ -82,6 +87,8 @@ export default function DeskScreens(p: DeskScreensProps) {
   }, [ui.undo]);
   // A read that failed says so once.
   useEffect(() => { if (p.problem) patch({ toast: p.problem }); }, [p.problem, patch]);
+  // A shared action's words (a send that failed, a forward …) reach the desktop's toast too (rev 1 showed them nowhere).
+  useEffect(() => { if (p.actToast) patch({ toast: p.actToast }); }, [p.actToast, patch]);
 
   // Appointment greys a full slot: the showroom's booked counts around the week shown.
   const rooms = data.rooms.filter(r => r.active);
@@ -161,17 +168,41 @@ export default function DeskScreens(p: DeskScreensProps) {
         setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === roomId ? { ...r, mapGoogle: x.gmap || null, mapWaze: x.waze || null, ...(x.removePhoto ? { photo: null } : {}) } : r)) }));
         return true;
       },
+      // Channels (v2): the CRM's own link state, and a tab sent to Meta (never from the demo).
+      async setChannel(kind, id, name, linked, isDefault) {
+        return !!(await call("crm_set_channel", { p_kind: kind, p_external: id, p_name: name, p_linked: linked, p_default: isDefault }));
+      },
+      async saveMeta(s) {
+        if (!live) { patch({ toast: "The preview does not send anything to Meta" }); return false; }
+        const r = await saveCrmChannel(s);
+        if (!r.ok) { patch({ toast: r.error }); return false; }
+        return true;
+      },
     };
   }, [live, patch, setData, data.customers, p.me.id]);
 
+  // Channels: what Meta answers, read when Channels opens and again on Refresh / after a save.
+  const [metaData, setMetaData] = useState<MetaChannels | null>(null);
+  const [metaErr, setMetaErr] = useState("");
+  const [metaN, setMetaN] = useState(0);
+  const onChannels = ui.tab === "channels";
+  useEffect(() => {
+    if (!onChannels) return;
+    let current = true;
+    if (!live) { setMetaData(null); setMetaErr("Meta is not read in the preview"); return; }
+    void fetchCrmChannels().then(r => { if (!current) return; if (r.ok) { setMetaData(r.data); setMetaErr(""); } else setMetaErr(r.error); });
+    return () => { current = false; };
+  }, [onChannels, live, metaN]);
+  const meta = useMemo(() => ({ data: metaData, loading: onChannels && !metaData && !metaErr, error: metaErr, reload: () => setMetaN(n => n + 1) }), [metaData, onChannels, metaErr]);
+
   const ctx = {
     data, me: p.me, now: p.now, live, ui, set: setUi, patch, act, deskAct, teams: p.teams, directors: p.directors, nameOf: p.nameOf,
-    slotCounts, W: size.W, H: size.H, app: p.app, toMine: p.toMine, exit: p.exit,
+    slotCounts, W: size.W, H: size.H, app: p.app, toMine: p.toMine, exit: p.exit, meta,
   };
   const v = deskVM(ctx);
-  const histOn = !!v.isHistOp;
-
-  // History reads the audit trail when it opens (Settings › History; picking it again reads it again).
+  // The audit trail (audit_changes) is read when Assignment or the Audit log opens (their logs), and again after a
+  // setting is saved (a write sets history back to null); CRM · Manage only, as History was.
+  const histOn = data.can.manage && (ui.tab === "assignment" || ui.tab === "auditlog");
   useEffect(() => {
     if (!histOn || ui.history !== null) return;
     let current = true;
@@ -184,6 +215,20 @@ export default function DeskScreens(p: DeskScreensProps) {
     return () => { current = false; };
   }, [histOn, ui.history, live, patch, p]);
 
+
+  // A setting changed (here or by somebody else — the 5 s re-read): the logs read the trail again.
+  const settingsSig = JSON.stringify([data.adRules, data.ftRules, data.forms, data.rooms.map(r => [r.id, r.name, r.slots, r.blocks]), data.people.map(p => [p.id, p.fullTime]), data.templates?.length]);
+  const lastSig = useRef(settingsSig);
+  useEffect(() => { if (lastSig.current === settingsSig) return; lastSig.current = settingsSig; if (histOn) patch({ history: null }); }, [settingsSig, histOn, patch]);
+
+  // Entering Ads to teams opens its first ad, Full time its first team (v2) — once per entering, not after a close.
+  const seeded = useRef("");
+  const seedKey = `${ui.tab}:${ui.pick}:${ui.stage}`;
+  useEffect(() => {
+    if (seeded.current === seedKey) return;
+    if (v.adSeed) { seeded.current = seedKey; patch({ ad: v.adSeed }); }
+    else if (v.ftSeed) { seeded.current = seedKey; v.ftSeed(); }
+  }, [seedKey, v.adSeed, v.ftSeed, patch]);
 
   // The prototype's keyboard: ↑ ↓ walk the number fields of the open editor; Esc closes the menu, then the pane.
   const closeRef = useRef(v.closePane);
@@ -211,6 +256,9 @@ export default function DeskScreens(p: DeskScreensProps) {
   return (
     <div ref={boxRef} className={R.root} data-revenue-app="" style={{ position: "fixed", inset: 0, zIndex: 10, overflow: "auto" }}>
       <DeskApp v={v} />
+      {/* The phone's photo / video / document viewer and the message dialogs (Forward, Info, Starred), shared. */}
+      <MediaViewer />
+      <MessageMenu />
     </div>
   );
 }

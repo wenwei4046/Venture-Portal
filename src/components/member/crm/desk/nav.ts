@@ -9,7 +9,8 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import type { DeskUi } from "./vm/ctx";
 
-export const NAV_KEYS = ["tab", "pane", "kind", "stage", "pick", "menu", "chat", "fromTeam", "fromList", "fromInfo", "infoId", "visit", "clist", "team", "person", "inbF"] as const;
+// v2 (README › Navigation persistence): the open ad, Channels' tab and Audit log's tab are steps too.
+export const NAV_KEYS = ["tab", "pane", "kind", "stage", "pick", "menu", "chat", "fromTeam", "fromList", "fromInfo", "infoId", "visit", "clist", "team", "person", "inbF", "ad", "chTab", "chWaTab", "auCat", "ppBy", "cfDev", "ftEdit"] as const;
 type NavKey = (typeof NAV_KEYS)[number];
 export type DeskPlace = Pick<DeskUi, NavKey>;
 

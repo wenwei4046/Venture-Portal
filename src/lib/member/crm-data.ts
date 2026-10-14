@@ -224,7 +224,7 @@ export interface CrmData {
 }
 
 /** A form's field (CRM Desktop rev 1, H3). `id` of a built-in field is the customer's own column (name, phone, type, size, loc, req, budget). */
-export interface CrmFormField { id: string; label: string; type: "Text" | "Long text" | "Choice" | "Number" | "Phone" | "Date"; req: 0 | 1; locked?: 1; ph?: string; opts?: string[]; isNew?: 1 }
+export interface CrmFormField { id: string; label: string; type: "Text" | "Long text" | "Choice" | "Number" | "Phone" | "Date" | "Range"; req: 0 | 1; locked?: 1; ph?: string; opts?: string[]; isNew?: 1 }
 export interface CrmForm { id: string; name: string; sections: { id: string; title: string; fields: CrmFormField[] }[]; base?: boolean }
 export interface CrmNote { id: string; customerId: string; by: string | null; text: string; at: string }
 

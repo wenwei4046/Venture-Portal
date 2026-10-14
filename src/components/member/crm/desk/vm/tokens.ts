@@ -1,5 +1,5 @@
 /**
- * The desktop CRM's constants, copied from the prototype (CrmFrame.dc.html's script, CRM Desktop rev 1): its icons'
+ * The desktop CRM's constants, copied from the prototype (CrmFrame v2.dc.html's script, CRM Desktop v2): its icons'
  * paths, colours and copy. Kept as the design writes them; a change here is a change to the design.
  */
 
@@ -21,12 +21,21 @@ export const ICON: Record<string, string> = {
   calendar: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
   settings: "M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4",
   contacts: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
+  people: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
+  channels: "M4.9 19.1a10 10 0 0 1 0-14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4M19.1 4.9a10 10 0 0 1 0 14.2M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z",
+  forms: "M9 3h6v3H9zM6 5H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-1M8 11h8M8 15h5",
+  auditlog: "M12 8v4l3 3M3.05 11a9 9 0 1 1 .5 4M3 4v5h5",
   profile: "M20 21a8 8 0 0 0-16 0M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z",
 };
-export const PANEL_TABS: [import("./ctx").DeskTab, string][] = [["insight", "Insight"], ["inbox", "Inbox"], ["assignment", "Assignment"], ["calendar", "Calendar"], ["adsperf", "Ads Performance"], ["showrooms", "Showrooms"], ["settings", "Settings"]];
-/** CRM · Manage's pages (unchanged rule, rev 1 dev changes). */
-export const MANAGE_TABS = new Set(["assignment", "adsperf", "showrooms", "settings"]);
-export const PANE_MODE = { adsperf: "closed", insight: "closed", calendar: "closed", inbox: "empty", assignment: "wideEmpty", settings: "wideEmpty", showrooms: "wideEmpty" } as const;
+export const PANEL_TABS: [import("./ctx").DeskTab, string][] = [["insight", "Insight"], ["inbox", "Inbox"], ["people", "Contacts"], ["assignment", "Assignment"], ["calendar", "Calendar"], ["adsperf", "Ads Performance"], ["showrooms", "Showrooms"], ["forms", "Customer form"], ["channels", "Channels"], ["settings", "Settings"], ["auditlog", "Audit log"]];
+/** The sidebar's groups (v2): [label, pages]. */
+export const NAV_GROUPS: [string, import("./ctx").DeskTab[]][] = [["", ["insight", "inbox", "people", "calendar"]], ["MARKETING", ["adsperf", "assignment"]], ["MANAGEMENT", ["showrooms", "forms", "channels", "settings", "auditlog"]]];
+/**
+ * CRM · Manage's pages (rev 1 dev changes), with v2's Customer form and Audit log (a setting and its history). Contacts
+ * reads (View at All, as Inbox); Channels shows read-only to whoever cannot manage (README §7).
+ */
+export const MANAGE_TABS = new Set(["assignment", "adsperf", "showrooms", "settings", "forms", "auditlog"]);
+export const PANE_MODE = { adsperf: "closed", insight: "closed", calendar: "closed", inbox: "empty", assignment: "wideEmpty", settings: "wideEmpty", showrooms: "wideEmpty", people: "closed", forms: "wideEmpty", channels: "closed", auditlog: "closed" } as const;
 export const LI: Record<string, string> = {
   sprout: "M7 20h10M10 20c5.5-2.5.8-6.4 3-10M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8zM14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z",
   megaphone: "M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6",
@@ -61,10 +70,11 @@ export const ST_META: Record<string, [string, string, null, string, string]> = {
   Paused: ["Paused", "#B4AEA4", null, "#F2F0EB", "#6B645A"], Pending: ["Pending", "#E1B04F", null, "#FFF0CC", "#A46312"],
 };
 export const SHEET_COPY: Record<string, [string, string, string]> = {
+  forms: ["Customer form", "What salespeople fill in for each customer", "Customer form"],
   showrooms: ["Showrooms", "Where visits are booked", "Showrooms"], assignment: ["Assignment", "Who gets each new enquiry", "All assignment"],
   settings: ["Settings", "Choose what to set up", "All settings"],
 };
-export const SECTION_PICK: Record<string, number> = { assignment: 0, settings: 2, showrooms: 0 };
+export const SECTION_PICK: Record<string, number> = { assignment: 0, settings: 0, showrooms: 0, forms: 0 };
 export const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 export const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export const DIRECTOR_TEAM = "Revenue Director";

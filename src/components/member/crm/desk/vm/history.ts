@@ -45,7 +45,7 @@ export function historyRows(rows: CrmHistoryRow[], nameOf: (id: string) => strin
     const label = (row.name ?? row.ad_label ?? (row.staff_id ? nameOf(String(row.staff_id)) : row.tl_id ? `${nameOf(String(row.tl_id))}'s team` : null) ?? r.key) as string;
     const fields = r.op === "UPDATE" ? r.changed : Object.keys(row);
     return {
-      at: r.at, who: r.who, table: r.table, op: r.op, what: String(label || "—"),
+      at: r.at, who: r.who, table: r.table, op: r.op, what: String(label || "—"), row, before: r.before, after: r.after,
       changes: r.op === "UPDATE"
         ? fields.filter(k => !SKIP.has(k)).map(k => ({ field: FIELD[k] ?? k, from: words(k, r.before?.[k], nameOf), to: words(k, r.after?.[k], nameOf) }))
         : [],

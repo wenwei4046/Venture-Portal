@@ -21,7 +21,9 @@ const noop = () => {};
 const PROTO_FRAME = {
   frameRadius: "14px", frameShadow: "0 1px 2px rgba(63,43,34,.08), 0 12px 40px rgba(63,43,34,.10)",
   greetWord: "Good morning", subLabel: "Fair view", subCur: "auto", dateLine: "Sat 3 Oct 2026 · Q4 2026", appBellDot: true,
-  openSubDept: noop, openAppBell: noop, signOut: noop, signOutMe: noop, alertsN: "7", alertsHas: true, metaSync: "Synced from Meta Ads · 9:00 am", metaDot: "#3FA06B",
+  openSubDept: noop, openAppBell: noop, signOut: noop, signOutMe: noop, alertsN: "7", alertsHas: true,
+  chTokenLine: "System user token · renews in 42 days", chTokenMask: "EAAG••••••••••••••••3fQ", chHookLine: "Receiving · last event 2 min ago", chHookUrl: "https://crm.houzs.my/api/meta/webhook",
+  chReconnect: noop, chOpenPage: noop, chOpenWaManager: noop, chPageIni: "H", chPageName: "HOUZS Venture", waIni: "H", chMonth: "OCT", metaSync: "Synced from Meta Ads · 9:00 am", metaDot: "#3FA06B",
 };
 const MIC = "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0m7 7v3";
 /**
@@ -35,7 +37,9 @@ function protoChats(p: Record<string, unknown>) {
     tick: "#3B8FD9", hasTick: true, failed: false, quote: null, quoteMargin: "0", appt: null, ...NO_MEDIA };
   const appt = p.chatAppt ? [{ ...msg, key: "a", id: "a", inn: false, out: false, appt: { ...(p.appt as object), kind: "REMINDER", deco: "none", go: noop } }] : [];
   return {
-    firstDay: "Today", pinText: String(p.chatText ?? ""), msgs: [msg, ...appt],
+    firstDay: "Today", pinText: String(p.chatText ?? ""), replyText: String(p.chatText ?? ""), msgs: [msg, ...appt],
+    // Inbox rows: the time's colour as the design writes it (live: rust while unread).
+    chats: ((p.chats ?? []) as Record<string, unknown>[]).map(c => ({ ...c, timeFg: "#A8968B" })),
     draft: "", micD: MIC, sendTitle: "Voice note",
     setDraft: noop, draftKey: noop, send: noop, photo: noop,
     awInfo: noop, awBook: noop, openNote: noop, editInfo: noop, cyclePeriod: noop, openInfo: noop, openBook: noop, freeLabel: "Free · 2 per slot",

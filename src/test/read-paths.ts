@@ -193,6 +193,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'crm_save_showroom_extras',
   // CRM photos, videos and voice notes (mig 20261013240000): asks crm_can_reply().
   'crm_set_out_media',
+  // CRM Desktop v2's Channels (mig 20261015100000): asks crm_manages().
+  'crm_note_channel_save',
   // The Product List (mig 20261014100000): a bill and a scheme never open to its key — the costing gaps ask
   // Product List · View, the cost setting Product List · Edit, both running as their owner.
   'revenue_costing_gaps', 'catalogue_save_cost_setting',
