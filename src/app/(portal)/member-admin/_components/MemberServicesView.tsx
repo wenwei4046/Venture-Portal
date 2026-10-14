@@ -49,7 +49,7 @@ export default function MemberServicesView({
     : []
   // HR's sidebar opens each tab as its own row (2026-10-15, the Attendance handoff): `?tab=` picks it on arrival.
   // The page never writes the URL itself (see above) — it only follows a link that does.
-  const asked = useSearchParams().get('tab')
+  const asked = useSearchParams()?.get('tab') ?? null
   const fromUrl = tabs.find(t => t.key === asked)?.key
   const [tab, setTab] = useState<Tab>(fromUrl ?? tabs[0]?.key ?? 'requests')
   useEffect(() => {

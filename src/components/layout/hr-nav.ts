@@ -181,8 +181,8 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
           icon: 'lock',
           href: '/team/people?tab=permissions',
           match: (p, s) => (under(p, '/team/people') && s?.get('tab') === 'permissions') || under(p, '/team/permissions'),
-          visible: canOpenPeople,
-          permissionTabs: ['hr.permissions'],
+          // The tab People Management draws for its full readers (the directory's readers have none).
+          visible: canAccessTeam,
         },
         // Hierarchy merged into People Management (the handoff): its three tabs.
         { key: 'hierChart', label: 'Org chart', icon: 'org', href: hier('chart'), match: hierOn('chart'), visible: canOpenPeople },
