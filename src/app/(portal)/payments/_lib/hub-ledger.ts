@@ -41,6 +41,8 @@ export interface LedgerParams {
   to?: string
   min?: string
   max?: string
+  /** `1`: arrive with Create payment open (the Overview's button). */
+  new?: string
 }
 
 /** One line of a card's list. */

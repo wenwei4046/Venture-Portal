@@ -5,9 +5,10 @@ import { canSeePayrollPayouts } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
 import { startRead } from '@/lib/start-read'
 import { formatMoney } from '@/lib/utils'
-import { officeDay } from '@/lib/office-time'
+import { officeDay, officeMonth, officeToday } from '@/lib/office-time'
 import { claimReference, readClaimQueueRow } from '@/lib/claim-requests'
 import { loadHubLedger, type LedgerParams } from '../_lib/hub-ledger'
+import { loadCreatePaymentOptions } from '../_lib/create-payment-options'
 import PaymentsHubClient, { type RequestItem } from './PaymentsHubClient'
 
 // Payments (2026-10-14, the Finance revamp v2 — D02–D05): the ledger read
@@ -19,6 +20,7 @@ export default async function PaymentsHub({ params }: { params: LedgerParams }) 
   const user = await requirePermission('treasury')
   const supabase = await createClient()
   const seesPayroll = canSeePayrollPayouts(user)
+  const canCreate = canDo(user, 'treasury', 'create')
 
   const ledgerRead = startRead(loadHubLedger(supabase, user, 'debit', params))
   const deptRead = startRead(
@@ -48,6 +50,9 @@ export default async function PaymentsHub({ params }: { params: LedgerParams }) 
       }
     })(),
   )
+
+  // Arriving with Create payment open (the Overview's button): its lists come with the page, so nothing asks for them after the navigation.
+  const createRead = canCreate && params.new === '1' ? startRead(loadCreatePaymentOptions(supabase).catch(() => null)) : null
 
   const ledger = await ledgerRead
 
@@ -94,7 +99,8 @@ export default async function PaymentsHub({ params }: { params: LedgerParams }) 
   return (
     <PaymentsHubClient
       ledger={ledger}
-      canCreate={canDo(user, 'treasury', 'create')}
+      canCreate={canCreate}
+      create={canCreate ? { prefix: `HV-PV-${officeMonth().replace('-', '')}`, today: officeToday(), open: params.new === '1', initial: createRead ? await createRead : null } : null}
       canSetDefault={user.role === 'finance' || user.role === 'principal'}
       dept={dept}
       payroll={payroll}

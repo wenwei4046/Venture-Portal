@@ -739,18 +739,12 @@ async function createPaymentVoucherInner(formData: FormData) {
   revalidatePath('/payments')
   revalidatePath('/dashboard')
 
-  // Settling an invoice used to end on the voucher page, three screens away
-  // from the Billing list the work started on (user, 2026-09-29: "当我 settle
-  // invoice 后会自动跳去 payment"). A caller that sends return_to gets sent
-  // back there with the receipt number to show. Same-origin paths only — an
-  // absolute URL or a protocol-relative // would be an open redirect.
-  const rawReturn = ((formData.get('return_to') as string) ?? '').trim()
-  const returnTo = /^\/[A-Za-z0-9\-_/]*$/.test(rawReturn) ? rawReturn : null
-  if (returnTo) {
-    revalidatePath(returnTo)
-    redirect(`${returnTo}?receipt=${encodeURIComponent(voucherNo)}`)
-  }
-  redirect(`/payments/${data.id}`)
+  return { id: data.id as string, voucherNo, user }
+}
+
+const isRedirect = (err: unknown) => {
+  const digest = (err as { digest?: string })?.digest
+  return (typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')) || (err instanceof Error && err.message.includes('NEXT_REDIRECT'))
 }
 
 // Wrapper: every throw inside Inner (validation AND mid-flow fail-louds)
@@ -763,14 +757,61 @@ async function createPaymentVoucherInner(formData: FormData) {
 export async function createPaymentVoucher(
   formData: FormData
 ): Promise<{ error: string } | undefined> {
+  let made: { id: string; voucherNo: string }
   try {
-    await createPaymentVoucherInner(formData)
-    return undefined
+    made = await createPaymentVoucherInner(formData)
   } catch (err) {
-    const digest = (err as { digest?: string })?.digest
-    if (typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')) throw err
-    if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
+    if (isRedirect(err)) throw err
     return { error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+  // Settling an invoice used to end on the voucher page, three screens away
+  // from the Billing list the work started on (user, 2026-09-29: "当我 settle
+  // invoice 后会自动跳去 payment"). A caller that sends return_to gets sent
+  // back there with the receipt number to show. Same-origin paths only — an
+  // absolute URL or a protocol-relative // would be an open redirect.
+  const rawReturn = ((formData.get('return_to') as string) ?? '').trim()
+  const returnTo = /^\/[A-Za-z0-9\-_/]*$/.test(rawReturn) ? rawReturn : null
+  if (returnTo) {
+    revalidatePath(returnTo)
+    redirect(`${returnTo}?receipt=${encodeURIComponent(made.voucherNo)}`)
+  }
+  redirect(`/payments/${made.id}`)
+}
+
+/**
+ * Create payment, the dialog's (2026-10-14, the Finance revamp v2 — D07): the
+ * same voucher the form page makes (createPaymentVoucherInner, every rule of
+ * it), but the dialog stays on Payments — so the answer is words, never a
+ * redirect: *HV-PV-… saved as draft*, or *… submitted — waiting for
+ * Principal* when `submit=1` sends it on at once (the draft stays, said so,
+ * if that second step is refused).
+ */
+export type DialogPaymentResult =
+  | { ok: true; id: string; voucherNo: string; submitted: boolean; note?: string }
+  | { ok: false; reason: string }
+
+export async function createPaymentFromDialog(formData: FormData): Promise<DialogPaymentResult> {
+  try {
+    if (formData.get('direction') !== 'debit') return { ok: false, reason: 'Create payment makes a payment voucher.' }
+    if (formData.get('return_to')) formData.delete('return_to')
+    const made = await createPaymentVoucherInner(formData)
+    if (formData.get('submit') !== '1') return { ok: true, id: made.id, voucherNo: made.voucherNo, submitted: false }
+    try {
+      const supabase = await createClient()
+      await submitDraftForApproval(supabase, made.user.id, made.id)
+      return { ok: true, id: made.id, voucherNo: made.voucherNo, submitted: true }
+    } catch (err) {
+      return {
+        ok: true,
+        id: made.id,
+        voucherNo: made.voucherNo,
+        submitted: false,
+        note: `Saved as a draft — it was not sent for approval: ${err instanceof Error ? err.message : 'unknown error'}`,
+      }
+    }
+  } catch (err) {
+    if (isRedirect(err)) throw err
+    return { ok: false, reason: err instanceof Error ? err.message : 'Unknown error' }
   }
 }
 
@@ -783,6 +824,11 @@ export async function submitForApproval(formData: FormData) {
   const id = formData.get('id') as string
   if (!id) throw new Error('Voucher id is required')
 
+  await submitDraftForApproval(supabase, user.id, id)
+}
+
+/** A draft sent to the approvals: its request, then the voucher pending. The caller has asked Treasury · Create. */
+async function submitDraftForApproval(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, id: string) {
   // Fetch voucher
   const { data: voucher, error: fetchError } = await supabase
     .from('payment_vouchers')
@@ -800,7 +846,7 @@ export async function submitForApproval(formData: FormData) {
       request_type: 'payment_voucher' as const,
       reference_id: id,
       reference_table: 'payment_vouchers',
-      submitted_by: user.id,
+      submitted_by: userId,
       description: `${voucher.voucher_no}: ${voucher.description}`,
       amount: voucher.amount,
       status: 'pending' as const,

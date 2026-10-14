@@ -1,0 +1,145 @@
+/* The date field and its calendar (2026-10-14, the Finance revamp v2 — the
+   prototype's `dateField`, D08). Every value is the prototype's: a 40px button
+   (its own box) with the date and the calendar glyph, ringed in the accent
+   while open; under it (or over it, when the form has no room below) a 300px
+   card of days — content-box, as the prototype's divs are — fading in from 4px
+   over .16s. It sits in the form's scroll, as the prototype's does. */
+
+.wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.field {
+  box-sizing: border-box;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: 10px;
+  background: var(--ds-surface);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--ds-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s, box-shadow 0.16s;
+}
+.field[data-open='true'] {
+  border-color: var(--ds-accent);
+  box-shadow: var(--ds-focus-ring);
+}
+.field:disabled { cursor: default; color: rgb(var(--hvs-muted)); }
+.field:focus-visible { outline: none; border-color: var(--ds-accent); box-shadow: var(--ds-focus-ring); }
+.glyph { display: grid; place-items: center; color: rgb(var(--hvs-graphite)); }
+
+.pop {
+  position: absolute;
+  left: 0;
+  z-index: 20;
+  box-sizing: content-box;
+  width: 300px;
+  padding: 10px 8px;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: 14px;
+  box-shadow: var(--fv-cal-shadow);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.pop[data-side='down'] { top: calc(100% + 6px); }
+.pop[data-side='up'] { bottom: calc(100% + 6px); transform: translateY(4px); }
+.pop[data-in='true'] { opacity: 1; transform: translateY(0); }
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 6px;
+}
+.nav {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  font-family: inherit;
+  font-size: 17px;
+  line-height: 1;
+  color: rgb(var(--hvs-graphite));
+  cursor: pointer;
+}
+.nav:hover { background: rgb(var(--hvs-nav-hover)); }
+.title { font-size: 13.5px; font-weight: 600; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  row-gap: 2px;
+}
+.dow {
+  padding-bottom: 4px;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgb(var(--hvs-muted));
+}
+.cell {
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  font-family: inherit;
+  cursor: pointer;
+}
+.cell:disabled { cursor: default; }
+.day {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 400;
+  color: rgb(var(--hvs-ink));
+}
+.day[data-today='true'] { font-weight: 600; box-shadow: inset 0 0 0 1.5px var(--ds-accent); }
+.day[data-on='true'] { background: var(--ds-accent); color: var(--ds-ink); font-weight: 700; box-shadow: var(--fv-cal-pick); }
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  padding: 8px 6px 0;
+  border-top: 1px solid var(--ds-border);
+}
+.footDate { font-size: 12px; color: rgb(var(--hvs-muted)); }
+.today {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(var(--fv-peach));
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ds-ink);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pop, .field { transition: none; }
+}

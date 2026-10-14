@@ -10,7 +10,9 @@ import { DialogMenu, FinDialog, type DialogMenuItem } from '@/components/finv/Di
 import AmendDateButton from './AmendDateButton'
 import AmendRepaymentButton from './AmendRepaymentButton'
 import { VoucherDrawer, fd } from './VoucherDrawer'
+import CreatePaymentDialog from './CreatePaymentDialog'
 import { statusWord, type HubCardKey, type HubLedger, type HubRow } from '../_lib/hub-ledger'
+import type { CreatePaymentOptions } from '../_lib/create-payment-options'
 
 // Payments' hub (2026-10-14, the Finance revamp v2 — D02–D05 of
 // `.design/fin-r2/handoff`): the head (Create payment, Dept · N, Payroll · N,
@@ -62,6 +64,7 @@ const COLUMNS: FinColumn<HubRow>[] = [
 export default function PaymentsHubClient({
   ledger,
   canCreate,
+  create = null,
   canSetDefault,
   dept,
   payroll,
@@ -69,6 +72,8 @@ export default function PaymentsHubClient({
 }: {
   ledger: HubLedger
   canCreate: boolean
+  /** Create payment's dialog (whoever may make a voucher): its line, today, and — arriving with ?new=1 — open with its lists. */
+  create?: { prefix: string; today: string; open: boolean; initial: CreatePaymentOptions | null } | null
   canSetDefault: boolean
   dept: RequestItem[]
   /** null without Payroll payouts: Payroll Requests is not theirs to open. */
@@ -84,6 +89,7 @@ export default function PaymentsHubClient({
   const [rowMenu, setRowMenu] = useState<{ row: HubRow; anchor: RowMenuAnchor } | null>(null)
   const [redate, setRedate] = useState<{ row: HubRow; nonce: number } | null>(null)
   const [amend, setAmend] = useState<{ row: HubRow; nonce: number } | null>(null)
+  const [creating, setCreating] = useState(!!create?.open)
 
   // The card in the URL, so a refresh or a link lands on it (no navigation: the list is here).
   useEffect(() => {
@@ -92,6 +98,16 @@ export default function PaymentsHubClient({
     else url.searchParams.set('status', card)
     if (url.toString() !== window.location.href) window.history.replaceState(window.history.state, '', url.toString())
   }, [card])
+
+  // Closed, the dialog leaves the URL (?new=1 opened it) so a refresh does not open it again.
+  const closeCreate = () => {
+    setCreating(false)
+    const url = new URL(window.location.href)
+    if (url.searchParams.has('new')) {
+      url.searchParams.delete('new')
+      window.history.replaceState(window.history.state, '', url.toString())
+    }
+  }
 
   const q = query.trim().toLowerCase()
   const rows = useMemo(
@@ -172,8 +188,8 @@ export default function PaymentsHubClient({
         title="Payments"
         actions={
           <>
-            {canCreate ? (
-              <HeadButton primary href="/payments/new">
+            {canCreate && create ? (
+              <HeadButton primary onClick={() => setCreating(true)}>
                 Create payment
               </HeadButton>
             ) : null}
@@ -243,6 +259,7 @@ export default function PaymentsHubClient({
       </div>
 
       <VoucherDrawer id={drawer} onClose={() => setDrawer(null)} onChanged={() => router.refresh()} />
+      {create ? <CreatePaymentDialog open={creating} onClose={closeCreate} prefix={create.prefix} today={create.today} initial={create.initial} /> : null}
 
       <FinDialog open={menu === 'dept'} onClose={() => setMenu(null)} title="Dept Requests" sub={dept.length > 0 ? `${dept.length} waiting for a voucher` : undefined}>
         <DialogMenu items={requestMenu(dept, '/payments/dept-requests', 'Open Dept Requests', 'Nothing waiting')} />

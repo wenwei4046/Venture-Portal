@@ -120,7 +120,7 @@ describe("Finance's Overview (D01)", () => {
     render(await drawn())
     expect(screen.getByText('Wed 14 Oct 2026 · Q4 2026')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Good afternoon, Aina.')
-    expect(screen.getByRole('link', { name: 'Create payment' })).toHaveAttribute('href', '/payments/new')
+    expect(screen.getByRole('link', { name: 'Create payment' })).toHaveAttribute('href', '/payments?new=1')
     expect(screen.getByRole('link', { name: 'Create invoice' })).toHaveAttribute('href', '/statements')
   })
 
