@@ -125,6 +125,33 @@ select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
   background: rgb(var(--fv-peach));
   border-top: 1px solid var(--ds-border);
 }
+/* A card's head row (a company, its total) and the parts under a row (Salary 933.20 · EPF 121.32 …). */
+.summaryRow[data-head='true'] { background: rgb(var(--hvs-ground)); }
+.summaryRow[data-head='true'] .summaryLabel,
+.summaryRow[data-head='true'] .summaryValue { font-weight: 600; }
+.summaryParts {
+  padding: 0 14px 9px;
+  margin-top: -4px;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgb(var(--hvs-muted));
+}
+/* A few words of state beside a name (matches ✓, not invoiced, under-billed …). */
+.tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--ds-border);
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+.tag[data-tone='ledger'] { color: var(--ds-success); }
+.tag[data-tone='alert'] { color: var(--ds-warning); }
+.tag[data-tone='danger'] { color: var(--ds-danger); }
 .summaryTotalLabel { font-size: 13px; font-weight: 500; }
 .summaryTotalValue { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 14px; font-weight: 600; }
 
@@ -148,7 +175,7 @@ select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
 }
 /* A company and its amount · a mode, a category and an amount · an item and its amount (and its category). */
 .lineRow[data-shape='party'] { grid-template-columns: minmax(0, 1fr) 128px 28px; }
-.lineRow[data-shape='pool'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) 112px 28px; }
+.lineRow[data-shape='pool'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 100px 28px; }
 .lineRow[data-shape='item'] { grid-template-columns: minmax(0, 1fr) 128px 28px; }
 .lineRow[data-shape='item-cat'] { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 112px 28px; }
 /* A narrow dialog (a phone): a line of four takes two rows — its two selects, then its amount and its ×. */
@@ -233,6 +260,30 @@ select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
 }
 .addLine:hover { text-decoration: underline; }
 .addLine:disabled { opacity: 0.45; cursor: default; text-decoration: none; }
+
+/* Ticks on a white card (Change account's accounts): a row a choice — its box,
+   its words, a figure at its end — the box the kit's accent when ticked. */
+.checks {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--ds-border);
+  font-size: 13px;
+  cursor: pointer;
+}
+.check:first-child { border-top: 0; }
+.check:hover { background: rgb(var(--fv-menu-hover)); }
+.check input { width: 15px; height: 15px; margin: 0; accent-color: var(--ds-accent); cursor: pointer; }
+.checkCode { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; color: rgb(var(--hvs-muted)); }
+.checkName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.checkValue { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 12.5px; white-space: nowrap; }
 
 /* Two fields side by side (a party's phone and email). */
 .duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }

@@ -431,6 +431,8 @@ export default async function InvoicePage({ params }: Props) {
             }}
             lines={storedLines.map((l) => ({ description: l.description, amount: l.amount, category_code: l.category_code }))}
             remaining={remaining}
+            received={directReceived}
+            creditNotesHeld={r2(creditNotes.filter((c) => c.status !== 'voided').reduce((s, c) => s + c.amount, 0))}
             settled={isPaid || directReceived > 0}
             voidable={isIssued && directReceived <= 0 && credited <= 0}
             payeeLabel={party.name}
@@ -438,7 +440,9 @@ export default async function InvoicePage({ params }: Props) {
             here={here}
             today={today}
             categories={accounts.map((a) => ({ code: a.code, label: a.name, type: a.type as AccountType, parent_code: a.parent_code }))}
-            companies={companyRows.filter((c) => c.is_active !== false).map((c) => ({ id: c.id, name: c.name }))}
+            companies={companyRows
+              .filter((c) => c.is_active !== false || c.id === inv.company_id)
+              .map((c) => ({ id: c.id, name: c.name, short_code: c.short_code ?? '' }))}
             departments={Array.from(departmentMap, ([did, name]) => ({ id: did, name }))}
             extraModes={extraModes}
             banks={((banks ?? []) as Array<{ id: string; bank_name: string; account_number: string | null }>).map((b) => ({

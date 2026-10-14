@@ -10,13 +10,18 @@ import { withActions } from '@/test/with-actions'
 // apart from the contra items (its credit notes) and the receipts, and what
 // Finance can do to it in its present status.
 
-type DialogProps = { invoiceNo?: string | null; autoOpen?: boolean; hideTrigger?: boolean; status?: string; settled?: boolean }
+type DialogProps = { open?: boolean; editing?: { no: string | null; status: string; settled: boolean } | null; invoice?: { no: string | null; received?: number; credited?: number } }
 const mocks = vi.hoisted(() => ({
   requirePermission: vi.fn(), createClient: vi.fn(), notFound: vi.fn(), push: vi.fn(), refresh: vi.fn(),
   approveInvoice: vi.fn(), deleteDraftInvoice: vi.fn(), voidIssuedInvoices: vi.fn(), copyInvoice: vi.fn(), settleInvoicesConsolidated: vi.fn(),
   dialog: (name: string) =>
     function Dialog(p: DialogProps) {
-      return <div data-testid={name} data-auto={String(!!p.autoOpen)} data-hide={String(!!p.hideTrigger)} data-status={p.status ?? ''} data-settled={String(!!p.settled)}>{p.invoiceNo}</div>
+      const inv = p.editing ?? p.invoice
+      return (
+        <div data-testid={name} data-open={String(!!p.open)} data-status={p.editing?.status ?? ''} data-settled={String(!!p.editing?.settled)} data-received={String(p.invoice?.received ?? '')} data-credited={String(p.invoice?.credited ?? '')}>
+          {inv?.no}
+        </div>
+      )
     },
 }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
@@ -29,9 +34,9 @@ vi.mock('@/app/(portal)/billing/actions', () => ({
   approveInvoice: mocks.approveInvoice, deleteDraftInvoice: mocks.deleteDraftInvoice, voidIssuedInvoices: mocks.voidIssuedInvoices,
   copyInvoice: mocks.copyInvoice, settleInvoicesConsolidated: mocks.settleInvoicesConsolidated,
 }))
-vi.mock('@/app/(portal)/billing/_components/InvoiceActions', () => ({ EditInvoiceButton: mocks.dialog('dialog-edit') }))
-vi.mock('@/app/(portal)/billing/_components/CreateCreditNoteButton', () => ({ default: mocks.dialog('dialog-cn') }))
-vi.mock('@/app/(portal)/billing/_components/ReassignInvoiceGlButton', () => ({ default: mocks.dialog('dialog-gl') }))
+vi.mock('@/app/(portal)/statements/_components/InvoiceLinesDialog', () => ({ default: mocks.dialog('dialog-edit') }))
+vi.mock('@/app/(portal)/statements/_components/CreditNoteDialog', () => ({ default: mocks.dialog('dialog-cn') }))
+vi.mock('@/app/(portal)/statements/_components/ChangeAccountDialog', () => ({ default: mocks.dialog('dialog-gl') }))
 
 import InvoicePage from './page'
 
@@ -173,9 +178,11 @@ describe('an invoice’s own page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
     const edit = screen.getByTestId('dialog-edit')
     expect(edit).toHaveTextContent('HV-INV-202610-0013')
-    expect(edit.dataset).toMatchObject({ auto: 'true', hide: 'true', status: 'issued', settled: 'true' })
+    expect(edit.dataset).toMatchObject({ open: 'true', status: 'issued', settled: 'true' })
     fireEvent.click(screen.getByRole('button', { name: '+ Credit note' }))
     expect(screen.getByTestId('dialog-cn')).toHaveTextContent('HV-INV-202610-0013')
+    // What a credit note may still take: received, and the credit notes not voided.
+    expect(screen.getByTestId('dialog-cn').dataset).toMatchObject({ received: '500', credited: '100' })
     fireEvent.click(screen.getByRole('button', { name: 'Change account' }))
     expect(screen.getByTestId('dialog-gl')).toBeInTheDocument()
     unmount()
@@ -193,7 +200,7 @@ describe('an invoice’s own page', () => {
     expect(mocks.refresh).toHaveBeenCalled()
   })
 
-  it('a draft is approved, edited or deleted; a paid one refunded or credited', async () => {
+  it('a draft is approved, edited or deleted; a paid one refunded', async () => {
     database({ ...ISSUED, status: 'draft', invoice_no: null }, { receipts: [], cns: [] })
     mocks.approveInvoice.mockResolvedValue(undefined)
     mocks.deleteDraftInvoice.mockResolvedValue(undefined)
@@ -226,7 +233,9 @@ describe('an invoice’s own page', () => {
     expect(or).toHaveTextContent('RM 2,204.00')
     expect(or).toHaveTextContent('consolidated receipt · RM 5,000.00 in all')
     expect(screen.getByRole('link', { name: 'Refund' })).toHaveAttribute('href', '/payments/new?mode=refund&invoice_id=i13&return_to=/invoices/i13')
-    expect(screen.getByRole('button', { name: '+ Credit note' })).toBeInTheDocument()
+    // A credit note nets what is still owed (CN v2): a paid invoice is refunded — the button says why it is shut.
+    expect(screen.getByRole('button', { name: '+ Credit note' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '+ Credit note' })).toHaveAttribute('title', 'A credit note nets what is still owed — a paid invoice is refunded instead')
   })
 
   it('names a department pool and a free-text party with its contact; a pool settles on the voucher page', async () => {

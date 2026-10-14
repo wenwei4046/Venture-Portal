@@ -38,6 +38,8 @@ export interface InvoiceStep {
   kind: 'primary' | 'secondary' | 'danger'
   /** A line under it in a menu ("Salary Income · 5020"). */
   sub?: string
+  /** Why it cannot be done to this invoice — drawn shut, saying so (the design's button, the system's rule). */
+  off?: string
 }
 
 /** The status in the design's words — as the list's chip and the hero say it. */
@@ -58,13 +60,27 @@ const rm = (n: number) => `RM ${f2(n)}`
  * the design's order (D10) — draft: Approve & issue · Edit · ⋯ (Delete draft);
  * issued: Settle · Edit · ⋯ (+ Credit note, Change account, Void invoice);
  * paid: Refund · + Credit note · ⋯ (Change account). The system's own, kept in
- * the ⋯: Copy, and Edit on a paid invoice.
+ * the ⋯: Copy, and Edit on a paid invoice. A step the system refuses for this
+ * invoice (a credit note on a paid one) is drawn shut, saying why.
  */
 export function invoiceSteps(inv: HubInvoice, can: InvoiceCan): { bar: InvoiceStep[]; more: InvoiceStep[] } {
   const bar: InvoiceStep[] = []
   const more: InvoiceStep[] = []
   const account: InvoiceStep = { key: 'reassign', label: 'Change account', kind: 'secondary', sub: inv.gl ? `${inv.gl.name} · ${inv.gl.code}` : undefined }
   const copy: InvoiceStep = { key: 'copy', label: 'Copy as new draft', kind: 'secondary' }
+  // A credit note nets what an issued invoice still owes (CN v2, 2026-08-19): a paid one is refunded, a
+  // consolidated payroll invoice settles in full — the system refuses both, so the button says why.
+  const creditNote: InvoiceStep = {
+    key: 'credit_note',
+    label: '+ Credit note',
+    kind: 'secondary',
+    off:
+      inv.status !== 'issued'
+        ? 'A credit note nets what is still owed — a paid invoice is refunded instead'
+        : inv.modeKey === 'payroll_consolidated'
+          ? 'A consolidated payroll invoice settles in full — no credit note'
+          : undefined,
+  }
   if (inv.status === 'draft') {
     if (can.edit) bar.push({ key: 'approve', label: 'Approve & issue', kind: 'primary' }, { key: 'edit', label: 'Edit', kind: 'secondary' })
     if (can.create) more.push(copy)
@@ -72,13 +88,13 @@ export function invoiceSteps(inv: HubInvoice, can: InvoiceCan): { bar: InvoiceSt
   } else if (inv.status === 'issued') {
     if (inv.settleable ? can.create : can.voucher) bar.push({ key: inv.settleable ? 'settle' : 'settle_netting', label: 'Settle', kind: 'primary' })
     if (can.edit) bar.push({ key: 'edit', label: 'Edit', kind: 'secondary' })
-    if (can.create) more.push({ key: 'credit_note', label: '+ Credit note', kind: 'secondary' })
+    if (can.create) more.push(creditNote)
     if (can.edit) more.push(account)
     if (can.create) more.push(copy)
     if (can.void && inv.voidable) more.push({ key: 'void', label: 'Void invoice', kind: 'danger' })
   } else if (inv.status === 'paid' || inv.status === 'paid_via_netting') {
     if (can.voucher && inv.status === 'paid') bar.push({ key: 'refund', label: 'Refund', kind: 'secondary' })
-    if (can.create) bar.push({ key: 'credit_note', label: '+ Credit note', kind: 'secondary' })
+    if (can.create) bar.push(creditNote)
     if (can.edit) more.push(account, { key: 'edit', label: 'Edit', kind: 'secondary' })
     if (can.create) more.push(copy)
   }
@@ -95,9 +111,9 @@ function noteOf(inv: HubInvoice): string {
     case 'draft':
       return 'Approving issues the invoice and posts it to the GL.'
     case 'paid':
-      return 'Paid. Refund or raise a credit note if something was billed wrong.'
+      return 'Paid. Refund it if something was billed wrong.'
     case 'paid_via_netting':
-      return 'Paid via netting. Raise a credit note if something was billed wrong.'
+      return 'Paid via netting.'
     case 'voided':
       return 'Voided.'
     default:
@@ -152,7 +168,8 @@ export function InvoiceDrawer({
         type="button"
         className={d.barBtn}
         data-kind={s.kind === 'secondary' ? undefined : s.kind}
-        disabled={busy}
+        disabled={busy || !!s.off}
+        title={s.off}
         onClick={() => inv && onStep(s.key, inv)}
       >
         {s.label}

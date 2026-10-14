@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { toHubInvoice, type HubCreditNote, type InvoiceContext, type InvoiceHubData, type InvoiceRowIn } from '../_lib/invoice-model'
-import type { InvoiceCan } from './InvoiceDrawer'
+import { invoiceSteps, type InvoiceCan } from './InvoiceDrawer'
 
 // Invoice's hub (2026-10-14, the Finance revamp v2 — D10): the head's three
 // menus, the month's total with its month pill, a card a list, the table with
@@ -56,12 +56,14 @@ vi.mock('../invoice-actions', () => ({
 }))
 vi.mock('./CreateInvoiceDialog', () => ({ default: marker('single') }))
 vi.mock('./InvoiceLinesDialog', () => ({ default: marker('lines') }))
-vi.mock('../../billing/_components/CreateCreditNoteButton', () => ({ default: marker('credit_note') }))
-vi.mock('../../billing/_components/ReassignInvoiceGlButton', () => ({ default: marker('reassign') }))
-vi.mock('../../billing/_components/GenerateInvoicesButton', () => ({ default: marker('marketing') }))
-vi.mock('../../billing/_components/GenerateConsolidatedInvoicesButton', () => ({ default: marker('consolidated') }))
-vi.mock('../../billing/_components/ReconcilePayrollBillingButton', () => ({ default: marker('reconcile') }))
-vi.mock('../../billing/_components/GenerateOwnShareInvoiceButton', () => ({ default: marker('own-share') }))
+vi.mock('./CreditNoteDialog', () => ({ default: marker('credit_note') }))
+vi.mock('./ChangeAccountDialog', () => ({ default: marker('reassign') }))
+vi.mock('./GenerateDialogs', () => ({
+  MarketingDialog: marker('marketing'),
+  PayrollInvoicesDialog: marker('consolidated'),
+  ReconcileDialog: marker('reconcile'),
+  OwnShareDialog: marker('own-share'),
+}))
 vi.mock('@/components/department/DepartmentModeSwitch', () => ({ default: () => <div data-testid="mode-switch" /> }))
 
 import InvoicesHubClient from './InvoicesHubClient'
@@ -207,6 +209,22 @@ describe('the head and the cards', () => {
     expect(mocks.dialog.mock.lastCall?.[1].editing).toBeUndefined()
   })
 
+  it('the generators open on the page’s month — Marketing from Create invoice ▾, the three payroll ones from Payroll ▾', () => {
+    draw()
+    const pick = (menu: string, item: RegExp) => {
+      fireEvent.click(screen.getByRole('button', { name: menu }))
+      fireEvent.click(within(dialog()).getByRole('menuitem', { name: item }))
+    }
+    pick('Create invoice ▾', /Generate Marketing invoices/)
+    expect(mocks.dialog).toHaveBeenLastCalledWith('marketing', expect.objectContaining({ period: '2026-10-01', open: true }))
+    pick('Payroll ▾', /Generate payroll invoices/)
+    expect(mocks.dialog).toHaveBeenLastCalledWith('consolidated', expect.objectContaining({ period: '2026-10-01', open: true }))
+    pick('Payroll ▾', /Reconcile payroll/)
+    expect(mocks.dialog).toHaveBeenLastCalledWith('reconcile', expect.objectContaining({ period: '2026-10-01', open: true }))
+    pick('Payroll ▾', /Own-share/)
+    expect(mocks.dialog).toHaveBeenLastCalledWith('own-share', expect.objectContaining({ period: '2026-10-01', open: true }))
+  })
+
   it('Export ▾ names the files of the month on show', () => {
     draw()
     fireEvent.click(screen.getByRole('button', { name: 'Export ▾' }))
@@ -341,8 +359,39 @@ describe('the drawer', () => {
     draw()
     fireEvent.click(rowOf('HOUZS Century', '1,250.00'))
     expect(within(drawer()).getAllByRole('button').map((b) => b.textContent)).toEqual(['×', 'Refund', '+ Credit note', '⋯'])
+    expect(drawer()).toHaveTextContent('Paid. Refund it if something was billed wrong.')
     fireEvent.click(within(drawer()).getByRole('button', { name: 'Refund' }))
     expect(mocks.push).toHaveBeenCalledWith('/payments/new?mode=refund&invoice_id=pd1&return_to=/statements')
+  })
+
+  it('⋯ › + Credit note and Change account open their dialogs on the invoice — what it owes, what it posted to', () => {
+    draw({ data: hub({ invoices: [toHubInvoice(row({ id: 'hc1', invoice_no: 'HV-INV-202610-0013', total_amount: 2204 }), { ...ctx, creditNotes: new Map([['hc1', [{ id: 'c1', no: 'HV-CN-202610-0002', amount: 220.4, reason: 'Overbilled', status: 'draft' }]]]) })] }) })
+    fireEvent.click(rowOf('HOUZS Century', '2,204.00'))
+    fireEvent.click(within(drawer()).getByRole('button', { name: 'More' }))
+    fireEvent.click(within(dialog()).getByRole('menuitem', { name: /\+ Credit note/ }))
+    expect(mocks.dialog).toHaveBeenLastCalledWith(
+      'credit_note',
+      expect.objectContaining({
+        open: true,
+        invoice: { id: 'hc1', no: 'HV-INV-202610-0013', party: 'HOUZS Century (HC)', total: 2204, received: 0, credited: 220.4, mode: 'hr_attribution', category: '5020' },
+      }),
+    )
+    fireEvent.click(within(drawer()).getByRole('button', { name: 'More' }))
+    fireEvent.click(within(dialog()).getByRole('menuitem', { name: /Change account/ }))
+    expect(mocks.dialog).toHaveBeenLastCalledWith('reassign', expect.objectContaining({ open: true, invoice: expect.objectContaining({ id: 'hc1', category: '5020' }) }))
+  })
+
+  // CN v2 (2026-08-19): a credit note nets what an ISSUED invoice still owes — the system refuses one on a
+  // paid invoice (refund it) and on a consolidated payroll invoice; the design's button stays, shut, saying why.
+  it('a credit note the system would refuse is drawn shut, with why', () => {
+    draw()
+    fireEvent.click(rowOf('HOUZS Century', '1,250.00'))
+    const cn = within(drawer()).getByRole('button', { name: '+ Credit note' })
+    expect(cn).toBeDisabled()
+    expect(cn).toHaveAttribute('title', 'A credit note nets what is still owed — a paid invoice is refunded instead')
+    const inv = toHubInvoice(row({ id: 'pc1', invoice_no: 'HV-INV-202610-0020', billing_mode: 'payroll_consolidated' }), ctx)
+    const { more } = invoiceSteps(inv, ALL)
+    expect(more.find((s) => s.key === 'credit_note')?.off).toBe('A consolidated payroll invoice settles in full — no credit note')
   })
 
   it('Void asks for a reason before it voids', async () => {

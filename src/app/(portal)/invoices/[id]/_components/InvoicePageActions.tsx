@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import type { AccountType } from '@/lib/coa'
 import { approveInvoice, deleteDraftInvoice, settleInvoicesConsolidated, voidIssuedInvoices } from '@/app/(portal)/billing/actions'
-import { EditInvoiceButton } from '@/app/(portal)/billing/_components/InvoiceActions'
-import CreateCreditNoteButton from '@/app/(portal)/billing/_components/CreateCreditNoteButton'
-import ReassignInvoiceGlButton from '@/app/(portal)/billing/_components/ReassignInvoiceGlButton'
+import InvoiceLinesDialog from '@/app/(portal)/statements/_components/InvoiceLinesDialog'
+import CreditNoteDialog from '@/app/(portal)/statements/_components/CreditNoteDialog'
+import ChangeAccountDialog from '@/app/(portal)/statements/_components/ChangeAccountDialog'
+import type { InvoiceEditInitial } from '@/app/(portal)/statements/_lib/invoice-model'
 
 // What Finance can do to an invoice from its own page (2026-10-09, the
 // handoff's Actions panel) — the same actions Service Billing's row menu
@@ -19,16 +20,21 @@ import ReassignInvoiceGlButton from '@/app/(portal)/billing/_components/Reassign
 // Settle takes the receipt here, for what remains or part of it, through the
 // same server action as the list's settle dialog; a department pool's invoice
 // settles by netting on the voucher page, which brings the reader back. The
-// dialogs are the list's own (Edit, credit note, change account).
+// dialogs are Invoice's hub's own (2026-10-14: Edit, credit note, change
+// account in the Finance kit's sheet); a credit note the system refuses — on a
+// paid invoice, a consolidated payroll one — is shut, saying why.
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
 interface Props {
   invoice: { id: string; invoiceNo: string | null; status: string; billableToType: string | null; totalAmount: number }
-  editInitial: Parameters<typeof EditInvoiceButton>[0]['initial']
+  editInitial: InvoiceEditInitial
   lines: Array<{ description: string | null; amount: number; category_code: string | null }>
   /** What an issued invoice still has to collect. */
   remaining: number
+  /** Money received against it, and its credit notes not voided — what a credit note may still take. */
+  received: number
+  creditNotesHeld: number
   /** Money has come in against it — its amount, payer and period are fixed. */
   settled: boolean
   /** Issued and untouched — no receipt, no credit note. */
@@ -40,17 +46,17 @@ interface Props {
   here: string
   today: string
   categories: Array<{ code: string; label: string; type: AccountType; parent_code: string | null }>
-  companies: Array<{ id: string; name: string }>
+  companies: Array<{ id: string; name: string; short_code: string }>
   departments: Array<{ id: string; name: string }>
   extraModes: Array<{ value: string; label: string }>
   banks: Array<{ id: string; label: string }>
   can: { edit: boolean; create: boolean; void: boolean; voucher: boolean }
 }
 
-type Dialog = { kind: 'edit' | 'credit_note' | 'reassign'; nonce: number } | null
+type Dialog = { kind: 'edit' | 'credit_note' | 'reassign'; nonce: number; open: boolean } | null
 
 export default function InvoicePageActions({
-  invoice, editInitial, lines, remaining, settled, voidable, payeeLabel, listHref, here, today, categories, companies, departments, extraModes, banks, can,
+  invoice, editInitial, lines, remaining, received, creditNotesHeld, settled, voidable, payeeLabel, listHref, here, today, categories, companies, departments, extraModes, banks, can,
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -68,7 +74,19 @@ export default function InvoicePageActions({
   const isIssued = status === 'issued'
   const isPaid = status === 'paid' || status === 'paid_via_netting'
   const deptPool = invoice.billableToType === 'dept_pool'
-  const open = (kind: NonNullable<Dialog>['kind']) => setDialog({ kind, nonce: Date.now() })
+  const open = (kind: NonNullable<Dialog>['kind']) => setDialog({ kind, nonce: Date.now(), open: true })
+  const closeDialog = () => setDialog((d) => (d ? { ...d, open: false } : d))
+  const dialogDone = (message: string) => {
+    setError(null)
+    setDone(message)
+    router.refresh()
+  }
+  // A credit note nets what an issued invoice still owes (CN v2, 2026-08-19) — the system refuses the rest.
+  const cnOff = !isIssued
+    ? 'A credit note nets what is still owed — a paid invoice is refunded instead'
+    : editInitial.billing_mode === 'payroll_consolidated'
+      ? 'A consolidated payroll invoice settles in full — no credit note'
+      : undefined
   const toggle = (which: 'settle' | 'void') => {
     setError(null)
     setPanel((p) => (p === which ? null : which))
@@ -167,7 +185,7 @@ export default function InvoicePageActions({
               </button>
             ) : null}
             {can.edit ? <button type="button" className="btn-sec" onClick={() => open('edit')}>Edit</button> : null}
-            {can.create ? <button type="button" className="btn-sec" onClick={() => open('credit_note')}>+ Credit note</button> : null}
+            {can.create ? <button type="button" className="btn-sec" disabled={!!cnOff} title={cnOff} onClick={() => open('credit_note')}>+ Credit note</button> : null}
             {can.edit ? <button type="button" className="btn-sec" onClick={() => open('reassign')}>Change account</button> : null}
             {can.void && voidable ? (
               <button type="button" className="btn-danger" aria-expanded={panel === 'void'} onClick={() => toggle('void')}>
@@ -185,7 +203,7 @@ export default function InvoicePageActions({
                 Refund
               </Link>
             ) : null}
-            {can.create ? <button type="button" className="btn-sec" onClick={() => open('credit_note')}>+ Credit note</button> : null}
+            {can.create ? <button type="button" className="btn-sec" disabled={!!cnOff} title={cnOff} onClick={() => open('credit_note')}>+ Credit note</button> : null}
             {can.edit ? <button type="button" className="btn-sec" onClick={() => open('reassign')}>Change account</button> : null}
           </>
         ) : null}
@@ -234,44 +252,48 @@ export default function InvoicePageActions({
       {error ? <div className="mt-3 bg-danger-bg border border-danger text-danger rounded-md p-3 text-sm font-sans">{error}</div> : null}
 
       {dialog?.kind === 'edit' ? (
-        <EditInvoiceButton
+        <InvoiceLinesDialog
           key={`edit:${dialog.nonce}`}
-          autoOpen
-          hideTrigger
-          id={id}
-          invoiceNo={invoiceNo}
-          status={status}
-          settled={settled}
-          initial={editInitial}
-          initialLines={lines}
-          categories={categories}
+          open={dialog.open}
+          onClose={closeDialog}
+          onDone={dialogDone}
+          period={editInitial.period_month ?? `${today.slice(0, 7)}-01`}
+          today={today}
           companies={companies}
           departments={departments}
+          categories={categories}
+          extraModes={extraModes}
+          editing={{ id, no: invoiceNo, status, settled, initial: editInitial, lines }}
         />
       ) : null}
       {dialog?.kind === 'credit_note' ? (
-        <CreateCreditNoteButton
+        <CreditNoteDialog
           key={`cn:${dialog.nonce}`}
-          autoOpen
-          hideTrigger
-          invoiceId={id}
-          invoiceNo={invoiceNo}
-          invoiceTotal={invoice.totalAmount}
-          payeeLabel={payeeLabel}
+          open={dialog.open}
+          onClose={closeDialog}
+          onDone={dialogDone}
+          invoice={{
+            id,
+            no: invoiceNo,
+            party: payeeLabel,
+            total: invoice.totalAmount,
+            received,
+            credited: creditNotesHeld,
+            mode: editInitial.billing_mode,
+            category: editInitial.category_code ?? (new Set(lines.map((l) => l.category_code)).size === 1 ? (lines[0]?.category_code ?? null) : null),
+          }}
           categories={categories}
           extraModes={extraModes}
         />
       ) : null}
       {dialog?.kind === 'reassign' ? (
-        <ReassignInvoiceGlButton
+        <ChangeAccountDialog
           key={`gl:${dialog.nonce}`}
-          autoOpen
-          hideTrigger
-          invoiceId={id}
-          invoiceNo={invoiceNo}
-          currentCategory={editInitial.category_code ?? null}
-          categories={categories.map((c) => ({ code: c.code, label: c.label }))}
-          postedAccounts={postedAccounts}
+          open={dialog.open}
+          onClose={closeDialog}
+          onDone={dialogDone}
+          invoice={{ id, no: invoiceNo, category: editInitial.category_code ?? null, posted: postedAccounts }}
+          categories={categories}
         />
       ) : null}
     </>
