@@ -332,8 +332,9 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
         // encoded again to fit (shared/video-fit.ts); one that already fits goes as it is.
         if (kind === "video") {
           const max = mediaLimit(channel, "video"), name = channel === "messenger" ? "Messenger" : "WhatsApp";
-          let tenth = -1;
-          const fit = await fitVideo(file, max, name, p => { const n = Math.floor(p * 10); if (n !== tenth) { tenth = n; toast(`Preparing the video · ${n * 10}%`); } });
+          // No progress toast (the owner, 2026-10-14: "能不能不顯示 preparing video"): the video is already in the chat with its clock;
+          // only a refusal is said.
+          const fit = await fitVideo(file, max, name);
           if (!fit.ok) return { ok: false as const, error: fit.error };
           file = fit.file;
         }

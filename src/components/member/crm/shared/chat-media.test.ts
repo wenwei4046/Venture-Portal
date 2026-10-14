@@ -58,6 +58,11 @@ describe("photos sent together are one album, as on WhatsApp", () => {
     expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2, "me", "look"), pic("d", 3)]).lead.size).toBe(0);
     expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2, "lead"), pic("d", 3)]).lead.size).toBe(0);
     expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2), pic("d", 500)]).lead.size).toBe(0);
+    // 16:11:12 – 16:11:21 four photos, then a video at 16:13:09: the album is the four; the video stands alone.
+    const vid = { id: "v", from: "me" as const, at: new Date(Date.UTC(2026, 9, 14, 2, 0, 9 + 108)).toISOString(), text: "", media: { kind: "video" as const, url: "/m/v" } };
+    const r = albumsOf([pic("a", 0), pic("b", 3), pic("c", 6), pic("d", 9), vid]);
+    expect(r.lead.get("a")?.length).toBe(4);
+    expect(r.hidden.has("v")).toBe(false);
   });
   it("draws a PDF as its card and a voice note as a voice bubble", () => {
     expect(mediaOf({ id: "p", media: { kind: "file", url: "/m/p", name: "x.pdf", mime: "application/pdf" } }, []).isPdf).toBe(true);

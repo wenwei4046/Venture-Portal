@@ -49,7 +49,8 @@ export function galleryOf(messages: Msg[]): ViewerItem[] {
 
 /**
  * Albums (WhatsApp's): four or more photos / videos in a row from the same side, without words of their own, each within
- * two minutes of the one before. The first message carries the album; the others are not drawn (`hidden`).
+ * 20 seconds of the one before — sent together (it was two minutes, which swallowed a video sent after an album, 2026-10-14).
+ * The first message carries the album; the others are not drawn (`hidden`).
  */
 export function albumsOf(messages: Msg[]): { lead: Map<string, Msg[]>; hidden: Set<string> } {
   const lead = new Map<string, Msg[]>(), hidden = new Set<string>();
@@ -57,7 +58,7 @@ export function albumsOf(messages: Msg[]): { lead: Map<string, Msg[]>; hidden: S
   const close = () => { if (run.length >= 4) { lead.set(run[0].id, run); run.slice(1).forEach(m => hidden.add(m.id)); } run = []; };
   for (const m of messages) {
     const prev = run[run.length - 1];
-    const joins = visual(m) && !m.text && (!prev || (prev.from === m.from && Math.abs(new Date(m.at ?? 0).getTime() - new Date(prev.at ?? 0).getTime()) <= 120_000));
+    const joins = visual(m) && !m.text && (!prev || (prev.from === m.from && Math.abs(new Date(m.at ?? 0).getTime() - new Date(prev.at ?? 0).getTime()) <= 20_000));
     if (!joins) { close(); if (visual(m) && !m.text) run = [m]; continue; }
     run.push(m);
   }
