@@ -25,8 +25,8 @@ describe("a chat's photos, videos and documents (2026-10-14)", () => {
     expect(docLabel(undefined, undefined)).toBe("FILE");
   });
 
-  it("keeps a voice note and plain text in the usual bubble", () => {
-    expect(mediaOf(msgs[4], []).pad).toBe("10px 13px");
+  it("keeps a voice note snug (2026-10-14) and plain text in the usual bubble", () => {
+    expect(mediaOf(msgs[4], []).pad).toBe("6px 9px 5px");
     expect(mediaOf(msgs[4], []).view).toBeUndefined();
     expect(mediaOf(msgs[1], [])).toEqual(NO_MEDIA);
   });
@@ -62,5 +62,14 @@ describe("photos sent together are one album, as on WhatsApp", () => {
   it("draws a PDF as its card and a voice note as a voice bubble", () => {
     expect(mediaOf({ id: "p", media: { kind: "file", url: "/m/p", name: "x.pdf", mime: "application/pdf" } }, []).isPdf).toBe(true);
     expect(mediaOf({ id: "v", from: "me", media: { kind: "audio", url: "/m/v" } }, []).voiceMine).toBe(true);
+  });
+});
+
+describe("a voice note's speed (2026-10-14)", () => {
+  it("goes 1× → 1.25× → 1.5× → 2× and round again", async () => {
+    const { nextSpeed, speedLabel } = await import("./voice-note");
+    expect([1, 1.25, 1.5, 2].map(nextSpeed)).toEqual([1.25, 1.5, 2, 1]);
+    expect(speedLabel(1.25)).toBe("1.25×");
+    expect(mediaOf({ id: "v", media: { kind: "audio", url: "/m/v" } }, []).pad).toBe("6px 9px 5px");
   });
 });

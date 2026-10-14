@@ -86,7 +86,8 @@ export function mediaOf(m: Msg, gallery: ViewerItem[], album?: Msg[]): typeof NO
       const t = e.currentTarget as HTMLImageElement & HTMLVideoElement;
       rememberShape(url, t.naturalWidth || t.videoWidth, t.naturalHeight || t.videoHeight);
     } : undefined,
-    pad: framed ? "3px 3px 5px" : "10px 13px",
-    inPad: framed ? "0 7px" : "0",
+    // A voice note sits closer to its bubble too ("語音聊天的畫面改小一點").
+    pad: framed ? "3px 3px 5px" : k === "audio" ? "6px 9px 5px" : "10px 13px",
+    inPad: framed ? "0 7px" : k === "audio" ? "0 2px" : "0",
   };
 }
