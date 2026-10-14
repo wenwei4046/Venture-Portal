@@ -37,6 +37,21 @@ function poolOnDocument(pool: string | null | undefined): string | null {
   return words(pool)
 }
 
+/**
+ * When each voucher was sent for approval, and by whom — the Approval list's
+ * *Submitted*. The treasury's read only (the route asks `can(user, 'treasury')`
+ * before calling it): HR's readers of a payroll voucher get its maker there.
+ */
+async function readSubmissions(supabase: Awaited<ReturnType<typeof createClient>>, voucherIds: string[]) {
+  const { data, error } = await supabase
+    .from('approval_requests')
+    .select('reference_id, submitted_by, created_at')
+    .eq('reference_table', 'payment_vouchers')
+    .in('reference_id', voucherIds)
+    .order('created_at', { ascending: true })
+  return error ? [] : ((data ?? []) as Array<{ reference_id: string; submitted_by: string | null; created_at: string }>)
+}
+
 export async function GET(req: Request) {
   const user = await requireAnyActionOn('/payments', ['treasury', 'export'], ['hr_costing', 'export'])
   const url = new URL(req.url)
@@ -106,15 +121,8 @@ export async function GET(req: Request) {
           .in('voucher_id', salaryIds)
           .order('department_name').order('employee_name').order('salary_component')
       : Promise.resolve({ data: [], error: null }),
-    // When each was sent for approval, and by whom — the Approval list's *Submitted* (a reader who may not
-    // see the requests gets the voucher's own creator there instead).
-    supabase
-      .from('approval_requests')
-      .select('reference_id, submitted_by, created_at')
-      .eq('reference_table', 'payment_vouchers')
-      .in('reference_id', voucherIds)
-      .order('created_at', { ascending: true })
-      .then((r) => (r.error ? [] : ((r.data ?? []) as Array<{ reference_id: string; submitted_by: string | null; created_at: string }>))),
+    // The Approval list's *Submitted* — a reader who may not see the requests gets the voucher's own creator there instead.
+    can(user, 'treasury') ? readSubmissions(supabase, voucherIds) : Promise.resolve([]),
   ])
   if (coverageResult.error) {
     return Response.json({ error: 'Unable to load recorded statutory contribution details. Please try again.' }, { status: 500 })
