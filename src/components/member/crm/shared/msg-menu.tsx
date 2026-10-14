@@ -33,7 +33,21 @@ let state: MsgMenu | null = null;
 const subs = new Set<() => void>();
 const emit = () => subs.forEach(f => f());
 export function openMsgMenu(m: MsgMenu) { state = m; emit(); }
-const closeMenu = () => { state = null; emit(); };
+
+/** A chat's starred messages (the chat's ⋮ › Starred messages, 2026-10-14): a tap goes to the message in the chat. */
+export type StarredItem = { id: string; who: string; text: string; at: string };
+let starred: { items: StarredItem[] } | null = null;
+export function openStarred(items: StarredItem[]) { starred = { items }; state = null; emit(); }
+/** Brings a message into view in the open chat and lights it a moment. */
+export function goToMessage(id: string) {
+  const el = typeof document !== "undefined" ? document.querySelector<HTMLElement>(`[data-msg="${CSS.escape(id)}"]`) : null;
+  if (!el) return;
+  el.scrollIntoView({ block: "center", behavior: "smooth" });
+  const was = el.style.filter;
+  el.style.transition = "filter 300ms"; el.style.filter = "brightness(.85)";
+  setTimeout(() => { el.style.filter = was; }, 1200);
+}
+const closeMenu = () => { state = null; starred = null; emit(); };
 
 /**
  * A long press (450 ms, the finger still) opens the menu; the tap that ends it does not also open the photo or the
@@ -57,6 +71,7 @@ export function pressToOpen(open: () => void) {
 
 export function MessageMenu() {
   const m = useSyncExternalStore(f => { subs.add(f); return () => { subs.delete(f); }; }, () => state, () => null);
+  const st = useSyncExternalStore(f => { subs.add(f); return () => { subs.delete(f); }; }, () => starred, () => null);
   const [view, setView] = useState<"" | "forward" | "info">("");
   const [q, setQ] = useState("");
   useEffect(() => { setView(""); setQ(""); }, [m]);
@@ -66,6 +81,29 @@ export function MessageMenu() {
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [m]);
+  if (st && typeof document !== "undefined") {
+    return createPortal(
+      <div onClick={closeMenu} role="dialog" aria-modal="true" aria-label="Starred messages" style={{ position: "fixed", inset: 0, zIndex: 2147481000, background: "rgba(40,30,25,.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(env(safe-area-inset-top, 0px) + 16px) 14px calc(var(--safe-bottom, 0px) + 16px)", fontFamily: "Inter, -apple-system, 'Segoe UI', sans-serif" }}>
+        <div onClick={e => e.stopPropagation()} style={{ width: "340px", maxWidth: "92vw", maxHeight: "80vh", display: "flex", flexDirection: "column", borderRadius: "16px", background: "#fff", boxShadow: "0 6px 24px rgba(0,0,0,.18)", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", padding: "14px 16px 10px" }}>
+            <strong style={{ flex: "1", fontSize: "17px", color: "#3F2B22" }}>★ Starred messages</strong>
+            <button type="button" onClick={closeMenu} style={{ border: 0, background: "transparent", color: "#806B60", fontSize: "15px", fontWeight: 600, cursor: "pointer" }}>Done</button>
+          </div>
+          <div style={{ overflowY: "auto", flex: "1", minHeight: 0 }}>
+            {!st.items.length && <p style={{ margin: "8px 16px 18px", color: "#806B60", fontSize: "14px", lineHeight: 1.45 }}>No starred messages in this chat. Long-press a message and tap Star to keep it here.</p>}
+            {st.items.map(it => (
+              <button key={it.id} type="button" onClick={() => { closeMenu(); setTimeout(() => goToMessage(it.id), 60); }}
+                style={{ width: "100%", display: "flex", flexDirection: "column", gap: "3px", padding: "11px 16px", border: 0, borderTop: "1px solid #F3E9E1", background: "transparent", textAlign: "left", cursor: "pointer" }}>
+                <span style={{ display: "flex", justifyContent: "space-between", gap: "8px", fontSize: "12px", color: "#806B60" }}><strong style={{ color: "#BD4A19", fontWeight: 650 }}>{it.who}</strong><span>{it.at}</span></span>
+                <span style={{ fontSize: "14px", color: "#3F2B22", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{it.text}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
   if (!m || typeof document === "undefined") return null;
   const side = m.mine ? "flex-end" : "flex-start";
   const card = { width: "320px", maxWidth: "92vw", borderRadius: "16px", background: "#fff", boxShadow: "0 6px 24px rgba(0,0,0,.18)", overflow: "hidden" } as const;

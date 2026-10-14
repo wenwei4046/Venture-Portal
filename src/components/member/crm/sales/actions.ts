@@ -23,6 +23,8 @@ export interface SalesActions {
   send(customerId: string, text: string, replyTo?: string | null): Promise<boolean>;
   react(messageId: string, emoji: string): Promise<void>;
   hideMessage(messageId: string): Promise<void>;
+  /** Star or unstar a message — one's own (mig 20261014060000). */
+  star(messageId: string, on: boolean): Promise<void>;
   setPref(customerId: string, p: Partial<CrmPrefs>): Promise<void>;
   saveLabels(labels: { id?: string | null; name: string; color: string }[]): Promise<CrmLabel[] | null>;
   setLabel(customerId: string, labelId: string, on: boolean): Promise<void>;
@@ -138,6 +140,12 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
     async react(messageId, emoji) {
       if (live) { const r = await reactToMessage(messageId, emoji); if (!r.ok) { toast(r.error); return; } }
       setData(d => ({ ...d, customers: d.customers.map(c => ({ ...c, messages: c.messages.map(m => (m.id === messageId ? { ...m, myReaction: emoji || undefined } : m)) })) }));
+    },
+    async star(messageId, on) {
+      const toggle = (d: CrmData) => ({ ...d, starredMessages: on ? [...new Set([...(d.starredMessages ?? []), messageId])] : (d.starredMessages ?? []).filter(x => x !== messageId) });
+      setData(toggle);
+      if (!(await write("crm_star_message", { p_message: messageId, p_on: on })).ok) setData(d => ({ ...d, starredMessages: on ? (d.starredMessages ?? []).filter(x => x !== messageId) : [...(d.starredMessages ?? []), messageId] }));
+      else toast(on ? "Starred" : "Unstarred");
     },
     async hideMessage(messageId) {
       if (!(await write("crm_hide_message", { p_message: messageId })).ok) return;

@@ -17,7 +17,7 @@ import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice"
 import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, mediaOf, mediaWord } from "../../shared/chat-media";
-import { MENU_ICON, openMsgMenu, pressToOpen } from "../../shared/msg-menu";
+import { MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
@@ -56,17 +56,18 @@ export function leadVM(ctx: PanelCtx) {
     } : null };
   };
   const gallery = galleryOf(c?.messages ?? []), al = albumsOf(c?.messages ?? []);
-  const hiddenMsgs = new Set(ctx.data.hiddenMessages);
+  const hiddenMsgs = new Set(ctx.data.hiddenMessages), stars = new Set(ctx.data.starredMessages ?? []);
   const msgs = (c?.messages ?? []).filter(m => !hiddenMsgs.has(m.id)).map((m, k, arr) => {
     const sep = daySep(m.at, now), mine = m.from === "me", by = mine && m.by && m.by !== ow ? `Sent by ${nameOf(m.by)}` : m.auto ? "Auto-reply" : "";
     // A photo, video or voice note shows as itself (2026-10-13), as in the salesperson's chat; a file opens.
     const md = m.media, mk = md?.kind, shows = mk === "image" || mk === "video" || mk === "audio";
-    return { sep: !k || daySep(arr[k - 1].at, now) !== sep ? sep : "", time: msgTime(m.at), mine, text: m.text || (md && !shows ? (md.name ?? "File") : ""), at: msgTime(m.at),
+    const star = stars.has(m.id) ? "★ " : "";
+    return { sep: !k || daySep(arr[k - 1].at, now) !== sep ? sep : "", time: star + msgTime(m.at), mine, text: m.text || (md && !shows ? (md.name ?? "File") : ""), at: star + msgTime(m.at),
       ...mediaOf(m, gallery, al.lead.get(m.id)), vis: al.hidden.has(m.id) ? "none" : undefined,
       // The message menu, as in Mine's chat (shared/msg-menu.tsx): a long press — reactions, Reply, Copy, Delete for me.
       reaction: m.myReaction ?? "", rxGap: m.myReaction ? "14px" : "0", rxSide: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto",
       quote: (() => { const q = m.replyTo ? c?.messages.find(x => x.id === m.replyTo) : undefined; return q ? { who: q.from === "me" ? "You" : c?.name ?? "", text: q.text || mediaWord(q) } : null; })(),
-      press: pressToOpen(() => openMsgMenu({
+      press: { "data-msg": m.id, ...pressToOpen(() => openMsgMenu({
         mine, preview: m.text || (m.media ? mediaWord(m) : ""), reaction: m.myReaction ?? "", react: e => void ctx.act.react(m.id, e),
         forward: c ? { chats: forwardChats(ctx.data.customers, c.id, nameOf), send: toId => void ctx.act.forward(m.id, toId) } : undefined,
         info: c ? messageInfo(m, c, nameOf) : undefined,
@@ -75,9 +76,10 @@ export function leadVM(ctx: PanelCtx) {
           { label: "Forward", icon: MENU_ICON.forward, run: () => {} },
           ...(m.text ? [{ label: "Copy", icon: MENU_ICON.copy, run: () => { void navigator.clipboard?.writeText(m.text).catch(() => {}); } }] : []),
           { label: "Info", icon: MENU_ICON.info, run: () => {} },
+          { label: stars.has(m.id) ? "Unstar" : "Star", icon: MENU_ICON.star, run: () => void ctx.act.star(m.id, !stars.has(m.id)) },
           { label: "Delete for me", icon: MENU_ICON.del, danger: true, run: () => void ctx.act.hideMessage(m.id) },
         ],
-      })),
+      })) },
       tickC: m.status === "read" ? "#2F8FD8" : m.status === "failed" ? "#A3371A" : "#A8968B",
       tickPath: m.status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1" : "M1 6l3 3 6-7M7 8.5l.5.5 6-7",
       by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? "#FCD6B8" : "#fff", bd: mine ? "#FCD6B8" : "#fff", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
@@ -215,6 +217,8 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
       { label: "Assign to", icon: "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", bg: "#E4EDF8", fg: "#2F6FB5", go: () => patch({ pMenu: false, reSheet: true }) },
       { label: "Customer info", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", bg: "#E4F1E8", fg: "#387557", go: () => patch({ pMenu: false, pInfo: true }) },
       { label: "Appointment", icon: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", bg: "#F3E8EF", fg: "#8E4B6E", go: openBook },
+      // One's own starred messages in this chat (the message menu's Star, 2026-10-14).
+      { label: "Starred messages", icon: "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", bg: "#FBF1D9", fg: "#A46312", go: () => { patch({ pMenu: false }); if (c) openStarred(c.messages.filter(x => (ctx.data.starredMessages ?? []).includes(x.id)).map(x => ({ id: x.id, who: x.from === "me" ? "You" : c.name, text: x.text || (x.media ? mediaWord(x) : ""), at: msgTime(x.at) }))); } },
     ],
     shareOpen: false, closeShare: NONE, shareList: [] as { name: string; role: string; ini: string; pick: () => void }[],
     infoOpen: on && ui.pInfo, closeInfo: () => patch({ pInfo: false }), info,
