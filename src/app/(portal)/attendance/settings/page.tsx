@@ -1,16 +1,19 @@
 import { requirePage, requirePermission } from '@/lib/auth'
 import { HvPage, PageHead } from '@/components/hrv/kit'
-import { officeToday } from '@/lib/office-time'
-import { loadBoard } from '@/lib/attendance/server'
+import { loadConfig } from '@/lib/attendance/server'
 import SettingsView from '../_components/SettingsView'
 
 export const dynamic = 'force-dynamic'
 
-/** HR › Attendance › Settings (2026-10-15, the handoff "Attendance Prototype Design"). Attendance · View reads it. */
+/**
+ * HR › Attendance › Settings (2026-10-15, the handoff "Attendance Prototype Design"): who clocks, schedules,
+ * locations, holidays, leave types, OT rules, approval routes and the clock-in policy. Attendance · View reads
+ * it; its windows write with Attendance · Edit (`att_save_setting` / `att_delete_setting`).
+ */
 export default async function Page() {
   await requirePage('/attendance/settings')
   await requirePermission('attendance')
-  const read = await loadBoard(officeToday())
+  const read = await loadConfig()
   if (!read.ok) {
     return (
       <HvPage>
@@ -19,5 +22,5 @@ export default async function Page() {
       </HvPage>
     )
   }
-  return <SettingsView {...read.data} />
+  return <SettingsView config={read.data} />
 }
