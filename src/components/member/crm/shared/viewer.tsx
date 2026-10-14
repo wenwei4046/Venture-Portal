@@ -103,7 +103,10 @@ function downloadFile(f: File) {
 }
 async function saveFile(it: ViewerItem, ready: File | null): Promise<boolean> {
   const f = ready ?? (await fileOf(it));
-  if (!f) return false;
+  return f ? saveToDevice(f) : false;
+}
+/** A file handed to the phone's share sheet (Photos, Files) or, on a computer, downloaded — the viewer's and the editor's Save. */
+export async function saveToDevice(f: File): Promise<boolean> {
   const phone = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
   if (phone && typeof navigator.canShare === "function" && navigator.canShare({ files: [f] })) {
     try { await navigator.share({ files: [f] }); return true; } catch (e) { if ((e as Error)?.name === "AbortError") return true; }

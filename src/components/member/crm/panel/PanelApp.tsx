@@ -6,6 +6,7 @@
 // change the design and regenerate.
 import { Fragment } from "react";
 import H from "../crm.module.css";
+import { PickEditor } from "../shared/pick-editor";
 import type { PanelAppVM } from "./vm/app";
 
 /** The whole Control panel: the top bar, every tab, every sheet and page, the toast and the bottom bar. */
@@ -456,21 +457,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </div>
               </Fragment>))}
             </div>
-            {!!(v.ld.lx.pk) && (<div onClick={v.ld.lx.pk?.cancel} style={{ position: "absolute", inset: "0", zIndex: "9", background: "rgba(63,43,34,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeIn 200ms ease-out" }}>
-        <div onClick={v.ld.lx.pk?.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 16px 20px", display: "flex", flexDirection: "column", gap: "12px", maxHeight: "88%", boxSizing: "border-box" }}>
-          <span style={{ flex: "none", alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2" }}></span>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-            <span onClick={v.ld.lx.pk?.toggleHd} title="HD" style={{ flex: "none", height: "28px", padding: "0 10px", boxSizing: "border-box", borderRadius: "8px", border: `1.5px solid ${v.ld.lx.pk?.hdBd}`, background: v.ld.lx.pk?.hdBg, color: v.ld.lx.pk?.hdFg, display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "800", letterSpacing: ".05em", cursor: "pointer" }}>HD</span>
-            <strong style={{ fontSize: "15px", fontWeight: "700", color: "#3F2B22" }}>{v.ld.lx.pk?.title}</strong>
-            <span onClick={v.ld.lx.pk?.cancel} style={{ flex: "none", fontSize: "14px", fontWeight: "650", color: "#806B60", cursor: "pointer" }}>Cancel</span>
-          </div>
-          <div style={{ display: "flex", gap: "8px", overflowX: "auto", scrollbarWidth: "none" }}>
-            {(v.ld.lx.pk?.items ?? []).map((it, it_i) => (<Fragment key={it_i}><div style={{ flex: "none", width: "104px", height: "104px", borderRadius: "12px", overflow: "hidden", background: "#F5EBE3" }}>{it.img ? (<img src={it.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />) : (<video src={it.vid} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} />)}</div></Fragment>))}
-          </div>
-          <span style={{ fontSize: "12px", color: "#806B60" }}>{v.ld.lx.pk?.note}</span>
-          <span onClick={v.ld.lx.pk?.send} style={{ flex: "none", height: "48px", borderRadius: "24px", background: "#BD4A19", color: "#fff", display: "grid", placeItems: "center", fontSize: "16px", fontWeight: "650", cursor: "pointer" }}>{v.ld.lx.pk?.sendLabel}</span>
-        </div>
-      </div>)}
+            {!!(v.ld.lx.pk) && (<PickEditor pk={v.ld.lx.pk} />)}
       {!!(v.ld.lx.rec) && (<div style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px" }}>
               <span onClick={v.ld.lx.rec?.cancel} title="Cancel" style={{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: "#A3371A", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></span>
               <span style={{ flex: "1", minWidth: "0", height: "44px", boxSizing: "border-box", borderRadius: "22px", background: "#FBF1EC", display: "flex", alignItems: "center", gap: "10px", padding: "0 16px", fontSize: "15px", fontWeight: "600", color: "#3F2B22", fontVariantNumeric: "tabular-nums" }}><span style={{ flex: "none", width: "10px", height: "10px", borderRadius: "50%", background: "#D93025", animation: "fadeIn 700ms ease-in-out infinite alternate" }}></span>{v.ld.lx.rec?.time} · Recording…</span>
