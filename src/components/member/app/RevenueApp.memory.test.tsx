@@ -86,16 +86,16 @@ describe("the Revenue app opens on what the phone kept (2026-10-08)", () => {
     render(<RevenueApp initialData={principalData()} initialSearch="?department=fair" today="2026-10-05" source={source.api} />);
 
     // The kept figure, while the department's read is still out — no "Working out…".
-    expect(await screen.findByText("RM 1,234.50")).toBeInTheDocument();
+    expect(await screen.findByText("1,234.50")).toBeInTheDocument();
     expect(screen.queryByText(/Working out/)).not.toBeInTheDocument();
     await vi.waitFor(() => expect(source.asked).toContain("departmentIncome"));
     expect(screen.getByText("Refreshing…")).toBeInTheDocument();
-    expect(screen.getByText("RM 1,234.50")).toBeInTheDocument();
+    expect(screen.getByText("1,234.50")).toBeInTheDocument();
 
     fresh = 2500;
     await source.release();
-    expect(await screen.findByText("RM 2,500.00")).toBeInTheDocument();
-    expect(screen.queryByText("RM 1,234.50")).not.toBeInTheDocument();
+    expect(await screen.findByText("2,500.00")).toBeInTheDocument();
+    expect(screen.queryByText("1,234.50")).not.toBeInTheDocument();
     expect(screen.queryByText("Refreshing…")).not.toBeInTheDocument();
   });
 
@@ -108,7 +108,7 @@ describe("the Revenue app opens on what the phone kept (2026-10-08)", () => {
     await vi.waitFor(() => expect(source.asked).toContain("departmentIncome"));
     expect(screen.queryByText("Refreshing…")).not.toBeInTheDocument();
     await source.release();
-    expect(await screen.findByText("RM 2,000.00")).toBeInTheDocument();
+    expect(await screen.findByText("2,000.00")).toBeInTheDocument();
   });
 
   it("Today's reads all leave before any answer — this month's figures no longer wait for the two-month book", async () => {

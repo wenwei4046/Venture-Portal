@@ -4,10 +4,26 @@
    custom properties set by `.t_*` / `.m*`. */
 
 /* ── board themes (BTHEME) and medals (MEDAL) ──────────────────────────── */
-.t_sales { --b-solid: var(--rv-brown); --b-ink: var(--rv-white); --b-sub: var(--rv-blush); --b-icon-bg: var(--rv-white-14); --b-glow: var(--rv-brown-18); }
-.t_margin { --b-solid: var(--rv-gold); --b-ink: var(--rv-ink); --b-sub: var(--rv-gold-sub); --b-icon-bg: var(--rv-white-35); --b-glow: var(--rv-gold-28); }
-.t_kpi { --b-solid: var(--rv-green); --b-ink: var(--rv-white); --b-sub: var(--rv-green-pale); --b-icon-bg: var(--rv-white-16); --b-glow: var(--rv-green-18); }
-.t_champ { --b-solid: var(--rv-accent); --b-ink: var(--rv-white); --b-sub: var(--rv-orange-bg); --b-icon-bg: var(--rv-white-16); --b-glow: var(--rv-accent-20); }
+/* `--b-grad` / `--b-glow`: the board's bank card (2026-10-14, the "Revenue app refresh" handoff §4–5), the hub's cards
+   and a board's hero alike; the solid set stays the date sheet's. */
+.t_sales { --b-solid: var(--rv-brown); --b-ink: var(--rv-white); --b-sub: var(--rv-blush); --b-icon-bg: var(--rv-white-14); --b-grad: var(--rv-board-sales); --b-glow: var(--rv-brown-22); }
+.t_margin { --b-solid: var(--rv-gold); --b-ink: var(--rv-ink); --b-sub: var(--rv-gold-sub); --b-icon-bg: var(--rv-white-35); --b-grad: var(--rv-board-margin); --b-glow: var(--rv-gold-32); }
+.t_kpi { --b-solid: var(--rv-green); --b-ink: var(--rv-white); --b-sub: var(--rv-green-pale); --b-icon-bg: var(--rv-white-16); --b-grad: var(--rv-board-kpi); --b-glow: var(--rv-green-22); }
+.t_champ { --b-solid: var(--rv-accent); --b-ink: var(--rv-white); --b-sub: var(--rv-orange-bg); --b-icon-bg: var(--rv-white-16); --b-grad: var(--rv-board-champ); --b-glow: var(--rv-accent-24); }
+
+/* The motion's one curve (the refresh handoff): cubic-bezier(.2,.8,.2,1), and nothing moves for reduced motion. */
+/* A figure that changes cross-fades, 160ms (CrossFade.tsx): both in one grid cell. */
+.xf { display: inline-grid; }
+.xfBlock { display: grid; min-width: 0; }
+.xfCell { grid-area: 1 / 1; display: block; min-width: 0; }
+.xfIn { animation: arena-xf-in 160ms cubic-bezier(.2,.8,.2,1) both; }
+.xfOut { animation: arena-xf-out 160ms cubic-bezier(.2,.8,.2,1) both; pointer-events: none; }
+@keyframes arena-xf-in { from { opacity: 0; } }
+@keyframes arena-xf-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .xfIn { animation: none; }
+  .xfOut { display: none; }
+}
 
 /* the date sheet marks the picked month in the board's colour */
 .dateTheme { --d-solid: var(--b-solid); --d-ink: var(--b-ink); --d-sub: var(--b-sub); }
@@ -29,34 +45,43 @@
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; border-radius: 13px; background: var(--rv-sand); }
 .segBtn { height: 36px; border: 0; border-radius: 10px; background: transparent; box-shadow: none; color: var(--rv-sub); font-size: calc(13.5px * var(--rv-type)); font-weight: 500; }
 .segOn { background: var(--rv-white); box-shadow: 0 1px 3px var(--rv-ink-14); color: var(--rv-ink); font-weight: 650; }
+/* A period switch moves the pill's white and its ink over 220ms (hub and hero alike). */
+.segBtn, .heroSegBtn { transition: background-color 220ms cubic-bezier(.2,.8,.2,1), color 220ms cubic-bezier(.2,.8,.2,1), box-shadow 220ms cubic-bezier(.2,.8,.2,1); }
 
+/* The four boards as bank cards (2026-10-14, the refresh handoff §4): the board's gradient under the soft curves, all
+   white — the board and your figure beside its icon on top, your place at the foot; a press sinks it to .97. */
 .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .card {
   min-height: 176px;
   min-width: 0;
   border: 0;
   border-radius: 22px;
-  background: var(--b-solid);
-  color: var(--b-ink);
+  background: var(--rv-board-wave), var(--b-grad);
+  color: var(--rv-white);
   padding: 16px;
   text-align: left;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   box-shadow: 0 6px 16px var(--b-glow);
+  transition: transform 120ms cubic-bezier(.2,.8,.2,1);
 }
-.cardTop { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-.cardIcon { width: 38px; height: 38px; border-radius: 50%; background: var(--b-icon-bg); display: grid; place-items: center; }
-.cardChev { color: var(--b-sub); display: grid; place-items: center; }
-.cardBody { display: block; min-width: 0; }
+.card:active { transform: scale(.97); }
+.cardTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.cardHead { min-width: 0; }
+.cardIcon { flex: 0 0 34px; width: 34px; height: 34px; border-radius: 50%; background: var(--rv-white-24); display: grid; place-items: center; }
 .cardLabel { display: block; font-size: calc(15px * var(--rv-type)); font-weight: 650; }
-.cardRank { display: flex; align-items: flex-end; gap: 8px; margin-top: 6px; }
+.cardValue { display: block; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-white-88); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cardRank { display: flex; align-items: flex-end; gap: 6px; }
 .rankNum { display: flex; align-items: flex-start; line-height: 1; font-variant-numeric: tabular-nums; }
-.cardNum { font-family: var(--font-display-rv); font-size: calc(44px * var(--rv-type)); font-weight: 800; letter-spacing: -.05em; }
-.cardSuf { font-family: var(--font-display-rv); font-size: calc(18px * var(--rv-type)); font-weight: 700; margin: 4px 0 0 2px; letter-spacing: -.01em; color: var(--b-sub); }
-.cardOf { font-size: calc(13px * var(--rv-type)); color: var(--b-sub); padding-bottom: 4px; }
-.cardValue { display: block; font-size: calc(13px * var(--rv-type)); color: var(--b-sub); margin-top: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cardNum { font-family: var(--font-display-rv); font-size: calc(40px * var(--rv-type)); font-weight: 800; letter-spacing: -.05em; }
+.cardSuf { font-family: var(--font-display-rv); font-size: calc(16px * var(--rv-type)); font-weight: 700; margin: 4px 0 0 2px; }
+.cardOf { font-size: calc(13px * var(--rv-type)); color: var(--rv-white-88); padding-bottom: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .segBtn, .heroSegBtn, .card { transition: none; }
+  .card:active { transform: none; }
+}
 
 .recCard {
   width: 100%;
@@ -183,12 +208,28 @@
 .recAmt { font-size: calc(15px * var(--rv-type)); font-weight: 650; font-variant-numeric: tabular-nums; }
 .recNote { margin: 0; font-size: calc(12px * var(--rv-type)); line-height: 1.6; color: var(--rv-sub); }
 
-/* ── a board: the coloured hero ────────────────────────────────────────── */
+/* ── a board: its bank card for a hero ─────────────────────────────────── */
+/* (2026-10-14, the refresh handoff §5) the board's gradient under the soft curves, all white: back and the date; the
+   board and your figure beside its icon; your place; the chase; the period. It rises in 12px over 320ms as the page
+   opens and the page under it fades in 60ms behind; ‹ Arena fades it out over 200ms before the hub comes back. */
 .board { display: flex; flex-direction: column; }
-.hero { margin: 6px 12px 0; border-radius: 26px; background: var(--b-solid); color: var(--b-ink); padding: 8px 18px 16px; display: flex; flex-direction: column; gap: 14px; }
+.hero {
+  margin: 6px 12px 0;
+  border-radius: 22px;
+  background: var(--rv-board-wave), var(--b-grad);
+  box-shadow: 0 8px 20px var(--b-glow);
+  color: var(--rv-white);
+  padding: 10px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: arena-hero-in 320ms cubic-bezier(.2,.8,.2,1) both;
+}
+.heroLeaving { animation: arena-hero-out 200ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes arena-hero-in { from { opacity: 0; transform: translateY(12px); } }
+@keyframes arena-hero-out { from { opacity: 1; } to { opacity: 0; } }
 .heroTop { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .heroBack {
-  align-self: flex-start;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -197,7 +238,7 @@
   margin-left: -6px;
   border: 0;
   background: transparent;
-  color: var(--b-ink);
+  color: var(--rv-white);
   font-size: calc(14.5px * var(--rv-type));
   font-weight: 600;
 }
@@ -209,22 +250,25 @@
   padding: 0 10px 0 11px;
   border-radius: 16px;
   border: 0;
-  background: var(--b-icon-bg);
-  color: var(--b-ink);
+  background: var(--rv-white-20);
+  color: var(--rv-white);
   font-size: calc(13px * var(--rv-type));
   font-weight: 650;
   white-space: nowrap;
 }
-.heroTitleRow { display: flex; align-items: center; gap: 10px; }
-.heroIcon { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; background: var(--b-icon-bg); color: var(--b-ink); display: grid; place-items: center; }
-.heroTitle { margin: 0; font-family: var(--font-display-rv); font-size: calc(24px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
-.heroRank { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.heroRankLeft { display: flex; align-items: flex-end; gap: 8px; }
+.heroHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.heroHeadText { min-width: 0; }
+.heroTitle { display: block; margin: 0; font-size: calc(16px * var(--rv-type)); font-weight: 650; }
+.heroValue { display: block; font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.heroIcon { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; background: var(--rv-white-24); display: grid; place-items: center; }
+.heroRank { display: flex; align-items: flex-end; gap: 8px; }
+/* Fair results: your finish on the left, its medals on the right. */
+.heroRankFair { justify-content: space-between; gap: 12px; }
 .heroNum { font-family: var(--font-display-rv); font-size: calc(56px * var(--rv-type)); font-weight: 800; letter-spacing: -.05em; }
-.heroSuf { font-family: var(--font-display-rv); font-size: calc(22px * var(--rv-type)); font-weight: 700; margin: 5px 0 0 2px; color: var(--b-sub); }
-.heroOf { font-size: calc(14px * var(--rv-type)); color: var(--b-sub); padding-bottom: 6px; }
-.heroValue { font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 700; font-variant-numeric: tabular-nums; padding-bottom: 6px; }
-.heroChase { display: flex; align-items: center; gap: 8px; font-size: calc(13.5px * var(--rv-type)); font-weight: 550; padding: 10px 12px; border-radius: 14px; background: var(--b-icon-bg); }
+.heroSuf { font-family: var(--font-display-rv); font-size: calc(22px * var(--rv-type)); font-weight: 700; margin: 5px 0 0 2px; color: var(--rv-white-88); }
+.heroOf { font-size: calc(14px * var(--rv-type)); color: var(--rv-white-88); padding-bottom: 6px; }
+.heroChase { display: flex; align-items: center; gap: 8px; font-size: calc(13.5px * var(--rv-type)); font-weight: 550; padding: 10px 12px; border-radius: 14px; background: var(--rv-white-18); }
+.heroChaseIcon { flex: none; }
 .heroChaseText { min-width: 0; }
 .heroMedals { display: flex; gap: 5px; padding-bottom: 8px; }
 .heroMedal {
@@ -241,12 +285,16 @@
   font-variant-numeric: tabular-nums;
 }
 .heroMedalN { width: 20px; height: 20px; border-radius: 50%; background: var(--rv-white); font-size: max(10px, calc(10.5px * var(--rv-type))); font-weight: 700; display: grid; place-items: center; }
-.heroSeg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; border-radius: 13px; background: var(--b-icon-bg); }
-.heroSegBtn { height: 34px; border: 0; border-radius: 10px; background: transparent; color: var(--b-ink); font-size: calc(13px * var(--rv-type)); font-weight: 500; }
+.heroSeg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; border-radius: 13px; background: var(--rv-white-18); }
+.heroSegBtn { height: 34px; border: 0; border-radius: 10px; background: transparent; color: var(--rv-white); font-size: calc(13px * var(--rv-type)); font-weight: 500; }
 .heroSegOn { background: var(--rv-white); color: var(--rv-ink); font-weight: 650; }
 
 /* ── a board: the page under the hero ──────────────────────────────────── */
-.body { padding: 16px 20px 32px; display: flex; flex-direction: column; gap: 16px; }
+.body { padding: 16px 20px 32px; display: flex; flex-direction: column; gap: 16px; animation: arena-body-in 240ms cubic-bezier(.2,.8,.2,1) 60ms both; }
+@keyframes arena-body-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .hero, .heroLeaving, .body { animation: none; }
+}
 .tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--rv-line); }
 .tab {
   height: 40px;
@@ -261,6 +309,10 @@
   white-space: nowrap;
 }
 .tabOn { border-bottom-color: var(--rv-accent); color: var(--rv-accent); font-weight: 650; }
+/* Tabs and brand chips: their colour and underline over 160ms (the refresh handoff's motion). */
+.tab { transition: color 160ms cubic-bezier(.2,.8,.2,1), border-color 160ms cubic-bezier(.2,.8,.2,1); }
+.chip { transition: color 160ms cubic-bezier(.2,.8,.2,1), border-color 160ms cubic-bezier(.2,.8,.2,1), background-color 160ms cubic-bezier(.2,.8,.2,1); }
+@media (prefers-reduced-motion: reduce) { .tab, .chip { transition: none; } }
 .chips { display: flex; gap: 8px; overflow-x: auto; margin: -4px -20px 0; padding: 0 20px; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
 .chip {
@@ -508,9 +560,9 @@
 @keyframes arena-skel { from { background-position: 100% 0; } to { background-position: 0 0; } }
 @media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
 .heroNumSkel { width: 86px; height: calc(48px * var(--rv-type)); margin: 6px 0; }
-.heroValueSkel { width: 88px; height: calc(20px * var(--rv-type)); margin-bottom: 8px; }
-.cardNumSkel { width: 60px; height: calc(38px * var(--rv-type)); margin: 4px 0; }
-.cardValueSkel { width: 70%; height: calc(12px * var(--rv-type)); margin-top: 8px; }
-/* Nothing on this board yet: said in words where the place would be. */
+.heroValueSkel { width: 88px; height: calc(20px * var(--rv-type)); margin-top: 6px; }
+.cardNumSkel { width: 60px; height: calc(36px * var(--rv-type)); margin: 2px 0; }
+.cardValueSkel { width: 70%; height: calc(12px * var(--rv-type)); margin-top: 5px; }
+/* Nothing on this board yet: said in words where the place would be (a card: 13px in the card's soft white). */
 .heroNone { font-family: var(--font-display-rv); font-size: calc(22px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; padding-bottom: 6px; }
-.cardNone { font-size: calc(17px * var(--rv-type)); font-weight: 700; letter-spacing: -.01em; padding-bottom: 6px; }
+.cardNone { font-size: calc(13px * var(--rv-type)); color: var(--rv-white-88); padding-bottom: 4px; }

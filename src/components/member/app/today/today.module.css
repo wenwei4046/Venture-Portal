@@ -4,49 +4,47 @@
 .hello { margin: 0; font-family: var(--font-display-rv); font-size: calc(28px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; line-height: 1.2; }
 .helloSub { margin: 6px 0 0; font-size: calc(14px * var(--rv-type)); color: var(--rv-sub); }
 
-/* the income hero */
-.hero {
-  border-radius: 24px;
-  background: var(--rv-hero-grad);
-  border: 1px solid transparent;
-  color: var(--rv-white);
-  padding: 18px 18px 14px;
-  box-shadow: 0 12px 26px var(--rv-accent-30);
-}
+/* the income, as a statement (2026-10-14 — the "Revenue app refresh" handoff §3, `hero="ledger"`): no card, no
+   shadow — the figure in Inter Tight over a split line, then Sales · Margin · KPI between a dark rule and a light one */
+.hero { display: flex; flex-direction: column; gap: 12px; }
 .heroTop { display: flex; justify-content: space-between; align-items: center; }
-.heroLabel { font-size: calc(13px * var(--rv-type)); color: var(--rv-hero-sub); }
+.heroLabel { font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
 .heroEye {
   flex: 0 0 36px;
   width: 36px;
   height: 36px;
   border-radius: 10px;
   border: 0;
-  background: var(--rv-white-20);
-  color: var(--rv-white);
+  background: var(--rv-sand);
+  color: var(--rv-brown);
   display: grid;
   place-items: center;
 }
-.heroAmount { font-family: var(--font-display-rv); font-size: calc(36px * var(--rv-type)); font-weight: 750; letter-spacing: -.03em; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
-.heroSplit { margin: 0; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-hero-sub); }
-.heroMetrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 14px; border-top: 1px solid var(--rv-white-24); }
+.heroAmount { display: flex; align-items: baseline; gap: 6px; margin-top: -6px; font-family: var(--font-display-rv); font-feature-settings: "tnum", "cv01", "cv11"; }
+.heroCur { font-size: calc(20px * var(--rv-type)); font-weight: 650; color: var(--rv-sub); }
+.heroNum { font-size: calc(40px * var(--rv-type)); font-weight: 750; letter-spacing: -.04em; line-height: 1; }
+.heroSplit { margin: -4px 0 0; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); }
+.heroMetrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1.5px solid var(--rv-ink); border-bottom: 1px solid var(--rv-line); }
 .metric {
+  display: block;
   min-width: 0;
-  padding: 12px 4px 4px;
+  padding: 10px 0;
   border: 0;
-  border-right: 1px solid var(--rv-white-24);
   background: transparent;
-  color: var(--rv-white);
+  color: var(--rv-ink);
   text-align: left;
+  white-space: normal;
 }
-.metric:last-child { border-right-color: transparent; }
-.metricLabel { display: block; font-size: calc(11.5px * var(--rv-type)); color: var(--rv-hero-sub); }
-.metricValue { display: block; font-family: var(--font-display-rv); font-size: calc(19px * var(--rv-type)); font-weight: 750; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.metric:not(:first-child) { padding-left: 12px; border-left: 1px solid var(--rv-line); }
+/* Tappable into Insight: a press dims it (.6, 120ms). */
+.metricTap { transition: opacity 120ms cubic-bezier(.2,.8,.2,1); }
+.metricTap:active { opacity: .6; }
+.metricLabel { display: block; font-size: calc(11.5px * var(--rv-type)); color: var(--rv-sub); }
+.metricValue { display: block; font-family: var(--font-display-rv); font-size: calc(19px * var(--rv-type)); font-weight: 750; margin-top: 2px; }
 .metricTag { display: block; font-size: calc(11px * var(--rv-type)); margin-top: 2px; }
-.metricTagSub { color: var(--rv-hero-sub); }
-.metricTagGood { color: var(--rv-hero-good); }
-.metric:not(:first-child) .metricLabel,
-.metric:not(:first-child) .metricValue,
-.metric:not(:first-child) .metricTag { padding-left: 12px; }
+.metricTagSub { color: var(--rv-sub); }
+.metricTagGood { color: var(--rv-green); }
+@media (prefers-reduced-motion: reduce) { .metricTap { transition: none; } }
 
 /* section heads */
 .sectHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -121,12 +119,18 @@
   animation: today-skel 1.3s ease-in-out infinite;
 }
 @keyframes today-skel { from { background-position: 100% 0; } to { background-position: 0 0; } }
-@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
-.heroSkel { width: 62%; height: calc(36px * var(--rv-type)); margin: 8px 0 6px; }
+/* …and on the white page, the statement's: sand, not white. */
+.skelInk {
+  display: block;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--rv-sand) 25%, var(--rv-line) 50%, var(--rv-sand) 75%);
+  background-size: 300% 100%;
+  animation: today-skel 1.3s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .skel, .skelInk { animation: none; } }
+.heroSkel { width: 62%; height: calc(40px * var(--rv-type)); margin-top: -6px; }
 .metricSkel { width: 72%; height: calc(19px * var(--rv-type)); margin: 4px 0 5px; }
-.metric:not(:first-child) .metricSkel { margin-left: 12px; }
 .metricTagSkel { width: 52%; height: calc(10px * var(--rv-type)); }
-.metric:not(:first-child) .metricTagSkel { margin-left: 12px; }
 .boardSkel { width: 46px; height: calc(30px * var(--rv-type)); }
 /* A board with no place yet says so in words — a big dash looked like a bar still loading. */
 .boardNone { font-size: calc(13px * var(--rv-type)); font-weight: 650; opacity: .82; line-height: 1.2; }

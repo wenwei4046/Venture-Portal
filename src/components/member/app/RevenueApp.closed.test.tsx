@@ -148,10 +148,10 @@ describe("a page their ticks close is neither shown nor reachable", () => {
   it("My income closed: Today's income stays hidden — no eye shows it, nor Profile's Privacy", async () => {
     await open("?department=fair");
     expect(screen.getByRole("button", { name: "Hide amounts" })).toBeInTheDocument();
-    expect(screen.queryByText("RM ••••••")).not.toBeInTheDocument();
+    expect(screen.queryByText("••••")).not.toBeInTheDocument();
     cleanup();
     await open("?department=fair", { pages: ["income"], sends: [] });
-    expect(screen.getByText("RM ••••••")).toBeInTheDocument();
+    expect(screen.getByText("••••")).toBeInTheDocument();
     expect(screen.getByText("Amounts hidden")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Hide amounts" })).not.toBeInTheDocument();
     // Sales, Margin and KPI are not income: they stay.
@@ -170,14 +170,14 @@ describe("a page their ticks close is neither shown nor reachable", () => {
     window.history.replaceState({}, "", "/member/preview");
     const { unmount } = render(<RevenueApp initialData={protoData()} initialSearch="" today="2026-10-03" fixture={protoFixture()} closed={{ pages: ["income"], sends: [] }} />);
     await act(async () => {});
-    expect(screen.getByText("RM ••••••")).toBeInTheDocument();
+    expect(screen.getByText("••••")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Hide amounts" })).not.toBeInTheDocument();
     unmount();
     render(<RevenueApp initialData={protoData()} initialSearch="" today="2026-10-03" fixture={protoFixture()} />);
     await act(async () => {});
-    expect(screen.queryByText("RM ••••••")).not.toBeInTheDocument();
+    expect(screen.queryByText("••••")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Hide amounts" }));
-    expect(screen.getByText("RM ••••••")).toBeInTheDocument();
+    expect(screen.getByText("••••")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Hide amounts" }));
   });
 

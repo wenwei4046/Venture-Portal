@@ -256,8 +256,15 @@ const LOADING_METRICS: TodayMetric[] = [
   { key: "kpi", label: "KPI", value: "", tag: "", tagTone: "sub", loading: true },
 ];
 
-const HIDDEN_AMOUNT = "RM ••••••";
+/** The income hidden — "RM ••••", as the refresh handoff's statement draws it (2026-10-14; it was six dots). */
+const HIDDEN_AMOUNT = "RM ••••";
 const HIDDEN_SPLIT = "Amounts hidden";
+
+/** "RM 6,842.50" → the currency and the figure, drawn apart in Today's statement ("RM ••••" and "RM —" alike). */
+export function amountParts(amount: string): { cur: string; num: string } {
+  const m = /^(RM)\s+(.*)$/.exec(amount);
+  return m ? { cur: m[1], num: m[2] } : { cur: "", num: amount };
+}
 
 /**
  * The income card as the eye hides it — and as My income closed keeps it

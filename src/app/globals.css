@@ -343,6 +343,20 @@
   --rv-dim-sheet: rgba(43,31,23,.4);
   /* Documentation: the "Opening …" note */
   --rv-open-line: #F3D9C4;
+  /* Arena's bank cards (2026-10-14, the "Revenue app refresh" handoff §4–5): each board's gradient and glow under the
+     soft bank-card curves. Palette stops, the light ends darkened on purpose so white text passes contrast (#C98A2E,
+     never #E1B04F / #F2995E) — gradients the handoff keeps to the Arena. */
+  --rv-board-wave: radial-gradient(120% 140% at 105% 120%, rgba(255,255,255,.16) 0 38%, rgba(255,255,255,0) 38.5%), radial-gradient(90% 120% at 100% 130%, rgba(255,255,255,.12) 0 45%, rgba(255,255,255,0) 45.5%);
+  --rv-board-sales: linear-gradient(100deg,#4E2F20 0%,#7A4B35 100%);
+  --rv-board-margin: linear-gradient(100deg,#A46312 0%,#C98A2E 100%);
+  --rv-board-kpi: linear-gradient(100deg,#24513B 0%,#4E8A6B 100%);
+  --rv-board-champ: linear-gradient(100deg,#B8461A 0%,#D9622A 100%);
+  --rv-brown-22: rgba(78,47,32,.22);
+  --rv-gold-32: rgba(225,176,79,.32);
+  --rv-green-22: rgba(56,117,87,.22);
+  --rv-accent-24: rgba(189,74,25,.24);
+  --rv-white-18: rgba(255,255,255,.18);
+  --rv-white-88: rgba(255,255,255,.88);
 }
 /* The Revenue app refreshes on its own pull (2026-10-06): the browser's pull-to-reload would load the whole page again. */
 html:has([data-revenue-app]) { overscroll-behavior-y: none; }

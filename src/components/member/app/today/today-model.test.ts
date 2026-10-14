@@ -55,7 +55,7 @@ describe("the income hero", () => {
   });
   it("hides every amount when asked", () => {
     const m = todayModel({ ...base, hidden: true });
-    expect(m.heroAmount).toBe("RM ••••••");
+    expect(m.heroAmount).toBe("RM ••••");
     expect(m.heroSplit).toBe("Amounts hidden");
   });
   // 2026-10-06 (user: "on live date, not showing last month"): Today is the
@@ -66,7 +66,7 @@ describe("the income hero", () => {
     expect(m.heroLabel).toBe("October · Estimated income");
     expect(m.heroAmount).toBe("RM —");
     expect(m.heroSplit).toBe("Working out October's commission…");
-    expect(todayModel({ ...base, today: "2026-10-06", incomeStatus: "loading", hidden: true }).heroAmount).toBe("RM ••••••");
+    expect(todayModel({ ...base, today: "2026-10-06", incomeStatus: "loading", hidden: true }).heroAmount).toBe("RM ••••");
   });
   it("says so when the month could not be worked out, rather than showing the salary alone", () => {
     const m = todayModel({ ...base, today: "2026-10-06", incomeStatus: "failed" });
