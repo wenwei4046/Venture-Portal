@@ -93,7 +93,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
             <span style={{ alignSelf: "center", margin: "6px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "#FFFFFF", boxShadow: "0 1px 1px rgba(63,43,34,.10)", color: "#4E2F20", fontSize: "12px", fontWeight: "600" }}>{m.sep}</span>
           </>)}
           {!!(m.plain) && (<>
-            <div onMouseEnter={m.enter} onMouseLeave={m.leave} style={{ position: "relative", alignSelf: m.align, maxWidth: m.max, display: "flex", flexDirection: m.rowDir, alignItems: "center", gap: "6px", marginBottom: m.rxGap }}>
+            <div {...m.press} onMouseEnter={m.enter} onMouseLeave={m.leave} style={{ WebkitTouchCallout: "none", position: "relative", alignSelf: m.align, maxWidth: m.max, display: "flex", flexDirection: m.rowDir, alignItems: "center", gap: "6px", marginBottom: m.rxGap }}>
               <div style={{ position: "relative", minWidth: "0", padding: m.pad, boxSizing: "border-box", borderRadius: m.radius, boxShadow: "0 1px 1px rgba(63,43,34,.10)", background: m.bg, border: `1px ${m.borderStyle} ${m.border}`, textAlign: m.textAlign, color: m.fg }}>
                 {!!(m.quote) && (<>
                   <div style={{ margin: "-3px -6px 6px", padding: "6px 10px", borderRadius: "8px", borderLeft: "3px solid #BD4A19", background: "rgba(63,43,34,.06)", display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}>

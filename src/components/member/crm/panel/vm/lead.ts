@@ -16,7 +16,8 @@ import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
-import { albumsOf, galleryOf, mediaOf } from "../../shared/chat-media";
+import { albumsOf, galleryOf, mediaOf, mediaWord } from "../../shared/chat-media";
+import { MENU_ICON, openMsgMenu, pressToOpen } from "../../shared/msg-menu";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
@@ -54,12 +55,24 @@ export function leadVM(ctx: PanelCtx) {
     } : null };
   };
   const gallery = galleryOf(c?.messages ?? []), al = albumsOf(c?.messages ?? []);
-  const msgs = (c?.messages ?? []).map((m, k, arr) => {
+  const hiddenMsgs = new Set(ctx.data.hiddenMessages);
+  const msgs = (c?.messages ?? []).filter(m => !hiddenMsgs.has(m.id)).map((m, k, arr) => {
     const sep = daySep(m.at, now), mine = m.from === "me", by = mine && m.by && m.by !== ow ? `Sent by ${nameOf(m.by)}` : m.auto ? "Auto-reply" : "";
     // A photo, video or voice note shows as itself (2026-10-13), as in the salesperson's chat; a file opens.
     const md = m.media, mk = md?.kind, shows = mk === "image" || mk === "video" || mk === "audio";
     return { sep: !k || daySep(arr[k - 1].at, now) !== sep ? sep : "", time: msgTime(m.at), mine, text: m.text || (md && !shows ? (md.name ?? "File") : ""), at: msgTime(m.at),
       ...mediaOf(m, gallery, al.lead.get(m.id)), vis: al.hidden.has(m.id) ? "none" : undefined,
+      // The message menu, as in Mine's chat (shared/msg-menu.tsx): a long press — reactions, Reply, Copy, Delete for me.
+      reaction: m.myReaction ?? "", rxGap: m.myReaction ? "14px" : "0", rxSide: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto",
+      quote: (() => { const q = m.replyTo ? c?.messages.find(x => x.id === m.replyTo) : undefined; return q ? { who: q.from === "me" ? "You" : c?.name ?? "", text: q.text || mediaWord(q) } : null; })(),
+      press: pressToOpen(() => openMsgMenu({
+        mine, preview: m.text || (m.media ? mediaWord(m) : ""), reaction: m.myReaction ?? "", react: e => void ctx.act.react(m.id, e),
+        actions: [
+          { label: "Reply", icon: MENU_ICON.reply, run: () => patch({ pReply: { msgId: m.id, who: mine ? "You" : c?.name ?? "", text: m.text || mediaWord(m) } }) },
+          ...(m.text ? [{ label: "Copy", icon: MENU_ICON.copy, run: () => { void navigator.clipboard?.writeText(m.text).catch(() => {}); } }] : []),
+          { label: "Delete for me", icon: MENU_ICON.del, danger: true, run: () => void ctx.act.hideMessage(m.id) },
+        ],
+      })),
       tickC: m.status === "read" ? "#2F8FD8" : m.status === "failed" ? "#A3371A" : "#A8968B",
       tickPath: m.status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1" : "M1 6l3 3 6-7M7 8.5l.5.5 6-7",
       by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? "#FCD6B8" : "#fff", bd: mine ? "#FCD6B8" : "#fff", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
@@ -68,7 +81,7 @@ export function leadVM(ctx: PanelCtx) {
       ...visitCard(m.card), pDisp: m.card || mk === "file" || (shows && !m.text) ? "none" : "block" };
   });
   return {
-    onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, pEmoji: null, pPick: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
+    onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, pReply: null, pEmoji: null, pPick: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
     ld: {
       name: c?.name ?? "", ini: c ? ini(c.name) : "", ad: c?.ad ?? "", ownerFirst: ow ? first(ownerName) : "No one", ownerName,
       // No "· reply window open Xh Ym" under the name (rev 1011 §2.3, as RS rev 1010 §1.4); the cold banner stays.
@@ -102,7 +115,9 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     if (!c || !has) return;
     const text = draft.trim();
     set(u => ({ ...u, pDraft: "" }));
-    if (!(await act.send(c.id, text))) set(u => ({ ...u, pDraft: u.pDraft || text }));
+    const replyTo = ui.pReply?.msgId ?? null;
+    set(u => ({ ...u, pReply: null }));
+    if (!(await act.send(c.id, text, replyTo))) set(u => ({ ...u, pDraft: u.pDraft || text }));
   };
   // Voice notes: with nothing typed the round button is the mic — tap to record, then Send or Cancel.
   const recOn = ui.pRec != null;
@@ -160,6 +175,8 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     return rows;
   })() : [];
   return {
+    // The message being answered, over the reply box (the message menu's Reply).
+    replying: !!ui.pReply, replyWho: ui.pReply?.who ?? "", replyText: ui.pReply?.text ?? "", cancelReply: () => patch({ pReply: null }),
     inbox: on, viewOnly: false, draft, setDraft: (e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value; set(u => ({ ...u, pDraft: v })); },
     send: has ? () => void send() : () => void micTap(), sendBg: has ? "#BD4A19" : "#D9C7BA",
     // The sticker button: an emoji sheet; each tap adds one to the reply.

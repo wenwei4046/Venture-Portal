@@ -422,14 +422,18 @@ export async function sendCrmMedia(input: { contact: string; path: string; name:
       if (!sent.ok) throw new Error(sent.error);
       externalId = sent.mid;
     } else {
-      const sendAs = async (k: typeof kind) => {
-        const type = k === "video" && mime === "video/quicktime" ? "video/mp4" : k === "document" ? (mime || "application/octet-stream") : mime;
+      // A voice note (Ogg Opus, shared/video-fit.ts › fitVoice) is uploaded as WhatsApp names its own — "audio/ogg; codecs=opus"
+      // — and sent as a voice message; the customer got the bare "audio/ogg" as a silent audio file (2026-10-14).
+      const opus = kind === "audio" && mime === "audio/ogg";
+      const sendAs = async (k: typeof kind, voice = false) => {
+        const type = k === "video" && mime === "video/quicktime" ? "video/mp4" : k === "document" ? (mime || "application/octet-stream") : k === "audio" && opus ? "audio/ogg; codecs=opus" : mime;
         const name = k === "video" && mime === "video/quicktime" ? filename.replace(/\.mov$/i, "") + ".mp4" : filename;
         const up = await uploadWhatsAppMedia({ phoneNumberId: contact.account_id, token, file: new Blob([await file.arrayBuffer()], { type }), filename: name });
         if (!up.ok) return up;
-        return sendWhatsApp({ phoneNumberId: contact.account_id, token, message: mediaMessage(contact.external_id, k, up.id, caption, name) });
+        return sendWhatsApp({ phoneNumberId: contact.account_id, token, message: mediaMessage(contact.external_id, k, up.id, caption, name, voice) });
       };
-      let sent = await sendAs(kind);
+      let sent = await sendAs(kind, opus);
+      if (!sent.ok && opus) sent = await sendAs(kind);
       if (!sent.ok && (kind === "video" || kind === "audio")) { kind = "document"; sent = await sendAs("document"); }
       if (!sent.ok) throw new Error(sent.error);
       externalId = (sent as { wamid: string }).wamid;

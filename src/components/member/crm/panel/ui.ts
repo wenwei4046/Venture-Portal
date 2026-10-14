@@ -50,6 +50,8 @@ export interface PanelUi {
   reSheet: boolean;
   pick: string;
   pDraft: string;
+  /** The message being answered (the message menu's Reply, 2026-10-14): shown over the reply box, sent as its reply. */
+  pReply?: { msgId: string; who: string; text: string } | null;
   /** A voice note being recorded in the chat: when it started (shared/voice.ts); pRecTick moves its clock. */
   pRec: number | null;
   /** The chat's emoji sheet. */
