@@ -39,13 +39,13 @@ export const FUNCTIONS: Record<string, { actions: Action[]; scopes: Scope[] }> =
   guest_link: { actions: ['view', 'edit'], scopes: ['all'] },
 }
 
-// `permission_cell_keys` (as permission-matrix.test.ts holds it).
+// `permission_cell_keys` (as permission-matrix.test.ts holds it; the Product List's gate went 2026-10-14, mig 20261014100000).
 const K = (functionKey: string, action: Action, legacyKey: string, minScope: Scope, gate: CellKey['gate'] = null): CellKey => ({ functionKey, action, legacyKey, minScope, gate })
 export const CELL_KEYS: CellKey[] = [
   K('dashboard', 'view', 'dashboard', 'own'), K('approvals', 'view', 'approvals', 'all', 'principal'), K('approvals', 'view', 'approvals_queue', 'all'),
   K('treasury', 'view', 'treasury', 'all', 'treasury'), K('treasury', 'approve', 'override', 'all', 'principal'), K('billing', 'view', 'billing', 'all', 'treasury'),
   K('categories', 'view', 'categories', 'all', 'treasury'), K('hr_costing', 'view', 'hr_costing', 'all', 'salary'), K('revenue', 'view', 'revenue', 'all', 'salary'),
-  K('product_list', 'view', 'product_list', 'all', 'principal'), K('director_salary', 'view', 'director_salary', 'all', 'salary'),
+  K('product_list', 'view', 'product_list', 'all'), K('director_salary', 'view', 'director_salary', 'all', 'salary'),
   K('director_pool', 'view', 'director_pool', 'all', 'salary'), K('team', 'view', 'team', 'all', 'salary'), K('team', 'view', 'team_directory', 'own'),
   K('accounts', 'create', 'team_invite', 'all', 'principal'), K('accounts', 'manage', 'permissions_manage', 'all', 'principal'),
   K('member', 'manage', 'member_requests_manage', 'all'), K('member', 'manage', 'member_memos_manage', 'all'), K('dept_pool', 'view', 'dept_pool', 'own'),
