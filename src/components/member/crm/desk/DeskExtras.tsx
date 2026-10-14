@@ -6,7 +6,7 @@
  * fields and rust buttons, Inter, the same colours. Behaviour: vm/extras.ts.
  */
 import { Fragment } from "react";
-import DH from "./desk-hover.module.css";
+import DX from "./desk-extras.module.css";
 import type { bookVM, customerFormVM, historyVM, noteVM } from "./vm/extras";
 
 const BACK = { flex: "0 0 auto", display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", border: "0", borderBottom: "1px solid #EBDDD2", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "#BD4A19", cursor: "pointer", textAlign: "left" } as const;
@@ -172,15 +172,15 @@ export function DeskEmoji({ v }: { v: ReturnType<typeof import("./vm/chat").chat
       <div style={{ display: "flex", alignItems: "center", gap: "2px", padding: "2px 2px 4px", borderBottom: "1px solid #F1E7DF" }}>
         {v.searching
           ? <input autoFocus value={v.q} onChange={v.setQ} placeholder="Search emoji" style={{ flex: "1", minWidth: "0", height: "34px", boxSizing: "border-box", padding: "0 12px", borderRadius: "10px", border: "1px solid #E2CFC1", font: "inherit", fontSize: "13.5px", color: "#3F2B22", outline: "none" }} />
-          : v.cats.map(c => <button key={c.label} type="button" title={c.label} onClick={c.pick} className={DH.emo} style={ib(c.on)}><Ico d={c.d} /></button>)}
+          : v.cats.map(c => <button key={c.label} type="button" title={c.label} onClick={c.pick} className={DX.emo} style={ib(c.on)}><Ico d={c.d} /></button>)}
         <span style={{ flex: v.searching ? "0 0 auto" : "1" }} />
-        <button type="button" title={v.searching ? "Close search" : "Search emoji"} onClick={v.toggleSearch} className={DH.emo} style={ib(v.searching)}>
+        <button type="button" title={v.searching ? "Close search" : "Search emoji"} onClick={v.toggleSearch} className={DX.emo} style={ib(v.searching)}>
           <Ico d={v.searching ? "M6 6l12 12M18 6 6 18" : "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm9 2-4.35-4.35"} />
         </button>
       </div>
       <span style={{ padding: "4px 8px 0", fontSize: "10.5px", fontWeight: "700", letterSpacing: ".1em", textTransform: "uppercase", color: "#A08E82" }}>{v.label}</span>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: "2px", maxHeight: "148px", overflowY: "auto" }}>
-        {v.list.map((x, i) => <button key={i} type="button" onClick={x.pick} className={DH.emo}
+        {v.list.map((x, i) => <button key={i} type="button" onClick={x.pick} className={DX.emo}
           style={{ height: "36px", border: "0", borderRadius: "8px", background: "transparent", fontSize: "22px", lineHeight: "1", cursor: "pointer", padding: "0" }}>{x.e}</button>)}
       </div>
     </div>
