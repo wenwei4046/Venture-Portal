@@ -86,21 +86,25 @@ function styleObj(s, scope) {
 const ATTR = { "stroke-width": "strokeWidth", "stroke-linecap": "strokeLinecap", "stroke-linejoin": "strokeLinejoin", "fill-rule": "fillRule", "clip-rule": "clipRule", inputmode: "inputMode", autofocus: "autoFocus", readonly: "readOnly", viewbox: "viewBox", "stroke-dasharray": "strokeDasharray", class: "className", for: "htmlFor", tabindex: "tabIndex", maxlength: "maxLength" };
 const NUMERIC = new Set(["rows", "cols", "tabIndex", "maxLength"]);
 
-/** auto: the CSS-module import name generated hover / focus classes are read from (null = the fixed crm.module.css list). */
+/** auto: the CSS-module import name generated hover / focus / active classes are read from (null = the fixed crm.module.css list). */
 const opts = { auto: null };
-const autoHover = new Map(), autoFocus = new Map();
+const autoHover = new Map(), autoFocus = new Map(), autoActive = new Map();
 /** The generated classes as CSS (each declaration !important: the element's own inline style would win otherwise). */
 function autoCss() {
   const decl = (s, k) => { let j = 0; return s.replace(/\{\{\}\}/g, () => `var(--${k}-${j++})`).split(";").map(d => d.trim()).filter(Boolean).map(d => `${d} !important;`).join(" "); };
-  return [...[...autoHover].map(([s, k]) => `.${k}:hover { ${decl(s, k)} }`), ...[...autoFocus].map(([s, k]) => `.${k}:focus { ${decl(s, k)} }`)].join("\n") + "\n";
+  return [...[...autoHover].map(([s, k]) => `.${k}:hover { ${decl(s, k)} }`), ...[...autoFocus].map(([s, k]) => `.${k}:focus { ${decl(s, k)} }`),
+    ...[...autoActive].map(([s, k]) => `.${k}:active { ${decl(s, k)} }`)].join("\n") + "\n";
 }
 
 function attrs(n, scope) {
-  const out = []; let hover = null, focus = null;
+  const out = []; let hover = null, focus = null, active = null;
   for (const [a0, val] of n.attrs) {
     if (a0.startsWith("hint-placeholder")) continue;
     if (a0 === "style-hover") { hover = val; continue; }
     if (a0 === "style-focus") { focus = val; continue; }
+    // A press (the chat composer's keys, 2026-10-14): the prototype's runtime draws style-active as a class's :active, as
+    // it draws style-hover — so does the generator's stylesheet.
+    if (a0 === "style-active") { active = val; continue; }
     const a = ATTR[a0] || ATTR[a0.toLowerCase()] || a0;
     if (val == null) { out.push(a); continue; }
     // A whole style object bound at once (style="{{ paneStyle }}") goes through as it is.
@@ -111,7 +115,8 @@ function attrs(n, scope) {
     if (NUMERIC.has(a) && r.lit && /^\d+$/.test(val)) { out.push(`${a}={${val}}`); continue; }
     out.push(r.lit ? `${a}=${JSON.stringify(val)}` : `${a}={${r.code}}`);
   }
-  if (opts.auto && (hover || focus)) {
+  if (active && !opts.auto) throw new Error("A press style (style-active) needs the generator's own stylesheet (opts.auto): " + active);
+  if (opts.auto && (hover || focus || active)) {
     // Generated classes (CRM desktop, 2026-10-13): each distinct style-hover / style-focus becomes a class of the
     // generator's own stylesheet, so a new hover in the design needs no hand-made class. A bound value ({{ t.tint }})
     // becomes a custom property the class reads and the element sets in its own style.
@@ -125,6 +130,7 @@ function attrs(n, scope) {
     };
     if (hover) cls(autoHover, hover, "h");
     if (focus) cls(autoFocus, focus, "f");
+    if (active) cls(autoActive, active, "a");
     out.push(`className={${names.map(n => `${opts.auto}.${n}`).join(' + " " + ')}}`);
     if (vars.length) {
       const extra = vars.map(([k, e]) => `${JSON.stringify(k)}: ${e}`).join(", ");

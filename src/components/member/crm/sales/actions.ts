@@ -46,6 +46,8 @@ export interface SalesActions {
   saveAutoReplies(set: CrmAutoReplySet): void;
   /** Mark notifications read: these ids, or (all) everything up to now — invitations stay until answered. */
   readNotifs(keys: string[], all?: boolean): void;
+  /** The chat composer's Recents (mig 20261014251500): kept on the server a moment after the last emoji picked. */
+  saveRecentEmoji(list: string[]): void;
   invite(kind: "share" | "move", customerId: string, to: string): Promise<boolean>;
   answerInvite(inviteId: string, accept: boolean): Promise<void>;
   loadTemplates(): Promise<WaTemplate[] | null>;
@@ -295,6 +297,16 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       setData(d => ({ ...d, notifRead: all ? [] : [...new Set([...d.notifRead, ...keys])], notifsSeenAt: all ? new Date().toISOString() : d.notifsSeenAt }));
       if (live) void crmWrite("crm_read_notifs", { p_keys: keys, p_all: all });
     },
+    saveRecentEmoji: (() => {
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      return (list: string[]) => {
+        if (!live) return;
+        if (timer) clearTimeout(timer);
+        // A burst of emoji is one save, and never in front of a send (Server Actions go one at a time). The screen shows
+        // the list already (SalesUi.recents); a save that fails changes nothing there, so it says nothing.
+        timer = setTimeout(() => { timer = null; void crmWrite("crm_save_recent_emoji", { p_emoji: list }); }, 1200);
+      };
+    })(),
     async invite(kind, customerId, to) {
       const r = await write("crm_invite", { p_kind: kind, p_contact: customerId, p_to: to });
       if (!r.ok) return false;

@@ -68,7 +68,12 @@ export interface SalesUi {
   menu: { msgId: string; full: boolean; from: "lead" | "me"; text: string } | null;
   reply: { msgId: string; from: "lead" | "me"; text: string } | null;
   draft: Record<string, string>;
-  att: boolean;
+  /** The composer of the chat it was opened in (`chat`): its panel (Sticker / Attach), emoji search and category, toast
+   *  (vm/composer.ts). Another chat's — or none — opens as new: a chat left any way (the Calendar, Assign, a switch)
+   *  never hands its panel to the next. */
+  cmp?: (import("./vm/composer").ComposerState & { chat: string }) | null;
+  /** Emoji picked in this visit, most recent first — shown at once, kept on the server a moment later (crm_staff_prefs). */
+  recents?: string[];
   qr: boolean;
   qrPage: "list" | "new" | null;
   qrNew: { s: string; m: string };
@@ -83,8 +88,6 @@ export interface SalesUi {
   sending: boolean;
   /** A voice note being recorded: when it started (shared/voice.ts); recTick moves its clock. */
   rec: number | null;
-  /** The emoji sheet (the composer's sticker button). */
-  emoji?: string | null;
   /** Photos / videos picked, waiting on the preview with its HD switch (shared/pick.ts). */
   pick?: import("../shared/pick").Picked | null;
   recTick?: number;
@@ -115,7 +118,7 @@ export const initialSalesUi = (): SalesUi => ({
   tab: "inbox", hist: [], chat: null,
   q: "", filter: null, adSel: [], adSheet: null, swipe: null, moreLead: null, moreView: "main", labelForm: null, toast: "",
   cq: "", cSwipe: null, rename: null, cInfo: null,
-  hover: null, menu: null, reply: null, draft: {}, att: false, qr: false, qrPage: null, qrNew: { s: "", m: "" }, qrEditIdx: null,
+  hover: null, menu: null, reply: null, draft: {}, qr: false, qrPage: null, qrNew: { s: "", m: "" }, qrEditIdx: null,
   hm: null, cform: null, book: null, cancelAsk: null, tpl: false, templates: null, sending: false, rec: null,
   calView: "month", calSel: null, calYM: null, outcomeAsk: null, celebrate: null, rebookFor: null,
   insPeriod: "month", insRange: null, insSheet: null, insList: null, insInfo: null, nTab: "unread",
