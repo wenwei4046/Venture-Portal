@@ -257,6 +257,7 @@ export default function InvoiceLinesDialog({
       title={editing ? 'Edit invoice' : 'Multi-line invoice'}
       sub={editing ? (editing.no ? `${editing.no} · ${statusWords}` : 'Draft') : 'Saved as draft · approve to issue'}
       locked={busy}
+      tall
     >
       <DialogForm
         buttons={

@@ -161,16 +161,23 @@ export function Row({
   )
 }
 
+export type ChipTone = 'def' | 'wait' | 'accent' | 'ledger' | 'info' | 'danger' | 'alert'
+
 export interface ItemLine {
   key: string
   label: string
   sub?: string
   value?: string
   tone?: 'ledger' | 'out' | 'alert' | 'muted' | null
-  action?: { label: string; onClick?: () => void; href?: string } | null
+  /** Its state, as the design's item lists show it (a credit note's, a project's, a person's). */
+  chip?: { text: string; tone: ChipTone } | null
+  /** A file to open in its own tab, or a step; pale while it would only say why not. */
+  action?: { label: string; onClick?: () => void; href?: string; newTab?: boolean; off?: boolean } | null
+  /** Pressing the line itself (a credit note's menu, a project's page). */
+  onOpen?: () => void
 }
 
-/** Lines of a list that opens nothing (a credit note, a staff row, a report's line): the title and count over a card. */
+/** The lines of a list that are no records of their own (a credit note, a staff row, a report's line): the title and count over a card. */
 export function ItemGroup({ title, count, items, empty }: { title: string; count: string; items: ItemLine[]; empty?: string }) {
   return (
     <>
@@ -182,32 +189,57 @@ export function ItemGroup({ title, count, items, empty }: { title: string; count
         <div className={s.empty}>{empty}</div>
       ) : (
         <div className={s.rows}>
-          {items.map((i) => (
-            <div key={i.key} className={s.item}>
-              <span className={s.itemText}>
-                <span className={s.itemL}>{i.label}</span>
-                {i.sub ? <span className={s.itemSub}>{i.sub}</span> : null}
-              </span>
-              {i.value !== undefined ? (
-                <span className={s.itemRight}>
-                  <span className={s.itemV} data-tone={i.tone ?? undefined}>
-                    {i.value}
-                  </span>
+          {items.map((i) => {
+            const body = (
+              <>
+                <span className={s.itemText}>
+                  <span className={s.itemL}>{i.label}</span>
+                  {i.sub ? <span className={s.itemSub}>{i.sub}</span> : null}
                 </span>
-              ) : null}
-              {i.action ? (
-                i.action.href ? (
-                  <a className={s.itemAct} href={i.action.href}>
-                    {i.action.label}
-                  </a>
-                ) : (
-                  <button type="button" className={s.itemAct} onClick={i.action.onClick}>
-                    {i.action.label}
+                {i.value !== undefined || i.chip ? (
+                  <span className={s.itemRight}>
+                    {i.value !== undefined ? (
+                      <span className={s.itemV} data-tone={i.tone ?? undefined}>
+                        {i.value}
+                      </span>
+                    ) : null}
+                    {i.chip ? (
+                      <span className={s.itemChip} data-tone={i.chip.tone}>
+                        {i.chip.text}
+                      </span>
+                    ) : null}
+                  </span>
+                ) : null}
+              </>
+            )
+            return (
+              <div key={i.key} className={s.item}>
+                {i.onOpen ? (
+                  <button type="button" className={s.itemMain} onClick={i.onOpen}>
+                    {body}
                   </button>
-                )
-              ) : null}
-            </div>
-          ))}
+                ) : (
+                  body
+                )}
+                {i.action ? (
+                  i.action.href ? (
+                    <a
+                      className={s.itemAct}
+                      href={i.action.href}
+                      target={i.action.newTab ? '_blank' : undefined}
+                      rel={i.action.newTab ? 'noopener noreferrer' : undefined}
+                    >
+                      {i.action.label}
+                    </a>
+                  ) : (
+                    <button type="button" className={s.itemAct} data-off={i.action.off ? 'true' : undefined} onClick={i.action.onClick}>
+                      {i.action.label}
+                    </button>
+                  )
+                ) : null}
+              </div>
+            )
+          })}
         </div>
       )}
     </>

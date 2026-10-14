@@ -1,10 +1,9 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
-import { HUB_HREF, TOP_LABEL, tabHubs, type HubKey } from '@/lib/fin-app/routes'
+import { HUB_HREF, TOP_LABEL, type HubKey } from '@/lib/fin-app/routes'
 import AppScreen, { PageHead } from './AppScreen'
-import { rememberHub, useFrame } from './FinAppFrame'
+import { useHubTabs } from './hub-tabs'
 import { canStepBack, setIntent } from './nav'
 import { Placeholder } from './parts'
 
@@ -15,22 +14,9 @@ import { Placeholder } from './parts'
 // every screen is drawn (lib/one-app.ts).
 
 export function ComingHub({ hub, tab }: { hub: HubKey; tab: 'daily' | 'fund' | 'report' }) {
-  const { rows } = useFrame()
-  useEffect(() => rememberHub(tab, hub), [tab, hub])
-  const hubs = tabHubs(tab, rows)
+  const { topTabs, swipe } = useHubTabs(tab, hub)
   return (
-    <AppScreen
-      screenKey={HUB_HREF[hub]}
-      head={{ kind: 'bare' }}
-      root
-      topTabs={hubs.map((h) => ({
-        key: h,
-        label: TOP_LABEL[h],
-        href: HUB_HREF[h],
-        current: h === hub,
-        onPress: () => setIntent(hubs.indexOf(h) > hubs.indexOf(hub) ? 'push' : 'pop'),
-      }))}
-    >
+    <AppScreen screenKey={HUB_HREF[hub]} head={{ kind: 'bare' }} root topTabs={topTabs} onSwipe={swipe}>
       <Placeholder>{TOP_LABEL[hub]} is drawn in the next part of the app.</Placeholder>
     </AppScreen>
   )

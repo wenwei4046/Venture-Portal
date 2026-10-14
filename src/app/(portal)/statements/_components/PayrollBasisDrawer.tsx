@@ -33,6 +33,15 @@ export default function PayrollBasisDrawer({
   basis: PayrollBasisModel
   department: DepartmentMode | null
 }) {
+  return (
+    <FinDrawer open={open} onClose={onClose} label={`Payroll basis · ${month}`} title={`Payroll basis · ${month}`}>
+      <PayrollBasisBody basis={basis} department={department} />
+    </FinDrawer>
+  )
+}
+
+/** The drawer's groups — the Finance phone app draws them as a screen of their own. */
+export function PayrollBasisBody({ basis, department }: { basis: PayrollBasisModel; department: DepartmentMode | null }) {
   let n = 0
   const next = () => ROMAN[n++] ?? ''
   const dir = basis.director
@@ -43,7 +52,7 @@ export default function PayrollBasisDrawer({
       .join(' · ')
 
   return (
-    <FinDrawer open={open} onClose={onClose} label={`Payroll basis · ${month}`} title={`Payroll basis · ${month}`}>
+    <>
       <Group n={next()} title="Status">
         <Line label="Payroll basis" value={basis.status} sub={basis.note} />
       </Group>
@@ -99,6 +108,6 @@ export default function PayrollBasisDrawer({
           </div>
         </Group>
       ) : null}
-    </FinDrawer>
+    </>
   )
 }

@@ -10,11 +10,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 // phone's back gesture — is a `pop` too.
 //
 // Inside one page (a hub, its lists, a record) the screens are steps in the
-// browser's history made with `history.pushState` (Next's own state copied
-// in, so its router restores the page it has instead of fetching it — the
-// Revenue app's way, components/member/app/route.ts); between pages it is
-// Next's router. Back from a screen goes back a step while there is one this
-// visit made, else up to the screen above it.
+// browser's history made with `history.pushState(null, …)` — Next's shallow
+// routing: its patched pushState copies its own state in and takes the new
+// address as its own, so the page is kept (no fetch) and the address stays
+// what the step says. Handing Next its own state instead (`history.state`)
+// tells it the call was its own: it keeps its old address and puts it back on
+// its next update — a server action answering — so a record's address
+// reverted to its hub's (2026-10-15). Between pages it is Next's router. Back
+// from a screen goes back a step while there is one this visit made, else up
+// to the screen above it.
 
 export type Intent = 'push' | 'pop' | 'tab'
 
@@ -116,7 +120,7 @@ export function useStep<T>(read: (search: URLSearchParams) => T, initialSearch: 
     const href = `${window.location.pathname}${search ? `?${search}` : ''}`
     setIntent('push')
     stepped()
-    window.history.pushState(window.history.state, '', href)
+    window.history.pushState(null, '', href)
     setStep(readRef.current(new URLSearchParams(search)))
   }, [])
 
@@ -128,7 +132,7 @@ export function useStep<T>(read: (search: URLSearchParams) => T, initialSearch: 
     }
     const href = `${window.location.pathname}${parentSearch ? `?${parentSearch}` : ''}`
     setIntent('pop')
-    window.history.replaceState(window.history.state, '', href)
+    window.history.replaceState(null, '', href)
     setStep(readRef.current(new URLSearchParams(parentSearch)))
   }, [])
 

@@ -186,73 +186,147 @@ export function InvoiceDrawer({
       }
       bar={buttons.length > 0 ? buttons : null}
     >
-      {!inv ? (
-        <div className={d.loading}>This invoice is not on this month’s list any more.</div>
-      ) : (
+      {!inv ? <div className={d.loading}>This invoice is not on this month’s list any more.</div> : <InvoiceDetailBody inv={inv} today={today} error={error} />}
+    </FinDrawer>
+  )
+}
+
+/** The hero alone — what a record screen shows while the rest is read. */
+export function InvoiceHero({ inv }: { inv: HubInvoice }) {
+  return (
+    <div className={d.hero} data-light={statusTone(inv.status)}>
+      <div className={d.heroTop}>
+        <span className={d.kicker}>Invoice · {inv.mode}</span>
+        <span className={d.heroChip}>
+          <span className={d.heroDot} />
+          {statusText(inv.status)}
+        </span>
+      </div>
+      <div className={d.heroNo}>{inv.no ?? 'Draft'}</div>
+      <div className={d.heroAmount}>{rm(inv.total)}</div>
+      <div className={d.heroTo}>
+        {inv.party.name} · {inv.party.kind}
+      </div>
+      <div className={d.heroNote}>
+        <span className={d.heroNoteDot} />
+        <span>{noteOf(inv)}</span>
+      </div>
+    </div>
+  )
+}
+
+/** What the full page adds, on a screen that is the invoice's page (the phone app). */
+export interface InvoiceBodyExtras {
+  said: string | null
+  /** The month it bills, when its invoice date falls outside it. */
+  period: string | null
+  address: string | null
+  contact: string
+  createdBy: string | null
+  createdAt: string
+  trail: Array<{ label: string; by: string | null; when: string | null; state: 'done' | 'todo' | 'bad' }>
+  audit: Array<{ at: string; who: string; what: string }>
+}
+
+/**
+ * The drawer's body (the prototype's `detailInv`): the hero, then Balance ·
+ * Billing · Line items · Receipts, and its credit notes when it has any — and,
+ * where the screen is the invoice's page, what the full page adds: the period,
+ * the address and contact it was billed with, the description, the Trail and
+ * the Audit log.
+ */
+export function InvoiceDetailBody({ inv, today, error, extras = null }: { inv: HubInvoice; today: string; error: string | null; extras?: InvoiceBodyExtras | null }) {
+  let n = inv.creditNotes.length > 0 ? 5 : 4
+  const roman = () => `${['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'][n++] ?? n}.`
+  return (
+    <>
+      <InvoiceHero inv={inv} />
+
+      {error ? (
+        <div className={d.error} role="alert">
+          {error}
+        </div>
+      ) : null}
+
+      <Group n="I." title="Balance">
+        <Line label="Received" value={rm(inv.received)} mono tone={inv.received > 0 ? 'ledger' : undefined} />
+        <Line label="Remaining" value={rm(inv.remaining)} mono tone={inv.remaining > 0 && inv.status === 'issued' ? 'wait' : undefined} />
+        <Line label="Due" value={fd(inv.due)} sub={dueNote(inv, today)} mono />
+      </Group>
+      <Group n="II." title="Billing">
+        <Line label="Billed to" value={inv.party.name} sub={inv.party.kind} />
+        <Line label="Billing mode" value={inv.mode} />
+        <Line label="GL category" value={inv.gl?.name ?? '—'} sub={inv.gl?.code} />
+        <Line label="Reference no" value={inv.reference || '—'} mono />
+        <Line label="Invoice date" value={fd(inv.date)} mono />
+        {extras?.period ? <Line label="Period" value={extras.period} /> : null}
+        {extras?.address ? <Line label="Address" value={extras.address} /> : null}
+        {extras?.contact ? <Line label="Contact" value={extras.contact} /> : null}
+        {extras ? <Line label="Created by" value={extras.createdBy ?? 'Unknown'} sub={extras.createdAt} /> : null}
+      </Group>
+      <Group n="III." title="Line items" foot={{ l: 'Total', v: rm(inv.total) }}>
+        {inv.lines.map((l, i) => (
+          <Line key={i} label={l.description || `Line ${i + 1}`} value={rm(l.amount)} sub={l.code ?? undefined} mono />
+        ))}
+      </Group>
+      <Group n="IV." title="Receipts" empty={inv.receipts.length === 0 ? 'No money received against this invoice yet.' : undefined}>
+        {inv.receipts.map((r, i) => (
+          <Line
+            key={i}
+            label={r.no ?? '—'}
+            value={`+${rm(r.amount)}`}
+            sub={r.batchTotal !== null ? `${fd(r.date)} · one receipt for ${rm(r.batchTotal)} in all` : fd(r.date)}
+            mono
+            tone="ledger"
+          />
+        ))}
+      </Group>
+      {inv.creditNotes.length > 0 ? (
+        <Group n="V." title="Credit notes">
+          {inv.creditNotes.map((c) => (
+            <Line key={c.id} label={c.no ?? 'Draft'} value={`−${rm(c.amount)}`} sub={[c.status, c.reason].filter(Boolean).join(' · ')} mono />
+          ))}
+        </Group>
+      ) : null}
+      {extras?.said ? <Group n={roman()} title="Description" empty={extras.said} /> : null}
+
+      {extras ? (
         <>
-          <div className={d.hero} data-light={statusTone(inv.status)}>
-            <div className={d.heroTop}>
-              <span className={d.kicker}>Invoice · {inv.mode}</span>
-              <span className={d.heroChip}>
-                <span className={d.heroDot} />
-                {statusText(inv.status)}
-              </span>
-            </div>
-            <div className={d.heroNo}>{no}</div>
-            <div className={d.heroAmount}>{rm(inv.total)}</div>
-            <div className={d.heroTo}>
-              {inv.party.name} · {inv.party.kind}
-            </div>
-            <div className={d.heroNote}>
-              <span className={d.heroNoteDot} />
-              <span>{noteOf(inv)}</span>
-            </div>
+          <div className={d.label}>Trail</div>
+          <div className={d.trail}>
+            {extras.trail.map((s, i) => (
+              <div key={i} className={d.step} data-state={s.state}>
+                <div className={d.stepRail}>
+                  <span className={d.stepDot} />
+                  <span className={d.stepLine} data-on={extras.trail[i + 1] && extras.trail[i + 1].state !== 'todo' ? 'true' : undefined} />
+                </div>
+                <div className={d.stepText}>
+                  <div className={d.stepLabel}>{s.label}</div>
+                  <div className={d.stepBy}>{[s.by, s.when].filter(Boolean).join(' · ')}</div>
+                </div>
+              </div>
+            ))}
           </div>
 
-          {error ? (
-            <div className={d.error} role="alert">
-              {error}
-            </div>
-          ) : null}
-
-          <Group n="I." title="Balance">
-            <Line label="Received" value={rm(inv.received)} mono tone={inv.received > 0 ? 'ledger' : undefined} />
-            <Line label="Remaining" value={rm(inv.remaining)} mono tone={inv.remaining > 0 && inv.status === 'issued' ? 'wait' : undefined} />
-            <Line label="Due" value={fd(inv.due)} sub={dueNote(inv, today)} mono />
-          </Group>
-          <Group n="II." title="Billing">
-            <Line label="Billed to" value={inv.party.name} sub={inv.party.kind} />
-            <Line label="Billing mode" value={inv.mode} />
-            <Line label="GL category" value={inv.gl?.name ?? '—'} sub={inv.gl?.code} />
-            <Line label="Reference no" value={inv.reference || '—'} mono />
-            <Line label="Invoice date" value={fd(inv.date)} mono />
-          </Group>
-          <Group n="III." title="Line items" foot={{ l: 'Total', v: rm(inv.total) }}>
-            {inv.lines.map((l, i) => (
-              <Line key={i} label={l.description || `Line ${i + 1}`} value={rm(l.amount)} sub={l.code ?? undefined} mono />
-            ))}
-          </Group>
-          <Group n="IV." title="Receipts" empty={inv.receipts.length === 0 ? 'No money received against this invoice yet.' : undefined}>
-            {inv.receipts.map((r, i) => (
-              <Line
-                key={i}
-                label={r.no ?? '—'}
-                value={`+${rm(r.amount)}`}
-                sub={r.batchTotal !== null ? `${fd(r.date)} · one receipt for ${rm(r.batchTotal)} in all` : fd(r.date)}
-                mono
-                tone="ledger"
-              />
-            ))}
-          </Group>
-          {inv.creditNotes.length > 0 ? (
-            <Group n="V." title="Credit notes">
-              {inv.creditNotes.map((c) => (
-                <Line key={c.id} label={c.no ?? 'Draft'} value={`−${rm(c.amount)}`} sub={[c.status, c.reason].filter(Boolean).join(' · ')} mono />
-              ))}
-            </Group>
-          ) : null}
+          <div className={d.label}>
+            Audit log · {extras.audit.length} {extras.audit.length === 1 ? 'event' : 'events'}
+          </div>
+          <div className={d.audit}>
+            {extras.audit.length === 0 ? (
+              <div className={d.groupEmpty}>No change on record.</div>
+            ) : (
+              extras.audit.map((a, i) => (
+                <div key={i} className={d.auditRow}>
+                  <span className={d.auditWhat}>{a.what}</span>
+                  <span className={d.auditMeta}>
+                    {a.who} · {a.at}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
         </>
-      )}
-    </FinDrawer>
+      ) : null}
+    </>
   )
 }
