@@ -63,7 +63,7 @@ export function ClockPanel({ config, open, canEdit }: PanelProps) {
       {tiers.map(([n, title, note, level, add]) => (
         <div key={n} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--ds-ink)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 11.5, fontWeight: 600 }}>{n}</span>
+            <span style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--ds-ink)', color: 'rgb(255 255 255)', display: 'grid', placeItems: 'center', fontSize: 11.5, fontWeight: 600 }}>{n}</span>
             <span style={{ fontSize: 14, fontWeight: 500 }}>{title}</span>
             <span style={{ fontSize: 12, color: 'var(--ds-ink-3)' }}>{note}</span>
           </div>
@@ -186,7 +186,7 @@ export function FenceRing({ radius }: { radius: number }) {
   const r = `${Math.min(130, Math.round(radius / 2.2))}px`
   return (
     <span style={{ width: r, height: r, borderRadius: '50%', border: '2px solid var(--hr-accent, rgb(233 154 83))', background: 'rgb(232 150 80 / .14)', display: 'grid', placeItems: 'center' }}>
-      <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--hr-accent, rgb(233 154 83))', boxShadow: '0 0 0 3px #fff' }} />
+      <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--hr-accent, rgb(233 154 83))', boxShadow: '0 0 0 3px rgb(255 255 255)' }} />
     </span>
   )
 }

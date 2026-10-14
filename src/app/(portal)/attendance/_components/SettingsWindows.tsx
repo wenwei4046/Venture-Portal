@@ -301,7 +301,7 @@ function HolidayWindow(props: Props) {
                 const on = f.day === d
                 const other = others.find(h => h.day === d)
                 return (
-                  <button key={i} type="button" title={other?.name} onClick={() => set('day', d)} style={{ height: 34, border: 0, borderRadius: 8, background: on ? 'var(--hr-accent, rgb(233 154 83))' : other ? 'var(--ds-surface-3)' : 'transparent', color: on ? '#fff' : isWeekend(d) ? 'var(--ds-ink-3)' : 'var(--ds-ink)', fontFamily: 'inherit', fontSize: 12.5, fontWeight: on ? 700 : 500, cursor: 'pointer' }}>
+                  <button key={i} type="button" title={other?.name} onClick={() => set('day', d)} style={{ height: 34, border: 0, borderRadius: 8, background: on ? 'var(--hr-accent, rgb(233 154 83))' : other ? 'var(--ds-surface-3)' : 'transparent', color: on ? 'rgb(255 255 255)' : isWeekend(d) ? 'var(--ds-ink-3)' : 'var(--ds-ink)', fontFamily: 'inherit', fontSize: 12.5, fontWeight: on ? 700 : 500, cursor: 'pointer' }}>
                     {Number(d.slice(8, 10))}
                   </button>
                 )
@@ -436,7 +436,7 @@ function LeaveWindow(props: Props) {
                           const on = g.titles.includes(t.id)
                           return (
                             <HoverButton key={t.id} onClick={() => setG(a => { a[gi].titles = t.id === 'all' ? ['all'] : toggleAll(a[gi].titles, t.id) })} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', border: 0, borderRadius: 6, background: 'transparent', fontFamily: 'inherit', fontSize: 13, color: 'var(--ds-ink)', cursor: 'pointer', textAlign: 'left' }}>
-                              <span style={{ width: 16, height: 16, flex: 'none', boxSizing: 'border-box', borderRadius: 4, border: `1.5px solid ${on ? 'var(--hr-accent, rgb(233 154 83))' : 'var(--ds-border)'}`, background: on ? 'var(--hr-accent, rgb(233 154 83))' : 'transparent', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 700 }}>{on ? '✓' : ''}</span>
+                              <span style={{ width: 16, height: 16, flex: 'none', boxSizing: 'border-box', borderRadius: 4, border: `1.5px solid ${on ? 'var(--hr-accent, rgb(233 154 83))' : 'var(--ds-border)'}`, background: on ? 'var(--hr-accent, rgb(233 154 83))' : 'transparent', color: 'rgb(255 255 255)', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 700 }}>{on ? '✓' : ''}</span>
                               <span style={{ fontWeight: on ? 600 : 400 }}>{t.name}</span>
                             </HoverButton>
                           )
