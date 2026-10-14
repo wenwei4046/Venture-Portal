@@ -187,7 +187,7 @@ const ROW_ACT = (side, off, bg, click, label, icon) => '<span onClick={' + click
 PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []),
   ['<div style={{ position: "relative", overflow: "hidden", borderTop: l.rule }}>',
    '<div data-inbox-row="1" style={{ position: "relative", overflow: "hidden", borderTop: l.rule }}>\n            '
-   + '{!!(l.canRead) && (' + ROW_ACT("left", '"0"', "#2F8FD8", "l.read", "Read", "M3 7l9 6 9-6M3 7v10h18V7M3 7l9-4 9 4") + ')}\n            '
+   + '{!!(l.canRead) && (' + ROW_ACT("left", '"0"', "#2F8FD8", "l.read", "{l.readLabel}", "M3 7l9 6 9-6M3 7v10h18V7M3 7l9-4 9 4") + ')}\n            '
    + ROW_ACT("left", 'l.canRead ? "84px" : "0"', "#A8968B", "l.pin", "{l.pinLabel}", "M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z") + '\n            '
    + '{!!(l.canAssign) && (' + ROW_ACT("right", '"84px"', "#2F6FB5", "l.assign", "Assign", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3") + ')}'],
   ['<div onClick={l.open} onPointerDown={l.down} onPointerUp={l.up} onPointerCancel={l.cancel}', '<div onClick={l.open} onPointerDown={l.down} onPointerMove={l.move} onPointerUp={l.up} onPointerCancel={l.cancel}'],

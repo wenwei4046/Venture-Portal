@@ -75,7 +75,10 @@ export function inboxVM(ctx: SalesCtx) {
   // ── Row swipes ──
   const W = 84;
   const canAssign = (c: CrmCustomer) => !!ctx.embedded?.assignTo || leaderAssignees(ctx, c).length > 0;
-  const canRead = (c: CrmCustomer) => c.unread > 0 && c.assignedTo === owner.id && !ctx.viewingOther;
+  // Right: Read for an unread chat (its messages, or one marked unread), else Unread — this person's own view (2026-10-14).
+  const marked = (c: CrmCustomer) => !!data.prefs[c.id]?.markedUnread;
+  const showsUnread = (c: CrmCustomer) => c.unread > 0 || marked(c);
+  const canRead = (_c: CrmCustomer) => !ctx.viewingOther;
   const nRight = (c: CrmCustomer) => (canAssign(c) ? 2 : 1), nLeft = (c: CrmCustomer) => (canRead(c) ? 2 : 1);
   const goAssign = (c: CrmCustomer) => { set(u => ({ ...u, swipe: null, swipeR: null, moreLead: null, moreView: "main", chat: c.id, hm: { assign: true, sel: null } })); act.openChat(c.id); };
   /** Puts a row dragged by hand where React will draw it (its inline style), with the glide back on. */
@@ -132,19 +135,21 @@ export function inboxVM(ctx: SalesCtx) {
     const open = () => { set(u2 => ({ ...u2, chat: c.id, swipe: null })); act.openChat(c.id); };
     return {
       name: c.name, ini: ini(c.name), ad: c.ad, preview: previewOf(c), when: lastChat(new Date(lastAt(c)).toISOString(), now),
-      unread: c.unread, chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, cold,
+      // A chat marked unread shows the badge as a dot, as WhatsApp's.
+      unread: c.unread || (marked(c) ? "\u00a0" : 0), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, cold,
       ownerTag: shared ? firstName(nameOf(c.assignedTo)) : "", ownerC: shared ? ownerColor.get(c.assignedTo!)! : "#806B60",
       urgShow: !cold && u.level !== "none", urg: u.label, urg3b: u.color,
       firstVisit: firstMarked ? `${dayLabel(new Date(firstMarked.start))}, ${timeLabel(new Date(firstMarked.start))}` : "",
       tags: labelsOf(c).map(l => ({ t: l.name, c: l.color })),
-      rule: n ? `1px solid ${BORDER}` : "0", isMuted: mu, isPinned: pi, iconRight: c.unread ? "28px" : "0px", padR: `${32 + (mu ? 22 : 0) + (pi ? 22 : 0)}px`,
+      rule: n ? `1px solid ${BORDER}` : "0", isMuted: mu, isPinned: pi, iconRight: c.unread || marked(c) ? "28px" : "0px", padR: `${32 + (mu ? 22 : 0) + (pi ? 22 : 0)}px`,
       // Swipe as WhatsApp's (the owner, 2026-10-14: "往左滑很慢"): the row follows the finger and lets go open or shut.
       // Left: Assign (a TL / STL, their team's customer) · More. Right: Read (an unread chat of one's own) · Pin / Unpin.
       // A tap opens the chat (or closes an open swipe).
       ...rowSwipe(c, nRight(c), nLeft(c)),
       moreOp: 1,
       canAssign: canAssign(c), assign: (e: PEvent | MouseEvent) => { e.stopPropagation(); goAssign(c); },
-      canRead: canRead(c), read: (e: PEvent | MouseEvent) => { e.stopPropagation(); patch({ swipeR: null }); act.openChat(c.id); },
+      canRead: canRead(c), readLabel: showsUnread(c) ? "Read" : "Unread",
+      read: (e: PEvent | MouseEvent) => { e.stopPropagation(); patch({ swipeR: null }); if (showsUnread(c)) act.openChat(c.id); else void act.setPref(c.id, { markedUnread: true }); },
       pinLabel: pi ? "Unpin" : "Pin", pin: (e: PEvent | MouseEvent) => { e.stopPropagation(); patch({ swipeR: null }); void act.setPref(c.id, { pinned: !pi }); },
       cancel: () => { clearTimeout(refs.lp); refs.ls = null; settleRow(); },
       noMenu: (e: MouseEvent) => e.preventDefault(),

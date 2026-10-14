@@ -146,7 +146,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
         .order("sent_at").order("id").range(from, to), "crm messages"),
       read<CrmDataRows["visits"]>(db.from("crm_appointments").select("id, contact_id, showroom, start_at, minutes, state, outcome, reminded_at")),
       read<CrmDataRows["rooms"]>(db.from("crm_showrooms").select("id, name, active, sort_order, address, slots, cap, weekly, blocks")),
-      read<CrmDataRows["prefs"]>(db.from("crm_contact_prefs").select("contact_id, pinned, muted, hidden, blocked, pinned_message_id")),
+      read<CrmDataRows["prefs"]>(db.from("crm_contact_prefs").select("contact_id, pinned, muted, hidden, blocked, pinned_message_id, marked_unread")),
       read<CrmDataRows["hides"]>(db.from("crm_message_hides").select("message_id")),
       read<CrmDataRows["labels"]>(db.from("crm_labels").select("id, name, color, sort_order")),
       read<CrmDataRows["contactLabels"]>(db.from("crm_contact_labels").select("label_id, contact_id")),

@@ -111,7 +111,7 @@ export interface CrmRoom {
   mapWaze?: string | null;
 }
 
-export interface CrmPrefs { pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinnedMessageId: string | null }
+export interface CrmPrefs { pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinnedMessageId: string | null; /** Marked unread by this person (swipe right › Unread, 2026-10-14); opening the chat takes it off. */ markedUnread?: boolean }
 export interface CrmLabel { id: string; name: string; color: string }
 export interface CrmQuickReply { id: string; shortcut: string; message: string }
 
@@ -286,7 +286,7 @@ export interface CrmRoomRow {
   /** CRM Desktop rev 1 (B4): the photo's signed link (made by the read), the map links typed over the address's own. */
   photo_url?: string | null; map_google?: string | null; map_waze?: string | null;
 }
-export interface CrmPrefRow { contact_id: string; pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinned_message_id: string | null }
+export interface CrmPrefRow { contact_id: string; pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinned_message_id: string | null; marked_unread?: boolean }
 export interface CrmInviteRow {
   id: string; kind: "share" | "move"; contact_id: string; contact_name: string; from_staff: string; to_staff: string;
   state: CrmInvite["state"]; created_at: string; decided_at: string | null;
@@ -419,7 +419,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     customers: rows.contacts.map(c => customerFromRow(c, rows.messages)),
     visits: rows.visits.map(visitFromRow),
     rooms: [...rows.rooms].sort((a, b) => a.sort_order - b.sort_order).map(roomFromRow),
-    prefs: Object.fromEntries(rows.prefs.map(p => [p.contact_id, { pinned: p.pinned, muted: p.muted, hidden: p.hidden, blocked: p.blocked, pinnedMessageId: p.pinned_message_id }])),
+    prefs: Object.fromEntries(rows.prefs.map(p => [p.contact_id, { pinned: p.pinned, muted: p.muted, hidden: p.hidden, blocked: p.blocked, pinnedMessageId: p.pinned_message_id, markedUnread: !!p.marked_unread }])),
     hiddenMessages: rows.hides.map(h => h.message_id),
     starredMessages: (rows.stars ?? []).map(s => s.message_id),
     labels: [...rows.labels].sort((a, b) => a.sort_order - b.sort_order).map(l => ({ id: l.id, name: l.name, color: l.color })),
