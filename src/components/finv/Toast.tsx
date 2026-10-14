@@ -39,7 +39,7 @@ export function FinToastHost() {
 
   if (!shown || typeof document === 'undefined') return null
   return createPortal(
-    <div role="status" aria-live="polite" className={s.toast} data-shown={visible ? 'true' : 'false'} key={shown.id}>
+    <div role="status" aria-live="polite" className={s.toast} data-shown={visible ? 'true' : 'false'} data-fin-kit="" key={shown.id}>
       <span className={s.toastDot} aria-hidden="true">●</span>
       <span className={s.toastText}>{shown.message}</span>
     </div>,

@@ -26,6 +26,11 @@ vi.mock('@/lib/approval-amounts', () => ({
 }))
 vi.mock('@/lib/treasury-terms-data', async (orig) => ({ ...(await orig<object>()), fetchTermsHistory: async () => new Map() }))
 
+// Finance's view and HR's Overview (2026-10-14) read through these server modules; the treasury Overview does not.
+vi.mock('@/lib/hiring/board', () => ({ loadHiringBoard: async () => ({ ok: false, reason: 'test' }) }))
+vi.mock('@/lib/member/server', () => ({ adminMemberAction: async () => ({ ok: false, reason: 'test' }) }))
+vi.mock('../revenue/_lib/sub-departments', () => ({ listSubDepartments: async () => [] }))
+
 import DashboardPage from './page'
 
 const SUMMARY = {
@@ -93,7 +98,7 @@ function database(summary: object = SUMMARY) {
   mocks.createClient.mockResolvedValue({ from, rpc: mocks.rpc })
 }
 
-const FINANCE = () => withActions({ id: 'f', role: 'finance', permissions: ['treasury'] })
+const FINANCE = () => withActions({ id: 'f', role: 'staff', permissions: ['treasury'] })
 const PRINCIPAL = () => withActions({ id: 'p', role: 'principal', permissions: ['treasury', 'approvals', 'override'] })
 
 /** The page as Finance and the Principal see it: on the Finance view. */

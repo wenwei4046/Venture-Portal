@@ -1,0 +1,176 @@
+/* The Overview of Finance's view and of HR's (2026-10-14, the Finance revamp
+   v2 — `.design/fin-r2/handoff`: `Finance Desktop.dc.html` D01 and
+   `HR Overview.dc.html` H01–H02). Every value is the prototype's own; its
+   colours are the shell's tokens (`--hvs-*`, `--tone-*` on `.hrv-shell`) and
+   the design system's (`--ds-*`). */
+
+.root {
+  line-height: normal;
+  color: rgb(var(--hvs-ink));
+  font-variant-numeric: tabular-nums lining-nums;
+}
+/* HR's sheet pads 24px (20 under 1000px); the HR Overview's prototype pads its
+   scroller 24 / 28 / 48 as Finance's does. Only this page takes it. */
+@media (min-width: 768px) {
+  :global(.hrv-sheet.sheet):has(> .hrRoot) { padding: 24px 28px 48px; scrollbar-width: auto; scrollbar-color: auto; }
+}
+
+/* ── The head: the date, the greeting, the 64px segment; the actions right ── */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+.headText { min-width: 0; }
+.eyebrow {
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(var(--hvs-ink));
+}
+/* `h1` is drawn by the portal's global rule; the class pair outranks it. */
+.head .title {
+  margin: 12px 0 0;
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--ds-ink);
+}
+.rule { margin-top: 14px; width: 64px; height: 2px; background: var(--ds-accent); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--ds-border);
+  border-radius: 8px;
+  background: var(--ds-surface);
+  color: var(--ds-ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: normal;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.btn:hover { filter: brightness(0.97); color: var(--ds-ink); text-decoration: none; }
+.btn:active { transform: scale(0.98); }
+.btn[data-kind='primary'] { border: 0; background: var(--ds-accent); font-weight: 500; }
+/* HR's two (H01): the primary darkens to the accent's hover, the other washes. */
+.hrRoot .btn:hover { filter: none; background: rgb(var(--hvs-nav-hover)); }
+.hrRoot .btn[data-kind='primary']:hover { background: var(--ds-accent-hover); }
+
+/* ── What waits, in one line ── */
+.summary {
+  margin: 18px 0 0;
+  max-width: 640px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: rgb(var(--hvs-graphite));
+  text-wrap: pretty;
+}
+
+/* ── Quick actions: a label on a hairline, then the tiles ── */
+.label { display: flex; align-items: baseline; gap: 8px; margin: 28px 0 12px; }
+.labelText { font-size: 10.5px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(var(--hvs-muted)); }
+.labelRule { flex: 1; height: 1px; background: var(--ds-border); }
+.quick { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgb(var(--hvs-tile-border));
+  border-radius: 12px;
+  background: var(--ds-surface);
+  box-shadow: 0 3px 12px rgb(var(--hvs-walnut) / 5.5%);
+  font-family: inherit;
+  font-size: 13.333px;
+  text-align: left;
+  text-decoration: none;
+  color: rgb(var(--hvs-ink));
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.tile:hover { border-color: var(--ds-accent); color: rgb(var(--hvs-ink)); text-decoration: none; }
+.tileIcon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: rgb(var(--tile-light));
+  color: rgb(var(--tile-deep));
+}
+.badge {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 99px;
+  border: 2px solid var(--ds-surface);
+  background: var(--ds-accent);
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--ds-ink);
+}
+.tileLabel { font-size: 13.5px; font-weight: 500; }
+
+/* ── One card per category: its numeral, name and page count, then its rows ── */
+.cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 28px; }
+.cat { padding: 14px 8px 8px; border: 1px solid var(--ds-border); border-radius: 12px; background: var(--ds-surface); }
+.catHead { display: flex; align-items: baseline; gap: 8px; padding: 0 8px 8px; }
+.catRoman { font-size: 11px; color: rgb(var(--hvs-roman)); }
+.catLabel { font-size: 10.5px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(var(--hvs-muted)); }
+.grow { flex: 1; }
+.catCount { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; color: rgb(var(--hvs-muted)); }
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 8px;
+  border-radius: 8px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.row:hover { background: var(--ds-row-hover); text-decoration: none; }
+.rowIcon {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  flex: none;
+  border-radius: 8px;
+  background: rgb(var(--tile-light));
+  color: rgb(var(--tile-deep));
+}
+.rowLabel { flex: 1; font-size: 13px; color: rgb(var(--hvs-graphite)); }
+.rowNote { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; color: rgb(var(--hvs-muted)); }
+.chev { font-size: 15px; color: rgb(var(--hvs-quiet)); }
+
+/* The tones (the sidebar's): light tile, deep glyph. */
+.walnut { --tile-light: var(--tone-walnut); --tile-deep: var(--tone-walnut-deep); }
+.clay { --tile-light: var(--tone-clay); --tile-deep: var(--tone-clay-deep); }
+.gold { --tile-light: var(--tone-gold); --tile-deep: var(--tone-gold-deep); }
+.slate { --tile-light: var(--tone-slate); --tile-deep: var(--tone-slate-deep); }
+.olive { --tile-light: var(--tone-olive); --tile-deep: var(--tone-olive-deep); }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .tile { transition: none; }
+  .btn:active { transform: none; }
+}

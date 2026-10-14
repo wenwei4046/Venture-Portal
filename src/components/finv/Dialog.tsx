@@ -49,7 +49,7 @@ export function FinDialog({
   }, [open])
   if (!mounted || typeof document === 'undefined') return null
   return createPortal(
-    <div className={s.dialogRoot} data-shown={shown ? 'true' : 'false'} data-fin-dialog="">
+    <div className={s.dialogRoot} data-shown={shown ? 'true' : 'false'} data-fin-dialog="" data-fin-kit="">
       <div className={s.dialogScrim} onClick={close} aria-hidden="true" />
       <div
         ref={panel}

@@ -56,6 +56,20 @@ export function isFinanceShell(role: UserRole | string | null | undefined): bool
   return role === 'finance'
 }
 
+/**
+ * The account as it is drawn: on Finance's view (its shell, its Overview) —
+ * which view a page is drawn in, never what it may do (the cells decide that).
+ */
+export function onFinanceView(viewer: { role: UserRole | string }): boolean {
+  return isFinanceShell(viewer.role)
+}
+
+/** The name the views greet with (the prototypes' `acct.first`): its first word. */
+export function firstName(name: string | null | undefined, fallback = ''): string {
+  const n = (name ?? '').trim()
+  return n ? n.split(/\s+/)[0] : fallback
+}
+
 // A row's own page under a list: `/payments/<id>`, `/fund-in/<id>`, … — what
 // "← Back to …" returns from with the list's scroll put back, and what an
 // edge swipe on a phone leaves. The second segment names the row unless it is

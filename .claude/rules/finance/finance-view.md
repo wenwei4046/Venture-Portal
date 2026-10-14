@@ -7,6 +7,8 @@ paths:
   - "src/components/layout/FinSidebar.tsx"
   - "src/components/layout/AccountMenu.tsx"
   - "src/components/finv/**"
+  - "src/app/*/dashboard/_components/FinanceOverview.tsx"
+  - "src/app/*/dashboard/_lib/finance-overview.ts"
   - "src/app/*/payments/**"
   - "src/app/*/receipts/**"
   - "src/app/*/statements/**"
@@ -68,3 +70,8 @@ Read this before changing anything it covers, and again in every full scan of su
 - **Admin is no category:** the footer opens the account menu — Account (Edit profile, Change password — a login of one's own only), Admin (Audit Log, Departments = Settings › Departments, Meeting Rooms), Sign out (asked first). **Edit profile** is new (做，只给个人帐号): the name (`users.name`, what a voucher prints for whoever made it) and the phone (the People record's), the email shown only — `my_profile()` / `update_my_profile()`, mig `20261014210000`; the rule in `../portal-wide/permissions.md` › EDIT PROFILE.
 - **What the later parts follow** (asked now, built in their PRs): Create payment keeps every feature of today's form in the design's dialog (样子照设计，功能全留 — one pool looks exactly like the design; a split, a repayment or attachments add their rows); Fund OUT / Fund IN cards in the design's style with the system's own categories (Fund OUT by the loans' status — All, Active, Overdue, Pending approval, Repaid, Cancelled; Fund IN by source type — Subsidiary, Director saving, Director loan, Dept pool, Outsource — and Pending approval), never the design's sample types (Inter-co transfer, Director advance, Capital injection, Financing settled), which the system does not have; phone lists the rounded card (the README's default), not the flush option; the HR Overview drops its three tables, as the design.
 - **PDFs:** today's documents already print *HOUZS Venture Holdings Sdn. Bhd.*, the account name *Houzs Venture Holding Sdn Bhd* and Hong Leong 23600599248 — the design copied them, nothing changes there. The design's new line *finance@houzs.my* is not printed until the user names the right email (asked 2026-10-14; the logins are @venture.my).
+
+**FINANCE'S OVERVIEW (2026-10-14, the revamp v2's D01; DESIGN.md v4.6 › Finance's view — the Overview):** the Finance view (`onFinanceView` — the finance kind or the Principal's Finance lens, whose Overview is the treasury's) opens on the design's Overview; the Principal's own view keeps the treasury dashboard. The page reads, the component only draws (`loadFinanceOverviewCounts` → `FinanceOverview`).
+- **The line and the badges count what the pages list,** each part only for whoever opens that page — the pages' own keys: Payments (treasury) the debit vouchers waiting for approval (the badge adds the drafts), read by department on Finance's lens so no payroll voucher is counted (PAYROLL LIVES IN ITS OWN TAB); Invoice (billing) the issued invoices still owed; Billing Allocator (billing) this month's allocations with no batch, or whose batch has no live invoice left — the allocator's own lock rule. A part that cannot be read says nothing.
+- **The buttons** ask what their pages ask: *Create payment* Treasury · Create, *Create invoice* Billing · Create. Until their dialogs come (Payments' PR, Invoice's PR) they open `/payments/new` and `/statements`.
+- **Quick actions** open their sidebar rows' pages and show only where the row shows. **The categories** are the sidebar's (`finNavSections`), in its order — the README's Daily · Fund · Report · Department, not the prototype's (Department before Report) — with Approvals and Claims where their holders have them.

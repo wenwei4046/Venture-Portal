@@ -774,6 +774,15 @@ The source is the Claude Design handoff *Finance 侧栏分类整理* (`.design/f
 - **The kit** (`components/finv/`): `FinDialog` — the prototype's desktop sheet, 520px content-box on `248 245 240`, radius 16, `0 30px 70px` shadow, fading in from .98 over .2s and out again before it unmounts (`usePresence`); its bodies `DialogMenu`, `DialogConfirm` (red when it undoes), `DialogForm` with `Field` / `Input` (40px content-box, radius 10, the .18 ring) / `Hint` / `DialogButton` (38px). `FinToastHost` draws `flash()` as the walnut pill at the window's foot, 12px up and in over .28s, held 2.2s, played out too.
 - **Edit profile** — Full name, Email (shown, never edited: it is the sign-in), Phone; *Shown on vouchers you create*; Cancel · Save; *Profile saved*. **Change password** — the 2026-10-12 rules in the design's dialog, its sub *At least 6 characters* (the real rule, not the design's 8). **Sign out?** asks first.
 
+### Finance's view — the Overview (v4.6, 2026-10-14)
+
+D01 of the same handoff, and HR's Overview drawn on it (H01–H02, `HR Overview.dc.html`). `dashboard/_components/FinanceOverview.tsx` / `HrOverview.tsx` on `overview.module.css`; the page reads (`_lib/finance-overview.ts`, `_lib/hr-overview.ts`) and hands the figures in. The Principal's own view keeps the treasury dashboard.
+- **The head:** the office's date and quarter in Chivo Mono caps (HR's adds *· HR view*), the greeting by the office clock and the first name in Newsreader, a short accent rule; on the right one primary and one quiet button — *Create payment* / *Create invoice* (Finance), *Import payroll* / *Calculate director salary* (HR) — each shown only to whoever may do it.
+- **One line of what waits**, each part only for whoever opens its page: *N vouchers waiting for approval · N invoices outstanding · N allocations to bill.* / *October payroll is not imported yet · N hiring requests waiting · director salary not calculated.*
+- **Quick actions:** a label with a rule, then eight tiles (icon in its tone, label under it, a walnut count badge where something waits) — Finance: Payment, Receive, Invoice, Billing, Daily Bank, Fund IN, Fund OUT, Ledger; HR: Hiring requests, Import payroll, Payment, Director salary, People, Member services, Book a room, Comm Cal.
+- **A card per category**, the sidebar's own sections in its order (Finance: Daily · Fund · Report · Department), its numeral, name and *N pages*, then its rows — icon tile, label, a short mono note where the row has news (HR's), a chevron.
+- **The sheet** pads 24 / 28 / 48 on both and scrolls on the browser's own scrollbar (`.hrRoot` sets it for HR's).
+
 **HR & Payroll**
 
 ### Payroll grid (v3.3, 2026-09-05 — HR → Payroll)
@@ -1403,6 +1412,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.6** · 2026-10-14 · Finance's Overview and HR's on its layout: the greeting, one line of what waits, eight quick actions with counts, a card per category; HR's three tables gone → Finance's view — the Overview
 - **v4.5** · 2026-10-14 · A person's own documents: Company · Personal everywhere, the Data center's right-click, *<person> can view* and *View only me* ticks and badges, Copy to… / Duplicate, *Hidden* letters → Documentation; My documents; The HR phone app; The Revenue app
 - **v4.4** · 2026-10-14 · The Revenue app's bell moves by itself (Realtime, silently); every CRM page has the Revenue app's home beside its bell → The Revenue app — the refresh
 - **v4.3** · 2026-10-14 · Finance's view wears its own shell: the sidebar in Daily / Fund / Report / Department, the account menu, Edit profile; both views' sidebars 212px → Finance's view — its own shell
