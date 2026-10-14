@@ -113,6 +113,22 @@ describe("step 2's margin", () => {
     expect(calc).not.toHaveBeenCalled();
   });
 
+  it("is not left waiting when the calculator cannot be reached, and asks again at the next price", async () => {
+    let reachable = false;
+    const calc = vi.fn((input: QuoteInput) => {
+      if (!reachable) throw new Error("Failed to fetch");
+      return Promise.resolve(server(input));
+    });
+    const { result } = renderHook(() => useQuote(args(calc, { initial: { ...args(calc).initial!, price: "3000" } })));
+    await wait(SOON_MS);
+    expect(result.current.vm.note).toMatch(/could not be reached/);
+    reachable = true;
+    act(() => result.current.press("0"));
+    await wait(SOON_MS);
+    expect(prices(calc)).toEqual(["3000.00", "30000.00"]);
+    expect(result.current.vm.marginText).toBe(marginAt("30000.00"));
+  });
+
   it("says the server's reason when it refuses the cart, at every price", async () => {
     const calc = vi.fn(async (): Promise<Outcome<QuoteResult>> => ({ ok: false, error: "Product cost is pending a Principal update. Margin cannot be confirmed yet." }));
     const { result } = renderHook(() => useQuote(args(calc)));

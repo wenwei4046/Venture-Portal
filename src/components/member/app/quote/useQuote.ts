@@ -229,7 +229,8 @@ export function useQuote(args: UseQuoteArgs) {
         busy.current = false;
         setBook(b => recordAnswer(b, ask, r, failed));
       };
-      calc(ask.input).then(r => settle(r), () => settle({ ok: false, error: NOT_REACHED }, true));
+      // A throw — offline, a newer release — is an answer too, or the next question would wait for good.
+      Promise.resolve().then(() => calc(ask.input)).then(r => settle(r), () => settle({ ok: false, error: NOT_REACHED }, true));
     }, ask.wait);
     return () => window.clearTimeout(timer);
   }, [ask, calc]);
