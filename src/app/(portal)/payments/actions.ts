@@ -777,7 +777,7 @@ export async function createPaymentVoucher(
 // ─── Submit for approval (Finance) ───────────────────────────────────────────
 
 export async function submitForApproval(formData: FormData) {
-  const user = await requireActionOn('/payments/[id]', 'treasury', 'create')
+  const user = await requireActionOn(['/payments', '/payments/[id]'], 'treasury', 'create')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -831,7 +831,7 @@ export async function submitForApproval(formData: FormData) {
 // card; whoever then clicks Submit for approval becomes the new submitter.
 // Nothing financial has posted at pending stage, so this is bookkeeping-free.
 export async function returnVoucherToDraft(formData: FormData) {
-  await requireActionOn('/payments/[id]', 'treasury', 'edit')
+  await requireActionOn(['/payments', '/payments/[id]'], 'treasury', 'edit')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -854,7 +854,7 @@ export async function returnVoucherToDraft(formData: FormData) {
 // the money + marks the voucher paid in the same action.
 
 export async function approveVoucher(formData: FormData) {
-  const user = await requireApproverOn('/payments/[id]')
+  const user = await requireApproverOn(['/payments', '/payments/[id]'])
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -1344,7 +1344,7 @@ export async function reassignVoucherGlAccount(
 // ─── Void voucher (Finance, only draft/pending) ─────────────────────────────
 
 export async function voidVoucher(formData: FormData) {
-  const user = await requireActionOn('/payments/[id]', 'treasury', 'void')
+  const user = await requireActionOn(['/payments', '/payments/[id]'], 'treasury', 'void')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -1387,7 +1387,7 @@ export async function voidVoucher(formData: FormData) {
 // a wrong receipt can be undone. Steps: reverse bank cache, reverse each linked
 // GL entry, reverse the pool credits, un-settle the invoice(s), mark voided.
 export async function voidPaidReceipt(formData: FormData) {
-  const user = await requireActionOn('/payments/[id]', 'treasury', 'void')
+  const user = await requireActionOn(['/payments', '/payments/[id]'], 'treasury', 'void')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -1547,7 +1547,7 @@ export async function voidPaidReceipt(formData: FormData) {
 // pointer to the right flow — reversing them generically would leave their
 // downstream records (loans, payroll accruals, claims, dept requests) dangling.
 export async function reversePaidPayment(formData: FormData) {
-  const user = await requireActionOn('/payments/[id]', 'treasury', 'void')
+  const user = await requireActionOn(['/payments', '/payments/[id]'], 'treasury', 'void')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -1871,7 +1871,7 @@ const UPLOADABLE_STATUSES = ['draft', 'pending_approval', 'approved', 'paid']
 const UNDECIDED_STATUSES = ['draft', 'pending_approval']
 
 export async function uploadVoucherAttachment(formData: FormData): Promise<{ count: number }> {
-  const user = await requireActionOn('/payments/[id]', 'treasury', 'edit')
+  const user = await requireActionOn(['/payments', '/payments/[id]'], 'treasury', 'edit')
   const supabase = await createClient()
 
   const voucherId = (formData.get('voucher_id') as string) ?? ''

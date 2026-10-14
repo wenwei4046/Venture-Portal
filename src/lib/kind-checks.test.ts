@@ -18,6 +18,7 @@ const KIND_IS_THE_POINT: Record<string, string> = {
   'lib/hr-app/server.ts': "the HR app's view switch marks the view it is in (the Principal's mask) — presentation",
   'app/(portal)/approvals/page.tsx': "canSetDefault — the shared table layout, kept by kind in the database (table_layout_defaults_set)",
   'app/(portal)/payments/_components/VoucherLedger.tsx': "canSetDefault — the shared table layout, kept by kind in the database (table_layout_defaults_set)",
+  'app/(portal)/payments/_components/PaymentsHub.tsx': "canSetDefault — the shared table layout, kept by kind in the database (table_layout_defaults_set)",
   'app/(portal)/hr-costing/payroll/[period]/page.tsx': "reopening a Total-Closed month — the Principal's own power (payroll_reopen_month)",
   'lib/approval-domains.ts': 'the owner kind — the Principal may decide what they raised themselves (approver_may)',
   'lib/view-as.ts': "the view-as switch — the Principal's mask is a kind",
