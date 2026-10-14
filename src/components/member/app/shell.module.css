@@ -254,7 +254,9 @@
 }
 .asideMeText { min-width: 0; }
 .asideMeName { display: block; font-size: calc(14px * var(--rv-type)); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.asideMeSub { display: block; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); }
+/* Title · rank wraps under the name (2026-10-14): the prototype's button is `nowrap`, and "Revenue Director · Rank SS"
+   or "Senior Revenue Specialist · Rank B" ran out past the card. */
+.asideMeSub { display: block; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); white-space: normal; overflow-wrap: anywhere; }
 
 .deskHeader {
   flex: 0 0 60px;

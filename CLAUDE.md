@@ -181,7 +181,7 @@ Every gate reads a PERMISSION, never a role (2026-09-01). A title points at a TE
 Role	DB Value	Access
 Principal	`principal`	Everything + Approve + Settings
 Finance	`finance`	Treasury + Billing + Reports — no individual salary, no Director Salary module, no Director Pool (v2 2026-07-21: calculator is Principal + HR only)
-HR	`hr`	Staff costs + Director Salary + Claims + Director Pool (v2 calculator, granted 2026-07-21) + Revenue Department (commission rules, hierarchy, runs — but NOT the Product List, which is Principal-only)
+HR	`hr`	Staff costs + Director Salary + Claims + Director Pool (v2 calculator, granted 2026-07-21) + Revenue Department (commission rules, hierarchy, runs — but NOT the Product List, a tick of its own: the Principal's templates and, since 2026-10-14, the Revenue Director's)
 Dept Manager	`dept_manager`	Own department only
 Key Business Rules
 Treasury
