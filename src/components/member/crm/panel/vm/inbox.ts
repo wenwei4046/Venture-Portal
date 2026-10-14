@@ -6,7 +6,7 @@
  */
 import type { ChangeEvent, MouseEvent, PointerEvent } from "react";
 import type { CrmCustomer } from "@/lib/member/crm-data";
-import { STATUS_LABEL, lastChat, lastReal, urgencyOf } from "../../sales/vm/common";
+import { STATUS_LABEL, isCold, lastChat, lastReal, urgencyOf } from "../../sales/vm/common";
 import { phoneLabel, telHref } from "../../sales/vm/customer";
 import { first, ini, NO_SEAT, seatOf, type PanelCtx } from "./common";
 
@@ -67,7 +67,9 @@ export function inboxVM(ctx: PanelCtx) {
   const chipDefs: [string, string, string][] = [["", "All", "transparent"], ...(me.role === "hod" ? [] : ctx.directors.length ? [["hod", "Director", "#387557"] as [string, string, string]] : []), ...ctx.teams.map(t => [t.id, t.name, t.c] as [string, string, string])];
   const tSel = f && f !== "hod" ? ctx.teams.find(t => t.id === f) : null;
   const need = list.filter(r => r.needs);
-  const col = (r: typeof all[number]) => (isNewChat(r.c) ? "new" : r.needs ? "need" : r.c.status === "appointment" ? "appt" : r.c.status === "won" ? "won" : r.c.status === "lost" ? "lost" : "fup");
+  // The same categories as everybody's Mine inbox, in its order (the owner, 2026-10-14: "只要在 mine 有的，team 也要有"):
+  // a Cold lead (the window shut, we wrote last) is its own column and nowhere else, as in Mine.
+  const col = (r: typeof all[number]) => (isCold(r.c, ctx.now) ? "cold" : isNewChat(r.c) ? "new" : r.needs ? "need" : r.c.status === "appointment" ? "appt" : r.c.status === "won" ? "won" : r.c.status === "lost" ? "lost" : "fup");
   return {
     onInbox: ui.tab === "inbox" && !ui.lead,
     inbSummary: `${list.length} chats · ${need.length} need attention`,
@@ -79,8 +81,10 @@ export function inboxVM(ctx: PanelCtx) {
       const on = who === id;
       return { label, n: all.filter(r => r.seat.id === f && (!id || r.c.assignedTo === id)).length, bg: on ? "#3F2B22" : "transparent", fg: on ? "#fff" : "#806B60", bd: on ? "#3F2B22" : "#E2CFC1", pick: () => set(u => ({ ...u, inbWho: id })) };
     }) : [],
-    inbCols: ([["new", "New", "#BD4A19", "#FFF0E4"], ["need", "Attention", "#A3371A", "#FBE4DE"], ["fup", "Follow up", "#A46312", "#FBF1E3"], ["appt", "Appointment", "#387557", "#E4F1E8"], ["won", "Won", "#2F6FB5", "#E4EDF8"], ["lost", "Lost", "#806B60", "#F2EDE9"]] as const)
-      .map(([k, title, c, bg]) => { const rows = list.filter(r => col(r) === k); return { title, c, bg, n: rows.length, rows, empty: !rows.length }; }),
+    inbCols: ([["new", "New", "#7A4FB0", "#F1EBF8"], ["need", "Attention", "#A3371A", "#FBE4DE"], ["fup", "Follow up", "#A46312", "#FBF1E3"], ["appt", "Appointment", "#387557", "#E4F1E8"], ["won", "Won", "#2F6FB5", "#E4EDF8"], ["lost", "Lost", "#806B60", "#F2EDE9"], ["cold", "Cold leads", "#3E5C7A", "#E8EEF4"]] as const)
+      .map(([k, title, c, bg], i) => { const rows = list.filter(r => col(r) === k); return { title, c, bg, n: rows.length, rows, empty: !rows.length,
+        // The chip above the board slides it to this column.
+        jump: () => { const b = document.querySelector<HTMLElement>("[data-inb-board]"), el = b?.children[i] as HTMLElement | undefined; if (b && el) b.scrollTo({ left: el.offsetLeft - b.offsetLeft - 20, behavior: "smooth" }); } }; }),
     openPc: () => set(u => ({ ...u, pcOpen: true })),
   };
 }

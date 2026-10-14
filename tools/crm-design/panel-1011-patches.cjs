@@ -71,6 +71,13 @@ module.exports = [
   [/<h2 style=\{\{[^}]*\}\}>Needs your action<\/h2>\s*<section[\s\S]*?<\/section>\s*/, ""],
   // The Team inbox's "Needs a reply" column is Attention, as everybody's Mine inbox calls it (vm/inbox.ts).
   ["Not assigned yet · leads wait in Organic Leads", "Not assigned yet · dealt evenly across teams"],
+  // Team inbox (the owner, 2026-10-14: "我不知道哪一個應該先處理，沒有數字提示"; "只要在 mine 有的，team 也要有"): a row of the
+  // same categories as Mine, each with its count, above the board — a tap slides the board to that column.
+  ['<div data-drag-scroll="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "10px", overflowX: "auto", overflowY: "hidden",',
+    '<div data-drag-scroll="1" style={{ flex: "0 0 auto", display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", margin: "-4px -16px 0", padding: "0 16px", userSelect: "none" }}>\n' +
+    '            {(v.ib.inbCols).map((g, g_i) => (<Fragment key={g_i}><span onClick={g.jump} style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 12px", borderRadius: "16px", border: "1px solid #EBDDD2", background: "#fff", color: "#3F2B22", fontSize: "13px", fontWeight: "600", whiteSpace: "nowrap", cursor: "pointer" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.c }}></span>{g.title}<b style={{ fontWeight: "700", color: g.c }}>{g.n}</b></span></Fragment>))}\n' +
+    '          </div>\n' +
+    '          <div data-inb-board="1" data-drag-scroll="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "10px", overflowX: "auto", overflowY: "hidden",'],
   // Full time team editor: the people table keeps its rows full height and the page scrolls (user 2026-10-13: LAWRENCE's
   // title was cut — the scroller squeezed the table, whose overflow is hidden, to make room for the week below).
   [/<div style=\{\{ display: "flex", flexDirection: "column", borderRadius: "16px", background: "#fff", border: "1px solid #EBDDD2", overflow: "hidden" \}\}>(\s*<div style=\{\{ display: "grid", gridTemplateColumns: "minmax\(0, 1fr\) repeat\(7, 30px\)", alignItems: "center", gap: "4px", padding: "10px 12px 6px" \}\}>)/,

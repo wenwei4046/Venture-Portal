@@ -307,7 +307,10 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </Fragment>))}
             </div>
           </>)}
-          <div data-drag-scroll="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "10px", overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", margin: "0 -20px", padding: "0 20px 4px", scrollSnapType: "x mandatory", scrollPadding: "0 20px", userSelect: "none" }}>
+          <div data-drag-scroll="1" style={{ flex: "0 0 auto", display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", margin: "-4px -16px 0", padding: "0 16px", userSelect: "none" }}>
+            {(v.ib.inbCols).map((g, g_i) => (<Fragment key={g_i}><span onClick={g.jump} style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 12px", borderRadius: "16px", border: "1px solid #EBDDD2", background: "#fff", color: "#3F2B22", fontSize: "13px", fontWeight: "600", whiteSpace: "nowrap", cursor: "pointer" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.c }}></span>{g.title}<b style={{ fontWeight: "700", color: g.c }}>{g.n}</b></span></Fragment>))}
+          </div>
+          <div data-inb-board="1" data-drag-scroll="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "10px", overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", margin: "0 -20px", padding: "0 20px 4px", scrollSnapType: "x mandatory", scrollPadding: "0 20px", userSelect: "none" }}>
             {(v.ib.inbCols).map((g, g_i) => (<Fragment key={g_i}>
               <div style={{ flex: "0 0 264px", height: "100%", scrollSnapAlign: "start", display: "flex", flexDirection: "column", gap: "8px", padding: "10px", boxSizing: "border-box", borderRadius: "18px", background: g.bg, overflowY: "auto", scrollbarWidth: "none" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "2px 4px" }}>
