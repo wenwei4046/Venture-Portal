@@ -1,6 +1,6 @@
 # DESIGN.md — HOUZS Venture Portal
 
-**Version 4.20 · 2026-10-14** — the single design doc for every screen: the portal, the Revenue app and the HR phone app. Version history: Part IV.
+**Version 4.22 · 2026-10-15** — the single design doc for every screen: the portal, the Revenue app and the HR phone app. Version history: Part IV.
 
 **The design system.** The visual source is the Claude Design project **HOUZS Venture Design System** (https://claude.ai/design/p/1fecd655-db12-4974-abf4-3d7434e41386, synced from `main` on 2026-10-13). It holds the tokens, the foundation cards, the core and view components and four templates. This file says how the code does it — which token, class or component a page uses today — and holds the rules the code enforces. Where the project and this file disagree, this file is the code's truth. Change either one on purpose, never by drift.
 
@@ -1058,7 +1058,7 @@ No test button: the ERP's own page proves the key.
 
 **The tools above the list:** **"+"** (v3.54, Member services · Edit only), *Upload form* (once a form is uploaded, the file's own icon instead — never its name), *Form settings*.
 
-- **The uploaded form** (2026-10-15) — a 31px square in the uploaded green holding its file's icon, as an app would show it: Word's **W** on blue (.doc, .docx), **PDF** on red, a picture on orange, **</>** on walnut (HTML) — the Data center's badge colours. Its name is the tooltip; nothing on the button reads it.
+- **The uploaded form** (v4.22) — a 31px square in the uploaded green holding its file's icon, as an app would show it: Word's **W** on blue (.doc, .docx), **PDF** on red, a picture on orange, **</>** on walnut (HTML) — the Data center's badge colours. Its name is the tooltip; nothing on the button reads it.
 - **Its menu** (v4.20) — a click replaces the file; a right-click (Shift + F10 from the keys) opens its paper menu, `FormFileMenu` on `MenuPanel`: the file's name, *View*, *Remove…*. Shift + right-click keeps the browser's.
   - *View* opens a 640px drawer (`FormFileViewer`, Documentation's preview drawer): a PDF in the browser's viewer, a picture as it is, a Word .docx read in the browser, an HTML form as its page — those two in a sandboxed frame. An old .doc reads *No preview for .doc files.* beside *Download*.
   - *Remove…* asks beside it (Cancel · **Remove**, the danger one). The chip reads *Upload form* again; a refusal stays in the panel.
@@ -1462,6 +1462,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.22** · 2026-10-15 · Sales Groups: an uploaded form shows as its file's icon — Word's W, PDF, a picture, </> in the Data center's colours — its name in the tooltip, never on the button → Waiting list flow (#422)
 - **v4.21** · 2026-10-14 · The Quote's margin answers as it is typed; *Calculating* while a changed cart is priced → The Revenue app — built to the prototype
 - **v4.20** · 2026-10-14 · Sales Groups: the uploaded form's chip has a right-click menu — *View* (a 640px drawer: a PDF, a picture, a Word .docx read in the browser, an HTML form) and *Remove…* (asked beside it; the file is deleted too) → Waiting list flow (#418)
 - **v4.19** · 2026-10-14 · The invoice's other dialogs in the kit's sheet — + Credit note, Change account, Generate Marketing invoices, Generate payroll invoices, Reconcile payroll, Own-share → Venture (Office) — on the hub and the invoice's page; a credit note the system refuses drawn shut → Finance's view — Create payment
