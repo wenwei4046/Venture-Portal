@@ -121,7 +121,7 @@ describe("Finance's Overview (D01)", () => {
     expect(screen.getByText('Wed 14 Oct 2026 · Q4 2026')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Good afternoon, Aina.')
     expect(screen.getByRole('link', { name: 'Create payment' })).toHaveAttribute('href', '/payments?new=1')
-    expect(screen.getByRole('link', { name: 'Create invoice' })).toHaveAttribute('href', '/statements')
+    expect(screen.getByRole('link', { name: 'Create invoice' })).toHaveAttribute('href', '/statements?new=1')
   })
 
   it('says what waits — payroll left out, read by department — and badges the tiles with it', async () => {

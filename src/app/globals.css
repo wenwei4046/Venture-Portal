@@ -4168,6 +4168,8 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   --fv-band-rule: 190 200 214;
   --fv-box: 207 197 183;
   --fv-box-fixed: 214 206 196;
+  /* …Invoice's Select (D10): an unticked row's box. */
+  --fv-frame: 216 210 200;
   --fv-strip: 250 249 247;
   --fv-strip-head: 235 231 224;
   --fv-notice: 245 243 240;
@@ -4445,12 +4447,6 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   .alloc-sheet .gen-strip { padding: 10px 12px; font-size: 12px; }
   .alloc-sheet .gen-strip small { display: none; }
 }
-/* An invoice list's extras: a voided row struck through, Settle as a text
-   link on the desktop and an orange pill on a phone (user: the phone's Settle
-   orange, like the Principal's Approve). */
-.fin-queue table.ledger-table tbody tr.inv-void > td { color: rgb(var(--muted)); text-decoration: line-through; }
-.fin-queue table.ledger-table tbody tr.inv-void > td .chip,
-.fin-queue table.ledger-table tbody tr.inv-void > td input { text-decoration: none; }
 /* The billing page's action band: every control on show, in captioned groups. */
 .act-band {
   display: flex;
@@ -4624,15 +4620,6 @@ details.fin-fold .fin-fold-inner { padding: 4px 0 18px; }
     font-weight: 500;
     letter-spacing: 0.06em;
     color: rgb(var(--card-label, var(--graphite)));
-  }
-  .fin-queue .inv-settle {
-    display: inline-block;
-    padding: 7px 12px;
-    border-radius: 6px;
-    background: rgb(var(--accent));
-    color: rgb(var(--ink));
-    font-size: 13px;
-    text-decoration: none !important;
   }
   /* On a phone the fold is just a line: no box, so its tables keep the sheet's width. */
   details.fin-fold { padding: 0; border: 0; border-radius: 0; background: transparent; margin: 0 0 18px; }
@@ -5590,67 +5577,6 @@ table.ledger-table.audit-saves td { vertical-align: top; }
   color: rgb(130 143 170);
 }
 
-/* A page-head menu (2026-10-09, the Finance revamp — ActMenu): the button,
-   and the list of the controls it holds. */
-.act-menu { position: relative; display: inline-block; }
-.act-menu-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 6px;
-  background: rgb(var(--surface));
-  font-size: 12.5px;
-  font-weight: 500;
-  color: rgb(var(--ink));
-  white-space: nowrap;
-  cursor: pointer;
-}
-.act-menu-btn:hover { background: rgb(var(--surface-2)); }
-.act-menu-btn.primary { border-color: rgb(var(--accent)); background: rgb(var(--accent)); color: #000; font-weight: 600; }
-.act-menu-btn.primary:hover { background: rgb(var(--accent-hover)); }
-.act-menu-chev { font-size: 10px; opacity: 0.7; }
-.act-menu-pop {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: 30;
-  min-width: 240px;
-  padding: 6px;
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 10px;
-  background: rgb(var(--surface));
-  box-shadow: 0 10px 30px rgb(43 31 23 / 0.14);
-}
-/* Each control the menu holds reads as a row of it, whatever it wore outside. */
-.act-menu-pop > * { display: block; }
-.act-menu-pop > :is(a, button),
-.act-menu-pop > * > :is(a, button) {
-  display: block;
-  width: 100%;
-  margin: 0;
-  padding: 9px 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  box-shadow: none;
-  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
-  font-size: 13px;
-  font-style: normal;
-  font-weight: 400;
-  text-align: left;
-  color: rgb(var(--ink));
-  text-decoration: none;
-}
-.act-menu-pop > :is(a, button):hover,
-.act-menu-pop > * > :is(a, button):hover { background: rgb(var(--accent-bg)); }
-.act-menu-pop :is(a, button):disabled { opacity: 0.5; }
-@media (max-width: 767px) {
-  .act-menu-pop { right: auto; left: 0; }
-}
-
 /* Facts in groups (2026-10-09, the Finance revamp — DetailGroups): cards side
    by side, each with a banded title and label / value rows. */
 .dl-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 9px; }
@@ -6499,50 +6425,6 @@ button.bil-month-label:hover:not(:disabled) { background: rgb(247 247 245); }
 .bil-month-foot { display: flex; justify-content: flex-end; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgb(229 228 223); }
 .bil-month-foot button { border: 0; background: transparent; color: #96640C; font-size: 12px; font-weight: 500; cursor: pointer; }
 
-/* Service Billing's head: the month, then From payroll ▼, Export ▼,
-   + Create Invoice ▼ (the menus wear the existing .act-menu dress). */
-.bil-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
-.bil-menu-chev { font-size: 10px; opacity: 0.7; }
-@media (max-width: 767px) {
-  /* The phone: the month full width and 44px tall, From payroll and Export
-     side by side, Create full width. */
-  .bil-tools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; width: 100%; }
-  .bil-tools > .bil-month { grid-column: 1 / -1; height: 44px; }
-  .bil-tools > .bil-month .bil-month-label { flex: 1 1 auto; }
-  .bil-tools > .bil-menu { display: block; }
-  .bil-tools > .bil-menu.primary { grid-column: 1 / -1; }
-  .bil-tools > .bil-menu > .act-menu-btn { justify-content: center; width: 100%; min-height: 44px; }
-  .bil-tools > .bil-menu > .act-menu-pop { top: 50px; left: 0; right: auto; }
-  .bil-tools > .bil-menu:nth-child(3):not(.primary) > .act-menu-pop { left: auto; right: 0; }
-  .bil-tools > .bil-menu.primary > .act-menu-pop { left: 0; right: 0; }
-  /* The head scrolls away on a phone: three rows of tools would hold a third
-     of the screen under a sticky head. */
-  .page-head:has(> .bil-tools) { position: static; }
-}
-
-/* The opened Payroll basis fold starts with a line per department. */
-.bil-fold-lines { display: grid; gap: 6px; margin: 0 0 16px; }
-.bil-fold-line { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; border: 1px solid rgb(229 228 223); border-radius: 8px; background: rgb(247 247 245); font-size: 12px; color: #000; }
-.bil-fold-line .num { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; white-space: nowrap; }
-
-/* "No invoices.", "No Venture Pool transactions in …" — the handoff's empty box. */
-.bil-empty { padding: 24px; border: 1px solid rgb(229 228 223); border-radius: 12px; background: rgb(247 247 245); color: #000; font-size: 13px; text-align: center; }
-
-/* The invoice list's tab row: the statuses, and the "Include other months"
-   switch at its end, over one rule. */
-.bil-tabrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 20px; border-bottom: 1px solid rgb(var(--sheet-divider, 226 224 218)); }
-.bil-tabrow > nav[data-variant] { flex: 1 1 320px; min-width: 0; margin-bottom: 0; border-bottom: 0; }
-.bil-switch { flex: none; display: inline-flex; align-items: center; gap: 8px; margin-bottom: 4px; padding: 4px 12px 4px 4px; border: 1px solid rgb(229 228 223); border-radius: 99px; background: #fff; color: #000; font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 12px; white-space: nowrap; cursor: pointer; }
-.bil-switch-track { position: relative; width: 28px; height: 16px; border-radius: 99px; background: rgb(229 228 223); transition: background 0.15s; }
-.bil-switch-knob { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 0.2); transition: left 0.15s; }
-.bil-switch[aria-checked='true'] .bil-switch-track { background: #E99A53; }
-.bil-switch[aria-checked='true'] .bil-switch-knob { left: 14px; }
-
-/* What is ticked, above the table: "n selected · RM x", then Clear · Print
-   selected · Void selected · Settle n →. */
-.bil-selbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; padding: 10px 14px; border: 1px solid #E99A53; border-radius: 10px; background: rgb(255 244 231); color: #000; font-size: 12px; font-variant-numeric: tabular-nums; }
-.bil-selbar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-
 /* Buttons: a quiet white one, the orange primary, a red-edged danger. */
 .bil-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: #fff; color: #000; font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 12px; font-style: normal; font-weight: 400; line-height: 1.2; white-space: nowrap; text-decoration: none; cursor: pointer; }
 .bil-btn:hover:not(:disabled) { background: rgb(247 247 245); }
@@ -6557,10 +6439,6 @@ button.bil-month-label:hover:not(:disabled) { background: rgb(247 247 245); }
 .bil-row-btn { display: inline-flex; align-items: center; padding: 6px 12px; border: 0; border-radius: 6px; background: #fff; box-shadow: inset 0 0 0 1px #E99A53; color: #000; font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 11px; font-style: normal; font-weight: 500; line-height: 1.2; white-space: nowrap; text-decoration: none !important; cursor: pointer; transition: background 0.12s; }
 .bil-row-btn:hover:not(:disabled) { background: #E99A53; }
 .bil-row-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-@media (max-width: 767px) {
-  .fin-queue .bil-row-btn.inv-settle { padding: 7px 12px; background: rgb(var(--accent)); box-shadow: none; font-size: 13px; }
-}
-
 /* The orange notice ("To bill RM x across n companies — …"). */
 .bil-notice { margin-bottom: 20px; padding: 12px 14px; border: 1px solid #E99A53; border-radius: 10px; background: rgb(255 244 231); color: #000; font-size: 12px; line-height: 1.5; text-wrap: pretty; }
 

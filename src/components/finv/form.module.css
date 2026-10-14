@@ -93,6 +93,28 @@
 }
 .addFiles:hover { background: rgb(var(--hvs-nav-hover)); }
 
+/* A summary card over the fields (Invoice's settle, D10): a row an item, the total on peach. */
+.summary {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.summaryRow { display: flex; justify-content: space-between; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--ds-border); }
+.summaryRow:first-child { border-top: 0; }
+.summaryLabel { min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.summaryValue { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 13px; white-space: nowrap; }
+.summaryTotal {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgb(var(--fv-peach));
+  border-top: 1px solid var(--ds-border);
+}
+.summaryTotalLabel { font-size: 13px; font-weight: 500; }
+.summaryTotalValue { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 14px; font-weight: 600; }
+
 /* The row of small buttons: what this voucher may also be or carry. */
 .more { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 2px; }
 .moreBtn {

@@ -60,7 +60,7 @@ export async function GET(req: Request) {
 
   const supabase = await createClient()
 
-  // Replicate the page's invoice fetch — see BillingView.tsx for the canonical query.
+  // Replicate the page's invoice fetch — see statements/_lib/invoice-hub.ts for the canonical query.
   const periodStart = `${period}-01`
   const { data: invoices } = await supabase
     .from('invoices')
