@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { VoidRepaymentDialog } from '@/components/treasury/DealDialogs'
+import { VoidRepaymentDialog } from './VoidRepaymentDialog'
 
 // Void one repayment row (2026-08-20): reverses the JE / bank / pool effects
 // atomically via the void_loan_repayment RPC, then the row disappears from

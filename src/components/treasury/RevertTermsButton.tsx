@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { RevertTermsDialog } from './DealDialogs'
+import { RevertTermsDialog } from './RevertTermsDialog'
 
 // The undo of the latest 从某月起 change (Principal). The RPC puts the
 // previous segment back as the current terms and drops its history row.
