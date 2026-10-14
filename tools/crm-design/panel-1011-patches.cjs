@@ -103,4 +103,8 @@ module.exports = [
   ['<span style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "3px", marginTop: m.timeTop, padding: m.inPad,', '<span style={{ display: m.tDisp, float: m.tFloat, marginLeft: m.tML, marginBottom: m.tMB, alignItems: "center", justifyContent: "flex-end", gap: "3px", marginTop: m.timeTop, padding: m.inPad,'],
   // The customer form follows the Control panel's Forms (CRM Desktop rev 1, B5) — tools/crm-design/form-patches.cjs.
   ...require("./form-patches.cjs")(),
+  // 2026-10-14 (the owner: "點聊天室可以收起右上 3 個點的功能"): the chat's ⋮ menu closes on a tap anywhere outside it, as
+  // Mine's does — marked for sales/outside.ts › useCloseOnOutside (PanelScreens).
+  ['<span onClick={v.ld.lx.toggleMenu} title="More"', '<span data-hm-toggle="1" onClick={v.ld.lx.toggleMenu} title="More"'],
+  ['<div style={{ position: "absolute", top: "48px", right: "0", zIndex: "7", width: "240px"', '<div data-hm-menu="1" style={{ position: "absolute", top: "48px", right: "0", zIndex: "7", width: "240px"'],
 ];

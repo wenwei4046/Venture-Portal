@@ -46,7 +46,7 @@ export interface PanelUi {
   ftsOpen: boolean;
   tplOpen: boolean;
   tplEd: { id: string | null; name: string; ch: "whatsapp" | "messenger"; body: string } | null;
-  pBook: { customerId: string; room: number; day: number; slot: string | null; view?: "week" | "month"; ym?: [number, number] } | null;
+  pBook: { customerId: string; room: number; day: number; slot: string | null; view?: "week" | "month"; ym?: [number, number]; /** Change: the visit this booking moves. */ visitId?: string } | null;
   reSheet: boolean;
   pick: string;
   pDraft: string;

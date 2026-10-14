@@ -52,18 +52,65 @@ const closeMenu = () => { state = null; starred = null; emit(); };
 /**
  * A long press (450 ms, the finger still) opens the menu; the tap that ends it does not also open the photo or the
  * viewer; the phone's own callout (Save Image …) is held back by the bubble's `WebkitTouchCallout: none`.
+ * A finger dragged RIGHT across a message replies to it, as WhatsApp's (the owner, 2026-10-14: "點擊對話往右滑可以回復該
+ * 條信息"): the bubble follows the finger up to 80 px with the reply arrow showing behind it, and let go past 56 px it
+ * becomes the reply (`reply`). Touch only — a mouse drag selects text. The bubbles take `touch-action: pan-y`
+ * (crm.module.css) so a sideways drag reaches us while an up / down one still scrolls the chat.
  */
-export function pressToOpen(open: () => void) {
+/** After a swipe reply the reply box takes the keyboard, as WhatsApp's does (the box is redrawn first). */
+// Mine's box is `textarea[data-draft]`; the Team chat's is the input reading "Reply to …".
+export function focusDraft() { setTimeout(() => document.querySelector<HTMLElement>('textarea[data-draft], input[placeholder^="Reply to "]')?.focus(), 30); }
+export const SWIPE_REPLY = 56, SWIPE_MAX = 80;
+/** How far a drag of dx × dy moves the bubble: 0 until it is plainly sideways and rightward, then dx up to the most. */
+export function swipeShift(dx: number, dy: number, dragging: boolean): number {
+  if (!dragging && (dx < 12 || Math.abs(dy) > dx * 0.6)) return 0;
+  return Math.max(0, Math.min(SWIPE_MAX, dx));
+}
+export function pressToOpen(open: () => void, reply?: () => void) {
   let timer: ReturnType<typeof setTimeout> | null = null, fired = false, x = 0, y = 0;
+  let el: HTMLElement | null = null, drag = false, shift = 0, arrow: HTMLDivElement | null = null;
   const stop = () => { if (timer) clearTimeout(timer); timer = null; };
+  const settle = () => {
+    if (el) { const b = el; b.style.transition = "transform 180ms ease-out"; b.style.transform = ""; setTimeout(() => { b.style.transition = ""; }, 200); }
+    arrow?.remove(); arrow = null; drag = false; shift = 0;
+  };
+  const draw = () => {
+    if (!el) return;
+    el.style.transition = ""; el.style.transform = shift ? `translateX(${shift}px)` : "";
+    if (!arrow) {
+      arrow = document.createElement("div");
+      arrow.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3F2B22" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="${MENU_ICON.reply}"/></svg>`;
+      Object.assign(arrow.style, { position: "fixed", zIndex: "2147480000", width: "30px", height: "30px", borderRadius: "15px", background: "rgba(63,43,34,.12)", display: "grid", placeItems: "center", pointerEvents: "none" });
+      document.body.appendChild(arrow);
+    }
+    const r = el.getBoundingClientRect();
+    arrow.style.left = `${r.left - shift + Math.min(shift, 44) - 38}px`;
+    arrow.style.top = `${r.top + r.height / 2 - 15}px`;
+    arrow.style.opacity = String(Math.min(1, shift / SWIPE_REPLY));
+    arrow.style.transform = `scale(${shift >= SWIPE_REPLY ? 1.15 : 0.7 + 0.3 * shift / SWIPE_REPLY})`;
+  };
   return {
     onPointerDown: (e: PointerEvent) => {
-      fired = false; x = e.clientX; y = e.clientY; stop();
+      fired = false; x = e.clientX; y = e.clientY; stop(); settle();
+      el = reply && e.pointerType !== "mouse" ? e.currentTarget as HTMLElement : null;
       timer = setTimeout(() => { fired = true; timer = null; try { navigator.vibrate?.(12); } catch { /* no buzz */ } open(); }, 450);
     },
-    onPointerMove: (e: PointerEvent) => { if (Math.abs(e.clientX - x) + Math.abs(e.clientY - y) > 10) stop(); },
-    onPointerUp: stop,
-    onPointerCancel: stop,
+    onPointerMove: (e: PointerEvent) => {
+      const dx = e.clientX - x, dy = e.clientY - y;
+      if (Math.abs(dx) + Math.abs(dy) > 10) stop();
+      if (!el || fired) return;
+      const next = swipeShift(dx, dy, drag);
+      if (!drag && !next) return;
+      if (!drag) { drag = true; try { el.setPointerCapture(e.pointerId); } catch { /* fine */ } }
+      if (shift < SWIPE_REPLY && next >= SWIPE_REPLY) { try { navigator.vibrate?.(10); } catch { /* no buzz */ } }
+      shift = next; draw();
+    },
+    onPointerUp: () => {
+      stop();
+      if (drag) { fired = true; const go = shift >= SWIPE_REPLY; settle(); if (go) reply?.(); }
+      el = null;
+    },
+    onPointerCancel: () => { stop(); settle(); el = null; },
     onClickCapture: (e: MouseEvent) => { if (fired) { e.stopPropagation(); e.preventDefault(); fired = false; } },
     onContextMenu: (e: MouseEvent) => { e.preventDefault(); stop(); fired = true; open(); },
   };

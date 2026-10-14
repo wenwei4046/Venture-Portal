@@ -25,6 +25,7 @@ import { chatVM } from "./vm/chat";
 import type { SalesCtx } from "./vm/common";
 import { useFollowNewest } from "../shared/stick";
 import { useCloseOnOutside } from "./outside";
+import { DOC_ACCEPT } from "../shared/attach-sheet";
 
 export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: () => void }) {
   const { ui } = ctx;
@@ -49,7 +50,7 @@ export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: (
       {/* The + sheet's Photos (several photos and videos at once) and Document, and the camera (a photo or a video), open these. */}
       <input id="crm-pick-photo" type="file" accept="image/*,video/*" multiple onChange={chat.pickVisual} style={{ display: "none" }} />
       <input id="crm-pick-camera" type="file" accept="image/*,video/*" capture="environment" onChange={chat.pickVisual} style={{ display: "none" }} />
-      <input id="crm-pick-file" type="file" multiple onChange={chat.pickMedia} style={{ display: "none" }} />
+      <input id="crm-pick-file" type="file" accept={DOC_ACCEPT} multiple onChange={chat.pickMedia} style={{ display: "none" }} />
     </>)}
     {!chat && <SalesNav v={navVM(ctx)} />}
     {/* What happened, wherever the person is (the Inbox and a chat show it in their own place). */}
