@@ -17,6 +17,7 @@ import {
 } from '@/lib/loans-coa'
 import type { PaymentType } from '@/types'
 import type { Json } from '@/lib/supabase/database.types'
+import { loadNewLoanOptions, type NewLoanOptions } from './_lib/new-loan-options'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
 //
@@ -28,6 +29,45 @@ export type CreateLoanResult = { error: string } | undefined
 
 export async function createLoan(formData: FormData): Promise<CreateLoanResult> {
   await requireActionOn('/fund-out', 'treasury', 'create')
+  const made = await createLoanInner(formData)
+  if ('error' in made) return made
+  loanCreated()
+  redirect(`/fund-out/${made.id}`)
+}
+
+/**
+ * The hub's *Create fund out* (2026-10-15, the Finance revamp v2 — D12): the
+ * same loan as the form page's, every rule its own (createLoanInner), answered
+ * in words instead of a redirect — the hub stays where it is and says so.
+ */
+export async function createLoanFromDialog(formData: FormData): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+  await requireActionOn('/fund-out', 'treasury', 'create')
+  try {
+    const made = await createLoanInner(formData)
+    if ('error' in made) return { ok: false, reason: made.error }
+    loanCreated()
+    return { ok: true, id: made.id }
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : 'The loan could not be saved. Try again.' }
+  }
+}
+
+/** What *Create fund out* chooses from — the form page's lists, read when the dialog opens (Treasury · Create). */
+export async function openCreateLoan(): Promise<{ ok: true; options: NewLoanOptions } | { ok: false; reason: string }> {
+  await requireActionOn('/fund-out', 'treasury', 'create')
+  const options = await loadNewLoanOptions(await createClient())
+  if (!options.baseRate) return { ok: false, reason: 'No approved base rate yet — the Principal approves the quarter’s rate in Settings before a loan can be made.' }
+  return { ok: true, options }
+}
+
+function loanCreated() {
+  revalidatePath('/fund-out')
+  revalidatePath('/approvals')
+  revalidatePath('/dashboard')
+}
+
+/** Every rule of a new loan: it checks, then files the loan and its approval request (create_loan_with_approval). */
+async function createLoanInner(formData: FormData): Promise<{ error: string } | { id: string }> {
   const supabase = await createClient()
 
   const companyId = (formData.get('company_id') as string) ?? ''
@@ -55,7 +95,7 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
     return { error: 'Repayment period must be between 1 and 120 months (or leave blank for no fixed term)' }
   }
   if (!loanStartDate || !dayjs(loanStartDate).isValid()) {
-    throw new Error('Loan start date is required')
+    return { error: 'Loan start date is required' }
   }
   // 首期还款日 (2026-09-22, "首期日 fund in 和 fund out 要一样"): optional, on or
   // after the start date; only its month matters (repayment_start_month).
@@ -198,13 +238,10 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
       .update(creationFlags)
       .eq('id', loanId as string)
       .eq('status', 'pending_approval')
-    if (cErr) return { error: `Loan created but marking 利滚利/最低还息/首期 failed: ${cErr.message}` }
+    if (cErr) return { error: `The loan was filed, but its compound interest / minimum pay / first repayment were not set: ${cErr.message} — set them on its page.` }
   }
 
-  revalidatePath('/fund-out')
-  revalidatePath('/approvals')
-  revalidatePath('/dashboard')
-  redirect(`/fund-out/${loanId}`)
+  return { id: loanId as string }
 }
 
 // ─── Record repayment (Finance) ───────────────────────────────────────────────

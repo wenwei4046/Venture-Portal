@@ -4,18 +4,17 @@ import { canDo } from '@/lib/permission-actions'
 import { canDecide } from '@/lib/approval-domains'
 import { createClient } from '@/lib/supabase/server'
 import { IN_CARDS, type FundCardKey } from '@/lib/fund-hub'
-import { HeadButton } from '@/components/finv/Hub'
-import FundHub from '@/components/treasury/FundHub'
+import FundInHub from './_components/FundInHub'
 import { loadSourceHub } from './_lib/source-hub'
-import { withdrawFundSource } from './actions'
 
 // Fund IN (2026-10-15, the Finance revamp v2 — D12 of `.design/fin-r2/handoff`,
 // read for Fund IN): the design's hub for every reader of it — *Record fund
-// in*, *Fund in · {Month YYYY}* (what came in this office month), the cards the
-// user chose (2026-10-14: All, each source type — Subsidiary, Director saving,
-// Director loan, Dept pool, Outsource — and Pending approval), the list beside
-// them, a fund source's drawer on a press. Its own page (/fund-in/[id]) keeps
-// its schedule, its repayments and the rest of what it always did.
+// in* (its dialog on the page), *Fund in · {Month YYYY}* (what came in this
+// office month), the cards the user chose (2026-10-14: All, each source type —
+// Subsidiary, Director saving, Director loan, Dept pool, Outsource — and
+// Pending approval), the list beside them, a fund source's drawer on a press.
+// Its own page (/fund-in/[id]) keeps its schedule, its repayments and the rest
+// of what it always did.
 
 interface Props {
   searchParams: Promise<{ status?: string }>
@@ -36,22 +35,14 @@ export default async function FundInPage({ searchParams }: Props) {
   const canRaise = canDo(user, 'treasury', 'create')
 
   return (
-    <FundHub
-      side="in"
+    <FundInHub
       records={records}
       month={officeMonth()}
       today={officeToday()}
       initialCard={initialCard}
       canSetDefault={canRaise}
       can={{ edit: canDo(user, 'treasury', 'edit'), void: canDo(user, 'treasury', 'void'), amend: canDo(user, 'treasury', 'approve') }}
-      onWithdraw={withdrawFundSource}
-      head={
-        canRaise ? (
-          <HeadButton primary href="/fund-in/new">
-            Record fund in
-          </HeadButton>
-        ) : null
-      }
+      canCreate={canRaise}
     />
   )
 }
