@@ -4130,6 +4130,14 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
    a light sheet was the very wall #152 took out. */
 .hrv-shell {
   color-scheme: light;
+  background: rgb(var(--hvs-ground));
+}
+/* The shell's palette — on the shell, and on the Finance kit's windows and
+   toast (`[data-fin-kit]`, components/finv), which portal to the body and
+   open on Finance's pages in the Principal's own view too, where no shell is
+   drawn (2026-10-14). */
+.hrv-shell,
+[data-fin-kit] {
   --hvs-ground: 243 243 241;
   --hvs-nav: 248 245 240;
   --hvs-nav-border: 229 222 211;
@@ -4143,6 +4151,9 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   --hvs-avatar: 236 229 219;
   --hvs-walnut: 90 62 43;
   --hvs-cream: 246 238 230;
+  /* The Finance revamp v2 (2026-10-14): a tile's edge and the quietest glyph (a row's chevron). */
+  --hvs-tile-border: 232 225 216;
+  --hvs-quiet: 170 160 150;
   --hvs-top: 255 255 255;
   --hvs-top-border: 229 228 223;
   --hvs-top-ink: 43 31 23;
@@ -4160,7 +4171,6 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   --tone-slate-deep: 78 101 116;
   --tone-olive: 238 240 226;
   --tone-olive-deep: 88 98 68;
-  background: rgb(var(--hvs-ground));
 }
 /* The content frame: 10px of ground around ONE sheet that scrolls inside
    itself, so the sheet's rounded foot is always in view and a drawer covers

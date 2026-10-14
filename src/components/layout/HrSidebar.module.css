@@ -201,7 +201,7 @@
   cursor: pointer;
   transition: background-color 0.15s;
 }
-.footButton:hover { background: rgb(241 236 228 / 0.45); }
+.footButton:hover { background: rgb(var(--hvs-nav-hover) / 0.45); }
 .footButton:focus-visible { outline: 2px solid rgb(var(--hvs-nav-bar)); outline-offset: -2px; }
 
 /* The account menu (the design's D13): a white popover 10px in from the rail,
@@ -215,10 +215,10 @@
   bottom: 64px;
   z-index: 41;
   padding: 6px;
-  background: rgb(255 255 255);
+  background: var(--ds-surface);
   border: 1px solid rgb(var(--hvs-nav-border));
   border-radius: 12px;
-  box-shadow: 0 14px 36px rgb(51 36 27 / 0.18), 0 2px 6px rgb(51 36 27 / 0.06);
+  box-shadow: 0 14px 36px rgb(var(--hvs-ink) / 0.18), 0 2px 6px rgb(var(--hvs-ink) / 0.06);
   line-height: normal;
 }
 .menu[data-collapsed='true'] { right: auto; width: 193px; }
