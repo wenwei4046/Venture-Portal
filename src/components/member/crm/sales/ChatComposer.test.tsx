@@ -1,0 +1,196 @@
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import CrmApp from "../CrmApp";
+import { ICON } from "./vm/composer";
+import { HOLD_HINT } from "./ChatComposer";
+
+// The chat composer (the owner's Claude Design handoff "Typing bar UI mobile chat design", 2026-10-14 —
+// docs/design/chat-composer) in the salesperson's chat, on the demo's data as /member/preview draws it: the One pill
+// typing bar, the Sticker panel (Emoji — GIF and Sticker are not live), the Attach panel, the mic held to record.
+vi.mock("@/app/(member)/member/crm-actions", () => ({}));
+const voice = vi.hoisted(() => ({ start: vi.fn(async () => null as string | null), stop: vi.fn(async () => new File(["x"], "Voice note.m4a", { type: "audio/mp4" })), cancel: vi.fn() }));
+vi.mock("../shared/voice", async importOriginal => ({
+  ...(await importOriginal<typeof import("../shared/voice")>()),
+  startVoice: voice.start, stopVoice: voice.stop, cancelVoice: voice.cancel,
+}));
+
+class NoResize { observe() {} unobserve() {} disconnect() {} }
+beforeEach(() => { vi.stubGlobal("ResizeObserver", NoResize); voice.start.mockClear(); voice.stop.mockClear(); voice.cancel.mockClear(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); window.history.replaceState({}, "", "/"); });
+
+/** The demo salesperson's chat with Lim Wei Jie (l3), opened as a tapped notice opens it. */
+async function openChat() {
+  window.history.replaceState({}, "", "/member/preview");
+  render(<CrmApp live={false} salesperson="You" onExit={() => {}} open={{ chat: "l3" }} />);
+  await act(async () => {});
+}
+const composer = () => document.querySelector<HTMLElement>("[data-composer]")!;
+const box = () => composer().querySelector("textarea")!;
+const byTitle = (t: string) => composer().querySelector<HTMLElement>(`[title="${t}"]`);
+const iconOf = (el: Element | null) => el?.querySelector("path")?.getAttribute("d");
+async function tap(el: Element | null) {
+  expect(el).not.toBeNull();
+  fireEvent.click(el!);
+  await act(async () => {});
+}
+async function type(text: string) {
+  fireEvent.change(box(), { target: { value: text } });
+  await act(async () => {});
+}
+const emojiCells = () => [...composer().querySelectorAll<HTMLElement>('div[style*="repeat(8"] > span')];
+
+describe("the typing bar", () => {
+  it("is one pill: Sticker, the reply box, Attach and Camera; the main button is the mic", async () => {
+    await openChat();
+    expect(screen.getByText("Lim Wei Jie")).toBeInTheDocument();
+    expect(box()).toHaveAttribute("placeholder", "Reply to Lim…");
+    expect(box()).toHaveAttribute("data-draft", "1");
+    for (const t of ["Sticker", "Attach", "Camera", "Voice note"]) expect(byTitle(t)).not.toBeNull();
+    expect(iconOf(byTitle("Voice note"))).toBe(ICON.mic);
+    expect(iconOf(byTitle("Sticker"))).toBe(ICON.stk);
+    // No + button, no emoji sheet, no attach sheet of the old composer.
+    expect(screen.queryByText("EMOJI")).toBeNull();
+    expect(byTitle("Emoji")).toBeNull();
+  });
+
+  it("typing folds Attach and Camera away and the mic becomes Send; Send sends and empties the box", async () => {
+    await openChat();
+    await type("See you Sunday 11am");
+    expect(byTitle("Attach")).toBeNull();
+    expect(byTitle("Camera")).toBeNull();
+    expect(iconOf(byTitle("Send"))).toBe(ICON.send);
+    await tap(byTitle("Send"));
+    expect(screen.getByText("See you Sunday 11am")).toBeInTheDocument();
+    expect(box().value).toBe("");
+    expect(byTitle("Voice note")).not.toBeNull();
+    // Words of spaces only are no message.
+    await type("   ");
+    expect(byTitle("Send")).toBeNull();
+  });
+
+  it("the chat's own rows come with it: \"/\" shows the quick replies above the bar", async () => {
+    await openChat();
+    await type("/");
+    expect(composer().textContent).toContain("Quick replies");
+  });
+});
+
+describe("the Sticker panel", () => {
+  it("opens in the keyboard's place on Emoji's Recents, its toggle the keyboard icon; tapped again it closes", async () => {
+    await openChat();
+    await tap(byTitle("Sticker"));
+    expect(iconOf(byTitle("Sticker"))).toBe(ICON.kb);
+    expect(composer().textContent).toContain("Emoji");
+    expect(composer().textContent).not.toContain("GIF");
+    expect(composer().textContent).toContain("Recents");
+    expect(emojiCells()).toHaveLength(24);
+    expect(composer().querySelector('[data-panel]')).toHaveStyle({ height: "280px" });
+    await tap(byTitle("Sticker"));
+    expect(composer().querySelector("[data-panel]")).toBeNull();
+    expect(iconOf(byTitle("Sticker"))).toBe(ICON.stk);
+  });
+
+  it("a tapped emoji goes into the reply and first into Recents; Delete takes one emoji off whole", async () => {
+    await openChat();
+    await type("Ok");
+    await tap(byTitle("Sticker"));
+    await tap(byTitle("Home"));
+    expect(composer().textContent).toContain("Home");
+    await tap(emojiCells()[1]); // 🛋️
+    expect(box().value).toBe("Ok🛋️");
+    await tap(byTitle("Delete"));
+    expect(box().value).toBe("Ok");
+    await tap(byTitle("Recents"));
+    expect(emojiCells()[0].textContent).toBe("🛋️");
+  });
+
+  it("searches emoji by English words; a category ends the search", async () => {
+    await openChat();
+    await tap(byTitle("Sticker"));
+    await tap(byTitle("Search"));
+    const search = composer().querySelector("input")!;
+    expect(search).toHaveAttribute("placeholder", "Search emoji");
+    fireEvent.change(search, { target: { value: "bed" } });
+    await act(async () => {});
+    expect(composer().textContent).toContain("Results");
+    expect(emojiCells().map(c => c.textContent)).toEqual(["🛏️"]);
+    fireEvent.change(search, { target: { value: "zzz" } });
+    await act(async () => {});
+    expect(composer().textContent).toContain("No emoji match “zzz”");
+    await tap(byTitle("Symbols"));
+    expect(composer().querySelector("input")).toBeNull();
+    expect(composer().textContent).toContain("Symbols");
+  });
+
+  it("stays open after a send; a tap on the messages closes it", async () => {
+    await openChat();
+    await type("Thanks");
+    await tap(byTitle("Sticker"));
+    await tap(byTitle("Send"));
+    expect(composer().querySelector("[data-panel]")).not.toBeNull();
+    await tap(document.querySelector("[data-chat-list]"));
+    expect(composer().querySelector("[data-panel]")).toBeNull();
+  });
+});
+
+describe("the Attach panel", () => {
+  it("holds Photos, Document, Quick replies and Auto replies — the CRM's own", async () => {
+    await openChat();
+    await tap(byTitle("Attach"));
+    const panel = composer().querySelector<HTMLElement>("[data-panel]")!;
+    expect([...panel.querySelectorAll(":scope > div > span")].map(t => t.textContent)).toEqual(["Photos", "Document", "Quick replies", "Auto replies"]);
+    expect(iconOf(byTitle("Attach"))).not.toBeUndefined();
+    const photo = document.getElementById("crm-pick-photo")!, click = vi.spyOn(photo, "click");
+    await tap(screen.getByText("Photos"));
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(composer().querySelector("[data-panel]")).toBeNull();
+    await tap(byTitle("Attach"));
+    await tap(screen.getByText("Quick replies"));
+    expect(screen.getByRole("heading", { name: "Quick replies" })).toBeInTheDocument();
+  });
+
+  it("Camera opens the camera picker", async () => {
+    await openChat();
+    const cam = document.getElementById("crm-pick-camera")!, click = vi.spyOn(cam, "click");
+    await tap(byTitle("Camera"));
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the mic is held to record", () => {
+  it("a tap says so (the prototype's toast) and records nothing", async () => {
+    await openChat();
+    fireEvent.pointerDown(byTitle("Voice note")!);
+    fireEvent.pointerUp(window);
+    await act(async () => {});
+    expect(screen.getByText(HOLD_HINT)).toBeInTheDocument();
+    expect(voice.start).not.toHaveBeenCalled();
+  });
+
+  it("held, it records; let go and the voice note goes", async () => {
+    await openChat();
+    const mic = byTitle("Voice note")!;
+    fireEvent.pointerDown(mic);
+    await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+    expect(voice.start).toHaveBeenCalledTimes(1);
+    expect(composer().textContent).toContain("Recording…");
+    // The main button is the same element under the finger, now Send.
+    expect(byTitle("Send voice note")).toBe(mic);
+    await act(async () => { await new Promise(r => setTimeout(r, 750)); });
+    fireEvent.pointerUp(window, { clientX: 300 });
+    await act(async () => {});
+    expect(voice.stop).toHaveBeenCalledTimes(1);
+    expect(voice.cancel).not.toHaveBeenCalled();
+  });
+
+  it("let go on the bin, it is thrown away", async () => {
+    await openChat();
+    fireEvent.pointerDown(byTitle("Voice note")!);
+    await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+    expect(byTitle("Cancel")).not.toBeNull();
+    fireEvent.pointerUp(window, { clientX: 0 });
+    await act(async () => {});
+    expect(voice.cancel).toHaveBeenCalledTimes(1);
+    expect(voice.stop).not.toHaveBeenCalled();
+  });
+});

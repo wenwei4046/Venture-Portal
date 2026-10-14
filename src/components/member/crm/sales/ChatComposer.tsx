@@ -102,7 +102,7 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
     const clear = () => {
       if (!fitted) return;
       fitted = false;
-      for (const p of ["top", "bottom", "height"]) app.style.removeProperty(p);
+      for (const p of ["top", "bottom"]) app.style.removeProperty(p);
       app.style.removeProperty("--safe-bottom");
       setCapH(null);
     };
@@ -128,11 +128,12 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
       const swapping = Date.now() < swapUntil.current;
       if ((!up && pan < 0.5) || !(inBox || inSearch || shownRef.current || swapping)) { clear(); return; }
       // Fitted to the keyboard while it is the reply box's (or the search's); a panel in its place keeps the full height.
+      // By its top and bottom, never a height: the screen pads itself by the phone's insets (crm.module.css › .app,
+      // content-box), so a height would add them on top.
       const toKb = up && ((inBox && !shownRef.current) || inSearch);
       fitted = true;
       app.style.top = `${pan}px`;
-      app.style.bottom = "auto";
-      app.style.height = `${toKb ? vv.height : window.innerHeight}px`;
+      app.style.bottom = `${Math.round(window.innerHeight - pan - (toKb ? vv.height : window.innerHeight))}px`;
       if (toKb) app.style.setProperty("--safe-bottom", "0px"); else app.style.removeProperty("--safe-bottom");
       // Searching over the keyboard: the panel gives way so the bar and the header both stay on the screen.
       if (inSearch && up) {
