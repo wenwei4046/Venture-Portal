@@ -1,8 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CrmApp from "../CrmApp";
-import { ICON } from "./vm/composer";
-import { HOLD_HINT } from "./ChatComposer";
+import { HOLD_HINT, ICON } from "./vm/composer";
 
 // The chat composer (the owner's Claude Design handoff "Typing bar UI mobile chat design", 2026-10-14 —
 // docs/design/chat-composer) in the salesperson's chat, on the demo's data as /member/preview draws it: the One pill

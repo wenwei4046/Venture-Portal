@@ -73,6 +73,8 @@ export const PANEL_H = 280;
 export const BOX_MAX = 154;
 /** One line of the reply box: 12px padding, a 22px line, 12px padding. */
 export const BOX_MIN = 46;
+/** What a tap on the mic says (the prototype's toast): it is held to record. */
+export const HOLD_HINT = "Hold to record a voice note";
 
 const RUST = "#BD4A19", SUB = "rgb(128 107 96)", MUTED = "#806B60";
 

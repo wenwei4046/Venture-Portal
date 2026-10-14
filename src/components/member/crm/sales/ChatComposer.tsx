@@ -18,7 +18,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import SalesComposer from "./SalesComposer";
-import { BOX_MAX, BOX_MIN, PANEL_H, composerVM, dropLast, flash, focusBox, togglePanel, type ComposerIn, type ComposerPanel } from "./vm/composer";
+import { BOX_MAX, BOX_MIN, HOLD_HINT, PANEL_H, composerVM, dropLast, flash, focusBox, togglePanel, type ComposerIn, type ComposerPanel } from "./vm/composer";
 
 /** A press held this long records; shorter is a tap. */
 const HOLD_MS = 250;
@@ -30,7 +30,6 @@ const KB_MIN = 120;
 /** How long a panel waits for the keyboard to come up over it before it goes anyway. */
 const RISE_MS = 700;
 const KB_KEY = "crm-kb-h";
-export const HOLD_HINT = "Hold to record a voice note";
 
 /** The keyboard's last height (px, the home-indicator inset out), kept across chats; null until one is measured. */
 let lastKbH: number | null = null;
