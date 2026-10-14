@@ -783,6 +783,15 @@ D01 of the same handoff, and HR's Overview drawn on it (H01–H02, `HR Overview.
 - **A card per category**, the sidebar's own sections in its order (Finance: Daily · Fund · Report · Department), its numeral, name and *N pages*, then its rows — icon tile, label, a short mono note where the row has news (HR's), a chevron.
 - **The sheet** pads 24 / 28 / 48 on both and scrolls on the browser's own scrollbar (`.hrRoot` sets it for HR's).
 
+### Finance's view — the hubs (v4.8, 2026-10-14)
+
+D02–D05 of the same handoff, first on Payments (`payments/_components/PaymentsHub` → `PaymentsHubClient`; the kit `components/finv/Hub.tsx`, `FinTable.tsx`, `Drawer.tsx` on `hub.module.css` / `drawer.module.css`). Receipt, Invoice, the Billing Allocator and Fund OUT / IN follow on the same parts.
+- **The head:** `I. DAILY · PAYMENTS`, the title, the 64px segment; on the right *Create payment* (the primary), *Dept · N*, *Payroll · N* and ours kept — *Claims · N*, *Export ▾* — each a white button opening a menu (the dialog's) of what waits. On a narrow sheet the five wrap under the title.
+- **The cards** (`flex: 1 1 260px`, a grid of `minmax(168px, 1fr)`): the walnut-framed total — *Total paid · {Month YYYY}*, Chivo 26 in walnut — then one card per list: All vouchers (walnut), Draft, Pending approval (black, never blue), Approved (clay), Paid (olive), Voided (the quiet light one, a hairline), Payroll batches; a round icon chip, the name 13.5/600, a mono count, the figure Chivo 15/600, a faint arc; the one on show ringed `0 0 0 2px #fff, 0 0 0 4px` accent.
+- **The table panel** (`flex: 2.6 1 440px`): the list's name and its mono count (*11 · RM 457,783.00*, or *4 of 11 · filtered*), the search (36px content-box, radius 10), *Columns*. The navy head band (40px, 10.5/600 caps): every heading sorts ↕ → ▲ → ▼ → off, filters by its values through the funnel (not Amount — a popover of 230px: the values with their counts, *Clear*), moves when dragged onto another (the target lit with a black edge) and widens from its right edge (never under 70px). Rows 46px, peach on hover and while open in the drawer, a quiet `›`. Name · Description · Amount always; Ref #, Date, Category, Pool, Status ticked on in the Columns panel (230px: *Drag a heading to move it · drag its edge to resize*, the fixed three greyed, *Reset*), each in its place before Amount; the table scrolls sideways only once it outgrows the panel.
+- **Payroll batches:** a band that counts them, each batch a 48px row (▸ turning 90°, its name, *N vouchers · all paid · 06 Oct 2026*, the total in red) opening to its members.
+- **The drawer** (460px, max 92%, over the sheet only, inside its edge; in 40px and a fade over .34s, out the same way): the number in mono caps, *View full page ↗* (not on a receipt), *Print*, ×; the dark hero (kicker, status chip with its light, number, amount Chivo 28, *Pay to …*, the status sentence), groups I–IV in white cards (Pay to · When & where · Deducted from with a peach Total · Booking), the files and a dashed *+ Add attachments*, the trail (dots and lines in the accent), and at its foot the steps this reader may take now — the primary 1.5, the others 1, ⋯ 52px.
+
 **HR & Payroll**
 
 ### Payroll grid (v3.3, 2026-09-05 — HR → Payroll)
@@ -1412,6 +1421,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.8** · 2026-10-14 · Payments' hub: the status cards beside the list, the table's column tools (sort, filter, move, widen, Columns), the payroll batches, the right drawer a row opens → Finance's view — the hubs
 - **v4.7** · 2026-10-14 · The CRM Profile's *Back to Revenue app* card is gone: the house beside the bell is the way back → The Revenue app — the refresh
 - **v4.6** · 2026-10-14 · Finance's Overview and HR's on its layout: the greeting, one line of what waits, eight quick actions with counts, a card per category; HR's three tables gone → Finance's view — the Overview
 - **v4.5** · 2026-10-14 · A person's own documents: Company · Personal everywhere, the Data center's right-click, *<person> can view* and *View only me* ticks and badges, Copy to… / Duplicate, *Hidden* letters → Documentation; My documents; The HR phone app; The Revenue app

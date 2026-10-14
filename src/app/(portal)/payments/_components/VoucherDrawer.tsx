@@ -377,13 +377,6 @@ export function VoucherDrawer({ id, onClose, onChanged }: { id: string | null; o
                 </>
               }
             >
-              {v.noCash ? null : v.bankBalance != null && v.bank ? (
-                <Hint danger={short}>
-                  {v.bank.name} balance {rm(v.bankBalance)}
-                  {short ? ` — not enough for ${rm(v.amount)}` : ''}
-                </Hint>
-              ) : null}
-              <Hint>Approving pays this voucher at once — the bank, the pool and the ledger move in the same step. This cannot be undone.</Hint>
               <Field label="Notes" htmlFor="approve-notes">
                 <textarea
                   id="approve-notes"
@@ -394,6 +387,13 @@ export function VoucherDrawer({ id, onClose, onChanged }: { id: string | null; o
                   placeholder="Optional — for the audit trail"
                 />
               </Field>
+              {v.noCash ? null : v.bankBalance != null && v.bank ? (
+                <Hint danger={short}>
+                  {v.bank.name} balance {rm(v.bankBalance)}
+                  {short ? ` — not enough for ${rm(v.amount)}` : ''}
+                </Hint>
+              ) : null}
+              <Hint>Approving pays this voucher at once — the bank, the pool and the ledger move in the same step. This cannot be undone.</Hint>
             </DialogForm>
           </FinDialog>
         </>
