@@ -232,6 +232,7 @@
 
 /* ── The table panel ── */
 .panel {
+  box-sizing: content-box;
   position: relative;
   flex: 2.6 1 440px;
   min-width: 0;
@@ -374,6 +375,7 @@
 /* The table: a navy head band, 46px rows, peach on hover. */
 .scroll { overflow-x: auto; border-radius: 0 0 12px 12px; }
 .thead {
+  box-sizing: content-box;
   display: flex;
   align-items: stretch;
   height: 40px;
@@ -431,6 +433,7 @@
 .resize::after { content: ''; position: absolute; right: 0; top: 11px; bottom: 11px; width: 1px; background: rgb(var(--fv-band-rule)); }
 .empty { padding: 36px 16px; text-align: center; font-size: 13px; color: rgb(var(--hvs-graphite)); }
 .row {
+  box-sizing: content-box;
   display: flex;
   align-items: center;
   min-height: 46px;
@@ -517,6 +520,7 @@
 .batchAmt { flex: none; width: 140px; text-align: right; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 13.5px; color: var(--ds-danger); }
 .members { padding: 0 16px 8px 40px; background: rgb(var(--fv-strip)); }
 .member {
+  box-sizing: content-box;
   display: flex;
   align-items: center;
   gap: 14px;

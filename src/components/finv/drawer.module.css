@@ -25,7 +25,7 @@
   right: 11px;
   bottom: 11px;
   z-index: 21;
-  box-sizing: border-box;
+  box-sizing: content-box;
   width: min(460px, 92%);
   display: flex;
   flex-direction: column;
@@ -52,6 +52,7 @@
 .root[data-shown='true'] .panel { transform: none; opacity: 1; }
 
 .head {
+  box-sizing: content-box;
   flex: none;
   display: flex;
   align-items: center;
