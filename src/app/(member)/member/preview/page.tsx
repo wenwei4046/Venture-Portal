@@ -12,6 +12,7 @@ import ArenaDesignReview from "@/components/member/design-preview/ArenaDesignRev
 import ArenaDesignPreview from "@/components/member/design-preview/ArenaDesignPreview";
 import type { AdminMemberData } from "@/lib/member/server";
 import RevenueApp from "@/components/member/app/RevenueApp";
+import { interTight } from "@/components/member/app/fonts";
 import DeskProto from "@/components/member/crm/desk/DeskProto";
 import AppError from "@/components/member/app/shell/AppError";
 import AppLoading from "@/components/member/app/shell/AppLoading";
@@ -81,8 +82,12 @@ export default async function MemberPreview({
   if (params.app === "proto") {
     const device = params.device === "android" || params.device === "desktop" ? params.device : "ios";
     const search = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => typeof e[1] === "string")).toString();
-    return <RevenueApp initialData={protoData({ principal: params.role === "principal" })} initialSearch={search ? `?${search}` : ""} device={device} today="2026-10-03" fixture={protoFixture({ brand: params.brand, sheet: params.sheet, charges: params.charges === "1", track: params.track === "sample" })}
-      closed={{ pages: appPages(params.closed), sends: appPages(params.sends) }} />;
+    // In the app's own display face, as /member draws it (its layout's wrapper): compared against the prototype, the
+    // titles and amounts must be Inter Tight, not the Inter it falls back to (2026-10-14).
+    return <div className={interTight.variable} style={{ display: "contents" }}>
+      <RevenueApp initialData={protoData({ principal: params.role === "principal" })} initialSearch={search ? `?${search}` : ""} device={device} today="2026-10-03" fixture={protoFixture({ brand: params.brand, sheet: params.sheet, charges: params.charges === "1", track: params.track === "sample" })}
+        closed={{ pages: appPages(params.closed), sends: appPages(params.sends) }} />
+    </div>;
   }
   // What /member shows while it loads (loading.tsx) or when it cannot (error.tsx), held on
   // screen: `&page=` picks the tab.

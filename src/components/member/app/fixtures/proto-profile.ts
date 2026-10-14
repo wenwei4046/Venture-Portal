@@ -46,6 +46,13 @@ const MY_FAIRS = [
   { venue: "Sunway Pyramid", dates: "18–20 Sep", brand: "Zanotti", org: "Furniture & Living Fair" },
   { venue: "1 Utama", dates: "25–27 Sep", brand: "Dunlopillo", org: "Sleep & Living Expo" },
 ];
+/** Each of MY_FAIRS as the claim forms read it: its weekend's Friday, its fair's first and last day, and how they read. */
+const FOOD_DAYS: [string, string, string, string][] = [
+  ["2026-09-04", "2026-09-04", "2026-09-06", "4–6 Sep"],
+  ["2026-09-11", "2026-09-11", "2026-09-13", "11–13 Sep"],
+  ["2026-09-18", "2026-09-18", "2026-09-20", "18–20 Sep"],
+  ["2026-09-25", "2026-09-24", "2026-09-27", "24–27 Sep"],
+];
 /** A brand's two colours as palette tokens (the prototype's BILL_BRAND). */
 const BRAND_TONE: Record<string, [string, string]> = {
   Akemi: ["var(--rv-accent)", "var(--rv-peach-bg)"], Ergotex: ["var(--rv-green)", "var(--rv-green-bg)"],
@@ -333,14 +340,21 @@ export function protoProfile(opts: { track?: boolean } = {}): ProfileFixture {
     track: sample?.track ?? { queue: { title: "Fair waiting list", total: "0 in queue", rows: [] }, waiting: [], replacements: [] },
     form: {
       subName: "Fair",
-      weeks: MY_FAIRS.map((f, i) => ({ key: `w${i}`, month: "SEP", n: `W${i + 1}`, brandWeek: `${f.brand} week`, brand: f.brand.toUpperCase(), dates: f.dates, venue: f.venue, org: f.org,
-        fairId: `f${i}`, start: null, end: null, auto: false, claimable: true, color: BRAND_TONE[f.brand][0], tint: BRAND_TONE[f.brand][1] })),
+      // Each brand week by its Friday and its fair's own days (2026-10-14): the refresh handoff's food claim sample, its
+      // Dunlopillo week a 4-day fair (24–27 Sep) to show 3-vs-4.
+      weeks: MY_FAIRS.map((f, i) => {
+        const [key, start, end, dates] = FOOD_DAYS[i];
+        return { key, month: "SEP", n: `W${i + 1}`, brandWeek: `${f.brand} week`, brand: f.brand.toUpperCase(), dates, venue: f.venue, org: f.org,
+          fairId: `f${i}`, start, end, auto: false, claimable: true, worked: true, color: BRAND_TONE[f.brand][0], tint: BRAND_TONE[f.brand][1] };
+      }),
       rates: {
         // No small-group cap: the prototype's Airbnb form is the per-person one.
         base: "Klang Valley", perSpot: 50, perPaxNight: 65, groupMaxPax: 3, groupCapPerNight: null,
         regions: ([["KL", 0], ["Penang", 4], ["Ipoh", 2], ["Melaka", 2], ["Johor", 3], ["Pahang", 3], ["Sabah", 6], ["Sarawak", 6]] as const).map(([name, spots]) => ({ id: name, name, spots, planeTicket: false })),
         // Every fair in Penang: the region the prototype's form shows picked.
         fairs: Object.fromEntries(MY_FAIRS.map((f, i) => [`f${i}`, { venue: f.venue, regionId: "Penang" }])),
+        // The food claim (the refresh handoff's sample): Fair's, RM 20.00 a day, open to the member's title.
+        food: { subDepartmentId: "fair", perDay: 20, titles: ["Senior Executive"] },
       },
       members: ["Darren Ong", "Priya Nair", "Siti Aminah", "Jason Teh"].map(n => ({ id: n, name: n })),
       // The HR revamp's handoff (2026-10-10): Fair and IR, "2 of 30 open".

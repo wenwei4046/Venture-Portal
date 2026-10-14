@@ -1045,7 +1045,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   }, [fxp, membership, arena, arenaNow, today, claimRates, team, data.departments, myRequests, waitingForm, replacementForm]);
   // Requests' ways to start one: a food claim only in Fair, for a title HR picked (2026-10-13) — sent under the
   // same Create as a claim. In View as, the viewed person's title decides.
-  const foodOpen = !fxp && foodOpenTo(claimRates, membership?.id, me.title);
+  // The design preview's form carries the refresh handoff's food sample (2026-10-14), so its Requests offer it too.
+  const foodOpen = foodOpenTo(fxp ? fxp.form.rates : claimRates, membership?.id, me.title);
   const pageKinds = useMemo<RequestKindVM[]>(() => requestKinds.flatMap(k => (k === "claim" && foodOpen ? ["claim", "food"] as RequestKindVM[] : [k])),
     [requestKinds, foodOpen]);
 

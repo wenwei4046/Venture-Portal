@@ -810,6 +810,9 @@
 }
 .foodDayOn { border: 1.5px solid var(--rv-accent); background: var(--rv-cream); color: var(--rv-accent); }
 .foodDay:disabled { opacity: .45; cursor: default; }
+/* A day ticked or unticked (the refresh handoff's motion): its border, fill and ink over 160ms; the tick swaps at once. */
+.foodDay, .foodDayWk, .foodDayNote { transition: border-color 160ms cubic-bezier(.2,.8,.2,1), background-color 160ms cubic-bezier(.2,.8,.2,1), color 160ms cubic-bezier(.2,.8,.2,1); }
+@media (prefers-reduced-motion: reduce) { .foodDay, .foodDayWk, .foodDayNote { transition: none; } }
 .foodDayWk { font-size: calc(11px * var(--rv-type)); font-weight: 600; color: var(--rv-sub); text-transform: uppercase; letter-spacing: .04em; }
 .foodDayOn .foodDayWk { color: var(--rv-accent); }
 .foodDayN { font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 750; line-height: 1.15; font-variant-numeric: tabular-nums; }
@@ -833,6 +836,11 @@
 .sumRow { display: flex; justify-content: space-between; gap: 12px; font-size: calc(13px * var(--rv-type)); }
 .sumLabel { color: var(--rv-sub); }
 .sumValue { font-weight: 650; font-variant-numeric: tabular-nums; }
+/* The food claim's Month and Days are words, not amounts (the refresh handoff's screenshots): their own figures, and the
+   day list wrapping right-aligned under its first line, its label never squeezed. */
+.sumWords { font-variant-numeric: normal; }
+.sumDays { text-align: right; }
+.sumLabelFixed { flex: none; }
 .sumTotal { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-top: 8px; margin-top: 2px; border-top: 1px solid var(--rv-line); }
 .sumTotalLabel { font-size: calc(14px * var(--rv-type)); font-weight: 700; }
 .sumTotalValue { font-family: var(--font-display-rv); font-size: calc(22px * var(--rv-type)); font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
@@ -966,7 +974,8 @@
 .wlText { flex: 1; min-width: 0; }
 .wlName { display: block; font-size: calc(14.5px * var(--rv-type)); font-weight: 650; }
 .wlSub { display: block; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); margin-top: 1px; }
-.wlCaret { display: grid; place-items: center; transition: transform 180ms; }
+.wlCaret { display: grid; place-items: center; transition: transform 180ms cubic-bezier(.2,.8,.2,1); }
+@media (prefers-reduced-motion: reduce) { .wlCaret { transition: none; } }
 .wlCaretOpen { transform: rotate(180deg); }
 .wlList { border-radius: 14px; border: 1px solid var(--rv-handle); background: var(--rv-white); box-shadow: 0 10px 24px var(--rv-ink-14); overflow: hidden; }
 .wlItem {
