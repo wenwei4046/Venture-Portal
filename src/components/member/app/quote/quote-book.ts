@@ -101,6 +101,7 @@ function without<V>(map: ReadonlyMap<string, V>, key: string): ReadonlyMap<strin
 /** The book once `ask` was answered (`failed`: it never reached the server). */
 export function recordAnswer(book: QuoteBook, ask: Ask, outcome: Outcome<QuoteResult>, failed = false): QuoteBook {
   let { anchors, refused } = book;
+  let standIn = ask.standIn ? ask.key : book.standIn;
   const last: Said | null = ask.standIn ? book.last : {
     key: ask.key, cartId: ask.cartId, result: outcome.ok ? outcome.data : null, error: outcome.ok ? null : outcome.error, failed,
   };
@@ -113,10 +114,13 @@ export function recordAnswer(book: QuoteBook, ask: Ask, outcome: Outcome<QuoteRe
     refused = kept(refused, ask.cartId, outcome.error);
     anchors = without(anchors, ask.cartId);
   } else if (!failed) {
-    // Refused at the member's price: what was read before may not hold any more.
+    // Refused at the member's price: what was read before may not hold any more. The
+    // stand-in is asked again — the cart's own refusal then shows at every price; a
+    // price's alone (free KPI items that take all of it) leaves the others worked out.
     anchors = without(anchors, ask.cartId);
+    standIn = null;
   }
-  return { last, anchors, refused, standIn: ask.standIn ? ask.key : book.standIn };
+  return { last, anchors, refused, standIn };
 }
 
 /** What step 2 shows for the input on screen. `pending`: its cart has not been answered yet. */
