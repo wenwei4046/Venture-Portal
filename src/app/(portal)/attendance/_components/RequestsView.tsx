@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { HvPage, PageHead } from '@/components/hrv/kit'
 import { Tabs } from '@/components/hrv/tabs'
 import { Button } from '@/components/ds/Button'
@@ -29,8 +30,11 @@ const BUCKETS: Array<[Bucket, string]> = [['hr', 'Pending'], ['upline', 'At upli
 
 export default function RequestsView({ config, requests, ledger }: { config: AttConfig; requests: AttRequest[]; ledger: AttLedger | null }) {
   const [sub, setSub] = useState<'list' | 'routes'>('list')
-  const [bucket, setBucket] = useState<Bucket>('hr')
-  const [reqId, setReqId] = useState<string | null>(null)
+  // `?r=<request id>` opens one request (Month close's Open), on the pill it sits in.
+  const askedId = useSearchParams().get('r')
+  const asked = requests.find(r => r.id === askedId) ?? null
+  const [bucket, setBucket] = useState<Bucket>(asked ? bucketOf(asked) : 'hr')
+  const [reqId, setReqId] = useState<string | null>(asked?.id ?? null)
   const [note, setNote] = useState('')
   const [attOpen, setAttOpen] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
