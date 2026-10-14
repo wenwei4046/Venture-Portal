@@ -20,6 +20,30 @@ export const PAY_MODE_LABEL: Readonly<Record<PayMode, string>> = {
   commission_eligible: 'Commission-eligible',
 }
 
+/**
+ * What a basic means in a commission department (2026-10-14, the user, on a
+ * Revenue person: "他要给 basic，然后从他薪水扣"): the payroll pays it OUT OF
+ * the month's commission (`lib/revenue-payroll.ts` — the commissioned basic is
+ * funded from commission, not an extra earning), so "Salaried" there is a
+ * basic carved from commission. KRIS and PETER were the first two.
+ */
+export const BASIC_FROM_COMMISSION = 'Basic from commission'
+
+/** How a pay basis reads for somebody in their department. */
+export function payModeLabel(mode: PayMode, dept: { commission_dept: boolean }): string {
+  return dept.commission_dept && mode === 'salaried' ? BASIC_FROM_COMMISSION : PAY_MODE_LABEL[mode]
+}
+
+/**
+ * A commission department chooses its pay basis with ONE tick on the Salary
+ * section — Basic from commission, on or off (Fully commission based) —
+ * rather than the Employment Type select. Anything else they hold (a basis
+ * from another department) keeps the select.
+ */
+export function choosesByTick(dept: { commission_dept: boolean }, current: PayMode): boolean {
+  return dept.commission_dept && (current === 'full_commission' || current === 'salaried')
+}
+
 export function payModeOf(row: { employment_type: string; commission_dept: boolean }): PayMode {
   if (isFullyCommissionBased(row)) return 'full_commission'
   if (isVariablePay(row)) return 'variable'

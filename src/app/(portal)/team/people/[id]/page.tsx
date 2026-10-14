@@ -110,6 +110,7 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
     },
     bank: { name1: staff.bank_name, no1: priv.bank_account_no, name2: staff.bank_name_2, no2: priv.bank_account_no_2 },
     payMode: payModeOf({ employment_type: staff.employment_type, commission_dept: row.departments?.payroll_source === 'commission' }),
+    commissionDept: row.departments?.payroll_source === 'commission',
     pay: {
       basic: pay(Number(staff.basic_salary)),
       allowances: pay(Number(staff.allowances)),
