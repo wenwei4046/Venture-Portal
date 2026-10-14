@@ -23,13 +23,15 @@ if (!out) { console.error("usage: node tools/crm-design/compare-desk.mjs <outDir
 const APP = appArg ?? "desk-proto";
 mkdirSync(out, { recursive: true });
 const repo = resolve(import.meta.dirname, "../..");
-const protoDir = join(repo, "docs/design/crm-desktop-rev1/prototypes");
+const protoDir = join(repo, "docs/design_handoff_crm_desktop_v2/prototypes");
 const canvas = readFileSync(join(protoDir, "CRM Desktop rev 1.dc.html"), "utf8");
 const frames = [...canvas.matchAll(/<div id="([0-9a-z]+)"[\s\S]*?(<dc-import [^>]*>)/g)].map(m => {
   const props = Object.fromEntries([...m[2].matchAll(/([a-z-]+)="([^"]*)"/g)].map(x => [x[1], x[2]]).filter(([k]) => k !== "name" && k !== "hint-size")
     .map(([k, v]) => [k, v === "{{ true }}" ? "true" : v === "{{ false }}" ? "false" : v]));
-  return { id: m[1], tag: m[2], props, w: Number(props.w ?? 1440) };
-}).filter(f => !only || only.split(",").includes(f.id));
+  // v2 (2026-10-15): every frame is drawn by CrmFrame v2 — the canvas still names rev 1's for Steps 1–4, whose pages v2
+  // keeps. The salesperson's desktop (variant rs) is not built.
+  return { id: m[1], tag: m[2].replace(/name="CrmFrame"/, 'name="CrmFrame v2"'), props, w: Number(props.w ?? 1440) };
+}).filter(f => f.props.variant !== "rs").filter(f => !only || only.split(",").includes(f.id));
 
 // The prototype, one page per frame: the canvas's own <dc-import>, on the canvas's ground.
 const harness = mkdtempSync(join(tmpdir(), "crm-proto-"));
@@ -54,6 +56,8 @@ const send = (method, params = {}) => new Promise(r => { const i = ++id; wait.se
 const js = async e => (await send("Runtime.evaluate", { expression: e, awaitPromise: true, returnByValue: true })).result?.result?.value;
 async function shot(url, w, h, ready) {
   await send("Emulation.setDeviceMetricsOverride", { width: w + 80, height: h + 80, deviceScaleFactor: 1, mobile: false });
+  // v2 keeps its place in localStorage (refresh returns to it), keyed by the frame's props: each shot starts clean.
+  await send("Storage.clearDataForOrigin", { origin: new URL(url).origin, storageTypes: "local_storage,session_storage" });
   await send("Page.navigate", { url });
   for (let i = 0; i < 80; i++) { await sleep(250); if (await js(ready)) break; }
   await js("document.fonts.ready.then(() => true)"); await sleep(800);
