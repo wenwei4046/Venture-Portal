@@ -5,6 +5,7 @@ import { loadCommissionInput } from './commission-input'
 import { loadMonthOrders, type MonthOrder } from './month-orders'
 import { saleMonthOf } from '@/lib/fair-calendar'
 import type { CloseBills } from '@/lib/commission/row-origin'
+import { workbenchStaffIds } from '@/lib/commission/workbench'
 import { loadFairCalendar } from './fair-calendar'
 import { loadOrderFairs } from './order-fairs'
 import { fairDays } from './upsales'
@@ -25,7 +26,9 @@ export async function loadCommissionWorkbench(
     loadCommissionInput(period, subDepartmentId, db, { replayRunId: runId, includeCurrentRules: true, monthOrders }),
     loadFairCalendar(db),
   ])
-  const ids = [...new Set([...input.hierarchy.map(n => n.staffId), ...currentHierarchy.map(n => n.staffId), ...input.orders.map(o => o.staffId)])]
+  // Everybody the board lists — a director paid in a month they sold nothing
+  // too — named, and in the salary preview.
+  const ids = [...new Set([...workbenchStaffIds(input), ...currentHierarchy.map(n => n.staffId)])]
   // Carry-forward bills need the same resolved venue/organiser as the source month's board.
   const earlierPeriods = [...new Set(input.orders.filter(o => !o.upsale && o.periodMonth !== period).map(o => o.periodMonth))]
   // Rows from another month (2026-10-12): the bill each upsell or drop

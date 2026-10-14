@@ -14,7 +14,7 @@ import { principalReadContext } from "./read-access";
 import { readInsightRange, readOrderBook, type MemberInsightRange, type MemberOrderBook } from "./order-book";
 import { closedIncome, liveIncome, type DepartmentIncome, type IncomeMonth, type IncomePast, type IncomePayLine, type MemberIncome, type OverrideFacts } from "./income";
 import { parseCloseSummary } from "@/lib/commission/closes";
-import { buildCommissionWorkbench } from "@/lib/commission/workbench";
+import { buildCommissionWorkbench, workbenchStaffIds } from "@/lib/commission/workbench";
 import type { StatementDto } from "@/lib/commission/run-payload";
 import { fetchByKeys } from "@/lib/paginate";
 import { loadCommissionInput } from "@/app/(portal)/revenue/_lib/commission-input";
@@ -568,7 +568,7 @@ async function liveWorkbench(client: SupabaseClient, subDepartmentId: string, fi
     throw error;
   }
   const { input } = loaded;
-  const ids = [...new Set([...input.hierarchy.map(n => n.staffId), ...input.orders.map(o => o.staffId), ...(alsoStaffId ? [alsoStaffId] : [])])];
+  const ids = [...new Set([...workbenchStaffIds(input), ...(alsoStaffId ? [alsoStaffId] : [])])];
   const people = await fetchByKeys<{ id: string; employee_name: string }, string>(ids, keys =>
     client.from("hr_staff_costs").select("id, employee_name").in("id", keys));
   return buildCommissionWorkbench(input, { people: people.map(p => ({ staffId: p.id, name: p.employee_name })) });

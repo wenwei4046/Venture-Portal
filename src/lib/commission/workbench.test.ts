@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { computeCommissionRun, round2 } from './engine'
 import { splitOrdersByShares } from './shares'
 import type { EngineInput, Rank, SalesOrder } from './types'
-import { allocateCommissionAmount, buildCommissionWorkbench, type CommissionWorkbench } from './workbench'
+import { allocateCommissionAmount, buildCommissionWorkbench, workbenchStaffIds, type CommissionWorkbench } from './workbench'
 
 const rank = (rankKey: string, productRate: number, sortOrder: number, extra: Partial<Rank> = {}): Rank => ({
   rankKey, productRate, sortOrder, titleId: rankKey, titleLabel: `${rankKey} title`, label: `${productRate * 100}%`,
@@ -297,6 +297,19 @@ describe('a Revenue Director on the ledger', () => {
     const workbench = buildCommissionWorkbench({ ...directorInput(), monthCommissionableValue: 2_899.99 })
     reconcile(workbench)
     expect(workbench.people.find(person => person.staffId === 'director')!.monthlyDirectorPay).toBe(38_000)
+  })
+
+  // September 2026 on Comm Cal: PETER and KRIS sold nothing and were listed
+  // by their ids — the loaders read names for the team and the bills only.
+  it('is named in a month they sold nothing: the loaders read names for workbenchStaffIds', () => {
+    const source = { ...directorInput(), orders: [sale('one')] }
+    const directory = new Map([['agent', 'ADRIAN'], ['leader', 'ANTHONY'], ['director', 'KRIS']])
+    const ids = workbenchStaffIds(source)
+    expect(ids).toContain('director')
+    const workbench = buildCommissionWorkbench(source, { people: ids.map(staffId => ({ staffId, name: directory.get(staffId)! })) })
+    reconcile(workbench)
+    expect(workbench.people.map(person => person.name)).toEqual(['ADRIAN', 'ANTHONY', 'KRIS'])
+    expect(workbench.people.find(person => person.staffId === 'director')).toMatchObject({ personalRows: [], monthlyDirectorPay: 43_000 })
   })
 })
 

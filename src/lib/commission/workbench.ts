@@ -241,6 +241,21 @@ export function allocateCommissionAmount(amount: number, weights: readonly numbe
 }
 
 /**
+ * Everybody the board can list, for a loader to read the names of (2026-10-14):
+ * the team, whoever holds a bill, and every director. The engine gives a
+ * director with an amount to be paid a line in a month they sold nothing, so
+ * names read for the team and the bills alone left PETER and KRIS listed by
+ * their ids on September's Comm Cal.
+ */
+export function workbenchStaffIds(input: EngineInput): string[] {
+  return [...new Set([
+    ...input.hierarchy.map(node => node.staffId),
+    ...input.orders.map(order => order.staffId),
+    ...(input.directors ?? []).map(director => director.staffId),
+  ])]
+}
+
+/**
  * Live/draft ledger over the production engine. Exclusions affect the entire
  * original bill, including every shared part and every upline's calculation.
  * Release flags are respected; the loader must choose the appropriate release
