@@ -1,9 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { DateField } from '@/components/finv/DateField'
 import { DialogButton, DialogForm, Field, FinDialog, Hint, Input } from '@/components/finv/Dialog'
-import { useEscape } from '@/components/hrv/overlay'
+import { FilesField } from '@/components/finv/FilesField'
+import { PartyInput } from '@/components/finv/PartyInput'
+import { FILES_CAP, fileSize, money, neededSentence, num, poolName, shortDay } from '@/components/finv/form-words'
+import fm from '@/components/finv/form.module.css'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { typeLabel, type AccountType } from '@/lib/coa'
@@ -44,8 +47,6 @@ const OVERRIDE_TYPES: Array<{ value: AccountType; label: string }> = [
   { value: 'other_income', label: 'P&L · Other Inc.' },
   { value: 'expense', label: 'P&L · Expense' },
 ]
-/** The Server Action body's cap is 4 MB (next.config); the files must leave room for the rest. */
-const FILES_CAP = 3.8 * 1024 * 1024
 
 interface Override {
   type: AccountType | ''
@@ -63,26 +64,8 @@ interface Line {
   ov?: Override
 }
 
-const money = (n: number) => n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const num = (s: string) => {
-  const n = parseFloat(s)
-  return Number.isFinite(n) ? n : 0
-}
-/** "Venture Pool" → "Venture", "HR Dept Pool" → "HR" — the design's pool names. */
-export const poolName = (label: string) => label.replace(/ Dept Pool$/, '').replace(/ Pool$/, '')
-const size = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`)
-const dayLabel = (iso: string | null | undefined) => {
-  if (!iso) return '—'
-  const [y, m, d] = iso.slice(0, 10).split('-').map(Number)
-  return `${String(d).padStart(2, '0')} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]} ${y}`
-}
-
-/** "Pay to, an amount and a description are needed before you can save." — the prototype's sentence, for what is missing. */
-export function neededSentence(need: string[]): string | null {
-  if (need.length === 0) return null
-  const list = need.length === 1 ? need[0] : `${need.slice(0, -1).join(', ')} and ${need[need.length - 1]}`
-  return `${list.charAt(0).toUpperCase()}${list.slice(1)} ${need.length === 1 ? 'is' : 'are'} needed before you can save.`
-}
+// The words are the kit's (components/finv/form-words), kept importable from here.
+export { neededSentence, poolName }
 
 export default function CreatePaymentDialog({
   open,
@@ -129,7 +112,6 @@ export default function CreatePaymentDialog({
   const [singleOv, setSingleOv] = useState<Override>(NO_OVERRIDE)
   const [busy, setBusy] = useState<'draft' | 'submit' | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const fileInput = useRef<HTMLInputElement>(null)
 
   // The lists, asked for once the dialog opens (unless the page brought them).
   useEffect(() => {
@@ -307,7 +289,7 @@ export default function CreatePaymentDialog({
     neededSentence(need) ??
     (Math.abs(offBy) > 0.005 ? `The lines add up to RM ${money(lineSum)} — the amount is RM ${money(total)}.` : null) ??
     (overrideOpen ? 'An override needs its type, its GL account and a reason.' : null) ??
-    (filesBytes > FILES_CAP ? `The files come to ${size(filesBytes)} — under 4 MB goes in one save. Compress them or add some later.` : null)
+    (filesBytes > FILES_CAP ? `The files come to ${fileSize(filesBytes)} — under 4 MB goes in one save. Compress them or add some later.` : null)
   const ok = problem === null && !!opts
 
   const save = async (submit: boolean) => {
@@ -401,11 +383,11 @@ export default function CreatePaymentDialog({
         {repay ? (
           <>
             <Field label="Repay" htmlFor="cp-deal">
-              <Select id="cp-deal" round={12} className={c.select} value={dealId} onChange={(e) => pickDeal(e.target.value)}>
+              <Select id="cp-deal" round={12} className={fm.select} value={dealId} onChange={(e) => pickDeal(e.target.value)}>
                 <option value="">Choose the loan</option>
                 {(opts?.fundSources ?? []).map((f) => (
                   <option key={f.id} value={f.id} data-search={f.label}>
-                    {`${f.lender ?? f.label.split(' · ')[0]} · RM ${money(f.original_amount)} · ${dayLabel(f.effective_date)}`}
+                    {`${f.lender ?? f.label.split(' · ')[0]} · RM ${money(f.original_amount)} · ${shortDay(f.effective_date)}`}
                   </option>
                 ))}
               </Select>
@@ -416,7 +398,7 @@ export default function CreatePaymentDialog({
                 </Hint>
               ) : null}
             </Field>
-            <div className={c.trio}>
+            <div className={fm.trio}>
               <Field label="Principal RM" htmlFor="cp-principal">
                 <Input id="cp-principal" mono align="right" inputMode="decimal" value={principal} onChange={(e) => setPrincipal(e.target.value)} placeholder="0.00" />
               </Field>
@@ -431,7 +413,9 @@ export default function CreatePaymentDialog({
         ) : null}
 
         <Field label="Pay to" htmlFor="cp-payee">
-          <PayTo
+          <PartyInput
+            id="cp-payee"
+            placeholder="Payee name"
             value={payee}
             readOnly={repay}
             companies={opts?.companies ?? []}
@@ -450,13 +434,13 @@ export default function CreatePaymentDialog({
                 <div key={i} className={c.lineWrap}>
                 <div className={c.line} data-repay={repay ? 'true' : undefined}>
                   {repay && l.role ? <span className={c.role}>{ROLE_LABEL[l.role]}</span> : null}
-                  <Select round={12} className={c.select} value={l.pool} onChange={(e) => setLine(i, { pool: e.target.value })} aria-label={`Line ${i + 1} pool`}>
+                  <Select round={12} className={fm.select} value={l.pool} onChange={(e) => setLine(i, { pool: e.target.value })} aria-label={`Line ${i + 1} pool`}>
                     <option value="">Pool</option>
                     {poolOptions}
                   </Select>
                   <Select
                     round={12}
-                    className={c.select}
+                    className={fm.select}
                     value={l.account}
                     onChange={(e) => setLine(i, { account: e.target.value, autoAccount: false })}
                     aria-label={`Line ${i + 1} category`}
@@ -499,13 +483,13 @@ export default function CreatePaymentDialog({
         ) : (
           <>
             <Field label="Category" htmlFor="cp-account">
-              <Select id="cp-account" round={12} className={c.select} value={account} onChange={(e) => setAccount(e.target.value)}>
+              <Select id="cp-account" round={12} className={fm.select} value={account} onChange={(e) => setAccount(e.target.value)}>
                 <option value="">Choose a category</option>
                 {accountOptions}
               </Select>
             </Field>
             <Field label="Pool" htmlFor="cp-pool">
-              <Select id="cp-pool" round={12} className={c.select} value={pool} onChange={(e) => setPool(e.target.value)}>
+              <Select id="cp-pool" round={12} className={fm.select} value={pool} onChange={(e) => setPool(e.target.value)}>
                 {opts ? null : <option value="venture_pool">Venture</option>}
                 {poolOptions}
               </Select>
@@ -521,7 +505,7 @@ export default function CreatePaymentDialog({
         )}
 
         <Field label="From bank" htmlFor="cp-bank">
-          <Select id="cp-bank" round={12} className={c.select} value={bankId} onChange={(e) => setBankId(e.target.value)}>
+          <Select id="cp-bank" round={12} className={fm.select} value={bankId} onChange={(e) => setBankId(e.target.value)}>
             {method === 'netting' || !opts || opts.banks.length === 0 ? <option value="">{method === 'netting' ? 'No bank — netting' : opts ? 'No active bank account' : '…'}</option> : null}
             {(opts?.banks ?? []).map((b) => (
               <option key={b.id} value={b.id}>
@@ -533,7 +517,7 @@ export default function CreatePaymentDialog({
 
         <Field label="Amount RM" htmlFor="cp-amount">
           {repay ? (
-            <Input id="cp-amount" mono align="right" value={money(repaySum)} readOnly className={c.fixed} />
+            <Input id="cp-amount" mono align="right" value={money(repaySum)} readOnly className={fm.fixed} />
           ) : (
             <Input id="cp-amount" mono align="right" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
           )}
@@ -552,7 +536,7 @@ export default function CreatePaymentDialog({
             <Select
               id="cp-method"
               round={12}
-              className={c.select}
+              className={fm.select}
               value={method}
               onChange={(e) => {
                 setMethod(e.target.value)
@@ -570,36 +554,7 @@ export default function CreatePaymentDialog({
 
         {showFiles ? (
           <Field label="Attachments">
-            {files.length > 0 ? (
-              <div className={c.files}>
-                {files.map((f, i) => (
-                  <div key={`${f.name}-${i}`} className={c.file}>
-                    <span className={c.fileName} title={f.name}>
-                      {f.name}
-                    </span>
-                    <span className={c.fileSize}>{size(f.size)}</span>
-                    <button type="button" className={c.fileRemove} onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}>
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            <input
-              ref={fileInput}
-              type="file"
-              multiple
-              hidden
-              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-              onChange={(e) => {
-                const picked = Array.from(e.target.files ?? [])
-                setFiles((prev) => [...prev, ...picked])
-                e.target.value = ''
-              }}
-            />
-            <button type="button" className={c.addFiles} onClick={() => fileInput.current?.click()}>
-              + Add files
-            </button>
+            <FilesField files={files} onChange={setFiles} />
           </Field>
         ) : null}
 
@@ -609,28 +564,28 @@ export default function CreatePaymentDialog({
           </Field>
         ) : null}
 
-        <div className={c.more} role="group" aria-label="More">
-          <button type="button" className={c.moreBtn} aria-pressed={split} onClick={toggleSplit} disabled={repay}>
+        <div className={fm.more} role="group" aria-label="More">
+          <button type="button" className={fm.moreBtn} aria-pressed={split} onClick={toggleSplit} disabled={repay}>
             Split pools
           </button>
           {(opts?.fundSources.length ?? 0) > 0 ? (
-            <button type="button" className={c.moreBtn} aria-pressed={repay} onClick={toggleRepay}>
+            <button type="button" className={fm.moreBtn} aria-pressed={repay} onClick={toggleRepay}>
               Loan repayment
             </button>
           ) : null}
-          <button type="button" className={c.moreBtn} aria-pressed={transfer} onClick={() => setTransfer((t) => !t)} title="A move between HV's own banks: no pool pays for it">
+          <button type="button" className={fm.moreBtn} aria-pressed={transfer} onClick={() => setTransfer((t) => !t)} title="A move between HV's own banks: no pool pays for it">
             Internal transfer
           </button>
-          <button type="button" className={c.moreBtn} aria-pressed={showMethod} onClick={() => setShowMethod((v) => !v)}>
+          <button type="button" className={fm.moreBtn} aria-pressed={showMethod} onClick={() => setShowMethod((v) => !v)}>
             Method
           </button>
-          <button type="button" className={c.moreBtn} aria-pressed={showFiles} onClick={() => setShowFiles((v) => !v)}>
+          <button type="button" className={fm.moreBtn} aria-pressed={showFiles} onClick={() => setShowFiles((v) => !v)}>
             Attachments
           </button>
-          <button type="button" className={c.moreBtn} aria-pressed={showNotes} onClick={() => setShowNotes((v) => !v)}>
+          <button type="button" className={fm.moreBtn} aria-pressed={showNotes} onClick={() => setShowNotes((v) => !v)}>
             Notes
           </button>
-          <button type="button" className={c.moreBtn} aria-pressed={override} onClick={toggleOverride} title="Post a line to another account type and GL, with the reason the auditors will read">
+          <button type="button" className={fm.moreBtn} aria-pressed={override} onClick={toggleOverride} title="Post a line to another account type and GL, with the reason the auditors will read">
             GL override
           </button>
         </div>
@@ -655,7 +610,7 @@ function OverrideRow({
 }) {
   return (
     <div className={c.override}>
-      <Select round={12} className={c.select} value={value.type} onChange={(e) => onChange({ ...value, type: e.target.value as AccountType, gl: '' })} aria-label={`${label} type`}>
+      <Select round={12} className={fm.select} value={value.type} onChange={(e) => onChange({ ...value, type: e.target.value as AccountType, gl: '' })} aria-label={`${label} type`}>
         <option value="">Type</option>
         {OVERRIDE_TYPES.map((t) => (
           <option key={t.value} value={t.value}>
@@ -663,7 +618,7 @@ function OverrideRow({
           </option>
         ))}
       </Select>
-      <Select round={12} className={c.select} value={value.gl} onChange={(e) => onChange({ ...value, gl: e.target.value })} aria-label={`${label} GL account`}>
+      <Select round={12} className={fm.select} value={value.gl} onChange={(e) => onChange({ ...value, gl: e.target.value })} aria-label={`${label} GL account`}>
         <option value="">GL account</option>
         {accounts
           .filter((a) => a.type === value.type)
@@ -674,92 +629,6 @@ function OverrideRow({
           ))}
       </Select>
       <input className={c.lineText} value={value.reason} onChange={(e) => onChange({ ...value, reason: e.target.value })} placeholder="Reason" aria-label={`${label} reason`} />
-    </div>
-  )
-}
-
-/** Pay to: the payee's name, and the companies it matches under it — picking one links the voucher to it. */
-function PayTo({
-  value,
-  readOnly,
-  companies,
-  companyId,
-  onChange,
-}: {
-  value: string
-  readOnly: boolean
-  companies: Array<{ id: string; name: string; short_code: string }>
-  companyId: string
-  onChange: (name: string, companyId: string) => void
-}) {
-  const [focused, setFocused] = useState(false)
-  const [keyAt, setKeyAt] = useState(-1)
-  const q = value.trim().toLowerCase()
-  const linked = companies.find((co) => co.id === companyId) ?? null
-  const matches = q && !readOnly ? companies.filter((co) => co.name.toLowerCase().includes(q) || co.short_code.toLowerCase().includes(q)).slice(0, 6) : []
-  const listOpen = focused && matches.length > 0 && !(linked && linked.name === value)
-  useEscape(listOpen, () => setFocused(false))
-
-  const pick = (co: { id: string; name: string }) => {
-    onChange(co.name, co.id)
-    setFocused(false)
-    setKeyAt(-1)
-  }
-  return (
-    <div className={c.suggestWrap}>
-      <Input
-        id="cp-payee"
-        value={value}
-        readOnly={readOnly}
-        className={readOnly ? c.fixed : undefined}
-        placeholder="Payee name"
-        autoComplete="off"
-        role="combobox"
-        aria-expanded={listOpen}
-        aria-controls="cp-payee-list"
-        aria-autocomplete="list"
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        onChange={(e) => {
-          const name = e.target.value
-          // Still the linked company's name: still linked. Typed past it: a payee of its own.
-          onChange(name, linked && linked.name === name ? linked.id : '')
-          setFocused(true)
-          setKeyAt(-1)
-        }}
-        onKeyDown={(e) => {
-          if (!listOpen) return
-          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-            e.preventDefault()
-            const step = e.key === 'ArrowDown' ? 1 : -1
-            setKeyAt((i) => (i + step + matches.length) % matches.length)
-          } else if (e.key === 'Enter' && keyAt >= 0 && matches[keyAt]) {
-            e.preventDefault()
-            pick(matches[keyAt])
-          }
-        }}
-      />
-      {listOpen ? (
-        <div id="cp-payee-list" className={c.suggest} role="listbox">
-          {matches.map((co, i) => (
-            <button
-              key={co.id}
-              type="button"
-              role="option"
-              aria-selected={i === keyAt}
-              className={c.suggestItem}
-              data-key={i === keyAt ? 'true' : undefined}
-              onMouseDown={(e) => {
-                e.preventDefault()
-                pick(co)
-              }}
-            >
-              <span>{co.name}</span>
-              {co.short_code ? <span className={c.suggestCode}>{co.short_code}</span> : null}
-            </button>
-          ))}
-        </div>
-      ) : null}
     </div>
   )
 }

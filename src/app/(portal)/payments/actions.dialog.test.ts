@@ -19,7 +19,7 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
-import { createPaymentFromDialog, createPaymentVoucher } from './actions'
+import { createPaymentFromDialog, createPaymentVoucher, createReceiptFromDialog } from './actions'
 
 function database() {
   const db = recordingSupabase((call) => {
@@ -95,8 +95,8 @@ describe('createPaymentFromDialog', () => {
     expect(update?.values).toEqual({ status: 'pending_approval' })
   })
 
-  it('a split across pools must add up to the amount', async () => {
-    database()
+  it('a split across pools must add up to the amount — refused before anything is written', async () => {
+    const db = database()
     const res = await createPaymentFromDialog(
       dialogForm({
         source_rows_count: '2',
@@ -107,6 +107,7 @@ describe('createPaymentFromDialog', () => {
     )
     expect(res.ok).toBe(false)
     expect(res.ok === false && res.reason).toMatch(/does not match voucher amount/)
+    expect(db.writes()).toHaveLength(0)
   })
 
   it('what the form page refuses, it refuses in words (no description)', async () => {
@@ -149,3 +150,64 @@ describe('the form page keeps its way', () => {
     expect(mocks.redirect).toHaveBeenCalledWith('/billing?receipt=HV-PV-202610-0521')
   })
 })
+
+describe('createReceiptFromDialog (Receipt’s dialog, D09)', () => {
+  const receiptForm = (over: Record<string, string> = {}) => {
+    const form = new FormData()
+    const fields: Record<string, string> = {
+      direction: 'credit',
+      voucher_type: 'receive_payment',
+      reference_type: '',
+      reference_id: '',
+      payee_name: 'HOUZS Century',
+      payee_company_id: 'hc',
+      bank_account_id: 'bank-hl',
+      amount: '25768.10',
+      payment_date: '2026-10-10',
+      payment_method: 'bank_transfer',
+      description: 'Rental Oct',
+      target_pool: 'venture_pool',
+      source_pool: '',
+      account_code: '3031',
+      attachment_count: '0',
+      ...over,
+    }
+    for (const [k, v] of Object.entries(fields)) form.set(k, v)
+    return form
+  }
+
+  it('makes the receipt the form page makes — received at once into its pool, on its account — and answers with its number', async () => {
+    const db = recordingSupabase(
+      (call) => {
+        if (call.table === 'payment_vouchers' && call.op === 'insert') return { data: { id: 'or-new' } }
+        if (call.table === 'payment_vouchers' && call.op === 'select') return { count: 521 }
+        if (call.table === 'bank_accounts') return { data: { gl_account_code: '3000' } }
+        return {}
+      },
+      (fn) => (fn === 'post_journal_entry_as_caller' ? { data: 'je-1' } : {}),
+    )
+    mocks.createClient.mockResolvedValue(db.client)
+    const res = await createReceiptFromDialog(receiptForm())
+    expect(res).toEqual({ ok: true, id: 'or-new', voucherNo: 'HV-OR-202610-0522', submitted: false })
+    expect(mocks.redirect).not.toHaveBeenCalled()
+    expect(mocks.requireActionOn.mock.calls[0]).toEqual(['/receipts', 'treasury', 'create'])
+    expect(db.writes('payment_vouchers')[0].values).toMatchObject({ voucher_no: 'HV-OR-202610-0522', direction: 'credit', status: 'paid', target_pool: 'venture_pool', voucher_type: 'receive_payment' })
+    expect(db.writes('payment_voucher_sources')[0].values).toEqual([expect.objectContaining({ pool: 'venture_pool', amount: 25768.1, account_code: '3031' })])
+    expect(db.rpcs.map((r) => r.fn)).toContain('bump_bank_for_paid_credit')
+  })
+
+  it('makes receipts only — never a payment, never an invoice’s settle', async () => {
+    const db = database()
+    expect(await createReceiptFromDialog(receiptForm({ direction: 'debit' }))).toEqual({ ok: false, reason: 'Create receipt makes an official receipt.' })
+    expect(await createReceiptFromDialog(receiptForm({ invoice_id: 'inv-1' }))).toEqual({ ok: false, reason: 'An invoice is settled from Invoice.' })
+    expect(db.writes()).toHaveLength(0)
+  })
+
+  it('what the form page refuses, it refuses in words — before anything is written (no account)', async () => {
+    const db = database()
+    const res = await createReceiptFromDialog(receiptForm({ account_code: '' }))
+    expect(res).toEqual({ ok: false, reason: 'Account is required on inbound (credit) vouchers' })
+    expect(db.writes()).toHaveLength(0)
+  })
+})
+

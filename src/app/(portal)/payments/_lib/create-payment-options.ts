@@ -8,10 +8,11 @@ import { listPayableFundSources, type PayableFundSource } from '../../fund-in/ac
 
 // What the Create payment dialog offers (2026-10-14, the Finance revamp v2 —
 // D07): the form page's lists, read when the dialog is asked for, never with
-// every visit to Payments. The same reads `/payments/new` makes.
+// every visit to Payments. The same reads `/payments/new` makes. Create receipt
+// (D09) offers the same lists but the loans HV owes, under HV-OR-.
 
-export interface CreatePaymentOptions {
-  /** "HV-PV-202610" — the dialog's line under its title. */
+export interface VoucherFormOptions {
+  /** "HV-PV-202610" / "HV-OR-202610" — the dialog's line under its title. */
   prefix: string
   /** The office's today — the payment date's default and the calendar's ring. */
   today: string
@@ -20,6 +21,9 @@ export interface CreatePaymentOptions {
   /** The accounts a voucher line may post to: active, no header (an account with children). */
   accounts: Array<{ code: string; name: string; type: AccountType }>
   pools: PoolOption[]
+}
+
+export interface CreatePaymentOptions extends VoucherFormOptions {
   /** What HV owes and may repay — the loan repayment's deals. */
   fundSources: PayableFundSource[]
 }
@@ -30,16 +34,30 @@ export function postableAccounts<A extends { code: string; parent_code: string |
   return rows.filter((a) => !headers.has(a.code))
 }
 
-export async function loadCreatePaymentOptions(supabase: Awaited<ReturnType<typeof createClient>>): Promise<CreatePaymentOptions> {
-  const [{ data: companies }, { data: banks }, { data: accounts }, fundSources, registry] = await Promise.all([
+type Client = Awaited<ReturnType<typeof createClient>>
+
+export async function loadCreatePaymentOptions(supabase: Client): Promise<CreatePaymentOptions> {
+  const [basics, fundSources] = await Promise.all([
+    loadVoucherFormOptions(supabase, 'HV-PV-'),
+    listPayableFundSources().catch(() => [] as PayableFundSource[]),
+  ])
+  return { ...basics, fundSources }
+}
+
+/** Create receipt's: the same lists, under HV-OR-. */
+export function loadCreateReceiptOptions(supabase: Client): Promise<VoucherFormOptions> {
+  return loadVoucherFormOptions(supabase, 'HV-OR-')
+}
+
+async function loadVoucherFormOptions(supabase: Client, series: 'HV-PV-' | 'HV-OR-'): Promise<VoucherFormOptions> {
+  const [{ data: companies }, { data: banks }, { data: accounts }, registry] = await Promise.all([
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
     supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
     supabase.from('chart_of_accounts').select('code, name, type, parent_code').eq('is_active', true).order('code'),
-    listPayableFundSources().catch(() => [] as PayableFundSource[]),
     fetchDeptRegistry(supabase).catch(() => []),
   ])
   return {
-    prefix: `HV-PV-${officeMonth().replace('-', '')}`,
+    prefix: `${series}${officeMonth().replace('-', '')}`,
     today: officeToday(),
     companies: (companies ?? []).map((c) => ({ id: c.id as string, name: c.name as string, short_code: (c.short_code as string | null) ?? '' })),
     banks: (banks ?? []).map((b) => ({
@@ -57,6 +75,5 @@ export async function loadCreatePaymentOptions(supabase: Awaited<ReturnType<type
       })),
     ).map(({ code, name, type }) => ({ code, name, type })),
     pools: paymentPoolOptions(registryPoolOptions(registry)),
-    fundSources,
   }
 }

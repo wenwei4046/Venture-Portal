@@ -266,6 +266,67 @@ async function createPaymentVoucherInner(formData: FormData) {
     }
   }
 
+  // Every line checked BEFORE the voucher is written (2026-10-14): a refusal
+  // after the insert left a voucher with no lines behind (a receipt already
+  // paid). Debit: the lines, their accounts, their sum. Credit: its account.
+  const rows: {
+    pool: string
+    amount: number
+    account_code: string
+    override_account_type: AccountType | null
+    override_gl_account_code: string | null
+    override_reason: string | null
+  }[] = []
+  if (direction === 'debit') {
+    const rowCount = parseInt((formData.get('source_rows_count') as string) ?? '0', 10)
+    if (rowCount > 0) {
+      for (let i = 0; i < rowCount; i++) {
+        const pool = (formData.get(`source_rows[${i}][pool]`) as string)?.trim() ?? ''
+        const amt = parseFloat((formData.get(`source_rows[${i}][amount]`) as string) ?? '0')
+        const acct = (formData.get(`source_rows[${i}][account_code]`) as string)?.trim() || ''
+        const ovType = (formData.get(`source_rows[${i}][override_account_type]`) as string)?.trim() ?? ''
+        const ovGl   = (formData.get(`source_rows[${i}][override_gl_account_code]`) as string)?.trim() ?? ''
+        const ovRsn  = (formData.get(`source_rows[${i}][override_reason]`) as string)?.trim() ?? ''
+        const isOverride = !!ovType && !!ovGl && !!ovRsn
+        if (!isOverride && (ovType || ovGl || ovRsn)) {
+          throw new Error(`source row ${i + 1}: override requires account type, GL, AND reason — fill all three or clear all`)
+        }
+        if (isOverride && !ACCOUNT_TYPES.includes(ovType as AccountType)) {
+          throw new Error(`source row ${i + 1}: invalid override account type "${ovType}"`)
+        }
+        if (pool && amt > 0) {
+          if (!acct) {
+            throw new Error(`source row ${i + 1}: account is required (every PV source row must reference a chart_of_accounts code)`)
+          }
+          rows.push({
+            pool, amount: amt, account_code: acct,
+            override_account_type: isOverride ? (ovType as AccountType) : null,
+            override_gl_account_code: isOverride ? ovGl : null,
+            override_reason: isOverride ? ovRsn : null,
+          })
+        }
+      }
+    } else if (sourcePool) {
+      // Legacy single-source form path — account falls back to the voucher-level
+      // field name still sent by older UIs.
+      if (!accountCode) {
+        throw new Error('Account is required on debit voucher source rows')
+      }
+      rows.push({
+        pool: sourcePool, amount, account_code: accountCode,
+        override_account_type: null, override_gl_account_code: null, override_reason: null,
+      })
+    }
+    if (rows.length > 0) {
+      const sum = rows.reduce((s, r) => s + r.amount, 0)
+      if (Math.abs(sum - amount) > 0.005) {
+        throw new Error(`source rows sum (${sum.toFixed(2)}) does not match voucher amount (${amount.toFixed(2)})`)
+      }
+    }
+  } else if (direction === 'credit' && (targetPool || consolidatedGroups) && !accountCode) {
+    throw new Error('Account is required on inbound (credit) vouchers')
+  }
+
   const { data, error } = await supabase
     .from('payment_vouchers')
     .insert({
@@ -314,58 +375,7 @@ async function createPaymentVoucherInner(formData: FormData) {
   // DEBIT: user-entered rows (pool + category + amount), sum must match voucher total.
   // CREDIT: synthetic single row (pool = target_pool, amount = voucher amount).
   if (direction === 'debit') {
-    const rowCount = parseInt((formData.get('source_rows_count') as string) ?? '0', 10)
-    const rows: {
-      pool: string
-      amount: number
-      account_code: string
-      override_account_type: AccountType | null
-      override_gl_account_code: string | null
-      override_reason: string | null
-    }[] = []
-    if (rowCount > 0) {
-      for (let i = 0; i < rowCount; i++) {
-        const pool = (formData.get(`source_rows[${i}][pool]`) as string)?.trim() ?? ''
-        const amt = parseFloat((formData.get(`source_rows[${i}][amount]`) as string) ?? '0')
-        const acct = (formData.get(`source_rows[${i}][account_code]`) as string)?.trim() || ''
-        const ovType = (formData.get(`source_rows[${i}][override_account_type]`) as string)?.trim() ?? ''
-        const ovGl   = (formData.get(`source_rows[${i}][override_gl_account_code]`) as string)?.trim() ?? ''
-        const ovRsn  = (formData.get(`source_rows[${i}][override_reason]`) as string)?.trim() ?? ''
-        const isOverride = !!ovType && !!ovGl && !!ovRsn
-        if (!isOverride && (ovType || ovGl || ovRsn)) {
-          throw new Error(`source row ${i + 1}: override requires account type, GL, AND reason — fill all three or clear all`)
-        }
-        if (isOverride && !ACCOUNT_TYPES.includes(ovType as AccountType)) {
-          throw new Error(`source row ${i + 1}: invalid override account type "${ovType}"`)
-        }
-        if (pool && amt > 0) {
-          if (!acct) {
-            throw new Error(`source row ${i + 1}: account is required (every PV source row must reference a chart_of_accounts code)`)
-          }
-          rows.push({
-            pool, amount: amt, account_code: acct,
-            override_account_type: isOverride ? (ovType as AccountType) : null,
-            override_gl_account_code: isOverride ? ovGl : null,
-            override_reason: isOverride ? ovRsn : null,
-          })
-        }
-      }
-    } else if (sourcePool) {
-      // Legacy single-source form path — account falls back to the voucher-level
-      // field name still sent by older UIs.
-      if (!accountCode) {
-        throw new Error('Account is required on debit voucher source rows')
-      }
-      rows.push({
-        pool: sourcePool, amount, account_code: accountCode,
-        override_account_type: null, override_gl_account_code: null, override_reason: null,
-      })
-    }
     if (rows.length > 0) {
-      const sum = rows.reduce((s, r) => s + r.amount, 0)
-      if (Math.abs(sum - amount) > 0.005) {
-        throw new Error(`source rows sum (${sum.toFixed(2)}) does not match voucher amount (${amount.toFixed(2)})`)
-      }
       await supabase.from('payment_voucher_sources').insert(
         rows.map(r => ({
           voucher_id: data.id,
@@ -809,6 +819,28 @@ export async function createPaymentFromDialog(formData: FormData): Promise<Dialo
         note: `Saved as a draft — it was not sent for approval: ${err instanceof Error ? err.message : 'unknown error'}`,
       }
     }
+  } catch (err) {
+    if (isRedirect(err)) throw err
+    return { ok: false, reason: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
+/**
+ * Create receipt, Receipt's dialog (2026-10-14, the Finance revamp v2 — D09):
+ * the receipt the form page makes (`?mode=receipt` — createPaymentVoucherInner,
+ * every rule: received at once, bank and GL posted), answered in words — the
+ * design's *HV-OR-… received — bank and GL updated*. Asked on Receipt's page
+ * first; the voucher's own create asks Payments' as the form page always has.
+ */
+export async function createReceiptFromDialog(formData: FormData): Promise<DialogPaymentResult> {
+  await requireActionOn('/receipts', 'treasury', 'create')
+  try {
+    if (formData.get('direction') !== 'credit') return { ok: false, reason: 'Create receipt makes an official receipt.' }
+    if (formData.get('invoice_id')) return { ok: false, reason: 'An invoice is settled from Invoice.' }
+    formData.set('voucher_type', 'receive_payment')
+    if (formData.get('return_to')) formData.delete('return_to')
+    const made = await createPaymentVoucherInner(formData)
+    return { ok: true, id: made.id, voucherNo: made.voucherNo, submitted: false }
   } catch (err) {
     if (isRedirect(err)) throw err
     return { ok: false, reason: err instanceof Error ? err.message : 'Unknown error' }

@@ -392,6 +392,31 @@ export async function recordRepayment(formData: FormData) {
 // outgoing payment form's "this is a loan repayment" option.
 export async function recordLoanRepaymentReceived(formData: FormData) {
   await requireActionOn('/payments/new', 'treasury', 'create')
+  const loanId = await recordReceivedParts(formData)
+  redirect(`/fund-out/${loanId}`)
+}
+
+/**
+ * Loan repayment received, Receipt's dialog (2026-10-14, the Finance revamp v2 —
+ * D09): the same parts the form page records (recordReceivedParts), answered in
+ * words — the dialog stays on Receipt. Asked on Receipt's page; each part's own
+ * record asks Fund OUT's, as the form page's always has.
+ */
+export async function recordLoanRepaymentFromDialog(formData: FormData): Promise<{ ok: true; total: number } | { ok: false; reason: string }> {
+  await requireActionOn('/receipts', 'treasury', 'create')
+  try {
+    await recordReceivedParts(formData)
+    const total = ['repayment_principal', 'repayment_interest', 'repayment_penalty'].reduce((n, k) => n + (parseFloat((formData.get(k) as string) ?? '0') || 0), 0)
+    return { ok: true, total: Math.round(total * 100) / 100 }
+  } catch (err) {
+    const digest = (err as { digest?: string })?.digest
+    if ((typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')) || (err instanceof Error && err.message.includes('NEXT_REDIRECT'))) throw err
+    return { ok: false, reason: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
+/** A received repayment's parts, each its own record — interest and penalty first, the principal last. */
+async function recordReceivedParts(formData: FormData): Promise<string> {
   const loanId = (formData.get('loan_id') as string) ?? ''
   const paymentDate = (formData.get('payment_date') as string) ?? ''
   const bankAccountId = (formData.get('bank_account_id') as string) || ''
@@ -431,9 +456,10 @@ export async function recordLoanRepaymentReceived(formData: FormData) {
   }
 
   revalidatePath('/payments')
+  revalidatePath('/receipts')
   revalidatePath('/fund-out')
   revalidatePath('/dashboard')
-  redirect(`/fund-out/${loanId}`)
+  return loanId
 }
 
 // ─── Repayment start (Finance self-service, mig 20260724050000) ─────────────

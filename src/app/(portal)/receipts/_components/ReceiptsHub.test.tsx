@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import type { ReactNode } from 'react'
 import { withActions } from '@/test/with-actions'
 
 // Receipt's hub (2026-10-14, the Finance revamp v2 — D09): the ledger's credit
@@ -11,8 +10,8 @@ const mocks = vi.hoisted(() => ({ user: null as unknown, load: vi.fn(), hub: vi.
 vi.mock('@/lib/auth', () => ({ requirePermission: async () => mocks.user }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({}) }))
 vi.mock('../../payments/_lib/hub-ledger', () => ({ loadHubLedger: mocks.load }))
-vi.mock('../../payments/_components/VoucherHub', () => ({
-  default: (props: { actions?: ReactNode; ledger: unknown }) => (mocks.hub(props), <div data-testid="hub">{props.actions}</div>),
+vi.mock('./ReceiptsHubClient', () => ({
+  default: (props: { canCreate: boolean; prefix: string; today: string }) => (mocks.hub(props), <div data-testid="hub">{props.canCreate ? 'can create' : 'cannot'}</div>),
 }))
 
 import ReceiptsHub from './ReceiptsHub'
@@ -23,19 +22,18 @@ beforeEach(() => {
 })
 
 describe('ReceiptsHub', () => {
-  it('reads the credit side and offers Create receipt and Loan repayment', async () => {
+  it('reads the credit side, for whoever may make a receipt: its line HV-OR-202610 and the office’s today', async () => {
+    vi.useFakeTimers({ now: new Date('2026-10-14T07:00:00Z'), toFake: ['Date'] })
     mocks.user = withActions({ id: 'f', role: 'finance', permissions: ['treasury'] })
     render(await ReceiptsHub({ params: { status: 'paid' } }))
     expect(mocks.load).toHaveBeenCalledWith(expect.anything(), mocks.user, 'credit', { status: 'paid' })
-    expect(screen.getByRole('link', { name: 'Create receipt' })).toHaveAttribute('href', '/payments/new?mode=receipt')
-    expect(screen.getByRole('link', { name: 'Loan repayment' })).toHaveAttribute('href', '/payments/new?mode=loan_repayment')
-    expect(mocks.hub).toHaveBeenCalledWith(expect.objectContaining({ dept: [], payroll: null, claims: [], canSetDefault: true }))
+    expect(mocks.hub).toHaveBeenCalledWith(expect.objectContaining({ canCreate: true, canSetDefault: true, prefix: 'HV-OR-202610', today: '2026-10-14' }))
+    vi.useRealTimers()
   })
 
   it('offers neither to whoever may not make one', async () => {
     mocks.user = { ...withActions({ id: 'v', role: 'staff', permissions: ['treasury'] }), actions: { 'treasury.view': 'all' } }
     render(await ReceiptsHub({ params: {} }))
-    expect(screen.queryByRole('link', { name: 'Create receipt' })).toBeNull()
-    expect(screen.queryByRole('link', { name: 'Loan repayment' })).toBeNull()
+    expect(mocks.hub).toHaveBeenCalledWith(expect.objectContaining({ canCreate: false }))
   })
 })
