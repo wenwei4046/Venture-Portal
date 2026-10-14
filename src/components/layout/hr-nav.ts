@@ -1,23 +1,33 @@
 // HR's sidebar (2026-10-10, the HR revamp handoff): sections of icon tiles,
-// each section in its own tone. The order is the user's (2026-10-12) —
+// each section in its own tone. The order is the Attendance handoff's
+// (2026-10-15, "Attendance Prototype Design" README › Sidebar, final order) —
 //
 //   Overview
-//   I.   HIRING         Requests · Insights · Talent Bank
-//   II.  HR & PAYROLL   HR Costing · Payroll · Payment
-//   III. REVENUE        Comm Cal · Sales Groups · Rules
-//   IV.  PEOPLE         People Management · Hierarchy · Member Services · Documentation
-//   V.   ADMIN          Meeting Rooms · Guest Link · Audit Log · Change password (a personal login's)
-//   VI.  DIRECTORS      Director Salary · Director Pool
+//   I.    HIRING             Requests · Insights · Talent Bank
+//   II.   ATTENDANCE         Today · Records · Requests · Leave balances · Month close · Settings · Readiness
+//   III.  HR & PAYROLL       HR Costing · Payroll · Allocation · Payment
+//   IV.   REVENUE            Comm Cal · Sales chart · Members · Waiting list · Replacement list · Rules ·
+//                            Requests · Brand weeks · Claim rates · Food claim
+//   V.    PEOPLE MANAGEMENT  People · Permissions · Org chart · People & roles · Levels
+//   VI.   DOCUMENTATION      Documents · Data center · Letters · Publish
+//   VII.  ADMIN              Room schedule · Rooms · Guest Link · Audit Log · Change password
+//   VIII. DIRECTORS          Director Salary · Director Pool
 //
+// A page with tabs is opened on its tab (`?tab=`): Sales Groups' four tabs,
+// Member Services' four (dissolved into Revenue — "Request reviews" became
+// Requests), People Management's two, Hierarchy's three (merged into People
+// Management), Documentation's four and Meeting Rooms' two are each a row.
 // Claims and the Revenue Department page left HR's sidebar (their pages are
 // still there), and Fair | IR left it altogether: a Revenue page picks its
-// sub-department with the switcher on its own head, and these three links
-// open the one last picked.
+// sub-department with the switcher on its own head, and its links open the one
+// last picked. Admin's My documents left it (the handoff: "Company docs /
+// Personal docs removed"); the page stays.
 
 import { can } from '@/lib/permissions'
 import { opensPath } from '@/lib/page-tabs'
 import { revenuePath } from '@/lib/revenue'
 import {
+  canAccessAttendance,
   canAccessDirectorPool,
   canAccessDirectorSalary,
   canAccessDocumentation,
@@ -29,7 +39,6 @@ import {
   canAccessMeetingRooms,
   canAccessGuestLink,
   canChangePassword,
-  canSeeMyDocuments,
 } from '@/lib/roles'
 import type { HrIconName } from '@/components/hrv/icons'
 import type { NavViewer } from './nav-config'
@@ -56,6 +65,12 @@ export interface HrNavSection {
 }
 
 const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(prefix + '/')
+/** On `prefix`, on the tab `tab` (`fallback` when the query names none or another the page does not know). */
+const onTab = (pathname: string, search: URLSearchParams | null | undefined, prefix: string, tab: string, tabs: readonly string[], fallback: string) => {
+  if (!under(pathname, prefix)) return false
+  const raw = search?.get('tab') ?? ''
+  return (tabs.includes(raw) ? raw : fallback) === tab
+}
 
 /** Which of Revenue's three a `/revenue/<sub>/…` path is; null off Revenue (or on its reserved pages). */
 export function revenueView(pathname: string): 'cc' | 'sg' | 'rules' | null {
@@ -72,16 +87,32 @@ const seesHrCosting = (v: NavViewer) => canAccessTeam(v)
 const seesRevenue = (sub: string | null) => (v: NavViewer) => sub !== null && canAccessRevenue(v)
 const seesMemberServices = (v: NavViewer) => can(v, 'member_requests_manage') || can(v, 'member_memos_manage')
 
+const SG_TABS = ['chart', 'members', 'waiting', 'replacement'] as const
+const MEM_TABS = ['requests', 'weeks', 'claims', 'food'] as const
+const HIER_TABS = ['chart', 'roles', 'levels'] as const
+const DOC_TABS = ['documents', 'data-center', 'letters', 'publish'] as const
+const ROOM_TABS = ['schedule', 'rooms'] as const
+
 /** HR's sections, with Revenue's links on `revenueSub` (null = none set up yet). */
 export function hrNavSections(revenueSub: string | null): HrNavSection[] {
   const rev = (view?: 'hierarchy' | 'rules') => (revenueSub ? (view ? revenuePath(revenueSub, view) : revenuePath(revenueSub)) : '/revenue')
+  const sg = (tab: (typeof SG_TABS)[number]) => (tab === 'chart' ? rev('hierarchy') : `${rev('hierarchy')}?tab=${tab}`)
+  const sgOn = (tab: string) => (p: string, s?: URLSearchParams | null) => revenueView(p) === 'sg' && (SG_TABS.includes((s?.get('tab') ?? '') as never) ? s?.get('tab') : 'chart') === tab
+  const mem = (tab: (typeof MEM_TABS)[number]) => (tab === 'requests' ? '/member-admin' : `/member-admin?tab=${tab}`)
+  const memOn = (tab: string) => (p: string, s?: URLSearchParams | null) => onTab(p, s, '/member-admin', tab, MEM_TABS, 'requests')
+  const hier = (tab: (typeof HIER_TABS)[number]) => (tab === 'chart' ? '/team/hierarchy' : `/team/hierarchy?tab=${tab}`)
+  const hierOn = (tab: string) => (p: string, s?: URLSearchParams | null) =>
+    under(p, '/team/roles') ? tab === 'roles' : onTab(p, s, '/team/hierarchy', tab, [...HIER_TABS, 'table'], 'chart') || (tab === 'roles' && under(p, '/team/hierarchy') && s?.get('tab') === 'table')
+  const doc = (tab: (typeof DOC_TABS)[number]) => (tab === 'documents' ? '/team/documentation' : `/team/documentation?tab=${tab}`)
+  const docOn = (tab: string) => (p: string, s?: URLSearchParams | null) => onTab(p, s, '/team/documentation', tab, DOC_TABS, 'documents')
+  const roomOn = (tab: string) => (p: string, s?: URLSearchParams | null) => onTab(p, s, '/admin/rooms', tab, ROOM_TABS, 'schedule')
+  const att = (path: string) => (p: string) => under(p, path)
   return [
     {
       label: null,
       tone: 'walnut',
       items: [{ key: 'overview', label: 'Overview', icon: 'home', href: '/dashboard', match: p => under(p, '/dashboard'), visible: () => true }],
     },
-    // Round 2 (2026-10-11, README §3): HIRING, clay — first since 2026-10-12 (user).
     {
       label: 'Hiring',
       tone: 'clay',
@@ -89,6 +120,20 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
         { key: 'hire', label: 'Requests', icon: 'hire', href: '/hiring/requests', match: p => under(p, '/hiring/requests'), visible: canAccessHiring },
         { key: 'hireIns', label: 'Insights', icon: 'report', href: '/hiring/insights', match: p => under(p, '/hiring/insights'), visible: canAccessHiring },
         { key: 'talent', label: 'Talent Bank', icon: 'staff', href: '/hiring/talent', match: p => under(p, '/hiring/talent'), visible: canAccessHiring },
+      ],
+    },
+    // HR › Attendance (2026-10-15, the Attendance handoff): olive, after Hiring.
+    {
+      label: 'Attendance',
+      tone: 'olive',
+      items: [
+        { key: 'today', label: 'Today', icon: 'in', href: '/attendance/today', match: att('/attendance/today'), visible: canAccessAttendance },
+        { key: 'records', label: 'Records', icon: 'report', href: '/attendance/records', match: att('/attendance/records'), visible: canAccessAttendance },
+        { key: 'requests', label: 'Requests', icon: 'approve', href: '/attendance/requests', match: att('/attendance/requests'), visible: canAccessAttendance },
+        { key: 'balances', label: 'Leave balances', icon: 'calendar', href: '/attendance/balances', match: att('/attendance/balances'), visible: canAccessAttendance },
+        { key: 'close', label: 'Month close', icon: 'lock', href: '/attendance/close', match: att('/attendance/close'), visible: canAccessAttendance },
+        { key: 'settings', label: 'Settings', icon: 'org', href: '/attendance/settings', match: att('/attendance/settings'), visible: canAccessAttendance },
+        { key: 'ready', label: 'Readiness', icon: 'fileAlert', href: '/attendance/readiness', match: att('/attendance/readiness'), visible: canAccessAttendance },
       ],
     },
     {
@@ -100,10 +145,11 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
           label: 'HR Costing',
           icon: 'report',
           href: '/hr-costing',
-          match: p => under(p, '/hr-costing') && !under(p, '/hr-costing/payroll') && !under(p, '/hr-costing/payment'),
+          match: p => under(p, '/hr-costing') && !under(p, '/hr-costing/payroll') && !under(p, '/hr-costing/payment') && !under(p, '/hr-costing/allocation'),
           visible: seesHrCosting,
         },
         { key: 'pay', label: 'Payroll', icon: 'payroll', href: '/hr-costing/payroll', match: p => under(p, '/hr-costing/payroll'), visible: seesHrCosting },
+        { key: 'payAlloc', label: 'Allocation', icon: 'percent', href: '/hr-costing/allocation', match: p => under(p, '/hr-costing/allocation'), visible: seesHrCosting },
         { key: 'pmt', label: 'Payment', icon: 'out', href: '/hr-costing/payment', match: p => under(p, '/hr-costing/payment'), visible: seesHrCosting },
       ],
     },
@@ -112,30 +158,57 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
       tone: 'slate',
       items: [
         { key: 'cc', label: 'Comm Cal', icon: 'in', href: rev(), match: p => revenueView(p) === 'cc', visible: seesRevenue(revenueSub) },
-        { key: 'sg', label: 'Sales Groups', icon: 'tree', href: rev('hierarchy'), match: p => revenueView(p) === 'sg', visible: seesRevenue(revenueSub) },
+        { key: 'sgChart', label: 'Sales chart', icon: 'tree', href: sg('chart'), match: sgOn('chart'), visible: seesRevenue(revenueSub) },
+        { key: 'sgMembers', label: 'Members', icon: 'people', href: sg('members'), match: sgOn('members'), visible: seesRevenue(revenueSub) },
+        { key: 'sgWait', label: 'Waiting list', icon: 'calendar', href: sg('waiting'), match: sgOn('waiting'), visible: seesRevenue(revenueSub) },
+        { key: 'sgRepl', label: 'Replacement list', icon: 'staff', href: sg('replacement'), match: sgOn('replacement'), visible: seesRevenue(revenueSub) },
         { key: 'rules', label: 'Rules', icon: 'invoice', href: rev('rules'), match: p => revenueView(p) === 'rules', visible: seesRevenue(revenueSub) },
+        // Member Services dissolved into Revenue (the handoff): its four tabs, "Request reviews" → Requests.
+        { key: 'memReq', label: 'Requests', icon: 'approve', href: mem('requests'), match: memOn('requests'), visible: seesMemberServices },
+        { key: 'memWeeks', label: 'Brand weeks', icon: 'calendar', href: mem('weeks'), match: memOn('weeks'), visible: seesMemberServices },
+        { key: 'memClaims', label: 'Claim rates', icon: 'receipt', href: mem('claims'), match: memOn('claims'), visible: seesMemberServices },
+        { key: 'memFood', label: 'Food claim', icon: 'receipt', href: mem('food'), match: memOn('food'), visible: seesMemberServices },
       ],
     },
     {
-      label: 'People',
+      label: 'People Management',
       tone: 'olive',
       items: [
-        { key: 'ppl', label: 'People Management', icon: 'staff', href: '/team/people', match: p => under(p, '/team/people') || under(p, '/team/accounts') || under(p, '/team/permissions'), visible: canOpenPeople },
-        { key: 'hier', label: 'Hierarchy', icon: 'org', href: '/team/hierarchy', match: p => under(p, '/team/hierarchy') || under(p, '/team/roles'), visible: canOpenPeople },
-        { key: 'mem', label: 'Member Services', icon: 'approve', href: '/member-admin', match: p => under(p, '/member-admin'), visible: seesMemberServices },
-        { key: 'docs', label: 'Documentation', icon: 'doc', href: '/team/documentation', match: p => under(p, '/team/documentation'), visible: canAccessDocumentation },
+        { key: 'pplPeople', label: 'People', icon: 'staff', href: '/team/people', match: (p, s) => (under(p, '/team/people') && s?.get('tab') !== 'permissions') || under(p, '/team/accounts'), visible: canOpenPeople },
+        {
+          key: 'pplPerm',
+          label: 'Permissions',
+          icon: 'lock',
+          href: '/team/people?tab=permissions',
+          match: (p, s) => (under(p, '/team/people') && s?.get('tab') === 'permissions') || under(p, '/team/permissions'),
+          // The tab People Management draws for its full readers (the directory's readers have none).
+          visible: canAccessTeam,
+        },
+        // Hierarchy merged into People Management (the handoff): its three tabs.
+        { key: 'hierChart', label: 'Org chart', icon: 'org', href: hier('chart'), match: hierOn('chart'), visible: canOpenPeople },
+        { key: 'hierRoles', label: 'People & roles', icon: 'people', href: hier('roles'), match: hierOn('roles'), visible: canOpenPeople },
+        { key: 'hierLevels', label: 'Levels', icon: 'tree', href: hier('levels'), match: hierOn('levels'), visible: canOpenPeople },
+      ],
+    },
+    {
+      label: 'Documentation',
+      tone: 'olive',
+      items: [
+        { key: 'docDocs', label: 'Documents', icon: 'doc', href: doc('documents'), match: docOn('documents'), visible: canAccessDocumentation },
+        { key: 'docData', label: 'Data center', icon: 'fileAlert', href: doc('data-center'), match: docOn('data-center'), visible: canAccessDocumentation },
+        { key: 'docLetters', label: 'Letters', icon: 'doc', href: doc('letters'), match: docOn('letters'), visible: canAccessDocumentation },
+        { key: 'docPublish', label: 'Publish', icon: 'out', href: doc('publish'), match: docOn('publish'), visible: canAccessDocumentation },
       ],
     },
     {
       label: 'Admin',
       tone: 'walnut',
       items: [
-        // Round 2 (2026-10-11): every view books a room.
-        { key: 'rooms', label: 'Meeting Rooms', icon: 'room', href: '/admin/rooms', match: p => under(p, '/admin/rooms'), visible: canAccessMeetingRooms },
+        // Every view books a room (2026-10-11); its two tabs are rows here.
+        { key: 'roomSched', label: 'Room schedule', icon: 'room', href: '/admin/rooms', match: roomOn('schedule'), visible: canAccessMeetingRooms },
+        { key: 'roomRooms', label: 'Rooms', icon: 'room', href: '/admin/rooms?tab=rooms', match: roomOn('rooms'), visible: canAccessMeetingRooms },
         { key: 'guestlink', label: 'Guest Link', icon: 'link', href: '/admin/guest-link', match: p => under(p, '/admin/guest-link'), visible: canAccessGuestLink },
         { key: 'audit', label: 'Audit Log', icon: 'report', href: '/audit-log', match: p => under(p, '/audit-log'), visible: canSeeAuditChanges },
-        // My documents (2026-10-14): one's own — Company and Personal — for a login of one's own, as Change password.
-        { key: 'mydocs', label: 'My documents', icon: 'doc', href: '/admin/documents', match: p => under(p, '/admin/documents'), visible: canSeeMyDocuments },
         // Change password (2026-10-12): a person's own login only — never a shared one (principal@, hr@ …).
         { key: 'password', label: 'Change password', icon: 'lock', href: '/admin/password', match: p => under(p, '/admin/password'), visible: canChangePassword },
       ],
@@ -153,7 +226,7 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
 
 /** The sections this viewer sees: empty sections drop out, and the roman numerals count only what is left. */
 export function visibleHrNav(sections: HrNavSection[], viewer: NavViewer): Array<HrNavSection & { roman: string | null }> {
-  const ROMAN = ['I.', 'II.', 'III.', 'IV.', 'V.', 'VI.', 'VII.']
+  const ROMAN = ['I.', 'II.', 'III.', 'IV.', 'V.', 'VI.', 'VII.', 'VIII.', 'IX.']
   let n = 0
   const out: Array<HrNavSection & { roman: string | null }> = []
   for (const section of sections) {

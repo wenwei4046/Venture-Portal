@@ -37,6 +37,8 @@ export const AUDIT_READ_KEYS = [
   'documentation',
   // The guest link and its subsidiaries (2026-10-11).
   'guest_link',
+  // HR › Attendance's settings, days, requests and balances (2026-10-15).
+  'attendance',
 ] as const satisfies readonly Permission[]
 
 /**

@@ -3,65 +3,86 @@ import { withActions } from '@/test/with-actions'
 import { activeHrNavKey, hrNavSections, revenueView, visibleHrNav } from './hr-nav'
 import type { NavViewer } from './nav-config'
 
-// HR's sidebar (2026-10-10, the HR revamp handoff): the five sections in the
-// prototype's order, which page lights which row, and what drops out.
+// HR's sidebar (2026-10-15, the Attendance handoff's README › Sidebar — final
+// order): the eight sections, which page (and which tab of it) lights which
+// row, and what drops out.
 
-const hr = withActions({ id: 'h', role: 'hr', permissions: ['team', 'director_salary', 'director_pool', 'revenue', 'member_requests_manage', 'audit_log'] }) as unknown as NavViewer
+const hr = withActions({ id: 'h', role: 'hr', permissions: ['team', 'director_salary', 'director_pool', 'revenue', 'member_requests_manage', 'audit_log', 'attendance'] }) as unknown as NavViewer
+const q = (s: string) => new URLSearchParams(s)
 
 describe("HR's sidebar", () => {
-  it('lists the sections and rows in the user’s order (2026-10-12)', () => {
+  it('lists the sections and rows in the handoff’s order', () => {
     const sections = visibleHrNav(hrNavSections('fair'), hr)
     expect(sections.map(s => [s.roman, s.label, s.items.map(i => i.label)])).toEqual([
       [null, null, ['Overview']],
-      ['I.', 'HR & Payroll', ['HR Costing', 'Payroll', 'Payment']],
-      ['II.', 'Revenue', ['Comm Cal', 'Sales Groups', 'Rules']],
-      ['III.', 'People', ['People Management', 'Hierarchy', 'Member Services']],
-      ['IV.', 'Admin', ['Audit Log']],
-      ['V.', 'Directors', ['Director Salary', 'Director Pool']],
+      ['I.', 'Attendance', ['Today', 'Records', 'Requests', 'Leave balances', 'Month close', 'Settings', 'Readiness']],
+      ['II.', 'HR & Payroll', ['HR Costing', 'Payroll', 'Allocation', 'Payment']],
+      ['III.', 'Revenue', ['Comm Cal', 'Sales chart', 'Members', 'Waiting list', 'Replacement list', 'Rules', 'Requests', 'Brand weeks', 'Claim rates', 'Food claim']],
+      ['IV.', 'People Management', ['People', 'Permissions', 'Org chart', 'People & roles', 'Levels']],
+      ['V.', 'Admin', ['Audit Log']],
+      ['VI.', 'Directors', ['Director Salary', 'Director Pool']],
     ])
   })
 
-  it('puts Hiring first and Directors last: Hiring, HR & Payroll, Revenue, People, Admin, Directors', () => {
-    expect(hrNavSections('fair').map(s => s.label)).toEqual([null, 'Hiring', 'HR & Payroll', 'Revenue', 'People', 'Admin', 'Directors'])
+  it('keeps the handoff’s eight sections: Hiring, Attendance, HR & Payroll, Revenue, People Management, Documentation, Admin, Directors', () => {
+    expect(hrNavSections('fair').map(s => s.label)).toEqual([null, 'Hiring', 'Attendance', 'HR & Payroll', 'Revenue', 'People Management', 'Documentation', 'Admin', 'Directors'])
   })
 
-  it('opens Revenue on the sub-department it is handed', () => {
+  it('opens Revenue on the sub-department it is handed, each Sales Groups tab its own row', () => {
     const rev = hrNavSections('ir').find(s => s.label === 'Revenue')!
-    expect(rev.items.map(i => i.href)).toEqual(['/revenue/ir', '/revenue/ir/hierarchy', '/revenue/ir/rules'])
+    expect(rev.items.slice(0, 6).map(i => i.href)).toEqual([
+      '/revenue/ir', '/revenue/ir/hierarchy', '/revenue/ir/hierarchy?tab=members', '/revenue/ir/hierarchy?tab=waiting',
+      '/revenue/ir/hierarchy?tab=replacement', '/revenue/ir/rules',
+    ])
   })
 
   it('drops a section nobody can open, and the numerals count what is left', () => {
     const noRevenue = withActions({ id: 'h', role: 'hr', permissions: ['team', 'audit_log'] }) as unknown as NavViewer
     const sections = visibleHrNav(hrNavSections('fair'), noRevenue)
     expect(sections.map(s => s.label)).not.toContain('Revenue')
+    expect(sections.map(s => s.label)).not.toContain('Attendance')
     expect(sections.map(s => s.label)).not.toContain('Directors')
     expect(sections.find(s => s.label === 'Admin')?.roman).toBe('III.')
   })
 
-  it('has no Revenue rows while there is no sub-department', () => {
-    const sections = visibleHrNav(hrNavSections(null), hr)
-    expect(sections.map(s => s.label)).not.toContain('Revenue')
+  it('has no Revenue rows while there is no sub-department, but Member Services’ rows stay', () => {
+    const rev = visibleHrNav(hrNavSections(null), hr).find(s => s.label === 'Revenue')!
+    expect(rev.items.map(i => i.label)).toEqual(['Requests', 'Brand weeks', 'Claim rates', 'Food claim'])
   })
 
   it.each([
-    ['/dashboard', 'overview'],
-    ['/hr-costing', 'hrc'],
-    ['/hr-costing/allocation', 'hrc'],
-    ['/hr-costing/payroll/2026-09-01', 'pay'],
-    ['/hr-costing/payment', 'pmt'],
-    ['/director-pool', 'dpool'],
-    ['/revenue/fair', 'cc'],
-    ['/revenue/ir/2026-09-01/orders', 'cc'],
-    ['/revenue/fair/hierarchy', 'sg'],
-    ['/revenue/fair/rules', 'rules'],
-    ['/team/people/abc', 'ppl'],
-    ['/team/hierarchy', 'hier'],
-    ['/member-admin', 'mem'],
-    ['/audit-log/access', 'audit'],
-    ['/claims', null],
-    ['/revenue/department', null],
-  ])('%s lights %s', (path, key) => {
-    expect(activeHrNavKey(hrNavSections('fair'), path)).toBe(key)
+    ['/dashboard', '', 'overview'],
+    ['/attendance/today', '', 'today'],
+    ['/attendance/records', 'm=2026-09', 'records'],
+    ['/attendance/readiness', '', 'ready'],
+    ['/hr-costing', '', 'hrc'],
+    ['/hr-costing/allocation', '', 'payAlloc'],
+    ['/hr-costing/allocation/2026-09-01', '', 'payAlloc'],
+    ['/hr-costing/payroll/2026-09-01', '', 'pay'],
+    ['/hr-costing/payment', '', 'pmt'],
+    ['/director-pool', '', 'dpool'],
+    ['/revenue/fair', '', 'cc'],
+    ['/revenue/ir/2026-09-01/orders', '', 'cc'],
+    ['/revenue/fair/hierarchy', '', 'sgChart'],
+    ['/revenue/fair/hierarchy', 'tab=waiting', 'sgWait'],
+    ['/revenue/fair/hierarchy', 'tab=nonsense', 'sgChart'],
+    ['/revenue/fair/rules', '', 'rules'],
+    ['/team/people/abc', '', 'pplPeople'],
+    ['/team/people', 'tab=permissions', 'pplPerm'],
+    ['/team/hierarchy', '', 'hierChart'],
+    ['/team/hierarchy', 'tab=levels', 'hierLevels'],
+    ['/team/hierarchy', 'tab=table', 'hierRoles'],
+    ['/team/roles', '', 'hierRoles'],
+    ['/member-admin', '', 'memReq'],
+    ['/member-admin', 'tab=food', 'memFood'],
+    ['/team/documentation', 'tab=letters', 'docLetters'],
+    ['/admin/rooms', 'tab=rooms', 'roomRooms'],
+    ['/admin/rooms', '', 'roomSched'],
+    ['/audit-log/access', '', 'audit'],
+    ['/claims', '', null],
+    ['/revenue/department', '', null],
+  ])('%s?%s lights %s', (path, search, key) => {
+    expect(activeHrNavKey(hrNavSections('fair'), path, q(search))).toBe(key)
   })
 
   it('reads which of Revenue’s three a path is', () => {

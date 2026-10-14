@@ -41,9 +41,10 @@ describe('Change password in the portal’s sidebar', () => {
 
 // My documents (2026-10-14): one's own documents sit just before it, for the same logins.
 describe('My documents beside it', () => {
-  it('is there for a personal login, in both sidebars, and lights there', () => {
+  // HR's sidebar dropped it (2026-10-15, the Attendance handoff: "Admin's Company docs / Personal docs removed"); the page stays.
+  it('is there for a personal login in the portal’s sidebar, not in HR’s', () => {
     expect(leaves(buildNavEntries(emptyNavData), { ...finance, personalLogin: true }).map(l => l.href)).toContain('/admin/documents')
-    expect(activeHrNavKey(hrNavSections('fair'), '/admin/documents')).toBe('mydocs')
+    expect(activeHrNavKey(hrNavSections('fair'), '/admin/documents')).toBeNull()
     expect(navLabelByPath(emptyNavData).get('/admin/documents')).toBe('My documents')
   })
 
@@ -57,7 +58,7 @@ describe('My documents beside it', () => {
 describe('Change password in HR’s sidebar', () => {
   it('ends Admin for a personal login, and lights there', () => {
     const admin = visibleHrNav(hrNavSections('fair'), { ...hr, personalLogin: true }).find(s => s.label === 'Admin')
-    expect(admin?.items.map(i => i.label)).toEqual(['Audit Log', 'My documents', 'Change password'])
+    expect(admin?.items.map(i => i.label)).toEqual(['Audit Log', 'Change password'])
     expect(admin?.items.at(-1)).toMatchObject({ href: '/admin/password', icon: 'lock' })
     expect(activeHrNavKey(hrNavSections('fair'), '/admin/password')).toBe('password')
   })

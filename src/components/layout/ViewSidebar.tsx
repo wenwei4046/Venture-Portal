@@ -32,6 +32,7 @@ export default function ViewSidebar({
   fallbackName = 'HR',
   footerSub,
   footerMenu,
+  wide = false,
 }: {
   user: User
   /** The sections this viewer sees, numbered (visibleHrNav). */
@@ -43,6 +44,8 @@ export default function ViewSidebar({
   footerSub: string
   /** A menu the footer opens (Finance's account menu): drawn above the footer while `open`. */
   footerMenu?: (menu: { open: boolean; close: () => void; collapsed: boolean }) => ReactNode
+  /** 248px open, as the HR Attendance handoff (2026-10-15) draws HR's sidebar; Finance's stays 212. */
+  wide?: boolean
 }) {
   const pathname = usePathname() ?? ''
   const search = useSearchParams()
@@ -116,7 +119,7 @@ export default function ViewSidebar({
 
   return (
     <div className={`${s.rail} hidden md:flex`}>
-      <aside className={s.aside} data-collapsed={collapsed ? 'true' : 'false'} aria-label="Main navigation" onMouseEnter={() => railEntered()}>
+      <aside className={s.aside} data-collapsed={collapsed ? 'true' : 'false'} data-wide={wide ? 'true' : undefined} aria-label="Main navigation" onMouseEnter={() => railEntered()}>
         <div className={s.brand}>
           <button
             type="button"

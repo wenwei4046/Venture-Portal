@@ -37,6 +37,8 @@ export const FUNCTIONS: Record<string, { actions: Action[]; scopes: Scope[] }> =
   hiring: { actions: ['view', 'create', 'edit', 'approve'], scopes: ['all'] },
   rooms: { actions: ['view', 'create', 'edit'], scopes: ['all'] },
   guest_link: { actions: ['view', 'edit'], scopes: ['all'] },
+  // HR › Attendance (mig 20261015030000).
+  attendance: { actions: ['view', 'create', 'edit', 'approve'], scopes: ['all'] },
 }
 
 // `permission_cell_keys` (as permission-matrix.test.ts holds it; the Product List's gate went 2026-10-14, mig 20261014100000).
@@ -57,13 +59,15 @@ export const CELL_KEYS: CellKey[] = [
   K('revenue_app', 'create', 'member_requests', 'own'), K('crm', 'view', 'member_crm', 'own'), K('crm', 'manage', 'crm_manage', 'all'),
   K('view_switch', 'view', 'view_switch', 'all', 'principal'),
   K('documentation', 'view', 'documentation', 'all'), K('hiring', 'view', 'hiring', 'all'), K('rooms', 'view', 'meeting_rooms', 'all'),
-  K('rooms', 'edit', 'meeting_rooms_manage', 'all'), K('guest_link', 'view', 'guest_link', 'all'),
+  K('rooms', 'edit', 'meeting_rooms_manage', 'all'), K('guest_link', 'view', 'guest_link', 'all'), K('attendance', 'view', 'attendance', 'all'),
 ]
 
 // The eleven templates exactly as production holds them on 2026-10-11 (permission_template_grants) —
 // with round 2's cells (20261011060000): every portal template books a room; Ultimate, Full and HR
 // hold Documentation, Hiring, Meeting rooms and the Guest link whole.
 const ROOMS = ' rooms.create:all rooms.view:all'
+// HR › Attendance (20261015030000): Ultimate, Full and HR hold it whole.
+const ATTENDANCE = ' attendance.approve:all attendance.create:all attendance.edit:all attendance.view:all'
 const ROUND2 = ' documentation.create:all documentation.edit:all documentation.view:all guest_link.edit:all guest_link.view:all hiring.approve:all hiring.create:all hiring.edit:all hiring.view:all rooms.create:all rooms.edit:all rooms.view:all'
 const everything = (withSwitch: boolean) => Object.entries(FUNCTIONS)
   .filter(([key]) => key !== 'revenue_app' && (withSwitch || key !== 'view_switch'))
@@ -75,7 +79,7 @@ export const PROD: Record<string, { cells: string; sensitive: SensitiveField[]; 
   fin_checker: { baseRole: 'finance', sensitive: ['bank'], cells: 'billing.export:all billing.view:all categories.manage:all categories.view:all claims.approve:all claims.view:all dashboard.view:all dept_pool.view:all dept_reports.export:all dept_reports.view:all reconciliation.approve:all reconciliation.view:all reports.export:all reports.view:all treasury.approve:all treasury.export:all treasury.view:all venture_pool.export:all venture_pool.view:all' + ROOMS },
   fin_maker: { baseRole: 'finance', sensitive: ['bank'], cells: 'billing.create:all billing.edit:all billing.view:all claims.create:own claims.view:own dashboard.view:all reconciliation.create:all reconciliation.edit:all reconciliation.view:all treasury.create:all treasury.edit:all treasury.view:all venture_pool.create:all venture_pool.view:all' + ROOMS },
   full: { baseRole: 'principal', sensitive: ['salary', 'nric', 'bank'], cells: everything(false) },
-  hr: { baseRole: 'hr', sensitive: ['salary', 'nric', 'bank'], cells: 'accounts.view:all claims.create:own claims.view:own dashboard.view:all director_pool.view:all director_salary.edit:all director_salary.view:all hr_costing.create:all hr_costing.edit:all hr_costing.export:all hr_costing.view:all member.manage:all member.view:all revenue.create:all revenue.edit:all revenue.manage:all revenue.view:all team.create:all team.edit:all team.view:all' + ROUND2 },
+  hr: { baseRole: 'hr', sensitive: ['salary', 'nric', 'bank'], cells: 'accounts.view:all claims.create:own claims.view:own dashboard.view:all director_pool.view:all director_salary.edit:all director_salary.view:all hr_costing.create:all hr_costing.edit:all hr_costing.export:all hr_costing.view:all member.manage:all member.view:all revenue.create:all revenue.edit:all revenue.manage:all revenue.view:all team.create:all team.edit:all team.view:all' + ROUND2 + ATTENDANCE },
   revenue_director: { baseRole: 'revenue_member', sensitive: [], cells: 'crm.edit:all crm.manage:all crm.view:all revenue_app.create:own revenue_app.view:own' },
   revenue_team: { baseRole: 'revenue_member', sensitive: [], cells: 'crm.edit:own crm.view:own revenue_app.create:own revenue_app.view:own' },
   staff: { baseRole: 'staff', sensitive: [], cells: 'claims.create:own claims.edit:own claims.view:own dashboard.view:all' + ROOMS },

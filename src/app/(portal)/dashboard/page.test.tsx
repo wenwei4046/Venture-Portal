@@ -15,6 +15,7 @@ vi.mock('@/lib/approval-amounts', () => ({ resolveLiveApprovalAmounts: async () 
 
 // Finance's view and HR's Overview (2026-10-14) read through these server modules; the treasury Overview does not.
 vi.mock('@/lib/hiring/board', () => ({ loadHiringBoard: async () => ({ ok: false, reason: 'test' }) }))
+vi.mock('@/lib/attendance/server', () => ({ loadConfig: async () => ({ ok: false, reason: 'test' }), loadMonth: async () => ({ ok: false, reason: 'test' }), loadRequests: async () => ({ ok: false, reason: 'test' }), loadLedger: async () => ({ ok: false, reason: 'test' }) }))
 vi.mock('@/lib/member/server', () => ({ adminMemberAction: async () => ({ ok: false, reason: 'test' }) }))
 vi.mock('../revenue/_lib/sub-departments', () => ({ listSubDepartments: async () => [] }))
 
@@ -82,8 +83,7 @@ describe('the Overview, on the office clock', () => {
     mocks.requireAuth.mockResolvedValue(withActions({ id: 'h', role: 'hr', permissions: ['hr_costing'] }))
     render(await drawnByTheServer())
     expect(mocks.rpc).toHaveBeenCalledWith('hr_dashboard_summary', { p_period: '2026-11-01' })
-    // HR's Overview (2026-10-14, the Finance revamp v2's H01): the office's date in the eyebrow, the month in the line.
-    expect(screen.getByText(/Sun 1 Nov 2026 · Q4 2026 · HR view/)).toBeInTheDocument()
+    // HR's Overview (2026-10-15, the Attendance handoff): the month in the head's line.
     expect(screen.getByText(/November payroll is not imported yet/)).toBeInTheDocument()
     expect(screen.queryByText(/October/)).toBeNull()
   })

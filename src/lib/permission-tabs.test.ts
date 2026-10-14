@@ -39,7 +39,10 @@ describe('the tab catalog (HR revamp 8)', () => {
       'Overview', 'HR Costing', 'Payroll', 'Payment', 'Director Salary', 'Director Pool', 'Comm Cal', 'Sales Groups', 'Rules',
       'People Management', 'Permissions', 'Hierarchy', 'Member Services',
       // Round 2 (20261011060000), in the handoff's order.
-      'Documentation', 'Hiring requests', 'Hiring insights', 'Talent Bank', 'Meeting Rooms', 'Guest Link', 'Audit Log',
+      'Documentation', 'Hiring requests', 'Hiring insights', 'Talent Bank',
+      // HR › Attendance (20261015030000), in the sidebar's order.
+      'Attendance today', 'Attendance records', 'Attendance requests', 'Leave balances', 'Month close', 'Attendance settings', 'Readiness',
+      'Meeting Rooms', 'Guest Link', 'Audit Log',
     ])
     expect(PERMISSION_TABS.filter(t => t.view === 'rev').map(t => t.label).slice(0, 8)).toEqual([
       'Today', 'Insight', 'Quote', 'Arena', 'Profile · My income', 'Profile · Requests', 'Profile · Waiting list & replacements', 'Profile · Team & capacity',

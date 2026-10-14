@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { HvPage, PageHead } from '@/components/hrv/kit'
 import { Tabs } from '@/components/hrv/tabs'
 import type { AdminMemberData } from '@/app/(member)/member/actions'
@@ -46,7 +47,16 @@ export default function MemberServicesView({
     ? [{ key: 'requests', label: 'Request reviews' }, { key: 'weeks', label: 'Brand weeks' }, { key: 'claims', label: 'Claim rates' },
         { key: 'food', label: 'Food claim' }]
     : []
-  const [tab, setTab] = useState<Tab>(tabs[0]?.key ?? 'requests')
+  // HR's sidebar opens each tab as its own row (2026-10-15, the Attendance handoff): `?tab=` picks it on arrival.
+  // The page never writes the URL itself (see above) — it only follows a link that does.
+  const asked = useSearchParams()?.get('tab') ?? null
+  const fromUrl = tabs.find(t => t.key === asked)?.key
+  const [tab, setTab] = useState<Tab>(fromUrl ?? tabs[0]?.key ?? 'requests')
+  useEffect(() => {
+    if (!fromUrl) return
+    setTab(fromUrl)
+    setOpened(o => (o.includes(fromUrl) ? o : [...o, fromUrl]))
+  }, [fromUrl])
   // A tab mounts when it is first opened and then stays, hidden, so what was
   // typed on it waits for the user's return — and Brand weeks reads once.
   const [opened, setOpened] = useState<Tab[]>(() => [tab])

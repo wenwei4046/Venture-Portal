@@ -1,124 +1,81 @@
-import Link from 'next/link'
-import { can } from '@/lib/permissions'
 import { officeClock } from '@/lib/office-clock'
 import { firstName } from '@/lib/finance-view'
-import { revenuePath } from '@/lib/revenue'
-import {
-  canAccessDirectorSalary,
-  canAccessHRCosting,
-  canAccessHiring,
-  canAccessMeetingRooms,
-  canAccessRevenue,
-  canOpenPeople,
-} from '@/lib/roles'
-import { HrIcon, type HrIconName } from '@/components/hrv/icons'
+import { canDo } from '@/lib/permission-actions'
+import { canAccessAttendance, canAccessDocumentation, canAccessHRCosting, canAccessHiring, canOpenPeople } from '@/lib/roles'
+import { HvPage, PageHead } from '@/components/hrv/kit'
+import { Button } from '@/components/ds/Button'
 import { hrNavSections, visibleHrNav, type HrNavTone } from '@/components/layout/hr-nav'
+import type { HrIconName } from '@/components/hrv/icons'
 import type { User } from '@/types'
 import type { HrOverviewData } from '../_lib/hr-overview'
-import s from './overview.module.css'
+import { OvCatRow, OvQuickTile } from './HrOverviewTiles'
 
-// HR's Overview (2026-10-14, the Finance revamp v2 — `HR Overview.dc.html`,
-// H01–H02): Finance's layout for HR's view. The office's date and "HR view",
-// the greeting, Import payroll / Calculate director salary, one line of where
-// the month stands, eight quick actions, and a card per section of HR's
-// sidebar with a short note where a row has news. The payroll / staff /
-// director tables it used to carry are gone (the user: 照设计拿掉).
+// HR's Overview (2026-10-15, the Attendance handoff — `HR Attendance.dc.html`
+// isOverview): the greeting as the page's title, one line of where things
+// stand, Review requests / Add person, eight quick actions and a card per
+// section of HR's sidebar, each row's count where it has one.
 
 const QUICK: ReadonlyArray<{ key: string; label: string; icon: HrIconName; tone: HrNavTone; visible: (u: User) => boolean }> = [
-  { key: 'hire', label: 'Hiring requests', icon: 'hire', tone: 'clay', visible: canAccessHiring },
-  { key: 'pay', label: 'Import payroll', icon: 'payroll', tone: 'clay', visible: canAccessHRCosting },
-  { key: 'pmt', label: 'Payment', icon: 'out', tone: 'clay', visible: canAccessHRCosting },
-  { key: 'dsal', label: 'Director salary', icon: 'director', tone: 'gold', visible: canAccessDirectorSalary },
-  { key: 'ppl', label: 'People', icon: 'staff', tone: 'olive', visible: canOpenPeople },
-  { key: 'mem', label: 'Member services', icon: 'approve', tone: 'olive', visible: (u) => can(u, 'member_requests_manage') || can(u, 'member_memos_manage') },
-  { key: 'rooms', label: 'Book a room', icon: 'room', tone: 'walnut', visible: canAccessMeetingRooms },
-  { key: 'cc', label: 'Comm Cal', icon: 'in', tone: 'slate', visible: canAccessRevenue },
+  { key: 'today', label: 'Today', icon: 'in', tone: 'olive', visible: canAccessAttendance },
+  { key: 'requests', label: 'Approve', icon: 'approve', tone: 'olive', visible: canAccessAttendance },
+  { key: 'balances', label: 'Leave', icon: 'calendar', tone: 'olive', visible: canAccessAttendance },
+  { key: 'close', label: 'Month close', icon: 'lock', tone: 'olive', visible: canAccessAttendance },
+  { key: 'hire', label: 'Hiring', icon: 'hire', tone: 'clay', visible: canAccessHiring },
+  { key: 'pay', label: 'Payroll', icon: 'payroll', tone: 'clay', visible: canAccessHRCosting },
+  { key: 'pplPeople', label: 'People', icon: 'staff', tone: 'olive', visible: canOpenPeople },
+  { key: 'docDocs', label: 'Documents', icon: 'doc', tone: 'olive', visible: canAccessDocumentation },
 ]
 
 export default function HrOverview({ user, data, revenueSub }: { user: User; data: HrOverviewData; revenueSub: string | null }) {
   const clock = officeClock()
-  const { period, summary, notes, badges } = data
-
-  const sections = visibleHrNav(hrNavSections(revenueSub), user).filter((sec) => sec.label !== null)
-  const hrefOf: Record<string, string> = {
-    ...Object.fromEntries(sections.flatMap((sec) => sec.items.map((i) => [i.key, i.href] as const))),
-    // Import payroll opens the month's payroll; Comm Cal the sub-department last picked.
-    pay: `/hr-costing/payroll/${period}`,
-    cc: revenueSub ? revenuePath(revenueSub) : '/revenue',
-  }
+  const { summary, badges } = data
+  const sections = visibleHrNav(hrNavSections(revenueSub), user).filter(sec => sec.label !== null)
+  const hrefOf: Record<string, string> = Object.fromEntries(sections.flatMap(sec => sec.items.map(i => [i.key, i.href] as const)))
   const name = firstName(user.name, 'HR')
+  const right = (
+    <div style={{ display: 'flex', gap: 8 }}>
+      {canAccessAttendance(user) ? (
+        <Button href="/attendance/requests">Review requests</Button>
+      ) : null}
+      {canDo(user, 'team', 'create') ? (
+        <Button href="/team/people/new" variant="secondary">Add person</Button>
+      ) : null}
+    </div>
+  )
 
   return (
-    <div className={`${s.root} ${s.hrRoot}`}>
-      <div className={s.head}>
-        <div className={s.headText}>
-          <div className={s.eyebrow} suppressHydrationWarning>
-            {clock.date} · {clock.quarter} · HR view
+    <HvPage>
+      <PageHead eyebrow="Overview" title={`${clock.greeting}, ${name}.`} subtitle={summary ? <span suppressHydrationWarning>{summary.replace(/\.$/, '')}.</span> : undefined} right={right} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ds-ink-3)', flex: 'none' }}>Quick actions</span>
+            <span style={{ flex: 1, height: 1, background: 'var(--ds-border)' }} />
           </div>
-          <h1 className={s.title} suppressHydrationWarning>
-            {clock.greeting}, {name}.
-          </h1>
-          <div className={s.rule} aria-hidden="true" />
-        </div>
-        <div className={s.actions}>
-          {canAccessHRCosting(user) ? (
-            <Link href={`/hr-costing/payroll/${period}`} className={s.btn} data-kind="primary">
-              Import payroll
-            </Link>
-          ) : null}
-          {canAccessDirectorSalary(user) ? (
-            <Link href="/director-salary" className={s.btn}>
-              Calculate director salary
-            </Link>
-          ) : null}
-        </div>
-      </div>
-
-      {summary ? <p className={s.summary}>{summary}</p> : null}
-
-      <div className={s.label}>
-        <span className={s.labelText}>Quick actions</span>
-        <span className={s.labelRule} aria-hidden="true" />
-      </div>
-      <div className={s.quick}>
-        {QUICK.filter((q) => q.visible(user) && hrefOf[q.key]).map((q) => {
-          const badge = badges[q.key] ?? 0
-          return (
-            <Link key={q.key} href={hrefOf[q.key]} className={`${s.tile} ${s[q.tone]}`}>
-              <span className={s.tileIcon}>
-                <HrIcon name={q.icon} size={18} />
-                {badge > 0 ? <span className={s.badge}>{badge}</span> : null}
-              </span>
-              <span className={s.tileLabel}>{q.label}</span>
-            </Link>
-          )
-        })}
-      </div>
-
-      <div className={s.cats}>
-        {sections.map((sec) => (
-          <div key={sec.label} className={s.cat}>
-            <div className={s.catHead}>
-              <span className={s.catRoman}>{sec.roman}</span>
-              <span className={s.catLabel}>{sec.label}</span>
-              <span className={s.grow} />
-              <span className={s.catCount}>
-                {sec.items.length} {sec.items.length === 1 ? 'page' : 'pages'}
-              </span>
-            </div>
-            {sec.items.map((item) => (
-              <Link key={item.key} href={item.href} className={`${s.row} ${s[sec.tone]}`}>
-                <span className={s.rowIcon}>
-                  <HrIcon name={item.icon} size={15} />
-                </span>
-                <span className={s.rowLabel}>{item.label}</span>
-                {notes[item.key] ? <span className={s.rowNote}>{notes[item.key]}</span> : null}
-                <span className={s.chev} aria-hidden="true">›</span>
-              </Link>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8,minmax(0,1fr))', gap: 10 }}>
+            {QUICK.filter(q => q.visible(user) && hrefOf[q.key]).map(q => (
+              <OvQuickTile key={q.key} href={hrefOf[q.key]} label={q.label} icon={q.icon} tone={q.tone} badge={badges[q.key] ?? 0} />
             ))}
           </div>
-        ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 12, alignItems: 'start' }}>
+          {sections.map(sec => (
+            <div key={sec.label} style={{ border: '1px solid var(--ds-border)', borderRadius: 12, background: 'var(--ds-surface)', padding: '14px 14px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '0 2px 4px' }}>
+                <span style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ds-ink-3)' }}>
+                  <span style={{ color: `rgb(var(--tone-${sec.tone}-deep))` }}>{sec.roman}</span> {sec.label}
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ds-ink-3)' }}>
+                  {sec.items.length} {sec.items.length === 1 ? 'page' : 'pages'}
+                </span>
+              </div>
+              {sec.items.map(item => (
+                <OvCatRow key={item.key} href={item.href} label={item.label} icon={item.icon} tone={sec.tone} badge={badges[item.key] ?? 0} />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </HvPage>
   )
 }

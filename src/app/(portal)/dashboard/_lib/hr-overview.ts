@@ -4,7 +4,9 @@ import { can } from '@/lib/permissions'
 import { officeTime } from '@/lib/office-time'
 import { loadHiringBoard } from '@/lib/hiring/board'
 import { adminMemberAction } from '@/lib/member/server'
-import { canAccessDirectorSalary, canAccessHRCosting, canAccessHiring } from '@/lib/roles'
+import { canAccessAttendance, canAccessDirectorSalary, canAccessHRCosting, canAccessHiring } from '@/lib/roles'
+import { loadConfig, loadLedger, loadMonth, loadRequests } from '@/lib/attendance/server'
+import { attendanceNews } from '@/lib/attendance/overview'
 import type { User } from '@/types'
 
 // HR's Overview (2026-10-14, the Finance revamp v2 — `HR Overview.dc.html`,
@@ -34,11 +36,21 @@ export async function loadHrOverview(supabase: SupabaseClient, user: User): Prom
   const monthName = dayjs(period).format('MMMM')
   const monthShort = dayjs(period).format('MMM')
 
-  const [summaryRead, hiring, members] = await Promise.all([
+  const year = Number(period.slice(0, 4))
+  const seesAttendance = canAccessAttendance(user)
+  const [summaryRead, hiring, members, attConfig, attMonth, attRequests, attLedger] = await Promise.all([
     supabase.rpc('hr_dashboard_summary', { p_period: period }),
     canAccessHiring(user) ? loadHiringBoard() : Promise.resolve(null),
     can(user, 'member_requests_manage') ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
+    seesAttendance ? loadConfig() : Promise.resolve(null),
+    seesAttendance ? loadMonth(officeTime().format('YYYY-MM-DD')) : Promise.resolve(null),
+    seesAttendance ? loadRequests() : Promise.resolve(null),
+    seesAttendance ? loadLedger(year) : Promise.resolve(null),
   ])
+  // Attendance (2026-10-15, the Attendance handoff's Overview): requests waiting for HR, who is not in yet, the close.
+  const att = attConfig?.ok && attMonth?.ok && attRequests?.ok && attLedger?.ok
+    ? attendanceNews(attConfig.data, attMonth.data, attRequests.data, attLedger.data)
+    : null
   const hr = (summaryRead.error ? null : summaryRead.data) as HrSummaryRow | null
   const board = hiring && hiring.ok ? hiring.board : null
   const memberData = members && members.ok ? members.data : null
@@ -55,7 +67,7 @@ export async function loadHrOverview(supabase: SupabaseClient, user: User): Prom
   // Where the month stands (H01): the payroll, the hiring requests, the director salary.
   const payroll = rows === 0 ? `${monthName} payroll is not imported yet` : submitted ? `${monthName} payroll is submitted` : `${monthName} payroll is imported`
   const directorWords = director === 'confirmed' ? 'director salary confirmed' : director === 'draft' ? 'director salary in draft' : 'director salary not calculated'
-  const parts = [
+  const parts = att ? [att.summary] : [
     canAccessHRCosting(user) ? payroll : null,
     waiting === null ? null : `${waiting} hiring ${waiting === 1 ? 'request' : 'requests'} waiting`,
     canAccessDirectorSalary(user) ? directorWords : null,
@@ -72,6 +84,6 @@ export async function loadHrOverview(supabase: SupabaseClient, user: User): Prom
       mem: newRequests ? `${newRequests} new` : null,
       dsal: director === 'not_calculated' ? 'Not calculated' : director === 'draft' ? 'Draft' : null,
     },
-    badges: { hire: waiting ?? 0, mem: newRequests ?? 0 },
+    badges: { hire: waiting ?? 0, mem: newRequests ?? 0, memReq: newRequests ?? 0, ...(att?.badges ?? {}) },
   }
 }
