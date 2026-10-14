@@ -90,7 +90,7 @@
 /* A line's GL override, under it: the type, the GL, the reason. */
 .override {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr) minmax(0, 1.2fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.25fr) minmax(0, 1fr);
   align-items: center;
   gap: 6px;
   padding: 0 10px 8px 12px;

@@ -292,7 +292,7 @@ export default function CreatePaymentDialog({
   if (!payee.trim()) need.push('Pay to')
   if (!(total > 0)) need.push('an amount')
   if (useLines) {
-    if (lines.length === 0 || lines.some((l) => !l.pool || !l.account || !(num(l.amount) > 0))) need.push('each line’s pool, category and amount')
+    if (lines.length === 0 || lines.some((l) => !l.pool || !l.account || !(num(l.amount) > 0))) need.push('each line’s pool, category, amount')
   } else {
     if (!account) need.push('a category')
     if (!pool) need.push('a pool')
