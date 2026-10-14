@@ -113,7 +113,7 @@ describe("the preview's calculator", () => {
     };
     const r = tableCalc({ schemeId: "s", price: "5480.00", delivery: "0", lines: [
       { productId: "m", quantity: 1, gift: false }, { productId: "f", quantity: 1, gift: false }, { productId: "a", quantity: 2, gift: false },
-    ] }, table, 0.7, [36, 43]);
+    ] }, table, 0.7, BANDS);
     expect(r.ok && r.data.margin?.toFixed(1)).toBe("34.6");
     expect(r.ok && r.data.nextPrice).toBe(5596.88);
     expect(r.ok && r.data.nextThreshold).toBe(36);

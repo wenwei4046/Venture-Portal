@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MemberBand, QuoteInput, QuoteResult } from "@/lib/member/types";
 import type { Outcome } from "../source";
-import { calcVM, press as pressKey, quoteInput, type CalcVM } from "./calc-model";
+import { calcVM, press as pressKey, quoteCart, quoteInput, type CalcVM } from "./calc-model";
+import { EMPTY_BOOK, NOT_REACHED, confirmedAnswer, nextAsk, recordAnswer, shownAnswer, type QuoteBook } from "./quote-book";
+import { cartKey } from "./reprice";
 import {
   EMPTY_MEMORY, NO_SOFA_BUILD, addLines, bump as bumpLine, defaultSize, firstFrame, itemCount, layoutFits, layoutKey, remember, sheetLines, sofaBuildOf,
   sofaBuildToSend, sofaCartCharge, sofaPick,
@@ -204,44 +206,53 @@ export function useQuote(args: UseQuoteArgs) {
   useEffect(() => { if (!cart.length) setCartOpen(false); }, [cart.length]);
 
   // ── step 2 ──
+  // The margin answers as the digits go in (2026-10-14): each cart is asked once, as soon as it
+  // changes, and every price typed after is worked out from that answer (quote-book.ts).
   const press = useCallback((key: string) => setPrice(p => pressKey(p, key)), []);
-  const input = useMemo(() => quoteInput(schemeId, cart, price, fee, sofaBuildToSend(build, catalog, cart)), [schemeId, cart, price, fee, build, catalog]);
+  const sentBuild = useMemo(() => sofaBuildToSend(build, catalog, cart), [build, catalog, cart]);
+  const asked = useMemo(() => quoteCart(schemeId, cart, sentBuild), [schemeId, cart, sentBuild]);
+  const input = useMemo(() => quoteInput(schemeId, cart, price, fee, sentBuild), [schemeId, cart, price, fee, sentBuild]);
+  const cartId = asked ? cartKey(asked) : "";
   const inputKey = input ? JSON.stringify(input) : "";
-  const [answer, setAnswer] = useState<{ key: string; result: QuoteResult | null; error: string | null } | null>(null);
-  const latest = useRef(inputKey);
-  latest.current = inputKey;
-  useEffect(() => {
-    if (!pricing || !input) return;
-    const key = JSON.stringify(input);
-    const timer = window.setTimeout(() => {
-      void calc(input).then(r => {
-        if (latest.current !== key) return;
-        setAnswer(r.ok ? { key, result: r.data, error: null } : { key, result: null, error: r.error });
-      });
-    }, 220);
-    return () => window.clearTimeout(timer);
-    // `input` is keyed by `inputKey`; a new object with the same content asks nothing again.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pricing, inputKey, calc]);
-
   const brandBands = useMemo(() => bands.filter(b => b.brand === brand), [bands, brand]);
+  const [book, setBook] = useState<QuoteBook>(EMPTY_BOOK);
+  // One question at a time (the client runs Server Actions one behind another): the next waits for it.
+  const busy = useRef(false);
+  const ask = useMemo(() => nextAsk(book, {
+    cart: asked, cartId, input, inputKey, pricing, allowed: pricing || !readOnly, bands: brandBands,
+  }), [book, asked, cartId, input, inputKey, pricing, readOnly, brandBands]);
+  useEffect(() => {
+    if (!ask || busy.current) return;
+    const timer = window.setTimeout(() => {
+      busy.current = true;
+      const settle = (r: Outcome<QuoteResult>, failed = false) => {
+        busy.current = false;
+        setBook(b => recordAnswer(b, ask, r, failed));
+      };
+      calc(ask.input).then(r => settle(r), () => settle({ ok: false, error: NOT_REACHED }, true));
+    }, ask.wait);
+    return () => window.clearTimeout(timer);
+  }, [ask, calc]);
+  const shown = useMemo(() => shownAnswer(book, { cartId, input, inputKey }), [book, cartId, input, inputKey]);
+
   const kpiLines = cart.filter(l => l.kind === "kpi");
   const kpiAmount = kpiLines.reduce((a, l) => a + (catalog?.kpis.find(k => k.key === l.key)?.price ?? 0) * l.qty, 0);
   // What the options are charged (2026-10-05; every option since 2026-10-06): the server's
   // figure for the cart on screen, else the catalogue's own — the same charges: each bed
   // frame's, and the sofas' once per sofa.
-  const optionCharge = answer && answer.key === inputKey && answer.result?.optionCharge !== undefined
-    ? answer.result.optionCharge
-    : cart.reduce((a, l) => a + (l.charge ?? 0) * l.qty, 0) + sofaCartCharge(catalog, cart, sofaBuildToSend(build, catalog, cart));
+  const optionCharge = shown.result?.optionCharge !== undefined
+    ? shown.result.optionCharge
+    : cart.reduce((a, l) => a + (l.charge ?? 0) * l.qty, 0) + sofaCartCharge(catalog, cart, sentBuild);
   const vm: CalcVM = useMemo(() => calcVM({
     price, items, bands: brandBands, fee,
-    result: answer && input ? answer.result : null,
-    error: answer && input ? answer.error : null,
+    result: shown.result,
+    error: shown.error,
+    pending: shown.pending,
     kpi: { qty: kpiLines.reduce((a, l) => a + l.qty, 0), amount: kpiAmount },
     options: optionCharge,
-  }), [price, items, brandBands, fee, answer, input, kpiLines, kpiAmount, optionCharge]);
+  }), [price, items, brandBands, fee, shown, kpiLines, kpiAmount, optionCharge]);
   /** The customer's quote, once the price on screen has been confirmed by the calculator. */
-  const confirmed = answer && answer.key === inputKey && answer.result?.valid ? answer.result : null;
+  const confirmed = confirmedAnswer(book, inputKey);
   const applyNext = useCallback(() => { if (vm.next) setPrice(vm.next.value.toFixed(2)); }, [vm.next]);
 
   return {
