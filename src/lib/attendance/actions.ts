@@ -136,3 +136,9 @@ export async function deleteSetting(kind: Exclude<SettingKind, 'ot' | 'policy'>,
   await requireActionOn('/attendance/settings', 'attendance', 'edit')
   return call<{ id: string; label: string }>('att_delete_setting', { p_kind: kind, p_id: id }, 'The setting could not be deleted.')
 }
+
+/** Requests › Approval routes: one route's Upline only / HR only / Upline → HR, from its own tab. */
+export async function saveRoute(id: string, row: Record<string, unknown>) {
+  await requireActionOn('/attendance/requests', 'attendance', 'edit')
+  return call<{ id: string; label: string }>('att_save_setting', { p_kind: 'route', p_id: id, p_row: row }, 'The route could not be saved.')
+}

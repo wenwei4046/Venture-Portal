@@ -1,7 +1,7 @@
 import { requirePage, requirePermission } from '@/lib/auth'
 import { HvPage, PageHead } from '@/components/hrv/kit'
 import { officeToday } from '@/lib/office-time'
-import { loadBoard } from '@/lib/attendance/server'
+import { loadConfig, loadLedger } from '@/lib/attendance/server'
 import BalancesView from '../_components/BalancesView'
 
 export const dynamic = 'force-dynamic'
@@ -10,14 +10,15 @@ export const dynamic = 'force-dynamic'
 export default async function Page() {
   await requirePage('/attendance/balances')
   await requirePermission('attendance')
-  const read = await loadBoard(officeToday())
-  if (!read.ok) {
+  const [config, ledger] = await Promise.all([loadConfig(), loadLedger(Number(officeToday().slice(0, 4)))])
+  const fail = !config.ok ? config.reason : !ledger.ok ? ledger.reason : null
+  if (fail || !config.ok || !ledger.ok) {
     return (
       <HvPage>
         <PageHead eyebrow="Attendance" title="Leave balances" />
-        <div className="sheet-danger">{read.reason}</div>
+        <div className="sheet-danger">{fail}</div>
       </HvPage>
     )
   }
-  return <BalancesView {...read.data} />
+  return <BalancesView config={config.data} ledger={ledger.data} />
 }
