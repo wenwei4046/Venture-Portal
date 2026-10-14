@@ -466,10 +466,10 @@ export function chatVM(ctx: SalesCtx) {
       if (files.length) set(u => ({ ...u, pick: { ...pickedOf(files), caption: draft } }));
     },
     // The editor's caption starts as what was typed in the reply box, and takes its place once sent.
-    pk: pickVM(ui.pick, p => set(u => ({ ...u, pick: p })), async (files, caption) => {
+    pk: pickVM(ui.pick, p => set(u => ({ ...u, pick: p })), async (files, captions) => {
       if (draft) setDraft("");
       scrollDown();
-      await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
+      await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, captions[i] ?? "")));
     }),
     // The sticker button: an emoji sheet; each tap adds one to the reply, the sheet stays until closed.
     // Open only in the chat it was opened in (user 2026-10-13: it came up on its own in the next chat).

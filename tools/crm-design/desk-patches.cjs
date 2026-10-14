@@ -95,7 +95,14 @@ function chatPatches(inn, out, text, time, reply, list, draft, setDraft, draftKe
     `\\{!!\\(${e(inn)}\\) && \\(<>\\s*(<div style=\\{\\{[^\\n]*?\\}\\}>)\\s*<p style=(\\{\\{[^\\n]*?\\}\\})>\\{${e(text)}\\}</p>\\s*<span style=(\\{\\{[^\\n]*?\\}\\})>\\{${e(time)}\\}</span>\\s*</div>\\s*</>\\)\\}\\s*` +
     `\\{!!\\(${e(out)}\\) && \\(<>\\s*(<div style=\\{\\{[^\\n]*?\\}\\}>)\\s*<p style=\\{\\{[^\\n]*?\\}\\}>\\{${e(text)}\\}</p>\\s*<span style=(\\{\\{[^\\n]*?\\}\\})>\\{${e(time)}\\}<svg ([^>]*?)stroke="#3B8FD9"([^>]*)>(${NO})</svg></span>\\s*</div>\\s*</>\\)\\}` +
     (aw ? `\\s*\\{!!\\(v\\.aw\\.reminded\\) && \\(<>${NO}</>\\)\\}` : ""));
-  const loop = (_m, pill, inDiv, pSt, inTime, outDiv, outTime, svgA, svgB, svgIn) =>
+  // 2026-10-14 (the owner, WhatsApp's computer app beside ours: "電腦端的聊天邊框再小一些"): a photo, video, album or
+  // document sits 3 px inside its bubble, its words and time 7 px in (mediaOf's m.pad / m.inPad, as on the phone).
+  const tight = (_m, pill, inDiv, pSt, inTime, outDiv, outTime, ...rest) => loop0(_m, pill,
+    inDiv.replace('padding: "10px 13px"', "padding: m.pad"), pSt.replace(/^\{\{ /, "{{ padding: m.inPad, "),
+    inTime.replace('marginTop: "4px",', 'marginTop: "4px", padding: m.inPad,'),
+    outDiv.replace('padding: "10px 13px"', "padding: m.pad"), outTime.replace('marginTop: "4px",', 'marginTop: "4px", padding: m.inPad,'), ...rest);
+  const loop = (...a) => tight(...a);
+  const loop0 = (_m, pill, inDiv, pSt, inTime, outDiv, outTime, svgA, svgB, svgIn) =>
     `{(${list}).map((m, m_i) => (<Fragment key={m_i}>` +
     `{!!(m.day) && (<>${pill}{m.day}</span></>)}` +
     `{!!(m.sys) && (<><span style={${SYS}}>{!!(m.bell) && (<>${BELL}</>)}{m.sys}</span></>)}` +
