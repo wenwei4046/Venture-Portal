@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { galleryOf, mediaOf, NO_MEDIA } from "./chat-media";
+import { albumsOf, galleryOf, mediaOf, NO_MEDIA } from "./chat-media";
 import { docLabel, mediaHeight, rememberShape } from "./viewer";
 
 describe("a chat's photos, videos and documents (2026-10-14)", () => {
@@ -28,7 +28,7 @@ describe("a chat's photos, videos and documents (2026-10-14)", () => {
   it("keeps a voice note and plain text in the usual bubble", () => {
     expect(mediaOf(msgs[4], []).pad).toBe("10px 13px");
     expect(mediaOf(msgs[4], []).view).toBeUndefined();
-    expect(mediaOf(msgs[1], [])).toBe(NO_MEDIA);
+    expect(mediaOf(msgs[1], [])).toEqual(NO_MEDIA);
   });
 
   it("draws a photo's box at its own shape once seen, so the chat does not jump while it loads", () => {
@@ -38,5 +38,29 @@ describe("a chat's photos, videos and documents (2026-10-14)", () => {
     rememberShape("/m/tall", 600, 3000);
     expect(mediaHeight("/m/tall")).toBe("320px");
     expect(mediaOf(msgs[3], []).vidSrc).toBe("/m/d#t=0.1");
+  });
+});
+
+describe("photos sent together are one album, as on WhatsApp", () => {
+  const at = (s: number) => new Date(Date.UTC(2026, 9, 14, 2, 0, s)).toISOString();
+  const pic = (id: string, s: number, from: "me" | "lead" = "me", text = "") => ({ id, from, at: at(s), text, media: { kind: "image" as const, url: "/m/" + id } });
+  it("groups four or more in a row from the same side, the first carrying them", () => {
+    const { lead, hidden } = albumsOf([pic("a", 0), pic("b", 5), pic("c", 9), pic("d", 20), pic("e", 30)]);
+    expect([...lead.keys()]).toEqual(["a"]);
+    expect([...hidden]).toEqual(["b", "c", "d", "e"]);
+    const m = mediaOf(pic("a", 0), [], lead.get("a"));
+    expect(m.album.length).toBe(4);
+    expect(m.albumMore).toBe(1);
+    expect(m.img).toBe("");
+  });
+  it("leaves three, a caption, the other side or a long pause as they are", () => {
+    expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2)]).lead.size).toBe(0);
+    expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2, "me", "look"), pic("d", 3)]).lead.size).toBe(0);
+    expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2, "lead"), pic("d", 3)]).lead.size).toBe(0);
+    expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2), pic("d", 500)]).lead.size).toBe(0);
+  });
+  it("draws a PDF as its card and a voice note as a voice bubble", () => {
+    expect(mediaOf({ id: "p", media: { kind: "file", url: "/m/p", name: "x.pdf", mime: "application/pdf" } }, []).isPdf).toBe(true);
+    expect(mediaOf({ id: "v", from: "me", media: { kind: "audio", url: "/m/v" } }, []).voiceMine).toBe(true);
   });
 });

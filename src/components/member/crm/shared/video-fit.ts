@@ -35,31 +35,39 @@ export function videoPlan(maxBytes: number, seconds: number, hd = true): { bps: 
 export type VideoFit = { ok: true; file: File } | { ok: false; error: string };
 
 /**
- * The video as the channel takes it: unchanged when it is already H.264 and small enough, else encoded again to fit.
- * `onProgress` gets 0–1 while it encodes.
+ * The video as the channel takes it (2026-10-14, second look at 131053 — the files Meta refused, opened):
+ * - always an MP4: an iPhone .mov holds H.264 the channel can play, but WhatsApp refuses the QuickTime box around it — it
+ *   is put into an MP4 box as it is (no quality lost, quick);
+ * - encoded again only when it is too big, not H.264 (an iPhone "High Efficiency" video), trimmed past what a copy can
+ *   do, or sent standard; and never sent without its picture — this phone once dropped the picture track and sent the
+ *   sound alone, which Meta refused.
+ * `onProgress` gets 0–1 while it works.
  */
 export async function fitVideo(file: File, channelMax: number, channelName: string, onProgress?: (p: number) => void): Promise<VideoFit> {
   // Standard: at most 8 MB and 960 px — the channel's own limit stays the limit for HD.
   const hd = !standard.has(file), maxBytes = hd ? channelMax : Math.min(channelMax, STANDARD_VIDEO_MAX);
   const tooBig = `A video can be up to ${Math.round(channelMax / MB)} MB on ${channelName}`;
-  if (typeof VideoEncoder === "undefined" || typeof VideoDecoder === "undefined") {
-    return file.size <= channelMax ? { ok: true, file } : { ok: false, error: `${tooBig}, and this phone cannot make it smaller. Trim it and send it again.` };
-  }
+  let mb: Mb;
+  try { mb = await import("mediabunny"); } catch { return file.size <= channelMax ? { ok: true, file } : { ok: false, error: `${tooBig}. Trim it and send it again.` }; }
   try {
-    const mb = await import("mediabunny");
     const input = new mb.Input({ source: new mb.BlobSource(file), formats: mb.ALL_FORMATS });
     const track = await input.getPrimaryVideoTrack();
-    if (!track) return file.size <= channelMax ? { ok: true, file } : { ok: false, error: `${tooBig}.` };
+    if (!track) return { ok: false, error: "This video has no picture to send." };
+    const isMp4 = (await input.getFormat()).name === "MP4";
     const cut = cuts.get(file);
-    if (!cut && track.codec === "avc" && file.size <= maxBytes) return { ok: true, file };
     const full = await input.computeDuration();
     const start = cut ? Math.max(0, Math.min(cut.start, full)) : 0, end = cut ? Math.max(start + 0.2, Math.min(cut.end, full)) : full;
     const seconds = end - start;
-    const trim = cut ? { trim: { start, end } } : {}, audio = cut?.mute ? { audio: { discard: true } } : {};
-    // Trimmed or muted, an H.264 video that then fits is cut without being encoded again (quick, no loss).
-    if (cut && track.codec === "avc" && full > 0 && (file.size * seconds) / full <= maxBytes * 0.95) {
-      const out = await convert(mb, input, file, { ...trim, ...audio }, onProgress);
-      if (out && out.size <= maxBytes) return { ok: true, file: out };
+    const trim = cut ? { trim: { start, end } } : {}, audio = cut?.mute ? { audio: { discard: true as const } } : {};
+    const estimate = full > 0 ? (file.size * seconds) / full : file.size;
+    // H.264 that fits: as it is when it is already a plain MP4, else copied into one (trimmed / muted on the way).
+    if (track.codec === "avc" && estimate <= maxBytes * 0.97) {
+      if (!cut && isMp4) return { ok: true, file };
+      const copy = await convert(mb, input, file, { ...trim, ...audio }, onProgress);
+      if (copy.file && copy.file.size <= maxBytes) return { ok: true, file: copy.file };
+    }
+    if (typeof VideoEncoder === "undefined" || typeof VideoDecoder === "undefined") {
+      return { ok: false, error: track.codec === "avc" ? `${tooBig}, and this phone cannot make it smaller. Trim it and send it again.` : HEVC };
     }
     const plan = videoPlan(maxBytes, seconds, hd) ?? (hd ? null : videoPlan(channelMax, seconds, true));
     if (!plan) return { ok: false, error: `${tooBig} — this one is too long to fit. Trim it and send it again.` };
@@ -68,24 +76,58 @@ export async function fitVideo(file: File, channelMax: number, channelName: stri
     const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
     const out = await convert(mb, input, file, {
       ...trim, ...audio,
-      video: { ...(w >= h ? { width: even(w * k) } : { height: even(h * k) }), codec: "avc", quality: new mb.Quality(plan.bps), forceTranscode: true },
+      video: { width: even(w * k), height: even(h * k), fit: "contain", codec: "avc", quality: new mb.Quality(plan.bps), forceTranscode: true },
     }, onProgress);
-    if (!out) return { ok: false, error: `${tooBig}, and this phone cannot make this one smaller. Trim it and send it again.` };
-    return out.size <= channelMax ? { ok: true, file: out } : { ok: false, error: `${tooBig} — this one is too long to fit. Trim it and send it again.` };
+    if (!out.file) return { ok: false, error: track.codec === "avc" ? `${tooBig}, and this phone cannot make this one smaller. Trim it and send it again.` : HEVC };
+    return out.file.size <= channelMax ? { ok: true, file: out.file } : { ok: false, error: `${tooBig} — this one is too long to fit. Trim it and send it again.` };
   } catch {
-    return file.size <= channelMax ? { ok: true, file } : { ok: false, error: "The video could not be prepared. Try again, or trim it first." };
+    return { ok: false, error: "The video could not be prepared. Try again, or trim it first." };
   }
+}
+
+const HEVC = "This is an iPhone High Efficiency video, which this phone cannot convert for WhatsApp. On the iPhone: Settings › Camera › Formats › Most Compatible, then record it again.";
+
+/**
+ * A voice note as WhatsApp plays it as a voice message (2026-10-14: the iPhone's recording — a fragmented MP4 — came
+ * back 131053): Ogg Opus when this phone can make it (WhatsApp then shows it as a voice message, with its waveform),
+ * else the same sound copied into a plain MP4. Messenger takes the recording as it is.
+ */
+export async function fitVoice(file: File, channel: "whatsapp" | "messenger"): Promise<File> {
+  if (channel !== "whatsapp") return file;
+  try {
+    const mb = await import("mediabunny");
+    const input = new mb.Input({ source: new mb.BlobSource(file), formats: mb.ALL_FORMATS });
+    const track = await input.getPrimaryAudioTrack();
+    if (!track) return file;
+    const base = file.name.replace(/\.[A-Za-z0-9]{1,5}$/, "") || "voice";
+    if (track.codec === "opus" || (await mb.canEncodeAudio("opus"))) {
+      const output = new mb.Output({ format: new mb.OggOutputFormat(), target: new mb.BufferTarget() });
+      const conv = await mb.Conversion.init({ input, output, showWarnings: false, video: { discard: true }, audio: { codec: "opus", ...(track.codec === "opus" ? {} : { bitrate: 32_000 }) } });
+      if (conv.isValid && conv.utilizedTracks.some(t => t.type === "audio")) {
+        await conv.execute();
+        if (output.target.buffer) return new File([output.target.buffer], `${base}.ogg`, { type: "audio/ogg" });
+      }
+    }
+    const input2 = new mb.Input({ source: new mb.BlobSource(file), formats: mb.ALL_FORMATS });
+    const output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: "in-memory" }), target: new mb.BufferTarget() });
+    const conv = await mb.Conversion.init({ input: input2, output, showWarnings: false, video: { discard: true } });
+    if (conv.isValid && conv.utilizedTracks.some(t => t.type === "audio")) {
+      await conv.execute();
+      if (output.target.buffer) return new File([output.target.buffer], `${base}.m4a`, { type: "audio/mp4" });
+    }
+  } catch { /* sent as recorded */ }
+  return file;
 }
 
 type Mb = typeof import("mediabunny");
 type ConvOpts = Omit<Parameters<Mb["Conversion"]["init"]>[0], "input" | "output">;
-/** One run of mediabunny into an MP4 in memory; null when this phone cannot make it. */
-async function convert(mb: Mb, input: InstanceType<Mb["Input"]>, file: File, opts: ConvOpts, onProgress?: (p: number) => void): Promise<File | null> {
+/** One run of mediabunny into an MP4 in memory. No file when this phone cannot make it, or would drop the picture. */
+async function convert(mb: Mb, input: InstanceType<Mb["Input"]>, file: File, opts: ConvOpts, onProgress?: (p: number) => void): Promise<{ file: File | null }> {
   const output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: "in-memory" }), target: new mb.BufferTarget() });
   const conversion = await mb.Conversion.init({ input, output, showWarnings: false, ...opts });
-  if (!conversion.isValid) return null;
+  if (!conversion.isValid || !conversion.utilizedTracks.some(t => t.type === "video")) return { file: null };
   if (onProgress) conversion.onProgress = p => onProgress(p);
   await conversion.execute();
   const buf = output.target.buffer;
-  return buf ? new File([buf], (file.name.replace(/\.[A-Za-z0-9]{1,5}$/, "") || "video") + ".mp4", { type: "video/mp4" }) : null;
+  return { file: buf ? new File([buf], (file.name.replace(/\.[A-Za-z0-9]{1,5}$/, "") || "video") + ".mp4", { type: "video/mp4" }) : null };
 }

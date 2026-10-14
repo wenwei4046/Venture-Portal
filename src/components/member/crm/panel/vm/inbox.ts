@@ -43,7 +43,9 @@ function chatRow(ctx: PanelCtx, c: CrmCustomer) {
   return {
     c, seat, needs, name: c.name, ini: ini(c.name), ad: c.ad, state, uc: UC[u.level],
     who: c.assignedTo ? nameOf(c.assignedTo) : `${seat.name || "Team"} · to assign`, wc: seat.c, ownBg: seat.own,
-    preview: last ? (last.from === "me" ? "You: " : "") + (last.text || "Attachment") : "", at: last ? lastChat(last.at, now) : "",
+    preview: last ? (last.from === "me" ? "You: " : "") + (last.text || mediaWord(last)) : "", at: last ? lastChat(last.at, now) : "",
+    // Its unread messages on the card, so the Inbox badge's number can be found (the owner, 2026-10-14: "inbox 2 是誰？").
+    unread: c.unread ? String(c.unread) : "",
     stBg: u.level === "overdue" ? "#FBE4DE" : u.level === "urgent" ? "#FBF1E3" : u.level === "soon" ? "#F5EEE9" : "transparent", hasSt: !!state,
     // rev 1011 §1.1: a chat opens here, as the Principal / Director, whoever has it (as Calendar and Awaiting reply do);
     // acting as a salesperson is Profile › View as only.
@@ -53,6 +55,7 @@ function chatRow(ctx: PanelCtx, c: CrmCustomer) {
 }
 
 export { isNewChat } from "../../shared/new-chat";
+import { mediaWord } from "../../shared/chat-media";
 import { isNewChat } from "../../shared/new-chat";
 
 /** The chats the panel shows: everyone's, and those waiting in a team. Organic Leads are Assignment's. */

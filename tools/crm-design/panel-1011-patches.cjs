@@ -52,7 +52,7 @@ module.exports = [
   ['<p style={{ display: m.pDisp, margin: "0", whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "14px", lineHeight: "1.45" }}>{m.text}</p>',
     CHAT_MEDIA + '<p style={{ display: m.pDisp, margin: "0", padding: m.inPad, whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "14px", lineHeight: "1.45" }}>{m.text}</p>'],
   // 2026-10-14 (chat-media.cjs): a photo, video or document sits 3 px inside its bubble, as WhatsApp's ("聊天室的邊框不要那麼大").
-  ['<div style={{ alignSelf: m.align, maxWidth: "80%", padding: "10px 13px", boxSizing: "border-box", borderRadius: m.radius, boxShadow', '<div style={{ alignSelf: m.align, maxWidth: "80%", padding: m.pad, boxSizing: "border-box", borderRadius: m.radius, boxShadow'],
+  ['<div style={{ alignSelf: m.align, maxWidth: "80%", padding: "10px 13px", boxSizing: "border-box", borderRadius: m.radius, boxShadow', '<div style={{ display: m.vis, alignSelf: m.align, maxWidth: "80%", padding: m.pad, boxSizing: "border-box", borderRadius: m.radius, boxShadow'],
   ['justifyContent: "flex-end", gap: "3px", marginTop: "4px", fontSize: "11px", color: "#806B60" }}', 'justifyContent: "flex-end", gap: "3px", marginTop: "4px", padding: m.inPad, fontSize: "11px", color: "#806B60" }}'],
   // 2026-10-14 (the owner: "team 的聊天室，點進來後下方的 insight inbox… 可以拿掉，像 mine 一樣"): a chat open hides the bottom bar.
   ['<nav style={{ flex: "none", display: "flex", alignItems: "flex-end", height: "62px"', '<nav style={{ flex: "none", display: v.navOn ? "flex" : "none", alignItems: "flex-end", height: "62px"'],
@@ -92,6 +92,8 @@ module.exports = [
   [/<div style=\{\{ display: "flex", flexDirection: "column", borderRadius: "14px", border: "1px solid #EBDDD2" \}\}>(\s*\{\(v\.ci\.Rows\))/,
     "<div style={{ flex: \"none\", display: \"flex\", flexDirection: \"column\", borderRadius: \"14px\", border: \"1px solid #EBDDD2\" }}>$1"],
   ["<span onClick={v.ci.Chat} style={{ height: \"50px\",", "<span onClick={v.ci.Chat} style={{ flex: \"none\", height: \"50px\","],
+  // 2026-10-14 (the owner: "作為用戶，我不知道 inbox 2 是誰？"): a board card shows its unread messages beside its time.
+  ['<small style={{ flex: "none", fontSize: "11px", color: "#A8968B" }}>{r.at}</small>', '<small style={{ flex: "none", fontSize: "11px", color: "#A8968B" }}>{r.at}</small>{!!(r.unread) && (<span style={{ flex: "none", minWidth: "20px", height: "20px", padding: "0 6px", boxSizing: "border-box", borderRadius: "10px", background: "#BD4A19", color: "#fff", fontSize: "11px", fontWeight: "700", display: "grid", placeItems: "center" }}>{r.unread}</span>)}'],
   // The customer form follows the Control panel's Forms (CRM Desktop rev 1, B5) — tools/crm-design/form-patches.cjs.
   ...require("./form-patches.cjs")(),
 ];

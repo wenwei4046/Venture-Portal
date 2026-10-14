@@ -15,7 +15,7 @@ import { withMapLinks } from "@/lib/member/crm-maps";
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
 import { rememberLocalMedia } from "../shared/pending";
 import { isPrepared, prepareImage } from "../shared/image-prep";
-import { fitVideo, VIDEO_PICK_MAX } from "../shared/video-fit";
+import { fitVideo, fitVoice, VIDEO_PICK_MAX } from "../shared/video-fit";
 import { dayLabel, timeLabel, windowShut } from "./vm/common";
 
 export interface SalesActions {
@@ -327,6 +327,8 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
           if (!fit.ok) return { ok: false as const, error: fit.error };
           file = fit.file;
         }
+        // A voice note as WhatsApp takes it: Ogg Opus (a voice message), else a plain MP4 — the iPhone's recording is refused.
+        if (kind === "audio") file = await fitVoice(file, channel);
         const mime = (file.type || "application/octet-stream").split(";")[0];
         const path = mediaPath(customerId, file.name || "file", mime);
         const up = await createClient().storage.from("crm-media").upload(path, file, { contentType: mime, upsert: false });

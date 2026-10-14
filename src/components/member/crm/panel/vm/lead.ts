@@ -16,7 +16,7 @@ import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
-import { galleryOf, mediaOf } from "../../shared/chat-media";
+import { albumsOf, galleryOf, mediaOf } from "../../shared/chat-media";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
@@ -53,13 +53,13 @@ export function leadVM(ctx: PanelCtx) {
       go: () => patch({ lead: null, tab: "calendar", cView: "grid", cDay: day0(cd), cGM: [cd.getFullYear(), cd.getMonth()] }),
     } : null };
   };
-  const gallery = galleryOf(c?.messages ?? []);
+  const gallery = galleryOf(c?.messages ?? []), al = albumsOf(c?.messages ?? []);
   const msgs = (c?.messages ?? []).map((m, k, arr) => {
     const sep = daySep(m.at, now), mine = m.from === "me", by = mine && m.by && m.by !== ow ? `Sent by ${nameOf(m.by)}` : m.auto ? "Auto-reply" : "";
     // A photo, video or voice note shows as itself (2026-10-13), as in the salesperson's chat; a file opens.
     const md = m.media, mk = md?.kind, shows = mk === "image" || mk === "video" || mk === "audio";
     return { sep: !k || daySep(arr[k - 1].at, now) !== sep ? sep : "", time: msgTime(m.at), mine, text: m.text || (md && !shows ? (md.name ?? "File") : ""), at: msgTime(m.at),
-      ...mediaOf(m, gallery),
+      ...mediaOf(m, gallery, al.lead.get(m.id)), vis: al.hidden.has(m.id) ? "none" : undefined,
       tickC: m.status === "read" ? "#2F8FD8" : m.status === "failed" ? "#A3371A" : "#A8968B",
       tickPath: m.status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1" : "M1 6l3 3 6-7M7 8.5l.5.5 6-7",
       by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? "#FCD6B8" : "#fff", bd: mine ? "#FCD6B8" : "#fff", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",

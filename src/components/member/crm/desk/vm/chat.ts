@@ -9,7 +9,7 @@ import type { CrmChatMessage, CrmCustomer } from "@/lib/member/crm-data";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { first, initials } from "./data";
 import type { DeskCtx } from "./ctx";
-import { galleryOf, mediaOf, NO_MEDIA } from "../../shared/chat-media";
+import { albumsOf, galleryOf, mediaOf, NO_MEDIA } from "../../shared/chat-media";
 
 const DAY = 86_400_000;
 const day0 = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -37,7 +37,9 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
     .sort((a, b) => a.at.localeCompare(b.at));
   let prev = "";
   const url = (m: CrmChatMessage) => `/member/crm-media/${m.id}`;
-  const gallery = galleryOf(c.messages.map(m => (m.media ? { id: m.id, media: { ...m.media, url: url(m) } } : m)));
+  const withUrl = (m: CrmChatMessage) => (m.media ? { ...m, media: { ...m.media, url: url(m) } } : m);
+  const shownMsgs = c.messages.filter(m => !data.hiddenMessages.includes(m.id)).map(withUrl);
+  const gallery = galleryOf(shownMsgs), al = albumsOf(shownMsgs);
   return its.map(it => { const d = dayLabel(it.at, now), day = d !== prev ? d : ""; prev = d;
     if (it.sys) return { day, sys: it.sys, bell: it.sys.includes("a reminder to reply"), inn: false, out: false, text: "", time: "", tick: "", hasTick: false, media: "", mediaHref: "", ...NO_MEDIA, failed: false, ev: null };
     const m = it.m!, mine = m.from === "me";
@@ -51,8 +53,10 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
       bg: card.kind === "Cancelled" ? "#F5EBE3" : "#FFF0E4", fg: card.kind === "Cancelled" ? "#806B60" : "#BD4A19", deco: card.kind === "Cancelled" ? "line-through" : "none",
       go: () => patch({ tab: "calendar", pane: "closed", calView: "month" }),
     } : null;
-    return { day, sys: "", bell: false, inn: !mine, out: mine, text: m.card || mk === "file" ? "" : m.text ?? "", time: time(m.at), tick: m.status === "read" ? "#3B8FD9" : "#A8968B", hasTick: mine && m.status !== "failed",
-      media: "", mediaHref: "", ...mediaOf(m.media ? { id: m.id, media: { ...m.media, url: url(m) } } : m, gallery), failed: m.status === "failed", ev };
+    // An album's other photos are drawn in its first message (shared/chat-media.ts › albumsOf).
+    const hide = al.hidden.has(m.id);
+    return { day: hide ? "" : day, sys: "", bell: false, inn: !mine && !hide, out: mine && !hide, text: m.card || mk === "file" ? "" : m.text ?? "", time: time(m.at), tick: m.status === "read" ? "#3B8FD9" : "#A8968B", hasTick: mine && m.status !== "failed",
+      media: "", mediaHref: "", ...mediaOf(withUrl(m), gallery, al.lead.get(m.id)), failed: m.status === "failed", ev };
   });
 }
 
