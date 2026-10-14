@@ -10,13 +10,15 @@ import { DEFAULT_LABELS, LABEL_SWATCHES, type CrmCustomer, type CrmLabel } from 
 import { BORDER, CHANNEL, dayLabel, firstName, ini, INK, isCold, lastChat, lastReal, STATUS_LABEL, stop, timeLabel, urgencyOf, type PEvent, type SalesCtx } from "./common";
 import type { InboxFilter } from "../ui";
 import { isNewChat } from "../../shared/new-chat";
+import { mediaWord } from "../../shared/chat-media";
 
 /** One row's preview: a card we sent reads as what it was; ours start "You: ". */
 export function previewOf(c: CrmCustomer): string {
   const m = lastReal(c);
   if (!m) return "";
   if (m.card) return `You: ${m.card.kind === "Reminder" ? "Reminder" : "Calendar invite"} · ${dayLabel(new Date(m.card.start))}, ${timeLabel(new Date(m.card.start))}`;
-  return (m.from === "me" ? "You: " : "") + m.text.replace(/\*([^*\n]+)\*/g, "$1");
+  // A photo, video, voice note or file with no words is named (it read "You:" and nothing, 2026-10-14).
+  return (m.from === "me" ? "You: " : "") + (m.text ? m.text.replace(/\*([^*\n]+)\*/g, "$1") : m.media ? mediaWord(m) : "");
 }
 
 /** The time of the newest message (customer's or ours) — the Inbox's order. */

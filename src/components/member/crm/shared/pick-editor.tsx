@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { CHAT_EMOJIS } from "./emoji";
 import { clampCrop, drawBase, FULL, noEdits, renderEdited, turnedSize, type Label, type PhotoEdits, type Rect, type Stroke } from "./edit-render";
 import { prepareImage } from "./image-prep";
-import type { PickedItem, PickVM } from "./pick";
+import { pickedOf, type PickedItem, type PickVM } from "./pick";
 import { STANDARD_VIDEO_MAX } from "./video-fit";
 import { saveToDevice } from "./viewer";
 
@@ -122,8 +122,12 @@ export function PickEditor({ pk }: { pk: PickVM }) {
       )}
       {mode !== "crop" && mode !== "text" && (
         <div style={{ flex: "none", position: "relative", zIndex: 3, padding: "8px 12px calc(var(--safe-bottom, 0px) + 10px)", display: "flex", flexDirection: "column", gap: "10px", background: "linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.6))" }}>
-          {p.items.length > 1 && (
+          {(
             <div style={{ display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", touchAction: "pan-x" }}>
+              {/* More photos or videos, ticked several at a time (the owner: "可以勾選多張圖片一起發送"). */}
+              <label aria-label="Add more" style={{ flex: "none", width: "52px", height: "52px", borderRadius: "8px", border: "2px dashed rgba(255,255,255,.5)", display: "grid", placeItems: "center", cursor: "pointer", fontSize: "26px", fontWeight: 300 }}>+
+                <input type="file" accept="image/*,video/*" multiple style={{ display: "none" }} onChange={e => { const fs = [...(e.target.files ?? [])]; e.target.value = ""; if (fs.length) set({ ...p, items: [...p.items, ...pickedOf(fs).items], at: p.items.length }); }} />
+              </label>
               {p.items.map((x, i) => (
                 <button key={x.url} type="button" onClick={() => set({ ...p, at: i })} aria-label={`Item ${i + 1}`} style={{ flex: "none", width: "52px", height: "52px", padding: 0, borderRadius: "8px", overflow: "hidden", border: i === at ? "2px solid #fff" : "2px solid transparent", background: "#222", cursor: "pointer" }}>
                   {x.video ? <video src={x.url} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <img src={x.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}

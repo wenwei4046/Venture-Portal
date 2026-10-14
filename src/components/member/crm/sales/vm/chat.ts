@@ -18,7 +18,7 @@ import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
-import { galleryOf, mediaOf, NO_MEDIA } from "../../shared/chat-media";
+import { albumsOf, galleryOf, mediaOf, NO_MEDIA } from "../../shared/chat-media";
 import { CHAT_WALL } from "../wall";
 
 const RUST = "#BD4A19", INK = "#3F2B22", SUB = "rgb(128 107 96)", BD = "#EBDDD2";
@@ -86,11 +86,12 @@ export function windowLeft(c: CrmCustomer, now: Date): string {
 
 /**
  * Why a message did not reach the customer, in words, under it (the owner, 2026-10-13: a video showed only a red tick).
- * WhatsApp's 131053 after a video = it could not take the video's format — an iPhone's High Efficiency (HEVC) video;
- * Messenger takes it, and an iPhone set to Most Compatible records one WhatsApp takes.
+ * WhatsApp's 131053 = Meta could not open the file. Opened, the ones refused on 2026-10-14 were an iPhone .mov (WhatsApp
+ * refuses the QuickTime box), a converted video that had lost its picture, and an iPhone voice recording (a fragmented
+ * MP4) — each is now made into what WhatsApp takes before it goes (shared/video-fit.ts), so one sent before says so.
  */
 export function failNote(error: string | null | undefined): string {
-  if (error && /131053/.test(error)) return "Not delivered · WhatsApp cannot take this video's format. On iPhone: Settings › Camera › Formats › Most Compatible, then record again.";
+  if (error && /131053/.test(error)) return "Not delivered · WhatsApp could not open this file. Send it again — videos and voice notes are now made ready for WhatsApp first.";
   return error ? `Not delivered · ${error}` : "Not delivered";
 }
 
@@ -120,7 +121,8 @@ export function chatVM(ctx: SalesCtx) {
     ...c.messages.filter(m => !hidden.has(m.id)).map(m => ({ kind: "msg" as const, m })),
     ...systemLines(ctx, c).map(s => ({ kind: "sys" as const, ...s })),
   ].sort((a, b) => (a.kind === "msg" ? a.m.at : a.at).localeCompare(b.kind === "msg" ? b.m.at : b.at));
-  const gallery = galleryOf(items.flatMap(it => (it.kind === "msg" ? [it.m] : [])));
+  const shownMsgs = items.flatMap(it => (it.kind === "msg" ? [it.m] : []));
+  const gallery = galleryOf(shownMsgs), al = albumsOf(shownMsgs);
   const msgs3b = items.map((it, k, arr) => {
     const at = it.kind === "msg" ? it.m.at : it.at, prevAt = k ? (arr[k - 1].kind === "msg" ? (arr[k - 1] as { m: CrmChatMessage }).m.at : (arr[k - 1] as { at: string }).at) : null;
     const sep = !prevAt || new Date(at).toDateString() !== new Date(prevAt).toDateString() ? daySep(at, now) : "";
@@ -140,7 +142,8 @@ export function chatVM(ctx: SalesCtx) {
     // "Sent by": a reply from someone other than the customer's own person.
     const by = mine && m.by && m.by !== c.assignedTo && !m.auto ? nameOf(m.by) : m.auto ? "Auto-reply" : "";
     return {
-      sep, plain: true, align: mine ? "flex-end" : "flex-start", max: "80%", rowDir: mine ? ("row-reverse" as const) : ("row" as const), rxGap: m.myReaction ? "14px" : "0",
+      // An album's other photos are drawn in its first message (shared/chat-media.ts › albumsOf).
+      sep, plain: !al.hidden.has(key), align: mine ? "flex-end" : "flex-start", max: "80%", rowDir: mine ? ("row-reverse" as const) : ("row" as const), rxGap: m.myReaction ? "14px" : "0",
       radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px", bg: mine ? MINE : "#fff", borderStyle: "solid", border: mine ? MINE : "#fff",
       textAlign: "left" as const, fg: INK, quote: q ? { who: q.from === "me" ? "You" : c.name, text: plain(q.text) } : null,
       ev: card && cd ? {
@@ -151,7 +154,7 @@ export function chatVM(ctx: SalesCtx) {
         go: () => set(u => ({ ...u, chat: null, tab: "calendar", calView: "month", calSel: day0(cd), calYM: [cd.getFullYear(), cd.getMonth()], hist: [...u.hist, u.tab].slice(-20) })),
       } : null,
       // A document is its tile (name and type), never its name again under it (2026-10-14).
-      ...mediaOf(m, gallery),
+      ...mediaOf(m, gallery, al.lead.get(key)),
       pDisp: card || mk === "file" || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: "14px", textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : mk === "file" ? "📄 " + m.text : m.text),
       timeJustify: "flex-end", timeColor: mine ? "#806B60" : SUB, by, at: msgTime(m.at),
       failNote: mine && m.status === "failed" ? failNote(m.error) : "",

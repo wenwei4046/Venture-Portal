@@ -7,6 +7,7 @@ import type { CrmCustomer, CrmPerson, CrmVisit } from "@/lib/member/crm-data";
 import { STATUS_LABEL, isCold, lastChat, lastReal, urgencyOf } from "../../sales/vm/common";
 import { DIRECTOR_TEAM, teamColours } from "./tokens";
 import type { DeskCtx } from "./ctx";
+import { mediaWord } from "../../shared/chat-media";
 
 export const initials = (name: string) => name.trim().split(/\s+/).map(w => w[0] ?? "").join("").slice(0, 2).toUpperCase() || "?";
 export const first = (name: string) => name.trim().split(/\s+/)[0] ?? name;
@@ -42,7 +43,7 @@ export function chatRows(ctx: DeskCtx): ChatRow[] {
       : cold ? "Cold" : (STATUS_LABEL[c.status] as ChatRow["key"]);
     return {
       id: c.id, c, ini: initials(c.name), name: c.name, time: last ? lastChat(last.at, now) : lastChat(c.createdAt, now), ad: c.ad,
-      msg: last ? (last.from === "me" ? "You: " : "") + (last.text || "Attachment") : "",
+      msg: last ? (last.from === "me" ? "You: " : "") + (last.text || mediaWord(last)) : "",
       owner, ownerId: c.assignedTo, teamId: c.teamId, team,
       status: u.level !== "none" ? u.label : cold ? "Cold" : STATUS_LABEL[c.status], key,
       last: new Date(last?.at ?? c.createdAt).getTime(),
