@@ -1,0 +1,396 @@
+[
+ {
+  "id": "i01-chat-more",
+  "base": "1a",
+  "steps": [
+   [
+    "sel",
+    "[title=\"More\"]"
+   ]
+  ]
+ },
+ {
+  "id": "i02-attach",
+  "base": "1a",
+  "steps": [
+   [
+    "sel",
+    "[title=\"Attach\"]"
+   ]
+  ]
+ },
+ {
+  "id": "i03-msg-hover",
+  "base": "1a",
+  "steps": [
+   [
+    "hover",
+    "Boleh tengok katil di showroom?",
+    0
+   ]
+  ]
+ },
+ {
+  "id": "i04-msg-menu",
+  "base": "1a",
+  "steps": [
+   [
+    "has",
+    "Boleh tengok katil di showroom?",
+    -1
+   ],
+   [
+    "sel",
+    "[title=\"Message options\"]"
+   ]
+  ]
+ },
+ {
+  "id": "i06-row-hover",
+  "base": "1b",
+  "steps": [
+   [
+    "hover",
+    "Lim Wei Jie"
+   ]
+  ]
+ },
+ {
+  "id": "i07-alerts",
+  "base": "3a",
+  "steps": [
+   [
+    "click",
+    "CRM alerts"
+   ]
+  ]
+ },
+ {
+  "id": "i08-range",
+  "base": "3a",
+  "steps": [
+   [
+    "click",
+    "This month"
+   ]
+  ]
+ },
+ {
+  "id": "i09-nav-hover",
+  "base": "3a",
+  "steps": [
+   [
+    "hover",
+    "Contacts"
+   ]
+  ]
+ },
+ {
+  "id": "i10-collapse",
+  "base": "3a",
+  "steps": [
+   [
+    "sel",
+    "[title=\"Collapse sidebar\"]"
+   ]
+  ]
+ },
+ {
+  "id": "i11-me-menu",
+  "base": "3a",
+  "steps": [
+   [
+    "sel",
+    "[title=\"Profile\"]"
+   ]
+  ]
+ },
+ {
+  "id": "i12-ppl-filter",
+  "base": "6h",
+  "steps": [
+   [
+    "click",
+    "Property type"
+   ]
+  ]
+ },
+ {
+  "id": "i13-ppl-chart",
+  "base": "6h",
+  "steps": [
+   [
+    "click",
+    "Budget",
+    -1
+   ]
+  ]
+ },
+ {
+  "id": "i14-ppl-addcol",
+  "base": "6h",
+  "steps": [
+   [
+    "sel",
+    "[title=\"Add a column from Customer info\"]"
+   ]
+  ]
+ },
+ {
+  "id": "i15-ch-fb",
+  "base": "6j",
+  "steps": [
+   [
+    "click",
+    "Facebook Page"
+   ]
+  ]
+ },
+ {
+  "id": "i16-ch-msgr",
+  "base": "6j",
+  "steps": [
+   [
+    "click",
+    "Messenger"
+   ]
+  ]
+ },
+ {
+  "id": "i17-ch-wa",
+  "base": "6j",
+  "steps": [
+   [
+    "click",
+    "WhatsApp"
+   ]
+  ]
+ },
+ {
+  "id": "i18-ch-tpl",
+  "base": "6j",
+  "steps": [
+   [
+    "click",
+    "Templates"
+   ]
+  ]
+ },
+ {
+  "id": "i19-ch-ads",
+  "base": "6j",
+  "steps": [
+   [
+    "click",
+    "Ads"
+   ]
+  ]
+ },
+ {
+  "id": "i20-ch-unlink",
+  "base": "6j",
+  "steps": [
+   [
+    "click",
+    "Unlink",
+    0
+   ]
+  ]
+ },
+ {
+  "id": "i21-ch-addnum",
+  "base": "6j",
+  "steps": [
+   [
+    "click",
+    "Add a number"
+   ]
+  ]
+ },
+ {
+  "id": "i22-ad-byteam",
+  "base": "6a",
+  "steps": [
+   [
+    "click",
+    "By team"
+   ]
+  ]
+ },
+ {
+  "id": "i23-ad-log",
+  "base": "6c",
+  "steps": [
+   [
+    "sel",
+    "[title=\"Open audit log\"]"
+   ]
+  ]
+ },
+ {
+  "id": "i24-ad-status",
+  "base": "6d",
+  "steps": [
+   [
+    "sel",
+    "[title=\"Open audit log\"]"
+   ]
+  ]
+ },
+ {
+  "id": "i25-ft-setup",
+  "base": "6f",
+  "steps": [
+   [
+    "click",
+    "Set up",
+    -1
+   ]
+  ]
+ },
+ {
+  "id": "i26-mwt-toggle",
+  "base": "6e",
+  "steps": [
+   [
+    "click",
+    "Kelvin Lee"
+   ]
+  ]
+ },
+ {
+  "id": "i27-form-field",
+  "base": "6i",
+  "steps": [
+   [
+    "has",
+    "New, Follow up",
+    0
+   ]
+  ]
+ },
+ {
+  "id": "i28-audit-cat",
+  "base": "6g",
+  "steps": [
+   [
+    "has",
+    "Marketing",
+    0
+   ]
+  ]
+ },
+ {
+  "id": "i29-cp-open",
+  "base": "4a",
+  "steps": [
+   [
+    "sel",
+    "[title=\"Open chat progress\"]"
+   ]
+  ]
+ },
+ {
+  "id": "i30-sort",
+  "base": "6h",
+  "steps": [
+   [
+    "sel",
+    "[title=\"Sort\"]"
+   ]
+  ]
+ },
+ {
+  "id": "i05-everyone",
+  "base": "1b",
+  "steps": [
+   [
+    "click",
+    "35 chats"
+   ]
+  ]
+ },
+ {
+  "id": "i31-audit-who",
+  "base": "6g",
+  "steps": [
+   [
+    "click",
+    "Kelvin Lee",
+    0
+   ]
+  ]
+ },
+ {
+  "id": "i32-audit-range",
+  "base": "6g",
+  "steps": [
+   [
+    "click",
+    "This month"
+   ]
+  ]
+ },
+ {
+  "id": "i33-form-desktop",
+  "base": "6i",
+  "steps": [
+   [
+    "click",
+    "Desktop"
+   ]
+  ]
+ },
+ {
+  "id": "i34-form-addfield",
+  "base": "6i",
+  "steps": [
+   [
+    "click",
+    "Add field",
+    0
+   ]
+  ]
+ },
+ {
+  "id": "i35-form-type",
+  "base": "6i",
+  "steps": [
+   [
+    "click",
+    "Short text",
+    0
+   ]
+  ]
+ },
+ {
+  "id": "i36-ppl-row",
+  "base": "6h",
+  "steps": [
+   [
+    "hover",
+    "Lim Wei Jie"
+   ]
+  ]
+ },
+ {
+  "id": "i37-ad-hover",
+  "base": "6d",
+  "steps": [
+   [
+    "hover",
+    "Bedframe Bundle · Reels"
+   ]
+  ]
+ },
+ {
+  "id": "i38-fair-view",
+  "base": "3a",
+  "steps": [
+   [
+    "click",
+    "Fair view"
+   ]
+  ]
+ }
+]

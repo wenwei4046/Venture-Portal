@@ -150,6 +150,7 @@ chGreet
 chGreetHint
 chGroups
 chHasSave
+chHookC
 chHookLine
 chHookUrl
 chHours
@@ -164,6 +165,7 @@ chMsgr
 chNewF
 chNewOpen
 chNewToggle
+chNote
 chOpenPage
 chOpenWaManager
 chPage
@@ -173,7 +175,6 @@ chPageName
 chPerms
 chReconnect
 chRefresh
-chRo
 chSave
 chSaveBg
 chTabs

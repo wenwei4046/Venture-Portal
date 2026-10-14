@@ -122,7 +122,7 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
   const choices = view === "quick" ? data.quickReplies.map(q => ({ label: q.shortcut ? `/${q.shortcut}` : q.message.slice(0, 24), text: q.message }))
     : view === "auto" ? autoChoices(data.autoReplies) : [];
   const attachOpts = view ? [
-    { label: "‹ Back", bg: "#806B60", d: "M15 18l-6-6 6-6", sep: false, pick: () => patch({ attachView: "" }) },
+    { label: "Back", bg: "#806B60", d: "M15 18l-6-6 6-6", sep: false, pick: () => patch({ attachView: "" }) },
     ...(choices.length ? choices.map((x, i) => ({ label: x.label, bg: view === "quick" ? "#A46312" : "#387557", d: view === "quick" ? ATTACH_TILES[3][2] : ATTACH_TILES[4][2], sep: i === 0,
       pick: () => { setD(x.text); patch({ attachOpen: false, attachView: "" }); } }))
       : [{ label: view === "quick" ? "No quick replies yet" : "No auto replies yet", bg: "#A08E82", d: ATTACH_TILES[view === "quick" ? 3 : 4][2], sep: true, pick: () => {} }]),

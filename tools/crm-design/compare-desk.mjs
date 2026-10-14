@@ -25,13 +25,24 @@ mkdirSync(out, { recursive: true });
 const repo = resolve(import.meta.dirname, "../..");
 const protoDir = join(repo, "docs/design_handoff_crm_desktop_v2/prototypes");
 const canvas = readFileSync(join(protoDir, "CRM Desktop rev 1.dc.html"), "utf8");
-const frames = [...canvas.matchAll(/<div id="([0-9a-z]+)"[\s\S]*?(<dc-import [^>]*>)/g)].map(m => {
+const allFrames = [...canvas.matchAll(/<div id="([0-9a-z]+)"[\s\S]*?(<dc-import [^>]*>)/g)].map(m => {
   const props = Object.fromEntries([...m[2].matchAll(/([a-z-]+)="([^"]*)"/g)].map(x => [x[1], x[2]]).filter(([k]) => k !== "name" && k !== "hint-size")
     .map(([k, v]) => [k, v === "{{ true }}" ? "true" : v === "{{ false }}" ? "false" : v]));
   // v2 (2026-10-15): every frame is drawn by CrmFrame v2 — the canvas still names rev 1's for Steps 1–4, whose pages v2
   // keeps. The salesperson's desktop (variant rs) is not built.
   return { id: m[1], tag: m[2].replace(/name="CrmFrame"/, 'name="CrmFrame v2"'), props, w: Number(props.w ?? 1440) };
-}).filter(f => f.props.variant !== "rs").filter(f => !only || only.split(",").includes(f.id));
+}).filter(f => f.props.variant !== "rs")
+  // v2 is drawn at 1440 × 900 and 1280 × 800 (README): ALSO1280=1 draws every 1440 frame again at 1280, as "<id>w".
+  .flatMap(f => process.env.ALSO1280 && f.w === 1440
+    ? [f, { id: `${f.id}w`, tag: f.tag.replace(/w="1440"/, 'w="1280"'), props: { ...f.props, w: "1280" }, w: 1280 }] : [f]);
+const frames = allFrames.filter(f => !only || only.split(",").includes(f.id));
+// SCENES=<file.json>: interaction states — [{ id, base: "<frame id>", steps: [["click"|"hover", "exact text", nth?] | ["sel", "css"] | ["wait", ms]] }],
+// each played with real mouse events on the prototype and on the app alike, then compared as a frame.
+if (process.env.SCENES) {
+  const byId = Object.fromEntries(allFrames.map(f => [f.id, f]));
+  frames.length = 0;
+  for (const sc of JSON.parse(readFileSync(process.env.SCENES, "utf8"))) { const b = byId[sc.base]; if (!b) { console.error("no frame", sc.base); continue; } if (!only || only.split(",").includes(sc.id)) { frames.push({ ...b, id: sc.id, steps: sc.steps }); if (process.env.ALSO1280 && b.w === 1440) frames.push({ id: `${sc.id}w`, tag: b.tag.replace(/w="1440"/, 'w="1280"'), props: { ...b.props, w: "1280" }, w: 1280, steps: sc.steps }); } }
+}
 
 // The prototype, one page per frame: the canvas's own <dc-import>, on the canvas's ground.
 const harness = mkdtempSync(join(tmpdir(), "crm-proto-"));
@@ -54,13 +65,26 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 let ws, id = 0; const wait = new Map();
 const send = (method, params = {}) => new Promise(r => { const i = ++id; wait.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
 const js = async e => (await send("Runtime.evaluate", { expression: e, awaitPromise: true, returnByValue: true })).result?.result?.value;
-async function shot(url, w, h, ready) {
+const center = q => js(`(() => { ${q}; if (!el) return null; el.scrollIntoView({ block: "nearest" }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+const find = (t, nth = -1) => `const all = [...document.body.querySelectorAll("*")].filter(e => e.offsetParent !== null && e.children.length < 12 && (e.innerText || "").trim() === ${JSON.stringify(t)}); const el = all.at(${nth})`;
+async function play(steps = []) {
+  for (const [k, a, n] of steps) {
+    if (k === "wait") { await sleep(a); continue; }
+    const c = await center(k === "has" ? `const all = [...document.body.querySelectorAll("*")].filter(e => e.offsetParent !== null && (e.innerText || "").includes(${JSON.stringify(a)}) && ![...e.children].some(x => (x.innerText || "").includes(${JSON.stringify(a)}))); const el = all.at(${n ?? 0})` : k === "sel" ? `const el = document.querySelector(${JSON.stringify(a)})` : find(a, n ?? -1));
+    if (!c) { console.log("  step not found:", k, a); continue; }
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: c.x, y: c.y });
+    if (k !== "hover") { await send("Input.dispatchMouseEvent", { type: "mousePressed", x: c.x, y: c.y, button: "left", clickCount: 1 }); await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: c.x, y: c.y, button: "left", clickCount: 1 }); }
+    await sleep(700);
+  }
+}
+async function shot(url, w, h, ready, steps) {
   await send("Emulation.setDeviceMetricsOverride", { width: w + 80, height: h + 80, deviceScaleFactor: 1, mobile: false });
   // v2 keeps its place in localStorage (refresh returns to it), keyed by the frame's props: each shot starts clean.
   await send("Storage.clearDataForOrigin", { origin: new URL(url).origin, storageTypes: "local_storage,session_storage" });
   await send("Page.navigate", { url });
   for (let i = 0; i < 80; i++) { await sleep(250); if (await js(ready)) break; }
   await js("document.fonts.ready.then(() => true)"); await sleep(800);
+  await play(steps);
   const r = await send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width: w, height: h, scale: 1 } });
   return r.result.data;
 }
@@ -86,9 +110,9 @@ try {
   await send("Page.enable"); await send("Runtime.enable");
   for (const f of frames) {
     const h = f.w === 1440 ? 900 : 800;
-    const proto = await shot(`http://localhost:3410/${f.id}.html`, f.w, h, "!!document.querySelector('aside, header')");
+    const proto = await shot(`http://localhost:3410/${f.id}.html`, f.w, h, "!!document.querySelector('aside, header')", f.steps);
     const q = new URLSearchParams({ app: APP, ...f.props }).toString();
-    const app = await shot(`${process.env.CRM_BASE ?? "http://localhost:3000"}/member/preview?${q}`, f.w, h, "!!document.querySelector('aside, header')");
+    const app = await shot(`${process.env.CRM_BASE ?? "http://localhost:3000"}/member/preview?${q}`, f.w, h, "!!document.querySelector('aside, header')", f.steps);
     writeFileSync(join(out, `${f.id}-proto.png`), Buffer.from(proto, "base64"));
     writeFileSync(join(out, `${f.id}-app.png`), Buffer.from(app, "base64"));
     await send("Page.navigate", { url: "about:blank" }); await sleep(200);

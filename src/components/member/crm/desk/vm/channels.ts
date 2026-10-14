@@ -23,7 +23,7 @@ const ago = (iso: string | null, now: Date) => { if (!iso) return null; const m 
   return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.floor(m / 60)} h ago` : `${Math.floor(m / 1440)} d ago`; };
 const spaced = (id: string) => id.replace(/(\d{4})(?=\d)/g, "$1 ");
 
-export interface MetaState { data: MetaChannels | null; loading: boolean; error: string; reload(): void }
+export interface MetaState { data: MetaChannels | null; loading: boolean; error: string; reload(): void; /** This site, set after the first paint. */ origin: string }
 
 export function channelsVM(ctx: DeskCtx) {
   const { ui, set, patch, data, now, meta } = ctx;
@@ -146,7 +146,9 @@ export function channelsVM(ctx: DeskCtx) {
   return {
     kCh: ui.tab === "channels",
     chTabs: TABS.map(([k, label]) => ({ label, on: k === tab, off: k !== tab, dot: ui.chDirty[k] ? "#A46312" : "transparent", pick: () => patch({ chTab: k, chNew: null, chNewOpen: false }) })),
-    chCan: can, chRo: !can, chConn: tab === "conn", chPage: tab === "page", chMsgr: tab === "msgr", chWa: tab === "wa", chTpl: tab === "tpl", chAds: tab === "ads", chHasSave: tab !== "conn" && tab !== "tpl",
+    chCan: can, chRo: !can,
+    // The banner: Meta's state first (read, or why not), then read-only — the states the design did not draw.
+    chNote: meta.error && !M ? `Could not read Meta: ${meta.error}. Try again from Refresh.` : meta.loading && !M ? "Reading Channels from Meta…" : !can ? "Only Principal and Director can change these. You can look." : "", chConn: tab === "conn", chPage: tab === "page", chMsgr: tab === "msgr", chWa: tab === "wa", chTpl: tab === "tpl", chAds: tab === "ads", chHasSave: tab !== "conn" && tab !== "tpl",
     chDirtyNow: dirty, chSave: save, chSaveBg: dirty && can ? "#BD4A19" : "#E2CFC1",
     chDiscard: () => set(u => ({ ...u, chDraft: Object.fromEntries(Object.entries(u.chDraft).filter(([k]) => !keysOf(u.chTab, k))), chDirty: { ...u.chDirty, [u.chTab]: false } })),
     chGroups, chDlgOpen: !!dlg, chDlg, chDlgClose: () => patch({ chDlg: null }),
@@ -154,8 +156,8 @@ export function channelsVM(ctx: DeskCtx) {
     chTestHook: () => { meta.reload(); toast(M?.lastEvent ? `Last event ${ago(M.lastEvent, now)}` : "No event received yet"); },
     chTokenLine: M ? (M.set.token ? "System user token · kept on the server" : "System user token · not set on this server") : meta.loading ? "Reading Meta…" : meta.error || "—",
     chTokenMask: M?.set.token ? "•••••••••••••••• (never shown)" : "—",
-    chHookLine: M?.lastEvent ? `Receiving · last event ${ago(M.lastEvent, now)}` : "No event received yet",
-    chHookUrl: typeof window !== "undefined" ? `${window.location.origin}/api/{whatsapp,messenger}/v1/webhook` : "/api/{whatsapp,messenger}/v1/webhook",
+    chHookLine: M?.lastEvent ? `Receiving · last event ${ago(M.lastEvent, now)}` : "No event received yet", chHookC: M?.lastEvent ? "#387557" : "#A08E82",
+    chHookUrl: `${meta.origin}/api/{whatsapp,messenger}/v1/webhook`,
     chReconnect: () => open(META_SUITE), chOpenPage: () => open(page ? `https://www.facebook.com/${page.id}` : META_SUITE), chOpenWaManager: () => open(WA_MANAGER),
     chPerms: ([["Manage the Page", "pages_manage_metadata"], ["Send and read messages", "pages_messaging"], ["WhatsApp profile and templates", "whatsapp_business_management"], ["Pause ads and change budgets", "ads_management"]] as const)
       .map(([t, code]) => { const st = M?.perms?.find(p => p.permission === code)?.status; const ok = st === "granted";

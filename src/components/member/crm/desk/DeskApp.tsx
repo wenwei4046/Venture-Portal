@@ -2935,8 +2935,8 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                         </svg></a>
                     </span>
                   </div>
-                  {!!(v.chRo) && (<>
-                    <div style={{ padding: "10px 14px", borderRadius: "10px", background: "#FBF6F2", fontSize: "13px", color: "#806B60" }}>Only Principal and Director can change these. You can look.</div>
+                  {!!(v.chNote) && (<>
+                    <div style={{ padding: "10px 14px", borderRadius: "10px", background: "#FBF6F2", fontSize: "13px", color: "#806B60" }}>{v.chNote}</div>
                   </>)}
                   {!!(v.chHasSave) && (<>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "-6px" }}>
@@ -3001,7 +3001,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                           <strong style={{ flex: "1", fontSize: "14px", fontWeight: "650" }}>Webhook</strong>
                           <button type="button" onClick={v.chTestHook} style={{ height: "30px", padding: "0 12px", borderRadius: "15px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#3F2B22", cursor: "pointer", whiteSpace: "nowrap" }}>Send test</button>
                         </div>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "#387557", fontWeight: "650" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#387557" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: v.chHookC, fontWeight: "650" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.chHookC }}>
                           </span>{v.chHookLine}</span>
                         <span style={{ fontSize: "12px", color: "#A08E82", fontFamily: "ui-monospace, monospace" }}>{v.chHookUrl}</span>
                       </div>

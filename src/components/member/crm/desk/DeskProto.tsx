@@ -22,7 +22,7 @@ const PROTO_FRAME = {
   frameRadius: "14px", frameShadow: "0 1px 2px rgba(63,43,34,.08), 0 12px 40px rgba(63,43,34,.10)",
   greetWord: "Good morning", subLabel: "Fair view", subCur: "auto", dateLine: "Sat 3 Oct 2026 · Q4 2026", appBellDot: true,
   openSubDept: noop, openAppBell: noop, signOut: noop, signOutMe: noop, alertsN: "7", alertsHas: true,
-  chTokenLine: "System user token · renews in 42 days", chTokenMask: "EAAG••••••••••••••••3fQ", chHookLine: "Receiving · last event 2 min ago", chHookUrl: "https://crm.houzs.my/api/meta/webhook",
+  chTokenLine: "System user token · renews in 42 days", chTokenMask: "EAAG••••••••••••••••3fQ", chHookLine: "Receiving · last event 2 min ago", chHookC: "#387557", chHookUrl: "https://crm.houzs.my/api/meta/webhook",
   chReconnect: noop, chOpenPage: noop, chOpenWaManager: noop, chPageIni: "H", chPageName: "HOUZS Venture", waIni: "H", chMonth: "OCT", metaSync: "Synced from Meta Ads · 9:00 am", metaDot: "#3FA06B",
 };
 const MIC = "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0m7 7v3";
@@ -85,7 +85,7 @@ function ProtoFrame({ props }: { props: ProtoProps }) {
   });
   useLayoutEffect(() => () => c.componentWillUnmount(), [c]);
   const p = { ...P, ...c.renderVals() } as Record<string, unknown>;
-  const v = { ...p, ...PROTO_FRAME, ...protoChats(p) } as unknown as DeskVM;
+  const v = { ...p, ...PROTO_FRAME, ...protoChats(p), chNote: p.chRo ? "Only Principal and Director can change these. You can look." : "" } as unknown as DeskVM;
   // data-revenue-app: where the desktop always sits (inside the Revenue app), so the portal's display serif stays off.
   return <div className={R.root} data-revenue-app=""><DeskApp v={v} /></div>;
 }

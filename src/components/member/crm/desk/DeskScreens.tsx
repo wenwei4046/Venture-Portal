@@ -193,7 +193,9 @@ export default function DeskScreens(p: DeskScreensProps) {
     void fetchCrmChannels().then(r => { if (!current) return; if (r.ok) { setMetaData(r.data); setMetaErr(""); } else setMetaErr(r.error); });
     return () => { current = false; };
   }, [onChannels, live, metaN]);
-  const meta = useMemo(() => ({ data: metaData, loading: onChannels && !metaData && !metaErr, error: metaErr, reload: () => setMetaN(n => n + 1) }), [metaData, onChannels, metaErr]);
+  const [origin, setOrigin] = useState("");
+  useEffect(() => { setOrigin(window.location.origin); }, []);
+  const meta = useMemo(() => ({ data: metaData, loading: onChannels && !metaData && !metaErr, error: metaErr, reload: () => setMetaN(n => n + 1), origin }), [metaData, onChannels, metaErr, origin]);
 
   const ctx = {
     data, me: p.me, now: p.now, live, ui, set: setUi, patch, act, deskAct, teams: p.teams, directors: p.directors, nameOf: p.nameOf,
