@@ -47,6 +47,45 @@ export function keepImage(url: string) {
   void fetch(url, { credentials: "same-origin" }).then(r => (r.ok ? r.blob() : null)).then(b => { if (b && b.type.startsWith("image/")) void write(key, b); }).catch(() => {});
 }
 
+/**
+ * Photos fetched BEFORE anybody opens their chat (the owner, 2026-10-14: a customer's last photo "點進去會空白幾秒，才顯出
+ * 畫面"): a customer's WhatsApp photo is fetched from Meta through our route the first time it is shown, which takes
+ * seconds; now, as each read lands, every chat's newest photos not yet on the phone are fetched quietly in the
+ * background, two at a time, and kept — so opening the chat draws them from the phone at once. Each address is tried
+ * once a session (`tried`), so the 5 s re-reads add only what is new.
+ */
+const tried = new Set<string>();
+let queue: string[] = [], running = 0;
+function pump() {
+  while (running < 2 && queue.length) {
+    const key = queue.shift()!;
+    running++;
+    void read(key)
+      .then(hit => (hit ? null : fetch(key, { credentials: "same-origin" }).then(r => (r.ok ? r.blob() : null))))
+      .then(b => { if (b && b.type.startsWith("image/")) return write(key, b); })
+      .catch(() => {})
+      .finally(() => { running--; pump(); });
+  }
+}
+/** The newest photos to fetch ahead: per chat its last `perChat`, the newest chats first, `max` at most. */
+export function photosAhead(chats: { lastCustomerAt?: string | null; messages: { media?: { kind: string; url: string } | null }[] }[], perChat = 4, max = 40): string[] {
+  const out: string[] = [];
+  const byNew = [...chats].sort((a, b) => (b.lastCustomerAt ?? "").localeCompare(a.lastCustomerAt ?? ""));
+  for (const c of byNew) {
+    const urls = c.messages.filter(m => m.media?.kind === "image").slice(-perChat).map(m => keyOf(m.media!.url)).filter(keepable);
+    for (const u of urls.reverse()) { if (out.length >= max) return out; out.push(u); }
+  }
+  return out;
+}
+export function warmPhotos(urls: string[]) {
+  if (!ok()) return;
+  const fresh = urls.filter(u => !tried.has(u) && !mem.has(u));
+  fresh.forEach(u => tried.add(u));
+  if (!fresh.length) return;
+  queue = [...fresh, ...queue];
+  pump();
+}
+
 /** Keeps a video's first frame, drawn from the playing element (a CDN that refuses CORS leaves nothing kept). */
 export function keepPoster(url: string, video: HTMLVideoElement) {
   const key = keyOf(url) + "#poster";
@@ -84,7 +123,7 @@ export function useKeptSrc(url: string, poster = false): { src: string | null; k
 /** /login forgets the kept media with every other kept read. */
 export async function forgetMedia() {
   mem.forEach(u => URL.revokeObjectURL(u));
-  mem.clear();
+  mem.clear(); tried.clear(); queue = [];
   try { if (ok()) await caches.delete(NAME); } catch { /* nothing kept */ }
 }
 

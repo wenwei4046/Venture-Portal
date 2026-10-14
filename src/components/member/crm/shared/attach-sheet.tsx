@@ -12,6 +12,12 @@ import { createPortal } from "react-dom";
  * videos) · **Document** (files only — `DOC_ACCEPT` names no photo or video type, so the iPhone opens Files straight
  * away instead of offering Take Photo and Photo Library again).
  */
+/**
+ * Where the hidden Photos / Document pickers sit: invisible, just above the + button. The iPhone's own menu (Photo
+ * Library · Take Photo or Video · Choose Files) cannot be skipped by a web page, but it opens beside the picker — hidden
+ * with display: none it floated over the middle of the chat (the owner, 2026-10-14: "Photo 功能鍵會漂浮").
+ */
+export const PICKER_AT = { position: "fixed", left: "28px", bottom: "calc(var(--safe-bottom, 0px) + 64px)", width: "1px", height: "1px", opacity: 0, pointerEvents: "none" } as const;
 /** What Document picks: documents, never photos or videos (those are Camera's and Photos'). */
 export const DOC_ACCEPT = [
   ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".xlsm", ".ods", ".csv", ".ppt", ".pptx", ".odp", ".odt", ".rtf", ".txt", ".md",

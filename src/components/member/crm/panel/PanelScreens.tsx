@@ -12,7 +12,7 @@ import { panelAppVM } from "./vm/app";
 import type { PanelCtx } from "./vm/common";
 import { useFollowNewest } from "../shared/stick";
 import { useCloseOnOutside } from "../sales/outside";
-import { DOC_ACCEPT } from "../shared/attach-sheet";
+import { DOC_ACCEPT, PICKER_AT } from "../shared/attach-sheet";
 
 export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
   const { ui, set } = ctx;
@@ -38,9 +38,9 @@ export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
     <PanelApp v={v} />
     {/* The chat's + (a document) and camera (photos and videos, several at once) open these. */}
     {!!ui.lead && (<>
-      <input id="crm-panel-photo" type="file" accept="image/*,video/*" multiple onChange={v.ld.lx.pickVisual} style={{ display: "none" }} />
+      <input id="crm-panel-photo" type="file" accept="image/*,video/*" multiple onChange={v.ld.lx.pickVisual} style={PICKER_AT} tabIndex={-1} aria-hidden="true" />
       <input id="crm-panel-camera" type="file" accept="image/*,video/*" capture="environment" onChange={v.ld.lx.pickVisual} style={{ display: "none" }} />
-      <input id="crm-panel-file" type="file" accept={DOC_ACCEPT} multiple onChange={v.ld.lx.pickMedia} style={{ display: "none" }} />
+      <input id="crm-panel-file" type="file" accept={DOC_ACCEPT} multiple onChange={v.ld.lx.pickMedia} style={PICKER_AT} tabIndex={-1} aria-hidden="true" />
     </>)}
   </>);
 }
