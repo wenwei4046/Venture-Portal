@@ -58,7 +58,8 @@ const ABOVE = [
   '        <div style={{ flex: "none", maxHeight: "232px", overflowY: "auto", scrollbarWidth: "none", margin: "8px 12px 0", borderRadius: "16px", border: "1px solid #EBDDD2", background: "#fff", boxShadow: "0 6px 18px rgba(63,43,34,.10)" }}>',
   '          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px 4px" }}>',
   '            <span style={{ fontSize: "12px", fontWeight: "600", color: "#806B60" }}>Quick replies</span>',
-  '            <span onClick={p.qrEdit} style={{ fontSize: "13px", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }}>Edit</span>',
+  // Edit opens the chat's quick-replies page — Mine's; the Team side's chat has none (its composer passes no qrEdit).
+  '            {!!(p.qrEdit) && (<span onClick={p.qrEdit} style={{ fontSize: "13px", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }}>Edit</span>)}',
   '          </div>',
   '          {(p.slashList).map((q, q_i) => (<Fragment key={q_i}>',
   '            <div onClick={q.pick} style={{ display: "flex", flexDirection: "column", gap: "2px", padding: "10px 14px", borderTop: q.rule, cursor: "pointer" }} className={H.hov3}>',

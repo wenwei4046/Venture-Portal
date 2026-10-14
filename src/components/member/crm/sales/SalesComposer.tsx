@@ -28,7 +28,7 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
         <div style={{ flex: "none", maxHeight: "232px", overflowY: "auto", scrollbarWidth: "none", margin: "8px 12px 0", borderRadius: "16px", border: "1px solid #EBDDD2", background: "#fff", boxShadow: "0 6px 18px rgba(63,43,34,.10)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px 4px" }}>
             <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", color: "#806B60" }}>Quick replies</span>
-            <span onClick={p.qrEdit} style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }}>Edit</span>
+            {!!(p.qrEdit) && (<span onClick={p.qrEdit} style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }}>Edit</span>)}
           </div>
           {(p.slashList).map((q, q_i) => (<Fragment key={q_i}>
             <div onClick={q.pick} style={{ display: "flex", flexDirection: "column", gap: "2px", padding: "10px 14px", borderTop: q.rule, cursor: "pointer" }} className={H.hov3}>

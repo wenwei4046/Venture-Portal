@@ -495,9 +495,10 @@ export function chatVM(ctx: SalesCtx) {
     voiceStop: send => void recStop(send),
     camera: () => document.getElementById("crm-pick-camera")?.click(),
     tile,
-    // One's recent emoji: picked ones show at once (ui.recents) and are kept on the server a moment later.
-    recents: ui.recents ?? data.recentEmoji ?? [],
-    saveRecents: list => { patch({ recents: list }); act.saveRecentEmoji(list); },
+    // One's recent emoji: picked ones show at once (CrmApp's list, the Team side's chat shares it) and are kept on the
+    // server a moment later.
+    recents: ctx.recents?.list ?? data.recentEmoji ?? [],
+    saveRecents: list => { ctx.recents?.keep(list); act.saveRecentEmoji(list); },
   };
   // Loading templates for a cold chat's button (also the ⋮ flow's).
   async function openTpl() { patch({ tpl: true }); if (c!.channel === "whatsapp" && ui.templates == null) { const t = await act.loadTemplates(); patch({ templates: t ?? [] }); } }

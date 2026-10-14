@@ -74,6 +74,9 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   // View as somebody who leads: their Team side (the Control panel as they see it), or null for their CRM.
   const [teamAs, setTeamAs] = useState<string | null>(null);
   const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});
+  // One's recent emoji in this visit, one list for Mine's chat and the Team side's (neither saves over the other's picks).
+  const [recentList, setRecentList] = useState<string[] | null>(null);
+  const recents = useMemo(() => ({ list: recentList, keep: setRecentList }), [recentList]);
   const refs = useRef<SalesRefs>({}).current;
   const dataRef = useRef<CrmData | null>(data);
   dataRef.current = data;
@@ -269,7 +272,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       // same page (the desktop).
       toMyCrm: panelFor.id !== me.id ? (tab?: SalesTab) => { setTeamAs(null); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab], chat: null, profSub: null })); }
         : sells ? (tab?: SalesTab) => { openCrmOf(me.id); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab] })); } : undefined,
-      exitApp: onExit, slotCounts,
+      exitApp: onExit, slotCounts, recents,
     };
     // On a computer, whoever holds View at All (the Principal and the Director — user 2026-10-12) gets the desktop
     // Control panel: CRM Desktop rev 1, built to its prototype (2026-10-13), on the same data and writes.
@@ -304,7 +307,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     .sort((a, b) => lastAt(b) - lastAt(a));
   const patch = (p: Partial<SalesUi>) => setUi(u => ({ ...u, ...p }));
   const ctx: SalesCtx = {
-    data, me, owner, viewingOther: owner.id !== me.id, now, live, ui, set: setUi, patch, act, refs, slotCounts, mine,
+    data, me, owner, viewingOther: owner.id !== me.id, now, live, ui, set: setUi, patch, act, refs, slotCounts, mine, recents,
     nameOf,
     embedded: {
       // The Director's own CRM carries Control panel | My CRM.

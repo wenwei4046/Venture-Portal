@@ -72,8 +72,6 @@ export interface SalesUi {
    *  (vm/composer.ts). Another chat's — or none — opens as new: a chat left any way (the Calendar, Assign, a switch)
    *  never hands its panel to the next. */
   cmp?: (import("./vm/composer").ComposerState & { chat: string }) | null;
-  /** Emoji picked in this visit, most recent first — shown at once, kept on the server a moment later (crm_staff_prefs). */
-  recents?: string[];
   qr: boolean;
   qrPage: "list" | "new" | null;
   qrNew: { s: string; m: string };
