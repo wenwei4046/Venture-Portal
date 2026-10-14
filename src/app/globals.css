@@ -4205,6 +4205,10 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 @media (min-width: 768px) {
   .hrv-sheet.sheet.fin-sheet { padding: 24px 28px 48px; }
 }
+/* …and scrolls on the browser's own scrollbar: the prototype's scroller styles
+   none (HR's round-one sheet asked for a thin one), so its content stops 28px
+   short of a full-width bar — the tiles end at 855 of 909 in D01. */
+.hrv-sheet.sheet.fin-sheet { scrollbar-width: auto; scrollbar-color: auto; }
 @media print {
   .hrv-sheet.sheet.fin-sheet { padding: 0; }
 }
