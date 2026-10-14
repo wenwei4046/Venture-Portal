@@ -325,7 +325,7 @@ describe('"+" — straight onto the list', () => {
 })
 
 describe('Upload form', () => {
-  it('uploads HR’s own form and names it on the button', async () => {
+  it('uploads HR’s own form and shows it as its file’s icon — the name in the tooltip, never on the button', async () => {
     actions.uploadWaitingFormTemplate.mockResolvedValue({ ok: true, form: { ...V1, version: 2, templatePath: 'templates/x/Form.pdf', templateName: 'Form.pdf' } })
     show()
     const input = screen.getByLabelText('Upload form') as HTMLInputElement
@@ -334,8 +334,27 @@ describe('Upload form', () => {
     })
     expect(actions.uploadWaitingFormTemplate).toHaveBeenCalledTimes(1)
     expect((actions.uploadWaitingFormTemplate.mock.calls[0][0] as FormData).get('file')).toBeInstanceOf(File)
-    expect(screen.getByText('Form: Form.pdf')).toBeInTheDocument()
+    // 2026-10-15, the user: "我不要它直接显示文字，那样很难看".
+    const chip = screen.getByLabelText('Form: Form.pdf').closest('label')!
+    expect(chip).toHaveAttribute('title', 'Form.pdf')
+    expect(chip).toHaveAttribute('data-icon', 'true')
+    expect(chip).toHaveTextContent(/^PDF$/)
+    expect(screen.queryByText(/Form\.pdf/)).toBeNull()
     expect(flash).toHaveBeenCalledWith('Form uploaded — the waiting-list application is now Form.pdf')
+  })
+
+  it('wears the icon of each kind the bucket takes', () => {
+    const icon = (name: string) => {
+      cleanup()
+      show({ form: { ok: true, form: { ...V1, version: 2, templatePath: `templates/x/${name}`, templateName: name } } })
+      const badge = screen.getByLabelText(`Form: ${name}`).closest('label')!.querySelector('[data-kind]')!
+      return [badge.getAttribute('data-kind'), badge.textContent]
+    }
+    expect(icon('Revenue_Team_Waiting_List_Form_04.09.2026 (2).docx')).toEqual(['word', 'W'])
+    expect(icon('Old form.doc')).toEqual(['word', 'W'])
+    expect(icon('Form.pdf')).toEqual(['pdf', 'PDF'])
+    expect(icon('Form.html')).toEqual(['html', '</>'])
+    expect(icon('scan.JPG')).toEqual(['image', ''])
   })
 
   it('refuses what the bucket would refuse, before sending it', async () => {
@@ -353,7 +372,7 @@ describe('Upload form', () => {
 describe('the uploaded form’s right-click menu', () => {
   const DOCX = 'templates/0b3fb828/Revenue_Team_Waiting_List_Form.docx'
   const uploaded = (name = 'Revenue_Team_Waiting_List_Form.docx', path = DOCX): WaitingForm => ({ ...V1, version: 2, templatePath: path, templateName: name })
-  const chip = (name = 'Revenue_Team_Waiting_List_Form.docx') => screen.getByText(`Form: ${name}`).closest('label')!
+  const chip = (name = 'Revenue_Team_Waiting_List_Form.docx') => screen.getByLabelText(`Form: ${name}`).closest('label')!
   const openMenu = (name?: string) => fireEvent.contextMenu(chip(name))
 
   it('opens on the uploaded form with its name, View and Remove…', () => {
@@ -398,7 +417,7 @@ describe('the uploaded form’s right-click menu', () => {
     expect(actions.removeFormTemplate).toHaveBeenCalledExactlyOnceWith('waiting', DOCX)
     expect(screen.queryByRole('menu')).toBeNull()
     expect(screen.getByText('Upload form')).toBeInTheDocument()
-    expect(screen.queryByText(/^Form: /)).toBeNull()
+    expect(screen.queryByLabelText(/^Form: /)).toBeNull()
     expect(flash).toHaveBeenCalledWith('Revenue_Team_Waiting_List_Form.docx removed — members download the built form')
   })
 

@@ -31,6 +31,27 @@
 .upload[data-uploaded='true'] { border-color: rgb(var(--hv-ledger-border)); background: rgb(var(--hv-ledger-wash)); }
 .upload[data-busy='true'] { opacity: 0.6; cursor: progress; }
 .upload input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+/* An uploaded form is its file's icon (2026-10-15, the user: no name on the button — "很难看"): a square as
+   tall as the "+" beside it, still in the uploaded green; the name is its tooltip. */
+.upload[data-icon='true'] { box-sizing: border-box; width: 31px; height: 31px; padding: 0; justify-content: center; flex: none; }
+/* The icon: the Data center's badge colours (drive.module.css › .tone) — Word blue, PDF red, a picture
+   orange, anything else walnut — white on them. */
+.fileIcon {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 5px;
+  color: rgb(255 255 255);
+  font-family: var(--font-sans), sans-serif;
+  font-weight: 700;
+  line-height: 1;
+}
+.fileIcon[data-kind='word'] { background: rgb(var(--hv-blue)); font-size: 12.5px; }
+.fileIcon[data-kind='pdf'] { background: rgb(var(--hv-danger)); font-size: 7.5px; letter-spacing: 0.02em; }
+.fileIcon[data-kind='image'] { background: rgb(var(--hv-orange-text)); }
+.fileIcon[data-kind='html'] { background: rgb(var(--hv-walnut)); font-size: 8.5px; letter-spacing: -0.04em; }
+.fileIcon[data-kind='file'] { background: rgb(var(--hv-walnut)); }
 .settings {
   display: flex;
   align-items: center;
