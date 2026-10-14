@@ -76,7 +76,7 @@
    Two classes, so the figure's own size never wins whatever the order. */
 .priceNum.figSmall, .marginNum.figSmall { font-size: calc(22px * var(--rv-type)); }
 .priceNum.figTiny, .marginNum.figTiny { font-size: calc(18px * var(--rv-type)); }
-.tierChip { display: inline-block; margin-top: 8px; font-size: calc(12px * var(--rv-type)); font-weight: 650; line-height: 1.35; background: var(--rv-white); border-radius: 8px; padding: 3px 9px; }
+.tierChip { display: inline-block; margin-top: 8px; text-wrap: balance; font-size: calc(12px * var(--rv-type)); font-weight: 650; line-height: 1.35; background: var(--rv-white); border-radius: 8px; padding: 3px 9px; }
 .penalty { display: block; margin-top: 5px; font-size: calc(11.5px * var(--rv-type)); font-weight: 600; }
 /* The card at its tallest from the start (2026-10-15): what changes as a price is typed and an
    invisible copy of its tallest state share one place, so the keypad below never moves. */
