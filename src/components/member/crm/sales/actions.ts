@@ -12,8 +12,10 @@ import type { CrmAutoReplySet, CrmCard, CrmChatMessage, CrmData, CrmLabel, CrmPr
 import type { WaTemplate } from "@/lib/whatsapp/send";
 import { createClient } from "@/lib/supabase/client";
 import { withMapLinks } from "@/lib/member/crm-maps";
-import { mediaKindOf, mediaPath } from "@/lib/member/crm-media";
+import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
 import { rememberLocalMedia } from "../shared/pending";
+import { isPrepared, prepareImage } from "../shared/image-prep";
+import { fitVideo, VIDEO_PICK_MAX } from "../shared/video-fit";
 import { dayLabel, timeLabel, windowShut } from "./vm/common";
 
 export interface SalesActions {
@@ -302,15 +304,30 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
     async sendMedia(customerId, file, caption) {
       // Photos, videos and voice notes (2026-10-13): shown at once from the phone itself, then put in the private bucket
       // crm-media straight from the browser (no 4 MB Server Action), then sent by the server from there.
-      if (file.size > 25 * 1024 * 1024) { toast("A photo, video or file can be up to 25 MB."); return false; }
-      const mime = (file.type || "application/octet-stream").split(";")[0];
-      const kind = mediaKindOf(mime), shown = kind === "document" ? "file" : kind;
+      const kind0 = mediaKindOf((file.type || "").split(";")[0]);
+      // A video may be picked bigger: it is shrunk to fit its channel below (shared/video-fit.ts, 2026-10-14).
+      if (kind0 === "video" ? file.size > VIDEO_PICK_MAX : file.size > 25 * 1024 * 1024) { toast(kind0 === "video" ? "A video can be up to 400 MB to start with." : "A photo or file can be up to 25 MB."); return false; }
+      const kind = kind0, shown = kind === "document" ? "file" : kind;
+      const channel = data().customers.find(c => c.id === customerId)?.channel ?? "whatsapp";
       const local = typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : "";
       const draft: CrmChatMessage = { id: `sending-${uid()}`, from: "me", kind, text: kind === "document" ? file.name : caption, at: new Date().toISOString(), status: live ? "sending" : "sent", by: me,
         ...(local ? { media: { kind: shown, url: local, ...(shown === "file" ? { name: file.name, mime: file.type } : {}) } } : {}) };
       addMessage(customerId, draft);
       if (!live) return true;
       const r = await inTurn(customerId, async () => {
+        // Every photo is sent as an upright JPEG — a PNG screenshot went to WhatsApp as it was and came back 131053
+        // (2026-10-14, 9:57 am); one the preview already made ready is sent as it is (HD stays HD).
+        if (kind === "image" && file.type !== "image/gif" && !isPrepared(file)) file = await prepareImage(file, false);
+        // A video too big for its channel, one WhatsApp cannot play (an iPhone HEVC video), or a standard (not HD) one is
+        // encoded again to fit (shared/video-fit.ts); one that already fits goes as it is.
+        if (kind === "video") {
+          const max = mediaLimit(channel, "video"), name = channel === "messenger" ? "Messenger" : "WhatsApp";
+          let tenth = -1;
+          const fit = await fitVideo(file, max, name, p => { const n = Math.floor(p * 10); if (n !== tenth) { tenth = n; toast(`Preparing the video · ${n * 10}%`); } });
+          if (!fit.ok) return { ok: false as const, error: fit.error };
+          file = fit.file;
+        }
+        const mime = (file.type || "application/octet-stream").split(";")[0];
         const path = mediaPath(customerId, file.name || "file", mime);
         const up = await createClient().storage.from("crm-media").upload(path, file, { contentType: mime, upsert: false });
         if (up.error) return { ok: false as const, error: "The file could not be uploaded. Check the connection and try again." };

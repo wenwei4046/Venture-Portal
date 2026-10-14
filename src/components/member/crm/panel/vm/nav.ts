@@ -1,5 +1,5 @@
 /** The Control panel's bottom bar: Insight · Inbox · Assignment · Calendar · Profile, with what waits on each. */
-import { day0, urgencyOf } from "../../sales/vm/common";
+import { day0 } from "../../sales/vm/common";
 import type { PanelTab } from "../ui";
 import type { PanelCtx } from "./common";
 
@@ -15,7 +15,9 @@ export function navVM(ctx: PanelCtx) {
   const { ui, set, data, now } = ctx;
   const badge: Record<PanelTab, number> = {
     overview: 0, profile: 0, ads: 0,
-    inbox: data.customers.filter(c => urgencyOf(c, now).level !== "none").length,
+    // Unread messages, as Mine's Inbox badge (the owner, 2026-10-14: "team & mine 的 inbox 數字都是未讀消息的數字"; it was the chats
+    // waiting 3 h+).
+    inbox: data.customers.reduce((n, c) => n + (c.unread || 0), 0),
     assign: data.customers.filter(c => !c.assignedTo && !c.teamId && !c.held).length,
     // Today's booked visits (the owner, 2026-10-13: "today appt"; it was every upcoming one).
     calendar: data.visits.filter(v => v.state === "booked" && day0(new Date(v.start)) === day0(now)).length,

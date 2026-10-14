@@ -27,9 +27,11 @@ export default function PullRefresh({ target, enabled, refreshing, failed, onRef
   const latest = useRef({ enabled, refreshing, onRefresh });
   latest.current = { enabled, refreshing, onRefresh };
 
+  // Listening only while a pull is possible: a non-passive touchmove makes the browser wait for script before every
+  // scroll of what is under it, so with pulls off (a sheet, the CRM) nothing listens (2026-10-14).
   useEffect(() => {
     const el = target.current;
-    if (!el) return;
+    if (!el || !enabled) return;
     let mode: "idle" | "wait" | "pull" = "idle";
     let x0 = 0, y0 = 0, distance = 0;
     const start = (e: TouchEvent) => {
@@ -72,7 +74,7 @@ export default function PullRefresh({ target, enabled, refreshing, failed, onRef
       el.removeEventListener("touchend", end);
       el.removeEventListener("touchcancel", end);
     };
-  }, [target]);
+  }, [target, enabled]);
 
   const y = refreshing ? PULL_REST : pull;
   const cls = [s.ptrDot, dragging && s.ptrDrag, refreshing && s.ptrBusy, !refreshing && pull >= PULL_ARM && s.ptrArmed].filter(Boolean).join(" ");

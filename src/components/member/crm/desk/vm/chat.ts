@@ -9,6 +9,7 @@ import type { CrmChatMessage, CrmCustomer } from "@/lib/member/crm-data";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { first, initials } from "./data";
 import type { DeskCtx } from "./ctx";
+import { galleryOf, mediaOf, NO_MEDIA } from "../../shared/chat-media";
 
 const DAY = 86_400_000;
 const day0 = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -18,7 +19,8 @@ const dayLabel = (iso: string, now: Date) => { const d = day0(new Date(iso)), T 
 
 /** A visit card (the salesperson chat's m.ev): the visit's day, time and showroom; tapping it opens the Calendar. */
 export interface VisitCard { kind: string; title: string; wk: string; dn: string; mon: string; time: string; room: string; addr: string; bg: string; fg: string; deco: string; go: () => void }
-export interface Msg { day: string; sys: string; bell: boolean; inn: boolean; out: boolean; text: string; time: string; tick: string; hasTick: boolean; media: string; mediaHref: string; img: string; vid: string; aud: string; failed: boolean; ev: VisitCard | null }
+/** A photo, video, voice note or document: the phone chats' markup and viewer (shared/chat-media.ts, 2026-10-14). */
+export type Msg = Omit<typeof NO_MEDIA, never> & { day: string; sys: string; bell: boolean; inn: boolean; out: boolean; text: string; time: string; tick: string; hasTick: boolean; media: string; mediaHref: string; failed: boolean; ev: VisitCard | null };
 
 /** The conversation, oldest first, with the CRM's own lines between the messages. */
 export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
@@ -34,12 +36,14 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
     ...(data.notes ?? []).filter(n => n.customerId === c.id).map(n => ({ at: n.at, sys: `Note by ${n.by ? nameOf(n.by) : "—"}: ${n.text}` }))]
     .sort((a, b) => a.at.localeCompare(b.at));
   let prev = "";
+  const url = (m: CrmChatMessage) => `/member/crm-media/${m.id}`;
+  const gallery = galleryOf(c.messages.map(m => (m.media ? { id: m.id, media: { ...m.media, url: url(m) } } : m)));
   return its.map(it => { const d = dayLabel(it.at, now), day = d !== prev ? d : ""; prev = d;
-    if (it.sys) return { day, sys: it.sys, bell: it.sys.includes("a reminder to reply"), inn: false, out: false, text: "", time: "", tick: "", hasTick: false, media: "", mediaHref: "", img: "", vid: "", aud: "", failed: false, ev: null };
+    if (it.sys) return { day, sys: it.sys, bell: it.sys.includes("a reminder to reply"), inn: false, out: false, text: "", time: "", tick: "", hasTick: false, media: "", mediaHref: "", ...NO_MEDIA, failed: false, ev: null };
     const m = it.m!, mine = m.from === "me";
-    // A photo, video or voice note is drawn as itself (2026-10-13); a file is its name, opened in a tab.
-    const mk = m.media?.kind, url = m.media ? `/member/crm-media/${m.id}` : "";
-    const media = mk === "file" ? `📄 ${m.media?.name ?? "Document"}` : "";
+    // A photo, video, voice note or document is drawn as on the phone and opens in the viewer (2026-10-14: "電腦版&手機版，
+    // 點擊圖片&影片&pdf 可以變為單獨畫面看"); a document is its tile, its name not repeated as text.
+    const mk = m.media?.kind;
     const card = m.card, cd = card ? new Date(card.start) : null;
     const ev: VisitCard | null = card && cd ? {
       kind: card.kind, title: "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()),
@@ -47,8 +51,8 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
       bg: card.kind === "Cancelled" ? "#F5EBE3" : "#FFF0E4", fg: card.kind === "Cancelled" ? "#806B60" : "#BD4A19", deco: card.kind === "Cancelled" ? "line-through" : "none",
       go: () => patch({ tab: "calendar", pane: "closed", calView: "month" }),
     } : null;
-    return { day, sys: "", bell: false, inn: !mine, out: mine, text: m.card ? "" : m.text ?? "", time: time(m.at), tick: m.status === "read" ? "#3B8FD9" : "#A8968B", hasTick: mine && m.status !== "failed",
-      media, mediaHref: mk === "file" ? url : "", img: mk === "image" ? url : "", vid: mk === "video" ? url : "", aud: mk === "audio" ? url : "", failed: m.status === "failed", ev };
+    return { day, sys: "", bell: false, inn: !mine, out: mine, text: m.card || mk === "file" ? "" : m.text ?? "", time: time(m.at), tick: m.status === "read" ? "#3B8FD9" : "#A8968B", hasTick: mine && m.status !== "failed",
+      media: "", mediaHref: "", ...mediaOf(m.media ? { id: m.id, media: { ...m.media, url: url(m) } } : m, gallery), failed: m.status === "failed", ev };
   });
 }
 
