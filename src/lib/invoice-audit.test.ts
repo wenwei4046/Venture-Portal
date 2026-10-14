@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { invoiceChangeLine, invoiceTrail, type DatedInvoiceChange } from './invoice-audit'
+import { invoiceChangeLine, invoiceTrail, type DatedInvoiceChange, type InvoiceChange } from './invoice-audit'
 
 // An invoice's audit log and trail in words (2026-10-15, the Finance revamp v2
 // — D06's *Trail* and *Audit log* on an invoice's full page).
@@ -55,7 +55,7 @@ describe('an invoice’s change in words', () => {
 describe('an invoice’s trail', () => {
   const stamp = (at: string) => `@${at}`
   const base = { createdBy: 'Aina', createdAt: 't0', invoiceDate: '2026-10-31', lastReceipt: null as string | null }
-  const at = (t: string, who: string, c: ReturnType<typeof upd> | DatedInvoiceChange): DatedInvoiceChange => ({ ...c, at: t, who })
+  const at = (t: string, who: string, c: InvoiceChange): DatedInvoiceChange => ({ ...c, at: t, who })
 
   it('a draft: created, the rest still to come', () => {
     expect(invoiceTrail({ ...base, status: 'draft' }, [], stamp)).toEqual([

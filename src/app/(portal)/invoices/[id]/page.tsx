@@ -230,7 +230,13 @@ export default async function InvoicePage({ params }: Props) {
 
           <FullCard n={++n} title="Receipts" aside={plural(h.receipts.length, 'receipt', 'receipts')}>
             {h.receipts.length === 0 ? (
-              <p className={s.none}>{h.status === 'paid_via_netting' ? 'Settled by netting — no receipt.' : 'No money received against this invoice yet.'}</p>
+              <p className={s.none}>
+                {h.status === 'paid_via_netting'
+                  ? 'Settled by netting — no receipt.'
+                  : h.status === 'voided'
+                    ? 'Nothing was received against it.'
+                    : 'No money received against this invoice yet.'}
+              </p>
             ) : (
               <div className={s.table}>
                 <div className={s.tHead}>

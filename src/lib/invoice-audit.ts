@@ -51,7 +51,8 @@ function fieldLine(key: string, before: Record<string, unknown>, after: Record<s
   if (CONTACT.has(key)) return 'Contact changed'
   if (key === 'status') return statusLine(before.status, after.status)
   if (key === 'total_amount') return `Amount ${money(before.total_amount)} → ${money(after.total_amount)}`
-  if (key === 'category_code') return `Account ${words(before.category_code)} → ${words(after.category_code)}`
+  // No account of its own: its lines carry theirs.
+  if (key === 'category_code') return `Account ${before.category_code ?? 'by line'} → ${after.category_code ?? 'by line'}`
   if (key === 'invoice_date') return `Invoice date ${day(before.invoice_date)} → ${day(after.invoice_date)}`
   if (key === 'due_date') return `Due ${day(before.due_date)} → ${day(after.due_date)}`
   if (key === 'period_month') return `Period ${month(before.period_month)} → ${month(after.period_month)}`
