@@ -108,7 +108,7 @@ export function RequestInfoSheet({ open, vm, busy, error, onSave, onCancel, onCl
                   if (f.anyTime) {
                     const on = isAnyTime(editing[f.key]);
                     return (
-                      <div key={f.key} className={s.field} role="group" aria-label={f.label}>
+                      <div key={f.key} className={s.field}>
                         <span className={s.fieldLabel}>{f.label}</span>
                         <div className={s.dayOrAny}>
                           <input className={s.input} type="date" aria-label={f.label} value={on ? "" : editing[f.key] ?? ""} disabled={on}

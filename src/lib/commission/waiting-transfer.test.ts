@@ -53,6 +53,8 @@ describe('the facts the form starts from', () => {
     expect(defaultHireDate('2026-10-20', '2026-10-10')).toBe('2026-10-20')
     expect(defaultHireDate('2026-09-11', '2026-10-10')).toBe('2026-10-10')
     expect(defaultHireDate(null, '2026-10-10')).toBe('2026-10-10')
+    // Ready any time (2026-10-14): HR picks the day, starting from today.
+    expect(defaultHireDate('anytime', '2026-10-10')).toBe('2026-10-10')
   })
 })
 

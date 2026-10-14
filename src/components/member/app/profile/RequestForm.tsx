@@ -880,7 +880,7 @@ function FormQuestion({ f, err, value, choices, onValue, maxLength, anyTime = fa
   if (anyTime) {
     const on = isAnyTime(value);
     return (
-      <div className={s.field} role="group" aria-label={f.label}>
+      <div className={s.field}>
         {head}
         <div className={s.dayOrAny}>
           <input type="date" aria-label={f.label} className={`${s.input} ${err ? s.inputErr : ""}`} value={on ? "" : value}

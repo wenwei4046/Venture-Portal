@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MemberRequest } from "./types";
-import { canEditRequest, editChanges, editProblem, editValues, lockedNote, revisionForm } from "./request-edit";
+import { canEditRequest, EDIT_FIELDS, editChanges, editProblem, editValues, lockedNote, revisionForm } from "./request-edit";
 
 const HASH = "a".repeat(64);
 const waiting = (over: Partial<MemberRequest> = {}): MemberRequest => ({
@@ -45,6 +45,18 @@ describe("Edit request → Update (HR revamp 7b)", () => {
     expect(editChanges(waiting(), { newPerson: "Amelia Tan ", contact: "011-222 3333", start: "2026-11-10" }).map(f => f.label))
       .toEqual(["Phone number", "Preferred start date"]);
     expect(editChanges(waiting(), editValues(waiting()))).toEqual([]);
+  });
+
+  // 2026-10-14, the user: some are ready any time — "just wait us to let them join".
+  it("lets the start date be Any time ready — kept, compared and sent as it is", () => {
+    expect(EDIT_FIELDS.waiting.find(f => f.key === "start")?.anyTime).toBe(true);
+    expect(EDIT_FIELDS.replacement.some(f => f.anyTime)).toBe(false);
+    const ready = waiting({ detail: { ...waiting().detail, start: "anytime" } });
+    expect(editValues(ready).start).toBe("anytime");
+    expect(editChanges(ready, editValues(ready))).toEqual([]);
+    expect(editChanges(waiting(), { ...editValues(waiting()), start: "anytime" }).map(f => f.label)).toEqual(["Preferred start date"]);
+    expect(editProblem(ready, editValues(ready))).toBeNull();
+    expect(revisionForm(ready, editValues(ready)).get("start")).toBe("anytime");
   });
 
   it("refuses a blank field the way the form does", () => {

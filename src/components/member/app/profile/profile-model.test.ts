@@ -340,6 +340,18 @@ describe("waiting list & replacements", () => {
     expect(requestDetailVM(pending, null, { nameOf, readOnly: true, queues }).edit).toBeNull();
   });
 
+  it("says Any time ready for an applicant ready whenever HR calls them (2026-10-14)", () => {
+    const ready = { ...pending, detail: { ...pending.detail, start: "anytime" } };
+    const vm = requestDetailVM(ready, null, { nameOf, readOnly: false, queues });
+    expect(vm.facts).toContainEqual({ l: "Start date", v: "Any time ready" });
+    expect(vm.edit?.values.start).toBe("anytime");
+    expect(vm.edit?.fields.find(f => f.key === "start")?.anyTime).toBe(true);
+    expect(waitingChoices([request({ id: "w1", kind: "waiting", status: "reserved", requestNo: "RQ-2610-002", detail: { newPerson: "Joan Quek", start: "anytime" } })])[0].sub)
+      .toBe("RQ-2610-002 · any time ready");
+    const sent: RequestEvent[] = [{ at: "2026-10-14T01:00:00Z", status: "submitted", from: "draft", actor: "you", actorName: null, note: null }];
+    expect(requestDetailVM(ready, sent, { nameOf, readOnly: false, queues }).log[0].note).toBe("Amelia Tan · any time ready");
+  });
+
   it("locks one HR accepted, and says where it stands", () => {
     const vm = requestDetailVM(accepted, null, { nameOf, readOnly: false, queues });
     expect(vm.facts).toContainEqual({ l: "Queue position", v: "#2 of 2" });

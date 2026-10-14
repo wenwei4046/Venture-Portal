@@ -66,6 +66,12 @@ describe('Request reviews · words and facts', () => {
     ])
   })
 
+  it('says Any time ready for an applicant ready whenever HR calls them (2026-10-14)', () => {
+    const rows = requestFacts(req({ detail: { subDepartmentId: FAIR, newPerson: 'Joan Quek', contact: '018-776 0020', start: 'anytime', signature: 'Joan Quek' } }),
+      { submittedBy: 'SHAWN', original: null, successor: null, target: null, acceptedAt: null, events: [] }, { departments })
+    expect(rows.find(r => r.l === 'Joining date')?.v).toBe('Any time ready')
+  })
+
   // HR revamp 7a (2026-10-10): the answers to HR's own questions, the signed form and the form's version.
   it('lists what the waiting-list form asked, the signed form it came with and its version', () => {
     const hash = 'b'.repeat(64)

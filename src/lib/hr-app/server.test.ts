@@ -129,6 +129,13 @@ describe('Member services’ requests and the meeting rooms', () => {
     expect(memberRequestOf(request({ kind: 'memo' as never }), undefined, subs)).toBeNull()
   })
 
+  it('says Any time ready for a waiting-list applicant ready whenever HR calls them (2026-10-14)', () => {
+    const subs = [{ id: 'fair', name: 'Fair' }] as never
+    const waiting = (start: string) => request({ kind: 'waiting', detail: { newPerson: 'Joan Quek', contact: '018', start, subDepartmentId: 'fair' } })
+    expect(memberRequestOf(waiting('anytime'), undefined, subs)?.start).toBe('Any time ready')
+    expect(memberRequestOf(waiting('2026-11-02'), undefined, subs)?.start).toBe('2026-11-02')
+  })
+
   it('lets the viewer cancel only what the database says they may', () => {
     const b = { id: 'b1', room: 'r1', day: '2026-10-11', from: 540, to: 600, title: 'Sync', department: 'HR', subDepartment: null, bookedBy: 'Grace Lim', canChange: true, source: 'hr_app', guestCompany: null, pax: 3 } as unknown as Booking
     expect(bookingOf(b)).toEqual({ id: 'b1', roomId: 'r1', date: '2026-10-11', from: 540, to: 600, title: 'Sync', dept: 'HR', byName: 'Grace Lim', mine: true, guest: false, company: null, pax: 3 })
