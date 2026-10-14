@@ -424,6 +424,24 @@ describe('a member sends a request', () => {
     }))
   })
 
+  // 2026-10-14, the user: some are ready any time — "just wait us to let them join".
+  it('a waiting list may start any time; anything else not a day is refused as before', async () => {
+    expect((await submitMemberRequest(form({
+      kind: 'waiting', subDepartmentId: fair, idempotencyKey: key, newPerson: 'Joan Quek', contact: '018-776 0020',
+      targetDepartmentId: fair, start: 'anytime', consent: 'true', signature: 'Jia En',
+    }))).ok).toBe(true)
+    expect(mocks.rpc).toHaveBeenNthCalledWith(1, 'member_prepare_request', expect.objectContaining({
+      p_kind: 'waiting', p_detail: expect.objectContaining({ start: 'anytime' }),
+    }))
+    mocks.rpc.mockClear()
+    const refused = await submitMemberRequest(form({
+      kind: 'waiting', subDepartmentId: fair, idempotencyKey: key, newPerson: 'Joan Quek', contact: '018-776 0020',
+      targetDepartmentId: fair, start: 'whenever', consent: 'true', signature: 'Jia En',
+    }))
+    expect(refused).toMatchObject({ ok: false })
+    expect(mocks.rpc).not.toHaveBeenCalledWith('member_prepare_request', expect.anything())
+  })
+
   // HR revamp 7a (2026-10-10): the form Sales Groups › Form settings versions.
   describe('a waiting list on HR’s form', () => {
     const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37])

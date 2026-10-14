@@ -14,6 +14,8 @@
  * Pure, so the drawer stays thin and this is tested.
  */
 
+import { ANY_TIME_LABEL } from '@/lib/member/waiting-start'
+
 export type WaitingFieldType = 'text' | 'dropdown' | 'date' | 'yesno' | 'phone'
 
 export interface WaitingField {
@@ -323,6 +325,8 @@ export function applicationFormHtml(
         box = '<div class="opts">' + options.map(o => '<span>&#9744; ' + esc(o) + '</span>').join('') + '</div>'
       if (f.type === 'yesno') box = '<div class="opts"><span>&#9744; Yes</span><span>&#9744; No</span></div>'
       if (f.type === 'date') box = '<div class="line short">&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>'
+      // The joining date may be any time — ready whenever HR calls them (2026-10-14).
+      if (kind === 'waiting' && f.builtin && f.id === 'start') box = '<div class="when">' + box + '<span>&#9744; ' + esc(ANY_TIME_LABEL) + '</span></div>'
       return '<div class="row"><div class="lab">' + esc(f.label) + (f.required ? ' *' : '') + '</div>' + box + '</div>'
     })
     .join('')
@@ -331,6 +335,7 @@ export function applicationFormHtml(
     'body{font-family:Georgia,"Times New Roman",serif;color:#000;background:#fff;margin:48px auto;max-width:640px;padding:0 24px}' +
     'h1{font-size:22px;margin:0 0 4px}.sub{font-size:13px;margin:0 0 28px}.row{margin:0 0 22px}.lab{font-size:13px;margin-bottom:8px}' +
     '.line{border-bottom:1px solid #000;height:22px}.line.short{width:180px;font-size:12px}.opts{display:flex;gap:22px;font-size:13px;flex-wrap:wrap}' +
+    '.when{display:flex;gap:22px;align-items:flex-end;font-size:13px;flex-wrap:wrap}' +
     '.sig{display:flex;gap:40px;margin-top:40px}.sig div{flex:1}.foot{margin-top:36px;font-size:11px;border-top:1px solid #000;padding-top:10px}' +
     '@media print{body{margin:0}}</style></head><body>' +
     '<h1>HOUZS Venture · ' + spec.heading + '</h1><p class="sub">Revenue Department' + (subName ? ' · ' + esc(subName) : '') + ' · Form v' + form.version + '</p>' +

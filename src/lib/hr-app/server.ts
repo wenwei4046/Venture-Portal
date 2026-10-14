@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { adminMemberAction, type AdminMemberData } from '@/lib/member/server'
 import { requestFactsFromRow, type RequestFacts } from '@/lib/member/member-services'
 import type { MemberRequest } from '@/lib/member/types'
+import { ANY_TIME_LABEL, isAnyTime } from '@/lib/member/waiting-start'
 import { readRoomsPeople, readRoomsRange } from '@/lib/rooms/read'
 import { loadDocumentation } from '@/lib/documentation/server'
 import { deptLabel, liveLetters, type Documentation } from '@/lib/documentation/model'
@@ -59,7 +60,8 @@ export function memberRequestOf(r: MemberRequest, facts: RequestFacts | undefine
     byName: facts?.submittedBy ?? '—',
     newPerson: str(d.newPerson) || null,
     contact: str(d.contact) || null,
-    start: str(d.start) || null,
+    // A waiting list's joining date: the day, or "Any time ready" (2026-10-14).
+    start: isAnyTime(str(d.start)) ? ANY_TIME_LABEL : str(d.start) || null,
     originalName: facts?.original ?? null,
     pickName: facts?.successor ?? null,
     effective: str(d.effective) || null,

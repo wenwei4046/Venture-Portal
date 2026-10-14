@@ -74,6 +74,13 @@ describe('what stops an add', () => {
     expect(waitingAddRefusal(input(), FORM, false)).toBeNull()
   })
 
+  // 2026-10-14, the user: some are ready any time — "just wait us to let them join".
+  it('takes Any time ready for the joining date, and sends it as it is', () => {
+    expect(waitingAddRefusal(input({ start: 'anytime' }), FORM, false)).toBeNull()
+    expect(waitingAddRefusal(input({ start: 'whenever' }), FORM, false)).toBe('Pick the joining date.')
+    expect(waitingAddDetail(input({ start: 'anytime' }), FORM, null).start).toBe('anytime')
+  })
+
   it('asks for the signed form once Form settings does, and only then', () => {
     expect(waitingAddRefusal(input(), { ...FORM, requireUpload: true }, false)).toBe('Upload the signed application form — Form settings asks for it.')
     expect(waitingAddRefusal(input(), { ...FORM, requireUpload: true }, true)).toBeNull()

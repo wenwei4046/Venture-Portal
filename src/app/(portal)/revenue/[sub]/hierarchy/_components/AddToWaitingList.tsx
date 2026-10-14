@@ -6,6 +6,7 @@ import { Window } from '@/components/hrv/overlay'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { ownQuestions } from '@/lib/member/waiting-answers'
+import { ANY_TIME, ANY_TIME_LABEL, isAnyTime } from '@/lib/member/waiting-start'
 import {
   EMPTY_ADD,
   SIGNED_FORM_ACCEPT,
@@ -22,9 +23,9 @@ import w from './waiting.module.css'
 /**
  * Sales Groups › Waiting list's "+" (2026-10-11, the user: "我点击「加」了过后，我可以直接加人进去这个
  * waiting list 里面"): the accent square left of Upload form opens a window — the new member's name,
- * phone and joining date, who brought them in (the Revenue team, required), HR's own questions
- * (optional) and the signed application form (as Form settings asks). Added, they join the END of the
- * list, as if accepted today.
+ * phone and joining date (a day, or *Any time ready* — 2026-10-14), who brought them in (the Revenue
+ * team, required), HR's own questions (optional) and the signed application form (as Form settings
+ * asks). Added, they join the END of the list, as if accepted today.
  */
 export default function AddToWaitingList({
   subDepartmentId,
@@ -86,6 +87,8 @@ function AddWindow({
   const fileRef = useRef<HTMLInputElement>(null)
   const questions = ownQuestions(form)
   const formRequired = form?.requireUpload === true
+  // Ready whenever HR calls them (2026-10-14): no day to pick.
+  const anyTime = isAnyTime(draft.start)
 
   const set = (patch: Partial<WaitingAddDraft>) => {
     setDraft(d => ({ ...d, ...patch }))
@@ -150,10 +153,21 @@ function AddWindow({
               maxLength={60}
             />
           </label>
-          <label className={s.addField}>
+          <div className={s.addField}>
             <span>Joining date</span>
-            <input className={`${hv.input} ${w.addInput}`} type="date" value={draft.start} onChange={e => set({ start: e.target.value })} />
-          </label>
+            <input
+              className={`${hv.input} ${w.addInput}`}
+              type="date"
+              aria-label="Joining date"
+              value={anyTime ? '' : draft.start}
+              disabled={anyTime}
+              onChange={e => set({ start: e.target.value })}
+            />
+            <label className={w.anyTime}>
+              <input type="checkbox" checked={anyTime} onChange={e => set({ start: e.target.checked ? ANY_TIME : '' })} />
+              {ANY_TIME_LABEL}
+            </label>
+          </div>
         </div>
         <label className={s.addField}>
           <span>Submitted by</span>

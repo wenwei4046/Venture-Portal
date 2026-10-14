@@ -247,6 +247,60 @@ try {
   check(await one(`SELECT status FROM member_requests WHERE id = $1`, [five.id]), 'draft', 'the draft stays a draft')
   check(await one(`SELECT count(*)::int FROM member_request_attachments WHERE request_id = $1`, [five.id]), 0, 'and keeps no attestation')
 
+  // ── Any time ready (20261014213000; 2026-10-14, the user: "some of them is anytime ready, just wait us to let
+  // then join") — the joining date may be the word `anytime`. Production's three readers of it: this add (above,
+  // verbatim), and stand-ins carrying the Revenue app's send and the legacy candidate's statements as production
+  // words them. ──
+  await refuse({ start: 'anytime' }, /Pick the joining date/, 'before: a day only')
+  await db.exec(`
+    CREATE FUNCTION public.member_prepare_request(p_kind text, p_sub_department uuid, p_detail jsonb, p_idempotency uuid, p_revision uuid)
+    RETURNS date LANGUAGE plpgsql AS $$
+    DECLARE v_date date;
+    BEGIN
+     v_date:=(p_detail->>'start')::date;
+     RETURN v_date;
+    END $$;
+    CREATE FUNCTION public.member_admin_action(p_action text, p_request uuid, p_data jsonb)
+    RETURNS date LANGUAGE plpgsql AS $$
+    DECLARE r record; v_now date := '2026-10-14';
+    BEGIN
+     SELECT p_data AS detail INTO r;
+     RETURN greatest((r.detail->>'start')::date,v_now);
+    END $$;
+  `)
+  const ANYTIME = (await readFile(new URL('20261014213000_waiting_list_any_time_start.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  const md5s = () => q(`SELECT proname, md5(prosrc) AS m FROM pg_proc WHERE proname IN ('member_waiting_add', 'member_prepare_request', 'member_admin_action') ORDER BY proname`)
+  const before = await md5s()
+  await db.exec(ANYTIME)
+  const after = await md5s()
+  check(after.map((r, i) => r.m !== before[i].m), [true, true, true], 'each of the three swapped')
+
+  const ready = await add({ detail: detail({ newPerson: 'Joan Quek', contact: '018-776 0020', start: 'anytime' }) })
+  check(ready.status, 'waiting', 'Any time ready goes on the list')
+  check(await one(`SELECT detail ->> 'start' FROM member_requests WHERE id = $1`, [ready.id]), 'anytime', 'kept as the word, not a day')
+  const dated = await add({ detail: detail({ newPerson: 'Dated', contact: '011-6', start: '2026-12-01' }) })
+  check(await one(`SELECT detail ->> 'start' FROM member_requests WHERE id = $1`, [dated.id]), '2026-12-01', 'a day is kept as the day')
+  for (const [start, what] of [['2026-02-30', 'a day the calendar has not'], ['', 'blank'], ['today', 'a word Postgres reads as a date'],
+    ['ANYTIME', 'the word in capitals'], ['infinity', 'infinity']]) {
+    await refuse({ start }, /Pick the joining date/, `still refused: ${what}`)
+  }
+
+  const send = start => one(`SELECT public.member_prepare_request('waiting', $1, $2::jsonb, $3, NULL)::text`, [FAIR, JSON.stringify({ start }), id(++keys)])
+  check(await send('anytime'), null, 'the Revenue app’s send takes anytime, no day cast')
+  check(await send('2026-11-02'), '2026-11-02', 'a day is still read as the day')
+  await reject(`SELECT public.member_prepare_request('waiting', $1, $2::jsonb, $3, NULL)`, [FAIR, JSON.stringify({ start: 'whenever' }), id(++keys)],
+    /invalid input syntax for type date/, 'anything else is still not a day')
+  const candidate = start => one(`SELECT public.member_admin_action('create_candidate', NULL, $1::jsonb)::text`, [JSON.stringify({ start })])
+  check([await candidate('anytime'), await candidate('2026-11-02'), await candidate('2026-10-01')], ['2026-10-14', '2026-11-02', '2026-10-14'],
+    'the legacy roster row: anytime starts today, a day as before')
+
+  await db.exec(ANYTIME)
+  check(await md5s(), after, 'a second run changes nothing')
+  await db.exec(`CREATE OR REPLACE FUNCTION public.member_prepare_request(p_kind text, p_sub_department uuid, p_detail jsonb, p_idempotency uuid, p_revision uuid)
+    RETURNS date LANGUAGE plpgsql AS $$ BEGIN RETURN NULL; END $$`)
+  await assert.rejects(() => db.exec(ANYTIME), /not once — production changed since this migration was written/, 'a body changed since is refused')
+  checks++
+
   console.log(`validate-waiting-add: ${checks} checks passed`)
 } finally {
   await db.close()

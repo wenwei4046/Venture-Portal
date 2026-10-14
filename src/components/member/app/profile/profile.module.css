@@ -899,6 +899,11 @@
 .pills { display: flex; flex-wrap: wrap; gap: 8px; }
 .pill { height: 38px; padding: 0 14px; border-radius: 19px; border: 1px solid var(--rv-handle); background: var(--rv-white); color: var(--rv-ink); font-size: calc(13.5px * var(--rv-type)); font-weight: 500; }
 .pillOn { border-color: var(--rv-accent); background: var(--rv-cream); color: var(--rv-accent); font-weight: 650; }
+/* The waiting list's start date: a day, or the "Any time ready" pill beside it (2026-10-14). */
+.dayOrAny { display: flex; align-items: center; gap: 8px; }
+.dayOrAny > .input { flex: 1; }
+.dayOrAny > .input:disabled { background: var(--rv-cream); color: var(--rv-sub); }
+.dayOrAny > .pill { flex: none; white-space: nowrap; }
 .radios { display: flex; flex-direction: column; gap: 8px; }
 .radio {
   display: flex;

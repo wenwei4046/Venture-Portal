@@ -8,7 +8,8 @@ import { Drawer } from '@/components/hrv/overlay'
 import { Chevron } from '@/components/hrv/icons'
 import { flash } from '@/components/hrv/toast'
 import { revenuePath } from '@/lib/revenue'
-import { addedHere, dayLabel, historyOf, shortDay, waitingList, type SubDeptRequest } from '@/lib/commission/sales-group-requests'
+import { addedHere, dayLabel, historyOf, joiningDayLabel, shortDay, waitingList, type SubDeptRequest } from '@/lib/commission/sales-group-requests'
+import { isAnyTime } from '@/lib/member/waiting-start'
 import type { WaitingForm } from '@/lib/commission/waiting-form'
 import type { SubmitterGroup } from '@/lib/commission/waiting-add'
 import type { SubDepartmentCapacity } from '@/lib/commission/capacity'
@@ -126,7 +127,7 @@ export default function WaitingList({
               </div>
             </div>
             <span role="cell" className={s.cell10}>{r.submittedBy ?? '—'}</span>
-            <span role="cell" className={`${s.cell10} ${hv.mono}`} style={{ fontSize: 12 }}>{dayLabel(r.start)}</span>
+            <span role="cell" className={isAnyTime(r.start) ? s.cell10 : `${s.cell10} ${hv.mono}`} style={{ fontSize: 12 }}>{joiningDayLabel(r.start)}</span>
             <span role="cell" className={s.cell10} style={{ fontSize: 12, color: 'rgb(var(--hv-body-2))' }}>{dayLabel(r.acceptedAt)}</span>
             <span role="cell" className={hv.chev} aria-hidden="true">
               <Chevron right />
@@ -197,7 +198,7 @@ export default function WaitingList({
                 addedHere(open)
                   ? [
                       { l: 'Mobile number', v: open.contact ?? '—' },
-                      { l: 'Joining date', v: dayLabel(open.start) },
+                      { l: 'Joining date', v: joiningDayLabel(open.start) },
                       { l: 'Department', v: `Revenue · ${subDeptName}` },
                       { l: 'Submitted by', v: open.submittedBy ?? '—' },
                       { l: 'Added by', v: open.events.find(e => e.to === 'waiting')?.by ?? 'HR' },
@@ -205,7 +206,7 @@ export default function WaitingList({
                     ]
                   : [
                       { l: 'Mobile number', v: open.contact ?? '—' },
-                      { l: 'Joining date', v: dayLabel(open.start) },
+                      { l: 'Joining date', v: joiningDayLabel(open.start) },
                       { l: 'Department', v: `Revenue · ${subDeptName}` },
                       { l: 'Submitted by', v: open.submittedBy ?? '—' },
                       { l: 'Signed by', v: open.signature ?? '—' },

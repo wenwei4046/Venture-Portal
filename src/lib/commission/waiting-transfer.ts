@@ -74,7 +74,7 @@ export function transferBanner(f: Pick<WaitingTransferFacts, 'requestNo' | 'subm
   ].filter(Boolean).join(' · ')
 }
 
-/** The hire date it opens on: the preferred start, unless that has passed. */
+/** The hire date it opens on: the preferred start, unless that has passed — today for "Any time ready". */
 export function defaultHireDate(start: string | null, today: string): string {
   return start && /^\d{4}-\d{2}-\d{2}$/.test(start) && start > today ? start : today
 }

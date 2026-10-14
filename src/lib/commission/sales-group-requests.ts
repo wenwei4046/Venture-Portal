@@ -9,6 +9,7 @@
  */
 
 import { formatIntlDate } from '@/lib/utils'
+import { joiningLabel } from '@/lib/member/waiting-start'
 
 export interface RequestEvent {
   /** The status it moved to. */
@@ -30,7 +31,7 @@ export interface SubDeptRequest {
   submittedBy: string | null
   newPerson: string | null
   contact: string | null
-  /** Waiting list: the preferred joining date (YYYY-MM-DD). */
+  /** Waiting list: the preferred joining date (YYYY-MM-DD), or `anytime` — ready whenever HR calls them. */
   start: string | null
   signature: string | null
   /** Replacement: the member being replaced. */
@@ -208,6 +209,11 @@ export function dayLabel(date: string | null): string {
   const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T00:00:00+08:00` : date)
   if (Number.isNaN(d.getTime())) return '—'
   return formatIntlDate(d, { day: 'numeric', month: 'short', year: 'numeric', timeZone: OFFICE }, 'en-GB')
+}
+
+/** The joining date: "11 Sep 2026", or "Any time ready" (2026-10-14). */
+export function joiningDayLabel(start: string | null): string {
+  return joiningLabel(start, dayLabel)
 }
 
 /** "9 Sep" — a history step's day. */

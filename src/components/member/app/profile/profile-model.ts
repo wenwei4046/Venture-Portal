@@ -3,6 +3,7 @@ import { arenaMonthFridays, arenaWeekendLabel, type ArenaPerson, type MemberAren
 import { claimPayoutLine, readClaimPayout } from "@/lib/member/claim-payout";
 import { canEditRequest, EDIT_FIELDS, editValues, lockedNote } from "@/lib/member/request-edit";
 import { placeOf, type WaitingQueue } from "@/lib/member/waiting-queue";
+import { isAnyTime, joiningLabel } from "@/lib/member/waiting-start";
 import { memoFileExt } from "@/lib/memos/model";
 import { MONTHS_SHORT, dayList, dayRange, initials, klDate, klDayTime, klLongTime, monthShort, rm, rm2, shortDay } from "../format";
 import type {
@@ -143,7 +144,10 @@ export function requestSummary(r: MemberRequest, nameOf: (staffId: string) => st
     }
     return [str(d.location), money].filter(Boolean).join(" · ");
   }
-  if (r.kind === "waiting") return [str(d.newPerson), str(d.start) ? `preferred start ${shortDay(str(d.start))}` : ""].filter(Boolean).join(" · ");
+  if (r.kind === "waiting") {
+    const start = str(d.start);
+    return [str(d.newPerson), !start ? "" : isAnyTime(start) ? "any time ready" : `preferred start ${shortDay(start)}`].filter(Boolean).join(" · ");
+  }
   const original = nameOf(str(d.originalStaffId));
   const source = ({ new: "new member joining", existing: "existing member", waiting: "from the waiting list", vacancy: "no replacement" } as Record<string, string>)[str(d.replacementSource)] ?? "";
   return [original ? `Replace ${original}` : "", source].filter(Boolean).join(" · ");
@@ -234,7 +238,7 @@ export function requestDetailVM(r: MemberRequest, events: readonly RequestEvent[
     ? [
         { l: "Applicant", v: str(d.newPerson) },
         { l: "Phone", v: str(d.contact) },
-        { l: "Start date", v: str(d.start) ? shortDay(str(d.start)) : "" },
+        { l: "Start date", v: str(d.start) ? joiningLabel(str(d.start), shortDay) : "" },
         { l: "Sub-department", v: str(d.department) ? `Revenue · ${str(d.department)}` : "" },
         { l: "Queue position", v: place ? `#${place.position} of ${place.total}` : "" },
       ]
@@ -574,7 +578,7 @@ export function waitingChoices(requests: readonly MemberRequest[]): { id: string
     const ok = ["waiting", "reserved", "accepted", "allocated"].includes(r.status);
     return {
       id: r.id, name: typeof r.detail.newPerson === "string" ? r.detail.newPerson : "New member",
-      sub: `${requestCode(r)} · ${ok && start ? `start ${shortDay(start)}` : `submitted ${shortDay(klDate(r.submittedAt ?? r.createdAt))}`}`,
+      sub: `${requestCode(r)} · ${ok && start ? (isAnyTime(start) ? "any time ready" : `start ${shortDay(start)}`) : `submitted ${shortDay(klDate(r.submittedAt ?? r.createdAt))}`}`,
       status: ok ? "Approved" : requestStatus(r.status)[0], ok,
     };
   });

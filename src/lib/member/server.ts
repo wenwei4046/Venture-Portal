@@ -21,6 +21,7 @@ import { loadCommissionInput } from "@/app/(portal)/revenue/_lib/commission-inpu
 import { monthFinishes, type HonourBoard } from "./honours";
 import { formFromRow, type WaitingForm } from "@/lib/commission/waiting-form";
 import { waitingAnswersFrom, type WaitingAnswer } from "./waiting-answers";
+import { ANY_TIME, isAnyTime } from "./waiting-start";
 import { queuesFrom, type WaitingQueue } from "./waiting-queue";
 import { SEND_REFUSED, appClosed, requestPageOf } from "./app-pages";
 import { readFoodWeeks, type FoodWeekPick } from "./claim-rules";
@@ -1177,7 +1178,8 @@ export async function submitMemberRequest(
         const consent = form.get("consent");
         Object.assign(detail, {
           contact: field(form, "contact", 60),
-          start: date(field(form, "start"), "preferred start date"),
+          // A day, or "Any time ready" (2026-10-14): ready whenever HR calls them.
+          start: isAnyTime(field(form, "start")) ? ANY_TIME : date(field(form, "start"), "preferred start date"),
           signature: field(form, "signature", 160),
           consent: consent === "on" || consent === "true" || consent === "1",
         });

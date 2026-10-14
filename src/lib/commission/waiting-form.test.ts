@@ -181,4 +181,13 @@ describe('applicationFormHtml — the black-and-white form', () => {
     expect(html).toContain('Own &lt;car&gt;</div><div class="opts"><span>&#9744; Yes</span><span>&#9744; No</span>')
     expect(html.indexOf('New member name')).toBeLessThan(html.indexOf('Preferred start date'))
   })
+
+  // 2026-10-14, the user: some are ready any time — the paper offers it beside the date.
+  it('offers Any time ready beside the start date — the waiting list’s only', () => {
+    const html = applicationFormHtml({ ...V1, fields: [...BUILT_IN] }, 'Fair', ['Fair', 'IR'])
+    expect(html).toMatch(/Preferred start date \*<\/div><div class="when"><div class="line short">.*<\/div><span>&#9744; Any time ready<\/span><\/div>/)
+    expect(html.match(/Any time ready/g)).toHaveLength(1)
+    const replacement = applicationFormHtml({ version: 1, fields: [...REPLACEMENT_BUILTIN_FIELDS], templateName: REPLACEMENT_FORM_NAME }, 'Fair', ['Fair', 'IR'], 'replacement')
+    expect(replacement).not.toContain('Any time ready')
+  })
 })

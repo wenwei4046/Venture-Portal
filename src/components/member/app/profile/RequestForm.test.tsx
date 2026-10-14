@@ -421,6 +421,30 @@ describe("a waiting list, on HR's form", () => {
       start: "2026-11-01", consent: "true", formVersion: "3", signature: "Jia En" });
   });
 
+  // 2026-10-14, the user: some are ready any time — "just wait us to let them join".
+  it("takes Any time ready for the start date — the day then left empty", async () => {
+    const onSubmit = vi.fn(async (data: FormData) => { void data; return { ok: true as const, code: "RQ-2610-012" }; });
+    const { container } = waiting(onSubmit);
+    fill();
+    const anyTime = screen.getByRole("button", { name: "Any time ready" });
+    expect(anyTime).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(anyTime);
+    const day = screen.getByLabelText("Preferred start date", { exact: false }) as HTMLInputElement;
+    expect(day).toBeDisabled();
+    expect(day.value).toBe("");
+    expect(anyTime).toHaveAttribute("aria-pressed", "true");
+    upload(container);
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit" }));
+    expect(await screen.findByText("RQ-2610-012")).toBeInTheDocument();
+    expect(sent(onSubmit)).toMatchObject({ start: "anytime" });
+  });
+
+  it("an update of one sent as Any time ready opens with it chosen", () => {
+    waiting(vi.fn(), {}, { revising: { id: "r2", detail: { newPerson: "Joan Quek", contact: "018", start: "anytime", targetDepartmentId: "fair" } } });
+    expect(screen.getByRole("button", { name: "Any time ready" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Preferred start date", { exact: false })).toBeDisabled();
+  });
+
   it("goes without a signed form when HR does not ask for one", async () => {
     const onSubmit = vi.fn(async (data: FormData) => { void data; return { ok: true as const, code: "RQ-2610-010" }; });
     waiting(onSubmit, { requireUpload: false });
