@@ -53,13 +53,13 @@ describe("photos sent together are one album, as on WhatsApp", () => {
     expect(m.albumMore).toBe(1);
     expect(m.img).toBe("");
   });
-  it("makes two or three an album too, the first one's words its caption; keeps out later words, the other side, a long pause", () => {
-    // 17:05:29 (with "photo"), :32, :36 — three, the first captioned: one album (2026-10-14).
-    expect(albumsOf([pic("a", 0, "me", "photo"), pic("b", 3), pic("c", 7)]).lead.get("a")?.length).toBe(3);
-    expect(albumsOf([pic("a", 0), pic("b", 1)]).lead.size).toBe(1);
-    expect(albumsOf([pic("a", 0), pic("b", 1, "me", "look")]).lead.size).toBe(0);
-    expect(albumsOf([pic("a", 0), pic("b", 1, "lead")]).lead.size).toBe(0);
-    expect(albumsOf([pic("a", 0), pic("b", 100)]).lead.size).toBe(0);
+  it("leaves two or three one by one (2026-10-14: \"超過 4 張以上才合併\"); the first one's words its caption; keeps out later words, the other side, a long pause", () => {
+    expect(albumsOf([pic("a", 0, "me", "photo"), pic("b", 3), pic("c", 7)]).lead.size).toBe(0);
+    expect(albumsOf([pic("a", 0), pic("b", 1)]).lead.size).toBe(0);
+    expect(albumsOf([pic("a", 0, "me", "photo"), pic("b", 3), pic("c", 7), pic("d", 9)]).lead.get("a")?.length).toBe(4);
+    expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2), pic("d", 3, "me", "look")]).lead.size).toBe(0);
+    expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2), pic("d", 3, "lead")]).lead.size).toBe(0);
+    expect(albumsOf([pic("a", 0), pic("b", 1), pic("c", 2), pic("d", 100)]).lead.size).toBe(0);
     expect(albumsOf([pic("a", 0)]).lead.size).toBe(0);
     // 16:11:12 – 16:11:21 four photos, then a video at 16:13:09: the album is the four; the video stands alone.
     const vid = { id: "v", from: "me" as const, at: new Date(Date.UTC(2026, 9, 14, 2, 0, 9 + 108)).toISOString(), text: "", media: { kind: "video" as const, url: "/m/v" } };
