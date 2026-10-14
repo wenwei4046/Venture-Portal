@@ -67,16 +67,25 @@ export async function fitVideo(file: File, channelMax: number, channelName: stri
     const trim = cut ? { trim: { start, end } } : {}, audio = cut?.mute ? { audio: { discard: true as const } } : {};
     const estimate = full > 0 ? (file.size * seconds) / full : file.size;
     // H.264 that fits: as it is when it is already a plain MP4, else copied into one (trimmed / muted on the way).
+    // An iPhone video keeps its picture sideways and a "turn 90°" flag; WhatsApp on a computer ignores the flag and
+    // showed the customer the video sideways (the owner, 2026-10-14). So a turned video is encoded again with the turn
+    // drawn into the picture (allowTransformationMetadata: false); only an upright one is copied as it is.
+    const turned = (track.rotation ?? 0) !== 0;
+    let copyFile: File | null = null;
     if (!look && track.codec === "avc" && estimate <= maxBytes * 0.97) {
-      if (!cut && isMp4) return { ok: true, file };
+      if (!cut && isMp4 && !turned) return { ok: true, file };
       const copy = await convert(mb, input, file, { ...trim, ...audio }, onProgress);
-      if (copy.file && copy.file.size <= maxBytes) return { ok: true, file: copy.file };
+      if (copy.file && copy.file.size <= maxBytes) {
+        if (!turned) return { ok: true, file: copy.file };
+        copyFile = copy.file;
+      }
     }
     if (typeof VideoEncoder === "undefined" || typeof VideoDecoder === "undefined") {
+      if (copyFile) return { ok: true, file: copyFile };
       return { ok: false, error: track.codec === "avc" ? `${tooBig}, and this phone cannot make it smaller. Trim it and send it again.` : HEVC };
     }
     const plan = videoPlan(maxBytes, seconds, hd) ?? (hd ? null : videoPlan(channelMax, seconds, true));
-    if (!plan) return { ok: false, error: `${tooBig} — this one is too long to fit. Trim it and send it again.` };
+    if (!plan) return copyFile ? { ok: true, file: copyFile } : { ok: false, error: `${tooBig} — this one is too long to fit. Trim it and send it again.` };
     // Turned and cropped first (the editor's order); the size that fits is the cropped picture's.
     const t = turnedSize(track.displayWidth, track.displayHeight, look?.turn ?? 0);
     const ev = (n: number) => Math.max(0, Math.round(n / 2) * 2);
@@ -90,10 +99,12 @@ export async function fitVideo(file: File, channelMax: number, channelName: stri
       const kk = Math.min(1, side / Math.max(w, h, 1)), W = even(w * kk), Hh = even(h * kk);
       out = await convert(mb, input, file, {
         ...trim, ...audio,
-        video: { width: W, height: Hh, fit: "contain", codec: "avc", quality: new mb.Quality(plan.bps), forceTranscode: true, ...(look ? drawn(look, crop!, W, Hh) : {}) },
+        video: { width: W, height: Hh, fit: "contain", codec: "avc", quality: new mb.Quality({ bitrate: plan.bps }), forceTranscode: true, allowTransformationMetadata: false, ...(look ? drawn(look, crop!, W, Hh) : {}) },
       }, onProgress);
       if (out.file) break;
     }
+    // This phone could not turn it: the copy still plays upright on phones (only a computer's WhatsApp ignores the flag).
+    if (!out.file && copyFile) return { ok: true, file: copyFile };
     if (!out.file) {
       return { ok: false, error: track.codec === "avc" ? `${tooBig}, and this phone could not make this one smaller (${out.why ?? "no encoder"}). Trim it and send it again.` : `${HEVC} (${out.why ?? "no encoder"})` };
     }
