@@ -71,6 +71,13 @@ describe("step 2's card keeps one size", () => {
     for (const size of ["figSmall", "figTiny"]) expect(css).toMatch(new RegExp(`\\.priceNum\\.${size}, \\.marginNum\\.${size} \\{`));
   });
 
+  it("names its own classes once in the module — a `.chip` of its own took the option chips' 52px and flex", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/components/member/app/quote/quote.module.css"), "utf8");
+    for (const name of ["steady", "layer", "room", "stackChip", "nextLine", "noteText"]) {
+      expect(css.match(new RegExp(`(^|[\\s,}])\\.${name}(?=[\\s,{:.])`, "gm")) ?? [], name).toHaveLength(1);
+    }
+  });
+
   it("offers one Use price, the real one", () => {
     const { getAllByRole } = draw(STATES[0][1]);
     expect(getAllByRole("button", { name: "Use price" })).toHaveLength(1);

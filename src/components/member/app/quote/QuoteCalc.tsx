@@ -67,8 +67,8 @@ export default function QuoteCalc({ vm, brandName, cart, fee, kpiEach, onPress, 
                 keypad under the member's thumb (2026-10-15): the chip and the penalty line each share one place
                 with, invisible, everything they can say — every tier name, every penalty line — laid out alike. */}
             <div className={s.steady}>
-              <span className={`${s.layer} ${s.tierChip} ${s.chip}`} style={{ color: tone.ink }}>{vm.tierLabel}</span>
-              {vm.room.tiers.map(t => <span key={t} className={`${s.layer} ${s.tierChip} ${s.chip} ${s.room}`} aria-hidden>{t}</span>)}
+              <span className={`${s.layer} ${s.tierChip} ${s.stackChip}`} style={{ color: tone.ink }}>{vm.tierLabel}</span>
+              {vm.room.tiers.map(t => <span key={t} className={`${s.layer} ${s.tierChip} ${s.stackChip} ${s.room}`} aria-hidden>{t}</span>)}
             </div>
             <div className={s.steady}>
               {vm.penalty && <span className={`${s.layer} ${s.penalty}`} style={{ color: tone.ink }}>{vm.penalty}</span>}
