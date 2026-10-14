@@ -4,61 +4,56 @@
 //   ?period=YYYY-MM      — every invoice in that period → multi-page PDF
 //
 // Distinct from /statements/export which renders a TABLE of invoices in a
-// single page (list view); this route renders a proper invoice document
-// (HV letterhead, bill-to block, amount table) per page.
+// single page (list view); this route renders a proper invoice document per
+// page — the Finance revamp v2's sheet (2026-10-15, README §3 · P01). What it
+// still asks for is worked out as Invoice's hub works it out (`toHubInvoice`):
+// the receipts against it, a consolidated receipt's part, its approved credit
+// notes.
 
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn } from '@/lib/auth'
 import { exportPdfResponse } from '@/lib/export/response'
-import { InvoiceDocPdf, type InvoiceDocData } from '../_format/invoice-doc-pdf'
+import { fetchByKeys } from '@/lib/paginate'
+import { billingModeLabel } from '@/lib/invoice-labels'
+import { extraBillingModeOptions, primedRegistryRows } from '@/lib/dept-registry'
+import { toHubInvoice, type HubCreditNoteLine, type InvoiceRowIn } from '@/app/(portal)/statements/_lib/invoice-model'
+import { InvoiceDocPdf, type InvoiceDocData, type InvoiceLineData } from '../_format/invoice-doc-pdf'
 import { officeTime } from '@/lib/office-time'
 
-interface InvoiceRow {
-  id: string
-  invoice_no: string | null
-  company_id: string | null
-  period_month: string
-  billing_mode: string
-  total_amount: number
-  status: string
-  billable_to_type: 'subsidiary' | 'director' | 'dept_pool' | 'freetext' | null
-  billable_to_department_id: string | null
-  billable_to_freetext_name: string | null
-  billable_to_freetext_address: string | null
-  billable_to_freetext_phone: string | null
-  billable_to_freetext_email: string | null
-  description: string | null
-  invoice_date: string | null
-  due_date: string | null
-  reference_no: string | null
-  category_code: string | null
+const COLUMNS =
+  'id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, settlement_voucher_id'
+
+// The billing mode as the invoice has always printed it (the design's *Venture (HV) OPEX*).
+const MODE_ON_INVOICE: Record<string, string> = {
+  marketing_project: 'Marketing project',
+  director_office_attribution: 'Director Office OPEX',
+  director_attribution: 'Director OPEX',
+  hr_attribution: 'HR OPEX',
+  finance_attribution: 'Finance OPEX',
+  venture_attribution: 'Venture (HV) OPEX',
+  non_billable: 'Non-billable',
+  payroll_consolidated: 'Payroll (consolidated)',
 }
 
-function resolveBillTo(
-  inv: InvoiceRow,
-  companyMap: Map<string, { name: string; code: string }>,
-  departmentMap: Map<string, string>,
-): { primary: string; sub: string } {
+/** Who it bills, as the sheet's *Bill to* says it: the name, then its kind. */
+function billTo(
+  inv: InvoiceRowIn,
+  companies: Map<string, { name: string; code: string | null }>,
+  departments: Map<string, string>,
+): InvoiceDocData['bill_to'] {
   if (inv.company_id) {
-    const c = companyMap.get(inv.company_id)
-    return {
-      primary: c?.name ?? '—',
-      sub: c?.code ? `Subsidiary · ${c.code}` : 'Subsidiary',
-    }
+    const c = companies.get(inv.company_id)
+    return { name: c?.name ?? '—', kind: c?.code ? `Subsidiary · ${c.code}` : 'Subsidiary', contact: [] }
   }
   if (inv.billable_to_type === 'dept_pool' && inv.billable_to_department_id) {
-    return {
-      primary: departmentMap.get(inv.billable_to_department_id) ?? '—',
-      sub: 'Department pool',
-    }
+    return { name: departments.get(inv.billable_to_department_id) ?? '—', kind: 'Department pool', contact: [] }
   }
-  const name = inv.billable_to_freetext_name ?? '—'
-  const subMap: Record<string, string> = {
-    director: 'Director',
-    dept_pool: 'Department pool',
-    freetext: 'External party',
-  }
-  return { primary: name, sub: subMap[inv.billable_to_type ?? ''] ?? '—' }
+  const kind: Record<string, string> = { director: 'Director', dept_pool: 'Department pool', freetext: 'External party' }
+  const contact =
+    inv.billable_to_type === 'freetext'
+      ? [inv.billable_to_freetext_address, inv.billable_to_freetext_phone, inv.billable_to_freetext_email].filter((x): x is string => !!x?.trim())
+      : []
+  return { name: inv.billable_to_freetext_name ?? '—', kind: kind[inv.billable_to_type ?? ''] ?? '—', contact }
 }
 
 export async function GET(req: Request) {
@@ -78,12 +73,7 @@ export async function GET(req: Request) {
   const supabase = await createClient()
 
   // Fetch invoices for whichever filter was provided.
-  let invoicesQuery = supabase
-    .from('invoices')
-    .select(
-      'id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code',
-    )
-
+  let invoicesQuery = supabase.from('invoices').select(COLUMNS)
   if (id) {
     invoicesQuery = invoicesQuery.eq('id', id)
   } else if (idsParam) {
@@ -97,81 +87,93 @@ export async function GET(req: Request) {
   }
   invoicesQuery = invoicesQuery.order('invoice_no', { ascending: true })
 
-  const { data: invoices } = await invoicesQuery
-  if (!invoices || invoices.length === 0) {
+  const { data: found } = await invoicesQuery
+  if (!found || found.length === 0) {
     return Response.json({ error: 'No matching invoices' }, { status: 404 })
   }
+  const invoices = found as unknown as InvoiceRowIn[]
+  const invoiceIds = invoices.map((inv) => inv.id)
+  const settlementIds = [...new Set(invoices.map((inv) => inv.settlement_voucher_id).filter((v): v is string => !!v))]
 
-  const [{ data: companies }, { data: departments }, { data: coaRows }] = await Promise.all([
+  const [{ data: companies }, { data: departments }, lineRows, receiptRows, settlementRows, cnRows] = await Promise.all([
     supabase.from('companies').select('id, name, short_code'),
-    // is_internal=false — the 'Venture Office' pseudo-dept is never a billable party.
-    supabase.from('departments').select('id, name').eq('is_internal', false),
-    supabase.from('chart_of_accounts').select('code, name'),
+    // Every department: the own-share invoice bills Venture (Office), an internal one.
+    supabase.from('departments').select('id, name'),
+    fetchByKeys(invoiceIds, (chunk) =>
+      supabase.from('invoice_lines').select('invoice_id, line_no, description, amount, category_code, segment').in('invoice_id', chunk).order('line_no'),
+    ),
+    // Receipts made against each (a part payment, a single settle).
+    fetchByKeys(invoiceIds, (chunk) =>
+      supabase
+        .from('payment_vouchers')
+        .select('invoice_id, voucher_no, payment_date, amount')
+        .in('invoice_id', chunk)
+        .eq('direction', 'credit')
+        .neq('status', 'voided')
+        .order('payment_date'),
+    ),
+    // The consolidated receipt a paid one points at.
+    fetchByKeys(settlementIds, (chunk) => supabase.from('payment_vouchers').select('id, voucher_no, payment_date, amount').in('id', chunk)),
+    fetchByKeys(invoiceIds, (chunk) => supabase.from('credit_notes').select('id, invoice_id, credit_note_no, amount, reason, status').in('invoice_id', chunk)),
   ])
-  const companyMap = new Map(
-    (companies ?? []).map((c) => [c.id as string, { name: c.name as string, code: c.short_code as string }]),
-  )
-  const departmentMap = new Map<string, string>(
-    (departments ?? []).map((d) => [d.id as string, d.name as string]),
-  )
-  const coaMap = new Map<string, string>(
-    (coaRows ?? []).map((c) => [c.code as string, c.name as string]),
-  )
 
-  // Mig 275: fetch line items for these invoices if any.
-  const invoiceIds = invoices.map((inv) => inv.id as string)
-  const { data: allLines } = await supabase
-    .from('invoice_lines')
-    .select('invoice_id, line_no, description, amount, category_code, segment')
-    .in('invoice_id', invoiceIds)
-    .order('line_no')
-  const linesByInvoice = new Map<string, Array<{ line_no: number; description: string | null; amount: number; category_code: string | null; segment: string | null }>>()
-  for (const ln of allLines ?? []) {
-    const arr = linesByInvoice.get(ln.invoice_id as string) ?? []
-    arr.push({
-      line_no: ln.line_no as number,
-      description: (ln.description as string | null) ?? null,
-      amount: Number(ln.amount),
-      category_code: (ln.category_code as string | null) ?? null,
-      segment: (ln.segment as string | null) ?? null,
-    })
-    linesByInvoice.set(ln.invoice_id as string, arr)
+  const companyMap = new Map((companies ?? []).map((c) => [c.id as string, { name: c.name as string, code: (c.short_code as string | null) ?? null }]))
+  const departmentMap = new Map<string, string>((departments ?? []).map((d) => [d.id as string, d.name as string]))
+  const extraModes = extraBillingModeOptions(primedRegistryRows())
+
+  const group = <T, K extends string>(rows: T[], key: (r: T) => K) => {
+    const out = new Map<K, T[]>()
+    for (const r of rows) {
+      const k = key(r)
+      out.set(k, [...(out.get(k) ?? []), r])
+    }
+    return out
   }
+  type LineRow = { invoice_id: string; description: string | null; amount: number | string; category_code: string | null; segment: string | null }
+  type ReceiptRow = { invoice_id: string; voucher_no: string | null; payment_date: string | null; amount: number | string }
+  type CnRow = { id: string; invoice_id: string; credit_note_no: string | null; amount: number | string; reason: string | null; status: string }
+  const linesBy = group(lineRows as LineRow[], (l) => l.invoice_id)
+  const receiptsBy = group(receiptRows as ReceiptRow[], (r) => r.invoice_id)
+  const cnsBy = group(cnRows as CnRow[], (c) => c.invoice_id)
+  const settlements = new Map(
+    (settlementRows as Array<{ id: string; voucher_no: string | null; payment_date: string | null; amount: number | string }>).map((v) => [
+      v.id,
+      { voucher_no: v.voucher_no, payment_date: v.payment_date, amount: Number(v.amount) },
+    ]),
+  )
 
-  const docs: InvoiceDocData[] = invoices.map((raw) => {
-    const inv = raw as InvoiceRow
-    const billTo = resolveBillTo(inv, companyMap, departmentMap)
-    const lines = linesByInvoice.get(inv.id)
+  const docs: InvoiceDocData[] = invoices.map((inv) => {
+    const lines = linesBy.get(inv.id) ?? []
+    const h = toHubInvoice(inv, {
+      companies: companyMap,
+      departments: departmentMap,
+      accounts: new Map(),
+      extraModes,
+      lines: new Map([[inv.id, lines.map((l) => ({ description: l.description, amount: Number(l.amount), category_code: l.category_code }))]]),
+      receipts: new Map([[inv.id, (receiptsBy.get(inv.id) ?? []).map((r) => ({ voucher_no: r.voucher_no, payment_date: r.payment_date, amount: Number(r.amount) }))]]),
+      settlements,
+      creditNotes: new Map([
+        [inv.id, (cnsBy.get(inv.id) ?? []).map((c): HubCreditNoteLine => ({ id: c.id, no: c.credit_note_no, amount: Number(c.amount), status: c.status, reason: c.reason }))],
+      ]),
+    })
+    const paidOn = h.receipts.reduce<string | null>((last, r) => (r.date && (!last || r.date > last) ? r.date : last), null)
     return {
       id: inv.id,
       invoice_no: inv.invoice_no,
       status: inv.status,
-      total_amount: Number(inv.total_amount),
       period_month: inv.period_month,
-      billing_mode: inv.billing_mode,
       invoice_date: inv.invoice_date,
       due_date: inv.due_date,
-      description: inv.description,
       reference_no: inv.reference_no,
-      // Customer-facing: show the category NAME only, never the GL account code.
-      category_label: inv.category_code ? (coaMap.get(inv.category_code) || null) : null,
-      bill_to_primary: billTo.primary,
-      bill_to_sub: billTo.sub,
-      // External (Other) payer contact details — only for freetext invoices.
-      bill_to_address: inv.billable_to_type === 'freetext' ? inv.billable_to_freetext_address : null,
-      bill_to_phone: inv.billable_to_type === 'freetext' ? inv.billable_to_freetext_phone : null,
-      bill_to_email: inv.billable_to_type === 'freetext' ? inv.billable_to_freetext_email : null,
-      lines: lines && lines.length > 0
-        ? lines.map((ln) => ({
-            line_no: ln.line_no,
-            description: ln.description,
-            amount: ln.amount,
-            category_label: ln.category_code
-              ? `${ln.category_code} · ${coaMap.get(ln.category_code) ?? ''}`.trim()
-              : null,
-            segment: ln.segment,
-          }))
-        : undefined,
+      description: inv.description,
+      billing_mode_label: MODE_ON_INVOICE[inv.billing_mode] ?? billingModeLabel(inv.billing_mode, extraModes),
+      bill_to: billTo(inv, companyMap, departmentMap),
+      lines: lines.map((l): InvoiceLineData => ({ description: l.description, amount: Number(l.amount), segment: l.segment })),
+      total: h.total,
+      credited: h.credited,
+      received: h.received,
+      remaining: h.remaining,
+      paid_on: paidOn,
     }
   })
 
