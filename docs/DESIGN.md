@@ -1,6 +1,6 @@
 # DESIGN.md — HOUZS Venture Portal
 
-**Version 4.30 · 2026-10-15** — the single design doc for every screen: the portal, the Revenue app and the HR phone app. Version history: Part IV.
+**Version 4.34 · 2026-10-15** — the single design doc for every screen: the portal, the Revenue app and the HR phone app. Version history: Part IV.
 
 **The design system.** The visual source is the Claude Design project **HOUZS Venture Design System** (https://claude.ai/design/p/1fecd655-db12-4974-abf4-3d7434e41386, synced from `main` on 2026-10-13). It holds the tokens, the foundation cards, the core and view components and four templates. This file says how the code does it — which token, class or component a page uses today — and holds the rules the code enforces. Where the project and this file disagree, this file is the code's truth. Change either one on purpose, never by drift.
 
@@ -848,6 +848,12 @@ README §1 and `prototype/Finance Mobile App.dc.html` (M01–M18): Finance's vie
 
 **HR & Payroll**
 
+### HR's view — Attendance (v4.34, 2026-10-15)
+
+The Attendance handoff (`HR Portal Desktop (standalone).html`, `source/HR Attendance.dc.html`, measured at a 1600×1000 window — at 1440×900 its stage scales to 0.947): HR's sidebar is the handoff's eight sections at **248px** (Finance's stays 212), and Attendance is section II — Today · Records · Requests · Leave balances · Month close · Settings · Readiness (`/attendance/*`, `lib/hr-nav.ts`). The rules: `.claude/rules/hr/attendance.md`.
+- **The kit** (`components/ds/`): the design system bundle's Button, Field / Select, SegmentedControl / Switch, StatusChip, DescriptionList, DataTable, the right-hand Sheet (10px inside the content frame, 40px + fade over 340ms), the prototype's fixed SidePanel (480 / 460px), Settings' CenterWindow (620px, radius 14) and the one-line Toast (2.2s). A panel portalled to `<body>` brings `.sheet-theme` and `[data-fin-kit]` with it.
+- **The pages**: Today's lanes (Clocked in · Late · Not in yet · On leave) and the person calendar; Records' people × days matrix (drag to select, set / clear, a whole day for everyone); Requests' queue, record and route tab; Leave balances with the ledger; Month close (decide each day, the register, close / reopen, CSV); Settings' eight tabs; Readiness' checklist. HR's Overview opens on the handoff's tiles and the news.
+- **No descriptions**: the prototype's page subtitles and drag hints are left out (No descriptions on the page). The punch itself is not on these pages — the apps carry it (`att_punch`).
 ### Payroll grid (v3.3, 2026-09-05 — HR → Payroll)
 
 Every row is a form, so the grid neither folds nor sheds columns. Values: `globals.css` › "Payroll grid".
@@ -1516,6 +1522,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.34** · 2026-10-15 · HR's view — Attendance: HR's sidebar the handoff's eight sections at 248px; Attendance's seven pages (Today, Records, Requests, Leave balances, Month close, Settings, Readiness) on the design system kit (`components/ds/`), and HR's new Overview → HR's view — Attendance
 - **v4.33** · 2026-10-15 · Finance's phone app, part 1 (M01–M09, M17–M18): `/fin-app`'s frame and tab bar, the screen's heads and moves, the Overview, Daily › Payment and Receive (stacked cards, lists, the record with the full page's parts), Profile; every kit window rising as the design's bottom sheet inside the app → Finance's view — the phone app
 - **v4.32** · 2026-10-15 · Finance's sidebar has no Claims any more (the user: "delete the claim tab") — Department ends at Venture Pool, on the Overview's Department card too; the page itself stays → Finance's view — its own shell
 - **v4.31** · 2026-10-15 · The documents — invoice, receipt, payment voucher, credit note — on the design's one sheet (P01–P04): A4, one sans face, no fills; the title and the walnut H, the meta list, the issuer beside the counter-party, the headline, the items under a black rule, the totals block, payment details / the approval list / signature lines, the footer with *Page N of M*; the salary and statutory detail pages to the same rules → Finance's view — the documents
