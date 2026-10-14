@@ -17,6 +17,8 @@ export type NotifSummary = {
   lines: SummaryLine[];
   visit: string;
   openChat?: () => void;
+  /** One more button above Open chat (a visit tomorrow: Send reminder). */
+  action?: { label: string; run: () => void };
 };
 
 let state: NotifSummary | null = null;
@@ -74,6 +76,10 @@ export function NotifSummaryHost() {
           )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {s.action && (
+            <button type="button" onClick={() => { const go = s.action!.run; close(); go(); }}
+              style={{ height: "46px", borderRadius: "23px", border: 0, background: "#8E4B6E", color: "#fff", fontSize: "15px", fontWeight: 650, cursor: "pointer" }}>{s.action.label}</button>
+          )}
           {s.openChat && (
             <button type="button" onClick={() => { const go = s.openChat; close(); go?.(); }}
               style={{ height: "46px", borderRadius: "23px", border: 0, background: "#BD4A19", color: "#fff", fontSize: "15px", fontWeight: 650, cursor: "pointer" }}>Open chat</button>

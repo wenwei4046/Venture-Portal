@@ -6,7 +6,7 @@
  */
 import { downlineOf } from "../../shared/people";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
-import { gb, day0, DAY, firstName, ini, money, urgencyOf, type SalesCtx } from "./common";
+import { gb, day0, DAY, firstName, ini, isCold, money, urgencyOf, type SalesCtx } from "./common";
 
 export interface SalesNotif {
   id: string;
@@ -22,6 +22,10 @@ export interface SalesNotif {
   inviteId?: string;
   /** The customer it is about — tapping the update opens that chat (user 2026-10-13: 點了裡面的未讀訊息要有跳到該功能). */
   customerId?: string;
+  /** A visit tomorrow (2026-10-14): its summary offers Send reminder. */
+  visitId?: string;
+  /** How the row is drawn: a visit tomorrow (calendar), a chat waiting for a reply (clock); else by `ok`. */
+  tone?: "appt" | "wait";
 }
 
 const atLabel = (t: number, now: Date) => {
@@ -59,6 +63,29 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
     const t = new Date(c.assignedAt).getTime(), by = c.assignedBy && c.assignedBy !== me ? nameOf(c.assignedBy) : "";
     out.push({ id: "a" + c.id + t, customerId: c.id, kind: "status", from: by || c.name, ini: ini(by || c.name), lead: c.name, at: atLabel(t, now), time: t, ok: true, pending: false,
       text: by ? `${firstName(by)} assigned a customer to you` : c.adId ? `New enquiry for you · ${c.ad}` : "New enquiry for you" });
+  }
+  // Their own customers' visits TOMORROW (the owner, 2026-10-14: "notification 要包含 upcoming appt 可以提前 1 天，就是通知
+  // 業務去 send reminder 給客戶"): from the start of the day before, until the visit; "reminder sent" once it went.
+  const tomorrow = day0(now) + DAY;
+  for (const v of data.visits) {
+    if (v.state !== "booked") continue;
+    const c = data.customers.find(x => x.id === v.customerId);
+    if (!c || c.assignedTo !== me) continue;
+    const s = new Date(v.start);
+    if (day0(s) !== tomorrow) continue;
+    const at = s.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" }), t = tomorrow - DAY;
+    out.push({ id: "t" + v.id, customerId: c.id, visitId: v.id, tone: "appt", kind: "status", from: c.name, ini: ini(c.name), lead: c.name, at: atLabel(t, now), time: t, pending: false,
+      ok: !!v.remindedAt, text: v.remindedAt ? `Visit tomorrow, ${at} · reminder sent` : `Visit tomorrow, ${at} · send the customer a reminder` });
+  }
+  // Their own chats waiting for their reply past 3 h · 6 h · 9 h (the owner, 2026-10-14: "有 3h, 6h, 9h 未回復的也有
+  // notification 提醒，要儘快回復"): the line it crossed, one notice a line — each new line is unread again.
+  for (const c of data.customers) {
+    if (c.assignedTo !== me || !c.lastCustomerAt || isCold(c, now)) continue;
+    const u = urgencyOf(c, now);
+    if (u.level === "none") continue;
+    const h = u.level === "overdue" ? 9 : u.level === "urgent" ? 6 : 3, t = new Date(c.lastCustomerAt).getTime() + h * 3_600_000;
+    out.push({ id: `w${c.id}@${c.lastCustomerAt}:${h}`, customerId: c.id, tone: "wait", kind: "status", from: c.name, ini: ini(c.name), lead: c.name, at: atLabel(t, now), time: t, ok: false, pending: false,
+      text: u.level === "overdue" ? `Overdue · waiting ${Math.floor(u.waitingMinutes / 60)} h for your reply` : u.level === "urgent" ? "Urgent · waiting 6 h for your reply" : "Waiting for your reply · 3 h" });
   }
   // About the people below them, only theirs.
   const below = new Set(downlineOf(me, data.people).filter(id => id !== me));

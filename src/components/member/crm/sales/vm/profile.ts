@@ -27,8 +27,12 @@ export function profileVM(ctx: SalesCtx) {
   const lastWords = (id?: string) => lastWordsOf(data, id);
   const summaryOf = (n: (typeof notifs)[number]) => {
     const c = custOf(n.customerId);
-    openSummary(summaryFor({ data, nameOf, me: owner.id }, { title: n.text, when: n.at, customerId: n.customerId, lead: n.lead },
-      c && ctx.mine.some(x => x.id === c.id) ? () => { set(u => ({ ...u, profSub: null, tab: "inbox", chat: c.id, hist: [...u.hist, u.tab].slice(-20) })); act.openChat(c.id); } : undefined));
+    const s = summaryFor({ data, nameOf, me: owner.id }, { title: n.text, when: n.at, customerId: n.customerId, lead: n.lead },
+      c && ctx.mine.some(x => x.id === c.id) ? () => { set(u => ({ ...u, profSub: null, tab: "inbox", chat: c.id, hist: [...u.hist, u.tab].slice(-20) })); act.openChat(c.id); } : undefined);
+    // A visit tomorrow: send the customer its reminder card from here (again, once sent).
+    const v = n.visitId ? data.visits.find(x => x.id === n.visitId && x.state === "booked") : undefined;
+    if (v && !viewingOther) s.action = { label: v.remindedAt ? "Send reminder again" : "Send reminder", run: () => { void act.remind(v.id).then(ok => { if (ok) act.toast(`Reminder sent to ${c?.name ?? "the customer"}`); }); } };
+    openSummary(s);
   };
   const unread = notifs.filter(n => !isRead(n)).length, nTab = ui.nTab;
   const vis = notifs.filter(n => (nTab === "unread") === !isRead(n));
@@ -87,7 +91,9 @@ export function profileVM(ctx: SalesCtx) {
       text: n.text, rule: k ? "1px solid #EBDDD2" : "0",
       meta: (() => { const c = custOf(n.customerId); return [n.lead, c ? CHANNEL[c.channel].name : "", n.at].filter(Boolean).join(" · "); })(),
       sum: lastWords(n.customerId),
-      c: n.ok ? "#387557" : "#A3371A", bg: n.ok ? "#E4F1E8" : "#FBEAE6", icon: n.ok ? "m5 12 5 5 9-10" : "M6 6l12 12M18 6 6 18",
+      ...(n.tone === "appt" ? { c: "#8E4B6E", bg: "#F3E8EF", icon: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14" }
+        : n.tone === "wait" ? { c: "#A46312", bg: "#FBF1D9", icon: "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" }
+        : { c: n.ok ? "#387557" : "#A3371A", bg: n.ok ? "#E4F1E8" : "#FBEAE6", icon: n.ok ? "m5 12 5 5 9-10" : "M6 6l12 12M18 6 6 18" }),
     })),
     qrRows: qrs.map((q, i) => ({
       title: q.shortcut, text: q.message,
