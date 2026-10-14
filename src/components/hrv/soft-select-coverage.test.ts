@@ -23,6 +23,11 @@ const ROOTS = [
   'src/app/(portal)/audit-log',
   'src/components/layout/HrTopBar.tsx',
   'src/components/layout/HrSidebar.tsx',
+  // Finance's shell and the Finance view's kit (2026-10-14, the Finance revamp v2: its HrSelect is this Select).
+  'src/components/layout/ViewSidebar.tsx',
+  'src/components/layout/FinSidebar.tsx',
+  'src/components/layout/AccountMenu.tsx',
+  'src/components/finv',
 ]
 
 function files(at: string): string[] {

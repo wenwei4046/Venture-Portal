@@ -4192,6 +4192,15 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   .hrv-frame { display: block; padding: 0; }
   .hrv-sheet.sheet { overflow: visible; }
 }
+/* Finance's sheet (2026-10-14, the Finance revamp v2 — `Finance Desktop.dc.html`):
+   the prototype's scroller pads 24 top, 28 each side and 48 at the foot, at
+   every width the sidebar shows. */
+@media (min-width: 768px) {
+  .hrv-sheet.sheet.fin-sheet { padding: 24px 28px 48px; }
+}
+@media print {
+  .hrv-sheet.sheet.fin-sheet { padding: 0; }
+}
 
 /* ── Finance's queues (2026-10-07) ──
    The Approvals queue first, then the Invoices and the Statements: a table

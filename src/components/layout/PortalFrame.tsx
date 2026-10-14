@@ -6,7 +6,7 @@ import type { User } from '@/types'
 import { dropSelectionsForPath } from '@/lib/selection-store'
 import { logPageView } from '@/lib/page-view'
 import { isSheetRoute } from '@/lib/sheet-routes'
-import { isFinanceDetailRoute, isFinanceView } from '@/lib/finance-view'
+import { isFinanceDetailRoute, isFinanceShell, isFinanceView } from '@/lib/finance-view'
 import { FinViewProvider } from './fin-view'
 import FinSwipeBack from './FinSwipeBack'
 import FinScrollMemory from './FinScrollMemory'
@@ -20,10 +20,12 @@ import BackToTop from '@/components/BackToTop'
 import RouteFreshener from './RouteFreshener'
 import HrSidebar from './HrSidebar'
 import HrTopBar from './HrTopBar'
+import FinSidebar from './FinSidebar'
 import ViewingAsBanner from './ViewingAsBanner'
 import { isHrView } from '@/lib/hr-view'
 import { lensNav } from '@/lib/view-as'
 import { ToastHost } from '@/components/hrv/toast'
+import { FinToastHost } from '@/components/finv/Toast'
 
 // Portal shell.
 //
@@ -39,13 +41,16 @@ export default function PortalFrame({
   user,
   navData: layoutNav,
   hrNavCollapsed = false,
+  phone = false,
   children,
 }: {
   user: User
   /** The nav rows that come from the database — Revenue's sub-departments. */
   navData: NavData
-  /** HR's sidebar folded to its 64px rail (a cookie, so it draws folded). */
+  /** HR's (or Finance's) sidebar folded to its 64px rail (a cookie, so it draws folded). */
   hrNavCollapsed?: boolean
+  /** A phone, by its browser's own words (lib/one-app.ts): Finance's view keeps the portal's phone shell there. */
+  phone?: boolean
   children: React.ReactNode
 }) {
   const [moreOpen, setMoreOpen] = useState(false)
@@ -67,6 +72,11 @@ export default function PortalFrame({
   // pages as Finance or the Principal sees them take the revamp — the shared
   // components read it through FinViewProvider, the CSS through `.fin-view`.
   const fin = isFinanceView(pathname, user.role)
+  // Finance's own shell (2026-10-14, the Finance revamp v2): HR's square
+  // sidebar and greeting bar, drawn with Finance's categories — for the
+  // finance kind and the Principal's Finance lens, on a computer (a phone keeps
+  // the portal's phone shell until Finance's phone app takes it over).
+  const finShell = !hr && isFinanceShell(user.role) && !phone
   const mainRef = useRef<HTMLElement>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
 
@@ -99,39 +109,49 @@ export default function PortalFrame({
   // view is a lens over the account's own power, which still opens every page.
   const navUser = useMemo(() => lensNav(user), [user])
 
-  if (hr) {
-    // HR's shell: the square sidebar, the white greeting bar, and the sheet as
-    // the scroller inside a 10px frame — the frame is where drawers, windows
-    // and the toast are drawn, so they cover the sheet and nothing else.
+  if (hr || finShell) {
+    // HR's shell — and Finance's since 2026-10-14: the square sidebar, the
+    // white greeting bar, and the sheet as the scroller inside a 10px frame —
+    // the frame is where drawers, windows and HR's toast are drawn, so they
+    // cover the sheet and nothing else. Finance's pages keep `.fin-view` on the
+    // frame (the first revamp's rules) and their list's place on Back; its
+    // toast is the design's pill at the window's foot.
+    const finPage = finShell && fin
     return (
-      <FinViewProvider value={false}>
-        <div className="hrv-shell flex h-screen overflow-hidden print:h-auto print:overflow-visible">
+      <FinViewProvider value={finPage}>
+        <div className={`hrv-shell${finShell ? ' fin-shell' : ''} flex h-screen overflow-hidden print:h-auto print:overflow-visible`}>
           <div className="print:hidden contents">
-            <HrSidebar user={navUser} revenueSub={navData.revenueSub ?? null} initialCollapsed={hrNavCollapsed} />
+            {finShell ? (
+              <FinSidebar user={navUser} navData={navData} initialCollapsed={hrNavCollapsed} />
+            ) : (
+              <HrSidebar user={navUser} revenueSub={navData.revenueSub ?? null} initialCollapsed={hrNavCollapsed} />
+            )}
           </div>
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden print:overflow-visible">
             <div className="print:hidden contents">
               {user.viewingAs ? <ViewingAsBanner name={user.viewingAs.name} /> : null}
-              <HrTopBar user={user} />
+              <HrTopBar user={user} viewLabel={finShell ? 'Finance view' : 'HR view'} />
               <div className="md:hidden">
-                <TopBar user={user} />
+                <TopBar user={user} fin={finPage} />
               </div>
             </div>
-            <div className="hrv-frame" data-hrv-overlay="">
-              <main ref={mainRef} className="sheet-theme sheet hrv-sheet route-surface page-enter print:p-0">
-                {children}
+            <div className={`hrv-frame${finPage ? ' fin-view' : ''}`} data-hrv-overlay="">
+              <main ref={mainRef} className={`sheet-theme sheet hrv-sheet${finShell ? ' fin-sheet' : ''} route-surface page-enter print:p-0`}>
+                {finShell ? <div ref={surfaceRef}>{children}</div> : children}
               </main>
-              <ToastHost />
+              {finShell ? null : <ToastHost />}
             </div>
           </div>
+          {finPage ? <FinScrollMemory root={surfaceRef} view={pathname ?? ''} /> : null}
           <BottomTabBar
             role={user.role}
             viewer={navUser}
             moreOpen={moreOpen}
             onMoreClick={() => setMoreOpen((o) => !o)}
-            fin={false}
+            fin={finPage}
           />
           <MoreSheet user={navUser} navData={navData} open={moreOpen} onClose={() => setMoreOpen(false)} />
+          {finShell ? <FinToastHost /> : null}
           <Suspense fallback={null}>
             <RouteFreshener />
           </Suspense>

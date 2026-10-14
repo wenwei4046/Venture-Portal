@@ -6,6 +6,7 @@ import { canAccessRevenue } from '@/lib/roles'
 import { primedRegistryRows } from '@/lib/dept-registry'
 import { statementDepts } from '@/lib/dept-statements'
 import { HR_NAV_COOKIE, REVENUE_SUB_COOKIE, isHrView } from '@/lib/hr-view'
+import { isFinanceShell } from '@/lib/finance-view'
 import { listSubDepartments } from './revenue/_lib/sub-departments'
 import { redirect } from 'next/navigation'
 import { isPhone, opensHrAppOnPhone } from '@/lib/one-app'
@@ -19,8 +20,9 @@ export default async function PortalLayout({
 }) {
   const user = await requireAuth()
   if (user.role === 'revenue_member') redirect('/member')
+  const phone = isPhone((await headers()).get('user-agent'))
   // One app (2026-10-11, lib/one-app.ts): on a phone, HR's view IS the HR app — its other pages are the computer's.
-  if (opensHrAppOnPhone(user) && isPhone((await headers()).get('user-agent'))) redirect('/hr-app')
+  if (opensHrAppOnPhone(user) && phone) redirect('/hr-app')
   const jar = await cookies()
   // Admin › Change password is a personal login's own (2026-10-12): asked beside the nav's rows.
   const personal = startRead(loginIsPersonal())
@@ -52,7 +54,9 @@ export default async function PortalLayout({
     <PortalFrame
       user={personalLogin ? { ...user, personalLogin } : user}
       navData={navData}
-      hrNavCollapsed={isHrView(user.role) && jar.get(HR_NAV_COOKIE)?.value === 'collapsed'}
+      // HR's sidebar and Finance's (2026-10-14) fold alike, on the one cookie.
+      hrNavCollapsed={(isHrView(user.role) || isFinanceShell(user.role)) && jar.get(HR_NAV_COOKIE)?.value === 'collapsed'}
+      phone={phone}
     >
       {children}
     </PortalFrame>

@@ -1,14 +1,25 @@
-/* HR's sidebar (2026-10-10) — the prototype's aside, value for value:
-   square, full height, flush to the left edge; 248px open, 64px folded. */
+/* The view sidebar (2026-10-10 HR's; 2026-10-14 Finance's too) — the
+   prototype's aside, value for value: square, full height, flush to the left
+   edge; 212px open since the Finance revamp v2 (its README: "HrSidebar (212px
+   wide, 64 folded)", HR's too), 64px folded. */
+
+/* The prototype's `data-fin-side` box: the aside, and the footer's menu drawn
+   over it. display: flex comes from `md:flex` — below md the phone's tab bar
+   navigates. */
+.rail {
+  position: relative;
+  flex: none;
+  height: 100%;
+}
 
 .aside {
-  /* The prototype's box is content-box: 248px plus its 1px border. */
+  /* The prototype's box is content-box: 212px plus its 1px border. */
   box-sizing: content-box;
-  width: 248px;
+  width: 212px;
   flex: none;
+  display: flex;
   border-right: 1px solid rgb(var(--hvs-nav-border));
   background: rgb(var(--hvs-nav));
-  /* display: flex comes from `md:flex` — below md the phone's tab bar navigates. */
   flex-direction: column;
   overflow: hidden;
   transition: width 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -173,8 +184,91 @@
 }
 .footText { flex: 1; min-width: 0; transition: opacity 0.2s; }
 .footName { font-size: 13px; font-weight: 500; color: rgb(var(--hvs-ink)); line-height: 17px; overflow: hidden; text-overflow: ellipsis; }
-.footSub { font-size: 11px; color: rgb(var(--hvs-muted)); line-height: 15px; }
+.footSub { font-size: 11px; color: rgb(var(--hvs-muted)); line-height: 15px; overflow: hidden; text-overflow: ellipsis; }
 .version { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; color: rgb(var(--hvs-muted)); }
+
+/* Finance's footer opens the account menu (2026-10-14): the prototype lays a
+   57px hit area over the footer (its right 1px left to the border) that
+   washes on hover. Here the footer is the button. */
+.footButton {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid rgb(var(--hvs-nav-border));
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.footButton:hover { background: rgb(241 236 228 / 0.45); }
+.footButton:focus-visible { outline: 2px solid rgb(var(--hvs-nav-bar)); outline-offset: -2px; }
+
+/* The account menu (the design's D13): a white popover 10px in from the rail,
+   64px up from its foot, over a transparent scrim that closes it. Folded, the
+   menu keeps the open rail's width. */
+.menuScrim { position: fixed; inset: 0; z-index: 40; }
+.menu {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 64px;
+  z-index: 41;
+  padding: 6px;
+  background: rgb(255 255 255);
+  border: 1px solid rgb(var(--hvs-nav-border));
+  border-radius: 12px;
+  box-shadow: 0 14px 36px rgb(51 36 27 / 0.18), 0 2px 6px rgb(51 36 27 / 0.06);
+  line-height: normal;
+}
+.menu[data-collapsed='true'] { right: auto; width: 193px; }
+.menuTitle {
+  padding: 8px 10px 4px;
+  font-size: 10.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgb(var(--hvs-muted));
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: rgb(var(--hvs-graphite));
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.menuItem:hover { background: rgb(var(--hvs-nav-hover)); color: rgb(var(--hvs-graphite)); text-decoration: none; }
+.menuItem:focus-visible { outline: 2px solid rgb(var(--hvs-nav-bar)); outline-offset: -2px; }
+.menuRule { height: 1px; margin: 6px 4px; background: rgb(var(--hvs-nav-border)); }
+.menuSignOut {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgb(var(--hvs-muted));
+  text-align: left;
+  cursor: pointer;
+}
+.menuSignOut:hover { background: rgb(var(--hvs-nav-hover)); }
+.menuSignOut:focus-visible { outline: 2px solid rgb(var(--hvs-nav-bar)); outline-offset: -2px; }
 
 /* Folded: the words fade out where they stand, so nothing reflows. */
 .aside[data-collapsed='true'] .brandText,

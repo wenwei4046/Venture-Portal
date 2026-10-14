@@ -45,6 +45,17 @@ export function isFinanceView(pathname: string | null | undefined, role: UserRol
   return FINANCE_VIEW_PREFIXES.some((p) => under(pathname, p))
 }
 
+/**
+ * Does the portal wear Finance's own shell (2026-10-14, the Finance revamp v2 —
+ * `.design/fin-r2/handoff`): HR's square sidebar and greeting bar with
+ * Finance's categories. The finance kind (finance@, a Finance template's
+ * holder) and the Principal's Finance lens — the user: "只给 Finance view";
+ * the Principal's own view keeps its sidebar, which holds far more.
+ */
+export function isFinanceShell(role: UserRole | string | null | undefined): boolean {
+  return role === 'finance'
+}
+
 // A row's own page under a list: `/payments/<id>`, `/fund-in/<id>`, … — what
 // "← Back to …" returns from with the list's scroll put back, and what an
 // edge swipe on a phone leaves. The second segment names the row unless it is

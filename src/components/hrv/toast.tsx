@@ -38,6 +38,11 @@ function subscribe(l: Listener) {
   }
 }
 
+/** The toast on show (null between them) — for a host that draws it its own way (the Finance view's pill). */
+export function useCurrentToast(): { id: number; message: string } | null {
+  return useSyncExternalStore(subscribe, () => current, () => null)
+}
+
 /** Test-only: forget whatever is showing. */
 export function resetToast() {
   if (timer) clearTimeout(timer)
