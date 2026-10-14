@@ -66,6 +66,8 @@ export interface AllocInvoiceRow {
   companyId: string
   companyLabel: string
   status: string
+  /** The batch it belongs to — invoices.reference_no (ALC-YYYYMM, ALC-YYYYMM-2 …). */
+  ref: string
 }
 
 export interface AllocatorData {

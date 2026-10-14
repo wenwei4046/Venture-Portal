@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allocatorSummary, batchLabel, byCompanyRows, splitSummary, type SheetTxn } from './allocator-sheet'
+import { allocatorSummary, batchLabel, byCompanyRows, methodLabel, recordLine, shareLine, splitSummary, type SheetTxn } from './allocator-sheet'
 
 // 2026-10-07 — the Billing Allocator on the sheet; 2026-10-09 — the user's
 // Claude Design handoff (照设计档): the split is one column of text, and a
@@ -101,5 +101,25 @@ describe('batchLabel', () => {
     expect(batchLabel(TXNS[1])).toBe('ALC-202609-3')
     expect(batchLabel(TXNS[2])).toBe('not billed')
     expect(batchLabel({ ...TXNS[2], billedRef: null })).toBe('not billed')
+  })
+})
+
+// 2026-10-14 — the revamp v2's D11: a record's line in Records and a share's in the drawer and the preview.
+describe('recordLine', () => {
+  it('says how it was split and its batch', () => {
+    expect(recordLine(TXNS[0])).toBe('Headcount split · ALC-202609')
+    expect(recordLine(TXNS[2])).toBe('Percentage split · not billed')
+    expect(methodLabel('equal')).toBe('Equal')
+  })
+})
+
+describe('shareLine', () => {
+  it('names the heads behind a headcount share, an equal share as such, else its part of the amount', () => {
+    expect(shareLine('Head: 3.25/16.75 (2026-09)', 3681.57, 18980)).toBe('3.25 staff · 19.4%')
+    expect(shareLine('Head: 4.00/16.75 (current)', 4532.54, 18980)).toBe('4 staff · 23.9%')
+    expect(shareLine('Equal: 1/7', 100, 700)).toBe('equal share')
+    expect(shareLine('17.5%', 175, 1000)).toBe('17.5%')
+    expect(shareLine('Custom', 250, 1000)).toBe('25.0%')
+    expect(shareLine('Custom', 0, 0)).toBe('0.0%')
   })
 })

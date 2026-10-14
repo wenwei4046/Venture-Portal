@@ -157,3 +157,28 @@ export function byCompanyRows(txns: SheetTxn[], invoices: SheetInvoice[]): ByCom
 export function batchLabel(t: Pick<SheetTxn, 'billedRef' | 'locked'>): string {
   return t.locked && t.billedRef ? t.billedRef : 'not billed'
 }
+
+const METHOD: Record<string, string> = { headcount: 'Headcount', percentage: 'Percentage', equal: 'Equal', custom: 'Custom' }
+
+/** A method in words: Headcount, Percentage, Equal, Custom. */
+export function methodLabel(method: string): string {
+  return METHOD[method] ?? method
+}
+
+/** A record's line in Records (2026-10-14, the revamp v2's D11 — the design's
+ *  *Headcount split · Batch 3 · Oct*): how it was split, and its batch. */
+export function recordLine(t: Pick<SheetTxn, 'method' | 'billedRef' | 'locked'>): string {
+  return `${methodLabel(t.method)} split · ${batchLabel(t)}`
+}
+
+/** A share in words (the design's preview, *5 staff · 19.4%*): the heads
+ *  behind a headcount share, an equal share as such, else its part of the
+ *  amount. `detail` is the engine's — "Head: 3.25/16.75 (2026-09)",
+ *  "Equal: 1/7", "17.5%", "Custom". */
+export function shareLine(detail: string, amount: number, total: number): string {
+  const pct = `${total > 0 ? ((amount / total) * 100).toFixed(1) : '0.0'}%`
+  const heads = /^Head: ([\d.]+)\//.exec(detail)
+  if (heads) return `${Number(heads[1])} staff · ${pct}`
+  if (detail.startsWith('Equal')) return 'equal share'
+  return pct
+}

@@ -672,9 +672,10 @@ async function assertTxnNotBilled(
     .neq('status', 'voided')
     .limit(1)
   if (data && data.length > 0) {
+    // In English since 2026-10-14 (the page is): a draft batch is deleted, an issued one voided, on Invoice.
     throw new Error(
-      `${txnNo} 已经开单(${billedRef},如 ${data[0].invoice_no} · ${data[0].status})。` +
-        'draft 的话先去 Invoice 页删掉那批;已 issue 的记录不能再改。',
+      `${txnNo} is billed under ${billedRef} (${data[0].invoice_no} · ${data[0].status}). ` +
+        'Delete that batch’s drafts — or void its issued invoices — on Invoice first.',
     )
   }
 }
@@ -724,7 +725,7 @@ async function generateAllocatorInvoicesInner(period: string): Promise<GenerateR
     return !br || !liveRefs.has(br)
   })
   if (eligible.length === 0) {
-    throw new Error(`${period} 的分摊全部开过单了 — 先加新费用,或删掉某批 draft 再重开。`)
+    throw new Error(`Every allocation of ${period} is billed — add a new expense, or delete a batch’s drafts to bill it again.`)
   }
 
   const coLabel = new Map((cos ?? []).map((c) => [c.id as string, (c.short_code ?? c.name) as string]))

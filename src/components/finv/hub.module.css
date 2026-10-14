@@ -691,6 +691,9 @@ button.member:hover .memberWho { text-decoration: underline; }
 .itemValue { flex: none; width: 140px; text-align: right; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 13.5px; color: var(--ds-ink); }
 .itemValue[data-tone='danger'] { color: var(--ds-danger); }
 .itemValue[data-tone='ledger'] { color: rgb(var(--fv-chip-ledger-ink)); }
+/* The Billing Allocator's lists (D11): *to bill …* in the alert gold, a word of state (off, inactive) quiet. */
+.itemValue[data-tone='alert'] { color: rgb(var(--fv-chip-alert-ink)); }
+.itemValue[data-tone='muted'] { color: rgb(var(--hvs-muted)); }
 .itemAct {
   flex: none;
   display: inline-flex;
