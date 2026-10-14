@@ -331,7 +331,7 @@ export default function CreateInvoiceDialog({
   )
 
   return (
-    <FinDialog open={open} onClose={() => !busy && onClose()} title="Create invoice" sub="Saved as draft · approve to issue" locked={busy}>
+    <FinDialog open={open} onClose={() => !busy && onClose()} title="Create invoice" sub="Saved as draft · approve to issue" locked={busy} tall>
       <DialogForm
         buttons={
           partly ? (

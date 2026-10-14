@@ -8,6 +8,9 @@
 // Director loan, Dept pool, Outsource) and Pending approval. Pure, so the
 // figures are tested without a database.
 
+import type { HrIconName } from '@/components/hrv/icons'
+import type { CardTone, HubCardItem } from '@/components/finv/Hub'
+
 export type FundSide = 'out' | 'in'
 
 export type FundStatus = 'pending_approval' | 'active' | 'matured' | 'repaid' | 'cancelled'
@@ -142,6 +145,36 @@ export function fundCard(records: ReadonlyArray<FundRecord>, key: FundCardKey): 
     amount: r2(rows.reduce((s, r) => s + amountOf(r), 0)),
     pending: rows.filter((r) => r.status === 'pending_approval').length,
   }
+}
+
+/** Each card's colour and glyph — the design's tones, chosen for what the system's cards mean (Pending approval black, the README's). */
+export const FUND_CARD_LOOK: Record<FundCardKey, { tone: CardTone; icon: HrIconName }> = {
+  all: { tone: 'all', icon: 'doc' },
+  active: { tone: 'approved', icon: 'approve' },
+  overdue: { tone: 'issued', icon: 'fileAlert' },
+  pending_approval: { tone: 'pending_approval', icon: 'calendar' },
+  repaid: { tone: 'paid', icon: 'payroll' },
+  cancelled: { tone: 'quiet', icon: 'doc' },
+  subsidiary: { tone: 'approved', icon: 'org' },
+  director_saving: { tone: 'paid', icon: 'payroll' },
+  director_loan: { tone: 'payroll', icon: 'director' },
+  department_pool: { tone: 'issued', icon: 'people' },
+  outsource: { tone: 'company', icon: 'link' },
+}
+
+/** The side's cards, figures and all (2026-10-15 — the hub's, shared with the Finance phone app's stacked cards). */
+export function fundCards(side: FundSide, records: ReadonlyArray<FundRecord>): HubCardItem[] {
+  return (side === 'out' ? OUT_CARDS : IN_CARDS).map((k) => {
+    const fig = fundCard(records, k)
+    return {
+      key: k,
+      tone: FUND_CARD_LOOK[k].tone,
+      icon: FUND_CARD_LOOK[k].icon,
+      label: cardLabel(side, k),
+      sub: `${fig.count} ${fig.count === 1 ? 'transfer' : 'transfers'}${k === 'all' ? ` · ${fig.pending} pending` : ''}`,
+      value: rmText(fig.amount),
+    }
+  })
 }
 
 /** The hero: what moved in the office's month (the design's *Fund out · October 2026*) — deals that went through, by the day the money moved. */

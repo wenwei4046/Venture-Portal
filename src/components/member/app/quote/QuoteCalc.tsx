@@ -29,6 +29,9 @@ export interface CalcProps {
 /** A long figure is drawn smaller, on the same line: `-5220.2%`, `12,345.50`. */
 const fig = (text: string) => (text.length >= 10 ? s.figTiny : text.length >= 8 ? s.figSmall : "");
 
+/** A tier wraps whole — *Below margin* / *Tier 3*, never *Below margin Tier* / *3*. */
+const keepTier = (label: string) => label.replace(/ (\d+)$/, "\u00a0$1");
+
 /** A digit, `.` or Backspace typed on a keyboard works the keypad (desktop). */
 function useKeyboard(onPress: (key: string) => void) {
   useEffect(() => {
@@ -61,22 +64,18 @@ export default function QuoteCalc({ vm, brandName, cart, fee, kpiEach, onPress, 
             <span className={s.priceHint}>{vm.hint}</span>
           </div>
           <div className={s.marginCell} style={{ background: tone.bg }}>
-            {/* The card keeps the size of its tallest state from the start, so a price typed never moves
-                the keypad under the member's thumb (2026-10-15): an invisible copy of that state shares
-                each changing part's place. */}
+            <span className={s.cellLabel}>Margin</span>
+            <div className={`${s.marginNum} ${fig(vm.marginText)}`} style={{ color: tone.ink }}>{vm.marginText}</div>
+            {/* The card keeps the size of its tallest state from the start, so a price typed never moves the
+                keypad under the member's thumb (2026-10-15): the chip and the penalty line each share one place
+                with, invisible, everything they can say — every tier name, every penalty line — laid out alike. */}
             <div className={s.steady}>
-              <div className={s.layer}>
-                <span className={s.cellLabel}>Margin</span>
-                <div className={`${s.marginNum} ${fig(vm.marginText)}`} style={{ color: tone.ink }}>{vm.marginText}</div>
-                <span className={s.tierChip} style={{ color: tone.ink }}>{vm.tierLabel}</span>
-                {vm.penalty && <span className={s.penalty} style={{ color: tone.ink }}>{vm.penalty}</span>}
-              </div>
-              <div className={`${s.layer} ${s.room}`} aria-hidden>
-                <span className={s.cellLabel}>Margin</span>
-                <div className={`${s.marginNum} ${fig(vm.marginText)}`}>{vm.marginText}</div>
-                <span className={s.tierChip}>{vm.room.tier}</span>
-                {vm.room.penalty && <span className={s.penalty}>{vm.room.penalty}</span>}
-              </div>
+              <span className={`${s.layer} ${s.tierChip} ${s.stackChip}`} style={{ color: tone.ink }}>{keepTier(vm.tierLabel)}</span>
+              {vm.room.tiers.map(t => <span key={t} className={`${s.layer} ${s.tierChip} ${s.stackChip} ${s.room}`} aria-hidden>{keepTier(t)}</span>)}
+            </div>
+            <div className={s.steady}>
+              {vm.penalty && <span className={`${s.layer} ${s.penalty}`} style={{ color: tone.ink }}>{vm.penalty}</span>}
+              {vm.room.penalties.map(p => <span key={p} className={`${s.layer} ${s.penalty} ${s.room}`} aria-hidden>{p}</span>)}
             </div>
           </div>
         </div>
@@ -91,10 +90,12 @@ export default function QuoteCalc({ vm, brandName, cart, fee, kpiEach, onPress, 
                   </>
                 ) : vm.reached ? <span className={s.nextText}><strong>{vm.reached}</strong> reached</span> : null}
             </div>
-            <div className={`${s.layer} ${s.nextLine} ${s.room}`} aria-hidden>
-              <span className={s.nextText}>Reach <strong>{vm.room.reach.tier}</strong> at <strong>{vm.room.reach.price}</strong></span>
-              <span className={s.usePrice}>Use price</span>
-            </div>
+            {vm.room.reaches.map(r => (
+              <div key={r} className={`${s.layer} ${s.nextLine} ${s.room}`} aria-hidden>
+                <span className={s.nextText}>Reach <strong>{r}</strong> at <strong>{vm.room.price}</strong></span>
+                <span className={s.usePrice}>Use price</span>
+              </div>
+            ))}
           </div>
         </div>
         {vm.pay && (

@@ -3,8 +3,8 @@
 /**
  * The Control panel (rev 1011): one generated screen, PanelApp.tsx — the prototype's markup verbatim — on one view
  * model, vm/app.ts, which groups the vm/*.ts of every screen. What the markup cannot hold lives here: the Undo bar's
- * countdown, the toast's 3 seconds, the chat following its newest message, and the file pickers the chat's + and camera
- * open.
+ * countdown, the toast's 3 seconds, the chat following its newest message, and the file pickers the chat's composer opens
+ * (its Attach panel's Photos and Document, its Camera — Mine's composer since 2026-10-15).
  */
 import { useCallback, useEffect } from "react";
 import PanelApp from "./PanelApp";
@@ -36,7 +36,7 @@ export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
   const v = panelAppVM(ctx);
   return (<>
     <PanelApp v={v} />
-    {/* The chat's + (a document) and camera (photos and videos, several at once) open these. */}
+    {/* The composer's Photos (photos and videos, several at once), Camera and Document open these. */}
     {!!ui.lead && (<>
       <input id="crm-panel-photo" type="file" accept="image/*,video/*" multiple onChange={v.ld.lx.pickVisual} style={PICKER_AT} tabIndex={-1} aria-hidden="true" />
       <input id="crm-panel-camera" type="file" accept="image/*,video/*" capture="environment" onChange={v.ld.lx.pickVisual} style={{ display: "none" }} />

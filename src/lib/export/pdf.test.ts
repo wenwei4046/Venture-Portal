@@ -252,9 +252,10 @@ export function buildGeometryFixture(): React.ReactElement {
 //   src/app/(portal)/billing/_format/invoice-doc-pdf.tsx
 //   src/app/(portal)/billing/_format/credit-note-doc-pdf.tsx
 //   src/app/(portal)/payments/_format/voucher-doc-pdf.tsx
-// all lay their amount rows out as `flexDirection: 'row'` with a `flex: 1` label
-// and a fixed-width right-aligned amount (invoice-doc-pdf.tsx:41-45, 234, 248,
-// 255, 266). That is what this fixture reproduces.
+// all draw on one sheet (src/lib/export/doc-sheet.tsx, 2026-10-15), whose item
+// and total rows are `flexDirection: 'row'` with a `flex: 1` first cell and
+// fixed-width right-aligned amounts (DocItemRow, DocTotals). That is what this
+// fixture reproduces.
 //
 // It is the `flex: 1` that matters. It expands the label to fill the row, which
 // pushes the amount cell against the right edge of the content box. Drop

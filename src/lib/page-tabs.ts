@@ -95,6 +95,14 @@ export const PAGE_TABS = {
   '/hiring/insights': ['hr.hiring_insights'],
   '/hiring/talent': ['hr.talent_bank'],
   '/hiring/talent/[id]': ['hr.talent_bank'],
+  // HR › Attendance (2026-10-15): one tab a page.
+  '/attendance/today': ['hr.att_today'],
+  '/attendance/records': ['hr.att_records'],
+  '/attendance/requests': ['hr.att_requests'],
+  '/attendance/balances': ['hr.att_balances'],
+  '/attendance/close': ['hr.att_close'],
+  '/attendance/settings': ['hr.att_settings'],
+  '/attendance/readiness': ['hr.att_ready'],
   // Changes: what it shows follows the reader's other boxes (each view's Audit Log).
   '/audit-log': ['hr.audit_log', 'fin.audit_log', 'pri.audit_log'],
   // Admin › Meeting Rooms (2026-10-11): every view books a room.

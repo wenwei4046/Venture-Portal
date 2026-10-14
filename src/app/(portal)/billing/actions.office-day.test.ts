@@ -67,7 +67,8 @@ afterEach(() => vi.useRealTimers())
 describe("billing at half past midnight on the 1st is November's", () => {
   it('a copied invoice is a November draft, dated 1 Nov, numbered for November', async () => {
     const db = database()
-    await expect(asTheServer(() => copyInvoice(form({ invoice_id: 'inv-1' })))).rejects.toThrow('NEXT_REDIRECT')
+    // It answers the draft it made (2026-10-15 — the invoice's full page opens it).
+    await expect(asTheServer(() => copyInvoice(form({ invoice_id: 'inv-1' })))).resolves.toEqual({ id: 'new-row', no: 'HV-INV-202611-0001' })
     expect(db.rpcs.find((r) => r.fn === 'mint_invoice_no')?.args).toEqual({ p_period: '2026-11-01' })
     expect(db.writes('invoices')[0].values).toMatchObject({ period_month: '2026-11-01', invoice_date: '2026-11-01' })
   })

@@ -111,21 +111,13 @@ export async function hubSettleInvoices(payload: {
 }
 
 /**
- * Copy an invoice as a new draft in this month. Service Billing's copy ends by
- * sending the reader to its list; from the hub the reader stays where they
- * are — its redirect is the copy done, and the hub says so (and opens this
- * month when another is on show).
+ * Copy an invoice as a new draft in this month — the draft it made, so the
+ * invoice's full page can open it (2026-10-15); the hub stays where it is and
+ * says so (and opens this month when another is on show).
  */
-export async function hubCopyInvoice(id: string): Promise<HubResult> {
+export async function hubCopyInvoice(id: string): Promise<HubResult<{ id: string; no: string }>> {
   await requireActionOn('/invoices/[id]', 'billing', 'create')
-  return attempt(async () => {
-    try {
-      await copyInvoice(withId('invoice_id', id))
-    } catch (err) {
-      if (!isRedirect(err)) throw err
-    }
-    return null
-  })
+  return attempt(() => copyInvoice(withId('invoice_id', id)))
 }
 
 /** Approve a draft credit note — it posts and takes the amount off what the invoice owes. */

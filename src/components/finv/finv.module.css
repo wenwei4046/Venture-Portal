@@ -163,6 +163,8 @@
 .input:disabled { background: var(--ds-surface); color: rgb(var(--hvs-muted)); cursor: default; }
 .input[data-mono='true'] { font-family: var(--font-mono), 'Chivo Mono', monospace; }
 .input[data-align='right'] { text-align: right; }
+/* A few lines of words (a fund source's notes): the text box, grown to its lines. */
+.area { height: auto; min-height: 64px; padding: 10px 12px; line-height: 1.45; resize: vertical; }
 .select { width: 100%; }
 .hint { margin: 0; font-size: 12px; line-height: 1.5; color: rgb(var(--hvs-muted)); }
 .hint[data-tone='danger'] { color: var(--ds-danger); }
@@ -212,6 +214,102 @@
 .toast[data-shown='true'] { opacity: 1; transform: translate(-50%, 0); }
 .toastDot { color: var(--ds-accent); }
 .toastText { white-space: nowrap; }
+
+/* ── The Finance phone app (2026-10-15): the same windows rise as the design's
+   bottom sheets — README › Motion ("translateY(105%) → 0 .32s; scrim fade
+   .24s, rgb(51 36 27 / .28); animates out too"), M05–M08, M18, the prototype's
+   sheet: max 92%, a form's 92% tall, the grab bar, the 20/600 title, iOS's
+   round ×, radius 28 (Android) / 34 (iPhone), the foot clear of the phone's own
+   bar (--safe-bottom). ── */
+.dialogRoot[data-sheet] {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0;
+}
+.dialogRoot[data-sheet] .dialogScrim { background: rgb(var(--hvs-ink) / 0.28); transition: opacity 0.24s; }
+.dialogRoot[data-sheet] .dialog {
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 92%;
+  border: 0;
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -10px 30px rgb(var(--hvs-ink) / 0.14);
+  opacity: 1;
+  transform: translateY(105%);
+  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  padding-bottom: calc(14px + var(--safe-bottom, 0px));
+}
+.dialogRoot[data-sheet][data-platform='ios'] .dialog {
+  border-radius: 34px 34px 0 0;
+  padding-bottom: max(30px, var(--safe-bottom, 0px));
+}
+.dialogRoot[data-sheet][data-shown='true'] .dialog { opacity: 1; transform: none; }
+.dialogRoot[data-sheet] .dialog[data-tall] { height: 92%; }
+.sheetHead { flex: none; padding: 10px 20px 0; }
+.grab {
+  display: block;
+  margin: 0 auto 12px;
+  width: 36px;
+  height: 5px;
+  border-radius: 99px;
+  background: rgb(var(--hvs-nav-border));
+}
+.sheetHeadRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dialogRoot[data-sheet] .dialogTitle { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.dialogRoot[data-sheet] .dialogSub { margin-top: 3px; font-size: 12px; }
+.sheetClose {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(var(--hvs-avatar));
+  color: rgb(var(--hvs-graphite));
+  font-family: inherit;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sheetClose:disabled { opacity: 0.45; cursor: default; }
+/* A menu: 52px rows on a 14px card; on an iPhone, Cancel under it. */
+.dialogRoot[data-sheet] .menuBody { padding: 14px 16px 8px; }
+.dialogRoot[data-sheet] .menuCard { border-radius: 14px; }
+.dialogRoot[data-sheet] .menuRow { min-height: 52px; }
+.dialogRoot[data-sheet] .menuRow:hover { background: transparent; }
+.dialogRoot[data-sheet] .menuRow:active { background: var(--ds-row-hover); }
+.dialogRoot[data-sheet] .menuLabel { font-size: 15.5px; }
+.menuCancel { display: none; }
+.dialogRoot[data-sheet] .menuCancel {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  min-height: 50px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--ds-surface);
+  font-family: inherit;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: rgb(var(--fv-chip-wait-ink));
+  cursor: pointer;
+}
+/* A confirm: the sentence, then Cancel and the answer side by side, 48px. */
+.dialogRoot[data-sheet] .confirmBody { padding: 12px 20px 8px; }
+.dialogRoot[data-sheet] .confirmText { font-size: 14px; }
+.dialogRoot[data-sheet] .confirmButtons { justify-content: stretch; margin-top: 18px; }
+.dialogRoot[data-sheet] .confirmButtons .btn { flex: 1; min-height: 48px; padding: 0 10px; border-radius: 10px; font-size: 15px; }
+.dialogRoot[data-sheet] .confirmButtons .btn:last-child { flex: 1.3; }
+/* A form: 46px fields at 15px, the buttons 48px across the foot, the primary wider. */
+.dialogRoot[data-sheet] .formBody { padding: 14px 20px 8px; }
+.dialogRoot[data-sheet] .formFoot { justify-content: stretch; padding: 10px 20px 6px; }
+.dialogRoot[data-sheet] .formFoot .btn { flex: 1; min-height: 48px; padding: 0 10px; border-radius: 10px; font-size: 15px; }
+.dialogRoot[data-sheet] .formFoot .btn[data-kind='primary'] { flex: 1.4; }
+.dialogRoot[data-sheet] .input { height: 46px; border-radius: 12px; font-size: 15px; }
+.dialogRoot[data-sheet] .btn:active { transform: scale(0.97); }
 
 @media (prefers-reduced-motion: reduce) {
   .dialogScrim, .dialog, .toast { transition: none; }

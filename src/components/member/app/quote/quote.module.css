@@ -83,6 +83,9 @@
 .steady { display: grid; }
 .layer { grid-area: 1 / 1; min-width: 0; }
 .room { visibility: hidden; pointer-events: none; }
+/* Each chip in the stack — the one on show and the invisible ones — is as wide and as tall as its words:
+   the stack is as tall as the tallest, the chip on show never stretched to it. */
+.stackChip { justify-self: start; align-self: start; }
 .nextRow { border-top: 1px solid var(--rv-line); padding: 10px 12px 10px 16px; }
 .nextLine { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .nextText { font-size: calc(13.5px * var(--rv-type)); line-height: 1.4; }

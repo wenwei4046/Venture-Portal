@@ -14,7 +14,7 @@ export function headVM(ctx: PanelCtx) {
     // A customer's chat has its own back arrow (the design's full mode); sub-pages show the link.
     showHead: !lead && ui.tab === "ads",
     backLabel: lead ? "Back" : ui.tab === "ads" ? "Profile" : "Back to Revenue app",
-    back: lead ? () => patch({ lead: null, toast: "", pMenu: false, reSheet: false, pick: "", pEmoji: null, pPick: null }) : ui.tab === "ads" ? () => patch({ tab: "profile" }) : ctx.exitApp,
+    back: lead ? () => patch({ lead: null, toast: "", pMenu: false, reSheet: false, pick: "", pCmp: null, pPick: null }) : ui.tab === "ads" ? () => patch({ tab: "profile" }) : ctx.exitApp,
   };
 }
 export type HeadVM = ReturnType<typeof headVM>;

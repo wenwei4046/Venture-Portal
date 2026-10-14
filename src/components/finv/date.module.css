@@ -143,6 +143,27 @@
   cursor: pointer;
 }
 
+/* In the Finance phone app's sheets (2026-10-15, M08): the field 46px at 15px, the card the sheet's width, days
+   36px in 42px rows at 14.5px, the arrows 36px, Today 32px — the prototype's phone calendar. */
+[data-sheet] .field,
+[data-fin-app] .field { height: 46px; border-radius: 12px; font-size: 15px; }
+[data-sheet] .pop,
+[data-fin-app] .pop { right: 0; width: auto; }
+[data-sheet] .nav,
+[data-fin-app] .nav { width: 36px; height: 36px; font-size: 18px; }
+[data-sheet] .title,
+[data-fin-app] .title { font-size: 14px; }
+[data-sheet] .dow,
+[data-fin-app] .dow { font-size: 11px; }
+[data-sheet] .cell,
+[data-fin-app] .cell { height: 42px; }
+[data-sheet] .day,
+[data-fin-app] .day { width: 36px; height: 36px; font-size: 14.5px; }
+[data-sheet] .foot,
+[data-fin-app] .foot { padding: 8px 8px 0; }
+[data-sheet] .today,
+[data-fin-app] .today { height: 32px; border-radius: 8px; font-size: 12.5px; }
+
 @media (prefers-reduced-motion: reduce) {
   .pop, .field { transition: none; }
 }

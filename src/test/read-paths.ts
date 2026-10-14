@@ -32,6 +32,8 @@ export const GUARDS: Readonly<Record<string, Gate>> = {
     { wants: ['revenue.view:own'], text: 'canAccessRevenue(user) — the sidebar’s Revenue sub-departments (listSubDepartments)' },
   'src/components/layout/BottomTabBar.tsx#BottomTabBar':
     { wants: ['approvals.view', ...APPROVE], text: 'canApprove(viewer) — the phone’s approvals badge' },
+  'src/app/(portal)/payments/voucher-doc/route.tsx#readSubmissions':
+    { wants: ['treasury.view'], text: 'can(user, treasury) — the voucher print’s approval requests, the treasury’s read only' },
 }
 
 /**
@@ -68,6 +70,13 @@ export const BRANCHES: Readonly<Record<string, Readonly<Record<Want, readonly st
     ...Object.fromEntries(APPROVE.map(a => [a, ['approval_requests', 'loans', 'payment_vouchers', 'payment_voucher_sources', 'payment_attachments', 'bank_accounts']])),
     // A department sees only its own dept_expense requests: no loan, no voucher.
     'dept_pool.view:dept': ['approval_requests'],
+  },
+  // The Finance phone app's Overview (2026-10-15, M01) — the desktop Overview's counts
+  // (loadFinanceOverviewCounts): the vouchers only for the treasury, the invoices and
+  // this month's allocations only for Billing (canAccessTreasury / canAccessBilling).
+  'src/app/(fin-app)/fin-app/page.tsx#FinAppOverview': {
+    'treasury.view': ['payment_vouchers'],
+    'billing.view': ['alloc_txns', 'invoices'],
   },
 }
 
@@ -287,6 +296,10 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Admin › Meeting Rooms (mig 20261011090000): each asks has_any_action(rooms.*), a member's revenue_app.view:own.
   'meeting_rooms_range', 'meeting_rooms_booking', 'meeting_rooms_rooms', 'meeting_rooms_people', 'meeting_rooms_book',
   'meeting_rooms_cancel', 'meeting_rooms_save_room', 'meeting_rooms_delete_room',
+  // HR › Attendance (mig 20261015030200): each asks has_any_action(attendance.*); a person's own request / punch asks their own staff record.
+  'att_config', 'att_month', 'att_requests_list', 'att_ledger', 'att_save_setting', 'att_delete_setting', 'att_set_days', 'att_clear_days',
+  'att_set_day_override', 'att_invalidate_punch', 'att_create_request', 'att_decide', 'att_ledger_add', 'att_decide_day', 'att_close_month',
+  'att_reopen_month', 'att_register',
   // Admin › Guest Link (mig 20261011091000): each asks has_any_action(guest_link.* / rooms.view); the guest page's
   // five (page, day, book, cancel, hire) are anon's by name and check the link's code instead.
   'guest_link_admin', 'guest_link_set', 'guest_link_new_code', 'guest_link_room', 'guest_link_save_subsidiary',

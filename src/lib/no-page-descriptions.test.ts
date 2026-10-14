@@ -64,7 +64,8 @@ const shown = (text: string) =>
 
 // A subtitle that is live data, not a description: who is signed in, the
 // voucher's own description. Anything new here is a decision, not a detail.
-const DATA_SUBTITLES = ['src/app/(portal)/admin/password/page.tsx']
+// HR's Overview (2026-10-15, the Attendance handoff): where things stand — requests waiting, who is not in, the close.
+const DATA_SUBTITLES = ['src/app/(portal)/admin/password/page.tsx', 'src/app/(portal)/dashboard/_components/HrOverview.tsx']
 const DATA_PAGE_SUBS = ['src/app/(portal)/reconciliation/journal-entries/[id]/page.tsx']
 
 // The hints the pages carried until 2026-10-12, as they opened a sentence. The

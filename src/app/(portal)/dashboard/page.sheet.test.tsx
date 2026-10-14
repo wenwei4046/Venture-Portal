@@ -25,6 +25,7 @@ vi.mock('@/lib/supabase/client', () => ({
 
 // Finance's view and HR's Overview (2026-10-14) read through these server modules; the treasury Overview does not.
 vi.mock('@/lib/hiring/board', () => ({ loadHiringBoard: async () => ({ ok: false, reason: 'test' }) }))
+vi.mock('@/lib/attendance/server', () => ({ loadConfig: async () => ({ ok: false, reason: 'test' }), loadMonth: async () => ({ ok: false, reason: 'test' }), loadRequests: async () => ({ ok: false, reason: 'test' }), loadLedger: async () => ({ ok: false, reason: 'test' }) }))
 vi.mock('@/lib/member/server', () => ({ adminMemberAction: async () => ({ ok: false, reason: 'test' }) }))
 vi.mock('../revenue/_lib/sub-departments', () => ({ listSubDepartments: async () => [] }))
 

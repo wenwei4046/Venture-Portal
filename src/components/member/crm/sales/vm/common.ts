@@ -103,6 +103,8 @@ export interface SalesCtx {
   refs: SalesRefs;
   /** Booked counts per slot start (ISO) for the showroom being booked — Book visit greys a full slot. */
   slotCounts: Record<string, number>;
+  /** One's recent emoji, shared with the Team side's chat (vm/composer.ts › SharedRecents). */
+  recents?: import("./composer").SharedRecents;
   embedded: { rdMode: boolean; toPanel?: () => void; exitAs?: () => void; switchList?: CrmPerson[]; onSwitch?: (id: string) => void;
     /** Team | Mine: to the Control panel scoped to this person (the Director; leaders with a downline), on its first page. */
     toTeam?: () => void;

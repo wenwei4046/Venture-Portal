@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { FinDrawer, drawerStyles as d } from '@/components/finv/Drawer'
 import { Field, Input } from '@/components/finv/Dialog'
 import fm from '@/components/finv/form.module.css'
@@ -107,6 +107,48 @@ export default function AllocationCalc({
   /** A record being corrected — saving overwrites it, its number kept. */
   edit: TxnRow | null
 }) {
+  const calc = useAllocationCalc({ onClose, onSaved, data, edit })
+  const bar = calc.steps.map((st) => (
+    <button key={st.key} type="button" className={d.barBtn} data-kind={st.primary ? 'primary' : undefined} data-off={st.off ? 'true' : undefined} disabled={calc.busy} onClick={st.onClick}>
+      {st.label}
+    </button>
+  ))
+  return (
+    <FinDrawer open={open} onClose={() => !calc.busy && onClose()} label={calc.title} title={calc.title} bar={bar}>
+      {calc.body}
+    </FinDrawer>
+  )
+}
+
+/** One of Calculate's steps at its foot: *+ Add expense*, *Save allocation*. */
+export interface CalcStep {
+  key: 'add' | 'save'
+  label: string
+  primary: boolean
+  /** Drawn pale: what it needs is missing (pressing it says what). */
+  off: boolean
+  onClick: () => void
+}
+
+/**
+ * Calculate itself — its fields, its preview, its steps — for whatever holds
+ * it: the hub's drawer on a computer, a screen of its own in the Finance phone
+ * app (the prototype's `vCalc`, a screen there).
+ */
+export function useAllocationCalc({
+  onClose,
+  onSaved,
+  data,
+  edit,
+}: {
+  /** Saved: it closes. */
+  onClose: () => void
+  /** The toast, once saved. */
+  onSaved: (message: string) => void
+  data: AllocatorData
+  /** A record being corrected — saving overwrites it, its number kept. */
+  edit: TxnRow | null
+}): { busy: boolean; title: string; steps: CalcStep[]; body: ReactNode } {
   const keySeq = useRef(0)
   const nextKey = () => ++keySeq.current
   const [rows, setRows] = useState<Expense[]>(() => [edit ? fromTxn(edit, nextKey()) : blank(nextKey())])
@@ -195,21 +237,13 @@ export default function AllocationCalc({
   const snapshotMonths = data.snapshotPeriods
   const otherMonth = hcSource !== 'current' && hcSource !== data.period
 
-  const bar = [
-    ...(edit
-      ? []
-      : [
-          <button key="add" type="button" className={d.barBtn} disabled={busy} onClick={() => setRows((prev) => [...prev, blank(nextKey())])}>
-            + Add expense
-          </button>,
-        ]),
-    <button key="save" type="button" className={d.barBtn} data-kind="primary" data-off={ok ? undefined : 'true'} disabled={busy} onClick={save}>
-      {busy ? 'Saving…' : 'Save allocation'}
-    </button>,
+  const steps: CalcStep[] = [
+    ...(edit ? [] : [{ key: 'add' as const, label: '+ Add expense', primary: false, off: false, onClick: () => setRows((prev) => [...prev, blank(nextKey())]) }]),
+    { key: 'save', label: busy ? 'Saving…' : 'Save allocation', primary: true, off: !ok, onClick: () => void save() },
   ]
 
-  return (
-    <FinDrawer open={open} onClose={() => !busy && onClose()} label={edit ? `Correct ${edit.txnNo}` : 'New allocation'} title={edit ? `Correct ${edit.txnNo}` : 'New allocation'} bar={bar}>
+  const body = (
+    <>
       {rows.map((r, i) => (
         <div key={r.key} className={a.card} role="group" aria-label={rows.length > 1 ? `Expense ${i + 1}` : 'Expense'}>
           {rows.length > 1 ? (
@@ -356,8 +390,10 @@ export default function AllocationCalc({
           {problem}
         </p>
       ) : null}
-    </FinDrawer>
+    </>
   )
+
+  return { busy, title: edit ? `Correct ${edit.txnNo}` : 'New allocation', steps, body }
 }
 
 /** A Percentage or Custom split: HV's own box first, then each company; the sum on peach (red off 100%). */

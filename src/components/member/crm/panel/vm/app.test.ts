@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { crmDemoData } from "@/lib/member/crm-demo-data";
 import { personOf } from "../../shared/people";
 import { initialPanelUi, type PanelUi } from "../ui";
@@ -30,5 +30,32 @@ describe("the Control panel's view model", () => {
     const v = panelAppVM(ctxWith({ tab: "inbox", lead, toast: "Visit booked for Tan Mei Ling" }));
     expect(v.ld.toast).toBe("Visit booked for Tan Mei Ling");
     expect(v.toast).toBe("");
+  });
+});
+
+// The Team chat's composer is Mine's (2026-10-15, "all need same"), on the panel's own state — which, like Mine's, keeps
+// each chat's words and reply to itself (the review: words typed for one customer were in the next chat's box, and Send
+// would have sent them there).
+describe("the Team chat's composer", () => {
+  const customers = crmDemoData("a1", "boss").customers;
+  const lim = customers.find(c => c.name === "Lim Wei Jie")!.id, tan = customers.find(c => c.name === "Tan Mei Ling")!.id;
+
+  it("a chat's words and the message it answers are its own", () => {
+    const ui: Partial<PanelUi> = { tab: "inbox", pDrafts: { [lim]: "See you Sunday" }, pReply: { chat: lim, msgId: "m5", who: "Lim Wei Jie", text: "Can we change to Sunday 11am?" } };
+    const inLim = panelAppVM(ctxWith({ ...ui, lead: lim })).ld.lx.cmp, inTan = panelAppVM(ctxWith({ ...ui, lead: tan })).ld.lx.cmp;
+    expect(inLim.draft).toBe("See you Sunday");
+    expect(inLim.reply).toEqual({ who: "Lim Wei Jie", text: "Can we change to Sunday 11am?" });
+    expect(inTan.draft).toBe("");
+    expect(inTan.reply).toBeNull();
+  });
+
+  it("Recents are CrmApp's list, shared with Mine's chat: a pick keeps it there and saves it", () => {
+    const keep = vi.fn(), save = vi.fn();
+    const act = new Proxy({}, { get: (_t, k) => (k === "saveRecentEmoji" ? save : () => Promise.resolve(true)) }) as PanelCtx["act"];
+    const cmp = panelAppVM({ ...ctxWith({ tab: "inbox", lead: lim }), act, recents: { list: ["🛏️"], keep } }).ld.lx.cmp;
+    expect(cmp.recents).toEqual(["🛏️"]);
+    cmp.saveRecents(["😀", "🛏️"]);
+    expect(keep).toHaveBeenCalledWith(["😀", "🛏️"]);
+    expect(save).toHaveBeenCalledWith(["😀", "🛏️"]);
   });
 });

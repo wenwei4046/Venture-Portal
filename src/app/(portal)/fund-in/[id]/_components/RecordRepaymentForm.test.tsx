@@ -89,7 +89,8 @@ describe('Record repayment on a fund source', () => {
     form()
     fireEvent.change(box('repay_principal'), { target: { value: '70000' } })
     fireEvent.submit(document.querySelector('form')!)
-    expect(await screen.findByText(/超过这笔借款尚欠/)).toBeInTheDocument()
+    // In English since 2026-10-15 (the refusal is `lib/fund-source-repayment`'s, the phone app's sheet's too).
+    expect(await screen.findByText(/is more than the 64500\.00 still owed on it/)).toBeInTheDocument()
     expect(mocks.createPaymentVoucher).not.toHaveBeenCalled()
   })
 
@@ -97,7 +98,7 @@ describe('Record repayment on a fund source', () => {
     // A legacy source with no account of its own: the principal row has nowhere to go.
     form({ accountCode: null })
     fireEvent.submit(document.querySelector('form')!)
-    expect(await screen.findByText(/本金那一行还没有科目/)).toBeInTheDocument()
+    expect(await screen.findByText(/The principal line has no account yet/)).toBeInTheDocument()
     expect(mocks.createPaymentVoucher).not.toHaveBeenCalled()
   })
 

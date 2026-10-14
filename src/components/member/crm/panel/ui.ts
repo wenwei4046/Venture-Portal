@@ -49,13 +49,16 @@ export interface PanelUi {
   pBook: { customerId: string; room: number; day: number; slot: string | null; view?: "week" | "month"; ym?: [number, number]; /** Change: the visit this booking moves. */ visitId?: string } | null;
   reSheet: boolean;
   pick: string;
-  pDraft: string;
-  /** The message being answered (the message menu's Reply, 2026-10-14): shown over the reply box, sent as its reply. */
-  pReply?: { msgId: string; who: string; text: string } | null;
+  /** What is typed in each chat, by customer — as Mine's (`SalesUi.draft`): words typed in one chat never go to another. */
+  pDrafts: Record<string, string>;
+  /** The message being answered (the message menu's Reply, 2026-10-14): shown over the reply box, sent as its reply — in
+   *  the chat it was chosen in only. */
+  pReply?: { chat: string; msgId: string; who: string; text: string } | null;
   /** A voice note being recorded in the chat: when it started (shared/voice.ts); pRecTick moves its clock. */
   pRec: number | null;
-  /** The chat's emoji sheet. */
-  pEmoji?: string | null;
+  /** The chat's composer, as Mine's (the chat composer handoff; sales/vm/composer.ts): its panel, emoji search and
+   *  category, toast — of the chat it was opened in; another chat opens with nothing open. */
+  pCmp?: (import("../sales/vm/composer").ComposerState & { chat: string }) | null;
   /** Photos / videos picked in the chat, waiting on the preview with its HD switch. */
   pPick?: import("../shared/pick").Picked | null;
   pRecTick?: number;
@@ -98,7 +101,7 @@ export interface PanelUi {
 export const initialPanelUi = (): PanelUi => ({
   tab: "overview", period: "month", ovRange: null, cmp: null, cmpFold: false, ovSheet: null, openT: {},
   inbTeam: "", inbWho: "", pcOpen: false, pcQ: "",
-  lead: null, pMenu: false, pInfo: false, pForm: null, calInfo: null, cLs: false, asSec: null, ftx: null, bp: null, hlOpen: false, ftsOpen: false, tplOpen: false, tplEd: null, pBook: null, reSheet: false, pick: "", pDraft: "", pRec: null, toast: "",
+  lead: null, pMenu: false, pInfo: false, pForm: null, calInfo: null, cLs: false, asSec: null, ftx: null, bp: null, hlOpen: false, ftsOpen: false, tplOpen: false, tplEd: null, pBook: null, reSheet: false, pick: "", pDrafts: {}, pRec: null, toast: "",
   sendFor: null, sdSel: null, mvFor: null, mvSel: null, undo: null, movedRec: {}, adEd: null, ftEd: null, att: false, attF: "all", asgF: null,
   viewAs: false, vaQ: "", nfOpen: false, nfF: "", nfR: "unread", roomsOpen: false, rmEdit: null, rmTP: null, rmDel: null,
   cView: "list", cTeam: "all", cPerson: "", cpSheet: false, cDay: null, cGM: null, cRange: null, crSheet: null,

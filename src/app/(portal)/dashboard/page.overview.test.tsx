@@ -13,6 +13,7 @@ vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireAuth: 
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/approval-amounts', () => ({ resolveLiveApprovalAmounts: async () => new Map() }))
 vi.mock('@/lib/hiring/board', () => ({ loadHiringBoard: mocks.hiring }))
+vi.mock('@/lib/attendance/server', () => ({ loadConfig: async () => ({ ok: false, reason: 'test' }), loadMonth: async () => ({ ok: false, reason: 'test' }), loadRequests: async () => ({ ok: false, reason: 'test' }), loadLedger: async () => ({ ok: false, reason: 'test' }) }))
 vi.mock('@/lib/member/server', () => ({ adminMemberAction: mocks.members }))
 vi.mock('../revenue/_lib/sub-departments', () => ({ listSubDepartments: mocks.subs }))
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }))
@@ -146,7 +147,8 @@ describe("Finance's Overview (D01)", () => {
     mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', name: 'Aina Rahman', role: 'finance', permissions: FINANCE }))
     const { container } = render(await drawn())
     const heads = [...container.querySelectorAll('[class*="catHead"]')].map((h) => h.textContent)
-    expect(heads).toEqual(['I.Daily7 pages', 'II.Fund5 pages', 'III.Report11 pages', 'IV.Department8 pages'])
+    // Department: Dept Pool, the five departments, Venture Pool — no Claims since 2026-10-15.
+    expect(heads).toEqual(['I.Daily7 pages', 'II.Fund5 pages', 'III.Report11 pages', 'IV.Department7 pages'])
   })
 
   it('reads by person for whoever holds Payroll payouts in their own view (finance@): payroll counted', async () => {
@@ -169,33 +171,28 @@ describe("Finance's Overview (D01)", () => {
   })
 })
 
-describe("HR's Overview (H01–H02)", () => {
+describe("HR's Overview (the Attendance handoff, 2026-10-15)", () => {
   const HR = ['claims', 'claims_approve', 'dashboard', 'director_pool', 'director_salary', 'documentation', 'guest_link', 'hiring', 'hr_costing', 'meeting_rooms', 'meeting_rooms_manage', 'member_memos_manage', 'member_requests_manage', 'revenue', 'salary_individual', 'team']
 
-  it('greets, says where the month stands, and opens Import payroll on the month', async () => {
+  const link = (text: string) => screen.getAllByRole('link').find(a => a.textContent === text) as HTMLElement
+
+  it('greets as the title, says where things stand, and offers Add person', async () => {
     mocks.requireAuth.mockResolvedValue(withActions({ id: 'h', name: 'Principal', role: 'hr', permissions: HR }))
     render(await drawn())
-    expect(screen.getByText('Wed 14 Oct 2026 · Q4 2026 · HR view')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Good afternoon, Principal.')
+    // No Attendance here: the payroll, hiring and director words stand in for its line.
     expect(screen.getByText('October payroll is not imported yet · 2 hiring requests waiting · director salary not calculated.')).toBeInTheDocument()
-    // The head's button and the quick action both open the month.
-    const imports = screen.getAllByRole('link', { name: 'Import payroll' })
-    expect(imports).toHaveLength(2)
-    for (const a of imports) expect(a).toHaveAttribute('href', '/hr-costing/payroll/2026-10-01')
-    expect(screen.getByRole('link', { name: 'Calculate director salary' })).toHaveAttribute('href', '/director-salary')
+    expect(screen.queryByRole('link', { name: 'Review requests' })).toBeNull()
+    expect(link('Payroll')).toHaveAttribute('href', '/hr-costing/payroll')
   })
 
-  it('badges Hiring requests and Member services, and notes the rows with news', async () => {
+  it('counts on the quick actions and the rows: hiring requests waiting, Member services’ new requests', async () => {
     mocks.requireAuth.mockResolvedValue(withActions({ id: 'h', name: 'Principal', role: 'hr', permissions: HR }))
     render(await drawn())
-    expect(within(tile('Hiring requests')).getByText('2')).toBeInTheDocument()
-    expect(within(tile('Member services')).getByText('1')).toBeInTheDocument()
-    expect(screen.getByText('2 waiting')).toBeInTheDocument()
-    expect(screen.getByText('Oct · not imported')).toBeInTheDocument()
-    expect(screen.getByText('63 active')).toBeInTheDocument()
-    expect(screen.getByText('1 new')).toBeInTheDocument()
-    expect(screen.getByText('Not calculated')).toBeInTheDocument()
-    expect(tile('Comm Cal')).toHaveAttribute('href', '/revenue/fair')
+    expect(link('2Hiring')).toHaveAttribute('href', '/hiring/requests')
+    expect(link('Requests2›')).toHaveAttribute('href', '/hiring/requests')
+    expect(link('Requests1›')).toHaveAttribute('href', '/member-admin')
+    expect(link('Comm Cal›')).toHaveAttribute('href', '/revenue/fair')
   })
 
   it('carries none of the old tables (the user: 照设计拿掉)', async () => {

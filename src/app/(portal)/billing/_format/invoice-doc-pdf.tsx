@@ -1,330 +1,146 @@
 import React from 'react'
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
-import dayjs from 'dayjs'
-import { officeTime } from '@/lib/office-time'
+import { Document } from '@react-pdf/renderer'
+import {
+  DocBlock,
+  DocHeadline,
+  DocItems,
+  DocMeta,
+  DocPage,
+  DocParties,
+  DocTotals,
+  PAYMENT_DETAILS,
+  docDay,
+  docMoney,
+  docMonth,
+  docPeriod,
+  type DocLine,
+  type DocRow,
+} from '@/lib/export/doc-sheet'
 
-// Per-invoice document PDF. Each invoice = one A4 portrait page. Used for
-// both single-invoice download (one page) and batch (N pages, one per
-// invoice). Distinct from the existing list-style PDF (statements/export)
-// which renders a table of multiple invoices in a single page.
-
-const styles = StyleSheet.create({
-  page: { fontFamily: 'Helvetica', fontSize: 10, padding: 48, color: '#1a1a1a' },
-  // Letterhead
-  letterhead: { borderBottom: '1pt solid #1a1a1a', paddingBottom: 12, marginBottom: 24 },
-  brand: { fontFamily: 'Helvetica-Bold', fontSize: 16 },
-  brandSub: { fontFamily: 'Helvetica-Oblique', fontSize: 9, color: '#555', marginTop: 2 },
-  // Header row: title + invoice meta
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  invoiceTitle: { fontFamily: 'Helvetica-Bold', fontSize: 22, letterSpacing: 1 },
-  metaBlock: { textAlign: 'right' },
-  metaLine: { fontSize: 9, marginBottom: 2 },
-  metaLabel: { color: '#777', fontFamily: 'Helvetica' },
-  metaValue: { color: '#1a1a1a', fontFamily: 'Helvetica-Bold' },
-  // Bill-to
-  sectionLabel: {
-    fontSize: 8,
-    fontFamily: 'Helvetica-Bold',
-    color: '#777',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 4,
-  },
-  billTo: { marginBottom: 18 },
-  billToPrimary: { fontSize: 12, fontFamily: 'Helvetica-Bold', marginBottom: 2 },
-  billToSub: { fontSize: 9, color: '#555' },
-  billToContact: { fontSize: 9, color: '#444', marginTop: 2 },
-  // Description block
-  descBlock: { marginBottom: 24, paddingTop: 4 },
-  descText: { fontSize: 10, lineHeight: 1.4 },
-  // Amount row
-  amountTable: { borderTop: '0.5pt solid #1a1a1a', borderBottom: '0.5pt solid #1a1a1a' },
-  amountRow: { flexDirection: 'row', paddingVertical: 6 },
-  amountLabel: { flex: 1, fontSize: 10, paddingLeft: 4 },
-  amountValue: { width: 120, textAlign: 'right', fontFamily: 'Courier', fontSize: 10, paddingRight: 4 },
-  totalRow: { flexDirection: 'row', paddingVertical: 8, borderTop: '0.5pt solid #aaa' },
-  totalLabel: { flex: 1, fontFamily: 'Helvetica-Bold', fontSize: 11, paddingLeft: 4 },
-  totalValue: { width: 120, textAlign: 'right', fontFamily: 'Courier-Bold', fontSize: 12, paddingRight: 4 },
-  // Footer / reference
-  footerNote: { marginTop: 28, fontSize: 9, color: '#555' },
-  footerLine: { marginBottom: 2 },
-  // Bank / payment details
-  bankBox: { marginTop: 20, padding: 10, border: '0.5pt solid #aaa', backgroundColor: '#faf5ea' },
-  bankTitle: {
-    fontSize: 8.5,
-    fontFamily: 'Helvetica-Bold',
-    marginBottom: 5,
-    color: '#333',
-    letterSpacing: 0.5,
-  },
-  bankLine: { fontSize: 9.5, marginBottom: 2.5, color: '#333' },
-  bankLabel: { fontFamily: 'Helvetica-Bold' },
-  bankAcc: { fontFamily: 'Courier-Bold', fontSize: 10.5, color: '#000' },
-  bankNote: { marginTop: 5, fontSize: 8, color: '#888' },
-  pageFooter: {
-    position: 'absolute',
-    fontSize: 7.5,
-    bottom: 24,
-    left: 48,
-    right: 48,
-    textAlign: 'center',
-    color: '#999',
-    fontFamily: 'Courier',
-  },
-})
+// An invoice's document (2026-10-15, the Finance revamp v2 — README §3, P01):
+// *Invoice* and the H; Invoice number · Date of issue · Date due · Period;
+// HOUZS Venture beside *Bill to*; *RM 63,440.00 due 15 October 2026* over its
+// description; Description · Qty · Unit price · Amount (each line one unit at
+// its amount, the invoice's month under it); Subtotal · Total · Amount due;
+// the payment details; the footer. One A4 page an invoice — a batch prints
+// each on its own, its own *Page 1 of 1*. A consolidated payroll invoice keeps
+// its lines grouped by department with a subtotal each.
 
 export interface InvoiceLineData {
-  line_no: number
   description: string | null
   amount: number
-  category_label: string | null
-  // Per-line P&L segment (consolidated payroll invoices). When present, lines
-  // render grouped by department with a subtotal per group.
+  /** Its P&L segment (a consolidated payroll invoice): the lines group by department. */
   segment?: string | null
 }
 
-// gl_segment → group header on a consolidated payroll invoice.
+export interface InvoiceDocData {
+  id: string
+  invoice_no: string | null
+  /** draft · issued · paid · paid_via_netting · voided */
+  status: string
+  period_month: string
+  invoice_date: string | null
+  due_date: string | null
+  reference_no: string | null
+  description: string | null
+  /** "Venture (HV) OPEX". */
+  billing_mode_label: string
+  bill_to: {
+    name: string
+    /** "Subsidiary · HK" / "Department pool" / "External party". */
+    kind: string
+    /** A free-text party's address, phone and email. */
+    contact: string[]
+  }
+  /** Its stored lines; none — a simple invoice, the invoice itself one line. */
+  lines: InvoiceLineData[]
+  total: number
+  /** Approved credit notes against it. */
+  credited: number
+  /** Money received against it. */
+  received: number
+  /** What it still asks for (a draft: its total). */
+  remaining: number
+  /** The day its last money came in (a paid one's headline). */
+  paid_on: string | null
+}
+
+// gl_segment → a department's group on a consolidated payroll invoice.
 const SEGMENT_LABEL: Record<string, string> = {
   hr: 'HR',
   finance: 'Finance',
   director_office: 'Director Office',
   director: 'Director',
   marketing: 'Marketing',
+  it: 'IT',
 }
 
-export interface InvoiceDocData {
-  id: string
-  invoice_no: string | null
-  status: string
-  total_amount: number
-  period_month: string
-  billing_mode: string
-  invoice_date: string | null
-  due_date: string | null
-  description: string | null
-  reference_no: string | null
-  category_label: string | null
-  // Bill-to resolved upstream
-  bill_to_primary: string
-  bill_to_sub: string
-  bill_to_address?: string | null
-  bill_to_phone?: string | null
-  bill_to_email?: string | null
-  // Multi-line (mig 275). When present, render as a line-items table instead
-  // of the flat description block.
-  lines?: InvoiceLineData[]
-}
+const r2 = (n: number) => Math.round(n * 100) / 100
+const firstLine = (s: string | null | undefined) => (s ?? '').split(/\r?\n/)[0].trim()
 
-function fmtMoney(v: number): string {
-  if (v === 0) return '—'
-  const abs = Math.abs(v).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  return v < 0 ? `(${abs})` : abs
-}
-
-function formatBillingMode(m: string): string {
-  switch (m) {
-    case 'marketing_project':           return 'Marketing project'
-    case 'director_office_attribution': return 'Director Office OPEX'
-    case 'director_attribution':        return 'Director OPEX'
-    case 'hr_attribution':              return 'HR OPEX'
-    case 'finance_attribution':         return 'Finance OPEX'
-    case 'venture_attribution':         return 'Venture (HV) OPEX'
-    case 'non_billable':                return 'Non-billable'
-    case 'payroll_consolidated':        return 'Payroll (consolidated)'
-    default:                            return m
+/** The headline: what it asks for and by when — or that it is paid, voided. */
+export function invoiceHeadline(inv: Pick<InvoiceDocData, 'status' | 'total' | 'remaining' | 'due_date' | 'paid_on'>): string {
+  if (inv.status === 'voided') return `${docMoney(inv.total)} voided`
+  if (inv.status === 'paid' || inv.status === 'paid_via_netting') {
+    const on = docDay(inv.paid_on)
+    return on ? `${docMoney(inv.total)} paid on ${on}` : `${docMoney(inv.total)} paid`
   }
-}
-
-function groupLinesBySegment(
-  lines: InvoiceLineData[],
-): Array<{ label: string; lines: InvoiceLineData[]; subtotal: number }> {
-  const order: string[] = []
-  const map = new Map<string, InvoiceLineData[]>()
-  for (const ln of lines) {
-    const seg = ln.segment ?? ''
-    if (!map.has(seg)) {
-      map.set(seg, [])
-      order.push(seg)
-    }
-    map.get(seg)!.push(ln)
-  }
-  return order.map((seg) => {
-    const grp = map.get(seg)!
-    const subtotal = Math.round(grp.reduce((s, l) => s + l.amount, 0) * 100) / 100
-    return { label: SEGMENT_LABEL[seg] ?? seg, lines: grp, subtotal }
-  })
+  const amount = inv.status === 'issued' ? inv.remaining : inv.total
+  const due = docDay(inv.due_date)
+  return due ? `${docMoney(amount)} due ${due}` : `${docMoney(amount)} due`
 }
 
 function InvoicePage({ inv }: { inv: InvoiceDocData }) {
-  const generatedAt = officeTime().format('YYYY-MM-DD HH:mm')
-  const segmented = !!inv.lines && inv.lines.some((l) => l.segment)
-  const lineGroups = segmented && inv.lines ? groupLinesBySegment(inv.lines) : null
+  const no = inv.invoice_no ?? 'Draft'
+  const headline = invoiceHeadline(inv)
+  const period = docPeriod(inv.period_month)
+  const meta: DocLine[] = [
+    { label: 'Invoice number', value: no, strong: true },
+    { label: 'Date of issue', value: docDay(inv.invoice_date) ?? '—' },
+    { label: 'Date due', value: docDay(inv.due_date) ?? '—' },
+    { label: 'Period', value: docMonth(inv.period_month) ?? '—' },
+  ]
+  if (inv.reference_no) meta.push({ label: 'Reference', value: inv.reference_no })
+  // A draft or a voided invoice says so: the design's sheet is an issued one.
+  if (inv.status === 'draft') meta.push({ label: 'Status', value: 'Draft — not issued' })
+  if (inv.status === 'voided') meta.push({ label: 'Status', value: 'Voided' })
+
+  const lines = inv.lines.length > 0 ? inv.lines : [{ description: firstLine(inv.description) || 'Invoice amount', amount: inv.total, segment: null }]
+  const row = (l: InvoiceLineData): DocRow => ({
+    cells: [l.description?.trim() || '—', '1', docMoney(l.amount), docMoney(l.amount)],
+    second: period,
+  })
+  const segmented = lines.some((l) => l.segment)
+  const groups = segmented
+    ? [...new Set(lines.map((l) => l.segment ?? ''))].map((seg) => {
+        const its = lines.filter((l) => (l.segment ?? '') === seg)
+        const label = SEGMENT_LABEL[seg] ?? (seg || 'Other')
+        return { label, rows: its.map(row), subtotal: { cells: [`${label} subtotal`, '', '', docMoney(r2(its.reduce((s, l) => s + l.amount, 0)))] } }
+      })
+    : undefined
+  const subtotal = r2(lines.reduce((s, l) => s + l.amount, 0))
+
+  const totals = [
+    { label: 'Subtotal', value: docMoney(subtotal) },
+    { label: 'Total', value: docMoney(inv.total) },
+  ]
+  if (inv.credited > 0.004) totals.push({ label: 'Credit notes', value: docMoney(-inv.credited) })
+  if (inv.received > 0.004 && inv.status !== 'paid' && inv.status !== 'paid_via_netting') totals.push({ label: 'Paid', value: docMoney(-inv.received) })
+  totals.push({ label: 'Amount due', value: docMoney(inv.status === 'issued' || inv.status === 'draft' ? inv.remaining : 0) })
+
   return (
-    <Page size="A4" style={styles.page}>
-      <View style={styles.letterhead}>
-        <Text style={styles.brand}>HOUZS Venture Holdings Sdn. Bhd.</Text>
-        <Text style={styles.brandSub}>Internal banking · Shared services · Director salary distribution</Text>
-      </View>
-
-      <View style={styles.headerRow}>
-        <Text style={styles.invoiceTitle}>INVOICE</Text>
-        <View style={styles.metaBlock}>
-          <Text style={styles.metaLine}>
-            <Text style={styles.metaLabel}>No.  </Text>
-            <Text style={styles.metaValue}>{inv.invoice_no ?? inv.id.slice(0, 8)}</Text>
-          </Text>
-          <Text style={styles.metaLine}>
-            <Text style={styles.metaLabel}>Date  </Text>
-            <Text style={styles.metaValue}>
-              {inv.invoice_date ? dayjs(inv.invoice_date).format('DD MMM YYYY') : '—'}
-            </Text>
-          </Text>
-          <Text style={styles.metaLine}>
-            <Text style={styles.metaLabel}>Due  </Text>
-            <Text style={styles.metaValue}>
-              {inv.due_date ? dayjs(inv.due_date).format('DD MMM YYYY') : '—'}
-            </Text>
-          </Text>
-          <Text style={styles.metaLine}>
-            <Text style={styles.metaLabel}>Period  </Text>
-            <Text style={styles.metaValue}>{dayjs(inv.period_month).format('MMMM YYYY')}</Text>
-          </Text>
-          <Text style={styles.metaLine}>
-            <Text style={styles.metaLabel}>Status  </Text>
-            <Text style={styles.metaValue}>{inv.status.toUpperCase()}</Text>
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.billTo}>
-        <Text style={styles.sectionLabel}>Bill to</Text>
-        <Text style={styles.billToPrimary}>{inv.bill_to_primary}</Text>
-        {inv.bill_to_sub ? <Text style={styles.billToSub}>{inv.bill_to_sub}</Text> : null}
-        {inv.bill_to_address ? <Text style={styles.billToContact}>{inv.bill_to_address}</Text> : null}
-        {inv.bill_to_phone ? <Text style={styles.billToContact}>Tel: {inv.bill_to_phone}</Text> : null}
-        {inv.bill_to_email ? <Text style={styles.billToContact}>Email: {inv.bill_to_email}</Text> : null}
-      </View>
-
-      <View>
-        <Text style={styles.sectionLabel}>Mode · Category</Text>
-        <Text style={[styles.descText, { marginBottom: 12 }]}>
-          {formatBillingMode(inv.billing_mode)}
-          {inv.category_label ? `  ·  ${inv.category_label}` : ''}
-        </Text>
-      </View>
-
-      {inv.lines && inv.lines.length > 0 ? (
-        <>
-          {inv.description ? (
-            <View style={styles.descBlock}>
-              <Text style={styles.sectionLabel}>Summary</Text>
-              <Text style={styles.descText}>{inv.description}</Text>
-            </View>
-          ) : null}
-          <View style={[styles.amountTable, { marginTop: 8 }]}>
-            <View style={[styles.amountRow, { backgroundColor: '#eee', borderBottom: '0.5pt solid #aaa' }]}>
-              <Text style={[styles.amountLabel, { fontFamily: 'Helvetica-Bold', fontSize: 8.5 }]}>DESCRIPTION</Text>
-              <Text style={[styles.amountValue, { fontFamily: 'Helvetica-Bold', fontSize: 8.5, textAlign: 'right' }]}>AMOUNT (RM)</Text>
-            </View>
-            {lineGroups
-              ? lineGroups.map((grp) => (
-                  <View key={grp.label} wrap={false}>
-                    <View style={[styles.amountRow, { paddingVertical: 4, backgroundColor: '#f6f1e6' }]}>
-                      <Text
-                        style={{
-                          flex: 1,
-                          paddingLeft: 4,
-                          fontFamily: 'Helvetica-Bold',
-                          fontSize: 8.5,
-                          textTransform: 'uppercase',
-                          letterSpacing: 0.5,
-                          color: '#555',
-                        }}
-                      >
-                        {grp.label}
-                      </Text>
-                    </View>
-                    {grp.lines.map((ln) => (
-                      <View key={ln.line_no} style={[styles.amountRow, { borderBottom: '0.5pt solid #eee' }]}>
-                        <View style={{ flex: 1, paddingLeft: 12 }}>
-                          <Text style={{ fontSize: 10 }}>{ln.description ?? '—'}</Text>
-                        </View>
-                        <Text style={styles.amountValue}>{fmtMoney(ln.amount)}</Text>
-                      </View>
-                    ))}
-                    <View style={[styles.amountRow, { borderBottom: '0.5pt solid #ccc', paddingVertical: 4 }]}>
-                      <Text style={{ flex: 1, paddingLeft: 4, fontFamily: 'Helvetica-Bold', fontSize: 9 }}>
-                        {grp.label} subtotal
-                      </Text>
-                      <Text style={[styles.amountValue, { fontFamily: 'Courier-Bold' }]}>
-                        {fmtMoney(grp.subtotal)}
-                      </Text>
-                    </View>
-                  </View>
-                ))
-              : inv.lines.map((ln) => (
-                  <View key={ln.line_no} style={[styles.amountRow, { borderBottom: '0.5pt solid #ddd' }]}>
-                    <View style={{ flex: 1, paddingLeft: 4 }}>
-                      <Text style={{ fontSize: 10 }}>{ln.description ?? '—'}</Text>
-                    </View>
-                    <Text style={styles.amountValue}>{fmtMoney(ln.amount)}</Text>
-                  </View>
-                ))}
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>TOTAL (RM)</Text>
-              <Text style={styles.totalValue}>{fmtMoney(inv.total_amount)}</Text>
-            </View>
-          </View>
-        </>
-      ) : (
-        <>
-          <View style={styles.descBlock}>
-            <Text style={styles.sectionLabel}>Description</Text>
-            <Text style={styles.descText}>{inv.description ?? '—'}</Text>
-          </View>
-          <View style={styles.amountTable}>
-            <View style={styles.amountRow}>
-              <Text style={styles.amountLabel}>Subtotal (RM)</Text>
-              <Text style={styles.amountValue}>{fmtMoney(inv.total_amount)}</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>TOTAL (RM)</Text>
-              <Text style={styles.totalValue}>{fmtMoney(inv.total_amount)}</Text>
-            </View>
-          </View>
-        </>
-      )}
-
-      {inv.reference_no ? (
-        <View style={styles.footerNote}>
-          <Text style={styles.footerLine}>
-            <Text style={styles.metaLabel}>Reference: </Text>
-            <Text>{inv.reference_no}</Text>
-          </Text>
-        </View>
-      ) : null}
-
-      <View style={styles.bankBox}>
-        <Text style={styles.bankTitle}>PAYMENT DETAILS</Text>
-        <Text style={styles.bankLine}>
-          <Text style={styles.bankLabel}>Account Name: </Text>
-          Houzs Venture Holding Sdn Bhd
-        </Text>
-        <Text style={styles.bankLine}>
-          <Text style={styles.bankLabel}>Bank: </Text>
-          Hong Leong Bank Berhad
-        </Text>
-        <Text style={styles.bankLine}>
-          <Text style={styles.bankLabel}>Account No.: </Text>
-          <Text style={styles.bankAcc}>23600599248</Text>
-        </Text>
-        <Text style={styles.bankNote}>Kindly quote the invoice number as your payment reference.</Text>
-      </View>
-
-      <Text style={styles.pageFooter} fixed>
-        HOUZS Venture Holdings Sdn. Bhd. · Generated {generatedAt} · {inv.invoice_no ?? ''}
-      </Text>
-    </Page>
+    <DocPage title="Invoice" footer={`${no} · ${headline}`}>
+      <DocMeta lines={meta} />
+      <DocParties full counter={{ heading: 'Bill to', lines: [inv.bill_to.name, inv.bill_to.kind, inv.billing_mode_label, ...inv.bill_to.contact] }} />
+      <DocHeadline headline={headline} summary={inv.description?.trim() || null} />
+      <DocItems
+        columns={[{ label: 'Description' }, { label: 'Qty', width: 40, align: 'right' }, { label: 'Unit price', width: 100, align: 'right' }, { label: 'Amount', width: 100, align: 'right' }]}
+        rows={groups ? undefined : lines.map(row)}
+        groups={groups}
+      />
+      <DocTotals lines={totals} />
+      <DocBlock title="Payment details" lines={PAYMENT_DETAILS} note="Kindly quote the invoice number as your payment reference." />
+    </DocPage>
   )
 }
 

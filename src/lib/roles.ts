@@ -157,6 +157,10 @@ export function canAccessMeetingRooms(u: PermissionHolder): boolean {
   return can(u, 'meeting_rooms', 'meeting_rooms_manage')
 }
 
+export function canAccessAttendance(u: PermissionHolder): boolean {
+  return can(u, 'attendance')
+}
+
 export function canAccessGuestLink(u: PermissionHolder): boolean {
   return can(u, 'guest_link')
 }

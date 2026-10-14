@@ -27,6 +27,8 @@
   font-size: 13px;
   color: rgb(var(--hvs-ink));
 }
+/* HR's view (2026-10-15, the Attendance handoff: HrSidebar 248px, its 1px border makes 249). */
+.aside[data-wide='true'] { width: 248px; }
 .aside[data-collapsed='true'] { width: 64px; }
 
 /* Round 2 (README 3): no rule under the brand, and more air between it and

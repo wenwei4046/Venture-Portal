@@ -50,6 +50,8 @@ export interface PanelCtx {
   toMyCrm?: (tab?: SalesTab) => void;
   exitApp: () => void;
   slotCounts: Record<string, number>;
+  /** One's recent emoji, shared with Mine's chat (sales/vm/composer.ts › SharedRecents). */
+  recents?: import("../../sales/vm/composer").SharedRecents;
 }
 
 /** The teams, each a TL with everyone below them, in the design's order and colours. */

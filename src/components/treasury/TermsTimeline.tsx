@@ -18,7 +18,8 @@ const money = (n: number) => (Math.abs(n) < 0.005 ? '—' : formatMoneyBare(n))
 const signed = (n: number) => (Math.abs(n) < 0.005 ? '—' : `${n > 0 ? '+' : '−'}${formatMoneyBare(Math.abs(n))}`)
 const monthsLabel = (m: number | null) => (m == null ? 'no fixed term' : `${m}mo`)
 
-function segmentLine(s: TermsSegment, i: number): string {
+/** A segment's terms in a line — the Finance phone app's record says it too. */
+export function segmentLine(s: TermsSegment, i: number): string {
   let line = `${pct(s.rate)} /mo · ${monthsLabel(s.months)}${s.compounding ? ' · compounding' : ''}`
   if (!s.compounding && s.months) {
     line += ` · monthly RM ${formatMoneyBare(s.principalPerMonth)} + ${formatMoneyBare(s.interestPerMonth)}`

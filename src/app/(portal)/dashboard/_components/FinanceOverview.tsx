@@ -16,8 +16,8 @@ import s from './overview.module.css'
 // counts, then one card per category — the sidebar's, in its order, each row a
 // page this viewer opens.
 
-/** The eight quick actions, in the design's order: the page each opens (by its sidebar row), its tone and icon. */
-const QUICK: ReadonlyArray<{ key: string; label: string; icon: HrIconName; tone: HrNavTone; badge?: 'payments' | 'invoices' | 'billing' }> = [
+/** The eight quick actions, in the design's order: the page each opens (by its sidebar row), its tone and icon — the phone app's Overview too. */
+export const QUICK: ReadonlyArray<{ key: string; label: string; icon: HrIconName; tone: HrNavTone; badge?: 'payments' | 'invoices' | 'billing' }> = [
   { key: 'payments', label: 'Payment', icon: 'out', tone: 'clay', badge: 'payments' },
   { key: 'receipts', label: 'Receive', icon: 'in', tone: 'clay' },
   { key: 'invoices', label: 'Invoice', icon: 'invoice', tone: 'clay', badge: 'invoices' },

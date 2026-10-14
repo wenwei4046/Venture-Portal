@@ -13,7 +13,8 @@ const parts = [
   ["PanelHead", "HeadVM", "head", lines(39, 41), "The back link a sub-page shows."],
   ["PanelOverview", "OverviewVM", "overview", lines(43, 133), "Insight: greeting, Control panel | My CRM, period, the hero, Comparison, Needs your action, Team performance — and the date sheet."],
   ["PanelInbox", "InboxVM", "inbox", lines(135, 154), "Inbox: the status board — Needs a reply · Follow up · Appointment · Won · Lost — by team and member."],
-  ["PanelLead", "LeadVM", "lead", lines(176, 245), "One customer's chat from Calendar / Awaiting reply: view, reply, book, reassign."],
+  // PanelLead (the chat, 176–245) is no longer generated: the Control panel's chat is PanelApp's (gen-panel-1011.cjs), with
+  // Mine's composer since 2026-10-15 (panel-chat-composer-patches.cjs); nothing imported the 1a one.
   ["PanelAds", "AdsVM", "ads", lines(247, 314), "Profile › Ads Performance: per-ad leads, appointment rate and show-up, with a comparison."],
   // The Team Leader's own split page (371–402) is not reachable in this design: a TL uses the salesperson CRM.
   ["PanelAssign", "AssignVM", "assign", lines(315, 370) + "\n" + lines(403, 478), "Assignment: Organic Leads, Ads to teams (and its edit page), Awaiting reply, Full time lead allocation (and its page)."],

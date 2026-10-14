@@ -267,7 +267,9 @@ export interface InvoiceLineInput {
 // Monthly billing repeats with small tweaks, so let Finance duplicate a prior
 // invoice (header + line items + who-to-bill + mode) as a fresh draft, then
 // edit the amount / description via the inline Edit modal before issuing.
-export async function copyInvoice(formData: FormData): Promise<void> {
+// It answers the draft it made (2026-10-15, the Finance revamp v2 — an
+// invoice's full page opens the copy; it used to send the reader to /billing).
+export async function copyInvoice(formData: FormData): Promise<{ id: string; no: string }> {
   const user = await requireActionOn('/invoices/[id]', 'billing', 'create')
   const supabase = await createClient()
 
@@ -341,7 +343,7 @@ export async function copyInvoice(formData: FormData): Promise<void> {
 
   revalidatePath('/billing')
   revalidatePath('/statements')
-  redirect('/billing')
+  return { id: created.id as string, no: invoiceNo as string }
 }
 
 export async function createMultiLineInvoice(

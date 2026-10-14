@@ -9,6 +9,10 @@ import { useState, useTransition } from 'react'
 import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import { useFinView } from '@/components/layout/fin-view'
+import { DialogButton, DialogForm, Field, FinDialog, Hint, Input } from '@/components/finv/Dialog'
+import fm from '@/components/finv/form.module.css'
+import { useFinSurface } from '@/components/finv/surface'
+import { Select } from '@/components/hrv/select'
 import { reassignVoucherGlAccount } from '../../actions'
 
 interface FromOption {
@@ -65,13 +69,20 @@ export default function ReassignGlAccountButton({
   voucherId,
   fromOptions,
   accountOptions,
+  autoOpen = false,
+  hideTrigger = false,
 }: {
   voucherId: string
   fromOptions: FromOption[]
   accountOptions: AccountOption[]
+  /** Opened from a menu (the phone app's ⋯): the window starts open, and no trigger is drawn. */
+  autoOpen?: boolean
+  hideTrigger?: boolean
 }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(autoOpen)
+  // In the Finance phone app the window is the kit's, rising as a sheet (2026-10-15).
+  const sheet = useFinSurface() !== null
   const [oldAccount, setOldAccount] = useState(fromOptions.length === 1 ? fromOptions[0].code : '')
   const [newAccount, setNewAccount] = useState('')
   const [reason, setReason] = useState('')
@@ -104,19 +115,65 @@ export default function ReassignGlAccountButton({
 
   return (
     <>
-      <button
-        onClick={() => {
-          setOpen(true)
-          setDone(null)
-          setError(null)
-        }}
-        className="text-xs text-accent hover:text-accent-hover font-serif italic"
-        title={w.triggerTitle}
-      >
-        {w.trigger}
-      </button>
+      {hideTrigger ? null : (
+        <button
+          onClick={() => {
+            setOpen(true)
+            setDone(null)
+            setError(null)
+          }}
+          className="text-xs text-accent hover:text-accent-hover font-serif italic"
+          title={w.triggerTitle}
+        >
+          {w.trigger}
+        </button>
+      )}
 
-      {open ? (
+      {sheet ? (
+        <FinDialog open={open} onClose={() => !isPending && setOpen(false)} title={w.title} locked={isPending}>
+          <DialogForm
+            onSubmit={submit}
+            buttons={
+              <>
+                <DialogButton onClick={() => setOpen(false)} disabled={isPending}>
+                  {done ? 'Close' : 'Cancel'}
+                </DialogButton>
+                {done ? null : (
+                  <DialogButton type="submit" kind="primary" disabled={isPending}>
+                    {isPending ? w.saving : w.confirm}
+                  </DialogButton>
+                )}
+              </>
+            }
+          >
+            <Hint>{w.intro}</Hint>
+            <Field label={w.from} htmlFor="reassign-gl-from-sheet">
+              <Select id="reassign-gl-from-sheet" round={12} className={fm.select} value={oldAccount} onChange={(e) => setOldAccount(e.target.value)}>
+                <option value="">Select…</option>
+                {fromOptions.map((o) => (
+                  <option key={o.code} value={o.code} data-search={o.code}>
+                    {`${o.code} · ${o.name} (RM ${o.total.toLocaleString('en-MY', { minimumFractionDigits: 2 })})`}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={w.to} htmlFor="reassign-gl-to-sheet">
+              <Select id="reassign-gl-to-sheet" round={12} className={fm.select} value={newAccount} onChange={(e) => setNewAccount(e.target.value)}>
+                <option value="">Select…</option>
+                {accountOptions.map((o) => (
+                  <option key={o.code} value={o.code} data-search={o.code}>
+                    {`${o.code} · ${o.name}`}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={w.reason} htmlFor="reassign-gl-reason-sheet">
+              <Input id="reassign-gl-reason-sheet" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={w.reasonHint} />
+            </Field>
+            {error ? <Hint danger>{error}</Hint> : done ? <Hint>{done}</Hint> : null}
+          </DialogForm>
+        </FinDialog>
+      ) : open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 p-4" {...backdropDismiss(() => !isPending && setOpen(false))}>
           <div className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-hairline">

@@ -76,14 +76,26 @@ describe("step 2's card", () => {
 
   // 2026-10-15 (the user: typing a price pushed the keypad down — the next-tier line and a two-line
   // tier name appeared — and the thumb hit the wrong key): the card is drawn at its tallest from the start.
-  it("makes room for the tallest the card gets: the longest tier name, the longest penalty, the widest next-tier line", () => {
+  // Every one, not the longest (the same day, on production at 384px wide: "Below margin Tier 3" wrapped
+  // where "Below margin Tier 1", as long, did not, and the keypad still dropped 15px).
+  it("makes room for everything the card can say: every tier name, every penalty line, every next tier at the widest price", () => {
     const vm = calcVM({ price: "", items: 2, bands: BANDS, result: null, error: null });
-    expect(vm.room).toEqual({ tier: "Below margin Tier 1", penalty: "Commission × 0.25", reach: { tier: "Incentive Tier 1 (36%)", price: "RM 999,999.99" } });
+    expect(vm.room).toEqual({
+      tiers: ["Incentive Tier 2", "Incentive Tier 1", "Standard margin", "Low margin", "Below margin Tier 1", "Below margin Tier 2", "Below margin Tier 3",
+        "Add products", "Enter a price", "Calculating", "Cost pending", "Not calculated", "No brand rules", "Below cost"],
+      penalties: ["Commission × 0.5", "Commission × 0.25", "No commission"],
+      reaches: ["Incentive Tier 1 (36%)", "Incentive Tier 2 (43%)"],
+      price: "RM 999,999.99",
+    });
+    // Whatever the chip or the penalty line says is among them.
+    for (const margin of [50, 40, 34, 31, 28, 26, 24.5, 10, -5]) {
+      const at = calcVM({ price: "4000", items: 2, bands: BANDS, result: result(margin), error: null });
+      expect(vm.room.tiers).toContain(at.tierLabel);
+      if (at.penalty) expect(vm.room.penalties).toContain(at.penalty);
+    }
     // The same room whatever is typed: it follows the ladder, never the price.
     expect(calcVM({ price: "4000", items: 2, bands: BANDS, result: result(24, [36, 4752.24]), error: null }).room).toEqual(vm.room);
-    expect(calcVM({ price: "", items: 2, bands: [], result: null, error: null }).room).toEqual({
-      tier: "Not calculated", penalty: null, reach: { tier: "Incentive Tier 1 (36%)", price: "RM 999,999.99" },
-    });
+    expect(calcVM({ price: "", items: 2, bands: [], result: null, error: null }).room).toMatchObject({ penalties: [], reaches: ["Incentive Tier 1 (36%)"] });
   });
 
   it("names the first incentive and its price before a price is typed", () => {

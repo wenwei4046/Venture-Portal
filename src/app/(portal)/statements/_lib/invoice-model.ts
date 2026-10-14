@@ -394,3 +394,71 @@ export function settleSelection(selected: ReadonlyArray<HubInvoice>): {
     payer: payees.size === 1 ? settleable[0].party.name : null,
   }
 }
+
+/** The status in the design's words — as the list's chip, the drawer's hero and the full page say it. */
+export function statusText(status: string): string {
+  return status === 'paid_via_netting' ? 'paid via netting' : status
+}
+
+/** A status's tone: issued waits, paid is green, voided red, a draft quiet. */
+export function statusTone(status: string): 'alert' | 'ledger' | 'danger' | 'def' {
+  return status === 'issued' ? 'alert' : status === 'paid' || status === 'paid_via_netting' ? 'ledger' : status === 'voided' ? 'danger' : 'def'
+}
+
+/** "29 days left" / "Due today" / "3 days past due" — counted from the office's today. */
+export function dueNote(inv: Pick<HubInvoice, 'status' | 'due'>, today: string): string | undefined {
+  if (inv.status === 'paid' || inv.status === 'paid_via_netting') return 'Paid'
+  if (inv.status === 'voided') return 'Voided'
+  if (inv.status === 'draft') return 'Draft'
+  if (!inv.due) return 'No due date'
+  const days = Math.round((Date.parse(inv.due.slice(0, 10)) - Date.parse(today)) / 864e5)
+  if (days > 1) return `${days} days left`
+  if (days === 1) return '1 day left'
+  if (days === 0) return 'Due today'
+  return `${-days} ${days === -1 ? 'day' : 'days'} past due`
+}
+
+/**
+ * What a credit note on it starts from (the hub's and the invoice's own page
+ * alike): the total less what came in less its credit notes not voided —
+ * drafts hold theirs, as the server counts — and the billing mode and the one
+ * account its first line starts on.
+ */
+export function creditNoteFigures(inv: HubInvoice): {
+  id: string
+  no: string | null
+  party: string
+  total: number
+  received: number
+  credited: number
+  mode: string | null
+  category: string | null
+} {
+  const cats = new Set(inv.editLines.map((l) => l.category_code ?? ''))
+  return {
+    id: inv.id,
+    no: inv.no,
+    party: inv.party.name,
+    total: inv.total,
+    received: inv.received,
+    credited: r2(inv.creditNotes.filter((c) => c.status !== 'voided').reduce((s, c) => s + c.amount, 0)),
+    mode: inv.modeKey,
+    category: inv.edit.category_code ?? (cats.size === 1 ? [...cats][0] || null : null),
+  }
+}
+
+/**
+ * Back from the voucher page with the voucher it wrote (`?receipt=`): a
+ * department pool's settle by netting writes a receipt, a refund a payment
+ * voucher — each said as what it is.
+ */
+export function returnedNote(no: string): string {
+  return /-OR-/.test(no) ? `Receipt ${no} written — the invoice is settled` : `Refund voucher ${no} written`
+}
+
+/** The accounts its lines posted to, with their totals — Change account moves them in one go. */
+export function postedAccounts(inv: HubInvoice): Array<{ code: string; amount: number }> {
+  const by = new Map<string, number>()
+  for (const l of inv.editLines) if (l.category_code) by.set(l.category_code, r2((by.get(l.category_code) ?? 0) + Number(l.amount)))
+  return [...by.entries()].map(([code, amount]) => ({ code, amount })).sort((a, b) => a.code.localeCompare(b.code))
+}

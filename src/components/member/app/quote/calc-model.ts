@@ -28,11 +28,12 @@ export interface CalcVM {
   /** The top incentive the price has reached, when none is left above it: `Incentive Tier 2 (43%)`. */
   reached: string | null;
   /**
-   * The tallest the card gets — its longest tier name, its longest penalty line, the next-tier line at
-   * its widest — made room for from the start, so no price typed moves the keypad under the member's
-   * thumb (2026-10-15).
+   * Everything the card's changing parts can say — every tier name the chip shows, every penalty line,
+   * every next tier at the widest price — made room for from the start, so no price typed moves the
+   * keypad under the member's thumb (2026-10-15). Every one, not the longest: "Tier 3" can wrap where
+   * "Tier 1" of the same length does not (384px wide, found on production).
    */
-  room: { tier: string; penalty: string | null; reach: { tier: string; price: string } };
+  room: { tiers: string[]; penalties: string[]; reaches: string[]; price: string };
   /** KPI items on top of the price: `2 KPI items` · `+ RM 500`. */
   kpi: { label: string; total: string } | null;
   /** The options charged on top (2026-10-05; every option since 2026-10-06): `+ RM 120`. */
@@ -130,7 +131,7 @@ const NONE = { marginText: "—", tone: "none" as Tone, penalty: null, next: nul
 
 /** The labels the chip shows when no row of the ladder does. */
 const STATE_LABELS = ["Add products", "Enter a price", "Calculating", "Cost pending", "Not calculated", "No brand rules", "Below cost"];
-const longest = (texts: string[]) => texts.reduce((a, b) => (b.length > a.length ? b : a), "");
+const each = (texts: string[]) => [...new Set(texts)];
 /** The widest price a next-tier line is drawn for. */
 const WIDE_PRICE = 999999.99;
 
@@ -162,7 +163,7 @@ export function calcVM(args: {
     return { tier: `${band?.label ?? "the next tier"} (${pctText(threshold)}%)`, price: rm2(value), value };
   };
   const top = ladder.incentives[ladder.incentives.length - 1];
-  const widest = longest(ladder.incentives.map(i => `${i.label} (${pctText(i.threshold)}%)`)) || "Incentive Tier 1 (36%)";
+  const reaches = ladder.incentives.map(i => `${i.label} (${pctText(i.threshold)}%)`);
   const base = {
     priceText: priceText(price),
     hint: items ? "Next: enter your selling price" : "Choose a model to continue",
@@ -170,9 +171,10 @@ export function calcVM(args: {
     options: options > 0 ? { total: rm(options) } : null,
     pay: kpiAmount + options > 0 ? rm(typed + kpiAmount + options + (Number(args.fee) || 0)) : null,
     room: {
-      tier: longest([...ladder.rows.map(r => r.label), ...STATE_LABELS]),
-      penalty: longest(ladder.rows.filter(r => r.kind === "penalty").map(r => r.effect)) || null,
-      reach: { tier: widest, price: rm2(WIDE_PRICE) },
+      tiers: each([...ladder.rows.map(r => r.label), ...STATE_LABELS]),
+      penalties: each(ladder.rows.filter(r => r.kind === "penalty").map(r => r.effect)),
+      reaches: reaches.length ? each(reaches) : ["Incentive Tier 1 (36%)"],
+      price: rm2(WIDE_PRICE),
     },
   };
   const said = (text: string) => ({ ...base, ...NONE, tierLabel: /cost/i.test(text) ? "Cost pending" : "Not calculated", note: text });

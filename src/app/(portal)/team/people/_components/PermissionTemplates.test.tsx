@@ -90,8 +90,8 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     expect(screen.queryByText(/Applies to everyone holding/)).toBeNull()
     // A template with no ticks stored is drawn from its cells: Overview, HR Costing's three pages, Audit Log (Changes).
     expect(screen.getByRole('tab', { name: /HR view/ })).toHaveAttribute('aria-selected', 'true')
-    // Of the HR view's 20 tabs (round 2 added Documentation, Hiring ×3, Meeting Rooms, Guest Link).
-    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('5/20')
+    // Of the HR view's 27 tabs (round 2 added Documentation, Hiring ×3, Meeting Rooms, Guest Link; Attendance its seven, 2026-10-15).
+    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('5/27')
     expect(box('Payroll · View')).toHaveAttribute('aria-checked', 'true')
     expect(box('Payroll · Approve')).toHaveAttribute('aria-checked', 'false')
     expect(box('Overview · Create')).toBeDisabled()
@@ -201,9 +201,9 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     fireEvent.click(box('Select all · every box in HR view'))
     expect(box('Director Pool · Edit')).toHaveAttribute('aria-checked', 'true')
     expect(box('Select all · every box in HR view')).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('20/20')
+    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('27/27')
     fireEvent.click(box('Select all · every box in HR view'))
-    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('0/20')
+    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('0/27')
     expect(screen.getByText('Unsaved changes to HR · Payroll')).toBeInTheDocument()
   })
 
