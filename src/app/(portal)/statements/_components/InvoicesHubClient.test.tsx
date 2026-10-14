@@ -539,6 +539,12 @@ describe('arriving', () => {
     expect(window.location.search).toBe('')
   })
 
+  it('back from a refund it says the refund’s voucher, not a receipt (2026-10-15)', () => {
+    window.history.replaceState(null, '', '/statements?receipt=HV-PV-202610-0612')
+    draw()
+    expect(mocks.flash).toHaveBeenCalledWith('Refund voucher HV-PV-202610-0612 written')
+  })
+
   it('the card is kept in the address', () => {
     draw()
     fireEvent.click(screen.getByRole('button', { name: /^Issued/ }))

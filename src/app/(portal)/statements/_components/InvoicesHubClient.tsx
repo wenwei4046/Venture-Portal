@@ -15,7 +15,7 @@ import { InvoiceDrawer, invoiceSteps, statusText, statusTone, type InvoiceCan, t
 import SettleDialog from './SettleDialog'
 import CreateInvoiceDialog from './CreateInvoiceDialog'
 import InvoiceLinesDialog from './InvoiceLinesDialog'
-import CreditNoteDialog, { type CreditNoteInvoice } from './CreditNoteDialog'
+import CreditNoteDialog from './CreditNoteDialog'
 import ChangeAccountDialog from './ChangeAccountDialog'
 import { MarketingDialog, OwnShareDialog, PayrollInvoicesDialog, ReconcileDialog } from './GenerateDialogs'
 import PayrollBasisDrawer from './PayrollBasisDrawer'
@@ -32,8 +32,11 @@ import {
 } from '../invoice-actions'
 import {
   STATUS_CARD_KEYS,
+  creditNoteFigures,
   invoicedTotal,
   onCard,
+  postedAccounts,
+  returnedNote,
   settleSelection,
   statusCard,
   type HubContract,
@@ -180,7 +183,7 @@ export default function InvoicesHubClient({
     const url = new URL(window.location.href)
     const receipt = url.searchParams.get('receipt')
     const fresh = url.searchParams.get('new') === '1'
-    if (receipt) flash(`Receipt ${receipt} written — the invoice is settled`)
+    if (receipt) flash(returnedNote(receipt))
     if (fresh && openNew && can.create) setDialog({ kind: 'single', nonce: Date.now(), open: true })
     if (receipt || url.searchParams.has('new')) {
       url.searchParams.delete('receipt')
@@ -567,25 +570,6 @@ export default function InvoicesHubClient({
     flash(message)
     router.refresh()
   }
-  // What a credit note may still take: the total less what came in and its credit notes not voided (drafts hold theirs).
-  const creditNoteInvoice = (inv: HubInvoice): CreditNoteInvoice => {
-    const cats = new Set(inv.editLines.map((l) => l.category_code ?? ''))
-    return {
-      id: inv.id,
-      no: inv.no,
-      party: inv.party.name,
-      total: inv.total,
-      received: inv.received,
-      credited: r2(inv.creditNotes.filter((c) => c.status !== 'voided').reduce((s, c) => s + c.amount, 0)),
-      mode: inv.modeKey,
-      category: inv.edit.category_code ?? (cats.size === 1 ? [...cats][0] || null : null),
-    }
-  }
-  const postedAccounts = (inv: HubInvoice) => {
-    const by = new Map<string, number>()
-    for (const l of inv.editLines) if (l.category_code) by.set(l.category_code, r2((by.get(l.category_code) ?? 0) + Number(l.amount)))
-    return [...by.entries()].map(([code, amount]) => ({ code, amount })).sort((a, b) => a.code.localeCompare(b.code))
-  }
 
   // ── The toolbar's own buttons ──
   const tools =
@@ -911,7 +895,7 @@ export default function InvoicesHubClient({
           open={dialog.open}
           onClose={closeDialog}
           onDone={dialogDone}
-          invoice={creditNoteInvoice(dialogInvoice)}
+          invoice={creditNoteFigures(dialogInvoice)}
           categories={hub.categories}
           extraModes={hub.extraModes}
         />

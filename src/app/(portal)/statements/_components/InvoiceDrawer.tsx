@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { FinDrawer, drawerStyles as d } from '@/components/finv/Drawer'
 import { DrawerGroup as Group, DrawerLine as Line, fd } from '@/components/finv/DrawerParts'
-import type { HubInvoice } from '../_lib/invoice-model'
+import { dueNote, statusText, statusTone, type HubInvoice } from '../_lib/invoice-model'
 
 // An invoice in the hub's drawer (2026-10-14, the Finance revamp v2 — D10, the
 // prototype's `detailInv`): the dark hero, then Balance · Billing · Line items
@@ -42,15 +42,8 @@ export interface InvoiceStep {
   off?: string
 }
 
-/** The status in the design's words — as the list's chip and the hero say it. */
-export function statusText(status: string): string {
-  return status === 'paid_via_netting' ? 'paid via netting' : status
-}
-
-/** A status's tone: issued waits, paid is green, voided red, a draft quiet. */
-export function statusTone(status: string): 'alert' | 'ledger' | 'danger' | 'def' {
-  return status === 'issued' ? 'alert' : status === 'paid' || status === 'paid_via_netting' ? 'ledger' : status === 'voided' ? 'danger' : 'def'
-}
+// The status's words and tone live in the model — the invoice's full page (a server page) says them too.
+export { statusText, statusTone }
 
 const f2 = (n: number) => (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const rm = (n: number) => `RM ${f2(n)}`
@@ -119,19 +112,6 @@ function noteOf(inv: HubInvoice): string {
     default:
       return ''
   }
-}
-
-/** "29 days left" / "Due today" / "3 days past due" — counted from the office's today. */
-function dueNote(inv: HubInvoice, today: string): string | undefined {
-  if (inv.status === 'paid' || inv.status === 'paid_via_netting') return 'Paid'
-  if (inv.status === 'voided') return 'Voided'
-  if (inv.status === 'draft') return 'Draft'
-  if (!inv.due) return 'No due date'
-  const days = Math.round((Date.parse(inv.due.slice(0, 10)) - Date.parse(today)) / 864e5)
-  if (days > 1) return `${days} days left`
-  if (days === 1) return '1 day left'
-  if (days === 0) return 'Due today'
-  return `${-days} ${days === -1 ? 'day' : 'days'} past due`
 }
 
 export function InvoiceDrawer({
