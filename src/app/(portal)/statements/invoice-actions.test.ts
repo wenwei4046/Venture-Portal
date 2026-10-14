@@ -117,9 +117,9 @@ describe('in words, not a throw', () => {
     expect(await hubDeleteDraft('i1')).toEqual({ ok: false, reason: 'Only drafts can be deleted' })
   })
 
-  it('a copy’s redirect is the copy done — the reader stays on the hub', async () => {
-    mocks.copyInvoice.mockRejectedValue(redirectError())
-    expect(await hubCopyInvoice('i1')).toEqual({ ok: true, value: null })
+  it('a copy answers the draft it made — the full page opens it, the hub stays', async () => {
+    mocks.copyInvoice.mockResolvedValue({ id: 'i9', no: 'HV-INV-202610-0099' })
+    expect(await hubCopyInvoice('i1')).toEqual({ ok: true, value: { id: 'i9', no: 'HV-INV-202610-0099' } })
     expect(sent(mocks.copyInvoice)).toEqual({ invoice_id: 'i1' })
   })
 
