@@ -449,7 +449,7 @@ export default function CreateInvoiceDialog({
                 </span>
               </div>
             </div>
-            {several ? <Hint>Each company’s amount is split in these proportions — an invoice a company and a line.</Hint> : null}
+            {several ? <Hint>Each company’s amount is split in these proportions — one invoice for each company and line.</Hint> : null}
           </Field>
         ) : (
           <>

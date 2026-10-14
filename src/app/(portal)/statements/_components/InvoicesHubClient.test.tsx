@@ -54,11 +54,10 @@ vi.mock('../invoice-actions', () => ({
   hubVoidCreditNote: mocks.cnVoid,
   hubDeleteCreditNote: mocks.cnDelete,
 }))
-vi.mock('../../billing/_components/InvoiceActions', () => ({ EditInvoiceButton: marker('edit') }))
+vi.mock('./CreateInvoiceDialog', () => ({ default: marker('single') }))
+vi.mock('./InvoiceLinesDialog', () => ({ default: marker('lines') }))
 vi.mock('../../billing/_components/CreateCreditNoteButton', () => ({ default: marker('credit_note') }))
 vi.mock('../../billing/_components/ReassignInvoiceGlButton', () => ({ default: marker('reassign') }))
-vi.mock('../../billing/_components/CreateInvoiceButton', () => ({ default: marker('single') }))
-vi.mock('../../billing/_components/CreateMultiLineInvoiceButton', () => ({ default: marker('multi') }))
 vi.mock('../../billing/_components/GenerateInvoicesButton', () => ({ default: marker('marketing') }))
 vi.mock('../../billing/_components/GenerateConsolidatedInvoicesButton', () => ({ default: marker('consolidated') }))
 vi.mock('../../billing/_components/ReconcilePayrollBillingButton', () => ({ default: marker('reconcile') }))
@@ -195,13 +194,17 @@ describe('the head and the cards', () => {
     expect(within(dialog()).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Payroll basisPending · HR pending · Director salary pending · 1 marketing contract'])
   })
 
-  it('Create invoice ▾ opens the system’s dialogs on the page’s month', () => {
+  it('Create invoice ▾ opens the invoice dialogs on the page’s month', () => {
     draw()
     fireEvent.click(screen.getByRole('button', { name: 'Create invoice ▾' }))
     expect(within(dialog()).getByText('From 1 active marketing project')).toBeInTheDocument()
     fireEvent.click(within(dialog()).getByRole('menuitem', { name: /Single invoice/ }))
     expect(screen.getByTestId('dialog-single')).toBeInTheDocument()
-    expect(mocks.dialog).toHaveBeenLastCalledWith('single', expect.objectContaining({ currentPeriod: '2026-10-01', autoOpen: true, hideTrigger: true }))
+    expect(mocks.dialog).toHaveBeenLastCalledWith('single', expect.objectContaining({ period: '2026-10-01', open: true, today: '2026-10-14' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create invoice ▾' }))
+    fireEvent.click(within(dialog()).getByRole('menuitem', { name: /Multi-line invoice/ }))
+    expect(mocks.dialog).toHaveBeenLastCalledWith('lines', expect.objectContaining({ period: '2026-10-01', open: true }))
+    expect(mocks.dialog.mock.lastCall?.[1].editing).toBeUndefined()
   })
 
   it('Export ▾ names the files of the month on show', () => {
@@ -266,6 +269,26 @@ describe('the drawer', () => {
     expect(within(d).getByRole('link', { name: 'View full page ↗' })).toHaveAttribute('href', '/invoices/hc1')
     expect(within(d).getByRole('link', { name: 'PDF' })).toHaveAttribute('href', '/billing/invoice-doc?id=hc1')
     expect(within(d).getAllByRole('button').map((b) => b.textContent)).toEqual(['×', 'Settle', 'Edit', '⋯'])
+  })
+
+  it('Edit opens the invoice in the lines dialog — its fields, its lines, whether money came in', () => {
+    draw()
+    fireEvent.click(rowOf('HOUZS Century', '2,204.00'))
+    fireEvent.click(within(drawer()).getByRole('button', { name: 'Edit' }))
+    expect(mocks.dialog).toHaveBeenLastCalledWith(
+      'lines',
+      expect.objectContaining({
+        open: true,
+        editing: expect.objectContaining({ id: 'hc1', status: 'issued', settled: false, initial: expect.objectContaining({ billing_mode: 'hr_attribution' }) }),
+      }),
+    )
+    // Saved: the hub's toast says so and reads the list again.
+    const { onDone, onClose } = mocks.dialog.mock.lastCall?.[1] as { onDone: (m: string) => void; onClose: () => void }
+    act(() => onDone('HV-INV-202610-0001 changed — JE-202610-0901 corrected'))
+    expect(mocks.flash).toHaveBeenCalledWith('HV-INV-202610-0001 changed — JE-202610-0901 corrected')
+    expect(mocks.refresh).toHaveBeenCalled()
+    act(() => onClose())
+    expect(mocks.dialog).toHaveBeenLastCalledWith('lines', expect.objectContaining({ open: false }))
   })
 
   it('Settle opens the settle dialog for it; a department pool’s settles on the voucher page', () => {

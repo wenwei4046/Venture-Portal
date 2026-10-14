@@ -99,8 +99,8 @@ export default function InvoiceLinesDialog({
   const startLines = (): LineRow[] => {
     if (!editing) return [0, 1].map(() => ({ key: nextKey(), desc: '', amount: '', category: '' }))
     if (editing.lines.length > 0)
-      return editing.lines.map((l) => ({ key: nextKey(), desc: l.description ?? '', amount: String(l.amount), category: l.category_code ?? '' }))
-    return [{ key: nextKey(), desc: '', amount: String(editing.initial.total_amount), category: editing.initial.category_code ?? '' }]
+      return editing.lines.map((l) => ({ key: nextKey(), desc: l.description ?? '', amount: Number(l.amount).toFixed(2), category: l.category_code ?? '' }))
+    return [{ key: nextKey(), desc: '', amount: Number(editing.initial.total_amount).toFixed(2), category: editing.initial.category_code ?? '' }]
   }
   const [lines, setLines] = useState<LineRow[]>(startLines)
   const sameCategory = lines.every((l) => l.category === lines[0]?.category)
@@ -226,7 +226,7 @@ export default function InvoiceLinesDialog({
       if (editing) {
         const res = await hubUpdateInvoice({ ...payload, id: editing.id, issued, reason: reason.trim() })
         if (!res.ok) return setError(res.reason)
-        const no = editing.no ?? 'The draft'
+        const no = editing.no ?? 'Draft'
         onDone(issued ? `${no} changed${res.value ? ` — ${res.value} corrected` : ''}` : `${no} saved`)
       } else {
         const res = await hubCreateLinesInvoice(payload)
@@ -255,7 +255,7 @@ export default function InvoiceLinesDialog({
       open={open}
       onClose={() => !busy && onClose()}
       title={editing ? 'Edit invoice' : 'Multi-line invoice'}
-      sub={editing ? `${editing.no ?? 'Draft'} · ${statusWords}` : 'Saved as draft · approve to issue'}
+      sub={editing ? (editing.no ? `${editing.no} · ${statusWords}` : 'Draft') : 'Saved as draft · approve to issue'}
       locked={busy}
     >
       <DialogForm

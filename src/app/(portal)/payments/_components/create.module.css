@@ -22,3 +22,14 @@
   padding: 0 10px 8px 12px;
 }
 .override:first-child { padding-top: 8px; }
+
+/* A narrow dialog (a phone): a line takes two rows — its pool and category,
+   then its amount and its × (a repayment's: its part and pool, then its
+   category and amount); an override's reason under its type and GL. */
+@media (max-width: 560px) {
+  .line,
+  .line[data-repay='true'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .line > :last-child { justify-self: end; }
+  .override { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .override > :last-child { grid-column: 1 / -1; }
+}

@@ -55,7 +55,8 @@ function groupTotal(components: ConsolidatedCompanyPreview['groups'][number]['co
   )
 }
 
-// One instance per month — see CreateInvoiceButton. The preview effect keys
+// One instance per month, keyed on the month the server rendered (2026-09-11:
+// a ?period= navigation keeps a modal mounted). The preview effect keys
 // off the local `period`, which was seeded once; a ?period= navigation keeps
 // this mounted, so the modal previewed and generated for the old month.
 export default function GenerateConsolidatedInvoicesButton(props: Props) {

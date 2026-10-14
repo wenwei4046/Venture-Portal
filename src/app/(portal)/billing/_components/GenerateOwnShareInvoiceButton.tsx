@@ -60,7 +60,8 @@ function groupTotal(c: Components): number {
   return Math.round((c.salary + c.allowance + c.epf + c.socso + c.eis) * 100) / 100
 }
 
-// One instance per month — see CreateInvoiceButton.
+// One instance per month, keyed on the month the server rendered (2026-09-11:
+// a ?period= navigation keeps a modal mounted, seeded with the old month).
 export default function GenerateOwnShareInvoiceButton(props: Props) {
   return <GenerateOwnShareInvoiceButtonBody key={props.currentPeriod} {...props} />
 }

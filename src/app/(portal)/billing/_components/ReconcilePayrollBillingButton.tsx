@@ -26,7 +26,8 @@ interface Props {
   hideTrigger?: boolean
 }
 
-// One instance per month — see CreateInvoiceButton. Both the delta lookup and
+// One instance per month, keyed on the month the server rendered (2026-09-11:
+// a ?period= navigation keeps a modal mounted). Both the delta lookup and
 // the top-up drafts use the local `period`, seeded once.
 export default function ReconcilePayrollBillingButton(props: Props) {
   return <ReconcilePayrollBillingButtonBody key={props.currentPeriod} {...props} />

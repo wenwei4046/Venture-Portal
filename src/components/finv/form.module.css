@@ -13,6 +13,11 @@ select.select { height: 32px; padding-left: 12px; }
 /* A select in a line of the lines card: the line's 32px, its words 8px in, as the line's inputs. */
 .lineSelect { width: 100%; }
 select.lineSelect { height: 32px; }
+/* Their edge and ink as an input's. The soft select draws both from the HR
+   view's --hv-* colours, which a dialog portaled to <body> does not have —
+   there the edge was dropped altogether (D07 draws it). */
+select.select,
+select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
 
 /* Pay to: the input, and the companies it matches under it (the soft menu's look). */
 .suggestWrap { position: relative; display: flex; flex-direction: column; }
@@ -146,10 +151,17 @@ select.lineSelect { height: 32px; }
 .lineRow[data-shape='pool'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) 112px 28px; }
 .lineRow[data-shape='item'] { grid-template-columns: minmax(0, 1fr) 128px 28px; }
 .lineRow[data-shape='item-cat'] { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 112px 28px; }
+/* A narrow dialog (a phone): a line of four takes two rows — its two selects, then its amount and its ×. */
+@media (max-width: 560px) {
+  .lineRow[data-shape='pool'],
+  .lineRow[data-shape='item-cat'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .lineRow[data-shape='pool'] > :last-child,
+  .lineRow[data-shape='item-cat'] > :last-child { justify-self: end; }
+}
 .lineAmount {
-  box-sizing: content-box;
-  width: calc(100% - 18px);
-  height: 30px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 32px;
   margin: 0;
   padding: 0 8px;
   border: 1px solid var(--ds-border);
@@ -164,9 +176,9 @@ select.lineSelect { height: 32px; }
 .lineAmount:focus { border-color: var(--ds-accent); box-shadow: var(--ds-focus-ring); }
 .lineAmount:read-only { color: rgb(var(--hvs-graphite)); }
 .lineText {
-  box-sizing: content-box;
-  width: calc(100% - 18px);
-  height: 30px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 32px;
   margin: 0;
   padding: 0 8px;
   border: 1px solid var(--ds-border);
