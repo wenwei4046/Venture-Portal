@@ -21,6 +21,7 @@ import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, INLINE_TIME, mediaOf, mediaWord, NO_MEDIA } from "../../shared/chat-media";
 import { MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
+import { autoChoices, openAttach } from "../../shared/attach-sheet";
 
 const NO_PRESS: Partial<ReturnType<typeof pressToOpen>> = {};
 import { CHAT_WALL } from "../wall";
@@ -469,9 +470,11 @@ export function chatVM(ctx: SalesCtx) {
     sendDraft,
     openAtt: () => patch({ att: true }), attOpen: ui.att, closeAtt: () => patch({ att: false }),
     attTiles: ([
-      ["Photos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "#2F8FD8", () => { patch({ att: false }); document.getElementById("crm-pick-photo")?.click(); }],
+      ["Photos & videos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "#2F8FD8", () => { patch({ att: false }); document.getElementById("crm-pick-photo")?.click(); }],
       ["Document", "M7 3h7l5 5v13H7V3Zm7 0v5h5", "#BD4A19", () => { patch({ att: false }); document.getElementById("crm-pick-file")?.click(); }],
       ["Quick replies", "M13 2 4 14h7l-1 8 9-12h-7l1-8Z", "#A46312", () => patch({ att: false, qr: true })],
+      // Auto replies (2026-10-14): one's saved welcome / after-hours / keyword replies, into the reply box to send by hand.
+      ["Auto replies", "M12 8v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", "#387557", () => { patch({ att: false }); openAttach({ view: "auto", quick: [], auto: autoChoices(data.autoReplies), pick: text => setDraft(text) }); }],
     ] as [string, string, string, () => void][]).map(([label, icon, color, go]) => ({ label, icon, color, go })),
     /** The chat's hidden file pickers (Photos · Document) send what is chosen, the draft as its caption. */
     // Photos (several at once), the camera's photo or video, a document: each goes as its own message, in order; the

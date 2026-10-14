@@ -18,6 +18,7 @@ import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, INLINE_TIME, mediaOf, mediaWord } from "../../shared/chat-media";
 import { MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
+import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
@@ -194,8 +195,14 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     emojis: CHAT_EMOJIS.map(e => ({ e, pick: () => set(u => ({ ...u, pDraft: withEmoji(u.pDraft, e) })) })),
     rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()), cancel: recStop(false), send: recStop(true) } : null,
     // + = a document, the camera = a photo (PanelScreens' hidden pickers); the typed text goes as the caption.
-    attach: () => document.getElementById("crm-panel-file")?.click(),
-    photo: () => document.getElementById("crm-panel-photo")?.click(),
+    // + : Photos & videos · Document · Quick replies · Auto replies (the owner, 2026-10-14) — it picked any file and sent it.
+    attach: () => openAttach({
+      photos: () => document.getElementById("crm-panel-photo")?.click(), document: () => document.getElementById("crm-panel-file")?.click(),
+      quick: ctx.data.quickReplies.map(q => ({ label: q.shortcut ? `/${q.shortcut}` : "Quick reply", text: q.message })), auto: autoChoices(ctx.data.autoReplies),
+      pick: text => set(u => ({ ...u, pDraft: text })),
+    }),
+    // The camera button opens the camera itself ("點相機後刪掉 document file" — it offered the iPhone's Choose Files too).
+    photo: () => document.getElementById("crm-panel-camera")?.click(),
     // Photos and videos (the camera button) wait on the preview with its HD switch; a document (+) goes at once.
     pickVisual: (e: ChangeEvent<HTMLInputElement>) => {
       const files = [...(e.target.files ?? [])]; e.target.value = "";

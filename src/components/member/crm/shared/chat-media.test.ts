@@ -78,3 +78,12 @@ describe("a voice note's speed (2026-10-14)", () => {
     expect(mediaOf({ id: "v", media: { kind: "audio", url: "/m/v" } }, []).pad).toBe("6px 9px 5px");
   });
 });
+
+describe("the + sheet's auto replies (2026-10-14)", () => {
+  it("lists the saved auto replies that have words", async () => {
+    const { autoChoices } = await import("./attach-sheet");
+    expect(autoChoices({ welcome: { text: "Hi, thanks!" }, after: { text: "" }, kws: [{ words: "price", text: "Our prices…" }, { words: "x", text: " " }] }))
+      .toEqual([{ label: "Welcome", text: "Hi, thanks!" }, { label: "Keyword · price", text: "Our prices…" }]);
+    expect(autoChoices(null)).toEqual([]);
+  });
+});
