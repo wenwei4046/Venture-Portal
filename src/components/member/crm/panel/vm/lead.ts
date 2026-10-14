@@ -8,9 +8,8 @@
  */
 import type { ChangeEvent } from "react";
 import { DEFAULT_QUICK_REPLIES, type CrmChatMessage, type CrmCustomer } from "@/lib/member/crm-data";
-import type { WaTemplate } from "@/lib/whatsapp/send";
 import { DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel, windowShut } from "../../sales/vm/common";
-import { roomClosed, roomSlots, slotAt, slotBlocked, windowLeft } from "../../sales/vm/chat";
+import { roomClosed, roomSlots, slotAt, slotBlocked } from "../../sales/vm/chat";
 import { infoRows } from "../../sales/vm/customer";
 import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "../../sales/vm/composer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
@@ -21,7 +20,7 @@ import { albumsOf, galleryOf, INLINE_TIME, mediaOf, mediaWord } from "../../shar
 import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
-import { openActions } from "../../shared/action-sheet";
+import { actionsOnScreen, closeActions, openActions, type ActionSheet } from "../../shared/action-sheet";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
@@ -77,14 +76,14 @@ export function leadVM(ctx: PanelCtx) {
         forward: c ? { chats: forwardChats(ctx.data.customers, c.id, nameOf), send: toId => void ctx.act.forward(m.id, toId) } : undefined,
         info: c ? messageInfo(m, c, nameOf) : undefined,
         actions: [
-          { label: "Reply", icon: MENU_ICON.reply, run: () => patch({ pReply: { msgId: m.id, who: mine ? "You" : c?.name ?? "", text: m.text || mediaWord(m) } }) },
+          { label: "Reply", icon: MENU_ICON.reply, run: () => patch({ pReply: { chat: c?.id ?? "", msgId: m.id, who: mine ? "You" : c?.name ?? "", text: m.text || mediaWord(m) } }) },
           { label: "Forward", icon: MENU_ICON.forward, run: () => {} },
           ...(m.text ? [{ label: "Copy", icon: MENU_ICON.copy, run: () => { void navigator.clipboard?.writeText(m.text).catch(() => {}); } }] : []),
           { label: "Info", icon: MENU_ICON.info, run: () => {} },
           { label: stars.has(m.id) ? "Unstar" : "Star", icon: MENU_ICON.star, run: () => void ctx.act.star(m.id, !stars.has(m.id)) },
           { label: "Delete for me", icon: MENU_ICON.del, danger: true, run: () => void ctx.act.hideMessage(m.id) },
         ],
-      }), () => { patch({ pReply: { msgId: m.id, who: mine ? "You" : c?.name ?? "", text: m.text || mediaWord(m) } }); focusDraft(); }) },
+      }), () => { patch({ pReply: { chat: c?.id ?? "", msgId: m.id, who: mine ? "You" : c?.name ?? "", text: m.text || mediaWord(m) } }); focusDraft(); }) },
       tickC: m.status === "read" ? "#2F8FD8" : m.status === "failed" ? "#A3371A" : "#A8968B",
       tickPath: m.status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1" : "M1 6l3 3 6-7M7 8.5l.5.5 6-7",
       by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? "#FCD6B8" : "#fff", bd: mine ? "#FCD6B8" : "#fff", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
@@ -114,7 +113,11 @@ export type LeadVM = ReturnType<typeof leadVM>;
 /** The chat's full mode: reply, the ⋮ menu, Customer info and Book visit. */
 function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   const { ui, patch, set, now, data, act, nameOf } = ctx;
-  const draft = ui.pDraft, has = !!draft.trim();
+  // This chat's own words and the message it answers (as Mine's): another chat's never show here, and never go here.
+  const cid = c?.id ?? "";
+  const draft = (c ? ui.pDrafts[c.id] : undefined) ?? "", has = !!draft.trim();
+  const setDraft = (text: string) => set(u => ({ ...u, pDrafts: { ...u.pDrafts, [cid]: text } }));
+  const reply = c && ui.pReply?.chat === c.id ? ui.pReply : null;
   const rooms = data.rooms.filter(r => r.active);
   const B = c && ui.pBook && ui.pBook.customerId === c.id ? ui.pBook : null;
   const T = day0(now);
@@ -140,14 +143,12 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     ] });
   };
   const setB = (p: Partial<NonNullable<typeof B>>) => set(u => (u.pBook ? { ...u, pBook: { ...u.pBook, ...p } } : u));
-  // Shows at once and the box empties (2026-10-13); a failed send puts the words back into an empty box.
+  // Shows at once and the box empties (2026-10-13); a failed send puts the words back into its own chat's empty box.
   const send = async () => {
     if (!c || !has) return;
-    const text = draft.trim();
-    set(u => ({ ...u, pDraft: "" }));
-    const replyTo = ui.pReply?.msgId ?? null;
-    set(u => ({ ...u, pReply: null }));
-    if (!(await act.send(c.id, text, replyTo))) set(u => ({ ...u, pDraft: u.pDraft || text }));
+    const id = c.id, text = draft.trim(), replyTo = reply?.msgId ?? null;
+    set(u => ({ ...u, pDrafts: { ...u.pDrafts, [id]: "" }, pReply: u.pReply?.chat === id ? null : u.pReply }));
+    if (!(await act.send(id, text, replyTo))) set(u => ({ ...u, pDrafts: { ...u.pDrafts, [id]: u.pDrafts[id] || text } }));
   };
   // Voice notes: the mic is held to record, as in Mine's chat (the composer, 2026-10-14) — let go and it goes, let go on
   // the bin and it is thrown away; the time ticks on screen.
@@ -169,36 +170,35 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     const file = await stopVoice();
     if (file && c) await act.sendMedia(c.id, file, "");
   };
-  // A cold chat (the reply window closed) sends a template, as Mine's: the composer's button opens them — read once.
+  // A cold chat (the reply window closed) sends a template, as Mine's: the composer's button opens them with the words each
+  // sends. Read each time — this is where templates are switched on and off (Profile › Cold lead templates), so a list
+  // kept from earlier would go stale — and the sheet waiting on the read is replaced only while it is still on screen
+  // (closed, it stays closed: a template is never offered over another chat).
   const shut = !!c && windowShut(c, now);
-  const sendTpl = (t: WaTemplate) => {
+  const openTpl = async () => {
     if (!c) return;
-    const params = Array.from({ length: t.params }, (_, i) => (i === 0 ? first(c.name) : ""));
-    void oneAtATime(`send:${c.id}:${t.name}`, () => act.sendTemplate(c.id, t, params));
-  };
-  const tplSheet = (tpls: WaTemplate[] | null | undefined) => {
-    const title = "Send template message";
-    if (!c) return;
+    const name = first(c.name), id = c.id;
     if (c.channel === "messenger") { openActions({ title: "Messenger has no templates", sub: "After 7 days Messenger allows no message from the Page. Call the customer instead.", actions: [{ label: "Close", run: NONE }] }); return; }
-    if (tpls == null) { openActions({ title, sub: "Reading the templates you may send.", actions: [{ label: "Close", run: NONE }] }); return; }
+    const reading: ActionSheet = { title: "Send template message", sub: "Reading the templates you may send.", actions: [{ label: "Close", run: NONE }] };
+    openActions(reading);
+    const tpls = await act.loadTemplates();
+    if (actionsOnScreen() !== reading) return;
+    // The read failed: its toast says why.
+    if (!tpls) { closeActions(); return; }
     if (!tpls.length) { openActions({ title: "No templates switched on", sub: "Switch approved templates on in Profile › Cold lead templates.", actions: [{ label: "Close", run: NONE }] }); return; }
-    openActions({ title, sub: `Only template messages reach ${first(c.name)} until they write again.`, actions: [
-      ...tpls.map((t, i) => ({ label: t.label ?? t.name.replace(/_/g, " ").replace(/^\w/, x => x.toUpperCase()), primary: i === 0, run: () => sendTpl(t) })),
+    openActions({ title: "Send template message", sub: `Only template messages reach ${name} until they write again.`, actions: [
+      ...tpls.map(t => {
+        const params = Array.from({ length: t.params }, (_, i) => (i === 0 ? name : ""));
+        return { label: t.label ?? t.name.replace(/_/g, " ").replace(/^\w/, x => x.toUpperCase()), detail: t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] || "…"),
+          run: () => { void oneAtATime(`send:${id}:${t.name}`, () => act.sendTemplate(id, t, params)); } };
+      }),
       { label: "Close", run: NONE },
     ] });
-  };
-  const openTpl = async () => {
-    tplSheet(ui.pTemplates);
-    if (c?.channel !== "whatsapp" || ui.pTemplates != null) return;
-    const t = (await act.loadTemplates()) ?? [];
-    patch({ pTemplates: t });
-    tplSheet(t);
   };
   // "/" in the reply box lists one's quick replies, as Mine's (the ones saved in Mine › Profile, the design's set until then).
   const qrs = data.quickReplies.length ? data.quickReplies : DEFAULT_QUICK_REPLIES.map((q, i) => ({ id: "d" + i, ...q }));
   const slash = /^\/(\S*)$/.exec(draft), sq = slash ? slash[1].toLowerCase() : "";
   const hits = slash ? qrs.filter(q => q.shortcut.toLowerCase().includes(sq)) : [];
-  const setDraft = (text: string) => set(u => ({ ...u, pDraft: text }));
   const textChoices = { quick: data.quickReplies.map(q => ({ label: q.shortcut ? `/${q.shortcut}` : "Quick reply", text: q.message })), auto: autoChoices(data.autoReplies), pick: setDraft };
   // The Attach panel's tiles: the CRM's own pickers (PanelScreens' hidden inputs) and lists.
   const tile = (label: TileLabel) => {
@@ -206,21 +206,21 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     else if (label === "Document") document.getElementById("crm-panel-file")?.click();
     else openAttach({ ...textChoices, view: label === "Quick replies" ? "quick" : "auto" });
   };
-  const cid = c?.id ?? "";
   const setCmp = (f: (s: ComposerState) => ComposerState) => set(u => ({ ...u, pCmp: { ...f(composerOf(u.pCmp, cid) ?? initialComposer()), chat: cid } }));
   // The composer (the chat composer handoff — sales/ChatComposer.tsx), Mine's exactly; its words this chat's draft.
   const cmp: ComposerIn = {
     key: cid, state: composerOf(ui.pCmp, cid) ?? initialComposer(), set: setCmp,
     placeholder: c ? `Reply to ${first(c.name)}…` : "", draft, setDraft, canSend: has, send: () => void send(),
     warm: !shut, openTpl: () => void openTpl(),
-    reply: ui.pReply ? { who: ui.pReply.who, text: ui.pReply.text } : null, cancelReply: () => patch({ pReply: null }),
+    reply: reply ? { who: reply.who, text: reply.text } : null, cancelReply: () => patch({ pReply: null }),
     slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid #EBDDD2" : "0", pick: () => setDraft(q.message) })) } : null,
     rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()) } : null,
     voiceStart, voiceStop: sendIt => void recStop(sendIt),
     camera: () => document.getElementById("crm-panel-camera")?.click(),
     tile,
-    recents: ui.pRecents ?? data.recentEmoji ?? [],
-    saveRecents: list => { patch({ pRecents: list }); act.saveRecentEmoji(list); },
+    // One's recent emoji: CrmApp's list, shared with Mine's chat; kept on the server a moment later.
+    recents: ctx.recents?.list ?? data.recentEmoji ?? [],
+    saveRecents: list => { ctx.recents?.keep(list); act.saveRecentEmoji(list); },
   };
   const room = B ? rooms[B.room] ?? rooms[0] : undefined;
   const taken = (start: Date) => data.visits.filter(v => v.id !== B?.visitId && v.showroomId === room?.id && v.state === "booked" && new Date(v.start).getTime() === start.getTime()).length;
@@ -274,7 +274,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
       if (files.length) set(u => ({ ...u, pPick: { ...pickedOf(files), caption: draft } }));
     },
     pk: c ? pickVM(ui.pPick, p => set(u => ({ ...u, pPick: p })), async (files, captions) => {
-      if (draft) set(u => ({ ...u, pDraft: "" }));
+      if (draft) setDraft("");
       await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, captions[i] ?? "")));
     }) : null,
     // Several files at once, each its own message; the typed words go with the first.
@@ -288,7 +288,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
       if (visual.length) set(u => ({ ...u, pPick: { ...pickedOf(visual), caption: draft } }));
       if (!docs.length) return;
       const caption = visual.length ? "" : draft.trim();
-      if (caption) set(u => ({ ...u, pDraft: "" }));
+      if (caption) setDraft("");
       await Promise.all(docs.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
     },
     // The header, as Mine's: the avatar's title names the channel; ⋮ tints while its menu is open.

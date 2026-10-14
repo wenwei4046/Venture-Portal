@@ -99,6 +99,10 @@ export function recentList(mine: readonly string[]): string[] {
 /** One's recents after picking `e`: it goes first, once, 24 at most. */
 export const pushRecent = (mine: readonly string[], e: string) => [e, ...mine.filter(x => x !== e)].slice(0, RECENT_MAX);
 
+/** One's recent emoji in this visit, shared by Mine's chat and the Team side's (CrmApp keeps it, so neither saves over the
+ *  other's picks): null until one is picked — the server's copy (crm_staff_prefs.recent_emoji) until then. */
+export interface SharedRecents { list: readonly string[] | null; keep: (list: string[]) => void }
+
 /** The emoji grid's label and emoji: the category's, or — searching — every emoji a keyword holds the query in. */
 export function emojiView(s: Pick<ComposerState, "searching" | "q" | "ecat">, mine: readonly string[]): { label: string; list: string[] } {
   const ql = s.searching ? s.q.trim().toLowerCase() : "";

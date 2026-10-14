@@ -149,6 +149,35 @@ describe("the Team chat is Mine's", () => {
     expect(voice.cancel).toHaveBeenCalledTimes(1);
   });
 
+  it("words typed in one chat stay in it: another chat opens with an empty box (as Mine's)", async () => {
+    await openTeamChat();
+    await type("For Lim only");
+    await tap(head().querySelector('[title="Back to Inbox"]'));
+    await tap(screen.getAllByText("Tan Mei Ling", { exact: true })[0]);
+    expect(box().value).toBe("");
+    await tap(head().querySelector('[title="Back to Inbox"]'));
+    await tap(screen.getAllByText("Lim Wei Jie", { exact: true })[0]);
+    expect(box().value).toBe("For Lim only");
+  });
+
+  it("a cold chat's templates are read each time: switched on in Profile, offered at once with the words each sends", async () => {
+    await openTeamChat("Rajesh Kumar");
+    const sendTemplate = () => tap([...composer().querySelectorAll("span")].find(s => s.textContent === "Send template message") ?? null);
+    await sendTemplate();
+    fireEvent.click(screen.getByRole("dialog", { name: "No templates switched on" }));
+    await act(async () => {});
+    await tap(head().querySelector('[title="Back to Inbox"]'));
+    await tap(screen.getAllByText("Profile", { exact: true }).find(e => e.closest("nav")) ?? null);
+    await tap(screen.getAllByText("Cold lead templates", { exact: true })[0]);
+    await tap(document.querySelector('[title="Turn on"]'));
+    await tap(screen.getAllByText("Inbox", { exact: true }).find(e => e.closest("nav")) ?? null);
+    await tap(screen.getAllByText("Rajesh Kumar", { exact: true })[0]);
+    await sendTemplate();
+    const sheet = screen.getByRole("dialog", { name: "Send template message" });
+    expect(sheet.textContent).toContain("Follow up visit");
+    expect(sheet.textContent).toContain("Hi Rajesh, this is HOUZS.");
+  });
+
   it("a cold chat: the cold-lead note in the header and Send template message in the bar's place, as Mine's", async () => {
     await openTeamChat("Rajesh Kumar");
     expect(head().textContent).toContain("Cold lead · the 24 h WhatsApp window has closed");
