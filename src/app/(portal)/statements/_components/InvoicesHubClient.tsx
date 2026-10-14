@@ -11,17 +11,16 @@ import { FinTable, type FinColumn } from '@/components/finv/FinTable'
 import { DialogConfirm, DialogMenu, Field, FinDialog, Input, type DialogMenuItem } from '@/components/finv/Dialog'
 import { fd } from '@/components/finv/DrawerParts'
 import { officeTime } from '@/lib/office-time'
-import { EditInvoiceButton } from '../../billing/_components/InvoiceActions'
 import CreateCreditNoteButton from '../../billing/_components/CreateCreditNoteButton'
 import ReassignInvoiceGlButton from '../../billing/_components/ReassignInvoiceGlButton'
-import CreateInvoiceButton from '../../billing/_components/CreateInvoiceButton'
-import CreateMultiLineInvoiceButton from '../../billing/_components/CreateMultiLineInvoiceButton'
 import GenerateInvoicesButton from '../../billing/_components/GenerateInvoicesButton'
 import GenerateConsolidatedInvoicesButton from '../../billing/_components/GenerateConsolidatedInvoicesButton'
 import ReconcilePayrollBillingButton from '../../billing/_components/ReconcilePayrollBillingButton'
 import GenerateOwnShareInvoiceButton from '../../billing/_components/GenerateOwnShareInvoiceButton'
 import { InvoiceDrawer, invoiceSteps, statusText, statusTone, type InvoiceCan, type InvoiceStep, type InvoiceStepKey } from './InvoiceDrawer'
 import SettleDialog from './SettleDialog'
+import CreateInvoiceDialog from './CreateInvoiceDialog'
+import InvoiceLinesDialog from './InvoiceLinesDialog'
 import PayrollBasisDrawer from './PayrollBasisDrawer'
 import {
   hubApproveCreditNote,
@@ -152,7 +151,8 @@ export default function InvoicesHubClient({
   const [moreOpen, setMoreOpen] = useState(false)
   const [cnMenu, setCnMenu] = useState<HubCreditNote | null>(null)
   const [cnOpen, setCnOpen] = useState(false)
-  const [dialog, setDialog] = useState<{ kind: DialogKind; id?: string; nonce: number } | null>(null)
+  // A dialog of the kit's stays mounted while it fades out (open: false); the next one, a new nonce, starts afresh.
+  const [dialog, setDialog] = useState<{ kind: DialogKind; id?: string; nonce: number; open: boolean } | null>(null)
   const [settleIds, setSettleIds] = useState<string[]>([])
   const [ask, setAsk] = useState<Ask | null>(null)
   const [reason, setReason] = useState('')
@@ -184,7 +184,7 @@ export default function InvoicesHubClient({
     const receipt = url.searchParams.get('receipt')
     const fresh = url.searchParams.get('new') === '1'
     if (receipt) flash(`Receipt ${receipt} written — the invoice is settled`)
-    if (fresh && openNew && can.create) setDialog({ kind: 'single', nonce: Date.now() })
+    if (fresh && openNew && can.create) setDialog({ kind: 'single', nonce: Date.now(), open: true })
     if (receipt || url.searchParams.has('new')) {
       url.searchParams.delete('receipt')
       url.searchParams.delete('new')
@@ -266,7 +266,7 @@ export default function InvoicesHubClient({
     setError(null)
     setMoreOpen(false)
     setRowMenu(null)
-    const open = (kind: DialogKind) => setDialog({ kind, id: inv.id, nonce: Date.now() })
+    const open = (kind: DialogKind) => setDialog({ kind, id: inv.id, nonce: Date.now(), open: true })
     switch (key) {
       case 'approve':
         void run(
@@ -484,7 +484,7 @@ export default function InvoicesHubClient({
       onClick()
     },
   })
-  const openDialog = (kind: DialogKind) => () => setDialog({ kind, nonce: Date.now() })
+  const openDialog = (kind: DialogKind) => () => setDialog({ kind, nonce: Date.now(), open: true })
   const createItems: DialogMenuItem[] = [
     menuItem('single', 'Single invoice', openDialog('single')),
     menuItem('multi', 'Multi-line invoice', openDialog('multi'), 'Several lines on one invoice'),
@@ -560,7 +560,16 @@ export default function InvoicesHubClient({
   const drawerInvoice = drawerId ? (all.get(drawerId) ?? null) : null
   const dialogInvoice = dialog?.id ? all.get(dialog.id) : undefined
   const settling = settleIds.map((id) => all.get(id)).filter((i): i is HubInvoice => !!i)
-  const companiesForEdit = hub.companies.map((c) => ({ id: c.id, name: c.name }))
+  // An invoice keeps its company in Edit's list though the company has since gone inactive.
+  const companiesForEdit =
+    dialogInvoice?.edit.company_id && !hub.companies.some((c) => c.id === dialogInvoice.edit.company_id)
+      ? [...hub.companies, { id: dialogInvoice.edit.company_id, name: dialogInvoice.party.name, short_code: '' }]
+      : hub.companies
+  const closeDialog = () => setDialog((d) => (d ? { ...d, open: false } : d))
+  const dialogDone = (message: string) => {
+    flash(message)
+    router.refresh()
+  }
   const postedAccounts = (inv: HubInvoice) => {
     const by = new Map<string, number>()
     for (const l of inv.editLines) if (l.category_code) by.set(l.category_code, r2((by.get(l.category_code) ?? 0) + Number(l.amount)))
@@ -828,25 +837,29 @@ export default function InvoicesHubClient({
         />
       ) : null}
 
-      {/* The system's own dialogs, mounted open for what asked (restyled in the next part). */}
+      {/* The invoice dialogs (the design's inv-form), and the system's own for the rest, mounted open for what asked. */}
       {dialog?.kind === 'single' ? (
-        <CreateInvoiceButton
+        <CreateInvoiceDialog
           key={dialog.nonce}
-          autoOpen
-          hideTrigger
+          open={dialog.open}
+          onClose={closeDialog}
+          onDone={dialogDone}
+          period={hub.period}
+          today={today}
           companies={hub.companies}
-          currentPeriod={hub.period}
           departments={hub.departments}
           categories={hub.categories}
           extraModes={hub.extraModes}
         />
       ) : dialog?.kind === 'multi' ? (
-        <CreateMultiLineInvoiceButton
+        <InvoiceLinesDialog
           key={dialog.nonce}
-          autoOpen
-          hideTrigger
+          open={dialog.open}
+          onClose={closeDialog}
+          onDone={dialogDone}
+          period={hub.period}
+          today={today}
           companies={hub.companies}
-          currentPeriod={hub.period}
           departments={hub.departments}
           categories={hub.categories}
           extraModes={hub.extraModes}
@@ -860,19 +873,25 @@ export default function InvoicesHubClient({
       ) : dialog?.kind === 'own-share' ? (
         <GenerateOwnShareInvoiceButton key={dialog.nonce} autoOpen hideTrigger currentPeriod={hub.period} categories={hub.categories} />
       ) : dialog?.kind === 'edit' && dialogInvoice ? (
-        <EditInvoiceButton
+        <InvoiceLinesDialog
           key={dialog.nonce}
-          autoOpen
-          hideTrigger
-          id={dialogInvoice.id}
-          invoiceNo={dialogInvoice.no}
-          status={dialogInvoice.status}
-          settled={dialogInvoice.status === 'paid' || dialogInvoice.status === 'paid_via_netting' || dialogInvoice.received > 0}
-          initial={dialogInvoice.edit}
-          initialLines={dialogInvoice.editLines}
-          categories={hub.categories}
+          open={dialog.open}
+          onClose={closeDialog}
+          onDone={dialogDone}
+          period={hub.period}
+          today={today}
           companies={companiesForEdit}
           departments={hub.departments}
+          categories={hub.categories}
+          extraModes={hub.extraModes}
+          editing={{
+            id: dialogInvoice.id,
+            no: dialogInvoice.no,
+            status: dialogInvoice.status,
+            settled: dialogInvoice.status === 'paid' || dialogInvoice.status === 'paid_via_netting' || dialogInvoice.received > 0,
+            initial: dialogInvoice.edit,
+            lines: dialogInvoice.editLines,
+          }}
         />
       ) : dialog?.kind === 'credit_note' && dialogInvoice ? (
         <CreateCreditNoteButton

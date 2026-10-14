@@ -1,17 +1,9 @@
 /* Create payment (2026-10-14, the Finance revamp v2 — D07): the parts only it
-   has — the lines of a split or a repayment, a line's GL override. The
-   fields, the files and the row of small buttons are the kit's
+   has — a split's or a repayment's line, a line's GL override. The card of
+   lines, the fields, the files and the row of small buttons are the kit's
    (components/finv/form.module.css). */
 
-/* The lines (a split, or a repayment's parts): a white card of rows. */
-.lines {
-  background: var(--ds-surface);
-  border: 1px solid var(--ds-border);
-  border-radius: 12px;
-  overflow: hidden;
-}
-.lineWrap { border-top: 1px solid var(--ds-border); }
-.lineWrap:first-child { border-top: 0; }
+/* A line of a split, or a repayment's part. */
 .line {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr) 112px 28px;
@@ -21,23 +13,6 @@
 }
 .line[data-repay='true'] { grid-template-columns: 64px minmax(0, 0.9fr) minmax(0, 1.4fr) 104px; }
 .role { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; color: rgb(var(--hvs-muted)); }
-.lineAmount {
-  box-sizing: content-box;
-  width: calc(100% - 18px);
-  height: 30px;
-  margin: 0;
-  padding: 0 8px;
-  border: 1px solid var(--ds-border);
-  border-radius: 10px;
-  background: var(--ds-surface);
-  font-family: var(--font-mono), 'Chivo Mono', monospace;
-  font-size: 13px;
-  text-align: right;
-  color: var(--ds-ink);
-  outline: none;
-}
-.lineAmount:focus { border-color: var(--ds-accent); box-shadow: var(--ds-focus-ring); }
-.lineAmount:read-only { color: rgb(var(--hvs-graphite)); }
 /* A line's GL override, under it: the type, the GL, the reason. */
 .override {
   display: grid;
@@ -46,60 +21,4 @@
   gap: 6px;
   padding: 0 10px 8px 12px;
 }
-.lines > .override { padding-top: 8px; }
-.lineText {
-  box-sizing: content-box;
-  width: calc(100% - 18px);
-  height: 30px;
-  margin: 0;
-  padding: 0 8px;
-  border: 1px solid var(--ds-border);
-  border-radius: 10px;
-  background: var(--ds-surface);
-  font-family: inherit;
-  font-size: 13px;
-  color: var(--ds-ink);
-  outline: none;
-}
-.lineText::placeholder { color: var(--ds-placeholder); opacity: 1; }
-.lineText:focus { border-color: var(--ds-accent); box-shadow: var(--ds-focus-ring); }
-
-.remove {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  font-family: inherit;
-  font-size: 17px;
-  line-height: 1;
-  color: rgb(var(--hvs-graphite));
-  cursor: pointer;
-}
-.remove:hover { background: rgb(var(--hvs-nav-hover)); }
-.linesFoot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 9px 14px;
-  background: rgb(var(--fv-peach));
-  border-top: 1px solid var(--ds-border);
-}
-.linesTotal { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 13px; font-weight: 600; }
-.linesTotal[data-off='true'] { color: var(--ds-danger); }
-.addLine {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--ds-ink);
-  cursor: pointer;
-}
-.addLine:hover { text-decoration: underline; }
+.override:first-child { padding-top: 8px; }

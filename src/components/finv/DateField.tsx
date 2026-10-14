@@ -42,6 +42,8 @@ export function DateField({
   name,
   disabled = false,
   label,
+  emptyText,
+  onClear,
 }: {
   /** `YYYY-MM-DD`. */
   value: string
@@ -54,8 +56,15 @@ export function DateField({
   disabled?: boolean
   /** The field's name for a screen reader, when no <label> points at it. */
   label?: string
+  /**
+   * A day that may be left out (an invoice's due date, 2026-10-14): with no
+   * value the field says this, muted, and the calendar offers *Clear*.
+   */
+  emptyText?: string
+  onClear?: () => void
 }) {
   const v = value || today
+  const shownText = !value && emptyText ? emptyText : dayLabel(v)
   const [open, setOpen] = useState(false)
   const [month, setMonth] = useState<string | null>(null)
   const [up, setUp] = useState(false)
@@ -131,11 +140,11 @@ export function DateField({
         data-open={open ? 'true' : undefined}
         onClick={toggle}
         disabled={disabled}
-        aria-label={label ? `${label}: ${dayLabel(v)}` : undefined}
+        aria-label={label ? `${label}: ${shownText}` : undefined}
         aria-expanded={open}
         aria-haspopup="true"
       >
-        <span>{dayLabel(v)}</span>
+        <span data-empty={!value && emptyText ? 'true' : undefined}>{shownText}</span>
         <span className={s.glyph}>
           <CardIcon name="calendar" size={16} />
         </span>
@@ -165,7 +174,7 @@ export function DateField({
             {Array.from({ length: days }, (_, i) => {
               const d = i + 1
               const iso = `${ym}-${String(d).padStart(2, '0')}`
-              const on = iso === v
+              const on = iso === (value || (emptyText ? '' : today))
               return (
                 <button
                   key={iso}
@@ -183,7 +192,19 @@ export function DateField({
             })}
           </div>
           <div className={s.foot}>
-            <span className={s.footDate}>{dayLabel(v)}</span>
+            <span className={s.footDate}>{shownText}</span>
+            {onClear && value ? (
+              <button
+                type="button"
+                className={s.today}
+                onClick={() => {
+                  onClear()
+                  close()
+                }}
+              >
+                Clear
+              </button>
+            ) : null}
             <button type="button" className={s.today} onClick={() => pick(today)}>
               Today
             </button>

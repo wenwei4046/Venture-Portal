@@ -429,18 +429,18 @@ export default function CreatePaymentDialog({
 
         {useLines ? (
           <Field label={repay ? 'Lines' : 'Split across pools'}>
-            <div className={c.lines}>
+            <div className={fm.lines}>
               {lines.map((l, i) => (
-                <div key={i} className={c.lineWrap}>
+                <div key={i} className={fm.lineWrap}>
                 <div className={c.line} data-repay={repay ? 'true' : undefined}>
                   {repay && l.role ? <span className={c.role}>{ROLE_LABEL[l.role]}</span> : null}
-                  <Select round={12} className={fm.select} value={l.pool} onChange={(e) => setLine(i, { pool: e.target.value })} aria-label={`Line ${i + 1} pool`}>
+                  <Select round={12} className={fm.lineSelect} value={l.pool} onChange={(e) => setLine(i, { pool: e.target.value })} aria-label={`Line ${i + 1} pool`}>
                     <option value="">Pool</option>
                     {poolOptions}
                   </Select>
                   <Select
                     round={12}
-                    className={fm.select}
+                    className={fm.lineSelect}
                     value={l.account}
                     onChange={(e) => setLine(i, { account: e.target.value, autoAccount: false })}
                     aria-label={`Line ${i + 1} category`}
@@ -449,7 +449,7 @@ export default function CreatePaymentDialog({
                     {accountOptions}
                   </Select>
                   <input
-                    className={c.lineAmount}
+                    className={fm.lineAmount}
                     inputMode="decimal"
                     value={l.amount}
                     readOnly={repay}
@@ -458,7 +458,7 @@ export default function CreatePaymentDialog({
                     aria-label={`Line ${i + 1} amount`}
                   />
                   {repay ? null : lines.length > 1 ? (
-                    <button type="button" className={c.remove} onClick={() => setLines((prev) => prev.filter((_, j) => j !== i))} aria-label={`Remove line ${i + 1}`}>
+                    <button type="button" className={fm.remove} onClick={() => setLines((prev) => prev.filter((_, j) => j !== i))} aria-label={`Remove line ${i + 1}`}>
                       ×
                     </button>
                   ) : (
@@ -468,13 +468,13 @@ export default function CreatePaymentDialog({
                 {override ? <OverrideRow value={l.ov ?? NO_OVERRIDE} onChange={(ov) => setLine(i, { ov })} accounts={accounts} label={`Line ${i + 1} override`} /> : null}
                 </div>
               ))}
-              <div className={c.linesFoot}>
+              <div className={fm.linesFoot}>
                 {repay ? <span /> : (
-                  <button type="button" className={c.addLine} onClick={() => setLines((prev) => [...prev, { pool: '', account: '', amount: '' }])}>
+                  <button type="button" className={fm.addLine} onClick={() => setLines((prev) => [...prev, { pool: '', account: '', amount: '' }])}>
                     + Add line
                   </button>
                 )}
-                <span className={c.linesTotal} data-off={Math.abs(offBy) > 0.005 ? 'true' : undefined}>
+                <span className={fm.linesTotal} data-off={Math.abs(offBy) > 0.005 ? 'true' : undefined}>
                   RM {money(lineSum)}
                 </span>
               </div>
@@ -496,7 +496,7 @@ export default function CreatePaymentDialog({
             </Field>
             {override ? (
               <Field label="GL override">
-                <div className={c.lines}>
+                <div className={fm.lines}>
                   <OverrideRow value={singleOv} onChange={setSingleOv} accounts={accounts} label="Override" />
                 </div>
               </Field>
@@ -610,7 +610,7 @@ function OverrideRow({
 }) {
   return (
     <div className={c.override}>
-      <Select round={12} className={fm.select} value={value.type} onChange={(e) => onChange({ ...value, type: e.target.value as AccountType, gl: '' })} aria-label={`${label} type`}>
+      <Select round={12} className={fm.lineSelect} value={value.type} onChange={(e) => onChange({ ...value, type: e.target.value as AccountType, gl: '' })} aria-label={`${label} type`}>
         <option value="">Type</option>
         {OVERRIDE_TYPES.map((t) => (
           <option key={t.value} value={t.value}>
@@ -618,7 +618,7 @@ function OverrideRow({
           </option>
         ))}
       </Select>
-      <Select round={12} className={fm.select} value={value.gl} onChange={(e) => onChange({ ...value, gl: e.target.value })} aria-label={`${label} GL account`}>
+      <Select round={12} className={fm.lineSelect} value={value.gl} onChange={(e) => onChange({ ...value, gl: e.target.value })} aria-label={`${label} GL account`}>
         <option value="">GL account</option>
         {accounts
           .filter((a) => a.type === value.type)
@@ -628,7 +628,7 @@ function OverrideRow({
             </option>
           ))}
       </Select>
-      <input className={c.lineText} value={value.reason} onChange={(e) => onChange({ ...value, reason: e.target.value })} placeholder="Reason" aria-label={`${label} reason`} />
+      <input className={fm.lineText} value={value.reason} onChange={(e) => onChange({ ...value, reason: e.target.value })} placeholder="Reason" aria-label={`${label} reason`} />
     </div>
   )
 }

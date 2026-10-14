@@ -158,7 +158,7 @@ async function assertBillingModeSupported(
 
 export type BillableToKind = 'subsidiary' | 'director' | 'dept_pool' | 'freetext'
 
-export async function createManualInvoice(formData: FormData): Promise<void> {
+export async function createManualInvoice(formData: FormData): Promise<{ invoice_no: string }> {
   const user = await requireActionOn('/invoices/[id]', 'billing', 'create')
   const supabase = await createClient()
 
@@ -169,6 +169,10 @@ export async function createManualInvoice(formData: FormData): Promise<void> {
   const companyId = String(formData.get('company_id') ?? '')
   const billableDeptId = String(formData.get('billable_to_department_id') ?? '')
   const billableFreetext = String(formData.get('billable_to_freetext_name') ?? '').trim()
+  // Someone else's address, phone and email, as the multi-line invoice keeps
+  // them (2026-10-14: Create invoice's dialog asks them for any party it names).
+  const contact = (key: string) =>
+    billableToType === 'freetext' ? String(formData.get(key) ?? '').trim() || null : null
 
   const rawPeriod = String(formData.get('period_month') ?? '')
   const rawMode = String(formData.get('billing_mode') ?? '')
@@ -233,12 +237,16 @@ export async function createManualInvoice(formData: FormData): Promise<void> {
     billable_to_department_id: billableToType === 'dept_pool' ? billableDeptId : null,
     billable_to_freetext_name:
       billableToType === 'director' || billableToType === 'freetext' ? billableFreetext : null,
+    billable_to_freetext_address: contact('billable_to_freetext_address'),
+    billable_to_freetext_phone: contact('billable_to_freetext_phone'),
+    billable_to_freetext_email: contact('billable_to_freetext_email'),
   })
 
   if (error) throw new Error(`Failed to create invoice: ${error.message}`)
 
   revalidatePath('/billing')
   revalidatePath('/statements')
+  return { invoice_no: invoiceNo as string }
 }
 
 // ─── Create multi-line invoice (Finance) ────────────────────────────────────
