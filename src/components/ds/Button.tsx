@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import { HrIcon, type HrIconName } from '@/components/hrv/icons'
 
@@ -48,6 +49,7 @@ export function Button({
   type = 'button',
   style,
   title,
+  href,
 }: {
   variant?: ButtonVariant
   size?: 'sm' | 'md' | 'lg'
@@ -60,6 +62,8 @@ export function Button({
   type?: 'button' | 'submit'
   style?: CSSProperties
   title?: string
+  /** A link drawn as the button (Overview's Review requests / Add person). */
+  href?: string
 }) {
   const [s, ev] = usePress()
   const off = disabled
@@ -71,6 +75,35 @@ export function Button({
     danger: { background: s.h && !off ? 'var(--ds-danger-bg)' : 'var(--ds-surface)', color: 'var(--ds-danger)', border: '1px solid var(--ds-danger-border)' },
     'danger-solid': { background: 'var(--ds-danger)', color: '#fff', border: '1px solid transparent' },
     link: { background: 'transparent', color: 'var(--ds-link)', border: 0, padding: 0, height: 'auto', textDecoration: s.h ? 'underline' : 'none', textUnderlineOffset: 3 },
+  }
+  const look: CSSProperties = {
+    display: block ? 'flex' : 'inline-flex',
+    width: block ? '100%' : undefined,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    boxSizing: 'border-box',
+    height: H[size],
+    padding: size === 'sm' ? '0 12px' : '0 var(--ds-control-px)',
+    borderRadius: 'var(--ds-r-control)',
+    fontFamily: 'var(--ds-font-body)',
+    fontSize: size === 'sm' ? 'var(--ds-small-size)' : 'var(--ds-control-fs)',
+    fontWeight: 'var(--ds-weight-medium)' as CSSProperties['fontWeight'],
+    lineHeight: 1,
+    whiteSpace: 'nowrap',
+    textDecoration: 'none',
+    cursor: off ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.5 : 1,
+    transition: `background-color .12s, border-color .12s, transform 120ms ${EASE}`,
+    ...V[variant],
+    ...style,
+  }
+  if (href && !off) {
+    return (
+      <Link href={href} title={title} onMouseEnter={ev.onMouseEnter} onMouseLeave={ev.onMouseLeave} style={look}>
+        {children}
+      </Link>
+    )
   }
   return (
     <button
