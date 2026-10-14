@@ -163,6 +163,8 @@
 .input:disabled { background: var(--ds-surface); color: rgb(var(--hvs-muted)); cursor: default; }
 .input[data-mono='true'] { font-family: var(--font-mono), 'Chivo Mono', monospace; }
 .input[data-align='right'] { text-align: right; }
+/* A few lines of words (a fund source's notes): the text box, grown to its lines. */
+.area { height: auto; min-height: 64px; padding: 10px 12px; line-height: 1.45; resize: vertical; }
 .select { width: 100%; }
 .hint { margin: 0; font-size: 12px; line-height: 1.5; color: rgb(var(--hvs-muted)); }
 .hint[data-tone='danger'] { color: var(--ds-danger); }

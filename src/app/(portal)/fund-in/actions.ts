@@ -121,7 +121,7 @@ export async function revertTermsChange(
   const supabase = await createClient()
   if (!id) return { error: 'Record id is required' }
   const { error } = await supabase.rpc('revert_terms_change', { p_record_kind: kind, p_record_id: id })
-  if (error) return { error: `撤销失败: ${error.message}` }
+  if (error) return { error: `The change was not reverted: ${error.message}` }
   revalidatePath(kind === 'loan' ? `/fund-out/${id}` : `/fund-in/${id}`)
   revalidatePath('/repayment-schedule')
   revalidatePath('/reports/company-statement')
@@ -605,7 +605,7 @@ export async function setFundSourceMinPayInterest(
     p_fund_source_id: id,
     p_value: value,
   } as never)
-  if (error) return { error: `保存失败: ${error.message}` }
+  if (error) return { error: `Could not save: ${error.message}` }
 
   revalidatePath(`/fund-in/${id}`)
   revalidatePath('/repayment-schedule')
@@ -629,7 +629,7 @@ export async function setFundSourceNotes(
     p_fund_source_id: id,
     p_notes: notes,
   } as never)
-  if (error) return { error: `保存失败: ${error.message}` }
+  if (error) return { error: `Could not save: ${error.message}` }
 
   revalidatePath(`/fund-in/${id}`)
   revalidatePath('/reports/company-statement')

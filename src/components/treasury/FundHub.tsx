@@ -5,19 +5,18 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
 import RowMenu, { type RowMenuAnchor, type RowMenuItem } from '@/components/RowMenu'
-import { HubCards, HubHead, hubStyles as hs, type CardTone, type HubCardItem } from '@/components/finv/Hub'
+import { HubCards, HubHead, hubStyles as hs, type HubCardItem } from '@/components/finv/Hub'
 import { FinTable, type FinColumn } from '@/components/finv/FinTable'
 import { DialogConfirm, FinDialog } from '@/components/finv/Dialog'
 import { FinDrawer, drawerStyles as d } from '@/components/finv/Drawer'
 import { DrawerGroup as Group, DrawerLine as Line, fd } from '@/components/finv/DrawerParts'
-import type { HrIconName } from '@/components/hrv/icons'
 import { officeTime } from '@/lib/office-time'
 import {
   IN_CARDS,
   OUT_CARDS,
   cardAmountOf,
   cardLabel,
-  fundCard,
+  fundCards,
   fundHaystack,
   fundLine,
   fundNote,
@@ -48,21 +47,6 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 /** "06 Oct 2026 · 09:12" on the office's clock. */
 const stamp = (iso: string) => officeTime(iso).format('DD MMM YYYY · HH:mm')
-
-/** Each card's colour and glyph — the design's tones, chosen for what the system's cards mean (Pending approval black, the README's). */
-const LOOK: Record<FundCardKey, { tone: CardTone; icon: HrIconName }> = {
-  all: { tone: 'all', icon: 'doc' },
-  active: { tone: 'approved', icon: 'approve' },
-  overdue: { tone: 'issued', icon: 'fileAlert' },
-  pending_approval: { tone: 'pending_approval', icon: 'calendar' },
-  repaid: { tone: 'paid', icon: 'payroll' },
-  cancelled: { tone: 'quiet', icon: 'doc' },
-  subsidiary: { tone: 'approved', icon: 'org' },
-  director_saving: { tone: 'paid', icon: 'payroll' },
-  director_loan: { tone: 'payroll', icon: 'director' },
-  department_pool: { tone: 'issued', icon: 'people' },
-  outsource: { tone: 'company', icon: 'link' },
-}
 
 export interface FundCan {
   /** Treasury · Edit — a pending fund source's Edit. */
@@ -120,17 +104,7 @@ export default function FundHub({
   }, [card])
 
   const [y, m] = month.split('-').map(Number)
-  const cards: HubCardItem[] = keys.map((k) => {
-    const fig = fundCard(records, k)
-    return {
-      key: k,
-      tone: LOOK[k].tone,
-      icon: LOOK[k].icon,
-      label: cardLabel(side, k),
-      sub: `${plural(fig.count, 'transfer', 'transfers')}${k === 'all' ? ` · ${fig.pending} pending` : ''}`,
-      value: rm(fig.amount),
-    }
-  })
+  const cards: HubCardItem[] = useMemo(() => fundCards(side, records), [side, records])
 
   const q = query.trim().toLowerCase()
   const rows = useMemo(
@@ -299,41 +273,17 @@ function FundDrawer({
   onWithdraw: (r: FundRecord) => void
 }) {
   const out = r?.side === 'out'
-  const st = r ? fundStatus(r, today) : null
-  const bar: ReactNode[] = []
-  if (r?.status === 'pending_approval') {
-    if (r.approval && r.decidable) {
-      bar.push(
-        <Link key="decide" href={`/approvals/${r.approval.id}`} className={d.barBtn} data-kind="primary">
-          Open in Approvals
-        </Link>,
-      )
-    }
-    if (!out && can.edit) {
-      bar.push(
-        <Link key="edit" href={`${base}/${r.id}/edit`} className={d.barBtn}>
-          Edit
-        </Link>,
-      )
-    }
-    if (can.void) {
-      bar.push(
-        <button key="withdraw" type="button" className={d.barBtn} data-kind="danger" disabled={busy} onClick={() => onWithdraw(r)}>
-          {out ? 'Cancel loan' : 'Withdraw'}
-        </button>,
-      )
-    }
-  } else if (r && can.amend && r.status === 'active') {
-    bar.push(
-      <Link key="amend" href={`${base}/${r.id}/edit`} className={d.barBtn}>
-        Amend terms
-      </Link>,
-    )
-  }
-
-  // The deal's switches, said only when on (its own page keeps them): compound interest, minimum pay.
-  const interest = r ? [r.compound ? 'Compound' : null, r.minPayInterest ? 'Minimum pay' : null].filter(Boolean).join(' · ') : ''
-  const steps = r ? fundTrail(r) : []
+  const bar: ReactNode[] = (r ? fundSteps(r, can) : []).map((st) =>
+    st.href ? (
+      <Link key={st.key} href={st.href} className={d.barBtn} data-kind={st.kind === 'secondary' ? undefined : st.kind}>
+        {st.label}
+      </Link>
+    ) : (
+      <button key={st.key} type="button" className={d.barBtn} data-kind={st.kind === 'secondary' ? undefined : st.kind} disabled={busy} onClick={() => r && onWithdraw(r)}>
+        {st.label}
+      </button>
+    ),
+  )
 
   return (
     <FinDrawer
@@ -357,70 +307,139 @@ function FundDrawer({
       }
       bar={bar.length > 0 ? bar : null}
     >
-      {!r || !st ? (
-        <div className={d.loading}>This is not on the list any more.</div>
-      ) : (
-        <>
-          <div className={d.hero} data-light={st.tone}>
-            <div className={d.heroTop}>
-              <span className={d.kicker}>
-                {out ? 'Fund out' : 'Fund in'} · {r.typeLabel}
-              </span>
-              <span className={d.heroChip}>
-                <span className={d.heroDot} />
-                {st.text}
-              </span>
+      {!r ? <div className={d.loading}>This is not on the list any more.</div> : <FundDetailBody r={r} today={today} />}
+    </FinDrawer>
+  )
+}
+
+export type FundStepKey = 'decide' | 'edit' | 'withdraw' | 'amend'
+
+/**
+ * What this reader may do to a deal from its drawer (the prototype's `detailFund` bar, the system's steps): one
+ * still waiting — Open in Approvals (whoever decides it), a fund source's Edit, Cancel loan / Withdraw; a live
+ * one — Amend terms. The rest is its own page's.
+ */
+export function fundSteps(r: FundRecord, can: FundCan): Array<{ key: FundStepKey; label: string; kind: 'primary' | 'secondary' | 'danger'; href?: string }> {
+  const out = r.side === 'out'
+  const base = out ? '/fund-out' : '/fund-in'
+  if (r.status === 'pending_approval') {
+    return [
+      ...(r.approval && r.decidable ? [{ key: 'decide' as const, label: 'Open in Approvals', kind: 'primary' as const, href: `/approvals/${r.approval.id}` }] : []),
+      ...(!out && can.edit ? [{ key: 'edit' as const, label: 'Edit', kind: 'secondary' as const, href: `${base}/${r.id}/edit` }] : []),
+      ...(can.void ? [{ key: 'withdraw' as const, label: out ? 'Cancel loan' : 'Withdraw', kind: 'danger' as const }] : []),
+    ]
+  }
+  if (can.amend && r.status === 'active') return [{ key: 'amend', label: 'Amend terms', kind: 'secondary', href: `${base}/${r.id}/edit` }]
+  return []
+}
+
+/**
+ * A deal as the drawer draws it (the prototype's `detailFund`): the dark hero — *Fund out · Loan out*, the amount,
+ * to or from whom, where it stands — then I Transfer to / Received from, II When & where, III Booking, and the
+ * trail. The Finance phone app's record draws it too, with the full page's own parts (`more`, before the trail)
+ * and its audit log (after it).
+ */
+export function FundDetailBody({
+  r,
+  today,
+  more,
+  audit,
+}: {
+  r: FundRecord
+  today: string
+  /** The full page's own groups — the schedule, the repayments, the terms, the settings (the phone's record). */
+  more?: ReactNode
+  /** The audit log — what the reader's permissions open. */
+  audit?: Array<{ at: string; who: string; what: string }> | null
+}) {
+  const out = r.side === 'out'
+  const st = fundStatus(r, today)
+  // The deal's switches, said only when on (its own page keeps them): compound interest, minimum pay.
+  const interest = [r.compound ? 'Compound' : null, r.minPayInterest ? 'Minimum pay' : null].filter(Boolean).join(' · ')
+  const steps = fundTrail(r)
+  return (
+    <>
+      <div className={d.hero} data-light={st.tone}>
+        <div className={d.heroTop}>
+          <span className={d.kicker}>
+            {out ? 'Fund out' : 'Fund in'} · {r.typeLabel}
+          </span>
+          <span className={d.heroChip}>
+            <span className={d.heroDot} />
+            {st.text}
+          </span>
+        </div>
+        <div className={d.heroAmount}>
+          {out ? '−' : '+'}
+          {rm(r.amount)}
+        </div>
+        <div className={d.heroTo}>
+          {out ? 'To' : 'From'} {r.party}
+        </div>
+        <div className={d.heroNote}>
+          <span className={d.heroNoteDot} />
+          <span>{fundNote(r)}</span>
+        </div>
+      </div>
+
+      <Group n="I." title={out ? 'Transfer to' : 'Received from'}>
+        <Line label={out ? 'Recipient' : 'Payer'} value={r.party} />
+        <Line label="Type" value={r.typeLabel} />
+        {r.fundingSource ? <Line label="Funding source" value={`SC ${r.fundingSource}`} /> : null}
+        {r.notes ? <Line label={out ? 'Terms' : 'Notes'} value={r.notes} /> : null}
+      </Group>
+      <Group n="II." title="When & where">
+        <Line label="Date" value={fd(r.date)} mono />
+        <Line label="Maturity" value={r.maturity ? fd(r.maturity) : 'No fixed term'} mono={!!r.maturity} />
+        {r.bank ? <Line label="Into bank" value={r.bank.name} sub={r.bank.number} /> : null}
+      </Group>
+      <Group n="III." title="Booking">
+        {r.account ? <Line label="Account" value={r.account.name} sub={r.account.code} /> : null}
+        <Line label="Amount" value={rm(r.amount)} mono />
+        <Line label="Rate" value={`${ratePct(r.rate)} /mo`} sub={r.months == null ? 'no fixed term' : plural(r.months, 'month', 'months')} mono />
+        {interest ? <Line label="Interest" value={interest} /> : null}
+        {r.outstanding != null ? <Line label="Outstanding" value={rm(r.outstanding)} sub={r.repaid > 0 ? `${rm(r.repaid)} repaid` : undefined} mono /> : null}
+        {r.overdue ? <Line label="Overdue" value={rm(r.overdue.amount)} sub={`since ${fd(r.overdue.since)} · ${plural(r.overdue.days, 'day', 'days')}`} mono /> : null}
+      </Group>
+      {more}
+
+      <div className={d.label}>Trail</div>
+      <div className={d.trail}>
+        {steps.map((s, i) => (
+          <div key={i} className={d.step} data-state={s.state}>
+            <div className={d.stepRail}>
+              <span className={d.stepDot} />
+              <span className={d.stepLine} data-on={steps[i + 1] && steps[i + 1].state !== 'todo' ? 'true' : undefined} />
             </div>
-            <div className={d.heroAmount}>
-              {out ? '−' : '+'}
-              {rm(r.amount)}
-            </div>
-            <div className={d.heroTo}>
-              {out ? 'To' : 'From'} {r.party}
-            </div>
-            <div className={d.heroNote}>
-              <span className={d.heroNoteDot} />
-              <span>{fundNote(r)}</span>
+            <div className={d.stepText}>
+              <div className={d.stepLabel}>{s.label}</div>
+              <div className={d.stepBy}>{[s.by, s.at ? stamp(s.at) : s.on ? fd(s.on) : null].filter(Boolean).join(' ')}</div>
             </div>
           </div>
+        ))}
+      </div>
 
-          <Group n="I." title={out ? 'Transfer to' : 'Received from'}>
-            <Line label={out ? 'Recipient' : 'Payer'} value={r.party} />
-            <Line label="Type" value={r.typeLabel} />
-            {r.fundingSource ? <Line label="Funding source" value={`SC ${r.fundingSource}`} /> : null}
-            {r.notes ? <Line label={out ? 'Terms' : 'Notes'} value={r.notes} /> : null}
-          </Group>
-          <Group n="II." title="When & where">
-            <Line label="Date" value={fd(r.date)} mono />
-            <Line label="Maturity" value={r.maturity ? fd(r.maturity) : 'No fixed term'} mono={!!r.maturity} />
-            {r.bank ? <Line label="Into bank" value={r.bank.name} sub={r.bank.number} /> : null}
-          </Group>
-          <Group n="III." title="Booking">
-            {r.account ? <Line label="Account" value={r.account.name} sub={r.account.code} /> : null}
-            <Line label="Amount" value={rm(r.amount)} mono />
-            <Line label="Rate" value={`${ratePct(r.rate)} /mo`} sub={r.months == null ? 'no fixed term' : plural(r.months, 'month', 'months')} mono />
-            {interest ? <Line label="Interest" value={interest} /> : null}
-            {r.outstanding != null ? <Line label="Outstanding" value={rm(r.outstanding)} sub={r.repaid > 0 ? `${rm(r.repaid)} repaid` : undefined} mono /> : null}
-            {r.overdue ? <Line label="Overdue" value={rm(r.overdue.amount)} sub={`since ${fd(r.overdue.since)} · ${plural(r.overdue.days, 'day', 'days')}`} mono /> : null}
-          </Group>
-
-          <div className={d.label}>Trail</div>
-          <div className={d.trail}>
-            {steps.map((s, i) => (
-              <div key={i} className={d.step} data-state={s.state}>
-                <div className={d.stepRail}>
-                  <span className={d.stepDot} />
-                  <span className={d.stepLine} data-on={steps[i + 1] && steps[i + 1].state !== 'todo' ? 'true' : undefined} />
+      {audit ? (
+        <>
+          <div className={d.label}>
+            Audit log · {audit.length} {audit.length === 1 ? 'event' : 'events'}
+          </div>
+          <div className={d.audit}>
+            {audit.length === 0 ? (
+              <div className={d.groupEmpty}>No change on record.</div>
+            ) : (
+              audit.map((a, i) => (
+                <div key={i} className={d.auditRow}>
+                  <span className={d.auditWhat}>{a.what}</span>
+                  <span className={d.auditMeta}>
+                    {a.who} · {a.at}
+                  </span>
                 </div>
-                <div className={d.stepText}>
-                  <div className={d.stepLabel}>{s.label}</div>
-                  <div className={d.stepBy}>{[s.by, s.at ? stamp(s.at) : s.on ? fd(s.on) : null].filter(Boolean).join(' ')}</div>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </>
-      )}
-    </FinDrawer>
+      ) : null}
+    </>
   )
 }

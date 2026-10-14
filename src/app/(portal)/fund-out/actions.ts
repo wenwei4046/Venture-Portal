@@ -452,6 +452,24 @@ export async function recordLoanRepaymentFromDialog(formData: FormData): Promise
   }
 }
 
+/**
+ * Record repayment on a loan, the Finance phone app's sheet (2026-10-15 — M13):
+ * the loan page's form (`recordRepayment`, every rule of it — one type, one
+ * amount, its day, the bank, the journal), answered in words — production
+ * reduces a thrown message to a digest, and the sheet says why it was refused.
+ */
+export async function recordRepaymentFromSheet(formData: FormData): Promise<{ ok: true } | { ok: false; reason: string }> {
+  await requireActionOn('/fund-out', 'treasury', 'create')
+  try {
+    await recordRepayment(formData)
+    return { ok: true }
+  } catch (err) {
+    const digest = (err as { digest?: string })?.digest
+    if ((typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')) || (err instanceof Error && err.message.includes('NEXT_REDIRECT'))) throw err
+    return { ok: false, reason: err instanceof Error ? err.message : 'The repayment was not recorded. Try again.' }
+  }
+}
+
 /** A received repayment's parts, each its own record — interest and penalty first, the principal last. */
 async function recordReceivedParts(formData: FormData): Promise<string> {
   const loanId = (formData.get('loan_id') as string) ?? ''
@@ -553,7 +571,7 @@ export async function setLoanMinPayInterest(
     p_loan_id: id,
     p_value: value,
   } as never)
-  if (error) return { error: `保存失败: ${error.message}` }
+  if (error) return { error: `Could not save: ${error.message}` }
 
   revalidatePath(`/fund-out/${id}`)
   revalidatePath('/repayment-schedule')
@@ -579,7 +597,7 @@ export async function voidRepayment(formData: FormData): Promise<{ error: string
   const { error } = await supabase.rpc('void_loan_repayment' as never, {
     p_repayment_id: repaymentId,
   } as never)
-  if (error) return { error: `撤销失败: ${error.message}` }
+  if (error) return { error: `The repayment was not voided: ${error.message}` }
 
   if (loanId) revalidatePath(`/fund-out/${loanId}`)
   revalidatePath('/fund-out')
@@ -771,13 +789,13 @@ export async function setLoanFundingSource(
   const source = ((formData.get('funding_source') as string) ?? '')
     .replace(/[·\r\n]+/g, ' ')
     .trim()
-  if (source.length > 60) return { error: '资金来源最多 60 个字' }
+  if (source.length > 60) return { error: 'A funding source is 60 characters at most.' }
 
   const { error } = await supabase.rpc('set_loan_funding_source' as never, {
     p_loan_id: loanId,
     p_source: source,
   } as never)
-  if (error) return { error: `保存失败: ${error.message}` }
+  if (error) return { error: `Could not save: ${error.message}` }
 
   revalidatePath(`/fund-out/${loanId}`)
   revalidatePath('/fund-out')

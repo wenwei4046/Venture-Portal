@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { HrIcon } from '@/components/hrv/icons'
 import type { HubCardItem } from '@/components/finv/Hub'
+import { drawerStyles as d } from '@/components/finv/Drawer'
 import s from './fin-app.module.css'
 
 // The Finance phone app's parts (2026-10-15, the Finance revamp v2's phone —
@@ -185,6 +186,30 @@ export function ItemGroup({ title, count, items, empty }: { title: string; count
         <span className={s.listTitle}>{title}</span>
         <span className={s.listCount}>{count}</span>
       </div>
+      <ItemRows items={items} empty={empty} />
+    </>
+  )
+}
+
+/**
+ * A record's own numbered group of lines (a deal's schedule, its repayments, its settings — 2026-10-15): the
+ * drawer's numeral and title over the same card of lines, so the record reads on from the drawer's groups.
+ */
+export function RecordItems({ roman, title, count, items, empty }: { roman: string; title: string; count?: string; items: ItemLine[]; empty?: string }) {
+  return (
+    <>
+      <div className={d.label}>
+        <span className={d.labelRoman}>{roman}</span> {title}
+        {count ? ` · ${count}` : null}
+      </div>
+      <ItemRows items={items} empty={empty} />
+    </>
+  )
+}
+
+function ItemRows({ items, empty }: { items: ItemLine[]; empty?: string }) {
+  return (
+    <>
       {items.length === 0 && empty ? (
         <div className={s.empty}>{empty}</div>
       ) : (
