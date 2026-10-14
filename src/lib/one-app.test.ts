@@ -65,6 +65,9 @@ describe('one install', () => {
   it('opens the right face from its start: `/` and every portal page send HR’s view on a phone to the HR app', () => {
     const home = readFileSync(resolve(ROOT, 'src/app/page.tsx'), 'utf8')
     const portal = readFileSync(resolve(ROOT, 'src/app/(portal)/layout.tsx'), 'utf8')
-    for (const src of [home, portal]) expect(src).toMatch(/opensHrAppOnPhone\(user\) && isPhone\(\(await headers\(\)\)\.get\('user-agent'\)\)\) redirect\('\/hr-app'\)/)
+    expect(home).toMatch(/opensHrAppOnPhone\(user\) && isPhone\(\(await headers\(\)\)\.get\('user-agent'\)\)\) redirect\('\/hr-app'\)/)
+    // The portal reads the phone once (2026-10-14): the HR app's redirect, and Finance's shell kept off a phone.
+    expect(portal).toMatch(/const phone = isPhone\(\(await headers\(\)\)\.get\('user-agent'\)\)/)
+    expect(portal).toMatch(/if \(opensHrAppOnPhone\(user\) && phone\) redirect\('\/hr-app'\)/)
   })
 })

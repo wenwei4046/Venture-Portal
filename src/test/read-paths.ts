@@ -278,6 +278,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'notifications_mine', 'notifications_read', 'notification_topics_sync', 'push_subscribe', 'push_unsubscribe', 'push_outbox_take', 'push_outbox_done',
   // Change password (mig 20261012000000): whether the caller's own login is one a People record names — nothing else.
   'my_login_is_personal',
+  // Edit profile (mig 20261014210000): the caller's own name, email and phone; the change asks a personal login first.
+  'my_profile', 'update_my_profile',
   // One's own memos, in every view (mig 20261012210000): the login's own memos and receipt (a sign-in, their People
   // record); a memo's file to its person or to Documentation · View; Publish › Preview asks Documentation · View.
   'my_memos', 'my_memo_mark', 'memo_attachment', 'hr_memo_preview',

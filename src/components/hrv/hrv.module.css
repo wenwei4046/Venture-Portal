@@ -466,6 +466,12 @@
   font-size: 13px;
 }
 .drawerFixed { position: fixed; top: 10px; right: 10px; bottom: 10px; max-width: calc(100vw - 20px); }
+/* On a computer the frame has no ground above the sheet (2026-10-14, globals.css › .hrv-frame):
+   the scrim and the drawer start at its top, over the sheet's own edge. */
+@media (min-width: 768px) {
+  .scrim:not(.scrimFixed) { top: 0; }
+  .drawer:not(.drawerFixed) { top: 0; }
+}
 /* Inside the frame too a drawer never runs past its left edge (a 640px preview on a phone). */
 .drawer:not(.drawerFixed) { max-width: calc(100% - 20px); }
 .drawerHead {

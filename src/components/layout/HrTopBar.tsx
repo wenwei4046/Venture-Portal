@@ -20,9 +20,10 @@ import s from './HrTopBar.module.css'
 // 10px in from the frame — "Good afternoon, Principal." on the left, the
 // view (an amber dot and "HR view"), the office date and quarter in mono, and
 // SIGN OUT on the right. For an account that may switch views the "HR view"
-// words ARE the switcher, drawn as the words.
+// words ARE the switcher, drawn as the words. Finance's view wears the same
+// bar since 2026-10-14 (the Finance revamp v2), its words "Finance view".
 
-export default function HrTopBar({ user }: { user: User }) {
+export default function HrTopBar({ user, viewLabel = 'HR view' }: { user: User; viewLabel?: string }) {
   const router = useRouter()
   const clock = officeClock()
   const displayName = user.name || getRoleLabel(user.role)
@@ -50,7 +51,7 @@ export default function HrTopBar({ user }: { user: User }) {
         ) : (
           <div className={s.view}>
             <span className={s.dot} aria-hidden="true" />
-            <span className={s.viewLabel}>HR view</span>
+            <span className={s.viewLabel}>{viewLabel}</span>
           </div>
         )}
         <div className={s.clock}>

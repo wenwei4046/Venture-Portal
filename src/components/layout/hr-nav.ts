@@ -30,7 +30,7 @@ import {
   canAccessGuestLink,
   canChangePassword,
 } from '@/lib/roles'
-import type { NavIconName } from '@/components/hrv/icons'
+import type { HrIconName } from '@/components/hrv/icons'
 import type { NavViewer } from './nav-config'
 
 export type HrNavTone = 'walnut' | 'clay' | 'gold' | 'slate' | 'olive'
@@ -38,11 +38,13 @@ export type HrNavTone = 'walnut' | 'clay' | 'gold' | 'slate' | 'olive'
 export interface HrNavItem {
   key: string
   label: string
-  icon: NavIconName
+  icon: HrIconName
   href: string
-  /** Is this the page being read? */
-  match: (pathname: string) => boolean
+  /** Is this the page being read? The query is handed in for a link into a tab (`/settings?tab=accounts`). */
+  match: (pathname: string, search?: URLSearchParams | null) => boolean
   visible: (viewer: NavViewer) => boolean
+  /** The permission tabs any one of which shows the link, where its page's own list is not the answer — Settings' tabs share one page. */
+  permissionTabs?: readonly string[]
 }
 
 export interface HrNavSection {
@@ -153,7 +155,7 @@ export function visibleHrNav(sections: HrNavSection[], viewer: NavViewer): Array
   const out: Array<HrNavSection & { roman: string | null }> = []
   for (const section of sections) {
     // A link also asks its page's tabs (2026-10-11, 8b): it shows only where its page would open.
-    const items = section.items.filter(item => item.visible(viewer) && opensPath(viewer.tabs, item.href))
+    const items = section.items.filter(item => item.visible(viewer) && opensPath(viewer.tabs, item.href, item.permissionTabs))
     if (items.length === 0) continue
     out.push({ ...section, items, roman: section.label ? ROMAN[n++] : null })
   }
@@ -161,9 +163,9 @@ export function visibleHrNav(sections: HrNavSection[], viewer: NavViewer): Array
 }
 
 /** The item the path belongs to, if any. */
-export function activeHrNavKey(sections: HrNavSection[], pathname: string): string | null {
+export function activeHrNavKey(sections: HrNavSection[], pathname: string, search?: URLSearchParams | null): string | null {
   for (const section of sections) {
-    for (const item of section.items) if (item.match(pathname)) return item.key
+    for (const item of section.items) if (item.match(pathname, search)) return item.key
   }
   return null
 }

@@ -4172,6 +4172,13 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   display: flex;
   position: relative;
 }
+/* The sheet sits right under the greeting bar (2026-10-14, the Finance revamp
+   v2 — both its views' prototypes draw the sheet `margin: 0 10px 10px` under
+   the bar's 70px): no ground between them on a computer. The kit's drawers
+   and scrims start at the frame's top to match (hrv.module.css). */
+@media (min-width: 768px) {
+  .hrv-frame { padding-top: 0; }
+}
 .hrv-sheet.sheet {
   flex: 1 1 auto;
   min-width: 0;
@@ -4191,6 +4198,19 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 @media print {
   .hrv-frame { display: block; padding: 0; }
   .hrv-sheet.sheet { overflow: visible; }
+}
+/* Finance's sheet (2026-10-14, the Finance revamp v2 — `Finance Desktop.dc.html`):
+   the prototype's scroller pads 24 top, 28 each side and 48 at the foot, at
+   every width the sidebar shows. */
+@media (min-width: 768px) {
+  .hrv-sheet.sheet.fin-sheet { padding: 24px 28px 48px; }
+}
+/* …and scrolls on the browser's own scrollbar: the prototype's scroller styles
+   none (HR's round-one sheet asked for a thin one), so its content stops 28px
+   short of a full-width bar — the tiles end at 855 of 909 in D01. */
+.hrv-sheet.sheet.fin-sheet { scrollbar-width: auto; scrollbar-color: auto; }
+@media print {
+  .hrv-sheet.sheet.fin-sheet { padding: 0; }
 }
 
 /* ── Finance's queues (2026-10-07) ──

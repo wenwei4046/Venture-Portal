@@ -185,3 +185,17 @@ export function CardIcon({ name, size = 15, stroke = 1.6 }: { name: CardIconName
 export function Chevron({ right = false, size = 14 }: { right?: boolean; size?: number }) {
   return <NavIcon name={right ? 'chevR' : 'chev'} size={size} />
 }
+
+/** Any glyph of the two sets — the design system's `HrIcon` (2026-10-14, the Finance revamp v2). */
+export type HrIconName = NavIconName | CardIconName
+
+export function isCardIcon(name: HrIconName): name is CardIconName {
+  return name in CARD
+}
+
+/** One name for both sets, each at its own stroke (the nav set 1.5, the card set 1.6). */
+export function HrIcon({ name, size = 16, stroke }: { name: HrIconName; size?: number; stroke?: number }) {
+  return isCardIcon(name)
+    ? <Svg size={size} stroke={stroke ?? 1.6}>{CARD[name]}</Svg>
+    : <Svg size={size} stroke={stroke ?? 1.5}>{NAV[name]}</Svg>
+}

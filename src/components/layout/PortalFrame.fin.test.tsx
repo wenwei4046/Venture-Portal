@@ -22,7 +22,9 @@ vi.mock('./FinSwipeBack', () => ({ default: () => <span data-testid="swipe" /> }
 vi.mock('./FinScrollMemory', () => ({ default: () => <span data-testid="scroll-memory" /> }))
 vi.mock('./RouteFreshener', () => ({ default: () => null }))
 vi.mock('./HrSidebar', () => ({ default: () => <aside>hr sidebar</aside> }))
-vi.mock('./HrTopBar', () => ({ default: () => <div data-testid="hr-topbar" /> }))
+vi.mock('./FinSidebar', () => ({ default: () => <aside>fin sidebar</aside> }))
+vi.mock('./HrTopBar', () => ({ default: (p: { viewLabel?: string }) => <div data-testid="hr-topbar">{p.viewLabel}</div> }))
+vi.mock('@/components/finv/Toast', () => ({ FinToastHost: () => <span data-testid="fin-toast" /> }))
 
 import PortalFrame from './PortalFrame'
 
@@ -37,14 +39,44 @@ beforeEach(() => {
 })
 
 describe('PortalFrame and the Finance view', () => {
-  it('marks Finance’s pages for Finance: the frame, the provider, the phone chrome, the scroll memory', () => {
-    render(<PortalFrame user={user('finance')} navData={navData}><Probe /></PortalFrame>)
+  it('marks Finance’s pages for Finance on a phone: the frame, the provider, the phone chrome, the scroll memory', () => {
+    render(<PortalFrame user={user('finance')} navData={navData} phone><Probe /></PortalFrame>)
     expect(document.querySelector('.sheet-frame')).toHaveClass('fin-view')
     expect(screen.getByTestId('probe')).toHaveTextContent('true')
     expect(screen.getByTestId('topbar')).toHaveAttribute('data-fin', 'true')
     expect(screen.getByTestId('tabbar')).toHaveAttribute('data-fin', 'true')
     expect(screen.getByTestId('scroll-memory')).toBeInTheDocument()
     expect(screen.queryByTestId('swipe')).toBeNull() // a list, not a detail page
+    expect(document.querySelector('.hrv-shell')).toBeNull()
+  })
+
+  it('draws Finance’s own shell on a computer (2026-10-14): HR’s sidebar and bar with Finance’s categories, the sheet in its frame', () => {
+    render(<PortalFrame user={user('finance')} navData={navData}><Probe /></PortalFrame>)
+    expect(document.querySelector('.hrv-shell')).toHaveClass('fin-shell')
+    expect(screen.getByText('fin sidebar')).toBeInTheDocument()
+    expect(screen.queryByText('hr sidebar')).toBeNull()
+    expect(screen.getByTestId('hr-topbar')).toHaveTextContent('Finance view')
+    expect(document.querySelector('.hrv-frame')).toHaveClass('fin-view')
+    expect(document.querySelector('main.hrv-sheet')).toHaveClass('fin-sheet', 'sheet-theme')
+    expect(document.querySelector('.sheet-frame')).toBeNull()
+    expect(screen.getByTestId('probe')).toHaveTextContent('true')
+    expect(screen.getByTestId('scroll-memory')).toBeInTheDocument()
+    expect(screen.getByTestId('fin-toast')).toBeInTheDocument()
+  })
+
+  it('keeps the Principal’s own view in its own shell — the new sidebar is Finance’s view only', () => {
+    render(<PortalFrame user={user('principal')} navData={navData}><Probe /></PortalFrame>)
+    expect(document.querySelector('.hrv-shell')).toBeNull()
+    expect(document.querySelector('.sheet-frame')).toHaveClass('fin-view')
+    expect(screen.queryByText('fin sidebar')).toBeNull()
+  })
+
+  it('wears Finance’s shell off Finance’s pages too, without .fin-view (Meeting Rooms from the account menu)', () => {
+    nav.pathname = '/admin/rooms'
+    render(<PortalFrame user={user('finance')} navData={navData}><Probe /></PortalFrame>)
+    expect(document.querySelector('.hrv-shell')).toHaveClass('fin-shell')
+    expect(document.querySelector('.fin-view')).toBeNull()
+    expect(screen.getByTestId('probe')).toHaveTextContent('false')
   })
 
   it('mounts the edge swipe on a detail page', () => {

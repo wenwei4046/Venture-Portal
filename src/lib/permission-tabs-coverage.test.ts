@@ -6,6 +6,7 @@ import { PERMISSION_TABS, TAB_BY_ID, TAB_VIEWS } from './permission-tabs'
 import { APP_PAGE_TABS } from './member/app-pages'
 import { statementDepts } from './dept-statements'
 import { hrNavSections } from '@/components/layout/hr-nav'
+import { finAccountMenu, finNavSections } from '@/components/layout/fin-nav'
 import { buildNavEntries, isGroup, type NavEntry } from '@/components/layout/nav-config'
 import { PROFILE_VIEWS, SCREENS, type Screen } from '@/components/member/app/route'
 import { pageOfRoute } from '@/components/member/app/app-access'
@@ -61,6 +62,23 @@ describe('every tab of every view is in People › Permissions', () => {
       if (route === 'open') return []
       if (route === null) return [`${item.label} (${item.href}): no page in PAGE_TABS`]
       return TABS[route].some(t => t.startsWith('hr.')) ? [] : [`${item.label} (${item.href}): no HR view tab opens it`]
+    })
+    expect(bad).toEqual([])
+  })
+
+  it('Finance’s sidebar and account menu (2026-10-14): every link opens from a tab of the Finance view', () => {
+    const items = [
+      ...finNavSections({ revenueSubDepts: [], deptPoolDepts: statementDepts([]) }).flatMap(section => section.items),
+      ...finAccountMenu().flatMap(group => group.items).filter(item => item.href !== undefined),
+    ]
+    const bad = items.flatMap(item => {
+      const href = item.href as string
+      const route = known(href)
+      if (route === 'open') return []
+      if (route === null) return [`${item.label} (${href}): no page in PAGE_TABS`]
+      const own = item.permissionTabs
+      const opens = own ? own.some(t => t.startsWith('fin.')) : TABS[route].some(t => t.startsWith('fin.'))
+      return opens ? [] : [`${item.label} (${href}): no Finance view tab opens it`]
     })
     expect(bad).toEqual([])
   })

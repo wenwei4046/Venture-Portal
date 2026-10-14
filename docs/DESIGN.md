@@ -172,7 +172,7 @@ What still binds it:
   - `gap-ds` 12;
   - `gap-ds-lg` — HR 20, Revenue 24;
   - `gap-ds-section` — HR 28, Revenue 24.
-- **HR** — the sidebar is 248px (64 folded) and the greeting bar 60px. The sheet sits 10px in from the frame, padded 24px — 20 under 1000px, 18 × 12 on a phone. Summary cards stand 9px apart.
+- **HR** — the sidebar is 212px (64 folded; 248 until v4.3) and the greeting bar 60px. The sheet sits 10px in from the frame, padded 24px — 20 under 1000px, 18 × 12 on a phone; Finance's view pads it 24 / 28 / 48 (v4.3). Summary cards stand 9px apart.
 - **Revenue** — a 20px side gutter, 24px between sections, hit targets of 44px or more, and a 62px bottom nav with a raised 58px Quote button. The 1440 desktop is a 240 sidebar, a 760 column and a 400 panel.
 
 **Radius — named, each with a job. Round the container, never the rows**: a table lives in a rounded well and every row inside stays square, because rounded rows break the column the eye scans.
@@ -425,7 +425,7 @@ Every sheet override in `globals.css` is written `:where(.sheet-theme) <base sel
 The source is the Claude Design handoff *Sidebar design revamp from HR* (`.design/hr-revamp/handoff`; variant A). The `.dc.html` wins over its README, and every value is the prototype's. The `.design/hr-*` handoffs are kept on the office PC outside git (`.git/info/exclude`). Measurements: `HrSidebar.module.css`, `HrTopBar.module.css`, `hrv.module.css`.
 
 **HR's shell** — `lib/hr-view.ts` decides who gets it: the hr role, and the Principal viewing as HR. Every other view keeps its own shell. `.hrv-shell`:
-- **The sidebar** (`HrSidebar`, 248 ↔ 64px) is square, full height and flush. Its icon tiles sit in five toned sections (`components/layout/hr-nav.ts`): Overview · I. HR & PAYROLL (clay) · II. DIRECTORS (gold) · III. REVENUE (slate) · IV. PEOPLE (olive) · V. ADMIN (walnut).
+- **The sidebar** (`HrSidebar` over the shared `ViewSidebar`, 212 ↔ 64px since v4.3 — the Finance revamp v2 draws both views' sidebars that wide) is square, full height and flush. Its icon tiles sit in toned sections (`components/layout/hr-nav.ts`): Overview · I. HIRING (clay) · II. HR & PAYROLL (clay) · III. REVENUE (slate) · IV. PEOPLE (olive) · V. ADMIN (walnut) · VI. DIRECTORS (gold).
   - One peach pill with a 3px orange bar **slides** to the row clicked: `top .34s` on the curve, measured from the row's `offsetTop`.
   - The open row's tile swaps light / deep and grows to 1.06.
   - The walnut **H** folds the rail; the words fade where they stand. A cookie, `vp-hr-nav`, makes it draw folded.
@@ -764,6 +764,15 @@ Converted so far:
   - An Approvals row is Description + Amount, with who / when as small print. Its arrow opens the rest of the row and the voucher.
   - The `.fin-queue` pages set an opened row's labels in the card-label face, and its one action (Settle) as an orange pill.
   - Finance's and the Principal's tab bar reads in English.
+
+### Finance's view — its own shell (v4.3, 2026-10-14)
+
+The source is the Claude Design handoff *Finance 侧栏分类整理* (`.design/fin-r2/handoff`, `prototype/Finance Desktop.dc.html` + README; screenshots D01–D13). Who wears it: the finance kind and the Principal's Finance lens, on a computer (`isFinanceShell`); the Principal's own view keeps its sidebar, and a phone keeps the portal's phone shell until Finance's phone app.
+- **The shell is HR's** (`.hrv-shell.fin-shell`): `FinSidebar` over `ViewSidebar` at 212px, `HrTopBar` reading *Finance view*, the sheet padded 24 / 28 / 48 (`.fin-sheet`) and scrolling on the browser's own scrollbar, not the portal's thin one. On a computer the sheet sits right under the 70px bar — the frame keeps its 10px on the other three sides only (both views; both prototypes draw it so). Finance's pages keep `.fin-view` — on the frame now — and their place on Back.
+- **The sidebar's categories** (`components/layout/fin-nav.ts`): Overview · I. DAILY (clay) Payments, Receipt, Invoice, Billing Allocator, Daily Bank, Reconciliation, Journal Entries · II. FUND (olive) Fund IN, Fund OUT, Invoice Financing, Repayment, Statements · III. REPORT (slate) General Ledger, P&L, Cash Flow, Receipt & Payment, Balance Sheet, Trial Balance, Debtor Aging, Loan Aging, Company Statement, Chart of Account, Base Rate History · IV. DEPARTMENT (gold) Dept Pool, each department, Venture Pool. Approvals (first in Daily) and Claims (last in Department) show only to their holders; Overdue is not drawn (its page is gone).
+- **The footer is a button** — *Finance · settings & admin* — that opens the account menu (D13): a white popover 10px in, 64px up, radius 12, the menu shadow; ACCOUNT (Edit profile, Change password — a login of one's own only), ADMIN (Audit Log, Departments, Meeting Rooms), a rule, SIGN OUT in caps. A transparent scrim closes it.
+- **The kit** (`components/finv/`): `FinDialog` — the prototype's desktop sheet, 520px content-box on `248 245 240`, radius 16, `0 30px 70px` shadow, fading in from .98 over .2s and out again before it unmounts (`usePresence`); its bodies `DialogMenu`, `DialogConfirm` (red when it undoes), `DialogForm` with `Field` / `Input` (40px content-box, radius 10, the .18 ring) / `Hint` / `DialogButton` (38px). `FinToastHost` draws `flash()` as the walnut pill at the window's foot, 12px up and in over .28s, held 2.2s, played out too.
+- **Edit profile** — Full name, Email (shown, never edited: it is the sign-in), Phone; *Shown on vouchers you create*; Cancel · Save; *Profile saved*. **Change password** — the 2026-10-12 rules in the design's dialog, its sub *At least 6 characters* (the real rule, not the design's 8). **Sign out?** asks first.
 
 **HR & Payroll**
 
@@ -1383,6 +1392,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.3** · 2026-10-14 · Finance's view wears its own shell: the sidebar in Daily / Fund / Report / Department, the account menu, Edit profile; both views' sidebars 212px → Finance's view — its own shell
 - **v4.2** · 2026-10-14 · The Revenue app's refresh: Today's CRM chat button (live unread), income as a statement, Arena bank cards and board heroes, the 10px type floor, sheets close when pulled down → The Revenue app — the refresh
 - **v4.1** · 2026-10-14 · A Revenue Director in the Revenue app: the sub-departments they direct, *All of Fair*, *ANNA leads* → The Revenue app (#381)
 - **v4.0** · 2026-10-14 · The HOUZS Venture Design System (Claude Design) adopted: two themes, `--ds-*`, Newsreader / Inter Tight; history trimmed to this index → Part I (#366)
