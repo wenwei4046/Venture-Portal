@@ -23,6 +23,8 @@ export const NO_MEDIA = {
   pad: "10px 13px", inPad: "0",
   /** The time row's top margin: a voice note's time sits on its own duration line, as WhatsApp's (the bubble one line shorter). */
   timeTop: "4px",
+  /** The time row's layout: its own line (block) by default; beside the words for a text message (INLINE_TIME). */
+  tDisp: "flex", tFloat: "none" as "none" | "right", tML: "0", tMB: "0", pShow: "block",
 };
 
 /** A message with no words, named in a chat list as the chat names it (it read "Attachment", or nothing). */
@@ -30,6 +32,13 @@ export function mediaWord(m: Pick<CrmChatMessage, "media">): string {
   const k = m.media?.kind;
   return k === "image" ? "📷 Photo" : k === "video" ? "🎥 Video" : k === "audio" ? "🎤 Voice message" : k === "file" ? `📄 ${m.media?.name ?? "Document"}` : "Attachment";
 }
+
+/**
+ * A text message as WhatsApp lays it out (the owner, 2026-10-14: "時間放在訊息的右邊，就不會顯得大"): the words run inline
+ * and the time floats right — at the end of the last line when it fits there, on a line of its own at the right only
+ * when it does not — and the bubble's padding is WhatsApp's.
+ */
+export const INLINE_TIME = { tDisp: "inline-flex", tFloat: "right", tML: "12px", tMB: "-5px", timeTop: "8px", pShow: "inline", pad: "6px 9px 7px 11px" } as const;
 
 const visual = (m: Msg) => m.media?.kind === "image" || m.media?.kind === "video";
 

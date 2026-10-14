@@ -16,7 +16,7 @@ import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
-import { albumsOf, galleryOf, mediaOf, mediaWord } from "../../shared/chat-media";
+import { albumsOf, galleryOf, INLINE_TIME, mediaOf, mediaWord } from "../../shared/chat-media";
 import { MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 
@@ -63,7 +63,9 @@ export function leadVM(ctx: PanelCtx) {
     const md = m.media, mk = md?.kind, shows = mk === "image" || mk === "video" || mk === "audio";
     const star = stars.has(m.id) ? "★ " : "";
     return { sep: !k || daySep(arr[k - 1].at, now) !== sep ? sep : "", time: star + msgTime(m.at), mine, text: m.text || (md && !shows ? (md.name ?? "File") : ""), at: star + msgTime(m.at),
-      ...mediaOf(m, gallery, al.lead.get(m.id)), ...(by ? { timeTop: "4px" } : {}), vis: al.hidden.has(m.id) ? "none" : undefined,
+      ...mediaOf(m, gallery, al.lead.get(m.id)), ...(by ? { timeTop: "4px" } : {}), ...(!md && !m.card && m.text ? INLINE_TIME : {}),
+      // flow-root: the bubble holds the floated time (INLINE_TIME).
+      vis: al.hidden.has(m.id) ? "none" : "flow-root",
       // The message menu, as in Mine's chat (shared/msg-menu.tsx): a long press — reactions, Reply, Copy, Delete for me.
       reaction: m.myReaction ?? "", rxGap: m.myReaction ? "14px" : "0", rxSide: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto",
       quote: (() => { const q = m.replyTo ? c?.messages.find(x => x.id === m.replyTo) : undefined; return q ? { who: q.from === "me" ? "You" : c?.name ?? "", text: q.text || mediaWord(q) } : null; })(),
@@ -85,7 +87,7 @@ export function leadVM(ctx: PanelCtx) {
       by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? "#FCD6B8" : "#fff", bd: mine ? "#FCD6B8" : "#fff", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
       // A visit sent to the customer shows as the visit card, as in the salesperson's chat (sales/vm/chat.ts › ev), not
       // as its text with the map links (user 2026-10-11). Tap → Calendar on that day.
-      ...visitCard(m.card), pDisp: m.card || mk === "file" || (shows && !m.text) ? "none" : "block" };
+      ...visitCard(m.card), pDisp: !md && !m.card && m.text ? "inline" : m.card || mk === "file" || (shows && !m.text) ? "none" : "block" };
   });
   return {
     onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, pReply: null, pEmoji: null, pPick: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
