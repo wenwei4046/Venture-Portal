@@ -117,6 +117,8 @@ function readMessage(m: WaMessage, phoneNumberId: string, names: Map<string, str
   const body =
     m.text?.body ??
     media?.caption ??
+    // A document with no caption is named by its file (2026-10-14: a customer's PDF showed only "Document"), as one we send is.
+    m.document?.filename ??
     m.button?.text ??
     m.interactive?.button_reply?.title ?? m.interactive?.list_reply?.title ??
     (m.location ? [m.location.name, m.location.address, m.location.latitude != null ? `${m.location.latitude},${m.location.longitude}` : null].filter(Boolean).join(" · ") : null) ??
