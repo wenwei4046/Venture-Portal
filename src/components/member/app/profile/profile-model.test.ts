@@ -96,6 +96,9 @@ describe("profileMainVM", () => {
       memos: [{ id: "a", cat: "hr", from: "", when: "", whenFull: "", title: "", paras: [], read: false, needsAck: true, acked: false, ackedText: "" }] });
     expect(vm).toMatchObject({ ini: "JT", sub: "HOUZS Venture · Revenue · Fair", badges: { requests: "1 pending", memos: "1 new" } });
   });
+  it("a director with no rung on this sub-department's ladder has no rank there", () => {
+    expect(profileMainVM({ name: "PETER", title: "Revenue Director", rank: "", subName: "IR", requests: [], memos: [] }).rank).toBe("—");
+  });
 });
 
 describe("vaGroupsVM", () => {
@@ -166,6 +169,24 @@ describe("teamVM", () => {
   it("is null for somebody not on the department's map", () => {
     expect(teamVM({ map, departmentId: "fair", subName: "Fair", staffId: "ghost", people: [], month: "2026-09",
       kpi: { enabled: true, threshold: 10 }, capacity: null, occupied: 0, ranks: new Map() })).toBeNull();
+  });
+  // A Revenue Director holds no seat (2026-10-14): they are the top of their own chart.
+  it("draws a director at the top, every tree's top under them, the other director nowhere above", () => {
+    const peter = fairTeam("d1");
+    expect(peter.ups).toEqual([]);
+    expect(peter.me).toEqual({ id: "d:d1", name: "PETER", title: "You · Revenue Director", ini: "PE", dot: "up" });
+    expect(peter.kids).toMatchObject([{ name: "MARCUS", kids: [{ name: "JIA HUI" }] }]);
+    expect(peter.count).toBe("0 above · 2 below");
+    expect(peter.sheets["d:d1"]).toMatchObject({ name: "PETER", role: "Revenue Director", self: true, reportsTo: "Leads Fair" });
+    expect(peter.sheets["n-top"].reportsTo).toBe("Reports to you");
+    expect(peter.sheets["n-me"].reportsTo).toBe("Reports to MARCUS");
+  });
+  it("a seat whose upline holds none here is one of the director's tops too", () => {
+    const stray = { ...twoDirectors, people: [...twoDirectors.people,
+      { id: "n-s", staffId: "s", departmentId: "fair", schemeId: "s", name: "EVE", code: null, title: "Executive", parentId: "n-elsewhere", self: false, mine: true }] };
+    const vm = teamVM({ map: stray, departmentId: "fair", subName: "Fair", staffId: "d0", people: [], month: "2026-09",
+      kpi: { enabled: false, threshold: null }, capacity: null, occupied: 0, ranks: new Map() })!;
+    expect(vm.kids.map(k => k.name)).toEqual(["EVE", "MARCUS"]);
   });
 });
 

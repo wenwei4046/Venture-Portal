@@ -136,6 +136,12 @@ export interface MemberMembership {
   capacity: number | null;
   occupied: number;
   people: MemberPerson[];
+  /**
+   * A sub-department the person DIRECTS, not a seat (2026-10-14): a Revenue Director heads the department and holds
+   * no seat (23DIR), so the snapshot lists the ones they direct after the seats — their title, the rung their title
+   * holds on its ladder ("" where it has none), everybody as its people.
+   */
+  director?: boolean;
 }
 export interface MemberKpi {
   label: string;
@@ -447,6 +453,13 @@ export interface MemberInsightBlock {
   title: string;
   rank: string;
   rankSort: number;
+  /** The reader directs this sub-department (2026-10-14): everybody in it is their downline, and no rung is next. */
+  director?: boolean;
+  /**
+   * A director's block only: the month's every bill of the sub-department — the directors' own too — summed. What
+   * Today's Sales / Margin / KPI show them ("All of Fair"), the same for every director of it.
+   */
+  team?: Omit<MemberScore, "staffId" | "lastOrder">;
   me: MemberScore & { name: string };
   target: MemberTarget | null;
   boards: MemberBoard[];

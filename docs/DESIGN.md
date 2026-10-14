@@ -1,6 +1,6 @@
 # DESIGN.md — HOUZS Venture Portal
 
-**Version 4.0 · 2026-10-14** — the single design doc for every screen: the portal, the Revenue app and the HR phone app. Version history: Part IV.
+**Version 4.1 · 2026-10-14** — the single design doc for every screen: the portal, the Revenue app and the HR phone app. Version history: Part IV.
 
 **The design system.** The visual source is the Claude Design project **HOUZS Venture Design System** (https://claude.ai/design/p/1fecd655-db12-4974-abf4-3d7434e41386, synced from `main` on 2026-10-13). It holds the tokens, the foundation cards, the core and view components and four templates. This file says how the code does it — which token, class or component a page uses today — and holds the rules the code enforces. Where the project and this file disagree, this file is the code's truth. Change either one on purpose, never by drift.
 
@@ -1318,6 +1318,7 @@ Only for a login a People record names: the shared principal@, finance@, hr@ and
 - **A food claim** (v3.81), for whom HR opened it: a month at a time — *Month* pills, the month's brand weeks as cards with their day count, the fair's days as tiles (*Claimed* / *Not yet* faded and untappable), then *Set by HR's rate a day. You can't edit the amount.*
 - **Notifications** (v3.47, v3.52, v3.86): the bell and its page; the first open asks *Turn on notifications?*; a CRM notice is titled by the customer with their picture; *Make them pop up* with *Send a test*.
 - **Switch view** (v3.60): Profile on a phone lists Principal and Finance (*The portal*), HR (*The HR app*), Revenue team (*You are here*).
+- **A Revenue Director** (v4.1): the switcher lists the sub-departments they direct (*Revenue Director · Rank SS*); Today's Sales / Margin / KPI are tagged *All of Fair*; a place on a board they are not on names who leads — *ANNA leads* on Today and the hub (head: *Who leads every board*), the leader's figure and *RM 300 ahead of ME* on a board's hero; no *This week*; the family chart has them at the top.
 
 ### The Revenue app — Book a room and Documentation (v3.36, 2026-10-11)
 
@@ -1369,6 +1370,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.1** · 2026-10-14 · A Revenue Director in the Revenue app: the sub-departments they direct, *All of Fair*, *ANNA leads* → The Revenue app (#381)
 - **v4.0** · 2026-10-14 · The HOUZS Venture Design System (Claude Design) adopted: two themes, `--ds-*`, Newsreader / Inter Tight; history trimmed to this index → Part I (#366)
 - **v3.86** · 2026-10-14 · CRM phone notices titled by the customer, their picture as icon; *Make them pop up* → The HR phone app; The Revenue app (#363)
 - **v3.85** · 2026-10-14 · Finance view: payroll only in Payments' *Payroll batches* tab, by department; All and status tabs count none → Sheet theme (#361)

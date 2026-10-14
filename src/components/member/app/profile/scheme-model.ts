@@ -38,8 +38,11 @@ export function schemeVM(input: {
   const since = m?.effective ? `${shortDay(m.effective)} ${m.effective.slice(0, 4)}` : "—";
   const salary = input.salary === undefined ? "—" : input.hidden ? "RM ••••"
     : input.salary === null ? "Not set" : input.salary === 0 ? "Commission only" : rm2(input.salary);
-  const rate = m ? m.rate : input.rate ?? null;
-  const codes = [...new Set(input.bands.map(b => b.brand))].sort((a, b) => brandName(a).localeCompare(brandName(b)));
+  // A director (2026-10-14) is paid their rung's rate on their own bills and nothing of the brands' ladders —
+  // and in a sub-department where their title holds no rung, no rate at all.
+  const director = !!m?.director;
+  const rate = m ? (director && !m.rank ? null : m.rate) : input.rate ?? null;
+  const codes = director ? [] : [...new Set(input.bands.map(b => b.brand))].sort((a, b) => brandName(a).localeCompare(brandName(b)));
   return {
     name: input.name,
     ini: input.ini,
@@ -57,6 +60,8 @@ export function schemeVM(input: {
         value: r.range,
       })),
     })),
-    note: "Margin is measured brand by brand. Which of these a month pays — and what you earned — is on My income; your payslip confirms it.",
+    note: director
+      ? "Your own bills pay at your rank's rate. Your fixed amount and incentive are on My income; your payslip confirms it."
+      : "Margin is measured brand by brand. Which of these a month pays — and what you earned — is on My income; your payslip confirms it.",
   };
 }

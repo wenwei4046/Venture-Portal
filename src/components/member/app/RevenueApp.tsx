@@ -310,6 +310,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const context = useMemo<MemberReadContext | undefined>(() => (principal && route.staff && membershipId
     ? { staffId: route.staff, subDepartmentId: membershipId } : undefined), [principal, route.staff, membershipId]);
   const viewed = principal && route.staff ? membership?.people.find(p => p.id === route.staff) : undefined;
+  // A Revenue Director's own app (2026-10-14): the sub-department they direct, everybody in it under them.
+  const director = !principal && !!membership?.director;
 
   const me: Me = useMemo(() => {
     if (viewed) return { name: viewed.name, first: firstName(viewed.name), ini: initials(viewed.name), title: viewed.title, rank: viewed.rank };
@@ -610,28 +612,33 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     else openBoard("sales", settled?.period ?? null);
   };
 
+  // A sub-department somebody directs (2026-10-14) reads as their title and rung; a seat as Home (the first) or Member.
   const subOptions: SubDeptOption[] = data.memberships.map((m, i) => ({
     id: m.id, name: m.name, abbr: m.name.replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase(),
-    meta: i === 0 ? ["Home", m.title, m.rank].filter(Boolean).join(" · ") : ["Member", m.title].filter(Boolean).join(" · "),
+    meta: m.director ? [m.title, m.rank].filter(Boolean).join(" · ")
+      : i === 0 ? ["Home", m.title, m.rank].filter(Boolean).join(" · ") : ["Member", m.title].filter(Boolean).join(" · "),
   }));
 
   // ── this month's Championship, for Today's board ──
   // The KPI rule is the scheme's (Rules), not a month's: this month's summary says it.
   const kpiRule = useMemo(() => ({ enabled: !!now.kpi?.enabled, threshold: now.kpi?.threshold ?? null }), [now.kpi?.enabled, now.kpi?.threshold]);
   const selfId = arenaToday?.selfId || context?.staffId || "";
-  const champRank = useMemo(() => {
+  // The reader's place, and who leads — a director is on no board, so their card names the leader.
+  const champ = useMemo(() => {
     if (!arenaToday) return null;
     const month = championshipMonth({ month: arenaToday.period, people: arenaToday.people, brands: arenaToday.brands.map(b => b.code), tiers: arenaToday.tiers, history: arenaToday.history ?? null, kpi: kpiRule });
-    return championshipStandings([month]).find(s => s.id === selfId)?.position ?? null;
+    const standings = championshipStandings([month]);
+    return { rank: standings.find(s => s.id === selfId)?.position ?? null, leader: standings.find(s => s.position === 1)?.name ?? null };
   }, [arenaToday, kpiRule, selfId]);
 
   const model = useMemo(() => todayModel({
     today, first: me.first, title: me.title, rank: me.rank, income, incomeStatus, salary: todaySalary, hidden: hidden || incomeShut,
     department: principal && !viewed && !fixture ? membership?.name ?? "the department" : undefined,
+    team: director ? membership?.name : undefined,
     insight: now.block ?? undefined, kpi: now.kpi, arena: arenaToday, book: now.book, bands: data.bands, memos, requests, requestCode,
     metricsLoading: now.loading && !now.block && !data.demo, arenaLoading: arenaCur.loading && !data.demo,
-  }, champRank), [today, me, income, incomeStatus, todaySalary, hidden, incomeShut, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book,
-    now.loading, arenaCur.loading, data.demo, data.bands, memos, requests, champRank]);
+  }, champ?.rank ?? null, champ?.leader ?? null), [today, me, income, incomeStatus, todaySalary, hidden, incomeShut, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book,
+    now.loading, arenaCur.loading, data.demo, data.bands, memos, requests, champ, director]);
 
   // ── Insight: Month / Quarter / Year, opening on the current month ──
   const [insKind, setInsKind] = useState<PeriodKind>("monthly");
@@ -703,7 +710,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     openMonths: arData.snapshot?.openMonths ?? (isLiveMonth(arPeriod.from, period, monthState) ? [arPeriod.from] : []),
     current: period,
     failed: !!arData.failed,
-  }), [arPeriod, arData.snapshot, arData.history, arData.standings, selfId, membership?.name, kpiRule.enabled, period, monthState, arData.failed]);
+    director,
+  }), [arPeriod, arData.snapshot, arData.history, arData.standings, selfId, membership?.name, kpiRule.enabled, period, monthState, arData.failed, director]);
   const hubVM = useMemo(() => fixture?.arena?.hub[arKind] ?? hubModel(arInput), [fixture, arKind, arInput]);
   const boardVM = useMemo(() => {
     const fx = fixture?.arena;

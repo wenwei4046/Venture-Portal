@@ -223,7 +223,7 @@ export function DeskAside({ active, count, notifOpen, me, products, modules, hid
           <span className={s.asideAvatar}>{me.ini}</span>
           <span className={s.asideMeText}>
             <span className={s.asideMeName}>{me.name}</span>
-            <span className={s.asideMeSub}>{me.title} · {me.rank}</span>
+            <span className={s.asideMeSub}>{[me.title, me.rank].filter(Boolean).join(" · ")}</span>
           </span>
         </button>
       )}

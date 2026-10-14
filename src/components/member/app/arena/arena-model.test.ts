@@ -109,6 +109,40 @@ describe("loading versus no place", () => {
   });
 });
 
+describe("a Revenue Director reads the boards (2026-10-14: on none of them)", () => {
+  // The director is on no board: nobody in the snapshot is them.
+  const theirs = people.map(p => ({ ...p, self: false }));
+  const director = (over: Partial<ArenaInput> = {}) => input({ snapshot: snapshot(theirs, { selfId: "peter" }), selfId: "peter", director: true, ...over });
+
+  it("each hero names who leads, their figure, and the gap to the next", () => {
+    const hero = boardModel(director()).rank!.hero;
+    expect([hero.state, hero.leader, hero.value, hero.chase, hero.num]).toEqual(["lead", "XAVIER LIM", "RM 800", "RM 300 ahead of ME", ""]);
+    const margin = boardModel(director({ board: "margin" })).rank!.hero;
+    expect([margin.state, margin.leader]).toEqual(["lead", "ME"]);
+  });
+  it("a board nobody is on yet says so; KPI not counted stays off, with no leader", () => {
+    const empty = boardModel(director({ snapshot: snapshot(theirs.map(p => ({ ...p, sales: 0, marginRevenue: 0, marginCost: 0 })), { selfId: "peter" }) })).rank!.hero;
+    expect([empty.state, empty.leader, empty.chase]).toEqual(["lead", undefined, "No counted sales yet"]);
+    const off = boardModel(director({ board: "kpi", kpiEnabled: false })).rank!.hero;
+    expect([off.state, off.leader, off.num]).toEqual(["off", undefined, "—"]);
+  });
+  it("the hub's cards name the leaders; its head says so", () => {
+    const hub = hubModel(director());
+    expect(hub.director).toBe(true);
+    expect(hub.cards.find(c => c.board === "sales")).toMatchObject({ state: "lead", leader: "XAVIER LIM", value: "RM 800", of: "" });
+    expect(hubModel(input()).director).toBeUndefined();
+  });
+  it("Fair results: the leader's medals, none of the director's own", () => {
+    const fair = boardModel(director({ sub: "fair" })).fair!;
+    expect([fair.hero.state, fair.hero.leader, fair.hero.chase]).toEqual(["lead", "ME", "ME has the most fair wins"]);
+    expect([fair.chips, fair.sheet.other]).toEqual([[], ""]);
+  });
+  it("a member's boards are unchanged", () => {
+    const hero = boardModel(input()).rank!.hero;
+    expect([hero.state, hero.leader]).toEqual(["ranked", undefined]);
+  });
+});
+
 describe("fairTallies", () => {
   it("counts only the brand week's booth, at the place held among everybody there", () => {
     const rows = fairTallies(people, history, "2026-09", "2026-09");

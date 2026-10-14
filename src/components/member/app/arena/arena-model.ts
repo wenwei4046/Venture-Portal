@@ -99,10 +99,12 @@ export function chaseLine(board: Board, rows: readonly BoardRow[]): { line: stri
 
 /**
  * `state` (2026-10-08): `ranked` shows the place; `unranked` (nothing on this board yet) says so in words — a giant
- * dash looked like a bar still loading; `loading` is a placeholder while the board is read.
+ * dash looked like a bar still loading; `loading` is a placeholder while the board is read. `lead` (2026-10-14): the
+ * reader is on no board — a Revenue Director, above the ladder — so the place names who leads (`leader`, absent while
+ * nobody is placed) and the value is theirs.
  */
-export type HeroState = "ranked" | "unranked" | "loading" | "off";
-export interface RankHero { num: string; suf: string; count: number; value: string; chase: string; state: HeroState }
+export type HeroState = "ranked" | "unranked" | "loading" | "off" | "lead";
+export interface RankHero { num: string; suf: string; count: number; value: string; chase: string; state: HeroState; leader?: string }
 export interface PodiumItem { id: string; place: 1 | 2 | 3; ini: string; name: string; value: string }
 export interface RankRowVM { id: string; pos: string; medal: Medal; ini: string; name: string; value: string; tag: "you" | "next" | null; mine: boolean; muted: boolean }
 
@@ -121,7 +123,18 @@ export interface RankView {
 
 const medalOf = (position: number | null): Medal => (position !== null && position >= 1 && position <= 3 ? (position as Medal) : 0);
 
-function rankView(board: Board, rows: BoardRow[], count: number): RankView {
+/** A director's hero: who leads, their figure, and by how much over the next. */
+function leadHero(board: Board, ordered: readonly BoardRow[], count: number): RankHero {
+  const placed = ordered.filter(r => r.position !== null && r.value !== null);
+  const [first, second] = placed;
+  if (!first) return { num: "", suf: "", count, value: "—", chase: EMPTY_CHASE[board], state: "lead" };
+  const chase = !second ? `Only ${firstName(first.name)} is on the board`
+    : second.value === first.value ? `Level with ${firstName(second.name)} at the top`
+    : `${gap(board, first.value! - second.value!)} ahead of ${firstName(second.name)}`;
+  return { num: "", suf: "", count, value: boardValue(board, first.value, first.pending), chase, state: "lead", leader: firstName(first.name) };
+}
+
+function rankView(board: Board, rows: BoardRow[], count: number, director = false): RankView {
   const ordered = displayOrder(rows);
   const me = ordered.find(r => r.self);
   const { line, aboveId } = chaseLine(board, ordered);
@@ -131,7 +144,7 @@ function rankView(board: Board, rows: BoardRow[], count: number): RankView {
     name: r.self ? "You" : firstName(r.name), value: boardValue(board, r.value, r.pending),
   }));
   return {
-    hero: {
+    hero: director ? leadHero(board, ordered, count) : {
       num: me?.position ? String(me.position) : "—",
       suf: me?.position ? ordinalSuffix(me.position) : "",
       count,
@@ -229,7 +242,7 @@ export interface FairPodiumVM { id: string; medal: 1 | 2 | 3; place: string; joi
 export interface FairRowVM { id: string; pos: string; medal: Medal; ini: string; name: string; sub: string; joint: boolean; g: number; s: number; b: number; mine: boolean }
 export interface FairListItem { venue: string; dates: string; sales: string; finish: string; place: string; medal: Medal }
 export interface FairView {
-  hero: { num: string; suf: string; count: number; medals: FairMedalVM[]; chase: string; state: HeroState };
+  hero: { num: string; suf: string; count: number; medals: FairMedalVM[]; chase: string; state: HeroState; leader?: string };
   podium: FairPodiumVM[];
   entrySub: string;
   chips: FairListItem[];
@@ -240,13 +253,16 @@ export interface FairView {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-function fairView(tallies: FairTally[], count: number): FairView {
-  const me = tallies.find(t => t.self);
+function fairView(tallies: FairTally[], count: number, director = false): FairView {
   const placed = tallies.filter(t => t.position !== null);
+  // A director is on no board: the hero is the leader's.
+  const me = director ? placed[0] : tallies.find(t => t.self);
   const ahead = me?.position ? placed.filter(t => t.position! < me.position!).slice(-1)[0] : undefined;
   const two = (name: string) => firstName(name);
   let chase = "No completed fairs yet";
-  if (me?.position) {
+  if (director) {
+    if (me) chase = `${two(me.name)} has the most fair wins`;
+  } else if (me?.position) {
     if (!ahead) chase = "Most fair wins this period";
     else if (ahead.g > me.g) chase = `${ahead.g - me.g} more 1st place${ahead.g - me.g > 1 ? "s" : ""} to catch ${two(ahead.name)}`;
     else if (ahead.s > me.s) chase = `More 2nd places to pass ${two(ahead.name)}`;
@@ -259,14 +275,15 @@ function fairView(tallies: FairTally[], count: number): FairView {
     venue: f.venue, dates: dayRange(f.start, f.end), sales: rm(f.sales), finish: `${ordinal(f.position)} of ${f.of}`,
     place: ordinal(f.position), medal: medalOf(f.position),
   });
-  const mine = me?.fairs ?? [];
+  const mine = director ? [] : me?.fairs ?? [];
   const n = mine.length;
   return {
     hero: {
-      num: me?.position ? String(me.position) : "—", suf: me?.position ? ordinalSuffix(me.position) : "", count,
+      num: !director && me?.position ? String(me.position) : director ? "" : "—", suf: !director && me?.position ? ordinalSuffix(me.position) : "", count,
       medals: [["1st", me?.g ?? 0], ["2nd", me?.s ?? 0], ["3rd", me?.b ?? 0]].map(([label, c], i) => ({ n: (i + 1) as 1 | 2 | 3, label: String(label), count: Number(c) })),
       chase,
-      state: me?.position ? "ranked" : "unranked",
+      state: director ? "lead" : me?.position ? "ranked" : "unranked",
+      ...(director && me ? { leader: two(me.name) } : {}),
     },
     podium: order.map(t => ({
       id: t.id, medal: Math.min(3, t.position!) as 1 | 2 | 3, place: ordinal(t.position!), joint: t.joint ? "Joint" : "",
@@ -282,7 +299,7 @@ function fairView(tallies: FairTally[], count: number): FairView {
       sub: t.position === null ? "No fairs" : t.joint ? `Joint ${ordinal(t.position)}` : `${t.fairs.length - t.g - t.s - t.b} × 4th or lower`,
       joint: t.joint, g: t.g, s: t.s, b: t.b, mine: t.self,
     })),
-    sheet: { countText: plural(n, "fair"), other: `${n - (me?.g ?? 0) - (me?.s ?? 0) - (me?.b ?? 0)} finished 4th or lower`, fairs: mine.map(finish) },
+    sheet: { countText: plural(n, "fair"), other: director ? "" : `${n - (me?.g ?? 0) - (me?.s ?? 0) - (me?.b ?? 0)} finished 4th or lower`, fairs: mine.map(finish) },
   };
 }
 
@@ -324,6 +341,8 @@ export interface ArenaInput {
   current: string;
   /** The window's read failed: nothing is on its way, so nothing shows as loading. */
   failed?: boolean;
+  /** A Revenue Director reads the boards (2026-10-14): on none of them, so each hero names who leads. */
+  director?: boolean;
 }
 
 /** The scheme's brands, in the prototype's order. */
@@ -394,24 +413,25 @@ export function boardModel(input: ArenaInput): BoardVM {
 
   let rank: RankView | null = null;
   let fair: FairView | null = null;
+  const director = !!input.director;
   if (isFair) {
-    fair = fairView(fairTallies(people, input.history, period.from, period.through), people.length);
+    fair = fairView(fairTallies(people, input.history, period.from, period.through), people.length, director);
   } else if (board === "champ") {
     const rows = input.standings ? fromStandings(input.standings, input.selfId) : [];
-    rank = rankView("champ", rows, count);
+    rank = rankView("champ", rows, count, director);
     if (input.standings) rank.champ = champBreakdown(input.standings, input.selfId, period, input.kpiEnabled);
   } else {
     const metric = METRIC[board];
     const enabled = board !== "kpi" || input.kpiEnabled;
     const rows = enabled ? fromRankings(arenaRankings(people, metric, brand || undefined), board)
       : people.map(p => ({ id: p.id, name: p.name, self: p.self, position: null, value: null, pending: false, active: false }));
-    rank = rankView(board, rows, count);
+    rank = rankView(board, rows, count, director);
     if (!enabled) {
       // KPI switched off for the sub-department: nobody has a count to show.
       rank.hero.value = "Not counted";
       rank.hero.chase = "KPI items are not counted this period";
-      // Nobody will ever have a place here: not "Not ranked yet".
-      rank.hero.state = "off";
+      // Nobody will ever have a place here: not "Not ranked yet" — nor a leader.
+      rank.hero = { ...rank.hero, num: "—", suf: "", state: "off", leader: undefined };
       rank.rows = rank.rows.map(r => ({ ...r, value: "—" }));
     }
   }
@@ -436,8 +456,9 @@ export function boardModel(input: ArenaInput): BoardVM {
 
 // ── the hub ──────────────────────────────────────────────────────────────
 
-export interface HubCardVM { board: Board; label: string; rankNum: string; rankSuf: string; of: string; value: string; state: HeroState }
-export interface HubVM { updated: string; cards: HubCardVM[]; recordLine: string }
+export interface HubCardVM { board: Board; label: string; rankNum: string; rankSuf: string; of: string; value: string; state: HeroState; leader?: string }
+/** `director`: the reader is on no board (a Revenue Director) — the hub's head says the cards name who leads. */
+export interface HubVM { updated: string; cards: HubCardVM[]; recordLine: string; director?: boolean }
 
 /** `2:40 pm` in Kuala Lumpur. */
 export function klTime(iso: string): string {
@@ -457,9 +478,13 @@ export function hubModel(input: Omit<ArenaInput, "board" | "sub" | "brand">): Hu
       of: hero?.state === "ranked" || hero?.state === "off" ? `of ${hero?.count ?? 0}` : "",
       value: loading ? "" : hero?.value ?? "—",
       state: hero?.state ?? "unranked",
+      ...(hero?.leader ? { leader: hero.leader } : {}),
     };
   });
-  return { updated: input.snapshot ? klTime(input.snapshot.asOf) : "", cards, recordLine: recordModel(input.history, input.selfId).cardLine };
+  return {
+    updated: input.snapshot ? klTime(input.snapshot.asOf) : "", cards, recordLine: recordModel(input.history, input.selfId).cardLine,
+    ...(input.director ? { director: true } : {}),
+  };
 }
 
 // ── Highest Fair Record ──────────────────────────────────────────────────

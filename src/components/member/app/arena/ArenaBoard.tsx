@@ -73,10 +73,14 @@ export default function ArenaBoard({ vm, kind, dateLabel, actions }: { vm: Board
   );
 }
 
-/** The hero's place: the number, "Not ranked yet" in words, or a placeholder while the board is read. */
-function HeroPlace({ state, num, suf }: { state: HeroState; num: string; suf: string }) {
+/**
+ * The hero's place: the number, "Not ranked yet" in words, or a placeholder while the board is read — and for a
+ * director, who is on no board, who leads it.
+ */
+function HeroPlace({ state, num, suf, leader }: { state: HeroState; num: string; suf: string; leader?: string }) {
   if (state === "loading") return <span className={`${s.skel} ${s.heroNumSkel}`} role="img" aria-label="Loading your place" />;
   if (state === "unranked") return <span className={s.heroNone}>Not ranked yet</span>;
+  if (state === "lead") return <span className={s.heroNone}>{leader ? `${leader} leads` : "Nobody placed yet"}</span>;
   // "off" (KPI not counted this period) keeps the dash: nobody has a place, and nobody will.
   return <span className={s.rankNum}><span className={s.heroNum}>{num}</span><span className={s.heroSuf}>{suf}</span></span>;
 }
@@ -87,7 +91,7 @@ function RankHeroBlock({ rank }: { rank: RankView }) {
     <>
       <div className={s.heroRank}>
         <span className={s.heroRankLeft}>
-          <HeroPlace state={h.state} num={h.num} suf={h.suf} />
+          <HeroPlace state={h.state} num={h.num} suf={h.suf} leader={h.leader} />
           {(h.state === "ranked" || h.state === "off") && <span className={s.heroOf}>of {h.count}</span>}
         </span>
         {h.state === "loading" ? <span className={`${s.skel} ${s.heroValueSkel}`} /> : <span className={s.heroValue}>{h.value}</span>}
@@ -103,7 +107,7 @@ function FairHeroBlock({ fair }: { fair: FairView }) {
     <>
       <div className={s.heroRank}>
         <span className={s.heroRankLeft}>
-          <HeroPlace state={h.state} num={h.num} suf={h.suf} />
+          <HeroPlace state={h.state} num={h.num} suf={h.suf} leader={h.leader} />
           {(h.state === "ranked" || h.state === "off") && <span className={s.heroOf}>of {h.count}</span>}
         </span>
         <span className={s.heroMedals}>

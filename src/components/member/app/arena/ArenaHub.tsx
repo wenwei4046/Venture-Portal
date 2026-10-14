@@ -22,7 +22,7 @@ export default function ArenaHub({ vm, kind, onKind, onBoard, onRecord }: {
     <div className={s.hub}>
       <div>
         <h1 className={s.title}>Arena</h1>
-        <p className={s.lede}>Your rank on every board{vm.updated ? ` · Updated ${vm.updated}` : ""}</p>
+        <p className={s.lede}>{vm.director ? "Who leads every board" : "Your rank on every board"}{vm.updated ? ` · Updated ${vm.updated}` : ""}</p>
       </div>
       <div className={s.seg}>
         {PERIOD_SEG.map(([id, label]) => (
@@ -41,6 +41,7 @@ export default function ArenaHub({ vm, kind, onKind, onBoard, onRecord }: {
               <span className={s.cardRank}>
                 {c.state === "loading" ? <span className={`${s.skel} ${s.cardNumSkel}`} />
                   : c.state === "unranked" ? <span className={s.cardNone}>Not ranked yet</span>
+                  : c.state === "lead" ? <span className={s.cardNone}>{c.leader ? `${c.leader} leads` : "Nobody placed yet"}</span>
                   : <span className={s.rankNum}><span className={s.cardNum}>{c.rankNum}</span><span className={s.cardSuf}>{c.rankSuf}</span></span>}
                 <span className={s.cardOf}>{c.of}</span>
               </span>

@@ -1,4 +1,4 @@
-import type { MemberMemo, MemberMembership, MemberOrgMap, MemberRequest } from "@/lib/member/types";
+import type { MemberMemo, MemberMembership, MemberOrgMap, MemberOrgPerson, MemberRequest } from "@/lib/member/types";
 import { arenaMonthFridays, arenaWeekendLabel, type ArenaPerson, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { claimPayoutLine, readClaimPayout } from "@/lib/member/claim-payout";
 import { canEditRequest, EDIT_FIELDS, editValues, lockedNote } from "@/lib/member/request-edit";
@@ -33,7 +33,8 @@ export function profileMainVM(input: {
     ini: initials(input.name),
     sub: input.subName ? `HOUZS Venture · Revenue · ${input.subName}` : "HOUZS Venture · Revenue",
     title: input.title,
-    rank: input.rank,
+    // A director whose title holds no rung on this sub-department's ladder (IR) has no rank there.
+    rank: input.rank || "—",
     badges: {
       ...(pending ? { requests: `${pending} pending` } : {}),
       ...(trackedCount(input.requests) ? { track: String(trackedCount(input.requests)) } : {}),
@@ -390,15 +391,24 @@ export interface TeamInput {
 
 const CAP_NOTE = "Waiting-list matches use eligibility, start dates and open places. Direct-report capacity is checked separately.";
 
-/** The family chart: everybody above (to the department's directors), the member, two levels below. */
+/**
+ * The family chart: everybody above (to the department's directors), the member, two levels below. A Revenue
+ * Director (2026-10-14) holds no seat: on the department's rail, they are the top of the chart and the top of every
+ * tree reports to them — the other directors are their peers, never drawn above them.
+ */
 export function teamVM(input: TeamInput): TeamVM | null {
   const people = input.map.people.filter(p => p.departmentId === input.departmentId);
-  const me = people.find(p => p.staffId === input.staffId);
+  const department = input.map.departments.find(d => d.id === input.departmentId);
+  const lead = people.some(p => p.staffId === input.staffId) ? undefined : department?.directors.find(d => d.id === input.staffId);
+  const me: MemberOrgPerson | undefined = lead && department
+    ? { id: `d:${lead.id}`, staffId: lead.id, departmentId: department.id, schemeId: department.schemeId, name: lead.name, code: null,
+      title: "Revenue Director", parentId: null, self: true, mine: true }
+    : people.find(p => p.staffId === input.staffId);
   if (!me) return null;
   const byNode = new Map(people.map(p => [p.id, p]));
   const score = new Map(input.people.map(p => [p.id, p]));
-  const department = input.map.departments.find(d => d.id === input.departmentId);
   const mon = monthShort(input.month).split(" ")[0];
+  const tops = people.filter(p => !p.parentId || !byNode.has(p.parentId));
 
   const status = (staffId: string): [string, TeamDot] => {
     const p = score.get(staffId);
@@ -410,7 +420,7 @@ export function teamVM(input: TeamInput): TeamVM | null {
     if (p.blindOrders > 0) return ["Cost pending", "wait"];
     return ["Selling", "good"];
   };
-  const childrenOf = (nodeId: string) => people.filter(p => p.parentId === nodeId).sort((a, b) => a.name.localeCompare(b.name));
+  const childrenOf = (nodeId: string) => (lead && nodeId === me.id ? [...tops] : people.filter(p => p.parentId === nodeId)).sort((a, b) => a.name.localeCompare(b.name));
   const titleOf = (p: { staffId: string; title: string }) => [p.title, input.ranks.get(p.staffId)].filter(Boolean).join(" · ");
 
   // Up the line, then the department's directors above the top of the tree.
@@ -420,7 +430,7 @@ export function teamVM(input: TeamInput): TeamVM | null {
   // director rail.
   const chain: typeof people = [];
   for (let p = me.parentId ? byNode.get(me.parentId) : undefined; p && !chain.includes(p); p = p.parentId ? byNode.get(p.parentId) : undefined) chain.push(p);
-  const directors = (department?.directors ?? []).filter(d => d.id !== input.staffId);
+  const directors = lead ? [] : (department?.directors ?? []).filter(d => d.id !== input.staffId);
   const ups: TeamLevelVM[] = [
     ...(directors.length ? [{
       level: directors.length > 1 ? "DIRECTORS" : "DIRECTOR",
@@ -440,12 +450,12 @@ export function teamVM(input: TeamInput): TeamVM | null {
   };
   const sheets: Record<string, PersonSheetVM> = {};
   const teamText = (nodeId: string) => { const n = childrenOf(nodeId).length; return n ? `${n} direct` : "None yet"; };
-  for (const d of directors) {
-    const tops = people.filter(p => !p.parentId || !byNode.has(p.parentId)).length;
-    sheets[`d:${d.id}`] = { name: d.name, role: "Revenue Director", ini: initials(d.name), self: false,
-      stats: [{ label: `Sales · ${mon}`, value: "—", tone: "ink" }, { label: "Status", value: "Director", tone: "up" }, { label: "Team", value: `${tops} team${tops === 1 ? "" : "s"}`, tone: "ink" }],
-      reportsTo: `Leads ${input.subName}` };
-  }
+  const directorSheet = (d: { id: string; name: string }, self: boolean): PersonSheetVM => ({
+    name: d.name, role: "Revenue Director", ini: initials(d.name), self,
+    stats: [{ label: `Sales · ${mon}`, value: "—", tone: "ink" }, { label: "Status", value: "Director", tone: "up" }, { label: "Team", value: `${tops.length} team${tops.length === 1 ? "" : "s"}`, tone: "ink" }],
+    reportsTo: `Leads ${input.subName}`,
+  });
+  for (const d of directors) sheets[`d:${d.id}`] = directorSheet(d, false);
   for (const p of chain) {
     const up = p.parentId ? byNode.get(p.parentId) : undefined;
     sheets[p.id] = { name: p.name, role: titleOf(p), ini: initials(p.name), self: false,
@@ -459,7 +469,8 @@ export function teamVM(input: TeamInput): TeamVM | null {
       reportsTo };
   };
   const upline = me.parentId ? byNode.get(me.parentId) : undefined;
-  own(me, upline ? `Reports to ${upline.name}` : directors.length ? `Reports to ${directors.map(d => d.name).join(" · ")}` : "Top of the team", true);
+  if (lead) sheets[me.id] = directorSheet(lead, true);
+  else own(me, upline ? `Reports to ${upline.name}` : directors.length ? `Reports to ${directors.map(d => d.name).join(" · ")}` : "Top of the team", true);
   for (const k of childrenOf(me.id)) {
     own(k, "Reports to you");
     for (const g of childrenOf(k.id)) own(g, `Reports to ${k.name}`);
@@ -468,7 +479,9 @@ export function teamVM(input: TeamInput): TeamVM | null {
   const below = kids.length + kids.reduce((a, k) => a + k.kids.length, 0);
   const cap = input.capacity;
   const open = cap !== null ? cap - input.occupied : null;
-  const meNode: TeamNodeVM = { id: me.id, name: me.name, title: ["You", input.ranks.get(input.staffId)].filter(Boolean).join(" · "), ini: initials(me.name), dot: status(input.staffId)[1] };
+  const meNode: TeamNodeVM = lead
+    ? { id: me.id, name: me.name, title: "You · Revenue Director", ini: initials(me.name), dot: "up" }
+    : { id: me.id, name: me.name, title: ["You", input.ranks.get(input.staffId)].filter(Boolean).join(" · "), ini: initials(me.name), dot: status(input.staffId)[1] };
   return {
     lede: `${input.subName} · Revenue`,
     capacity: {
