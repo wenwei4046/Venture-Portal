@@ -29,7 +29,7 @@ const bandsOf = (brand: string) => BANDS.filter(b => b.brand === brand);
 const product = (over: Partial<MemberProduct> & Pick<MemberProduct, "id" | "code">): MemberProduct => ({
   name: over.code, brand: null, category: "Accessory", size: "", color: "", available: true, gift: false, kind: "OTHER", version: "v1", ...over,
 });
-const module = (id: string, code: string, cost: number) => product({
+const sofaModule = (id: string, code: string, cost: number) => product({
   id, code: `8030-${code}`, name: "8030 SOFFIO", brand: "ZANOTTI", category: "Sofa", size: code, kind: "SOFA", modelId: "soffio",
   baseModel: "8030", moduleCode: code, cost: null, costGrid: [{ height: "30", tier: "PRICE_2", cost }], options: [{ height: "30", tier: "PRICE_2" }],
 });
@@ -38,7 +38,7 @@ const PRODUCTS: MemberProduct[] = [
   product({ id: "ak-k", code: "AK-K", name: "Serene", brand: "AKEMI", category: "Mattress", size: "King", kind: "MATTRESS", cost: 2345.67 }),
   product({ id: "fr-q", code: "FR-(Q)", name: "Haven", category: "Bed frame", size: "Queen", kind: "BEDFRAME", modelId: "haven", cost: 456.78 }),
   product({ id: "pl", code: "PL-1", name: "Latex Pillow", category: "Pillow", size: "Standard", gift: true, cost: 45.5 }),
-  module("m1", "1A(LHF)", 1000.01), module("m2", "2NA", 1499.99),
+  sofaModule("m1", "1A(LHF)", 1000.01), sofaModule("m2", "2NA", 1499.99),
 ];
 const PRICING: QuotePricing = {
   options: [
