@@ -1161,7 +1161,7 @@ The dense kit for lists of short strings, never money. It now serves the payroll
 - **The person window** (760px; 900 on a login's Permissions) — Details and History tabs, "missing" in amber, then *Esc closes.* · Full page.
 - **Invite user** (466px) — Email, Password with Regenerate, Role, then *Send invite*.
 - **The full page edits where it stands** (v4.10; `PersonRecord`, `person-record.module.css`). *Edit* opens no other page: each row's value becomes its field in the same section.
-  - Title, Employment Type and the statutory categories are soft dropdowns; the text fields match them (radius 10, white, hairline). The name is edited in the title's place and face, over a dashed line as long as the name.
+  - Title, Employment Type and the statutory categories are soft dropdowns; the text fields match them (radius 10, white, hairline). The name is edited in the title's place and face, over a dashed line as long as the name. On a phone each label stands over its field, and the name keeps the title's size over the 16px field rule.
   - Department, Account and Role read as they did. An unticked NRIC or bank account is a quiet box with no field behind it (A hidden value).
   - Employment Type is one select of the department's choices: *Fully commission based* / *Salaried* in a commission department, *Variable pay* / *Salaried* in the Director department, *Salaried* / *Commission-eligible* elsewhere. The salary and statutory rows follow it as they read.
   - A changed field turns peach. The kit's peach save bar sticks to the sheet's foot (above the phone's tab bar outside HR's frame): *Editing · N changes* · *Cancel* · *Save changes*, off until something changed. A refusal replaces the count in red until the next edit.
