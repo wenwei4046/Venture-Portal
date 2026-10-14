@@ -81,6 +81,7 @@ export function FinTable<R>({
   rowKey,
   columns,
   amountOf,
+  itemsOf,
   faint,
   search,
   activeKey,
@@ -99,6 +100,8 @@ export function FinTable<R>({
   columns: FinColumn<R>[]
   /** The figure the count sums ("11 · RM 457,783.00"). */
   amountOf: (r: R) => number
+  /** How many the count counts for a row — a folded payroll batch stands for its members (1 when left out). */
+  itemsOf?: (r: R) => number
   /** A row whose figure is grey (a voided voucher). */
   faint?: (r: R) => boolean
   search?: { value: string; onChange: (v: string) => void; placeholder: string } | null
@@ -203,10 +206,12 @@ export function FinTable<R>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, sort])
 
+  // The count counts what the card beside it counts: a folded batch its members.
+  const items = (rs: R[]) => rs.reduce((n, r) => n + (itemsOf ? itemsOf(r) : 1), 0)
   const count =
     active.length > 0
-      ? `${sorted.length} of ${rows.length} · filtered`
-      : `${rows.length} · RM ${f2(Math.round(rows.reduce((n, r) => n + amountOf(r), 0) * 100) / 100)}`
+      ? `${items(sorted)} of ${items(rows)} · filtered`
+      : `${items(rows)} · RM ${f2(Math.round(rows.reduce((n, r) => n + amountOf(r), 0) * 100) / 100)}`
 
   const toggleSort = (key: string) => {
     const next: Sort = !sort || sort.key !== key ? { key, dir: 'asc' } : sort.dir === 'asc' ? { key, dir: 'desc' } : null

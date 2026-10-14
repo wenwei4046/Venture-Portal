@@ -62,6 +62,8 @@ export interface HubRow {
   href: string | null
   /** The cards that list it. */
   cards: HubCardKey[]
+  /** What it counts for: 1, or a folded batch's members in its card. */
+  items: number
   /** A batch row's batch. */
   batch: string | null
   /** A paid voucher's date (or a received repayment's) corrected in place — the row menu's Change date. */
@@ -96,7 +98,10 @@ export interface HubBatch {
 
 export interface HubCardFigure {
   key: HubCardKey
+  /** Vouchers (a folded batch's members each); the Payroll batches card, its batches. */
   count: number
+  /** Money moved outside the voucher flow on its list (All, Paid). */
+  other: number
   amount: number
 }
 
@@ -244,13 +249,8 @@ export function buildHubLedger(input: HubLedgerInput): HubLedger {
   }
   const firstLine = (text: string | null) => (text ?? '').split(/\r?\n/)[0].trim()
 
-  // ── The cards: what each lists, counted (read by department, payroll stands in its own card only). ──
+  // ── What each card lists (read by department, payroll stands in its own card only). ──
   const listed = byPerson ? vouchers : vouchers.filter((v) => !isPayrollReference(v.reference_type))
-  const figure = (key: HubCardKey, vs: VoucherRead[]): HubCardFigure => ({
-    key,
-    count: vs.length,
-    amount: r2(vs.reduce((s, v) => s + Number(v.amount), 0)),
-  })
 
   // ── Payroll batches ──
   // Read by person: each salary voucher, folded under its batch. Read by
@@ -311,6 +311,7 @@ export function buildHubLedger(input: HubLedgerInput): HubLedger {
       bank: receipts && v.bank_account_id ? (bankById.get(v.bank_account_id) ?? null) : null,
       href: null,
       cards: ['all', v.status as HubCardKey],
+      items: 1,
       batch: null,
       // A paid voucher's date is corrected in place — a draft or pending one with Edit, payroll's from HR Payment.
       amendDate:
@@ -344,6 +345,7 @@ export function buildHubLedger(input: HubLedgerInput): HubLedger {
         bank: null,
         href: null,
         cards: [card],
+        items: b.count,
         batch: key,
         amendDate: null,
         amendAmount: false,
@@ -367,6 +369,7 @@ export function buildHubLedger(input: HubLedgerInput): HubLedger {
       bank: r.bankLabel ?? null,
       href: r.href ?? null,
       cards: ['all', 'paid'],
+      items: 1,
       batch: null,
       amendDate: r.amendDate ?? null,
       amendAmount: r.id.startsWith('rpy-'),
@@ -375,13 +378,24 @@ export function buildHubLedger(input: HubLedgerInput): HubLedger {
   // Newest first; a day's rows by number, as the ledger's date sort read them.
   rows.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.no ?? '').localeCompare(a.no ?? '')))
 
-  // ── The cards' figures ──
+  // ── The cards' figures: what each card's list holds, as the list's head counts it (2026-10-14 — the
+  // All card said 190 vouchers beside a list of 317, its 127 rows of money moved outside the flow uncounted). ──
+  const figure = (key: HubCardKey): HubCardFigure => {
+    const inCard = rows.filter((r) => r.cards.includes(key))
+    return {
+      key,
+      count: inCard.reduce((n, r) => n + (r.kind === 'extra' ? 0 : r.items), 0),
+      other: inCard.filter((r) => r.kind === 'extra').length,
+      amount: r2(inCard.reduce((s, r) => s + r.amount, 0)),
+    }
+  }
   const cards: HubCardFigure[] = [
-    figure('all', listed),
-    ...STATUS_CARDS.map((s) => figure(s, listed.filter((v) => v.status === s))),
+    figure('all'),
+    ...STATUS_CARDS.map((s) => figure(s)),
     {
       key: 'payroll',
       count: batches.length,
+      other: 0,
       amount: r2(batches.reduce((s, b) => s + b.total, 0)),
     },
   ]

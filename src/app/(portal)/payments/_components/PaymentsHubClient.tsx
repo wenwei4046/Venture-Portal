@@ -112,7 +112,7 @@ export default function PaymentsHubClient({
     sub:
       c.key === 'payroll'
         ? `${plural(c.count, 'batch', 'batches')} · ${plural(ledger.batches.reduce((n, b) => n + b.count, 0), 'voucher', 'vouchers')}`
-        : plural(c.count, 'voucher', 'vouchers'),
+        : `${plural(c.count, 'voucher', 'vouchers')}${c.other > 0 ? ` · ${c.other} other` : ''}`,
     value: rm(c.amount),
   }))
 
@@ -230,6 +230,7 @@ export default function PaymentsHubClient({
             rowKey={(r) => r.id}
             columns={COLUMNS}
             amountOf={(r) => r.amount}
+            itemsOf={(r) => r.items}
             faint={(r) => r.status === 'voided'}
             search={{ value: query, onChange: setQuery, placeholder: 'Search voucher #, payee, description…' }}
             activeKey={drawer}

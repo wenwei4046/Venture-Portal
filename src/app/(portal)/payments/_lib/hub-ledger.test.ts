@@ -113,6 +113,37 @@ describe('read by department (the Finance view, or no Payroll payouts)', () => {
     // Paid this month: 0003 + 0006 + the salary and the statutory voucher, and the repayment outside the flow.
     expect(ledger.hero).toEqual({ label: 'Total paid · October 2026', amount: 2184.6 + 9000 + 3000 + 4100 + 13750 })
   })
+
+  it('counts the money moved outside the flow apart — All and Paid — and sums it in (2026-10-14: 190 vouchers beside a list of 317)', () => {
+    const fig = Object.fromEntries(ledger.cards.map((c) => [c.key, c]))
+    // A repayment straight to a lender and a loan paid out.
+    expect(fig.all.other).toBe(2)
+    expect(fig.paid.other).toBe(2)
+    expect(fig.draft.other).toBe(0)
+    expect(fig.all.amount).toBe(Math.round(ledger.rows.filter((r) => r.cards.includes('all')).reduce((s, r) => s + r.amount, 0) * 100) / 100)
+  })
+})
+
+describe('a card counts what its list holds, as the list’s head counts it', () => {
+  for (const byPerson of [false, true]) {
+    it(byPerson ? 'read by person — a folded batch counts its members' : 'read by department', () => {
+      const ledger = buildHubLedger(input({ byPerson }))
+      for (const c of ledger.cards.filter((c) => c.key !== 'payroll')) {
+        const inCard = ledger.rows.filter((r) => r.cards.includes(c.key))
+        expect(c.count, c.key).toBe(inCard.filter((r) => r.kind !== 'extra').reduce((n, r) => n + r.items, 0))
+        expect(c.other, c.key).toBe(inCard.filter((r) => r.kind === 'extra').length)
+        expect(c.amount, c.key).toBe(Math.round(inCard.reduce((s, r) => s + r.amount, 0) * 100) / 100)
+      }
+    })
+  }
+
+  it('read by person, All counts both salary vouchers of the folded batch', () => {
+    const ledger = buildHubLedger(input())
+    const all = ledger.cards.find((c) => c.key === 'all')!
+    const batch = ledger.rows.find((r) => r.id === 'batch:all:Payroll disbursement Sep 2026')!
+    expect(batch.items).toBe(2)
+    expect(all.count).toBe(ledger.rows.filter((r) => r.cards.includes('all') && r.kind === 'voucher').length + 2)
+  })
 })
 
 describe('read by person (Payroll payouts, not on the Finance view)', () => {

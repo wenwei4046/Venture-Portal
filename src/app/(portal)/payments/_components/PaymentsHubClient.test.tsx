@@ -38,6 +38,7 @@ const row = (over: Partial<HubRow> & { id: string }): HubRow => ({
   bank: null,
   href: null,
   cards: ['all', over.status ?? 'paid'] as HubRow['cards'],
+  items: 1,
   batch: null,
   amendDate: null,
   amendAmount: false,
@@ -50,20 +51,20 @@ const LEDGER: HubLedger = {
   byPerson: true,
   hero: { label: 'Total paid · October 2026', amount: 256684.6 },
   cards: [
-    { key: 'all', count: 4, amount: 457783 },
-    { key: 'draft', count: 1, amount: 1386 },
-    { key: 'pending_approval', count: 1, amount: 25000 },
-    { key: 'approved', count: 0, amount: 0 },
-    { key: 'paid', count: 1, amount: 2184.6 },
-    { key: 'voided', count: 1, amount: 18500 },
-    { key: 'payroll', count: 1, amount: 6200 },
+    { key: 'all', count: 6, other: 1, amount: 67020.6 },
+    { key: 'draft', count: 1, other: 0, amount: 1386 },
+    { key: 'pending_approval', count: 1, other: 0, amount: 25000 },
+    { key: 'approved', count: 0, other: 0, amount: 0 },
+    { key: 'paid', count: 1, other: 1, amount: 15934.6 },
+    { key: 'voided', count: 1, other: 0, amount: 18500 },
+    { key: 'payroll', count: 1, other: 0, amount: 6200 },
   ],
   rows: [
     row({ id: '0001', name: 'Meta Platforms Ireland', desc: 'FB ads top-up', amount: 25000, status: 'pending_approval', cards: ['all', 'pending_approval'] }),
     row({ id: '0002', name: 'Google Asia Pacific', desc: 'Workspace Oct', amount: 1386, status: 'draft', cards: ['all', 'draft'] }),
     row({ id: '0003', amount: 2184.6 }),
     row({ id: '0004', name: 'Syarikat Logistik Jaya', amount: 18500, status: 'voided', cards: ['all', 'voided'] }),
-    row({ id: 'batch:all:Payroll disbursement Sep 2026', kind: 'batch', no: null, name: 'Payroll disbursement Sep 2026', desc: '2 vouchers · all paid', amount: 6200, cards: ['all'], batch: 'Payroll disbursement Sep 2026', cat: 'Payroll' }),
+    row({ id: 'batch:all:Payroll disbursement Sep 2026', kind: 'batch', no: null, name: 'Payroll disbursement Sep 2026', desc: '2 vouchers · all paid', amount: 6200, cards: ['all'], items: 2, batch: 'Payroll disbursement Sep 2026', cat: 'Payroll' }),
     row({ id: 'fsr-1', kind: 'extra', no: null, name: 'HOUZS Mattress (HM)', href: '/fund-in/fs9', amount: 13750 }),
   ],
   batches: [
@@ -142,6 +143,15 @@ describe('the cards and the list', () => {
     expect(screen.getByText('RM 256,684.60')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /All vouchers/ })).toHaveAttribute('aria-pressed', 'true')
     expect(names()).toHaveLength(6)
+  })
+
+  it('a card and its list count alike: the folded batch its members, the money outside the flow apart', async () => {
+    draw()
+    await act(async () => undefined)
+    expect(screen.getByRole('button', { name: /All vouchers/ })).toHaveTextContent('6 vouchers · 1 other')
+    // 4 vouchers + the batch's 2 + the repayment outside the flow, the same RM.
+    expect(screen.getByText('7 · RM 67,020.60')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Paid/ })).toHaveTextContent('1 voucher · 1 other')
   })
 
   it('a card picks its list at once, and the URL keeps it', async () => {
