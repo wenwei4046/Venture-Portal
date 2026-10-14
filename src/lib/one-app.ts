@@ -1,4 +1,5 @@
 import { isHrView } from '@/lib/hr-view'
+import { isFinanceShell } from '@/lib/finance-view'
 import { can, type PermissionHolder } from '@/lib/permissions'
 
 /**
@@ -32,4 +33,14 @@ export function opensHrApp(user: PermissionHolder | null | undefined): boolean {
  */
 export function opensHrAppOnPhone(user: (PermissionHolder & { role: string }) | null | undefined): boolean {
   return !!user && (isHrView(user.role) || user.role === 'staff') && opensHrApp(user)
+}
+
+/**
+ * Somebody the Finance app (`/fin-app`, 2026-10-15 — the Finance revamp v2's
+ * phone) opens for: Finance's view — the finance kind, or the Principal's
+ * Finance lens (`isFinanceShell`). Its screens each ask the page they stand
+ * for, as the portal's would.
+ */
+export function opensFinApp(user: { role: string } | null | undefined): boolean {
+  return !!user && isFinanceShell(user.role)
 }
