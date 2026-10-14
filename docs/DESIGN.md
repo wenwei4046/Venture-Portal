@@ -792,6 +792,13 @@ D02–D05 of the same handoff, first on Payments (`payments/_components/Payments
 - **Payroll batches:** a band that counts them, each batch a 48px row (▸ turning 90°, its name, *N vouchers · all paid · 06 Oct 2026*, the total in red) opening to its members.
 - **The drawer** (460px, max 92%, over the sheet only, inside its edge; in 40px and a fade over .34s, out the same way): the number in mono caps, *View full page ↗* (not on a receipt), *Print*, ×; the dark hero (kicker, status chip with its light, number, amount Chivo 28, *Pay to …*, the status sentence), groups I–IV in white cards (Pay to · When & where · Deducted from with a peach Total · Booking), the files and a dashed *+ Add attachments*, the trail (dots and lines in the accent), and at its foot the steps this reader may take now — the primary 1.5, the others 1, ⋯ 52px.
 
+### Finance's view — a voucher's full page (v4.9, 2026-10-14)
+
+D06 of the same handoff (`payments/[id]/_components/FinanceVoucherPage.tsx` on `full.module.css`), for the treasury's readers of a payment voucher; a receipt keeps its page (the README: not redesigned) and HR keeps its own.
+- **The head:** *← Payments* (30px, radius 8) and the mono crumb `DAILY · PAYMENTS · HV-PV-…`; the kicker *Payment voucher · {account}*, the number in Chivo 28 with its status pill (the list's tones), four facts in 10px caps over their values — Amount and Payment date in mono, To, Created by on the office's clock; *Print* and *Copy* in Newsreader italic 14 (Copy asks first, in the dialog). A hairline closes it.
+- **The cards** (`flex: 1 1 520px`): a 12px-radius white card each, its strip `--fv-strip` with a peach numbered dot, the title in Newsreader 16 and a mono aside — 1 Pay to (the payee 19/600, then Company · Description · Method · Notes), 2 Deducted from (Pool / Item · Account · Amount, a 2px rule over the Total; *Change GL account* beside the aside once decided), People on this voucher and Statutory contributions on a payroll voucher, Attachments (open, add — late once decided — and *Remove* while it is still being made), Trail (its steps across, a dot and a line each), Audit log (When · Who · What changed, newest first — `audit_changes()` for the voucher and its files).
+- **The dark panel** (`flex: 1 1 280px`, 316 + 36 wide, sticky): *Payment voucher* and its chip, the amount 30/600, *Pay to …*; WHEN & WHERE (Payment date — *Change date* under it on a paid one — and From bank with its number), BOOKING (Account with its GL code, Pool, Settles invoice); then the steps stacked — the primary in the accent, the rest translucent, Reverse in the light red. Narrow, it comes first (the cards wrap under it); side by side it meets the cards at the top.
+
 **HR & Payroll**
 
 ### Payroll grid (v3.3, 2026-09-05 — HR → Payroll)
@@ -1421,6 +1428,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.9** · 2026-10-14 · A payment voucher's full page: the crumb, the number with its status and four facts, the numbered cards (Pay to, Deducted from, the files, the trail across, the audit log) beside the sticky dark panel → Finance's view — a voucher's full page
 - **v4.8** · 2026-10-14 · Payments' hub: the status cards beside the list, the table's column tools (sort, filter, move, widen, Columns), the payroll batches, the right drawer a row opens → Finance's view — the hubs
 - **v4.7** · 2026-10-14 · The CRM Profile's *Back to Revenue app* card is gone: the house beside the bell is the way back → The Revenue app — the refresh
 - **v4.6** · 2026-10-14 · Finance's Overview and HR's on its layout: the greeting, one line of what waits, eight quick actions with counts, a card per category; HR's three tables gone → Finance's view — the Overview
