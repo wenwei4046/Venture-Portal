@@ -1,7 +1,8 @@
 /**
  * The back link above a sub-page (design 1a): a customer's chat goes back to
  * where it was opened; Ads Performance back to Profile. Since round 2 (rev 1011
- * §8) no page shows "‹ Back to Revenue app": Profile's card is the way back.
+ * §8) no page shows "‹ Back to Revenue app": the house left of the bell is the way back (2026-10-14; Profile's card
+ * is gone).
  */
 import type { PanelCtx } from "./common";
 

@@ -120,4 +120,7 @@ module.exports = [
     '{!!(v.bellIn) && (<>\n              ' + switchBack("              ", 'position: "absolute", top: "14px", right: "62px", ') + '\n              <span onClick={v.bl.openNotifs} title="Notifications" style={{ flex: "none", width: "40px",'],
   ['<div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "48px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>',
     '<div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "96px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>'],
+  // Profile's "Back to Revenue app" card is gone (the owner, 2026-10-14: "delete this, cause is no need anymore"): the house
+  // left of the bell (switch-back.cjs) is the way back on every page.
+  [/\n *<div onClick=\{v\.exitCrm\} style=\{\{ display: "flex", alignItems: "center", gap: "14px", padding: "16px", borderRadius: "22px", background: "#F5EBE3"[^\n]*\n[\s\S]*?Back to Revenue app<\/strong>[\s\S]*?<\/svg>\n *<\/div>/, ""],
 ];

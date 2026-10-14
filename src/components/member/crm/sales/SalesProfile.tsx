@@ -68,21 +68,6 @@ export default function SalesProfile({ v }: { v: ProfileVM & ShellExtras }) {
             </svg>
           </div>
         </>)}
-        <div onClick={v.exitCrm} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px", borderRadius: "22px", background: "#F5EBE3", color: "#3F2B22", cursor: "pointer" }} className={H.hov13}>
-          <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "14px", background: "#F6D9C4", color: "#BD4A19", display: "grid", placeItems: "center" }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 17l-5-5 5-5M5 12h11a4 4 0 0 1 4 4v3">
-              </path>
-            </svg>
-          </span>
-          <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-            <strong style={{ fontSize: "17px", fontWeight: "700" }}>Back to Revenue app</strong>
-          </span>
-          <svg style={{ flex: "none", color: "#A8968B" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m9 6 6 6-6 6">
-            </path>
-          </svg>
-        </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <h2 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: "700", letterSpacing: "-.02em" }}>Your workspace</h2>
           <div onClick={v.openNotif} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", cursor: "pointer" }}>
