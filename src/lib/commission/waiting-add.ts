@@ -13,12 +13,15 @@
  */
 
 import { answersFor, fillIn, type WaitingAnswer } from '@/lib/member/waiting-answers'
+import { isJoiningDate } from '@/lib/member/waiting-start'
 import type { WaitingForm } from './waiting-form'
+
+export { isDay } from '@/lib/member/waiting-start'
 
 export interface WaitingAddDraft {
   name: string
   contact: string
-  /** The joining date, YYYY-MM-DD. */
+  /** The joining date, YYYY-MM-DD — or `anytime` (`ANY_TIME`): ready whenever HR calls them (2026-10-14). */
   start: string
   /** The Revenue-team member who brought them in: their staff id. */
   submittedBy: string
@@ -42,14 +45,6 @@ const FIELDS: ReadonlyArray<{ key: keyof Omit<WaitingAddDraft, 'answers'>; label
 ]
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-/** "2026-11-01" and a day the calendar has. */
-export function isDay(v: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false
-  const [y, m, d] = v.split('-').map(Number)
-  const t = new Date(Date.UTC(y, m - 1, d))
-  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d
-}
 
 /** What the browser sent, read on the server: only strings where strings belong. */
 export function waitingAddInputFrom(raw: unknown): WaitingAddInput | null {
@@ -85,7 +80,7 @@ export function waitingAddRefusal(
   if (blank.length) return fillIn(blank)
   if (input.name.trim().length > 160) return 'Keep the name under 160 characters.'
   if (input.contact.trim().length > 60) return 'Keep the phone number under 60 characters.'
-  if (!isDay(input.start)) return 'Pick the joining date.'
+  if (!isJoiningDate(input.start)) return 'Pick the joining date.'
   if (!UUID.test(input.submittedBy) || !UUID.test(input.subDepartmentId)) return 'Reload the page and try again.'
   if (Object.values(input.answers).some(v => v.trim().length > 500)) return 'An answer is too long — keep it under 500 characters.'
   if (form?.requireUpload && !attached) return 'Upload the signed application form — Form settings asks for it.'

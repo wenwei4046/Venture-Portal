@@ -13,6 +13,7 @@ import {
 } from "@/lib/member/claim-rules";
 import { applicationFormHtml, BUILTIN_FIELDS, FORM_KINDS, REPLACEMENT_BUILTIN_FIELDS, type WaitingField } from "@/lib/commission/waiting-form";
 import { answersFor, blankRequired, capacityLine, fillIn, priorAnswers } from "@/lib/member/waiting-answers";
+import { ANY_TIME, ANY_TIME_LABEL, isAnyTime } from "@/lib/member/waiting-start";
 import s from "./profile.module.css";
 
 const CAT_OUT = "M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18";
@@ -727,6 +728,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                 <FormQuestion key={f.id} f={f} err={blank.has(f.id)} choices={choices}
                   value={f.id === "target" ? target || options.departmentId : vals[f.id] ?? ""}
                   onValue={v => (f.id === "target" ? setTarget(v) : setVal(f.id, v))}
+                  anyTime={f.builtin && f.id === "start"}
                   maxLength={f.id === "contact" ? 32 : f.id === "newPerson" ? 150 : 500} />
               );
             })}
@@ -843,9 +845,10 @@ function Radio({ on, label, sub, onClick }: { on: boolean; label: string; sub: s
  * field for the rest; "(optional)" when it need not be answered and a red
  * Required once a send found it blank. The waiting list's and, since
  * 2026-10-11, the replacement's. Declared out here so a field keeps its focus
- * while it is typed in.
+ * while it is typed in. The waiting list's start date may be *Any time ready*
+ * instead of a day (2026-10-14) — a pill beside it, the day then left empty.
  */
-function FormQuestion({ f, err, value, choices, onValue, maxLength }: {
+function FormQuestion({ f, err, value, choices, onValue, maxLength, anyTime = false }: {
   f: WaitingField;
   err: boolean;
   value: string;
@@ -853,6 +856,8 @@ function FormQuestion({ f, err, value, choices, onValue, maxLength }: {
   choices: ReadonlyArray<readonly [string, string]> | null;
   onValue: (value: string) => void;
   maxLength: number;
+  /** A day, or Any time ready. */
+  anyTime?: boolean;
 }) {
   const head = (
     <span className={`${s.fieldLabel} ${s.qHead}`}>
@@ -868,6 +873,19 @@ function FormQuestion({ f, err, value, choices, onValue, maxLength }: {
           {choices.map(([id, label]) => (
             <button key={id} className={`${s.pill} ${value === id ? s.pillOn : ""}`} aria-pressed={value === id} onClick={() => onValue(id)}>{label}</button>
           ))}
+        </div>
+      </div>
+    );
+  }
+  if (anyTime) {
+    const on = isAnyTime(value);
+    return (
+      <div className={s.field} role="group" aria-label={f.label}>
+        {head}
+        <div className={s.dayOrAny}>
+          <input type="date" aria-label={f.label} className={`${s.input} ${err ? s.inputErr : ""}`} value={on ? "" : value}
+            disabled={on} onChange={e => onValue(e.target.value)} />
+          <button type="button" className={`${s.pill} ${on ? s.pillOn : ""}`} aria-pressed={on} onClick={() => onValue(on ? "" : ANY_TIME)}>{ANY_TIME_LABEL}</button>
         </div>
       </div>
     );

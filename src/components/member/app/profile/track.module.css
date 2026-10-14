@@ -100,6 +100,11 @@
   font-size: calc(15px * var(--rv-type));
   outline: none;
 }
+/* The start date: a day, or the "Any time ready" pill beside it (2026-10-14). */
+.dayOrAny { display: flex; align-items: center; gap: 8px; }
+.dayOrAny > .input { flex: 1; }
+.dayOrAny > .input:disabled { background: var(--rv-cream); color: var(--rv-sub); }
+.dayOrAny > button { flex: none; white-space: nowrap; }
 .editBtns { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; align-items: start; }
 .ghost {
   height: 50px;

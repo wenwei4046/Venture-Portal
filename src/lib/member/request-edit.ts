@@ -17,6 +17,8 @@ export interface EditField {
   key: "newPerson" | "contact" | "start" | "effective" | "reason";
   label: string;
   type: "text" | "tel" | "date";
+  /** A day, or "Any time ready" (2026-10-14) — the waiting list's start date. */
+  anyTime?: boolean;
 }
 
 /** The handoff's three fields a member may change, by kind. */
@@ -24,7 +26,7 @@ export const EDIT_FIELDS: Readonly<Record<EditableKind, readonly EditField[]>> =
   waiting: [
     { key: "newPerson", label: "New member name", type: "text" },
     { key: "contact", label: "Phone number", type: "tel" },
-    { key: "start", label: "Preferred start date", type: "date" },
+    { key: "start", label: "Preferred start date", type: "date", anyTime: true },
   ],
   replacement: [
     { key: "newPerson", label: "Replacement name", type: "text" },

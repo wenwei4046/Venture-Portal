@@ -81,6 +81,17 @@
   color: rgb(var(--hv-brown));
 }
 .addHint { font-size: 11.5px; color: rgb(var(--hv-note)); }
+/* Joining date's "Any time ready" (2026-10-14): ready whenever HR calls them — the date sits empty. */
+.anyTime {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  font-size: 12.5px;
+  color: rgb(var(--hv-ink));
+  cursor: pointer;
+}
+.anyTime input { width: 15px; height: 15px; margin: 0; accent-color: rgb(var(--hv-accent)); cursor: pointer; }
 .addFile { display: flex; align-items: center; gap: 6px; color: rgb(var(--hv-ink)); font-size: 12.5px; }
 .addFileX {
   width: 26px;

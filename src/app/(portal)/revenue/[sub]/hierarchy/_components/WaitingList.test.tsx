@@ -259,6 +259,45 @@ describe('"+" — straight onto the list', () => {
     expect(flash).toHaveBeenCalledWith("Daniel Lee is on Fair's waiting list · RQ-2610-006")
   })
 
+  // 2026-10-14, the user: some are ready any time — "just wait us to let them join".
+  it('takes Any time ready instead of a day — the date then left empty', async () => {
+    actions.addToWaitingList.mockResolvedValue({ ok: true, requestNo: 'RQ-2610-007' })
+    show({ canAdd: true, subDepartmentId: SUB, submitters })
+    fireEvent.click(plus())
+    const win = screen.getByRole('dialog', { name: WINDOW })
+    fill(win)
+    const date = within(win).getByLabelText('Joining date') as HTMLInputElement
+    fireEvent.click(within(win).getByRole('checkbox', { name: 'Any time ready' }))
+    expect(date).toBeDisabled()
+    expect(date.value).toBe('')
+    await act(async () => {
+      fireEvent.click(within(win).getByRole('button', { name: 'Add to the list' }))
+    })
+    expect(added().start).toBe('anytime')
+    expect(flash).toHaveBeenCalledWith("Daniel Lee is on Fair's waiting list · RQ-2610-007")
+  })
+
+  it('unticked, asks for the day again', () => {
+    show({ canAdd: true, subDepartmentId: SUB, submitters })
+    fireEvent.click(plus())
+    const win = screen.getByRole('dialog', { name: WINDOW })
+    fill(win)
+    const tick = within(win).getByRole('checkbox', { name: 'Any time ready' })
+    fireEvent.click(tick)
+    fireEvent.click(tick)
+    expect(within(win).getByLabelText('Joining date')).not.toBeDisabled()
+    fireEvent.click(within(win).getByRole('button', { name: 'Add to the list' }))
+    expect(within(win).getByRole('alert')).toHaveTextContent('Fill in joining date.')
+    expect(actions.addToWaitingList).not.toHaveBeenCalled()
+  })
+
+  it('shows Any time ready on the list and in the drawer', () => {
+    show({ rows: [req({ id: 'ready', requestNo: 'RQ-2610-008', newPerson: 'Joan Quek', contact: '018-776 0020', submittedBy: 'SHAWN', start: 'anytime', acceptedAt: '2026-10-14T07:00:00Z' })] })
+    expect(screen.getAllByRole('row')[1]).toHaveTextContent('Any time ready')
+    fireEvent.click(screen.getAllByRole('row')[1])
+    expect(screen.getByRole('dialog')).toHaveTextContent('Joining dateAny time ready')
+  })
+
   it('opens a row HR added with who added it — never who signed', () => {
     const mine = req({
       id: 'added', requestNo: 'RQ-2610-005', newPerson: 'Daniel Lee', contact: '016-221 0457', submittedBy: 'STANLEY', start: '2026-11-02',

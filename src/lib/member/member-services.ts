@@ -9,7 +9,7 @@
 
 import type { AdminMemberData } from "@/lib/member/server";
 import type { MemberMemo, MemberRequest } from "@/lib/member/types";
-import { dayLabel, historyOf, statusOf, type RequestEvent, type RequestTone } from "@/lib/commission/sales-group-requests";
+import { dayLabel, historyOf, joiningDayLabel, statusOf, type RequestEvent, type RequestTone } from "@/lib/commission/sales-group-requests";
 import { formatMoney } from "@/lib/utils";
 
 export type RequestKind = "claim" | "replacement" | "waiting";
@@ -132,7 +132,7 @@ export function requestFacts(r: MemberRequest, facts: RequestFacts | undefined, 
       ? [
           ["Applicant", str(d.newPerson)],
           ["Mobile number", str(d.contact)],
-          ["Joining date", str(d.start) ? dayLabel(str(d.start)) : ""],
+          ["Joining date", str(d.start) ? joiningDayLabel(str(d.start)) : ""],
           ["Signed by", str(d.signature)],
           ["Request department", department],
           ["Submitted by", facts?.submittedBy ?? ""],

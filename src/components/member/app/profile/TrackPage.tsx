@@ -5,6 +5,7 @@ import { ICON, Svg } from "../icons";
 import Sheet, { SheetHandle } from "../Sheet";
 import { PageHead, TONE } from "./IncomePages";
 import type { RequestDetailVM, TrackVM } from "./profile-vm";
+import { ANY_TIME, ANY_TIME_LABEL, isAnyTime } from "@/lib/member/waiting-start";
 import p from "./profile.module.css";
 import s from "./track.module.css";
 
@@ -102,14 +103,31 @@ export function RequestInfoSheet({ open, vm, busy, error, onSave, onCancel, onCl
           <div className={s.body}>
             {editing && vm.edit ? (
               <>
-                {vm.edit.fields.map(f => (
-                  <label key={f.key} className={s.field}>
-                    <span className={s.fieldLabel}>{f.label}</span>
-                    <input className={s.input} type={f.type} inputMode={f.type === "tel" ? "tel" : undefined} value={editing[f.key] ?? ""}
-                      maxLength={f.key === "reason" ? 3000 : f.key === "contact" ? 32 : 150}
-                      onChange={e => setEditing({ ...editing, [f.key]: e.target.value })} />
-                  </label>
-                ))}
+                {vm.edit.fields.map(f => {
+                  // The start date may be "Any time ready" instead of a day (2026-10-14).
+                  if (f.anyTime) {
+                    const on = isAnyTime(editing[f.key]);
+                    return (
+                      <div key={f.key} className={s.field} role="group" aria-label={f.label}>
+                        <span className={s.fieldLabel}>{f.label}</span>
+                        <div className={s.dayOrAny}>
+                          <input className={s.input} type="date" aria-label={f.label} value={on ? "" : editing[f.key] ?? ""} disabled={on}
+                            onChange={e => setEditing({ ...editing, [f.key]: e.target.value })} />
+                          <button type="button" className={`${p.pill} ${on ? p.pillOn : ""}`} aria-pressed={on}
+                            onClick={() => setEditing({ ...editing, [f.key]: on ? "" : ANY_TIME })}>{ANY_TIME_LABEL}</button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <label key={f.key} className={s.field}>
+                      <span className={s.fieldLabel}>{f.label}</span>
+                      <input className={s.input} type={f.type} inputMode={f.type === "tel" ? "tel" : undefined} value={editing[f.key] ?? ""}
+                        maxLength={f.key === "reason" ? 3000 : f.key === "contact" ? 32 : 150}
+                        onChange={e => setEditing({ ...editing, [f.key]: e.target.value })} />
+                    </label>
+                  );
+                })}
                 {error && <p className={p.formError} role="alert">{error}</p>}
                 <div className={s.editBtns}>
                   <button className={s.ghost} onClick={() => setEditing(null)} disabled={busy}>Cancel</button>
