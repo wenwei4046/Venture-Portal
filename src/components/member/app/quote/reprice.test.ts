@@ -159,6 +159,20 @@ describe("the keypad's margin is the server's, at every price", () => {
   });
 });
 
+describe("what the phone keeps", () => {
+  // The user: "make sure they can't find it out from 浏览器的开发工具" — React DevTools shows a page's state, so the
+  // state holds the server's answer as it came, and the sums are worked out where needed and dropped.
+  it("keeps the server's answer as it came and the ladder, never a sum of its own", () => {
+    const first = answer(CARTS[1].cart, "3000");
+    const anchor = anchorOf(first, AKEMI)!;
+    expect(Object.keys(anchor).sort()).toEqual(["answer", "ladder"]);
+    expect(anchor.answer).toBe(first);
+    // The cart's cost in sen, as the server works it out, is in no field of what is kept.
+    const cost = Math.round(Math.round(first.price * 100) * (1 - first.margin! / 100));
+    expect(JSON.stringify(anchor)).not.toMatch(new RegExp(`\\b${cost}\\b|\\b${(cost / 100).toFixed(2).replace(".", "\\.")}\\b`));
+  });
+});
+
 describe("what the phone trusts", () => {
   it("trusts only sums that give the server's own answer back — another brand's ladder gives a different one", () => {
     const { cart } = CARTS[0];
