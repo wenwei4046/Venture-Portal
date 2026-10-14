@@ -1,6 +1,7 @@
 const { PICK_SHEET } = require("./pick-sheet.cjs");
 const { EMOJI_PANEL } = require("./emoji-panel.cjs");
 const CHAT_MEDIA = require("./chat-media.cjs");
+const switchBack = require("./switch-back.cjs");
 // Live-data patches on the rev 1011 Control panel markup (each must match exactly once). Kept short on purpose: the
 // markup is the prototype's; a patch is only where the live app must differ, and says why.
 module.exports = [
@@ -107,4 +108,16 @@ module.exports = [
   // Mine's does — marked for sales/outside.ts › useCloseOnOutside (PanelScreens).
   ['<span onClick={v.ld.lx.toggleMenu} title="More"', '<span data-hm-toggle="1" onClick={v.ld.lx.toggleMenu} title="More"'],
   ['<div style={{ position: "absolute", top: "48px", right: "0", zIndex: "7", width: "240px"', '<div data-hm-menu="1" style={{ position: "absolute", top: "48px", right: "0", zIndex: "7", width: "240px"'],
+  // 2026-10-14 (the owner: "the switch back revenue app, put the same place with switch to crm, put a icon, easy to switch"):
+  // the Revenue app's home left of the bell in every page's title row (switch-back.cjs) — Insight, Inbox, Assignment,
+  // Calendar — as the Revenue app's Today has the CRM's chat button left of its bell. Profile's card keeps its way back.
+  ['>Hello, {v.ov.meFirst}</h1>\n              {!!(v.bellIn) && (<>\n', '>Hello, {v.ov.meFirst}</h1>\n              {!!(v.bellIn) && (<>\n                ' + switchBack("                ") + "\n"],
+  ['</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n', '</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n              ' + switchBack("              ") + "\n"],
+  ['>Who gets each new enquiry</span>\n              </div>\n              {!!(v.bellIn) && (<>\n', '>Who gets each new enquiry</span>\n              </div>\n              {!!(v.bellIn) && (<>\n                ' + switchBack("                ") + "\n"],
+  ['</svg></span>\n            {!!(v.bellIn) && (<>\n', '</svg></span>\n            {!!(v.bellIn) && (<>\n              ' + switchBack("              ") + "\n"],
+  // …and Profile: the bell sits in the card's top-right corner, the way back 8 px left of it, the name row 96 px clear.
+  ['{!!(v.bellIn) && (<>\n              <span onClick={v.bl.openNotifs} title="Notifications" style={{ flex: "none", width: "40px",',
+    '{!!(v.bellIn) && (<>\n              ' + switchBack("              ", 'position: "absolute", top: "14px", right: "62px", ') + '\n              <span onClick={v.bl.openNotifs} title="Notifications" style={{ flex: "none", width: "40px",'],
+  ['<div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "48px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>',
+    '<div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "96px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>'],
 ];

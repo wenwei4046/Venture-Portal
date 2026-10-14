@@ -18,6 +18,13 @@ export default function SalesCalendar({ v }: { v: CalendarVM & ShellExtras }) {
         <h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "26px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>{v.calTitle}</h1>
         <span onClick={v.calToday} style={{ height: "34px", padding: "0 14px", boxSizing: "border-box", borderRadius: "17px", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "600", color: "#3F2B22", cursor: "pointer" }}>Today</span>
         {!!(v.tb) && (<>
+          <span style={{ display: "flex", alignItems: "center", gap: "8px", flex: "none" }}>
+          <span onClick={v.exitCrm} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#BD4A19", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9">
+              </path>
+            </svg>
+          </span>
           <span onClick={v.tb.open} title="Notifications" style={{ position: "relative", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0">
@@ -26,6 +33,7 @@ export default function SalesCalendar({ v }: { v: CalendarVM & ShellExtras }) {
             {!!(v.tb.has) && (<>
               <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", background: "#BD4A19", border: "2px solid #fff", color: "#fff", display: "grid", placeItems: "center", fontSize: "10px", fontWeight: "700" }}>{v.tb.n}</span>
             </>)}
+          </span>
           </span>
         </>)}
       </div>

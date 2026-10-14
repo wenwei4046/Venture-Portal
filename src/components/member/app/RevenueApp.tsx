@@ -37,6 +37,7 @@ import type { MemberWaitingForm } from "@/lib/member/server";
 import { useKeyedRead } from "./useKeyedRead";
 import { BottomNav, DeskAside, DeskHeader, MobileHeader, ViewingAsBar, type Me, type ModuleId } from "./shell/Chrome";
 import { useCrmUnread } from "./shell/useCrmUnread";
+import { useLiveBell } from "./shell/useLiveBell";
 import PullRefresh from "./shell/PullRefresh";
 import { RETURN_REFRESH_MS, isStaleAppError, reloader } from "./shell/pull-refresh";
 import StatusBar from "./shell/StatusBar";
@@ -430,23 +431,34 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     return { period: settled.period, subName: membership?.name ?? "", ranked: arenaRankings(settledArena.people, "sales").filter(r => r.position).length,
       sales: rank("sales"), margin: rank("margin"), champ: null };
   }, [settled, settledArena, membership?.name]);
+  // Live (2026-10-14, the owner: "change to on live as well"): whatever moves the bell reaches the phone at once and is read
+  // silently (shell/useLiveBell). A memo or a request moving reads the snapshot again and takes only those two from it —
+  // nothing else on the screen changes.
+  const bellSnapshot = useCallback(() => {
+    void source.refresh().then(r => { if (r.ok) setData(d => ({ ...d, memos: r.data.memos, requests: r.data.requests })); });
+  }, [source]);
+  const liveNotices = useLiveBell({ enabled: live && !data.demo && !fixture && !principal, account, initial: notices, source, gen, track,
+    onSnapshot: bellSnapshot });
   // A memo's notice (2026-10-12) is not listed twice: the memo itself is the bell's item, and opening it reads its notice.
-  const appNotices = useMemo(() => notices.items.filter(n => n.refKind !== "memo"), [notices.items]);
+  const appNotices = useMemo(() => liveNotices.items.filter(n => n.refKind !== "memo"), [liveNotices.items]);
+  // The bell's dot counts what the database told them since they last opened it; opening it reads those, and they stay
+  // marked new in the list until it opens again. One coming in after that counts again.
+  const [seenNew, setSeenNew] = useState<ReadonlySet<string>>(() => new Set());
+  const unseen = useMemo(() => (principal ? [] : appNotices.filter(n => !n.read && !seenNew.has(n.id))), [principal, appNotices, seenNew]);
+  const shownNotices = useMemo(() => (seenNew.size ? appNotices.map(n => (seenNew.has(n.id) ? { ...n, read: false } : n)) : appNotices),
+    [appNotices, seenNew]);
   const nf = useMemo(() => notifications({ now: new Date(), memos: principal && !viewed && !ownMode ? [] : memos, requests: principal && !viewed ? [] : requests,
     settled, salary: data.profile.salary, results, readAll, requestCode,
     // News about a page their ticks close is not shown (2026-10-11).
     opens: go => go.to === "memo" || go.to === "none" || (go.to === "requests" ? requestPage(closed, go.kind ?? "claim") !== null : shows(closed, go.to)),
-    notices: principal ? [] : appNotices,
-  }), [memos, requests, settled, data.profile.salary, results, readAll, principal, viewed, ownMode, closed, appNotices]);
-  // The bell's dot counts what the database told them until they open it; opening it reads them (they stay marked new in the list until the next open).
-  const [noticesSeen, setNoticesSeen] = useState(false);
-  const unseenNotices = principal || noticesSeen ? 0 : appNotices.filter(n => !n.read).length;
+    notices: principal ? [] : shownNotices,
+  }), [memos, requests, settled, data.profile.salary, results, readAll, principal, viewed, ownMode, closed, shownNotices]);
+  const unseenNotices = unseen.length;
   const seeNotices = useCallback(() => {
-    if (unseenNotices > 0) {
-      setNoticesSeen(true);
-      void readNotices(null);
-    }
-  }, [unseenNotices]);
+    if (!unseen.length) return;
+    setSeenNew(new Set(unseen.map(n => n.id)));
+    void readNotices(unseen.map(n => n.id));
+  }, [unseen]);
   const settledMonth = settled ? monthName(settled.period) : null;
 
   // ── Today's CRM chat button (2026-10-14, the refresh handoff §2): the account's own chats' unread messages, live ──

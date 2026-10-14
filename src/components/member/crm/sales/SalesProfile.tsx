@@ -16,6 +16,12 @@ export default function SalesProfile({ v }: { v: ProfileVM & ShellExtras }) {
       {!!(v.profMain) && (<>
         <div style={{ position: "relative", borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)", border: "1px solid #EBDDD2", boxShadow: "0 6px 20px rgba(63,43,34,.06)", padding: "18px 16px 16px", display: "flex", flexDirection: "column", gap: "16px" }}>
           {!!(v.tb) && (<>
+          <span onClick={v.exitCrm} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ position: "absolute", top: "14px", right: "62px", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#BD4A19", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9">
+              </path>
+            </svg>
+          </span>
           <span onClick={v.tb.open} title="Notifications" style={{ position: "absolute", top: "14px", right: "14px", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0">
@@ -26,7 +32,7 @@ export default function SalesProfile({ v }: { v: ProfileVM & ShellExtras }) {
             </>)}
           </span>
         </>)}
-          <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "48px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "96px" }}>
             <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.meIniX}</span>
             <div style={{ minWidth: "0" }}>
               <h1 style={{ margin: "0", fontSize: "24px", fontWeight: "700", letterSpacing: "-.02em" }}>{v.meNameX}</h1>
