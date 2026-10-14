@@ -133,7 +133,7 @@ export default function ProfileMain({ vm, hidden, actions, crm = true, closedRow
             <button key={r.key} className={s.workRow} onClick={() => actions.open(r.key)}>
               <span className={`${s.workIcon} ${r.tone}`}><Svg d={r.d} size={22} sw={1.8} /></span>
               <span className={s.workText}>
-                <span className={s.workLabel}>{r.label}{vm.badges[r.key] && <span className={r.key === "track" || r.key === "docs" ? s.workCount : s.workBadge}>{vm.badges[r.key]}</span>}</span>
+                <span className={s.workLabel}>{r.label}{vm.badges[r.key] && <span className={r.key === "track" || r.key === "docs" || r.key === "crm" ? s.workCount : s.workBadge}>{vm.badges[r.key]}</span>}</span>
                 <span className={s.workSub}>{r.sub}</span>
               </span>
               <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
