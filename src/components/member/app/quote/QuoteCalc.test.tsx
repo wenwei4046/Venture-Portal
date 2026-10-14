@@ -38,7 +38,7 @@ describe("step 2's card keeps one size", () => {
     const { container } = draw(vm);
     const rows = container.querySelectorAll('[class*="nextRow"]');
     expect(rows).toHaveLength(1);
-    const rooms = [...container.querySelectorAll('[aria-hidden="true"]')].map(el => el.textContent);
+    const rooms = [...container.querySelectorAll('[aria-hidden="true"]')].map(el => el.textContent?.replace(/ /g, " "));
     expect(rooms).toEqual(expect.arrayContaining([
       ...["Incentive Tier 2", "Incentive Tier 1", "Standard margin", "Low margin", "Below margin Tier 1", "Below margin Tier 3", "Enter a price", "Calculating", "Cost pending"],
       "Commission × 0.5", "No commission",
@@ -49,6 +49,14 @@ describe("step 2's card keeps one size", () => {
     const chip = container.querySelector('[class*="tierChip"]:not([aria-hidden])')!;
     expect(chip.parentElement!.className).toMatch(/steady/);
     expect(chip.className).toMatch(/layer/);
+  });
+
+  it("keeps a tier's number with its word, on show and in the room alike: Below margin / Tier 3", () => {
+    const { container } = draw(STATES[1][1]);
+    expect(container.querySelector('[class*="tierChip"]:not([aria-hidden])')!.textContent).toBe("Below margin Tier 3");
+    const room = [...container.querySelectorAll('[class*="tierChip"][aria-hidden]')].map(el => el.textContent);
+    expect(room).toContain("Below margin Tier 1");
+    expect(room).toContain("Standard margin");
   });
 
   it("says what each state says on the line", () => {
