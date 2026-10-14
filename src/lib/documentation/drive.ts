@@ -21,6 +21,13 @@
  * The Bin (mig 20261013183000, `?in=bin`, the Talent Bank's rules): a file or
  * a folder HR deleted in the last 30 days, none of it in the tree; `binFrom`
  * says where each was. A folder HR made moves with Move to… (`moveTargets`).
+ *
+ * A person's own (mig 20261014190000 — the user: "documentation 我要分成两种：
+ * company / personal"): a person's folder holds folders and files of HR's
+ * beside their letters, each shared with them or kept back (`memberView`, and
+ * whether they see it, `memberSees`, worked out by the database); anything HR
+ * made may be View only me (`lock`) — the read leaves out what the reader is
+ * not shown; a file moves too, and both are copied (Copy to…, Duplicate).
  */
 
 import { dataCenterPeople, deptLabel, fileExt, liveLetters, type DataCenterPerson, type DocEvent, type Documentation, type PersonLetter } from './model'
@@ -32,16 +39,38 @@ export const HV = 'company:hv'
 /** The portal's own company — the one folder of the Data center made by itself. */
 export const HV_NAME = 'HOUZS Venture'
 
-export interface DriveFolder {
+/**
+ * View only me (2026-10-14): only the one who set it, whoever stands higher on the ladder and the Principal are shown it
+ * — and everything in a folder with it. The read already leaves out what the reader is not shown.
+ */
+export interface DriveLock {
+  /** Who set it. */
+  by: string
+  /** The reader set it. */
+  mine: boolean
+  at: string
+}
+
+/** What HR made, as the page draws it. */
+interface DriveItem {
+  /** View only me — this one's own; a folder above it may be locked too. */
+  lock: DriveLock | null
+  /** Shared with the person whose folder it is in: true, kept back (false), or as its folder (null). */
+  memberView: boolean | null
+  /** Whether that person sees it — null outside a person's folder. */
+  memberSees: boolean | null
+}
+
+export interface DriveFolder extends DriveItem {
   id: string
   name: string
-  /** The address of the place it is in: root, company:hv, dept:<id>, folder:<id>. */
+  /** The address of the place it is in: root, company:hv, dept:<id>, person:<staff id>, folder:<id>. */
   parent: string
   createdAt: string
   createdBy: string
 }
 
-export interface DriveFile {
+export interface DriveFile extends DriveItem {
   id: string
   ref: string
   fileName: string
@@ -84,9 +113,11 @@ export interface Drive {
    * write and the same on the server and in the browser. '' when not known.
    */
   readAt: string
+  /** The reader may lock things View only me: a login of their own, their title on the ladder. */
+  canLock: boolean
 }
 
-export const EMPTY_DRIVE: Drive = { folders: [], files: [], bin: [], readAt: '' }
+export const EMPTY_DRIVE: Drive = { folders: [], files: [], bin: [], readAt: '', canLock: false }
 
 // ── Reading the database's answer ───────────────────────────────────────────
 
@@ -96,6 +127,17 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '')
 const strOrNull = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null)
 const numOrNull = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null
+const boolOrNull = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null)
+
+/** Its lock, its share and whether its person sees it (mig 20261014190000). */
+function itemOf(x: Record<string, unknown>): DriveItem {
+  const lock = obj(x.lock)
+  return {
+    lock: x.lock && typeof x.lock === 'object' ? { by: str(lock.by) || 'HR', mine: lock.mine === true, at: str(lock.at) } : null,
+    memberView: boolOrNull(x.memberView),
+    memberSees: boolOrNull(x.memberSees),
+  }
+}
 
 /** `hr_drive()`'s answer. */
 export function driveFromRow(raw: unknown): Drive | null {
@@ -104,7 +146,9 @@ export function driveFromRow(raw: unknown): Drive | null {
   return {
     folders: arr(o.folders).flatMap(f => {
       const x = obj(f)
-      return str(x.id) ? [{ id: str(x.id), name: str(x.name), parent: str(x.parent) || ROOT, createdAt: str(x.createdAt), createdBy: str(x.createdBy) }] : []
+      return str(x.id)
+        ? [{ id: str(x.id), name: str(x.name), parent: str(x.parent) || ROOT, createdAt: str(x.createdAt), createdBy: str(x.createdBy), ...itemOf(x) }]
+        : []
     }),
     files: arr(o.files).flatMap(f => {
       const x = obj(f)
@@ -123,6 +167,7 @@ export function driveFromRow(raw: unknown): Drive | null {
           const y = obj(e)
           return { what: str(y.what), at: str(y.at), who: str(y.who), note: str(y.note) }
         }),
+        ...itemOf(x),
       }]
     }),
     bin: arr(o.bin).flatMap(b => {
@@ -145,6 +190,7 @@ export function driveFromRow(raw: unknown): Drive | null {
       }]
     }),
     readAt: '',
+    canLock: obj(o.me).canLock === true,
   }
 }
 
@@ -235,6 +281,10 @@ export interface FolderCard {
   missingWhy: string
   /** Made by HR: renamed and deleted with Documentation · Edit. A folder made by itself has no menu. */
   own: boolean
+  /** A folder HR made (2026-10-14): View only me, and — in a person's folder — its share and whether they see it. */
+  lock?: DriveLock | null
+  memberView?: boolean | null
+  memberSees?: boolean | null
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
@@ -247,30 +297,54 @@ function contentsLine(at: string, drive: Drive): string {
   return [folders ? plural(folders, 'folder') : '', files ? plural(files, 'file') : ''].filter(Boolean).join(' · ')
 }
 
+/** A folder HR made, as a card. */
+function ownCard(f: DriveFolder, drive: Drive): FolderCard {
+  return {
+    at: folderAt(f.id),
+    kind: 'folder',
+    name: f.name,
+    line: contentsLine(folderAt(f.id), drive),
+    missing: 0,
+    missingWhy: '',
+    own: true,
+    lock: f.lock,
+    memberView: f.memberView,
+    memberSees: f.memberSees,
+  }
+}
+
 /** The folders HR made in a place, as cards (by name). */
 function ownCards(at: string, drive: Drive): FolderCard[] {
   return drive.folders
     .filter(f => f.parent === at)
     .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }))
-    .map(f => ({ at: folderAt(f.id), kind: 'folder' as const, name: f.name, line: contentsLine(folderAt(f.id), drive), missing: 0, missingWhy: '', own: true }))
+    .map(f => ownCard(f, drive))
 }
 
-function personCard(p: DataCenterPerson): FolderCard {
+function personCard(p: DataCenterPerson, drive: Drive): FolderCard {
+  // What HR keeps for them beside their letters (2026-10-14).
+  const at = personAt(p.id)
+  const folders = drive.folders.filter(f => f.parent === at).length
+  const files = drive.files.filter(f => f.parent === at && !f.deletedAt).length
   return {
-    at: personAt(p.id),
+    at,
     kind: 'person',
     name: p.name,
-    line: [p.title, plural(p.letters, 'letter')].filter(Boolean).join(' · '),
+    line: [p.title, plural(p.letters, 'letter'), folders ? plural(folders, 'folder') : '', files ? plural(files, 'file') : ''].filter(Boolean).join(' · '),
     missing: p.missing ? 1 : 0,
     missingWhy: p.missing,
     own: false,
   }
 }
 
-/** The folders in a place: what is there by itself first (HOUZS Venture, its departments, their people), then HR's. */
+/**
+ * The folders in a place: what is there by itself first (HOUZS Venture, its departments, their people), then HR's —
+ * a person's folder holds only HR's (since 2026-10-14; their letters are drawn as their record).
+ */
 export function folderCards(at: string, doc: Tree, drive: Drive): FolderCard[] {
   const p = parsePlace(at)
-  if (!p || p.kind === 'person') return []
+  if (!p) return []
+  if (p.kind === 'person') return ownCards(at, drive)
   const people = dataCenterPeople(doc)
   if (p.kind === 'root') {
     const missing = people.filter(x => x.missing).length
@@ -304,26 +378,46 @@ export function folderCards(at: string, doc: Tree, drive: Drive): FolderCard[] {
     })
     // Somebody active with no department of the Data center's lands in HOUZS Venture itself.
     const known = new Set(doc.departments.map(d => d.id))
-    const loose = people.filter(x => !x.departmentId || !known.has(x.departmentId)).map(personCard)
+    const loose = people.filter(x => !x.departmentId || !known.has(x.departmentId)).map(x => personCard(x, drive))
     return [...depts, ...loose, ...ownCards(HV, drive)]
   }
   if (p.kind === 'dept') {
-    return [...people.filter(x => x.departmentId === p.id).map(personCard), ...ownCards(at, drive)]
+    return [...people.filter(x => x.departmentId === p.id).map(x => personCard(x, drive)), ...ownCards(at, drive)]
   }
   return ownCards(at, drive)
 }
 
-/** The files HR keeps in a place (never a person's — their folder holds their letters); deleted ones only when asked. */
+/** The files HR keeps in a place — a person's folder too, beside their letters; deleted ones only when asked. */
 export function placeFiles(at: string, drive: Drive, withDeleted = false): DriveFile[] {
   return drive.files
     .filter(f => f.parent === at && (withDeleted || !f.deletedAt))
     .sort((a, b) => Number(!!a.deletedAt) - Number(!!b.deletedAt) || a.fileName.localeCompare(b.fileName, 'en', { sensitivity: 'base' }))
 }
 
-/** Where a new folder may go: anywhere but inside a person (their folder is their record). */
+/** Where a new folder or file may go: anywhere — a person's folder too, since 2026-10-14 (the database refused it before). */
 export function takesFolders(at: string): boolean {
-  const p = parsePlace(at)
-  return !!p && p.kind !== 'person'
+  return !!parsePlace(at)
+}
+
+/**
+ * The person whose folder a place is in — the person's folder itself, or a folder HR made somewhere inside it — or
+ * null. What is there may be shared with them (2026-10-14).
+ */
+export function personOf(at: string, drive: Pick<Drive, 'folders'>): string | null {
+  const seen = new Set<string>()
+  let cur: string | undefined = at
+  while (cur && !seen.has(cur)) {
+    seen.add(cur)
+    const p = parsePlace(cur)
+    if (!p || p.kind !== 'folder') return p?.kind === 'person' ? p.id : null
+    cur = drive.folders.find(f => f.id === p.id)?.parent
+  }
+  return null
+}
+
+/** "Only you and above", "Only Alvin and above" — a lock's words for its badge and its menu. */
+export function lockWords(lock: DriveLock): string {
+  return lock.mine ? 'Only you and above' : `Only ${lock.by} and above`
 }
 
 /** Why a folder name will not do here — or null. The database asks the same (`hr_drive_name_taken`). */
@@ -378,8 +472,8 @@ export function searchDrive(query: string, doc: Tree, drive: Drive): SearchHit[]
   const people = dataCenterPeople(doc)
   const places: SearchHit[] = [
     ...doc.departments.filter(d => has(deptLabel(d.name))).flatMap(d => folderCards(HV, doc, drive).filter(c => c.at === deptAt(d.id))),
-    ...people.filter(p => has(p.name) || has(p.code ?? '')).map(personCard),
-    ...drive.folders.filter(f => has(f.name)).map(f => ({ at: folderAt(f.id), kind: 'folder' as const, name: f.name, line: contentsLine(folderAt(f.id), drive), missing: 0, missingWhy: '', own: true })),
+    ...people.filter(p => has(p.name) || has(p.code ?? '')).map(p => personCard(p, drive)),
+    ...drive.folders.filter(f => has(f.name)).map(f => ownCard(f, drive)),
   ].map(card => ({ kind: 'place' as const, card, path: pathLine(parentOf(card.at, doc, drive) ?? ROOT, doc, drive) }))
   const files: SearchHit[] = drive.files
     .filter(f => !f.deletedAt && has(f.fileName))
@@ -393,21 +487,27 @@ export function searchDrive(query: string, doc: Tree, drive: Drive): SearchHit[]
 // ── Move to… (2026-10-13) ───────────────────────────────────────────────────
 
 /**
- * Every place a folder HR made may be moved to, top down, each with its path ("HOUZS Venture › Revenue"): the Data
- * center itself, HOUZS Venture, its departments, the folders HR made — never a person (their folder is their record),
- * never `from` or anything inside it. The Talent Bank's twin is lib/hiring/bank.ts `moveTargets`.
+ * Every place a folder or a file HR keeps may be moved or copied to, top down, each with its path ("HOUZS Venture ›
+ * Revenue"): the Data center itself, HOUZS Venture, its departments, each person's folder (since 2026-10-14) and the
+ * folders HR made — never `from` (a folder) or anything inside it. The Talent Bank's twin is lib/hiring/bank.ts
+ * `moveTargets`.
  */
 export function moveTargets(doc: Tree, drive: Drive, from: string): Array<{ at: string; path: string; depth: number }> {
   const out: Array<{ at: string; path: string; depth: number }> = [{ at: ROOT, path: 'Data center', depth: 0 }]
   const walk = (at: string, depth: number) => {
     for (const card of folderCards(at, doc, drive)) {
-      if (card.kind === 'person' || card.at === from) continue
+      if (card.at === from) continue
       out.push({ at: card.at, path: pathLine(card.at, doc, drive), depth })
       walk(card.at, depth + 1)
     }
   }
   walk(ROOT, 1)
   return out
+}
+
+/** A copy's name in the same place, as Drive names it: "Copy of Offer.pdf". (A folder's the database picks.) */
+export function copyName(fileName: string): string {
+  return `Copy of ${fileName}`.slice(0, 200)
 }
 
 // ── The Bin (2026-10-13) ────────────────────────────────────────────────────

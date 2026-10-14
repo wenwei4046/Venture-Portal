@@ -171,6 +171,14 @@ export function canChangePassword(u: { personalLogin?: boolean; viewingAs?: unkn
   return u.personalLogin === true && !u.viewingAs
 }
 
+/**
+ * Admin › My documents (2026-10-14): one's own documents — Company and Personal — for a login of one's own (a shared
+ * one is no person and has none), never while viewing as somebody. The same as Change password's.
+ */
+export function canSeeMyDocuments(u: { personalLogin?: boolean; viewingAs?: unknown }): boolean {
+  return u.personalLogin === true && !u.viewingAs
+}
+
 export function canAccessAuditLog(u: PermissionHolder): boolean {
   // The whole history, and Audit Log › Access (who read what).
   return can(u, 'audit_log')

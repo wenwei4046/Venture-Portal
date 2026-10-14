@@ -50,8 +50,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'hr_drive', 'hr_drive_file',
   // …Publish › Preview and a memo's file (mig 20261012210000): both STABLE, reading only.
   'hr_memo_preview', 'memo_attachment',
-  // …and, the Revenue app's View as, one member's (mig 20261011110000).
-  'member_documents_of',
+  // …and, the Revenue app's View as, one member's (mig 20261011110000) — Company and Personal since mig 20261014190000.
+  'member_documents_of', 'my_documents_of',
   // Hiring (round 2): the board and where a file is — and the Talent Bank's folders (mig 20261013030000).
   'hiring_board', 'hiring_file_path', 'hiring_bank',
   // HOUZS Venture's director share — the grid's month (mig 20261013170000): STABLE.

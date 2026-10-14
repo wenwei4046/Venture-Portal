@@ -38,6 +38,7 @@ import {
   canAccessMeetingRooms,
   canAccessGuestLink,
   canChangePassword,
+  canSeeMyDocuments,
 } from '@/lib/roles'
 
 /**
@@ -478,6 +479,8 @@ function navEntries(data: NavData): NavEntry[] {
     },
     // Change password (2026-10-12 — the user: in their profile "or admin category", "just for that
     // personal acc"): a login of their own, never a shared one; no tab closes it (OPEN_PAGES).
+    // My documents (2026-10-14): one's own — Company and Personal — beside it, for the same logins.
+    { href: '/admin/documents', label: 'My documents', section: 'Reports & Admin', visible: canSeeMyDocuments },
     { href: '/admin/password', label: 'Change password', section: 'Reports & Admin', visible: canChangePassword },
   ]
 }

@@ -21,7 +21,7 @@ const types: LetterType[] = [
 const letter = (over: Partial<PersonLetter>): PersonLetter => ({
   id: 'l1', ref: 'D-101', staffId: 'zack', staffName: 'Zack', typeId: 'offer', typeName: 'Offer letter', fileName: 'Offer_zack.pdf',
   contentType: 'application/pdf', size: 1, filedAt: '2026-10-01T02:00:00Z', filedBy: 'HR Manager', source: 'upload',
-  readAt: null, acknowledgedAt: null, withdrawnAt: null, events: [], ...over,
+  readAt: null, acknowledgedAt: null, withdrawnAt: null, hiddenAt: null, events: [], ...over,
 })
 
 describe('documentationFromRow', () => {

@@ -176,6 +176,25 @@ export async function withdrawLetter(id: string): Promise<WithdrawOutcome> {
   return { ok: true, person: typeof said.person === 'string' ? said.person : '', type: typeof said.type === 'string' ? said.type : 'The letter' }
 }
 
+export type LetterShareOutcome = { ok: true; person: string; type: string; sees: boolean } | { ok: false; reason: string }
+
+/**
+ * A letter's ⋮ › "<person> can view" (2026-10-14 — the user: a letter can be kept from its person too). Off: still on
+ * the record and counted — a compulsory type met — but nowhere in their app, the memo it travelled as with it; on: back,
+ * read and acknowledged as it was (`hr_letter_member_view`, mig 20261014190000). Documentation · Edit.
+ */
+export async function setLetterShare(id: string, on: boolean): Promise<LetterShareOutcome> {
+  await requireActionOn('/team/documentation', 'documentation', 'edit')
+  const { data, error } = await (await client()).rpc('hr_letter_member_view', { p_letter: id, p_on: on })
+  if (error) return { ok: false, reason: refusal(error, 'The letter could not be changed. Please try again.') }
+  revalidateDocs()
+  revalidatePath('/admin/documents')
+  // Shown again, its memo is theirs again: they are told, on their phone too.
+  if (on) pushSoon()
+  const said = (data ?? {}) as { person?: unknown; type?: unknown }
+  return { ok: true, person: typeof said.person === 'string' ? said.person : '', type: typeof said.type === 'string' ? said.type : 'The letter', sees: on }
+}
+
 // ── Publish ─────────────────────────────────────────────────────────────────
 
 export async function addPublishType(name: string): Promise<DocIdOutcome> {

@@ -49,6 +49,8 @@ export async function GET(request: Request) {
     const dataCenterBin = await sweepDataCenterBin(db)
     if (!dataCenterBin) console.error('Data center bin sweep failed')
     else if (dataCenterBin.expired) console.info('Data center bin let go', dataCenterBin.expired, 'after 30 days; files deleted', dataCenterBin.deleted)
+    // …and (2026-10-14) objects nobody recorded a day after they went up — an upload or a copy whose record never came.
+    if (dataCenterBin?.orphans) console.info('Data center unrecorded objects removed', dataCenterBin.orphans)
     if (error || !data || !['complete', 'partial', 'skipped'].includes(data.status)) {
       // Log codes only. Never echo SQL errors, credentials or private rows.
       console.error('Member queue worker failed', error?.code ?? 'invalid_result')

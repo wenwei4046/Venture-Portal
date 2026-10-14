@@ -20,6 +20,8 @@ import {
   type CandStage, type HrAppData, type HrAppView, type HrBooking, type HrHire,
 } from '@/lib/hr-app/model'
 import { ackedLine, memoDay, memoFileExt, memoParas, memoUnread, memoWaiting, memoWhen, memosInOrder, type MyMemo } from '@/lib/memos/model'
+import { letterState, personalIn, personalPath, personalUnseen, type MyDocuments } from '@/lib/documentation/personal'
+import { docDay } from '@/lib/documentation/model'
 import s from './hr-app.module.css'
 
 // The HR phone app (2026-10-11, HR revamp round 2 — README §17, the handoff's
@@ -62,6 +64,8 @@ export interface HrAppActions {
   memoMark(id: string, ack: boolean): Promise<{ ok: true; acknowledgedAt?: string | null } | { ok: false; reason: string }>
   /** A memo's file: a short link made at the press. */
   memoFile(id: string, mode: 'view' | 'download'): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
+  /** One of their own documents (2026-10-14): a short link made at the press, the open recorded for HR. The login's own. */
+  myDocLink(kind: 'document' | 'drive' | 'letter', id: string): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
   /** After a write: read the app's data again. */
   refresh(): void
 }
@@ -78,6 +82,8 @@ type Page =
   | { k: 'notices' }
   | { k: 'memos' }
   | { k: 'memo'; id: string }
+  | { k: 'mydocs' }
+  | { k: 'mydocsFolder'; id: string }
 type Sheet =
   | { k: 'stage'; cid: string; name: string; cur: CandStage }
   | { k: 'ack' }
@@ -103,7 +109,7 @@ const TABS: Array<[Tab, string]> = [['home', 'Home'], ['review', 'Review'], ['hi
 const TITLES: Record<string, [string, string]> = {
   home: ['', 'Human Resource'], review: ['Inbox', 'Review'], hiring: ['Hiring', 'Requests'], rooms: ['Admin', 'Meeting rooms'],
   more: ['HR', 'More'], insights: ['Hiring', 'Insights'], talents: ['Hiring', 'Talent Bank'], docs: ['Documentation', 'Data center'],
-  notices: ['HR', 'Notifications'], memos: ['For you', 'Memos'],
+  notices: ['HR', 'Notifications'], memos: ['For you', 'Memos'], mydocs: ['For you', 'My documents'],
 }
 
 /** The book sheet opens on HR, as the prototype's does — or the first department there is. */
@@ -129,6 +135,8 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
   const [tq, setTq] = useState('')
   const [arm, setArm] = useState(false)
   const [talentNotes, setTalentNotes] = useState<{ id: string; text: string } | null>(null)
+  // My documents (2026-10-14): Company or Personal.
+  const [mdTab, setMdTab] = useState<'company' | 'personal'>('company')
   const [busy, startBusy] = useTransition()
   const [error, setError] = useState('')
 
@@ -281,12 +289,29 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
     })
   }
 
+  // One of their own documents (2026-10-14): a link made at the press, in a tab readied in the tap; the open is recorded
+  // (seen, a letter's memo read), so the app reads again.
+  const openMine = (kind: 'document' | 'drive' | 'letter', id: string) => {
+    const win = window.open('', '_blank')
+    if (win) win.opener = null
+    void actions.myDocLink(kind, id).then(res => {
+      if (res.ok && win) win.location.href = res.url
+      else {
+        win?.close()
+        if (!res.ok) setError(res.reason)
+      }
+      if (res.ok) actions.refresh()
+    })
+  }
+  const mf = top?.k === 'mydocsFolder' && d.myDocs ? d.myDocs.personal.folders.find(f => f.id === top.id) ?? null : null
+
   const [kicker, title] =
     view === 'hire' ? [hr?.id ?? '', hr ? hr.position : '']
       : view === 'req' ? [rr ? MEMBER_KIND[rr.kind] : '', rr ? requestTitle(rr) : '']
         : view === 'talent' ? ['Talent Bank', tt?.name ?? '']
           : view === 'person' ? ['Data center', pp?.name ?? '']
             : view === 'memo' ? [mm?.kind ?? 'Memo', mm?.title ?? '']
+              : view === 'mydocsFolder' ? ['My documents', mf?.name ?? '']
               : TITLES[view] ?? ['', '']
 
   return (
@@ -456,6 +481,17 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
                   <Chevron />
                 </button>
               ) : null}
+              {/* Not in the handoff (2026-10-14): their own documents — Company and Personal, as the Revenue app has them. */}
+              {d.myDocs?.staffId && !d.viewingAs ? (
+                <button type="button" className={s.moreRow} onClick={() => push({ k: 'mydocs' })}>
+                  <span className={s.moreIcon} style={{ background: 'rgb(255 244 231)', color: 'rgb(163 78 37)' }}>▥</span>
+                  <span className={s.grow}>
+                    <span className={s.moreTitle}>My documents</span>
+                    <span className={s.moreSub}>{myDocsLine(d.myDocs)}</span>
+                  </span>
+                  <Chevron />
+                </button>
+              ) : null}
               {([
                 ['insights', 'Insights', 'Hiring time, cost and sources', '◔', 'rgb(230 237 241)', SLATE, d.parts.insights],
                 ['talents', 'Talent Bank', `${d.talents.length} people kept on file`, '★', 'rgb(255 244 231)', 'rgb(163 78 37)', d.parts.talent],
@@ -569,6 +605,13 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
             </>
           ) : null}
           {view === 'memo' && !mm ? <div className={s.emptyCard}>This memo was taken back.</div> : null}
+
+          {view === 'mydocs' ? (
+            <MyDocsScreen docs={d.myDocs ?? null} folder={null} tab={mdTab} setTab={setMdTab} openFolder={id => push({ k: 'mydocsFolder', id })} open={openMine} />
+          ) : null}
+          {top?.k === 'mydocsFolder' ? (
+            <MyDocsScreen docs={d.myDocs ?? null} folder={top.id} tab="personal" setTab={setMdTab} openFolder={id => push({ k: 'mydocsFolder', id })} open={openMine} />
+          ) : null}
 
           {view === 'insights' ? <InsightsScreen d={data} /> : null}
 
@@ -717,6 +760,85 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
 }
 
 /** The bell's page (2026-10-11): what was new when it opened, then the rest; a tap opens what it is about. */
+/** More › My documents' line: what is new, or what is there. */
+function myDocsLine(docs: MyDocuments): string {
+  const fresh = docs.company.filter(x => !x.seen).length + personalUnseen(docs.personal)
+  return fresh ? `${fresh} new for you` : 'Company and personal'
+}
+
+const CHIP_ON = { background: 'rgb(43 31 23)', color: 'rgb(246 238 230)' }
+const CHIP_OFF = { background: 'rgb(255 255 255)', color: 'rgb(43 31 23)' }
+
+/**
+ * My documents (2026-10-14 — the user: Documentation in two, company and personal; "他在手机那边用自己的 user 账号
+ * login，就可以 view 到他自己的资料"): Company — what HR shares with their department — and Personal — what of their own
+ * Data center folder HR shares with them: their letters at the top, folders (a press goes in), files. Each opens by a
+ * link made at the press. A folder's page is Personal only.
+ */
+function MyDocsScreen({ docs, folder, tab, setTab, openFolder, open }: {
+  docs: MyDocuments | null
+  folder: string | null
+  tab: 'company' | 'personal'
+  setTab: (t: 'company' | 'personal') => void
+  openFolder: (id: string) => void
+  open: (kind: 'document' | 'drive' | 'letter', id: string) => void
+}) {
+  if (!docs) return <div className={s.emptyCard}>Your documents could not be read.</div>
+  const held = personalIn(docs.personal, folder)
+  const fileRow = (key: string, ext: string, name: string, line: string, onView: () => void) => (
+    <div key={key} className={s.letter}>
+      <span className={s.letterIcon}>{ext || 'FILE'}</span>
+      <span className={s.grow}>
+        <span className={s.memoFileName} style={{ display: 'block' }}>{name}</span>
+        <span className={s.meta12}>{line}</span>
+      </span>
+      <button type="button" className={s.viewBtn} onClick={onView}>View</button>
+    </div>
+  )
+  return (
+    <>
+      {folder === null ? (
+        <div className={s.chips}>
+          {([['company', 'Company', docs.company.filter(x => !x.seen).length], ['personal', 'Personal', personalUnseen(docs.personal)]] as const).map(([k, label, n]) => (
+            <button key={k} type="button" className={s.chip} onClick={() => setTab(k)} style={tab === k ? CHIP_ON : CHIP_OFF} aria-pressed={tab === k}>
+              {label}{n ? <span className={s.chipN}>{n} new</span> : null}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className={s.meta12}>{personalPath(docs.personal, folder).map(x => x.name).join(' › ')}</div>
+      )}
+      {tab === 'company' && folder === null ? (
+        docs.company.length ? (
+          docs.company.map(doc => fileRow(doc.id, doc.ext, doc.name, `Added ${docDay(doc.uploadedAt)}${doc.seen ? '' : ' · New'}`, () => open('document', doc.id)))
+        ) : (
+          <div className={s.emptyCard}>Nothing shared with your department yet.</div>
+        )
+      ) : (
+        <>
+          {held.letters.map(l =>
+            fileRow(l.id, l.ext, l.typeName, `${l.name} · ${docDay(l.at)}${letterState(l) === 'new' ? ' · New' : ''}`, () => open('letter', l.id)),
+          )}
+          {held.folders.map(f => (
+            <button key={f.id} type="button" className={s.moreRow} onClick={() => openFolder(f.id)}>
+              <span className={s.moreIcon} style={{ background: 'rgb(238 240 226)', color: 'rgb(88 98 68)' }}>▤</span>
+              <span className={s.grow}>
+                <span className={s.moreTitle}>{f.name}</span>
+                <span className={s.moreSub}>{f.files === 1 ? '1 file' : `${f.files} files`}{f.unseen ? ` · ${f.unseen} new` : ''}</span>
+              </span>
+              <Chevron />
+            </button>
+          ))}
+          {held.files.map(f => fileRow(f.id, f.ext, f.name, `Added ${docDay(f.at)}${f.seen ? '' : ' · New'}`, () => open('drive', f.id)))}
+          {!held.letters.length && !held.folders.length && !held.files.length ? (
+            <div className={s.emptyCard}>{folder ? 'This folder is empty.' : 'Nothing of yours is shared with you yet.'}</div>
+          ) : null}
+        </>
+      )}
+    </>
+  )
+}
+
 function NoticesScreen({ items, fresh, open }: { items: Notice[]; fresh: ReadonlySet<string>; open: (n: Notice) => void }) {
   const now = new Date()
   if (!items.length) return <div className={s.emptyCard}>No notifications yet.</div>

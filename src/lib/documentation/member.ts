@@ -2,7 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { DOC_BUCKET, type FileLink } from './server'
-import { fileExt } from './model'
+import { memberDocumentsFromRow, type MemberDocument } from './member-model'
 
 /**
  * The Revenue app's side of Documentation (2026-10-11, HR revamp round 2 —
@@ -14,38 +14,8 @@ import { fileExt } from './model'
  * actions.
  */
 
-export interface MemberDocument {
-  id: string
-  name: string
-  fileName: string
-  /** "PDF", "XLSX". */
-  ext: string
-  contentType: string | null
-  size: number | null
-  uploadedAt: string
-  /** False = the app's "New". */
-  seen: boolean
-}
-
-export function memberDocumentsFromRow(raw: unknown): MemberDocument[] {
-  if (!Array.isArray(raw)) return []
-  return raw.flatMap(r => {
-    if (!r || typeof r !== 'object') return []
-    const o = r as Record<string, unknown>
-    if (typeof o.id !== 'string' || typeof o.name !== 'string') return []
-    const fileName = typeof o.fileName === 'string' ? o.fileName : ''
-    return [{
-      id: o.id,
-      name: o.name,
-      fileName,
-      ext: fileExt(fileName),
-      contentType: typeof o.contentType === 'string' ? o.contentType : null,
-      size: typeof o.size === 'number' ? o.size : null,
-      uploadedAt: typeof o.uploadedAt === 'string' ? o.uploadedAt : '',
-      seen: o.seen === true,
-    }]
-  })
-}
+// The pure part lives in member-model.ts (2026-10-14) so client screens can read it; kept here under its old names.
+export { memberDocumentsFromRow, type MemberDocument }
 
 async function client(): Promise<SupabaseClient> {
   return (await createClient()) as unknown as SupabaseClient

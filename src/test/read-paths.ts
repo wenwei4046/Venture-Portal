@@ -236,6 +236,13 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // hourly sweep's purge and its "File deleted" are the service role's (api/member-queue).
   'hr_drive_bin_restore', 'hr_drive_bin_delete', 'hr_drive_bin_empty', 'hr_drive_folder_move', 'hr_drive_bin_purge',
   'hr_drive_bin_files_gone',
+  // A person's own, View only me, Move / Copy (mig 20261014190000): a file's move, the copy's plan and its record, the two
+  // settings and a letter's share ask Documentation (Create / Edit; the plan View and Create); one's own documents answer
+  // for the caller's People record only; somebody else's (the Revenue app's View as) asks Documentation · View.
+  'hr_drive_file_move', 'hr_drive_copy_plan', 'hr_drive_file_copy', 'hr_drive_folder_copy', 'hr_drive_private', 'hr_drive_member_view',
+  'hr_letter_member_view', 'my_documents', 'my_document_open', 'my_documents_of',
+  // …and the hourly sweep's day-old objects nobody recorded (mig 20261014230000): the service role's alone.
+  'hr_drive_orphans',
   // The Revenue app's View as (mig 20261011110000): has_any_action(documentation.view).
   'member_documents_of',
   // A replacement runs itself on its date (mig 20261010170000): HR's two ask member_is_manager; the

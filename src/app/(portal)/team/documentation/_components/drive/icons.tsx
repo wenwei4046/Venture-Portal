@@ -37,6 +37,23 @@ export const RestoreGlyph = ({ size = 16 }: { size?: number }) => svg(size, <><p
 export const BackGlyph = ({ size = 16 }: { size?: number }) => svg(size, <path d="M15 6l-6 6 6 6" />, 2)
 export const ChevronGlyph = ({ size = 16 }: { size?: number }) => svg(size, <path d="M9 6l6 6-6 6" />, 2)
 export const SearchGlyph = ({ size = 16 }: { size?: number }) => svg(size, <><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></>, 2)
+/** A menu item's tick (2026-10-14: a setting that is on). */
+export const CheckGlyph = ({ size = 14 }: { size?: number }) => svg(size, <path d="M5 12.5l4.5 4.5L19 7.5" />, 2.2)
+/** View only me (2026-10-14). */
+export const LockGlyph = ({ size = 16 }: { size?: number }) =>
+  svg(size, <><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" /></>)
+/** Shared with the person whose folder it is in (2026-10-14). */
+export const SharedGlyph = ({ size = 16 }: { size?: number }) =>
+  svg(size, <><circle cx="9" cy="8.5" r="3.2" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" /><path d="M15.5 11.5l2 2 4-4" /></>)
+/** Copy to… / Duplicate (2026-10-14): two sheets. */
+export const CopyGlyph = ({ size = 16 }: { size?: number }) =>
+  svg(size, <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8" /></>)
+export const DuplicateGlyph = ({ size = 16 }: { size?: number }) =>
+  svg(size, <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8" /><path d="M14 11.5v5M11.5 14h5" /></>)
+/** Move to… (2026-10-14, a file's too): a folder with an arrow in. */
+export const MoveGlyph = ({ size = 16 }: { size?: number }) =>
+  svg(size, <><path d="M3 7.5A2 2 0 0 1 5 5.5h3.8l2 2.2H19a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /><path d="M9 13.5h6M12.5 11l2.5 2.5-2.5 2.5" /></>)
+
 export const DotsGlyph = ({ size = 18 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
     <circle cx="12" cy="5.5" r="1.7" fill="currentColor" />

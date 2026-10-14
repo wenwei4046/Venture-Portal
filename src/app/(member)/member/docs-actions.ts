@@ -7,6 +7,9 @@ import { isPrincipalAccount } from "@/lib/view-as";
 import { appClosed } from "@/lib/member/app-pages";
 import { loadMemberDocuments, memberDocumentsFromRow, openMemberDocument, type MemberDocument } from "@/lib/documentation/member";
 import { openDocumentationFile } from "@/lib/documentation/actions";
+import { openDriveFile } from "@/lib/documentation/drive-actions";
+import { loadDocumentsOf, loadMyDocuments, openMyDocument } from "@/lib/documentation/my-docs";
+import type { Personal } from "@/lib/documentation/personal";
 import type { User } from "@/types";
 
 /**
@@ -49,6 +52,46 @@ export async function fetchMemberDocuments(staffId?: string): Promise<Outcome<Me
     return read.ok ? { ok: true, data: read.documents } : { ok: false, error: read.reason };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Documentation could not be read." };
+  }
+}
+
+/**
+ * Documentation › Personal (2026-10-14 — the user: "documentation 我要分成两种：company / personal"): what HR shares
+ * with the member of their own Data center folder, and their letters (`my_documents()` under their own session — mig
+ * 20261014190000) — or, for the Principal viewing them, that member's as they see it (`my_documents_of`, Documentation ·
+ * View, less what the Principal is not shown). Behind the same Documentation box as Company.
+ */
+export async function fetchMemberPersonal(staffId?: string): Promise<Outcome<Personal>> {
+  try {
+    const user = await member();
+    if (staffId !== undefined) {
+      if (!isPrincipalAccount(user)) return { ok: false, error: "Only the Principal can view another member's documents." };
+      if (!isId(staffId)) return { ok: false, error: "Pick a team member first." };
+      const read = await loadDocumentsOf(staffId);
+      return read.ok ? { ok: true, data: read.data.personal } : { ok: false, error: read.reason };
+    }
+    const read = await loadMyDocuments();
+    return read.ok ? { ok: true, data: read.data.personal } : { ok: false, error: read.reason };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Documentation could not be read." };
+  }
+}
+
+/**
+ * Open one of Personal: the member's own tap marks it seen (a file) or reads its memo (a letter); the Principal's,
+ * viewing `staffId`, opens it the way People › Documentation does — a "Viewed" line on its trail, nothing marked.
+ */
+export async function openMemberPersonal(kind: "drive" | "letter", id: string, staffId?: string): Promise<Outcome<{ url: string; fileName: string }>> {
+  try {
+    const user = await member();
+    if (!isId(id) || (kind !== "drive" && kind !== "letter")) return { ok: false, error: "That is not there." };
+    const viewing = staffId !== undefined && isPrincipalAccount(user);
+    const link = viewing
+      ? kind === "drive" ? await openDriveFile(id, "view") : await openDocumentationFile("letter", id, "view")
+      : await openMyDocument(kind, id, "view");
+    return link.ok ? { ok: true, data: { url: link.url, fileName: link.fileName } } : { ok: false, error: link.reason };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "It could not be opened." };
   }
 }
 

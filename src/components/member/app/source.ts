@@ -18,11 +18,12 @@ import type { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-ac
 import { readMemberBatch, type MemberRead } from "@/app/(member)/member/batch-actions";
 import { bookMemberRoom, cancelMemberBooking, type MemberBookInput, type fetchMemberRooms } from "@/app/(member)/member/rooms-actions";
 import type { MemberRoomsData } from "./profile/rooms-model";
-import { openMemberDoc, type fetchMemberDocuments } from "@/app/(member)/member/docs-actions";
+import { openMemberDoc, openMemberPersonal, type fetchMemberDocuments, type fetchMemberPersonal } from "@/app/(member)/member/docs-actions";
 import type { fetchMemberCrmUnread } from "@/app/(member)/member/chat-badge-actions";
 import type { fetchMemberNotices } from "@/app/(member)/member/bell-actions";
 import type { Notices } from "@/lib/push/notices";
-import type { MemberDocument } from "@/lib/documentation/member";
+import type { MemberDocument } from "@/lib/documentation/member-model";
+import type { Personal } from "@/lib/documentation/personal";
 import { createReadBatcher } from "./read-batch";
 import { createReadMemory, idbStore, readKey, type ReadStore } from "./read-memory";
 
@@ -74,6 +75,7 @@ export const ask = {
   documents: (context?: { staffId: string }): MemberRead => (context ? { kind: "documents", staffId: context.staffId } : { kind: "documents" }),
   crmUnread: (): MemberRead => ({ kind: "crmUnread" }),
   notices: (): MemberRead => ({ kind: "notices" }),
+  personal: (context?: { staffId: string }): MemberRead => (context ? { kind: "personal", staffId: context.staffId } : { kind: "personal" }),
 };
 
 /**
@@ -140,6 +142,10 @@ export interface RevenueSource {
   crmUnread?(): Promise<Outcome<number>>;
   /** The bell (2026-10-14, live): the account's own notifications, read again — the layout hands the open's. */
   notices?(): Promise<Outcome<Notices>>;
+  /** Documentation › Personal (2026-10-14): what HR shares with the member of their own folder, and their letters. */
+  personal?(context?: { staffId: string }): Promise<Outcome<Personal>>;
+  /** One of Personal: a file of theirs, or a letter — its short link made at the tap. */
+  openPersonal?(kind: "drive" | "letter", id: string, context?: { staffId: string }): Promise<Outcome<{ url: string; fileName: string }>>;
   /**
    * What the phone kept from an earlier open (the live app only, 2026-10-08):
    * the last answer to a read (`ask.*`), shown while it is read again.
@@ -227,6 +233,8 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     crmUnread: () => go<Answer<typeof fetchMemberCrmUnread>>(ask.crmUnread()),
     // Never kept on the phone: every open has the layout's own, fresh.
     notices: () => read<Answer<typeof fetchMemberNotices>>(ask.notices()),
+    personal: context => go<Answer<typeof fetchMemberPersonal>>(ask.personal(context)),
+    openPersonal: (kind, id, context) => openMemberPersonal(kind, id, context?.staffId),
     ...(memory ? {
       peek: <T,>(request: MemberRead) => memory.get<T>(readKey(request)),
       ready: memory.ready,

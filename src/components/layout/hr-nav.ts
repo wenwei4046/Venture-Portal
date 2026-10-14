@@ -29,6 +29,7 @@ import {
   canAccessMeetingRooms,
   canAccessGuestLink,
   canChangePassword,
+  canSeeMyDocuments,
 } from '@/lib/roles'
 import type { HrIconName } from '@/components/hrv/icons'
 import type { NavViewer } from './nav-config'
@@ -133,6 +134,8 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
         { key: 'rooms', label: 'Meeting Rooms', icon: 'room', href: '/admin/rooms', match: p => under(p, '/admin/rooms'), visible: canAccessMeetingRooms },
         { key: 'guestlink', label: 'Guest Link', icon: 'link', href: '/admin/guest-link', match: p => under(p, '/admin/guest-link'), visible: canAccessGuestLink },
         { key: 'audit', label: 'Audit Log', icon: 'report', href: '/audit-log', match: p => under(p, '/audit-log'), visible: canSeeAuditChanges },
+        // My documents (2026-10-14): one's own — Company and Personal — for a login of one's own, as Change password.
+        { key: 'mydocs', label: 'My documents', icon: 'doc', href: '/admin/documents', match: p => under(p, '/admin/documents'), visible: canSeeMyDocuments },
         // Change password (2026-10-12): a person's own login only — never a shared one (principal@, hr@ …).
         { key: 'password', label: 'Change password', icon: 'lock', href: '/admin/password', match: p => under(p, '/admin/password'), visible: canChangePassword },
       ],
