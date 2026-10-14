@@ -730,8 +730,12 @@ button.member:hover .memberWho { text-decoration: underline; }
   font-variant-numeric: tabular-nums lining-nums;
 }
 .bulk[data-fixed='true'] { position: fixed; }
+/* A phone's tab bar is drawn over the frame's foot: the bar stands clear of it, as the kit's drawer does. */
+@media (max-width: 767px) {
+  .bulk { bottom: calc(var(--tabbar-h) + 18px + var(--safe-bottom)); }
+}
 .bulkText { display: flex; flex-direction: column; min-width: 0; }
-.bulkMain { font-size: 13px; font-weight: 500; white-space: nowrap; }
+.bulkMain { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bulkSub { font-size: 11px; color: rgb(var(--fv-dark-label)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bulkBtn {
   flex: none;
