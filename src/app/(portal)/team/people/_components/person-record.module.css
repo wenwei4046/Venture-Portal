@@ -115,4 +115,8 @@
   /* Outside HR's frame the portal's phone tab bar lies over the scroller's
      foot (HR's frame already stands clear of it). */
   :global(.sheet-frame) .bar { bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 10px); }
+  /* The phone's field rule (globals.css) holds every field at 16px with
+     !important — iOS's zoom floor. The name keeps the title's own size, which
+     is above it; an id is what outweighs that rule. */
+  .name:global(#person-name) { font-size: inherit !important; }
 }

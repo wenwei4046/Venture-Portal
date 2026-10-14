@@ -335,35 +335,32 @@ export type EpfPart = (typeof EPF_PARTS)[number]
 export type SocsoCategory = (typeof SOCSO_CATEGORIES)[number]
 export type PcbCategory = (typeof PCB_CATEGORIES)[number]
 
-export interface RawPayFields {
-  /** The "Fully commission based" tick on the Edit form. */
-  fullCommission: boolean
-  /** The "Variable pay" tick on the Edit form (Director department). */
-  variablePay?: boolean
-  employmentType?: string | null
-  basicSalary?: string | null
-  allowances?: string | null
-  nonStatutoryAllowance?: string | null
-  epfCategory?: string | null
-  socsoCategory?: string | null
-  isEpfExempt?: boolean
-  pcbCategory?: string | null
-  childrenCount?: string | null
-}
-
-export interface FullCommissionPay {
-  employment_type: 'commission_eligible'
-  basic_salary: 0
-  allowances: 0
-  non_statutory_allowance: 0
-}
-
 /**
- * Every pay and statutory column. Variable pay takes this shape too, with
- * the three amounts at 0: the categories still decide what the month's keyed
- * figure attracts, so they stay on the form and are written.
+ * What a save of a person's record sends about their pay — only what changed
+ * (2026-10-14). A field left out (`undefined`) is not touched, so the save
+ * never writes back what somebody else changed after the page was opened.
  */
-export interface SalariedPay {
+export interface RawPayPatch {
+  /**
+   * The pay basis, sent only when it changed: the old Edit form's ticks
+   * (`full_commission`, `variable_pay`) or its select (`salaried`,
+   * `commission_eligible`).
+   */
+  mode?: string | null
+  /** Whether the record is on a fixed pay now (Salaried or Commission-eligible). */
+  fixedPayNow: boolean
+  basicSalary?: string
+  allowances?: string
+  nonStatutoryAllowance?: string
+  epfCategory?: string
+  socsoCategory?: string
+  isEpfExempt?: boolean
+  pcbCategory?: string
+  childrenCount?: string
+}
+
+/** The pay and statutory columns, each written only when its field was sent. */
+export interface PayColumns {
   employment_type: StaffEmploymentType
   basic_salary: number
   allowances: number
@@ -375,6 +372,8 @@ export interface SalariedPay {
   children_count: number
 }
 
+const PAY_MODES = ['full_commission', 'variable', 'salaried', 'commission_eligible'] as const
+
 function oneOf<T extends string>(label: string, value: string | null | undefined, choices: readonly T[]): T {
   const v = (value ?? '').trim()
   if (v === '') throw new Error(`${label} is required`)
@@ -383,45 +382,47 @@ function oneOf<T extends string>(label: string, value: string | null | undefined
 }
 
 /**
- * The pay and statutory columns an Edit save writes.
+ * The pay and statutory columns a save writes: what was sent, checked rather
+ * than cast — and nothing else.
  *
- * Fully commission based writes exactly the four columns that say so and
- * leaves the statutory categories as they were: with a 0 base they decide
- * nothing, and the fields were not on the form to be read. Variable pay
- * (Director department) writes the three amounts as 0 and the categories
- * too — the month's keyed figure attracts statutory by them, so the form
- * keeps asking. Otherwise every field is on the form and every one is
- * written, checked rather than cast.
+ * A new pay basis writes what it means. Fully commission based: the type and
+ * the three amounts at 0, and nothing more — the statutory categories decide
+ * nothing on a 0 base, so they stay as they were. Variable pay (the Director
+ * department): the type and the three amounts at 0; the categories still
+ * decide what the month's keyed figure attracts, so any sent are written.
+ * Salaried / Commission-eligible: the type, then the amounts sent.
+ *
+ * Amounts sent with no new basis must land on a fixed pay: a record somebody
+ * moved to commission or variable pay after the page was opened is refused
+ * rather than given a basic it does not have.
  */
-export function payFieldsForUpdate(raw: RawPayFields): FullCommissionPay | SalariedPay {
-  if (raw.fullCommission) {
+export function payPatchForUpdate(raw: RawPayPatch): Partial<PayColumns> {
+  const mode = raw.mode == null || raw.mode.trim() === '' ? null : oneOf('Employment type', raw.mode, PAY_MODES)
+  if (mode === 'full_commission') {
     return { employment_type: 'commission_eligible', basic_salary: 0, allowances: 0, non_statutory_allowance: 0 }
   }
 
-  const childrenText = (raw.childrenCount ?? '').trim()
-  const children = childrenText === '' ? 0 : Number(childrenText)
-  if (!Number.isInteger(children) || children < 0) {
-    throw new Error('Children must be a whole number')
-  }
-  const statutory = {
-    epf_category: oneOf('EPF category', raw.epfCategory, EPF_PARTS),
-    socso_category: oneOf('SOCSO category', raw.socsoCategory, SOCSO_CATEGORIES),
-    is_epf_exempt: raw.isEpfExempt === true,
-    pcb_category: oneOf('PCB category', raw.pcbCategory, PCB_CATEGORIES),
-    children_count: children,
+  const out: Partial<PayColumns> = {}
+  if (mode === 'variable') Object.assign(out, { employment_type: 'variable', basic_salary: 0, allowances: 0, non_statutory_allowance: 0 })
+  else if (mode) out.employment_type = mode
+
+  const fixedPay = mode ? mode === 'salaried' || mode === 'commission_eligible' : raw.fixedPayNow
+  if ([raw.basicSalary, raw.allowances, raw.nonStatutoryAllowance].some(v => v !== undefined)) {
+    if (!fixedPay) throw new Error('Their pay basis changed since this page was opened — reload it to see the record as it is now.')
+    if (raw.basicSalary !== undefined) out.basic_salary = money('Basic salary', raw.basicSalary)
+    if (raw.allowances !== undefined) out.allowances = money('Statutory allowance', raw.allowances)
+    if (raw.nonStatutoryAllowance !== undefined) out.non_statutory_allowance = money('Non-statutory allowance', raw.nonStatutoryAllowance)
   }
 
-  if (raw.variablePay) {
-    return { employment_type: 'variable', basic_salary: 0, allowances: 0, non_statutory_allowance: 0, ...statutory }
+  if (raw.epfCategory !== undefined) out.epf_category = oneOf('EPF category', raw.epfCategory, EPF_PARTS)
+  if (raw.socsoCategory !== undefined) out.socso_category = oneOf('SOCSO category', raw.socsoCategory, SOCSO_CATEGORIES)
+  if (raw.isEpfExempt !== undefined) out.is_epf_exempt = raw.isEpfExempt
+  if (raw.pcbCategory !== undefined) out.pcb_category = oneOf('PCB category', raw.pcbCategory, PCB_CATEGORIES)
+  if (raw.childrenCount !== undefined) {
+    const text = raw.childrenCount.trim()
+    const children = text === '' ? 0 : Number(text)
+    if (!Number.isInteger(children) || children < 0) throw new Error('Children must be a whole number')
+    out.children_count = children
   }
-
-  return {
-    // The Employment Type select is not on the form for a commission or
-    // Director department (a tick replaces it), so nothing read means salaried.
-    employment_type: raw.employmentType === 'commission_eligible' ? 'commission_eligible' : 'salaried',
-    basic_salary: money('Basic salary', raw.basicSalary),
-    allowances: money('Statutory allowance', raw.allowances),
-    non_statutory_allowance: money('Non-statutory allowance', raw.nonStatutoryAllowance),
-    ...statutory,
-  }
+  return out
 }

@@ -66,7 +66,15 @@ afterEach(cleanup)
 
 const form = () => screen.getByRole('form') as HTMLFormElement
 const bar = () => screen.getByRole('region', { name: 'Save changes' })
-const sent = () => new FormData(form())
+/** What the last save sent to updateStaff. */
+async function save(): Promise<Record<string, FormDataEntryValue>> {
+  mocks.updateStaff.mockResolvedValue({ ok: true })
+  await act(async () => {
+    fireEvent.submit(form())
+  })
+  const [, data] = mocks.updateStaff.mock.calls.at(-1) as [string, FormData]
+  return Object.fromEntries(data.entries())
+}
 
 function openEditor(v = view(), e: PersonEditor | null = editor()) {
   render(<PersonRecord view={v} editor={e} inviteHref={null} />)
@@ -133,12 +141,9 @@ describe('Edit — each value becomes its field where it stands', () => {
     expect(mocks.updateStaff).toHaveBeenCalledTimes(1)
     const [id, data] = mocks.updateStaff.mock.calls[0] as [string, FormData]
     expect(id).toBe('staff-1')
-    expect(data.get('contact_number')).toBe('012-999 0000')
-    // The whole record rides along, as the old form sent it.
-    expect(data.get('name')).toBe('TEST STAFF')
-    expect(data.get('employment_type')).toBe('salaried')
-    expect(data.get('basic_salary')).toBe('2500')
-    expect(data.get('epf_category')).toBe('A')
+    // Only what changed goes — the rest of the record is not written back
+    // (2026-10-14: a whole-page save put old values over changes made since).
+    expect(Object.fromEntries(data.entries())).toEqual({ contact_number: '012-999 0000' })
     // Saved: the page reads again, and says so.
     expect(screen.queryByRole('form')).toBeNull()
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
@@ -205,7 +210,7 @@ describe('Edit — each value becomes its field where it stands', () => {
 })
 
 describe('Employment Type — one row for the pay basis', () => {
-  it('fully commission based: no basic, no statutory, sent as the old tick; Salaried brings both back', () => {
+  it('fully commission based: no basic, no statutory; Salaried brings both back and is sent as the old select', async () => {
     const e = editor({ department_name: 'Revenue', commission_dept: true, employment_type: 'commission_eligible', basic_salary: 0 })
     openEditor(view({ department: 'Revenue', payMode: 'full_commission' }), e)
     const type = screen.getByLabelText('Employment Type') as HTMLSelectElement
@@ -213,19 +218,26 @@ describe('Employment Type — one row for the pay basis', () => {
     expect(Array.from(type.options).map(o => o.text)).toEqual(['Fully commission based', 'Salaried'])
     expect(screen.queryByLabelText('Basic')).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Statutory' })).toBeNull()
-    expect(sent().get('full_commission')).toBe('on')
-    expect(sent().get('employment_type')).toBeNull()
 
     fireEvent.change(type, { target: { value: 'salaried' } })
     expect(screen.getByLabelText('Basic')).toBeRequired()
     expect(screen.getByRole('heading', { name: 'Statutory' })).toBeInTheDocument()
-    expect(sent().get('full_commission')).toBeNull()
-    expect(sent().get('employment_type')).toBe('salaried')
     expect(type).toHaveAttribute('data-dirty', 'true')
     expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Basic'), { target: { value: '1800' } })
+    expect(await save()).toEqual({ employment_type: 'salaried', basic_salary: '1800' })
   })
 
-  it('variable pay: the pay fields go, statutory stays, sent as the old tick', () => {
+  it('back to fully commission based is sent as the old tick, and nothing of the pay it leaves', async () => {
+    openEditor(view({ department: 'Revenue', payMode: 'salaried' }), editor({ department_name: 'Revenue', commission_dept: true }))
+    fireEvent.change(screen.getByLabelText('Basic'), { target: { value: '9999' } })
+    fireEvent.change(screen.getByLabelText('Employment Type'), { target: { value: 'full_commission' } })
+    expect(screen.queryByLabelText('Basic')).toBeNull()
+    expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
+    expect(await save()).toEqual({ full_commission: 'on' })
+  })
+
+  it('variable pay: the pay fields go, statutory stays, sent as the old tick', async () => {
     const e = editor({ department_name: 'Director', director_dept: true, employment_type: 'variable', basic_salary: 0 })
     openEditor(view({ department: 'Director', payMode: 'variable' }), e)
     const type = screen.getByLabelText('Employment Type') as HTMLSelectElement
@@ -234,46 +246,59 @@ describe('Employment Type — one row for the pay basis', () => {
     expect(screen.getByText('Variable pay — keyed monthly')).toBeInTheDocument()
     expect(screen.getByLabelText('EPF')).toBeInTheDocument()
     expect(screen.getByLabelText('PCB')).toBeInTheDocument()
-    expect(sent().get('variable_pay')).toBe('on')
 
     fireEvent.change(type, { target: { value: 'salaried' } })
     expect(screen.getByLabelText('Basic')).toBeRequired()
-    expect(sent().get('variable_pay')).toBeNull()
+    fireEvent.change(type, { target: { value: 'variable' } })
+    fireEvent.change(screen.getByLabelText('PCB'), { target: { value: 'KA2' } })
+    // Back where it started: the basis is no change; the category is.
+    expect(await save()).toEqual({ pcb_category: 'KA2' })
   })
 
-  it('elsewhere, Salaried or Commission-eligible, sent as the old select', () => {
+  it('a director moved to a fixed pay is sent the select and the basic typed', async () => {
+    const e = editor({ department_name: 'Director', director_dept: true, employment_type: 'variable', basic_salary: 0 })
+    openEditor(view({ department: 'Director', payMode: 'variable' }), e)
+    fireEvent.change(screen.getByLabelText('Employment Type'), { target: { value: 'salaried' } })
+    fireEvent.change(screen.getByLabelText('Basic'), { target: { value: '14400' } })
+    expect(await save()).toEqual({ employment_type: 'salaried', basic_salary: '14400' })
+  })
+
+  it('elsewhere, Salaried or Commission-eligible, sent as the old select', async () => {
     openEditor()
     const type = screen.getByLabelText('Employment Type') as HTMLSelectElement
     expect(Array.from(type.options).map(o => o.text)).toEqual(['Salaried', 'Commission-eligible'])
     fireEvent.change(type, { target: { value: 'commission_eligible' } })
-    expect(sent().get('employment_type')).toBe('commission_eligible')
     expect(screen.getByLabelText('Basic')).toBeInTheDocument()
+    expect(await save()).toEqual({ employment_type: 'commission_eligible' })
   })
 })
 
 describe('what this editor may not see is shown, not sent (DESIGN.md › A hidden value)', () => {
-  it('NRIC and bank accounts unticked: •••• in a box with no field behind it', () => {
+  it('NRIC and bank accounts unticked: •••• in a box with no field behind it, never sent', async () => {
     const e = editor({ nric: '••••', bank_account_no: '••••', bank_account_no_2: '••••' }, { nric: false, bank: false })
     openEditor(view({ nric: '••••', bank: { name1: 'Maybank', no1: '••••', name2: 'CIMB', no2: '••••' } }), e)
     expect(screen.queryByLabelText('NRIC')).toBeNull()
     expect(screen.getByTitle('NRIC / IC is not ticked for your title')).toHaveTextContent('••••')
-    const data = sent()
-    for (const key of ['nric', 'bank_name', 'bank_account_no', 'bank_name_2', 'bank_account_no_2']) {
-      expect(data.has(key), key).toBe(false)
+    for (const name of ['nric', 'bank_name', 'bank_account_no', 'bank_name_2', 'bank_account_no_2']) {
+      expect(form().elements.namedItem(name), name).toBeNull()
     }
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'other@example.com' } })
+    expect(await save()).toEqual({ email: 'other@example.com' })
   })
 
-  it('loads both accounts and sends an Account 2 removal without touching Account 1', () => {
+  it('loads both accounts and sends an Account 2 removal without touching Account 1', async () => {
     openEditor()
     expect(screen.getByLabelText('Account 1 bank')).toHaveValue('Maybank')
     expect(screen.getByLabelText('Account 2 bank')).toHaveValue('CIMB')
     expect(screen.getByLabelText('Account 2 number')).toHaveValue('0098765432')
     fireEvent.change(screen.getByLabelText('Account 2 bank'), { target: { value: '' } })
     fireEvent.change(screen.getByLabelText('Account 2 number'), { target: { value: '' } })
-    const data = sent()
-    expect(data.get('bank_name')).toBe('Maybank')
-    expect(data.get('bank_account_no')).toBe('0012345678')
-    expect(data.get('bank_name_2')).toBe('')
-    expect(data.get('bank_account_no_2')).toBe('')
+    expect(await save()).toEqual({ bank_name_2: '', bank_account_no_2: '' })
+  })
+
+  it('sends a bank account whole when only its number changed', async () => {
+    openEditor()
+    fireEvent.change(screen.getByLabelText('Account 1 number'), { target: { value: '0012399999' } })
+    expect(await save()).toEqual({ bank_name: 'Maybank', bank_account_no: '0012399999' })
   })
 })

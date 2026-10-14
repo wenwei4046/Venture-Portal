@@ -17,6 +17,9 @@ vi.mock('@/lib/supabase/server', () => ({ createClient }))
 const { gate } = vi.hoisted(() => ({ gate: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: gate, requireActionOn: gate, requireAnyActionOn: gate, requirePayrollPayoutsActionOn: gate }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+// Account 1 as the record holds it — read only when Account 2 is saved alone.
+const { readStaffPrivate } = vi.hoisted(() => ({ readStaffPrivate: vi.fn() }))
+vi.mock('@/lib/private-fields', () => ({ readStaffPrivate }))
 import { addStaff, updateStaff } from './actions'
 
 // HR's title ticks all three (2026-10-09, PR4). The Director template ticks
@@ -71,13 +74,72 @@ describe('staff bank account server actions', () => {
       await expect(updateStaff('staff', staffForm(second))).resolves.toEqual({ ok: false, reason: expect.stringMatching(/Account 2/) })
       await expect(addStaff(staffForm(second))).rejects.toThrow(/Account 2/)
     }
+    // The record is read as it stands (2026-10-14: Account 2 is checked
+    // against the Account 1 it will sit beside); nothing is written.
     expect(insert).not.toHaveBeenCalled()
     expect(update).not.toHaveBeenCalled()
-    expect(query.select).not.toHaveBeenCalled()
   })
 })
 
 describe('a person is saved from their own page (2026-10-14, edited where it stands)', () => {
+  it('writes only the fields sent — what changed — and nothing back over the rest', async () => {
+    // The side note the user passed on (2026-10-14): a save of the whole page
+    // put the page's old values back over changes made since it was opened.
+    const form = new FormData()
+    form.set('contact_number', ' 012-999 0000 ')
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: true })
+    expect(update).toHaveBeenCalledWith({ contact_number: '012-999 0000' })
+  })
+
+  it('writes nothing at all when nothing was sent', async () => {
+    await expect(updateStaff('staff', new FormData())).resolves.toEqual({ ok: true })
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('checks Account 2 saved alone against Account 1 on file', async () => {
+    query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, bank_name: 'Maybank' }, error: null })
+    readStaffPrivate.mockResolvedValueOnce(new Map([['staff', { nric: null, bank_account_no: '0012345678', bank_account_no_2: null }]]))
+    const form = new FormData()
+    form.set('bank_name_2', 'maybank')
+    form.set('bank_account_no_2', '0012-345678')
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: false, reason: 'Account 2 must be different from Account 1' })
+    expect(update).not.toHaveBeenCalled()
+
+    // A different account: written alone, Account 1 untouched.
+    query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, bank_name: 'Maybank' }, error: null })
+    readStaffPrivate.mockResolvedValueOnce(new Map([['staff', { nric: null, bank_account_no: '0012345678', bank_account_no_2: null }]]))
+    form.set('bank_account_no_2', '0098 7654')
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: true })
+    expect(update).toHaveBeenCalledWith({ bank_name_2: 'maybank', bank_account_no_2: '00987654' })
+  })
+
+  it('refuses a basic for somebody moved to commission since the page was opened', async () => {
+    query.maybeSingle.mockResolvedValueOnce({
+      data: { department_id: 'department', title_id: null, employment_type: 'commission_eligible', departments: { payroll_source: 'commission' } },
+      error: null,
+    })
+    const form = new FormData()
+    form.set('basic_salary', '3500')
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: false, reason: expect.stringMatching(/pay basis changed/) })
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('never blanks a name, a date or a contact the save did not carry', async () => {
+    const form = new FormData()
+    form.set('email', 'new@example.com')
+    await updateStaff('staff', form)
+    const fields = update.mock.calls[0][0]
+    for (const key of ['employee_name', 'hire_date', 'resignation_date', 'employee_code', 'contact_number', 'address', 'title_id', 'employment_type', 'basic_salary']) {
+      expect(fields, key).not.toHaveProperty(key)
+    }
+  })
+
+  it('refuses a blank name', async () => {
+    const form = new FormData()
+    form.set('name', '   ')
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: false, reason: 'A name is required' })
+  })
+
   it('names the full page as the write’s page, and answers ok', async () => {
     await expect(updateStaff('staff', staffForm())).resolves.toEqual({ ok: true })
     expect(gate).toHaveBeenCalledWith('/team/people/[id]', 'team', 'edit')

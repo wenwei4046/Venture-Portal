@@ -26,6 +26,7 @@ import {
   asksPay,
   asksStatutory,
   changedFields,
+  changedFormData,
   changesLabel,
   payModeChoices,
   payModeFields,
@@ -41,8 +42,9 @@ import s from './person-record.module.css'
  * should be can edit key in column"). Edit turns each fact into its field in
  * the same row of the same section; Department, Account and Role stay as they
  * read. The bar at the sheet's foot holds Cancel and Save, and stays in view
- * while the page scrolls. The old Edit page (`/team/people/[id]/edit`) sends
- * here with `?edit=1`.
+ * while the page scrolls. Save sends only the fields that changed, so it never
+ * puts back what somebody else changed since the page was opened. The old
+ * Edit page (`/team/people/[id]/edit`) sends here with `?edit=1`.
  */
 
 /** What the page reads, worded — and masked — by the server as this viewer may see it. */
@@ -164,7 +166,10 @@ export default function PersonRecord({
       leave()
       return
     }
-    const data = new FormData(event.currentTarget)
+    // Only what changed goes (2026-10-14): a field left as it was drawn is not
+    // sent, so the save cannot put back an older value over somebody else's
+    // change made since this page was opened.
+    const data = changedFormData(event.currentTarget, changedFields(event.currentTarget), mode !== initialMode ? payModeFields(mode) : {})
     setError(null)
     startSaving(async () => {
       try {
@@ -317,26 +322,21 @@ export default function PersonRecord({
           field="employment_mode"
           value={PAY_MODE_LABEL[view.payMode]}
           edit={e => (
-            <>
-              {/* Not a field of its own: what it sends is the old form's ticks
-                  or its select (payModeFields), which updateStaff reads. */}
-              <Select
-                id={fieldId('employment_mode')}
-                value={mode}
-                onChange={event => setMode(event.target.value as PayMode)}
-                className={s.select}
-                data-dirty={mode !== initialMode ? 'true' : undefined}
-              >
-                {payModeChoices(e.staff, initialMode).map(m => (
-                  <option key={m} value={m}>
-                    {PAY_MODE_LABEL[m]}
-                  </option>
-                ))}
-              </Select>
-              {Object.entries(payModeFields(mode)).map(([name, value]) => (
-                <input key={name} type="hidden" name={name} value={value} />
+            // Not a field of its own: a new basis is sent as the old form's
+            // ticks or its select (payModeFields), which updateStaff reads.
+            <Select
+              id={fieldId('employment_mode')}
+              value={mode}
+              onChange={event => setMode(event.target.value as PayMode)}
+              className={s.select}
+              data-dirty={mode !== initialMode ? 'true' : undefined}
+            >
+              {payModeChoices(e.staff, initialMode).map(m => (
+                <option key={m} value={m}>
+                  {PAY_MODE_LABEL[m]}
+                </option>
               ))}
-            </>
+            </Select>
           )}
         />
         <Row label="Hire Date" field="hire_date" value={view.hireDate} edit={e => <TextField name="hire_date" type="date" defaultValue={e.staff.hire_date} />} />
@@ -451,7 +451,7 @@ export default function PersonRecord({
 
       {/* Paid 100% on commission: no basic, no allowances, statutory at 0 —
           so salary says so and statutory is neither shown nor asked. A save
-          then leaves the categories as they were (payFieldsForUpdate). */}
+          then leaves the categories as they were (payPatchForUpdate). */}
       {shownMode === 'full_commission' ? (
         <Section title="Salary">
           <Row label="Pay basis" value="Fully commission based" />
@@ -610,6 +610,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
+/** A row while editing: label | field from 640px up, the label over its field below. */
+const EDIT_ROW = 'grid grid-cols-1 gap-1.5 sm:grid-cols-[140px_1fr] sm:gap-4 sm:items-center'
+
 /**
  * One fact: its label, and its value — or, while editing, the field `edit`
  * draws in the value's place. A row with no `edit` reads the same in both.
@@ -633,7 +636,8 @@ function Row({
   const editor = useContext(Editing)
   if (editor && edit) {
     return (
-      <div className="grid grid-cols-[140px_1fr] gap-4 items-center">
+      // On a phone the label stands over its field, so the field has the width.
+      <div className={EDIT_ROW}>
         <dt>
           <label htmlFor={field ? fieldId(field) : undefined} className="text-[10px] font-medium uppercase tracking-[0.06em]">
             {label}
@@ -645,7 +649,7 @@ function Row({
   }
   const isEmpty = value == null || value === ''
   return (
-    <div className={`grid grid-cols-[140px_1fr] gap-4 ${editor ? 'items-center min-h-[32px]' : 'items-baseline'}`}>
+    <div className={editor ? `${EDIT_ROW} sm:min-h-[32px]` : 'grid grid-cols-[140px_1fr] gap-4 items-baseline'}>
       <dt className="text-[10px] font-medium uppercase tracking-[0.06em]">{label}</dt>
       <dd className={[mono && !isEmpty ? 'font-mono tabular text-[12.5px]' : 'text-sm', multiline ? 'whitespace-pre-line' : ''].join(' ')}>
         {isEmpty ? '—' : value}

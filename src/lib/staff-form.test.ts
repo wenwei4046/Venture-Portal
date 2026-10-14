@@ -6,10 +6,9 @@ import {
   isVariablePay,
   managersForDepartment,
   offersVariablePay,
-  payFieldsForUpdate,
+  payPatchForUpdate,
   subDepartmentsForDepartment,
   titlesForDepartment,
-  type RawPayFields,
   type RawStaffForm,
   validateStaffForm,
 } from './staff-form'
@@ -229,23 +228,23 @@ describe('isVariablePay', () => {
   })
 })
 
-describe('payFieldsForUpdate', () => {
-  const salaried: RawPayFields = {
-    fullCommission: false,
-    employmentType: 'salaried',
-    basicSalary: '3500',
-    allowances: '200',
-    nonStatutoryAllowance: '50',
-    epfCategory: 'A',
-    socsoCategory: 'first',
-    isEpfExempt: false,
-    pcbCategory: 'KA1',
-    childrenCount: '2',
-  }
+/**
+ * A person's record saves only what changed (2026-10-14): a field not sent is
+ * not written, so a save never puts back what somebody else changed after
+ * the page was opened.
+ */
+describe('payPatchForUpdate', () => {
+  it('writes nothing when nothing was sent', () => {
+    expect(payPatchForUpdate({ fixedPayNow: true })).toEqual({})
+  })
+
+  it('writes one amount sent, alone', () => {
+    expect(payPatchForUpdate({ fixedPayNow: true, allowances: '200' })).toEqual({ allowances: 200 })
+  })
 
   it('fully commission based writes the four pay columns and nothing else', () => {
-    // The statutory fields were not on the form; whatever the row holds stays.
-    expect(payFieldsForUpdate({ ...salaried, fullCommission: true })).toEqual({
+    // The statutory categories decide nothing on a 0 base: whatever the row holds stays.
+    expect(payPatchForUpdate({ mode: 'full_commission', fixedPayNow: true, basicSalary: '3500', epfCategory: 'A' })).toEqual({
       employment_type: 'commission_eligible',
       basic_salary: 0,
       allowances: 0,
@@ -253,69 +252,51 @@ describe('payFieldsForUpdate', () => {
     })
   })
 
-  it('otherwise writes every pay and statutory field', () => {
-    expect(payFieldsForUpdate(salaried)).toEqual({
-      employment_type: 'salaried',
-      basic_salary: 3500,
-      allowances: 200,
-      non_statutory_allowance: 50,
-      epf_category: 'A',
-      socso_category: 'first',
-      is_epf_exempt: false,
-      pcb_category: 'KA1',
-      children_count: 2,
-    })
-  })
-
-  it('variable pay writes zero pay and the statutory categories with it', () => {
-    // The month's keyed figure still attracts statutory, so the categories
-    // stay on the form and are written — unlike fully commission based.
-    expect(payFieldsForUpdate({ ...salaried, variablePay: true, basicSalary: '14400' })).toEqual({
+  it('variable pay writes zero pay and the categories sent with it', () => {
+    // The month's keyed figure still attracts statutory, so a category sent is written.
+    expect(payPatchForUpdate({ mode: 'variable', fixedPayNow: true, epfCategory: 'A', childrenCount: '2' })).toEqual({
       employment_type: 'variable',
       basic_salary: 0,
       allowances: 0,
       non_statutory_allowance: 0,
       epf_category: 'A',
-      socso_category: 'first',
-      is_epf_exempt: false,
-      pcb_category: 'KA1',
       children_count: 2,
     })
   })
 
-  it('variable pay still checks the statutory categories', () => {
-    expect(() => payFieldsForUpdate({ ...salaried, variablePay: true, epfCategory: 'Z' })).toThrow(
-      /EPF category is not a valid choice/,
-    )
+  it('a fixed pay writes its type and the amounts sent — from commission too', () => {
+    expect(payPatchForUpdate({ mode: 'salaried', fixedPayNow: false, basicSalary: '3500' })).toEqual({
+      employment_type: 'salaried',
+      basic_salary: 3500,
+    })
+    expect(payPatchForUpdate({ mode: 'commission_eligible', fixedPayNow: true })).toEqual({ employment_type: 'commission_eligible' })
   })
 
-  it('reads a missing Employment Type select as salaried', () => {
-    expect(payFieldsForUpdate({ ...salaried, employmentType: null }).employment_type).toBe('salaried')
-    expect(payFieldsForUpdate({ ...salaried, employmentType: 'commission_eligible' }).employment_type).toBe(
-      'commission_eligible',
-    )
+  it('refuses an amount for a record moved off a fixed pay since the page was opened', () => {
+    expect(() => payPatchForUpdate({ fixedPayNow: false, basicSalary: '3500' })).toThrow(/pay basis changed since this page was opened/)
+    expect(() => payPatchForUpdate({ mode: 'variable', fixedPayNow: true, allowances: '10' })).toThrow(/pay basis changed/)
   })
 
-  it('checks the statutory categories instead of casting them', () => {
-    expect(() => payFieldsForUpdate({ ...salaried, epfCategory: 'Z' })).toThrow(
-      /EPF category is not a valid choice/,
-    )
-    expect(() => payFieldsForUpdate({ ...salaried, socsoCategory: null })).toThrow(
-      /SOCSO category is required/,
-    )
-    expect(() => payFieldsForUpdate({ ...salaried, pcbCategory: '' })).toThrow(/PCB category is required/)
+  it('checks the categories and the basis instead of casting them', () => {
+    expect(() => payPatchForUpdate({ fixedPayNow: true, epfCategory: 'Z' })).toThrow(/EPF category is not a valid choice/)
+    expect(() => payPatchForUpdate({ fixedPayNow: true, socsoCategory: '' })).toThrow(/SOCSO category is required/)
+    expect(() => payPatchForUpdate({ fixedPayNow: true, pcbCategory: '' })).toThrow(/PCB category is required/)
+    expect(() => payPatchForUpdate({ mode: 'bogus', fixedPayNow: true })).toThrow(/Employment type is not a valid choice/)
+  })
+
+  it('writes the EPF exempt tick either way when it was sent', () => {
+    expect(payPatchForUpdate({ fixedPayNow: true, isEpfExempt: false })).toEqual({ is_epf_exempt: false })
+    expect(payPatchForUpdate({ fixedPayNow: false, isEpfExempt: true })).toEqual({ is_epf_exempt: true })
   })
 
   it('reads children as a whole number, blank as 0', () => {
-    expect(payFieldsForUpdate({ ...salaried, childrenCount: '' })).toMatchObject({ children_count: 0 })
-    expect(() => payFieldsForUpdate({ ...salaried, childrenCount: '1.5' })).toThrow(/whole number/)
-    expect(() => payFieldsForUpdate({ ...salaried, childrenCount: '-1' })).toThrow(/whole number/)
+    expect(payPatchForUpdate({ fixedPayNow: true, childrenCount: '' })).toEqual({ children_count: 0 })
+    expect(() => payPatchForUpdate({ fixedPayNow: true, childrenCount: '1.5' })).toThrow(/whole number/)
+    expect(() => payPatchForUpdate({ fixedPayNow: true, childrenCount: '-1' })).toThrow(/whole number/)
   })
 
   it('refuses a negative amount by field name', () => {
-    expect(() => payFieldsForUpdate({ ...salaried, allowances: '-5' })).toThrow(
-      /Statutory allowance cannot be negative/,
-    )
+    expect(() => payPatchForUpdate({ fixedPayNow: true, allowances: '-5' })).toThrow(/Statutory allowance cannot be negative/)
   })
 })
 

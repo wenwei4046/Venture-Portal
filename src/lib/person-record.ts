@@ -1,9 +1,9 @@
 // A person's full page, edited where it stands (2026-10-14, the user: "when i
 // press edit, no need jump to another tab, it should be can edit key in
 // column"). Edit turns each fact into its field in the same row; one bar at
-// the sheet's foot saves. What the pay basis offers, how it travels in the
-// form `updateStaff` reads, and the words it reads as — shared by the read and
-// the edit rows, so the two cannot say different things.
+// the sheet's foot saves — only what changed. What the pay basis offers, how
+// it travels to `updateStaff`, and the words it reads as — shared by the read
+// and the edit rows, so the two cannot say different things.
 import { isFullyCommissionBased, isVariablePay } from './staff-form'
 
 /**
@@ -43,9 +43,9 @@ export function payModeChoices(row: { commission_dept: boolean; director_dept: b
 }
 
 /**
- * What a pay basis sends to `updateStaff`: the ticks the old form had
+ * What a new pay basis sends to `updateStaff`: the ticks the old form had
  * (`full_commission`, `variable_pay`) or its Employment Type select — the
- * action and `payFieldsForUpdate` read exactly these.
+ * action and `payPatchForUpdate` read exactly these.
  */
 export function payModeFields(mode: PayMode): Record<string, string> {
   switch (mode) {
@@ -82,10 +82,49 @@ export const PCB_LABELS: Readonly<Record<string, string>> = {
   KA3: 'KA3 (Married, spouse working)',
 }
 
+/** Fields saved together: a bank account is its bank and its number. */
+const SAVED_TOGETHER: ReadonlyArray<readonly string[]> = [
+  ['bank_name', 'bank_account_no'],
+  ['bank_name_2', 'bank_account_no_2'],
+]
+
+/**
+ * What a save sends: only the fields that changed — so it never writes back
+ * what somebody else changed after the page was opened (2026-10-14) — each
+ * bank account whole, a tick as `on` or blank, and the pay basis's own fields
+ * when it changed (`payModeFields`).
+ */
+export function changedFormData(form: HTMLFormElement, changed: ReadonlySet<string>, payBasis: Record<string, string> = {}): FormData {
+  const names = new Set(changed)
+  for (const pair of SAVED_TOGETHER) if (pair.some(name => names.has(name))) pair.forEach(name => names.add(name))
+  const out = new FormData()
+  for (const name of names) {
+    const el = form.elements.namedItem(name)
+    if (el instanceof HTMLInputElement) out.set(name, el.type === 'checkbox' ? (el.checked ? 'on' : '') : el.value)
+    else if (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) out.set(name, el.value)
+  }
+  for (const [name, value] of Object.entries(payBasis)) out.set(name, value)
+  return out
+}
+
 /** The save bar's count: "No changes", "1 change", "3 changes". */
 export function changesLabel(count: number): string {
   if (count === 0) return 'No changes'
   return `${count} change${count === 1 ? '' : 's'}`
+}
+
+const oneBreak = (text: string) => text.replace(/\r\n?/g, '\n')
+
+/**
+ * The value an input was drawn with, as the browser keeps it: its own clean-up
+ * of the record's text (an email trimmed, line breaks dropped from a text
+ * field) — else an imported value with a stray space reads as a change.
+ */
+function drawnValue(el: HTMLInputElement): string {
+  const probe = el.ownerDocument.createElement('input')
+  probe.type = el.type
+  probe.value = el.defaultValue
+  return probe.value
 }
 
 /**
@@ -100,10 +139,13 @@ export function changedFields(form: HTMLFormElement): Set<string> {
   for (const el of Array.from(form.elements)) {
     if (el instanceof HTMLInputElement) {
       if (!el.name || el.type === 'hidden' || el.disabled) continue
-      const changed = el.type === 'checkbox' || el.type === 'radio' ? el.checked !== el.defaultChecked : el.value !== el.defaultValue
+      const changed = el.type === 'checkbox' || el.type === 'radio' ? el.checked !== el.defaultChecked : el.value !== drawnValue(el)
       if (changed) out.add(el.name)
     } else if (el instanceof HTMLTextAreaElement) {
-      if (el.name && !el.disabled && el.value !== el.defaultValue) out.add(el.name)
+      // A textarea hands its value back with \n for every line break, while
+      // the text it was drawn with keeps the record's own (\r\n from the
+      // imports): an untouched address is not a change.
+      if (el.name && !el.disabled && oneBreak(el.value) !== oneBreak(el.defaultValue)) out.add(el.name)
     } else if (el instanceof HTMLSelectElement) {
       if (!el.name || el.disabled || el.multiple) continue
       const options = Array.from(el.options)
