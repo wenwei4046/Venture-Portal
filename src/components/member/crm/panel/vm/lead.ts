@@ -18,6 +18,7 @@ import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, mediaOf, mediaWord } from "../../shared/chat-media";
 import { MENU_ICON, openMsgMenu, pressToOpen } from "../../shared/msg-menu";
+import { forwardChats, messageInfo } from "../../shared/msg-info";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
@@ -67,9 +68,13 @@ export function leadVM(ctx: PanelCtx) {
       quote: (() => { const q = m.replyTo ? c?.messages.find(x => x.id === m.replyTo) : undefined; return q ? { who: q.from === "me" ? "You" : c?.name ?? "", text: q.text || mediaWord(q) } : null; })(),
       press: pressToOpen(() => openMsgMenu({
         mine, preview: m.text || (m.media ? mediaWord(m) : ""), reaction: m.myReaction ?? "", react: e => void ctx.act.react(m.id, e),
+        forward: c ? { chats: forwardChats(ctx.data.customers, c.id, nameOf), send: toId => void ctx.act.forward(m.id, toId) } : undefined,
+        info: c ? messageInfo(m, c, nameOf) : undefined,
         actions: [
           { label: "Reply", icon: MENU_ICON.reply, run: () => patch({ pReply: { msgId: m.id, who: mine ? "You" : c?.name ?? "", text: m.text || mediaWord(m) } }) },
+          { label: "Forward", icon: MENU_ICON.forward, run: () => {} },
           ...(m.text ? [{ label: "Copy", icon: MENU_ICON.copy, run: () => { void navigator.clipboard?.writeText(m.text).catch(() => {}); } }] : []),
+          { label: "Info", icon: MENU_ICON.info, run: () => {} },
           { label: "Delete for me", icon: MENU_ICON.del, danger: true, run: () => void ctx.act.hideMessage(m.id) },
         ],
       })),
