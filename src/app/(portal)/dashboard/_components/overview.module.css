@@ -1,0 +1,176 @@
+/* The Overview of Finance's view and of HR's (2026-10-14, the Finance revamp
+   v2 — `.design/fin-r2/handoff`: `Finance Desktop.dc.html` D01 and
+   `HR Overview.dc.html` H01–H02). Every value is the prototype's own; the
+   colours are the design system's `--hr-*`, written here as the code has them
+   (finv.module.css lists the names). */
+
+.root {
+  line-height: normal;
+  color: rgb(51 36 27);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+/* HR's sheet pads 24px (20 under 1000px); the HR Overview's prototype pads its
+   scroller 24 / 28 / 48 as Finance's does. Only this page takes it. */
+@media (min-width: 768px) {
+  :global(.hrv-sheet.sheet):has(> .hrRoot) { padding: 24px 28px 48px; }
+}
+
+/* ── The head: the date, the greeting, the 64px segment; the actions right ── */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+.headText { min-width: 0; }
+.eyebrow {
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(51 36 27);
+}
+/* `h1` is drawn by the portal's global rule; the class pair outranks it. */
+.head .title {
+  margin: 12px 0 0;
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: rgb(0 0 0);
+}
+.rule { margin-top: 14px; width: 64px; height: 2px; background: rgb(233 154 83); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid rgb(229 228 223);
+  border-radius: 8px;
+  background: rgb(255 255 255);
+  color: rgb(0 0 0);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: normal;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.btn:hover { filter: brightness(0.97); color: rgb(0 0 0); text-decoration: none; }
+.btn:active { transform: scale(0.98); }
+.btn[data-kind='primary'] { border: 0; background: rgb(233 154 83); font-weight: 500; }
+/* HR's two (H01): the primary darkens to the accent's hover, the other washes. */
+.hrRoot .btn:hover { filter: none; background: rgb(241 236 228); }
+.hrRoot .btn[data-kind='primary']:hover { background: rgb(221 139 66); }
+
+/* ── What waits, in one line ── */
+.summary {
+  margin: 18px 0 0;
+  max-width: 640px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: rgb(74 64 58);
+  text-wrap: pretty;
+}
+
+/* ── Quick actions: a label on a hairline, then the tiles ── */
+.label { display: flex; align-items: baseline; gap: 8px; margin: 28px 0 12px; }
+.labelText { font-size: 10.5px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(117 100 86); }
+.labelRule { flex: 1; height: 1px; background: rgb(229 228 223); }
+.quick { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgb(232 225 216);
+  border-radius: 12px;
+  background: rgb(255 255 255);
+  box-shadow: 0 3px 12px rgb(90 62 43 / 5.5%);
+  font-family: inherit;
+  font-size: 13.333px;
+  text-align: left;
+  text-decoration: none;
+  color: rgb(51 36 27);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.tile:hover { border-color: rgb(233 154 83); color: rgb(51 36 27); text-decoration: none; }
+.tileIcon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: rgb(var(--tile-light));
+  color: rgb(var(--tile-deep));
+}
+.badge {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 99px;
+  border: 2px solid rgb(255 255 255);
+  background: rgb(233 154 83);
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10px;
+  line-height: 14px;
+  color: rgb(0 0 0);
+}
+.tileLabel { font-size: 13.5px; font-weight: 500; }
+
+/* ── One card per category: its numeral, name and page count, then its rows ── */
+.cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 28px; }
+.cat { padding: 14px 8px 8px; border: 1px solid rgb(229 228 223); border-radius: 12px; background: rgb(255 255 255); }
+.catHead { display: flex; align-items: baseline; gap: 8px; padding: 0 8px 8px; }
+.catRoman { font-size: 11px; color: rgb(221 139 66); }
+.catLabel { font-size: 10.5px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(117 100 86); }
+.grow { flex: 1; }
+.catCount { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; color: rgb(117 100 86); }
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 8px;
+  border-radius: 8px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.row:hover { background: rgb(255 245 233); text-decoration: none; }
+.rowIcon {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  flex: none;
+  border-radius: 8px;
+  background: rgb(var(--tile-light));
+  color: rgb(var(--tile-deep));
+}
+.rowLabel { flex: 1; font-size: 13px; color: rgb(74 64 58); }
+.rowNote { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; color: rgb(117 100 86); }
+.chev { font-size: 15px; color: rgb(170 160 150); }
+
+/* The tones (the sidebar's): light tile, deep glyph. */
+.walnut { --tile-light: 239 228 217; --tile-deep: 75 48 36; }
+.clay { --tile-light: 249 231 216; --tile-deep: 163 78 37; }
+.gold { --tile-light: 246 237 213; --tile-deep: 125 91 32; }
+.slate { --tile-light: 230 237 241; --tile-deep: 78 101 116; }
+.olive { --tile-light: 238 240 226; --tile-deep: 88 98 68; }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .tile { transition: none; }
+  .btn:active { transform: none; }
+}

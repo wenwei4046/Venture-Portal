@@ -1,9 +1,20 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { cookies } from 'next/headers'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { officeTime, officeToday } from '@/lib/office-time'
 import { requireAuth } from '@/lib/auth'
+import { onFinanceView } from '@/lib/finance-view'
+import { REVENUE_SUB_COOKIE } from '@/lib/hr-view'
+import { canAccessRevenue } from '@/lib/roles'
+import { primedRegistryRows } from '@/lib/dept-registry'
+import { statementDepts } from '@/lib/dept-statements'
+import { readsDeptStatements, type NavData } from '@/components/layout/nav-config'
+import { listSubDepartments } from '../revenue/_lib/sub-departments'
+import FinanceOverview from './_components/FinanceOverview'
+import HrOverview from './_components/HrOverview'
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney, formatMoneyBare } from '@/lib/utils'
+import { formatMoney } from '@/lib/utils'
 import { resolveLiveApprovalAmounts, type ApprovalAmountRow } from '@/lib/approval-amounts'
 import { startRead } from '@/lib/start-read'
 import { decidesEverything, overviewFor, raisesForSignOff } from '@/lib/surfaces'
@@ -152,6 +163,25 @@ export default async function DashboardPage() {
   // HR's and Finance's views are lenses over the account's own power (2026-10-11):
   // the view picks the Overview, never the account's cells.
   const overview = lensOverview(user) ?? overviewFor(user)
+
+  // Finance's view opens on its own Overview (2026-10-14, the Finance revamp
+  // v2 — D01): the greeting, what waits, the quick actions, the categories.
+  // The Principal's own view keeps the treasury dashboard below.
+  if (overview === 'treasury' && onFinanceView(user)) {
+    const navData: NavData = { revenueSubDepts: [], ...(readsDeptStatements(user) ? { deptPoolDepts: statementDepts(primedRegistryRows()) } : {}) }
+    return <FinanceOverview user={user} supabase={supabase as unknown as SupabaseClient} navData={navData} />
+  }
+  // HR's Overview (2026-10-14, the same handoff's H01): Finance's layout for HR's view.
+  if (overview === 'hr') {
+    let revenueSub: string | null = null
+    if (canAccessRevenue(user)) {
+      const subs = await listSubDepartments()
+      const picked = (await cookies()).get(REVENUE_SUB_COOKIE)?.value
+      revenueSub = subs.find((x) => x.slug === picked)?.slug ?? (subs.find((x) => x.isHome) ?? subs[0])?.slug ?? null
+    }
+    return <HrOverview user={user} supabase={supabase as unknown as SupabaseClient} revenueSub={revenueSub} />
+  }
+
   const roleDashboard = overview !== 'treasury'
 
   // Inside the treasury Overview: the sign-off queue for whoever approves
@@ -247,322 +277,6 @@ export default async function DashboardPage() {
   // The RPC also returns { error: 'Access denied' } for a real HR/dept_manager
   // session (not a Supabase error) — kept as a belt-and-braces fallback.
   if (roleDashboard || (raw && typeof raw === 'object' && 'error' in raw && (raw as Record<string, unknown>).error === 'Access denied')) {
-    if (overview === 'hr') {
-      // HR Dashboard — data overview. Under the post-mig-278 flow HR's job is
-      // three actions (Import Employment List · Import Payroll · Calculate
-      // Director Salary), so the dashboard is three entry cards over the live
-      // HR figures. One RPC round-trip (hr_dashboard_summary, mig 283).
-      // The office's month. The summary is asked for it by name: left to its
-      // own default (current_date) it answers in UTC, which on the 1st until
-      // 08:00 in the office is still last month — beside this month's title.
-      const period = officeTime().startOf('month').format('YYYY-MM-DD')
-      const periodUrl = `/hr-costing/payroll/${period}`
-
-      const { data: hrRaw } = await supabase.rpc('hr_dashboard_summary', { p_period: period })
-
-      type HrDeptStaff = {
-        department_id: string
-        department_name: string
-        staff_count: number
-        total_basic: number
-      }
-      type HrPayrollDept = {
-        department_name: string
-        staff_count: number
-        basic: number
-        statutory_er: number
-        statutory_ee: number
-        gross: number
-        net: number
-      }
-      type HrDashboard = {
-        period: string
-        staff: { total_count: number; departments: HrDeptStaff[] }
-        payroll: {
-          run: { status: string; total_amount: number; submitted_at: string | null; approved_at: string | null } | null
-          rows_count: number
-          draft_count: number
-          by_department: HrPayrollDept[]
-        }
-        director: {
-          payout_count: number
-          status: 'not_calculated' | 'draft' | 'confirmed'
-          payout_mode: 'split' | 'fully_paid' | null
-          total_gross: number
-          total_saving: number
-          total_payroll_net: number
-          total_invoice: number
-          submission: { submitted_at: string; total_gross: number; director_count: number } | null
-        }
-        hr_pool_balance: number
-      }
-      const hr = hrRaw as unknown as HrDashboard
-
-      const staffCount = Number(hr?.staff?.total_count ?? 0)
-      const staffDepts = hr?.staff?.departments ?? []
-      const payrollRows = Number(hr?.payroll?.rows_count ?? 0)
-      const draftCount = Number(hr?.payroll?.draft_count ?? 0)
-      const run = hr?.payroll?.run ?? null
-      const payrollDepts = hr?.payroll?.by_department ?? []
-      const director = hr?.director
-      const poolBalance = Number(hr?.hr_pool_balance ?? 0)
-
-      const payrollTotals = payrollDepts.reduce(
-        (acc, d) => ({
-          staff: acc.staff + Number(d.staff_count ?? 0),
-          basic: acc.basic + Number(d.basic ?? 0),
-          statutory: acc.statutory + Number(d.statutory_er ?? 0) + Number(d.statutory_ee ?? 0),
-          gross: acc.gross + Number(d.gross ?? 0),
-          net: acc.net + Number(d.net ?? 0),
-        }),
-        { staff: 0, basic: 0, statutory: 0, gross: 0, net: 0 },
-      )
-
-      const runSubmitted = run?.status === 'approved' || run?.status === 'paid' || run?.status === 'submitted'
-      const directorStatus = director?.status ?? 'not_calculated'
-      const directorSubmitted = Boolean(director?.submission)
-
-      const monthLabel = dayjs(period).format('MMMM YYYY')
-      const monthName = dayjs(period).format('MMMM')
-      const deptCount = staffDepts.length
-      const directorMode =
-        director?.payout_mode === 'fully_paid'
-          ? 'Fully Paid'
-          : director?.payout_mode === 'split'
-            ? '75/25 split'
-            : null
-      // The Staff Master's closing line adds up its own rows.
-      const staffTotals = staffDepts.reduce(
-        (acc, d) => ({
-          staff: acc.staff + Number(d.staff_count ?? 0),
-          basic: acc.basic + Number(d.total_basic ?? 0),
-        }),
-        { staff: 0, basic: 0 },
-      )
-
-      return (
-        <div>
-          <div className="page-head">
-            <div>
-              <div className="page-eyebrow">
-                <em>II.</em> HR · OVERVIEW · {monthLabel.toUpperCase()}
-              </div>
-              <h1 className="page-title">HR Overview</h1>
-            </div>
-          </div>
-
-          {/* The whole HR job under the direct-submit flow is three actions —
-              Employment List, Import Payroll, Director Salary — so the month
-              opens on three cards that each lead to where the work is done,
-              and the HR Pool that pays for it. The month's payroll is the
-              figure the page is opened for: the one walnut card. */}
-          <StatCards label={`HR for ${monthLabel}`}>
-            <StatCard
-              label="Employment list"
-              value={staffCount > 0 ? String(staffCount) : 'No staff yet'}
-              icon="people"
-              href="/team/people"
-              note={
-                staffCount > 0
-                  ? `Active staff · ${deptCount} dept${deptCount === 1 ? '' : 's'} · manage / re-import`
-                  : 'Import Employment List'
-              }
-            />
-            <StatCard
-              label={`Payroll · ${monthName}`}
-              value={
-                payrollRows === 0
-                  ? 'Not imported'
-                  : runSubmitted
-                    ? formatMoney(Number(run?.total_amount ?? 0))
-                    : `${payrollRows} row${payrollRows === 1 ? '' : 's'}`
-              }
-              icon="receipt"
-              tone="primary"
-              href={periodUrl}
-              note={
-                payrollRows === 0
-                  ? 'Import Payroll'
-                  : runSubmitted
-                    ? 'Submitted to Finance'
-                    : `${draftCount} draft · open grid`
-              }
-            />
-            <StatCard
-              label={`Director salary · ${monthName}`}
-              value={
-                directorStatus === 'not_calculated'
-                  ? 'Not calculated'
-                  : directorStatus === 'confirmed'
-                    ? 'Confirmed'
-                    : 'Draft'
-              }
-              icon="briefcase"
-              tone={directorStatus === 'confirmed' ? 'ledger' : 'default'}
-              href="/director-salary"
-              note={
-                directorStatus === 'not_calculated'
-                  ? 'Calculate'
-                  : [directorMode, directorSubmitted ? 'submitted' : null].filter(Boolean).join(' · ') || undefined
-              }
-            />
-            <StatCard
-              label="HR Pool balance"
-              value={formatMoney(poolBalance)}
-              icon="wallet"
-              tone={poolBalance < 0 ? 'danger' : 'default'}
-              href="/hr-costing/payment"
-              note="Open Payment"
-            />
-          </StatCards>
-
-          {/* This month's payroll, per department */}
-          <section className="mb-10">
-            <div className="sect-head">
-              <h2>This month · payroll</h2>
-              <span className="rule" aria-hidden />
-              <span className="count">
-                {payrollRows} ROW{payrollRows === 1 ? '' : 'S'} · {run?.status ? run.status.toUpperCase() : 'NO RUN'}
-              </span>
-            </div>
-            {payrollDepts.length === 0 ? (
-              <div className={EMPTY_WELL}>
-                <p className="text-sm">No payroll imported for {monthLabel} yet.</p>
-                <Link href={periodUrl} className={`${PRIMARY_BUTTON} mt-3`}>
-                  Import Payroll
-                </Link>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="ledger-table">
-                  <thead>
-                    <tr>
-                      <th>Department</th>
-                      <th className="right m-hide">Staff</th>
-                      <th className="right m-hide">Basic</th>
-                      <th className="right m-hide">Statutory</th>
-                      <th className="right m-hide">Gross</th>
-                      <th className="right">Net</th>
-                      <th className="lt-toggle" aria-hidden />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payrollDepts.map((d) => (
-                      <LedgerRow key={d.department_name}>
-                        <td className="font-medium">{d.department_name}</td>
-                        <td className="num m-hide" data-label="Staff">{d.staff_count}</td>
-                        <td className="num m-hide" data-label="Basic">{formatMoneyBare(Number(d.basic))}</td>
-                        <td className="num m-hide" data-label="Statutory">{formatMoneyBare(Number(d.statutory_er) + Number(d.statutory_ee))}</td>
-                        <td className="num m-hide" data-label="Gross">{formatMoneyBare(Number(d.gross))}</td>
-                        <td className="num">{formatMoneyBare(Number(d.net))}</td>
-                      </LedgerRow>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td>All departments</td>
-                      <td className="num m-hide">{payrollTotals.staff}</td>
-                      <td className="num m-hide">{formatMoneyBare(payrollTotals.basic)}</td>
-                      <td className="num m-hide">{formatMoneyBare(payrollTotals.statutory)}</td>
-                      <td className="num m-hide">{formatMoneyBare(payrollTotals.gross)}</td>
-                      <td className="num">{formatMoneyBare(payrollTotals.net)}</td>
-                      <td className="lt-toggle" aria-hidden />
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            )}
-          </section>
-
-          {/* Staff master, per department */}
-          {staffDepts.length > 0 ? (
-            <section className="mb-10">
-              <div className="sect-head">
-                <h2>Staff master</h2>
-                <span className="rule" aria-hidden />
-                <span className="count">{staffCount} ACTIVE</span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="ledger-table">
-                  <thead>
-                    <tr>
-                      <th>Department</th>
-                      <th className="right">Staff</th>
-                      <th className="right">Total basic</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {staffDepts.map((d) => (
-                      <tr key={d.department_id}>
-                        <td className="font-medium">{d.department_name}</td>
-                        <td className="num">{d.staff_count}</td>
-                        <td className="num">{formatMoneyBare(Number(d.total_basic))}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td>All departments</td>
-                      <td className="num">{staffTotals.staff}</td>
-                      <td className="num">{formatMoneyBare(staffTotals.basic)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </section>
-          ) : null}
-
-          {/* The month's director salary in four figures */}
-          <section className="mb-10">
-            <div className="sect-head">
-              <h2>Director salary · {monthName}</h2>
-              <span className="rule" aria-hidden />
-              <span className="count">
-                {director?.payout_count ?? 0} DIRECTOR{(director?.payout_count ?? 0) === 1 ? '' : 'S'}
-              </span>
-            </div>
-            {directorStatus === 'not_calculated' ? (
-              <div className={EMPTY_WELL}>
-                <p className="text-sm">Not calculated for {monthLabel} yet.</p>
-                <Link href="/director-salary" className={`${PRIMARY_BUTTON} mt-3`}>
-                  Calculate Director Salary
-                </Link>
-              </div>
-            ) : (
-              <StatCards label={`Director salary for ${monthLabel}`}>
-                <StatCard
-                  label="Status"
-                  value={directorStatus === 'confirmed' ? 'Confirmed' : 'Draft'}
-                  icon={directorStatus === 'confirmed' ? 'check' : 'clock'}
-                  tone={directorStatus === 'confirmed' ? 'ledger' : 'alert'}
-                  note={`${director?.payout_mode === 'fully_paid' ? 'Fully Paid mode' : '75/25 split mode'}${directorSubmitted ? ' · submitted to Finance' : ''}`}
-                />
-                <StatCard
-                  label="Total gross"
-                  value={formatMoney(Number(director?.total_gross ?? 0))}
-                  icon="coin"
-                  tone="primary"
-                  note={`Saving ${formatMoneyBare(Number(director?.total_saving ?? 0))}`}
-                />
-                <StatCard
-                  label="Payroll net"
-                  value={formatMoney(Number(director?.total_payroll_net ?? 0))}
-                  icon="bank"
-                  note="Paid via payroll"
-                />
-                <StatCard
-                  label="Invoice total"
-                  value={formatMoney(Number(director?.total_invoice ?? 0))}
-                  icon="receipt"
-                  note={director?.payout_mode === 'fully_paid' ? 'n/a in Fully Paid mode' : '25% outsource accumulation'}
-                />
-              </StatCards>
-            )}
-          </section>
-        </div>
-      )
-    }
-
     if (overview === 'department') {
       // Dept Manager Dashboard — shows the manager's own department pool
       // state + their submitted expense requests awaiting Principal sign-off.
