@@ -33,6 +33,11 @@ export async function GET(request: Request) {
     // itself failing is this sweep's failure.
     const due = await db.rpc('member_run_due_replacements')
     if (due.error) console.error('Member replacement sweep failed', due.error.code ?? 'unknown')
+    // The CRM's due notices (mig 20261014240000): visits tomorrow whose reminder has not gone, chats waiting past
+    // 3 h · 6 h · 9 h — written once each, then sent by the flush below. A count only.
+    const crmDue = await db.rpc('notify_crm_due')
+    if (crmDue.error) console.error('CRM due notices failed', crmDue.error.code ?? 'unknown')
+    else if (crmDue.data) console.info('CRM due notices written', crmDue.data)
     // Phone notifications a write left unsent (mig 20261011180000) — through the outbox's own secret, not the service role.
     await flushPush()
     // Hiring's leftovers (mig 20261011210000; the user: every hour, even when nobody touches Hiring): files no

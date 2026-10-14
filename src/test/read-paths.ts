@@ -254,6 +254,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // A replacement runs itself on its date (mig 20261010170000): HR's two ask member_is_manager; the
   // hourly sweep is the service role's (api/member-queue).
   'member_schedule_replacement', 'member_unschedule_replacement', 'member_run_due_replacements',
+  // The CRM's due notices (mig 20261014240000): the hourly sweep's, the service role's alone.
+  'notify_crm_due',
   // The Revenue app's Waiting list & replacements (mig 20261010190000): member_requests, or member_is_manager for View as.
   'member_waiting_queue',
   // People › Permissions by view and tab (migs 20261011010000, 20261011020000): each asks has_perm('permissions_manage').
