@@ -71,13 +71,14 @@ function Shell({
       } else flash(r.reason ?? 'Something went wrong.')
     })
   return (
-    <CenterWindow open onClose={close} beside={beside}>
+    <CenterWindow open onClose={close} beside={beside ? <div className="sheet-theme" data-fin-kit="" style={{ display: 'contents' }}>{beside}</div> : undefined}>
+      <div className="sheet-theme" data-fin-kit="" style={{ display: 'contents' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: '18px 20px 14px', borderBottom: '1px solid var(--ds-border)' }}>
         <div>
           <div style={LBL}>Settings · {SECTION[sm.kind][0]}</div>
           <div style={{ fontSize: 18, fontWeight: 500, marginTop: 4 }}>{title || `New ${SECTION[sm.kind][1]}`}</div>
         </div>
-        <button type="button" onClick={close} aria-label="Close" style={{ border: 0, background: 'none', fontSize: 22, lineHeight: 1, color: 'var(--ds-ink-3)', cursor: 'pointer', padding: 0 }}>×</button>
+        <button type="button" onClick={close} aria-label="Close" style={{ border: 0, background: 'none', fontSize: 22, lineHeight: 1, color: 'var(--ds-ink-3)', cursor: 'pointer', padding: '1px 6px', fontFamily: 'Arial, sans-serif' }}>×</button>
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>{body}</div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '12px 20px', borderTop: '1px solid var(--ds-border)' }}>
@@ -94,6 +95,7 @@ function Shell({
             </Button>
           ) : null}
         </div>
+      </div>
       </div>
     </CenterWindow>
   )
@@ -287,9 +289,9 @@ function HolidayWindow(props: Props) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={LBL}>Date · {dmy(f.day)}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <button type="button" onClick={() => step(-1)} aria-label="Previous month" style={{ width: 30, height: 30, border: 0, background: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ds-ink)' }}>‹</button>
+                <button type="button" onClick={() => step(-1)} aria-label="Previous month" style={{ width: 30, height: 30, border: 0, background: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ds-ink)', padding: '1px 6px', fontFamily: 'Arial, sans-serif' }}>‹</button>
                 <span style={{ fontSize: 13, fontWeight: 600, minWidth: 72, textAlign: 'center' }}>{MONTHS[m - 1]} {y}</span>
-                <button type="button" onClick={() => step(1)} aria-label="Next month" style={{ width: 30, height: 30, border: 0, background: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ds-ink)' }}>›</button>
+                <button type="button" onClick={() => step(1)} aria-label="Next month" style={{ width: 30, height: 30, border: 0, background: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ds-ink)', padding: '1px 6px', fontFamily: 'Arial, sans-serif' }}>›</button>
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,minmax(0,1fr))', gap: 3, padding: 10, border: '1px solid var(--ds-border)', borderRadius: 12 }}>

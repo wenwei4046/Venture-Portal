@@ -28,7 +28,7 @@ export interface PanelProps {
 
 const LBL: CSSProperties = { fontSize: 10.5, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--ds-ink-3)' }
 const HOVER_ACCENT: CSSProperties = { borderColor: 'var(--hr-accent, rgb(233 154 83))' }
-const DASHED: CSSProperties = { border: '1.5px dashed var(--ds-border)', borderRadius: 12, background: 'transparent', minHeight: 120, fontFamily: 'inherit', fontSize: 13, color: 'var(--ds-ink-2)', cursor: 'pointer' }
+const DASHED: CSSProperties = { padding: '1px 6px', border: '1.5px dashed var(--ds-border)', borderRadius: 12, background: 'transparent', minHeight: 120, fontFamily: 'inherit', fontSize: 13, color: 'var(--ds-ink-2)', cursor: 'pointer' }
 const DASHED_HOVER: CSSProperties = { borderColor: 'var(--hr-accent, rgb(233 154 83))', color: 'rgb(var(--tone-clay-deep))' }
 
 function AddTile({ label, onClick, canEdit }: { label: string; onClick: () => void; canEdit: boolean }) {
@@ -248,9 +248,9 @@ export function HolidaysPanel({ config, open, canEdit, year }: PanelProps & { ye
           </span>
         ))}
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 2 }}>
-          <button type="button" aria-label="Previous year" onClick={() => setY(y - 1)} style={{ width: 30, height: 30, border: 0, background: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ds-ink)' }}>‹</button>
+          <button type="button" aria-label="Previous year" onClick={() => setY(y - 1)} style={{ width: 30, height: 30, border: 0, background: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ds-ink)', padding: '1px 6px', fontFamily: 'Arial, sans-serif' }}>‹</button>
           <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{y}</span>
-          <button type="button" aria-label="Next year" onClick={() => setY(y + 1)} style={{ width: 30, height: 30, border: 0, background: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ds-ink)' }}>›</button>
+          <button type="button" aria-label="Next year" onClick={() => setY(y + 1)} style={{ width: 30, height: 30, border: 0, background: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ds-ink)', padding: '1px 6px', fontFamily: 'Arial, sans-serif' }}>›</button>
         </span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10 }}>

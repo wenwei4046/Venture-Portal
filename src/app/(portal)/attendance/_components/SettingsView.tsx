@@ -54,7 +54,7 @@ export default function SettingsView({ config }: { config: AttConfig }) {
   return (
     <HvPage>
       <PageHead eyebrow="Attendance" title="Settings" right={<Button variant="secondary" onClick={download}>Export</Button>} />
-      <div style={{ display: 'grid', gridTemplateColumns: '260px minmax(0,1fr)', gap: 20, alignItems: 'start', marginTop: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '260px minmax(0,1fr)', gap: 20, alignItems: 'start', marginTop: 38 }}>
         <div style={{ border: '1px solid var(--ds-border)', borderRadius: 12, background: 'var(--ds-surface)', padding: 10, display: 'flex', flexDirection: 'column', gap: 12, position: 'sticky', top: 0 }}>
           {GROUPS.map(([title, keys]) => (
             <div key={title} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
