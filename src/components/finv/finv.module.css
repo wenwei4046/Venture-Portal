@@ -121,6 +121,9 @@
 .confirmBody { padding: 10px 22px 20px; }
 .confirmText { margin: 0; font-size: 13.5px; line-height: 1.55; color: rgb(var(--hvs-graphite)); text-wrap: pretty; }
 .confirmButtons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+/* What the system asks besides the question (a void's reason). */
+.confirmExtra { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.confirmError { margin-top: 12px; }
 
 /* A form: the fields scroll, the buttons stay at the foot. */
 .formBody {

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { officeTime } from '@/lib/office-time'
 import { HrIcon } from '@/components/hrv/icons'
 import { FinDrawer, drawerStyles as d } from '@/components/finv/Drawer'
+import { DrawerGroup as Group, DrawerLine as Line, fd } from '@/components/finv/DrawerParts'
 import { openVoucherDrawer, type DrawerRefusal } from '../drawer-actions'
 import type { VoucherDetail } from '../_lib/voucher-detail'
 import { useVoucherSteps } from './voucher-steps'
@@ -14,15 +15,9 @@ import { useVoucherSteps } from './voucher-steps'
 // `.design/fin-r2/handoff`): the dark hero, the numbered groups, the files and
 // the trail, and at its foot what this reader may do in the state it is in
 // (voucher-steps.tsx — the system's own steps, each confirmed where it cannot
-// be undone).
+// be undone). The groups and their lines are the kit's (DrawerParts).
 
-const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-/** "06 Oct 2026" — a date as the design writes it. */
-export function fd(iso: string | null): string {
-  if (!iso) return '—'
-  const [y, m, day] = iso.slice(0, 10).split('-').map(Number)
-  return `${String(day).padStart(2, '0')} ${MON[m - 1]} ${y}`
-}
+export { fd }
 const f2 = (n: number) => (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const rm = (n: number) => `RM ${f2(n)}`
 
@@ -265,48 +260,3 @@ export function VoucherDrawer({ id, onClose, onChanged }: { id: string | null; o
   )
 }
 
-function Group({
-  n,
-  title,
-  foot,
-  empty,
-  children,
-}: {
-  n: string
-  title: string
-  foot?: { l: string; v: string }
-  empty?: string
-  children?: ReactNode
-}) {
-  return (
-    <>
-      <div className={d.label}>
-        <span className={d.labelRoman}>{n}</span> {title}
-      </div>
-      <div className={d.group}>
-        {children}
-        {foot ? (
-          <div className={d.foot}>
-            <span className={d.footL}>{foot.l}</span>
-            <span className={d.footV}>{foot.v}</span>
-          </div>
-        ) : null}
-        {empty ? <div className={d.groupEmpty}>{empty}</div> : null}
-      </div>
-    </>
-  )
-}
-
-function Line({ label, value, sub, mono = false }: { label: string; value: string; sub?: string; mono?: boolean }) {
-  return (
-    <div className={d.line}>
-      <span className={d.lineLabel}>{label}</span>
-      <span className={d.lineValue}>
-        <span className={d.lineV} data-mono={mono ? 'true' : undefined}>
-          {value}
-        </span>
-        {sub ? <span className={d.lineSub}>{sub}</span> : null}
-      </span>
-    </div>
-  )
-}

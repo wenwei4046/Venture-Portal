@@ -59,7 +59,7 @@ export default function FinanceOverview({ user, navData, counts }: { user: User;
             </Link>
           ) : null}
           {canDo(user, 'billing', 'create') ? (
-            <Link href="/statements" className={s.btn}>
+            <Link href="/statements?new=1" className={s.btn}>
               Create invoice
             </Link>
           ) : null}

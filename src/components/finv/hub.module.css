@@ -133,6 +133,85 @@
 }
 .monthStep:hover { background: rgb(var(--hvs-nav-hover)); }
 .monthLabel { min-width: 110px; text-align: center; font-size: 12.5px; font-weight: 500; }
+/* Ours: the label opens the year's months — a 300px card like the calendar's (D08), fading in from 4px over .16s. */
+.monthWrap { position: relative; width: max-content; }
+.monthPick {
+  height: 28px;
+  margin: 0;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 99px;
+  background: transparent;
+  font-family: inherit;
+  color: var(--ds-ink);
+  cursor: pointer;
+}
+.monthPick:hover,
+.monthPick[aria-expanded='true'] { background: rgb(var(--hvs-nav-hover)); }
+.monthPop {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  box-sizing: content-box;
+  width: 300px;
+  padding: 10px 8px;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: 14px;
+  box-shadow: var(--fv-cal-shadow);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.monthPop[data-in='true'] { opacity: 1; transform: translateY(0); }
+.monthPopHead { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 6px; }
+.monthPopNav {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  font-family: inherit;
+  font-size: 17px;
+  line-height: 1;
+  color: rgb(var(--hvs-graphite));
+  cursor: pointer;
+}
+.monthPopNav:hover { background: rgb(var(--hvs-nav-hover)); }
+.monthPopTitle { font-size: 13.5px; font-weight: 600; }
+.monthGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.monthCell {
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 99px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  color: rgb(var(--hvs-ink));
+  cursor: pointer;
+}
+.monthCell:hover { background: rgb(var(--hvs-nav-hover)); }
+.monthCell[data-now='true'] { font-weight: 600; box-shadow: inset 0 0 0 1.5px var(--ds-accent); }
+.monthCell[data-on='true'] { background: var(--ds-accent); color: var(--ds-ink); font-weight: 700; box-shadow: var(--fv-cal-pick); }
+.monthPopFoot { display: flex; justify-content: flex-end; margin-top: 6px; padding: 8px 6px 0; border-top: 1px solid var(--ds-border); }
+.monthToday {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(var(--fv-peach));
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ds-ink);
+  cursor: pointer;
+}
 .notice {
   grid-column: 1 / -1;
   padding: 11px 13px;
@@ -463,6 +542,54 @@
 .cell[data-kind='date'] { font-family: var(--font-mono), 'Chivo Mono', monospace; }
 .chev { flex: none; width: 26px; font-size: 15px; color: rgb(var(--hvs-quiet)); }
 
+/* A toolbar button after Columns (Invoice's Select / Done; ours: Other months, Approve all, + New contract). */
+.toolBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: 8px;
+  background: var(--ds-surface);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ds-ink);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+.toolBtn:hover { background: rgb(var(--hvs-nav-hover)); color: var(--ds-ink); text-decoration: none; }
+.toolBtn[data-on='true'] { border-color: var(--ds-accent); background: rgb(var(--fv-peach)); }
+.toolBtn:disabled { opacity: 0.45; cursor: default; }
+.toolN { color: rgb(var(--hvs-muted)); }
+
+/* Select (Invoice, D10): a 44px column of 20px boxes — the accent once ticked,
+   faint where a row cannot be; the head's box ticks every row on show. */
+.tickCell { flex: none; width: 44px; display: grid; place-items: center; }
+.tick {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border-radius: 5px;
+  border: 1.5px solid rgb(var(--fv-frame));
+  background: var(--ds-surface);
+  color: var(--ds-surface);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+}
+button.tick { cursor: pointer; }
+button.tick:disabled { cursor: default; opacity: 0.35; }
+.tick[data-on='true'],
+.tick[data-on='some'] { border-color: var(--ds-accent); background: var(--ds-accent); }
+.tick[data-faint='true'] { opacity: 0.35; }
+
 /* A status in a list: the design's chips, Inter 11/500. */
 .chip {
   padding: 1px 8px;
@@ -541,7 +668,103 @@ button.member:hover .memberWho { text-decoration: underline; }
 .memberNo { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11.5px; color: rgb(var(--hvs-muted)); }
 .memberAmt { width: 110px; text-align: right; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 12.5px; color: var(--ds-ink); }
 
+/* ── A list that is not the table's (the prototype's itemGroups): a band, then a row an item ── */
+.bandSplit { justify-content: space-between; }
+.itemEmpty { padding: 28px 16px; text-align: center; font-size: 13px; color: rgb(var(--hvs-graphite)); }
+.item {
+  box-sizing: content-box;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 48px;
+  padding: 6px 16px;
+  border-top: 1px solid var(--ds-border);
+  background: var(--ds-surface);
+}
+.band + .item,
+.itemEmpty + .item { border-top: 0; }
+.item[data-open='true'] { cursor: pointer; transition: background-color 0.15s; }
+.item[data-open='true']:hover { background: var(--ds-row-hover); }
+.item:focus-visible { outline: 2px solid var(--ds-accent); outline-offset: -2px; }
+.itemLabel { flex: 1.1 1 0; min-width: 0; font-size: 13.5px; color: var(--ds-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.itemSub { flex: 1.6 1 0; min-width: 0; font-size: 13px; color: rgb(var(--hvs-graphite)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.itemValue { flex: none; width: 140px; text-align: right; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 13.5px; color: var(--ds-ink); }
+.itemValue[data-tone='danger'] { color: var(--ds-danger); }
+.itemValue[data-tone='ledger'] { color: rgb(var(--fv-chip-ledger-ink)); }
+.itemAct {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: 6px;
+  background: var(--ds-surface);
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--ds-ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+.itemAct:hover { background: rgb(var(--hvs-nav-hover)); color: var(--ds-ink); text-decoration: none; }
+.itemAct:disabled { opacity: 0.45; cursor: default; }
+.itemAct:disabled:hover { background: var(--ds-surface); }
+
+/* ── What is ticked (Invoice's Select): the dark bar at the sheet's bottom centre ── */
+.bulk {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  z-index: 6;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 32px);
+  padding: 8px 8px 8px 18px;
+  border-radius: 12px;
+  background: rgb(var(--fv-dark));
+  color: rgb(var(--hvs-cream));
+  box-shadow: 0 12px 30px rgb(var(--fv-dark) / 0.28);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.bulk[data-fixed='true'] { position: fixed; }
+/* A phone's tab bar is drawn over the frame's foot: the bar stands clear of it, as the kit's drawer does. */
+@media (max-width: 767px) {
+  .bulk { bottom: calc(var(--tabbar-h) + 18px + var(--safe-bottom)); }
+}
+.bulkText { display: flex; flex-direction: column; min-width: 0; }
+.bulkMain { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bulkSub { font-size: 11px; color: rgb(var(--fv-dark-label)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bulkBtn {
+  flex: none;
+  height: 36px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 8px;
+  background: transparent;
+  color: rgb(var(--hvs-cream));
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.bulkBtn:hover { background: rgb(255 255 255 / 0.08); }
+.bulkBtn:disabled { cursor: default; opacity: 0.45; }
+.bulkBtn[data-kind='primary'] {
+  padding: 0 14px;
+  border: 0;
+  background: var(--ds-accent);
+  color: var(--ds-ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+.bulkBtn[data-kind='primary']:hover { background: var(--ds-accent); filter: brightness(0.97); }
+.bulkBtn[data-off='true'] { opacity: 0.45; }
+.bulkBtn:active { transform: scale(0.97); }
+
 @media (prefers-reduced-motion: reduce) {
-  .btn, .card, .row, .batchChev { transition: none; }
-  .btn:active, .card:active { transform: none; }
+  .btn, .card, .row, .batchChev, .monthPop, .item { transition: none; }
+  .btn:active, .card:active, .bulkBtn:active { transform: none; }
 }

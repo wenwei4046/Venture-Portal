@@ -215,6 +215,9 @@
 .lineValue { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 0; text-align: right; }
 .lineV { font-size: 13.5px; color: var(--ds-ink); overflow-wrap: anywhere; }
 .lineV[data-mono='true'] { font-family: var(--font-mono), 'Chivo Mono', monospace; }
+/* An invoice's Balance (D10): money in green, what is left to collect in the wait blue. */
+.lineV[data-tone='ledger'] { color: rgb(var(--fv-chip-ledger-ink)); }
+.lineV[data-tone='wait'] { color: rgb(var(--fv-chip-wait-ink)); }
 .lineSub { font-size: 11.5px; color: rgb(var(--hvs-muted)); }
 .foot { display: flex; justify-content: space-between; gap: 14px; padding: 11px 14px; background: var(--ds-row-hover); border-top: 1px solid var(--ds-border); }
 .footL { font-size: 13px; font-weight: 500; }

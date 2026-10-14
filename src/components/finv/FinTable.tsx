@@ -53,6 +53,22 @@ export interface FinColumn<R> {
 type Sort = { key: string; dir: 'asc' | 'desc' } | null
 type Filters = Record<string, string[]>
 
+/**
+ * The design's *Select* (Invoice, D10): a 44px column of tick boxes before the
+ * rows, a press on a row ticks it instead of opening it, and the head's box
+ * ticks every row on show that can be (ours — the old list's *Select all to
+ * settle*).
+ */
+export interface FinTableSelect<R> {
+  on: boolean
+  isSelected: (r: R) => boolean
+  /** A box that cannot be ticked is drawn faint; pressing its row still asks (the page says why). */
+  canSelect: (r: R) => boolean
+  onToggle: (r: R) => void
+  /** The rows on show that can be ticked — all of them ticked, or (when they all are) none. */
+  onToggleAll: (rows: R[]) => void
+}
+
 const viewKey = (id: string) => `fin-table-view:${id}`
 function readView(id: string): { sort: Sort; filters: Filters } {
   try {
@@ -92,6 +108,9 @@ export function FinTable<R>({
   emptyText,
   canSetDefault = false,
   countText,
+  countLabel,
+  tools,
+  select,
   children,
 }: {
   /** Names the saved arrangement — each page arranges its own. */
@@ -115,6 +134,11 @@ export function FinTable<R>({
   canSetDefault?: boolean
   /** The count beside the title when the list is not the table's ("6 batches · 71 vouchers"). */
   countText?: string
+  /** The count beside the title, the list's own way ("13 · Oct 2026") — while no filter is on. */
+  countLabel?: (items: number, amount: number) => string
+  /** The toolbar's last buttons, after Columns (Invoice's *Select*). */
+  tools?: ReactNode
+  select?: FinTableSelect<R> | null
   /** Drawn in place of the table (the payroll batches), under the toolbar. */
   children?: ReactNode
 }) {
@@ -191,7 +215,8 @@ export function FinTable<R>({
     }
     return { style: { flex: `1 1 ${c.width}px`, width: c.width, minWidth: c.min }, min: c.min }
   }
-  const tableWidth = shown.reduce((n, c) => n + fx(c).min, 0) + 32
+  const selecting = !!select?.on
+  const tableWidth = shown.reduce((n, c) => n + fx(c).min, 0) + 32 + (selecting ? 44 : 0)
 
   // ── Filters, then the sort ──
   const active = Object.entries(filters).filter(([k, v]) => v.length > 0 && byKey.has(k))
@@ -210,10 +235,17 @@ export function FinTable<R>({
 
   // The count counts what the card beside it counts: a folded batch its members.
   const items = (rs: R[]) => rs.reduce((n, r) => n + (itemsOf ? itemsOf(r) : 1), 0)
+  const sum = Math.round(rows.reduce((n, r) => n + amountOf(r), 0) * 100) / 100
   const count =
     active.length > 0
       ? `${items(sorted)} of ${items(rows)} · filtered`
-      : `${items(rows)} · RM ${f2(Math.round(rows.reduce((n, r) => n + amountOf(r), 0) * 100) / 100)}`
+      : countLabel
+        ? countLabel(items(rows), sum)
+        : `${items(rows)} · RM ${f2(sum)}`
+  // The head's box: every row on show that can be ticked.
+  const tickable = selecting ? sorted.filter((r) => select!.canSelect(r)) : []
+  const ticked = tickable.filter((r) => select!.isSelected(r)).length
+  const allState = tickable.length > 0 && ticked === tickable.length ? 'all' : ticked > 0 ? 'some' : 'none'
 
   const toggleSort = (key: string) => {
     const next: Sort = !sort || sort.key !== key ? { key, dir: 'asc' } : sort.dir === 'asc' ? { key, dir: 'desc' } : null
@@ -272,7 +304,9 @@ export function FinTable<R>({
   }, [filterCol, rows])
 
   const onRowKey = (r: R, e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Enter' && e.target === e.currentTarget) onRowClick(r)
+    if (e.key !== 'Enter' || e.target !== e.currentTarget) return
+    if (select?.on) select.onToggle(r)
+    else onRowClick(r)
   }
 
   return (
@@ -300,6 +334,7 @@ export function FinTable<R>({
             Columns
           </button>
         )}
+        {tools}
       </div>
 
       {colOpen ? (
@@ -400,6 +435,21 @@ export function FinTable<R>({
         <div className={s.scroll}>
           <div role="table" aria-label={title} style={{ minWidth: tableWidth }}>
             <div className={s.thead} role="row" style={{ minWidth: tableWidth }}>
+              {selecting ? (
+                <span className={s.tickCell} role="columnheader">
+                  <button
+                    type="button"
+                    className={s.tick}
+                    data-on={allState === 'all' ? 'true' : allState === 'some' ? 'some' : undefined}
+                    disabled={tickable.length === 0}
+                    onClick={() => select!.onToggleAll(tickable)}
+                    aria-label={allState === 'all' ? 'Clear the selection' : 'Select every row that can be'}
+                    aria-pressed={allState === 'all' ? true : allState === 'some' ? 'mixed' : false}
+                  >
+                    {allState === 'all' ? '✓' : allState === 'some' ? '–' : ''}
+                  </button>
+                </span>
+              ) : null}
               <span className={s.lead} />
               {shown.map((c) => {
                 const on = sort?.key === c.key
@@ -475,6 +525,7 @@ export function FinTable<R>({
             ) : (
               sorted.map((r) => {
                 const key = rowKey(r)
+                const on = selecting && select!.isSelected(r)
                 return (
                   <div
                     key={key}
@@ -482,11 +533,19 @@ export function FinTable<R>({
                     tabIndex={0}
                     className={s.row}
                     style={{ minWidth: tableWidth }}
-                    data-active={activeKey === key ? 'true' : undefined}
-                    onClick={() => onRowClick(r)}
+                    data-active={selecting ? (on ? 'true' : undefined) : activeKey === key ? 'true' : undefined}
+                    aria-selected={selecting ? on : undefined}
+                    onClick={() => (selecting ? select!.onToggle(r) : onRowClick(r))}
                     onKeyDown={(e) => onRowKey(r, e)}
                     onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(r, e) : undefined}
                   >
+                    {selecting ? (
+                      <span className={s.tickCell} role="cell">
+                        <span className={s.tick} data-on={on ? 'true' : undefined} data-faint={select!.canSelect(r) ? undefined : 'true'} aria-hidden="true">
+                          {on ? '✓' : ''}
+                        </span>
+                      </span>
+                    ) : null}
                     <span className={s.lead} />
                     {shown.map((c) => {
                       const chip = c.kind === 'chip' ? c.chip?.(r) : null

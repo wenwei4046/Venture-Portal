@@ -15,9 +15,9 @@ interface Props {
 // one month at a time, not every month in one list): Service Billing's
 // "← September 2026 ▾ →", its grid dotting the months that have statements.
 // Changing it is a query-string navigation, which keeps this mounted — so it
-// is keyed on the month the server rendered and restarts with it, as
-// PeriodSelector does: after Back / Forward it never names a month the page
-// is not on.
+// is keyed on the month the server rendered and restarts with it (Service
+// Billing's PeriodSelector did the same): after Back / Forward it never names
+// a month the page is not on.
 export default function StatementsMonth(props: Props) {
   return <StatementsMonthBody key={props.month} {...props} />
 }

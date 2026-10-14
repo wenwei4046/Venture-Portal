@@ -105,12 +105,19 @@ export function DialogMenu({ items }: { items: DialogMenuItem[] }) {
   )
 }
 
-/** A question: the sentence, then Cancel and the answer (red when it undoes or removes). */
+/**
+ * A question: the sentence, then Cancel and the answer (red when it undoes or
+ * removes). What the system asks besides — a void's reason — goes between
+ * (`children`), and a refusal under it in red (`error`).
+ */
 export function DialogConfirm({
   text,
   confirmLabel,
   danger = false,
   busy = false,
+  off = false,
+  error,
+  children,
   onCancel,
   onConfirm,
 }: {
@@ -118,17 +125,27 @@ export function DialogConfirm({
   confirmLabel: string
   danger?: boolean
   busy?: boolean
+  /** Drawn at .45 while what it needs is missing. */
+  off?: boolean
+  error?: string | null
+  children?: ReactNode
   onCancel: () => void
   onConfirm: () => void
 }) {
   return (
     <div className={s.confirmBody}>
       <p className={s.confirmText}>{text}</p>
+      {children ? <div className={s.confirmExtra}>{children}</div> : null}
+      {error ? (
+        <p className={`${s.hint} ${s.confirmError}`} data-tone="danger" role="alert">
+          {error}
+        </p>
+      ) : null}
       <div className={s.confirmButtons}>
         <button type="button" className={s.btn} onClick={onCancel} disabled={busy}>
           Cancel
         </button>
-        <button type="button" className={s.btn} data-kind={danger ? 'danger' : 'primary'} onClick={onConfirm} disabled={busy}>
+        <button type="button" className={s.btn} data-kind={danger ? 'danger' : 'primary'} data-off={off ? 'true' : undefined} onClick={onConfirm} disabled={busy}>
           {confirmLabel}
         </button>
       </div>
