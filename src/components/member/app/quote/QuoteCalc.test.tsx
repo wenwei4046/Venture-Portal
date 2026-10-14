@@ -50,6 +50,13 @@ describe("step 2's card keeps one size", () => {
     expect(text(STATES[4][1])).toBe("Product cost is pending a Principal update.");
   });
 
+  it("draws a long figure smaller on its one line rather than past its cell", () => {
+    const figure = (vm: CalcVM) => draw(vm).container.querySelector('[class*="marginNum"]')!.className;
+    expect(figure(STATES[1][1])).not.toMatch(/fig/);
+    expect(figure(calcVM({ price: "2", items: 1, bands: BANDS, result: result(-77043), error: null }))).toMatch(/figSmall/);
+    expect(figure(calcVM({ price: "0.01", items: 1, bands: BANDS, result: result(-15428500), error: null }))).toMatch(/figTiny/);
+  });
+
   it("offers one Use price, the real one", () => {
     const { getAllByRole } = draw(STATES[0][1]);
     expect(getAllByRole("button", { name: "Use price" })).toHaveLength(1);

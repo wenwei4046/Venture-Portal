@@ -26,6 +26,9 @@ export interface CalcProps {
   onProducts: () => void;
 }
 
+/** A long figure is drawn smaller, on the same line: `-5220.2%`, `12,345.50`. */
+const fig = (text: string) => (text.length >= 10 ? s.figTiny : text.length >= 8 ? s.figSmall : "");
+
 /** A digit, `.` or Backspace typed on a keyboard works the keypad (desktop). */
 function useKeyboard(onPress: (key: string) => void) {
   useEffect(() => {
@@ -54,7 +57,7 @@ export default function QuoteCalc({ vm, brandName, cart, fee, kpiEach, onPress, 
         <div className={s.cardGrid}>
           <div className={s.priceCell}>
             <span className={s.cellLabel}>Selling price</span>
-            <div className={s.priceLine}><span className={s.priceRm}>RM</span><span className={s.priceNum}>{vm.priceText}</span><span className={s.caret} /></div>
+            <div className={s.priceLine}><span className={s.priceRm}>RM</span><span className={`${s.priceNum} ${fig(vm.priceText)}`}>{vm.priceText}</span><span className={s.caret} /></div>
             <span className={s.priceHint}>{vm.hint}</span>
           </div>
           <div className={s.marginCell} style={{ background: tone.bg }}>
@@ -64,13 +67,13 @@ export default function QuoteCalc({ vm, brandName, cart, fee, kpiEach, onPress, 
             <div className={s.steady}>
               <div className={s.layer}>
                 <span className={s.cellLabel}>Margin</span>
-                <div className={s.marginNum} style={{ color: tone.ink }}>{vm.marginText}</div>
+                <div className={`${s.marginNum} ${fig(vm.marginText)}`} style={{ color: tone.ink }}>{vm.marginText}</div>
                 <span className={s.tierChip} style={{ color: tone.ink }}>{vm.tierLabel}</span>
                 {vm.penalty && <span className={s.penalty} style={{ color: tone.ink }}>{vm.penalty}</span>}
               </div>
               <div className={`${s.layer} ${s.room}`} aria-hidden>
                 <span className={s.cellLabel}>Margin</span>
-                <div className={s.marginNum}>{vm.marginText}</div>
+                <div className={`${s.marginNum} ${fig(vm.marginText)}`}>{vm.marginText}</div>
                 <span className={s.tierChip}>{vm.room.tier}</span>
                 {vm.room.penalty && <span className={s.penalty}>{vm.room.penalty}</span>}
               </div>

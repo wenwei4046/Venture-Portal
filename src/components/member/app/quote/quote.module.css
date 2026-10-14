@@ -67,11 +67,14 @@
 .cellLabel { display: block; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); }
 .priceLine { display: flex; align-items: baseline; gap: 4px; margin-top: 6px; }
 .priceRm { font-size: calc(15px * var(--rv-type)); font-weight: 600; color: var(--rv-sub); }
-.priceNum { font-family: var(--font-display-rv); font-size: calc(30px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.priceNum { font-family: var(--font-display-rv); font-size: calc(30px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: calc(33px * var(--rv-type)); white-space: nowrap; }
+/* A long figure is drawn smaller on its line, never wider than its cell nor on a second line (2026-10-15). */
+.figSmall { font-size: calc(22px * var(--rv-type)); }
+.figTiny { font-size: calc(18px * var(--rv-type)); }
 .caret { width: 2px; height: 26px; background: var(--rv-accent); border-radius: 1px; align-self: center; }
 .priceHint { display: block; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); margin-top: 6px; }
 .marginCell { padding: 16px 16px 14px; border-left: 1px solid var(--rv-line); }
-.marginNum { font-family: var(--font-display-rv); font-size: calc(30px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: 6px; white-space: nowrap; }
+.marginNum { font-family: var(--font-display-rv); font-size: calc(30px * var(--rv-type)); font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: calc(33px * var(--rv-type)); margin-top: 6px; white-space: nowrap; }
 .tierChip { display: inline-block; margin-top: 8px; font-size: calc(12px * var(--rv-type)); font-weight: 650; line-height: 1.35; background: var(--rv-white); border-radius: 8px; padding: 3px 9px; }
 .penalty { display: block; margin-top: 5px; font-size: calc(11.5px * var(--rv-type)); font-weight: 600; }
 /* The card at its tallest from the start (2026-10-15): what changes as a price is typed and an
