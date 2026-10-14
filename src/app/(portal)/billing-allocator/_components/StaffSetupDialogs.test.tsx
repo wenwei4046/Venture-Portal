@@ -27,7 +27,6 @@ vi.mock('../actions', () => ({
   saveAllocTemplate: mocks.saveTpl,
   deleteAllocTemplate: mocks.delTpl,
 }))
-vi.mock('../../statements/invoice-actions', () => ({ hubHrFigures: vi.fn() }))
 
 import { ImportDialog, SnapshotDialog, StaffDialog } from './StaffDialogs'
 import { CategoryDialog, TemplateDialog } from './SetupDialogs'

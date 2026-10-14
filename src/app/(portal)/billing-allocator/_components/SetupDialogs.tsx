@@ -6,7 +6,8 @@ import fm from '@/components/finv/form.module.css'
 import { neededSentence, num } from '@/components/finv/form-words'
 import { Select } from '@/components/hrv/select'
 import type { AllocMethod } from '@/lib/billing-allocator'
-import { CategorySelect } from '../../statements/_components/InvoiceFormParts'
+// The accounts grouped as Invoice's dialogs group them (pure — not their select, which would bring Invoice's actions onto this page).
+import { categoryGroups } from '../../statements/_lib/invoice-form'
 import { deleteAllocCategory, deleteAllocTemplate, saveAllocCategory, saveAllocTemplate } from '../actions'
 import type { AllocatorData, CategoryRow, TemplateRow } from './types'
 import a from './alloc.module.css'
@@ -45,7 +46,8 @@ export function CategoryDialog({
   const [busy, setBusy] = useState(false)
   const [tried, setTried] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const accounts = useMemo(() => data.coaAccounts.map((c) => ({ code: c.code, label: c.name, type: c.type, parent_code: c.parent_code })), [data.coaAccounts])
+  // *7012 · Rental Income* — the code first, as the allocator writes a category.
+  const accounts = useMemo(() => data.coaAccounts.map((c) => ({ code: c.code, label: `${c.code} · ${c.name}`, type: c.type, parent_code: c.parent_code })), [data.coaAccounts])
   const problem = neededSentence(name.trim() ? [] : ['a name'])
 
   const run = async (call: () => Promise<{ error?: string }>, message: string) => {
@@ -111,7 +113,18 @@ export function CategoryDialog({
           <Input id="alloc-cat-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Rental" />
         </Field>
         <Field label="Account" htmlFor="alloc-cat-code">
-          <CategorySelect id="alloc-cat-code" value={code} onChange={setCode} categories={accounts} blank="No account — the invoice’s default" />
+          <Select id="alloc-cat-code" round={12} className={fm.select} value={code} onChange={(e) => setCode(e.target.value)}>
+            <option value="">No account — the invoice’s default</option>
+            {categoryGroups(accounts).map((g) => (
+              <optgroup key={g.type} label={g.label}>
+                {g.accounts.map((acct) => (
+                  <option key={acct.code} value={acct.code} data-search={acct.code}>
+                    {acct.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </Select>
         </Field>
         {error ? <Hint danger>{error}</Hint> : tried && problem ? <Hint>{problem}</Hint> : null}
       </DialogForm>
