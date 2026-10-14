@@ -34,6 +34,7 @@ import { useSwipeToClose } from "./shared/swipe-close";
 import { keepSending } from "./shared/pending";
 import { MediaViewer } from "./shared/viewer";
 import { loadSnapshot, saveSnapshot } from "./shared/snapshot";
+import { photosAhead, warmPhotos } from "./shared/media-cache";
 import { MessageMenu } from "./shared/msg-menu";
 import { AttachSheetHost } from "./shared/attach-sheet";
 import { ActionSheetHost } from "./shared/action-sheet";
@@ -123,6 +124,8 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     return () => { stopped = true; clearInterval(t); document.removeEventListener("visibilitychange", back); window.removeEventListener("focus", back); };
   }, [live, refs, desk]);
   // Demo only: whose eyes, after the first paint (the server cannot read the address's ?crmAs).
+  // Every chat's newest photos are fetched onto the phone ahead of being opened (shared/media-cache.ts › warmPhotos).
+  useEffect(() => { if (live && data) warmPhotos(photosAhead(data.customers)); }, [live, data]);
   useEffect(() => { const v = demoViewer(); if (!live && v) setData(crmDemoData(salesperson, v)); }, [live, salesperson]);
   // The clock behind the colours: every minute the waits grow.
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 60_000); return () => clearInterval(t); }, []);
