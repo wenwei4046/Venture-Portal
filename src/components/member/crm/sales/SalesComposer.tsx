@@ -159,7 +159,7 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
         </div>
       </>)}
       {!!(p.attach) && (<>
-        <div data-panel="" style={{ height: p.panelH, boxSizing: "border-box", padding: "24px 12px 16px", background: "#FBF7F3", borderTop: "1px solid #EBDDD2", animation: "fadeIn 160ms ease-out" }}>
+        <div data-attach="" style={{ position: "absolute", left: "10px", right: "10px", bottom: "calc(100% + 8px)", boxSizing: "border-box", padding: "18px 12px 14px", background: "#FBF7F3", borderRadius: "20px", boxShadow: "0 10px 30px rgba(63,43,34,.18),0 0 0 1px #EBDDD2", animation: "fadeIn 160ms ease-out" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "18px 8px" }}>
             {(p.tiles).map((t, t_i) => (<Fragment key={t_i}>
               <span onClick={t.go} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "7px", padding: "4px 0", color: "#3F2B22", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", cursor: "pointer" }}><span style={{ width: "54px", height: "54px", borderRadius: "27px", background: t.color, color: "#fff", display: "grid", placeItems: "center" }}>
