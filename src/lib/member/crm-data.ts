@@ -38,7 +38,7 @@ export interface CrmChatMessage {
   replyTo?: string;
   myReaction?: string;
   card?: CrmCard;
-  media?: { kind: "image" | "video" | "audio" | "file"; url: string; name?: string };
+  media?: { kind: "image" | "video" | "audio" | "file"; url: string; name?: string; mime?: string };
 }
 
 export interface CrmDetails { type: string; size: string; loc: string; req: string; budget: string }
@@ -340,7 +340,7 @@ export function chatMessage(row: CrmMessageRowX): CrmChatMessage {
     kind: row.kind,
     text,
     at: row.sent_at,
-    ...(shown ? { media: { kind: shown, url: `/member/crm-media/${row.id}`, ...(shown === "file" ? { name: row.body || "Document" } : {}) } } : {}),
+    ...(shown ? { media: { kind: shown, url: `/member/crm-media/${row.id}`, ...(shown === "file" ? { name: row.body || "Document", ...(row.media_mime ? { mime: row.media_mime } : {}) } : {}) } } : {}),
     ...(row.direction === "out" && row.status && row.status !== "received" ? { status: row.status } : {}),
     ...(row.error ? { error: row.error } : {}),
     ...(row.auto ? { auto: true } : {}),

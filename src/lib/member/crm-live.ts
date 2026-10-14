@@ -50,6 +50,8 @@ export interface CrmMessageRow {
   media_path?: string | null;
   /** Messenger's address for a customer's attachment (its own CDN). */
   media_url?: string | null;
+  /** The file's type ("application/pdf" …), for a document's tile. */
+  media_mime?: string | null;
   status?: "received" | "sent" | "delivered" | "read" | "failed" | null;
   error?: string | null;
 }

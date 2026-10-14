@@ -307,7 +307,7 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       const kind = mediaKindOf(mime), shown = kind === "document" ? "file" : kind;
       const local = typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : "";
       const draft: CrmChatMessage = { id: `sending-${uid()}`, from: "me", kind, text: kind === "document" ? file.name : caption, at: new Date().toISOString(), status: live ? "sending" : "sent", by: me,
-        ...(local ? { media: { kind: shown, url: local, ...(shown === "file" ? { name: file.name } : {}) } } : {}) };
+        ...(local ? { media: { kind: shown, url: local, ...(shown === "file" ? { name: file.name, mime: file.type } : {}) } } : {}) };
       addMessage(customerId, draft);
       if (!live) return true;
       const r = await inTurn(customerId, async () => {

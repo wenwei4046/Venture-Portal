@@ -18,6 +18,7 @@ import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
+import { galleryOf, mediaOf, NO_MEDIA } from "../../shared/chat-media";
 import { CHAT_WALL } from "../wall";
 
 const RUST = "#BD4A19", INK = "#3F2B22", SUB = "rgb(128 107 96)", BD = "#EBDDD2";
@@ -119,13 +120,14 @@ export function chatVM(ctx: SalesCtx) {
     ...c.messages.filter(m => !hidden.has(m.id)).map(m => ({ kind: "msg" as const, m })),
     ...systemLines(ctx, c).map(s => ({ kind: "sys" as const, ...s })),
   ].sort((a, b) => (a.kind === "msg" ? a.m.at : a.at).localeCompare(b.kind === "msg" ? b.m.at : b.at));
+  const gallery = galleryOf(items.flatMap(it => (it.kind === "msg" ? [it.m] : [])));
   const msgs3b = items.map((it, k, arr) => {
     const at = it.kind === "msg" ? it.m.at : it.at, prevAt = k ? (arr[k - 1].kind === "msg" ? (arr[k - 1] as { m: CrmChatMessage }).m.at : (arr[k - 1] as { at: string }).at) : null;
     const sep = !prevAt || new Date(at).toDateString() !== new Date(prevAt).toDateString() ? daySep(at, now) : "";
     if (it.kind === "sys") return {
       sep, plain: true, align: "center", max: "100%", rowDir: "row" as const, rxGap: "0", radius: "12px", bg: "rgba(255,255,255,.8)", borderStyle: "dashed", border: BORDER, textAlign: "center" as const, fg: SUB,
-      quote: null, ev: null, pDisp: "block", size: "12px", textStyle: "normal", textColor: "inherit", parts: parts(it.text), timeJustify: "center", timeColor: SUB, by: "", at: msgTime(at),
-      tick: false, tickColor: "#A8968B", tickLabel: "", failNote: "", showTools: false, openMenu: undefined, openReact: undefined, reaction: "", rxLeft: "auto", rxRight: "auto", rbLeft: "auto", rbRight: "auto",
+      ...NO_MEDIA, quote: null, ev: null, pDisp: "block", size: "12px", textStyle: "normal", textColor: "inherit", parts: parts(it.text), timeJustify: "center", timeColor: SUB, by: "", at: msgTime(at),
+      tick: false, tickColor: "#A8968B", tickLabel: "", tickPath: "", failNote: "", showTools: false, openMenu: undefined, openReact: undefined, reaction: "", rxLeft: "auto", rxRight: "auto", rbLeft: "auto", rbRight: "auto",
       enter: undefined, leave: undefined,
     };
     const m = it.m, mine = m.from === "me", key = m.id;
@@ -148,8 +150,9 @@ export function chatVM(ctx: SalesCtx) {
         // Tap the card → Calendar on the visit's date.
         go: () => set(u => ({ ...u, chat: null, tab: "calendar", calView: "month", calSel: day0(cd), calYM: [cd.getFullYear(), cd.getMonth()], hist: [...u.hist, u.tab].slice(-20) })),
       } : null,
-      img: mk === "image" ? md!.url : "", vid: mk === "video" ? md!.url : "", aud: mk === "audio" ? md!.url : "", file: mk === "file" ? md!.url : "",
-      pDisp: card || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: "14px", textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : mk === "file" ? "📄 " + m.text : m.text),
+      // A document is its tile (name and type), never its name again under it (2026-10-14).
+      ...mediaOf(m, gallery),
+      pDisp: card || mk === "file" || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: "14px", textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : mk === "file" ? "📄 " + m.text : m.text),
       timeJustify: "flex-end", timeColor: mine ? "#806B60" : SUB, by, at: msgTime(m.at),
       failNote: mine && m.status === "failed" ? failNote(m.error) : "",
       tick: mine, tickColor: read ? "#2F8FD8" : m.status === "failed" ? "#A3371A" : "#A8968B", tickLabel: m.status === "sending" ? "Sending" : read ? "Read" : m.status === "failed" ? "Not delivered" : "Delivered",
