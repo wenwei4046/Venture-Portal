@@ -110,8 +110,9 @@ const PATCHES = [
   [/<div style=\{\{ height: "26px", display: "grid", placeItems: "center", background: p\.homeBg \}\}>\s*<span style=\{\{ width: "134px", height: "5px", borderRadius: "3px", background: "#3F2B22" \}\}>\s*<\/span>\s*<\/div>/,
     '<div style={{ height: "var(--safe-bottom, 0px)", background: p.homeBg }}></div>',
     "the strip is the phone's home-indicator inset (0 on most Androids), coloured as the prototype's; the phone draws its own indicator"],
-  ['bottom: "100px", zIndex: "6"', 'bottom: "74px", zIndex: "6"',
-    "the prototype's 100px counts its 26px home strip; here the chat ends above the phone's inset"],
+  ['<div style={{ position: "absolute", left: "16px", right: "16px", bottom: "100px", zIndex: "6",',
+    '<div data-composer-toast="" style={{ position: "absolute", left: "16px", right: "16px", bottom: "74px", zIndex: "6",',
+    "the prototype's 100px counts its 26px home strip (here the chat ends above the phone's inset); marked for less motion"],
 ];
 for (const [from, to, why] of PATCHES) {
   if (!why) throw new Error(`composer patch without a reason: ${from}`);

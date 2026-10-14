@@ -175,7 +175,7 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
       <div style={{ height: "var(--safe-bottom, 0px)", background: p.homeBg }}></div>
     </div>
     {!!(p.toast) && (<>
-      <div style={{ position: "absolute", left: "16px", right: "16px", bottom: "74px", zIndex: "6", padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{p.toast}</div>
+      <div data-composer-toast="" style={{ position: "absolute", left: "16px", right: "16px", bottom: "74px", zIndex: "6", padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{p.toast}</div>
     </>)}
   </>);
 }
