@@ -640,9 +640,26 @@ export async function setFundSourceNotes(
 
 export async function cancelFundSource(formData: FormData) {
   const user = await requireActionOn('/fund-in', 'treasury', 'void')
-  const supabase = await createClient()
+  await fileFundSourceCancel(formData.get('id') as string, user.id)
+}
 
-  const id = formData.get('id') as string
+/**
+ * The full page's *Request cancellation* (2026-10-15, the Finance revamp v2 —
+ * D06's panel): cancelFundSource's request, answered in words, never thrown.
+ */
+export async function requestFundSourceCancel(id: string): Promise<{ error: string } | undefined> {
+  const user = await requireActionOn('/fund-in', 'treasury', 'void')
+  try {
+    await fileFundSourceCancel(id, user.id)
+    return undefined
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'The cancellation was not filed. Try again.' }
+  }
+}
+
+/** Files an active fund source's cancellation for the Principal (a tier_change request — the type it has always used). Throws a refusal. */
+async function fileFundSourceCancel(id: string, userId: string) {
+  const supabase = await createClient()
   if (!id) throw new Error('Fund source id is required')
 
   // Fetch fund source for description
@@ -662,7 +679,7 @@ export async function cancelFundSource(formData: FormData) {
       request_type: 'tier_change' as const, // reuse existing type for now; semantically "fund source cancel"
       reference_id: id,
       reference_table: 'fund_sources',
-      submitted_by: user.id,
+      submitted_by: userId,
       description: `Cancel fund source: ${source.source_type.replace('_', ' ')} — RM ${Number(source.amount).toLocaleString('en-MY', { minimumFractionDigits: 2 })}`,
       amount: Number(source.amount),
       status: 'pending' as const,

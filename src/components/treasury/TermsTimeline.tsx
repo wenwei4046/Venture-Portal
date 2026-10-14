@@ -149,6 +149,7 @@ export default function TermsTimeline({
   segments,
   changes,
   canRevert,
+  bare = false,
 }: {
   kind: 'loan' | 'fund_source'
   recordId: string
@@ -156,17 +157,22 @@ export default function TermsTimeline({
   changes: TermsChangeComparison[]
   /** Principal may undo the latest change. */
   canRevert: boolean
+  /** Inside a full page's card (2026-10-15, D06): the card's strip names it and counts the changes. */
+  bare?: boolean
 }) {
   if (!segments.some((s) => s.changed)) return null
+  const Wrap = bare ? 'div' : 'section'
   return (
-    <section className="mb-9">
-      <div className="sect-head">
-        <h2>Terms over time</h2>
-        <span className="rule" aria-hidden />
-        <span className="count">
-          {changes.length} CHANGE{changes.length === 1 ? '' : 'S'}
-        </span>
-      </div>
+    <Wrap className={bare ? undefined : 'mb-9'}>
+      {bare ? null : (
+        <div className="sect-head">
+          <h2>Terms over time</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">
+            {changes.length} CHANGE{changes.length === 1 ? '' : 'S'}
+          </span>
+        </div>
+      )}
       <div className="fund-segs">
         {segments.map((s, i) => {
           const current = i === segments.length - 1
@@ -189,6 +195,6 @@ export default function TermsTimeline({
           <RevertTermsButton kind={kind} recordId={recordId} latestFrom={changes[changes.length - 1].fromYM} />
         </div>
       ) : null}
-    </section>
+    </Wrap>
   )
 }

@@ -78,6 +78,8 @@
 .pill[data-tone='danger'] { --chip-bg: rgb(var(--fv-chip-danger)); --chip-fg: rgb(var(--fv-chip-danger-ink)); --chip-bd: rgb(var(--fv-chip-danger-ink) / 0.4); }
 /* An allocation still to bill (D11): the list's alert gold. */
 .pill[data-tone='alert'] { --chip-bg: rgb(var(--fv-chip-alert)); --chip-fg: rgb(var(--fv-chip-alert-ink)); --chip-bd: rgb(var(--fv-chip-alert-ink) / 0.4); }
+/* A deal repaid (2026-10-15): the list's quiet info. */
+.pill[data-tone='info'] { --chip-bg: rgb(var(--fv-chip-info)); --chip-fg: rgb(var(--fv-chip-info-ink)); --chip-bd: rgb(var(--fv-chip-info-ink) / 0.4); }
 .facts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; }
 .fact { display: flex; flex-direction: column; gap: 2px; }
 .factLabel { font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: rgb(var(--hvs-muted)); }
@@ -264,6 +266,7 @@
 .panel[data-light='wait'] { --light: rgb(var(--fv-light-wait)); }
 .panel[data-light='accent'] { --light: rgb(var(--fv-light-accent)); }
 .panel[data-light='alert'] { --light: rgb(var(--fv-light-alert)); }
+.panel[data-light='info'] { --light: rgb(var(--fv-light-info)); }
 .pAmount { margin-top: 8px; font-size: 30px; font-weight: 600; letter-spacing: -0.02em; color: var(--ds-surface); font-variant-numeric: tabular-nums; }
 .pTo { margin: 2px 0 14px; font-size: 13.5px; color: rgb(var(--fv-dark-note)); overflow-wrap: anywhere; }
 .pGroup {
