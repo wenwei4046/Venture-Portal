@@ -10,6 +10,7 @@ import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import { BORDER, gb, day0, DAY, dayLabel, firstName, ini, money, stop, timeLabel, type PEvent, type SalesCtx } from "./common";
 import type { OutcomeAsk } from "../ui";
 import { contactInfoVM, customerFormVM } from "./customer";
+import { oneAtATime } from "../../shared/once";
 
 export const LOST_OPTIONS: [string, string, string][] = [
   ["Price", "too_expensive", "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"],
@@ -205,9 +206,11 @@ export function calendarVM(ctx: SalesCtx) {
       const done = !!a.v.remindedAt;
       return { name: a.c.name, ini: ini(a.c.name), time: timeLabel(a.at), room: a.room, wk: a.at.toLocaleDateString("en-GB", { weekday: "short" }), dn: a.at.getDate(),
         open: openInfo(a.c), isToday: false, later: true, came: () => patch({ outcomeAsk: ask(a) }),
-        rLabel: done ? "Sent" : "Send reminder", rIcon: done ? "m5 12 5 5 9-10" : "M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z",
-        rBg: done ? "#fff" : "#BD4A19", rFg: done ? "#387557" : "#fff", rBd: done ? "#CFE3D6" : "#BD4A19", rCur: done ? "default" : "pointer",
-        remind: done ? undefined : () => { void act.remind(a.v.id); } };
+        // Sent once, it may go again (the owner, 2026-10-14: "upcoming 的 reminder 發過之後還可以再發"): the button keeps
+        // its green "sent" look and reads Send again; one at a time per visit (a double tap sent twice before).
+        rLabel: done ? "Send again" : "Send reminder", rIcon: done ? "m5 12 5 5 9-10" : "M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z",
+        rBg: done ? "#fff" : "#BD4A19", rFg: done ? "#387557" : "#fff", rBd: done ? "#CFE3D6" : "#BD4A19", rCur: "pointer",
+        remind: () => { void oneAtATime(`remind:${a.v.id}`, () => act.remind(a.v.id)).then(ok => { if (ok && done) act.toast(`Reminder sent again to ${a.c.name}`); }); } };
     }),
     // Customer info (Edit · Open chat) and its form, as on Contacts (rev 1010 §3).
     ...contactInfoVM(ctx), ...customerFormVM(ctx),
