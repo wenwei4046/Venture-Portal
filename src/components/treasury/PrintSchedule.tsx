@@ -25,6 +25,8 @@ export default function PrintSchedule({
   plan,
   printed,
   autoOpen = false,
+  triggerClassName = 'btn-quiet-sheet',
+  triggerLabel = 'Print schedule',
 }: {
   /** e.g. FUND IN · SUBSIDIARY */
   kicker: string
@@ -35,6 +37,9 @@ export default function PrintSchedule({
   /** e.g. Printed 9 Oct 2026 · Finance Manager */
   printed: string
   autoOpen?: boolean
+  /** The button that opens it — a full page's head draws its own (2026-10-15, D06: *Print* in Newsreader italic). */
+  triggerClassName?: string
+  triggerLabel?: string
 }) {
   const [open, setOpen] = useState(autoOpen)
 
@@ -50,8 +55,8 @@ export default function PrintSchedule({
 
   return (
     <>
-      <button type="button" className="btn-quiet-sheet" onClick={() => setOpen(true)}>
-        Print schedule
+      <button type="button" className={triggerClassName} onClick={() => setOpen(true)}>
+        {triggerLabel}
       </button>
       {open && typeof document !== 'undefined'
         ? createPortal(

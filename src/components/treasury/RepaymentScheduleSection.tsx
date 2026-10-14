@@ -11,31 +11,41 @@ import type { RepaymentPlan } from '@/lib/repayment-plan'
 
 const money = (n: number | null) => (n === null ? '—' : formatMoneyBare(n))
 
+/** What the schedule's head says beside its name: how far it is paid, or that it has no fixed term. */
+export function scheduleCount(plan: RepaymentPlan): string {
+  return plan.kind === 'open'
+    ? `NO FIXED TERM · ${plan.rows.length} ${plan.rows.length === 1 ? 'MONTH' : 'MONTHS'} TO DATE`
+    : plan.kind === 'fixed'
+      ? `PAID ${plan.paidCount} OF ${plan.months ?? plan.rows.length} · OUTSTANDING ${formatMoney(plan.outstandingDue)}`
+      : 'NO SCHEDULE'
+}
+
 export default function RepaymentScheduleSection({
   plan,
   recorded,
   cancelled = false,
+  bare = false,
 }: {
   plan: RepaymentPlan
   /** The payments as recorded, folded under the schedule. */
   recorded?: { count: number; content: ReactNode }
   cancelled?: boolean
+  /** Inside a full page's card (2026-10-15, D06): the card's strip names it and says the count. */
+  bare?: boolean
 }) {
-  const open = plan.kind === 'open'
-  const count = open
-    ? `NO FIXED TERM · ${plan.rows.length} ${plan.rows.length === 1 ? 'MONTH' : 'MONTHS'} TO DATE`
-    : plan.kind === 'fixed'
-      ? `PAID ${plan.paidCount} OF ${plan.months ?? plan.rows.length} · OUTSTANDING ${formatMoney(plan.outstandingDue)}`
-      : 'NO SCHEDULE'
+  const count = scheduleCount(plan)
   const sum = (pick: (r: RepaymentPlan['rows'][number]) => number | null) => plan.rows.reduce((s, r) => s + (pick(r) ?? 0), 0)
 
+  const Wrap = bare ? 'div' : 'section'
   return (
-    <section className="mb-9 sched">
-      <div className="sect-head">
-        <h2>Repayment schedule</h2>
-        <span className="rule" aria-hidden />
-        <span className="count">{count}</span>
-      </div>
+    <Wrap className={bare ? 'sched' : 'mb-9 sched'}>
+      {bare ? null : (
+        <div className="sect-head">
+          <h2>Repayment schedule</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">{count}</span>
+        </div>
+      )}
       {plan.rows.length === 0 ? (
         <div className="border border-hairline rounded-md bg-surface p-5 text-center">
           <p className="font-sans text-sm text-graphite">{cancelled ? 'Cancelled — no schedule.' : 'No installments yet.'}</p>
@@ -95,6 +105,6 @@ export default function RepaymentScheduleSection({
           <div className="mt-3">{recorded.content}</div>
         </details>
       ) : null}
-    </section>
+    </Wrap>
   )
 }

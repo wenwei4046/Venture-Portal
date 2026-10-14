@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
 import ReturnLink from '@/components/layout/ReturnLink'
 import s from '@/components/finv/full.module.css'
+import { FullCard as Card, FullFact as Fact, FullPanelRow as PanelRow, FullRow as Row } from '@/components/finv/FullParts'
 import a2 from '../../_components/alloc.module.css'
 import { officeTime } from '@/lib/office-time'
 import { methodLabel, shareLine } from '@/lib/allocator-sheet'
@@ -173,50 +173,3 @@ export default function AllocationPage({ allocation: a, can }: { allocation: Pag
   )
 }
 
-function Fact({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <span className={s.fact}>
-      <span className={s.factLabel}>{label}</span>
-      <span className={s.factValue} data-mono={mono ? 'true' : undefined}>
-        {value}
-      </span>
-    </span>
-  )
-}
-
-function Card({ n, title, aside, children }: { n: number; title: string; aside?: string; children: ReactNode }) {
-  return (
-    <section className={s.card} aria-label={title}>
-      <div className={s.cardHead}>
-        <span className={s.cardN}>{n}</span>
-        <span className={s.cardTitle}>{title}</span>
-        <span className={s.grow} />
-        {aside ? <span className={s.cardAside}>{aside}</span> : null}
-      </div>
-      <div className={s.cardBody}>{children}</div>
-    </section>
-  )
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <>
-      <dt className={s.dt}>{label}</dt>
-      <dd className={s.dd}>{value}</dd>
-    </>
-  )
-}
-
-function PanelRow({ label, value, sub, mono = false }: { label: string; value: string; sub?: string; mono?: boolean }) {
-  return (
-    <div className={s.pRow}>
-      <span className={s.pRowLabel}>{label}</span>
-      <span className={s.pRowValue}>
-        <span className={s.pRowV} data-mono={mono ? 'true' : undefined}>
-          {value}
-        </span>
-        {sub ? <span className={s.pRowSub}>{sub}</span> : null}
-      </span>
-    </div>
-  )
-}
