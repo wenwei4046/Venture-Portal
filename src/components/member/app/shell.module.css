@@ -227,7 +227,7 @@
   text-align: left;
 }
 .moduleText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.moduleLabel { font-size: calc(10.5px * var(--rv-type)); font-weight: 700; letter-spacing: .1em; color: var(--rv-faint); }
+.moduleLabel { font-size: max(10px, calc(10.5px * var(--rv-type))); font-weight: 700; letter-spacing: .1em; color: var(--rv-faint); }
 .moduleName { font-size: calc(14px * var(--rv-type)); font-weight: 650; }
 .asideMe {
   display: flex;
@@ -362,7 +362,7 @@
   border-radius: 8px;
   background: var(--rv-accent);
   color: var(--rv-white);
-  font-size: calc(10px * var(--rv-type));
+  font-size: max(10px, calc(10px * var(--rv-type)));
   font-weight: 700;
   line-height: 16px;
   text-align: center;

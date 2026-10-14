@@ -240,7 +240,7 @@
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
-.heroMedalN { width: 20px; height: 20px; border-radius: 50%; background: var(--rv-white); font-size: calc(10.5px * var(--rv-type)); font-weight: 700; display: grid; place-items: center; }
+.heroMedalN { width: 20px; height: 20px; border-radius: 50%; background: var(--rv-white); font-size: max(10px, calc(10.5px * var(--rv-type))); font-weight: 700; display: grid; place-items: center; }
 .heroSeg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; border-radius: 13px; background: var(--b-icon-bg); }
 .heroSegBtn { height: 34px; border: 0; border-radius: 10px; background: transparent; color: var(--b-ink); font-size: calc(13px * var(--rv-type)); font-weight: 500; }
 .heroSegOn { background: var(--rv-white); color: var(--rv-ink); font-weight: 650; }
@@ -394,7 +394,7 @@
 .fairStep1 { height: 60px; }
 .fairStep2 { height: 46px; }
 .fairPlace { font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 800; line-height: 1; }
-.fairJoint { font-size: calc(10.5px * var(--rv-type)); font-weight: 650; }
+.fairJoint { font-size: max(10px, calc(10.5px * var(--rv-type))); font-weight: 650; }
 
 .fairsCard {
   width: 100%;
