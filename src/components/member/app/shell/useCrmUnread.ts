@@ -22,7 +22,7 @@ export const LIVE_SETTLE_MS = 400;
  * `fixture`: the design preview's figure (the prototype's 4); nothing is read or listened to there.
  */
 export function useCrmUnread({ enabled, live, ready, source, gen, track, account, onCrm, fixture }: {
-  /** The account holds CRM · View and the button can show (a phone): nothing is read or listened to otherwise. */
+  /** The account holds CRM · View (Today's button on a phone, Profile's row everywhere): nothing is read or listened to otherwise. */
   enabled: boolean;
   /** The live app on real data. */
   live: boolean;

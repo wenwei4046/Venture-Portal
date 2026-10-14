@@ -451,9 +451,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
 
   // ── Today's CRM chat button (2026-10-14, the refresh handoff §2): the account's own chats' unread messages, live ──
   // Read with the open and every pull, and between them whenever a customer's row changes (Realtime, silently) — the
-  // phone's header only: the desktop draws none.
+  // phone's header, and Profile › My leads & appointments on the phone and the desktop alike (2026-10-14).
   const onCrm = route.screen === "account" && route.pf === "crm";
-  const crmUnread = useCrmUnread({ enabled: crm && !desk, live: live && !data.demo && !fixture, ready: memoryReady, source, gen, track,
+  const crmUnread = useCrmUnread({ enabled: crm, live: live && !data.demo && !fixture, ready: memoryReady, source, gen, track,
     account, onCrm, fixture: fixture?.crmUnread });
 
   // ── the Quote's catalogue (2026-10-08): no longer in the snapshot every open waited for ──
@@ -1280,7 +1280,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else if (pf === "brandWeeks") {
       page = <BrandWeeksPage months={bwMonths} viewing={!!context} onBack={back} />;
     } else {
-      page = <ProfileMain vm={docs.unseen ? { ...profileVM, badges: { ...profileVM.badges, docs: String(docs.unseen) } } : profileVM} hidden={hidden} crm={crm} closedRows={closedRows} push={!principal && !data.demo} actions={{
+      // My leads & appointments carries the chats' unread messages, the same live count as Today's chat button (the owner,
+      // 2026-10-14: "有任何消息，幫我出現 notification 在 revenue apps 的 my leads & appointment 中").
+      page = <ProfileMain vm={docs.unseen || crmUnread ? { ...profileVM, badges: { ...profileVM.badges, ...(docs.unseen ? { docs: String(docs.unseen) } : {}), ...(crm && crmUnread ? { crm: crmUnread > 99 ? "99+" : String(crmUnread) } : {}) } } : profileVM} hidden={hidden} crm={crm} closedRows={closedRows} push={!principal && !data.demo} actions={{
         open: (key: WorkKey) => goScreen("account", { pf: key }),
         scheme: shows(closed, "scheme") ? () => setSchemeOpen(true) : undefined,
         brandWeeks: shows(closed, "brandWeeks") ? () => goScreen("account", { pf: "brandWeeks" }) : undefined,
