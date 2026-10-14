@@ -141,6 +141,8 @@
 .barBtn:active { transform: scale(0.98); }
 .barBtn:disabled { opacity: 0.45; cursor: default; filter: none; transform: none; }
 .barBtn[data-kind='primary'] { flex: 1.5; border: 0; background: var(--ds-accent); font-weight: 500; }
+/* What it needs is missing (D11's Save allocation before an amount): the accent paled, the words kept. */
+.barBtn[data-kind='primary'][data-off='true'] { background: rgb(var(--fv-accent-off)); filter: none; }
 .barBtn[data-kind='danger'] { border-color: rgb(var(--fv-chip-danger-ink) / 0.4); color: var(--ds-danger); }
 .barBtn[data-kind='more'] { flex: 0 0 52px; font-weight: 600; }
 
@@ -218,6 +220,8 @@
 /* An invoice's Balance (D10): money in green, what is left to collect in the wait blue. */
 .lineV[data-tone='ledger'] { color: rgb(var(--fv-chip-ledger-ink)); }
 .lineV[data-tone='wait'] { color: rgb(var(--fv-chip-wait-ink)); }
+/* An allocation's HV own share (D11): kept, never billed — the design's muted figure. */
+.lineV[data-tone='muted'] { color: rgb(var(--hvs-muted)); }
 .lineSub { font-size: 11.5px; color: rgb(var(--hvs-muted)); }
 .foot { display: flex; justify-content: space-between; gap: 14px; padding: 11px 14px; background: var(--ds-row-hover); border-top: 1px solid var(--ds-border); }
 .footL { font-size: 13px; font-weight: 500; }

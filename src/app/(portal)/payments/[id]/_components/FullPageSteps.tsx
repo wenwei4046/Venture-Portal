@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { VoucherDetail } from '../../_lib/voucher-detail'
 import { useVoucherSteps } from '../../_components/voucher-steps'
-import s from './full.module.css'
+import s from '@/components/finv/full.module.css'
 
 // The full page's dark panel (2026-10-14, the Finance revamp v2 — D06): the
 // steps this reader may take now, stacked — the same as the drawer's bar

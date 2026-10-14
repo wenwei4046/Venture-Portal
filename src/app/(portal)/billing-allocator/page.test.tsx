@@ -1,32 +1,33 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 
-// 2026-10-07 — the Billing Allocator on the sheet (the user approved the
-// allocator sample): the month beside the title, four cards — what the month
-// allocated, what still has to be billed, what is billed, what HV keeps —
-// then the counted tabs.
+// The Billing Allocator's page (2026-10-14, the Finance revamp v2 — D11): it
+// reads the month — records, their invoices (each with its batch), the staff
+// list, the setup — and hands it to the hub, with what this reader may do
+// (+ New allocation and Generate invoices Billing · Create, the rest Billing ·
+// Edit), the list asked for (?card=) and a record sent back to be corrected
+// (?edit=).
 
-const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn() }))
+const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), canDo: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/permission-actions', () => ({ canDo: mocks.canDo }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
-vi.mock('./_components/AllocatorTabs', () => ({
-  default: (p: { data: { period: string; txns: Array<{ createdAt: string }>; invoices: unknown[]; companies: Array<{ label: string }> }; initialEditId?: string }) => (
-    <pre data-testid="tabs">
+vi.mock('@/lib/office-time', () => ({ officeMonth: () => '2026-10' }))
+vi.mock('./_components/AllocatorHub', () => ({
+  default: (p: Record<string, unknown> & { data: { period: string; txns: Array<{ txnNo: string; locked: boolean; createdAt: string }>; invoices: Array<{ invoiceNo: string; ref: string }>; companies: Array<{ label: string }> } }) => (
+    <pre data-testid="hub">
       {JSON.stringify({
-        period: p.data.period, txns: p.data.txns.length, invoices: p.data.invoices.length, companies: p.data.companies.map((c) => c.label),
-        ...(p.initialEditId ? { edit: p.initialEditId, recorded: p.data.txns.map((t) => t.createdAt) } : {}),
+        period: p.data.period,
+        txns: p.data.txns.map((t) => [t.txnNo, t.locked, t.createdAt]),
+        invoices: p.data.invoices.map((i) => [i.invoiceNo, i.ref]),
+        companies: p.data.companies.map((c) => c.label),
+        can: p.can,
+        canSetDefault: p.canSetDefault,
+        thisMonth: p.thisMonth,
+        initialCard: p.initialCard,
+        editId: p.editId ?? null,
       })}
     </pre>
-  ),
-}))
-vi.mock('./_components/AllocatorPeriod', () => ({
-  default: (p: { period: string }) => <span data-testid="month">{p.period}</span>,
-}))
-vi.mock('./_components/AllocGenerateButton', () => ({
-  default: (p: { period: string; onlyOnRecords?: boolean }) => (
-    <button type="button" data-period={p.period} data-only-on-records={String(!!p.onlyOnRecords)}>
-      Generate invoices
-    </button>
   ),
 }))
 
@@ -43,30 +44,22 @@ const detail = (company_id: string | null, department_id: string | null, amount:
 const TXNS = [
   {
     id: 't1', txn_no: 'ALC-202609-001', description: 'Office Rental', amount: 18980, method: 'headcount', category_id: 'cat-rent',
-    hc_period: '2026-09-01', billed_ref: 'ALC-202609',
+    hc_period: '2026-09-01', billed_ref: 'ALC-202609', created_at: '2026-09-01T02:00:00Z',
     alloc_txn_details: [detail(null, null, 366.59, true), detail('co-2990', null, 742.32), detail('co-car', null, 3681.57), detail(null, 'mkt', 4745)],
   },
   {
-    id: 't5', txn_no: 'ALC-202609-005', description: 'AI TOOLS - JUL26', amount: 1863.18, method: 'percentage', category_id: 'cat-web',
-    hc_period: null, billed_ref: 'ALC-202609-3',
-    alloc_txn_details: [detail(null, null, 745.27, true), detail('co-2990', null, 372.64), detail('co-car', null, 745.27)],
-  },
-  {
     id: 't6', txn_no: 'ALC-202609-006', description: "AI TOOLS-SEP'2026", amount: 2149.2, method: 'percentage', category_id: 'cat-web',
-    hc_period: null, billed_ref: 'ALC-202609-4', // that batch was voided: not billed
+    hc_period: null, billed_ref: 'ALC-202609-4', created_at: '2026-09-03T02:00:00Z', // that batch was voided: not billed
     alloc_txn_details: [detail(null, null, 859.68, true), detail('co-2990', null, 429.84), detail('co-car', null, 859.68)],
   },
 ]
 
 const INVOICES = [
   { id: 'i7', invoice_no: 'HV-INV-202609-0007', company_id: 'co-2990', billable_to_department_id: null, status: 'issued', reference_no: 'ALC-202609' },
-  { id: 'i8', invoice_no: 'HV-INV-202609-0008', company_id: 'co-car', billable_to_department_id: null, status: 'paid', reference_no: 'ALC-202609' },
   { id: 'i13', invoice_no: 'HV-INV-202609-0013', company_id: null, billable_to_department_id: 'mkt', status: 'paid', reference_no: 'ALC-202609' },
-  { id: 'i30', invoice_no: 'HV-INV-202609-0030', company_id: 'co-2990', billable_to_department_id: null, status: 'issued', reference_no: 'ALC-202609-3' },
-  { id: 'i31', invoice_no: 'HV-INV-202609-0031', company_id: 'co-car', billable_to_department_id: null, status: 'paid', reference_no: 'ALC-202609-3' },
 ]
 
-function database(txns = TXNS, invoices = INVOICES) {
+function database() {
   const tables: Record<string, unknown[]> = {
     companies: [
       { id: 'co-2990', short_code: '2990', name: '2990 Sdn Bhd' },
@@ -75,8 +68,8 @@ function database(txns = TXNS, invoices = INVOICES) {
     ],
     departments: [{ id: 'mkt', name: 'Marketing' }],
     alloc_categories: [{ id: 'cat-rent', name: 'Rental', coa_code: '7012' }, { id: 'cat-web', name: 'Website & Software', coa_code: '9087' }],
-    alloc_txns: txns,
-    invoices,
+    alloc_txns: TXNS,
+    invoices: INVOICES,
   }
   const from = vi.fn((table: string) => {
     const result = { data: tables[table] ?? [], error: null }
@@ -88,71 +81,53 @@ function database(txns = TXNS, invoices = INVOICES) {
   mocks.createClient.mockResolvedValue({ from })
 }
 
-const card = (name: string) => screen.getByRole('group', { name })
-const page = (period = '2026-09', edit?: string) => BillingAllocatorPage({ searchParams: Promise.resolve({ period, edit }) })
+const hub = () => JSON.parse(screen.getByTestId('hub').textContent ?? '{}')
+const page = (sp: Record<string, string> = {}) => BillingAllocatorPage({ searchParams: Promise.resolve({ period: '2026-09', ...sp }) })
 
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.requirePermission.mockResolvedValue({ id: 'fm', role: 'finance', permissions: ['billing'] })
+  mocks.canDo.mockImplementation((_u: unknown, fn: string, action: string) => fn === 'billing' && action !== 'create')
+  database()
 })
 
-describe('the Billing Allocator on the sheet', () => {
-  it('opens on the month with four cards: allocated, to bill, billed, and what HV keeps', async () => {
-    database()
+describe('the Billing Allocator’s page', () => {
+  it('hands the hub the month — a record billed while its batch has live invoices, each invoice with its batch', async () => {
     render(await page())
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Billing Allocator')
-    // 2026-10-10 — the handoff: "← September 2026 →" beside the title.
-    expect(screen.getByRole('heading', { level: 1 }).parentElement).toContainElement(screen.getByTestId('month'))
-    expect(screen.getByTestId('month')).toHaveTextContent('2026-09')
-    expect(card('Allocated · September')).toHaveAttribute('data-tone', 'primary')
-    expect(card('Allocated · September')).toHaveTextContent('RM 22,992.38')
-    expect(card('Allocated · September')).toHaveTextContent('3 expenses · 2 batches')
-    // Waiting on Finance to bill it: the handoff's blue wait tone (2026-10-10).
-    expect(card('To bill')).toHaveAttribute('data-tone', 'wait')
-    expect(card('To bill')).toHaveTextContent('RM 1,289.52')
-    expect(card('To bill')).toHaveTextContent('1 expense not yet billed · 2 companies')
-    expect(card('Billed')).toHaveTextContent('RM 10,286.80')
-    expect(card('Billed')).toHaveTextContent('5 invoices · 2 expenses')
-    expect(card('HV own share')).toHaveTextContent('RM 1,971.54')
-    expect(card('HV own share')).toHaveTextContent('kept by HV · not billed')
-    expect(JSON.parse(screen.getByTestId('tabs').textContent ?? '{}')).toEqual({ period: '2026-09', txns: 3, invoices: 5, companies: ['2990', 'CAR', 'HK'] })
-  })
-
-  // 2026-10-10 — the handoff puts Generate invoices, the primary, in the page
-  // head while Records is open and something is still to bill.
-  it('offers Generate invoices in the head while something is still to bill', async () => {
-    database()
-    const { unmount } = render(await page())
-    const button = within(document.querySelector('.page-head') as HTMLElement).getByRole('button', { name: 'Generate invoices' })
-    expect(button.dataset).toMatchObject({ period: '2026-09', onlyOnRecords: 'true' })
-    unmount()
-    database(TXNS.slice(0, 2))
-    render(await page())
-    expect(screen.queryByRole('button', { name: 'Generate invoices' })).toBeNull()
-  })
-
-  it('rests the To bill card when every allocation is billed, and says so when nothing is allocated yet', async () => {
-    database(TXNS.slice(0, 2))
-    const { unmount } = render(await page())
-    expect(card('To bill')).not.toHaveAttribute('data-tone')
-    expect(card('To bill')).toHaveTextContent('RM 0.00')
-    expect(card('To bill')).toHaveTextContent('every allocation billed')
-    unmount()
-    database([], [])
-    render(await page('2026-10'))
-    expect(card('Allocated · October')).toHaveTextContent('RM 0.00')
-    expect(card('Allocated · October')).toHaveTextContent('nothing allocated yet')
-    expect(card('Billed')).toHaveTextContent('no invoices')
-  })
-
-  // 2026-10-09 — a record's own page sends "Correct this record" back as
-  // ?edit=<id>, and each record now carries when it was recorded.
-  it('hands the tabs the record to correct and when each record was made', async () => {
-    database(TXNS.map((t, i) => ({ ...t, created_at: `2026-09-0${i + 1}T02:00:00Z` })))
-    render(await page('2026-09', 't6'))
-    expect(JSON.parse(screen.getByTestId('tabs').textContent ?? '{}')).toMatchObject({
-      edit: 't6',
-      recorded: ['2026-09-01T02:00:00Z', '2026-09-02T02:00:00Z', '2026-09-03T02:00:00Z'],
+    expect(hub()).toMatchObject({
+      period: '2026-09',
+      txns: [
+        ['ALC-202609-001', true, '2026-09-01T02:00:00Z'],
+        ['ALC-202609-006', false, '2026-09-03T02:00:00Z'],
+      ],
+      invoices: [
+        ['HV-INV-202609-0007', 'ALC-202609'],
+        ['HV-INV-202609-0013', 'ALC-202609'],
+      ],
+      companies: ['2990', 'CAR', 'HK'],
+      thisMonth: '2026-10',
+      initialCard: 'records',
+      editId: null,
     })
+  })
+
+  it('asks what this reader may do: Billing · Create for a new allocation and invoices, Billing · Edit for the rest', async () => {
+    render(await page())
+    expect(hub()).toMatchObject({ can: { create: false, edit: true }, canSetDefault: false })
+    expect(mocks.canDo).toHaveBeenCalledWith(expect.anything(), 'billing', 'create')
+    expect(mocks.canDo).toHaveBeenCalledWith(expect.anything(), 'billing', 'edit')
+  })
+
+  it('opens on the list asked for, and hands on a record sent back to be corrected', async () => {
+    render(await page({ card: 'staff', edit: 't6' }))
+    expect(hub()).toMatchObject({ initialCard: 'staff', editId: 't6' })
+  })
+
+  it('opens on Records for a list it does not know, and on the office’s month with none asked', async () => {
+    const { unmount } = render(await page({ card: 'nope' }))
+    expect(hub().initialCard).toBe('records')
+    unmount()
+    render(await BillingAllocatorPage({ searchParams: Promise.resolve({}) }))
+    expect(hub().period).toBe('2026-10')
   })
 })

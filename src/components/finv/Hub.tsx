@@ -271,7 +271,8 @@ export interface ItemRow {
   sub?: string
   /** The figure at its right, already written ("−220.40"). */
   value?: string
-  valueTone?: 'danger' | 'ledger' | null
+  /** A credit note in red, money in green, what is still to bill in the alert gold, a word of state quiet. */
+  valueTone?: 'danger' | 'ledger' | 'alert' | 'muted' | null
   /** The row's one button (Approve, Invoice, PDF…). */
   action?: { label: string; onClick?: () => void; href?: string; newTab?: boolean; disabled?: boolean; title?: string } | null
   /** A press on the row (or Enter). */

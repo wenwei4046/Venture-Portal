@@ -2,16 +2,10 @@ import dayjs from 'dayjs'
 import { officeMonth } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requirePermission, requirePage } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney } from '@/lib/utils'
-import { allocatorSummary } from '@/lib/allocator-sheet'
 import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
-import { StatCard, StatCards } from '@/components/sheet/StatCard'
-import AllocatorTabs from './_components/AllocatorTabs'
-import AllocatorPeriod from './_components/AllocatorPeriod'
-import AllocGenerateButton from './_components/AllocGenerateButton'
-import { AllocatorShell } from './_components/AllocatorShell'
-import { landingTab } from './_components/landing-tab'
+import AllocatorHub, { type AllocatorCard } from './_components/AllocatorHub'
 import type {
   AllocatorData, CoOpt, StaffRow, CategoryRow, TemplateRow, TxnRow, AllocInvoiceRow,
 } from './_components/types'
@@ -20,15 +14,22 @@ import type {
 // HV pays a shared expense → allocate to subsidiaries by headcount /
 // percentage / equal / custom → save → raise one DRAFT invoice per company
 // through the same path as manual multi-line invoices.
+//
+// 2026-10-14 — the Finance revamp v2 (D11): the design's hub for every reader
+// of it (AllocatorHub) — Records, By company, Staff, Setup as cards beside
+// the list, a record in the drawer, + New allocation in the drawer too.
 
 interface Props {
-  /** `edit` — a record's own page sent it back to be corrected (2026-10-09). */
-  searchParams: Promise<{ period?: string; edit?: string }>
+  /** `edit` — a record's own page sent it back to be corrected (2026-10-09);
+   *  `card` — the list on show (records, company, staff, setup). */
+  searchParams: Promise<{ period?: string; edit?: string; card?: string }>
 }
+
+const CARDS: ReadonlyArray<AllocatorCard> = ['records', 'company', 'staff', 'setup']
 
 export default async function BillingAllocatorPage({ searchParams }: Props) {
   await requirePage('/billing-allocator')
-  await requirePermission('billing')
+  const user = await requirePermission('billing')
   // alloc_* tables aren't in the generated database.types yet — untyped client,
   // same convention as lib/cfo-reports.ts; shapes narrowed manually below.
   const supabase = (await createClient()) as unknown as SupabaseClient
@@ -227,6 +228,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
       companyId: targetId ?? '',
       companyLabel: labelOf(targetId),
       status: i.status as string,
+      ref: (i.reference_no as string | null) ?? '',
     }
   })
 
@@ -264,72 +266,19 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     invoices: invoiceRows,
   }
 
-  // The sheet (2026-10-07; the user approved the allocator sample): the month
-  // beside the title, four cards — what the month allocated, what still has
-  // to be billed, what is billed, what HV keeps — then the counted tabs.
-  const summary = allocatorSummary(txnRows, invoiceRows)
-  const monthName = dayjs(pd).format('MMMM')
-  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
-
-  // 2026-10-10 — the handoff's head: "← September 2026 →" beside the title,
-  // and Generate invoices — the primary — on the right while Records is open
-  // and something is still to bill. The shell shares the open tab with it.
+  // Each button asks what its action asks: + New allocation and Generate
+  // invoices Billing · Create, the rest of the allocator's writes Billing ·
+  // Edit — on this page's boxes, as requirePage narrowed them.
   return (
-    <AllocatorShell key={period} initialTab={landingTab(txnRows, sp.edit)}>
-      <div className="page-head">
-        <div className="min-w-0">
-          <div className="page-eyebrow"><em>I.</em> BILLING · ALLOCATOR</div>
-          <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
-            <h1 className="page-title">Billing Allocator</h1>
-            <AllocatorPeriod period={period} />
-          </div>
-        </div>
-        {summary.toBillCount > 0 ? (
-          <div className="flex flex-wrap items-start justify-end gap-2 min-w-0">
-            <AllocGenerateButton period={period} onlyOnRecords />
-          </div>
-        ) : null}
-      </div>
-
-      <StatCards label="Billing Allocator">
-        <StatCard
-          tone="primary"
-          label={`Allocated · ${monthName}`}
-          value={formatMoney(summary.allocated)}
-          icon="layers"
-          note={
-            summary.txnCount === 0
-              ? 'nothing allocated yet'
-              : `${plural(summary.txnCount, 'expense', 'expenses')} · ${plural(summary.batchCount, 'batch', 'batches')}`
-          }
-        />
-        <StatCard
-          tone={summary.toBill > 0 ? 'wait' : 'default'}
-          label="To bill"
-          value={formatMoney(summary.toBill)}
-          icon="clock"
-          note={
-            summary.toBillCount > 0
-              ? `${plural(summary.toBillCount, 'expense', 'expenses')} not yet billed · ${plural(summary.toBillTargets, 'company', 'companies')}`
-              : summary.txnCount === 0
-                ? 'nothing to bill'
-                : 'every allocation billed'
-          }
-        />
-        <StatCard
-          label="Billed"
-          value={formatMoney(summary.billed)}
-          icon="receipt"
-          note={
-            summary.invoiceCount === 0
-              ? 'no invoices'
-              : `${plural(summary.invoiceCount, 'invoice', 'invoices')} · ${plural(summary.billedCount, 'expense', 'expenses')}`
-          }
-        />
-        <StatCard label="HV own share" value={formatMoney(summary.ownShare)} icon="building" note="kept by HV · not billed" />
-      </StatCards>
-
-      <AllocatorTabs data={data} initialEditId={sp.edit} />
-    </AllocatorShell>
+    <AllocatorHub
+      key={period}
+      data={data}
+      can={{ create: canDo(user, 'billing', 'create'), edit: canDo(user, 'billing', 'edit') }}
+      canSetDefault={canDo(user, 'billing', 'create')}
+      thisMonth={officeMonth()}
+      initialCard={CARDS.includes(sp.card as AllocatorCard) ? (sp.card as AllocatorCard) : 'records'}
+      editId={sp.edit}
+    />
   )
 }
+
