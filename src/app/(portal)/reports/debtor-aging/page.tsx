@@ -3,11 +3,10 @@ import { officeMonth, officeToday } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
-import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney } from '@/lib/utils'
 import { buildDebtorAging, debtorAgingView, invoicesAsAt, resolveAgingAsAt, type RawInvoice } from '@/lib/debtor-aging'
 import { toChoices } from '@/lib/report-range'
-import { fetchPaidByInvoice } from '@/lib/debtor-aging-data'
+import { readDebtorInvoices } from './_lib/debtor-read'
 import AgingByCustomer from './_components/AgingByCustomer'
 import { reportsCompanyWide } from '@/lib/surfaces'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
@@ -20,47 +19,8 @@ export default async function DebtorAgingPage({ searchParams }: { searchParams: 
   const user = await requirePermission('dept_reports')
   const supabase = await createClient()
 
-  const [invoices, companies, departments] = await Promise.all([
-    fetchAllRows((lo, hi) =>
-      supabase
-        .from('invoices')
-        .select('id, invoice_no, invoice_date, due_date, total_amount, description, company_id, billable_to_department_id, billable_to_freetext_name')
-        .eq('status', 'issued')
-        .order('id', { ascending: true })
-        .range(lo, hi),
-    ),
-    fetchAllRows((lo, hi) => supabase.from('companies').select('id, name').range(lo, hi)),
-    // is_internal=false — exclude the 'Venture Office' pseudo-dept from the
-    // id→name resolver (never a debtor).
-    fetchAllRows((lo, hi) => supabase.from('departments').select('id, name').eq('is_internal', false).range(lo, hi)),
-  ])
-
-  const companyMap = new Map((companies ?? []).map((c) => [c.id as string, c.name as string]))
-  const deptMap = new Map((departments ?? []).map((d) => [d.id as string, d.name as string]))
-
-  // Partial payments: outstanding = total − receipts already recorded.
-  const paidByInvoice = await fetchPaidByInvoice(supabase, (invoices ?? []).map((i) => i.id as string))
-
-  const raw: RawInvoice[] = (invoices ?? [])
-    .map((i) => {
-      const paid = paidByInvoice.get(i.id as string) ?? 0
-      const remaining = Math.round((Number(i.total_amount) - paid) * 100) / 100
-      const desc = (i.description as string | null) ?? null
-      return {
-        id: i.id as string,
-        invoiceNo: (i.invoice_no as string | null) ?? '—',
-        payer:
-          (i.company_id ? companyMap.get(i.company_id as string) : null) ??
-          (i.billable_to_department_id ? deptMap.get(i.billable_to_department_id as string) : null) ??
-          (i.billable_to_freetext_name as string | null) ??
-          '—',
-        invoiceDate: (i.invoice_date as string | null) ?? null,
-        dueDate: (i.due_date as string | null) ?? null,
-        amount: remaining,
-        description: paid > 0 ? `${desc ? `${desc} · ` : ''}part-paid RM ${paid.toFixed(2)}` : desc,
-      }
-    })
-    .filter((i) => i.amount > 0.005)
+  // Every issued invoice still unpaid, at its remainder (`_lib/debtor-read` — the Finance phone app's read too).
+  const raw: RawInvoice[] = await readDebtorInvoices(supabase)
 
   const today = officeToday()
   const aging = buildDebtorAging(raw, today)
