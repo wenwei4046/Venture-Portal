@@ -12,8 +12,6 @@ interface StaffRow {
   designation: string | null
   employment_type: string
   basic_salary: Num
-  allowances: Num
-  non_statutory_allowance: Num
   hire_date: string | null
   resignation_date: string | null
   epf_category: string
@@ -29,6 +27,9 @@ interface PayrollRow {
   staff_id: string
   status: string
   source: string
+  basic_salary: Num
+  statutory_allowance: Num
+  non_statutory_allowance: Num
   unpaid_leave_days: Num
   ot_amount: Num
   deduction_amount: Num
@@ -44,10 +45,31 @@ const zero: Contribution = { employer: 0, employee: 0 }
 const num = (value: Num | undefined): number => Number(value ?? 0)
 const round2 = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100
 
+/**
+ * The salary the payroll row holds — basic, statutory and non-statutory
+ * allowance — is the ROW's, as `compute_hr_monthly_payroll` reads it; before
+ * the row exists, what the close will write into it (`comm_close_sync_payroll`:
+ * the staff record's basic, no allowance). A Revenue Director's allowance on
+ * their record is part of their director pay, never paid on top of it (user
+ * 2026-10-14). `revenue_pay_preview` reads the same way.
+ */
+export function payrollSalary(
+  staff: Pick<StaffRow, 'basic_salary'>,
+  payroll?: Pick<PayrollRow, 'basic_salary' | 'statutory_allowance' | 'non_statutory_allowance'>,
+) {
+  return payroll
+    ? {
+      basic: num(payroll.basic_salary),
+      statutoryAllowance: num(payroll.statutory_allowance),
+      nonStatutoryAllowance: num(payroll.non_statutory_allowance),
+    }
+    : { basic: num(staff.basic_salary), statutoryAllowance: 0, nonStatutoryAllowance: 0 }
+}
+
 /** Same employment window and unrounded wage as revenue_pay_preview SQL. */
 export function previewWageWindow(
   period: string,
-  staff: Pick<StaffRow, 'hire_date' | 'resignation_date' | 'basic_salary' | 'allowances'>,
+  staff: Pick<StaffRow, 'hire_date' | 'resignation_date'> & { basic_salary: Num; allowances: Num },
   payroll?: Pick<PayrollRow, 'unpaid_leave_days' | 'deduction_amount'>,
 ) {
   const [year, month] = period.split('-').map(Number)
@@ -88,12 +110,12 @@ export async function loadPayBeforeRun(
   const [staff, payroll, elsewhere] = await Promise.all([
     fetchByKeys<StaffRow, string>(staffIds, async chunk => ({
       data: await fetchAllRows<StaffRow>((from, to) => supabase.from('hr_staff_costs')
-        .select('id, employee_name, employee_code, designation, employment_type, basic_salary, allowances, non_statutory_allowance, hire_date, resignation_date, epf_category, socso_category, pcb_category, children_count, is_epf_exempt, tax_mode, withholding_rate')
+        .select('id, employee_name, employee_code, designation, employment_type, basic_salary, hire_date, resignation_date, epf_category, socso_category, pcb_category, children_count, is_epf_exempt, tax_mode, withholding_rate')
         .in('id', chunk).order('id').range(from, to)), error: null,
     })),
     fetchByKeys<PayrollRow, string>(staffIds, async chunk => ({
       data: await fetchAllRows<PayrollRow>((from, to) => supabase.from('hr_monthly_payroll')
-        .select('staff_id, status, source, unpaid_leave_days, ot_amount, deduction_amount, skbbk_amount, commission_amount, commission_adjustment_amount, gross, net')
+        .select('staff_id, status, source, basic_salary, statutory_allowance, non_statutory_allowance, unpaid_leave_days, ot_amount, deduction_amount, skbbk_amount, commission_amount, commission_adjustment_amount, gross, net')
         .eq('period_month', period).in('staff_id', chunk).order('id').range(from, to)), error: null,
     })),
     fetchByKeys<{ staff_id: string; total_commission: Num }, string>(staffIds, async chunk => ({
@@ -129,7 +151,8 @@ export async function loadPayBeforeRun(
 
   const preview = await Promise.all(staff.map(async person => {
     const pay = payrollByPerson.get(person.id)
-    const window = previewWageWindow(period, person, pay)
+    const salary = payrollSalary(person, pay)
+    const window = previewWageWindow(period, { ...person, basic_salary: salary.basic, allowances: salary.statutoryAllowance }, pay)
     const args = { p_wages: window.statutoryWages, p_period: period }
     const [epf, socso, eis] = await Promise.all([
       window.statutoryWages > 0 && !person.is_epf_exempt
@@ -144,8 +167,8 @@ export async function loadPayBeforeRun(
     return {
       staff_id: person.id, employee_name: person.employee_name, employee_code: person.employee_code,
       designation: person.designation, employment_type: person.employment_type,
-      basic_salary: num(person.basic_salary), statutory_allowance: num(person.allowances),
-      non_statutory_allowance: num(person.non_statutory_allowance), ot_amount: num(pay?.ot_amount),
+      basic_salary: salary.basic, statutory_allowance: salary.statutoryAllowance,
+      non_statutory_allowance: salary.nonStatutoryAllowance, ot_amount: num(pay?.ot_amount),
       deduction_amount: num(pay?.deduction_amount), skbbk_amount: num(pay?.skbbk_amount), unpaid_leave_days: num(pay?.unpaid_leave_days),
       days_worked: window.daysWorked, days_in_month: window.daysInMonth,
       tax_mode: person.tax_mode, withholding_rate: num(person.withholding_rate), statutory_wages: round2(window.statutoryWages),

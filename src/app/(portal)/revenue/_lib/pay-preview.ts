@@ -12,8 +12,10 @@ import { loadPayBeforeRun } from './pay-preview-before-run'
  * Two sources, deliberately kept apart. The COMMISSION and its parts come from
  * the run's statements — the snapshot the engine committed to, never
  * recomputed here. The SALARY inputs come from `revenue_pay_preview`, which
- * reads the staff master and the statutory schedules with the same lookups the
- * payroll trigger uses. The arithmetic joining them is `lib/revenue-pay.ts`.
+ * reads the payroll row's basic and allowances as the payroll trigger does
+ * (before the row exists, the staff master's basic and no allowance — what the
+ * close writes) and the statutory schedules with the trigger's own lookups.
+ * The arithmetic joining them is `lib/revenue-pay.ts`.
  *
  * Before payroll exists this is a PREVIEW. Once it exists the board shows the
  * payroll row beside it and says so when the two disagree, which is the only

@@ -8,6 +8,10 @@ import { loadPayBoard } from './pay-preview'
 
 function mockClient(options: {
   salary?: number; tax?: string; rpcFailure?: string; noHistoricalMembers?: boolean; payLines?: Record<string, unknown>[]
+  /** The staff record's salary, where it differs from the payroll row's. */
+  record?: { basic_salary?: number; allowances?: number; non_statutory_allowance?: number }
+  /** No payroll row for the month yet. */
+  noPayrollRow?: boolean
 } = {}) {
   const tableReads: string[] = []
   const rpcReads: { name: string; args: Record<string, unknown> }[] = []
@@ -16,12 +20,13 @@ function mockClient(options: {
       : table === 'comm_hierarchy' ? (options.noHistoricalMembers ? [] : [{ staff_id: 'person-a' }])
       : table === 'hr_staff_costs' ? [{
         id: 'person-a', employee_name: 'Anthony', employee_code: 'A', designation: 'Sales', employment_type: 'full_time',
-        basic_salary: options.salary ?? 3000, allowances: 100, non_statutory_allowance: 50,
+        basic_salary: options.salary ?? 3000, allowances: 100, non_statutory_allowance: 50, ...options.record,
         hire_date: '2026-01-01', resignation_date: null, epf_category: 'A', socso_category: 'first',
         pcb_category: 'KA1', children_count: 0, is_epf_exempt: false, tax_mode: options.tax ?? 'pcb', withholding_rate: 0.02,
       }]
-      : table === 'hr_monthly_payroll' ? [{
-        staff_id: 'person-a', status: 'draft', source: 'commission', unpaid_leave_days: 2,
+      : table === 'hr_monthly_payroll' ? options.noPayrollRow ? [] : [{
+        staff_id: 'person-a', status: 'draft', source: 'commission',
+        basic_salary: options.salary ?? 3000, statutory_allowance: 100, non_statutory_allowance: 50, unpaid_leave_days: 2,
         ot_amount: 30, deduction_amount: 150, skbbk_amount: 20, commission_amount: 200,
         commission_adjustment_amount: 75, gross: 190, net: 180,
       }]
@@ -108,6 +113,32 @@ describe('salary before a saved commission run', () => {
     const denied = mockClient({ rpcFailure: 'revenue_pay_preview', payLines: [{ id: 'l1' }] })
     await expect(loadPayBoard(denied.client, 'sub-1', '2026-09-01', { allowWithoutRun: true })).rejects.toThrow('Individual pay')
     expect(denied.tableReads).not.toContain('revenue_pay_lines')
+  })
+
+  // 2026-10-14: HR put PETER's package on his record — basic RM 12,000 + a
+  // non-statutory allowance of RM 23,000 = his RM 35,000 director pay — and the
+  // preview paid the allowance on top. Payroll reads its own row, which the
+  // close makes with no allowance: the preview reads that row too.
+  it('reads the salary off the payroll row, as payroll does — a director’s allowance on the record is not paid on top', async () => {
+    const db = mockClient({ salary: 12_000, record: { allowances: 0, non_statutory_allowance: 23_000 } })
+    const rows = await loadPayBeforeRun(db.client, 'sub-1', '2026-09-01')
+    // The row's own allowances (100 statutory, 50 not) — never the record's 23,000.
+    expect(rows[0]).toMatchObject({ basic_salary: 12_000, statutory_allowance: 100, non_statutory_allowance: 50 })
+  })
+
+  it('takes the row’s basic over the record’s (STANLEY’s September: RM 7,000 on the row, 0 on the record)', async () => {
+    const db = mockClient({ salary: 7_000, record: { basic_salary: 0 } })
+    const rows = await loadPayBeforeRun(db.client, 'sub-1', '2026-09-01')
+    expect(rows[0].basic_salary).toBe(7_000)
+    // (7,000 + 100) × 28 / 30 − 150: the row's wage, the trigger's lookup.
+    expect(db.rpcReads.find(read => read.name === 'lookup_epf')?.args).toMatchObject({ p_wages: 6476.666666666667 })
+  })
+
+  it('before the payroll row exists: the record’s basic and no allowance — what the close writes', async () => {
+    const db = mockClient({ noPayrollRow: true, record: { basic_salary: 12_000, allowances: 300, non_statutory_allowance: 23_000 } })
+    const rows = await loadPayBeforeRun(db.client, 'sub-1', '2026-09-01')
+    expect(rows[0]).toMatchObject({ basic_salary: 12_000, statutory_allowance: 0, non_statutory_allowance: 0, payroll_exists: false })
+    expect(db.rpcReads.find(read => read.name === 'lookup_epf')?.args).toMatchObject({ p_wages: 12_000 })
   })
 
   it('can read salary inputs for the actual sellers when historical membership is absent', async () => {
