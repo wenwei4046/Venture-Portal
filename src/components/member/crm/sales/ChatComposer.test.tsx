@@ -67,10 +67,11 @@ describe("the typing bar", () => {
     expect(byTitle("Send")).toBeNull();
   });
 
-  it("the chat's own rows come with it: \"/\" shows the quick replies above the bar", async () => {
+  it("the chat's own rows come with it: \"/\" shows the quick replies above the bar, with Edit (the chat's page for them)", async () => {
     await openChat();
     await type("/");
     expect(composer().textContent).toContain("Quick replies");
+    expect([...composer().querySelectorAll("span")].some(s => s.textContent === "Edit")).toBe(true);
   });
 });
 

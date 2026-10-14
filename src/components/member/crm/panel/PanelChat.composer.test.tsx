@@ -1,0 +1,160 @@
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import CrmApp from "../CrmApp";
+import { HOLD_HINT, ICON } from "../sales/vm/composer";
+
+// The Team side's chat (the Control panel — the Principal and the Director answer someone's customer here) has Mine's
+// composer and header (the owner, 2026-10-15: "all need same, as new version"; docs/design/chat-composer). On the demo's
+// data as /member/preview draws it, the Principal ("boss") opening a salesperson's customer from a notice.
+vi.mock("@/app/(member)/member/crm-actions", () => ({}));
+const voice = vi.hoisted(() => ({ start: vi.fn(async () => null as string | null), stop: vi.fn(async () => new File(["x"], "Voice note.m4a", { type: "audio/mp4" })), cancel: vi.fn() }));
+vi.mock("../shared/voice", async importOriginal => ({
+  ...(await importOriginal<typeof import("../shared/voice")>()),
+  startVoice: voice.start, stopVoice: voice.stop, cancelVoice: voice.cancel,
+}));
+
+class NoResize { observe() {} unobserve() {} disconnect() {} }
+beforeEach(() => { vi.stubGlobal("ResizeObserver", NoResize); voice.start.mockClear(); voice.stop.mockClear(); voice.cancel.mockClear(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState({}, "", "/"); });
+
+/** The Principal in the Team chat of a demo salesperson's customer, opened from Team's Inbox as a person would: Lim Wei
+ *  Jie (WhatsApp, wrote 20 min ago), or Rajesh Kumar (WhatsApp, last wrote three days ago — cold). (A notice's `open`
+ *  would not do: the demo's eyes become the Principal's only after the first paint.) */
+async function openTeamChat(name = "Lim Wei Jie") {
+  window.history.replaceState({}, "", "/member/preview?crmAs=boss");
+  render(<CrmApp live={false} salesperson="You" onExit={() => {}} />);
+  await act(async () => {});
+  await tap(screen.getAllByText("Inbox", { exact: true }).find(e => e.closest("nav")) ?? null);
+  await tap(screen.getAllByText(name, { exact: true })[0]);
+  expect(document.querySelector('main[data-chat-screen] [title="Back to Inbox"]')).not.toBeNull();
+}
+const head = () => document.querySelector<HTMLElement>("main[data-chat-screen] [data-chat-head]")!;
+const composer = () => document.querySelector<HTMLElement>("main[data-chat-screen] [data-composer]")!;
+const box = () => composer().querySelector("textarea")!;
+const byTitle = (t: string) => composer().querySelector<HTMLElement>(`[title="${t}"]`);
+const iconOf = (el: Element | null) => el?.querySelector("path")?.getAttribute("d");
+async function tap(el: Element | null) {
+  expect(el).not.toBeNull();
+  fireEvent.click(el!);
+  await act(async () => {});
+}
+async function type(text: string) {
+  fireEvent.change(box(), { target: { value: text } });
+  await act(async () => {});
+}
+const emojiCells = () => [...composer().querySelectorAll<HTMLElement>('div[style*="repeat(8"] > span')];
+
+describe("the Team chat is Mine's", () => {
+  it("the header: back and ⋮ with no ring, the green dot, whose customer it is under the row — over the wallpaper", async () => {
+    await openTeamChat();
+    expect(head()).not.toBeNull();
+    expect(head().textContent).toContain("Lim Wei Jie");
+    expect(head().textContent).toContain("'s customer");
+    const back = head().querySelector<HTMLElement>('[title="Back to Inbox"]')!;
+    expect(back.style.border).toBe("");
+    expect(back.querySelector("svg")).toHaveAttribute("width", "22");
+    expect(head().querySelector<HTMLElement>('[title="More"]')!.style.border).toBe("");
+    expect(head().querySelector<HTMLElement>('[title="WhatsApp"] > span:last-child')).toHaveStyle({ background: "#387557" });
+    // The list runs under the header and the composer.
+    expect(document.querySelector<HTMLElement>("main[data-chat-screen] [data-chat-list]")).toHaveStyle({ position: "absolute" });
+  });
+
+  it("one pill: Sticker, the reply box, Attach and Camera, the mic; the old +, emoji button and sheet are gone", async () => {
+    await openTeamChat();
+    expect(box()).toHaveAttribute("placeholder", "Reply to Lim…");
+    for (const t of ["Sticker", "Attach", "Camera", "Voice note"]) expect(byTitle(t)).not.toBeNull();
+    expect(iconOf(byTitle("Voice note"))).toBe(ICON.mic);
+    expect(document.querySelector('[title="Send a file"]')).toBeNull();
+    expect(document.querySelector('[title="Emoji"]')).toBeNull();
+    expect(screen.queryByText("EMOJI")).toBeNull();
+  });
+
+  it("typing folds Attach and Camera away and the mic becomes Send; Send sends and empties the box", async () => {
+    await openTeamChat();
+    await type("Sunday 11am is fine");
+    expect(byTitle("Attach")).toBeNull();
+    expect(iconOf(byTitle("Send"))).toBe(ICON.send);
+    await tap(byTitle("Send"));
+    expect(screen.getByText("Sunday 11am is fine")).toBeInTheDocument();
+    expect(box().value).toBe("");
+  });
+
+  it("the Sticker panel: an emoji into the reply and first into Recents; Delete takes it off whole", async () => {
+    await openTeamChat();
+    await tap(byTitle("Sticker"));
+    expect(composer().querySelector("[data-panel]")).not.toBeNull();
+    expect(iconOf(byTitle("Sticker"))).toBe(ICON.kb);
+    expect(composer().textContent).not.toContain("GIF");
+    await tap(byTitle("Home"));
+    await tap(emojiCells()[0]); // 🛏️
+    expect(box().value).toBe("🛏️");
+    await tap(byTitle("Delete"));
+    expect(box().value).toBe("");
+    await tap(byTitle("Recents"));
+    expect(emojiCells()[0].textContent).toBe("🛏️");
+  });
+
+  it("Attach: Photos opens the photo picker; Quick replies and Auto replies open their lists", async () => {
+    await openTeamChat();
+    await tap(byTitle("Attach"));
+    const panel = composer().querySelector<HTMLElement>("[data-panel]")!;
+    expect([...panel.querySelectorAll(":scope > div > span")].map(t => t.textContent)).toEqual(["Photos", "Document", "Quick replies", "Auto replies"]);
+    const photo = document.getElementById("crm-panel-photo")!, click = vi.spyOn(photo, "click");
+    await tap(screen.getByText("Photos"));
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(composer().querySelector("[data-panel]")).toBeNull();
+    await tap(byTitle("Attach"));
+    await tap(screen.getByText("Auto replies"));
+    const sheet = screen.getByRole("dialog", { name: "Attach" });
+    expect(sheet.textContent).toContain("Auto replies");
+    const cam = document.getElementById("crm-panel-camera")!, camClick = vi.spyOn(cam, "click");
+    fireEvent.click(sheet);
+    await act(async () => {});
+    await tap(byTitle("Camera"));
+    expect(camClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('"/" lists the quick replies — no Edit here (that page is Mine\'s)', async () => {
+    await openTeamChat();
+    await type("/");
+    expect(composer().textContent).toContain("Quick replies");
+    expect([...composer().querySelectorAll("span")].some(s => s.textContent === "Edit")).toBe(false);
+  });
+
+  it("the mic is held to record: a tap says so; held and let go, the voice note goes", async () => {
+    await openTeamChat();
+    fireEvent.pointerDown(byTitle("Voice note")!);
+    fireEvent.pointerUp(window);
+    await act(async () => {});
+    expect(screen.getByText(HOLD_HINT)).toBeInTheDocument();
+    expect(voice.start).not.toHaveBeenCalled();
+    const mic = byTitle("Voice note")!;
+    fireEvent.pointerDown(mic);
+    await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+    expect(voice.start).toHaveBeenCalledTimes(1);
+    expect(composer().textContent).toContain("Recording…");
+    expect(byTitle("Send voice note")).toBe(mic);
+    await act(async () => { await new Promise(r => setTimeout(r, 750)); });
+    fireEvent.pointerUp(window, { clientX: 300 });
+    await act(async () => {});
+    expect(voice.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaving the chat while recording turns the microphone off", async () => {
+    await openTeamChat();
+    fireEvent.pointerDown(byTitle("Voice note")!);
+    await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+    await tap(head().querySelector('[title="Back to Inbox"]'));
+    expect(document.querySelector("[data-composer]")).toBeNull();
+    expect(voice.cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("a cold chat: the cold-lead note in the header and Send template message in the bar's place, as Mine's", async () => {
+    await openTeamChat("Rajesh Kumar");
+    expect(head().textContent).toContain("Cold lead · the 24 h WhatsApp window has closed");
+    expect(composer().querySelector("textarea")).toBeNull();
+    await tap([...composer().querySelectorAll("span")].find(s => s.textContent === "Send template message") ?? null);
+    // The demo's templates are all off: the sheet says where they are switched on.
+    expect(screen.getByRole("dialog", { name: "No templates switched on" })).toBeInTheDocument();
+  });
+});

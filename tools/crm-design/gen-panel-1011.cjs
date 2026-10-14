@@ -16,7 +16,8 @@ const inner = lines[27];
 const PATCHES = require("./panel-1011-patches.cjs");
 
 let body = convert(inner);
-for (const [a, b] of PATCHES) {
+// The chat composer handoff on the Team side's chat (panel-chat-composer-patches.cjs), after the panel's own patches.
+for (const [a, b] of [...PATCHES, ...require("./panel-chat-composer-patches.cjs")()]) {
   const n = typeof a === "string" ? body.split(a).length - 1 : (body.match(new RegExp(a.source, "g")) || []).length;
   if (n !== 1) throw new Error(`PanelApp: patch matched ${n} times: ${a}`);
   body = body.replace(a, b);
@@ -35,6 +36,7 @@ import { Fragment } from "react";
 import H from "../crm.module.css";
 import { PickEditor } from "../shared/pick-editor";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
+import ChatComposer from "../sales/ChatComposer";
 import type { PanelAppVM } from "./vm/app";
 
 /** The whole Control panel: the top bar, every tab, every sheet and page, the toast and the bottom bar. */

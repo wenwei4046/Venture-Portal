@@ -151,7 +151,7 @@ export interface ComposerVM {
   tiles: { label: string; icon: string; color: string; go: Click }[];
   homeBg: string; toast: string;
   replyText: string; replyWho: string; cancelReply: Click;
-  slashOpen: boolean; slashQ: string; slashEmpty: boolean; slashList: { title: string; text: string; rule: string; pick: () => void }[]; qrEdit: Click;
+  slashOpen: boolean; slashQ: string; slashEmpty: boolean; slashList: { title: string; text: string; rule: string; pick: () => void }[]; qrEdit?: Click;
   openTpl: Click;
   recTime: string; recCancel: Click; trashRef: Ref<HTMLSpanElement>;
 }
@@ -174,7 +174,8 @@ export interface ComposerIn {
   reply: { who: string; text: string } | null;
   cancelReply: () => void;
   slash: { q: string; empty: boolean; list: { title: string; text: string; rule: string; pick: () => void }[] } | null;
-  qrEdit: () => void;
+  /** The quick replies' Edit page (Mine's chat); none on the Team side — no Edit there. */
+  qrEdit?: () => void;
   /** A voice note being recorded: its clock. */
   rec: { time: string } | null;
   /** Start recording; false when the phone said no (the reason is already on screen). */
@@ -248,7 +249,7 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
     tiles: TILES.map(([label, icon, color]) => ({ label, icon, color, go: () => { set(x => ({ ...x, panel: null, kb: false })); v.tile(label); } })),
     homeBg: homeBg(shown), toast: s.toast,
     replyText: v.reply?.text ?? "", replyWho: v.reply?.who ?? "", cancelReply: () => v.cancelReply(),
-    slashOpen: !!v.slash, slashQ: v.slash ? `/${v.slash.q}` : "", slashEmpty: !!v.slash?.empty, slashList: v.slash?.list ?? [], qrEdit: () => v.qrEdit(),
+    slashOpen: !!v.slash, slashQ: v.slash ? `/${v.slash.q}` : "", slashEmpty: !!v.slash?.empty, slashList: v.slash?.list ?? [], qrEdit: v.qrEdit ? () => v.qrEdit?.() : undefined,
     openTpl: () => v.openTpl(),
     recTime: v.rec?.time ?? "", recCancel: () => d.recCancel(), trashRef: d.trashRef,
   };

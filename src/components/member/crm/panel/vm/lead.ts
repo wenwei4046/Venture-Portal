@@ -7,14 +7,15 @@
  * Director answer anyone (crm_can_reply).
  */
 import type { ChangeEvent } from "react";
-import type { CrmChatMessage, CrmCustomer } from "@/lib/member/crm-data";
-import { DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel } from "../../sales/vm/common";
+import { DEFAULT_QUICK_REPLIES, type CrmChatMessage, type CrmCustomer } from "@/lib/member/crm-data";
+import type { WaTemplate } from "@/lib/whatsapp/send";
+import { DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel, windowShut } from "../../sales/vm/common";
 import { roomClosed, roomSlots, slotAt, slotBlocked, windowLeft } from "../../sales/vm/chat";
 import { infoRows } from "../../sales/vm/customer";
+import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "../../sales/vm/composer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
 import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
-import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, INLINE_TIME, mediaOf, mediaWord } from "../../shared/chat-media";
 import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
@@ -92,7 +93,7 @@ export function leadVM(ctx: PanelCtx) {
       ...visitCard(m.card), pDisp: !md && !m.card && m.text ? "inline" : m.card || mk === "file" || (shows && !m.text) ? "none" : "block" };
   });
   return {
-    onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, pReply: null, pEmoji: null, pPick: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
+    onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, pReply: null, pCmp: null, pPick: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
     ld: {
       name: c?.name ?? "", ini: c ? ini(c.name) : "", ad: c?.ad ?? "", ownerFirst: ow ? first(ownerName) : "No one", ownerName,
       // No "· reply window open Xh Ym" under the name (rev 1011 §2.3, as RS rev 1010 §1.4); the cold banner stays.
@@ -148,21 +149,78 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     set(u => ({ ...u, pReply: null }));
     if (!(await act.send(c.id, text, replyTo))) set(u => ({ ...u, pDraft: u.pDraft || text }));
   };
-  // Voice notes: with nothing typed the round button is the mic — tap to record, then Send or Cancel.
+  // Voice notes: the mic is held to record, as in Mine's chat (the composer, 2026-10-14) — let go and it goes, let go on
+  // the bin and it is thrown away; the time ticks on screen.
   const recOn = ui.pRec != null;
-  const micTap = async () => {
-    if (recOn || !c) return;
+  const voiceStart = async () => {
+    if (ui.pRec != null) return true;
+    if (!c) return false;
     const why = await startVoice();
-    if (why) { patch({ toast: why }); return; }
+    if (why) { patch({ toast: why }); return false; }
     set(u => ({ ...u, pRec: Date.now() }));
+    clearInterval(recTimer);
     recTimer = setInterval(() => set(u => (u.pRec != null ? { ...u, pRecTick: Date.now() } : u)), 500);
+    return true;
   };
-  const recStop = (sendIt: boolean) => async () => {
+  const recStop = async (sendIt: boolean) => {
     clearInterval(recTimer); recTimer = undefined;
     set(u => ({ ...u, pRec: null }));
     if (!sendIt) { cancelVoice(); return; }
     const file = await stopVoice();
     if (file && c) await act.sendMedia(c.id, file, "");
+  };
+  // A cold chat (the reply window closed) sends a template, as Mine's: the composer's button opens them — read once.
+  const shut = !!c && windowShut(c, now);
+  const sendTpl = (t: WaTemplate) => {
+    if (!c) return;
+    const params = Array.from({ length: t.params }, (_, i) => (i === 0 ? first(c.name) : ""));
+    void oneAtATime(`send:${c.id}:${t.name}`, () => act.sendTemplate(c.id, t, params));
+  };
+  const tplSheet = (tpls: WaTemplate[] | null | undefined) => {
+    const title = "Send template message";
+    if (!c) return;
+    if (c.channel === "messenger") { openActions({ title: "Messenger has no templates", sub: "After 7 days Messenger allows no message from the Page. Call the customer instead.", actions: [{ label: "Close", run: NONE }] }); return; }
+    if (tpls == null) { openActions({ title, sub: "Reading the templates you may send.", actions: [{ label: "Close", run: NONE }] }); return; }
+    if (!tpls.length) { openActions({ title: "No templates switched on", sub: "Switch approved templates on in Profile › Cold lead templates.", actions: [{ label: "Close", run: NONE }] }); return; }
+    openActions({ title, sub: `Only template messages reach ${first(c.name)} until they write again.`, actions: [
+      ...tpls.map((t, i) => ({ label: t.label ?? t.name.replace(/_/g, " ").replace(/^\w/, x => x.toUpperCase()), primary: i === 0, run: () => sendTpl(t) })),
+      { label: "Close", run: NONE },
+    ] });
+  };
+  const openTpl = async () => {
+    tplSheet(ui.pTemplates);
+    if (c?.channel !== "whatsapp" || ui.pTemplates != null) return;
+    const t = (await act.loadTemplates()) ?? [];
+    patch({ pTemplates: t });
+    tplSheet(t);
+  };
+  // "/" in the reply box lists one's quick replies, as Mine's (the ones saved in Mine › Profile, the design's set until then).
+  const qrs = data.quickReplies.length ? data.quickReplies : DEFAULT_QUICK_REPLIES.map((q, i) => ({ id: "d" + i, ...q }));
+  const slash = /^\/(\S*)$/.exec(draft), sq = slash ? slash[1].toLowerCase() : "";
+  const hits = slash ? qrs.filter(q => q.shortcut.toLowerCase().includes(sq)) : [];
+  const setDraft = (text: string) => set(u => ({ ...u, pDraft: text }));
+  const textChoices = { quick: data.quickReplies.map(q => ({ label: q.shortcut ? `/${q.shortcut}` : "Quick reply", text: q.message })), auto: autoChoices(data.autoReplies), pick: setDraft };
+  // The Attach panel's tiles: the CRM's own pickers (PanelScreens' hidden inputs) and lists.
+  const tile = (label: TileLabel) => {
+    if (label === "Photos") document.getElementById("crm-panel-photo")?.click();
+    else if (label === "Document") document.getElementById("crm-panel-file")?.click();
+    else openAttach({ ...textChoices, view: label === "Quick replies" ? "quick" : "auto" });
+  };
+  const cid = c?.id ?? "";
+  const setCmp = (f: (s: ComposerState) => ComposerState) => set(u => ({ ...u, pCmp: { ...f(composerOf(u.pCmp, cid) ?? initialComposer()), chat: cid } }));
+  // The composer (the chat composer handoff — sales/ChatComposer.tsx), Mine's exactly; its words this chat's draft.
+  const cmp: ComposerIn = {
+    key: cid, state: composerOf(ui.pCmp, cid) ?? initialComposer(), set: setCmp,
+    placeholder: c ? `Reply to ${first(c.name)}…` : "", draft, setDraft, canSend: has, send: () => void send(),
+    warm: !shut, openTpl: () => void openTpl(),
+    reply: ui.pReply ? { who: ui.pReply.who, text: ui.pReply.text } : null, cancelReply: () => patch({ pReply: null }),
+    slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid #EBDDD2" : "0", pick: () => setDraft(q.message) })) } : null,
+    rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()) } : null,
+    voiceStart, voiceStop: sendIt => void recStop(sendIt),
+    camera: () => document.getElementById("crm-panel-camera")?.click(),
+    tile,
+    recents: ui.pRecents ?? data.recentEmoji ?? [],
+    saveRecents: list => { patch({ pRecents: list }); act.saveRecentEmoji(list); },
   };
   const room = B ? rooms[B.room] ?? rooms[0] : undefined;
   const taken = (start: Date) => data.visits.filter(v => v.id !== B?.visitId && v.showroomId === room?.id && v.state === "booked" && new Date(v.start).getTime() === start.getTime()).length;
@@ -205,26 +263,12 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     return rows;
   })() : [];
   return {
-    // The message being answered, over the reply box (the message menu's Reply).
-    replying: !!ui.pReply, replyWho: ui.pReply?.who ?? "", replyText: ui.pReply?.text ?? "", cancelReply: () => patch({ pReply: null }),
-    inbox: on, viewOnly: false, draft, setDraft: (e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value; set(u => ({ ...u, pDraft: v })); },
-    send: has ? () => void send() : () => void micTap(), sendBg: has ? "#BD4A19" : "#D9C7BA",
-    // The sticker button: an emoji sheet; each tap adds one to the reply.
-    // Open only in the chat it was opened in.
-    emojiOpen: !!c && ui.pEmoji === c.id, openEmoji: () => patch({ pEmoji: c?.id ?? null }), closeEmoji: () => patch({ pEmoji: null }),
-    emojis: CHAT_EMOJIS.map(e => ({ e, pick: () => set(u => ({ ...u, pDraft: withEmoji(u.pDraft, e) })) })),
-    rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()), cancel: recStop(false), send: recStop(true) } : null,
-    // + = a document, the camera = a photo (PanelScreens' hidden pickers); the typed text goes as the caption.
-    // + : Photos & videos · Document · Quick replies · Auto replies (the owner, 2026-10-14) — it picked any file and sent it.
-    attach: () => openAttach({
-      camera: () => document.getElementById("crm-panel-camera")?.click(),
-      photos: () => document.getElementById("crm-panel-photo")?.click(), document: () => document.getElementById("crm-panel-file")?.click(),
-      quick: ctx.data.quickReplies.map(q => ({ label: q.shortcut ? `/${q.shortcut}` : "Quick reply", text: q.message })), auto: autoChoices(ctx.data.autoReplies),
-      pick: text => set(u => ({ ...u, pDraft: text })),
-    }),
-    // The camera button opens the camera itself ("點相機後刪掉 document file" — it offered the iPhone's Choose Files too).
-    photo: () => document.getElementById("crm-panel-camera")?.click(),
-    // Photos and videos (the camera button) wait on the preview with its HD switch; a document (+) goes at once.
+    inbox: on, viewOnly: false,
+    // The reply box, the Sticker and Attach panels, Camera, the mic held to record — Mine's composer.
+    cmp,
+    // A tap on the messages closes the keyboard and any panel (the composer handoff).
+    dismiss: () => { setCmp(dismissComposer); (document.activeElement as HTMLElement | null)?.blur?.(); },
+    // Photos and videos (Camera, Photos) wait on the preview with its HD switch; a document goes at once.
     pickVisual: (e: ChangeEvent<HTMLInputElement>) => {
       const files = [...(e.target.files ?? [])]; e.target.value = "";
       if (files.length) set(u => ({ ...u, pPick: { ...pickedOf(files), caption: draft } }));
@@ -247,8 +291,12 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
       if (caption) set(u => ({ ...u, pDraft: "" }));
       await Promise.all(docs.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
     },
-    ph: c ? `Reply to ${first(c.name)}…` : "", sendIcon: has ? "M5 12h14m-6-6 6 6-6 6" : "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0m7 7v3", sendTitle: has ? "Send" : "Voice note",
-    chC: c?.channel === "messenger" ? "#2F6FB5" : "#1F7A4D", menuOpen: on && ui.pMenu, toggleMenu: () => set(u => ({ ...u, pMenu: !u.pMenu })),
+    // The header, as Mine's: the avatar's title names the channel; ⋮ tints while its menu is open.
+    chanName: c?.channel === "messenger" ? "Messenger" : "WhatsApp",
+    menuOpen: on && ui.pMenu, menuBg: on && ui.pMenu ? "#F5EBE3" : "transparent", toggleMenu: () => set(u => ({ ...u, pMenu: !u.pMenu })),
+    // The reply window closed: the cold-lead note in the header, and the composer's template button (Mine's words).
+    cold: on && shut,
+    coldMsg: c?.channel === "messenger" ? "the 7-day Messenger reply window has closed. Only template messages can be sent until the customer writes again." : "the 24 h WhatsApp window has closed. Only template messages can be sent until the customer writes again.",
     menu: [
       { label: "Assign to", icon: "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", bg: "#E4EDF8", fg: "#2F6FB5", go: () => patch({ pMenu: false, reSheet: true }) },
       { label: "Customer info", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", bg: "#E4F1E8", fg: "#387557", go: () => patch({ pMenu: false, pInfo: true }) },
@@ -259,7 +307,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     shareOpen: false, closeShare: NONE, shareList: [] as { name: string; role: string; ini: string; pick: () => void }[],
     infoOpen: on && ui.pInfo, closeInfo: () => patch({ pInfo: false }), info,
     editInfo: () => { if (c) patch({ pInfo: false, pForm: { customerId: c.id, edit: true } }); },
-    openBook, bookOpen: on && !!B, closeBook: () => patch({ pBook: null }),
+    bookOpen: on && !!B, closeBook: () => patch({ pBook: null }),
     rooms: book?.rooms ?? [], isMonth: book?.isMonth ?? true, isWeek: book?.isWeek ?? false, vMonth: book?.vMonth ?? NONE, vWeek: book?.vWeek ?? NONE,
     vMonthBg: book?.vMonthBg ?? "#fff", vWeekBg: book?.vWeekBg ?? "transparent", vMonthFg: book?.vMonthFg ?? "#3F2B22", vWeekFg: book?.vWeekFg ?? "#806B60",
     monthLbl: book?.monthLbl ?? "", mPrev: book?.mPrev ?? NONE, mNext: book?.mNext ?? NONE, cells: book?.cells ?? [], wk: book?.wk ?? [], slots: book?.slots ?? [],

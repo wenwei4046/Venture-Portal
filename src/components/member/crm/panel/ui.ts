@@ -54,8 +54,13 @@ export interface PanelUi {
   pReply?: { msgId: string; who: string; text: string } | null;
   /** A voice note being recorded in the chat: when it started (shared/voice.ts); pRecTick moves its clock. */
   pRec: number | null;
-  /** The chat's emoji sheet. */
-  pEmoji?: string | null;
+  /** The chat's composer, as Mine's (the chat composer handoff; sales/vm/composer.ts): its panel, emoji search and
+   *  category, toast — of the chat it was opened in; another chat opens with nothing open. */
+  pCmp?: (import("../sales/vm/composer").ComposerState & { chat: string }) | null;
+  /** Emoji picked in this visit, most recent first — shown at once, kept on the server a moment later (crm_staff_prefs). */
+  pRecents?: string[];
+  /** The WhatsApp Business Account's approved templates, read the first time a cold chat's template button is tapped. */
+  pTemplates?: import("@/lib/whatsapp/send").WaTemplate[] | null;
   /** Photos / videos picked in the chat, waiting on the preview with its HD switch. */
   pPick?: import("../shared/pick").Picked | null;
   pRecTick?: number;

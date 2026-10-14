@@ -8,6 +8,7 @@ import { Fragment } from "react";
 import H from "../crm.module.css";
 import { PickEditor } from "../shared/pick-editor";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
+import ChatComposer from "../sales/ChatComposer";
 import type { PanelAppVM } from "./vm/app";
 
 /** The whole Control panel: the top bar, every tab, every sheet and page, the toast and the bottom bar. */
@@ -359,7 +360,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     </>)}
     {!!(v.show.ld) && (<>
       {!!(v.ld.onLead) && (<>
-        <main style={{ position: "relative", flex: "1 1 auto", minHeight: "0", padding: "16px 20px 16px", background: v.chromeBg, display: "flex", flexDirection: "column", gap: "12px" }}>
+        <main data-chat-screen="" style={{ position: "relative", flex: "1 1 auto", minHeight: "0", background: v.chromeBg }}>
           {!!(v.ld.lx.viewOnly) && (<>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingBottom: "12px", borderBottom: "1px solid #EBDDD2" }}>
               <span style={{ flex: "none", width: "44px", height: "44px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", display: "grid", placeItems: "center", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "650" }}>{v.ld.ld.ini}</span>
@@ -379,35 +380,35 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
             </div>
           </>)}
           {!!(v.ld.lx.inbox) && (<>
-            <div style={{ position: "relative", flex: "none", display: "flex", alignItems: "center", gap: "10px", paddingBottom: "10px", borderBottom: "1px solid #EBDDD2" }}>
-              <span onClick={v.ld.back} title="Back to Inbox" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: "#3F2B22", cursor: "pointer" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <div data-chat-head="" style={{ position: "absolute", left: "0", right: "0", top: "0", zIndex: "4", background: "rgba(255,255,255,.96)", borderBottom: "1px solid rgb(235 221 210)" }}>
+            <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "10px", padding: "2px 16px 12px" }}>
+              <span onClick={v.ld.back} title="Back to Inbox" style={{ flex: "none", width: "40px", height: "40px", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#3F2B22", cursor: "pointer" }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M19 12H5m6-6-6 6 6 6">
                   </path>
                 </svg>
               </span>
-              <span style={{ position: "relative", flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", display: "grid", placeItems: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650" }}>{v.ld.ld.ini}<span style={{ position: "absolute", right: "-2px", bottom: "-2px", width: "16px", height: "16px", borderRadius: "50%", background: v.ld.lx.chC, border: "2px solid #fff", display: "grid", placeItems: "center", color: "#fff" }}>
-                  <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3Z">
-                    </path>
-                  </svg>
-                </span></span>
+              <span title={v.ld.lx.chanName} style={{ flex: "none", position: "relative", width: "40px", height: "40px" }}>
+                <span style={{ width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", background: "#FFF0E4", color: "#BD4A19", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650" }}>{v.ld.ld.ini}</span>
+                <span style={{ position: "absolute", right: "-3px", bottom: "-3px", width: "18px", height: "18px", boxSizing: "border-box", borderRadius: "50%", border: "2px solid #fff", background: "#387557" }}>
+                </span>
+              </span>
               <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column" }}>
-                <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.name}</strong>
+                <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.name}</strong>
                 <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "#387557", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.ad}</small>
               </span>
-              <span data-hm-toggle="1" onClick={v.ld.lx.toggleMenu} title="More" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: "#3F2B22", cursor: "pointer" }}>
+              <span data-hm-toggle="1" onClick={v.ld.lx.toggleMenu} title="More" style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: v.ld.lx.menuBg, display: "grid", placeItems: "center", color: "#3F2B22", cursor: "pointer" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="12" cy="5" r="1.7">
+                  <circle cx="12" cy="5" r="1.8">
                   </circle>
-                  <circle cx="12" cy="12" r="1.7">
+                  <circle cx="12" cy="12" r="1.8">
                   </circle>
-                  <circle cx="12" cy="19" r="1.7">
+                  <circle cx="12" cy="19" r="1.8">
                   </circle>
                 </svg>
               </span>
               {!!(v.ld.lx.menuOpen) && (<>
-                <div data-hm-menu="1" style={{ position: "absolute", top: "48px", right: "0", zIndex: "7", width: "240px", padding: "6px", boxSizing: "border-box", borderRadius: "20px", background: "#fff", border: "1px solid #F0E4DA", boxShadow: "0 16px 36px rgba(63,43,34,.16)", display: "flex", flexDirection: "column", gap: "2px", animation: "fadeIn 140ms ease-out" }}>
+                <div data-hm-menu="1" style={{ position: "absolute", top: "50px", right: "16px", zIndex: "7", width: "240px", padding: "6px", boxSizing: "border-box", borderRadius: "20px", background: "#fff", border: "1px solid #F0E4DA", boxShadow: "0 16px 36px rgba(63,43,34,.16)", display: "flex", flexDirection: "column", gap: "2px", animation: "fadeIn 140ms ease-out" }}>
                   {(v.ld.lx.menu).map((it, it_i) => (<Fragment key={it_i}>
                     <div onClick={it.go} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 10px", borderRadius: "14px", cursor: "pointer" }} className={H.hov2}>
                       <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "11px", background: it.bg, color: it.fg, display: "grid", placeItems: "center" }}>
@@ -422,7 +423,16 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </div>
               </>)}
             </div>
-            <p style={{ flex: "none", margin: "0", fontSize: "calc(12px * var(--rv-type, 1))", color: "#806B60" }}>{v.ld.ld.ownerName}'s customer{v.ld.ld.windowNote}</p>
+            <p style={{ flex: "none", margin: "0 16px 12px", fontSize: "calc(12px * var(--rv-type, 1))", color: "#806B60" }}>{v.ld.ld.ownerName}'s customer{v.ld.ld.windowNote}</p>
+            {!!(v.ld.lx.cold) && (<>
+              <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", margin: "0 16px 12px", padding: "10px 12px", borderRadius: "12px", background: "#E3EAF1", color: "#2E4760" }}>
+                <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600" }}>Cold lead · {v.ld.lx.coldMsg}</span>
+              </div>
+            </>)}
+            {!!(v.ld.ld.movedTo) && (<>
+              <div style={{ flex: "none", margin: "0 16px 12px", padding: "8px 12px", borderRadius: "12px", background: "#E4F1E8", color: "#2E6B4C", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600" }}>{v.ld.ld.movedTo}</div>
+            </>)}
+            </div>
             {!!(v.ld.lx.infoOpen) && (<>
               <div onClick={v.ld.lx.closeInfo} style={{ position: "absolute", inset: "0", zIndex: "8", background: "rgba(63,43,34,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeIn 200ms ease-out" }}>
                 <div onClick={v.ld.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", maxHeight: "90%", overflowY: "auto", scrollbarWidth: "none", boxSizing: "border-box", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "14px" }}>
@@ -444,10 +454,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </div>
               </div>
             </>)}
-            {!!(v.ld.ld.movedTo) && (<>
-              <div style={{ flex: "none", padding: "8px 12px", borderRadius: "12px", background: "#E4F1E8", color: "#2E6B4C", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600" }}>{v.ld.ld.movedTo}</div>
-            </>)}
-            <div data-chat-list="1" style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "10px", margin: "0 -20px", padding: "10px 20px", backgroundColor: "#EFE7DE", backgroundImage: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22240%22%20height%3D%22240%22%20viewBox%3D%220%200%20240%20240%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%237A6457%22%20stroke-opacity%3D%22.13%22%20stroke-width%3D%221.3%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20transform%3D%22translate%2814%2012%29%20rotate%28-12%2012%2012%29%22%20d%3D%22M15%2021v-8a1%201%200%200%200-1-1h-4a1%201%200%200%200-1%201v8M3%2010a2%202%200%200%201%20.709-1.528l7-5.999a2%202%200%200%201%202.582%200l7%205.999A2%202%200%200%201%2021%2010v9a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2z%22%2F%3E%3Cpath%20transform%3D%22translate%2892%208%29%20rotate%2810%2012%2012%29%22%20d%3D%22M20%209V6a2%202%200%200%200-2-2H6a2%202%200%200%200-2%202v3M2%2016a2%202%200%200%200%202%202h16a2%202%200%200%200%202-2v-5a2%202%200%200%200-4%200v1.5a.5.5%200%200%201-.5.5h-11a.5.5%200%200%201-.5-.5V11a2%202%200%200%200-4%200zM4%2018v2M20%2018v2M12%204v9%22%2F%3E%3Cpath%20transform%3D%22translate%28176%2020%29%20rotate%28-6%2012%2012%29%22%20d%3D%22M2%204v16M2%208h18a2%202%200%200%201%202%202v10M2%2017h20M6%208v9%22%2F%3E%3Cpath%20transform%3D%22translate%2840%2074%29%20rotate%288%2012%2012%29%22%20d%3D%22M7.9%2020A9%209%200%201%200%204%2016.1L2%2022Z%22%2F%3E%3Cpath%20transform%3D%22translate%28124%2066%29%20rotate%28-14%2012%2012%29%22%20d%3D%22M8%202h8l4%2010H4L8%202ZM12%2012v6M8%2022v-2c0-1.1.9-2%202-2h4a2%202%200%200%201%202%202v2H8Z%22%2F%3E%3Cpath%20transform%3D%22translate%28200%2092%29%20rotate%2812%2012%2012%29%22%20d%3D%22M19%2014c1.49-1.46%203-3.21%203-5.5A5.5%205.5%200%200%200%2016.5%203c-1.76%200-3%20.5-4.5%202-1.5-1.5-2.74-2-4.5-2A5.5%205.5%200%200%200%202%208.5c0%202.3%201.5%204.05%203%205.5l7%207Z%22%2F%3E%3Cpath%20transform%3D%22translate%2810%20140%29%20rotate%286%2012%2012%29%22%20d%3D%22M12%202l3.09%206.26L22%209.27l-5%204.87%201.18%206.88L12%2017.77l-6.18%203.25L7%2014.14%202%209.27l6.91-1.01L12%202z%22%2F%3E%3Cpath%20transform%3D%22translate%2878%20128%29%20rotate%28-8%2012%2012%29%22%20d%3D%22M8%202v4M16%202v4M3%2010h18M5%204h14a2%202%200%200%201%202%202v14a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2V6a2%202%200%200%201%202-2Z%22%2F%3E%3Cpath%20transform%3D%22translate%28160%20150%29%20rotate%2814%2012%2012%29%22%20d%3D%22M19%209V6a2%202%200%200%200-2-2H7a2%202%200%200%200-2%202v3M3%2016a2%202%200%200%200%202%202h14a2%202%200%200%200%202-2v-5a2%202%200%200%200-4%200v2H7v-2a2%202%200%200%200-4%200ZM5%2018v2M19%2018v2%22%2F%3E%3Cpath%20transform%3D%22translate%2834%20200%29%20rotate%28-10%2012%2012%29%22%20d%3D%22M22%2016.92v3a2%202%200%200%201-2.18%202%2019.79%2019.79%200%200%201-8.63-3.07%2019.5%2019.5%200%200%201-6-6%2019.79%2019.79%200%200%201-3.07-8.67A2%202%200%200%201%204.11%202h3a2%202%200%200%201%202%201.72%2012.84%2012.84%200%200%200%20.7%202.81%202%202%200%200%201-.45%202.11L8.09%209.91a16%2016%200%200%200%206%206l1.27-1.27a2%202%200%200%201%202.11-.45%2012.84%2012.84%200%200%200%202.81.7A2%202%200%200%201%2022%2016.92z%22%2F%3E%3Cpath%20transform%3D%22translate%28118%20196%29%20rotate%284%2012%2012%29%22%20d%3D%22M15%2021v-8a1%201%200%200%200-1-1h-4a1%201%200%200%200-1%201v8M3%2010a2%202%200%200%201%20.709-1.528l7-5.999a2%202%200%200%201%202.582%200l7%205.999A2%202%200%200%201%2021%2010v9a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2z%22%2F%3E%3Cpath%20transform%3D%22translate%28196%20206%29%20rotate%28-12%2012%2012%29%22%20d%3D%22M7.9%2020A9%209%200%201%200%204%2016.1L2%2022Z%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%237A6457%22%20fill-opacity%3D%22.12%22%3E%3Ccircle%20cx%3D%2266%22%20cy%3D%2240%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%2240%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%22104%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22230%22%20cy%3D%2260%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%22170%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22140%22%20cy%3D%22120%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22224%22%20cy%3D%22160%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%2290%22%20cy%3D%22230%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22180%22%20cy%3D%22240%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%22100%22%20r%3D%221.6%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E')", backgroundSize: "240px 240px" }}>
+            <div data-chat-list="1" onClick={v.ld.lx.dismiss} style={{ position: "absolute", left: "0", right: "0", top: "0", bottom: "calc(0px - var(--safe-bottom, 0px))", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", boxSizing: "border-box", padding: "calc(var(--chat-top, 55px) + 25px) 16px calc(var(--chat-foot, 64px) + 6px)", backgroundColor: "#EFE7DE", backgroundImage: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22240%22%20height%3D%22240%22%20viewBox%3D%220%200%20240%20240%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%237A6457%22%20stroke-opacity%3D%22.13%22%20stroke-width%3D%221.3%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20transform%3D%22translate%2814%2012%29%20rotate%28-12%2012%2012%29%22%20d%3D%22M15%2021v-8a1%201%200%200%200-1-1h-4a1%201%200%200%200-1%201v8M3%2010a2%202%200%200%201%20.709-1.528l7-5.999a2%202%200%200%201%202.582%200l7%205.999A2%202%200%200%201%2021%2010v9a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2z%22%2F%3E%3Cpath%20transform%3D%22translate%2892%208%29%20rotate%2810%2012%2012%29%22%20d%3D%22M20%209V6a2%202%200%200%200-2-2H6a2%202%200%200%200-2%202v3M2%2016a2%202%200%200%200%202%202h16a2%202%200%200%200%202-2v-5a2%202%200%200%200-4%200v1.5a.5.5%200%200%201-.5.5h-11a.5.5%200%200%201-.5-.5V11a2%202%200%200%200-4%200zM4%2018v2M20%2018v2M12%204v9%22%2F%3E%3Cpath%20transform%3D%22translate%28176%2020%29%20rotate%28-6%2012%2012%29%22%20d%3D%22M2%204v16M2%208h18a2%202%200%200%201%202%202v10M2%2017h20M6%208v9%22%2F%3E%3Cpath%20transform%3D%22translate%2840%2074%29%20rotate%288%2012%2012%29%22%20d%3D%22M7.9%2020A9%209%200%201%200%204%2016.1L2%2022Z%22%2F%3E%3Cpath%20transform%3D%22translate%28124%2066%29%20rotate%28-14%2012%2012%29%22%20d%3D%22M8%202h8l4%2010H4L8%202ZM12%2012v6M8%2022v-2c0-1.1.9-2%202-2h4a2%202%200%200%201%202%202v2H8Z%22%2F%3E%3Cpath%20transform%3D%22translate%28200%2092%29%20rotate%2812%2012%2012%29%22%20d%3D%22M19%2014c1.49-1.46%203-3.21%203-5.5A5.5%205.5%200%200%200%2016.5%203c-1.76%200-3%20.5-4.5%202-1.5-1.5-2.74-2-4.5-2A5.5%205.5%200%200%200%202%208.5c0%202.3%201.5%204.05%203%205.5l7%207Z%22%2F%3E%3Cpath%20transform%3D%22translate%2810%20140%29%20rotate%286%2012%2012%29%22%20d%3D%22M12%202l3.09%206.26L22%209.27l-5%204.87%201.18%206.88L12%2017.77l-6.18%203.25L7%2014.14%202%209.27l6.91-1.01L12%202z%22%2F%3E%3Cpath%20transform%3D%22translate%2878%20128%29%20rotate%28-8%2012%2012%29%22%20d%3D%22M8%202v4M16%202v4M3%2010h18M5%204h14a2%202%200%200%201%202%202v14a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2V6a2%202%200%200%201%202-2Z%22%2F%3E%3Cpath%20transform%3D%22translate%28160%20150%29%20rotate%2814%2012%2012%29%22%20d%3D%22M19%209V6a2%202%200%200%200-2-2H7a2%202%200%200%200-2%202v3M3%2016a2%202%200%200%200%202%202h14a2%202%200%200%200%202-2v-5a2%202%200%200%200-4%200v2H7v-2a2%202%200%200%200-4%200ZM5%2018v2M19%2018v2%22%2F%3E%3Cpath%20transform%3D%22translate%2834%20200%29%20rotate%28-10%2012%2012%29%22%20d%3D%22M22%2016.92v3a2%202%200%200%201-2.18%202%2019.79%2019.79%200%200%201-8.63-3.07%2019.5%2019.5%200%200%201-6-6%2019.79%2019.79%200%200%201-3.07-8.67A2%202%200%200%201%204.11%202h3a2%202%200%200%201%202%201.72%2012.84%2012.84%200%200%200%20.7%202.81%202%202%200%200%201-.45%202.11L8.09%209.91a16%2016%200%200%200%206%206l1.27-1.27a2%202%200%200%201%202.11-.45%2012.84%2012.84%200%200%200%202.81.7A2%202%200%200%201%2022%2016.92z%22%2F%3E%3Cpath%20transform%3D%22translate%28118%20196%29%20rotate%284%2012%2012%29%22%20d%3D%22M15%2021v-8a1%201%200%200%200-1-1h-4a1%201%200%200%200-1%201v8M3%2010a2%202%200%200%201%20.709-1.528l7-5.999a2%202%200%200%201%202.582%200l7%205.999A2%202%200%200%201%2021%2010v9a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2z%22%2F%3E%3Cpath%20transform%3D%22translate%28196%20206%29%20rotate%28-12%2012%2012%29%22%20d%3D%22M7.9%2020A9%209%200%201%200%204%2016.1L2%2022Z%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%237A6457%22%20fill-opacity%3D%22.12%22%3E%3Ccircle%20cx%3D%2266%22%20cy%3D%2240%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%2240%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%22104%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22230%22%20cy%3D%2260%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%22170%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22140%22%20cy%3D%22120%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22224%22%20cy%3D%22160%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%2290%22%20cy%3D%22230%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22180%22%20cy%3D%22240%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%22100%22%20r%3D%221.6%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E')", backgroundSize: "240px 240px" }}><div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "10px" }}>
               {(v.ld.ld.msgs).map((m, m_i) => (<Fragment key={m_i}>
                 {!!(m.sep) && (<>
                   <span style={{ alignSelf: "center", margin: "4px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "#FFFFFF", boxShadow: "0 1px 1px rgba(63,43,34,.10)", color: "#4E2F20", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600" }}>{m.sep}</span>
@@ -464,51 +471,9 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                     </>)}</span>
                 </div>
               </Fragment>))}
-            </div>
+            </div></div>
             {!!(v.ld.lx.pk) && (<PickEditor pk={v.ld.lx.pk} />)}
-      {!!(v.ld.lx.rec) && (<div style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px" }}>
-              <span onClick={v.ld.lx.rec?.cancel} title="Cancel" style={{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: "#A3371A", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></span>
-              <span style={{ flex: "1", minWidth: "0", height: "44px", boxSizing: "border-box", borderRadius: "22px", background: "#FBF1EC", display: "flex", alignItems: "center", gap: "10px", padding: "0 16px", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "600", color: "#3F2B22", fontVariantNumeric: "tabular-nums" }}><span style={{ flex: "none", width: "10px", height: "10px", borderRadius: "50%", background: "#D93025", animation: "fadeIn 700ms ease-in-out infinite alternate" }}></span>{v.ld.lx.rec?.time} · Recording…</span>
-              <span onClick={v.ld.lx.rec?.send} title="Send voice note" style={{ flex: "none", width: "44px", height: "44px", borderRadius: "50%", background: "#BD4A19", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg></span>
-            </div>)}
-            {!!(v.ld.lx.replying) && (<div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", marginBottom: "6px", borderRadius: "12px", borderLeft: "3px solid #BD4A19", background: "#F5EBE3" }}><span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}><strong style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "#BD4A19" }}>{v.ld.lx.replyWho}</strong><span style={{ fontSize: "calc(13px * var(--rv-type, 1))", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.lx.replyText}</span></span><span onClick={v.ld.lx.cancelReply} title="Cancel reply" style={{ flex: "none", width: "28px", height: "28px", display: "grid", placeItems: "center", color: "#806B60", fontSize: "calc(20px * var(--rv-type, 1))", cursor: "pointer" }}>×</span></div>)}<div style={{ flex: "none", display: v.ld.lx.rec ? "none" : "flex", alignItems: "center", gap: "6px" }}>
-              <span onClick={v.ld.lx.attach} title="Send a file" style={{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: "#806B60" }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 5v14M5 12h14">
-                  </path>
-                </svg>
-              </span>
-              <span style={{ flex: "1", minWidth: "0", height: "44px", boxSizing: "border-box", padding: "0 6px 0 16px", borderRadius: "22px", border: "1px solid #EBDDD2", display: "flex", alignItems: "center", gap: "4px" }}>
-                <input value={v.ld.lx.draft} onChange={v.ld.lx.setDraft} placeholder={v.ld.lx.ph} style={{ flex: "1", minWidth: "0", border: "0", background: "transparent", font: "inherit", fontSize: "calc(15px * var(--rv-type, 1))", color: "#3F2B22", outline: "none" }} />
-                <span onClick={v.ld.lx.openEmoji} title="Emoji" style={{ flex: "none", width: "32px", height: "32px", display: "grid", placeItems: "center", color: "#806B60" , cursor: "pointer" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 13V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6l7-7Zm0 0h-4a3 3 0 0 0-3 3v4">
-                    </path>
-                  </svg>
-                </span>
-              </span>
-              <span onClick={v.ld.lx.photo} title="Send a photo" style={{ flex: "none", width: "38px", height: "44px", display: "grid", placeItems: "center", color: "#806B60" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 8h3l2-3h6l2 3h3v11H4V8Zm8 9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z">
-                  </path>
-                </svg>
-              </span>
-              <span onClick={v.ld.lx.send} title={v.ld.lx.sendTitle} style={{ flex: "none", width: "44px", height: "44px", borderRadius: "50%", background: "#BD4A19", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d={v.ld.lx.sendIcon}>
-                  </path>
-                </svg>
-              </span>
-            </div>
-            {!!(v.ld.lx.emojiOpen) && (<div style={{ flex: "none", padding: "8px 12px 6px", borderTop: "1px solid #EBDDD2", background: "#FBF7F3", display: "flex", flexDirection: "column", gap: "6px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".06em", color: "#806B60" }}>EMOJI</span>
-          <span onClick={v.ld.lx.closeEmoji} style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }}>Done</span>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(8, minmax(0, 1fr))", gap: "2px", maxHeight: "196px", overflowY: "auto", scrollbarWidth: "none" }}>
-          {(v.ld.lx.emojis).map((e, e_i) => (<Fragment key={e_i}><span onClick={e.pick} style={{ height: "40px", display: "grid", placeItems: "center", fontSize: "calc(26px * var(--rv-type, 1))", borderRadius: "10px", cursor: "pointer" }}>{e.e}</span></Fragment>))}
-        </div>
-      </div>)}
+            <ChatComposer key={v.ld.lx.cmp.key} v={v.ld.lx.cmp} />
       
           </>)}
           {!!(v.ld.lx.viewOnly) && (<>
@@ -672,7 +637,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
             </div>
           </>)}
           {!!(v.ld.toast) && (<>
-            <div style={{ position: "absolute", left: "20px", right: "20px", bottom: "96px", padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{v.ld.toast}</div>
+            <div style={{ position: "absolute", left: "16px", right: "16px", bottom: "74px", zIndex: "6", padding: "12px 14px", borderRadius: "14px", background: "#3F2B22", color: "#fff", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{v.ld.toast}</div>
           </>)}
         </main>
       </>)}
