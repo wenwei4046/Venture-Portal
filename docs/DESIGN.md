@@ -1370,7 +1370,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
-- **v4.1** · 2026-10-14 · A Revenue Director in the Revenue app: the sub-departments they direct, *All of Fair*, *ANNA leads* → The Revenue app
+- **v4.1** · 2026-10-14 · A Revenue Director in the Revenue app: the sub-departments they direct, *All of Fair*, *ANNA leads* → The Revenue app (#381)
 - **v4.0** · 2026-10-14 · The HOUZS Venture Design System (Claude Design) adopted: two themes, `--ds-*`, Newsreader / Inter Tight; history trimmed to this index → Part I (#366)
 - **v3.86** · 2026-10-14 · CRM phone notices titled by the customer, their picture as icon; *Make them pop up* → The HR phone app; The Revenue app (#363)
 - **v3.85** · 2026-10-14 · Finance view: payroll only in Payments' *Payroll batches* tab, by department; All and status tabs count none → Sheet theme (#361)
