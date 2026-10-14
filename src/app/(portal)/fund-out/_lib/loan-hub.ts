@@ -4,7 +4,7 @@ import { isLoanUnscheduled } from '@/lib/treasury-schedule'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { loadRepaymentBook } from '@/lib/repayment-book'
 import { overdueOf } from '@/lib/repayment-calendar'
-import type { FundRecord, FundStatus } from '@/lib/fund-hub'
+import { withCode, type FundRecord, type FundStatus } from '@/lib/fund-hub'
 
 // Fund OUT's hub reads (2026-10-15, the Finance revamp v2 — D12): every loan
 // with its borrower, what is still owed on it (`loan_outstanding`), whether an
@@ -41,8 +41,8 @@ export async function loadLoanHub(supabase: SupabaseClient, today: string): Prom
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     // Overdue = an instalment past its day unpaid, on each active loan's plan.
     loadRepaymentBook(supabase, today, { only: 'collect' }),
-    // A pending loan's request — Finance cannot read the approvals queue, so it may come back empty.
-    supabase.from('approval_requests').select('id, reference_id').eq('reference_table', 'loans').eq('request_type', 'new_loan').eq('status', 'pending'),
+    // A pending loan's request, and a cancellation filed on an active one — what this reader's rows show (it may come back empty).
+    supabase.from('approval_requests').select('id, reference_id, request_type, submitted_by').eq('reference_table', 'loans').in('request_type', ['new_loan', 'loan_cancel']).eq('status', 'pending'),
   ])
   if (error) throw new Error('Unable to load the loans. Please try again.')
   const rows = (loans ?? []) as LoanRow[]
@@ -57,7 +57,9 @@ export async function loadLoanHub(supabase: SupabaseClient, today: string): Prom
     const late = overdueOf(deal.plan, today)
     if (late) lateBy.set(deal.id, { amount: late.outstanding, since: late.oldestDue, days: late.daysPast })
   }
-  const requests = new Map(((pendingRequests ?? []) as Array<{ id: string; reference_id: string }>).map((r) => [r.reference_id, r.id]))
+  const pendingReqs = (pendingRequests ?? []) as Array<{ id: string; reference_id: string; request_type: string; submitted_by: string | null }>
+  const requests = new Map(pendingReqs.filter((r) => r.request_type === 'new_loan').map((r) => [r.reference_id, { id: r.id, submittedBy: r.submitted_by }]))
+  const cancelling = new Set(pendingReqs.filter((r) => r.request_type === 'loan_cancel').map((r) => r.reference_id))
 
   return rows.map((l) => {
     const c = company.get(l.company_id)
@@ -67,7 +69,7 @@ export async function loadLoanHub(supabase: SupabaseClient, today: string): Prom
     return {
       id: l.id,
       side: 'out',
-      party: c ? (c.short_code ? `${c.name} (${c.short_code})` : c.name) : '—',
+      party: c ? withCode(c.name, c.short_code) : '—',
       type: 'loan',
       typeLabel: 'Loan out',
       amount: Number(l.principal),
@@ -88,8 +90,12 @@ export async function loadLoanHub(supabase: SupabaseClient, today: string): Prom
       notes: l.repayment_terms,
       bank: null,
       account: null,
-      approvalId: requests.get(l.id) ?? null,
+      approval: status === 'pending_approval' ? (requests.get(l.id) ?? null) : null,
+      decidable: false,
+      cancelPending: status === 'active' && cancelling.has(l.id),
       repaid: Number(o?.total_principal_paid ?? 0),
+      repaidAt: null,
+      repaidBy: null,
     }
   })
 }

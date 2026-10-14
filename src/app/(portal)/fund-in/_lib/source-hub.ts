@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchByKeys } from '@/lib/paginate'
-import { SOURCE_TYPE_LABELS, type FundRecord, type FundStatus } from '@/lib/fund-hub'
+import { SOURCE_TYPE_LABELS, withCode, type FundRecord, type FundStatus } from '@/lib/fund-hub'
 
 // Fund IN's hub reads (2026-10-15, the Finance revamp v2 — D12): every fund
 // source with who it came from (a company, a department, a director by name),
@@ -28,13 +28,15 @@ type SourceRow = {
   account_code: string | null
   created_by: string | null
   created_at: string
+  repaid_at: string | null
+  repaid_by: string | null
 }
 
 export async function loadSourceHub(supabase: SupabaseClient): Promise<FundRecord[]> {
   const [{ data: sources, error }, { data: companies }, { data: directors }, { data: departments }, { data: outstandingRows }, { data: banks }, { data: accounts }, { data: requests }] = await Promise.all([
     supabase
       .from('fund_sources')
-      .select('id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, maturity_date, status, notes, compound_interest, min_pay_interest, bank_account_id, account_code, created_by, created_at')
+      .select('id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, maturity_date, status, notes, compound_interest, min_pay_interest, bank_account_id, account_code, created_by, created_at, repaid_at, repaid_by')
       .order('effective_date', { ascending: false }),
     supabase.from('companies').select('id, name, short_code'),
     supabase.from('directors').select('id, name, code'),
@@ -43,14 +45,22 @@ export async function loadSourceHub(supabase: SupabaseClient): Promise<FundRecor
     supabase.from('fund_source_outstanding').select('fund_source_id, outstanding'),
     supabase.from('bank_accounts').select('id, bank_name, account_number'),
     supabase.from('chart_of_accounts').select('code, name'),
-    // Who approved it is the approved request's; a pending one links to its queue entry (where this reader may see them).
-    supabase.from('approval_requests').select('id, reference_id, status, approved_by, approved_at').eq('reference_table', 'fund_sources').eq('request_type', 'new_fund_source').in('status', ['pending', 'approved']),
+    // Who approved it is the approved request's; a pending one links to its queue entry, and a cancellation
+    // (filed as a tier_change, cancelFundSource's) says so — where this reader may see them.
+    supabase
+      .from('approval_requests')
+      .select('id, reference_id, request_type, status, submitted_by, approved_by, approved_at')
+      .eq('reference_table', 'fund_sources')
+      .in('request_type', ['new_fund_source', 'tier_change'])
+      .in('status', ['pending', 'approved']),
   ])
   if (error) throw new Error('Unable to load the fund sources. Please try again.')
   const rows = (sources ?? []) as SourceRow[]
-  const reqs = (requests ?? []) as Array<{ id: string; reference_id: string; status: string; approved_by: string | null; approved_at: string | null }>
+  const all = (requests ?? []) as Array<{ id: string; reference_id: string; request_type: string; status: string; submitted_by: string | null; approved_by: string | null; approved_at: string | null }>
+  const reqs = all.filter((r) => r.request_type === 'new_fund_source')
+  const cancelling = new Set(all.filter((r) => r.request_type === 'tier_change' && r.status === 'pending').map((r) => r.reference_id))
 
-  const userIds = [...new Set([...rows.map((s) => s.created_by), ...reqs.map((r) => r.approved_by)].filter((x): x is string => !!x))]
+  const userIds = [...new Set([...rows.flatMap((s) => [s.created_by, s.repaid_by]), ...reqs.map((r) => r.approved_by)].filter((x): x is string => !!x))]
   const people = await fetchByKeys<{ id: string; name: string }, string>(userIds, (chunk) => supabase.from('users').select('id, name').in('id', chunk), 'source hub users').catch(() => [])
   const names = new Map(people.map((u) => [u.id, u.name]))
   const company = new Map(((companies ?? []) as Array<{ id: string; name: string; short_code: string | null }>).map((c) => [c.id, c]))
@@ -59,20 +69,20 @@ export async function loadSourceHub(supabase: SupabaseClient): Promise<FundRecor
   const owed = new Map(((outstandingRows ?? []) as Array<{ fund_source_id: string; outstanding: number | string }>).map((o) => [o.fund_source_id, Number(o.outstanding)]))
   const bank = new Map(((banks ?? []) as Array<{ id: string; bank_name: string; account_number: string }>).map((b) => [b.id, b]))
   const account = new Map(((accounts ?? []) as Array<{ code: string; name: string }>).map((a) => [a.code, a.name]))
-  const pending = new Map(reqs.filter((r) => r.status === 'pending').map((r) => [r.reference_id, r.id]))
+  const pending = new Map(reqs.filter((r) => r.status === 'pending').map((r) => [r.reference_id, { id: r.id, submittedBy: r.submitted_by }]))
   const approved = new Map(reqs.filter((r) => r.status === 'approved').map((r) => [r.reference_id, r]))
 
   // Who it came from — free text first, as the list always read it (Item 4).
   const partyOf = (s: SourceRow) => {
     if (s.from_company_id) {
       const c = company.get(s.from_company_id)
-      return c ? (c.short_code ? `${c.name} (${c.short_code})` : c.name) : '—'
+      return c ? withCode(c.name, c.short_code) : '—'
     }
     if (s.from_department_id) return department.get(s.from_department_id) ?? '—'
     if (s.from_freetext_name) return s.from_freetext_name
     if (s.from_director_id) {
       const d = director.get(s.from_director_id)
-      return d ? (d.code ? `${d.name} (${d.code})` : d.name) : '—'
+      return d ? withCode(d.name, d.code) : '—'
     }
     return '—'
   }
@@ -104,8 +114,12 @@ export async function loadSourceHub(supabase: SupabaseClient): Promise<FundRecor
       notes: s.notes,
       bank: b ? { name: b.bank_name, number: b.account_number } : null,
       account: s.account_code ? { code: s.account_code, name: account.get(s.account_code) ?? s.account_code } : null,
-      approvalId: pending.get(s.id) ?? null,
+      approval: s.status === 'pending_approval' ? (pending.get(s.id) ?? null) : null,
+      decidable: false,
+      cancelPending: (s.status === 'active' || s.status === 'matured') && cancelling.has(s.id),
       repaid: Math.max(0, Math.round((Number(s.amount) - (owed.get(s.id) ?? Number(s.amount))) * 100) / 100),
+      repaidAt: s.repaid_at,
+      repaidBy: s.repaid_by ? (names.get(s.repaid_by) ?? null) : null,
     }
   })
 }

@@ -799,6 +799,31 @@ export async function cancelLoan(formData: FormData) {
   throw new Error(`Cannot cancel a ${loan.status} loan`)
 }
 
+// ─── Cancel a loan still waiting for approval, from the hub's drawer ─────────
+// (2026-10-15, the Finance revamp v2 — D12): the same RPC as the loan page's
+// *Cancel this loan*, answered in words instead of a redirect — the drawer
+// stays on the hub and says so. An active loan's cancellation (a reason, the
+// Principal's approval, refused once a repayment is recorded) stays on its page.
+
+export async function cancelPendingLoan(id: string): Promise<{ error: string } | undefined> {
+  await requireActionOn('/fund-out', 'treasury', 'void')
+  const supabase = await createClient()
+  if (!id) return { error: 'Which loan? Open it again.' }
+
+  const { data: loan } = await supabase.from('loans').select('status').eq('id', id).maybeSingle()
+  if (!loan) return { error: 'This loan is not there any more.' }
+  if ((loan as { status: string }).status !== 'pending_approval') {
+    return { error: 'Only a loan still waiting for approval is cancelled here — its own page requests the cancellation of an active one.' }
+  }
+  const { error } = await supabase.rpc('cancel_loan_and_approval', { p_loan_id: id })
+  if (error) return { error: `The loan was not cancelled: ${error.message}` }
+
+  revalidatePath('/fund-out')
+  revalidatePath('/approvals')
+  revalidatePath('/dashboard')
+  return undefined
+}
+
 // ─── List loans payable via debit voucher (Finance) — Phase 7 Step 12b ──────
 //
 // Active loans with outstanding > 0 + enriched with current-period overdue
