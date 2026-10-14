@@ -545,7 +545,7 @@
 /* Directors are peers: side by side on one level, one bar under their cards (`.bus`), card 132 + 24 between */
 .peers { display: flex; justify-content: center; }
 .peer { flex: none; width: 156px; display: flex; flex-direction: column; align-items: center; }
-.level { font-size: calc(10.5px * var(--rv-type)); font-weight: 700; letter-spacing: .1em; color: var(--rv-tree-level); margin: 2px 0 6px; }
+.level { font-size: max(10px, calc(10.5px * var(--rv-type))); font-weight: 700; letter-spacing: .1em; color: var(--rv-tree-level); margin: 2px 0 6px; }
 .node {
   box-sizing: border-box;
   border-radius: 18px;
@@ -609,10 +609,10 @@
   white-space: normal;
   overflow-wrap: break-word;
 }
-.grandAv { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 50%; background: var(--rv-sand); color: var(--rv-brown); font-size: calc(10.5px * var(--rv-type)); font-weight: 700; display: grid; place-items: center; }
+.grandAv { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 50%; background: var(--rv-sand); color: var(--rv-brown); font-size: max(10px, calc(10.5px * var(--rv-type))); font-weight: 700; display: grid; place-items: center; }
 .grandText { min-width: 0; }
 .grandName { display: block; font-size: calc(11.5px * var(--rv-type)); font-weight: 650; line-height: 1.2; }
-.grandTitle { display: block; font-size: calc(10px * var(--rv-type)); color: var(--rv-sub); margin-top: 1px; }
+.grandTitle { display: block; font-size: max(10px, calc(10px * var(--rv-type))); color: var(--rv-sub); margin-top: 1px; }
 .swipe { font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); }
 .psWho { display: flex; align-items: center; gap: 14px; }
 .psAv { flex: 0 0 52px; width: 52px; height: 52px; border-radius: 50%; background: var(--rv-sand); color: var(--rv-brown); font-size: calc(16px * var(--rv-type)); font-weight: 750; display: grid; place-items: center; }
@@ -810,12 +810,16 @@
 }
 .foodDayOn { border: 1.5px solid var(--rv-accent); background: var(--rv-cream); color: var(--rv-accent); }
 .foodDay:disabled { opacity: .45; cursor: default; }
+/* A day ticked or unticked (the refresh handoff's motion): its border, fill and ink over 160ms; the tick swaps at once. */
+.foodDay, .foodDayWk, .foodDayNote { transition: border-color 160ms cubic-bezier(.2,.8,.2,1), background-color 160ms cubic-bezier(.2,.8,.2,1), color 160ms cubic-bezier(.2,.8,.2,1); }
+@media (prefers-reduced-motion: reduce) { .foodDay, .foodDayWk, .foodDayNote { transition: none; } }
 .foodDayWk { font-size: calc(11px * var(--rv-type)); font-weight: 600; color: var(--rv-sub); text-transform: uppercase; letter-spacing: .04em; }
 .foodDayOn .foodDayWk { color: var(--rv-accent); }
 .foodDayN { font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 750; line-height: 1.15; font-variant-numeric: tabular-nums; }
-.foodDayNote { display: grid; place-items: center; min-height: 14px; font-size: calc(10.5px * var(--rv-type)); font-weight: 600; color: var(--rv-sub); }
+.foodDayNote { display: grid; place-items: center; min-height: 14px; font-size: max(10px, calc(10.5px * var(--rv-type))); font-weight: 600; color: var(--rv-sub); }
 .foodDayOn .foodDayNote { color: var(--rv-accent); }
-.weekMonth { font-size: calc(8.5px * var(--rv-type)); font-weight: 700; letter-spacing: .06em; opacity: .85; }
+/* Under 10px it is never scaled (the refresh handoff's floor): 8.5px on a phone as on a desktop. */
+.weekMonth { font-size: 8.5px; font-weight: 700; letter-spacing: .06em; opacity: .85; }
 /* The fair's region, as HR set it for the venue — shown, not picked. */
 .regionSet { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .regionChip { display: inline-grid; place-items: center; padding: 0 16px; }
@@ -832,6 +836,11 @@
 .sumRow { display: flex; justify-content: space-between; gap: 12px; font-size: calc(13px * var(--rv-type)); }
 .sumLabel { color: var(--rv-sub); }
 .sumValue { font-weight: 650; font-variant-numeric: tabular-nums; }
+/* The food claim's Month and Days are words, not amounts (the refresh handoff's screenshots): their own figures, and the
+   day list wrapping right-aligned under its first line, its label never squeezed. */
+.sumWords { font-variant-numeric: normal; }
+.sumDays { text-align: right; }
+.sumLabelFixed { flex: none; }
 .sumTotal { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-top: 8px; margin-top: 2px; border-top: 1px solid var(--rv-line); }
 .sumTotalLabel { font-size: calc(14px * var(--rv-type)); font-weight: 700; }
 .sumTotalValue { font-family: var(--font-display-rv); font-size: calc(22px * var(--rv-type)); font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
@@ -965,7 +974,8 @@
 .wlText { flex: 1; min-width: 0; }
 .wlName { display: block; font-size: calc(14.5px * var(--rv-type)); font-weight: 650; }
 .wlSub { display: block; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); margin-top: 1px; }
-.wlCaret { display: grid; place-items: center; transition: transform 180ms; }
+.wlCaret { display: grid; place-items: center; transition: transform 180ms cubic-bezier(.2,.8,.2,1); }
+@media (prefers-reduced-motion: reduce) { .wlCaret { transition: none; } }
 .wlCaretOpen { transform: rotate(180deg); }
 .wlList { border-radius: 14px; border: 1px solid var(--rv-handle); background: var(--rv-white); box-shadow: 0 10px 24px var(--rv-ink-14); overflow: hidden; }
 .wlItem {

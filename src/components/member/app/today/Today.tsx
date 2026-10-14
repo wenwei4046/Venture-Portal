@@ -1,7 +1,7 @@
 "use client";
 
 import { ICON, Svg } from "../icons";
-import type { TodayBoard, TodayModel, TodayTodo } from "./today-model";
+import { amountParts, type TodayBoard, type TodayModel, type TodayTodo } from "./today-model";
 import s from "./today.module.css";
 
 /**
@@ -25,6 +25,7 @@ const BOARD = { sales: s.board_sales, margin: s.board_margin, kpi: s.board_kpi, 
 /** Today — the command centre (`today-style="a"`). */
 export default function Today({ model, hidden, actions }: { model: TodayModel; hidden: boolean; actions: TodayActions }) {
   const { openMetric, openOrders, openArena, openBoard } = actions;
+  const amount = amountParts(model.heroAmount);
   return (
     <div className={s.page}>
       <div>
@@ -32,6 +33,8 @@ export default function Today({ model, hidden, actions }: { model: TodayModel; h
         <p className={s.helloSub}>{model.helloSub}</p>
       </div>
 
+      {/* The income as a statement (2026-10-14, the refresh handoff §3): no card — the label and the eye, the figure,
+          its split, then Sales · Margin · KPI between a dark rule and a light one. */}
       <section className={s.hero}>
         <div className={s.heroTop}>
           <span className={s.heroLabel}>{model.heroLabel}</span>
@@ -42,8 +45,8 @@ export default function Today({ model, hidden, actions }: { model: TodayModel; h
           )}
         </div>
         {model.heroLoading
-          ? <span className={`${s.skel} ${s.heroSkel}`} role="img" aria-label="Working out your income" />
-          : <div className={s.heroAmount}>{model.heroAmount}</div>}
+          ? <span className={`${s.skelInk} ${s.heroSkel}`} role="img" aria-label="Working out your income" />
+          : <div className={s.heroAmount}>{amount.cur && <span className={s.heroCur}>{amount.cur}</span>}<span className={s.heroNum}>{amount.num}</span></div>}
         <p className={s.heroSplit}>{model.heroSplit}</p>
         <div className={s.heroMetrics}>
           {model.metrics.map(m => {
@@ -52,8 +55,8 @@ export default function Today({ model, hidden, actions }: { model: TodayModel; h
                 <span className={s.metricLabel}>{m.label}</span>
                 {m.loading ? (
                   <>
-                    <span className={`${s.skel} ${s.metricSkel}`} />
-                    <span className={`${s.skel} ${s.metricTagSkel}`} />
+                    <span className={`${s.skelInk} ${s.metricSkel}`} />
+                    <span className={`${s.skelInk} ${s.metricTagSkel}`} />
                   </>
                 ) : (
                   <>
@@ -64,7 +67,7 @@ export default function Today({ model, hidden, actions }: { model: TodayModel; h
               </>
             );
             return openMetric
-              ? <button key={m.key} className={s.metric} onClick={() => openMetric(m.key)} aria-busy={m.loading || undefined}>{body}</button>
+              ? <button key={m.key} className={`${s.metric} ${s.metricTap}`} onClick={() => openMetric(m.key)} aria-busy={m.loading || undefined}>{body}</button>
               : <div key={m.key} className={s.metric} aria-busy={m.loading || undefined}>{body}</div>;
           })}
         </div>

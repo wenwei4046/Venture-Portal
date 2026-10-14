@@ -29,13 +29,35 @@ describe("Revenue app type scale", () => {
     expect(css.map(where)).toEqual(expect.arrayContaining(["base.module.css", "shell.module.css", "today/today.module.css"]));
   });
 
-  it("writes every px font-size as calc(Npx * var(--rv-type))", () => {
-    const plain = css.flatMap(path => read(path).split(/\r?\n/).flatMap((line, i) =>
-      [...line.matchAll(/font-size:\s*([^;}]+)/g)]
-        .map(match => match[1].trim())
-        .filter(value => /\d(px)?\b/.test(value) && !/^calc\(\d*\.?\d+px \* var\(--rv-type\)\)$/.test(value) && !/^\d*\.?\d+(em|%)$/.test(value))
-        .map(value => `${where(path)}:${i + 1} font-size: ${value}`)));
+  // The refresh handoff (2026-10-14, "Revenue app refresh" §1): no text falls under 10px because of the scale — a size
+  // the phone's .92 would take below it is written max(10px, …) — and a size drawn under 10px already (the food claim's
+  // "SEP") is never scaled, as the prototype's own type dial leaves it.
+  const sizes = () => css.flatMap(path => read(path).split(/\r?\n/).flatMap((line, i) =>
+    [...line.matchAll(/font-size:\s*([^;}]+)/g)].map(match => ({ at: `${where(path)}:${i + 1}`, value: match[1].trim() }))));
+  const SCALED = /^calc\((\d*\.?\d+)px \* var\(--rv-type\)\)$/;
+  const FLOORED = /^max\(10px, calc\((\d*\.?\d+)px \* var\(--rv-type\)\)\)$/;
+  const SMALL = /^(\d*\.?\d+)px$/;
+
+  it("writes every px font-size as calc(Npx * var(--rv-type)), floored at 10px, or under 10px unscaled", () => {
+    const plain = sizes()
+      .filter(({ value }) => /\d(px)?\b/.test(value) && !SCALED.test(value) && !FLOORED.test(value) && !/^\d*\.?\d+(em|%)$/.test(value)
+        && !(SMALL.test(value) && Number(SMALL.exec(value)![1]) < 10))
+      .map(({ at, value }) => `${at} font-size: ${value}`);
     expect(plain).toEqual([]);
+  });
+
+  it("lets the phone's scale take no text under 10px", () => {
+    const under = sizes().flatMap(({ at, value }) => {
+      const n = Number(SCALED.exec(value)?.[1] ?? NaN);
+      return n >= 10 && n * 0.92 < 10 ? [`${at} ${value} → ${(n * 0.92).toFixed(2)}px on a phone`] : [];
+    });
+    expect(under).toEqual([]);
+    // …and max(10px, …) only where it is needed.
+    const needless = sizes().flatMap(({ at, value }) => {
+      const n = Number(FLOORED.exec(value)?.[1] ?? NaN);
+      return n * 0.92 >= 10 || n < 10 ? [`${at} ${value}`] : [];
+    });
+    expect(needless).toEqual([]);
   });
 
   it("gives inline styles no number of their own either", () => {

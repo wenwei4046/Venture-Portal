@@ -1,6 +1,6 @@
 # DESIGN.md — HOUZS Venture Portal
 
-**Version 4.1 · 2026-10-14** — the single design doc for every screen: the portal, the Revenue app and the HR phone app. Version history: Part IV.
+**Version 4.2 · 2026-10-14** — the single design doc for every screen: the portal, the Revenue app and the HR phone app. Version history: Part IV.
 
 **The design system.** The visual source is the Claude Design project **HOUZS Venture Design System** (https://claude.ai/design/p/1fecd655-db12-4974-abf4-3d7434e41386, synced from `main` on 2026-10-13). It holds the tokens, the foundation cards, the core and view components and four templates. This file says how the code does it — which token, class or component a page uses today — and holds the rules the code enforces. Where the project and this file disagree, this file is the code's truth. Change either one on purpose, never by drift.
 
@@ -22,7 +22,7 @@
 | Theme | Who and where | In code | Feel |
 |---|---|---|---|
 | **HR — the ledger** (the default) | Every portal page, whatever the department (HR, Finance, the Principal, a department manager), plus the HR phone app | `:root`; the white sheet (`.sheet-theme`), HR's shell (`.hrv-shell`), `[data-hr-app]` | Formal. Black ink on white sheets, orange as a marker (never text), Newsreader page titles, mono figures, dense grid tables |
-| **Revenue — the sales app** | Salespeople (Fair, IR), Team Leaders, the Principal viewing as one: the Revenue app `/member` and the CRM | `[data-revenue-app]` | Warm. Brown ink, a rust accent that is also the link colour, one peach→rust gradient hero, big rounded cards, Inter Tight headlines and amounts. Mobile-first, desktop at 1440 |
+| **Revenue — the sales app** | Salespeople (Fair, IR), Team Leaders, the Principal viewing as one: the Revenue app `/member` and the CRM | `[data-revenue-app]` | Warm. Brown ink, a rust accent that is also the link colour, the income as a statement, the Arena's boards as bank cards, big rounded cards, Inter Tight headlines and amounts. Mobile-first, desktop at 1440 |
 
 **Pick the theme first.**
 
@@ -81,7 +81,7 @@ components  the HR kit (components/hrv) · the sheet kit (components/sheet) · t
 - **A status is a word on a wash with its border and dot** (`.chip ledger | alert | danger | info | accent`). Never coloured words alone, never an emoji.
 - **HR's accent is never lettering** — it is 2.2:1 on white. It fills primary buttons, the active tab's underline, the page head's segment, bars, rings and ticks, and anything painted orange carries black lettering. In Revenue, rust is also the link and active-nav colour.
 - **One primary action and one dark object per screen.** HR's dark object is walnut `90 62 43` (the primary summary card, a person header, a toast); Revenue's is `#4E2F20`.
-- **One gradient**: the Revenue income hero (140°, `#F2995E → #D9622A → #B8461A`). There is no other gradient.
+- **Gradients only on the Arena** (v4.2): its four boards as bank cards — `--rv-board-sales` · `-margin` · `-kpi` · `-champ` (100°, palette stops, the light ends darkened so white text passes) under `--rv-board-wave`, on the hub's cards and a board's hero. Today's income is a statement now, no card. Nowhere else.
 - **The brands recur in both views** (chips, Brand weeks):
 
   | Brand | Ink | Wash |
@@ -329,7 +329,7 @@ No coloured shadow other than the Revenue accent's.
 
 ### Don't
 
-- **No gradients** except the Revenue hero. No purple, violet or indigo anywhere.
+- **No gradients** except the Arena's bank cards (v4.2). No purple, violet or indigo anywhere.
 - **No decoration for its own sake:** no blobs, floating circles, wavy dividers or illustrations — the sign-in page's art is the one illustration.
 - **No emoji as design elements.** No three-column feature grids of icons in coloured circles. Don't centre everything. Don't put the same `rounded-xl` on every element.
 - **One of each:** no second primary button on a screen, no second dark object.
@@ -1303,7 +1303,7 @@ Only for a login a People record names: the shared principal@, finance@, hr@ and
 
 - **Its own floor.** Preflight is undone for the app (`app/base.module.css`); the portal's global `h1` / input rules stop at its edge.
 - **Shell.** Five tabs on a phone; on a desktop (`@container rv`, 1024px+) a sidebar, the page column and a panel rail where sheets, View as and the quote calculator open.
-- **Phone type one step smaller:** every size is `calc(Npx * var(--rv-type))` (.92 on a phone; inputs stay 16px) — `app/type-scale.test.ts` fails on a plain px.
+- **Phone type one step smaller:** every size is `calc(Npx * var(--rv-type))` (.92 on a phone; inputs stay 16px), never under 10px because of it — a size .92 would take below is `max(10px, …)` — and a size drawn under 10px already (the food claim's *SEP*) is never scaled (v4.2). `app/type-scale.test.ts` fails on any other form.
 - **Checked against the prototype** screen by screen (`/member/preview?app=proto`, `.design/revenue-app/tools/shoot-app.mjs`, done at ≤ 0.05%).
 - **Never says how the cost is made up** (`components/member/cost-basis-wording.test.ts`).
 - **Deliberate differences:** an unpaid figure says so (*KPI · Not counted*) instead of RM 0.00; a returned request has *Update and send again*; forms start empty.
@@ -1319,6 +1319,19 @@ Only for a login a People record names: the shared principal@, finance@, hr@ and
 - **Notifications** (v3.47, v3.52, v3.86): the bell and its page; the first open asks *Turn on notifications?*; a CRM notice is titled by the customer with their picture; *Make them pop up* with *Send a test*.
 - **Switch view** (v3.60): Profile on a phone lists Principal and Finance (*The portal*), HR (*The HR app*), Revenue team (*You are here*).
 - **A Revenue Director** (v4.1): the switcher lists the sub-departments they direct (*Revenue Director · Rank SS*); Today's Sales / Margin / KPI are tagged *All of Fair*; a place on a board they are not on names who leads — *ANNA leads* on Today and the hub (head: *Who leads every board*), the leader's figure and *RM 300 ahead of ME* on a board's hero; no *This week*; the family chart has them at the top.
+
+### The Revenue app — the refresh (v4.2, 2026-10-14)
+
+The Claude Design handoff *Revenue app refresh* (`CRM switch button proposals.zip` — `design_handoff_revenue_app_refresh/`, prototype `Revenue Today Phone.dc.html`), checked element by element against `/member/preview?app=proto`. Rules and history: `.claude/rules/revenue/revenue-app.md` › THE REFRESH.
+
+- **Today's header: the CRM chat button** between the capsule's rule and the bell — `ICON.chat` 21px, stroke 1.8, rust, 40×44 (padding-left 8); Fair ▾ gives up 2px on its right, the bell 4px of its width. Its badge is the account's own chats' **unread messages** (the CRM Inbox's figure), `99+` above 99, none at 0, and it moves by itself the moment a customer writes (Realtime) — nothing else on the screen reads again. Only for CRM · View, only on Today (the user: the header stays Today's), not over Quote's step 2. It opens the CRM as Profile's *My leads & appointments* does (still there), and the CRM's way out leads back to Today. Every capsule button dims to .6 on a press (120ms).
+- **Today's income is a statement:** no card — the label and the sand eye (36, radius 10), *RM* 20/650 grey beside the figure 40/750 (−.04em, Inter Tight, `tnum cv01 cv11`), the split 12.5 grey, then Sales · Margin · KPI between a 1.5px ink rule and a 1px line, a good tag green. Hidden: *RM ••••*, *Amounts hidden*. Loading: sand shimmer bars.
+- **The Arena's boards are bank cards** (2×2, gap 10): 176 tall, radius 22, padding 16, white; the board 15/650 and your figure 12.5 white .88 on top beside a 34px circle (white .24, the icon 17); your place at the foot — 40/800 −.05em, its suffix 16/700, *of 9* 13 white .88. No chevron: the whole card is the button; a press sinks it to .97 (120ms). Shadow `0 6px 16px` the board's glow.
+- **A board's hero is its bank card** (margin 6 12 0, radius 22, padding 10 18 16, gap 14, shadow `0 8px 20px` glow): *‹ Arena* and the date chip (white .2); the board 16/650 with your figure 20/700 under it, beside a 40px icon circle; your place 56/800 with its suffix 22/700 and *of 9* 14 (white .88); the chase on white .18; the period on white .18, the picked one white with ink. A board is its own page: no app header over it (there is none on the Arena).
+- **Motion — the handoff's, on the one curve:** a board's hero rises 12px and fades in over 320ms, the page under it fades in 240ms after 60ms; *‹ Arena* fades the hero out over 200ms first. A period switch moves the pill 220ms and cross-fades the place and the figure 160ms (`arena/CrossFade.tsx`), never a count. Tabs and brand chips 160ms. A brand week's days open 200ms (height and opacity, `profile/Reveal.tsx`), its caret turns in 180ms, a day's tile 160ms. Reduced motion: nothing moves.
+- **Every sheet of the app closes when pulled down** past 90px (`Sheet.tsx`), as the CRM's do; a field keeps its own touch.
+- **The food claim's summary:** *Month* and *Days* in their own figures, the day list wrapping right-aligned.
+- **Deliberate differences from the refresh prototype:** the header is Today's alone (the prototype draws it over the Arena hub too); badges in Inter (the prototype's buttons fell back to Arial); Top 3's avatars keep their ring outside 46 / 54px as the first prototype drew them (the refresh one draws it inside, 2px shorter); inputs stay 16px.
 
 ### The Revenue app — Book a room and Documentation (v3.36, 2026-10-11)
 
@@ -1370,6 +1383,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.2** · 2026-10-14 · The Revenue app's refresh: Today's CRM chat button (live unread), income as a statement, Arena bank cards and board heroes, the 10px type floor, sheets close when pulled down → The Revenue app — the refresh
 - **v4.1** · 2026-10-14 · A Revenue Director in the Revenue app: the sub-departments they direct, *All of Fair*, *ANNA leads* → The Revenue app (#381)
 - **v4.0** · 2026-10-14 · The HOUZS Venture Design System (Claude Design) adopted: two themes, `--ds-*`, Newsreader / Inter Tight; history trimmed to this index → Part I (#366)
 - **v3.86** · 2026-10-14 · CRM phone notices titled by the customer, their picture as icon; *Make them pop up* → The HR phone app; The Revenue app (#363)

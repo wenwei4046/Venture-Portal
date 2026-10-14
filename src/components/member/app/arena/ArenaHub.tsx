@@ -4,6 +4,7 @@ import { ICON, Svg } from "../icons";
 import type { Board } from "../route";
 import type { PeriodKind } from "../insight/period";
 import { BOARD_ICON, type HubVM } from "./arena-model";
+import CrossFade from "./CrossFade";
 import s from "./arena.module.css";
 
 export const PERIOD_SEG: [PeriodKind, string][] = [["monthly", "Monthly"], ["quarterly", "Quarterly"], ["annual", "Annual"]];
@@ -29,23 +30,29 @@ export default function ArenaHub({ vm, kind, onKind, onBoard, onRecord }: {
           <button key={id} className={`${s.segBtn} ${kind === id ? s.segOn : ""}`} onClick={() => onKind(id)} aria-pressed={kind === id}>{label}</button>
         ))}
       </div>
+      {/* The boards as bank cards (2026-10-14, the refresh handoff §4): the board and your figure over its icon, your
+          place under them; the whole card is the button. */}
       <div className={s.cards}>
         {vm.cards.map(c => (
-          <button key={c.board} className={`${s.card} ${s[`t_${c.board}`]}`} onClick={() => onBoard(c.board)}>
+          <button key={c.board} className={`${s.card} ${s[`t_${c.board}`]}`} onClick={() => onBoard(c.board)} aria-busy={c.state === "loading" || undefined}>
             <span className={s.cardTop}>
-              <span className={s.cardIcon}><Svg d={BOARD_ICON[c.board]} size={20} sw={1.8} /></span>
-              <span className={s.cardChev}><Svg d={ICON.chevronRight} size={16} sw={1.8} /></span>
-            </span>
-            <span className={s.cardBody}>
-              <span className={s.cardLabel}>{c.label}</span>
-              <span className={s.cardRank}>
-                {c.state === "loading" ? <span className={`${s.skel} ${s.cardNumSkel}`} />
-                  : c.state === "unranked" ? <span className={s.cardNone}>Not ranked yet</span>
-                  : c.state === "lead" ? <span className={s.cardNone}>{c.leader ? `${c.leader} leads` : "Nobody placed yet"}</span>
-                  : <span className={s.rankNum}><span className={s.cardNum}>{c.rankNum}</span><span className={s.cardSuf}>{c.rankSuf}</span></span>}
-                <span className={s.cardOf}>{c.of}</span>
+              <span className={s.cardHead}>
+                <span className={s.cardLabel}>{c.label}</span>
+                {c.state === "loading" ? <span className={`${s.skel} ${s.cardValueSkel}`} />
+                  : <CrossFade k={c.value} block><span className={s.cardValue}>{c.value}</span></CrossFade>}
               </span>
-              {c.state === "loading" ? <span className={`${s.skel} ${s.cardValueSkel}`} /> : <span className={s.cardValue}>{c.value}</span>}
+              <span className={s.cardIcon}><Svg d={BOARD_ICON[c.board]} size={17} sw={1.8} /></span>
+            </span>
+            <span className={s.cardRank}>
+              {c.state === "loading" ? <span className={`${s.skel} ${s.cardNumSkel}`} />
+                : c.state === "unranked" ? <span className={s.cardNone}>Not ranked yet</span>
+                : c.state === "lead" ? <span className={s.cardNone}>{c.leader ? `${c.leader} leads` : "Nobody placed yet"}</span>
+                : (
+                  <CrossFade k={`${c.rankNum}${c.rankSuf}`}>
+                    <span className={s.rankNum}><span className={s.cardNum}>{c.rankNum}</span><span className={s.cardSuf}>{c.rankSuf}</span></span>
+                  </CrossFade>
+                )}
+              {c.of && <span className={s.cardOf}>{c.of}</span>}
             </span>
           </button>
         ))}

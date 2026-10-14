@@ -15,13 +15,22 @@ export interface Me {
   rank: string;
 }
 
-/** The phone header (`header-style="d"`): wordmark, then Fair ▾ · bell · avatar in one capsule. */
-export function MobileHeader({ ruled, back, subName, count, me, onLogo, onBack, onSubDept, onBell, onProfile }: {
+/** A badge's figure: the count, `99+` above 99. */
+export const badgeCount = (n: number) => (n > 99 ? "99+" : String(n));
+
+/**
+ * The phone header (`header-style="d"`): wordmark, then Fair ▾ · bell · avatar in one capsule — and, on Today for an
+ * account in the CRM (2026-10-14, the refresh handoff §2; the user: the header stays Today's), the CRM chat button
+ * between the rule and the bell, its badge the customers' messages not read yet. Without it the capsule is as before.
+ */
+export function MobileHeader({ ruled, back, subName, count, me, crm, onLogo, onBack, onSubDept, onBell, onProfile }: {
   ruled: boolean;
   back: boolean;
   subName: string;
   count: number;
   me: Me;
+  /** The CRM chat button: `unread` = their own chats' unread messages (the CRM's own Inbox figure). */
+  crm?: { unread: number; onOpen: () => void } | null;
   onLogo: () => void;
   onBack: () => void;
   onSubDept: () => void;
@@ -38,11 +47,17 @@ export function MobileHeader({ ruled, back, subName, count, me, onLogo, onBack, 
           <span className={s.headerDept}>Revenue</span>
         </button>
       )}
-      <div className={s.capsule}>
+      <div className={`${s.capsule} ${crm ? s.capsuleWithCrm : ""}`}>
         <button className={s.capsuleSd} onClick={onSubDept} aria-label="Switch sub-department">
           {subName}<Svg d={ICON.chevronDown} size={15} sw={2.2} stroke="var(--rv-accent)" />
         </button>
         <span className={s.capsuleRule} />
+        {crm && (
+          <button className={s.capsuleCrm} onClick={crm.onOpen} aria-label="Open CRM">
+            <Svg d={ICON.chat} size={21} sw={1.8} />
+            {crm.unread > 0 && <span className={s.capsuleBadge}>{badgeCount(crm.unread)}</span>}
+          </button>
+        )}
         <button className={s.capsuleBell} onClick={onBell} aria-label="Notifications">
           <Svg d={ICON.bell} size={20} sw={1.7} />
           {count > 0 && <span className={s.capsuleBadge}>{count}</span>}

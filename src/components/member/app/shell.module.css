@@ -227,7 +227,7 @@
   text-align: left;
 }
 .moduleText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.moduleLabel { font-size: calc(10.5px * var(--rv-type)); font-weight: 700; letter-spacing: .1em; color: var(--rv-faint); }
+.moduleLabel { font-size: max(10px, calc(10.5px * var(--rv-type))); font-weight: 700; letter-spacing: .1em; color: var(--rv-faint); }
 .moduleName { font-size: calc(14px * var(--rv-type)); font-weight: 650; }
 .asideMe {
   display: flex;
@@ -317,10 +317,12 @@
   justify-content: space-between;
   gap: 12px;
   padding: 4px 20px 10px;
-  border-bottom: 1px solid transparent;
-  transition: border-color 160ms;
+  /* The rule once the page scrolls is drawn inside the header's own foot (2026-10-14): a 1px border put the page 1px
+     lower than the refresh handoff draws Today. */
+  box-shadow: inset 0 -1px 0 transparent;
+  transition: box-shadow 160ms;
 }
-.headerRuled { border-bottom-color: var(--rv-line); }
+.headerRuled { box-shadow: inset 0 -1px 0 var(--rv-line); }
 .headerBack { display: flex; align-items: center; gap: 6px; height: 44px; padding: 0; border: 0; background: transparent; color: var(--rv-accent); font-size: calc(15px * var(--rv-type)); font-weight: 600; }
 .headerLogo { min-width: 0; padding: 0; border: 0; background: transparent; text-align: left; }
 .headerWord { display: block; font-size: calc(15px * var(--rv-type)); font-weight: 700; letter-spacing: .14em; color: var(--rv-brown); line-height: 1.2; white-space: nowrap; }
@@ -362,13 +364,37 @@
   border-radius: 8px;
   background: var(--rv-accent);
   color: var(--rv-white);
-  font-size: calc(10px * var(--rv-type));
+  font-size: max(10px, calc(10px * var(--rv-type)));
   font-weight: 700;
   line-height: 16px;
   text-align: center;
   box-shadow: 0 0 0 2px var(--rv-white);
 }
 .capsuleAvatar { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; border: 0; padding: 1px 6px; background: var(--rv-brown); color: var(--rv-white); font-size: calc(12px * var(--rv-type)); font-weight: 650; }
+/* The CRM chat button (2026-10-14, the refresh handoff §2): rust, so it reads apart from the brown bell; Fair ▾ gives
+   up 2px on its right and the bell 4px of its width to make room, the bell's badge moving in to its edge. */
+.capsuleWithCrm .capsuleSd { padding-right: 6px; }
+.capsuleCrm {
+  position: relative;
+  width: 40px;
+  height: 44px;
+  padding: 0 0 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--rv-accent);
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+.capsuleCrm .capsuleBadge { right: -4px; }
+.capsuleWithCrm .capsuleBell { width: 42px; }
+.capsuleWithCrm .capsuleBell .capsuleBadge { right: 0; }
+/* A press: .6 for 120ms, every button of the capsule alike (the handoff: "same as other capsule buttons"). */
+.capsuleSd, .capsuleCrm, .capsuleBell, .capsuleAvatar { transition: opacity 120ms cubic-bezier(.2,.8,.2,1); }
+.capsuleSd:active, .capsuleCrm:active, .capsuleBell:active, .capsuleAvatar:active { opacity: .6; }
+@media (prefers-reduced-motion: reduce) {
+  .capsuleSd, .capsuleCrm, .capsuleBell, .capsuleAvatar { transition: none; }
+}
 
 /* ── the page ── */
 .main {

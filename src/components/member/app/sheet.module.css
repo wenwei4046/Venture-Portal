@@ -7,7 +7,8 @@
 .layer { position: absolute; inset: 0; pointer-events: none; }
 .layerOpen { pointer-events: auto; }
 
-.dim { position: absolute; inset: 0; opacity: 0; transition: opacity 240ms ease; }
+/* The dim on the refresh handoff's one curve (2026-10-14): 240ms, the panel 320ms; nothing moves for reduced motion. */
+.dim { position: absolute; inset: 0; opacity: 0; transition: opacity 240ms cubic-bezier(.2,.8,.2,1); }
 .dimOpen { opacity: 1; }
 .dimA { background: var(--rv-dim); }
 .dimB { background: var(--rv-dim-brown); }
@@ -37,6 +38,7 @@
   transition: transform 320ms cubic-bezier(.2,.8,.2,1);
 }
 .panelOpen { transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { .dim, .panel { transition: none; } }
 .panelScroll { overflow-y: auto; scrollbar-width: none; }
 .panelScroll::-webkit-scrollbar { display: none; }
 

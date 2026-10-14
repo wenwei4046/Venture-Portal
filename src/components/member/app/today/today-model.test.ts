@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MemberInsightBlock, MemberMemo, MemberRequest } from "@/lib/member/types";
 import type { MemberArenaSnapshot, ArenaPerson } from "@/lib/member/arena";
-import { reachedTier, shortTier, thousands, todayModel, weekFriday, type TodayInput } from "./today-model";
+import { amountParts, reachedTier, shortTier, thousands, todayModel, weekFriday, type TodayInput } from "./today-model";
 
 const score = (over: Partial<ArenaPerson> = {}): ArenaPerson => ({
   id: "p", name: "P", self: false, sales: 0, held: 0, orders: 0, kpiQty: 0, marginRevenue: 0, marginCost: 0, blindOrders: 0, brands: {}, ...over,
@@ -55,7 +55,7 @@ describe("the income hero", () => {
   });
   it("hides every amount when asked", () => {
     const m = todayModel({ ...base, hidden: true });
-    expect(m.heroAmount).toBe("RM ••••••");
+    expect(m.heroAmount).toBe("RM ••••");
     expect(m.heroSplit).toBe("Amounts hidden");
   });
   // 2026-10-06 (user: "on live date, not showing last month"): Today is the
@@ -66,7 +66,7 @@ describe("the income hero", () => {
     expect(m.heroLabel).toBe("October · Estimated income");
     expect(m.heroAmount).toBe("RM —");
     expect(m.heroSplit).toBe("Working out October's commission…");
-    expect(todayModel({ ...base, today: "2026-10-06", incomeStatus: "loading", hidden: true }).heroAmount).toBe("RM ••••••");
+    expect(todayModel({ ...base, today: "2026-10-06", incomeStatus: "loading", hidden: true }).heroAmount).toBe("RM ••••");
   });
   it("says so when the month could not be worked out, rather than showing the salary alone", () => {
     const m = todayModel({ ...base, today: "2026-10-06", incomeStatus: "failed" });
@@ -256,5 +256,15 @@ describe("todayModel — a Principal viewing nobody", () => {
     expect(m.heroAmount).toBe("RM 89,460.99");
     expect(m.heroSplit).toBe("Everybody in Fair, before salaries · View as a member for their own");
     expect(todayModel({ ...base, income }).heroLabel).toBe("October · Estimated income");
+  });
+});
+
+// The income as a statement (2026-10-14, the refresh handoff §3): the currency in its own smaller grey, the figure big.
+describe("amountParts", () => {
+  it("draws RM apart from the figure — the figure hidden or still unknown too", () => {
+    expect(amountParts("RM 6,842.50")).toEqual({ cur: "RM", num: "6,842.50" });
+    expect(amountParts("RM ••••")).toEqual({ cur: "RM", num: "••••" });
+    expect(amountParts("RM —")).toEqual({ cur: "RM", num: "—" });
+    expect(amountParts("—")).toEqual({ cur: "", num: "—" });
   });
 });

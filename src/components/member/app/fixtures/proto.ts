@@ -41,6 +41,8 @@ export interface AppFixture {
   brands: BrandOption[];
   today: TodayModel;
   notifications: { count: number; summary: string; groups: NotifGroup[] };
+  /** Today's CRM chat button: the refresh handoff's sample of unread messages (2026-10-14). */
+  crmUnread?: number;
   insight?: InsightFixture;
   arena?: ArenaFixture;
   quote?: QuoteFixture;
@@ -102,6 +104,7 @@ export function protoFixture(quote: { brand?: string; sheet?: string; charges?: 
     docs: protoDocs(),
     greeting: "Good morning",
     cartItems: 4,
+    crmUnread: 4,
     brands: [
       { code: "AKEMI", name: "Akemi", sofa: false, models: 16 },
       { code: "ERGOTEX", name: "Ergotex", sofa: false, models: 12 },

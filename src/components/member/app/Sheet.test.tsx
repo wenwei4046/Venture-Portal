@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import Sheet from "./Sheet";
+import Sheet, { SWIPE_CLOSE_PX } from "./Sheet";
 import { OrderSheet } from "./insight/InsightSheets";
 import { CommissionSheet } from "./profile/IncomePages";
 import { HonourSheet } from "./profile/HonoursPage";
@@ -141,5 +141,37 @@ describe.each(ROW_SHEETS)("%s is a peek", (_, sheet) => {
     fireEvent.click(screen.getByText("Next row"));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onRow).toHaveBeenCalledTimes(1);
+  });
+});
+
+// A phone's sheet closes when it is pulled down (2026-10-14, the refresh handoff's motion: "swipe-down closes").
+describe("Sheet › pulled down", () => {
+  const drag = (el: HTMLElement, by: number) => {
+    fireEvent.touchStart(el, { touches: [{ clientY: 100 }] });
+    fireEvent.touchMove(document, { touches: [{ clientY: 100 + by / 2 }] });
+    fireEvent.touchMove(document, { touches: [{ clientY: 100 + by }] });
+    fireEvent.touchEnd(document, { touches: [] });
+  };
+  function Pulled({ onClose }: { onClose: () => void }) {
+    const [open, setOpen] = useState(true);
+    return <Sheet open={open} onClose={() => { onClose(); setOpen(false); }} z={22} label="Food claim"><p>Days</p><textarea aria-label="Notes" /></Sheet>;
+  }
+
+  it("past the line it closes; short of it, it springs back", () => {
+    const onClose = vi.fn();
+    render(<Pulled onClose={onClose} />);
+    drag(panel(), SWIPE_CLOSE_PX - 30);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(panel().style.transform).toBe("");
+    drag(panel(), SWIPE_CLOSE_PX + 30);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(isOpen()).toBe(false);
+  });
+
+  it("a field inside it keeps its own touch", () => {
+    const onClose = vi.fn();
+    render(<Pulled onClose={onClose} />);
+    drag(screen.getByLabelText("Notes"), SWIPE_CLOSE_PX + 60);
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

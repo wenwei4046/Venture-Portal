@@ -125,7 +125,7 @@
 .cartList::-webkit-scrollbar { display: none; }
 .cartRow { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--rv-line); }
 .cartRow:last-child { border-bottom-color: transparent; }
-.tag { flex: 0 0 auto; font-size: calc(10.5px * var(--rv-type)); font-weight: 700; letter-spacing: .04em; border-radius: 6px; padding: 3px 6px; }
+.tag { flex: 0 0 auto; font-size: max(10px, calc(10.5px * var(--rv-type))); font-weight: 700; letter-spacing: .04em; border-radius: 6px; padding: 3px 6px; }
 .tagOrange { color: var(--rv-accent); background: var(--rv-orange-bg); }
 .tagSand { color: var(--rv-brown); background: var(--rv-sand); }
 .tagGreen { color: var(--rv-green); background: var(--rv-green-bg); }
@@ -292,7 +292,7 @@
 /* the sofa */
 .sofaCard { padding: 14px; border-radius: 16px; background: var(--rv-desk); border: 1px solid var(--rv-line); display: flex; flex-direction: column; gap: 10px; }
 .blocks { display: flex; gap: 4px; height: 34px; }
-.block { min-width: 0; border-radius: 8px; background: var(--rv-brown); color: var(--rv-white); font-size: calc(10.5px * var(--rv-type)); font-weight: 700; display: grid; place-items: center; letter-spacing: .02em; overflow: hidden; }
+.block { min-width: 0; border-radius: 8px; background: var(--rv-brown); color: var(--rv-white); font-size: max(10px, calc(10.5px * var(--rv-type))); font-weight: 700; display: grid; place-items: center; letter-spacing: .02em; overflow: hidden; }
 .blocksEmpty { flex: 1; border-radius: 8px; border: 1px dashed var(--rv-line-tan); }
 .sofaSum { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .sofaText { font-size: calc(15px * var(--rv-type)); font-weight: 700; color: var(--rv-ink); }

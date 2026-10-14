@@ -1,10 +1,11 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ICON, Svg } from "../icons";
 import type { PeriodKind } from "../insight/period";
 import { BOARD_ICON, type ArenaSub, type BoardVM, type FairView, type HeroState, type RankView } from "./arena-model";
 import { PERIOD_SEG } from "./ArenaHub";
+import CrossFade from "./CrossFade";
 import s from "./arena.module.css";
 
 export interface ArenaBoardActions {
@@ -21,20 +22,42 @@ export interface ArenaBoardActions {
 
 const medal = (n: number) => (n >= 1 && n <= 3 ? s[`m${n}`] : "");
 
-/** One board: the coloured hero, then its ranking (RevenueApp.dc.html 737–884). */
+/** ‹ Arena: the hero fades out over this long before the hub comes back (the refresh handoff's motion). */
+export const HERO_OUT_MS = 200;
+const reducedMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * One board: its bank card for a hero (2026-10-14, the refresh handoff §5 — back and the date, the board and your
+ * figure beside its icon, your place, the chase, the period), then its ranking (RevenueApp.dc.html 737–884). A board is
+ * its own page: the app's header is not drawn over it. The hero rises in as the page opens and fades out on ‹ Arena.
+ */
 export default function ArenaBoard({ vm, kind, dateLabel, actions }: { vm: BoardVM; kind: PeriodKind; dateLabel: string; actions: ArenaBoardActions }) {
+  const [leaving, setLeaving] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const back = () => {
+    if (leaving) return;
+    if (reducedMotion()) { actions.back(); return; }
+    setLeaving(true);
+    timer.current = setTimeout(actions.back, HERO_OUT_MS);
+  };
+  const hero = vm.rank?.hero;
   return (
     <div className={`${s.board} ${s[`t_${vm.board}`]}`}>
-      <section className={s.hero}>
+      <section className={`${s.hero} ${leaving ? s.heroLeaving : ""}`}>
         <div className={s.heroTop}>
-          <button className={s.heroBack} onClick={actions.back}><Svg d={ICON.back} size={20} sw={1.9} />Arena</button>
+          <button className={s.heroBack} onClick={back}><Svg d={ICON.back} size={20} sw={1.9} />Arena</button>
           <button className={s.heroDate} onClick={actions.openDate}>
             <Svg d={ICON.calendar} size={15} sw={1.9} />{dateLabel}<Svg d={ICON.chevronDown} size={13} sw={2.2} />
           </button>
         </div>
-        <div className={s.heroTitleRow}>
+        <div className={s.heroHead}>
+          <span className={s.heroHeadText}>
+            <h1 className={s.heroTitle}>{vm.title}</h1>
+            {hero && (hero.state === "loading" ? <span className={`${s.skel} ${s.heroValueSkel}`} />
+              : <CrossFade k={hero.value} block><span className={s.heroValue}>{hero.value}</span></CrossFade>)}
+          </span>
           <span className={s.heroIcon}><Svg d={BOARD_ICON[vm.board]} size={20} sw={1.8} /></span>
-          <h1 className={s.heroTitle}>{vm.title}</h1>
         </div>
         {vm.rank && <RankHeroBlock rank={vm.rank} />}
         {vm.fair && <FairHeroBlock fair={vm.fair} />}
@@ -82,7 +105,11 @@ function HeroPlace({ state, num, suf, leader }: { state: HeroState; num: string;
   if (state === "unranked") return <span className={s.heroNone}>Not ranked yet</span>;
   if (state === "lead") return <span className={s.heroNone}>{leader ? `${leader} leads` : "Nobody placed yet"}</span>;
   // "off" (KPI not counted this period) keeps the dash: nobody has a place, and nobody will.
-  return <span className={s.rankNum}><span className={s.heroNum}>{num}</span><span className={s.heroSuf}>{suf}</span></span>;
+  return (
+    <CrossFade k={`${num}${suf}`}>
+      <span className={s.rankNum}><span className={s.heroNum}>{num}</span><span className={s.heroSuf}>{suf}</span></span>
+    </CrossFade>
+  );
 }
 
 function RankHeroBlock({ rank }: { rank: RankView }) {
@@ -90,23 +117,21 @@ function RankHeroBlock({ rank }: { rank: RankView }) {
   return (
     <>
       <div className={s.heroRank}>
-        <span className={s.heroRankLeft}>
-          <HeroPlace state={h.state} num={h.num} suf={h.suf} leader={h.leader} />
-          {(h.state === "ranked" || h.state === "off") && <span className={s.heroOf}>of {h.count}</span>}
-        </span>
-        {h.state === "loading" ? <span className={`${s.skel} ${s.heroValueSkel}`} /> : <span className={s.heroValue}>{h.value}</span>}
+        <HeroPlace state={h.state} num={h.num} suf={h.suf} leader={h.leader} />
+        {(h.state === "ranked" || h.state === "off") && <span className={s.heroOf}>of {h.count}</span>}
       </div>
-      <div className={s.heroChase}><Svg d={ICON.arrowUp} size={16} sw={2.2} /><span className={s.heroChaseText}>{h.chase}</span></div>
+      <div className={s.heroChase}><Svg d={ICON.arrowUp} size={16} sw={2.2} className={s.heroChaseIcon} /><span className={s.heroChaseText}>{h.chase}</span></div>
     </>
   );
 }
 
+/** Sales › Fair results: your finish and its medals on the hero's place row; no figure beside the board's name. */
 function FairHeroBlock({ fair }: { fair: FairView }) {
   const h = fair.hero;
   return (
     <>
-      <div className={s.heroRank}>
-        <span className={s.heroRankLeft}>
+      <div className={`${s.heroRank} ${s.heroRankFair}`}>
+        <span className={s.heroRank}>
           <HeroPlace state={h.state} num={h.num} suf={h.suf} leader={h.leader} />
           {(h.state === "ranked" || h.state === "off") && <span className={s.heroOf}>of {h.count}</span>}
         </span>
@@ -116,7 +141,7 @@ function FairHeroBlock({ fair }: { fair: FairView }) {
           ))}
         </span>
       </div>
-      <div className={s.heroChase}><Svg d={ICON.arrowUp} size={16} sw={2.2} /><span className={s.heroChaseText}>{h.chase}</span></div>
+      <div className={s.heroChase}><Svg d={ICON.arrowUp} size={16} sw={2.2} className={s.heroChaseIcon} /><span className={s.heroChaseText}>{h.chase}</span></div>
     </>
   );
 }

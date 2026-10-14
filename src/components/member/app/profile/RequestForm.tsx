@@ -6,6 +6,7 @@ import Sheet, { SheetHandle } from "../Sheet";
 import { dayList, dayRange, initials, klToday, monthShort, MONTHS_SHORT, rm2, shortDay, weekdayShort } from "../format";
 import type { ClaimWeek, FormOptions, RequestKindVM } from "./profile-vm";
 import StayCalendar from "./StayCalendar";
+import Reveal from "./Reveal";
 import {
   airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairRegion, foodAmount, foodDayState, foodMonthOpensOn,
   foodMonthOver, isOutstation, monthOfWeek, nightsBetween, stayProblem, stayWindow,
@@ -464,7 +465,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                           {w.worked && <span className={`${s.wlCaret} ${open ? s.wlCaretOpen : ""}`}><Svg d={ICON.chevronDown} size={16} sw={2} stroke="var(--rv-sub)" /></span>}
                         </button>
                         {open && (
-                          <div className={s.foodDays} role="group" aria-label={`Days of the ${w.brandWeek}, ${w.dates}`}>
+                          <Reveal className={s.foodDays} role="group" aria-label={`Days of the ${w.brandWeek}, ${w.dates}`}>
                             {fairDays(w, w.key).map(day => {
                               const state = foodDayState(day, today, takenDays);
                               const ticked = state === "open" && days.includes(day);
@@ -481,7 +482,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                                 </button>
                               );
                             })}
-                          </div>
+                          </Reveal>
                         )}
                       </div>
                     );
@@ -491,8 +492,8 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
               </div>
             )}
             <div className={s.sum}>
-              <div className={s.sumRow}><span className={s.sumLabel}>Month</span><span className={s.sumValue}>{foodMonth ? monthShort(foodMonth) : "—"}</span></div>
-              <div className={s.sumRow}><span className={s.sumLabel}>Days</span><span className={s.sumValue}>{foodDays.length ? `${foodDays.length} day${foodDays.length === 1 ? "" : "s"} · ${dayList(foodDays)}` : "—"}</span></div>
+              <div className={s.sumRow}><span className={s.sumLabel}>Month</span><span className={`${s.sumValue} ${s.sumWords}`}>{foodMonth ? monthShort(foodMonth) : "—"}</span></div>
+              <div className={s.sumRow}><span className={`${s.sumLabel} ${s.sumLabelFixed}`}>Days</span><span className={`${s.sumValue} ${s.sumWords} ${s.sumDays}`}>{foodDays.length ? `${foodDays.length} day${foodDays.length === 1 ? "" : "s"} · ${dayList(foodDays)}` : "—"}</span></div>
               <div className={s.sumRow}><span className={s.sumLabel}>Rate a day</span><span className={s.sumValue}>{perDay !== null && perDay > 0 ? rm2(perDay) : "Not set"}</span></div>
               <div className={s.sumTotal}><span className={s.sumTotalLabel}>Claim amount</span><span className={s.sumTotalValue}>{rm2(foodTotal)}</span></div>
               <span className={s.sumNote}>Set by HR&apos;s rate a day. You can&apos;t edit the amount.</span>
