@@ -130,12 +130,14 @@ export default function ProfileMain({ vm, hidden, actions, crm = true, closedRow
           <h2 className={s.h2}>Your workspace</h2>
           {/* My leads & appointments: only for an account the CRM is open to (CRM · View, 2026-10-10). */}
           {ROWS.filter(r => (r.key !== "crm" || crm) && !closedRows.includes(r.key)).map(r => (
-            <button key={r.key} className={s.workRow} onClick={() => actions.open(r.key)}>
+            <button key={r.key} className={r.key === "crm" && vm.badges.crm ? `${s.workRow} ${s.workRowCount}` : s.workRow} onClick={() => actions.open(r.key)}>
               <span className={`${s.workIcon} ${r.tone}`}><Svg d={r.d} size={22} sw={1.8} /></span>
               <span className={s.workText}>
-                <span className={s.workLabel}>{r.label}{vm.badges[r.key] && <span className={r.key === "track" || r.key === "docs" || r.key === "crm" ? s.workCount : s.workBadge}>{vm.badges[r.key]}</span>}</span>
+                <span className={s.workLabel}>{r.label}{r.key !== "crm" && vm.badges[r.key] && <span className={r.key === "track" || r.key === "docs" ? s.workCount : s.workBadge}>{vm.badges[r.key]}</span>}</span>
                 <span className={s.workSub}>{r.sub}</span>
               </span>
+              {/* The chats' unread sits at the row's end, before its arrow (the owner, 2026-10-14). */}
+              {r.key === "crm" && vm.badges.crm && <span className={`${s.workCount} ${s.workCountEnd}`}>{vm.badges.crm}</span>}
               <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
             </button>
           ))}

@@ -164,6 +164,9 @@
 .workLabel { display: flex; align-items: center; gap: 8px; font-size: calc(16px * var(--rv-type)); font-weight: 650; }
 .workBadge { font-size: calc(11.5px * var(--rv-type)); font-weight: 650; color: var(--rv-amber); background: var(--rv-amber-bg); border-radius: 10px; padding: 1px 7px; }
 /* A count on its own (Waiting list & replacements, the handoff's): white on the accent. */
+/* A row with a count at its end (My leads & appointments' unread): the count gets its own column before the arrow. */
+.workRowCount { grid-template-columns: 52px minmax(0, 1fr) auto 16px; }
+.workCountEnd { justify-self: end; margin-right: -4px; }
 .workCount { font-size: calc(10.9px * var(--rv-type)); font-weight: 700; color: var(--rv-white); background: var(--rv-accent); border-radius: 9px; padding: 1px 7px; }
 .workSub { display: block; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); margin-top: 2px; text-wrap: pretty; }
 /* Install the app (not in the prototype — kept from the old Profile): the iOS / in-app steps open under the row */
