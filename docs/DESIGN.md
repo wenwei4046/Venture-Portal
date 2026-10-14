@@ -1447,6 +1447,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.15** · 2026-10-14 · A Revenue person's basic: *Basic from commission*, one tick on the Salary section in place of the Employment Type select → People (#412)
 - **v4.14** · 2026-10-14 · Receipt's dialogs: Create receipt (the design's six fields and the Category the system books on, Cancel / Save receipt) and Loan repayment received (the loan, its parts, the bank); the form kit's shared parts → Finance's view — Create payment
 - **v4.13** · 2026-10-14 · Receipt's hub: *Receive*, the cards All receipts … Received … Voided, the figures +RM in green, Bank among the columns, the same drawer (no full page) → Finance's view — the hubs
 - **v4.12** · 2026-10-14 · The CRM's Team | Mine is one round button left of the house (two people on Team, one on Mine), its top row gone; a title row beside the three round buttons never cuts its title → The Revenue app — the refresh
