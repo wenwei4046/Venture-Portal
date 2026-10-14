@@ -175,7 +175,7 @@ select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
 }
 /* A company and its amount · a mode, a category and an amount · an item and its amount (and its category). */
 .lineRow[data-shape='party'] { grid-template-columns: minmax(0, 1fr) 128px 28px; }
-.lineRow[data-shape='pool'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) 112px 28px; }
+.lineRow[data-shape='pool'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 100px 28px; }
 .lineRow[data-shape='item'] { grid-template-columns: minmax(0, 1fr) 128px 28px; }
 .lineRow[data-shape='item-cat'] { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 112px 28px; }
 /* A narrow dialog (a phone): a line of four takes two rows — its two selects, then its amount and its ×. */

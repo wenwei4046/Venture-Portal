@@ -42,7 +42,8 @@ export default function ChangeAccountDialog({
 }) {
   const several = invoice.posted.length > 1
   const nameOf = (code: string) => categories.find((c) => c.code === code)?.label ?? code
-  const [from, setFrom] = useState(invoice.category ?? '')
+  // The account it posts to, when it is one: its category, or the one its lines posted to.
+  const [from, setFrom] = useState(invoice.category ?? (invoice.posted.length === 1 ? invoice.posted[0].code : ''))
   const [picked, setPicked] = useState<string[]>(() => invoice.posted.map((a) => a.code))
   const [to, setTo] = useState('')
   const [reason, setReason] = useState('')
