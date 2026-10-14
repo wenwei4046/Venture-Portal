@@ -1,31 +1,20 @@
 'use client'
 
-import { useCallback, useEffect, useState, useTransition, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { officeTime } from '@/lib/office-time'
 import { HrIcon } from '@/components/hrv/icons'
-import { flash } from '@/components/hrv/toast'
 import { FinDrawer, drawerStyles as d } from '@/components/finv/Drawer'
-import { DialogButton, DialogConfirm, DialogForm, DialogMenu, Field, FinDialog, Hint, type DialogMenuItem } from '@/components/finv/Dialog'
-import {
-  approveVoucher,
-  getAttachmentSignedUrl,
-  returnVoucherToDraft,
-  reversePaidPayment,
-  submitForApproval,
-  uploadVoucherAttachment,
-  voidPaidReceipt,
-  voidVoucher,
-} from '../actions'
 import { openVoucherDrawer, type DrawerRefusal } from '../drawer-actions'
 import type { VoucherDetail } from '../_lib/voucher-detail'
+import { useVoucherSteps } from './voucher-steps'
 
 // A voucher in the hub's drawer (2026-10-14, the Finance revamp v2 — D05 of
 // `.design/fin-r2/handoff`): the dark hero, the numbered groups, the files and
-// the trail, and at its foot what this reader may do in the state it is in —
-// the system's own steps (an approval pays at once, so there is no separate
-// "Mark as paid"), each confirmed where it cannot be undone.
+// the trail, and at its foot what this reader may do in the state it is in
+// (voucher-steps.tsx — the system's own steps, each confirmed where it cannot
+// be undone).
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 /** "06 Oct 2026" — a date as the design writes it. */
@@ -37,14 +26,16 @@ export function fd(iso: string | null): string {
 const f2 = (n: number) => (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const rm = (n: number) => `RM ${f2(n)}`
 
-const STATUS_WORDS: Record<string, string> = {
+/** The status as the hero's chip says it. */
+export const STATUS_WORDS: Record<string, string> = {
   draft: 'Draft',
   pending_approval: 'Pending approval',
   approved: 'Approved',
   paid: 'Paid',
   voided: 'Voided',
 }
-const LIGHT: Record<string, string> = { draft: 'def', pending_approval: 'wait', approved: 'accent', paid: 'ledger', voided: 'danger' }
+/** The chip's light on the dark hero. */
+export const LIGHT: Record<string, string> = { draft: 'def', pending_approval: 'wait', approved: 'accent', paid: 'ledger', voided: 'danger' }
 const NOTE: Record<string, string> = {
   draft: 'Still a draft — not submitted yet.',
   pending_approval: 'Waiting for Principal approval. You can still edit or void it until then.',
@@ -59,27 +50,20 @@ const REFUSED: Record<DrawerRefusal, string> = {
 }
 
 /** "214 KB" — a file's size. */
-function sizeOf(bytes: number | null): string {
+export function sizeOf(bytes: number | null): string {
   if (bytes == null) return ''
   return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`
 }
-/** "14 Oct · 09:12" on the office's clock. */
-const stamp = (iso: string) => officeTime(iso).format('DD MMM YYYY · HH:mm')
-
-type Confirm = 'void' | 'reverse' | 'approve' | 'more' | null
+/** "06 Oct 2026 · 09:12" on the office's clock. */
+export const stamp = (iso: string) => officeTime(iso).format('DD MMM YYYY · HH:mm')
 
 export function VoucherDrawer({ id, onClose, onChanged }: { id: string | null; onClose: () => void; onChanged: () => void }) {
   const router = useRouter()
   const [detail, setDetail] = useState<VoucherDetail | null>(null)
   const [refused, setRefused] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [confirm, setConfirm] = useState<Confirm>(null)
-  const [notes, setNotes] = useState('')
-  const [busy, startBusy] = useTransition()
   const [shownId, setShownId] = useState<string | null>(id)
 
   const load = useCallback((voucherId: string) => {
-    setError(null)
     void openVoucherDrawer(voucherId).then(
       (res) => {
         if (res.ok) {
@@ -102,99 +86,42 @@ export function VoucherDrawer({ id, onClose, onChanged }: { id: string | null; o
     setShownId(id)
     setDetail(null)
     setRefused(null)
-    setConfirm(null)
     load(id)
   }, [id, load])
 
-  const run = (action: (fd: FormData) => Promise<unknown>, done: string, extra?: Record<string, string>) => {
-    if (!detail) return
-    setError(null)
-    const form = new FormData()
-    form.set('id', detail.id)
-    for (const [k, v] of Object.entries(extra ?? {})) form.set(k, v)
-    startBusy(async () => {
-      try {
-        await action(form)
-        setConfirm(null)
-        setNotes('')
-        flash(done)
-        onChanged()
-        load(detail.id)
-      } catch (e) {
-        if (e instanceof Error && e.message.includes('NEXT_REDIRECT')) throw e
-        setConfirm(null)
-        setError(e instanceof Error ? e.message : 'That did not go through.')
-      }
-    })
-  }
-
-  const openFile = async (fileId: string) => {
-    try {
-      const { url } = await getAttachmentSignedUrl(fileId)
-      window.open(url, '_blank', 'noopener,noreferrer')
-    } catch {
-      setError('That file could not be opened just now.')
-    }
-  }
-  const addFiles = () => {
-    if (!detail) return
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.multiple = true
-    input.accept = '.pdf,.jpg,.jpeg,.png,.xlsx,.xls,.docx,.doc,.csv'
-    input.onchange = () => {
-      const files = Array.from(input.files ?? [])
-      if (files.length === 0) return
-      const form = new FormData()
-      form.set('voucher_id', detail.id)
-      for (const f of files) form.append('files', f)
-      setError(null)
-      startBusy(async () => {
-        try {
-          const { count } = await uploadVoucherAttachment(form)
-          flash(`${count} ${count === 1 ? 'file' : 'files'} added`)
-          load(detail.id)
-          router.refresh()
-        } catch (e) {
-          setError(e instanceof Error ? e.message : 'The files could not be added.')
-        }
-      })
-    }
-    input.click()
-  }
-
   const v = detail
+  const { steps, busy, error, dialogs, openFile, addFiles } = useVoucherSteps(v, {
+    onDone: () => {
+      onChanged()
+      if (v) load(v.id)
+    },
+    onFilesChanged: () => {
+      if (v) load(v.id)
+      router.refresh()
+    },
+  })
   const title = v ? (v.no ?? 'Draft') : ''
   const st = v?.status ?? ''
 
-  // ── The bar: what this reader may do now ──
-  const more: DialogMenuItem[] = []
-  const bar: ReactNode[] = []
-  if (v) {
-    if (st === 'draft') {
-      if (v.can.create) bar.push(<button key="submit" type="button" className={d.barBtn} data-kind="primary" disabled={busy} onClick={() => run(submitForApproval, 'Submitted — waiting for Principal')}>Submit for approval</button>)
-      if (v.can.edit) bar.push(<Link key="edit" href={`/payments/${v.id}/edit`} className={d.barBtn}>Edit</Link>)
-      if (v.can.void) more.push({ key: 'void', label: 'Void voucher', danger: true, onClick: () => setConfirm('void') })
-    } else if (st === 'pending_approval') {
-      if (v.can.approve) bar.push(<button key="approve" type="button" className={d.barBtn} data-kind="primary" disabled={busy} onClick={() => setConfirm('approve')}>Approve</button>)
-      if (v.can.edit) {
-        bar.push(<Link key="edit" href={`/payments/${v.id}/edit`} className={d.barBtn}>Edit</Link>)
-        const back = <button key="back" type="button" className={d.barBtn} disabled={busy} onClick={() => run(returnVoucherToDraft, 'Returned to draft')}>Return to draft</button>
-        if (v.can.approve) more.push({ key: 'back', label: 'Return to draft', onClick: () => run(returnVoucherToDraft, 'Returned to draft') })
-        else bar.push(back)
-      }
-      if (v.can.void) more.push({ key: 'void', label: 'Void voucher', danger: true, onClick: () => setConfirm('void') })
-    } else if (st === 'paid' && v.can.void && (v.credit || v.reversible)) {
-      bar.push(
-        <button key="reverse" type="button" className={d.barBtn} data-kind="danger" disabled={busy} onClick={() => setConfirm('reverse')}>
-          {v.credit ? 'Void receipt' : 'Reverse payment'}
-        </button>,
-      )
-    }
-    if (more.length > 0) bar.push(<button key="more" type="button" className={d.barBtn} data-kind="more" aria-label="More" onClick={() => setConfirm('more')}>⋯</button>)
-  }
-
-  const short = v?.noCash ? false : v?.bankBalance != null && v.bankBalance < v.amount
+  const bar: ReactNode[] = steps.map((s) =>
+    s.href ? (
+      <Link key={s.key} href={s.href} className={d.barBtn}>
+        {s.label}
+      </Link>
+    ) : (
+      <button
+        key={s.key}
+        type="button"
+        className={d.barBtn}
+        data-kind={s.kind === 'secondary' ? undefined : s.kind}
+        disabled={busy && s.kind !== 'more'}
+        aria-label={s.kind === 'more' ? 'More' : undefined}
+        onClick={s.onClick}
+      >
+        {s.label}
+      </button>
+    ),
+  )
 
   return (
     <>
@@ -296,7 +223,7 @@ export function VoucherDrawer({ id, onClose, onChanged }: { id: string | null; o
                 </div>
                 <div className={d.files}>
                   {v.files.map((f) => (
-                    <button key={f.id} type="button" className={d.file} onClick={() => void openFile(f.id)}>
+                    <button key={f.id} type="button" className={d.file} onClick={() => openFile(f.id)}>
                       <span className={d.fileIcon}>
                         <HrIcon name="doc" size={15} />
                       </span>
@@ -325,9 +252,7 @@ export function VoucherDrawer({ id, onClose, onChanged }: { id: string | null; o
                   </div>
                   <div className={d.stepText}>
                     <div className={d.stepLabel}>{s.label}</div>
-                    <div className={d.stepBy}>
-                      {[s.by, s.at ? stamp(s.at) : null, s.note].filter(Boolean).join(' ')}
-                    </div>
+                    <div className={d.stepBy}>{[s.by, s.at ? stamp(s.at) : null, s.note].filter(Boolean).join(' ')}</div>
                   </div>
                 </div>
               ))}
@@ -335,69 +260,7 @@ export function VoucherDrawer({ id, onClose, onChanged }: { id: string | null; o
           </>
         )}
       </FinDrawer>
-
-      {v ? (
-        <>
-          <FinDialog open={confirm === 'more'} onClose={() => setConfirm(null)} title={title}>
-            <DialogMenu items={more.map((m) => ({ ...m, onClick: () => { setConfirm(null); m.onClick() } }))} />
-          </FinDialog>
-          <FinDialog open={confirm === 'void'} onClose={() => setConfirm(null)} title={`Void ${title}?`} locked={busy}>
-            <DialogConfirm
-              text="The voucher stays in the list as voided. This cannot be undone."
-              confirmLabel="Void voucher"
-              danger
-              busy={busy}
-              onCancel={() => setConfirm(null)}
-              onConfirm={() => run(voidVoucher, `${title} voided`)}
-            />
-          </FinDialog>
-          <FinDialog open={confirm === 'reverse'} onClose={() => setConfirm(null)} title={v.credit ? 'Void this receipt?' : 'Reverse this payment?'} locked={busy}>
-            <DialogConfirm
-              text={
-                v.credit
-                  ? 'The bank, pool and GL entries are reversed, and its invoices go back to unpaid.'
-                  : 'The money goes back to the bank, the GL and pool entries are reversed, and the voucher becomes void.'
-              }
-              confirmLabel={v.credit ? 'Void receipt' : 'Reverse payment'}
-              danger
-              busy={busy}
-              onCancel={() => setConfirm(null)}
-              onConfirm={() => run(v.credit ? voidPaidReceipt : reversePaidPayment, v.credit ? `${title} voided` : 'Payment reversed')}
-            />
-          </FinDialog>
-          <FinDialog open={confirm === 'approve'} onClose={() => setConfirm(null)} title={`Approve ${title}?`} locked={busy}>
-            <DialogForm
-              onSubmit={() => !short && run(approveVoucher, `${title} approved and paid`, { notes })}
-              buttons={
-                <>
-                  <DialogButton onClick={() => setConfirm(null)}>Cancel</DialogButton>
-                  <DialogButton kind="primary" type="submit" disabled={busy || short} off={short}>
-                    {short ? 'Insufficient balance' : busy ? 'Approving…' : 'Approve & pay'}
-                  </DialogButton>
-                </>
-              }
-            >
-              <Field label="Notes" htmlFor="approve-notes">
-                <textarea
-                  id="approve-notes"
-                  className={d.notes}
-                  rows={2}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Optional — for the audit trail"
-                />
-              </Field>
-              {v.noCash ? null : v.bankBalance != null && v.bank ? (
-                <Hint danger={short}>
-                  {v.bank.name} balance {rm(v.bankBalance)}
-                  {short ? ` — not enough for ${rm(v.amount)}` : ''}
-                </Hint>
-              ) : null}
-              <Hint>Approving pays this voucher at once — the bank, the pool and the ledger move in the same step. This cannot be undone.</Hint>
-            </DialogForm>
-          </FinDialog>
-        </>
-      ) : null}
+      {dialogs}
     </>
   )
 }
