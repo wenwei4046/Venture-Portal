@@ -119,8 +119,8 @@ export const templateMessage = (to: string, name: string, language: string, para
 
 /** A photo or document we uploaded (its media id), with a caption / file name. */
 /** A photo, video, voice note or document by its uploaded media id. A voice note carries no caption (WhatsApp takes none). */
-export const mediaMessage = (to: string, kind: "image" | "video" | "audio" | "document", mediaId: string, caption: string, filename?: string) =>
-  ({ to, type: kind, [kind]: { id: mediaId, ...(caption && kind !== "audio" ? { caption } : {}), ...(kind === "document" && filename ? { filename } : {}) } });
+export const mediaMessage = (to: string, kind: "image" | "video" | "audio" | "document", mediaId: string, caption: string, filename?: string, voice = false) =>
+  ({ to, type: kind, [kind]: { id: mediaId, ...(caption && kind !== "audio" ? { caption } : {}), ...(kind === "document" && filename ? { filename } : {}), ...(kind === "audio" && voice ? { voice: true } : {}) } });
 
 /** Send any message; returns Meta's id (wamid) or a readable reason. */
 export async function sendWhatsApp(

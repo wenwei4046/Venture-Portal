@@ -18,7 +18,10 @@ import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
-import { albumsOf, galleryOf, mediaOf, NO_MEDIA } from "../../shared/chat-media";
+import { albumsOf, galleryOf, mediaOf, mediaWord, NO_MEDIA } from "../../shared/chat-media";
+import { MENU_ICON, openMsgMenu, pressToOpen } from "../../shared/msg-menu";
+
+const NO_PRESS: Partial<ReturnType<typeof pressToOpen>> = {};
 import { CHAT_WALL } from "../wall";
 
 const RUST = "#BD4A19", INK = "#3F2B22", SUB = "rgb(128 107 96)", BD = "#EBDDD2";
@@ -130,7 +133,7 @@ export function chatVM(ctx: SalesCtx) {
       sep, plain: true, align: "center", max: "100%", rowDir: "row" as const, rxGap: "0", radius: "12px", bg: "rgba(255,255,255,.8)", borderStyle: "dashed", border: BORDER, textAlign: "center" as const, fg: SUB,
       ...NO_MEDIA, quote: null, ev: null, pDisp: "block", size: "12px", textStyle: "normal", textColor: "inherit", parts: parts(it.text), timeJustify: "center", timeColor: SUB, by: "", at: msgTime(at),
       tick: false, tickColor: "#A8968B", tickLabel: "", tickPath: "", failNote: "", showTools: false, openMenu: undefined, openReact: undefined, reaction: "", rxLeft: "auto", rxRight: "auto", rbLeft: "auto", rbRight: "auto",
-      enter: undefined, leave: undefined,
+      enter: undefined, leave: undefined, press: NO_PRESS,
     };
     const m = it.m, mine = m.from === "me", key = m.id;
     const q = m.replyTo ? c.messages.find(x => x.id === m.replyTo) : undefined;
@@ -163,6 +166,19 @@ export function chatVM(ctx: SalesCtx) {
       tickPath: m.status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1" : "M1 6l3 3 6-7M7 8.5l.5.5 6-7",
       showTools: ui.hover === key, enter: () => patch({ hover: key }), leave: () => set(u => (u.hover === key ? { ...u, hover: null } : u)),
       openMenu: () => patch({ menu: { msgId: key, full: true, from: m.from, text: m.text } }),
+      // A long press: WhatsApp's menu (shared/msg-menu.tsx) — reactions, Reply, Copy, Pin, Delete for me.
+      press: pressToOpen(() => {
+        const pinnedNow = prefs?.pinnedMessageId === key;
+        openMsgMenu({
+          mine, preview: m.text ? plain(m.text) : m.media ? mediaWord(m) : "", reaction: m.myReaction ?? "", react: e => void act.react(key, e),
+          actions: [
+            { label: "Reply", icon: MENU_ICON.reply, run: () => patch({ reply: { msgId: key, from: m.from, text: m.text || (m.media ? mediaWord(m) : "") }, menu: null, hover: null }) },
+            ...(m.text ? [{ label: "Copy", icon: MENU_ICON.copy, run: () => { void navigator.clipboard?.writeText(plain(m.text)).catch(() => {}); } }] : []),
+            { label: pinnedNow ? "Unpin" : "Pin", icon: MENU_ICON.pin, run: () => void act.setPref(c.id, { pinnedMessageId: pinnedNow ? null : key }) },
+            { label: "Delete for me", icon: MENU_ICON.del, danger: true, run: () => void act.hideMessage(key) },
+          ],
+        });
+      }),
       openReact: () => patch({ menu: { msgId: key, full: false, from: m.from, text: m.text } }),
       reaction: m.myReaction ?? "", rxLeft: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto", rbLeft: mine ? "-38px" : "auto", rbRight: mine ? "auto" : "-38px",
     };

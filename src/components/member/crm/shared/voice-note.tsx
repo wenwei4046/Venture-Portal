@@ -38,7 +38,14 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
   const ink = mine ? "#8A5A3C" : "#6B7B8C", dim = mine ? "rgba(138,90,60,.35)" : "rgba(107,123,140,.35)";
 
   return (
-    <span style={{ display: "flex", alignItems: "center", gap: "10px", width: "230px", maxWidth: "100%", padding: "2px 2px 0" }}>
+    <span style={{ display: "flex", alignItems: "center", gap: "8px", width: "260px", maxWidth: "100%", padding: "2px 2px 0" }}>
+      {/* WhatsApp's voice message: the speaker's round picture with a small mic on its corner (2026-10-14, the owner's screenshot). */}
+      <span style={{ position: "relative", flex: "none", width: "44px", height: "44px", borderRadius: "22px", background: mine ? "#F3B9A0" : "#D9E2EA", display: "grid", placeItems: "center", color: mine ? "#B2452A" : "#4E6478" }}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0v1H5v-1Z" /></svg>
+        <span style={{ position: "absolute", right: "-3px", bottom: "-2px", color: playing || at ? "#2F8FD8" : ink, display: "grid" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="#fff" strokeWidth="1.2"><path d="M12 2.5a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0v-6a3 3 0 0 0-3-3Z" /><path d="M18 11a6 6 0 0 1-12 0M12 17v4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+        </span>
+      </span>
       <audio ref={audio} src={src} preload="metadata"
         onLoadedMetadata={e => { const d = e.currentTarget.duration; if (Number.isFinite(d)) setDur(d); }}
         onDurationChange={e => { const d = e.currentTarget.duration; if (Number.isFinite(d)) setDur(d); }}

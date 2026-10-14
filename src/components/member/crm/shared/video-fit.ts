@@ -54,7 +54,7 @@ export async function fitVideo(file: File, channelMax: number, channelName: stri
   const hd = !standard.has(file), maxBytes = hd ? channelMax : Math.min(channelMax, STANDARD_VIDEO_MAX);
   const tooBig = `A video can be up to ${Math.round(channelMax / MB)} MB on ${channelName}`;
   let mb: Mb;
-  try { mb = await import("mediabunny"); } catch { return file.size <= channelMax ? { ok: true, file } : { ok: false, error: `${tooBig}. Trim it and send it again.` }; }
+  try { mb = await import("mediabunny"); } catch { return file.size <= channelMax ? { ok: true, file } : { ok: false, error: `${tooBig}, and the video tool did not load — check the connection and try again.` }; }
   try {
     const input = new mb.Input({ source: new mb.BlobSource(file), formats: mb.ALL_FORMATS });
     const track = await input.getPrimaryVideoTrack();
@@ -84,14 +84,23 @@ export async function fitVideo(file: File, channelMax: number, channelName: stri
     const w = crop?.width ?? t.w, h = crop?.height ?? t.h;
     const k = Math.min(1, plan.side / Math.max(w, h, 1));
     const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
-    const out = await convert(mb, input, file, {
-      ...trim, ...audio,
-      video: { width: even(w * k), height: even(h * k), fit: "contain", codec: "avc", quality: new mb.Quality(plan.bps), forceTranscode: true, ...(look ? drawn(look, crop!, even(w * k), even(h * k)) : {}) },
-    }, onProgress);
-    if (!out.file) return { ok: false, error: track.codec === "avc" ? `${tooBig}, and this phone cannot make this one smaller. Trim it and send it again.` : HEVC };
+    // The phone's encoder may refuse a size: smaller ones are tried before giving up (2026-10-14: "send video 又出現 limit").
+    let out: { file: File | null; why?: string } = { file: null };
+    for (const side of [plan.side, 960, 640, 480].filter((s, i, a) => s <= plan.side && a.indexOf(s) === i)) {
+      const kk = Math.min(1, side / Math.max(w, h, 1)), W = even(w * kk), Hh = even(h * kk);
+      out = await convert(mb, input, file, {
+        ...trim, ...audio,
+        video: { width: W, height: Hh, fit: "contain", codec: "avc", quality: new mb.Quality(plan.bps), forceTranscode: true, ...(look ? drawn(look, crop!, W, Hh) : {}) },
+      }, onProgress);
+      if (out.file) break;
+    }
+    if (!out.file) {
+      return { ok: false, error: track.codec === "avc" ? `${tooBig}, and this phone could not make this one smaller (${out.why ?? "no encoder"}). Trim it and send it again.` : `${HEVC} (${out.why ?? "no encoder"})` };
+    }
     return out.file.size <= channelMax ? { ok: true, file: out.file } : { ok: false, error: `${tooBig} — this one is too long to fit. Trim it and send it again.` };
-  } catch {
-    return { ok: false, error: "The video could not be prepared. Try again, or trim it first." };
+  } catch (e) {
+    const why = e instanceof Error ? e.message.slice(0, 80) : "";
+    return { ok: false, error: `The video could not be prepared${why ? ` (${why})` : ""}. Try again, or trim it first.` };
   }
 }
 
@@ -149,10 +158,12 @@ function drawn(look: PhotoEdits, crop: { left: number; top: number; width: numbe
 type Mb = typeof import("mediabunny");
 type ConvOpts = Omit<Parameters<Mb["Conversion"]["init"]>[0], "input" | "output">;
 /** One run of mediabunny into an MP4 in memory. No file when this phone cannot make it, or would drop the picture. */
-async function convert(mb: Mb, input: InstanceType<Mb["Input"]>, file: File, opts: ConvOpts, onProgress?: (p: number) => void): Promise<{ file: File | null }> {
+async function convert(mb: Mb, input: InstanceType<Mb["Input"]>, file: File, opts: ConvOpts, onProgress?: (p: number) => void): Promise<{ file: File | null; why?: string }> {
   const output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: "in-memory" }), target: new mb.BufferTarget() });
   const conversion = await mb.Conversion.init({ input, output, showWarnings: false, ...opts });
-  if (!conversion.isValid || !conversion.utilizedTracks.some(t => t.type === "video")) return { file: null };
+  if (!conversion.isValid || !conversion.utilizedTracks.some(t => t.type === "video")) {
+    return { file: null, why: conversion.discardedTracks.find(d => d.track.type === "video")?.reason ?? "not valid" };
+  }
   if (onProgress) conversion.onProgress = p => onProgress(p);
   await conversion.execute();
   const buf = output.target.buffer;
