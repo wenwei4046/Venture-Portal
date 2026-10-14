@@ -127,7 +127,6 @@ const SERVICE_ROLE_FILES = /^src\/app\/api\//
 const INVOKER_WRITES: Readonly<Record<string, Readonly<Record<string, readonly WriteCommand[]>>>> = {
   catalogue_add_combo: { catalogue_combos: ['INSERT'], catalogue_combo_prices: ['INSERT', 'UPDATE'] },
   catalogue_remove_combos: { catalogue_combos: ['DELETE'], catalogue_combo_prices: ['DELETE'] },
-  catalogue_save_cost_setting: { comm_cost_ratios: ['INSERT', 'UPDATE', 'DELETE'], comm_schemes: ['UPDATE'] },
   catalogue_save_kpi_items: { comm_kpi_items: ['INSERT', 'UPDATE'] },
   comm_clear_first_paid_month: { comm_cutovers: ['DELETE'] },
   comm_set_first_paid_month: { comm_cutovers: ['INSERT', 'UPDATE'] },

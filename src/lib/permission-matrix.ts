@@ -359,8 +359,12 @@ export interface CellKey {
   gate: CellGate | null
 }
 
-/** The Revenue app's keys — all a Revenue app account ever holds. */
-export const MEMBER_APP_KEYS: readonly string[] = ['member_portal', 'member_quote', 'member_requests', 'member_memos', 'member_insight', 'member_crm', 'crm_manage']
+/**
+ * The Revenue app's keys — all a Revenue app account ever holds (`current_permissions()`'s list). The Product List is
+ * a page of the Revenue app, so its key is one of them since 2026-10-14 (mig 20261014100000: the Revenue Director's
+ * template ticks it, and it is no admin-domain key any more).
+ */
+export const MEMBER_APP_KEYS: readonly string[] = ['member_portal', 'member_quote', 'member_requests', 'member_memos', 'member_insight', 'member_crm', 'crm_manage', 'product_list']
 
 /**
  * The module keys these cells open while the gates still read module keys —

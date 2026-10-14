@@ -107,7 +107,6 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   ar_account_for_invoice: ['chart_of_accounts', 'companies', 'invoices'],
   catalogue_add_combo: ['catalogue_combo_prices', 'catalogue_combos', 'catalogue_live_combos', 'erp_products'],
   catalogue_remove_combos: ['catalogue_combo_prices', 'catalogue_combos'],
-  catalogue_save_cost_setting: ['comm_cost_ratios', 'comm_schemes', 'erp_products'],
   catalogue_save_kpi_items: ['comm_kpi_items', 'comm_schemes', 'erp_maintenance_options', 'erp_products'],
   comm_clear_first_paid_month: ['comm_cutovers'],
   commission_payroll_closed: [],
@@ -154,7 +153,6 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   next_account_code: ['chart_of_accounts'],
   recost_sales_order_lines: ['catalogue_combo_prices', 'catalogue_live_combos', 'catalogue_option_prices', 'catalogue_skus', 'comm_order_releases', 'comm_runs', 'erp_fabrics', 'erp_products', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   revenue_apply_fair_calendar: ['comm_order_releases', 'comm_organisers', 'comm_runs', 'comm_venue_events', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
-  revenue_costing_gaps: ['catalogue_skus', 'erp_products', 'sales_order_lines', 'sales_orders'],
   revenue_dismiss_double_claim: ['comm_double_claim_dismissals', 'comm_order_releases', 'comm_runs', 'hr_staff_costs', 'sales_import_batches', 'sales_orders', 'users'],
   revenue_exclude_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_order_open_bill_tags', 'sales_orders', 'users'],
   revenue_fair_calendar: ['comm_organisers', 'comm_venue_events', 'comm_venues', 'sales_import_batches', 'sales_orders'],
@@ -187,6 +185,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'crm_save_showroom_extras',
   // CRM photos, videos and voice notes (mig 20261013240000): asks crm_can_reply().
   'crm_set_out_media',
+  // The Product List (mig 20261014100000): a bill and a scheme never open to its key — the costing gaps ask
+  // Product List · View, the cost setting Product List · Edit, both running as their owner.
+  'revenue_costing_gaps', 'catalogue_save_cost_setting',
   'close_approvals_for_voided_voucher', 'create_loan_with_approval', 'create_payroll_disbursement_vouchers', 'save_director_salary_results',
   'bank_gl_codes', 'bridge_mirror_slices', 'bridge_ref_flags', 'build_hr_cost_submission_payload', 'bump_bank_balance',
   'bump_bank_for_paid_credit', 'calculate_dept_np', 'cancel_dept_payment_request', 'cancel_loan_and_approval',

@@ -77,7 +77,8 @@ const CELL_KEYS: CellKey[] = [
   K('categories', 'view', 'categories', 'all', 'treasury'),
   K('hr_costing', 'view', 'hr_costing', 'all', 'salary'),
   K('revenue', 'view', 'revenue', 'all', 'salary'),
-  K('product_list', 'view', 'product_list', 'all', 'principal'),
+  // No gate since 20261014100000: a template ticked at All opens it, whatever its kind.
+  K('product_list', 'view', 'product_list', 'all'),
   K('director_salary', 'view', 'director_salary', 'all', 'salary'),
   K('director_pool', 'view', 'director_pool', 'all', 'salary'),
   K('team', 'view', 'team', 'all', 'salary'),
@@ -314,6 +315,23 @@ describe('what a template opens today — the database rule, in TypeScript', () 
     // Manage opens only at All; nothing short of it is the Control panel.
     const ownManager = setCell(T.revenue_team.grants, fn('crm'), 'manage', 'own')
     expect(openedKeys(ownManager, [], 'revenue_member', CELL_KEYS)).not.toContain('crm_manage')
+  })
+
+  // 20261014100000 (2026-10-14): the user ticked Product List View + Edit on the
+  // Revenue Director template and read "Does not open — only a full-access
+  // template opens it"; PETER's sidebar had no Product List.
+  it('opens the Product List to the Revenue Director template that ticks it — and nothing else', () => {
+    const ticked = setCell(setCell(T.revenue_director.grants, fn('product_list'), 'view', 'all'), fn('product_list'), 'edit', 'all')
+    expect(openedKeys(ticked, [], 'revenue_member', CELL_KEYS)).toEqual([...REVENUE_MEMBER, 'crm_manage', 'member_crm', 'product_list'].sort())
+    expect(heldCells(ticked, [], 'revenue_member', CELL_KEYS, FUNCTIONS)).toEqual([])
+    // Before: the Principal's gate held it back, and a Revenue app account could not hold the key.
+    const gated = CELL_KEYS.map(k => (k.legacyKey === 'product_list' ? { ...k, gate: 'principal' as const } : k))
+    const before = heldCells(ticked, [], 'revenue_member', gated, FUNCTIONS)
+    expect(before.map(h => h.key).sort()).toEqual(['product_list.edit', 'product_list.view'])
+    expect(before.every(h => /only a full-access template opens it/.test(h.reason))).toBe(true)
+    // Ticked short of All it stays closed, and says so.
+    const own = setCell(T.revenue_director.grants, fn('product_list'), 'view', 'own')
+    expect(openedKeys(own, [], 'revenue_member', CELL_KEYS)).not.toContain('product_list')
   })
 
   it('holds back what a module key would open wider than the cell', () => {
