@@ -13,15 +13,15 @@ export default function SalesInsight({ v }: { v: InsightVM & ShellExtras }) {
   return (<>
             
     <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+      <div data-fit-row="1" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
         <div style={{ flex: "1", display: "flex", flexDirection: "column", gap: "2px", minWidth: "0" }}>
           <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Insight</h1>
           <span style={{ fontSize: "13px", color: "#806B60" }}>{v.pRange}</span>
         </div>
-        <span onClick={v.openRange} style={{ flex: "0 0 auto", width: "max-content", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 12px 0 14px", boxSizing: "border-box", borderRadius: "20px", border: `1px solid ${v.rgBd}`, background: v.rgBg, color: v.rgFg, fontSize: "14px", fontWeight: "650", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <span onClick={v.openRange} data-fit-ctl="icon" style={{ flex: "0 0 auto", width: "max-content", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 12px 0 14px", boxSizing: "border-box", borderRadius: "20px", border: `1px solid ${v.rgBd}`, background: v.rgBg, color: v.rgFg, fontSize: "14px", fontWeight: "650", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14">
             </path>
-          </svg>{v.rgLabel}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          </svg><span data-fit-word="1">{v.rgLabel}</span><svg data-fit-word="1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m6 9 6 6 6-6">
             </path>
           </svg></span>

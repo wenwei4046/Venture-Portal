@@ -102,3 +102,13 @@
 .app [data-chat-list] { overflow-x: hidden; }
 /* An inbox row off screen skips its layout and paint, so a long list scrolls as the chat does (2026-10-14). */
 .app [data-inbox-row] { content-visibility: auto; contain-intrinsic-size: auto 86px; }
+/* A title row with a control beside its three round buttons (Team | Mine, the house, the bell — 2026-10-14) keeps its
+   title whole on a narrow phone: shared/fit-rows.ts marks it data-tight only when the title would be cut, and then the
+   control makes room — the range / dates become a round button like their neighbours (the Team calendar's dates move
+   under its title), the Team inbox's Contacts drops its icon, the Calendar's month takes its short name. Wide enough,
+   the row is exactly as designed. !important: the generated markup's styles are inline. */
+.app [data-fit-alt], .app [data-fit-short] { display: none; }
+.app [data-tight] [data-fit-alt], .app [data-tight] [data-fit-short] { display: inline; }
+.app [data-tight] [data-fit-word], .app [data-tight] [data-fit-icon], .app [data-tight] [data-fit-long] { display: none !important; }
+.app [data-tight] [data-fit-ctl="icon"] { width: 40px !important; height: 40px !important; padding: 0 !important; gap: 0 !important; justify-content: center !important; border-radius: 50% !important; }
+.app [data-tight] [data-fit-ctl="words"] { padding: 0 12px !important; }

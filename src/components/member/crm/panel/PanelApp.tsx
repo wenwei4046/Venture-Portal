@@ -281,12 +281,12 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     {!!(v.show.ib) && (<>
       {!!(v.ib.onInbox) && (<>
         <main style={{ flex: "1 1 auto", minHeight: "0", overflow: "hidden", scrollbarWidth: "none", padding: "10px 20px 14px", display: "flex", flexDirection: "column", gap: "14px" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+          <div data-fit-row="1" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
             <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
               <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Inbox</h1>
               <span style={{ fontSize: "13px", color: "#806B60" }}>{v.ib.inbSummary}</span>
             </div>
-            <span onClick={v.ib.openPc} style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 14px", boxSizing: "border-box", borderRadius: "18px", border: "1px solid #3F2B22", background: "#3F2B22", color: "#fff", fontSize: "13px", fontWeight: "650", cursor: "pointer" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <span onClick={v.ib.openPc} data-fit-ctl="words" style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 14px", boxSizing: "border-box", borderRadius: "18px", border: "1px solid #3F2B22", background: "#3F2B22", color: "#fff", fontSize: "13px", fontWeight: "650", cursor: "pointer" }}><svg data-fit-icon="1" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8">
                 </path>
               </svg>Contacts</span>
@@ -1417,15 +1417,15 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     {!!(v.show.cal) && (<>
       {!!(v.cal.onCal) && (<>
         <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "6px 20px 24px", display: "flex", flexDirection: "column", gap: "14px" }}>
-          <div style={{ flex: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+          <div data-fit-row="1" style={{ flex: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
             <div style={{ flex: "1", minWidth: "0" }}>
               <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Calendar</h1>
-              <span style={{ fontSize: "13px", color: "#806B60" }}>{v.cal.cRangeLabel}</span>
+              <span style={{ fontSize: "13px", color: "#806B60" }}><span data-fit-alt="1">{v.cal.cRangeBtn} · </span>{v.cal.cRangeLabel}</span>
             </div>
-            <span onClick={v.cal.cOpenRange} style={{ flex: "none", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 12px 0 14px", boxSizing: "border-box", borderRadius: "20px", border: "1px solid #EBDDD2", background: "#fff", fontSize: "14px", fontWeight: "650", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}><svg style={{ color: "#BD4A19" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <span onClick={v.cal.cOpenRange} data-fit-ctl="icon" style={{ flex: "none", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 12px 0 14px", boxSizing: "border-box", borderRadius: "20px", border: "1px solid #EBDDD2", background: "#fff", fontSize: "14px", fontWeight: "650", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}><svg style={{ color: "#BD4A19" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14">
                 </path>
-              </svg>{v.cal.cRangeBtn}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              </svg><span data-fit-word="1">{v.cal.cRangeBtn}</span><svg data-fit-word="1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="m6 9 6 6 6-6">
                 </path>
               </svg></span>

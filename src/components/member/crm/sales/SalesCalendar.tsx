@@ -14,8 +14,8 @@ export default function SalesCalendar({ v }: { v: CalendarVM & ShellExtras }) {
   return (<>
             
     <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "6px 0 24px", display: "flex", flexDirection: "column", gap: "10px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "0 20px" }}>
-        <h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "26px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>{v.calTitle}</h1>
+      <div data-fit-row="1" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "0 20px" }}>
+        <h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "26px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}><span data-fit-long="1">{v.calTitle}</span><span data-fit-short="1">{v.calShort}</span></h1>
         <span onClick={v.calToday} style={{ height: "34px", padding: "0 14px", boxSizing: "border-box", borderRadius: "17px", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "600", color: "#3F2B22", cursor: "pointer" }}>Today</span>
         {!!(v.tb) && (<>
           <span style={{ display: "flex", alignItems: "center", gap: "8px", flex: "none" }}>

@@ -224,16 +224,21 @@ PATCHES.SalesInbox = [...PATCHES.SalesInbox,
 PATCHES.SalesContacts = [...(PATCHES.SalesContacts ?? []),
   ['<div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>\n          <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Contacts</h1>\n        </div>',
     '<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginRight: "-8px" }}>\n          <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Contacts</h1>\n          ' + BELL + '\n        </div>']];
-// Calendar: after Today, 8 px apart.
+// Calendar: after Today, 8 px apart. On a phone too narrow for the month beside Today and the round buttons, the month
+// takes its short name (shared/fit-rows.ts, 2026-10-14).
 PATCHES.SalesCalendar = [...(PATCHES.SalesCalendar ?? []),
   ['<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px" }}>\n        <h1 style={{ margin: "0", fontSize: "26px",',
-    '<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "0 20px" }}>\n        <h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "26px",'],
+    '<div data-fit-row="1" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "0 20px" }}>\n        <h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "26px",'],
+  ['>{v.calTitle}</h1>', '><span data-fit-long="1">{v.calTitle}</span><span data-fit-short="1">{v.calShort}</span></h1>'],
   [/(<span onClick=\{v\.calToday\}[^\n]*?>Today<\/span>)/, "$1\n        " + BELL]];
-// Insight: after the date chip, 8 px apart.
+// Insight: after the date chip, 8 px apart. On a phone too narrow for "Insight" beside the chip and the round buttons, the
+// chip is a round button (its period is written under the title anyway — shared/fit-rows.ts, 2026-10-14).
 PATCHES.SalesInsight = [...(PATCHES.SalesInsight ?? []),
   ['<div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>\n        <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: "0" }}>\n          <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Insight</h1>',
-    '<div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>\n        <div style={{ flex: "1", display: "flex", flexDirection: "column", gap: "2px", minWidth: "0" }}>\n          <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Insight</h1>'],
-  [/(<span onClick=\{v\.openRange\}[\s\S]*?<\/svg><\/span>)/, "$1\n        " + BELL]];
+    '<div data-fit-row="1" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>\n        <div style={{ flex: "1", display: "flex", flexDirection: "column", gap: "2px", minWidth: "0" }}>\n          <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Insight</h1>'],
+  [/(<span onClick=\{v\.openRange\}[\s\S]*?<\/svg><\/span>)/, "$1\n        " + BELL],
+  ['<span onClick={v.openRange} style={{', '<span onClick={v.openRange} data-fit-ctl="icon" style={{'],
+  ['</svg>{v.rgLabel}<svg width="14" height="14"', '</svg><span data-fit-word="1">{v.rgLabel}</span><svg data-fit-word="1" width="14" height="14"']];
 // Profile: the bell in the profile card's top-right corner, 14 px in; the avatar + name row keeps 48 px clear of it so a long
 // name wraps first. (Its "Back to Revenue app" card, §8.1, is gone — the owner, 2026-10-14: "delete this, cause is no need
 // anymore": the house beside the bell is the way back, switch-back.cjs.)
