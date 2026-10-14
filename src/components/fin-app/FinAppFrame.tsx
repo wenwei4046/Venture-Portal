@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { HrIcon, type HrIconName } from '@/components/hrv/icons'
 import { useCurrentToast } from '@/components/hrv/toast'
@@ -79,11 +79,18 @@ const TABS: ReadonlyArray<{ key: AppTab; label: string; icon: HrIconName }> = [
   { key: 'profile', label: 'Profile', icon: 'staff' },
 ]
 
+/** A screen pushed over its tab — a list, a record (`?f=`, `?id=`), a page of its own — has no tab bar. */
+export function isRootScreen(pathname: string, search: Pick<URLSearchParams, 'has'>): boolean {
+  return !pathname.startsWith('/fin-app/page/') && !search.has('f') && !search.has('id')
+}
+
 export default function FinAppFrame({ platform, rows, children }: { platform: FinPlatform; rows: string[]; children: ReactNode }) {
   const pathname = usePathname() ?? '/fin-app'
+  const search = useSearchParams()
   const router = useRouter()
   const rowSet = useMemo(() => new Set(rows), [rows])
-  const [chrome, setChromeState] = useState<Chrome>({ root: true, bar: false, bulk: false })
+  // As the address says from the first paint, so a link into a list never shows the tab bar sliding away.
+  const [chrome, setChromeState] = useState<Chrome>(() => ({ root: isRootScreen(pathname, search), bar: false, bulk: false }))
   const setChrome = useCallback((c: Chrome) => {
     setChromeState((prev) => (prev.root === c.root && prev.bar === c.bar && prev.bulk === c.bulk ? prev : c))
   }, [])

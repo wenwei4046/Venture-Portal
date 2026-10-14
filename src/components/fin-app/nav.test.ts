@@ -55,6 +55,35 @@ describe('a page’s own screens', () => {
     expect(canStepBack()).toBe(true)
   })
 
+  it('hands Next no state of its own, so Next takes the step’s address as its own (shallow routing) and never puts its old one back', () => {
+    // 2026-10-15: pushed with `history.state` (Next's __NA), Next kept its old address and restored it when a
+    // server action answered — a record opened from a list showed the hub's address, and a refresh lost it.
+    window.history.replaceState({ __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: [] }, '', '/fin-app/daily/billing')
+    const pushed: unknown[] = []
+    const replaced: unknown[] = []
+    const push = window.history.pushState.bind(window.history)
+    const replace = window.history.replaceState.bind(window.history)
+    window.history.pushState = (data: unknown, unused: string, url?: string | URL | null) => {
+      pushed.push(data)
+      push(data, unused, url)
+    }
+    window.history.replaceState = (data: unknown, unused: string, url?: string | URL | null) => {
+      replaced.push(data)
+      replace(data, unused, url)
+    }
+    try {
+      const { result } = renderHook(() => useStep(read, ''))
+      act(() => result.current[1]('f=records'))
+      resetNav()
+      act(() => result.current[2](''))
+      expect(pushed).toEqual([null])
+      expect(replaced).toEqual([null])
+    } finally {
+      window.history.pushState = push
+      window.history.replaceState = replace
+    }
+  })
+
   it('goes straight up to the screen above when there is no step to go back to (a link, a refresh)', () => {
     window.history.replaceState(null, '', '/fin-app/daily/payments?id=v1&from=all')
     const { result } = renderHook(() => useStep(read, 'id=v1&from=all'))

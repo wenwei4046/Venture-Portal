@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { DialogMenu, FinDialog, type DialogMenuItem } from '@/components/finv/Dialog'
 import { drawerStyles as d } from '@/components/finv/Drawer'
 import { fd } from '@/components/finv/DrawerParts'
-import { HUB_HREF, HUB_TITLE, TOP_LABEL, tabHubs, type HubKey } from '@/lib/fin-app/routes'
+import { HUB_HREF, HUB_TITLE } from '@/lib/fin-app/routes'
 import { openVoucherPage } from '@/app/(portal)/payments/page-actions'
 import { cardLook, hubCards, plural, rm } from '@/app/(portal)/payments/_lib/hub-cards'
 import type { HubCardKey, HubLedger, HubRow } from '@/app/(portal)/payments/_lib/hub-ledger'
@@ -23,8 +23,8 @@ import { CopyVoucherDialog } from '@/app/(portal)/payments/[id]/_components/Copy
 import CreateReceiptDialog from '@/app/(portal)/receipts/_components/CreateReceiptDialog'
 import LoanRepaymentDialog from '@/app/(portal)/receipts/_components/LoanRepaymentDialog'
 import AppScreen, { PageHead, type BarButton } from './AppScreen'
-import { rememberHub, useFrame } from './FinAppFrame'
-import { pushIntent, setIntent, useStep } from './nav'
+import { useHubTabs } from './hub-tabs'
+import { pushIntent, useStep } from './nav'
 import { BankHero, ListBlock, Row, SearchRow, StackCards } from './parts'
 import s from './fin-app.module.css'
 
@@ -114,10 +114,9 @@ export default function VoucherApp({
   claims?: RequestItem[]
 }) {
   const router = useRouter()
-  const { rows: navRows } = useFrame()
   const receipts = hub === 'receipts'
   const [step, open, back] = useStep(readVoucherStep, search)
-  useEffect(() => rememberHub('daily', hub), [hub])
+  const { topTabs, swipe } = useHubTabs('daily', hub)
 
   // ── The voucher a record screen shows ──
   const [record, setRecord] = useState<VoucherRecord | null>(initialRecord)
@@ -156,23 +155,6 @@ export default function VoucherApp({
 
   const go = (next: VoucherStep) => open(searchOfStep(next))
   const backTo = () => back(parentSearch(step))
-
-  // ── Top tabs ──
-  const dailyHubs = tabHubs('daily', navRows)
-  const topTabs = dailyHubs.map((h: HubKey) => ({
-    key: h,
-    label: TOP_LABEL[h],
-    href: HUB_HREF[h],
-    current: h === hub,
-    onPress: () => setIntent(dailyHubs.indexOf(h) > dailyHubs.indexOf(hub) ? 'push' : 'pop'),
-  }))
-  const swipe = (way: 'next' | 'prev') => {
-    const i = dailyHubs.indexOf(hub) + (way === 'next' ? 1 : -1)
-    const to = dailyHubs[i]
-    if (!to) return
-    setIntent(way === 'next' ? 'push' : 'pop')
-    router.push(HUB_HREF[to])
-  }
 
   // ── What a list shows ──
   const title = HUB_TITLE[hub]

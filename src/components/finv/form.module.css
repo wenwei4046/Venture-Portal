@@ -18,6 +18,13 @@ select.lineSelect { height: 32px; }
    there the edge was dropped altogether (D07 draws it). */
 select.select,
 select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
+/* On a phone the words are 16px (globals.css: iOS zooms into a smaller field), and 16px's line is taller than
+   what the 32px box keeps inside its padding — a select clips its words to that, so a "y" lost its tail
+   (2026-10-15, Calculate's *No category*). There the padding goes and the line fills the box. */
+@media (max-width: 767px) {
+  select.select,
+  select.lineSelect { padding-top: 0; padding-bottom: 0; line-height: 30px; }
+}
 
 /* Pay to: the input, and the companies it matches under it (the soft menu's look). */
 .suggestWrap { position: relative; display: flex; flex-direction: column; }

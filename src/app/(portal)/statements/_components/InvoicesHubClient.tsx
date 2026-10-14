@@ -4,28 +4,16 @@ import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
-import type { HrIconName } from '@/components/hrv/icons'
 import RowMenu, { type RowMenuAnchor, type RowMenuItem } from '@/components/RowMenu'
-import { BulkBar, BulkButton, HeadButton, HubCards, HubHead, ItemList, MonthNav, hubStyles as hs, type CardTone, type ItemRow } from '@/components/finv/Hub'
+import { BulkBar, BulkButton, HeadButton, HubCards, HubHead, ItemList, MonthNav, hubStyles as hs, type ItemRow } from '@/components/finv/Hub'
 import { FinTable, type FinColumn } from '@/components/finv/FinTable'
 import { fd } from '@/components/finv/DrawerParts'
 import { officeTime } from '@/lib/office-time'
 import { InvoiceDrawer, invoiceSteps, statusText, statusTone, type InvoiceCan, type InvoiceStep, type InvoiceStepKey } from './InvoiceDrawer'
 import PayrollBasisDrawer from './PayrollBasisDrawer'
 import { useInvoiceWork } from './invoice-work'
-import {
-  STATUS_CARD_KEYS,
-  invoicedTotal,
-  onCard,
-  returnedNote,
-  settleSelection,
-  statusCard,
-  type HubContract,
-  type HubInvoice,
-  type InvoiceCardKey,
-  type InvoiceHubData,
-  type StatusCardKey,
-} from '../_lib/invoice-model'
+import { INVOICE_CARD, invoiceCards, isStatusCard } from '../_lib/invoice-cards'
+import { invoicedTotal, onCard, returnedNote, settleSelection, type HubContract, type HubInvoice, type InvoiceCardKey, type InvoiceHubData } from '../_lib/invoice-model'
 
 // Invoice's hub (2026-10-14, the Finance revamp v2 — D10 of `.design/fin-r2/handoff`):
 // the head (Create invoice ▾, Payroll ▾, Export ▾), the month's total with its
@@ -43,21 +31,7 @@ const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct
 const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const f2 = (n: number) => (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const rm = (n: number) => `RM ${f2(n)}`
-const r2 = (n: number) => Math.round(n * 100) / 100
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
-
-const CARD: Record<InvoiceCardKey, { label: string; tone: CardTone; icon: HrIconName }> = {
-  all: { label: 'All invoices', tone: 'all', icon: 'doc' },
-  issued: { label: 'Issued', tone: 'issued', icon: 'invoice' },
-  paid: { label: 'Paid', tone: 'paid', icon: 'payroll' },
-  draft: { label: 'Draft', tone: 'draft', icon: 'doc' },
-  voided: { label: 'Voided', tone: 'quiet', icon: 'fileAlert' },
-  cn: { label: 'Credit notes', tone: 'peach', icon: 'receipt' },
-  mkt: { label: 'Marketing projects', tone: 'peach', icon: 'people' },
-  nonbill: { label: 'Non-billable', tone: 'quiet', icon: 'doc' },
-}
-const CARD_KEYS = Object.keys(CARD) as InvoiceCardKey[]
-const isStatusCard = (k: InvoiceCardKey): k is StatusCardKey => (STATUS_CARD_KEYS as readonly string[]).includes(k)
 
 // The design's Name · Description · Amount, and its COLS.invoices to tick on (Category is ours, kept).
 const COLUMNS: FinColumn<HubInvoice>[] = [
@@ -201,30 +175,8 @@ export default function InvoicesHubClient({
 
   // ── The cards: the month's ──
   const hero = invoicedTotal(hub.invoices)
-  const activeContracts = work.activeContracts
-  const cnTotal = r2(hub.creditNotes.filter((c) => c.status !== 'voided').reduce((s, c) => s + c.amount, 0))
-  const deducted = r2(hub.nonBillable.filter((t) => t.out).reduce((s, t) => s + t.amount, 0))
   const drafts = work.drafts
-  const cards = CARD_KEYS.map((k) => {
-    const look = CARD[k]
-    let sub: string
-    let value: string
-    if (isStatusCard(k)) {
-      const f = statusCard(hub.invoices, k)
-      sub = plural(f.count, 'invoice', 'invoices')
-      value = rm(f.amount)
-    } else if (k === 'cn') {
-      sub = plural(hub.creditNotes.length, 'credit note', 'credit notes')
-      value = cnTotal > 0 ? `−${rm(cnTotal)}` : rm(0)
-    } else if (k === 'mkt') {
-      sub = hub.contracts.length === 0 ? '0 projects' : `${plural(hub.contracts.length, 'project', 'projects')} · ${activeContracts} active`
-      value = rm(r2(hub.contracts.reduce((s, c) => s + (c.amount ?? 0), 0)))
-    } else {
-      sub = plural(hub.nonBillable.length, 'transaction', 'transactions')
-      value = rm(deducted)
-    }
-    return { key: k, tone: look.tone, icon: look.icon, label: look.label, sub, value }
-  })
+  const cards = useMemo(() => invoiceCards(hub), [hub])
   const pickCard = (k: InvoiceCardKey) => {
     setCard(k)
     setSelecting(false)
@@ -366,7 +318,7 @@ export default function InvoicesHubClient({
     ) : null
 
   const drawerInvoice = drawerId ? (all.get(drawerId) ?? null) : null
-  const listTitle = CARD[card].label
+  const listTitle = INVOICE_CARD[card].label
   return (
     <div className={hs.root} data-fin-kit="">
       <HubHead

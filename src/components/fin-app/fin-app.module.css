@@ -18,7 +18,10 @@
   inset: 0;
   display: flex;
   flex-direction: column;
+  /* clip, not just hidden: the tab bar slid away below (a transform) widens what could scroll, and a
+     focus or a scroll-into-view would scroll the frame itself — the head half off the top. */
   overflow: hidden;
+  overflow: clip;
   background: rgb(var(--hvs-ground));
   color: rgb(var(--hvs-ink));
   font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
@@ -143,7 +146,7 @@
 }
 .headAct:active { transform: scale(0.96); }
 
-.scrollBox { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.scrollBox { position: relative; flex: 1; min-height: 0; overflow: hidden; overflow: clip; }
 .scroller {
   position: absolute;
   inset: 0;
@@ -582,8 +585,17 @@
 }
 .item:first-child { border-top: 0; }
 .itemText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.itemL { font-size: 14px; color: var(--ds-ink); overflow: hidden; text-overflow: ellipsis; }
-.itemSub { font-size: 11.5px; color: rgb(var(--hvs-muted)); overflow: hidden; text-overflow: ellipsis; }
+/* The design writes an ellipsis on both; a line the system wrote long (a voucher's whole description) stops at two. */
+.itemL {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 14px;
+  color: var(--ds-ink);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.itemSub { font-size: 11.5px; color: rgb(var(--hvs-muted)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .itemRight { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .itemV { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 13.5px; color: var(--ds-ink); }
 .itemV[data-tone='ledger'] { color: rgb(var(--fv-chip-ledger-ink)); }
@@ -606,6 +618,62 @@
   transition: transform 0.12s;
 }
 .itemAct:active { transform: scale(0.96); }
+.itemAct[data-off='true'] { opacity: 0.45; }
+
+/* Under the search while selecting: Other months · N (ours — the desktop's toolbar button, a chip here). */
+.toolRow { display: flex; gap: 8px; padding: 10px 16px 0; }
+.toolChip {
+  box-sizing: border-box;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: 99px;
+  background: var(--ds-surface);
+  font: inherit;
+  font-size: 13px;
+  color: var(--ds-ink);
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.toolChip:active { transform: scale(0.97); }
+.toolChip[aria-pressed='true'] { border-color: var(--ds-accent); background: var(--ds-row-hover); }
+
+/* Another month on its way from the server: what is on show steps back until it lands. */
+.pending { opacity: 0.55; transition: opacity 0.2s; pointer-events: none; }
+/* A line pressed for its own menu or page: the whole width but its button. */
+.itemMain {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+/* Its state: the design's chips (padding 1 8, 11/500, a 99px pill). */
+.itemChip {
+  padding: 1px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--chip-bd);
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.itemChip[data-tone='def'] { --chip-bg: rgb(var(--fv-chip-def)); --chip-fg: var(--ds-ink); --chip-bd: var(--ds-border); }
+.itemChip[data-tone='wait'] { --chip-bg: rgb(var(--fv-chip-wait)); --chip-fg: rgb(var(--fv-chip-wait-ink)); --chip-bd: rgb(var(--fv-chip-wait-ink) / 0.4); }
+.itemChip[data-tone='accent'] { --chip-bg: rgb(var(--fv-chip-accent)); --chip-fg: var(--ds-ink); --chip-bd: var(--ds-accent); }
+.itemChip[data-tone='ledger'] { --chip-bg: rgb(var(--fv-chip-ledger)); --chip-fg: rgb(var(--fv-chip-ledger-ink)); --chip-bd: rgb(var(--fv-chip-ledger-ink) / 0.4); }
+.itemChip[data-tone='info'] { --chip-bg: rgb(var(--fv-chip-info)); --chip-fg: rgb(var(--fv-chip-info-ink)); --chip-bd: rgb(var(--fv-chip-info-ink) / 0.4); }
+.itemChip[data-tone='danger'] { --chip-bg: rgb(var(--fv-chip-danger)); --chip-fg: rgb(var(--fv-chip-danger-ink)); --chip-bd: rgb(var(--fv-chip-danger-ink) / 0.4); }
+.itemChip[data-tone='alert'] { --chip-bg: rgb(var(--fv-chip-alert)); --chip-fg: rgb(var(--fv-chip-alert-ink)); --chip-bd: rgb(var(--fv-chip-alert-ink) / 0.4); }
 
 /* ── Profile (M17) ── */
 .profileCard {
@@ -853,7 +921,10 @@
   .card,
   .qTile,
   .cTile,
-  .batchCaret { transition: none; }
+  .batchCaret,
+  .toolChip,
+  .itemAct,
+  .pending { transition: none; }
   .content[data-anim='push'],
   .content[data-anim='pop'],
   .content[data-anim='tab'] { transform: none; opacity: 1; }

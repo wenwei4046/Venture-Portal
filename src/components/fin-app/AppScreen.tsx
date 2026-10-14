@@ -52,10 +52,11 @@ export interface TopTab {
 export interface BulkBar {
   text: string
   sub: string
-  label: string
+  /** Its step (Settle N →); none, and only Clear (and the ⋯) stand. */
+  label?: string | null
   off?: boolean
   onClear: () => void
-  onGo: () => void
+  onGo?: () => void
 }
 
 type Anim = Intent | 'in' | 'none'
@@ -111,14 +112,18 @@ export default function AppScreen({
   const scroller = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const [anim, setAnim] = useState<Anim>(() => peekIntent() ?? 'none')
+  // The move it was first drawn with — kept, because React may run the first effect twice (StrictMode) and the
+  // second run would find the move already used up and leave the screen invisible, waiting to play in.
+  const firstMove = useRef(anim)
   const shownKey = useRef(screenKey)
 
   // First drawn: the move into it is used up, Back's place is put back, then it plays in.
   useLayoutEffect(() => {
-    const how = takeIntent()
+    takeIntent()
+    const how = firstMove.current
     const el = scroller.current
     if (el && how === 'pop') el.scrollTop = scrollOf(screenKey)
-    if (how === null) return
+    if (how === 'none' || how === 'in') return
     return nextPaint(() => setAnim('in'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -190,7 +195,7 @@ export default function AppScreen({
                 {a.label}
               </a>
             ) : (
-              <button key={a.key} type="button" className={s.headAct} onClick={a.onClick}>
+              <button key={a.key} type="button" className={s.headAct} aria-label={a.label === '⋯' ? 'More' : undefined} onClick={a.onClick}>
                 {a.label}
               </button>
             ),
@@ -237,9 +242,11 @@ export default function AppScreen({
           <button type="button" className={s.bulkClear} onClick={bulk.onClear}>
             Clear
           </button>
-          <button type="button" className={s.bulkGo} data-off={bulk.off ? 'true' : undefined} onClick={bulk.onGo}>
-            {bulk.label}
-          </button>
+          {bulk.label && bulk.onGo ? (
+            <button type="button" className={s.bulkGo} data-off={bulk.off ? 'true' : undefined} onClick={bulk.onGo}>
+              {bulk.label}
+            </button>
+          ) : null}
         </div>
       ) : bar.length > 0 ? (
         <div className={s.bar}>
