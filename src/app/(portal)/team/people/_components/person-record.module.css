@@ -57,12 +57,15 @@
 .tick { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; cursor: pointer; }
 .check { width: 15px; height: 15px; margin: 0; accent-color: rgb(var(--hv-accent)); cursor: pointer; }
 
-/* The name in the title's place and face — the line under it says it edits. */
+/* The name in the title's place and face — the line under it says it edits,
+   and runs as long as the name (a browser without field-sizing draws it at
+   the input's own width). */
 .name {
   box-sizing: border-box;
   display: block;
-  width: 100%;
-  max-width: 760px;
+  field-sizing: content;
+  min-width: 8ch;
+  max-width: 100%;
   margin: 0 0 0 -6px;
   padding: 0 6px 2px;
   border: 0;

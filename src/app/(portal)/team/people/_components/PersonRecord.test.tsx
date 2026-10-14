@@ -164,6 +164,16 @@ describe('Edit — each value becomes its field where it stands', () => {
     expect(within(bar()).getByRole('alert')).toHaveTextContent('Employee code already used by another active staff')
     expect(screen.getByLabelText('Employee Code')).toHaveValue('HV001')
     expect(mocks.flash).not.toHaveBeenCalled()
+
+    // Correcting a field takes the refusal away; the count comes back.
+    fireEvent.change(screen.getByLabelText('Employee Code'), { target: { value: 'HV043' } })
+    expect(within(bar()).queryByRole('alert')).toBeNull()
+    expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
+  })
+
+  it('asks nothing it does not need: no example values in empty fields', () => {
+    openEditor(view(), editor({ nric: null, contact_number: null, infotech_code: null }))
+    expect(form().querySelectorAll('[placeholder]')).toHaveLength(0)
   })
 
   it('Cancel puts the page back as it was, sending nothing', () => {

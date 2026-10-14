@@ -151,6 +151,12 @@ export default function PersonRecord({
     return () => window.removeEventListener('beforeunload', hold)
   }, [editing, count])
 
+  // A field changed: count again, and a refusal said about the last try goes.
+  function edited() {
+    if (form.current) setChanged(changedFields(form.current))
+    setError(null)
+  }
+
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!editor || saving) return
@@ -284,7 +290,7 @@ export default function PersonRecord({
               // The dash is escaped: unescaped between `9` and `\s` the
               // browser reads a range, throws under the `v` flag and drops
               // the constraint altogether.
-              <TextField name="nric" defaultValue={e.staff.nric} placeholder="850101141234" pattern="[0-9\-\s]*" mono />
+              <TextField name="nric" defaultValue={e.staff.nric} pattern="[0-9\-\s]*" mono />
             ) : (
               <Locked value={e.staff.nric} why="NRIC / IC is not ticked for your title" />
             )
@@ -297,14 +303,14 @@ export default function PersonRecord({
           mono
           // Numbered by the database (HV + max + 1, 2026-09-12); a code is
           // never cleared, only corrected by typing another.
-          edit={e => <TextField name="employee_code" defaultValue={e.staff.employee_code} placeholder="HV001" mono />}
+          edit={e => <TextField name="employee_code" defaultValue={e.staff.employee_code} mono />}
         />
         <Row
           label="InfoTech No"
           field="infotech_code"
           value={view.infotechCode}
           mono
-          edit={e => <TextField name="infotech_code" defaultValue={e.staff.infotech_code} placeholder="HV022" mono />}
+          edit={e => <TextField name="infotech_code" defaultValue={e.staff.infotech_code} mono />}
         />
         <Row
           label="Employment Type"
@@ -348,20 +354,20 @@ export default function PersonRecord({
           field="contact_number"
           value={view.contact.phone}
           mono
-          edit={e => <TextField name="contact_number" type="tel" defaultValue={e.staff.contact_number} placeholder="012-345 6789" mono />}
+          edit={e => <TextField name="contact_number" type="tel" defaultValue={e.staff.contact_number} mono />}
         />
         <Row
           label="Email"
           field="email"
           value={view.contact.email}
-          edit={e => <TextField name="email" type="email" defaultValue={e.staff.email} placeholder="name@example.com" />}
+          edit={e => <TextField name="email" type="email" defaultValue={e.staff.email} />}
         />
         <Row
           label="Address"
           field="address"
           value={view.contact.address}
           multiline
-          edit={e => <AreaField name="address" defaultValue={e.staff.address} placeholder="Street, city, postcode" />}
+          edit={e => <AreaField name="address" defaultValue={e.staff.address} />}
         />
       </Section>
 
@@ -370,14 +376,14 @@ export default function PersonRecord({
           label="Name"
           field="emergency_contact_name"
           value={view.emergency.name}
-          edit={e => <TextField name="emergency_contact_name" defaultValue={e.staff.emergency_contact_name} placeholder="Full name" />}
+          edit={e => <TextField name="emergency_contact_name" defaultValue={e.staff.emergency_contact_name} />}
         />
         <Row
           label="Relationship"
           field="emergency_contact_relationship"
           value={view.emergency.relationship}
           edit={e => (
-            <TextField name="emergency_contact_relationship" defaultValue={e.staff.emergency_contact_relationship} placeholder="Spouse, Parent, Sibling…" />
+            <TextField name="emergency_contact_relationship" defaultValue={e.staff.emergency_contact_relationship} />
           )}
         />
         <Row
@@ -385,7 +391,7 @@ export default function PersonRecord({
           field="emergency_contact_phone"
           value={view.emergency.phone}
           mono
-          edit={e => <TextField name="emergency_contact_phone" type="tel" defaultValue={e.staff.emergency_contact_phone} placeholder="012-345 6789" mono />}
+          edit={e => <TextField name="emergency_contact_phone" type="tel" defaultValue={e.staff.emergency_contact_phone} mono />}
         />
       </Section>
 
@@ -396,7 +402,7 @@ export default function PersonRecord({
           value={view.bank.name1}
           edit={e =>
             e.canSee.bank ? (
-              <TextField name="bank_name" defaultValue={e.staff.bank_name} placeholder="Maybank" />
+              <TextField name="bank_name" defaultValue={e.staff.bank_name} />
             ) : (
               <Locked value={e.staff.bank_name} why="Bank accounts is not ticked for your title" />
             )
@@ -409,7 +415,7 @@ export default function PersonRecord({
           mono
           edit={e =>
             e.canSee.bank ? (
-              <TextField name="bank_account_no" defaultValue={e.staff.bank_account_no} placeholder="1234567890" inputMode="numeric" autoComplete="off" mono />
+              <TextField name="bank_account_no" defaultValue={e.staff.bank_account_no} inputMode="numeric" autoComplete="off" mono />
             ) : (
               <Locked value={e.staff.bank_account_no} why="Bank accounts is not ticked for your title" />
             )
@@ -422,7 +428,7 @@ export default function PersonRecord({
           value={view.bank.name2}
           edit={e =>
             e.canSee.bank ? (
-              <TextField name="bank_name_2" defaultValue={e.staff.bank_name_2} placeholder="Maybank" autoComplete="off" />
+              <TextField name="bank_name_2" defaultValue={e.staff.bank_name_2} autoComplete="off" />
             ) : (
               <Locked value={e.staff.bank_name_2 ?? null} why="Bank accounts is not ticked for your title" />
             )
@@ -435,7 +441,7 @@ export default function PersonRecord({
           mono
           edit={e =>
             e.canSee.bank ? (
-              <TextField name="bank_account_no_2" defaultValue={e.staff.bank_account_no_2} placeholder="1234567890" inputMode="numeric" autoComplete="off" mono />
+              <TextField name="bank_account_no_2" defaultValue={e.staff.bank_account_no_2} inputMode="numeric" autoComplete="off" mono />
             ) : (
               <Locked value={e.staff.bank_account_no_2 ?? null} why="Bank accounts is not ticked for your title" />
             )
@@ -560,7 +566,7 @@ export default function PersonRecord({
   return (
     <Editing.Provider value={ed}>
       <Changed.Provider value={changed}>
-        <form ref={form} onSubmit={save} onChange={() => form.current && setChanged(changedFields(form.current))} aria-label={`Edit ${view.name}`}>
+        <form ref={form} onSubmit={save} onChange={edited} aria-label={`Edit ${view.name}`}>
           {head}
           {sections}
           <div className={s.bar} role="region" aria-label="Save changes">
@@ -673,14 +679,13 @@ function TextField({
   )
 }
 
-function AreaField({ name, defaultValue, placeholder }: { name: string; defaultValue: string | null; placeholder?: string }) {
+function AreaField({ name, defaultValue }: { name: string; defaultValue: string | null }) {
   return (
     <textarea
       id={fieldId(name)}
       name={name}
       rows={2}
       defaultValue={defaultValue ?? ''}
-      placeholder={placeholder}
       data-dirty={useChanged(name)}
       className={`${s.input} ${s.area}`}
     />
