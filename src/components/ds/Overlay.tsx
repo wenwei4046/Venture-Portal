@@ -119,7 +119,8 @@ export function Sheet({
 function Portal({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false)
   useEffect(() => setReady(true), [])
-  return ready ? createPortal(children, document.body) : null
+  // The sheet's and the shell's palettes (`.sheet-theme`, `[data-fin-kit]`) do not reach <body>: the panel brings them.
+  return ready ? createPortal(<div className="sheet-theme" data-fin-kit="" style={{ display: 'contents' }}>{children}</div>, document.body) : null
 }
 
 /** The prototype's fixed right panel over the whole window. */
