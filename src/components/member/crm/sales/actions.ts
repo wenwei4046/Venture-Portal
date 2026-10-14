@@ -131,6 +131,11 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       return true;
     },
     openChat(customerId) {
+      // Opening a chat this person marked unread takes the mark off (theirs alone).
+      if (data().prefs[customerId]?.markedUnread) {
+        setData(d => ({ ...d, prefs: { ...d.prefs, [customerId]: { ...d.prefs[customerId]!, markedUnread: false } } }));
+        void write("crm_set_pref", { p_contact: customerId, p_pinned: null, p_muted: null, p_hidden: null, p_blocked: null, p_pinned_message: null, p_clear_pinned_message: false, p_marked_unread: false });
+      }
       const c = data().customers.find(x => x.id === customerId);
       if (!c || c.assignedTo !== me || c.unread === 0) return;
       patchCustomer(customerId, x => ({ ...x, unread: 0 }));
@@ -161,7 +166,9 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
     },
     async setPref(customerId, p) {
       const args: Record<string, unknown> = { p_contact: customerId, p_pinned: p.pinned ?? null, p_muted: p.muted ?? null, p_hidden: p.hidden ?? null, p_blocked: p.blocked ?? null };
-      if (p.pinnedMessageId !== undefined) { args.p_pinned_message = p.pinnedMessageId; args.p_clear_pinned_message = p.pinnedMessageId === null; }
+      // All eight names go, so PostgREST picks the eight-argument crm_set_pref (mig 20261014130000; null = unchanged).
+      args.p_pinned_message = p.pinnedMessageId ?? null; args.p_clear_pinned_message = p.pinnedMessageId === null;
+      args.p_marked_unread = p.markedUnread ?? null;
       if (!(await write("crm_set_pref", args)).ok) return;
       setData(d => ({ ...d, prefs: { ...d.prefs, [customerId]: { ...(d.prefs[customerId] ?? { pinned: false, muted: false, hidden: false, blocked: false, pinnedMessageId: null }), ...p } } }));
     },
