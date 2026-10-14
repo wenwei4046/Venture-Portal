@@ -65,6 +65,7 @@ const DETAIL: VoucherDetail = {
   createdAt: '2026-10-06T01:12:00Z',
   can: { create: true, edit: true, void: true, approve: false },
   reversible: true,
+  reference: null,
 }
 
 const drawn = async (detail: Partial<VoucherDetail>) => {

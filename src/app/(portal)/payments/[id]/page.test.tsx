@@ -5,8 +5,8 @@ vi.mock('server-only', () => ({}))
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), notFound: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
-vi.mock('next/navigation', () => ({ notFound: mocks.notFound }))
-vi.mock('../actions', () => ({ submitForApproval: vi.fn(), approveVoucher: vi.fn(), voidVoucher: vi.fn(), voidPaidReceipt: vi.fn(), reversePaidPayment: vi.fn(), returnVoucherToDraft: vi.fn() }))
+vi.mock('next/navigation', () => ({ notFound: mocks.notFound, useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
+vi.mock('../actions', () => ({ submitForApproval: vi.fn(), approveVoucher: vi.fn(), voidVoucher: vi.fn(), voidPaidReceipt: vi.fn(), reversePaidPayment: vi.fn(), returnVoucherToDraft: vi.fn(), copyPaymentVoucher: vi.fn(), getAttachmentSignedUrl: vi.fn(), uploadVoucherAttachment: vi.fn(), deleteVoucherAttachment: vi.fn() }))
 vi.mock('./_components/VoucherActions', () => ({ default: (props: { reversePaidPayment?: unknown }) => <div data-testid="voucher-actions" data-can-reverse={Boolean(props.reversePaidPayment)} /> }))
 vi.mock('./_components/CopyVoucherButton', () => ({ default: () => <div data-testid="copy-voucher" /> }))
 vi.mock('./_components/ReassignGlAccountButton', () => ({ default: () => <div data-testid="reassign-gl" /> }))
@@ -22,13 +22,13 @@ function database(referenceType = 'payroll_statutory', salaryLines: Record<strin
   const filters: string[][] = []
   const from = vi.fn((table: string) => {
     let allowedReferences: string[] | null = null
-    const result = { data: table === 'payroll_statutory_voucher_lines' ? [{ id: 'line', scope: 'staff', payroll_row_id: 'row', employee_name: 'Recorded Employee', employee_code: 'TEST001', department_name: 'Original Department', period_month: '2026-08-01', scheme: 'KWSP', amount: '100.10' }] : table === 'payroll_voucher_lines' ? salaryLines : table === 'invoices' ? invoices : table === 'payment_attachments' ? attachments : table === 'payment_voucher_sources' ? (more.sources ?? []) : [], error: table === 'payroll_voucher_lines' ? salaryError : null }
+    const result = { data: table === 'users' ? [{ id: 'creator', name: 'Creator' }] : table === 'payroll_statutory_voucher_lines' ? [{ id: 'line', scope: 'staff', payroll_row_id: 'row', employee_name: 'Recorded Employee', employee_code: 'TEST001', department_name: 'Original Department', period_month: '2026-08-01', scheme: 'KWSP', amount: '100.10' }] : table === 'payroll_voucher_lines' ? salaryLines : table === 'invoices' ? invoices : table === 'payment_attachments' ? attachments : table === 'payment_voucher_sources' ? (more.sources ?? []) : [], error: table === 'payroll_voucher_lines' ? salaryError : null }
     const query = {
       select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
       in: vi.fn((column: string, values: string[]) => { if (column === 'reference_type') { allowedReferences = values; filters.push(values) } return query }),
       single: vi.fn(() => Promise.resolve({ data: table === 'payment_vouchers' ? (allowedReferences && !allowedReferences.includes(referenceType) ? null : voucher) : table === 'bank_accounts' && more.bank ? more.bank : { name: 'Creator' }, error: null })),
       // The pending approval's submitter — who may decide it (2026-10-09).
-      maybeSingle: vi.fn(() => Promise.resolve({ data: table === 'approval_requests' ? { request_type: 'payment_voucher', submitted_by: 'creator' } : null, error: null })),
+      maybeSingle: vi.fn(() => Promise.resolve({ data: table === 'approval_requests' ? { request_type: 'payment_voucher', submitted_by: 'creator' } : table === 'payment_vouchers' ? (allowedReferences && !allowedReferences.includes(referenceType) ? null : voucher) : table === 'bank_accounts' ? (more.bank ?? null) : null, error: null })),
       then: (resolve: (value: typeof result) => unknown) => Promise.resolve(resolve(result)),
     }
     return query
@@ -66,25 +66,6 @@ describe('HR payroll voucher detail access', () => {
     const { from } = database('ordinary_payment')
     await expect(PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) })).rejects.toThrow('NOT_FOUND')
     expect(from).toHaveBeenCalledTimes(1)
-  })
-
-  it('preserves treasury access and its existing action controls', async () => {
-    mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
-    const { filters } = database('ordinary_payment')
-    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    expect(filters).toEqual([])
-    expect(screen.getByTestId('voucher-actions')).toBeInTheDocument()
-    expect(screen.getByTestId('voucher-actions')).toHaveAttribute('data-can-reverse', 'true')
-    expect(screen.getByTestId('copy-voucher')).toBeInTheDocument()
-    expect(screen.getByTestId('attachment-uploader')).toBeInTheDocument()
-  })
-
-  it('does not expose generic financial reversal for a paid salary PV', async () => {
-    mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] }))
-    const { voucher } = database('payroll_disbursement')
-    voucher.status = 'paid'
-    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    expect(screen.getByTestId('voucher-actions')).toHaveAttribute('data-can-reverse', 'false')
   })
 
   it('shows net basic and commission with their recorded receiving accounts as one person', async () => {
@@ -142,80 +123,162 @@ describe('HR payroll voucher detail access', () => {
   })
 })
 
-// 2026-10-02 (user: "这个 pv 点开看 detail 也是很乱 / receipt 也是字体你看怪怪的").
-describe('the voucher page, laid out like the deal forms', () => {
-  const asFinance = () => mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
-  const stepLabels = () => Array.from(document.querySelectorAll('.trail-step')).map((li) => li.firstElementChild?.textContent)
-  const panel = () => document.querySelector('aside.deal-side') as HTMLElement
+// 2026-10-14 — the Finance revamp v2 (D06 of `.design/fin-r2/handoff`): a payment
+// voucher, for the treasury's readers, is the design's full page. What the old
+// page held is still held: the number in the figures' face, the office's clock,
+// the panel's When & where and Booking, the trail, the steps this reader may
+// take (and no generic reversal of a salary voucher), the files, the payroll
+// right, a paid voucher's date corrected in place.
+describe('a payment voucher’s full page (D06)', () => {
+  const asFinance = (extra: string[] = []) => mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury', ...extra] }))
+  const panel = () => document.querySelector('aside') as HTMLElement
+  const cardTitles = () => Array.from(document.querySelectorAll('section')).map((c) => c.getAttribute('aria-label'))
+  const source = { pool: 'venture_pool', amount: 100.10, account_code: '9091', chart_of_accounts: { name: 'Water & Electricity' } }
+  const bank = { bank_name: 'Hong Leong Bank', account_number: '2190-0033-12', current_balance: 9000 }
 
-  // 2026-10-10 — the handoff (audit 2026-10-09 l, item 8): on the Finance view
-  // the page is English throughout — the chip says the status alone, the
-  // number is set in the figures' mono.
-  it('sets the number in the figures’ face, with its status beside it', async () => {
+  it('heads it with the way back, the crumb, the number in the figures’ face and its status', async () => {
     asFinance()
     database('ordinary_payment')
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.getByRole('link', { name: '← Payments' })).toHaveAttribute('href', '/payments')
+    expect(screen.getByText('Daily · Payments · TEST-STAT-PV')).toBeInTheDocument()
     const number = screen.getByRole('heading', { level: 1, name: 'TEST-STAT-PV' })
-    expect(number).toHaveClass('title-number') // not the Georgia page title, whose figures are old-style
-    expect(number).toHaveClass('pay-no')
-    expect(number.parentElement).toHaveTextContent('pending approval')
-    expect(number.parentElement).not.toHaveTextContent('等批准')
+    expect(number.parentElement).toHaveTextContent('Pending approval')
+    expect(screen.queryByTestId('nav-owner')).toBeNull()
   })
 
-  it('prints times as the office reads them, not as the server keeps them', async () => {
+  it('states four facts — the created time on the office’s clock', async () => {
     asFinance()
-    database('ordinary_payment') // created 2026-09-11T00:00Z — 08:00 in Kuala Lumpur
-    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    expect(screen.getByText(/Created by Creator · 11 Sep 2026 · 08:00/)).toBeVisible()
-  })
-
-  it('keeps what the voucher is in one panel: amount, payee, date, method — and the actions', async () => {
-    asFinance()
-    const { voucher } = database('ordinary_payment')
+    const { voucher } = database('ordinary_payment') // created 2026-09-11T00:00Z — 08:00 in Kuala Lumpur
     voucher.payment_date = '2026-09-12'
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.getByText('Amount').nextElementSibling).toHaveTextContent('RM 100.10')
+    expect(screen.getByText('To').nextElementSibling).toHaveTextContent('KWSP')
+    expect(screen.getAllByText('Payment date')[0].nextElementSibling).toHaveTextContent('12 Sep 2026')
+    expect(screen.getByText('Created by').nextElementSibling).toHaveTextContent('Creator · 11 Sep 2026 · 08:00')
+  })
+
+  it('keeps when, where and the booking in the dark panel, with the steps', async () => {
+    asFinance()
+    const { voucher } = database('ordinary_payment', [], null, [], [], { sources: [source], bank })
+    Object.assign(voucher, { bank_account_id: 'bank-1', payment_date: '2026-09-12' })
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
     const side = panel()
     expect(side).toHaveTextContent('RM 100.10')
     expect(side).toHaveTextContent('Pay to KWSP')
+    expect(side).toHaveTextContent('When & where')
     expect(side).toHaveTextContent('Payment date12 Sep 2026')
-    expect(side).toHaveTextContent('MethodBank transfer')
-    expect(within(side).getByTestId('voucher-actions')).toBeInTheDocument()
+    expect(side).toHaveTextContent('From bankHong Leong Bank2190-0033-12')
+    expect(side).toHaveTextContent('Booking')
+    expect(side).toHaveTextContent('AccountWater & Electricity9091')
+    expect(side).toHaveTextContent('PoolVenture Pool')
+    // Its maker, pending: Edit and Return to draft, Void under ⋯ (voucher-steps.tsx).
+    expect(within(side).getByRole('link', { name: 'Edit' })).toHaveAttribute('href', '/payments/stat/edit')
+    expect(within(side).getByRole('button', { name: 'Return to draft' })).toBeInTheDocument()
   })
 
-  // 2026-10-09 (the Finance revamp): the panel's rows sit under When & where
-  // and Booking, and a pending voucher's chip is the blue wait.
-  it('groups the panel under When & where and Booking, and waits in blue', async () => {
-    asFinance()
-    const { voucher } = database('ordinary_payment')
-    voucher.payment_date = '2026-09-12'
-    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    const side = panel()
-    const heads = Array.from(side.querySelectorAll('.deal-side-sec')).map((h) => h.textContent)
-    expect(heads).toEqual(['When & where', 'Booking'])
-    const number = screen.getByRole('heading', { level: 1, name: 'TEST-STAT-PV' })
-    expect(number.parentElement?.querySelector('.chip')).toHaveClass('wait')
-  })
-
-  it('says so when no payment date was set', async () => {
+  it('says — when no payment date was set', async () => {
     asFinance()
     database('ordinary_payment')
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    expect(panel()).toHaveTextContent('Payment dateNot set')
+    expect(panel()).toHaveTextContent('Payment date—')
+  })
+
+  it('lays its cards in the design’s order, every word English', async () => {
+    asFinance()
+    const { voucher } = database('ordinary_payment', [], null, [], [], { sources: [source], bank })
+    Object.assign(voucher, { bank_account_id: 'bank-1', notes: 'Paid before the 15th', payment_date: '2026-09-12' })
+    const { container } = render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(cardTitles()).toEqual(['Pay to', 'Deducted from', 'Attachments', 'Trail', 'Audit log'])
+    expect(container.textContent).not.toMatch(/[㐀-鿿]/)
+    const payTo = document.querySelector('section') as HTMLElement
+    for (const label of ['Description', 'Method', 'Notes']) expect(within(payTo).getByText(label)).toBeInTheDocument()
+    expect(screen.getByText('No attachments yet.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '+ Add attachments' })).toBeInTheDocument()
   })
 
   it('a payment waiting for approval has got as far as Submitted', async () => {
     asFinance()
     database('ordinary_payment')
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    expect(stepLabels()).toEqual(['Created', 'Submitted', 'Approved', 'Paid'])
-    const [made, sent, approve, pay] = Array.from(document.querySelectorAll('.trail-step'))
-    expect(made).toHaveClass('done', 'joined')
-    expect(sent).toHaveClass('done')
-    expect(sent).not.toHaveClass('joined') // nothing beyond it has happened
-    expect(approve).not.toHaveClass('done')
-    expect(approve).toHaveTextContent('Waiting for Principal')
-    expect(pay).not.toHaveClass('done')
+    const trail = screen.getByRole('region', { name: 'Trail' })
+    const labels = Array.from(trail.querySelectorAll('[data-state]')).map((st) => [st.children[1]?.textContent, st.getAttribute('data-state')])
+    expect(labels).toEqual([
+      ['Created', 'done'],
+      ['Submitted', 'done'],
+      ['Approved', 'todo'],
+      ['Paid', 'todo'],
+    ])
+    expect(trail).toHaveTextContent('Waiting for Principal')
   })
+
+  it('a voided voucher ends in Voided, takes no file and offers nothing', async () => {
+    asFinance()
+    const { voucher } = database('ordinary_payment')
+    voucher.status = 'voided'
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    const trail = screen.getByRole('region', { name: 'Trail' })
+    expect(Array.from(trail.querySelectorAll('[data-state]')).map((st) => st.getAttribute('data-state'))).toEqual(['done', 'bad'])
+    expect(screen.queryByRole('button', { name: /Add/ })).toBeNull()
+    expect(within(panel()).queryAllByRole('button')).toHaveLength(0)
+  })
+
+  it('a paid payment offers Reverse payment — never on a salary voucher, which goes back from HR Payment', async () => {
+    asFinance()
+    const { voucher } = database('ordinary_payment')
+    Object.assign(voucher, { status: 'paid', payment_date: '2026-10-01', approved_at: '2026-10-01T03:00:00Z', executed_at: '2026-10-01T03:00:00Z' })
+    const paid = render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(within(panel()).getByRole('button', { name: 'Reverse payment' })).toBeInTheDocument()
+    paid.unmount()
+
+    asFinance(['payroll_payouts'])
+    const salary = database('payroll_disbursement')
+    Object.assign(salary.voucher, { status: 'paid', payment_date: '2026-10-01', approved_at: '2026-10-01T03:00:00Z', executed_at: '2026-10-01T03:00:00Z' })
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.queryByRole('button', { name: 'Reverse payment' })).toBeNull()
+  })
+
+  it('Print opens the voucher’s document; Copy is offered to whoever raises vouchers', async () => {
+    asFinance()
+    database('ordinary_payment')
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.getByRole('link', { name: 'Print' })).toHaveAttribute('href', '/payments/voucher-doc?id=stat')
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument()
+  })
+
+  it('the payroll cards are English too', async () => {
+    asFinance(['payroll_payouts'])
+    database('payroll_statutory')
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(cardTitles()).toContain('Statutory contributions')
+    const card = screen.getByRole('region', { name: 'Statutory contributions' })
+    expect(card).toHaveTextContent('Recorded Employee')
+    expect(card).toHaveTextContent('Total contribution')
+    expect(card).toHaveTextContent('RM 100.10')
+    expect(document.body.textContent).not.toMatch(/[㐀-鿿]/)
+  })
+
+  it('a salary voucher lists whom it pays, the accounts as the reader may see them', async () => {
+    mocks.requirePermission.mockResolvedValue({ ...withActions({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] }), sensitive: ['salary'] })
+    const person = { scope: 'staff', payroll_row_id: 'salary-row', employee_name: 'Salary Employee', employee_code: 'SAL001', department_name: 'Original Revenue' }
+    database('payroll_disbursement', [{ ...person, id: 'basic', salary_component: 'basic', recipient_account: 'account_1', bank_name: 'Recorded Maybank', bank_account_no: '0012345678', net: 4302.70 }])
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'salary' }) }))
+    const card = screen.getByRole('region', { name: 'People on this voucher' })
+    expect(card).toHaveTextContent('Salary Employee')
+    expect(card).toHaveTextContent('Recorded Maybank · ••••')
+    expect(card).not.toHaveTextContent('0012345678')
+    expect(card).toHaveTextContent('1 person · 1 payment')
+  })
+})
+
+// The receipt keeps its page (the handoff's README: "the Receipt full page on desktop is not redesigned").
+describe('a receipt keeps its page', () => {
+  const asFinance = () => mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
+  const stepLabels = () => Array.from(document.querySelectorAll('.trail-step')).map((li) => li.firstElementChild?.textContent)
+  const panel = () => document.querySelector('aside.deal-side') as HTMLElement
+  const cardTitles = () => Array.from(document.querySelectorAll('section h2')).map((h) => h.textContent?.replace(/^\d+/, ''))
+  const source = { pool: 'venture_pool', amount: 100.10, account_code: '9091', chart_of_accounts: { name: 'Water & Electricity' } }
+  const bank = { bank_name: 'Hong Leong Bank', account_number: '2190-0033-12', current_balance: 9000 }
 
   it('a receipt has no approval to show, and names the invoices it settled', async () => {
     asFinance()
@@ -236,42 +299,7 @@ describe('the voucher page, laid out like the deal forms', () => {
     expect(head).not.toHaveTextContent('已收')
   })
 
-  it('a voided voucher ends in Voided', async () => {
-    asFinance()
-    const { voucher } = database('ordinary_payment')
-    voucher.status = 'voided'
-    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    expect(stepLabels()).toEqual(['Created', 'Voided'])
-    expect(document.querySelectorAll('.trail-step')[1]).toHaveClass('bad')
-  })
-})
-
-// 2026-10-10 — the handoff (audit 2026-10-09 l, items 8 and 10): the voucher
-// page in English on the Finance view, its words taken from the builders
-// (pagePaymentDetail / pageReceiptDetail). HR opens a payroll voucher here too,
-// from HR Payment — HR's page keeps its words.
-describe('the voucher page in the handoff’s English', () => {
-  const asFinance = () => mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
-  const panel = () => document.querySelector('aside.deal-side') as HTMLElement
-  const cardTitles = () => Array.from(document.querySelectorAll('section h2')).map((h) => h.textContent?.replace(/^\d+/, ''))
-  const source = { pool: 'venture_pool', amount: 100.10, account_code: '9091', chart_of_accounts: { name: 'Water & Electricity' } }
-  const bank = { bank_name: 'Hong Leong Bank', account_number: '2190-0033-12', current_balance: 9000 }
-
-  it('has no Chinese anywhere on a payment', async () => {
-    asFinance()
-    const { voucher } = database('ordinary_payment', [], null, [], [], { sources: [source], bank })
-    Object.assign(voucher, { bank_account_id: 'bank-1', notes: 'Paid before the 15th', payment_date: '2026-09-12' })
-    const { container } = render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    expect(cardTitles()).toEqual(['Pay to', 'Deducted from', 'Attachments', 'Trail'])
-    expect(container.textContent).not.toMatch(/[㐀-鿿]/)
-    const payTo = document.querySelector('section') as HTMLElement
-    for (const label of ['Description', 'Method', 'Notes']) expect(within(payTo).getByText(label)).toBeInTheDocument()
-    expect(screen.getByText('No attachments yet.')).toBeInTheDocument()
-    expect(screen.getByText('Add attachments')).toBeInTheDocument()
-    expect(panel().querySelector('.deal-side-muted')).toHaveTextContent(/^Payment voucher$/)
-  })
-
-  it('…nor on a receipt, which goes back to Receipt', async () => {
+  it('…in English, going back to Receipt', async () => {
     asFinance()
     const { voucher } = database('ordinary_payment', [], null, [{ invoice_no: 'HV-INV-202609-0039' }], [], { sources: [{ ...source, account_code: '5010', chart_of_accounts: { name: 'Service Fee Income' } }], bank })
     Object.assign(voucher, { direction: 'credit', status: 'paid', payee_name: 'Hookka', bank_account_id: 'bank-1', target_pool: 'venture_pool', payment_date: '2026-09-29', executed_at: '2026-09-29T03:54:53Z' })
@@ -290,40 +318,23 @@ describe('the voucher page in the handoff’s English', () => {
     expect(screen.getByText('Add a late attachment')).toBeInTheDocument()
   })
 
-  it('names the bank with its account number under it, and the account with its GL code', async () => {
+  it('a receipt is paid the moment it is made, so nothing on it counts as late', async () => {
     asFinance()
-    const { voucher } = database('ordinary_payment', [], null, [], [], { sources: [source], bank })
-    voucher.bank_account_id = 'bank-1'
+    const { voucher } = database('ordinary_payment', [], null, [], [{ id: 'f1', file_name: 'receipt.pdf', file_type: 'application/pdf', file_size: 1000, storage_path: 'x/receipt.pdf', description: null, uploaded_at: '2026-09-29T04:00:00Z', uploaded_by: 'creator' }])
+    Object.assign(voucher, { direction: 'credit', status: 'paid', approved_at: '2026-09-29T03:54:53Z', executed_at: '2026-09-29T03:54:53Z' })
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    const side = panel()
-    expect(side).toHaveTextContent('From bankHong Leong Bank2190-0033-12')
-    expect(side).toHaveTextContent('AccountWater & Electricity9091')
-    expect(side).toHaveTextContent('PoolVenture Pool')
-    expect(within(side).getByText('2190-0033-12')).toHaveClass('pay-side-sub')
-    expect(within(side).getByText('9091')).toHaveClass('pay-side-sub')
+    expect(screen.getByTestId('attachment-uploader').dataset.canUpload).toBe('true')
+    expect(screen.getByTestId('attachment-list').dataset.lateAfter).toBe('')
   })
+})
 
-  it('a payment still goes back to Payments', async () => {
-    asFinance()
-    database('ordinary_payment')
-    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    expect(screen.getByRole('link', { name: '← Back to Payments' })).toHaveAttribute('href', '/payments')
-    expect(screen.queryByTestId('nav-owner')).toBeNull()
-  })
-
-  it('the payroll cards are English too', async () => {
-    mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] }))
-    database('payroll_statutory')
-    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    expect(cardTitles()).toContain('Statutory contributions on this voucher')
-    expect(document.body.textContent).not.toMatch(/[㐀-鿿]/)
-  })
-
-  it('HR’s page keeps its words', async () => {
+describe('HR’s page keeps its words', () => {
+  it('in its own language, its own trail', async () => {
     mocks.requirePermission.mockResolvedValue(withActions({ role: 'hr', permissions: ['hr_costing'] }))
     database('payroll_statutory')
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    expect(cardTitles()[0]).toBe('付给谁Pay to')
+    const titles = Array.from(document.querySelectorAll('section h2')).map((h) => h.textContent?.replace(/^\d+/, ''))
+    expect(titles[0]).toBe('付给谁Pay to')
     expect(Array.from(document.querySelectorAll('.trail-step')).map((li) => li.firstElementChild?.textContent)).toEqual(['建立', '送批', '批准', '付款'])
     expect(screen.getByText(/Creator 建立 · 11 Sep 2026 · 08:00/)).toBeVisible()
     expect(screen.getByRole('heading', { level: 1 })).not.toHaveClass('pay-no')
@@ -332,7 +343,7 @@ describe('the voucher page in the handoff’s English', () => {
 })
 
 // 2026-10-02: a paid voucher's date is corrected in place, from the panel.
-describe('改日期 on the voucher page', () => {
+describe('Change date on the voucher page', () => {
   const asFinance = () => mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
   const paid = { status: 'paid', payment_date: '2026-10-01', approved_at: '2026-10-01T03:00:00Z', executed_at: '2026-10-01T03:00:00Z' }
 
@@ -392,55 +403,30 @@ describe('a payroll voucher, for a treasury account without Payroll payouts', ()
     mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] }))
     database('payroll_statutory')
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    expect(screen.getByRole('table', { name: 'Statutory contributions covered by this voucher' })).toHaveTextContent('Recorded Employee')
+    expect(screen.getByRole('region', { name: 'Statutory contributions' })).toHaveTextContent('Recorded Employee')
   })
 })
 
 // 2026-10-05 (user: two paid PVs had been made without their receipts — "做第 2 条").
-describe('attachments on a voucher that is already decided', () => {
+describe('files on a payment voucher', () => {
   const asFinance = () => mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
-  const file = (uploaded_at: string) => ({ id: 'f-' + uploaded_at, file_name: 'receipt.pdf', file_type: 'application/pdf', file_size: 1000, storage_path: 'x/receipt.pdf', description: null, uploaded_at, uploaded_by: 'creator' })
+  const file = (uploaded_at: string) => ({ id: 'f-' + uploaded_at, file_name: 'receipt.pdf', file_type: 'application/pdf', file_size: 1000, uploaded_at })
 
-  it('a paid voucher still takes a file, and says it is a late one; nothing can be removed', async () => {
+  it('a paid voucher still takes a file, a late one; nothing can be removed', async () => {
     asFinance()
     const { voucher } = database('ordinary_payment', [], null, [], [file('2026-10-05T02:00:00Z')])
     Object.assign(voucher, { status: 'paid', approved_at: '2026-10-04T13:23:40Z', executed_at: '2026-10-04T13:23:40Z' })
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    const uploader = screen.getByTestId('attachment-uploader')
-    expect(uploader.dataset.canUpload).toBe('true')
-    expect(uploader.dataset.late).toBe('true')
-    // The handoff's words on the Finance view (2026-10-10).
-    expect(screen.getByText('Add a late attachment')).toBeInTheDocument()
-    const list = screen.getByTestId('attachment-list')
-    expect(list.dataset.canDelete).toBe('false')
-    expect(list.dataset.lateAfter).toBe('2026-10-04T13:23:40Z') // the list marks what came after this
+    expect(screen.getByRole('button', { name: '+ Add a late attachment' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /receipt\.pdf/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
   })
 
-  it('while it is still being made, files come and go as before', async () => {
+  it('while it is still being made, files come and go', async () => {
     asFinance()
     database('ordinary_payment', [], null, [], [file('2026-09-11T01:00:00Z')]) // pending approval
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    const uploader = screen.getByTestId('attachment-uploader')
-    expect(uploader.dataset.canUpload).toBe('true')
-    expect(uploader.dataset.late).toBe('false')
-    expect(screen.getByText('Add attachments')).toBeInTheDocument()
-    expect(screen.getByTestId('attachment-list').dataset.canDelete).toBe('true')
-  })
-
-  it('a receipt is paid the moment it is made, so nothing on it counts as late', async () => {
-    asFinance()
-    const { voucher } = database('ordinary_payment', [], null, [], [file('2026-09-29T04:00:00Z')])
-    Object.assign(voucher, { direction: 'credit', status: 'paid', approved_at: '2026-09-29T03:54:53Z', executed_at: '2026-09-29T03:54:53Z' })
-    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    expect(screen.getByTestId('attachment-uploader').dataset.canUpload).toBe('true')
-    expect(screen.getByTestId('attachment-list').dataset.lateAfter).toBe('')
-  })
-
-  it('a voided voucher is closed', async () => {
-    asFinance()
-    const { voucher } = database('ordinary_payment')
-    voucher.status = 'voided'
-    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    expect(screen.getByTestId('attachment-uploader').dataset.canUpload).toBe('false')
+    expect(screen.getByRole('button', { name: '+ Add attachments' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument()
   })
 })

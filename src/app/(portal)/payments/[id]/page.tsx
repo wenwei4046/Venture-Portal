@@ -25,6 +25,9 @@ import { officeStamp } from '@/lib/office-clock'
 import { readPayrollLineAccounts, withLineAccounts } from '@/lib/private-fields'
 import type { ReactNode } from 'react'
 import { NavOwner } from '@/components/layout/nav-owner'
+import { loadVoucherDetail } from '../_lib/voucher-detail'
+import { loadVoucherPageExtras } from '../_lib/voucher-page'
+import FinanceVoucherPage from './_components/FinanceVoucherPage'
 
 const POOL_LABELS: Record<string, string> = {
   venture_pool: 'Venture Pool',
@@ -52,6 +55,18 @@ export default async function PaymentDetailPage({ params }: Props) {
   const en = canReadTreasury
   const { id } = await params
   const supabase = await createClient()
+
+  // A payment voucher, for the treasury's readers, is the Finance revamp v2's
+  // full page (2026-10-14, D06). A receipt keeps this page (the handoff's
+  // README: not redesigned), and so does HR, opening a payroll voucher.
+  if (canReadTreasury) {
+    const read = await loadVoucherDetail(supabase, user, id)
+    if (!read.ok) notFound()
+    if (!read.detail.credit) {
+      const extras = await loadVoucherPageExtras(supabase, user, read.detail)
+      return <FinanceVoucherPage detail={read.detail} extras={extras} canCopy={canDo(user, 'treasury', 'create')} />
+    }
+  }
 
   let voucherQuery = supabase
     .from('payment_vouchers')

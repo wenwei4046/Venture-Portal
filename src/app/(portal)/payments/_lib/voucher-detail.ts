@@ -79,6 +79,8 @@ export interface VoucherDetail {
   can: { create: boolean; edit: boolean; void: boolean; approve: boolean }
   /** A paid payment can be reversed (a salary voucher's goes back from HR Payment). */
   reversible: boolean
+  /** What made it — a salary or statutory voucher (payroll_disbursement, payroll_statutory …), or null. */
+  reference: string | null
 }
 
 type VoucherRow = {
@@ -299,6 +301,7 @@ export async function loadVoucherDetail(
         approve: mayDecide,
       },
       reversible: v.reference_type !== 'payroll_disbursement',
+      reference: v.reference_type,
     },
   }
 }
