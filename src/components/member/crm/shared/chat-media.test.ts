@@ -87,3 +87,15 @@ describe("the + sheet's auto replies (2026-10-14)", () => {
     expect(autoChoices(null)).toEqual([]);
   });
 });
+
+describe("documents other than a PDF open in the app (2026-10-14)", () => {
+  it("knows which reader opens a file", async () => {
+    const { previewKind } = await import("./file-preview");
+    expect(previewKind("Shop Office for rent - carress.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).toBe("sheet");
+    expect(previewKind("list.csv", "text/csv")).toBe("sheet");
+    expect(previewKind("Proposal.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")).toBe("word");
+    expect(previewKind("notes.txt", "text/plain")).toBe("text");
+    expect(previewKind("IMG_1.jpg", "image/jpeg")).toBe("image");
+    expect(previewKind("deck.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")).toBeNull();
+  });
+});
