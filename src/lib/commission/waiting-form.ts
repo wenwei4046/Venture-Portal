@@ -316,6 +316,22 @@ export function templateView(name: string): TemplateView {
   return 'none'
 }
 
+/**
+ * The chip of an uploaded form is the file's icon, never its name (2026-10-15, the user: "我不要它直接显示
+ * 文字，那样很难看" — an icon "比如 PDF、Word 之类的"): Word's W for a .doc or .docx, PDF, a picture,
+ * HTML's </>. The name is the chip's tooltip.
+ */
+export type TemplateIcon = 'word' | 'pdf' | 'image' | 'html' | 'file'
+
+export function templateIcon(name: string): TemplateIcon {
+  const ext = name.toLowerCase().split('.').pop() ?? ''
+  if (ext === 'doc' || ext === 'docx') return 'word'
+  if (ext === 'pdf') return 'pdf'
+  if (ext === 'png' || ext === 'jpg' || ext === 'jpeg') return 'image'
+  if (ext === 'html') return 'html'
+  return 'file'
+}
+
 /** A Word file as mammoth reads it (its words, tables and pictures) on a white page, for the frame's `srcDoc`. */
 export function wordPage(body: string, title: string): string {
   return (

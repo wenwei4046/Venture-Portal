@@ -5,6 +5,7 @@ import { flash } from '@/components/hrv/toast'
 import { TEMPLATE_ACCEPT, templateRefusal, type MemberFormKind, type WaitingForm } from '@/lib/commission/waiting-form'
 import { removeFormTemplate, uploadReplacementFormTemplate, uploadWaitingFormTemplate } from '../../../waiting-actions'
 import type { MenuAnchor } from './ContextMenuPanel'
+import FormFileIcon from './FormFileIcon'
 import FormFileMenu from './FormFileMenu'
 import FormFileViewer from './FormFileViewer'
 import WaitingFormSettings from './WaitingFormSettings'
@@ -14,7 +15,8 @@ import w from './waiting.module.css'
 // 18.5), the Replacement list: Upload form — HR's own form, the one Revenue
 // members download — and Form settings, the questions they answer. Each list
 // has its own versions; the tools are the same. Once a form is uploaded its
-// chip ("Form: name") has a right-click menu (2026-10-14): View and Remove.
+// chip has a right-click menu (2026-10-14): View and Remove — and since
+// 2026-10-15 the chip is the file's icon, its name in the tooltip.
 
 const WORDS: Readonly<Record<MemberFormKind, { title: string; uploaded: (name: string) => string }>> = {
   waiting: {
@@ -142,15 +144,18 @@ export default function MemberFormTools({
         <label
           className={w.upload}
           data-uploaded={uploaded ? 'true' : undefined}
+          data-icon={uploaded && !uploading ? 'true' : undefined}
           data-busy={uploading ? 'true' : undefined}
-          title={formMissing ?? (uploaded ? 'Click to replace — Revenue members download this file' : WORDS[kind].title)}
+          title={formMissing ?? uploaded ?? WORDS[kind].title}
           onContextMenu={openMenu}
         >
-          {uploading ? 'Uploading…' : uploaded ? `Form: ${uploaded}` : 'Upload form'}
+          {/* An uploaded form is its file's icon, its name in the tooltip (2026-10-15) — never the name itself. */}
+          {uploading ? 'Uploading…' : uploaded ? <FormFileIcon name={uploaded} /> : 'Upload form'}
           <input
             ref={fileRef}
             type="file"
             accept={TEMPLATE_ACCEPT}
+            aria-label={uploaded && !uploading ? `Form: ${uploaded}` : undefined}
             disabled={uploading || form === null}
             onChange={e => void upload(e.target.files?.[0])}
           />
