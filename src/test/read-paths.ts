@@ -52,6 +52,12 @@ export const BRANCHES: Readonly<Record<string, Readonly<Record<Want, readonly st
     ],
     // overviewFor → 'department': its pool, its requests, its invoices.
     'dept_pool.view:dept': ['approval_requests', 'dept_pools', 'invoices'],
+    // Finance's view (2026-10-14, the Finance revamp v2's Overview): this month's allocations not yet
+    // billed — read only with the billing key, as the Invoice and allocator pages (canAccessBilling,
+    // dashboard/_lib/finance-overview.ts).
+    'billing.view': ['alloc_txns', 'invoices'],
+    // HR's Overview (2026-10-14): Comm Cal opens the sub-department last picked — canAccessRevenue(user).
+    'revenue.view:own': ['comm_sub_departments', 'comm_schemes'],
   },
   'src/app/(portal)/approvals/[id]/page.tsx#ApprovalDetailPage': {
     // The request is read first, and the page stops (notFound) unless a row

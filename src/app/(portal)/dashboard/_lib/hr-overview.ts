@@ -1,0 +1,77 @@
+import dayjs from 'dayjs'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { can } from '@/lib/permissions'
+import { officeTime } from '@/lib/office-time'
+import { loadHiringBoard } from '@/lib/hiring/board'
+import { adminMemberAction } from '@/lib/member/server'
+import { canAccessDirectorSalary, canAccessHRCosting, canAccessHiring } from '@/lib/roles'
+import type { User } from '@/types'
+
+// HR's Overview (2026-10-14, the Finance revamp v2 — `HR Overview.dc.html`,
+// H01–H02): where the month stands — the payroll imported or not, the hiring
+// requests waiting, the director salary — and each row's news for its card.
+// Every part is read only for whoever opens its page; a part that cannot be
+// read says nothing rather than taking the page down.
+
+type HrSummaryRow = {
+  staff?: { total_count?: number }
+  payroll?: { run?: { status?: string } | null; rows_count?: number }
+  director?: { status?: 'not_calculated' | 'draft' | 'confirmed' }
+}
+
+export interface HrOverviewData {
+  /** The office's month, first day (`2026-10-01`). */
+  period: string
+  summary: string
+  /** Each sidebar row's news, by its key (H02). */
+  notes: Record<string, string | null>
+  /** The quick actions' counts: Hiring requests waiting, Member services' new requests. */
+  badges: Record<string, number>
+}
+
+export async function loadHrOverview(supabase: SupabaseClient, user: User): Promise<HrOverviewData> {
+  const period = officeTime().startOf('month').format('YYYY-MM-DD')
+  const monthName = dayjs(period).format('MMMM')
+  const monthShort = dayjs(period).format('MMM')
+
+  const [summaryRead, hiring, members] = await Promise.all([
+    supabase.rpc('hr_dashboard_summary', { p_period: period }),
+    canAccessHiring(user) ? loadHiringBoard() : Promise.resolve(null),
+    can(user, 'member_requests_manage') ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
+  ])
+  const hr = (summaryRead.error ? null : summaryRead.data) as HrSummaryRow | null
+  const board = hiring && hiring.ok ? hiring.board : null
+  const memberData = members && members.ok ? members.data : null
+
+  const rows = Number(hr?.payroll?.rows_count ?? 0)
+  const runStatus = hr?.payroll?.run?.status ?? null
+  const submitted = runStatus === 'submitted' || runStatus === 'approved' || runStatus === 'paid'
+  const director = hr?.director?.status ?? 'not_calculated'
+  const waiting = board ? board.requests.filter((r) => r.status === 'submitted').length : null
+  const talents = board ? board.talents.length : null
+  const active = hr?.staff?.total_count != null ? Number(hr.staff.total_count) : null
+  const newRequests = memberData ? memberData.requests.filter((r) => r.status === 'submitted').length : null
+
+  // Where the month stands (H01): the payroll, the hiring requests, the director salary.
+  const payroll = rows === 0 ? `${monthName} payroll is not imported yet` : submitted ? `${monthName} payroll is submitted` : `${monthName} payroll is imported`
+  const directorWords = director === 'confirmed' ? 'director salary confirmed' : director === 'draft' ? 'director salary in draft' : 'director salary not calculated'
+  const parts = [
+    canAccessHRCosting(user) ? payroll : null,
+    waiting === null ? null : `${waiting} hiring ${waiting === 1 ? 'request' : 'requests'} waiting`,
+    canAccessDirectorSalary(user) ? directorWords : null,
+  ].filter((p): p is string => p !== null)
+
+  return {
+    period,
+    summary: parts.length ? `${parts.join(' · ')}.` : '',
+    notes: {
+      hire: waiting ? `${waiting} waiting` : null,
+      talent: talents ? String(talents) : null,
+      pay: rows === 0 ? `${monthShort} · not imported` : submitted ? `${monthShort} · submitted` : null,
+      ppl: active ? `${active} active` : null,
+      mem: newRequests ? `${newRequests} new` : null,
+      dsal: director === 'not_calculated' ? 'Not calculated' : director === 'draft' ? 'Draft' : null,
+    },
+    badges: { hire: waiting ?? 0, mem: newRequests ?? 0 },
+  }
+}

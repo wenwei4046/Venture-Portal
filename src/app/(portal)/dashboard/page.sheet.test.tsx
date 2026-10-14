@@ -23,6 +23,11 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }))
 
+// Finance's view and HR's Overview (2026-10-14) read through these server modules; the treasury Overview does not.
+vi.mock('@/lib/hiring/board', () => ({ loadHiringBoard: async () => ({ ok: false, reason: 'test' }) }))
+vi.mock('@/lib/member/server', () => ({ adminMemberAction: async () => ({ ok: false, reason: 'test' }) }))
+vi.mock('../revenue/_lib/sub-departments', () => ({ listSubDepartments: async () => [] }))
+
 import DashboardPage from './page'
 
 const SUMMARY = {
@@ -80,7 +85,7 @@ afterEach(() => vi.useRealTimers())
 
 describe('the treasury Overview on the sheet', () => {
   it('heads the page with the month, Daily Bank and Record payment', async () => {
-    mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', role: 'finance', permissions: ['treasury'] }))
+    mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', role: 'staff', permissions: ['treasury'] }))
     render(await DashboardPage())
     expect(document.querySelector('.page-eyebrow')).toHaveTextContent('OVERVIEW · TREASURY · OCTOBER 2026')
     expect(screen.getByRole('link', { name: 'Daily Bank' })).toHaveAttribute('href', '/daily-bank')
@@ -99,13 +104,13 @@ describe('the treasury Overview on the sheet', () => {
   })
 
   it("keeps Finance's queue in the wait tone", async () => {
-    mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', role: 'finance', permissions: ['treasury'] }))
+    mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', role: 'staff', permissions: ['treasury'] }))
     render(await DashboardPage())
     expect(card('Awaiting Principal')).toHaveAttribute('data-tone', 'wait')
   })
 
   it('folds the pool breakdown and splits the margin from the month’s interest', async () => {
-    mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', role: 'finance', permissions: ['treasury'] }))
+    mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', role: 'staff', permissions: ['treasury'] }))
     render(await DashboardPage())
     const fold = document.querySelector('details.fin-fold') as HTMLElement
     expect(fold.querySelector('summary')).toHaveTextContent('Pool breakdown')
@@ -118,7 +123,7 @@ describe('the treasury Overview on the sheet', () => {
   })
 
   it('lists the installments behind and those coming up in the next 14 days', async () => {
-    mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', role: 'finance', permissions: ['treasury'] }))
+    mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', role: 'staff', permissions: ['treasury'] }))
     render(await DashboardPage())
     const behind = section('Overdue instalments')
     expect(within(behind).getByText('1 BEHIND')).toBeInTheDocument()

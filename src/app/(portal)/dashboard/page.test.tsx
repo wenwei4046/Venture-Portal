@@ -13,6 +13,11 @@ vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireAuth: 
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/approval-amounts', () => ({ resolveLiveApprovalAmounts: async () => new Map() }))
 
+// Finance's view and HR's Overview (2026-10-14) read through these server modules; the treasury Overview does not.
+vi.mock('@/lib/hiring/board', () => ({ loadHiringBoard: async () => ({ ok: false, reason: 'test' }) }))
+vi.mock('@/lib/member/server', () => ({ adminMemberAction: async () => ({ ok: false, reason: 'test' }) }))
+vi.mock('../revenue/_lib/sub-departments', () => ({ listSubDepartments: async () => [] }))
+
 import DashboardPage from './page'
 
 const SUMMARY = {
@@ -65,7 +70,7 @@ const drawnByTheServer = () => inTimeZoneAsync('UTC', () => DashboardPage())
 
 describe('the Overview, on the office clock', () => {
   it("is 'as of' the office's today, and dates a request by the office's day", async () => {
-    mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', role: 'finance', permissions: ['treasury'] }))
+    mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', role: 'staff', permissions: ['treasury'] }))
     render(await drawnByTheServer())
     expect(screen.getByText(/OVERVIEW · TREASURY · NOVEMBER 2026/)).toBeInTheDocument()
     expect(screen.getByText(/As of 1 November 2026/)).toBeInTheDocument()
@@ -77,7 +82,9 @@ describe('the Overview, on the office clock', () => {
     mocks.requireAuth.mockResolvedValue(withActions({ id: 'h', role: 'hr', permissions: ['hr_costing'] }))
     render(await drawnByTheServer())
     expect(mocks.rpc).toHaveBeenCalledWith('hr_dashboard_summary', { p_period: '2026-11-01' })
-    expect(screen.getAllByText(/November 2026/).length).toBeGreaterThan(0)
-    expect(screen.queryByText(/October 2026/)).toBeNull()
+    // HR's Overview (2026-10-14, the Finance revamp v2's H01): the office's date in the eyebrow, the month in the line.
+    expect(screen.getByText(/Sun 1 Nov 2026 · Q4 2026 · HR view/)).toBeInTheDocument()
+    expect(screen.getByText(/November payroll is not imported yet/)).toBeInTheDocument()
+    expect(screen.queryByText(/October/)).toBeNull()
   })
 })

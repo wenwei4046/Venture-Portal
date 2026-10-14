@@ -13,6 +13,8 @@ import { readsDeptStatements, type NavData } from '@/components/layout/nav-confi
 import { listSubDepartments } from '../revenue/_lib/sub-departments'
 import FinanceOverview from './_components/FinanceOverview'
 import HrOverview from './_components/HrOverview'
+import { loadFinanceOverviewCounts } from './_lib/finance-overview'
+import { loadHrOverview } from './_lib/hr-overview'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { resolveLiveApprovalAmounts, type ApprovalAmountRow } from '@/lib/approval-amounts'
@@ -169,17 +171,21 @@ export default async function DashboardPage() {
   // The Principal's own view keeps the treasury dashboard below.
   if (overview === 'treasury' && onFinanceView(user)) {
     const navData: NavData = { revenueSubDepts: [], ...(readsDeptStatements(user) ? { deptPoolDepts: statementDepts(primedRegistryRows()) } : {}) }
-    return <FinanceOverview user={user} supabase={supabase as unknown as SupabaseClient} navData={navData} />
+    const counts = await loadFinanceOverviewCounts(supabase as unknown as SupabaseClient, user)
+    return <FinanceOverview user={user} navData={navData} counts={counts} />
   }
   // HR's Overview (2026-10-14, the same handoff's H01): Finance's layout for HR's view.
   if (overview === 'hr') {
-    let revenueSub: string | null = null
-    if (canAccessRevenue(user)) {
-      const subs = await listSubDepartments()
-      const picked = (await cookies()).get(REVENUE_SUB_COOKIE)?.value
-      revenueSub = subs.find((x) => x.slug === picked)?.slug ?? (subs.find((x) => x.isHome) ?? subs[0])?.slug ?? null
-    }
-    return <HrOverview user={user} supabase={supabase as unknown as SupabaseClient} revenueSub={revenueSub} />
+    const [data, revenueSub] = await Promise.all([
+      loadHrOverview(supabase as unknown as SupabaseClient, user),
+      (async () => {
+        if (!canAccessRevenue(user)) return null
+        const [subs, jar] = await Promise.all([listSubDepartments(), cookies()])
+        const picked = jar.get(REVENUE_SUB_COOKIE)?.value
+        return subs.find((x) => x.slug === picked)?.slug ?? (subs.find((x) => x.isHome) ?? subs[0])?.slug ?? null
+      })(),
+    ])
+    return <HrOverview user={user} data={data} revenueSub={revenueSub} />
   }
 
   const roleDashboard = overview !== 'treasury'

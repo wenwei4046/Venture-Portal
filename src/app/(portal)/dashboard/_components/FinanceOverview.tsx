@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { canDo } from '@/lib/permission-actions'
 import { officeClock } from '@/lib/office-clock'
 import { firstName } from '@/lib/finance-view'
@@ -8,7 +7,7 @@ import { finNavSections } from '@/components/layout/fin-nav'
 import { visibleHrNav, type HrNavTone } from '@/components/layout/hr-nav'
 import type { NavData } from '@/components/layout/nav-config'
 import type { User } from '@/types'
-import { financeSummary, loadFinanceOverviewCounts } from '../_lib/finance-overview'
+import { financeSummary, type FinanceOverviewCounts } from '../_lib/finance-overview'
 import s from './overview.module.css'
 
 // The Finance view's Overview (2026-10-14, the Finance revamp v2 — D01 of
@@ -29,9 +28,8 @@ const QUICK: ReadonlyArray<{ key: string; label: string; icon: HrIconName; tone:
   { key: 'ledger', label: 'Ledger', icon: 'doc', tone: 'slate' },
 ]
 
-export default async function FinanceOverview({ user, supabase, navData }: { user: User; supabase: SupabaseClient; navData: NavData }) {
+export default function FinanceOverview({ user, navData, counts }: { user: User; navData: NavData; counts: FinanceOverviewCounts }) {
   const clock = officeClock()
-  const counts = await loadFinanceOverviewCounts(supabase, user)
   const sections = visibleHrNav(finNavSections(navData), user).filter((sec) => sec.label !== null)
   const hrefOf = new Map(sections.flatMap((sec) => sec.items.map((i) => [i.key, i.href] as const)))
   const badgeOf = {

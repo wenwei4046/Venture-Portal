@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { canDo } from '@/lib/permission-actions'
-import { listsPayrollByPerson } from '@/lib/roles'
+import { canAccessBilling, canAccessTreasury, listsPayrollByPerson } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { officeMonth } from '@/lib/office-time'
 import { startRead } from '@/lib/start-read'
@@ -30,8 +29,9 @@ type TxnRow = { billed_ref: string | null }
 type AllocInvoiceRow = { reference_no: string | null }
 
 export async function loadFinanceOverviewCounts(supabase: SupabaseClient, user: User): Promise<FinanceOverviewCounts> {
-  const treasury = canDo(user, 'treasury', 'view')
-  const billing = canDo(user, 'billing', 'view')
+  // Each part only for whoever opens its page — the pages' own gates (Payments: treasury; Invoice and the allocator: billing).
+  const treasury = canAccessTreasury(user)
+  const billing = canAccessBilling(user)
   const month = officeMonth()
   const ref = `ALC-${month.replace('-', '')}`
 
