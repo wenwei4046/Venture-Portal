@@ -31,6 +31,8 @@ const CRM_WRITES = [
   "crm_save_template", "crm_template_on", "crm_delete_template",
   // CRM Desktop rev 1 (mig 20261013100000): reminders, deleted notifications, forms, notes.
   "crm_remind", "crm_delete_notifs", "crm_save_form", "crm_delete_form", "crm_add_note",
+  // Starred messages (mig 20261014060000).
+  "crm_star_message",
 ] as const;
 export type CrmWrite = (typeof CRM_WRITES)[number];
 
@@ -171,7 +173,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       }),
       events: more.journey.length ? [...events, ...more.journey] : events,
       staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted }] : staffPrefs,
-      forms: more.forms, notes: more.notes,
+      forms: more.forms, notes: more.notes, stars: more.stars,
     }) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The CRM could not be loaded. Please try again.";
@@ -189,15 +191,17 @@ async function desktopRows(db: Db, journey: boolean) {
   const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
     try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
   };
-  const [forms, notes, extras, rooms, prefs, events] = await Promise.all([
+  const [forms, notes, extras, rooms, prefs, events, stars] = await Promise.all([
     soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order")),
     soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
     soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
     soft<{ id: string; photo_path: string | null; map_google: string | null; map_waze: string | null }[]>(db.from("crm_showrooms").select("id, photo_path, map_google, map_waze")),
     soft<{ notif_deleted: string[] | null }[]>(db.from("crm_staff_prefs").select("notif_deleted")),
     journey ? soft<CrmDataRows["events"]>(db.from("crm_events").select("id, kind, contact_id, actor, owner, data, at").in("kind", JOURNEY_EVENTS).order("at", { ascending: false }).limit(5000)) : Promise.resolve([] as CrmDataRows["events"]),
+    // One's own starred messages (mig 20261014060000).
+    soft<{ message_id: string }[]>(db.from("crm_message_stars").select("message_id")),
   ]);
-  return { forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events };
+  return { forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars };
 }
 
 /** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */

@@ -19,7 +19,7 @@ import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice"
 import { CHAT_EMOJIS, withEmoji } from "../../shared/emoji";
 import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, mediaOf, mediaWord, NO_MEDIA } from "../../shared/chat-media";
-import { MENU_ICON, openMsgMenu, pressToOpen } from "../../shared/msg-menu";
+import { MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 
 const NO_PRESS: Partial<ReturnType<typeof pressToOpen>> = {};
@@ -113,6 +113,7 @@ export function chatVM(ctx: SalesCtx) {
   const setDraft = (v: string) => set(u => ({ ...u, draft: { ...u.draft, [c.id]: v } }));
   const scrollDown = () => setTimeout(() => document.querySelectorAll<HTMLElement>("[data-chat-list]").forEach(el => { el.scrollTop = el.scrollHeight; }), 60);
   const prefs = data.prefs[c.id];
+  const stars = new Set(data.starredMessages ?? []);
   const pinned = prefs?.pinnedMessageId ? c.messages.find(m => m.id === prefs.pinnedMessageId) : undefined;
   const booked = data.visits.filter(v => v.customerId === c.id && v.state === "booked").sort((a, b) => a.start.localeCompare(b.start));
   const nextVisit: CrmVisit | undefined = booked[0];
@@ -160,7 +161,8 @@ export function chatVM(ctx: SalesCtx) {
       // A document is its tile (name and type), never its name again under it (2026-10-14).
       ...mediaOf(m, gallery, al.lead.get(key)),
       pDisp: card || mk === "file" || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: "14px", textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : mk === "file" ? "📄 " + m.text : m.text),
-      timeJustify: "flex-end", timeColor: mine ? "#806B60" : SUB, by, at: msgTime(m.at),
+      // A starred message shows ★ by its time (the message menu's Star, 2026-10-14).
+      timeJustify: "flex-end", timeColor: mine ? "#806B60" : SUB, by, at: (stars.has(key) ? "★ " : "") + msgTime(m.at),
       failNote: mine && m.status === "failed" ? failNote(m.error) : "",
       tick: mine, tickColor: read ? "#2F8FD8" : m.status === "failed" ? "#A3371A" : "#A8968B", tickLabel: m.status === "sending" ? "Sending" : read ? "Read" : m.status === "failed" ? "Not delivered" : "Delivered",
       // Sending: a small clock until it went (then the two ticks).
@@ -168,7 +170,7 @@ export function chatVM(ctx: SalesCtx) {
       showTools: ui.hover === key, enter: () => patch({ hover: key }), leave: () => set(u => (u.hover === key ? { ...u, hover: null } : u)),
       openMenu: () => patch({ menu: { msgId: key, full: true, from: m.from, text: m.text } }),
       // A long press: WhatsApp's menu (shared/msg-menu.tsx) — reactions, Reply, Copy, Pin, Delete for me.
-      press: pressToOpen(() => {
+      press: { "data-msg": key, ...pressToOpen(() => {
         const pinnedNow = prefs?.pinnedMessageId === key;
         openMsgMenu({
           mine, preview: m.text ? plain(m.text) : m.media ? mediaWord(m) : "", reaction: m.myReaction ?? "", react: e => void act.react(key, e),
@@ -179,11 +181,12 @@ export function chatVM(ctx: SalesCtx) {
             { label: "Forward", icon: MENU_ICON.forward, run: () => {} },
             ...(m.text ? [{ label: "Copy", icon: MENU_ICON.copy, run: () => { void navigator.clipboard?.writeText(plain(m.text)).catch(() => {}); } }] : []),
             { label: "Info", icon: MENU_ICON.info, run: () => {} },
+            { label: stars.has(key) ? "Unstar" : "Star", icon: MENU_ICON.star, run: () => void act.star(key, !stars.has(key)) },
             { label: pinnedNow ? "Unpin" : "Pin", icon: MENU_ICON.pin, run: () => void act.setPref(c.id, { pinnedMessageId: pinnedNow ? null : key }) },
             { label: "Delete for me", icon: MENU_ICON.del, danger: true, run: () => void act.hideMessage(key) },
           ],
         });
-      }),
+      }) },
       openReact: () => patch({ menu: { msgId: key, full: false, from: m.from, text: m.text } }),
       reaction: m.myReaction ?? "", rxLeft: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto", rbLeft: mine ? "-38px" : "auto", rbRight: mine ? "auto" : "-38px",
     };
@@ -238,6 +241,7 @@ export function chatVM(ctx: SalesCtx) {
       ...(superior ? [["Move", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, move: true, sel: null }), `Hand over to ${firstName(superior.name)}`, "#E4EDF8", "#2F6FB5"]] : []),
       ["Customer info", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => setHm({ menu: false, info: true }), "", "#E4F1E8", "#387557"],
       ["Appointment", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => setHm({ menu: false, appt: true }), "", "#F3E8EF", "#8E4B6E"],
+      ["Starred messages", "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", () => { setHm({ menu: false }); openStarred(c.messages.filter(m => stars.has(m.id)).map(m => ({ id: m.id, who: m.from === "me" ? "You" : c.name, text: m.text || (m.media ? mediaWord(m) : ""), at: msgTime(m.at) }))); }, `${c.messages.filter(m => stars.has(m.id)).length} in this chat`, "#FBF1D9", "#A46312"],
     ] as [string, string, () => void, string, string, string][]).map(([label, icon, go, sub, bg, fg]) => ({ label, icon, go, sub, bg, fg })),
     apptOpen: !!hm.appt, apptHas: !!nextVisit, apptNone: !nextVisit,
     apptRoom: nextVisit ? (roomOf(nextVisit.showroomId)?.name ?? "").replace(/ showroom$/i, "") : "",

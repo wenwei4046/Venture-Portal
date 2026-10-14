@@ -199,6 +199,8 @@ export interface CrmData {
   rooms: CrmRoom[];
   prefs: Record<string, CrmPrefs>;
   hiddenMessages: string[];
+  /** One's own starred messages (the message menu's Star, 2026-10-14). */
+  starredMessages?: string[];
   labels: CrmLabel[];
   customerLabels: Record<string, string[]>;
   quickReplies: CrmQuickReply[];
@@ -299,6 +301,8 @@ export interface CrmDataRows {
   rooms: CrmRoomRow[];
   prefs: CrmPrefRow[];
   hides: { message_id: string }[];
+  /** One's own starred messages (mig 20261014060000); absent before it. */
+  stars?: { message_id: string }[];
   labels: { id: string; name: string; color: string; sort_order: number }[];
   contactLabels: { label_id: string; contact_id: string }[];
   quickReplies: { id: string; shortcut: string; message: string; sort_order: number }[];
@@ -417,6 +421,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     rooms: [...rows.rooms].sort((a, b) => a.sort_order - b.sort_order).map(roomFromRow),
     prefs: Object.fromEntries(rows.prefs.map(p => [p.contact_id, { pinned: p.pinned, muted: p.muted, hidden: p.hidden, blocked: p.blocked, pinnedMessageId: p.pinned_message_id }])),
     hiddenMessages: rows.hides.map(h => h.message_id),
+    starredMessages: (rows.stars ?? []).map(s => s.message_id),
     labels: [...rows.labels].sort((a, b) => a.sort_order - b.sort_order).map(l => ({ id: l.id, name: l.name, color: l.color })),
     customerLabels,
     quickReplies: [...rows.quickReplies].sort((a, b) => a.sort_order - b.sort_order).map(q => ({ id: q.id, shortcut: q.shortcut, message: q.message })),
