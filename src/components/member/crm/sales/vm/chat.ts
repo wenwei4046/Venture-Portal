@@ -159,7 +159,7 @@ export function chatVM(ctx: SalesCtx) {
         go: () => set(u => ({ ...u, chat: null, tab: "calendar", calView: "month", calSel: day0(cd), calYM: [cd.getFullYear(), cd.getMonth()], hist: [...u.hist, u.tab].slice(-20) })),
       } : null,
       // A document is its tile (name and type), never its name again under it (2026-10-14).
-      ...mediaOf(m, gallery, al.lead.get(key)),
+      ...mediaOf(m, gallery, al.lead.get(key)), ...(by ? { timeTop: "4px" } : {}),
       pDisp: card || mk === "file" || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: "14px", textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : mk === "file" ? "📄 " + m.text : m.text),
       // A starred message shows ★ by its time (the message menu's Star, 2026-10-14).
       timeJustify: "flex-end", timeColor: mine ? "#806B60" : SUB, by, at: (stars.has(key) ? "★ " : "") + msgTime(m.at),
@@ -479,10 +479,16 @@ export function chatVM(ctx: SalesCtx) {
     pickMedia: async (e: ChangeEvent<HTMLInputElement>) => {
       const files = [...(e.target.files ?? [])]; e.target.value = "";
       if (!files.length) return;
-      const caption = draft.trim();
+      // A photo or video picked here too waits on the editor (caption, HD, edits) — the Team chat's + is this picker, and
+      // a photo chosen through it went straight out (the owner, 2026-10-14: "點勾選後就直接發送了"); only a document goes at once.
+      const isVisual = (f: File) => f.type.startsWith("image/") || f.type.startsWith("video/");
+      const visual = files.filter(isVisual), docs = files.filter(f => !isVisual(f));
+      if (visual.length) set(u => ({ ...u, pick: { ...pickedOf(visual), caption: draft } }));
+      if (!docs.length) return;
+      const caption = visual.length ? "" : draft.trim();
       if (caption) setDraft("");
       scrollDown();
-      await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
+      await Promise.all(docs.map((f, i) => act.sendMedia(c.id, f, i === 0 ? caption : "")));
     },
     openCamera: () => document.getElementById("crm-pick-camera")?.click(),
     // Photos and videos (the + sheet's Photos, the camera) wait on the preview with its HD switch; a document goes at once.

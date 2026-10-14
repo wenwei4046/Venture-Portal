@@ -56,7 +56,7 @@ module.exports = [
     CHAT_MEDIA + '<p style={{ display: m.pDisp, margin: "0", padding: m.inPad, whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "14px", lineHeight: "1.45" }}>{m.text}</p>'],
   // 2026-10-14 (chat-media.cjs): a photo, video or document sits 3 px inside its bubble, as WhatsApp's ("聊天室的邊框不要那麼大").
   ['<div style={{ alignSelf: m.align, maxWidth: "80%", padding: "10px 13px", boxSizing: "border-box", borderRadius: m.radius, boxShadow', '<div {...m.press} style={{ WebkitTouchCallout: "none", position: "relative", marginBottom: m.rxGap, display: m.vis, alignSelf: m.align, maxWidth: "80%", padding: m.pad, boxSizing: "border-box", borderRadius: m.radius, boxShadow'],
-  ['justifyContent: "flex-end", gap: "3px", marginTop: "4px", fontSize: "11px", color: "#806B60" }}', 'justifyContent: "flex-end", gap: "3px", marginTop: "4px", padding: m.inPad, fontSize: "11px", color: "#806B60" }}'],
+  ['justifyContent: "flex-end", gap: "3px", marginTop: "4px", fontSize: "11px", color: "#806B60" }}', 'justifyContent: "flex-end", gap: "3px", marginTop: m.timeTop, padding: m.inPad, fontSize: "11px", color: "#806B60" }}'],
   // 2026-10-14 (the owner: "team 的聊天室，點進來後下方的 insight inbox… 可以拿掉，像 mine 一樣"): a chat open hides the bottom bar.
   ['<nav style={{ flex: "none", display: "flex", alignItems: "flex-end", height: "62px"', '<nav style={{ flex: "none", display: v.navOn ? "flex" : "none", alignItems: "flex-end", height: "62px"'],
   [/(\{m\.time\}\{!!\(m\.mine\) && \(<>\s*<svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke=)"#2F8FD8"( strokeWidth="1\.6" strokeLinecap="round" strokeLinejoin="round">\s*<path d=)"M1 6l3 3 6-7M7 8\.5l\.5\.5 6-7"/,

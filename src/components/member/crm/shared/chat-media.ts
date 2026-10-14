@@ -21,6 +21,8 @@ export const NO_MEDIA = {
   album: [] as AlbumTile[], albumMore: 0,
   view: undefined as (() => void) | undefined, shape: undefined as ((e: SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => void) | undefined,
   pad: "10px 13px", inPad: "0",
+  /** The time row's top margin: a voice note's time sits on its own duration line, as WhatsApp's (the bubble one line shorter). */
+  timeTop: "4px",
 };
 
 /** A message with no words, named in a chat list as the chat names it (it read "Attachment", or nothing). */
@@ -89,5 +91,7 @@ export function mediaOf(m: Msg, gallery: ViewerItem[], album?: Msg[]): typeof NO
     // A voice note sits closer to its bubble too ("語音聊天的畫面改小一點").
     pad: framed ? "3px 3px 5px" : k === "audio" ? "6px 9px 5px" : "10px 13px",
     inPad: framed ? "0 7px" : k === "audio" ? "0 2px" : "0",
+    // 2026-10-14 ("語音氣泡還是一樣"): the time moves up beside the voice note's duration instead of a line of its own.
+    timeTop: k === "audio" ? "-16px" : "4px",
   };
 }

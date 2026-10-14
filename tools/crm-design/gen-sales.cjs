@@ -129,7 +129,7 @@ const PATCHES = {
     // viewer on a tap, a document as a tile with its name; a photo, video or document sits 3 px inside its bubble (m.pad / m.inPad).
     ['<p style={{ display: m.pDisp, margin: "0", whiteSpace: "pre-wrap",', CHAT_MEDIA + '\n                <p style={{ display: m.pDisp, margin: "0", padding: m.inPad, whiteSpace: "pre-wrap",'],
     ['minWidth: "0", padding: "10px 13px", boxSizing: "border-box", borderRadius: m.radius,', 'minWidth: "0", padding: m.pad, boxSizing: "border-box", borderRadius: m.radius,'],
-    ['gap: "3px", marginTop: "4px", fontSize: "11px", color: m.timeColor', 'gap: "3px", marginTop: "4px", padding: m.inPad, fontSize: "11px", color: m.timeColor'],
+    ['gap: "3px", marginTop: "4px", fontSize: "11px", color: m.timeColor', 'gap: "3px", marginTop: m.timeTop, padding: m.inPad, fontSize: "11px", color: m.timeColor'],
     // 2026-10-14: a long press on any message opens WhatsApp's menu (shared/msg-menu.tsx); the phone's own callout is held back.
     ['<div onMouseEnter={m.enter} onMouseLeave={m.leave} style={{ position: "relative", alignSelf: m.align,', '<div {...m.press} onMouseEnter={m.enter} onMouseLeave={m.leave} style={{ WebkitTouchCallout: "none", position: "relative", alignSelf: m.align,'],
     // …a message being sent shows a small clock instead of the ticks.
