@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { MemberBand, QuoteResult } from "@/lib/member/types";
@@ -55,6 +57,10 @@ describe("step 2's card keeps one size", () => {
     expect(figure(STATES[1][1])).not.toMatch(/fig/);
     expect(figure(calcVM({ price: "2", items: 1, bands: BANDS, result: result(-77043), error: null }))).toMatch(/figSmall/);
     expect(figure(calcVM({ price: "0.01", items: 1, bands: BANDS, result: result(-15428500), error: null }))).toMatch(/figTiny/);
+    // The smaller sizes outrank each figure's own whatever the order in the file (the first cut came before
+    // `.marginNum` and lost to it — caught on the preview, not here).
+    const css = readFileSync(resolve(process.cwd(), "src/components/member/app/quote/quote.module.css"), "utf8");
+    for (const size of ["figSmall", "figTiny"]) expect(css).toMatch(new RegExp(`\\.priceNum\\.${size}, \\.marginNum\\.${size} \\{`));
   });
 
   it("offers one Use price, the real one", () => {
