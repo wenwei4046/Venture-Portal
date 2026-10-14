@@ -5,6 +5,19 @@
    open the rest of a form (in the calendar's *Today* button's hand). */
 
 .select { width: 100%; }
+/* As the design's HrSelect draws a form's select (D07, measured): 32px tall,
+   its words 12px in — where an input's are. The soft select's own padding is
+   8px, and a native select ignores the line height that makes the design's
+   31.7px, so both are set here (`select.` outranks the soft select's class). */
+select.select { height: 32px; padding-left: 12px; }
+/* A select in a line of the lines card: the line's 32px, its words 8px in, as the line's inputs. */
+.lineSelect { width: 100%; }
+select.lineSelect { height: 32px; }
+/* Their edge and ink as an input's. The soft select draws both from the HR
+   view's --hv-* colours, which a dialog portaled to <body> does not have —
+   there the edge was dropped altogether (D07 draws it). */
+select.select,
+select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
 
 /* Pay to: the input, and the companies it matches under it (the soft menu's look). */
 .suggestWrap { position: relative; display: flex; flex-direction: column; }
@@ -114,6 +127,116 @@
 }
 .summaryTotalLabel { font-size: 13px; font-weight: 500; }
 .summaryTotalValue { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 14px; font-weight: 600; }
+
+/* Lines (a payment's split, an invoice's companies, its billing modes, its
+   items): a white card of rows, each its own grid; the peach foot with
+   *+ Add line* and the sum. Moved here from Create payment (2026-10-14) when
+   the invoice dialogs took the same card. */
+.lines {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.lineWrap { border-top: 1px solid var(--ds-border); }
+.lineWrap:first-child { border-top: 0; }
+.lineRow {
+  display: grid;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 8px 12px;
+}
+/* A company and its amount · a mode, a category and an amount · an item and its amount (and its category). */
+.lineRow[data-shape='party'] { grid-template-columns: minmax(0, 1fr) 128px 28px; }
+.lineRow[data-shape='pool'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) 112px 28px; }
+.lineRow[data-shape='item'] { grid-template-columns: minmax(0, 1fr) 128px 28px; }
+.lineRow[data-shape='item-cat'] { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 112px 28px; }
+/* A narrow dialog (a phone): a line of four takes two rows — its two selects, then its amount and its ×. */
+@media (max-width: 560px) {
+  .lineRow[data-shape='pool'],
+  .lineRow[data-shape='item-cat'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .lineRow[data-shape='pool'] > :last-child,
+  .lineRow[data-shape='item-cat'] > :last-child { justify-self: end; }
+}
+.lineAmount {
+  box-sizing: border-box;
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  padding: 0 8px;
+  border: 1px solid var(--ds-border);
+  border-radius: 10px;
+  background: var(--ds-surface);
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 13px;
+  text-align: right;
+  color: var(--ds-ink);
+  outline: none;
+}
+.lineAmount:focus { border-color: var(--ds-accent); box-shadow: var(--ds-focus-ring); }
+.lineAmount:read-only { color: rgb(var(--hvs-graphite)); }
+.lineText {
+  box-sizing: border-box;
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  padding: 0 8px;
+  border: 1px solid var(--ds-border);
+  border-radius: 10px;
+  background: var(--ds-surface);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ds-ink);
+  outline: none;
+}
+.lineText::placeholder { color: var(--ds-placeholder); opacity: 1; }
+.lineText:focus { border-color: var(--ds-accent); box-shadow: var(--ds-focus-ring); }
+.lineText:read-only { color: rgb(var(--hvs-graphite)); }
+.remove {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 17px;
+  line-height: 1;
+  color: rgb(var(--hvs-graphite));
+  cursor: pointer;
+}
+.remove:hover { background: rgb(var(--hvs-nav-hover)); }
+.remove:disabled { opacity: 0.3; cursor: default; background: transparent; }
+.linesFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 14px;
+  background: rgb(var(--fv-peach));
+  border-top: 1px solid var(--ds-border);
+}
+.linesTotal { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 13px; font-weight: 600; }
+.linesTotal[data-off='true'] { color: var(--ds-danger); }
+.addLine {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ds-ink);
+  cursor: pointer;
+}
+.addLine:hover { text-decoration: underline; }
+.addLine:disabled { opacity: 0.45; cursor: default; text-decoration: none; }
+
+/* Two fields side by side (a party's phone and email). */
+.duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.duo > * { min-width: 0; }
 
 /* The row of small buttons: what this voucher may also be or carry. */
 .more { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 2px; }

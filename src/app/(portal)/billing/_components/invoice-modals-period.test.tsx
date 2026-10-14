@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
-import CreateInvoiceButton from './CreateInvoiceButton'
-import CreateMultiLineInvoiceButton from './CreateMultiLineInvoiceButton'
 import GenerateConsolidatedInvoicesButton from './GenerateConsolidatedInvoicesButton'
 import GenerateOwnShareInvoiceButton from './GenerateOwnShareInvoiceButton'
 import ReconcilePayrollBillingButton from './ReconcilePayrollBillingButton'
@@ -17,10 +15,6 @@ import ReconcilePayrollBillingButton from './ReconcilePayrollBillingButton'
 const { push, refresh } = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push, refresh }) }))
 vi.mock('../actions', () => ({
-  createManualInvoice: vi.fn(),
-  createMultiLineInvoice: vi.fn(),
-  fetchDirectorCtcByCompany: vi.fn().mockResolvedValue([]),
-  fetchStaffAllocationByCompany: vi.fn().mockResolvedValue([]),
   fetchConsolidatedPayrollPreview: vi.fn().mockResolvedValue([]),
   generateConsolidatedPayrollInvoices: vi.fn(),
   fetchOwnShareInvoicePreview: vi.fn().mockResolvedValue({ groups: [] }),
@@ -31,8 +25,6 @@ vi.mock('../actions', () => ({
 vi.mock('@/components/AccountPicker', () => ({
   default: () => <select aria-label="Account" />,
 }))
-
-const companies = [{ id: 'co-hc', name: 'HOUZS Century', short_code: 'HC' }]
 
 /** The one month field an open modal has. */
 function modalMonth(): HTMLInputElement {
@@ -65,12 +57,6 @@ function itReseeds(
 }
 
 describe('Service Billing modals across periods', () => {
-  itReseeds('CreateInvoiceButton', '+ Create Invoice', p => (
-    <CreateInvoiceButton companies={companies} currentPeriod={p} />
-  ))
-  itReseeds('CreateMultiLineInvoiceButton', '+ Multi-line Invoice', p => (
-    <CreateMultiLineInvoiceButton companies={companies} currentPeriod={p} />
-  ))
   itReseeds('GenerateConsolidatedInvoicesButton', 'Generate payroll invoices', p => (
     <GenerateConsolidatedInvoicesButton currentPeriod={p} />
   ))
@@ -89,8 +75,6 @@ describe('Service Billing modals across periods', () => {
  */
 describe('Service Billing modals opened from a menu', () => {
   const cases: Array<[string, string, (p: string) => React.ReactElement]> = [
-    ['CreateInvoiceButton', '+ Create Invoice', (p) => <CreateInvoiceButton companies={companies} currentPeriod={p} autoOpen hideTrigger />],
-    ['CreateMultiLineInvoiceButton', '+ Multi-line Invoice', (p) => <CreateMultiLineInvoiceButton companies={companies} currentPeriod={p} autoOpen hideTrigger />],
     ['GenerateConsolidatedInvoicesButton', 'Generate payroll invoices', (p) => <GenerateConsolidatedInvoicesButton currentPeriod={p} autoOpen hideTrigger />],
     ['GenerateOwnShareInvoiceButton', 'Own-share → Venture (Office)', (p) => <GenerateOwnShareInvoiceButton currentPeriod={p} autoOpen hideTrigger />],
     ['ReconcilePayrollBillingButton', '对数补差', (p) => <ReconcilePayrollBillingButton currentPeriod={p} autoOpen hideTrigger />],
