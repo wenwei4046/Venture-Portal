@@ -53,16 +53,14 @@ const profileFrag = (() => {
   return f;
 })();
 
-// rev 1010 §7.3 Team | Mine in the top bar of every RS page, between the back link and the bell — the prototype's
-// Director pill (RS Insight's isDir / dirTabs), centred in the bar; shown to the Director and to anyone with a downline.
-// Round 2 (§8.2 / §8.4): the bar shows only on Profile's sub-pages ("‹ Profile" and the bell) and for Team | Mine, which
-// then sits alone at its right end — the RS prototypes' showTopBar; the bell moves into each page's title row.
+// Round 2 (§8.2): the top bar shows only on Profile's sub-pages ("‹ Profile" and the bell) — the RS prototypes'
+// showTopBar; the bell moves into each page's title row. (Team | Mine — rev 1010 §7.3, the prototype's Director pill
+// (RS Insight's isDir / dirTabs) — sat alone at this bar's right end on every page until 2026-10-14: it is one round
+// button left of the house now, team-mine-swap.cjs, in BELL and on Profile's card.)
 const headerFrag = (() => {
-  const pill = protoNode("RS Insight", "{{ isDir }}").replace("{{ isDir }}", "{{ hasTM }}").replace("{{ dirTabs }}", "{{ tmTabs }}")
-    .replace("align-self: flex-start;", "align-self: center; margin-left: auto;");
   const bar = lines(36, 39), bell = balanced(bar, '<span onClick="{{ openNotifTop }}"', "span", "3b header");
-  const withPill = once(bar, bell, pill + '<sc-if value="{{ bellTop }}" hint-placeholder-val="{{ false }}">' + bell + "</sc-if>");
-  return '<sc-if value="{{ showTopBar }}" hint-placeholder-val="{{ false }}">' + withPill + "</sc-if>";
+  const withBell = once(bar, bell, '<sc-if value="{{ bellTop }}" hint-placeholder-val="{{ false }}">' + bell + "</sc-if>");
+  return '<sc-if value="{{ showTopBar }}" hint-placeholder-val="{{ false }}">' + withBell + "</sc-if>";
 })();
 
 const line34 = src[33];
@@ -70,7 +68,7 @@ const shellPart = line34.slice(line34.indexOf('<sc-if value="{{ rdX }}"'));
 
 const parts = [
   ["SalesShellBanners", "ShellVM", shellPart, "The Revenue Director's Control panel | My CRM toggle, the Viewing-someone banner and the Switch sheet."],
-  ["SalesHeader", "HeaderVM", headerFrag, "Top bar: back to the Revenue app, Team | Mine (leaders and the Director), and the bell."],
+  ["SalesHeader", "HeaderVM", headerFrag, "Top bar of Profile's sub-pages: ‹ Profile and the bell."],
   ["SalesInbox", "InboxVM", lines(41, 118), "Inbox: search, filter chips, rows (swipe for More), the More / Label sheets and the ad filter."],
   ["SalesContacts", "ContactsVM", lines(121, 180), "Contacts: A–Z, swipe to edit or delete, customer details and info sheets."],
   // rev 1010 §3: a visit opens Contacts' Customer info sheet (lines 145–150) and its form (127–144) on the Calendar too.
@@ -173,10 +171,14 @@ for (const n of ["SalesContacts", "SalesCalendar", "SalesInsight"]) PATCHES[n] =
 for (const n of ["SalesChat", "SalesContacts", "SalesCalendar", "SalesInsight", "SalesCustomerForm"]) PATCHES[n] = [...(PATCHES[n] ?? []), ...require("./form-patches.cjs")()];
 // The way back to the Revenue app left of the bell on every page (2026-10-14, the owner — switch-back.cjs).
 const switchBack = require("./switch-back.cjs");
+// …and Team | Mine left of the house, for whoever has a Team side (2026-10-14, the owner — team-mine-swap.cjs).
+const teamMineSwap = require("./team-mine-swap.cjs");
+const SWAP = (indent, extra) => "{!!(v.tm.on) && (<>\n" + indent + "  " + teamMineSwap("v.tm", indent + "  ", extra) + "\n" + indent + "</>)}\n" + indent;
 // Round 2 (rev 1010 §8.2): the bell moves into each page's title row, at its right end — the Control panel prototype's
 // round button (40×40, 1px #EBDDD2, white, soft shadow, 20 px bell, rust badge top/right -4px) — and the way back left of it,
-// the two one group: a title row that spreads its children (Contacts) keeps them side by side at its right end.
-const BELL = "{!!(v.tb) && (<>\n          <span style={{ display: \"flex\", alignItems: \"center\", gap: \"8px\", flex: \"none\" }}>\n          " + switchBack("          ") + "\n          <span onClick={v.tb.open} title=\"Notifications\" style={{ position: \"relative\", flex: \"none\", width: \"40px\", height: \"40px\", boxSizing: \"border-box\", borderRadius: \"50%\", border: \"1px solid #EBDDD2\", background: \"#fff\", display: \"grid\", placeItems: \"center\", color: \"#3F2B22\", boxShadow: \"0 2px 8px rgba(63,43,34,.06)\", cursor: \"pointer\" }}>\n            <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.8\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\n              <path d=\"M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0\">\n              </path>\n            </svg>\n            {!!(v.tb.has) && (<>\n              <span style={{ position: \"absolute\", top: \"-4px\", right: \"-4px\", minWidth: \"18px\", height: \"18px\", padding: \"0 5px\", boxSizing: \"border-box\", borderRadius: \"9px\", background: \"#BD4A19\", border: \"2px solid #fff\", color: \"#fff\", display: \"grid\", placeItems: \"center\", fontSize: \"10px\", fontWeight: \"700\" }}>{v.tb.n}</span>\n            </>)}\n          </span>\n          </span>\n        </>)}";
+// one group (with Team | Mine left of both): a title row that spreads its children (Contacts) keeps them side by side at
+// its right end.
+const BELL = "{!!(v.tb) && (<>\n          <span style={{ display: \"flex\", alignItems: \"center\", gap: \"8px\", flex: \"none\" }}>\n          " + SWAP("          ") + switchBack("          ") + "\n          <span onClick={v.tb.open} title=\"Notifications\" style={{ position: \"relative\", flex: \"none\", width: \"40px\", height: \"40px\", boxSizing: \"border-box\", borderRadius: \"50%\", border: \"1px solid #EBDDD2\", background: \"#fff\", display: \"grid\", placeItems: \"center\", color: \"#3F2B22\", boxShadow: \"0 2px 8px rgba(63,43,34,.06)\", cursor: \"pointer\" }}>\n            <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.8\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\n              <path d=\"M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0\">\n              </path>\n            </svg>\n            {!!(v.tb.has) && (<>\n              <span style={{ position: \"absolute\", top: \"-4px\", right: \"-4px\", minWidth: \"18px\", height: \"18px\", padding: \"0 5px\", boxSizing: \"border-box\", borderRadius: \"9px\", background: \"#BD4A19\", border: \"2px solid #fff\", color: \"#fff\", display: \"grid\", placeItems: \"center\", fontSize: \"10px\", fontWeight: \"700\" }}>{v.tb.n}</span>\n            </>)}\n          </span>\n          </span>\n        </>)}";
 // Inbox rows: a long press opens More (user 2026-10-13); scrolling (pointer cancel) stops it, and the phone's own text
 // callout stays away.
 PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []),
@@ -201,7 +203,8 @@ PATCHES.SalesProfile = [...(PATCHES.SalesProfile ?? []),
    '<span style={{ fontSize: "12px", color: "#806B60" }}>{u.meta}</span>\n                    {!!(u.sum) && (<span style={{ fontSize: "13px", color: "#3F2B22", lineHeight: "1.35", marginTop: "2px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{u.sum}</span>)}'],
 ];
 // Inbox: after All ads, 8 px apart (the title takes the room, so All ads and the bell sit right). Team | Mine left the title
-// row for its own top row (§8.4, superseding 2026-10-11's place beside All ads).
+// row for its own top row (§8.4, superseding 2026-10-11's place beside All ads), and came back as one round button in
+// BELL (2026-10-14).
 PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []),
   ['<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>\n        <h1 style={{ margin: "0", fontSize: "28px",',
     '<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>\n        <h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "28px",'],
@@ -237,9 +240,10 @@ PATCHES.SalesInsight = [...(PATCHES.SalesInsight ?? []),
 PATCHES.SalesProfile = [...(PATCHES.SalesProfile ?? []),
   ['<div style={{ borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)",', '<div style={{ position: "relative", borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)",'],
   ['<div style={{ display: "flex", alignItems: "center", gap: "14px" }}>\n            <span style={{ flex: "none", width: "64px", height: "64px",',
-    // …and the way back left of it, 8 px apart (switch-back.cjs); the name row then keeps 96 px clear.
-    "{!!(v.tb) && (<>\n          " + switchBack("          ", "position: \"absolute\", top: \"14px\", right: \"62px\", ") + "\n          <span onClick={v.tb.open} title=\"Notifications\" style={{ position: \"absolute\", top: \"14px\", right: \"14px\", flex: \"none\", width: \"40px\", height: \"40px\", boxSizing: \"border-box\", borderRadius: \"50%\", border: \"1px solid #EBDDD2\", background: \"#fff\", display: \"grid\", placeItems: \"center\", color: \"#3F2B22\", boxShadow: \"0 2px 8px rgba(63,43,34,.06)\", cursor: \"pointer\" }}>\n            <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.8\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\n              <path d=\"M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0\">\n              </path>\n            </svg>\n            {!!(v.tb.has) && (<>\n              <span style={{ position: \"absolute\", top: \"-4px\", right: \"-4px\", minWidth: \"18px\", height: \"18px\", padding: \"0 5px\", boxSizing: \"border-box\", borderRadius: \"9px\", background: \"#BD4A19\", border: \"2px solid #fff\", color: \"#fff\", display: \"grid\", placeItems: \"center\", fontSize: \"10px\", fontWeight: \"700\" }}>{v.tb.n}</span>\n            </>)}\n          </span>\n        </>)}" + '\n          <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "96px" }}>\n            <span style={{ flex: "none", width: "64px", height: "64px",']];
-// The five pages read the bell (and Profile its way back) beside their own view model: header.ts › ShellExtras.
+    // …and the way back left of it, 8 px apart (switch-back.cjs), Team | Mine 8 px left of that (team-mine-swap.cjs); the
+    // name row then keeps 96 px clear, 144 px with Team | Mine.
+    "{!!(v.tb) && (<>\n          " + SWAP("          ", "position: \"absolute\", top: \"14px\", right: \"110px\", ") + switchBack("          ", "position: \"absolute\", top: \"14px\", right: \"62px\", ") + "\n          <span onClick={v.tb.open} title=\"Notifications\" style={{ position: \"absolute\", top: \"14px\", right: \"14px\", flex: \"none\", width: \"40px\", height: \"40px\", boxSizing: \"border-box\", borderRadius: \"50%\", border: \"1px solid #EBDDD2\", background: \"#fff\", display: \"grid\", placeItems: \"center\", color: \"#3F2B22\", boxShadow: \"0 2px 8px rgba(63,43,34,.06)\", cursor: \"pointer\" }}>\n            <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.8\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\n              <path d=\"M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0\">\n              </path>\n            </svg>\n            {!!(v.tb.has) && (<>\n              <span style={{ position: \"absolute\", top: \"-4px\", right: \"-4px\", minWidth: \"18px\", height: \"18px\", padding: \"0 5px\", boxSizing: \"border-box\", borderRadius: \"9px\", background: \"#BD4A19\", border: \"2px solid #fff\", color: \"#fff\", display: \"grid\", placeItems: \"center\", fontSize: \"10px\", fontWeight: \"700\" }}>{v.tb.n}</span>\n            </>)}\n          </span>\n        </>)}" + '\n          <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: v.tm.on ? "144px" : "96px" }}>\n            <span style={{ flex: "none", width: "64px", height: "64px",']];
+// The five pages read the bell, the house and Team | Mine beside their own view model: header.ts › ShellExtras.
 const EXTRAS = new Set(["SalesInbox", "SalesContacts", "SalesCalendar", "SalesInsight", "SalesProfile"]);
 for (const [name, vm, frag, doc, vmOverride] of parts) {
   let body = convert(frag);

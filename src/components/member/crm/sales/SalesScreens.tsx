@@ -15,7 +15,7 @@ import SalesInsight from "./SalesInsight";
 import SalesProfile from "./SalesProfile";
 import SalesChat from "./SalesChat";
 import SalesNav from "./SalesNav";
-import { headerVM, navVM, shellVM, titleBellVM } from "./vm/header";
+import { headerVM, navVM, shellVM, teamMineVM, titleBellVM } from "./vm/header";
 import { inboxVM } from "./vm/inbox";
 import { contactsVM } from "./vm/contacts";
 import { calendarVM } from "./vm/calendar";
@@ -33,8 +33,8 @@ export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: (
   useFollowNewest(ui.chat, ctx.data.customers.find(c => c.id === ui.chat)?.messages.length ?? 0);
   const { set } = ctx;
   useCloseOnOutside(!!ui.hm?.menu, useCallback(() => set(u => ({ ...u, hm: null })), [set]));
-  // Round 2: each page's title row has the bell; Profile's card leads back to the Revenue app (the top bar's link is gone).
-  const x = { tb: titleBellVM(ctx), exitCrm: onExit };
+  // Each page's title row: Team | Mine (whoever has a Team side), the house back to the Revenue app, the bell.
+  const x = { tb: titleBellVM(ctx), exitCrm: onExit, tm: teamMineVM(ctx) };
   return (<>
     <SalesShellBanners v={shellVM(ctx)} />
     {!chat && (<>

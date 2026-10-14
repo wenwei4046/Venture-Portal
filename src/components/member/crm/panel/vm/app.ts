@@ -20,6 +20,7 @@ import { calendarInfoVM, calendarListVM } from "./calendar-list";
 import { assignExtraVM } from "./assign-1011";
 import { memberWorkTypeVM, templatesVM } from "./profile-1011";
 import { teamName, teamOf } from "../../shared/people";
+import { teamMineSwap } from "../../shared/team-mine";
 import { customerForm } from "../../sales/vm/customer";
 import { DAY, day0 } from "../../sales/vm/common";
 import type { KeyboardEvent } from "react";
@@ -54,14 +55,14 @@ export function panelAppVM(ctx: PanelCtx) {
   const x = assignExtraVM(ctx, as0);
   const as = as0 ? { ...as0, adRows: x.adRows, ae: { ...as0.ae, ...x.aeApply, ...(x.aeSave ?? {}) } } : undefined;
   const cal = show.cal ? calendarVM(ctx) : undefined;
-  // Team | Mine (rev 1011: the Director, and leaders with a downline), never in a chat: at the right end of its own top
-  // row on every page, Inbox included (round 2, §8). The top bar shows only for it or a back link ("‹ Profile" on Ads
-  // Performance, "‹ Assignment" in a section); the bell sits in each page's title row, or in the top bar beside a back
-  // link — the prototype's bellIn / bellTop.
-  const dirTop = !!ctx.toMyCrm && !lead;
+  // The top bar shows only for a back link ("‹ Profile" on Ads Performance, "‹ Assignment" in a section); the bell sits in
+  // each page's title row, or in the top bar beside a back link — the prototype's bellIn / bellTop. Team | Mine (rev 1011:
+  // the Director, and leaders with a downline) is one round button left of the house in the title row (2026-10-14,
+  // shared/team-mine.ts); it had a top row of its own on every page (round 2, §8). Never in a chat.
   return {
     show, hd, bl, cf,
-    topBar: !!(hd.showHead || dirTop), dirTop, dirMine: () => ctx.toMyCrm?.(),
+    topBar: !!hd.showHead,
+    tm: teamMineSwap("team", lead ? undefined : ctx.toMyCrm),
     bellIn: !!bl.showBell && !hd.showHead, bellTop: !!bl.showBell && hd.showHead,
     // The house left of the bell on every page (switch-back.cjs, 2026-10-14); Profile's card is gone.
     exitCrm: () => ctx.exitApp(), enterNext,

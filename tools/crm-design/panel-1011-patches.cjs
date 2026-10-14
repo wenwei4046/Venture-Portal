@@ -2,6 +2,9 @@ const { PICK_SHEET } = require("./pick-sheet.cjs");
 const { EMOJI_PANEL } = require("./emoji-panel.cjs");
 const CHAT_MEDIA = require("./chat-media.cjs");
 const switchBack = require("./switch-back.cjs");
+const teamMineSwap = require("./team-mine-swap.cjs");
+// Team | Mine left of the house (team-mine-swap.cjs), only for whoever has the other side (v.tm.on).
+const SWAP = (indent, extra) => "{!!(v.tm.on) && (<>\n" + indent + "  " + teamMineSwap("v.tm", indent + "  ", extra) + "\n" + indent + "</>)}\n" + indent;
 // Live-data patches on the rev 1011 Control panel markup (each must match exactly once). Kept short on purpose: the
 // markup is the prototype's; a patch is only where the live app must differ, and says why.
 module.exports = [
@@ -47,7 +50,8 @@ module.exports = [
     '<small style={{ fontSize: "11px", lineHeight: "14px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.sub}</small>'],
   // (Round 2, 2026-10-13: Team | Mine sits at the right end of its own top row on every page, Inbox included, at the
   // prototype's 14 px a side — the 2026-10-11 patches that put it in Inbox's title row and narrowed it are gone, as the
-  // top bar no longer holds "‹ Back to Revenue app" beside it. rev 1011 §8.)
+  // top bar no longer holds "‹ Back to Revenue app" beside it. rev 1011 §8. Since 2026-10-14 that row is gone too: Team |
+  // Mine is one round button left of the house, below.)
   // 2026-10-13: a photo, video or voice note shows as itself in the chat's bubble (as the salesperson's), a file opens;
   // a message being sent shows a small clock, and the ticks go blue only once read.
   ['<p style={{ display: m.pDisp, margin: "0", whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "14px", lineHeight: "1.45" }}>{m.text}</p>',
@@ -110,16 +114,22 @@ module.exports = [
   ['<div style={{ position: "absolute", top: "48px", right: "0", zIndex: "7", width: "240px"', '<div data-hm-menu="1" style={{ position: "absolute", top: "48px", right: "0", zIndex: "7", width: "240px"'],
   // 2026-10-14 (the owner: "the switch back revenue app, put the same place with switch to crm, put a icon, easy to switch"):
   // the Revenue app's home left of the bell in every page's title row (switch-back.cjs) — Insight, Inbox, Assignment,
-  // Calendar — as the Revenue app's Today has the CRM's chat button left of its bell. Profile's card keeps its way back.
-  ['>Hello, {v.ov.meFirst}</h1>\n              {!!(v.bellIn) && (<>\n', '>Hello, {v.ov.meFirst}</h1>\n              {!!(v.bellIn) && (<>\n                ' + switchBack("                ") + "\n"],
-  ['</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n', '</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n              ' + switchBack("              ") + "\n"],
-  ['>Who gets each new enquiry</span>\n              </div>\n              {!!(v.bellIn) && (<>\n', '>Who gets each new enquiry</span>\n              </div>\n              {!!(v.bellIn) && (<>\n                ' + switchBack("                ") + "\n"],
-  ['</svg></span>\n            {!!(v.bellIn) && (<>\n', '</svg></span>\n            {!!(v.bellIn) && (<>\n              ' + switchBack("              ") + "\n"],
-  // …and Profile: the bell sits in the card's top-right corner, the way back 8 px left of it, the name row 96 px clear.
+  // Calendar — as the Revenue app's Today has the CRM's chat button left of its bell. And Team | Mine, the same day ("change
+  // the 原本的那个 team 跟 mine 换来这里", the design "Team · Mine toggle — 1a Single swap circle"): one round button left of
+  // the house (team-mine-swap.cjs), for whoever has a Mine to go to.
+  ['>Hello, {v.ov.meFirst}</h1>\n              {!!(v.bellIn) && (<>\n', '>Hello, {v.ov.meFirst}</h1>\n              {!!(v.bellIn) && (<>\n                ' + SWAP("                ") + switchBack("                ") + "\n"],
+  ['</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n', '</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n              ' + SWAP("              ") + switchBack("              ") + "\n"],
+  ['>Who gets each new enquiry</span>\n              </div>\n              {!!(v.bellIn) && (<>\n', '>Who gets each new enquiry</span>\n              </div>\n              {!!(v.bellIn) && (<>\n                ' + SWAP("                ") + switchBack("                ") + "\n"],
+  ['</svg></span>\n            {!!(v.bellIn) && (<>\n', '</svg></span>\n            {!!(v.bellIn) && (<>\n              ' + SWAP("              ") + switchBack("              ") + "\n"],
+  // …and Profile: the bell sits in the card's top-right corner, the way back 8 px left of it, Team | Mine 8 px left of
+  // that; the name row 96 px clear, 144 px with Team | Mine.
   ['{!!(v.bellIn) && (<>\n              <span onClick={v.bl.openNotifs} title="Notifications" style={{ flex: "none", width: "40px",',
-    '{!!(v.bellIn) && (<>\n              ' + switchBack("              ", 'position: "absolute", top: "14px", right: "62px", ') + '\n              <span onClick={v.bl.openNotifs} title="Notifications" style={{ flex: "none", width: "40px",'],
+    '{!!(v.bellIn) && (<>\n              ' + SWAP("              ", 'position: "absolute", top: "14px", right: "110px", ') + switchBack("              ", 'position: "absolute", top: "14px", right: "62px", ') + '\n              <span onClick={v.bl.openNotifs} title="Notifications" style={{ flex: "none", width: "40px",'],
   ['<div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "48px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>',
-    '<div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "96px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>'],
+    '<div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: v.tm.on ? "144px" : "96px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>'],
+  // …so the top bar's Team | Mine segment (rev 1011 §8: alone at the right end of its own row on every page) is gone; the
+  // bar is back to holding only a back link and its bell.
+  [/\{!!\(v\.dirTop\) && \(<>\s*<div style=\{\{ flex: "none", display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "#F0E6DE" \}\}>[\s\S]*?>Mine<\/span>\s*<\/div>\s*<\/>\)\}\s*/, ""],
   // Profile's "Back to Revenue app" card is gone (the owner, 2026-10-14: "delete this, cause is no need anymore"): the house
   // left of the bell (switch-back.cjs) is the way back on every page.
   [/\n *<div onClick=\{v\.exitCrm\} style=\{\{ display: "flex", alignItems: "center", gap: "14px", padding: "16px", borderRadius: "22px", background: "#F5EBE3"[^\n]*\n[\s\S]*?Back to Revenue app<\/strong>[\s\S]*?<\/svg>\n *<\/div>/, ""],
