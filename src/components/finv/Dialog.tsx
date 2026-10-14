@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
 import { createPortal } from 'react-dom'
 import { useEscape } from '@/components/hrv/overlay'
 import { usePresence } from './presence'
@@ -249,6 +249,11 @@ export function Input({ mono = false, align, className, ...props }: InputHTMLAtt
       data-align={align === 'right' ? 'right' : undefined}
     />
   )
+}
+
+/** A few lines of words — the text box's look, grown to its lines (a fund source's notes). */
+export function TextArea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className={[s.input, s.area, className ?? ''].filter(Boolean).join(' ')} />
 }
 
 /** The note under a form's fields ("Pay to and an amount are needed before you can save."). */

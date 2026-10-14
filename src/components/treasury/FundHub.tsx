@@ -336,9 +336,22 @@ export function fundSteps(r: FundRecord, can: FundCan): Array<{ key: FundStepKey
 /**
  * A deal as the drawer draws it (the prototype's `detailFund`): the dark hero — *Fund out · Loan out*, the amount,
  * to or from whom, where it stands — then I Transfer to / Received from, II When & where, III Booking, and the
- * trail. The Finance phone app's record draws it too.
+ * trail. The Finance phone app's record draws it too, with the full page's own parts (`more`, before the trail)
+ * and its audit log (after it).
  */
-export function FundDetailBody({ r, today }: { r: FundRecord; today: string }) {
+export function FundDetailBody({
+  r,
+  today,
+  more,
+  audit,
+}: {
+  r: FundRecord
+  today: string
+  /** The full page's own groups — the schedule, the repayments, the terms, the settings (the phone's record). */
+  more?: ReactNode
+  /** The audit log — what the reader's permissions open. */
+  audit?: Array<{ at: string; who: string; what: string }> | null
+}) {
   const out = r.side === 'out'
   const st = fundStatus(r, today)
   // The deal's switches, said only when on (its own page keeps them): compound interest, minimum pay.
@@ -388,6 +401,7 @@ export function FundDetailBody({ r, today }: { r: FundRecord; today: string }) {
         {r.outstanding != null ? <Line label="Outstanding" value={rm(r.outstanding)} sub={r.repaid > 0 ? `${rm(r.repaid)} repaid` : undefined} mono /> : null}
         {r.overdue ? <Line label="Overdue" value={rm(r.overdue.amount)} sub={`since ${fd(r.overdue.since)} · ${plural(r.overdue.days, 'day', 'days')}`} mono /> : null}
       </Group>
+      {more}
 
       <div className={d.label}>Trail</div>
       <div className={d.trail}>
@@ -404,6 +418,28 @@ export function FundDetailBody({ r, today }: { r: FundRecord; today: string }) {
           </div>
         ))}
       </div>
+
+      {audit ? (
+        <>
+          <div className={d.label}>
+            Audit log · {audit.length} {audit.length === 1 ? 'event' : 'events'}
+          </div>
+          <div className={d.audit}>
+            {audit.length === 0 ? (
+              <div className={d.groupEmpty}>No change on record.</div>
+            ) : (
+              audit.map((a, i) => (
+                <div key={i} className={d.auditRow}>
+                  <span className={d.auditWhat}>{a.what}</span>
+                  <span className={d.auditMeta}>
+                    {a.who} · {a.at}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      ) : null}
     </>
   )
 }

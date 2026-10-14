@@ -3,7 +3,8 @@
 import { useState, useTransition } from 'react'
 import { officeToday } from '@/lib/office-time'
 import { createPaymentVoucher } from '../../../payments/actions'
-import { buildRepaymentSourceRows, DEFAULT_REPAYMENT_POOL } from '@/lib/repayment-source-rows'
+import { DEFAULT_REPAYMENT_POOL } from '@/lib/repayment-source-rows'
+import { fundSourceRepaymentForm, repaymentTotal } from '@/lib/fund-source-repayment'
 import { bankShort } from '@/lib/deal-preview'
 
 // Record repayment, on the fund source's own page (2026-10-02).
@@ -68,55 +69,21 @@ export default function RecordRepaymentForm({
   const [pool, setPool] = useState(DEFAULT_REPAYMENT_POOL)
 
   const p = parseFloat(principal) || 0
-  const i = parseFloat(interest) || 0
-  const pen = parseFloat(penalty) || 0
-  const total = Math.round((p + i + pen) * 100) / 100
+  const total = repaymentTotal(principal, interest, penalty)
   const bank = bankAccounts.find((b) => b.id === bankId) ?? null
 
   function handleSubmit(formData: FormData) {
     setError(null)
-    if (total <= 0) return setError('请填本金 / 利息 / 罚息至少一项')
-    if (p > outstanding + 0.005) return setError(`本金 ${principal} 超过这笔借款尚欠 ${outstanding.toFixed(2)}`)
-    if (!bankId) return setError('请选从哪个银行付')
-
-    const active = new Set(activeAccounts)
-    const rows = buildRepaymentSourceRows([], { principal: p, interest: i, penalty: pen }, accountCode, (c) => active.has(c))
-    const missing = rows.find((r) => !r.account_code)
-    if (missing) {
-      return setError(
-        `${missing.role === 'principal' ? '本金' : missing.role === 'interest' ? '利息' : '罚息'}那一行还没有科目 —— 请到 Payments → Create payment 记这一笔,在那里选科目。`,
-      )
-    }
-
-    // The same FormData Create payment sends in loan-repayment mode.
-    formData.set('direction', 'debit')
-    formData.set('voucher_type', 'expense')
-    formData.set('payee_company_id', lenderCompanyId ?? '')
-    formData.set('payee_name', lender)
-    formData.set('reference_type', '')
-    formData.set('reference_id', '')
-    formData.set('amount', total.toFixed(2))
-    formData.set('payment_method', 'bank_transfer')
-    formData.set('target_pool', '')
-    formData.set('fund_source_id', fundSourceId)
-    formData.set('repayment_principal', principal)
-    formData.set('repayment_interest', interest)
-    formData.set('repayment_penalty', penalty)
-    formData.set('source_rows_count', String(rows.length))
-    rows.forEach((r, n) => {
-      formData.set(`source_rows[${n}][pool]`, pool)
-      formData.set(`source_rows[${n}][amount]`, r.amount)
-      formData.set(`source_rows[${n}][account_code]`, r.account_code)
-    })
-    formData.set('source_pool', pool)
-    formData.set('attachment_count', '0')
-    if (!String(formData.get('description') ?? '').trim()) {
-      formData.set('description', `Loan repayment — ${lender}`)
-    }
+    // The same FormData Create payment sends in loan-repayment mode (`lib/fund-source-repayment`, the phone app's too).
+    const built = fundSourceRepaymentForm(
+      { fundSourceId, lender, lenderCompanyId, accountCode, outstanding, activeAccounts, principal, interest, penalty, paymentDate, bankId, pool },
+      formData,
+    )
+    if (!built.ok) return setError(built.reason)
 
     startTransition(async () => {
       try {
-        const result = await createPaymentVoucher(formData)
+        const result = await createPaymentVoucher(built.formData)
         if (result?.error) setError(result.error)
       } catch (err) {
         if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err

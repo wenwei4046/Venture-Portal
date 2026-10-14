@@ -71,6 +71,8 @@ export interface LoanPageModel {
   /** A cancellation filed and waiting for the Principal. */
   pendingCancel: { by: string; at: string } | null
   can: {
+    /** Treasury · Edit — the repayment settings (funding source, start, minimum pay). */
+    edit: boolean
     /** Treasury · Void — cancel, request a cancellation, reverse a repayment. */
     void: boolean
     /** Treasury · Approve — amend a booked loan's terms, revert a change. */
@@ -217,6 +219,7 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
     pendingCancel: pendingCancel ? { by: ((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance', at: stamp(pendingCancel.created_at) } : null,
     // Each step asks for the action its Server Action asks (2026-10-08, PR2).
     can: {
+      edit: canDo(user, 'treasury', 'edit'),
       void: canDo(user, 'treasury', 'void'),
       amend: canDo(user, 'treasury', 'approve'),
       recordRepayment: canDo(user, 'treasury', 'create') && isActive,
