@@ -1392,6 +1392,14 @@ One's own documents — **Company** (what HR shares with their department) and *
 - **The family chart** fits real names (`max-content`, wrapping inside cards); **two directors stand side by side** as one `DIRECTORS` level.
 - **Sofa Leg height and Specials:** every option Maintenance prices is charged to the customer, *not in margin*; only legs and specials turned ON on Modular, and common to every sofa in the cart, are offered. The quote's **Total** is *Customer pays*.
 - **The margin answers as it is typed** (v4.21): step 2's margin, its tier chip and *Reach … at RM x* change with each digit, at once, like a calculator. Only a cart that has just changed reads **—** with a *Calculating* chip (the margin cell's grey) until the server has priced it — never the old cart's margin. *Preview customer quote* lights once the server has answered the price on screen.
+- **The keypad never moves** (v4.24): step 2's card is drawn at its tallest from the start, so a price typed never drops the keys under the thumb. The margin cell keeps room for the ladder's longest tier name (two lines on a narrow phone) and its penalty line. The next-tier line is always there:
+  - before a price is typed: *Reach Incentive Tier 1 (36%) at RM x* with *Use price*;
+  - while typing: the next tier;
+  - past the top tier: **Incentive Tier 2 (43%)** reached;
+  - while a changed cart is priced: empty, its place kept;
+  - a cart that cannot be priced: why, at any price.
+
+  A figure keeps to one line: 8+ characters are drawn at 22px, 10+ at 18px, on the same 33px line.
 - **An Airbnb stay on one calendar** (v3.72, `profile/StayCalendar.tsx`): only the day before the fair to the day after can be tapped; fair days dotted in the brand's colour; check-in / check-out circles and a band between; the line under it turns red when the stay breaks a rule. Every stay keys its invoice total; the summary reads *Up to, per night* or *Up to, per pax per night*.
 - **A food claim** (v3.81), for whom HR opened it: a month at a time — *Month* pills, the month's brand weeks as cards with their day count, the fair's days as tiles (*Claimed* / *Not yet* faded and untappable), then *Set by HR's rate a day. You can't edit the amount.*
 - **Notifications** (v3.47, v3.52, v3.86): the bell and its page; the first open asks *Turn on notifications?*; a CRM notice is titled by the customer with their picture; *Make them pop up* with *Send a test*.
@@ -1467,6 +1475,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.24** · 2026-10-15 · The Quote's keypad never moves: step 2's card at its tallest from the start, the next-tier line always there (the first incentive before a price is typed, *reached* past the top), long figures smaller on one line → The Revenue app — built to the prototype
 - **v4.23** · 2026-10-15 · The Billing Allocator's hub: *Generate invoices* / *+ New allocation*, *Allocated · {Month YYYY}* with the month pill, the notice of what is to bill, the cards Records · By company · Staff · Setup and the list each opens; an allocation's drawer; + New allocation (and Correct) in the drawer; Staff's and Setup's dialogs; an allocation's full page in D06's hand (the full page's stylesheet now the kit's) → Finance's view — the hubs
 - **v4.22** · 2026-10-15 · Sales Groups: an uploaded form shows as its file's icon — Word's W, PDF, a picture, </> in the Data center's colours — its name in the tooltip, never on the button → Waiting list flow (#422)
 - **v4.21** · 2026-10-14 · The Quote's margin answers as it is typed; *Calculating* while a changed cart is priced → The Revenue app — built to the prototype

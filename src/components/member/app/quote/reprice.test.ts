@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calculateQuote, type QuotePricing } from "@/lib/member/calculator";
 import type { MemberBand, MemberProduct, QuoteInput, QuoteResult, QuoteRules } from "@/lib/member/types";
-import { STAND_IN_PRICE, anchorOf, cartKey, repriced, standIn } from "./reprice";
+import { STAND_IN_PRICE, anchorOf, cartKey, firstTier, repriced, standIn } from "./reprice";
 
 /**
  * 2026-10-14 (the user: the margin "应该是毫秒级的"): the keypad works every price
@@ -156,6 +156,28 @@ describe("the keypad's margin is the server's, at every price", () => {
       expect(next?.ok && next.data.margin! + 1e-10 >= at.data.nextThreshold!).toBe(true);
       price = at.data.nextPrice.toFixed(2);
     }
+  });
+});
+
+describe("the first incentive, before a price is typed", () => {
+  it("is the price the server gives for the cart's lowest incentive", () => {
+    for (const { cart, brand } of CARTS) {
+      const at3000 = answer(cart, "3000");
+      const anchor = anchorOf(at3000, bandsOf(brand))!;
+      // A sen above what the free KPI items take off the price: a margin below every tier.
+      const giftSen = Math.round((at3000.kpiAmount ?? 0) * 100) - Math.round((at3000.addOnAmount ?? 0) * 100);
+      const below = answer(cart, ((giftSen + 1) / 100).toFixed(2));
+      const first = firstTier(anchor);
+      if (below.nextThreshold === null) { expect(first).toBeNull(); continue; }
+      expect(first).toEqual({ price: below.nextPrice, threshold: below.nextThreshold });
+      expect(below.nextThreshold).toBe(Math.min(...bandsOf(brand).filter(b => b.kind === "incentive").map(b => b.threshold)));
+    }
+  });
+
+  it("is none for riders alone: they are judged on no ladder", () => {
+    const anchor = anchorOf(answer(CARTS[4].cart, "3000"), AKEMI)!;
+    expect(anchor.ladder).toEqual([]);
+    expect(firstTier(anchor)).toBeNull();
   });
 });
 

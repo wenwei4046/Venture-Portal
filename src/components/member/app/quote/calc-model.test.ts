@@ -74,6 +74,34 @@ describe("step 2's card", () => {
       .toMatchObject({ tierLabel: "Below margin Tier 1", penalty: "Commission × 0.5" });
   });
 
+  // 2026-10-15 (the user: typing a price pushed the keypad down — the next-tier line and a two-line
+  // tier name appeared — and the thumb hit the wrong key): the card is drawn at its tallest from the start.
+  it("makes room for the tallest the card gets: the longest tier name, the longest penalty, the widest next-tier line", () => {
+    const vm = calcVM({ price: "", items: 2, bands: BANDS, result: null, error: null });
+    expect(vm.room).toEqual({ tier: "Below margin Tier 1", penalty: "Commission × 0.25", reach: { tier: "Incentive Tier 1 (36%)", price: "RM 999,999.99" } });
+    // The same room whatever is typed: it follows the ladder, never the price.
+    expect(calcVM({ price: "4000", items: 2, bands: BANDS, result: result(24, [36, 4752.24]), error: null }).room).toEqual(vm.room);
+    expect(calcVM({ price: "", items: 2, bands: [], result: null, error: null }).room).toEqual({
+      tier: "Not calculated", penalty: null, reach: { tier: "Incentive Tier 1 (36%)", price: "RM 999,999.99" },
+    });
+  });
+
+  it("names the first incentive and its price before a price is typed", () => {
+    const vm = calcVM({ price: "", items: 2, bands: BANDS, result: null, error: null, first: { price: 5803.58, threshold: 36 } });
+    expect(vm).toMatchObject({ tierLabel: "Enter a price", marginText: "—", next: { tier: "Incentive Tier 1 (36%)", price: "RM 5,803.58", value: 5803.58 } });
+    expect(calcVM({ price: "", items: 0, bands: BANDS, result: null, error: null, first: { price: 5803.58, threshold: 36 } }).next).toBeNull();
+  });
+
+  it("says the top incentive is reached once no tier is left above the price", () => {
+    expect(calcVM({ price: "9000", items: 2, bands: BANDS, result: result(47.2), error: null })).toMatchObject({ next: null, reached: "Incentive Tier 2 (43%)" });
+    expect(calcVM({ price: "6000", items: 2, bands: BANDS, result: result(40, [43, 6500]), error: null }).reached).toBeNull();
+  });
+
+  it("says why a cart cannot be priced before a price is typed, when the server refused the cart itself", () => {
+    expect(calcVM({ price: "", items: 1, bands: BANDS, result: null, error: null, refused: "Product cost is pending a Principal update." }))
+      .toMatchObject({ tierLabel: "Cost pending", note: "Product cost is pending a Principal update.", next: null });
+  });
+
   it("says why there is no margin", () => {
     expect(calcVM({ price: "100", items: 1, bands: BANDS, result: null, error: "Product cost is pending a Principal update." }))
       .toMatchObject({ tierLabel: "Cost pending", note: "Product cost is pending a Principal update." });
