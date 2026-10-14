@@ -1385,6 +1385,7 @@ One's own documents — **Company** (what HR shares with their department) and *
 - **A row's sheet on a desktop is a peek** (`peek` on `Sheet`): the page stays live, another row swaps the panel. Pickers dim; a phone dims every sheet.
 - **The family chart** fits real names (`max-content`, wrapping inside cards); **two directors stand side by side** as one `DIRECTORS` level.
 - **Sofa Leg height and Specials:** every option Maintenance prices is charged to the customer, *not in margin*; only legs and specials turned ON on Modular, and common to every sofa in the cart, are offered. The quote's **Total** is *Customer pays*.
+- **The margin answers as it is typed** (v4.21): step 2's margin, its tier chip and *Reach … at RM x* change with each digit, at once, like a calculator. Only a cart that has just changed reads **—** with a *Calculating* chip (the margin cell's grey) until the server has priced it — never the old cart's margin. *Preview customer quote* lights once the server has answered the price on screen.
 - **An Airbnb stay on one calendar** (v3.72, `profile/StayCalendar.tsx`): only the day before the fair to the day after can be tapped; fair days dotted in the brand's colour; check-in / check-out circles and a band between; the line under it turns red when the stay breaks a rule. Every stay keys its invoice total; the summary reads *Up to, per night* or *Up to, per pax per night*.
 - **A food claim** (v3.81), for whom HR opened it: a month at a time — *Month* pills, the month's brand weeks as cards with their day count, the fair's days as tiles (*Claimed* / *Not yet* faded and untappable), then *Set by HR's rate a day. You can't edit the amount.*
 - **Notifications** (v3.47, v3.52, v3.86): the bell and its page; the first open asks *Turn on notifications?*; a CRM notice is titled by the customer with their picture; *Make them pop up* with *Send a test*.
@@ -1460,6 +1461,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.21** · 2026-10-14 · The Quote's margin answers as it is typed; *Calculating* while a changed cart is priced → The Revenue app — built to the prototype
 - **v4.20** · 2026-10-14 · Sales Groups: the uploaded form's chip has a right-click menu — *View* (a 640px drawer: a PDF, a picture, a Word .docx read in the browser, an HTML form) and *Remove…* (asked beside it; the file is deleted too) → Waiting list flow (#418)
 - **v4.19** · 2026-10-14 · The invoice's other dialogs in the kit's sheet — + Credit note, Change account, Generate Marketing invoices, Generate payroll invoices, Reconcile payroll, Own-share → Venture (Office) — on the hub and the invoice's page; a credit note the system refuses drawn shut → Finance's view — Create payment
 - **v4.18** · 2026-10-14 · Invoice's dialogs: Create invoice (the design's seven fields, Cancel / Save draft; several companies, a split across billing modes, the month, a reference behind the small buttons; HR's figures fill a recharge) and Multi-line invoice, which also edits an invoice; the form's selects 32px with their edge, the lines card in the kit → Finance's view — Create payment

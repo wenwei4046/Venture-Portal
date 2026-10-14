@@ -4,14 +4,16 @@ import { buildLines } from "@/lib/member/build";
 import { brandLadder, pctText, rowFor, type Tone } from "../insight/ladder";
 import { rm, rm2 } from "../format";
 import { customerLines, type CartLine, type SofaBuild } from "./quote-model";
+import type { QuoteCart } from "./reprice";
 import type { CustomerQuote } from "./QuoteSheets";
 
 /**
  * Step 2 — Price & margin (RevenueApp.dc.html 328–382, `priceText` …
- * `useNext`). The margin and the price that reaches the next tier come from
- * the calculator on the server (a cost never reaches the phone); which row of
- * the brand's ladder that margin falls in is read here, from the same bands
- * Insight draws.
+ * `useNext`). The margin and the price that reaches the next tier are the
+ * calculator's on the server (a cost never reaches the phone), worked out on
+ * the phone for each price typed after its answer (2026-10-14, `reprice.ts`);
+ * which row of the brand's ladder that margin falls in is read here, from the
+ * same bands Insight draws.
  */
 
 export interface CalcVM {
@@ -47,15 +49,12 @@ export function priceText(price: string): string {
 }
 
 /**
- * What the server is asked: the cart by SKU — a bed frame by SKU AND its own
- * build (2026-10-05) — and the selling price as typed. KPI items and the
- * option charges ride on top of it, out of the margin; the server
- * works both out itself. The sofas' one build (seat height, tier, leg height,
+ * What the server is asked about: the cart by SKU — a bed frame by SKU AND its
+ * own build (2026-10-05). The sofas' one build (seat height, tier, leg height,
  * specials) goes only with a sofa in the cart.
  */
-export function quoteInput(schemeId: string, cart: CartLine[], price: string, fee: string, build: SofaBuild): QuoteInput | null {
-  const typed = Number(price);
-  if (!cart.length || !price || !Number.isFinite(typed) || typed <= 0) return null;
+export function quoteCart(schemeId: string, cart: CartLine[], build: SofaBuild): QuoteCart | null {
+  if (!cart.length) return null;
   const lines = new Map<string, QuoteLine>();
   for (const line of cart) {
     const key = JSON.stringify([line.productId, line.bedframe ? bedframeKey(line.bedframe) : ""]);
@@ -67,9 +66,24 @@ export function quoteInput(schemeId: string, cart: CartLine[], price: string, fe
   return {
     schemeId,
     lines: [...lines.values()].map(l => ({ ...l, quantity: Math.min(l.quantity, 100) })),
+    build: cart.some(l => l.kind === "sofa") ? sofaQuoteBuild(build) : undefined,
+  };
+}
+
+/**
+ * The cart and the selling price as typed. KPI items and the option charges
+ * ride on top of it, out of the margin; the server works both out itself.
+ */
+export function quoteInput(schemeId: string, cart: CartLine[], price: string, fee: string, build: SofaBuild): QuoteInput | null {
+  const typed = Number(price);
+  const asked = quoteCart(schemeId, cart, build);
+  if (!asked || !price || !Number.isFinite(typed) || typed <= 0) return null;
+  return {
+    schemeId: asked.schemeId,
+    lines: asked.lines,
     price: typed.toFixed(2),
     delivery: fee && Number(fee) > 0 ? Number(fee).toFixed(2) : "0",
-    build: cart.some(l => l.kind === "sofa") ? sofaQuoteBuild(build) : undefined,
+    build: asked.build,
   };
 }
 
@@ -111,6 +125,8 @@ export function calcVM(args: {
   bands: MemberBand[];
   result: QuoteResult | null;
   error: string | null;
+  /** The cart has just changed and the server has not priced it yet. */
+  pending?: boolean;
   /** The cart's KPI items: count and amount, RM. */
   kpi?: { qty: number; amount: number };
   /** What the cart's options are charged, RM. */
@@ -130,6 +146,7 @@ export function calcVM(args: {
   };
   if (!items) return { ...base, ...NONE, tierLabel: "Add products", note: null };
   if (!(typed > 0)) return { ...base, ...NONE, tierLabel: "Enter a price", note: null };
+  if (args.pending) return { ...base, ...NONE, tierLabel: "Calculating", note: null };
   if (error) return { ...base, ...NONE, tierLabel: /cost/i.test(error) ? "Cost pending" : "Not calculated", note: error };
   if (!result || result.margin === null) return { ...base, ...NONE, tierLabel: "Enter a price", note: null };
   const ladder = brandLadder(bands);

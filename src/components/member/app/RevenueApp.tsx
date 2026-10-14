@@ -508,8 +508,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const quoteCalc = useCallback((input: QuoteInput) => {
     const fx = fixture?.quote;
     if (!fx) return source.quote(input);
-    const incentives = [...new Set(fx.bands.filter(b => b.kind === "incentive").map(b => b.threshold))];
-    return Promise.resolve(tableCalc(input, fx.prices, fx.costDivisor, incentives));
+    // Every brand of the prototype climbs the same ladder.
+    return Promise.resolve(tableCalc(input, fx.prices, fx.costDivisor, fx.bands));
   }, [fixture, source]);
   const quote = useQuote({
     catalogs,

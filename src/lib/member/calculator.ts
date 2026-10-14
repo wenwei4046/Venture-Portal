@@ -27,14 +27,10 @@ import { pickCombo, spreadComboTotal, type PricedCombo } from "@/lib/catalogue/c
 import { costBasisOf, costDivisorFor } from "@/lib/commission/cost-basis";
 import { indexKpiItems, kpiItemLabel, orderKpiHits, type KpiLine } from "@/lib/commission/kpi";
 import { buildChoicesFor, buildError, buildKey, buildLines, frameBuildError, frameBuildText, kindOf } from "./build";
+import { atPrice, cents } from "./quote-price";
 
-/** Decimal money enters the engine as integer cents; tier comparisons use unrounded ratios. */
-export function cents(raw: string): number | null {
-  if (!/^\d+(?:\.\d{1,2})?$/.test(raw.trim())) return null;
-  const [whole, fraction = ""] = raw.trim().split(".");
-  const value = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
-  return Number.isSafeInteger(value) && value <= 99999999900 ? value : null;
-}
+// The price's own arithmetic is shared with the Revenue app's keypad (2026-10-14).
+export { bandFor, cents } from "./quote-price";
 
 /** The cost as keyed (or the grid cell), in cents, at the Revenue Team's basis. */
 export function teamCostCents(unitCost: number, costDivisor: number): number {
@@ -201,34 +197,6 @@ function hasGrid(product: MemberProduct): boolean {
   return (product.costGrid?.length ?? 0) > 0 || (product.options?.length ?? 0) > 0;
 }
 
-export function bandFor(margin: number | null, bands: MemberBand[]) {
-  if (margin === null)
-    return { label: "Cost pending", tone: "neutral" as const, multiplier: 1 };
-  const penalty = bands
-    .filter((b) => b.kind === "penalty" && margin <= b.threshold + 1e-10)
-    .sort((a, b) => (a.multiplier ?? 1) - (b.multiplier ?? 1))[0];
-  const cleared = bands
-    .filter((b) => b.kind !== "penalty" && margin + 1e-10 >= b.threshold)
-    .sort((a, b) => b.threshold - a.threshold)[0];
-  if (penalty)
-    return {
-      label: `Commission ×${penalty.multiplier ?? 1}`,
-      tone: "danger" as const,
-      multiplier: penalty.multiplier ?? 1,
-    };
-  if (margin < 0)
-    return { label: "Below cost", tone: "danger" as const, multiplier: 1 };
-  return {
-    label: cleared
-      ? cleared.kind === "incentive"
-        ? `${cleared.key} threshold`
-        : `${cleared.key} range`
-      : "Below reference range",
-    tone:
-      cleared?.kind === "incentive" ? ("good" as const) : ("warning" as const),
-    multiplier: 1,
-  };
-}
 export const DEFAULT_RULES: QuoteRules = { costDivisor: 1 };
 
 /**
@@ -443,11 +411,6 @@ export function calculateQuote(
   const giftLines = new Set(selected.flatMap(({ line }, i) => (line.gift ? [String(i)] : [])));
   const kpiGift = kpiHits.filter((hit) => giftLines.has(hit.lineId)).reduce((sum, hit) => sum + Math.round(hit.amount * 100), 0);
   const kpiOnTop = kpiHits.filter((hit) => !giftLines.has(hit.lineId)).reduce((sum, hit) => sum + Math.round(hit.amount * 100), 0);
-  const main = price - kpiGift;
-  if (main <= 0)
-    return invalid(
-      `The free KPI items (RM ${(kpiGift / 100).toFixed(2)}) take the whole price. Raise it to see a margin.`,
-    );
   // What the options are charged (user 2026-10-04, every option since 2026-10-06): on
   // top of the price, in the commission, out of the margin on both sides — a bed
   // frame's per frame, a sofa's once per sofa (the cart's one sofa build on every
@@ -470,22 +433,14 @@ export function calculateQuote(
   const charge =
     charged.reduce((sum, l) => sum + Math.round(l.charge * 100) * l.line.quantity, 0) +
     sofaSets.reduce((sum, s) => sum + Math.round(s.total * 100), 0);
-  const margin = ((main - cost) / main) * 100,
-    band = brand
-      ? bandFor(margin, bands)
-      : {
-          label: margin < 0 ? "Below cost" : "No brand rules",
-          tone: margin < 0 ? ("danger" as const) : ("neutral" as const),
-          multiplier: 1,
-        };
-  const next = bands
-    .filter((b) => b.kind === "incentive" && b.threshold > margin + 1e-10)
-    .sort((a, b) => a.threshold - b.threshold)[0];
-  // A displayed percentage may round up to a threshold while still being below it.
-  const boundary =
-    next && Number(margin.toFixed(2)) >= next.threshold
-      ? `Actual margin is just below ${next.threshold}%. Add RM ${((kpiGift + Math.ceil(cost / (1 - next.threshold / 100) - 1e-7) - price) / 100).toFixed(2)} to reach it.`
-      : null;
+  // The selling price's part — margin, band, the next tier and its price, what the
+  // customer pays — is the keypad's too (2026-10-14): one function, so the phone's
+  // answer at every other price is the one this would give. A cart of riders
+  // alone (no brand) is judged on no ladder.
+  const priced = atPrice({ cost, gift: kpiGift, onTop: kpiOnTop, charge }, brand ? bands : [], price, delivery);
+  if (!priced.ok) return invalid(priced.error);
+  const { margin } = priced.quote;
+  const main = price - kpiGift;
   const target = bands
     .filter((b) => b.kind === "incentive" && margin + 1e-10 >= b.threshold)
     .sort((a, b) => b.threshold - a.threshold)[0];
@@ -524,19 +479,8 @@ export function calculateQuote(
     : [];
   return {
     valid: true,
-    price: price / 100,
-    delivery: delivery / 100,
-    margin,
-    ...band,
-    nextPrice: next
-      ? (kpiGift + Math.ceil(cost / (1 - next.threshold / 100) - 1e-7)) / 100
-      : null,
-    nextThreshold: next?.threshold ?? null,
-    boundary,
-    kpiAmount: (kpiGift + kpiOnTop) / 100,
+    ...priced.quote,
     kpiItems: kpiHits.map((hit) => ({ label: kpiItemLabel(hit.item), qty: hit.qty, amount: hit.amount })),
-    addOnAmount: kpiOnTop / 100,
-    optionCharge: charge / 100,
     optionCharges: [
       ...charged.map((l) => ({
         label: [l.product.name, ...l.chargeParts.map(chargeWord)].join(" · "),
@@ -550,7 +494,6 @@ export function calculateQuote(
         amount: s.total,
       })),
     ],
-    customerPays: (price + kpiOnTop + charge + delivery) / 100,
     version: productVersions(selected.map(({ product }) => product!)),
     inputKey: quoteInputKey(input),
     suggestions,
