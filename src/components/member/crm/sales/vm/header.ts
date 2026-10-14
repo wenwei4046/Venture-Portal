@@ -1,21 +1,19 @@
-/** Top bar (back to the Revenue app, the bell), the bottom bar, and the View-my-team banner. */
+/** Top bar (Profile's sub-pages), the bottom bar, and the View-my-team banner. */
 import { day0, firstName, ini, RUST, SUB, stop, type SalesCtx } from "./common";
 import { salesNotifs, unreadNotifs } from "./notifs";
 import { teamName, teamOf, titleOf } from "../../shared/people";
+import { teamMineSwap, type TeamMineSwap } from "../../shared/team-mine";
 import type { SalesTab } from "../ui";
 
 /**
  * Team | Mine (rev 1010 §7.3): the Director and anyone with a downline; Mine is this CRM, Team the Control panel scoped
  * to them. Viewing somebody (View as) shows it as THEY would see it — CrmApp hands their Team (user 2026-10-11). Since
- * round 2 (§8.4) it sits at the right end of its own top row on every page, Inbox included. Never inside a chat.
+ * 2026-10-14 one round button left of the house in each page's title row (shared/team-mine.ts), on the same page of
+ * the other side; it had a top row of its own (round 2, §8.4). Never inside a chat.
  */
-export function teamMineVM(ctx: SalesCtx) {
+export function teamMineVM(ctx: SalesCtx): TeamMineSwap {
   const toTeam = ctx.embedded?.toTeam;
-  return {
-    hasTM: !!toTeam,
-    tmTabs: ([["Team", false], ["Mine", true]] as const).map(([label, on]) => ({ label, bg: on ? "#fff" : "transparent", fg: on ? "#3F2B22" : "#806B60", sh: on ? "0 1px 3px rgba(63,43,34,.14)" : "none",
-      pick: on ? undefined : () => toTeam?.(ctx.ui.tab) })),
-  };
+  return teamMineSwap("mine", toTeam && (() => toTeam(ctx.ui.tab)));
 }
 
 /** The bell (rev 1010 §8.2): opening Notifications reads nothing by itself — each update is read when tapped (§6). */
@@ -28,19 +26,19 @@ export function titleBellVM(ctx: SalesCtx) {
   };
 }
 export type TitleBellVM = ReturnType<typeof titleBellVM>;
-/** What the five pages get beside their own view model (round 2): the bell in their title row, and Profile's way back. */
-export type ShellExtras = { tb: TitleBellVM; exitCrm: () => void };
+/** What the five pages get beside their own view model: the bell in their title row, the house left of it (the way back
+ * to the Revenue app) and, for whoever has a Team side, Team | Mine left of the house. */
+export type ShellExtras = { tb: TitleBellVM; exitCrm: () => void; tm: TeamMineSwap };
 
 /**
- * The top bar (round 2, §8.2): gone on Inbox, Contacts, Calendar, Insight and Profile — the bell is in each page's title
- * row and Profile's card leads back to the Revenue app. It stays on Profile's sub-pages ("‹ Profile" and the bell) and,
- * for Team | Mine, as its own row holding only the switch at its right end (§8.4).
+ * The top bar (round 2, §8.2): gone on Inbox, Contacts, Calendar, Insight and Profile — the bell, the house and Team | Mine
+ * are in each page's title row. It stays on Profile's sub-pages ("‹ Profile" and the bell).
  */
 export function headerVM(ctx: SalesCtx) {
   const { ui, set } = ctx;
-  const tm = teamMineVM(ctx), sub = !!ui.profSub, bell = titleBellVM(ctx);
+  const sub = !!ui.profSub, bell = titleBellVM(ctx);
   return {
-    showTopBar: sub || tm.hasTM, hasTM: tm.hasTM, tmTabs: tm.tmTabs,
+    showTopBar: sub,
     backLabel: "Profile", backVis: sub ? "visible" as const : "hidden" as const, bellTop: sub,
     crmBack: () => { if (ui.profSub) set(u => ({ ...u, profSub: null })); },
     openNotifTop: bell.open, hasNotifBadge: bell.has, notifBadge: bell.n,

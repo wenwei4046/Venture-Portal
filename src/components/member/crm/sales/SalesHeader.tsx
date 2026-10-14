@@ -3,10 +3,9 @@
 // GENERATED from docs/design_handoff_crm_roles/CRM Revenue View.dc.html (3b) by the
 // design converter — markup and styles exactly as designed. Behaviour lives in
 // ./vm/header.ts. To change the look, change the design and regenerate.
-import { Fragment } from "react";
 import type { HeaderVM } from "./vm/header";
 
-/** Top bar: back to the Revenue app, Team | Mine (leaders and the Director), and the bell. */
+/** Top bar of Profile's sub-pages: ‹ Profile and the bell. */
 export default function SalesHeader({ v }: { v: HeaderVM }) {
   return (<>
     {!!(v.showTopBar) && (<>
@@ -16,13 +15,6 @@ export default function SalesHeader({ v }: { v: HeaderVM }) {
             <path d="m15 6-6 6 6 6">
             </path>
           </svg>{v.backLabel}</span>
-        {!!(v.hasTM) && (<>
-          <div style={{ flex: "none", alignSelf: "center", marginLeft: "auto", display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "#F0E6DE" }}>
-            {(v.tmTabs).map((d, d_i) => (<Fragment key={d_i}>
-              <span onClick={d.pick} style={{ height: "28px", padding: "0 14px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: d.bg, color: d.fg, boxShadow: d.sh, cursor: "pointer" }}>{d.label}</span>
-            </Fragment>))}
-          </div>
-        </>)}
         {!!(v.bellTop) && (<>
           <span onClick={v.openNotifTop} title="Notifications" style={{ position: "relative", marginLeft: "auto", width: "44px", height: "44px", display: "grid", placeItems: "center", color: "#3F2B22", cursor: "pointer" }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

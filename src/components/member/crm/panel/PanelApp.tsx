@@ -23,12 +23,6 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
         </>)}
         <span style={{ flex: "1" }}>
         </span>
-        {!!(v.dirTop) && (<>
-          <div style={{ flex: "none", display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "#F0E6DE" }}>
-            <span style={{ height: "28px", padding: "0 14px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", background: "#fff", color: "#3F2B22", boxShadow: "0 1px 3px rgba(63,43,34,.14)" }}>Team</span>
-            <span onClick={v.dirMine} style={{ height: "28px", padding: "0 14px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650", color: "#806B60", cursor: "pointer" }}>Mine</span>
-          </div>
-        </>)}
         {!!(v.bellTop) && (<>
           <span onClick={v.bl.openNotifs} title="Notifications" style={{ position: "relative", width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", color: "#3F2B22", cursor: "pointer" }} className={H.hov5}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -49,6 +43,14 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
               <h1 style={{ flex: "1", margin: "0", fontSize: "26px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.15" }}>Hello, {v.ov.meFirst}</h1>
               {!!(v.bellIn) && (<>
+                {!!(v.tm.on) && (<>
+                  <span onClick={v.tm.swap} title={v.tm.title} aria-label={v.tm.title} style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d={v.tm.icon}>
+                      </path>
+                    </svg>
+                  </span>
+                </>)}
                 <span onClick={v.exitCrm} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#BD4A19", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9">
@@ -279,16 +281,24 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     {!!(v.show.ib) && (<>
       {!!(v.ib.onInbox) && (<>
         <main style={{ flex: "1 1 auto", minHeight: "0", overflow: "hidden", scrollbarWidth: "none", padding: "10px 20px 14px", display: "flex", flexDirection: "column", gap: "14px" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+          <div data-fit-row="1" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
             <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
               <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Inbox</h1>
               <span style={{ fontSize: "13px", color: "#806B60" }}>{v.ib.inbSummary}</span>
             </div>
-            <span onClick={v.ib.openPc} style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 14px", boxSizing: "border-box", borderRadius: "18px", border: "1px solid #3F2B22", background: "#3F2B22", color: "#fff", fontSize: "13px", fontWeight: "650", cursor: "pointer" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <span onClick={v.ib.openPc} data-fit-ctl="words" style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 14px", boxSizing: "border-box", borderRadius: "18px", border: "1px solid #3F2B22", background: "#3F2B22", color: "#fff", fontSize: "13px", fontWeight: "650", cursor: "pointer" }}><svg data-fit-icon="1" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8">
                 </path>
               </svg>Contacts</span>
             {!!(v.bellIn) && (<>
+              {!!(v.tm.on) && (<>
+                <span onClick={v.tm.swap} title={v.tm.title} aria-label={v.tm.title} style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d={v.tm.icon}>
+                    </path>
+                  </svg>
+                </span>
+              </>)}
               <span onClick={v.exitCrm} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#BD4A19", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9">
@@ -936,6 +946,14 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 <span style={{ fontSize: "13px", color: "#806B60" }}>Who gets each new enquiry</span>
               </div>
               {!!(v.bellIn) && (<>
+                {!!(v.tm.on) && (<>
+                  <span onClick={v.tm.swap} title={v.tm.title} aria-label={v.tm.title} style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d={v.tm.icon}>
+                      </path>
+                    </svg>
+                  </span>
+                </>)}
                 <span onClick={v.exitCrm} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#BD4A19", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9">
@@ -1399,19 +1417,27 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     {!!(v.show.cal) && (<>
       {!!(v.cal.onCal) && (<>
         <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "6px 20px 24px", display: "flex", flexDirection: "column", gap: "14px" }}>
-          <div style={{ flex: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+          <div data-fit-row="1" style={{ flex: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
             <div style={{ flex: "1", minWidth: "0" }}>
               <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Calendar</h1>
-              <span style={{ fontSize: "13px", color: "#806B60" }}>{v.cal.cRangeLabel}</span>
+              <span style={{ fontSize: "13px", color: "#806B60" }}><span data-fit-alt="1">{v.cal.cRangeBtn} · </span>{v.cal.cRangeLabel}</span>
             </div>
-            <span onClick={v.cal.cOpenRange} style={{ flex: "none", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 12px 0 14px", boxSizing: "border-box", borderRadius: "20px", border: "1px solid #EBDDD2", background: "#fff", fontSize: "14px", fontWeight: "650", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}><svg style={{ color: "#BD4A19" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <span onClick={v.cal.cOpenRange} data-fit-ctl="icon" style={{ flex: "none", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 12px 0 14px", boxSizing: "border-box", borderRadius: "20px", border: "1px solid #EBDDD2", background: "#fff", fontSize: "14px", fontWeight: "650", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}><svg style={{ color: "#BD4A19" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14">
                 </path>
-              </svg>{v.cal.cRangeBtn}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              </svg><span data-fit-word="1">{v.cal.cRangeBtn}</span><svg data-fit-word="1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="m6 9 6 6 6-6">
                 </path>
               </svg></span>
             {!!(v.bellIn) && (<>
+              {!!(v.tm.on) && (<>
+                <span onClick={v.tm.swap} title={v.tm.title} aria-label={v.tm.title} style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d={v.tm.icon}>
+                    </path>
+                  </svg>
+                </span>
+              </>)}
               <span onClick={v.exitCrm} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#BD4A19", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9">
@@ -1737,8 +1763,16 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     {!!(v.show.pf) && (<>
       {!!(v.pf.onProfile) && (<>
         <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div style={{ position: "relative", borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)", border: "1px solid #EBDDD2", padding: "18px 16px 16px", display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div data-fit-row="1" style={{ position: "relative", borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)", border: "1px solid #EBDDD2", padding: "18px 16px 16px", display: "flex", flexDirection: "column", gap: "16px" }}>
             {!!(v.bellIn) && (<>
+              {!!(v.tm.on) && (<>
+                <span onClick={v.tm.swap} title={v.tm.title} aria-label={v.tm.title} style={{ position: "absolute", top: "14px", right: "110px", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#3F2B22", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d={v.tm.icon}>
+                    </path>
+                  </svg>
+                </span>
+              </>)}
               <span onClick={v.exitCrm} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ position: "absolute", top: "14px", right: "62px", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#BD4A19", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9">
@@ -1755,10 +1789,10 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </>)}
               </span>
             </>)}
-            <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "96px" }}>
+            <div data-fit-pad="1" style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: v.tm.on ? "144px" : "96px" }}>
               <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>
               <div style={{ minWidth: "0" }}>
-                <h1 style={{ margin: "0", fontSize: "24px", fontWeight: "700", letterSpacing: "-.02em" }}>{v.pf.meName}</h1>
+                <h1 data-fit-lines="1" style={{ margin: "0", fontSize: "24px", fontWeight: "700", letterSpacing: "-.02em" }}>{v.pf.meName}</h1>
                 <p style={{ margin: "2px 0 0", fontSize: "14px", color: "#806B60" }}>HOUZS Venture · CRM</p>
               </div>
             </div>

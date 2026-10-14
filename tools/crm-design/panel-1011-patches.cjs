@@ -2,6 +2,9 @@ const { PICK_SHEET } = require("./pick-sheet.cjs");
 const { EMOJI_PANEL } = require("./emoji-panel.cjs");
 const CHAT_MEDIA = require("./chat-media.cjs");
 const switchBack = require("./switch-back.cjs");
+const teamMineSwap = require("./team-mine-swap.cjs");
+// Team | Mine left of the house (team-mine-swap.cjs), only for whoever has the other side (v.tm.on).
+const SWAP = (indent, extra) => "{!!(v.tm.on) && (<>\n" + indent + "  " + teamMineSwap("v.tm", indent + "  ", extra) + "\n" + indent + "</>)}\n" + indent;
 // Live-data patches on the rev 1011 Control panel markup (each must match exactly once). Kept short on purpose: the
 // markup is the prototype's; a patch is only where the live app must differ, and says why.
 module.exports = [
@@ -47,7 +50,8 @@ module.exports = [
     '<small style={{ fontSize: "11px", lineHeight: "14px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.sub}</small>'],
   // (Round 2, 2026-10-13: Team | Mine sits at the right end of its own top row on every page, Inbox included, at the
   // prototype's 14 px a side — the 2026-10-11 patches that put it in Inbox's title row and narrowed it are gone, as the
-  // top bar no longer holds "‹ Back to Revenue app" beside it. rev 1011 §8.)
+  // top bar no longer holds "‹ Back to Revenue app" beside it. rev 1011 §8. Since 2026-10-14 that row is gone too: Team |
+  // Mine is one round button left of the house, below.)
   // 2026-10-13: a photo, video or voice note shows as itself in the chat's bubble (as the salesperson's), a file opens;
   // a message being sent shows a small clock, and the ticks go blue only once read.
   ['<p style={{ display: m.pDisp, margin: "0", whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "14px", lineHeight: "1.45" }}>{m.text}</p>',
@@ -110,16 +114,36 @@ module.exports = [
   ['<div style={{ position: "absolute", top: "48px", right: "0", zIndex: "7", width: "240px"', '<div data-hm-menu="1" style={{ position: "absolute", top: "48px", right: "0", zIndex: "7", width: "240px"'],
   // 2026-10-14 (the owner: "the switch back revenue app, put the same place with switch to crm, put a icon, easy to switch"):
   // the Revenue app's home left of the bell in every page's title row (switch-back.cjs) — Insight, Inbox, Assignment,
-  // Calendar — as the Revenue app's Today has the CRM's chat button left of its bell. Profile's card keeps its way back.
-  ['>Hello, {v.ov.meFirst}</h1>\n              {!!(v.bellIn) && (<>\n', '>Hello, {v.ov.meFirst}</h1>\n              {!!(v.bellIn) && (<>\n                ' + switchBack("                ") + "\n"],
-  ['</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n', '</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n              ' + switchBack("              ") + "\n"],
-  ['>Who gets each new enquiry</span>\n              </div>\n              {!!(v.bellIn) && (<>\n', '>Who gets each new enquiry</span>\n              </div>\n              {!!(v.bellIn) && (<>\n                ' + switchBack("                ") + "\n"],
-  ['</svg></span>\n            {!!(v.bellIn) && (<>\n', '</svg></span>\n            {!!(v.bellIn) && (<>\n              ' + switchBack("              ") + "\n"],
-  // …and Profile: the bell sits in the card's top-right corner, the way back 8 px left of it, the name row 96 px clear.
+  // Calendar — as the Revenue app's Today has the CRM's chat button left of its bell. And Team | Mine, the same day ("change
+  // the 原本的那个 team 跟 mine 换来这里", the design "Team · Mine toggle — 1a Single swap circle"): one round button left of
+  // the house (team-mine-swap.cjs), for whoever has a Mine to go to.
+  ['>Hello, {v.ov.meFirst}</h1>\n              {!!(v.bellIn) && (<>\n', '>Hello, {v.ov.meFirst}</h1>\n              {!!(v.bellIn) && (<>\n                ' + SWAP("                ") + switchBack("                ") + "\n"],
+  ['</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n', '</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n              ' + SWAP("              ") + switchBack("              ") + "\n"],
+  ['>Who gets each new enquiry</span>\n              </div>\n              {!!(v.bellIn) && (<>\n', '>Who gets each new enquiry</span>\n              </div>\n              {!!(v.bellIn) && (<>\n                ' + SWAP("                ") + switchBack("                ") + "\n"],
+  ['</svg></span>\n            {!!(v.bellIn) && (<>\n', '</svg></span>\n            {!!(v.bellIn) && (<>\n              ' + SWAP("              ") + switchBack("              ") + "\n"],
+  // …and Profile: the bell sits in the card's top-right corner, the way back 8 px left of it, Team | Mine 8 px left of
+  // that; the name row 96 px clear, 144 px with Team | Mine.
   ['{!!(v.bellIn) && (<>\n              <span onClick={v.bl.openNotifs} title="Notifications" style={{ flex: "none", width: "40px",',
-    '{!!(v.bellIn) && (<>\n              ' + switchBack("              ", 'position: "absolute", top: "14px", right: "62px", ') + '\n              <span onClick={v.bl.openNotifs} title="Notifications" style={{ flex: "none", width: "40px",'],
+    '{!!(v.bellIn) && (<>\n              ' + SWAP("              ", 'position: "absolute", top: "14px", right: "110px", ') + switchBack("              ", 'position: "absolute", top: "14px", right: "62px", ') + '\n              <span onClick={v.bl.openNotifs} title="Notifications" style={{ flex: "none", width: "40px",'],
   ['<div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "48px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>',
-    '<div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "96px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>'],
+    '<div data-fit-pad="1" style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: v.tm.on ? "144px" : "96px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>'],
+  // …and a name that would wrap beside them sits under them, full width (fit-rows.ts).
+  ['<div style={{ position: "relative", borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)",', '<div data-fit-row="1" style={{ position: "relative", borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)",'],
+  ['<h1 style={{ margin: "0", fontSize: "24px", fontWeight: "700", letterSpacing: "-.02em" }}>{v.pf.meName}</h1>', '<h1 data-fit-lines="1" style={{ margin: "0", fontSize: "24px", fontWeight: "700", letterSpacing: "-.02em" }}>{v.pf.meName}</h1>'],
+  // With three round buttons a title row that also holds a control keeps its title whole on a narrow phone
+  // (shared/fit-rows.ts marks the row data-tight only when the title would be cut — crm.module.css): Inbox's Contacts drops
+  // its icon; Calendar's dates become a round button and are written under the title instead.
+  ['<div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>\n            <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>\n              <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Inbox</h1>',
+    '<div data-fit-row="1" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>\n            <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>\n              <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Inbox</h1>'],
+  [/<span onClick=\{v\.ib\.openPc\} (style=\{\{[^}]*\}\}>)<svg /, '<span onClick={v.ib.openPc} data-fit-ctl="words" $1<svg data-fit-icon="1" '],
+  ['<div style={{ flex: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>\n            <div style={{ flex: "1", minWidth: "0" }}>\n              <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Calendar</h1>',
+    '<div data-fit-row="1" style={{ flex: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>\n            <div style={{ flex: "1", minWidth: "0" }}>\n              <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Calendar</h1>'],
+  ['<span onClick={v.cal.cOpenRange} style={{', '<span onClick={v.cal.cOpenRange} data-fit-ctl="icon" style={{'],
+  ['</svg>{v.cal.cRangeBtn}<svg width="14" height="14"', '</svg><span data-fit-word="1">{v.cal.cRangeBtn}</span><svg data-fit-word="1" width="14" height="14"'],
+  ['<span style={{ fontSize: "13px", color: "#806B60" }}>{v.cal.cRangeLabel}</span>', '<span style={{ fontSize: "13px", color: "#806B60" }}><span data-fit-alt="1">{v.cal.cRangeBtn} · </span>{v.cal.cRangeLabel}</span>'],
+  // …so the top bar's Team | Mine segment (rev 1011 §8: alone at the right end of its own row on every page) is gone; the
+  // bar is back to holding only a back link and its bell.
+  [/\{!!\(v\.dirTop\) && \(<>\s*<div style=\{\{ flex: "none", display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "#F0E6DE" \}\}>[\s\S]*?>Mine<\/span>\s*<\/div>\s*<\/>\)\}\s*/, ""],
   // Profile's "Back to Revenue app" card is gone (the owner, 2026-10-14: "delete this, cause is no need anymore"): the house
   // left of the bell (switch-back.cjs) is the way back on every page.
   [/\n *<div onClick=\{v\.exitCrm\} style=\{\{ display: "flex", alignItems: "center", gap: "14px", padding: "16px", borderRadius: "22px", background: "#F5EBE3"[^\n]*\n[\s\S]*?Back to Revenue app<\/strong>[\s\S]*?<\/svg>\n *<\/div>/, ""],

@@ -31,6 +31,7 @@ import { makePanelActions } from "./panel/actions";
 import { initialPanelUi, type PanelTab, type PanelUi } from "./panel/ui";
 import { teamsOf, type PanelCtx } from "./panel/vm/common";
 import { useSwipeToClose } from "./shared/swipe-close";
+import { useFitRows } from "./shared/fit-rows";
 import { keepSending } from "./shared/pending";
 import { MediaViewer } from "./shared/viewer";
 import { loadSnapshot, saveSnapshot } from "./shared/snapshot";
@@ -61,6 +62,8 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   const [data, setData] = useState<CrmData | null>(() => (live ? null : crmDemoData(salesperson)));
   // Any bottom sheet closes when pulled down (user 2026-10-13).
   useSwipeToClose();
+  // A title row beside Team | Mine, the house and the bell keeps its title whole on a narrow phone (2026-10-14).
+  useFitRows();
   const [problem, setProblem] = useState("");
   const [now, setNow] = useState(() => new Date());
   const [ui, setUi] = useState<SalesUi>(initialSalesUi);
