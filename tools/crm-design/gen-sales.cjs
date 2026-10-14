@@ -2,6 +2,7 @@
 // Run from the repo: node tools/crm-design/gen-sales.cjs (overwrites src/components/member/crm/sales/Sales*.tsx).
 const fs = require("fs"), path = require("path");
 const { convert, hoverClasses } = require("./dc2jsx.cjs");
+const scaleType = require("./type-scale.cjs");
 const repo = path.resolve(__dirname, "../..");
 const src = fs.readFileSync(path.join(repo, "docs/design_handoff_crm_roles/CRM Revenue View.dc.html"), "utf8").split(/\r?\n/);
 const out = path.join(repo, "src/components/member/crm/sales");
@@ -53,14 +54,13 @@ const profileFrag = (() => {
   return f;
 })();
 
-// Round 2 (§8.2): the top bar shows only on Profile's sub-pages ("‹ Profile" and the bell) — the RS prototypes'
-// showTopBar; the bell moves into each page's title row. (Team | Mine — rev 1010 §7.3, the prototype's Director pill
-// (RS Insight's isDir / dirTabs) — sat alone at this bar's right end on every page until 2026-10-14: it is one round
-// button left of the house now, team-mine-swap.cjs, in BELL and on Profile's card.)
+// Round 2 (§8.2): the top bar shows only on Profile's sub-pages — the RS prototypes' showTopBar — and holds only
+// "‹ Profile": the bell, the house and Team | Mine sit on the Inbox alone (2026-10-14, the owner: "这三个 icon 本身只需要出现在
+// 第一个界面 … 其他次级界面都不需要存在"). (Team | Mine — rev 1010 §7.3, the prototype's Director pill — sat alone at this bar's
+// right end on every page until 2026-10-14.)
 const headerFrag = (() => {
   const bar = lines(36, 39), bell = balanced(bar, '<span onClick="{{ openNotifTop }}"', "span", "3b header");
-  const withBell = once(bar, bell, '<sc-if value="{{ bellTop }}" hint-placeholder-val="{{ false }}">' + bell + "</sc-if>");
-  return '<sc-if value="{{ showTopBar }}" hint-placeholder-val="{{ false }}">' + withBell + "</sc-if>";
+  return '<sc-if value="{{ showTopBar }}" hint-placeholder-val="{{ false }}">' + once(bar, bell, "") + "</sc-if>";
 })();
 
 const line34 = src[33];
@@ -68,7 +68,7 @@ const shellPart = line34.slice(line34.indexOf('<sc-if value="{{ rdX }}"'));
 
 const parts = [
   ["SalesShellBanners", "ShellVM", shellPart, "The Revenue Director's Control panel | My CRM toggle, the Viewing-someone banner and the Switch sheet."],
-  ["SalesHeader", "HeaderVM", headerFrag, "Top bar of Profile's sub-pages: ‹ Profile and the bell."],
+  ["SalesHeader", "HeaderVM", headerFrag, "Top bar of Profile's sub-pages: ‹ Profile."],
   ["SalesInbox", "InboxVM", lines(41, 118), "Inbox: search, filter chips, rows (swipe for More), the More / Label sheets and the ad filter."],
   ["SalesContacts", "ContactsVM", lines(121, 180), "Contacts: A–Z, swipe to edit or delete, customer details and info sheets."],
   // rev 1010 §3: a visit opens Contacts' Customer info sheet (lines 145–150) and its form (127–144) on the Calendar too.
@@ -169,15 +169,16 @@ const INFO_SHEET = [
 for (const n of ["SalesContacts", "SalesCalendar", "SalesInsight"]) PATCHES[n] = [...(PATCHES[n] ?? []), ...INFO_SHEET];
 // The customer form follows the Control panel's Forms (CRM Desktop rev 1, B5): every copy of it.
 for (const n of ["SalesChat", "SalesContacts", "SalesCalendar", "SalesInsight", "SalesCustomerForm"]) PATCHES[n] = [...(PATCHES[n] ?? []), ...require("./form-patches.cjs")()];
-// The way back to the Revenue app left of the bell on every page (2026-10-14, the owner — switch-back.cjs).
+// The way back to the Revenue app left of the bell (2026-10-14, the owner — switch-back.cjs).
 const switchBack = require("./switch-back.cjs");
 // …and Team | Mine left of the house, for whoever has a Team side (2026-10-14, the owner — team-mine-swap.cjs).
 const teamMineSwap = require("./team-mine-swap.cjs");
 const SWAP = (indent, extra) => "{!!(v.tm.on) && (<>\n" + indent + "  " + teamMineSwap("v.tm", indent + "  ", extra) + "\n" + indent + "</>)}\n" + indent;
-// Round 2 (rev 1010 §8.2): the bell moves into each page's title row, at its right end — the Control panel prototype's
-// round button (40×40, 1px #EBDDD2, white, soft shadow, 20 px bell, rust badge top/right -4px) — and the way back left of it,
-// one group (with Team | Mine left of both): a title row that spreads its children (Contacts) keeps them side by side at
-// its right end.
+// Round 2 (rev 1010 §8.2): the bell in the title row, at its right end — the Control panel prototype's round button (40×40,
+// 1px #EBDDD2, white, soft shadow, 20 px bell, rust badge top/right -4px) — the way back left of it and Team | Mine left of
+// that, one group. On the Inbox alone, the first page of the bottom bar, as the Revenue app keeps its header to Today
+// (2026-10-14, the owner: "这三个 icon 本身只需要出现在第一个界面 … member view 只需要存在于 Inbox"; Contacts, Calendar,
+// Insight and Profile had them since round 2 / #400).
 const BELL = "{!!(v.tb) && (<>\n          <span style={{ display: \"flex\", alignItems: \"center\", gap: \"8px\", flex: \"none\" }}>\n          " + SWAP("          ") + switchBack("          ") + "\n          <span onClick={v.tb.open} title=\"Notifications\" style={{ position: \"relative\", flex: \"none\", width: \"40px\", height: \"40px\", boxSizing: \"border-box\", borderRadius: \"50%\", border: \"1px solid #EBDDD2\", background: \"#fff\", display: \"grid\", placeItems: \"center\", color: \"#3F2B22\", boxShadow: \"0 2px 8px rgba(63,43,34,.06)\", cursor: \"pointer\" }}>\n            <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.8\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\n              <path d=\"M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0\">\n              </path>\n            </svg>\n            {!!(v.tb.has) && (<>\n              <span style={{ position: \"absolute\", top: \"-4px\", right: \"-4px\", minWidth: \"18px\", height: \"18px\", padding: \"0 5px\", boxSizing: \"border-box\", borderRadius: \"9px\", background: \"#BD4A19\", border: \"2px solid #fff\", color: \"#fff\", display: \"grid\", placeItems: \"center\", fontSize: \"10px\", fontWeight: \"700\" }}>{v.tb.n}</span>\n            </>)}\n          </span>\n          </span>\n        </>)}";
 // Inbox rows: a long press opens More (user 2026-10-13); scrolling (pointer cancel) stops it, and the phone's own text
 // callout stays away.
@@ -219,39 +220,10 @@ PATCHES.SalesInbox = [...PATCHES.SalesInbox,
   // …its two icons keep their size.
   ['<svg style={{ color: "#BD4A19" }} width="16" height="16"', '<svg style={{ flex: "none", color: "#BD4A19" }} width="16" height="16"'],
   ['<svg style={{ color: "#806B60" }} width="14" height="14"', '<svg style={{ flex: "none", color: "#806B60" }} width="14" height="14"']];
-// Contacts: right of the title; the row reaches 8 px into main's 28 px right padding (kept for the A–Z index), so its bell
-// lines up with the other pages'.
-PATCHES.SalesContacts = [...(PATCHES.SalesContacts ?? []),
-  ['<div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>\n          <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Contacts</h1>\n        </div>',
-    '<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginRight: "-8px" }}>\n          <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Contacts</h1>\n          ' + BELL + '\n        </div>']];
-// Calendar: after Today, 8 px apart. On a phone too narrow for the month beside Today and the round buttons, the month
-// takes its short name (shared/fit-rows.ts, 2026-10-14).
-PATCHES.SalesCalendar = [...(PATCHES.SalesCalendar ?? []),
-  ['<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px" }}>\n        <h1 style={{ margin: "0", fontSize: "26px",',
-    '<div data-fit-row="1" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "0 20px" }}>\n        <h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "26px",'],
-  ['>{v.calTitle}</h1>', '><span data-fit-long="1">{v.calTitle}</span><span data-fit-short="1">{v.calShort}</span></h1>'],
-  [/(<span onClick=\{v\.calToday\}[^\n]*?>Today<\/span>)/, "$1\n        " + BELL]];
-// Insight: after the date chip, 8 px apart. On a phone too narrow for "Insight" beside the chip and the round buttons, the
-// chip is a round button (its period is written under the title anyway — shared/fit-rows.ts, 2026-10-14).
-PATCHES.SalesInsight = [...(PATCHES.SalesInsight ?? []),
-  ['<div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>\n        <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: "0" }}>\n          <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Insight</h1>',
-    '<div data-fit-row="1" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>\n        <div style={{ flex: "1", display: "flex", flexDirection: "column", gap: "2px", minWidth: "0" }}>\n          <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Insight</h1>'],
-  [/(<span onClick=\{v\.openRange\}[\s\S]*?<\/svg><\/span>)/, "$1\n        " + BELL],
-  ['<span onClick={v.openRange} style={{', '<span onClick={v.openRange} data-fit-ctl="icon" style={{'],
-  ['</svg>{v.rgLabel}<svg width="14" height="14"', '</svg><span data-fit-word="1">{v.rgLabel}</span><svg data-fit-word="1" width="14" height="14"']];
-// Profile: the bell in the profile card's top-right corner, 14 px in; the avatar + name row keeps 48 px clear of it so a long
-// name wraps first. (Its "Back to Revenue app" card, §8.1, is gone — the owner, 2026-10-14: "delete this, cause is no need
-// anymore": the house beside the bell is the way back, switch-back.cjs.)
-PATCHES.SalesProfile = [...(PATCHES.SalesProfile ?? []),
-  // (data-fit-row: a name that would wrap beside the corner buttons sits under them, on one line — fit-rows.ts.)
-  ['<div style={{ borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)",', '<div data-fit-row="1" style={{ position: "relative", borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)",'],
-  ['<h1 style={{ margin: "0", fontSize: "24px", fontWeight: "700", letterSpacing: "-.02em" }}>{v.meNameX}</h1>', '<h1 data-fit-lines="1" style={{ margin: "0", fontSize: "24px", fontWeight: "700", letterSpacing: "-.02em" }}>{v.meNameX}</h1>'],
-  ['<div style={{ display: "flex", alignItems: "center", gap: "14px" }}>\n            <span style={{ flex: "none", width: "64px", height: "64px",',
-    // …and the way back left of it, 8 px apart (switch-back.cjs), Team | Mine 8 px left of that (team-mine-swap.cjs); the
-    // name row then keeps 96 px clear, 144 px with Team | Mine.
-    "{!!(v.tb) && (<>\n          " + SWAP("          ", "position: \"absolute\", top: \"14px\", right: \"110px\", ") + switchBack("          ", "position: \"absolute\", top: \"14px\", right: \"62px\", ") + "\n          <span onClick={v.tb.open} title=\"Notifications\" style={{ position: \"absolute\", top: \"14px\", right: \"14px\", flex: \"none\", width: \"40px\", height: \"40px\", boxSizing: \"border-box\", borderRadius: \"50%\", border: \"1px solid #EBDDD2\", background: \"#fff\", display: \"grid\", placeItems: \"center\", color: \"#3F2B22\", boxShadow: \"0 2px 8px rgba(63,43,34,.06)\", cursor: \"pointer\" }}>\n            <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.8\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\n              <path d=\"M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0\">\n              </path>\n            </svg>\n            {!!(v.tb.has) && (<>\n              <span style={{ position: \"absolute\", top: \"-4px\", right: \"-4px\", minWidth: \"18px\", height: \"18px\", padding: \"0 5px\", boxSizing: \"border-box\", borderRadius: \"9px\", background: \"#BD4A19\", border: \"2px solid #fff\", color: \"#fff\", display: \"grid\", placeItems: \"center\", fontSize: \"10px\", fontWeight: \"700\" }}>{v.tb.n}</span>\n            </>)}\n          </span>\n        </>)}" + '\n          <div data-fit-pad="1" style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: v.tm.on ? "144px" : "96px" }}>\n            <span style={{ flex: "none", width: "64px", height: "64px",']];
-// The five pages read the bell, the house and Team | Mine beside their own view model: header.ts › ShellExtras.
-const EXTRAS = new Set(["SalesInbox", "SalesContacts", "SalesCalendar", "SalesInsight", "SalesProfile"]);
+// (Contacts, Calendar, Insight and Profile are as the prototypes draw them: the round buttons are the Inbox's alone since
+// 2026-10-14. Round 2 had put the bell — and #400 / #410 the house and Team | Mine — in their title rows and Profile's card.)
+// The Inbox reads the bell, the house and Team | Mine beside its own view model: header.ts › ShellExtras.
+const EXTRAS = new Set(["SalesInbox"]);
 for (const [name, vm, frag, doc, vmOverride] of parts) {
   let body = convert(frag);
   for (const [a, b] of PATCHES[name] ?? []) {
@@ -259,6 +231,8 @@ for (const [name, vm, frag, doc, vmOverride] of parts) {
     if (n !== 1) throw new Error(`${name}: patch matched ${n} times: ${a}`);
     body = body.replace(a, b);
   }
+  // The Revenue app's type scale on every size (2026-10-14 — type-scale.cjs), after the patches, which match the prototype's px.
+  body = scaleType(body);
   // Text with an apostrophe ("doesn't") renders as written; lint is told so on that file only.
   const apos = /[>}][^<>{}]*'[^<>{}]*[<{]/.test(body.replace(/"[^"]*"/g, '""'));
   const usesFragment = body.includes("<Fragment");

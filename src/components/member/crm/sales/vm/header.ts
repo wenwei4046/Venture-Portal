@@ -8,12 +8,11 @@ import type { SalesTab } from "../ui";
 /**
  * Team | Mine (rev 1010 §7.3): the Director and anyone with a downline; Mine is this CRM, Team the Control panel scoped
  * to them. Viewing somebody (View as) shows it as THEY would see it — CrmApp hands their Team (user 2026-10-11). Since
- * 2026-10-14 one round button left of the house in each page's title row (shared/team-mine.ts), on the same page of
- * the other side; it had a top row of its own (round 2, §8.4). Never inside a chat.
+ * 2026-10-14 one round button left of the house on the Inbox — the first page — going to Team's first page, Insight
+ * (shared/team-mine.ts); it had a top row of its own on every page (round 2, §8.4). Never inside a chat.
  */
 export function teamMineVM(ctx: SalesCtx): TeamMineSwap {
-  const toTeam = ctx.embedded?.toTeam;
-  return teamMineSwap("mine", toTeam && (() => toTeam(ctx.ui.tab)));
+  return teamMineSwap("mine", ctx.embedded?.toTeam);
 }
 
 /** The bell (rev 1010 §8.2): opening Notifications reads nothing by itself — each update is read when tapped (§6). */
@@ -26,22 +25,22 @@ export function titleBellVM(ctx: SalesCtx) {
   };
 }
 export type TitleBellVM = ReturnType<typeof titleBellVM>;
-/** What the five pages get beside their own view model: the bell in their title row, the house left of it (the way back
- * to the Revenue app) and, for whoever has a Team side, Team | Mine left of the house. */
+/** What the Inbox — the first page — gets beside its own view model (2026-10-14, the owner: the three round buttons on the
+ * first page alone): the bell in its title row, the house left of it (the way back to the Revenue app) and, for whoever has
+ * a Team side, Team | Mine left of the house. */
 export type ShellExtras = { tb: TitleBellVM; exitCrm: () => void; tm: TeamMineSwap };
 
 /**
- * The top bar (round 2, §8.2): gone on Inbox, Contacts, Calendar, Insight and Profile — the bell, the house and Team | Mine
- * are in each page's title row. It stays on Profile's sub-pages ("‹ Profile" and the bell).
+ * The top bar (round 2, §8.2): gone on Inbox, Contacts, Calendar, Insight and Profile. It stays on Profile's sub-pages with
+ * "‹ Profile" alone — its bell went with the other round buttons to the Inbox (2026-10-14).
  */
 export function headerVM(ctx: SalesCtx) {
   const { ui, set } = ctx;
-  const sub = !!ui.profSub, bell = titleBellVM(ctx);
+  const sub = !!ui.profSub;
   return {
     showTopBar: sub,
-    backLabel: "Profile", backVis: sub ? "visible" as const : "hidden" as const, bellTop: sub,
+    backLabel: "Profile", backVis: sub ? "visible" as const : "hidden" as const,
     crmBack: () => { if (ui.profSub) set(u => ({ ...u, profSub: null })); },
-    openNotifTop: bell.open, hasNotifBadge: bell.has, notifBadge: bell.n,
   };
 }
 export type HeaderVM = ReturnType<typeof headerVM>;

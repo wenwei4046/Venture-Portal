@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { PdfPages } from "./pdf-pages";
 import { FilePreview, previewKind } from "./file-preview";
+import { typePx } from "./type";
 
 /**
  * A chat's photos, videos and documents open INSIDE the app (the owner, 2026-10-14: "打開圖片後，沒有返回鍵能回到聊天室
@@ -247,14 +248,14 @@ export function MediaViewer() {
         <button type="button" onClick={close} aria-label="Close" style={btn}>
           <svg width="22" height="22" viewBox="0 0 24 24" {...ICON}><path d="M6 6l12 12M18 6 6 18" /></svg>
         </button>
-        <span style={{ flex: "1", minWidth: 0, fontSize: "15px", fontWeight: 600, textAlign: doc ? "left" : "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
+        <span style={{ flex: "1", minWidth: 0, fontSize: typePx(15), fontWeight: 600, textAlign: doc ? "left" : "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
         <button type="button" onClick={() => void save()} aria-label="Download" title="Download" style={{ ...btn, opacity: busy ? 0.6 : 1 }}>
           {busy
             ? <svg width="20" height="20" viewBox="0 0 24 24" {...ICON}><path d="M12 3a9 9 0 1 0 9 9"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite" /></path></svg>
             : <svg width="20" height="20" viewBox="0 0 24 24" {...ICON}><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>}
         </button>
       </div>
-      {!!note && (<span style={{ position: "absolute", left: "50%", bottom: "calc(var(--safe-bottom, 0px) + 24px)", transform: "translateX(-50%)", zIndex: 3, padding: "10px 16px", borderRadius: "12px", background: "rgba(0,0,0,.75)", fontSize: "14px" }}>{note}</span>)}
+      {!!note && (<span style={{ position: "absolute", left: "50%", bottom: "calc(var(--safe-bottom, 0px) + 24px)", transform: "translateX(-50%)", zIndex: 3, padding: "10px 16px", borderRadius: "12px", background: "rgba(0,0,0,.75)", fontSize: typePx(14) }}>{note}</span>)}
       {doc ? (
         isPdf(it)
           ? <PdfPages url={it.url} />
@@ -262,9 +263,9 @@ export function MediaViewer() {
           ? <FilePreview file={ready[it.url] ?? null} kind={previewKind(it.name, it.mime)} />
           : <div style={{ flex: "1", display: "grid", placeItems: "center", padding: "24px", textAlign: "center" }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px" }}>
-                <span style={{ width: "64px", height: "76px", borderRadius: "8px", background: "#BD4A19", display: "grid", placeItems: "center", fontSize: "15px", fontWeight: 700 }}>{docLabel(it.name, it.mime)}</span>
-                <span style={{ fontSize: "15px", fontWeight: 600, overflowWrap: "anywhere" }}>{title}</span>
-                <button type="button" onClick={() => void save()} style={{ height: "44px", padding: "0 22px", borderRadius: "22px", border: 0, background: "#fff", color: "#201814", fontSize: "15px", fontWeight: 650, cursor: "pointer" }}>{busy ? "Preparing…" : "Download"}</button>
+                <span style={{ width: "64px", height: "76px", borderRadius: "8px", background: "#BD4A19", display: "grid", placeItems: "center", fontSize: typePx(15), fontWeight: 700 }}>{docLabel(it.name, it.mime)}</span>
+                <span style={{ fontSize: typePx(15), fontWeight: 600, overflowWrap: "anywhere" }}>{title}</span>
+                <button type="button" onClick={() => void save()} style={{ height: "44px", padding: "0 22px", borderRadius: "22px", border: 0, background: "#fff", color: "#201814", fontSize: typePx(15), fontWeight: 650, cursor: "pointer" }}>{busy ? "Preparing…" : "Download"}</button>
               </div>
             </div>
       ) : (

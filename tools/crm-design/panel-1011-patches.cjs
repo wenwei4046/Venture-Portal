@@ -113,36 +113,26 @@ module.exports = [
   ['<span onClick={v.ld.lx.toggleMenu} title="More"', '<span data-hm-toggle="1" onClick={v.ld.lx.toggleMenu} title="More"'],
   ['<div style={{ position: "absolute", top: "48px", right: "0", zIndex: "7", width: "240px"', '<div data-hm-menu="1" style={{ position: "absolute", top: "48px", right: "0", zIndex: "7", width: "240px"'],
   // 2026-10-14 (the owner: "the switch back revenue app, put the same place with switch to crm, put a icon, easy to switch"):
-  // the Revenue app's home left of the bell in every page's title row (switch-back.cjs) — Insight, Inbox, Assignment,
-  // Calendar — as the Revenue app's Today has the CRM's chat button left of its bell. And Team | Mine, the same day ("change
-  // the 原本的那个 team 跟 mine 换来这里", the design "Team · Mine toggle — 1a Single swap circle"): one round button left of
-  // the house (team-mine-swap.cjs), for whoever has a Mine to go to.
+  // the Revenue app's home left of the bell (switch-back.cjs), as the Revenue app's Today has the CRM's chat button left of
+  // its bell. And Team | Mine, the same day ("change the 原本的那个 team 跟 mine 换来这里", the design "Team · Mine toggle —
+  // 1a Single swap circle"): one round button left of the house (team-mine-swap.cjs), for whoever has a Mine to go to.
+  // The three sit on the Overview alone — the first page of the bottom bar, as the Revenue app keeps its header to Today
+  // (the owner, later the same day: "这三个 icon 本身只需要出现在第一个界面 … principal view … 只存在于 Insight 界面"; vm/app.ts
+  // keeps the prototype's bell to it). Until then they were on Inbox, Assignment, Calendar and Profile's card too.
   ['>Hello, {v.ov.meFirst}</h1>\n              {!!(v.bellIn) && (<>\n', '>Hello, {v.ov.meFirst}</h1>\n              {!!(v.bellIn) && (<>\n                ' + SWAP("                ") + switchBack("                ") + "\n"],
-  ['</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n', '</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n              ' + SWAP("              ") + switchBack("              ") + "\n"],
-  ['>Who gets each new enquiry</span>\n              </div>\n              {!!(v.bellIn) && (<>\n', '>Who gets each new enquiry</span>\n              </div>\n              {!!(v.bellIn) && (<>\n                ' + SWAP("                ") + switchBack("                ") + "\n"],
-  ['</svg></span>\n            {!!(v.bellIn) && (<>\n', '</svg></span>\n            {!!(v.bellIn) && (<>\n              ' + SWAP("              ") + switchBack("              ") + "\n"],
-  // …and Profile: the bell sits in the card's top-right corner, the way back 8 px left of it, Team | Mine 8 px left of
-  // that; the name row 96 px clear, 144 px with Team | Mine.
-  ['{!!(v.bellIn) && (<>\n              <span onClick={v.bl.openNotifs} title="Notifications" style={{ flex: "none", width: "40px",',
-    '{!!(v.bellIn) && (<>\n              ' + SWAP("              ", 'position: "absolute", top: "14px", right: "110px", ') + switchBack("              ", 'position: "absolute", top: "14px", right: "62px", ') + '\n              <span onClick={v.bl.openNotifs} title="Notifications" style={{ flex: "none", width: "40px",'],
+  // …so Profile's card has no bell in its corner, and its name the whole row.
   ['<div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "48px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>',
-    '<div data-fit-pad="1" style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: v.tm.on ? "144px" : "96px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>'],
-  // …and a name that would wrap beside them sits under them, full width (fit-rows.ts).
-  ['<div style={{ position: "relative", borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)",', '<div data-fit-row="1" style={{ position: "relative", borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)",'],
-  ['<h1 style={{ margin: "0", fontSize: "24px", fontWeight: "700", letterSpacing: "-.02em" }}>{v.pf.meName}</h1>', '<h1 data-fit-lines="1" style={{ margin: "0", fontSize: "24px", fontWeight: "700", letterSpacing: "-.02em" }}>{v.pf.meName}</h1>'],
-  // With three round buttons a title row that also holds a control keeps its title whole on a narrow phone
-  // (shared/fit-rows.ts marks the row data-tight only when the title would be cut — crm.module.css): Inbox's Contacts drops
-  // its icon; Calendar's dates become a round button and are written under the title instead.
-  ['<div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>\n            <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>\n              <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Inbox</h1>',
-    '<div data-fit-row="1" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>\n            <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>\n              <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Inbox</h1>'],
-  [/<span onClick=\{v\.ib\.openPc\} (style=\{\{[^}]*\}\}>)<svg /, '<span onClick={v.ib.openPc} data-fit-ctl="words" $1<svg data-fit-icon="1" '],
-  ['<div style={{ flex: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>\n            <div style={{ flex: "1", minWidth: "0" }}>\n              <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Calendar</h1>',
-    '<div data-fit-row="1" style={{ flex: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>\n            <div style={{ flex: "1", minWidth: "0" }}>\n              <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Calendar</h1>'],
-  ['<span onClick={v.cal.cOpenRange} style={{', '<span onClick={v.cal.cOpenRange} data-fit-ctl="icon" style={{'],
-  ['</svg>{v.cal.cRangeBtn}<svg width="14" height="14"', '</svg><span data-fit-word="1">{v.cal.cRangeBtn}</span><svg data-fit-word="1" width="14" height="14"'],
-  ['<span style={{ fontSize: "13px", color: "#806B60" }}>{v.cal.cRangeLabel}</span>', '<span style={{ fontSize: "13px", color: "#806B60" }}><span data-fit-alt="1">{v.cal.cRangeBtn} · </span>{v.cal.cRangeLabel}</span>'],
+    '<div style={{ display: "flex", alignItems: "center", gap: "14px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>'],
+  // No line under a page's title (the owner, 2026-10-14, of the Team inbox's "5 chats · 1 need attention", Assignment's "Who
+  // gets each new enquiry" and the Calendar's "1 Oct – 31 Oct · 10 visits · 2 upcoming": "这行字不需要"); the title then sits
+  // level with the control beside it.
+  ['<div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>\n            <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>\n              <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Inbox</h1>\n              <span style={{ fontSize: "13px", color: "#806B60" }}>{v.ib.inbSummary}</span>',
+    '<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>\n            <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>\n              <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Inbox</h1>'],
+  [/\n *<span style=\{\{ fontSize: "13px", color: "#806B60" \}\}>Who gets each new enquiry<\/span>/, ""],
+  ['<div style={{ flex: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>\n            <div style={{ flex: "1", minWidth: "0" }}>\n              <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Calendar</h1>\n              <span style={{ fontSize: "13px", color: "#806B60" }}>{v.cal.cRangeLabel}</span>',
+    '<div style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>\n            <div style={{ flex: "1", minWidth: "0" }}>\n              <h1 style={{ margin: "0", fontSize: "28px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Calendar</h1>'],
   // …so the top bar's Team | Mine segment (rev 1011 §8: alone at the right end of its own row on every page) is gone; the
-  // bar is back to holding only a back link and its bell.
+  // bar holds only a back link (its bell went with the rest, vm/app.ts › bellTop).
   [/\{!!\(v\.dirTop\) && \(<>\s*<div style=\{\{ flex: "none", display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "#F0E6DE" \}\}>[\s\S]*?>Mine<\/span>\s*<\/div>\s*<\/>\)\}\s*/, ""],
   // Profile's "Back to Revenue app" card is gone (the owner, 2026-10-14: "delete this, cause is no need anymore"): the house
   // left of the bell (switch-back.cjs) is the way back on every page.
