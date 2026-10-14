@@ -36,3 +36,13 @@ hr-costing/ (Phase 3 — staff directory moved to team/) payment/ = monthly Paym
 **SALARY PVs ARE MADE BY DEPARTMENT (2026-10-13, the user, asked whether HR should: 预设按部门，例外才一人一张):** on HR › Payment's Salary and Statutory tables **Generate by Department** is each row's main button (`.pay-btn.pri`) and **Manual generate** a quiet link beside it (`.pay-btn.text`, *One PV per person — for an exception*). Why: a voucher per person names that person and their net pay — on Payments, and in its journal entry, which every ledger lists — while Finance reads payroll by department (`../finance/finance-view.md` › PAYROLL BY DEPARTMENT). A department's voucher keeps each person in `payroll_voucher_lines` (the bank file, paid status), which only payroll's readers see. June–September 2026 went out one per person and stay so; Finance's pages fold them.
 
 **THE DIRECTOR DEPARTMENT'S PART STAYS IN THE DIRECTOR POOL; HR'S CONFIRM STAYS AS IT IS (2026-10-13, after #353 — shown the two, the user: "对，就这样，不用改" and "current good enough"):** of the departments HR may pick for HOUZS Venture's share, **Director** is the Director pool itself, the pool the directors are paid from, so its part moves nothing: the Director pool pays that much more. October's example: Director 5% = RM 750 → the Director pool funds RM 85,750 against the subsidiaries' RM 85,000, and the director segment's accrual carries the RM 750. **Director Office** is another department with its own pool and is taken like Marketing (its pool, its segment). Director stays on the list. HR › Payroll's Submit to Finance confirm keeps listing the directors by department (*Director 4 · RM …*) without the split, which shows on Director Salary and on Finance's funding table.
+
+**FROM CLAUDE.MD, WORD FOR WORD (2026-10-15):** CLAUDE.md had reached 38,820 of its 40,000 characters; it now says these rules in fewer words, and the full text it carried — the reasons, the history, the numbers — is kept here, word for word. Spec Documents › the payroll cycles:
+
+module-spec-payroll-cycles.md — THE THREE PAYROLLS (design, 2026-09-16, nothing
+  built). Imported (Marketing/HR/Finance/IT/Director Office, 7th), Director
+  (board, 7th) and Revenue (commission, 15th) close on different days, but
+  `submit_payroll_to_principal` closes the whole MONTH at once — which is why
+  August 2026's Revenue commission can never be computed. Proposes cycle =
+  (month × track), the CEO's 1%-of-committed-sales share, the statutory-filing
+  timing risk and the six reports. Read it before touching payroll closing.

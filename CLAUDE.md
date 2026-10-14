@@ -1,14 +1,7 @@
 CLAUDE.md — HOUZS Venture Portal
 Project Overview
 Internal banking portal for HOUZS Venture Sdn Bhd (HV), a holding company managing 7 subsidiaries in Malaysia's home furnishing industry. HV acts as an internal bank (borrow from subsidiaries, lend to others), shared services hub (Marketing/Finance/HR), and director salary distribution center.
-Tech Stack
-Framework: Next.js 15 (App Router)
-Database: Supabase (PostgreSQL + Auth + RLS + Edge Functions)
-Hosting: Vercel
-Language: TypeScript
-Styling: Tailwind CSS
-Charts: Recharts
-State: React hooks (no Redux)
+Tech Stack — Next.js 15 (App Router) · Supabase (PostgreSQL + Auth + RLS + Edge Functions) · Vercel · TypeScript · Tailwind CSS · Recharts · React hooks (no Redux)
 Environment Variables
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://gixpptmfuryskbwkmiwz.supabase.co
@@ -31,141 +24,47 @@ This file keeps only what holds across the whole portal. What the portal decided
 | Principal | Approvals, Settings, People › Permissions | `.claude/rules/portal-wide/permissions.md` |
 | Every tab | permissions and the database's guard rails, navigation speed, the installed app (PWA) | `.claude/rules/portal-wide/` — `permissions.md`, `speed.md`, `pwa.md`; summarised under Permissions and Coding Conventions below |
 
-Keeping it that way: a new decision is written into its tab's file (`**TITLE (date):**`, as before), never here — this file stays under 40,000 characters (`src/lib/claude-md.test.ts`). The first decision for a tab with no folder starts one, with its row above. A rules file opens with `paths:` frontmatter — route groups and `[param]` folders written as `*`, because `(` and `[` are glob syntax — and the test refuses a file without it, which would load at every launch.
+Keeping it that way: a new decision is written into its tab's file (`**TITLE (date):**`, as before), never here — this file stays under 40,000 characters (`src/lib/claude-md.test.ts`) and well below it (cut to ~30,000 on 2026-10-15): a rule says itself here in its fewest words; its reasons and history go to the rules file. The first decision for a tab with no folder starts one, with its row above. A rules file opens with `paths:` frontmatter — route groups and `[param]` folders written as `*`, because `(` and `[` are glob syntax — and the test refuses a file without it, which would load at every launch.
 Architecture
 ```
 src/
 ├── app/
-│   ├── (auth)/
-│   │   └── login/page.tsx
-│   ├── (portal)/
-│   │   ├── layout.tsx              ← Sidebar + TopBar
-│   │   ├── dashboard/page.tsx      ← wired to dashboard_summary() RPC
-│   │   ├── fund-in/                ← list + new + detail + actions.ts
-│   │   ├── fund-out/                ← list + new + detail + actions.ts
-│   │   ├── statements/              ← list + detail + actions.ts (generate/issue/markPaid)
-│   │   ├── approvals/               ← Principal queue + detail + approve/reject
-│   │   ├── dept-pool/               (Phase 2)
-│   │   ├── billing/                 (Phase 2)
-│   │   ├── team/                    ← People: People Management (+ its Permissions
-│   │   │                              tab), Hierarchy (Org chart · Table · Levels ·
-│   │   │                              Roles), employee codes.
-│   │   │                              → .claude/rules/hr/people.md
-│   │   ├── director-salary/         (Phase 3)
-│   │   ├── hr-costing/              ← the unified Payroll (draft → completed →
-│   │   │                              submitted → paid, in batches), Payment
-│   │   │                              statement, Billing Allocation, department mode.
-│   │   │                              → .claude/rules/hr/payroll.md
-│   │   ├── revenue/                 ← Revenue Department, one sub-department at a
-│   │   │                              time (Fair, IR): Comm Cal (the month, closes,
-│   │   │                              the ERP feed, fairs), Staff Hierarchy, Rules,
-│   │   │                              Department. → .claude/rules/revenue/comm-cal.md
-│   │   ├── reports/                 (Phase 3)
-│   │   └── settings/                ← 9 tabs: treasury / splits / directors / companies / departments / banks / accounts / periods / simulator
-│   ├── (member)/member/            ← the Revenue app (Today / Insight / Quote / Arena /
-│   │                                  Profile), its Product List and the CRM — not the
-│   │                                  portal. → .claude/rules/revenue/revenue-app.md,
-│   │                                  product-list.md, crm.md
-│   └── api/erp/v1/                 ← the Houzs ERP's machine endpoints (and api/whatsapp/v1/, Meta's — see Machine ingest): the ERP's three
-│                                      receivers — `sales-orders` (POST, live per-save),
-│                                      `products` (POST, the catalogue mirror —
-│                                      SKU master, Modular, Maintenance, fabrics,
-│                                      combos; ITEMS ONLY, 2026-09-24) and
-│                                      `sales-attending` (POST, who works each booth —
-│                                      the brand weeks, 2026-10-12), plus `health`
-│                                      (GET). The only POST route handlers in the app —
-│                                      see the machine-ingest exception under Coding
-│                                      Conventions. Everything else stays Server Actions.
-├── components/
-│   └── layout/                     ← Sidebar, TopBar
+│   ├── (auth)/login/
+│   ├── (portal)/          ← layout.tsx (Sidebar + TopBar) and a folder per module: dashboard
+│   │                         (dashboard_summary RPC), fund-in, fund-out, statements, approvals,
+│   │                         dept-pool, billing, team (People → hr/people.md), director-salary,
+│   │                         hr-costing (Payroll → hr/payroll.md), revenue (Comm Cal →
+│   │                         revenue/comm-cal.md), reports, settings (9 tabs)
+│   ├── (member)/member/   ← the Revenue app, its Product List and the CRM — not the portal
+│   │                         (revenue/revenue-app.md, product-list.md, crm.md)
+│   └── api/               ← machine endpoints only (Machine ingest, under Coding Conventions):
+│                             erp/v1 sales-orders · products · sales-attending (POST), health
+│                             (GET); whatsapp/v1 · messenger/v1 (Meta's webhooks)
+├── components/layout/     ← Sidebar, TopBar
 ├── lib/
-│   ├── supabase/
-│   │   ├── client.ts               ← Browser client (anon key + RLS)
-│   │   ├── server.ts               ← Server client (anon key + RLS via SSR cookies)
-│   │   ├── admin.ts                ← Service role client. BYPASSES RLS. 'server-only',
-│   │   │                              built on FIRST USE not at import time. Nine callers,
-│   │   │                              listed under Coding Conventions › Supabase client.
-│   │   │                              Another is a decision, not a detail.
-│   │   └── database.types.ts       ← Generated from Supabase
-│   ├── auth.ts                     ← requireAuth / requireRole helpers
-│   ├── roles.ts                    ← canAccess* helpers for sidebar visibility
-│   └── utils.ts                    ← formatMoney / formatDate / cn / dayjs helpers
-├── test/
-│   └── setup.ts                    ← Vitest + jest-dom matcher setup
-├── types/
-│   └── index.ts                    ← All TypeScript interfaces
-├── (no middleware.ts)              ← it sits at the REPO ROOT, which Next never
-│                                     loads while the app is in src/ (the build's
-│                                     middleware manifest is empty; a signed-in
-│                                     GET /login answers 200 — found 2026-09-27).
-│                                     Gating is the layouts' requireAuth. Moving
-│                                     it would switch on session refresh +
-│                                     redirects everywhere: its own decision.
-supabase/
-├── migrations/                     ← every schema change, one SQL file each, applied in name order
-├── seed/                           ← (empty — seed scripts in /scripts)
-├── tests/                          ← SQL fixtures (payroll_disbursement_selection.sql feeds tests/revenue-payroll-sql)
-└── config.toml                     ← Supabase project link
-scripts/
-├── seed-users.mjs                  ← 4 test users (principal/finance/hr/marketing)
-├── seed-principal.mjs              ← Initial principal account
-├── seed-test-data.mjs              ← Step 8 QA test data (backdated loans + savings)
-├── check-loans.mjs                 ← DB inspection helper
-├── check-dashboard.mjs             ← dashboard_summary() RPC smoke test
-└── migrate-emails.mjs              ← @houzs.my → @venture.my domain migration
-tools/
-├── patch-yoga-wasm.mjs          ← postinstall. Replaces yoga-layout's runtime
-│                                  WebAssembly.instantiate() with a statically
-│                                  imported .wasm module, which is the only form
-│                                  workerd accepts. CI must run plain `npm ci`.
-├── assert-open-next-wasm.mjs    ← reads the built worker bundle, proves the fix
-│                                  is present and in the right shape
-├── smoke-worker-pdf.mjs         ← starts the built worker in workerd, asks for a
-│                                  real PDF, checks where the text landed
-└── yoga-setter-sweep.mjs        ← measures what src/lib/export/pdf.test.ts
-                                   actually catches (see TESTING.md)
-docs/
-├── DESIGN.md                       ← Design system v4.0 — single source of truth for ALL UI
-├── db-schema.md                    ← Database schema reference (32 tables)
-├── access-matrix.md                ← Role permissions reference
-├── module-spec-phase1.md           ← ✅ Shipped: Dashboard, Fund IN/OUT, Overdue, Statements
-├── module-spec-phase2.md           ← Phase 2: Dept Pool, Service Billing
-└── module-spec-phase3.md           ← Phase 3: Director Salary Engine, HR Costing, Reports
-.gstack/
-└── qa-reports/                     ← Phase audit reports (gitignored screenshots/)
+│   ├── supabase/          ← client.ts · server.ts (anon key + RLS) · admin.ts (service role,
+│   │                         BYPASSES RLS — nine callers, Coding Conventions › Supabase client;
+│   │                         another is a decision, not a detail) · database.types.ts (generated)
+│   └── auth.ts · roles.ts · utils.ts  ← gates · sidebar canAccess* · formatMoney / formatDate / cn / dayjs
+├── test/setup.ts · types/index.ts
+└── (no middleware.ts)     ← it sits at the REPO ROOT, which Next never loads while the app is in
+                              src/ (found 2026-09-27); gating is the layouts' requireAuth. Moving it
+                              switches on session refresh + redirects everywhere — its own decision.
+supabase/  migrations/ (every schema change, one SQL file each, applied in name order) · tests/ (SQL fixtures) · config.toml
+scripts/   seed-*.mjs (test users, principal, QA data …) · check-*.mjs (DB inspection)
+tools/     patch-yoga-wasm.mjs (postinstall: workerd takes only a statically imported .wasm — CI runs
+           plain `npm ci`) · assert-open-next-wasm · smoke-worker-pdf · yoga-setter-sweep (TESTING.md)
+docs/      DESIGN.md · db-schema.md · access-matrix.md · module-spec-*.md · erp-sync/
+.gstack/qa-reports/   phase audit reports
 ```
-Spec Documents (MUST READ BEFORE CODING)
-All specifications are in `/docs/`. These are the source of truth:
-db-schema.md — 32 tables, all fields, relationships, constraints
-access-matrix.md — 4 roles × 9 modules, RLS patterns, data visibility
-module-spec-phase1.md — Dashboard, Fund IN, Fund OUT, Overdue & Netting
-module-spec-phase2.md — Dept Pool, Service Billing (5 modes)
-module-spec-phase3.md — Director Salary Engine, HR Costing, Reports
-module-spec-payroll-cycles.md — THE THREE PAYROLLS (design, 2026-09-16, nothing
-  built). Imported (Marketing/HR/Finance/IT/Director Office, 7th), Director
-  (board, 7th) and Revenue (commission, 15th) close on different days, but
-  `submit_payroll_to_principal` closes the whole MONTH at once — which is why
-  August 2026's Revenue commission can never be computed. Proposes cycle =
-  (month × track), the CEO's 1%-of-committed-sales share, the statutory-filing
-  timing risk and the six reports. Read it before touching payroll closing.
-module-spec-revenue-commission.md — Revenue Department commission payroll: the
-  second payroll TYPE (ERP sales orders → commission engine → the one
-  `hr_monthly_payroll.commission_amount` field). Sub-departments, the tier
-  ladder, deposit gate, brand margin bands, Withholding Tax. Read this before
-  touching anything under `comm_*` / `sales_*` or `/revenue`. §3.0 explains the
-  routing: every page is scoped to a sub-department (`/revenue/fair/rules`) and
-  the sidebar's Revenue children are database rows, not constants.
-erp-sync/contract.md — the Houzs ERP → portal LIVE sales-order feed (2026-09-05):
-  the receiver at `/api/erp/v1/sales-orders`, the delivery shape (the ERP's own
-  rows, verbatim), what each outcome means, and the three SQL files the ERP
-  team applies on their side (`docs/erp-sync/houzs-erp-side/`). Read this before
-  touching `src/lib/erp-sync/`, `src/app/api/erp/` or `ingest_erp_sales_order`.
-DESIGN.md — v4.0, the HOUZS Venture Design System (Claude Design) mapped to the code. **Single source of truth for all UI.** Part I: themes, tokens, type, components. Part II: portal rules, utility classes, canonical pages. Part III: page specs. Part IV: version index.
-ALWAYS reference these docs before implementing any feature.
-
-Other project docs (at repo root):
-TODOS.md — the open items only (tech debt, compliance gates)
-.gstack/qa-reports/qa-report-phase1-2026-04-10.md — Phase 1 acceptance audit (6 findings, 2 fixed, 3 deferred to 1.5)
+Spec Documents (MUST READ BEFORE CODING) — in `/docs/`, the source of truth. ALWAYS reference them before implementing a feature.
+db-schema.md — the tables, fields, relationships, constraints · access-matrix.md — roles × modules, RLS patterns, data visibility
+module-spec-phase1.md / phase2.md / phase3.md — Treasury core (Dashboard, Fund IN / OUT, Overdue & Netting) · Dept Pool + Service Billing (5 modes) · Director Salary Engine, HR Costing, Reports
+module-spec-payroll-cycles.md — THE THREE PAYROLLS (design 2026-09-16, not built): Imported and Director close on the 7th, Revenue on the 15th, but `submit_payroll_to_principal` closes the whole month at once. Read it before touching payroll closing.
+module-spec-revenue-commission.md — the commission payroll (ERP sales orders → the engine → `hr_monthly_payroll.commission_amount`); §3.0: every page is scoped to a sub-department (`/revenue/fair/rules`) and the sidebar's Revenue children are database rows. Read it before touching `comm_*` / `sales_*` or `/revenue`.
+erp-sync/contract.md — the ERP → portal live feed: the receivers, the delivery shape, what each outcome means, the SQL the ERP team applies (`docs/erp-sync/houzs-erp-side/`). Read it before touching `src/lib/erp-sync/`, `src/app/api/erp/` or `ingest_erp_sales_order`.
+DESIGN.md — the HOUZS Venture Design System mapped to the code, **the single source of truth for all UI**: Part I themes, tokens, type, components · II portal rules, utility classes, canonical pages · III page specs · IV version index.
+At the root: TODOS.md (the open items only — tech debt, compliance gates) · TESTING.md. Phase audits: `.gstack/qa-reports/`.
 Permissions — the rules (history: `.claude/rules/portal-wide/permissions.md`)
 Every gate reads a PERMISSION, never a role (2026-09-01). A title points at a TEMPLATE (2026-10-08): cells = function × action (view create edit approve void export manage) × reach (own / dept / all), plus the sensitive fields salary / nric / bank; one person may be raised or lowered on a cell. `users.role` — the account's hidden KIND, the template's `base_role` — survives only as the fallback for an account with no template and for the few checks named in `src/lib/kind-checks.test.ts`, which fails on any new `user.role`. Do not add gates that read it.
 - Pages ask module KEYS: `requirePermission('treasury')`, `can(user, 'reports')`, `canAccessX(user)`; a page that differs by viewer asks the cells through `lib/surfaces.ts` (`overviewFor`, `ownDepartmentOnly`, …). Every page also asks its TAB first, `await requirePage('<route>')` (2026-10-11; `lib/page-tabs.ts` — a new page is listed there, `page-tabs.test.ts`): on top of its own gate, so a tab closes a page, never opens one. Its WRITES then follow that page's tabs' Create / Edit / Approve boxes (`actionsOnPage`; a Server Action by the page it was sent from), and the Revenue app hides its pages and sends the same way (`lib/member/app-pages.ts`) — only what somebody unticked closes (`closedBoxes`).
@@ -210,65 +109,34 @@ Finance CANNOT access the Director Salary module or Director Pool at all. (Direc
 HR CAN access Director Pool v2 (standalone calculator — full per-director detail; granted by user 2026-07-21)
 Only HR and Principal can see individual salary details
 Member catalogue & margin cost basis → `.claude/rules/revenue/product-list.md`. The rule every margin in the portal keeps: Revenue Team cost = cost ÷ `comm_schemes.revenue_cost_divisor` (Fair 0.7); margin = (price − cost) ÷ price; the price for threshold t is cost ÷ (1 − t), never cost × (1 + t). No member screen says how that cost is made (`components/member/cost-basis-wording.test.ts`).
-Development Phases
-Phase 1 (✅ Shipped 2026-04-10): Treasury Core
-Dashboard (dashboard_summary RPC), Fund IN, Fund OUT, Overdue & Netting,
-Monthly Statements, Approvals (Finance→Principal workflow), Settings, Auth
-9-step Forge pipeline (see Phase 1 commits a04a7bf..9a5e663)
-Phase 2 (✅ Shipped 2026-04-10): Department + Billing
-HR Cost Submission, Dept Pool (Marketing P&L), Service Billing (5 modes),
-Invoice Generation RPC, Invoice→Statement wiring, Rent/Utility templates,
-Unified config audit log (L2 fix), Dashboard KPI extensions (billing float,
-dept pool total, Marketing NP). M2 cancelLoan fix bundled in Step 2.
-9-step Forge pipeline (commits e58a8bb..Step 9). See
-`.gstack/qa-reports/qa-report-phase2-2026-04-10.md`.
-Phase 3: Salary + HR + Reports
-Director Salary Engine, HR Costing, Claims, Reports, Statutory Tables
-GStack Workflow
-For each phase:
-```
-1. /plan-eng-review    → Review spec, find edge cases, output diagrams
-2. /design-consultation → Design system, component patterns
-3. Parallel development → Backend API + Frontend UI (git worktree)
-4. /ship               → Test, coverage, PR
-5. /qa                 → Edge cases, security, RLS audit
-6. /land-and-deploy    → Deploy to Vercel
-7. /document-release   → Update docs
-8. /retro              → Phase review
-```
+Development Phases — Phase 1 Treasury Core (Dashboard, Fund IN / OUT, Overdue & Netting, Statements, Approvals, Settings, Auth) and Phase 2 Department + Billing (HR Cost Submission, Dept Pool, Service Billing, invoice → statement) shipped 2026-04-10 (audits in `.gstack/qa-reports/`); Phase 3: Director Salary Engine, HR Costing, Claims, Reports, Statutory Tables.
+GStack per phase: /plan-eng-review → /design-consultation → build in parallel worktrees → /ship → /qa → /land-and-deploy → /document-release → /retro.
 Coding Conventions
 TypeScript strict mode — no `any`
 Server Components by default — Client Components only when needed (forms, interactive widgets)
-Writes — use Server Actions (`'use server'`), NOT API Route Handlers. Every action calls `requireRole(...)` at entry. (Since 2026-10-08 that gate is the ACTION — `requireActionOn(…)`, see Permissions.)
-Read-only file downloads (PDF, CSV, ZIP binary streams) — GET Route Handlers (`app/**/route.ts`) are OK because Server Actions can't stream binary responses cleanly. Still call `requireRole(...)` at entry. Never accept write-side params — POST/PUT/DELETE route handlers remain forbidden. Locked by user 2026-04-17 (Spec 5 blocker Q5). (Since 2026-10-08 the entry gate there is the ACTION too — `requireActionOn(…)`.)
-Machine ingest — the ONE exception to the rule above (2026-09-05, ERP live sync): another SYSTEM pushing data in (the Houzs ERP's database via pg_net) cannot call a Server Action and has no session, so it gets a POST Route Handler under `app/api/<system>/v<n>/`. THREE of them exist, all the Houzs ERP's: `sales-orders`, since 2026-09-17 `products` (the catalogue mirror; items only since 2026-09-24) and since 2026-10-12 `sales-attending` (its Sales Attending — the brand weeks). A second endpoint of an existing feed is not a second exception — a second SYSTEM would be. The exception is narrow and every part of it is required: a static shared secret from env compared in constant time and failing closed when unset (never a session, never a query param); the service-role client used for ONE thing — calling a single ingest RPC that owns every write; the path excluded from `middleware.ts`; every delivery logged (`erp_sync_events`); 2xx for every delivery the portal chose not to apply, because the sender's outbox retries non-2xx forever. Nothing a browser calls may ever be a POST handler. **The second system is Meta** (user-approved 2026-10-01 for Messenger, 2026-10-02 for WhatsApp): `app/api/whatsapp/v1/webhook` and `app/api/messenger/v1/webhook` — GET answers Meta's one-time handshake only for the verify token; POST takes only deliveries signed `X-Hub-Signature-256` (HMAC of the RAW body with `META_APP_SECRET`, compared in constant time, failing closed when unset) and hands each to its one ingest RPC (`crm_ingest_whatsapp` / `crm_ingest_messenger`), every delivery logged in `crm_channel_events`. The rest of the CRM: `.claude/rules/revenue/crm.md`.
-Supabase client — server-side (`lib/supabase/server.ts`) uses the anon key with RLS via SSR cookies. `admin.ts` is the service-role client and BYPASSES RLS entirely. It is `'server-only'` guarded and has exactly NINE callers, each with one job: the two Meta webhooks (`app/api/whatsapp/v1/webhook/route.ts`, `app/api/messenger/v1/webhook/route.ts`) and the ERP's three receivers (`app/api/erp/v1/sales-orders/route.ts`, `app/api/erp/v1/products/route.ts`, `app/api/erp/v1/sales-attending/route.ts`), each calling its one ingest RPC; `app/api/member-queue/route.ts` (the cron-secret queue sweep, and Hiring's day-old leftover files); `lib/member/server.ts` (a member quote's prices and cost ratios, the member's month through Comm Cal's engine, My honours' kept finishes — each only after the member's own session was authorised); `team/people/invite-actions.ts`; and `lib/erp-sync/feed-key.ts` (the key the ERP generated, kept in Vault). Why each is allowed: `.claude/rules/portal-wide/permissions.md`. Reach for it only when a machine path has no session to act under or a secret must stay out of every session's reach, never to dodge an RLS policy that is merely inconvenient.
-Sign out (2026-10-08) — ends THIS device's session only: `auth.signOut({ scope: 'local' })`. Given no options supabase-js signs out `'global'`, and the auth server deletes every session of the account — the phone, the other PC, every tab. The shared accounts (principal@ / finance@ / hr@) are switched on the office PC by Sign out → sign in several times a day, so the Principal's phone and desktop kept landing on /login (auth log: ten global sign-outs of principal@ on Oct 5–7, each followed by "Refresh Token Not Found" elsewhere). `src/lib/sign-out-scope.test.ts` refuses any `auth.signOut(` without it.
+Writes — Server Actions (`'use server'`), NOT API Route Handlers, each gated at entry — since 2026-10-08 by the ACTION it is, `requireActionOn(…)` (see Permissions).
+Read-only file downloads (PDF, CSV, ZIP streams) — GET Route Handlers (`app/**/route.ts`), because Server Actions can't stream binary cleanly; gated at entry the same way, never taking write-side params. POST/PUT/DELETE route handlers stay forbidden (user 2026-04-17).
+Machine ingest — the ONE exception to the rule above (2026-09-05): another SYSTEM pushing data in has no session and cannot call a Server Action, so it gets a POST Route Handler under `app/api/<system>/v<n>/`. Two systems: the Houzs ERP's database via pg_net (`erp/v1` — sales-orders, products, sales-attending; a new endpoint of an existing feed is not a new exception, a new SYSTEM is) and Meta (`whatsapp/v1`, `messenger/v1` webhooks, user-approved 2026-10-01 / 02; its GET answers only the one-time handshake with the verify token). Every part is required: authentication by a static shared secret from env (the ERP) or the `X-Hub-Signature-256` HMAC of the RAW body with `META_APP_SECRET` (Meta), compared in constant time and failing closed when unset — never a session, never a query param; the service-role client used for ONE thing, calling the one ingest RPC that owns every write (Meta's: `crm_ingest_whatsapp` / `crm_ingest_messenger`); the path excluded from `middleware.ts`; every delivery logged (`erp_sync_events` / `crm_channel_events`); 2xx for every delivery the portal chose not to apply, because the sender's outbox retries non-2xx forever. Nothing a browser calls may ever be a POST handler. The full text: `.claude/rules/revenue/comm-cal.md` › FROM CLAUDE.MD; the CRM: `crm.md`.
+Supabase client — `lib/supabase/server.ts` uses the anon key with RLS via SSR cookies. `admin.ts` is the service-role client and BYPASSES RLS entirely: `'server-only'`, exactly NINE callers, each with one job — the two Meta webhooks and the ERP's three receivers (each calling its one ingest RPC), `app/api/member-queue/route.ts` (the cron-secret queue sweep, Hiring's day-old leftover files), `lib/member/server.ts` (a member's quote prices and cost ratios, month and kept honours — each only after the member's own session was authorised), `team/people/invite-actions.ts`, and `lib/erp-sync/feed-key.ts` (the ERP's key, kept in Vault). Why each: `.claude/rules/portal-wide/permissions.md`. Reach for it only when a machine path has no session to act under or a secret must stay out of every session's reach — never to dodge an RLS policy that is merely inconvenient.
+Sign out ends THIS device's session only — `auth.signOut({ scope: 'local' })` (2026-10-08): supabase-js's default `'global'` deletes every session of the account, and the shared accounts (principal@ / finance@ / hr@) are signed out and in on the office PC several times a day. `src/lib/sign-out-scope.test.ts` refuses any `auth.signOut(` without it.
 Navigation speed (2026-09-26) — a click must answer at once (the whole of it: `.claude/rules/portal-wide/speed.md`). Every route folder with child routes has a `loading.tsx` rendering `RouteSkeleton` (`src/app/route-boundaries.test.ts`). The client router keeps pages five minutes, so a write must `revalidatePath` (or set a cookie) before it redirects, and a component holding unsaved edits must survive a refresh. Warm a page only through `lib/nav-warm.ts`, never an `AUDITED_ROUTES` page; nothing may fire a Server Action on its own after a navigation. A page's independent reads start together (`startRead`, `lib/start-read.ts`); a whole table goes through `fetchAllRowsParallel`, an id list through `fetchByKeys` — never one long `.in()` — and a read or rpc that can pass 1,000 rows is PAGED (PostgREST stops at 1,000 without a word). A SQL function must not call another per row, and under RLS only LEAKPROOF comparisons reach an index.
 The installed app (2026-10-06 / 10-10; the whole of it: `.claude/rules/portal-wide/pwa.md`) — ONE app for everybody, never a second install (2026-10-11, `lib/one-app.ts`: on a phone HR's view opens the HR app; a Revenue member the Revenue app). A new build is OFFERED (*A new version is ready*, `components/pwa/UpdatePrompt`); only the Revenue app reloads by itself, after 30+ min away — never the portal, whose pages can hold unsaved pay. Every bottom bar, and whatever pads itself clear of one, stands on `var(--safe-bottom)`, never a bare `env(safe-area-inset-bottom)` (`src/lib/safe-area.test.ts`); a Revenue-app sheet that reaches the screen's bottom edge carries `--sheet-safe`. `public/sw.js` caches nothing but `offline.html` — every page is somebody's money.
-Aggregate queries — prefer RPC functions (`dashboard_summary`, `get_hr_cost_summary`) over scattered per-field selects. Single round-trip, clearer intent, easier to unit test at SQL level. A balance is SUMMED by the database, never downloaded line by line to be added up: `gl_net_by_account(p_before, p_codes)` (mig `20261008180000`, SECURITY INVOKER so RLS still answers per user) is the Ledger's BALANCE B/F and the Trial Balance — ~3,860 / ~4,230 lines in four / five pages became one row per account (2026-10-08).
+Aggregate queries — prefer RPC functions (`dashboard_summary`, `get_hr_cost_summary`) over scattered per-field selects: one round-trip, testable in SQL. A balance is SUMMED by the database, never downloaded line by line to be added up — `gl_net_by_account(p_before, p_codes)` (SECURITY INVOKER, so RLS still answers per user) is the Ledger's BALANCE B/F and the Trial Balance.
 Error handling — Server Actions throw, pages use error boundaries, never return `{ data, error }` to the client
-Date handling — store as `date` or `timestamptz` in DB, use `dayjs` for formatting. Compare by day (`dayjs().isAfter(x, 'day')`) to avoid timezone edge cases. A month is three letters (DESIGN.md › Date format): an `Intl` format goes through `formatIntlDate()` (`lib/utils.ts`), because en-GB and en-MY write September "Sept" (2026-10-03). TODAY AND THIS MONTH ARE THE OFFICE'S (UTC+8), on both floors (2026-10-09): Vercel and the database both keep UTC, so from 00:00 to 08:00 the machine's today is yesterday and on the 1st its month is last month. In the app: `officeToday()` / `officeMonth()` / `officeTime()` / `officeDay()` / `officeDayStart()` (`lib/office-time.ts`, #237), never a bare `dayjs()` / `new Date()` for a day. In SQL: `(now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date`, never `CURRENT_DATE`, `to_char(now(), …)` or `date_trunc('month', now())` (mig `20261009000000` moved all 36 functions; `src/lib/office-clock-sql.test.ts` fails a later migration that brings one back). `now()` as an INSTANT (expiries, "last 30 days", `updated_at`) stays as it is.
+Date handling — store `date` / `timestamptz`, format with `dayjs`, compare by day (`dayjs().isAfter(x, 'day')`). A month is three letters (DESIGN.md › Date format): an `Intl` format goes through `formatIntlDate()` (`lib/utils.ts`) — en-GB and en-MY write September "Sept". TODAY AND THIS MONTH ARE THE OFFICE'S (UTC+8), on both floors (2026-10-09): Vercel and the database keep UTC, so from 00:00 to 08:00 the machine's today is yesterday and on the 1st its month is last month. App: `officeToday()` / `officeMonth()` / `officeTime()` / `officeDay()` / `officeDayStart()` (`lib/office-time.ts`), never a bare `dayjs()` / `new Date()` for a day. SQL: `(now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date`, never `CURRENT_DATE`, `to_char(now(), …)` or `date_trunc('month', now())` (`src/lib/office-clock-sql.test.ts`). `now()` as an INSTANT (expiries, "last 30 days", `updated_at`) stays as it is.
 Money — `decimal(15,2)` in DB. Display with `formatMoney()` from `lib/utils.ts`. Negative amounts render as red parenthesis notation `(1,000.00)`.
 Naming — DB: snake_case, TypeScript: camelCase, Components: PascalCase
 Files — one component per file, co-locate related files (`_components/` subfolders per route)
 Testing
-Framework: Vitest + happy-dom + @testing-library/react (bootstrapped Phase 1.5 Step 1). Run `npm test` (watch) or `npm run test:ci` (single run). CI runs four jobs side by side on every push (`.github/workflows/test.yml`, 2026-10-06 — ~5 min instead of ~10.5 one after another): `unit` (the Vitest suite in two halves, `--shard=N/2`), `sql` (the PGlite checks in `tests/*-sql`), `build` (`next build`, 4 GB heap, `.next/cache` reused) and `worker` (`npm run verify:worker` — builds the Cloudflare worker and renders a real PDF inside workerd). A docs-only change (`**/*.md`, `docs/`, `.design/`) runs none of them. See `TESTING.md`.
-Layers: unit (pure helpers in `src/lib/*.test.ts`), integration (Supabase RPC — deferred until billing math in Phase 2 Step 5 needs it), RLS audit (manual via `/qa`), E2E (Playwright MCP during per-step verification, not in CI).
-Convention: every bug fix ships with a regression test. Extract pure logic from Server Actions into `src/lib/*.ts` helpers and test the helper (Server Actions themselves pull in next/cache + next/navigation + Supabase SSR cookies, mocking is more trouble than it's worth).
-Placeholder pattern: when a fix is planned but not yet implemented, drop a `describe.todo('...')` stub at the expected test file location so it stays indexed without breaking CI.
-API routes: test with sample data matching real scenarios
-Statutory lookups: test with known values from PDF tables
-Director salary: test with the two datasets provided in specs (verify against calculated results)
-RLS: test each role can only access what Access Matrix allows — see `docs/access-matrix.md`
-See `TESTING.md` at repo root for full layer descriptions + how to add new tests.
+Vitest + happy-dom + @testing-library/react: `npm test` (watch), `npm run test:ci` (once). CI (`.github/workflows/test.yml`) runs four jobs side by side on every push: `unit` (Vitest in two halves, `--shard=N/2`), `sql` (the PGlite checks in `tests/*-sql`), `build` (`next build`) and `worker` (`npm run verify:worker` — the Cloudflare worker renders a real PDF inside workerd). A docs-only change (`**/*.md`, `docs/`, `.design/`) runs none of them.
+Every bug fix ships with a regression test. Extract a Server Action's pure logic into a `src/lib/*.ts` helper and test that (mocking next/cache, next/navigation and the SSR cookies costs more than it's worth); a fix planned but not built gets a `describe.todo('...')` stub where its test will live. API routes: sample data matching real scenarios. Statutory lookups: known values from the PDF tables. Director salary: the spec's two datasets. RLS: each role reaches only what `docs/access-matrix.md` allows. E2E runs through Playwright MCP, not in CI. The layers and how to add a test: `TESTING.md`.
 Do NOT
 Do not hardcode any rates (interest, custom premium, penalty, saving %) — all from Settings/DB
 Do not skip RLS — every table must have policies matching Access Matrix
 Do not write a helper a row policy calls as `LANGUAGE sql SECURITY DEFINER` — its body is planned again on every call (plpgsql keeps the plan; see Navigation speed › The permission helpers are plpgsql).
-Do not leave a SECURITY DEFINER function open to PUBLIC / anon unless it checks the caller itself (`auth.uid()`, `has_perm`, `has_scope` …) — it runs as its owner, so RLS never asks, and Postgres grants EXECUTE to PUBLIC by default: the publishable key every browser holds can call it. A helper only other DEFINER functions call: `REVOKE … FROM PUBLIC, anon, authenticated` + `GRANT … TO service_role` — and "no app code calls it" means its BARE name appears nowhere in `src/`, `scripts/`, `tools/`: a call may put the name on its own line under `.rpc(` (that is how `approve_voucher_batch` was locked by mistake and handed back, mig `20261006050000`). 21 were open, writers and approvals included, until mig `20261006010000` (2026-10-06). And a function handed a user id (`p_user_id` / `p_approver` / `p_created_by`) refuses a JWT caller whose `auth.uid()` is not that id — the approvals do since mig `20261006020000`; the app always hands in `user.id`, which View-as never changes. Journals: the app posts through `post_journal_entry_as_caller` (own name + treasury / admin / hr scope); `post_journal_entry` is the owner's and the service role's (mig `20261006030000`). **A role check must hold for somebody who has NO role (2026-10-09):** `IF v_role NOT IN ('finance', 'principal')` is NULL — not true — when the role is NULL, so it never fires for the publishable key, a self-made sign-up with no portal account, or a switched-off account whose session lives on; ~60 DEFINER functions were guarded only that way, and the publishable key read director payouts and staff allocations through them (checked on prod, rolled back). Since mig `20261009000100`: `current_user_role()` REFUSES (42501) a sign-in with no active portal account (still NULL with no sign-in: anon / service role / the database); EXECUTE on every non-trigger DEFINER function is revoked from PUBLIC + anon except the five row-policy helpers (`current_user_role`, `current_user_department_id`, `current_user_segment`, `has_perm`, `has_scope`); and the schema's default no longer grants anon or PUBLIC EXECUTE on new functions — a function the browser's anon key must call needs an explicit GRANT — today only the guest link's, each checking the link's code (migs `20261011091000` / `20261011092000`, `.claude/rules/hr/rooms.md`). Write a new guard as `IS DISTINCT FROM` / `has_action()` anyway. `tests/member-sql/validate-definer-login.mjs`.
+Do not leave a SECURITY DEFINER function open to PUBLIC / anon unless it checks the caller itself (`auth.uid()`, `has_perm`, `has_scope` …) — it runs as its owner, so RLS never asks, and the publishable key every browser holds can call it. Since mig `20261009000100` EXECUTE on every non-trigger DEFINER function is revoked from PUBLIC + anon, except the five row-policy helpers (`current_user_role`, `current_user_department_id`, `current_user_segment`, `has_perm`, `has_scope`), and a new function gets no anon / PUBLIC EXECUTE by default — one the anon key must call needs an explicit GRANT and checks its own caller (today only the guest link's, `.claude/rules/hr/rooms.md`). A helper only other DEFINER functions call: `REVOKE … FROM PUBLIC, anon, authenticated` + `GRANT … TO service_role` — and only when its BARE name appears nowhere in `src/`, `scripts/`, `tools/` (a call may put the name alone on the line under `.rpc(`). A function handed a user id (`p_user_id` / `p_approver` / `p_created_by`) refuses a JWT caller whose `auth.uid()` is not that id — the app always hands in `user.id`, which View-as never changes. Journals: the app posts through `post_journal_entry_as_caller` (own name + treasury / admin / hr scope); `post_journal_entry` is the owner's and the service role's. **A role check must hold for somebody who has NO role:** `IF v_role NOT IN (…)` is NULL — not true — for a NULL role and never fires; `current_user_role()` refuses (42501) a sign-in with no active portal account, and a new guard is written `IS DISTINCT FROM` / `has_action()` (`tests/member-sql/validate-definer-login.mjs`). The history: `.claude/rules/portal-wide/permissions.md` › FROM CLAUDE.MD.
 Do not read an NRIC, an account number or a payroll submission's per-person copy straight off its table, or `select('*')` on `hr_staff_costs` / `directors` / `payroll_voucher_lines` / `hr_cost_submissions` — `authenticated` has no SELECT on those columns since mig `20261009050100` (PR4); go through `lib/private-fields.ts`, and ask for `STAFF_ROW_COLUMNS` / `DIRECTOR_ROW_COLUMNS` instead of `*`. A column ADDED to one of those tables is granted to `authenticated` in the same migration (`GRANT SELECT (col) ON … TO authenticated`), or listed in `lib/private-columns.ts` if it is private; a SELECT policy changed on one changes its reader in the same migration — `src/lib/private-columns.test.ts` refuses both otherwise.
-Do not `CREATE OR REPLACE` a function from its last copy in `supabase/migrations` without first comparing that copy's body with production's `md5(prosrc)` — functions changed straight on the database drift, and an old copy re-applied silently undoes production's fixes and guards. Nine (the approvals, `post_journal_entry`, `apply_pool_adjustment`, `reopen_director_salary`, `get_payroll_breakdown_by_pool`) were brought back in line by mig `20261006040000` (2026-10-06), which holds them exactly as production runs them. A change made straight on production goes into a migration file the same day.
+Do not `CREATE OR REPLACE` a function from its last copy in `supabase/migrations` without first comparing that copy's body with production's `md5(prosrc)` — functions changed straight on the database drift, and an old copy re-applied silently undoes production's fixes and guards (mig `20261006040000` holds nine exactly as production runs them). A change made straight on production goes into a migration file the same day.
 Do not let Finance access hr_staff_costs or director_payouts detail — use aggregate views
 Do not use localStorage for auth — use Supabase Auth sessions
 Do not create separate apps — single Next.js app, role-based routing
