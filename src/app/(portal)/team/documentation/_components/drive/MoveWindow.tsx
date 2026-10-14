@@ -3,14 +3,15 @@
 import { useState } from 'react'
 import { Window } from '@/components/hrv/overlay'
 import ds from '../documentation.module.css'
-import { CompanyGlyph, FolderGlyph } from './icons'
+import { CompanyGlyph, FolderGlyph, PersonGlyph } from './icons'
 import s from './drive.module.css'
 
 /**
  * Move to… in a Drive (2026-10-12 for the Talent Bank — a person, a folder with everything in it, everybody in a
  * department; 2026-10-13 for the Data center — a folder with everything in it). The Drive's window kind, 440px —
  * where it is now, a finder, every place it may go top down (indented a level at a time; the place it is in marked
- * *Here now*), **Move here**.
+ * *Here now*), **Move here**. Since 2026-10-14 the Data center's Copy to… too (`verb` "Copy here", no place marked),
+ * and a person's folder is a place (their glyph).
  */
 export default function MoveWindow({
   title,
@@ -20,18 +21,21 @@ export default function MoveWindow({
   kindOf,
   onMove,
   onClose,
+  verb = 'Move here',
 }: {
-  /** "Move Nur Iman", "Move Seniors", "Move everyone in Sales". */
+  /** "Move Nur Iman", "Move Seniors", "Move everyone in Sales", "Copy Offer.pdf". */
   title: string
   /** "Now in HOUZS Venture › Revenue". */
   now: string
   targets: Array<{ at: string; path: string; depth: number }>
   /** The place it is in — shown, never picked. */
   current?: string
-  /** Which glyph a place wears: a company's building or a folder. */
-  kindOf: (at: string) => 'company' | 'folder'
+  /** Which glyph a place wears: a company's building, a person, or a folder. */
+  kindOf: (at: string) => 'company' | 'person' | 'folder'
   onMove: (at: string) => Promise<{ ok: true } | { ok: false; reason: string }>
   onClose: () => void
+  /** The window's button: "Move here", "Copy here". */
+  verb?: string
 }) {
   const [query, setQuery] = useState('')
   const [picked, setPicked] = useState<string | null>(null)
@@ -44,7 +48,7 @@ export default function MoveWindow({
     if (!picked || busy) return
     setBusy(true)
     setError('')
-    const res = await onMove(picked).catch(() => ({ ok: false as const, reason: 'It could not be moved. Please try again.' }))
+    const res = await onMove(picked).catch(() => ({ ok: false as const, reason: `It could not be ${verb.startsWith('Copy') ? 'copied' : 'moved'}. Please try again.` }))
     setBusy(false)
     if (!res.ok) return setError(res.reason)
     onClose()
@@ -60,7 +64,7 @@ export default function MoveWindow({
         <button type="button" className={ds.close} onClick={onClose} aria-label="Close">×</button>
       </div>
       <div className={ds.winBody}>
-        <input className={ds.winInput} value={query} placeholder="Find a company, department or folder" aria-label="Find a place" onChange={e => setQuery(e.target.value)} />
+        <input className={ds.winInput} value={query} placeholder="Find a company, department, person or folder" aria-label="Find a place" onChange={e => setQuery(e.target.value)} />
         <div className={s.moveList} role="listbox" aria-label="Places">
           {rows.map(x => {
             const here = x.at === current
@@ -79,7 +83,9 @@ export default function MoveWindow({
                   setError('')
                 }}
               >
-                <span className={s.moveIcon}>{kindOf(x.at) === 'company' ? <CompanyGlyph size={16} /> : <FolderGlyph size={16} />}</span>
+                <span className={s.moveIcon}>
+                  {kindOf(x.at) === 'company' ? <CompanyGlyph size={16} /> : kindOf(x.at) === 'person' ? <PersonGlyph size={16} /> : <FolderGlyph size={16} />}
+                </span>
                 <span className={s.moveName} title={x.path}>{q ? x.path : x.path.split(' › ').at(-1)}</span>
                 {here ? <span className={s.moveHere}>Here now</span> : null}
               </button>
@@ -91,7 +97,7 @@ export default function MoveWindow({
       </div>
       <div className={ds.winFoot}>
         <button type="button" className={ds.cancel} onClick={onClose}>Cancel</button>
-        <button type="button" className={ds.go} disabled={!picked || busy} onClick={() => void move()}>Move here</button>
+        <button type="button" className={ds.go} disabled={!picked || busy} onClick={() => void move()}>{verb}</button>
       </div>
     </Window>
   )

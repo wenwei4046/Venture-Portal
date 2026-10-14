@@ -633,6 +633,8 @@ textarea.input { resize: vertical; }
 .status[data-tone='alert'] { background: rgb(249 238 214); border-color: rgb(232 206 150); color: rgb(150 100 12); }
 .status[data-tone='ledger'] { background: rgb(222 240 232); border-color: rgb(180 215 198); color: rgb(21 110 78); }
 .status[data-tone='gone'] { background: rgb(250 228 224); border-color: rgb(236 190 184); color: rgb(var(--hv-danger)); }
+/* A letter kept from its person (2026-10-14): beside its status, quiet. */
+.status[data-tone='muted'] { background: rgb(var(--hv-panel-2)); border-color: rgb(var(--hv-hairline)); color: rgb(var(--hv-brown)); margin-left: 6px; }
 .tableRow[data-gone='true'] { opacity: 0.55; }
 .tableEmpty { padding: 22px; text-align: center; color: rgb(var(--hv-brown)); }
 

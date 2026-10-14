@@ -23,8 +23,8 @@ describe('Change password in the portal’s sidebar', () => {
     expect(admin[admin.length - 1]).toMatchObject({ href: '/admin/password', label: 'Change password' })
   })
 
-  it('is there for a login that opens nothing else (Overview, and Admin › Change password)', () => {
-    expect(leaves(buildNavEntries(emptyNavData), { ...staff, personalLogin: true }).map(l => l.label)).toEqual(['Overview', 'Change password'])
+  it('is there for a login that opens nothing else (Overview, and Admin › My documents · Change password)', () => {
+    expect(leaves(buildNavEntries(emptyNavData), { ...staff, personalLogin: true }).map(l => l.label)).toEqual(['Overview', 'My documents', 'Change password'])
   })
 
   it('is not there for a shared login, nor while the portal is viewed as somebody', () => {
@@ -39,10 +39,25 @@ describe('Change password in the portal’s sidebar', () => {
   })
 })
 
+// My documents (2026-10-14): one's own documents sit just before it, for the same logins.
+describe('My documents beside it', () => {
+  it('is there for a personal login, in both sidebars, and lights there', () => {
+    expect(leaves(buildNavEntries(emptyNavData), { ...finance, personalLogin: true }).map(l => l.href)).toContain('/admin/documents')
+    expect(activeHrNavKey(hrNavSections('fair'), '/admin/documents')).toBe('mydocs')
+    expect(navLabelByPath(emptyNavData).get('/admin/documents')).toBe('My documents')
+  })
+
+  it('is not there for a shared login, nor while viewing as somebody', () => {
+    expect(leaves(buildNavEntries(emptyNavData), finance).map(l => l.href)).not.toContain('/admin/documents')
+    const viewing = leaves(buildNavEntries(emptyNavData), { ...finance, personalLogin: true, viewingAs: { id: 'x', name: 'X' } }).map(l => l.href)
+    expect(viewing).not.toContain('/admin/documents')
+  })
+})
+
 describe('Change password in HR’s sidebar', () => {
   it('ends Admin for a personal login, and lights there', () => {
     const admin = visibleHrNav(hrNavSections('fair'), { ...hr, personalLogin: true }).find(s => s.label === 'Admin')
-    expect(admin?.items.map(i => i.label)).toEqual(['Audit Log', 'Change password'])
+    expect(admin?.items.map(i => i.label)).toEqual(['Audit Log', 'My documents', 'Change password'])
     expect(admin?.items.at(-1)).toMatchObject({ href: '/admin/password', icon: 'lock' })
     expect(activeHrNavKey(hrNavSections('fair'), '/admin/password')).toBe('password')
   })

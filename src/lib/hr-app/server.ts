@@ -20,6 +20,7 @@ import { can } from '@/lib/permissions'
 import { loginIsPersonal } from '@/lib/account/personal-login'
 import { loadMyMemos } from '@/lib/memos/server'
 import { NO_MEMOS } from '@/lib/memos/model'
+import { loadMyDocuments } from '@/lib/documentation/my-docs'
 import type { User } from '@/types'
 import { hrAppViewOf, shiftDay, type HrAppData, type HrBooking, type HrHire, type HrMemberRequest, type HrTalent, type MemberKind } from './model'
 
@@ -205,7 +206,7 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
   const today = officeToday()
   const { parts, may } = appAccess(user)
   const readsHiring = parts.hiring || parts.insights || parts.talent
-  const [members, factsRead, range, people, docs, hiring, notices, personal, mine] = await Promise.all([
+  const [members, factsRead, range, people, docs, hiring, notices, personal, mine, myDocs] = await Promise.all([
     parts.requests ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
     parts.requests ? (async () => (await client()).rpc('member_admin_request_facts'))() : Promise.resolve(null),
     parts.rooms ? readRoomsRange(today, shiftDay(today, 6)) : Promise.resolve(null),
@@ -225,6 +226,8 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     user.viewingAs ? Promise.resolve(false) : loginIsPersonal(),
     // Their own memos (2026-10-12): the login's, in every view — never somebody else's while viewing as them.
     user.viewingAs ? Promise.resolve(NO_MEMOS) : loadMyMemos(),
+    // Their own documents (2026-10-14): Company and Personal — the login's, never somebody else's while viewing as them.
+    user.viewingAs ? Promise.resolve(null) : loadMyDocuments(),
   ])
   const board = hiring?.ok ? hiring.board : null
 
@@ -268,5 +271,6 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     views: user.canSwitchView && !user.viewingAs ? { current: hrAppViewOf(user.role) } : null,
     personalLogin: personal,
     memos: mine.memos,
+    myDocs: myDocs?.ok ? myDocs.data : null,
   }
 }

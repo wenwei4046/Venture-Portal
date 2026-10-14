@@ -4,10 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BIN, HV, ROOT, deptAt, folderAt, personAt, type Drive } from '@/lib/documentation/drive'
 import type { Documentation, PersonLetter } from '@/lib/documentation/model'
 
-const actions = vi.hoisted(() => ({ fileLetter: vi.fn(), withdrawLetter: vi.fn(), openDocumentationFile: vi.fn(), addLetterType: vi.fn() }))
+const actions = vi.hoisted(() => ({ fileLetter: vi.fn(), withdrawLetter: vi.fn(), openDocumentationFile: vi.fn(), addLetterType: vi.fn(), setLetterShare: vi.fn() }))
 const drive = vi.hoisted(() => ({
   addDriveFolder: vi.fn(), renameDriveFolder: vi.fn(), deleteDriveFolder: vi.fn(), saveDriveFile: vi.fn(), deleteDriveFile: vi.fn(), openDriveFile: vi.fn(),
   moveDriveFolder: vi.fn(), restoreDriveItem: vi.fn(), deleteDriveItemForever: vi.fn(), emptyDriveBin: vi.fn(),
+  moveDriveFile: vi.fn(), copyDriveItem: vi.fn(), setDriveLock: vi.fn(), setDriveShare: vi.fn(),
 }))
 const upload = vi.hoisted(() => ({ uploadDocumentationFile: vi.fn() }))
 const { flash } = vi.hoisted(() => ({ flash: vi.fn() }))
@@ -31,7 +32,7 @@ const CARRES = '55555555-5555-4555-8555-555555555555'
 const letter = (over: Partial<PersonLetter>): PersonLetter => ({
   id: 'L1', ref: 'D-101', staffId: ZACK, staffName: 'Zack', typeId: 'offer', typeName: 'Offer letter', fileName: 'Offer_zack.pdf',
   contentType: 'application/pdf', size: 1, filedAt: '2026-10-01T02:00:00Z', filedBy: 'HR Manager', source: 'upload',
-  readAt: null, acknowledgedAt: null, withdrawnAt: null, events: [], ...over,
+  readAt: null, acknowledgedAt: null, withdrawnAt: null, hiddenAt: null, events: [], ...over,
 })
 
 const DATA: Documentation = {
@@ -57,12 +58,13 @@ const DATA: Documentation = {
 }
 
 const DRIVE: Drive = {
-  folders: [{ id: CARRES, name: 'Carres', parent: ROOT, createdAt: '2026-10-12T01:00:00Z', createdBy: 'Amy' }],
+  folders: [{ id: CARRES, name: 'Carres', parent: ROOT, createdAt: '2026-10-12T01:00:00Z', createdBy: 'Amy', lock: null, memberView: null, memberSees: null }],
   files: [
-    { id: 'F1', ref: 'F-101', fileName: 'SOP.pdf', contentType: 'application/pdf', size: 2_400_000, parent: folderAt(CARRES), uploadedAt: '2026-10-12T02:00:00Z', uploadedBy: 'Amy', deletedAt: null, events: [] },
+    { id: 'F1', ref: 'F-101', fileName: 'SOP.pdf', contentType: 'application/pdf', size: 2_400_000, parent: folderAt(CARRES), uploadedAt: '2026-10-12T02:00:00Z', uploadedBy: 'Amy', deletedAt: null, events: [], lock: null, memberView: null, memberSees: null },
   ],
   bin: [],
   readAt: '',
+  canLock: false,
 }
 
 beforeEach(() => {
@@ -142,20 +144,20 @@ describe('Documentation › Data center as a Drive', () => {
     render(<Drive />)
     expect(screen.queryByRole('button', { name: 'More actions for HOUZS Venture' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'More actions for Carres' }))
-    expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual(['Rename', 'Move to…', 'Move to Bin'])
+    expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual(['Rename', 'Move to…', 'Copy to…', 'Duplicate', 'Move to Bin'])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Move to Bin' }))
     await waitFor(() => expect(drive.deleteDriveFolder).toHaveBeenCalledWith(CARRES))
     expect(flash).toHaveBeenCalledWith('Carres moved to the Bin')
   })
 
-  it('a folder’s Move to… lists every place but itself and the people; picked, it goes there with everything in it', async () => {
+  it('a folder’s Move to… lists every place but itself — a person’s folder too (2026-10-14); picked, it goes there with everything in it', async () => {
     drive.moveDriveFolder.mockResolvedValue({ ok: true })
     render(<Drive />)
     fireEvent.click(screen.getByRole('button', { name: 'More actions for Carres' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Move to…' }))
     const win = within(screen.getByRole('dialog', { name: 'Move Carres' }))
     expect(win.getByText('Now in Data center — everything in it goes with it')).toBeInTheDocument()
-    expect(win.getAllByRole('option').map(o => o.textContent)).toEqual(['Data centerHere now', 'HOUZS Venture', 'Revenue'])
+    expect(win.getAllByRole('option').map(o => o.textContent)).toEqual(['Data centerHere now', 'HOUZS Venture', 'Revenue', 'Zack'])
     expect(win.getByRole('option', { name: /Data center/ })).toBeDisabled()
     fireEvent.click(win.getByRole('option', { name: 'Revenue' }))
     fireEvent.click(win.getByRole('button', { name: 'Move here' }))
@@ -167,7 +169,7 @@ describe('Documentation › Data center as a Drive', () => {
     drive.deleteDriveFile.mockResolvedValue({ ok: true })
     render(<Drive start={folderAt(CARRES)} />)
     fireEvent.click(screen.getByRole('button', { name: 'More actions for SOP.pdf' }))
-    expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual(['View', 'Download', 'Move to Bin'])
+    expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual(['View', 'Download', 'Move to…', 'Copy to…', 'Duplicate', 'Move to Bin'])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Move to Bin' }))
     await waitFor(() => expect(drive.deleteDriveFile).toHaveBeenCalledWith('F1'))
     expect(flash).toHaveBeenCalledWith('SOP.pdf moved to the Bin')
@@ -212,7 +214,8 @@ describe('a person’s folder: their record, as before', () => {
     expect(record().getByText(/1 letter on file/)).toBeInTheDocument()
     expect(record().getAllByText('Warning letter')).toHaveLength(1)
     expect(screen.getByRole('button', { name: 'Show withdrawn (1)' })).toBeInTheDocument()
-    expect(record().getByText(/every copy Publish & save makes for Zack, land in this folder by themselves/)).toBeInTheDocument()
+    // No description under the name (2026-10-14, DESIGN.md › No descriptions on the page).
+    expect(record().queryByText(/land in this folder by themselves/)).toBeNull()
   })
 
   it('asks once more, then withdraws and says who no longer sees it', async () => {
@@ -255,10 +258,10 @@ describe('a person’s folder: their record, as before', () => {
     expect(screen.getByRole('button', { name: 'Hide withdrawn (1)' })).toBeInTheDocument()
   })
 
-  it('+ New in a person’s folder uploads a letter, never a folder', () => {
+  it('+ New in a person’s folder uploads a letter — or, since 2026-10-14, makes a folder or keeps files there', () => {
     view()
     fireEvent.click(screen.getByRole('button', { name: 'New' }))
-    expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual(['Upload a letter'])
+    expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual(['Upload a letter', 'New folder', 'Upload files'])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Upload a letter' }))
     expect(screen.getByRole('dialog', { name: 'Upload a letter' })).toBeInTheDocument()
   })
@@ -288,6 +291,193 @@ describe('the preview', () => {
     expect(screen.getByText('File · Carres')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: /Audit trail/ }))
     expect(screen.getByText('Folder').nextElementSibling).toHaveTextContent('Carres')
+  })
+})
+
+// A person's own (2026-10-14 — the user: "documentation 我要分成两种：company / personal"; right-click a folder of a
+// person's data so they may view it; a document kept from them; move, copy, duplicate; "view only me").
+describe('a person’s own, View only me, Move / Copy', () => {
+  const CONTRACTS = '88888888-8888-4888-8888-888888888888'
+  const item = { lock: null, memberView: null, memberSees: null }
+  const PERSONAL: Drive = {
+    ...DRIVE,
+    canLock: true,
+    folders: [
+      ...DRIVE.folders,
+      { id: CONTRACTS, name: 'Contracts', parent: personAt(ZACK), createdAt: '2026-10-14T01:00:00Z', createdBy: 'Alvin', ...item, memberView: true, memberSees: true },
+    ],
+    files: [
+      ...DRIVE.files,
+      { id: 'F2', ref: 'F-102', fileName: 'Offer.pdf', contentType: 'application/pdf', size: 900, parent: folderAt(CONTRACTS), uploadedAt: '2026-10-14T02:00:00Z', uploadedBy: 'Alvin', deletedAt: null, events: [], ...item, memberSees: true },
+      { id: 'F3', ref: 'F-103', fileName: 'Notes.pdf', contentType: 'application/pdf', size: 900, parent: personAt(ZACK), uploadedAt: '2026-10-14T02:00:00Z', uploadedBy: 'Alvin', deletedAt: null, events: [], ...item, memberSees: false, lock: { by: 'Alvin', mine: false, at: '2026-10-14T03:00:00Z' } },
+    ],
+  }
+  const view = (start: string, can = { create: true, edit: true }) => render(<Drive start={start} drive={PERSONAL} can={can} />)
+
+  beforeEach(() => {
+    drive.setDriveShare.mockResolvedValue({ ok: true, person: 'Zack', sees: false })
+    drive.setDriveLock.mockResolvedValue({ ok: true, on: true, wasShared: true })
+    drive.copyDriveItem.mockResolvedValue({ ok: true, name: 'Copy of SOP.pdf', files: 1, skipped: 0 })
+    drive.moveDriveFile.mockResolvedValue({ ok: true })
+    actions.setLetterShare.mockResolvedValue({ ok: true, person: 'Zack', type: 'Warning letter', sees: false })
+  })
+
+  it('a person’s folder holds their record, then the folders and files HR keeps for them — each wearing who sees it', () => {
+    view(personAt(ZACK))
+    expect(screen.getByRole('region', { name: 'Zack' })).toBeInTheDocument()
+    const contracts = screen.getByRole('button', { name: /^Contracts/ }).closest('[data-kind]') as HTMLElement
+    expect(within(contracts).getByLabelText('Zack can view')).toBeInTheDocument()
+    expect(screen.getByLabelText('View only me · Only Alvin and above')).toBeInTheDocument()
+  })
+
+  it('a folder’s ⋮ shares it with its person — ticked while they see it — and keeps it back', async () => {
+    view(personAt(ZACK))
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Contracts' }))
+    const share = screen.getByRole('menuitemcheckbox', { name: 'Zack can view' })
+    expect(share).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemcheckbox', { name: 'View only me' })).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(share)
+    await waitFor(() => expect(drive.setDriveShare).toHaveBeenCalledWith('folder', CONTRACTS, false))
+    expect(flash).toHaveBeenCalledWith('Contracts kept from Zack')
+  })
+
+  it('a file locked by somebody else is theirs to unlock too, once shown: “View only Alvin and above”, ticked', async () => {
+    drive.setDriveLock.mockResolvedValue({ ok: true, on: false, wasShared: false })
+    view(personAt(ZACK))
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Notes.pdf' }))
+    const lock = screen.getByRole('menuitemcheckbox', { name: 'View only Alvin and above' })
+    expect(lock).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(lock)
+    await waitFor(() => expect(drive.setDriveLock).toHaveBeenCalledWith('file', 'F3', false))
+    expect(flash).toHaveBeenCalledWith('Notes.pdf · everyone in HR sees it again')
+  })
+
+  it('View only me on something shared says its person no longer sees it', async () => {
+    view(folderAt(CONTRACTS))
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Offer.pdf' }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'View only me' }))
+    await waitFor(() => expect(drive.setDriveLock).toHaveBeenCalledWith('file', 'F2', true))
+    expect(flash).toHaveBeenCalledWith('Offer.pdf · View only me · Zack no longer sees it')
+  })
+
+  it('outside a person’s folder there is nobody to share with; a login that may not lock is not offered View only me', () => {
+    render(<Drive start={folderAt(CARRES)} drive={DRIVE} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for SOP.pdf' }))
+    expect(screen.queryAllByRole('menuitemcheckbox')).toEqual([])
+  })
+
+  it('a letter’s ⋮ has “Zack can view”, ticked while he sees it; unticked it is kept from him, still on the record', async () => {
+    view(personAt(ZACK))
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Warning letter' }))
+    const share = screen.getByRole('menuitemcheckbox', { name: 'Zack can view' })
+    expect(share).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(share)
+    await waitFor(() => expect(actions.setLetterShare).toHaveBeenCalledWith('L2', false))
+    expect(flash).toHaveBeenCalledWith('Warning letter kept from Zack · still on the record')
+  })
+
+  it('a letter kept from its person says Hidden, and its tick is off', () => {
+    const hidden = { ...DATA, letters: DATA.letters.map(l => (l.id === 'L2' ? { ...l, hiddenAt: '2026-10-14T05:00:00Z' } : l)) }
+    render(<DataCenterTab data={hidden} drive={PERSONAL} driveError={null} can={{ create: true, edit: true }} at={personAt(ZACK)} onAt={vi.fn()} onView={vi.fn()} />)
+    expect(screen.getByTitle('Kept from Zack — still on the record')).toHaveTextContent('Hidden')
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Warning letter' }))
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Zack can view' })).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('a right-click opens a card’s menu where the pointer is', () => {
+    view(personAt(ZACK))
+    const card = screen.getByRole('button', { name: /^Contracts/ }).closest('[data-kind]') as HTMLElement
+    fireEvent.contextMenu(card, { clientX: 300, clientY: 200 })
+    const menu = screen.getByRole('menu', { name: 'More actions for Contracts' })
+    expect(menu).toHaveAttribute('data-at', 'point')
+    expect(within(menu).getAllByRole('menuitem').map(m => m.textContent)).toEqual(['Rename', 'Move to…', 'Copy to…', 'Duplicate', 'Move to Bin'])
+  })
+
+  it('a card with no menu keeps the browser’s own right-click', () => {
+    view(HV)
+    const card = screen.getByRole('button', { name: /^Revenue/ }).closest('[data-kind]') as HTMLElement
+    expect(fireEvent.contextMenu(card)).toBe(true)
+  })
+
+  it('Duplicate copies a file into its own place as “Copy of …”', async () => {
+    render(<Drive start={folderAt(CARRES)} drive={DRIVE} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for SOP.pdf' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate' }))
+    await waitFor(() => expect(drive.copyDriveItem).toHaveBeenCalledWith({ kind: 'file', id: 'F1', parent: folderAt(CARRES), name: 'Copy of SOP.pdf' }))
+    expect(flash).toHaveBeenLastCalledWith('Copy of SOP.pdf made in Carres')
+  })
+
+  it('a folder’s Duplicate leaves its name to the database (“Copy of …”, then “(2)”)', async () => {
+    drive.copyDriveItem.mockResolvedValue({ ok: true, name: 'Copy of Contracts', files: 1, skipped: 0 })
+    view(personAt(ZACK))
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Contracts' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate' }))
+    await waitFor(() => expect(drive.copyDriveItem).toHaveBeenCalledWith({ kind: 'folder', id: CONTRACTS, parent: personAt(ZACK), name: null }))
+    expect(flash).toHaveBeenLastCalledWith('Copy of Contracts made in HOUZS Venture › Revenue › Zack')
+  })
+
+  it('Copy to… picks a place — any, its own too — and copies there under its own name', async () => {
+    drive.copyDriveItem.mockResolvedValue({ ok: true, name: 'SOP.pdf', files: 1, skipped: 0 })
+    render(<Drive start={folderAt(CARRES)} drive={DRIVE} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for SOP.pdf' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy to…' }))
+    const win = within(screen.getByRole('dialog', { name: 'Copy SOP.pdf' }))
+    expect(win.getByRole('option', { name: 'Carres' })).not.toBeDisabled()
+    fireEvent.click(win.getByRole('option', { name: 'Zack' }))
+    fireEvent.click(win.getByRole('button', { name: 'Copy here' }))
+    await waitFor(() => expect(drive.copyDriveItem).toHaveBeenCalledWith({ kind: 'file', id: 'F1', parent: personAt(ZACK), name: 'SOP.pdf' }))
+    expect(flash).toHaveBeenLastCalledWith('SOP.pdf copied to HOUZS Venture › Revenue › Zack')
+  })
+
+  it('a folder’s Copy to… keeps its name where the place has none of it, else leaves “Copy of …” to the database', async () => {
+    view(personAt(ZACK))
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Contracts' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy to…' }))
+    let win = within(screen.getByRole('dialog', { name: 'Copy Contracts' }))
+    fireEvent.click(win.getByRole('option', { name: 'Carres' }))
+    fireEvent.click(win.getByRole('button', { name: 'Copy here' }))
+    await waitFor(() => expect(drive.copyDriveItem).toHaveBeenCalledWith({ kind: 'folder', id: CONTRACTS, parent: folderAt(CARRES), name: 'Contracts' }))
+    drive.copyDriveItem.mockClear()
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Contracts' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy to…' }))
+    win = within(screen.getByRole('dialog', { name: 'Copy Contracts' }))
+    fireEvent.click(win.getByRole('option', { name: 'Zack' }))
+    fireEvent.click(win.getByRole('button', { name: 'Copy here' }))
+    await waitFor(() => expect(drive.copyDriveItem).toHaveBeenCalledWith({ kind: 'folder', id: CONTRACTS, parent: personAt(ZACK), name: null }))
+  })
+
+  it('a share the database refuses says why; one that does not reach its person says they still do not see it', async () => {
+    const why = 'Notes.pdf is inside Cases, which is View only me — share Cases with Zack first.'
+    drive.setDriveShare.mockResolvedValue({ ok: false, reason: why })
+    view(personAt(ZACK))
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Notes.pdf' }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Zack can view' }))
+    await waitFor(() => expect(drive.setDriveShare).toHaveBeenCalledWith('file', 'F3', true))
+    await waitFor(() => expect(flash).toHaveBeenLastCalledWith(why))
+    drive.setDriveShare.mockResolvedValue({ ok: true, person: 'Zack', sees: false })
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Notes.pdf' }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Zack can view' }))
+    await waitFor(() => expect(flash).toHaveBeenLastCalledWith('Notes.pdf is still kept from Zack'))
+  })
+
+  it('a file moves with Move to… — into a person’s folder too', async () => {
+    render(<Drive start={folderAt(CARRES)} drive={DRIVE} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for SOP.pdf' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to…' }))
+    const win = within(screen.getByRole('dialog', { name: 'Move SOP.pdf' }))
+    expect(win.getByText('Now in Carres')).toBeInTheDocument()
+    expect(win.getByRole('option', { name: /Carres/ })).toBeDisabled()
+    fireEvent.click(win.getByRole('option', { name: 'Zack' }))
+    fireEvent.click(win.getByRole('button', { name: 'Move here' }))
+    await waitFor(() => expect(drive.moveDriveFile).toHaveBeenCalledWith('F1', personAt(ZACK)))
+  })
+
+  it('without Edit no setting, no move; without Create no copy', () => {
+    view(personAt(ZACK), { create: false, edit: false })
+    expect(screen.queryByRole('button', { name: 'More actions for Contracts' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Notes.pdf' }))
+    expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual(['View', 'Download'])
+    expect(screen.queryAllByRole('menuitemcheckbox')).toEqual([])
   })
 })
 

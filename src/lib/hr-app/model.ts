@@ -8,6 +8,7 @@
 import { formatIntlDate } from '@/lib/utils'
 import type { Notice, Notices } from '@/lib/push/notices'
 import type { MyMemo } from '@/lib/memos/model'
+import type { MyDocuments } from '@/lib/documentation/personal'
 
 export type HireStatus = 'submitted' | 'needs_info' | 'acknowledged' | 'filled' | 'cancelled' | 'declined'
 export type CandStage = 'shortlisted' | 'appointment' | 'offered' | 'hired' | 'rejected'
@@ -180,6 +181,12 @@ export interface HrAppData {
    * shared login, none while viewing as somebody. Absent reads as none.
    */
   memos?: MyMemo[]
+  /**
+   * Their own documents (2026-10-14, mig 20261014190000 — the user: Documentation in two, company and personal): what
+   * HR shares with their department, and what of their own Data center folder HR shares with them. Null for a shared
+   * login's nothing, while viewing as somebody, or when it could not be read. Absent reads as none.
+   */
+  myDocs?: MyDocuments | null
 }
 
 /** A view of the one app (setViewAs): the portal as the Principal or Finance, this app, the Revenue app. */

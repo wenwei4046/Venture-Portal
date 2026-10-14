@@ -73,6 +73,11 @@ export interface PersonLetter {
   acknowledgedAt: string | null
   /** Withdrawn (2026-10-11): off its person's record and out of the Revenue app, its file deleted; kept with its trail. */
   withdrawnAt: string | null
+  /**
+   * Kept from its person (2026-10-14 — the user: a letter can be hidden from them too): still on the record and counted,
+   * nowhere in their app — the memo it travelled as with it. Null while they see it.
+   */
+  hiddenAt: string | null
   events: DocEvent[]
 }
 
@@ -180,6 +185,7 @@ export function documentationFromRow(raw: unknown): Documentation | null {
         readAt: strOrNull(x.readAt),
         acknowledgedAt: strOrNull(x.acknowledgedAt),
         withdrawnAt: strOrNull(x.withdrawnAt),
+        hiddenAt: strOrNull(x.hiddenAt),
         events: eventsOf(x.events),
       }
     }),

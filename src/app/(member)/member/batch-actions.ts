@@ -22,7 +22,7 @@ import {
 import { fetchMemberArena } from "./arena-actions";
 import { fetchMemberKpiSummary } from "./kpi-summary-actions";
 import { fetchMemberRooms } from "./rooms-actions";
-import { fetchMemberDocuments } from "./docs-actions";
+import { fetchMemberDocuments, fetchMemberPersonal } from "./docs-actions";
 import { fetchMemberCrmUnread } from "./chat-badge-actions";
 import { fetchMemberNotices } from "./bell-actions";
 
@@ -48,7 +48,8 @@ export type MemberRead =
   | { kind: "rooms"; from: string; to: string }
   | { kind: "documents"; staffId?: string }
   | { kind: "crmUnread" }
-  | { kind: "notices" };
+  | { kind: "notices" }
+  | { kind: "personal"; staffId?: string };
 
 /** A read's answer, or the message of what it threw — the client rejects that read alone. */
 export type MemberReadSlot = { value: unknown } | { thrown: string };
@@ -95,6 +96,7 @@ function readOne(read: MemberRead): Promise<unknown> {
     case "documents": return fetchMemberDocuments(read.staffId);
     case "crmUnread": return fetchMemberCrmUnread();
     case "notices": return fetchMemberNotices();
+    case "personal": return fetchMemberPersonal(read.staffId);
     default: return Promise.reject(new Error("Unknown read."));
   }
 }

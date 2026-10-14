@@ -56,6 +56,32 @@
 .new { font-size: calc(10.8696px * var(--rv-type)); font-weight: 700; color: var(--rv-white); background: var(--rv-accent); border-radius: 9px; padding: 1px 7px; }
 .meta { display: block; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); margin-top: 2px; }
 .empty { margin: 16px 0; text-align: center; font-size: calc(14.0217px * var(--rv-type)); color: var(--rv-sub); }
+
+/* Company · Personal (2026-10-14): Personal's groups, a folder's tile, the way back up a folder. */
+.group {
+  margin: 6px 0 0;
+  font-size: calc(12px * var(--rv-type));
+  font-weight: 650;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--rv-sub);
+}
+.folder { color: var(--rv-accent); background: var(--rv-cream); }
+.up {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  box-sizing: content-box;
+  height: 30px;
+  padding: 0;
+  margin-left: -4px;
+  border: 0;
+  background: transparent;
+  color: var(--rv-accent);
+  font-size: calc(13.5px * var(--rv-type));
+  font-weight: 600;
+}
+.folderTitle { margin: 0 0 4px; font-family: var(--font-display-rv); font-size: calc(19px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
 .opening {
   padding: 12px 14px;
   border-radius: 14px;

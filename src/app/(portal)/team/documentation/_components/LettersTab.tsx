@@ -169,6 +169,9 @@ export default function LettersTab({
                     <span className={s.statusDot} aria-hidden="true" />
                     {st.label}
                   </span>
+                  {l.hiddenAt && !withdrawn ? (
+                    <span className={s.status} data-tone="muted" title={`Kept from ${l.staffName} — still on the record`}>Hidden</span>
+                  ) : null}
                 </span>
                 <span className={s.cellActions}>
                   <button type="button" className={s.smallBtn} onClick={() => onView(l.id)}>View</button>

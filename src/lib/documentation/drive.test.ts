@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BIN, EMPTY_DRIVE, HV, ROOT, binDaysLeft, binFrom, binLeftLabel, binSections, crumbs, deptAt, driveFromRow, fileTone, folderAt, folderCards,
-  folderNameRefusal, moveTargets, parentOf, parsePlace, pathLine, personAt, placeExists, placeFiles, searchDrive, sizeLabel, takesFolders, type Drive,
+  BIN, EMPTY_DRIVE, HV, ROOT, binDaysLeft, binFrom, binLeftLabel, binSections, copyName, crumbs, deptAt, driveFromRow, fileTone, folderAt, folderCards,
+  folderNameRefusal, lockWords, moveTargets, parentOf, parsePlace, pathLine, personAt, personOf, placeExists, placeFiles, searchDrive, sizeLabel,
+  takesFolders, type Drive,
 } from './drive'
 import type { Documentation, PersonLetter } from './model'
 
@@ -18,7 +19,7 @@ const CARRES_FIN = '66666666-6666-4666-8666-666666666666'
 const letter = (over: Partial<PersonLetter>): PersonLetter => ({
   id: 'L1', ref: 'D-101', staffId: ZACK, staffName: 'Zack', typeId: 'warn', typeName: 'Warning letter', fileName: 'Warning_zack.pdf',
   contentType: 'application/pdf', size: 1, filedAt: '2026-10-01T02:00:00Z', filedBy: 'HR Manager', source: 'upload',
-  readAt: null, acknowledgedAt: null, withdrawnAt: null, events: [], ...over,
+  readAt: null, acknowledgedAt: null, withdrawnAt: null, hiddenAt: null, events: [], ...over,
 })
 
 const DOC: Pick<Documentation, 'departments' | 'people' | 'letters' | 'letterTypes'> = {
@@ -36,21 +37,22 @@ const DOC: Pick<Documentation, 'departments' | 'people' | 'letters' | 'letterTyp
 
 const DRIVE: Drive = {
   folders: [
-    { id: CARRES, name: 'Carres', parent: ROOT, createdAt: '2026-10-12T01:00:00Z', createdBy: 'Amy' },
-    { id: CARRES_FIN, name: 'Finance', parent: folderAt(CARRES), createdAt: '2026-10-12T01:00:00Z', createdBy: 'Amy' },
+    { id: CARRES, name: 'Carres', parent: ROOT, createdAt: '2026-10-12T01:00:00Z', createdBy: 'Amy', lock: null, memberView: null, memberSees: null },
+    { id: CARRES_FIN, name: 'Finance', parent: folderAt(CARRES), createdAt: '2026-10-12T01:00:00Z', createdBy: 'Amy', lock: null, memberView: null, memberSees: null },
   ],
   files: [
-    { id: 'F1', ref: 'F-101', fileName: 'SOP.pdf', contentType: 'application/pdf', size: 2_400_000, parent: folderAt(CARRES_FIN), uploadedAt: '2026-10-12T02:00:00Z', uploadedBy: 'Amy', deletedAt: null, events: [] },
-    { id: 'F2', ref: 'F-102', fileName: 'Old.xlsx', contentType: null, size: 900, parent: folderAt(CARRES_FIN), uploadedAt: '2026-10-12T02:00:00Z', uploadedBy: 'Amy', deletedAt: '2026-10-12T03:00:00Z', events: [] },
+    { id: 'F1', ref: 'F-101', fileName: 'SOP.pdf', contentType: 'application/pdf', size: 2_400_000, parent: folderAt(CARRES_FIN), uploadedAt: '2026-10-12T02:00:00Z', uploadedBy: 'Amy', deletedAt: null, events: [], lock: null, memberView: null, memberSees: null },
+    { id: 'F2', ref: 'F-102', fileName: 'Old.xlsx', contentType: null, size: 900, parent: folderAt(CARRES_FIN), uploadedAt: '2026-10-12T02:00:00Z', uploadedBy: 'Amy', deletedAt: '2026-10-12T03:00:00Z', events: [], lock: null, memberView: null, memberSees: null },
   ],
   bin: [],
   readAt: '',
+  canLock: false,
 }
 
 describe('reading hr_drive()', () => {
   it('keeps what it can read and skips what has no id', () => {
     const d = driveFromRow({
-      folders: [{ id: CARRES, name: 'Carres', parent: 'root', createdAt: 'x', createdBy: 'Amy' }, { name: 'no id' }],
+      folders: [{ id: CARRES, name: 'Carres', parent: 'root', createdAt: 'x', createdBy: 'Amy', lock: null, memberView: null, memberSees: null }, { name: 'no id' }],
       files: [{ id: 'F1', ref: 'F-101', fileName: 'a.pdf', size: '12', parent: `folder:${CARRES}`, events: [{ what: 'Uploaded', at: 'x', who: 'Amy', note: null }] }],
     })
     expect(d?.folders).toHaveLength(1)
@@ -84,9 +86,9 @@ describe('places', () => {
     expect(crumbs(folderAt('77777777-7777-4777-8777-777777777777'), DOC, DRIVE).map(c => c.at)).toEqual([ROOT])
   })
 
-  it('a folder may go anywhere but inside a person', () => {
-    expect([ROOT, HV, deptAt(REV), folderAt(CARRES)].map(takesFolders)).toEqual([true, true, true, true])
-    expect(takesFolders(personAt(ZACK))).toBe(false)
+  it('a folder may go anywhere — a person’s folder too, since 2026-10-14', () => {
+    expect([ROOT, HV, deptAt(REV), folderAt(CARRES), personAt(ZACK)].map(takesFolders)).toEqual([true, true, true, true, true])
+    expect(takesFolders('person:nope')).toBe(false)
   })
 })
 
@@ -169,17 +171,21 @@ describe('a file’s tile', () => {
 
 // Move to… and the Bin (2026-10-13 — the user: "Data center 也加 Bin 和 Move to…", the Talent Bank's rules).
 describe('Move to…', () => {
-  it('every place a folder may go, top down — the Data center itself first, never a person, never itself or inside it', () => {
+  it('every place a folder may go, top down — the Data center itself first, each person’s folder (2026-10-14), never itself or inside it', () => {
     expect(moveTargets(DOC, DRIVE, folderAt(CARRES)).map(x => [x.path, x.depth])).toEqual([
       ['Data center', 0],
       ['HOUZS Venture', 1],
       ['HOUZS Venture › Revenue', 2],
+      ['HOUZS Venture › Revenue › Zack', 3],
       ['HOUZS Venture › HR', 2],
+      ['HOUZS Venture › HR › Amy', 3],
     ])
     const fin = moveTargets(DOC, DRIVE, folderAt(CARRES_FIN)).map(x => x.at)
     expect(fin).toContain(folderAt(CARRES))
     expect(fin).not.toContain(folderAt(CARRES_FIN))
-    expect(fin.some(at => parsePlace(at)?.kind === 'person')).toBe(false)
+    expect(fin).toContain(personAt(ZACK))
+    // A file excludes nothing: every place, its own folder too.
+    expect(moveTargets(DOC, DRIVE, '').map(x => x.at)).toContain(folderAt(CARRES_FIN))
   })
 })
 
@@ -187,7 +193,7 @@ describe('the Bin', () => {
   const OLD = '77777777-7777-4777-8777-777777777777'
   const when = { deletedAt: '2026-10-12T08:00:00Z', deletedBy: 'Amy', expiresAt: '2026-11-11T08:00:00Z' }
   const read = driveFromRow({
-    folders: [{ id: CARRES, name: 'Carres', parent: 'root', createdAt: 'x', createdBy: 'Amy' }],
+    folders: [{ id: CARRES, name: 'Carres', parent: 'root', createdAt: 'x', createdBy: 'Amy', lock: null, memberView: null, memberSees: null }],
     files: [],
     bin: [
       { id: 'b1', kind: 'folder', name: 'Old', at: `folder:${CARRES}`, folderId: OLD, ...when },
@@ -224,5 +230,61 @@ describe('the Bin', () => {
   it('is not a place of the tree', () => {
     expect(parsePlace(BIN)).toBeNull()
     expect(placeExists(BIN, DOC, read)).toBe(false)
+  })
+})
+
+// A person’s own (2026-10-14, mig 20261014190000): what HR keeps in a person’s folder, its lock and its share.
+describe('a person’s own, View only me', () => {
+  const CONTRACTS = '88888888-8888-4888-8888-888888888888'
+  const NESTED = '99999999-9999-4999-8999-999999999999'
+  const read = driveFromRow({
+    me: { canLock: true },
+    folders: [
+      { id: CONTRACTS, name: 'Contracts', parent: personAt(ZACK), createdAt: 'x', createdBy: 'Alvin', memberView: true, memberSees: true,
+        lock: { by: 'Alvin', mine: true, at: '2026-10-14T01:00:00Z' } },
+      { id: NESTED, name: '2026', parent: folderAt(CONTRACTS), createdAt: 'x', createdBy: 'Alvin', memberView: null, memberSees: false, lock: null },
+    ],
+    files: [
+      { id: 'F9', ref: 'F-109', fileName: 'IC.pdf', parent: personAt(ZACK), uploadedAt: 'x', uploadedBy: 'Alvin', memberView: false, memberSees: false },
+      { id: 'FX', ref: 'F-110', fileName: 'junk', parent: personAt(ZACK), memberView: 'yes', memberSees: 1, lock: 'x' },
+    ],
+  })!
+
+  it('reads each one’s lock, its share and whether its person sees it — and whether the reader may lock', () => {
+    expect(read.canLock).toBe(true)
+    expect(read.folders[0]).toMatchObject({ lock: { by: 'Alvin', mine: true }, memberView: true, memberSees: true })
+    expect(read.folders[1]).toMatchObject({ lock: null, memberView: null, memberSees: false })
+    expect(read.files[0]).toMatchObject({ lock: null, memberView: false, memberSees: false })
+    // Anything malformed reads as nothing set.
+    expect(read.files[1]).toMatchObject({ lock: null, memberView: null, memberSees: null })
+    expect(driveFromRow({})?.canLock).toBe(false)
+  })
+
+  it('a person’s folder holds HR’s folders; their card counts them beside their letters', () => {
+    const doc = { ...DOC, letters: [] }
+    expect(folderCards(personAt(ZACK), doc, read).map(c => [c.name, c.own, c.memberSees])).toEqual([['Contracts', true, true]])
+    expect(folderCards(deptAt(REV), doc, read).find(c => c.at === personAt(ZACK))?.line).toBe('Team Leader · 0 letters · 1 folder · 2 files')
+    expect(placeFiles(personAt(ZACK), read).map(f => f.id)).toEqual(['F9', 'FX'])
+    expect(crumbs(folderAt(NESTED), doc, read).map(c => c.name)).toEqual(['Data center', 'HOUZS Venture', 'Revenue', 'Zack', 'Contracts', '2026'])
+  })
+
+  it('knows whose folder a place is in — or nobody’s', () => {
+    expect(personOf(personAt(ZACK), read)).toBe(ZACK)
+    expect(personOf(folderAt(NESTED), read)).toBe(ZACK)
+    expect(personOf(folderAt(CARRES), DRIVE)).toBeNull()
+    expect(personOf(HV, read)).toBeNull()
+    expect(personOf('nonsense', read)).toBeNull()
+  })
+
+  it('says a lock in words, and names a copy as Drive does', () => {
+    expect(lockWords({ by: 'Alvin', mine: true, at: '' })).toBe('Only you and above')
+    expect(lockWords({ by: 'Alvin', mine: false, at: '' })).toBe('Only Alvin and above')
+    expect(copyName('Offer.pdf')).toBe('Copy of Offer.pdf')
+    expect(copyName('x'.repeat(300))).toHaveLength(200)
+  })
+
+  it('a folder name in a person’s folder is once per place, as anywhere', () => {
+    expect(folderNameRefusal('contracts ', personAt(ZACK), DOC, read)).toBe('contracts is here already.')
+    expect(folderNameRefusal('Payslips', personAt(ZACK), DOC, read)).toBeNull()
   })
 })

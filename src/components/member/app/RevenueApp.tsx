@@ -1277,7 +1277,18 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else if (pf === "rooms") {
       page = <RoomsPage {...rooms.page} onBack={back} />;
     } else if (pf === "docs") {
-      page = <DocsPage docs={docs.docs} message={docs.message} opening={docs.opening} onBack={back} onOpen={docs.open} />;
+      page = (
+        <DocsPage
+          docs={docs.docs}
+          personal={docs.personal}
+          message={docs.message}
+          personalMessage={docs.personalMessage}
+          opening={docs.opening}
+          onBack={back}
+          onOpen={docs.open}
+          onOpenPersonal={docs.openPersonal}
+        />
+      );
     } else if (pf === "crm" && crm) {
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       // On a computer the Control panel draws the app's frame itself (CRM Desktop rev 1): its greeting, bell and links are these.

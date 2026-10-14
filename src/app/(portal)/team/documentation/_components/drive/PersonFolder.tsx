@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { flash } from '@/components/hrv/toast'
-import { fileLetter, withdrawLetter } from '@/lib/documentation/actions'
+import { fileLetter, setLetterShare, withdrawLetter } from '@/lib/documentation/actions'
 import {
   DOC_ACCEPT, LETTER_STATUS, deptLabel, docShortDay, letterStatus, liveLetters, missingFor, plural, type DataCenterPerson, type Documentation,
 } from '@/lib/documentation/model'
@@ -11,7 +11,7 @@ import { downloadFile } from '../DocumentsTab'
 import ds from '../documentation.module.css'
 import { FileTile } from './Cards'
 import type { MenuItem } from './Menu'
-import { BinGlyph, DownGlyph, EyeGlyph, UploadGlyph } from './icons'
+import { BinGlyph, DownGlyph, EyeGlyph, SharedGlyph, UploadGlyph } from './icons'
 import s from './drive.module.css'
 
 /**
@@ -20,6 +20,11 @@ import s from './drive.module.css'
  * their letters as the Drive's file cards: a press views one; ⋮ › View · Download · (Documentation · Edit)
  * Withdraw, asked twice. Withdrawn ones wait greyed under "Show withdrawn". Every copy "Publish & save" makes for
  * them lands here by itself.
+ *
+ * Since 2026-10-14 (the user: a document such as the offer letter can be kept from its person) each letter's ⋮ has
+ * "<person> can view", ticked while they see it (Edit): unticked, the letter stays on the record and counts, but is
+ * nowhere in their app — *Hidden* on its card. The folders and files HR keeps for them are drawn under it by the
+ * Data center (DataCenterTab).
  */
 export default function PersonFolder({
   data,
@@ -58,13 +63,28 @@ export default function PersonFolder({
     flash(res.ok ? `${res.type} withdrawn · ${res.person || 'its person'} no longer sees it` : res.reason)
   }
 
-  /** A letter's ⋮: View · Download, and Withdraw (asked twice) for Documentation · Edit. */
-  function letterItems(id: string, fileName: string): Array<MenuItem | 'rule'> {
+  async function share(id: string, on: boolean) {
+    const res = await setLetterShare(id, on)
+    flash(!res.ok ? res.reason : on ? `${res.type} · ${res.person || person.name} can view it again` : `${res.type} kept from ${res.person || person.name} · still on the record`)
+  }
+
+  /**
+   * A letter's ⋮: View · Download; for Documentation · Edit, "<person> can view" (ticked while they see it) and
+   * Withdraw (asked twice).
+   */
+  function letterItems(id: string, fileName: string, hidden: boolean): Array<MenuItem | 'rule'> {
     const items: Array<MenuItem | 'rule'> = [
       { key: 'view', label: 'View', icon: <EyeGlyph />, onSelect: () => onView(id) },
       { key: 'download', label: 'Download', icon: <DownGlyph />, onSelect: () => void download(id, fileName) },
     ]
-    if (can.edit) items.push('rule', { key: 'withdraw', label: 'Withdraw', confirm: 'Confirm withdraw', tone: 'danger', icon: <BinGlyph />, onSelect: () => void withdraw(id) })
+    if (can.edit) {
+      items.push(
+        'rule',
+        { key: 'share', label: `${person.name} can view`, icon: <SharedGlyph />, checked: !hidden, onSelect: () => void share(id, hidden) },
+        'rule',
+        { key: 'withdraw', label: 'Withdraw', confirm: 'Confirm withdraw', tone: 'danger', icon: <BinGlyph />, onSelect: () => void withdraw(id) },
+      )
+    }
     return items
   }
 
@@ -75,9 +95,6 @@ export default function PersonFolder({
           <div id="dc-name" className={ds.recordName}>{person.name}</div>
           <div className={ds.recordMeta}>
             {[person.title, person.code, deptName, `${plural(mine.length, 'letter')} on file`].filter(Boolean).join(' · ')}
-          </div>
-          <div className={s.personHint}>
-            Letters filed here, and every copy Publish &amp; save makes for {person.name}, land in this folder by themselves.
           </div>
         </div>
         {can.create ? (
@@ -137,10 +154,13 @@ export default function PersonFolder({
                     <>
                       <span>Filed {docShortDay(l.filedAt)}</span>
                       <span className={s.fileMetaGap} />
+                      {l.hiddenAt ? (
+                        <span className={s.status} data-tone="muted" title={`Kept from ${person.name} — still on the record`}>Hidden</span>
+                      ) : null}
                       <span className={s.status} data-tone={status.tone}>{status.label}</span>
                     </>
                   }
-                  items={letterItems(l.id, l.fileName)}
+                  items={letterItems(l.id, l.fileName, !!l.hiddenAt)}
                 />
               )
             })}

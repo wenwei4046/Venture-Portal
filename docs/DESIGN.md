@@ -1186,9 +1186,11 @@ People › Documentation, `/team/documentation`: the kit's head and tabs **Docum
 
 - **Documents** — an upload card (Name, file, department chips) beside the list: kind tile, name, `file · day · who`, department pills, **View** · **Download** · **Delete** (armed). *Show deleted (n)* brings deleted rows back greyed.
 - **Data center as a Drive (v3.69)** — **+ New** (*New folder* · *Upload files*; *Upload a letter* in a person's folder), the path, a search. Sections *Companies* (HOUZS Venture first) · *Departments* / *People* · *Folders* (HR's) · *Files*, as cards.
-  - A folder card shows what it holds and a red count of people missing a compulsory letter; HR's own folders have ⋮ **Rename** · **Move to…** · **Move to Bin** (Documentation · Edit).
-  - A file card: a badge in its kind's colour, ⋮ (View · Download · Move to Bin; a letter **Withdraw**), a drawn page — **never a thumbnail**: a file opens only on a press, which its trail records — and a foot (a letter: *Filed <day>* + Delivered / Opened / Acknowledged).
-  - **A person's folder** is their record: their letters, a danger row with Upload per missing compulsory letter, **Withdraw** (armed); *Show withdrawn (n)*, View only.
+  - A folder card shows what it holds and a red count of people missing a compulsory letter; HR's own folders have ⋮ **Rename** · **Move to…** · **Copy to…** · **Duplicate** · *<person> can view* · *View only me* · **Move to Bin** (v4.5; the two settings are ticks).
+  - **A right-click (v4.5)** opens a card's own menu where the pointer is (fixed to the window, closed by a scroll); a card with no menu keeps the browser's.
+  - **Badges (v4.5)** after a card's name: a lock on a walnut tile — *View only me · Only you and above* / *Only Alvin and above*; a person with a tick on the ledger tint — *PETER can view* (in a person's folder, while they see it).
+  - A file card: a badge in its kind's colour, ⋮ (View · Download · Move to… · Copy to… · Duplicate · the two ticks · Move to Bin; a letter *<person> can view* · **Withdraw**), a drawn page — **never a thumbnail**: a file opens only on a press, which its trail records — and a foot (a letter: *Filed <day>* + Delivered / Opened / Acknowledged).
+  - **A person's folder** is their record: their letters, a danger row with Upload per missing compulsory letter, **Withdraw** (armed); *Show withdrawn (n)*, View only. Since v4.5 HR's *Folders* and *Files* follow the record (+ New: *Upload a letter* · *New folder* · *Upload files*), and a letter kept from its person wears a muted *Hidden* chip before its status (Letters too). No description line under the name.
   - Files dropped on the page go into the open folder.
   - **The Bin and Move to… (v3.80)** — exactly the Talent Bank's (**The Bin** below), at `?tab=data-center&in=bin`, Folders and Files only. A binned file reaches *Show deleted* only when it leaves the Bin for good. **Move to…** is the 440px window both Drives share (`drive/MoveWindow.tsx`) — never into a person, never a folder into itself.
 - **Letters** — a *Letter type* switcher (types with a count, a *Compulsory* switch, ×, *+ Add*), a red *Compulsory · N people missing* pill, the table: Person (→ their folder) · Letter · File · Filed · Status · View · Download. Upload a letter is the kit's 460px window.
@@ -1292,6 +1294,13 @@ Only for a login a People record names: the shared principal@, finance@, hr@ and
 - **Words, everywhere** — *Password changed. You stay signed in here; your other devices are signed out within an hour and need the new password.* Refusals: `lib/account/password.ts`.
 - **While sending** the button reads *Changing…* and the sheets wait for the answer. The portal's boxes carry **no `name`** — a submit before hydration would put the passwords in the address.
 
+### My documents (v4.5, 2026-10-14 — Admin › My documents, the HR app's More, the Revenue app's Profile › Documentation)
+
+One's own documents — **Company** (what HR shares with their department) and **Personal** (what HR shares with them of their own Data center folder, and their letters) — for a login of one's own only, never while viewing as (as Change password).
+
+- **Portal** — `/admin/documents`, the kit: compact tabs *Company* · *Personal* (counts of new), then the Data center's own cards: files as file cards (*Added 14 Oct*, *New* in the alert tone; a letter *To acknowledge* once read), folders as folder cards (*2 files · 1 new*; a press goes in, the path back up). A press views (a link made at the press, a tab readied in the click); ⋮ View · Download. Beside Change password in Admin / Reports & Admin.
+- **HR app** — More › *My documents* (above). **Revenue app** — Profile › Documentation's *Personal* (above).
+
 **The phone apps**
 
 ### The HR phone app (v3.38, 2026-10-11)
@@ -1302,7 +1311,7 @@ Only for a login a People record names: the shared principal@, finance@, hr@ and
 - **Review** — All · Hiring · Member services; a claim's **Approve** asks *Request payment* or *Add to payroll* (v3.45).
 - **Hiring** — requests by status; a request's page ends on a bar pinned above the tabs (Decline / Request more info / Acknowledge, then Cancel / Mark filled).
 - **Rooms** — as the Revenue app's.
-- **More** — Insights, Talent Bank, Data center (a red `!` while a compulsory letter is missing), *Memos*, *Change password*, *Phone notifications*, *Make them pop up* (v3.86, `components/pwa/PopUpGuide.tsx`); last, for an account that may switch views, the view switch (*You are here* on the current one).
+- **More** — Insights, Talent Bank, Data center (a red `!` while a compulsory letter is missing), *Memos*, *My documents* (v4.3 — Company · Personal chips, then rows: a letter row with **View**, a folder as a More row), *Change password*, *Phone notifications*, *Make them pop up* (v3.86, `components/pwa/PopUpGuide.tsx`); last, for an account that may switch views, the view switch (*You are here* on the current one).
 - **Notifications (v3.47, v3.52)** — a bell; its page lists what was new when it opened, then the rest. First open asks *Turn on notifications?* once (`components/pwa/PushAsk.tsx`).
 - **Tab bar** — Home · Review · Hiring · Rooms · More, on `--safe-bottom` (Part II › The phone's own navigation bar); sheets rise over a walnut scrim; every select is the soft dropdown.
 
@@ -1350,7 +1359,7 @@ Profile › Your workspace: **Book a room** and **Documentation** (a count of fi
 
 - **Meeting rooms** — **+ Book**; *By room | Timeline*; seven day chips. Timeline is **64px an hour**; a press on empty space books that half hour (never later than 19:30). The member's own meetings are accent, the rest of HQ slate, the guest link's soft accent.
 - **Book a room** sheet — soft dropdowns for Department (*Revenue · Fair*, *Revenue · IR*, then HQ's), Room, From / To; attendees, *Total pax*; **Cancel** · **Book**. An open meeting: the booker's **Cancel meeting** (*Tap again to cancel*); viewing as, *Read-only while viewing as*.
-- **Documentation** — a row per file with *New* until opened; *Nothing shared with you yet.*
+- **Documentation** — a row per file with *New* until opened; *Nothing shared with you yet.* Since v4.3 two tabs on the profile's segmented control — **Company · N** (that list) and **Personal · N**: *LETTERS* (a small caps group) then folder rows (a cream tile with the accent folder, *N files*, *N new*; a tap goes in: *‹ parent* in the accent, the folder's name in Inter Tight 19px) and file rows; *Nothing of yours is shared with you yet.* / *This folder is empty.*
 
 ### Submit waiting list (v3.27, 2026-10-10)
 
@@ -1394,6 +1403,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.5** · 2026-10-14 · A person's own documents: Company · Personal everywhere, the Data center's right-click, *<person> can view* and *View only me* ticks and badges, Copy to… / Duplicate, *Hidden* letters → Documentation; My documents; The HR phone app; The Revenue app
 - **v4.4** · 2026-10-14 · The Revenue app's bell moves by itself (Realtime, silently); every CRM page has the Revenue app's home beside its bell → The Revenue app — the refresh
 - **v4.3** · 2026-10-14 · Finance's view wears its own shell: the sidebar in Daily / Fund / Report / Department, the account menu, Edit profile; both views' sidebars 212px → Finance's view — its own shell
 - **v4.2** · 2026-10-14 · The Revenue app's refresh: Today's CRM chat button (live unread), income as a statement, Arena bank cards and board heroes, the 10px type floor, sheets close when pulled down → The Revenue app — the refresh
