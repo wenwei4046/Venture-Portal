@@ -7,6 +7,8 @@
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { urgencyOf, money } from "../../sales/vm/common";
 import { day0, DAY, gb, type PanelCtx } from "./common";
+import { openSummary } from "../../shared/notif-summary";
+import { summaryFor } from "../../shared/notif-summary-data";
 
 type Kind = "move" | "share" | "won" | "lost" | "overdue";
 const K: Record<Kind, [string, string, string, string]> = {
@@ -65,10 +67,15 @@ export function notifsVM(ctx: PanelCtx) {
     const c = K[n.kind], read = isRead(n);
     return { who: n.who, text: n.text, lead: n.lead, tail: n.tail, extra: n.extra, at: new Date(n.at).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" }),
       tag: c[0], iFg: c[1], iBg: c[2], icon: c[3], rule: k ? "1px solid #F5EEE9" : "0", dot: read ? "transparent" : "#BD4A19", rowBg: read ? "#fff" : "#FFFAF6",
-      // Tapped: read, and the chat it is about opens (user 2026-10-13: 點了裡面的未讀訊息要有跳到該功能).
+      // Tapped: read, and its summary opens — the customer, the latest messages, the next visit — with Open chat for the
+      // chat it is about (the owner, 2026-10-14: "我點進去看到更多才去 chat"; until then a tap opened the chat at once).
       tap: () => {
         if (!read) act.readNotifs([n.key]);
-        if (n.customerId && data.customers.some(c => c.id === n.customerId)) patch({ nfOpen: false, lead: n.customerId, pick: "", toast: "", ...(["overview", "calendar", "assign", "inbox"].includes(ui.tab) ? {} : { tab: "inbox" as const }) });
+        const go = n.customerId && data.customers.some(c => c.id === n.customerId)
+          ? () => patch({ nfOpen: false, lead: n.customerId!, pick: "", toast: "", ...(["overview", "calendar", "assign", "inbox"].includes(ui.tab) ? {} : { tab: "inbox" as const }) })
+          : undefined;
+        const title = [n.who, n.text, n.lead, n.tail].filter(Boolean).join(" ");
+        openSummary(summaryFor({ data, nameOf: ctx.nameOf, me: ctx.me.id }, { title, when: `${dayOf(n.at)}, ${new Date(n.at).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" })}`, customerId: n.customerId, lead: n.lead }, go));
       } };
   };
   const groups: { day: string; items: ReturnType<typeof row>[] }[] = [];

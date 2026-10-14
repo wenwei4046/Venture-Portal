@@ -195,6 +195,11 @@ PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []),
    + '{!!(l.canAssign) && (' + ROW_ACT("right", '"84px"', "#2F6FB5", "l.assign", "Assign", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3") + ')}'],
   ['<div onClick={l.open} onPointerDown={l.down} onPointerUp={l.up} onPointerCancel={l.cancel}', '<div onClick={l.open} onPointerDown={l.down} onPointerMove={l.move} onPointerUp={l.up} onPointerCancel={l.cancel}'],
 ];
+// A notification's row shows the customer's latest words under its line (2026-10-14: "在 notification 裡，我看不到重點").
+PATCHES.SalesProfile = [...(PATCHES.SalesProfile ?? []),
+  ['<span style={{ fontSize: "12px", color: "#806B60" }}>{u.meta}</span>',
+   '<span style={{ fontSize: "12px", color: "#806B60" }}>{u.meta}</span>\n                    {!!(u.sum) && (<span style={{ fontSize: "13px", color: "#3F2B22", lineHeight: "1.35", marginTop: "2px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{u.sum}</span>)}'],
+];
 // Inbox: after All ads, 8 px apart (the title takes the room, so All ads and the bell sit right). Team | Mine left the title
 // row for its own top row (§8.4, superseding 2026-10-11's place beside All ads).
 PATCHES.SalesInbox = [...(PATCHES.SalesInbox ?? []),

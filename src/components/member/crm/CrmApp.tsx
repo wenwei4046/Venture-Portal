@@ -38,6 +38,7 @@ import { photosAhead, warmPhotos } from "./shared/media-cache";
 import { MessageMenu } from "./shared/msg-menu";
 import { AttachSheetHost } from "./shared/attach-sheet";
 import { ActionSheetHost } from "./shared/action-sheet";
+import { NotifSummaryHost } from "./shared/notif-summary";
 import { answerOnScreen, closeNotices } from "@/components/pwa/notice-screen";
 import { crmChatTag } from "@/lib/push/notices";
 
@@ -209,6 +210,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       <MessageMenu />
       <AttachSheetHost />
       <ActionSheetHost />
+      <NotifSummaryHost />
     </div>
   );
   // A line instead of the CRM (loading, not in it): on a computer in the page, not in a phone-sized box.
