@@ -59,6 +59,9 @@ export interface ApprovalRow {
   types: string[]
   /** The record's number, where it has one (a voucher's). */
   no: string | null
+  /** Who sent it, and when it was sent (pending) or decided (decided) — `D MMM`. */
+  sentBy: string
+  on: string
 }
 
 export interface ApprovalHubModel {
@@ -75,6 +78,8 @@ const f2 = (n: number) => (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US
 export const rm = (n: number) => `RM ${f2(n)}`
 export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 const day = (iso: string) => officeTime(iso).format('D MMM')
+/** A row's kind, said only when it is not the queue's everyday payment voucher (most rows are). */
+const kindOf = (label: string) => (/^Payment voucher( × \d+)?$/.test(label) ? null : label)
 const stamp = (iso: string) => officeTime(iso).format('DD MMM YYYY · HH:mm')
 
 /** "today", "1 day", "5 days" — the desktop's Oldest waiting. */
@@ -93,10 +98,12 @@ export function recordOf(table: string | null, id: string | null): AppRecordRef 
 }
 
 function memberOf(m: QueueMember, decision: ApprovalMember['decision'] = null): ApprovalMember {
+  const voucher = m.request_type === 'payment_voucher'
   return {
     id: m.id,
-    label: m.description || m.typeLabel,
-    sub: [m.voucherNo, m.typeLabel].filter(Boolean).join(' · '),
+    // "SIA JONAS — RM 3,550.97": the amount stands at the line's end already.
+    label: (m.amount !== null ? m.description.replace(/\s+—\s+RM\s?[\d,]+(?:\.\d{1,2})?$/, '') : m.description) || m.typeLabel,
+    sub: voucher ? (m.voucherNo ?? 'Draft') : [m.voucherNo, m.typeLabel].filter(Boolean).join(' · '),
     amount: m.amount,
     isVoucher: m.request_type === 'payment_voucher',
     open: recordOf(m.reference_table, m.reference_id),
@@ -115,8 +122,8 @@ export function pendingRows(queue: QueueRow[], undecidable: Record<string, strin
       kind: r.kind,
       id: r.id,
       groupId: r.groupId,
-      title: r.description || r.typeLabel,
-      desc: [r.kind === 'group' ? `Combined · ${r.members.length}` : null, r.typeLabel, r.submitterName, day(r.submittedAt)].filter(Boolean).join(' · '),
+      title: r.kind === 'group' ? groupTitle(r.members) : r.description || r.typeLabel,
+      desc: [r.kind === 'group' ? `Combined · ${r.members.length}` : null, kindOf(r.typeLabel), r.submitterName, day(r.submittedAt)].filter(Boolean).join(' · '),
       amount: r.amount,
       hasAmount: r.hasAmount,
       items: 1,
@@ -129,6 +136,8 @@ export function pendingRows(queue: QueueRow[], undecidable: Record<string, strin
       decision: null,
       types: r.requestTypes,
       no: r.voucherNo,
+      sentBy: r.submitterName,
+      on: day(r.submittedAt),
     }
   })
 }
@@ -177,7 +186,7 @@ export function decidedRows(rows: ApprovalRequestRow[], opts: { amountOf: (r: Ap
         id: r.id,
         groupId: null,
         title: m.description || m.typeLabel,
-        desc: [d === 'approved' ? 'Approved' : 'Rejected', m.typeLabel, opts.nameOf(r.submitted_by), r.approved_at ? day(r.approved_at) : null].filter(Boolean).join(' · '),
+        desc: [d === 'approved' ? 'Approved' : 'Rejected', kindOf(m.typeLabel), opts.nameOf(r.submitted_by), r.approved_at ? day(r.approved_at) : null].filter(Boolean).join(' · '),
         amount: m.amount ?? 0,
         hasAmount: m.amount !== null,
         items: 1,
@@ -189,10 +198,13 @@ export function decidedRows(rows: ApprovalRequestRow[], opts: { amountOf: (r: Ap
         decision: d,
         types: [r.request_type],
         no: m.voucherNo,
+        sentBy: opts.nameOf(r.submitted_by),
+        on: r.approved_at ? day(r.approved_at) : '',
       })
       continue
     }
-    const list = groups.get(o.group)!
+    // In the order they were raised — a batch's voucher numbers in a row (the read is newest decision first).
+    const list = [...groups.get(o.group)!].sort((a, b) => a.created_at.localeCompare(b.created_at) || (a.description ?? '').localeCompare(b.description ?? ''))
     const members = list.map(member)
     const vouchers = members.filter((m) => m.request_type === 'payment_voucher')
     const lead = vouchers[0] ?? members[0]
@@ -201,13 +213,12 @@ export function decidedRows(rows: ApprovalRequestRow[], opts: { amountOf: (r: Ap
     const approved = list.filter((r) => r.status === 'approved').length
     const d = approved === list.length ? 'approved' : approved === 0 ? 'rejected' : null
     const latest = list.reduce((max, r) => ((r.approved_at ?? '') > max ? (r.approved_at ?? '') : max), '')
-    const shared = sharedHead(members.map((m) => m.description))
     out.push({
       key: `g:${o.group}`,
       kind: 'group',
       id: null,
       groupId: o.group,
-      title: (vouchers.length === members.length ? shared : lead.description) || lead.typeLabel,
+      title: groupTitle(members),
       desc: [
         `Combined · ${members.length}`,
         d === 'approved' ? 'Approved' : d === 'rejected' ? 'Rejected' : `${approved} approved · ${list.length - approved} rejected`,
@@ -227,17 +238,28 @@ export function decidedRows(rows: ApprovalRequestRow[], opts: { amountOf: (r: Ap
       decision: d,
       types: [...new Set(members.map((m) => m.request_type))],
       no: lead.voucherNo,
+      sentBy: opts.nameOf(list[0].submitted_by),
+      on: latest ? day(latest) : '',
     })
   }
   return out
 }
 
-/** "Payroll disbursement Sep 2026 — Aina" and "… — Bala" are headed by the part before the dash. */
-function sharedHead(descriptions: string[]): string {
-  const first = descriptions[0] ?? ''
+/**
+ * A combined approval's name: "Payroll disbursement Sep 2026 — Aina" and "… — Bala" are headed by the part
+ * before the dash; vouchers that share none — a payroll batch made one voucher a person, "SIA JONAS — RM
+ * 3,550.97" — go by the first and how many more ("SIA JONAS + 11 more", as the desktop panel names payees);
+ * a loan's disbursement by its own words.
+ */
+export function groupTitle(members: Array<{ request_type: string; description: string; typeLabel: string }>): string {
+  const vouchers = members.filter((m) => m.request_type === 'payment_voucher')
+  const lead = vouchers[0] ?? members[0]
+  if (!lead) return 'Combined request'
+  if (vouchers.length !== members.length || members.length === 1) return lead.description || lead.typeLabel
+  const first = lead.description
   const head = first.split(' — ')[0].trim()
-  if (head && descriptions.length > 1 && descriptions.every((d) => d === head || d.startsWith(`${head} — `))) return head
-  return first
+  if (head && members.every((m) => m.description === head || m.description.startsWith(`${head} — `))) return head
+  return `${head || lead.typeLabel} + ${members.length - 1} more`
 }
 
 /** The hub: the pending total over its three cards — each card counts and sums exactly what its list holds. */

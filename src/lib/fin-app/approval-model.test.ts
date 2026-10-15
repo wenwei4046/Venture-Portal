@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildQueueRows, queueSummary, type ApprovalRequestRow } from '@/lib/approval-queue'
-import { approvalHubModel, approvalRecordModel, decidedRows, inApp, pendingRows, recordOf, waitLabel } from './approval-model'
+import { approvalHubModel, approvalRecordModel, decidedRows, groupTitle, inApp, pendingRows, recordOf, waitLabel } from './approval-model'
 
 // The Finance phone app's Approvals (2026-10-15, part 5): the queue's own
 // figures, shaped as the app's hub, lists, combined requests and a request's
@@ -35,10 +35,11 @@ describe('pendingRows', () => {
   const queue = buildQueueRows(PENDING, opts)
   const rows = pendingRows(queue, { 'g:g-loan': 'You raised it — somebody else decides it' }, new Set(['u-carrie']))
 
-  it('one row a request, a combined approval one row — no number in the line, who and when under it', () => {
+  it('one row a request, a combined approval one row — no number in the line, who and when under it (the kind only when not a payment voucher)', () => {
+    expect(rows[1].desc).toBe('Combined · 2 · New loan + PV · Joan · 14 Oct')
     expect(rows.map((r) => r.key)).toEqual(['0471', 'g:g-loan', 'g:g-pay'])
-    expect(rows[0]).toMatchObject({ title: 'Office rental', desc: 'Payment voucher · Carrie · 10 Oct', amount: 1000, no: 'HV-PV-202610-0471', why: null, executive: true })
-    expect(rows[2]).toMatchObject({ title: 'Payroll disbursement Sep 2026', desc: 'Combined · 2 · Payment voucher × 2 · Carrie · 14 Oct', amount: 6000 })
+    expect(rows[0]).toMatchObject({ title: 'Office rental', desc: 'Carrie · 10 Oct', amount: 1000, no: 'HV-PV-202610-0471', why: null, executive: true })
+    expect(rows[2]).toMatchObject({ title: 'Payroll disbursement Sep 2026', desc: 'Combined · 2 · Carrie · 14 Oct', amount: 6000 })
   })
 
   it('says why a row is not this reader’s to decide', () => {
@@ -77,7 +78,7 @@ describe('decidedRows', () => {
   })
 
   it('a single decision says how it went first, and opens its own record where it has one', () => {
-    expect(rows[0].desc).toBe('Approved · Payment voucher · Carrie · 15 Oct')
+    expect(rows[0].desc).toBe('Approved · Carrie · 15 Oct')
     expect(rows[2]).toMatchObject({ decision: 'rejected', desc: 'Rejected · New fund source · Carrie · 13 Oct' })
     expect(rows[2].members[0].open).toEqual({ hub: 'fund-in', id: 'fs-1' })
   })
@@ -209,6 +210,37 @@ describe('approvalRecordModel', () => {
     })
     expect(r).toMatchObject({ title: 'Fund in from Mr Liang', amount: 80000, submittedBy: 'Unknown', notes: 'Wrong rate', open: { hub: 'fund-in', id: 'fs-1' } })
     expect(r.decidedAt).toBe('14 Oct 2026 · 12:00')
+  })
+})
+
+describe('a member’s line', () => {
+  it('drops the amount its words repeat, and says its number', () => {
+    const [g] = decidedRows(
+      [
+        req({ id: 'm1', description: 'HV-PV-202610-0507: SIA JONAS — RM 3,550.97', amount: 3550.97, group_id: 'g', status: 'approved', approved_at: '2026-10-10T08:33:46Z' }),
+        req({ id: 'm2', description: 'HV-PV-202610-0508: SIA JOSIAH — RM 6,748.96', amount: 6748.96, group_id: 'g', status: 'approved', approved_at: '2026-10-10T08:33:46Z' }),
+      ],
+      opts,
+    )
+    expect(g.title).toBe('SIA JONAS + 1 more')
+    expect(g.members.map((m) => [m.label, m.sub, m.amount])).toEqual([
+      ['SIA JONAS', 'HV-PV-202610-0507', 3550.97],
+      ['SIA JOSIAH', 'HV-PV-202610-0508', 6748.96],
+    ])
+    expect([g.sentBy, g.on]).toEqual(['Carrie', '10 Oct'])
+  })
+})
+
+describe('groupTitle', () => {
+  const v = (description: string) => ({ request_type: 'payment_voucher', description, typeLabel: 'Payment voucher' })
+  it('vouchers sharing a head go by it', () => {
+    expect(groupTitle([v('Payroll disbursement Sep 2026 — Aina'), v('Payroll disbursement Sep 2026 — Bala')])).toBe('Payroll disbursement Sep 2026')
+  })
+  it('a payroll batch made one voucher a person goes by the first and how many more — never as if it were one person’s', () => {
+    expect(groupTitle([v('SIA JONAS — RM 3,550.97'), v('SIA JOSIAH — RM 6,748.96'), v('WONG JOEY — RM 2,369.78')])).toBe('SIA JONAS + 2 more')
+  })
+  it('a loan’s disbursement by its own words', () => {
+    expect(groupTitle([v('Loan disbursement to Carres'), { request_type: 'new_loan', description: 'New loan to Carres', typeLabel: 'New loan' }])).toBe('Loan disbursement to Carres')
   })
 })
 

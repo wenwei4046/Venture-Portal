@@ -55,6 +55,8 @@ const row = (over: Partial<ApprovalRow> & { key: string }): ApprovalRow => ({
   decision: null,
   types: ['payment_voucher'],
   no: null,
+  sentBy: 'Carrie',
+  on: '10 Oct',
   ...over,
 })
 
@@ -68,8 +70,8 @@ const PAYROLL = row({
   amount: 6000,
   splittable: true,
   members: [
-    { id: 'p1', label: 'Payroll disbursement Sep 2026 — Aina', sub: 'HV-PV-202610-0480 · Payment voucher', amount: 3200, isVoucher: true, open: { hub: 'payments', id: 'v-p1' }, decision: null },
-    { id: 'p2', label: 'Payroll disbursement Sep 2026 — Bala', sub: 'HV-PV-202610-0481 · Payment voucher', amount: 2800, isVoucher: true, open: { hub: 'payments', id: 'v-p2' }, decision: null },
+    { id: 'p1', label: 'Payroll disbursement Sep 2026 — Aina', sub: 'HV-PV-202610-0480', amount: 3200, isVoucher: true, open: { hub: 'payments', id: 'v-p1' }, decision: null },
+    { id: 'p2', label: 'Payroll disbursement Sep 2026 — Bala', sub: 'HV-PV-202610-0481', amount: 2800, isVoucher: true, open: { hub: 'payments', id: 'v-p2' }, decision: null },
   ],
 })
 

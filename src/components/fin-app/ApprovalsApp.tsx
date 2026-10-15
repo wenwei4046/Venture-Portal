@@ -417,7 +417,7 @@ export default function ApprovalsApp({
               no={row.no}
               amount={row.hasAmount ? rm(row.amount) : '—'}
               to={row.title}
-              note={live ? (row.why ?? 'Waiting for your decision.') : row.desc}
+              note={live ? (row.why ?? 'Waiting for your decision.') : `Sent by ${row.sentBy}${row.on ? ` · decided ${row.on}` : ''}`}
             />
             <RecordItems roman="I." title="Vouchers" count={String(vouchers.length)} items={vouchers.map(memberLine)} empty="No vouchers in this request." />
             {others.length > 0 ? <RecordItems roman="II." title="Approved together" items={others.map(memberLine)} /> : null}
@@ -576,7 +576,7 @@ export default function ApprovalsApp({
     const needsReason = ask.kind === 'reject' || (ask.kind === 'split' && ask.reject.length > 0)
     const takesNotes = ask.kind === 'approve' || (ask.kind === 'split' && ask.approve.length > 0)
     sheet = (
-      <FinDialog open onClose={closeAsk} title={title} sub={rm(sum)} locked={busy} tall={needsReason || takesNotes}>
+      <FinDialog open onClose={closeAsk} title={title} sub={rm(sum)} locked={busy}>
         <DialogConfirm
           text={text}
           confirmLabel={busy ? 'Saving…' : confirmLabel}
