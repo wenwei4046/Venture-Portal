@@ -59,7 +59,7 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
           </>)}
           {!(p.recOn) && (<span style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "flex-end", minHeight: "46px", boxSizing: "border-box", padding: "0 4px", borderRadius: "23px", background: "#fff", boxShadow: "0 1px 2px rgba(63,43,34,.14)" }}>
             <span onClick={p.toggleSticker} onMouseDown={p.keep} title="Sticker" style={{ flex: "none", width: "38px", height: "46px", display: "grid", placeItems: "center", cursor: "pointer", color: p.stkFg }}>
-              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
                 <path d={p.stkIcon}>
                 </path>
               </svg>
@@ -68,13 +68,13 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
             </textarea>
             {!!(p.noDraft) && (<>
               <span onClick={p.toggleAttach} onMouseDown={p.keep} title="Attach" style={{ flex: "none", width: "40px", height: "46px", display: "grid", placeItems: "center", cursor: "pointer", color: p.attFg }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(-45deg)" }}>
+                <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(-45deg)" }}>
                   <path d="M16.5 7.5v8.25a4.5 4.5 0 0 1-9 0V6a3 3 0 0 1 6 0v9.5a1.5 1.5 0 0 1-3 0V8">
                   </path>
                 </svg>
               </span>
               <span onClick={p.camera} onMouseDown={p.keep} title="Camera" style={{ flex: "none", width: "40px", height: "46px", display: "grid", placeItems: "center", cursor: "pointer", color: "rgb(128 107 96)" }}>
-                <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 9a2 2 0 0 1 2-2h2l1.5-2.2A1.5 1.5 0 0 1 9.75 4h4.5a1.5 1.5 0 0 1 1.25.8L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z">
                   </path>
                   <circle cx="12" cy="13" r="3.5">
@@ -84,7 +84,7 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
             </>)}
           </span>)}
           <span onClick={p.mainAct} onMouseDown={p.keep} onPointerDown={p.mainDown} onContextMenu={p.noMenu} title={p.mainTitle} style={{ flex: "none", width: "46px", height: "46px", borderRadius: "50%", display: "grid", placeItems: "center", background: "#BD4A19", color: "#fff", cursor: "pointer", boxShadow: "0 3px 9px rgba(189,74,25,.18)", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d={p.mainIcon}>
               </path>
             </svg>
