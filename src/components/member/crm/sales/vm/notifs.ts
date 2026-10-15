@@ -87,6 +87,36 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
     out.push({ id: `w${c.id}@${c.lastCustomerAt}:${h}`, customerId: c.id, tone: "wait", kind: "status", from: c.name, ini: ini(c.name), lead: c.name, at: atLabel(t, now), time: t, ok: false, pending: false,
       text: u.level === "overdue" ? `Overdue · waiting ${Math.floor(u.waitingMinutes / 60)} h for your reply` : u.level === "urgent" ? "Urgent · waiting 6 h for your reply" : "Waiting for your reply · 3 h" });
   }
+  // Everything else about their own customers (the owner, 2026-10-15: "只要是關於到業務員本身的（appt, upcoming, chat）都要通知"):
+  // a visit TODAY still to come, a visit gone by and not yet marked, a chat whose 24-hour window is about to shut, and a
+  // visit somebody else booked, moved or cancelled for them. notify_crm_due() pushes the first three to the phone.
+  const today = day0(now), hm = (d: Date) => d.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
+  for (const v of data.visits) {
+    if (v.state !== "booked") continue;
+    const c = data.customers.find(x => x.id === v.customerId);
+    if (!c || c.assignedTo !== me) continue;
+    const s0 = new Date(v.start), st = s0.getTime();
+    if (day0(s0) === today && st > now.getTime())
+      out.push({ id: "d" + v.id, customerId: c.id, visitId: v.id, tone: "appt", kind: "status", from: c.name, ini: ini(c.name), lead: c.name, at: atLabel(today, now), time: today, pending: false,
+        ok: !!v.remindedAt, text: `Visit today, ${hm(s0)}${v.remindedAt ? "" : " · send the customer a reminder"}` });
+    else if (st < now.getTime() - 3_600_000 && st > now.getTime() - 3 * DAY)
+      out.push({ id: "k" + v.id, customerId: c.id, visitId: v.id, tone: "appt", kind: "status", from: c.name, ini: ini(c.name), lead: c.name, at: atLabel(st, now), time: st + 3_600_000, pending: false,
+        ok: false, text: `Visit at ${hm(s0)} has passed · mark whether they came` });
+  }
+  for (const c of data.customers) {
+    if (c.assignedTo !== me || !c.lastCustomerAt || isCold(c, now) || c.status === "won" || c.status === "lost") continue;
+    const left = new Date(c.lastCustomerAt).getTime() + DAY - now.getTime();
+    if (left <= 0 || left > 3 * 3_600_000) continue;
+    const t = new Date(c.lastCustomerAt).getTime() + 21 * 3_600_000;
+    out.push({ id: `x${c.id}@${c.lastCustomerAt}`, customerId: c.id, tone: "wait", kind: "status", from: c.name, ini: ini(c.name), lead: c.name, at: atLabel(t, now), time: t, ok: false, pending: false,
+      text: `Chat closes in ${Math.max(1, Math.ceil(left / 3_600_000))} h · reply before the 24-hour window shuts` });
+  }
+  for (const e of data.events) {
+    if (e.owner !== me || !e.actor || e.actor === me || (e.kind !== "appt_booked" && e.kind !== "appt_changed" && e.kind !== "appt_cancelled")) continue;
+    const by = nameOf(e.actor), t = new Date(e.at).getTime(), cn = custOf(e.customerId);
+    out.push({ id: "v" + e.id, customerId: e.customerId, tone: "appt", kind: "status", from: by, ini: ini(by), lead: cn, at: atLabel(t, now), time: t, ok: e.kind !== "appt_cancelled", pending: false,
+      text: `${firstName(by)} ${e.kind === "appt_booked" ? "booked a visit" : e.kind === "appt_changed" ? "moved the visit" : "cancelled the visit"}` });
+  }
   // About the people below them, only theirs.
   const below = new Set(downlineOf(me, data.people).filter(id => id !== me));
   if (below.size) {
