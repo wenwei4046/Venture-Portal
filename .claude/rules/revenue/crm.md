@@ -211,7 +211,7 @@ Mig `20261015100000_crm_desktop_v2` (`crm_channels`, `crm_set_channel`, `crm_not
   - a visit gone by an hour or more (up to 3 days) still booked — mark whether they came;
   - a chat whose 24-hour window shuts within 3 h;
   - a visit somebody else booked, moved or cancelled for them (the journey's `appt_*` events).
-- **The phone** (the hourly `notify_crm_due()`, mig `20261015200000_notify_more_for_salespeople`, built from production's body md5 da6e0cfd…):
+- **The phone** (the hourly `notify_crm_due()`, mig `20261015154851_notify_more_for_salespeople`, built from production's body md5 da6e0cfd…):
   - the visit tomorrow, whether or not the reminder went;
   - a visit today within 2 h;
   - the visit to mark;
