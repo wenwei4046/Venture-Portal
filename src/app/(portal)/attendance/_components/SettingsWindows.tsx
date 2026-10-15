@@ -116,7 +116,8 @@ function AssignmentWindow(props: Props) {
     mode: cur?.mode ?? 'clock',
     scheduleId: cur?.scheduleId ?? config.schedules[0]?.id ?? '',
     where: cur ? (cur.anywhere ? 'anywhere' : cur.locationId ?? '') : config.locations[0]?.id ?? '',
-    ot: cur?.ot ?? 'statutory',
+    // A new assignment pays OT by wage (2026-10-15 — the user: "set default by wage"): RM 4,000's line is Policy's.
+    ot: cur?.ot ?? 'by_wage',
     from: cur?.from ?? froms[0],
   }))
   const set = (k: keyof typeof f, v: string) => setF(x => ({ ...x, [k]: v }))

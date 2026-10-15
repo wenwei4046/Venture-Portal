@@ -150,6 +150,7 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'attendance.approve': 'all',
   'attendance.create': 'all',
   'attendance.edit': 'all',
+  'attendance.view': 'all',
   'billing.create': 'all',
   'billing.edit': 'all',
   'billing.export': 'all',

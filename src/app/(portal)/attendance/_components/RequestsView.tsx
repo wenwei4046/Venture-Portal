@@ -8,8 +8,9 @@ import { Button } from '@/components/ds/Button'
 import { Banner, DataTable, DescriptionList, StatusChip, type Column } from '@/components/ds/Data'
 import { DsSelect, Field, Textarea } from '@/components/ds/Field'
 import { Toast, useFlash } from '@/components/ds/Overlay'
-import { decideRequest, saveRoute } from '@/lib/attendance/actions'
+import { attendanceFileLink, decideRequest, saveRoute } from '@/lib/attendance/actions'
 import { balanceOf } from '@/lib/attendance/engine'
+import type { FileLink } from '@/lib/attendance/files'
 import { ROUTE_WORDS, amountLabel, bucketOf, flowNodes, kindLabel, sinceLabel, statusOf, waitingStep, whenLabel, type Bucket } from '@/lib/attendance/requests'
 import type { AttConfig, AttLedger, AttRequest, AttRoute, Route } from '@/lib/attendance/types'
 import { Avatar, HoverButton, NodeTrack, Pill } from './bits'
@@ -40,6 +41,8 @@ export default function RequestsView({ config, requests, ledger }: { config: Att
   const [newOpen, setNewOpen] = useState(false)
   const [toast, flash] = useFlash()
   const [pending, start] = useTransition()
+  const [file, setFile] = useState<FileLink | null>(null)
+  const [, startFile] = useTransition()
   const now = useMemo(() => new Date(), [requests])
 
   const counts = { hr: 0, upline: 0, decided: 0 } as Record<Bucket, number>
@@ -52,6 +55,25 @@ export default function RequestsView({ config, requests, ledger }: { config: Att
       ['Code', 'Person', 'Request', 'When', 'Amount', 'Route', 'Status'],
       ...rows.map(r => [r.ref, r.who, kindLabel(r, config.leaveTypes), whenLabel(r), amountLabel(r), ROUTE_WORDS[r.route], statusOf(r)[1]]),
     ])
+
+  // The attachment, through a ten-minute link made at the press (the `attendance` bucket, 2026-10-15).
+  const download = () => {
+    if (!req) return
+    startFile(async () => {
+      const r = await attendanceFileLink('request', req.id, true)
+      if (!r.ok) return flash(r.reason)
+      window.location.assign(r.data.url)
+    })
+  }
+  const view = () => {
+    if (!req) return
+    startFile(async () => {
+      const r = await attendanceFileLink('request', req.id)
+      if (!r.ok) return flash(r.reason)
+      setFile(r.data)
+      setAttOpen(true)
+    })
+  }
 
   const decide = (approve: boolean) => {
     if (!req) return
@@ -126,8 +148,8 @@ export default function RequestsView({ config, requests, ledger }: { config: Att
                   busy={pending}
                   onDecide={decide}
                   onClose={() => setReqId(null)}
-                  onView={() => setAttOpen(true)}
-                  onDownload={() => flash('The file is not available yet.')}
+                  onView={view}
+                  onDownload={download}
                 />
               )}
             </div>
@@ -136,7 +158,7 @@ export default function RequestsView({ config, requests, ledger }: { config: Att
           <RoutesTable config={config} onSaved={m => flash(m)} />
         )}
       </div>
-      {req && attOpen ? <RequestAttachmentPanel req={req} kind={kindLabel(req, config.leaveTypes)} when={whenLabel(req)} onClose={() => setAttOpen(false)} onDownload={() => flash('The file is not available yet.')} /> : null}
+      {req && attOpen ? <RequestAttachmentPanel req={req} file={file} kind={kindLabel(req, config.leaveTypes)} when={whenLabel(req)} onClose={() => setAttOpen(false)} onDownload={download} /> : null}
       {newOpen ? <RequestOnBehalf config={config} onClose={() => setNewOpen(false)} onSent={m => { setNewOpen(false); flash(m) }} onError={m => flash(m)} /> : null}
       <Toast message={toast} />
     </HvPage>

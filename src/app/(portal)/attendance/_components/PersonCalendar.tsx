@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Button } from '@/components/ds/Button'
 import { DescriptionList, StatusChip } from '@/components/ds/Data'
 import { DsSelect, Field, TextField, Textarea } from '@/components/ds/Field'
 import { Sheet } from '@/components/ds/Overlay'
-import { setDays } from '@/lib/attendance/actions'
+import { attendanceFileLink, invalidatePunch, setDays } from '@/lib/attendance/actions'
 import {
   balanceOf,
   dayInfo,
@@ -90,6 +90,33 @@ export default function PersonCalendar({
     return new Map(ctx.config.leaveTypes.map(lt => [lt.code, balanceOf(p, lt, ctx.config, ledger, ctx.today).left]))
   }, [p, ledger, ctx.config, ctx.today])
 
+  // The picked day's punches: their photos through a short link (the `attendance` bucket, 2026-10-15), and
+  // Mark invalid on either (the user: "放在月历那一天").
+  const punchById = useMemo(() => new Map(ctx.month.punches.map(x => [x.id, x])), [ctx.month.punches])
+  const picked = days[calDay - 1]
+  const pickedIn = picked?.punchIds.in ?? null
+  const pickedOut = picked?.punchIds.out ?? null
+  const [photos, setPhotos] = useState<Record<string, string | null>>({})
+  const asked = useRef(new Set<string>())
+  const [inv, setInv] = useState<{ id: string; label: string; time: string } | null>(null)
+  const [invNote, setInvNote] = useState('')
+  useEffect(() => {
+    setInv(null)
+    setInvNote('')
+  }, [calDay, p])
+  useEffect(() => {
+    if (!open || hi > lo || editing) return
+    const ids = [pickedIn, pickedOut].filter((x): x is string => !!x && !!punchById.get(x)?.photo && !asked.current.has(x))
+    if (!ids.length) return
+    ids.forEach(x => asked.current.add(x))
+    void (async () => {
+      for (const pid of ids) {
+        const r = await attendanceFileLink('punch', pid)
+        setPhotos(m => ({ ...m, [pid]: r.ok ? r.data.url : null }))
+      }
+    })()
+  }, [open, hi, lo, editing, pickedIn, pickedOut, punchById])
+
   if (!p) return <Sheet open={false} onClose={onClose}>{null}</Sheet>
 
   const openEditor = (a: number, b: number) => {
@@ -130,6 +157,22 @@ export default function PersonCalendar({
     setEditing(false)
     flash(`${p.name} · ${n} day${n > 1 ? 's' : ''} set to ${code} · reason saved to the audit log`)
   }
+
+  const markInvalid = async () => {
+    if (!inv || !invNote.trim()) return
+    setBusy(true)
+    setError(null)
+    const r = await invalidatePunch(inv.id, invNote.trim())
+    setBusy(false)
+    if (!r.ok) return setError(r.reason)
+    flash(`${inv.label} ${inv.time} marked invalid · audited`)
+    setInv(null)
+    setInvNote('')
+  }
+  const sides = ([['IN', day?.in ?? null, pickedIn], ['OUT', day?.out ?? null, pickedOut]] as const).map(([label, time, pid]) => ({
+    label, time, punch: pid ? punchById.get(pid) ?? null : null,
+  }))
+  const voided = ctx.month.punches.filter(x => x.staffId === p.id && x.day === dayIso && x.invalid)
 
   const exportCsv = () =>
     downloadCsv(`${p.name.replace(/\s+/g, '_')}_${month.slice(0, 7)}.csv`, [
@@ -252,15 +295,62 @@ export default function PersonCalendar({
             {!multi ? <DescriptionList items={facts} layout="stacked" columns={4} /> : null}
             {!multi && day?.in ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10, paddingTop: 4 }}>
-                {([['IN', day.in], ['OUT', day.out]] as const).map(([label, time]) => (
-                  <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ position: 'relative', aspectRatio: '4/3', borderRadius: 8, overflow: 'hidden', background: time ? 'repeating-linear-gradient(135deg,var(--ds-surface-2) 0 8px,var(--ds-surface-3) 8px 9px)' : 'var(--ds-surface-2)', border: '1px solid var(--ds-border)', display: 'grid', placeItems: 'center' }}>
-                      <span style={{ fontSize: 11.5, color: 'var(--ds-ink-3)' }}>{time ? 'Selfie at punch' : 'No punch yet'}</span>
-                      <span style={{ position: 'absolute', left: 6, top: 6, fontSize: 10.5, fontWeight: 600, padding: '2px 7px', borderRadius: 999, background: 'rgb(255 255 255 / .92)', color: 'var(--ds-ink)' }}>{`${label} · ${time ?? '—'}`}</span>
+                {sides.map(({ label, time, punch }) => {
+                  const url = punch ? photos[punch.id] : null
+                  return (
+                    <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ position: 'relative', aspectRatio: '4/3', borderRadius: 8, overflow: 'hidden', background: time ? 'repeating-linear-gradient(135deg,var(--ds-surface-2) 0 8px,var(--ds-surface-3) 8px 9px)' : 'var(--ds-surface-2)', border: '1px solid var(--ds-border)', display: 'grid', placeItems: 'center' }}>
+                        {url ? (
+                          // A ten-minute signed link to the bucket: next/image would cache it past its life.
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={url} alt={`${p.name} · ${label} ${time ?? ''}`} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ fontSize: 11.5, color: 'var(--ds-ink-3)' }}>{!time ? 'No punch yet' : !punch ? 'Set by HR' : punch.photo ? 'Selfie at punch' : 'No photo'}</span>
+                        )}
+                        <span style={{ position: 'absolute', left: 6, top: 6, fontSize: 10.5, fontWeight: 600, padding: '2px 7px', borderRadius: 999, background: 'rgb(255 255 255 / .92)', color: 'var(--ds-ink)' }}>{`${label} · ${time ?? '—'}`}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                        <span style={{ minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ds-ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {punch ? `${punch.device || 'App'} · ${fence ?? '—'}` : time ? 'Set by HR' : '—'}
+                        </span>
+                        {punch && ctx.config.canEdit ? (
+                          <button
+                            type="button"
+                            onClick={() => { setInv({ id: punch.id, label, time: time ?? punch.time }); setInvNote(''); setError(null) }}
+                            style={{ flex: 'none', border: 0, background: 'none', padding: 0, fontFamily: 'inherit', fontSize: 11.5, fontWeight: 500, color: 'rgb(var(--tone-clay-deep))', cursor: 'pointer' }}
+                          >
+                            Mark invalid
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ds-ink-3)' }}>{time ? `Front camera · ${fence ?? '—'}` : '—'}</span>
+                  )
+                })}
+              </div>
+            ) : null}
+            {!multi && voided.length ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {voided.map(x => (
+                  <div key={x.id} style={{ fontSize: 12, color: 'var(--ds-ink-3)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', textDecoration: 'line-through' }}>{`${x.dir.toUpperCase()} ${x.time}`}</span>
+                    {` · Invalid${x.invalidReason ? ` — ${x.invalidReason}` : ''}`}
                   </div>
                 ))}
+              </div>
+            ) : null}
+            {!multi && inv ? (
+              <div style={{ border: '1.5px solid var(--ds-ink)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{ fontWeight: 500 }}>{`${inv.label} · ${inv.time}`}</span>
+                  <span style={{ fontSize: 11.5, color: 'var(--ds-ink-3)' }}>HR correction · audited</span>
+                </div>
+                <Field label="Reason" hint="Needed to mark a punch invalid. Audited." error={error}>
+                  <Textarea rows={2} value={invNote} onChange={setInvNote} placeholder="e.g. Punched from home, not the store" />
+                </Field>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <Button variant="secondary" size="sm" onClick={() => setInv(null)}>Cancel</Button>
+                  <Button variant="secondary" size="sm" disabled={!invNote.trim() || busy} onClick={markInvalid}>Mark punch invalid</Button>
+                </div>
               </div>
             ) : null}
           </div>

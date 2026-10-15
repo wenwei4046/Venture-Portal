@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { amountLabel, atLabel, bucketOf, flowNodes, kindLabel, rangeLabel, sinceLabel, statusOf, whenLabel } from './requests'
+import { amountLabel, atLabel, bucketOf, flowNodes, kindLabel, rangeLabel, shownChanges, sinceLabel, statusOf, whenLabel } from './requests'
 import type { AttLeaveType, AttRequest, AttStep } from './types'
 
 const step = (s: Partial<AttStep>): AttStep => ({
@@ -54,5 +54,24 @@ describe('Attendance › Requests words', () => {
     expect(nodes.map(n => [n.role, n.state, n.label])).toEqual([['Submitted', 'done', 'Sent'], ['Upline', 'done', 'Approved'], ['HR', 'current', 'Waiting']])
     expect(nodes[1].who).toBe('Daniel Lee · by Siti on behalf')
     expect(nodes[2].at).toBe('Arrived 14 Oct, 08:52')
+  })
+})
+
+describe('a profile change as the viewer may see it (2026-10-15)', () => {
+  const pf = req({ kind: 'profile', leaveCode: null, detail: { changes: [
+    { key: 'contact_number', field: 'Phone', from: '012-345 6789', to: '019-876 5432' },
+    { key: 'bank_account_no', field: 'Bank account', from: '112233445566', to: '512345678901' },
+    { key: 'bank_name', field: 'Bank', from: null, to: 'Maybank' },
+  ] } })
+  it('the account number is •••• unless the title ticks bank accounts — the rest as asked', () => {
+    const masked = shownChanges(pf, { sensitive: [] }).detail.changes as Array<{ from: string | null; to: string | null }>
+    expect(masked.map(c => [c.from, c.to])).toEqual([['012-345 6789', '019-876 5432'], ['••••', '••••'], [null, 'Maybank']])
+    expect(shownChanges(pf, { sensitive: ['bank'] })).toBe(pf)
+    expect(whenLabel(pf)).toBe('Phone · Bank account · Bank')
+    expect(amountLabel(pf)).toBe('3 fields')
+  })
+  it('leaves every other request alone', () => {
+    const leave = req({})
+    expect(shownChanges(leave, { sensitive: [] })).toBe(leave)
   })
 })
