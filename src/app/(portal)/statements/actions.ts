@@ -341,3 +341,53 @@ export async function markStatementPaid(formData: FormData) {
   revalidatePath(`/statements/${id}`)
   revalidatePath('/dashboard')
 }
+
+// ─── The Finance phone app's steps, answered in words (2026-10-15, part 5c) ──
+//
+// The very actions above, behind the same gates; a refusal — a closed month,
+// no active company, a statement already moved on — comes back as words, which
+// production would otherwise hide behind a digest.
+
+const reasonOf = (e: unknown, fallback: string) => (e instanceof Error && e.message ? e.message : fallback)
+
+/** Generate statements for a month (`YYYY-MM`) — how many were made and skipped, and any company's trouble. */
+export async function generateStatementsInWords(
+  month: string,
+): Promise<{ ok: true; generated: number; skipped: number; errors: string[]; period: string } | { ok: false; reason: string }> {
+  await requireActionOn('/statements/monthly', 'treasury', 'create')
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return { ok: false, reason: 'Pick the month.' }
+  const fd = new FormData()
+  fd.set('period_month', `${month}-01`)
+  try {
+    const r = await generateStatements(fd)
+    return { ok: true, generated: r.generated, skipped: r.skipped, errors: r.errors ?? [], period: r.period }
+  } catch (e) {
+    return { ok: false, reason: reasonOf(e, 'The statements could not be generated.') }
+  }
+}
+
+/** Issue a draft statement to its subsidiary. */
+export async function issueStatementInWords(id: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  await requireActionOn('/statements/[id]', 'treasury', 'edit')
+  const fd = new FormData()
+  fd.set('id', id)
+  try {
+    await issueStatement(fd)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, reason: reasonOf(e, 'The statement could not be issued.') }
+  }
+}
+
+/** Mark an issued statement paid. */
+export async function markStatementPaidInWords(id: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  await requireActionOn('/statements/[id]', 'treasury', 'edit')
+  const fd = new FormData()
+  fd.set('id', id)
+  try {
+    await markStatementPaid(fd)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, reason: reasonOf(e, 'The statement could not be marked paid.') }
+  }
+}
