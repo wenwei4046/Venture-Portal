@@ -285,15 +285,15 @@ describe("the iPhone's keyboard (the owner's kbdebug, 2026-10-15: inner 390, vv 
     delete (navigator as unknown as Record<string, unknown>).userAgent;
   });
 
-  it("fits the screen to the keyboard by its bottom alone — never moved down by the page's pan", async () => {
+  it("fits the screen to the keyboard from the page's full height, its top following the page's pan", async () => {
     const vv = phone(false);
     await openChat();
     box().focus();
     Object.assign(vv, { height: 390, offsetTop: 403 });
     Object.defineProperty(window, "innerHeight", { configurable: true, value: 390 });
     await act(async () => { vv.dispatchEvent(new Event("resize")); });
-    expect(app().style.top).toBe("0px");
-    expect(app().style.bottom).toBe("403px");
+    expect(app().style.top).toBe("403px");
+    expect(app().style.bottom).toBe("0px");
   });
 
   it("still sees the keyboard when the chat is drawn with it already up", async () => {
@@ -301,6 +301,31 @@ describe("the iPhone's keyboard (the owner's kbdebug, 2026-10-15: inner 390, vv 
     await openChat();
     box().focus();
     await act(async () => { window.visualViewport!.dispatchEvent(new Event("resize")); });
-    expect(app().style.bottom).toBe("403px");
+    expect(app().style.bottom).toBe("0px");
+    expect(app().style.top).toBe("403px");
+  });
+});
+
+describe("the iPhone's screen drawn away from what is visible", () => {
+  it("is moved back to the top of what is visible", async () => {
+    const vv = Object.assign(new EventTarget(), { height: 793, offsetTop: 0, scale: 1, width: 393 });
+    vi.stubGlobal("visualViewport", vv);
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 793 });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 393 });
+    Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: 793 });
+    Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)" });
+    await openChat();
+    const app = composer().closest<HTMLElement>("[data-revenue-app]")!;
+    // The phone draws the screen 403px above what is visible whatever its top says (the second kbdebug).
+    app.getBoundingClientRect = () => ({ top: app.style.top === "403px" ? -403 : 0 } as DOMRect);
+    box().focus();
+    Object.assign(vv, { height: 390, offsetTop: 403 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 390 });
+    await act(async () => { vv.dispatchEvent(new Event("resize")); });
+    expect(app.style.top).toBe("806px");
+    expect(app.style.bottom).toBe("-403px");
+    for (const k of ["innerHeight", "innerWidth"] as const) delete (window as unknown as Record<string, unknown>)[k];
+    delete (document.documentElement as unknown as Record<string, unknown>).clientHeight;
+    delete (navigator as unknown as Record<string, unknown>).userAgent;
   });
 });
