@@ -4097,6 +4097,7 @@ export type Database = {
       }
       hr_monthly_payroll: {
         Row: {
+          attendance_figures: Json | null
           basic_salary: number
           commission_amount: number
           commission_synced_amount: number | null
@@ -4152,6 +4153,7 @@ export type Database = {
           withholding_tax: number
         }
         Insert: {
+          attendance_figures?: Json | null
           basic_salary?: number
           commission_amount?: number
           commission_synced_amount?: number | null
@@ -4207,6 +4209,7 @@ export type Database = {
           withholding_tax?: number
         }
         Update: {
+          attendance_figures?: Json | null
           basic_salary?: number
           commission_amount?: number
           commission_synced_amount?: number | null

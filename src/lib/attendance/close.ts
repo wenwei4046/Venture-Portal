@@ -95,10 +95,26 @@ export function dayLine(day: string, code: 'A' | 'I', inTime: string | null): st
   return code === 'A' ? `${shortDay(day)} · absent · no punch, no leave` : `${shortDay(day)} · incomplete · IN ${inTime ?? '—'}, no OUT`
 }
 
-/** The register as a CSV (the frozen one, or as reckoned now). */
+/** The close's toast: the freeze, then what payroll took (lib/attendance/payroll-write.ts `sendToPayroll`). */
+export function closedWords(month: string, people: number, p: { allowed: boolean; written: number; left: readonly unknown[]; failed?: boolean }): string {
+  const head = `${monthLabel(month)} closed · ${people} ${people === 1 ? 'person' : 'people'} frozen`
+  if (!p.allowed) return `${head} · payroll not updated`
+  if (p.failed) return `${head} · payroll not reached — close again`
+  return `${head} · ${p.written} sent to payroll${p.left.length ? ` · ${p.left.length} not sent` : ''}`
+}
+
+/** Outputs › Payroll's status once closed: "12 in payroll · 2 not sent", "All 12 in payroll". */
+export function payrollLine(marks: ReadonlyArray<{ mark: string }>): string {
+  const inPay = marks.filter(m => m.mark === 'in').length
+  const out = marks.length - inPay
+  if (!marks.length) return 'Nobody on HQ payroll'
+  return out ? `${inPay} in payroll · ${out} not sent` : `All ${inPay} in payroll`
+}
+
+/** The register as a CSV (the frozen one, or as reckoned now). A register frozen before its overtime columns leaves them empty. */
 export function registerCsv(rows: ReadonlyArray<Record<string, unknown>>): string {
-  const cols = ['code', 'name', 'days', 'late', 'leave', 'absent', 'unpaid', 'hours'] as const
-  const head = ['Employee code', 'Name', 'Days in', 'Late', 'Leave', 'Absent', 'Unpaid days', 'Hours worked']
+  const cols = ['code', 'name', 'days', 'late', 'leave', 'absent', 'unpaid', 'hours', 'ot', 'otRest', 'otPh'] as const
+  const head = ['Employee code', 'Name', 'Days in', 'Late', 'Leave', 'Absent', 'Unpaid days', 'Hours worked', 'OT hours', 'Rest-day OT hours', 'Holiday OT hours']
   const cell = (v: unknown) => {
     const s = v == null ? '' : String(v)
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s

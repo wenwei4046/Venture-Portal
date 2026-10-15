@@ -265,6 +265,16 @@ export async function requireActionOn(page: WritePages, fn: FunctionKey, action:
   return user
 }
 
+/**
+ * requireActionOn answered instead of redirected (2026-10-15): the same
+ * narrowing to the page's boxes, for a write that rides along with another
+ * only when the account may — Attendance's Month close sends the month to
+ * payroll only for an account holding HR Costing · Edit on Payroll.
+ */
+export async function mayActOn(page: WritePages, fn: FunctionKey, action: Action, scope: Scope = 'all'): Promise<boolean> {
+  return canDo(await actingUser(page), fn, action, scope)
+}
+
 /** requireActionOn for a write reachable as either of two actions. Several pairs means OR. */
 export async function requireAnyActionOn(page: WritePages, ...wants: Array<[FunctionKey, Action] | [FunctionKey, Action, Scope]>): Promise<User> {
   const user = await actingUser(page)

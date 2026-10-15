@@ -3,7 +3,8 @@ import { requirePage, requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { closeMonthOf, registerCsv } from '@/lib/attendance/close'
 import { registerOf } from '@/lib/attendance/engine'
-import { loadBoard } from '@/lib/attendance/server'
+import { otHoursOf } from '@/lib/attendance/payroll'
+import { loadBoard, loadRequests } from '@/lib/attendance/server'
 import { officeToday } from '@/lib/office-time'
 
 // Month close › Outputs › Statutory register (2026-10-15, the Attendance handoff): the month's register as a CSV —
@@ -20,10 +21,11 @@ export async function GET(req: Request): Promise<Response> {
   const frozen = await supabase.rpc('att_register', { p_month: month })
   let rows: Array<Record<string, unknown>> | null = !frozen.error && Array.isArray(frozen.data) ? (frozen.data as Array<Record<string, unknown>>) : null
   if (!rows) {
-    const board = await loadBoard(month)
+    const [board, requests] = await Promise.all([loadBoard(month), loadRequests()])
     if (!board.ok) return new Response(board.reason, { status: 403 })
     const { config, month: facts } = board.data
-    rows = registerOf({ config, month: facts, today: config.today, now: config.now })
+    const ctx = { config, month: facts, today: config.today, now: config.now }
+    rows = registerOf(ctx, requests.ok ? otHoursOf(ctx, requests.data) : undefined)
   }
   const name = `Register_${month.slice(0, 7)}.csv`
   return new Response(registerCsv(rows), {

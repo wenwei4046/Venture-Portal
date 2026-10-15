@@ -34,6 +34,8 @@ export const GUARDS: Readonly<Record<string, Gate>> = {
     { wants: ['approvals.view', ...APPROVE], text: 'canApprove(viewer) — the phone’s approvals badge' },
   'src/app/(portal)/payments/voucher-doc/route.tsx#readSubmissions':
     { wants: ['treasury.view'], text: 'can(user, treasury) — the voucher print’s approval requests, the treasury’s read only' },
+  'src/lib/attendance/payroll-write.ts#payrollMarksFor':
+    { wants: ['hr_costing.view:own'], text: 'can(user, hr_costing) with the Payroll tab open — Month close shows where each person’s payroll stands to a payroll reader only' },
 }
 
 /**

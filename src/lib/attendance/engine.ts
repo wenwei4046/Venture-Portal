@@ -294,20 +294,31 @@ export function daysToDecide(ctx: Ctx): DayToDecide[] {
   return out
 }
 
-/** The register frozen on close: one row per person. */
-export function registerOf(ctx: Ctx) {
+/** A person's approved overtime hours in a month, by the rate's kind of day (`otHoursOf`, lib/attendance/payroll.ts). */
+export type OtHours = { ot: number; rest: number; ph: number }
+
+/**
+ * The register frozen on close: one row per person. Unpaid days are days on an
+ * unpaid leave type and absent / incomplete days decided Unpaid — what payroll
+ * is sent (lib/attendance/payroll.ts); `ot` adds the overtime columns.
+ */
+export function registerOf(ctx: Ctx, ot: ReadonlyMap<string, OtHours> = new Map()) {
   const idx = indexMonth(ctx.month)
   const g = monthGrid(ctx)
+  const unpaidCodes = new Set(ctx.config.leaveTypes.filter(t => t.unpaid).map(t => t.code))
   return g.rows.map(r => {
     let unpaid = 0
     let workedMin = 0
     r.cells.forEach((c, i) => {
       if (c.workedMin) workedMin += c.workedMin
-      const d = idx.decisions.get(idx.key(r.person.id, g.days[i]))
-      if (d?.decision === 'Unpaid') unpaid++
-      if (c.code === 'UL') unpaid++
+      if (unpaidCodes.has(c.code)) unpaid++
+      else if ((c.code === 'A' || c.code === 'I') && idx.decisions.get(idx.key(r.person.id, g.days[i]))?.decision === 'Unpaid') unpaid++
     })
-    return { staffId: r.person.id, name: r.person.name, code: r.person.code, days: r.t.inD, late: r.t.late, leave: r.t.leave, absent: r.t.abs, unpaid, hours: Math.round(workedMin / 6) / 10 }
+    const o = ot.get(r.person.id)
+    return {
+      staffId: r.person.id, name: r.person.name, code: r.person.code, days: r.t.inD, late: r.t.late, leave: r.t.leave, absent: r.t.abs, unpaid,
+      hours: Math.round(workedMin / 6) / 10, ot: o?.ot ?? 0, otRest: o?.rest ?? 0, otPh: o?.ph ?? 0,
+    }
   })
 }
 

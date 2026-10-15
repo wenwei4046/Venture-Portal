@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node validate-revenue-payroll.mjs && node validate-revenue-payroll-sync.mjs && node validate-salary-components.mjs && node validate-revenue-payroll-adjustments.mjs && node validate-pay-preview-row.mjs"
+    "test": "node validate-revenue-payroll.mjs && node validate-revenue-payroll-sync.mjs && node validate-salary-components.mjs && node validate-revenue-payroll-adjustments.mjs && node validate-pay-preview-row.mjs && node validate-payroll-ot-statutory.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.8"

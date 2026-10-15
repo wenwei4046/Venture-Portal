@@ -63,7 +63,7 @@ export async function previewInfotechImport(
       .eq('status', 'active'),
     supabase
       .from('hr_monthly_payroll')
-      .select('id, staff_id, status, source')
+      .select('id, staff_id, status, source, attendance_figures')
       .eq('period_month', period),
   ])
   if (staffError || payrollError) throw new Error(`Could not check import: ${staffError?.message ?? payrollError?.message}`)
@@ -91,6 +91,12 @@ export async function previewInfotechImport(
     const existing = payrollByStaff.get(matched.id)
     if (existing?.source === 'commission' || matched.departments?.payroll_source === 'commission') {
       skipped.push({ rowIndex: idx, reason: 'Synced from Revenue Commission Calculation — no InfoTech import needed', code, name })
+      return
+    }
+    // HQ's pay is the portal's own since 2026-10-15 ("will no longer use infotech"): a row this month's
+    // attendance close wrote keeps its figures — the file would put InfoTech's OT and pay over them.
+    if (existing?.attendance_figures) {
+      skipped.push({ rowIndex: idx, reason: 'Attendance sent this month’s OT and unpaid days — not imported', code, name })
       return
     }
     if (existing && existing.status !== 'draft') {

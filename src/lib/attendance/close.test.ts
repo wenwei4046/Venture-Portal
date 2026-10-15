@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { closeLabel, closeMonthOf, closeNodes, dayLine, dueLine, registerCsv, touches, waitingAt, waitingIn, whenLabel } from './close'
+import { closeLabel, closedWords, closeMonthOf, closeNodes, dayLine, dueLine, payrollLine, registerCsv, touches, waitingAt, waitingIn, whenLabel } from './close'
 import type { AttRequest } from './types'
 
 const req = (over: Partial<AttRequest>): AttRequest => ({
@@ -53,7 +53,24 @@ describe('Month close (the Attendance handoff)', () => {
   })
 
   it('writes the register as CSV, quoting what needs it', () => {
-    expect(registerCsv([{ code: 'HV001', name: 'Lee, Daniel', days: 20, late: 1, leave: 0, absent: 0, unpaid: 0, hours: 160 }])).toBe(
-      'Employee code,Name,Days in,Late,Leave,Absent,Unpaid days,Hours worked\nHV001,"Lee, Daniel",20,1,0,0,0,160\n')
+    expect(registerCsv([{ code: 'HV001', name: 'Lee, Daniel', days: 20, late: 1, leave: 0, absent: 0, unpaid: 0, hours: 160, ot: 6, otRest: 4, otPh: 0 }])).toBe(
+      'Employee code,Name,Days in,Late,Leave,Absent,Unpaid days,Hours worked,OT hours,Rest-day OT hours,Holiday OT hours\nHV001,"Lee, Daniel",20,1,0,0,0,160,6,4,0\n')
+  })
+
+  it('says what the close froze and what payroll took', () => {
+    expect(closedWords('2026-10-01', 12, { allowed: true, written: 10, left: [{}, {}] })).toBe('October 2026 closed · 12 people frozen · 10 sent to payroll · 2 not sent')
+    expect(closedWords('2026-10-01', 1, { allowed: true, written: 1, left: [] })).toBe('October 2026 closed · 1 person frozen · 1 sent to payroll')
+    expect(closedWords('2026-10-01', 12, { allowed: false, written: 0, left: [] })).toBe('October 2026 closed · 12 people frozen · payroll not updated')
+    expect(closedWords('2026-10-01', 12, { allowed: true, written: 0, left: [], failed: true })).toBe('October 2026 closed · 12 people frozen · payroll not reached — close again')
+  })
+
+  it('says where HQ’s payroll stands once closed', () => {
+    expect(payrollLine([{ mark: 'in' }, { mark: 'in' }, { mark: 'completed' }])).toBe('2 in payroll · 1 not sent')
+    expect(payrollLine([{ mark: 'in' }])).toBe('All 1 in payroll')
+    expect(payrollLine([])).toBe('Nobody on HQ payroll')
+  })
+
+  it('leaves the overtime columns empty for a register frozen before them', () => {
+    expect(registerCsv([{ code: 'HV001', name: 'Ann', days: 20, late: 0, leave: 0, absent: 0, unpaid: 0, hours: 160 }]).split('\n')[1]).toBe('HV001,Ann,20,0,0,0,0,160,,,')
   })
 })
