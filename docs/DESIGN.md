@@ -885,6 +885,7 @@ README §1 and `prototype/Finance Mobile App.dc.html` (M01–M18): Finance's vie
 - **Invoice Financing** (`BaApp`, `BaSheets`): *Active face* over *To charge borrowers*, *To pay HC*, *HV margin*, *Financing register*, *Limits*; a financing's page with *Generate PV · Bill interest · ⋯*; *Record financing* (the bank's advice, *Auto-read →* where the reader is on, the borrower, the terms — each rate's figure under it, the day chips — what they come to on the summary card, HV margin on peach, the over-limit warning) and *Calculator* (the same, nothing saved).
 - **Reconciliation** (`ReconApp`): a card a bank against its GL, *Monthly reconciliations*; a month's page; *Match lines* — two ticked lists (statement, then book), the sums as a notice, *Match N ↔ M* pale until they agree; *Report*.
 - **Statements** (`StatementsApp`): *Net · <month>* between the arrows over *Statements · <Month>*, *Draft*, *All statements*; a statement's page with *Issue to subsidiary* / *Mark as paid* and *Print statement*; *Generate statements*.
+- **One-way steps ask first** (v4.53): a press nothing in the app undoes — *Issue to subsidiary*, *Mark as paid*, *Bill interest*, *Mark executed* — opens the kit's question (*Issue to <company>?* · *<month> · <net>*, *This cannot be undone.*, *Cancel* · the step); a step with its own way back (Mark settled, Mark done, Submit for approval, a match) stays one press.
 
 
 **HR & Payroll**
@@ -1564,6 +1565,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.53** · 2026-10-15 · Finance's phone app: one-way steps ask first — Issue to subsidiary, Mark as paid, Bill interest, Mark executed open a question sheet before they act → Finance's view — the phone app
 - **v4.52** · 2026-10-15 · Finance's phone app, part 5c: Daily › Journal Entries and Reconciliation, Fund › Invoice Financing, Repayment Schedule and Statements — each page's cards, lists and records with its steps and sheets (Match lines on its own screen, Record financing and the Calculator, Generate statements) → Finance's view — the phone app
 - **v4.51** · 2026-10-15 · HR's view — Attendance › Month close sends HQ's overtime and unpaid days to payroll: the toast says what payroll took, Outputs › Payroll where each person's payroll stands; the register's OT columns → HR's view — Attendance
 - **v4.50** · 2026-10-15 · Finance's phone app, part 5b: Report › General Ledger, Receipt & Payment, Trial Balance, Company Statement, Base Rate History — one page frame (`PageApp`: the headline, the period between its arrows, a card a part, its lines, a line's own screen) → Finance's view — the phone app

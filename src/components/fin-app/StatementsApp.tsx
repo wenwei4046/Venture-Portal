@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from 'react'
 import { flash } from '@/components/hrv/toast'
-import { DialogButton, DialogForm, DialogMenu, Field, FinDialog, Hint, Input } from '@/components/finv/Dialog'
+import { DialogButton, DialogConfirm, DialogForm, DialogMenu, Field, FinDialog, Hint, Input } from '@/components/finv/Dialog'
 import { drawerStyles as d } from '@/components/finv/Drawer'
 import { DrawerGroup as Group, DrawerLine as Line } from '@/components/finv/DrawerParts'
 import { joinQuery, f2, monthWords, shiftMonth, type PagePlace } from '@/lib/fin-app/page-model'
@@ -12,7 +12,7 @@ import { generateStatementsInWords, issueStatementInWords, markStatementPaidInWo
 import { openStatement } from '@/app/(portal)/statements/[id]/page-actions'
 import AppScreen, { PageHead, type BarButton } from './AppScreen'
 import { canStepBack, setIntent, useStep } from './nav'
-import { BankHero, ListBlock, Notice, Row, StackCards } from './parts'
+import { BankHero, ListBlock, Row, StackCards } from './parts'
 import s from './fin-app.module.css'
 
 // Fund › Statements in the Finance phone app (2026-10-15, part 5c — a page the
@@ -78,8 +78,6 @@ export default function StatementsApp({
     startMove(() => router.replace(`${place.href}${keep ? `?${keep}` : ''}`, { scroll: false }))
   }
 
-  /** A step's refusal, said on the statement until the next step. */
-  const [said, setSaid] = useState<string | null>(null)
   const [record, setRecord] = useState<StatementRecordModel | null>(initialRecord)
   const [refused, setRefused] = useState<string | null>(initialRefused)
   const load = useCallback((id: string) => {
@@ -100,7 +98,6 @@ export default function StatementsApp({
   }, [])
   const recordId = step.kind === 'record' ? step.id : null
   useEffect(() => {
-    setSaid(null)
     if (!recordId || record?.id === recordId) return
     setRecord(null)
     load(recordId)
@@ -129,18 +126,29 @@ export default function StatementsApp({
     : files.map((f, i) => ({ key: f.key, label: f.label, kind: i === 0 ? ('primary' as const) : undefined, onClick: () => fetchFile(f) }))
 
   const r = step.kind === 'record' && record?.id === step.id ? record : null
-  const runStep = (fn: () => Promise<{ ok: true } | { ok: false; reason: string }>, words: string) => {
-    if (!r) return
-    setSaid(null)
+  // Issue and Mark as paid go one way — an issued statement locks (Generate statements skips it) and nothing
+  // here takes either back — so each is asked first (2026-10-15, the user: a thumb lands on the bar's first
+  // button by mistake). The refusal stays in the question.
+  const [asking, setAsking] = useState<'issue' | 'paid' | null>(null)
+  const [askError, setAskError] = useState<string | null>(null)
+  const ask = (which: 'issue' | 'paid') => {
+    setAskError(null)
+    setAsking(which)
+  }
+  const confirmStep = () => {
+    if (!r || !asking) return
+    const which = asking
+    setAskError(null)
     startBusy(async () => {
       try {
-        const res = await fn()
-        if (!res.ok) return setSaid(res.reason)
-        flash(words)
+        const res = which === 'issue' ? await issueStatementInWords(r.id) : await markStatementPaidInWords(r.id)
+        if (!res.ok) return setAskError(res.reason)
+        setAsking(null)
+        flash(which === 'issue' ? 'Statement issued' : 'Statement marked paid')
         router.refresh()
         load(r.id)
       } catch {
-        setSaid('That did not go through. Try again.')
+        setAskError('That did not go through. Try again.')
       }
     })
   }
@@ -149,8 +157,8 @@ export default function StatementsApp({
   if (step.kind === 'record') {
     const bar: BarButton[] = r
       ? [
-          ...(r.can.issue ? [{ key: 'issue', label: 'Issue to subsidiary', kind: 'primary' as const, disabled: busy, onClick: () => runStep(() => issueStatementInWords(r.id), 'Statement issued') }] : []),
-          ...(r.can.paid ? [{ key: 'paid', label: 'Mark as paid', kind: 'primary' as const, disabled: busy, onClick: () => runStep(() => markStatementPaidInWords(r.id), 'Statement marked paid') }] : []),
+          ...(r.can.issue ? [{ key: 'issue', label: 'Issue to subsidiary', kind: 'primary' as const, disabled: busy, onClick: () => ask('issue') }] : []),
+          ...(r.can.paid ? [{ key: 'paid', label: 'Mark as paid', kind: 'primary' as const, disabled: busy, onClick: () => ask('paid') }] : []),
           { key: 'print', label: 'Print statement', onClick: () => window.open(`/statements/${r.id}/print`, '_blank', 'noopener,noreferrer') },
         ]
       : []
@@ -158,7 +166,6 @@ export default function StatementsApp({
       <AppScreen screenKey={`statements?${stepQuery(step)}`} head={{ kind: 'back', title: r?.company || 'Statement', backLabel: step.from ? TITLE[step.from] : 'Statements', onBack: backTo }} bar={bar}>
         {r ? (
           <>
-            {said ? <Notice>{said}</Notice> : null}
             <div className={d.hero} data-light={r.status === 'paid' ? 'ledger' : r.status === 'issued' ? 'alert' : 'def'}>
               <div className={d.heroTop}>
                 <span className={d.kicker}>Monthly statement</span>
@@ -253,6 +260,22 @@ export default function StatementsApp({
       {screen}
       <FinDialog open={menu} onClose={() => setMenu(false)} title="Statements">
         <DialogMenu items={[{ key: 'xlsx', label: 'Export Excel', onClick: () => fetchFile(files[1]) }]} />
+      </FinDialog>
+      <FinDialog
+        open={asking !== null && !!r}
+        onClose={() => !busy && setAsking(null)}
+        title={asking === 'paid' ? `Mark ${r?.company ?? 'this statement'} paid?` : `Issue to ${r?.company ?? 'the subsidiary'}?`}
+        sub={r ? `${r.period} · ${r.net}` : undefined}
+        locked={busy}
+      >
+        <DialogConfirm
+          text={asking === 'paid' ? 'This cannot be undone.' : 'An issued statement is locked — Generate statements skips it. This cannot be undone.'}
+          confirmLabel={busy ? (asking === 'paid' ? 'Marking…' : 'Issuing…') : asking === 'paid' ? 'Mark as paid' : 'Issue statement'}
+          busy={busy}
+          error={askError}
+          onCancel={() => setAsking(null)}
+          onConfirm={confirmStep}
+        />
       </FinDialog>
       <GenerateSheet
         open={generating}
