@@ -267,3 +267,40 @@ describe("the keyboard", () => {
     expect(document.activeElement).toBe(box());
   });
 });
+
+describe("the iPhone's keyboard (the owner's kbdebug, 2026-10-15: inner 390, vv 390 at top 403, client 793)", () => {
+  function phone(kbUp: boolean) {
+    const vv = Object.assign(new EventTarget(), { height: kbUp ? 390 : 793, offsetTop: kbUp ? 403 : 0, scale: 1, width: 393 });
+    vi.stubGlobal("visualViewport", vv);
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: kbUp ? 390 : 793 });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 393 });
+    Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: 793 });
+    Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)" });
+    return vv;
+  }
+  const app = () => composer().closest<HTMLElement>("[data-revenue-app]")!;
+  afterEach(() => {
+    for (const k of ["innerHeight", "innerWidth"] as const) delete (window as unknown as Record<string, unknown>)[k];
+    delete (document.documentElement as unknown as Record<string, unknown>).clientHeight;
+    delete (navigator as unknown as Record<string, unknown>).userAgent;
+  });
+
+  it("fits the screen to the keyboard by its bottom alone — never moved down by the page's pan", async () => {
+    const vv = phone(false);
+    await openChat();
+    box().focus();
+    Object.assign(vv, { height: 390, offsetTop: 403 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 390 });
+    await act(async () => { vv.dispatchEvent(new Event("resize")); });
+    expect(app().style.top).toBe("0px");
+    expect(app().style.bottom).toBe("403px");
+  });
+
+  it("still sees the keyboard when the chat is drawn with it already up", async () => {
+    phone(true);
+    await openChat();
+    box().focus();
+    await act(async () => { window.visualViewport!.dispatchEvent(new Event("resize")); });
+    expect(app().style.bottom).toBe("403px");
+  });
+});
