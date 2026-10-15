@@ -1,12 +1,13 @@
 'use server'
 
-import { requirePermission } from '@/lib/auth'
+import { requireActionOn, requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { canDo } from '@/lib/permission-actions'
 import { actionsOnPage, opensPage } from '@/lib/page-tabs'
 import { loadVoucherDetail, type VoucherDetail } from './_lib/voucher-detail'
 import { loadVoucherPageExtras, type VoucherPageExtras } from './_lib/voucher-page'
 import type { DrawerRefusal } from './drawer-actions'
+import { readVoucherEdit, type VoucherEditData } from './[id]/edit/_lib/edit-read'
 
 /**
  * A voucher as the Finance phone app's record screen opens it (2026-10-15 —
@@ -29,4 +30,21 @@ export async function openVoucherPage(
   if (!read.ok) return read
   const extras = read.detail.credit ? null : await loadVoucherPageExtras(supabase, acting, read.detail)
   return { ok: true, detail: read.detail, extras, canCopy: !read.detail.credit && canDo(acting, 'treasury', 'create') }
+}
+
+/**
+ * A voucher's Edit, as the Finance phone app's sheet opens it (2026-10-16,
+ * part E4b): what `/payments/[id]/edit` reads, behind that page's own gate —
+ * refused, in words, once it is approved or paid.
+ */
+export async function openVoucherEdit(id: string): Promise<{ ok: true; data: VoucherEditData } | { ok: false; reason: string }> {
+  const user = await requireActionOn('/payments/[id]/edit', 'treasury', 'edit')
+  const supabase = await createClient()
+  try {
+    const read = await readVoucherEdit(supabase, user, id)
+    if (read.ok) return read
+    return { ok: false, reason: read.reason === 'missing' ? 'This voucher is not there to edit.' : 'Only a draft or a voucher waiting for approval can be edited.' }
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : 'The voucher could not be read.' }
+  }
 }
