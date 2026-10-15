@@ -69,7 +69,10 @@ export function calendarVM(ctx: DeskCtx) {
   const same = (a: [number, number]) => a[0] === r[0] && a[1] === r[1];
   const P: [string, [number, number], string][] = [["This month", [monthA, monthB], `${fmt(monthA)} – ${fmt(monthB)}`], ["This week", [wkA, wkB], `${fmt(wkA)} – ${fmt(wkB)}`],
     ["Today", [T, T], new Date(T).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", month: "short" })], ["Next 7 days", [T, T + 6 * DAY], `${fmt(T)} – ${fmt(T + 6 * DAY)}`],
-    ["Last week", [wkA - 7 * DAY, wkA - DAY], `${fmt(wkA - 7 * DAY)} – ${fmt(wkA - DAY)}`]];
+    ["Last week", [wkA - 7 * DAY, wkA - DAY], `${fmt(wkA - 7 * DAY)} – ${fmt(wkA - DAY)}`],
+    // v2: Next month.
+    ["Next month", [new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime(), new Date(now.getFullYear(), now.getMonth() + 2, 0).getTime()],
+      `${fmt(new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime())} – ${fmt(new Date(now.getFullYear(), now.getMonth() + 2, 0).getTime())}`]];
   // People: everyone by team (the Director's own first), several at once.
   const sel = ui.calWho;
   const opt = (label: string, val: string | null, av: [string, string]) => { const on = val ? sel.includes(val) : !sel.length;
@@ -102,10 +105,18 @@ export function calendarVM(ctx: DeskCtx) {
     calTitle: view === "month" ? `${MON[mA.getMonth()]} ${mA.getFullYear()}` : view === "week" ? `${label(wkA)} – ${label(wkB)}` : view === "day" ? `Today · ${new Date(T).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", month: "short" })}` : view === "today" ? "Today's appt" : "Upcoming",
     calSub: `${vs.length} visits · ${upcoming.length} upcoming`,
     calStats: ([[String(leads.length), "Leads", "#fff", "Leads"], [String(upcoming.length), "Upcoming", "#F6B48A", "Upcoming"], [String(showed), "Showed up", "#fff", "Showed up"],
-      [showed + noShow ? `${Math.round((showed / (showed + noShow)) * 100)}%` : "—", "Show-up", "#fff", "Show-up"]] as const)
+      [showed + noShow ? `${Math.round((showed / (showed + noShow)) * 100)}%` : "—", "Show-up", "#fff", "Show-up"],
+      // v2: No show (past visits not showed up) and Not reminded (tomorrow's visits with no reminder sent).
+      [String(vs.filter(v => day0(v.at) < T && v.v.state !== "attended").length), "No show", "#F2A08A", "No show"],
+      [String(all.filter(v => v.v.state === "booked" && !v.v.remindedAt && day0(v.at) === T + DAY).length), "Not reminded", "#F6D58A", "Not reminded"]] as const)
       .map(([value, l, color, k]) => ({ value, label: l, color, open: () => patch({ pane: "overlay", kind: "clist", clist: k, infoId: null, visit: null }) })),
-    calTeamBars: teamsList.slice(1).filter(([k]) => team === "all" || k === team).map(([k, l, color]) => { const n = all.filter(v => v.team === k).length;
-      return { name: l.replace(/^Team /, ""), color: color ?? "#806B60", pct: all.length ? Math.round((n / all.length) * 100) : 0, label: `${n} visits` }; }),
+    // v2: the bars By team or By showroom.
+    calBarBy: ([["team", "By team"], ["room", "By showroom"]] as const).map(([k, l]) => ({ l, bg: ui.calBy === k ? "rgba(255,255,255,.2)" : "transparent", op: ui.calBy === k ? 1 : 0.7, pick: () => patch({ calBy: k }) })),
+    calTeamBars: ui.calBy === "room"
+      ? data.rooms.filter(x => x.active).map((x, k) => { const n = all.filter(v => v.v.showroomId === x.id).length;
+        return { name: x.name.replace(/ showroom$/i, ""), color: ["#F6B48A", "#8FB8E8", "#C9A2D8", "#9FD1B4", "#E9D49A"][k % 5], pct: all.length ? Math.round((n / all.length) * 100) : 0, label: `${n} visits` }; })
+      : teamsList.slice(1).filter(([k]) => team === "all" || k === team).map(([k, l, color]) => { const n = all.filter(v => v.team === k).length;
+        return { name: l.replace(/^Team /, ""), color: color ?? "#806B60", pct: all.length ? Math.round((n / all.length) * 100) : 0, label: `${n} visits` }; }),
     dow: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(l => ({ l })), monthCells, weekCols, daySlots, upDays,
     freeLabel: `Free · ${cap} per slot`, dueN: due.length,
   };

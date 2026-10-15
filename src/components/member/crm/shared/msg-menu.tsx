@@ -34,6 +34,12 @@ let state: MsgMenu | null = null;
 const subs = new Set<() => void>();
 const emit = () => subs.forEach(f => f());
 export function openMsgMenu(m: MsgMenu) { state = m; emit(); }
+/**
+ * Straight to Forward or Info (the desktop, CRM Desktop v2: its own menu beside the bubble lists them, so the dialog
+ * opens without the phone's long-press sheet first).
+ */
+let startView: "" | "forward" | "info" = "";
+export function openMsgView(m: MsgMenu, view: "forward" | "info") { startView = view; state = m; emit(); }
 
 /** A chat's starred messages (the chat's ⋮ › Starred messages, 2026-10-14): a tap goes to the message in the chat. */
 export type StarredItem = { id: string; who: string; text: string; at: string };
@@ -122,7 +128,7 @@ export function MessageMenu() {
   const st = useSyncExternalStore(f => { subs.add(f); return () => { subs.delete(f); }; }, () => starred, () => null);
   const [view, setView] = useState<"" | "forward" | "info">("");
   const [q, setQ] = useState("");
-  useEffect(() => { setView(""); setQ(""); }, [m]);
+  useEffect(() => { setView(startView); startView = ""; setQ(""); }, [m]);
   useEffect(() => {
     if (!m) return;
     const key = (e: KeyboardEvent) => { if (e.key === "Escape") closeMenu(); };

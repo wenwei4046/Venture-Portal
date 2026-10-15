@@ -4,6 +4,8 @@
 const fs = require("fs");
 
 const VOID = new Set(["input", "br", "img", "hr", "meta", "link"]);
+// HTML's "special" elements (the parsing spec's list, those a template uses): an end tag never closes past one.
+const SPECIAL = new Set(["address", "article", "aside", "blockquote", "body", "button", "dd", "details", "dir", "div", "dl", "dt", "fieldset", "figcaption", "figure", "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "html", "iframe", "img", "input", "label", "li", "main", "nav", "ol", "p", "section", "select", "summary", "table", "tbody", "td", "textarea", "tfoot", "th", "thead", "tr", "ul"]);
 const hoverClasses = new Map(); // style-hover text → class key
 
 function tokenize(src) {
@@ -44,7 +46,12 @@ function tree(tokens) {
     else {
       // close: pop to the matching name (tolerate stray closes like </input>)
       if (VOID.has(tk.name)) continue;
-      let k = stack.length - 1; while (k > 0 && stack[k].name !== tk.name) k--;
+      let k = stack.length - 1;
+      // opts.htmlEnd (the desktop, 2026-10-15): as a browser parses the template — an end tag whose element is not open
+      // above the nearest "special" element (div, aside, button …) is ignored (HTML's "any other end tag" step), so a
+      // mis-nested </sc-if> in the design closes where the browser closes it.
+      if (opts.htmlEnd) { while (k > 0 && stack[k].name !== tk.name && !SPECIAL.has(stack[k].name)) k--; if (k > 0 && stack[k].name !== tk.name) continue; }
+      else while (k > 0 && stack[k].name !== tk.name) k--;
       if (k > 0) stack.length = k; // pop through
     }
   }
@@ -87,7 +94,7 @@ const ATTR = { "stroke-width": "strokeWidth", "stroke-linecap": "strokeLinecap",
 const NUMERIC = new Set(["rows", "cols", "tabIndex", "maxLength"]);
 
 /** auto: the CSS-module import name generated hover / focus / active classes are read from (null = the fixed crm.module.css list). */
-const opts = { auto: null };
+const opts = { auto: null, spans: false, htmlEnd: false };
 const autoHover = new Map(), autoFocus = new Map(), autoActive = new Map();
 /** The generated classes as CSS (each declaration !important: the element's own inline style would win otherwise). */
 function autoCss() {
@@ -156,8 +163,17 @@ function textJsx(t, scope) {
   return t.replace(/[{}<>]/g, c => (c === "{" || c === "}") ? c : `{"${c}"}`).replace(/\{\{([^}]+)\}\}/g, (_, x) => "{" + expr(x, scope) + "}");
 }
 
-function emit(n, scope, ind) {
-  if (n.text != null) { const t = n.text; if (!t.trim()) return t.includes("\n") ? "" : t; return textJsx(t.replace(/\s*\n\s*/g, " "), scope); }
+// opts.spans (the desktop, 2026-10-15): the design runtime draws every {{ value }} as its own <span>, so inside a flex or
+// grid box with text around it each piece is its own item (the box's gap between them) — drawn the same here.
+const flexy = n => !!n && !!n.attrs && /(^|;)\s*display:\s*(inline-)?(flex|grid)\b/.test((n.attrs.find(a => a[0] === "style") || [])[1] || "");
+function emit(n, scope, ind, parent) {
+  if (n.text != null) {
+    const t = n.text; if (!t.trim()) return t.includes("\n") ? "" : t;
+    const t1 = t.replace(/\s*\n\s*/g, " ");
+    if (opts.spans && t1.includes("{{") && flexy(parent) && t1.trim().replace(/^\{\{[^}]+\}\}$/, "") !== "")
+      return t1.split(/(\{\{[^}]+\}\})/).map(p => /^\{\{/.test(p) ? "<span>" + textJsx(p, scope) + "</span>" : textJsx(p, scope)).join("");
+    return textJsx(t1, scope);
+  }
   const pad = "  ".repeat(ind);
   if (n.name === "sc-if") {
     const v = n.attrs.find(a => a[0] === "value")[1];
@@ -178,7 +194,7 @@ function emit(n, scope, ind) {
 }
 function kids(n, scope, ind) {
   const allWs = n.kids.every(k => k.text != null ? !k.text.trim() : true);
-  const parts = n.kids.map(k => emit(k, scope, ind)).filter(x => x !== "");
+  const parts = n.kids.map(k => emit(k, scope, ind, n)).filter(x => x !== "");
   if (allWs) return parts.map(p => "\n" + "  ".repeat(ind) + p).join("") + "\n" + "  ".repeat(Math.max(0, ind - 1));
   return parts.join("");
 }

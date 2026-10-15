@@ -31,10 +31,16 @@ export function inboxVM(ctx: DeskCtx) {
   const short = (l: string) => (W >= 1440 ? l : l.replace("Needs a reply", "Reply").replace("Appointment", "Appt").replace("Follow up", "Follow"));
   const filters = F.map(([label, f]) => { const on = label === fSel[0];
     return { label: short(`${label} ${shown.filter(f).length}`), bg: on ? "#3F2B22" : "#fff", fg: on ? "#fff" : "#3F2B22", bd: on ? "#3F2B22" : "#EBDDD2", pick: () => patch({ inbF: label }) }; });
-  const chats = list.map((x, i) => { const c = chip(x.key);
+  // One's own marks on a chat (the ⋮ menu, README › To build): pinned first, then by the last message as before.
+  const pref = (id: string) => data.prefs[id];
+  const ordered = [...list].sort((a, b) => Number(!!pref(b.id)?.pinned) - Number(!!pref(a.id)?.pinned));
+  const chats = ordered.map((x, i) => { const c = chip(x.key), p = pref(x.id), n = x.c.unread, dot = !n && !!p?.markedUnread;
     return { ini: x.ini, name: x.name, time: x.time, ad: x.ad, msg: x.msg, owner: x.owner, status: x.status, stBg: c[0], stFg: c[1], avBg: AV[i % 5],
       rowBg: ui.pane === "docked" && ui.chat === x.id ? "#FFF1E6" : "#fff",
-      open: () => patch({ pane: "docked", kind: "chat", chat: x.id, fromTeam: false, menu: false }) }; });
+      pinned: !!p?.pinned, muted: !!p?.muted, unreadN: n > 0 ? (n > 99 ? "99+" : String(n)) : "", unreadDot: dot,
+      timeFg: n > 0 || dot ? "#BD4A19" : "#A8968B", timeW: n > 0 || dot ? 650 : undefined,
+      canSend: false, send: () => {}, sendBg: "#fff",
+      open: () => patch({ pane: "docked", kind: "chat", chat: x.id, fromTeam: false, menu: false, msgMenu: null, replyTo: null, attachOpen: false, emo: null }) }; });
 
   // Everyone: people grouped by team in team colours, whole teams, several at once (C1).
   const opt = (label: string, val: string | null, n: number, grp: [string, string] | null, av: [string, string] | null) => {
@@ -60,7 +66,9 @@ export function inboxVM(ctx: DeskCtx) {
       remove: () => set(u => ({ ...u, whoSel: u.whoSel.filter(x => x !== w) })) }; });
 
   return {
-    kList: ui.tab === "inbox", chats, filters, showWho: true, whoOpen: ui.whoOpen, toggleWho: () => set(u => ({ ...u, whoOpen: !u.whoOpen })),
+    kList: ui.tab === "inbox", chats, filters, showWho: true,
+    // v2 keeps the Action tab's markup (Organic leads); there is no such tab since 2026-10-13.
+    isAction: false, notAction: true, actN: 0, actEmpty: false, whoOpen: ui.whoOpen, toggleWho: () => set(u => ({ ...u, whoOpen: !u.whoOpen })),
     whoLabel: !whoSel.length ? "Everyone" : whoSel.length === 1 ? whoName(whoSel[0]) : `${whoName(whoSel[0])} +${whoSel.length - 1}`,
     whoAvs: !whoSel.length ? [{ ini: "ALL", bg: "#F5EBE3", fg: "#806B60" }] : [{ ini: String(whoSel.length), bg: "#BD4A19", fg: "#fff" }],
     whoChips, whoCount: `${shown.length} chats`, whoClear: () => patch({ whoSel: [] }), whoOpts,
@@ -159,4 +167,67 @@ export function alertsVM(ctx: DeskCtx) {
     .map(a => ({ kind: a.kind, color: a.color, time: a.time || new Date(a.at).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" }), title: a.title, sub: a.sub,
       open: () => ctx.patch({ tab: "inbox", pane: "docked", kind: "chat", chat: a.id }) }));
   return { alerts, alertsUnread: Number(n.notifUnread) || 0 };
+}
+
+/** CRM alerts' rows (the header's badge counts them). */
+export const alertRows = (ctx: DeskCtx) => alertsVM(ctx).alerts;
+
+/**
+ * The chat's ⋮ menu (CRM Desktop v2, README › ⋮ menu), three groups: Assign to (CRM · Manage) · Move · Share | Customer
+ * info · Appointment · Starred messages | Mark as unread / read · Mute / Unmute · Pin / Unpin chat — the last three are
+ * one's own marks on the chat (crm_contact_prefs, the phone's swipe actions), shown on Inbox's row, each with a toast.
+ * Move / Share (README › Move / Share rules): Move goes to one's DIRECT upline only — the Principal is the top ("You're the
+ * top level", Invite your team); the Revenue Director's upline is the Principal (sent there through crm_send_to, which
+ * CRM · Manage may). Share invites within one's own chain — above, same level, below, never another team; for the
+ * Principal and the Director that is everybody (the database's Edit · All, crm_invite). The invited accepts on their phone.
+ */
+export function chatMenuVM(ctx: DeskCtx, chat: { starCount: number; starredOpen(): void }) {
+  const { ui, patch, data, me, act, nameOf, teams } = ctx;
+  const c = ui.chat ? data.customers.find(x => x.id === ui.chat) : undefined;
+  const pref = c ? data.prefs[c.id] : undefined;
+  const unread = !!c && (!!pref?.markedUnread || c.unread > 0), muted = !!pref?.muted, pinned = !!pref?.pinned;
+  const flag = (p: Partial<{ markedUnread: boolean; muted: boolean; pinned: boolean }>, msg: string) => { if (!c) return; patch({ menu: false, toast: msg }); void act.setPref(c.id, p); };
+  const top = me.role === "boss";
+  const items: [string, string, string, () => void, string, boolean][] = [
+    ...(data.can.manage ? [["Assign to", "#2F6FB5", "M7 17 3 13l4-4M3 13h14M17 7l4 4-4 4M21 11H7", () => patch({ menu: false, kind: "assign" }), "", false] as [string, string, string, () => void, string, boolean]] : []),
+    ["Move", "#BD4A19", "M12 19V5M5 12l7-7 7 7", () => patch({ menu: false, kind: "move" }), "", false],
+    ["Share", "#A46312", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6", () => patch({ menu: false, kind: "share" }), "", false],
+    ["Customer info", "#387557", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => { if (c) patch({ menu: false, kind: "info", infoId: c.id, visit: null }); }, "", true],
+    ["Appointment", "#8E4B6E", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => { if (c) patch({ menu: false, kind: "book", book: null }); }, "", false],
+    ["Starred messages", "#A46312", "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", () => { patch({ menu: false }); chat.starredOpen(); }, `${chat.starCount} in this chat`, false],
+    [unread ? "Mark as read" : "Mark as unread", "#2F6FB5", "M21 12a9 9 0 1 1-9-9M19 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
+      () => { if (!c) return; if (unread) { flag({ markedUnread: false }, "Marked as read"); if (c.assignedTo === me.id) act.openChat(c.id); } else flag({ markedUnread: true }, "Marked as unread"); }, "", true],
+    [muted ? "Unmute" : "Mute notifications", "#6B645A", muted ? "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" : "M18 8a6 6 0 0 0-9.3-5M6 8c0 7-3 7-3 9h14M10 21h4M2 2l20 20",
+      () => flag({ muted: !muted }, muted ? "Notifications on" : "Muted · no alerts for this chat"), muted ? "Muted" : "", false],
+    [pinned ? "Unpin chat" : "Pin chat", "#806B60", "M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z", () => flag({ pinned: !pinned }, pinned ? "Unpinned" : "Pinned to the top of Inbox"), "", false],
+  ];
+  const chatMenuItems = items.map(([label, col, d, run, sub, sep]) => ({ label, c: col, d, run, sub: sub || null, sep }));
+
+  // Move / Share's people.
+  const kind = ui.kind, cn = c?.name ?? "";
+  const boss = data.people.find(p => p.role === "boss");
+  const done = c ? new Set([...data.shares.filter(s => s.customerId === c.id).map(s => s.staffId),
+    ...data.invites.filter(i => i.customerId === c.id && i.state === "pending" && i.kind === kind).map(i => i.to)]) : new Set<string>();
+  type P = { id: string; name: string; sub: string };
+  const stls = data.people.filter(p => p.role === "stl").map(p => ({ id: p.id, name: p.name, sub: "Senior TL" }));
+  const teamGroups = teams.map((t, k) => [t.name.toUpperCase(), teamColours(k)[0], t.people.map(p => ({ id: p.id, name: p.name, sub: t.name }))] as [string, string, P[]]);
+  const src: [string, string, P[]][] = kind === "move"
+    ? (top || !boss ? [] : [["YOUR DIRECT UPLINE", "#4E2F20", [{ id: boss.id, name: boss.name, sub: "Principal · Top level" }]]])
+    : top ? [["REVENUE DIRECTOR", "#4E2F20", ctx.directors.map(d => ({ id: d.id, name: d.name, sub: "Revenue Director" }))], ["SENIOR TL", "#806B60", stls], ...teamGroups]
+      : [["ABOVE YOU", "#4E2F20", boss ? [{ id: boss.id, name: boss.name, sub: "Top level" }] : []], ["SAME LEVEL", "#BD4A19", ctx.directors.filter(d => d.id !== me.id).map(d => ({ id: d.id, name: d.name, sub: "Revenue Director" }))],
+        ["BELOW YOU", "#387557", [...stls, ...teamGroups.flatMap(g => g[2])]]];
+  const btn = kind === "move" ? "Move" : top ? "Invite" : "Share";
+  const pickGroups = src.map(([label, color, ps]) => [label, color, ps.filter(p => p.id !== me.id && p.id !== c?.assignedTo)] as [string, string, P[]]).filter(g => g[2].length)
+    .map(([label, color, ps]) => ({ label, color, people: ps.map(p => { const on = done.has(p.id);
+      return { name: p.name, sub: p.sub, ini: initials(p.name), btn: on ? (kind === "move" ? "Requested" : top ? "Invited" : "Shared") : btn, bc: on ? "#387557" : "#BD4A19",
+        pick: () => {
+          if (on || !c) return;
+          if (kind === "move") { void act.sendTo(c.id, p.id).then(ok => { if (ok) patch({ kind: "chat", toast: `Moved ${cn} to ${p.name}`, undo: { kind: "send", customerId: c.id, prev: c.assignedTo, until: Date.now() + 30_000 } }); }); return; }
+          void act.invite("share", c.id, p.id).then(ok => { if (ok) patch({ toast: top ? `Invited ${p.name} into the chat with ${cn}` : `Shared ${cn} with ${p.name}` }); });
+        } }; }) }));
+  return {
+    chatMenuItems,
+    kTopMove: kind === "move" && top, kPick: (kind === "move" && !top) || kind === "share", pickBtn: btn, pickGroups,
+    shareFromTop: () => patch({ kind: "share" }),
+  };
 }

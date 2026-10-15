@@ -6,6 +6,7 @@
  * fields and rust buttons, Inter, the same colours. Behaviour: vm/extras.ts.
  */
 import { Fragment } from "react";
+import DX from "./desk-extras.module.css";
 import type { bookVM, customerFormVM, historyVM, noteVM } from "./vm/extras";
 
 const BACK = { flex: "0 0 auto", display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", border: "0", borderBottom: "1px solid #EBDDD2", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "#BD4A19", cursor: "pointer", textAlign: "left" } as const;
@@ -152,4 +153,36 @@ export function DeskCardPicker({ v }: { v: { insCardsToggle?: () => void; insCar
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#BD4A19" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"></path></svg>Metrics · {v.insCardsN}
     </button>
   );
+}
+
+/**
+ * The reply box's emoji panel (the design draws the sticker icon and nothing behind it): the phone's Sticker panel's
+ * Emoji tab (#425 — its categories, Recents kept on the server, the keyword search) as one of the README's popovers —
+ * white, a #EBDDD2 border, radius 16, padding 6, the popover shadow, rows hovering #FFF5EC. Behaviour: vm/chat.ts.
+ */
+export function DeskEmoji({ v }: { v: ReturnType<typeof import("./vm/chat").chatVM>["emoji"] }) {
+  const ib = (on: boolean) => ({ width: "34px", height: "34px", flex: "0 0 auto", display: "grid", placeItems: "center", borderRadius: "10px", border: "0",
+    background: on ? "#FFF0E4" : "transparent", color: on ? "#BD4A19" : "#806B60", cursor: "pointer", padding: "0" }) as const;
+  const Ico = ({ d }: { d: string }) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round"><path d={d}></path></svg>;
+  return (<>
+    <div onClick={e => { e.stopPropagation(); v.close(); }} style={{ position: "fixed", inset: "0", zIndex: 30, cursor: "default" }} />
+    <div onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === "Escape") v.close(); }}
+      style={{ position: "absolute", right: "-8px", bottom: "42px", zIndex: 31, width: "336px", boxSizing: "border-box", padding: "6px", borderRadius: "16px", border: "1px solid #EBDDD2",
+        background: "#fff", boxShadow: "0 10px 28px rgba(40,25,18,.16)", display: "flex", flexDirection: "column", gap: "4px", cursor: "default", color: "#3F2B22", textAlign: "left" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "2px", padding: "2px 2px 4px", borderBottom: "1px solid #F1E7DF" }}>
+        {v.searching
+          ? <input autoFocus value={v.q} onChange={v.setQ} placeholder="Search emoji" style={{ flex: "1", minWidth: "0", height: "34px", boxSizing: "border-box", padding: "0 12px", borderRadius: "10px", border: "1px solid #E2CFC1", font: "inherit", fontSize: "13.5px", color: "#3F2B22", outline: "none" }} />
+          : v.cats.map(c => <button key={c.label} type="button" title={c.label} onClick={c.pick} className={DX.emo} style={ib(c.on)}><Ico d={c.d} /></button>)}
+        <span style={{ flex: v.searching ? "0 0 auto" : "1" }} />
+        <button type="button" title={v.searching ? "Close search" : "Search emoji"} onClick={v.toggleSearch} className={DX.emo} style={ib(v.searching)}>
+          <Ico d={v.searching ? "M6 6l12 12M18 6 6 18" : "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm9 2-4.35-4.35"} />
+        </button>
+      </div>
+      <span style={{ padding: "4px 8px 0", fontSize: "10.5px", fontWeight: "700", letterSpacing: ".1em", textTransform: "uppercase", color: "#A08E82" }}>{v.label}</span>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: "2px", maxHeight: "148px", overflowY: "auto" }}>
+        {v.list.map((x, i) => <button key={i} type="button" onClick={x.pick} className={DX.emo}
+          style={{ height: "36px", border: "0", borderRadius: "8px", background: "transparent", fontSize: "22px", lineHeight: "1", cursor: "pointer", padding: "0" }}>{x.e}</button>)}
+      </div>
+    </div>
+  </>);
 }

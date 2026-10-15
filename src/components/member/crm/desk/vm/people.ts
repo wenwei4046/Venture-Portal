@@ -1,0 +1,125 @@
+/**
+ * Contacts (CRM Desktop v2, README › 3): the customers, analysed by what Customer info holds. Filters by Customer
+ * info (a dropdown per field, with counts; Name, phone and Requirement are search-only), the active filters as chips,
+ * four figures, a chart grouped by one field (click a row to filter by it), and the table — Contact always, the other
+ * columns picked from the + menu, sorted ↑ / ↓ / off, dragged to size; a row opens the chat in Inbox with Customer info.
+ * Its fields ARE the Customer form's (vm/form.ts): a question added there is a column here, and a Choice question a
+ * filter and a chart grouping too; a removed one leaves. The figures are the CRM's own customers, all of them.
+ */
+import type { CrmCustomer } from "@/lib/member/crm-data";
+import type { DeskCtx } from "./ctx";
+import { chatRows, initials } from "./data";
+import { budgetOf, formV2, SIZES, type FormFieldV2 } from "./form";
+import { mapDrag } from "./columns";
+import { CHANNEL } from "../../sales/vm/common";
+import { phoneLabel } from "../../sales/vm/customer";
+
+const DAY = 86_400_000;
+const BUDGET: [string, number, number][] = [["Under RM 5k", 0, 5000], ["RM 5k – 10k", 5000, 10000], ["RM 10k – 20k", 10000, 20000], ["RM 20k +", 20000, 1e12]];
+const COLS = ["#BD4A19", "#2F6FB5", "#8E4B6E", "#387557", "#A46312", "#6B574C", "#C9785A"];
+const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "—");
+
+/** One customer as Contacts reads it: every field's answer, the buckets the filters use. */
+type Row = Record<string, string | null> & { id: string; name: string; phone: string; ini: string; budgetN: string | null; filled: string | null };
+
+export function peopleVM(ctx: DeskCtx) {
+  const { ui, set, patch, data, now, nameOf } = ctx;
+  const T = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(), wkA = T - ((now.getDay() + 6) % 7) * DAY;
+  const secs = formV2(data);
+  const field = (id: string) => secs.flatMap(s => s.fields).find(f => f.id === id);
+  const own = secs.flatMap(s => s.fields.map(f => [s.label, f] as [string, FormFieldV2])).filter(([, f]) => f.kind === "own");
+  const statusOf = (key: string) => (["Overdue", "Urgent", "Reply soon"].includes(key) ? "Overdue" : key);
+  const status = new Map(chatRows(ctx).map(r => [r.id, statusOf(r.key)]));
+  const visitOf = (c: CrmCustomer) => data.visits.filter(v => v.customerId === c.id && v.state !== "cancelled").sort((a, b) => b.start.localeCompare(a.start))[0];
+  const rows0: Row[] = data.customers.map(c => {
+    const v = visitOf(c), b = budgetOf(c), t = new Date(c.createdAt).getTime();
+    const last = c.messages.length ? new Date(c.messages[c.messages.length - 1].at).getTime() : t;
+    const r: Row = {
+      id: c.id, name: c.name, phone: phoneLabel(c.phone) || "—", ini: initials(c.name),
+      type: c.details.type || null, size: c.details.size || null, loc: c.details.loc || null, req: c.details.req || null,
+      budget: b != null ? (BUDGET.find(x => b >= x[1] && b < x[2]) ?? BUDGET[3])[0] : null, budgetN: b != null ? String(b) : null,
+      plat: CHANNEL[c.channel].name, ad: c.ad || null, status: status.get(c.id) ?? null, sp: c.assignedTo ? nameOf(c.assignedTo) : null,
+      visit: v ? (v.state === "attended" ? "Showed up" : "Booked") : "No visit", showroom: v ? data.rooms.find(x => x.id === v.showroomId)?.name ?? "None" : "None",
+      first: t >= wkA ? "This week" : t >= wkA - 7 * DAY ? "Last 2 weeks" : "Earlier", last: last >= T ? "Today" : last >= wkA ? "This week" : "Earlier",
+      filled: c.details.type || c.details.size || c.details.loc || c.details.req || c.details.budget ? "1" : null,
+    };
+    for (const [, f] of own) r[f.id] = c.extra?.[f.id] || null;
+    return r;
+  });
+  const lbl = (id: string, fallback: string) => (field(id)?.label ?? fallback).replace(/ \(RM\)$/, "");
+  const uniq = (k: string) => [...new Set(rows0.map(d => d[k]).filter((x): x is string => !!x))].sort();
+  const typeOpts = field("type")?.opts.split(",").map(x => x.trim()).filter(Boolean) ?? ["Condo", "Landed"];
+  const sizeOpts = field("size")?.opts.split(",").map(x => x.trim()).filter(Boolean) ?? SIZES;
+  // The filters: the form's property questions it still has, then each Choice question of its own, then lead / visit / contact.
+  const KEYS: Record<string, [string, string[], string]> = {
+    ...(field("type") ? { type: [lbl("type", "Property type"), typeOpts, "PROPERTY"] as [string, string[], string] } : {}),
+    ...(field("size") ? { size: [lbl("size", "Unit size"), sizeOpts, "PROPERTY"] as [string, string[], string] } : {}),
+    ...(field("budget") ? { budget: [lbl("budget", "Budget"), BUDGET.map(x => x[0]), "PROPERTY"] as [string, string[], string] } : {}),
+    ...(field("loc") ? { loc: [lbl("loc", "Unit location"), uniq("loc"), "PROPERTY"] as [string, string[], string] } : {}),
+    ...Object.fromEntries(own.filter(([, f]) => f.type === "Choice").map(([g, f]) => [f.id, [f.label, f.opts.split(",").map(x => x.trim()).filter(Boolean), g]])),
+    plat: ["Platform", ["WhatsApp", "Messenger"], "LEAD"], ad: ["Ad", uniq("ad"), "LEAD"],
+    status: ["Status", ["New", "Overdue", "Follow up", "Appointment", "Won", "Lost", "Cold"], "LEAD"], sp: ["Salesperson", uniq("sp"), "LEAD"],
+    visit: ["Visit", ["Showed up", "Booked", "No visit"], "VISIT"], showroom: ["Showroom", [...data.rooms.filter(r => r.active).map(r => r.name), "None"], "VISIT"],
+    first: ["First contact", ["This week", "Last 2 weeks", "Earlier"], "CONTACT"], last: ["Last chat", ["Today", "This week", "Earlier"], "CONTACT"],
+  };
+  const F = ui.ppF, by = KEYS[ui.ppBy] ? ui.ppBy : Object.keys(KEYS)[0], q = ui.ppQ.trim().toLowerCase();
+  const rows = rows0.filter(d => Object.entries(F).every(([k, v]) => !v || !KEYS[k] || d[k] === v) && (!q || `${d.name} ${d.phone} ${d.req ?? ""}`.toLowerCase().includes(q)));
+  const tot = rows.length, filled = rows.filter(d => d.filled).length;
+  const vals = KEYS[by][1], counts = vals.map(v => rows.filter(d => d[by] === v).length), none = rows.filter(d => !d[by]).length;
+  const propKey = KEYS[by][2] === "PROPERTY" || own.some(([, f]) => f.id === by);
+  const mx = Math.max(1, ...counts, none);
+  const bars = [...vals.map((v, i) => ({ label: v, n: counts[i], pct: pct(counts[i], tot), w: Math.round((counts[i] / mx) * 100), color: COLS[i % COLS.length], on: F[by] === v,
+    pick: () => set(u => ({ ...u, ppF: { ...u.ppF, [by]: u.ppF[by] === v ? null : v } })) })),
+  ...(propKey ? [{ label: "Not filled yet", n: none, pct: pct(none, tot), w: Math.round((none / mx) * 100), color: "#D9C9BD", on: false, pick: () => {} }] : [])]
+    .map(b => ({ ...b, fw: b.on ? 700 : 600, bg: b.on ? "#FFF5EC" : "transparent" }));
+  const two = typeOpts.slice(0, 2), aN = rows.filter(d => d.type === two[0]).length, bN = rows.filter(d => d.type === two[1]).length;
+  const bs = rows.map(d => Number(d.budgetN)).filter(n => n > 0).sort((x, y) => x - y), med = bs.length ? bs[Math.floor(bs.length / 2)] : 0;
+  const chips = Object.entries(F).filter(([k, v]) => v && KEYS[k]).map(([k, v]) => ({ label: `${KEYS[k][0]}: ${v}`, clear: () => set(u => ({ ...u, ppF: { ...u.ppF, [k]: null } })) }));
+  const sel = (k: string) => { const open = ui.ppOpen === k, cur = F[k] || null;
+    const base = rows0.filter(d => Object.entries(F).every(([k2, v]) => k2 === k || !v || !KEYS[k2] || d[k2] === v));
+    const put = (val: string | null) => set(u => ({ ...u, ppF: { ...u.ppF, [k]: val }, ppOpen: null }));
+    return { label: KEYS[k][0], value: cur || "Any", open, bd: open || cur ? "#BD4A19" : "#E2CFC1", bg: cur ? "#FFF5EC" : "#fff",
+      toggle: () => patch({ ppOpen: open ? null : k }), close: () => patch({ ppOpen: null }),
+      opts: [{ v: "Any", n: base.length, on: !cur, pick: () => put(null) }, ...KEYS[k][1].map(v => ({ v, n: base.filter(d => d[k] === v).length, on: cur === v, pick: () => put(v) }))]
+        .map(o => ({ ...o, bg: o.on ? "#FFF5EC" : "transparent", w: o.on ? 650 : 500, chk: o.on ? "#BD4A19" : "transparent" })) }; };
+  // The table's columns: every field of Customer info but the Contact itself (README: 13 with the design's form).
+  const LBL: Record<string, string> = { type: lbl("type", "Property type"), size: lbl("size", "Unit size"), budget: lbl("budget", "Budget"), loc: lbl("loc", "Unit location"), req: lbl("req", "Requirement"),
+    plat: "Platform", ad: "Ad", status: "Status", sp: "Salesperson", visit: "Visit", showroom: "Showroom", first: "First contact", last: "Last chat",
+    ...Object.fromEntries(own.map(([, f]) => [f.id, f.label])) };
+  const GRP: Record<string, string> = { type: "Property", size: "Property", budget: "Property", loc: "Property", req: "Property", plat: "Lead", ad: "Lead", status: "Lead", sp: "Lead", visit: "Visit", showroom: "Visit", first: "Contact", last: "Contact",
+    ...Object.fromEntries(own.map(([g, f]) => [f.id, g.charAt(0) + g.slice(1).toLowerCase()])) };
+  const ALL = [...["type", "size", "budget", "loc", "req"].filter(k => !!field(k)), ...own.map(([, f]) => f.id), "plat", "ad", "status", "sp", "visit", "showroom", "first", "last"];
+  const DEF = ["type", "size", "budget", "loc", "req"].filter(k => ALL.includes(k));
+  const vis = (ui.ppVis ?? DEF).filter(k => ALL.includes(k));
+  const so = ui.ppSort, CW = ui.ppCW, dw = (k: string) => CW[k] || ({ req: 200, ad: 200, contact: 220 } as Record<string, number>)[k] || 130;
+  const sk = (k: string) => (k === "budget" ? "budgetN" : k);
+  const ord: Record<string, string[]> = { type: typeOpts, size: sizeOpts };
+  const val = (d: Row, k: string) => { const v = d[k]; if (v == null) return null; if (k === "budgetN") return Number(v); return ord[k] ? ord[k].indexOf(v) : v; };
+  const sorted = !so.k ? rows : [...rows].sort((x, y) => { const a2 = val(x, so.k!), b2 = val(y, so.k!); if (a2 == null && b2 == null) return 0; if (a2 == null) return 1; if (b2 == null) return -1;
+    return (typeof a2 === "string" ? a2.localeCompare(String(b2)) : (a2 as number) - (b2 as number)) * so.dir; });
+  const toggleSort = (k: string) => set(u => { const c = u.ppSort; return { ...u, ppSort: c.k === k ? (c.dir > 0 ? { k, dir: -1 } : { k: null, dir: 1 }) : { k, dir: 1 } }; });
+  return {
+    ppStats: [["Contacts", String(tot), "match these filters"], [`${two[0] ?? "Condo"} · ${two[1] ?? "Landed"}`, `${aN} · ${bN}`, `${pct(aN, aN + bN)} · ${pct(bN, aN + bN)} of filled`],
+      ["Median budget", med ? `RM ${med.toLocaleString("en-MY")}` : "—", `${bs.length} gave a budget`], ["Property info filled", pct(filled, tot), `${filled} of ${tot} in Customer info`]].map(([k, v, sub]) => ({ k, v, sub })),
+    ppBys: Object.entries(KEYS).filter(([k]) => ["type", "size", "budget", "loc", "status", "plat", "visit", "showroom"].includes(k) || own.some(([, f]) => f.id === k && f.type === "Choice"))
+      .map(([k, [label]]) => ({ label, on: k === by, off: k !== by, pick: () => patch({ ppBy: k }) })),
+    ppChartTitle: `By ${KEYS[by][0].toLowerCase()}`, ppBars: bars, ppStack: bars.filter(b => b.n).map(b => ({ color: b.color, n: b.n })),
+    ppSelGroups: [["PROPERTY", "PROPERTY"], ["LEAD", "LEAD"], ["VISIT", "VISIT"], ["CONTACT", "CONTACT"]].map(([label, g]) => ({ label, sels: Object.keys(KEYS).filter(k => KEYS[k][2] === g).map(sel) })).filter(g => g.sels.length),
+    ppChips: chips, ppHasChips: chips.length > 0, ppClear: () => patch({ ppF: {}, ppQ: "" }),
+    ppQ: ui.ppQ, setPpQ: (e: { target: { value: string } }) => patch({ ppQ: e.target.value }),
+    ppGrid: `${dw("contact")}px ${vis.map(k => `${dw(k)}px`).join(" ")} minmax(36px, 1fr)`, ppDragC: mapDrag(set, "ppCW", dw("contact"), "contact", 80, 480), ppReset: () => patch({ ppCW: {} }),
+    ppHead: vis.map(k => ({ label: LBL[k].toUpperCase(), arrow: so.k === sk(k) ? (so.dir > 0 ? "↑" : "↓") : "↕", fg: so.k === sk(k) ? "#3F2B22" : "#806B60",
+      drag: mapDrag(set, "ppCW", dw(k), k, 80, 480), pick: () => toggleSort(sk(k)), remove: () => set(u => ({ ...u, ppVis: (u.ppVis ?? DEF).filter(x => x !== k) })) })),
+    ppSortCols0: [{ arrow: so.k === "name" ? (so.dir > 0 ? "↑" : "↓") : "↕", fg: so.k === "name" ? "#3F2B22" : "#806B60", pick: () => toggleSort("name") }],
+    ppAddOpen: ui.ppAdd, ppAddToggle: () => patch({ ppAdd: !ui.ppAdd }), ppAddClose: () => patch({ ppAdd: false }),
+    ppAddOpts: ALL.map(k => { const on = vis.includes(k); return { label: LBL[k], grp: GRP[k], chk: on ? "#BD4A19" : "transparent", bd: on ? "#BD4A19" : "#D9C9BD", bg: on ? "#FFF5EC" : "transparent",
+      toggle: () => set(u => { const cur = (u.ppVis ?? DEF).filter(x => ALL.includes(x)); return { ...u, ppVis: cur.includes(k) ? cur.filter(x => x !== k) : ALL.filter(x => cur.includes(x) || x === k) }; }) }; }),
+    ppRows: sorted.map(d => ({ ini: d.ini, name: d.name, phone: d.phone,
+      cells: vis.map(k => { const raw = k === "budget" ? (d.budgetN ? `RM ${Number(d.budgetN).toLocaleString("en-MY")}` : null) : d[k]; const v = raw || "—";
+        if (k === "type") { const isB = d.type && d.type === typeOpts[1]; return { pill: true, plain: false, v, bg: isB ? "#FFF0E4" : d.type ? "#E4EDF8" : "#F5EEE8", fg: isB ? "#BD4A19" : d.type ? "#2F6FB5" : "#A08E82" }; }
+        return { pill: false, plain: true, v, bg: "transparent", fg: raw ? "#3F2B22" : "#A08E82" }; }),
+      // A row opens the chat in Inbox with Customer info beside it.
+      open: () => patch({ tab: "inbox", ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, pane: "docked", kind: "chat", chat: d.id, fromTeam: false, inbF: "All", whoSel: [] }) })),
+    ppEmpty: !rows.length, ppHas: rows.length > 0,
+  };
+}

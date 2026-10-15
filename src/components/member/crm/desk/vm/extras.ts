@@ -3,6 +3,7 @@
  * cancel a visit — the phone's own rules: the showroom's slots per weekday, its closures, its booking limit), Add note
  * (B6), Edit customer (the form the Principal / Director set, H3) and History (who changed which setting).
  */
+import { formV2 } from "./form";
 import { blockHours, type CrmCustomer, type CrmRoom } from "@/lib/member/crm-data";
 import { roomSlots, slotAt } from "../../sales/vm/chat";
 import { dayLabel, timeLabel } from "../../sales/vm/common";
@@ -114,7 +115,13 @@ export function noteVM(ctx: DeskCtx, c: CrmCustomer | undefined) {
 /** Edit customer: the Customer info form the Principal / Director set (Settings › Forms), its fields in its order. */
 export function customerFormVM(ctx: DeskCtx, c: CrmCustomer | undefined) {
   const { ui, set, patch, data, act } = ctx;
-  const form: FormSection[] = data.forms?.[0]?.sections ?? BASE_FORM;
+  // The Customer form's fields (v2, vm/form.ts): what the CRM fills itself and Status are not asked here.
+  const form: FormSection[] = formV2(data).map(s => ({ id: s.key, title: s.label.charAt(0) + s.label.slice(1).toLowerCase(),
+    fields: s.fields.filter(f => f.kind !== "auto" && f.id !== "status").map(f => ({ id: f.id, label: f.label, req: f.req ? 1 as const : 0 as const,
+      type: f.type === "Choice" ? "Choice" as const : f.type === "Long text" ? "Long text" as const : f.type === "Date" ? "Date" as const : f.type === "Number" ? "Number" as const : f.id === "phone" ? "Phone" as const : "Text" as const,
+      opts: f.type === "Choice" ? f.opts.split(",").map(x => x.trim()).filter(Boolean) : undefined, ph: f.type === "Range (from–to)" ? "From – to" : f.id === "budget" ? "RM" : "" })) }))
+    .filter(s => s.fields.length);
+  void BASE_FORM;
   const base: Record<string, string> = c ? { name: c.name, phone: c.phone ?? "", type: c.details.type, size: c.details.size, loc: c.details.loc, req: c.details.req, budget: c.details.budget, ...(c.extra ?? {}) } : {};
   const vals = { ...base, ...(ui.cform ?? {}) };
   const put = (id: string, v: string) => set(u => ({ ...u, cform: { ...(u.cform ?? {}), [id]: v } }));

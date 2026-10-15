@@ -35,6 +35,8 @@ const CRM_WRITES = [
   "crm_star_message",
   // The chat composer's Recents (mig 20261014251500): one's own recent emoji.
   "crm_save_recent_emoji",
+  // CRM Desktop v2 · Channels: link / unlink a Page or number, its default (mig 20261015100000).
+  "crm_set_channel",
 ] as const;
 export type CrmWrite = (typeof CRM_WRITES)[number];
 
@@ -108,6 +110,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_save_team_shares", "crm_set_full_time", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
   "crm_remind", "crm_save_form", "crm_delete_form",
+  "crm_set_channel",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
@@ -503,7 +506,7 @@ export async function saveCrmShowroomExtras(form: FormData): Promise<{ ok: true 
 }
 
 /** The CRM's settings tables History reads (B8), and what each is called there. */
-const HISTORY_TABLES = ["crm_showrooms", "crm_ad_assign", "crm_fulltime_rules", "crm_staff", "crm_templates", "crm_forms", "crm_settings"];
+const HISTORY_TABLES = ["crm_showrooms", "crm_ad_assign", "crm_fulltime_rules", "crm_staff", "crm_templates", "crm_forms", "crm_settings", "crm_channels"];
 export interface CrmHistoryRow { id: number; at: string; who: string; table: string; op: string; key: string; before: Record<string, unknown> | null; after: Record<string, unknown> | null; changed: string[] }
 
 /**

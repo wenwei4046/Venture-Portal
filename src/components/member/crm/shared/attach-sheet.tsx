@@ -41,7 +41,8 @@ const emit = () => subs.forEach(f => f());
 export function openAttach(s: AttachSheet) { state = s; emit(); }
 const close = () => { state = null; emit(); };
 
-const TILE = [
+/** The + menu's choices, shared with the desktop's + popover (CRM Desktop v2): [key, label, icon, colour]. */
+export const ATTACH_TILES = [
   ["camera", "Camera", "M3 8h4l2-3h6l2 3h4v12H3V8Zm9 9a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z", "#C8402A"],
   ["photos", "Photos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "#2F8FD8"],
   ["document", "Document", "M7 3h7l5 5v13H7V3Zm7 0v5h5", "#BD4A19"],
@@ -71,7 +72,7 @@ export function AttachSheetHost() {
         <span style={{ alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2" }} />
         {!list ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", padding: "6px 0 4px" }}>
-            {TILE.filter(([k]) => (k === "camera" ? !!s.camera : k === "photos" ? !!s.photos : k === "document" ? !!s.document : true)).map(([k, label, icon, color]) => (
+            {ATTACH_TILES.filter(([k]) => (k === "camera" ? !!s.camera : k === "photos" ? !!s.photos : k === "document" ? !!s.document : true)).map(([k, label, icon, color]) => (
               <button key={k} type="button" onClick={() => { if (k === "quick" || k === "auto") { setView(k); return; } close(); (k === "camera" ? s.camera : k === "photos" ? s.photos : s.document)?.(); }}
                 style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "7px", border: 0, background: "transparent", cursor: "pointer", padding: "4px 0", color: "#3F2B22", fontSize: typePx(12), fontWeight: 600 }}>
                 <span style={{ width: "54px", height: "54px", borderRadius: "27px", background: color, color: "#fff", display: "grid", placeItems: "center" }}>

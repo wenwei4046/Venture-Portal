@@ -1,5 +1,5 @@
 // Generates the CRM's desktop (Principal / Revenue Director, rev 1, 2026-10-13) from
-// docs/design/crm-desktop-rev1/prototypes/CrmFrame.dc.html into ONE component,
+// docs/design_handoff_crm_desktop_v2/prototypes/CrmFrame v2.dc.html into ONE component,
 // src/components/member/crm/desk/DeskApp.tsx — the prototype's markup verbatim, bound to one view model
 // (crm/desk/vm/app.ts) whose names are the prototype's own. Its hover / focus styles become
 // crm/desk/desk-hover.module.css. Changes the design does not carry go in desk-patches.cjs (each must match once).
@@ -7,38 +7,44 @@
 const fs = require("fs"), path = require("path");
 const dc = require("./dc2jsx.cjs");
 const repo = path.resolve(__dirname, "../..");
-const src = fs.readFileSync(path.join(repo, "docs/design/crm-desktop-rev1/prototypes/CrmFrame.dc.html"), "utf8").replace(/\r/g, "");
+const src = fs.readFileSync(path.join(repo, "docs/design_handoff_crm_desktop_v2/prototypes/CrmFrame v2.dc.html"), "utf8").replace(/\r/g, "");
 const a = src.indexOf("</helmet>"), b = src.indexOf("</x-dc>");
 if (a < 0 || b < 0) throw new Error("the template's <helmet> / </x-dc> moved");
 const tpl = src.slice(a + "</helmet>".length, b);
 const PATCHES = require("./desk-patches.cjs");
 
 dc.opts.auto = "DH";
+dc.opts.spans = true;
+dc.opts.htmlEnd = true;
 let body = dc.convert(tpl);
 // The design's own assets, inlined as the phone CRM inlines its chat pattern: a relative assets/ path has no home in
 // the app, and a data URI is the very bytes the prototype draws.
 body = body.replace(/url\(assets\/([\w.-]+)\)/g, (_, f) => {
-  const svg = fs.readFileSync(path.join(repo, "docs/design/crm-desktop-rev1/prototypes/assets", f), "utf8");
+  const svg = fs.readFileSync(path.join(repo, "docs/design_handoff_crm_desktop_v2/prototypes/assets", f), "utf8");
   return `url('data:image/svg+xml,${encodeURIComponent(svg).replace(/'/g, "%27")}')`;
 });
+// DESK_PATCH_REPORT=1 lists every patch that does not match once instead of stopping at the first (porting to a new design).
+const report = process.env.DESK_PATCH_REPORT === "1", missed = [];
 for (const [from, to, why] of PATCHES) {
   if (!why) throw new Error(`desk patch without a reason: ${from}`);
   const n = typeof from === "string" ? body.split(from).length - 1 : (body.match(new RegExp(from.source, "g")) || []).length;
+  if (n !== 1 && report) { missed.push(`${n}× ${why}`); continue; }
   if (n !== 1) throw new Error(`DeskApp: patch matched ${n} times: ${from}`);
   // `to` may be a function of the match's groups, to keep the design's own styles in what it rewrites.
   body = body.replace(from, to);
 }
+if (missed.length) console.log("patches not matched once:\n" + missed.join("\n"));
 const apos = /[>}][^<>{}]*'[^<>{}]*[<{]/.test(body.replace(/"[^"]*"/g, '""'));
 const code = `"use client";
 ${apos ? "/* eslint-disable react/no-unescaped-entities -- generated from the design; its text keeps its own apostrophes */\n" : ""}
-// GENERATED from docs/design/crm-desktop-rev1/prototypes/CrmFrame.dc.html (CRM Desktop rev 1) by
+// GENERATED from docs/design_handoff_crm_desktop_v2/prototypes/CrmFrame v2.dc.html (CRM Desktop rev 1) by
 // tools/crm-design/gen-desk.cjs — markup and styles exactly as designed. Behaviour lives in ./vm/app.ts. To change the
 // look, change the design (or tools/crm-design/desk-patches.cjs) and regenerate; never edit this file.
 import { Fragment } from "react";
 import type React from "react";
 import DH from "./desk-hover.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
-import { DeskBook, DeskCardPicker, DeskCustomerForm, DeskHistory, DeskNote } from "./DeskExtras";
+import { DeskBook, DeskCardPicker, DeskCustomerForm, DeskEmoji, DeskHistory, DeskNote } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
 /** The whole desktop CRM: the Revenue app's frame around it (sidebar, top bar), every page, pane, menu and the toast. */
