@@ -64,6 +64,13 @@ export function readinessRows(config: AttConfig, ledger: AttLedger | null, today
     rows.push({ key: 'schedule', tone: 'warning', title: `${plural(noSchedule.length, 'person', 'people')} with no schedule`, sub: names(noSchedule), fix: { label: 'Assign', href: '/attendance/settings' } })
   }
 
+  // 3b. People who clock with no hire date: their years of service count as none, so service steps never reach them
+  // (2026-10-15 — the user, told the 36 without one are the Revenue team and the directors: "Readiness 提醒，到时再补").
+  const noHire = clocking.filter(p => !p.hireDate)
+  if (noHire.length) {
+    rows.push({ key: 'hire', tone: 'warning', title: `${plural(noHire.length, 'person', 'people')} who clock have no hire date`, sub: `${names(noHire)} — add it in People`, fix: { label: 'Fix', href: '/team/people' } })
+  }
+
   // 4. Opening balances missing (annual leave, this year) for people who clock.
   const al = config.leaveTypes.find(t => t.accrues && !t.unpaid) ?? config.leaveTypes.find(t => t.code === 'AL') ?? null
   if (al && ledger) {

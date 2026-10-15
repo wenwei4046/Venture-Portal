@@ -49,7 +49,7 @@ describe('Readiness (the Attendance handoff)', () => {
   it('asks for opening balances, templates and next year’s chosen holidays', () => {
     const rows = readinessRows(
       config({
-        people: [person('p1', 'Ann', { titleId: 'store' }), person('p2', 'Bob')],
+        people: [person('p1', 'Ann', { titleId: 'store', hireDate: '2021-05-01' }), person('p2', 'Bob', { hireDate: '2019-02-11' })],
         titles: [{ id: 'store', name: 'Storekeeper', level: 2, departmentId: null, hasTemplate: false }],
         assignments: [assignment({})],
         leaveTypes: [{ id: 'al', code: 'AL', name: 'Annual leave', groups: [], rules: '', route: 'upline_only', counts: 'working', accrues: true, unpaid: false, drawsFrom: null }],
@@ -65,5 +65,19 @@ describe('Readiness (the Attendance handoff)', () => {
     expect(by.holidays.title).toBe('2027 holidays: 2 of 6 chosen picked')
     expect(by.holidays.sub).toBe('Publish before 1 Jan 2027')
     expect(readinessCount(rows)).toBe(3)
+    expect(by.hire).toBeUndefined()
+  })
+
+  it('names who clocks with no hire date — their service steps never come (2026-10-15)', () => {
+    const rows = readinessRows(
+      config({
+        people: [person('p1', 'Ann', { hireDate: '2020-01-06' }), person('p2', 'Bob'), person('p3', 'Cal'), person('p4', 'Dee', { hireDate: null })],
+        assignments: [assignment({}), assignment({ id: 'off', level: 'person', staffId: 'p4', mode: 'off' })],
+      }),
+      ledger,
+      '2026-11-03',
+    )
+    const hire = rows.find(r => r.key === 'hire')
+    expect(hire).toMatchObject({ tone: 'warning', title: '2 people who clock have no hire date', sub: 'Bob · Cal — add it in People', fix: { label: 'Fix', href: '/team/people' } })
   })
 })

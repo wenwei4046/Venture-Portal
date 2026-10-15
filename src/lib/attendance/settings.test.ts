@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CUTOVERS, HALF_HOURS, blankWeek, dayBar, entitlementLine, groupSummary, monthCells, multipliersFrom, nextFirsts, otRates, previewGroups, scheduleUsers, toggleAll, weeklyHours,
+  CUTOVERS, HALF_HOURS, blankWeek, dayBar, derivedFlags, entitlementLine, groupSummary, monthCells, multipliersFrom, nextFirsts, otRates, previewGroups, scheduleUsers,
+  settledFlags, toggleAll, weeklyHours,
 } from './settings'
 import type { AttConfig, AttLeaveType, AttPerson } from './types'
 
@@ -77,6 +78,21 @@ describe('Settings arithmetic (the handoff’s smVals / groupSummary)', () => {
     const oct = monthCells(2026, 10) // 1 Oct 2026 is a Thursday
     expect(oct.slice(0, 4)).toEqual([null, null, null, '2026-10-01'])
     expect(oct.filter(Boolean)).toHaveLength(31)
+  })
+
+  it('a new leave type’s code suggests its flags; a saved one keeps its own; the switches settle (2026-10-15)', () => {
+    expect(derivedFlags('AL', 'Annual leave')).toEqual({ accrues: true, unpaid: false, drawsFrom: null, counts: 'working' })
+    expect(derivedFlags('UL', 'Unpaid leave')).toEqual({ accrues: false, unpaid: true, drawsFrom: null, counts: 'working' })
+    expect(derivedFlags('EL', 'Emergency leave')).toEqual({ accrues: false, unpaid: false, drawsFrom: 'AL', counts: 'working' })
+    expect(derivedFlags('ML', 'Maternity leave').counts).toBe('calendar')
+    // NPL suggests nothing — the switch makes it unpaid, and it stays so once saved.
+    const npl = { id: 'n', code: 'NP', name: 'No-pay leave', groups: [], rules: '', route: 'upline_only' as const, counts: 'working' as const, accrues: false, unpaid: true, drawsFrom: null }
+    expect(derivedFlags('NP', 'No-pay leave').unpaid).toBe(false)
+    expect(derivedFlags('NP', 'No-pay leave', npl).unpaid).toBe(true)
+    // An unpaid type keeps no balance and comes out of none; one that comes out of another earns nothing itself.
+    expect(settledFlags({ accrues: true, unpaid: true, drawsFrom: 'AL', counts: 'working' })).toEqual({ accrues: false, unpaid: true, drawsFrom: null, counts: 'working' })
+    expect(settledFlags({ accrues: true, unpaid: false, drawsFrom: 'AL', counts: 'working' })).toEqual({ accrues: false, unpaid: false, drawsFrom: 'AL', counts: 'working' })
+    expect(settledFlags({ accrues: true, unpaid: false, drawsFrom: null, counts: 'calendar' })).toEqual({ accrues: true, unpaid: false, drawsFrom: null, counts: 'calendar' })
   })
 
   it('offers the first of the next months, across the year end', () => {

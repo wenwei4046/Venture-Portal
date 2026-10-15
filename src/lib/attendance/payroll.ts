@@ -1,6 +1,6 @@
 import { indexMonth, monthGrid, policyOn, toMin, type Ctx, type DayInfo, type OtHours } from './engine'
 import { otRates } from './settings'
-import type { AttRequest, AttSchedule } from './types'
+import type { AttRequest, AttSchedule, OtEligibility } from './types'
 import { seedPayrollRows, type PayrollSeedRow, type PayrollSeedStaff } from '@/lib/payroll-period'
 
 /**
@@ -22,7 +22,10 @@ import { seedPayrollRows, type PayrollSeedRow, type PayrollSeedStaff } from '@/l
  * - Unpaid days: days on an unpaid leave type, and absent / incomplete days
  *   Month close decided Unpaid. The payroll's own trigger takes them off the
  *   basic (× the days left ÷ the month's days) and works out the rest.
- * - Who clocks › OT: none keeps the hours on the line, unpaid.
+ * - Who clocks › OT: none keeps the hours on the line, unpaid; "by wage" pays
+ *   only while the row's wages — basic + its fixed (statutory) allowance — are
+ *   not above the policy's line, RM 4,000 to start (the user, 2026-10-15,
+ *   asked about Ben's RM 4,500: "要，超过 RM4,000 不付"). Statutory always pays.
  * - HQ only (the user: "先只做 HQ"): a Revenue team row is Comm Cal's; a
  *   director's pay is Director Salary's. A row already Completed, with Finance
  *   or paid is left and named (the user: "跳过，列出来").
@@ -66,6 +69,10 @@ export interface OtFact {
   base: 'basic' | 'fixed'
   /** Who clocks › OT on that day is not "none". */
   paid: boolean
+  /** Who clocks › OT on that day. */
+  eligibility: OtEligibility | null
+  /** The policy's wage line that day (Settings › Policy). */
+  wageCap: number | null
 }
 
 /** A person of a closed month, as payroll will hear it. */
@@ -140,6 +147,8 @@ export function attendanceFacts(ctx: Ctx, requests: readonly AttRequest[]): Atte
           hoursADay: hoursADay(info.schedule),
           base: policyOn(day, ctx.config.policies)?.otBase ?? 'basic',
           paid: info.assignment?.ot !== 'none',
+          eligibility: info.assignment?.ot ?? null,
+          wageCap: policyOn(day, ctx.config.policies)?.otWageCap ?? null,
         }
       }),
     }
@@ -156,7 +165,13 @@ export interface OtLine extends OtFact {
   orp: number
   hrp: number
   amount: number
+  /** Why a line is not paid: Who clocks says none, or "by wage" and the wages are above the line. */
+  unpaid: 'none' | 'over_line' | null
 }
+
+/** "by wage" and the row's wages (basic + fixed allowance) above the policy's line. */
+export const overWageLine = (o: Pick<OtFact, 'eligibility' | 'wageCap'>, salary: PaySalary) =>
+  o.eligibility === 'by_wage' && o.wageCap != null && round2(salary.basic + salary.statutoryAllowance) > o.wageCap
 
 /** What a close writes on a payroll row (`hr_monthly_payroll.attendance_figures`, beside its three columns). */
 export interface AttendancePay {
@@ -176,7 +191,8 @@ export function priceFact(month: string, closedAt: string, fact: AttendanceFact,
     const base = salary.basic + (o.base === 'fixed' ? salary.statutoryAllowance : 0)
     const { orp, hrp } = otRates(base, o.hoursADay)
     const hrp4 = round4(hrp)
-    return { ...o, orp: round4(orp), hrp: hrp4, amount: o.paid ? round2(o.hours * hrp4 * o.multiplier) : 0 }
+    const unpaid = !o.paid ? 'none' : overWageLine(o, salary) ? 'over_line' : null
+    return { ...o, paid: !unpaid, unpaid, orp: round4(orp), hrp: hrp4, amount: unpaid ? 0 : round2(o.hours * hrp4 * o.multiplier) }
   })
   const paid = lines.filter(l => l.paid)
   return {
