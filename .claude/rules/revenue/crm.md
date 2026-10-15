@@ -203,3 +203,19 @@ Mig `20261015100000_crm_desktop_v2` (`crm_channels`, `crm_set_channel`, `crm_not
 **UNDO SEND TAKEN OUT, AND KBDEBUG WITH IT (2026-10-15 — the owner: "你幫我把剛剛 delete everyone undo 10s 的取消，恢復原本的就行"; and of kbdebug's numbers: "如何取消上面綠色的字？"):** a message, photo, video, voice note or file goes the moment it is sent again, as before #447 — no 10 s hold, no *Unsend · Ns* in the long-press menu of either chat; `shared/undo-send.ts` and its test are gone (supersedes UNDO SEND and its no-bar follow-up above). `shared/kb-debug.tsx` and the `kbdebug` word are gone too: its one screenshot found the iPhone fault (#456).
 
 **THE IPHONE'S KEYBOARD, SECOND READING (2026-10-15 — the owner's kbdebug on #456: a white screen, the chat at −403→−13):** #456's "fitted by its bottom alone" was wrong — the pan IS needed on an iPhone. The fault since #425 was only the bottom, worked out from the window's 390 instead of the page's 793: now `top = vv.offsetTop`, `bottom = page − pan − visualViewport` on every phone (the page's full height on an iPhone, `fullH`). And because an iPhone measures the screen from the top of what is visible (both screenshots), a screen it still draws elsewhere is moved back there (`getBoundingClientRect().top`, iPhone only, while fitted to the keyboard). Tests: `ChatComposer.test.tsx` › the iPhone's keyboard; › the iPhone's screen drawn away from what is visible.
+
+**SHOWROOM HOURS ROUND THE CLOCK; A SALESPERSON TOLD OF EVERYTHING THEIRS (2026-10-15; the owner: "Showroom 時間表，做24小時的，從12am-11pm"; "只要是關於到業務員本身的（appt, upcoming, chat）都要通知"):**
+- **Showroom hours:** a showroom's visit times and closure hours run 12 am to 11 pm. On the desktop, `ALLT` (every half hour) and `HOURS` in desk/vm/showrooms.ts; on the phone panel, the closure times (`dBTimes`, panel/vm/rooms.ts). They were 10 am – 9 pm and 8 am – 10 pm. The database never limited the hours (`crm_save_showroom`, `crm_slot_check`).
+- **The screen** (Mine's notifications, `salesNotifs`) adds, for one's own customers:
+  - a visit today still to come;
+  - a visit gone by an hour or more (up to 3 days) still booked — mark whether they came;
+  - a chat whose 24-hour window shuts within 3 h;
+  - a visit somebody else booked, moved or cancelled for them (the journey's `appt_*` events).
+- **The phone** (the hourly `notify_crm_due()`, mig `20261015200000_notify_more_for_salespeople`, built from production's body md5 da6e0cfd…):
+  - the visit tomorrow, whether or not the reminder went;
+  - a visit today within 2 h;
+  - the visit to mark;
+  - the window closing.
+  Each is sent once (`data.due`) and never for a muted, hidden or blocked chat. Dry run on production (rolled back): 4 notices at that hour.
+- **Only a login is told:** a salesperson with no login (`hr_staff_costs.user_id` empty) gets nothing. On 2026-10-15, ALVIN — who was dealt KennyTeh, a real Click-to-WhatsApp lead — had none; told the owner.
+

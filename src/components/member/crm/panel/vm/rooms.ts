@@ -90,8 +90,9 @@ export function roomsVM(ctx: PanelCtx) {
       dBT1bd: ed.bPick === "t1" ? "#BD4A19" : "#EBDDD2", dBT2bd: ed.bPick === "t2" ? "#BD4A19" : "#EBDDD2",
       openT1: () => setD({ bPick: ed.bPick === "t1" ? null : "t1" }), openT2: () => setD({ bPick: ed.bPick === "t2" ? null : "t2" }),
       dBTOpen: !!ed.bPick, dBTTitle: ed.bPick === "t2" ? "Blocked until" : "Blocked from",
-      dBTimes: Array.from({ length: 29 }, (_, k) => {
-        const mm = 8 * 60 + k * 30, v = String(Math.floor(mm / 60)).padStart(2, "0") + ":" + String(mm % 60).padStart(2, "0");
+      // The whole day, 12 am to 11 pm, every half hour (the owner, 2026-10-15; it ran 8 am – 10 pm).
+      dBTimes: Array.from({ length: 47 }, (_, k) => {
+        const mm = k * 30, v = String(Math.floor(mm / 60)).padStart(2, "0") + ":" + String(mm % 60).padStart(2, "0");
         const key = ed.bPick === "t2" ? "bT2" : "bT1", on = ed[key] === v, off = key === "bT2" && !!ed.bT1 && v <= ed.bT1;
         return {
           t: t12(v).replace(":00", ""), bg: on ? "#BD4A19" : off ? "#FBF6F2" : "#fff", fg: on ? "#fff" : off ? "#C9B5A8" : "#3F2B22", bd: on ? "#BD4A19" : off ? "#FBF6F2" : "#EBDDD2",

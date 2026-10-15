@@ -11,9 +11,10 @@ import type { DeskCtx, SrBlk, SrBlock, SrDraft } from "./ctx";
 import { MON } from "./insight";
 
 const DN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], DS = ["M", "T", "W", "T", "F", "S", "S"], DI = [0, 1, 2, 3, 4, 5, 6];
-/** Every half hour a visit may start (the prototype's ALLT) and the hours a blocked time may run (HOURS). */
-const ALLT = Array.from({ length: 23 }, (_, k) => t12(`${10 + Math.floor(k / 2)}:${k % 2 ? "30" : "00"}`));
-const HOURS = Array.from({ length: 12 }, (_, k) => t12(`${10 + k}:00`));
+/** Every half hour a visit may start (the prototype's ALLT) and the hours a blocked time may run (HOURS) — the whole day,
+ *  12 am to 11 pm (the owner, 2026-10-15: "Showroom 時間表，做24小時的"; the prototype ran 10 am – 9 pm). */
+const ALLT = Array.from({ length: 47 }, (_, k) => t12(`${Math.floor(k / 2)}:${k % 2 ? "30" : "00"}`));
+const HOURS = Array.from({ length: 24 }, (_, k) => t12(`${k}:00`));
 const hm = (label: string) => { const m = label.match(/(\d+):(\d+) (am|pm)/); return m ? `${String((Number(m[1]) % 12) + (m[3] === "pm" ? 12 : 0)).padStart(2, "0")}:${m[2]}` : label; };
 const fd = (iso: string) => { if (!iso) return ""; const [, m, d] = iso.split("-"); return `${parseInt(d, 10)} ${MON[parseInt(m, 10) - 1].slice(0, 3)}`; };
 const mapU = (a: string) => ({ g: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a)}`, w: `https://waze.com/ul?q=${encodeURIComponent(a)}&navigate=yes` });
@@ -123,7 +124,7 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
         setF: (e: { target: { value: string } }) => { const nfi = HOURS.indexOf(e.target.value); updB({ ranges: bk.ranges.map((x, j) => (j === i ? { f: e.target.value, t: HOURS.indexOf(x.t) > nfi ? x.t : HOURS[nfi + 1] } : x)) }); },
         setT: (e: { target: { value: string } }) => updB({ ranges: bk.ranges.map((x, j) => (j === i ? { ...x, t: e.target.value } : x)) }),
         remove: () => { const nr = bk.ranges.filter((_, j) => j !== i); updB(nr.length ? { ranges: nr } : { ranges: [{ f: "11:00 am", t: "1:00 pm" }], allDay: true }); } }; }),
-    srAddRange: () => { const last = bk.ranges[bk.ranges.length - 1], li = last ? HOURS.indexOf(last.t) : 1; updB({ ranges: [...bk.ranges, { f: HOURS[Math.min(li + 1, 10)], t: HOURS[Math.min(li + 2, 11)] }] }); },
+    srAddRange: () => { const last = bk.ranges[bk.ranges.length - 1], li = last ? HOURS.indexOf(last.t) : 11; updB({ ranges: [...bk.ranges, { f: HOURS[Math.min(li + 1, 22)], t: HOURS[Math.min(li + 2, 23)] }] }); },
     srDtCur: okD ? "pointer" : "not-allowed", srDtHint: okD ? `${rng} · ${bk.allDay ? "All day" : bk.ranges.map(r => `${r.f} – ${r.t}`).join(", ")}` : "", srDtHintFg: okD ? "#3F2B22" : "#A08E82",
     srDtNoAdd: !okD, srDtAddBg: okD ? "#BD4A19" : "#D9C6B8",
     srDtAdd: () => { if (!okD || !dr) return; upd({ blocks: [...dr.blocks, { kind: "date", from: bk.from, to: bk.to || bk.from, allDay: bk.allDay, ranges: bk.allDay ? [] : bk.ranges, reason: bk.reason }] });
