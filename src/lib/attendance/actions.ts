@@ -4,6 +4,10 @@ import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { registerOf } from './engine'
+import { attendanceFacts, otHoursOf } from './payroll'
+import { sendToPayroll, type PayrollSend } from './payroll-write'
+import { loadBoard, loadMonth, loadRequests } from './server'
 
 /**
  * HR › Attendance's writes (2026-10-15). Each stands behind the Attendance
@@ -113,9 +117,42 @@ export async function decideDay(staffId: string, day: string, decision: 'Unpaid'
   return call('att_decide_day', { p_staff: staffId, p_day: day, p_decision: decision }, 'The day could not be decided.')
 }
 
-export async function closeMonth(month: string, register: unknown[]) {
+/**
+ * Close a month (2026-10-15): the register and what payroll is sent are worked
+ * out HERE, from the facts as they stand (never from the page's copy); the
+ * month is frozen; then each HQ person's overtime and unpaid days go onto the
+ * month's payroll — when the closer may edit payroll (lib/attendance/payroll-write.ts).
+ */
+export async function closeMonth(month: string): Promise<AttOutcome<{ month: string; people: number; payroll: PayrollSend }>> {
   await requireActionOn('/attendance/close', 'attendance', 'edit')
-  return call<{ month: string; people: number }>('att_close_month', { p_month: month, p_register: register }, 'The month could not be closed.')
+  if (!/^\d{4}-\d{2}-01$/.test(month)) return { ok: false, reason: 'The month could not be closed.' }
+  const [board, requests] = await Promise.all([loadBoard(month), loadRequests()])
+  if (!board.ok) return board
+  if (!requests.ok) return requests
+  const { config, month: facts } = board.data
+  const ctx = { config, month: facts, today: config.today, now: config.now }
+  let paid: ReturnType<typeof attendanceFacts>
+  try {
+    paid = attendanceFacts(ctx, requests.data)
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error ? e.message : 'The month could not be closed.' }
+  }
+  const closed = await call<{ month: string; people: number }>('att_close_month', { p_month: month, p_register: registerOf(ctx, otHoursOf(ctx, requests.data)) },
+    'The month could not be closed.')
+  if (!closed.ok) return closed
+  // The month is frozen now: whatever payroll answers, the close stands and says so.
+  const after = await loadMonth(month)
+  const closedAt = after.ok ? after.data.close?.closedAt ?? null : null
+  let payroll: PayrollSend = { allowed: true, written: 0, left: [], failed: true }
+  if (closedAt) {
+    try {
+      payroll = await sendToPayroll(month, closedAt, paid)
+    } catch {
+      // The rows could not be read; Reopen and Close again sends them.
+    }
+  }
+  if (payroll.written) revalidatePath('/hr-costing/payroll', 'layout')
+  return { ok: true, data: { ...closed.data, payroll } }
 }
 
 export async function reopenMonth(month: string, reason: string) {

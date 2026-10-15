@@ -9,8 +9,9 @@ import { StatusChip } from '@/components/ds/Data'
 import { Field, Textarea } from '@/components/ds/Field'
 import { CenterWindow, PanelHead, Toast, useFlash } from '@/components/ds/Overlay'
 import { closeMonth, decideDay, reopenMonth } from '@/lib/attendance/actions'
-import { closeLabel, closeNodes, dayLine, dueLine, kindLabel, waitingAt, waitingIn, whenLabel } from '@/lib/attendance/close'
-import { daysToDecide, dayMon, monthDays, monthLabel, monthName, registerOf, trackedPeople, type Ctx } from '@/lib/attendance/engine'
+import { closeLabel, closedWords, closeNodes, dayLine, dueLine, kindLabel, payrollLine, waitingAt, waitingIn, whenLabel } from '@/lib/attendance/close'
+import { daysToDecide, dayMon, monthDays, monthLabel, monthName, trackedPeople, type Ctx } from '@/lib/attendance/engine'
+import { MARK_WORDS, type PayrollMark } from '@/lib/attendance/payroll'
 import type { AttConfig, AttMonth, AttRequest } from '@/lib/attendance/types'
 import { Avatar, NodeTrack, Pill } from './bits'
 
@@ -27,7 +28,10 @@ type Decision = (typeof DECIDE)[number]
 
 const card = { border: '1px solid var(--ds-border)', borderRadius: 12, background: 'var(--ds-surface)' } as const
 
-export default function CloseView({ config, month, requests, today, now }: { config: AttConfig; month: AttMonth; requests: AttRequest[]; today: string; now: string }) {
+/** Where each HQ person's payroll stands after the close (lib/attendance/payroll-write.ts `payrollMarksFor`); null: not a payroll reader, or not closed. */
+type PayrollMarks = Array<{ staffId: string; name: string; mark: PayrollMark }> | null
+
+export default function CloseView({ config, month, requests, today, now, payroll }: { config: AttConfig; month: AttMonth; requests: AttRequest[]; today: string; now: string; payroll: PayrollMarks }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [toast, flash] = useFlash()
@@ -70,9 +74,9 @@ export default function CloseView({ config, month, requests, today, now }: { con
   }
   const doClose = () =>
     start(async () => {
-      const r = await closeMonth(m, registerOf(ctx))
+      const r = await closeMonth(m)
       if (!r.ok) return flash(r.reason)
-      flash(`${monthLabel(m)} closed · ${r.data.people} people frozen`)
+      flash(closedWords(m, r.data.people, r.data.payroll))
       router.refresh()
     })
   const doReopen = () => {
@@ -89,8 +93,9 @@ export default function CloseView({ config, month, requests, today, now }: { con
 
   const files = [
     { name: 'Statutory register', sub: 'Hours, days, OT, rest-day and holiday work, leave', btn: 'Download', href: `/attendance/close/register?m=${m.slice(0, 7)}` },
-    { name: `Payroll · ${monthName(m)} run`, sub: 'OT hours by rate and unpaid days, sent on close', btn: 'Open payroll', href: '/hr-costing/payroll' },
+    { name: `Payroll · ${monthName(m)} run`, sub: closed && payroll ? payrollLine(payroll) : 'OT hours by rate and unpaid days, sent on close', btn: 'Open payroll', href: `/hr-costing/payroll/${m}` },
   ]
+  const notSent = closed && payroll ? payroll.filter((p): p is { staffId: string; name: string; mark: Exclude<PayrollMark, 'in'> } => p.mark !== 'in') : []
 
   return (
     <HvPage>
@@ -195,6 +200,17 @@ export default function CloseView({ config, month, requests, today, now }: { con
                   </Button>
                 </div>
               ))}
+              {notSent.length ? (
+                <div style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--ds-border)', paddingTop: 2 }}>
+                  {notSent.map(p => (
+                    <div key={p.staffId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0' }}>
+                      <Avatar name={p.name} size={26} />
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                      <StatusChip tone="warning">{MARK_WORDS[p.mark]}</StatusChip>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

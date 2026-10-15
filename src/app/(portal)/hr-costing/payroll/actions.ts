@@ -669,11 +669,21 @@ export async function cancelPayrollPaymentRequest(
 /**
  * Copy values from last month's rows into this period's rows.
  * Only affects existing draft rows for p_period — does not create new rows.
+ * A row this month's attendance close wrote (`attendance_figures`, 2026-10-15)
+ * keeps its overtime and unpaid days: those are this month's, not last month's.
  */
 export async function copyFromLastMonth(period: string): Promise<{ copied: number }> {
   await requireActionOn('/hr-costing/payroll', 'hr_costing', 'edit')
   const supabase = await createClient()
   await assertPeriodOpen(supabase, period)
+
+  const { data: closed, error: closedErr } = await supabase
+    .from('hr_monthly_payroll')
+    .select('staff_id')
+    .eq('period_month', period)
+    .not('attendance_figures', 'is', null)
+  if (closedErr) throw new Error(`Failed to read this month's payroll: ${closedErr.message}`)
+  const fromAttendance = new Set((closed ?? []).map(r => r.staff_id))
 
   const periodDate = new Date(period + 'T00:00:00Z')
   const lastMonth = new Date(periodDate)
@@ -698,10 +708,10 @@ export async function copyFromLastMonth(period: string): Promise<{ copied: numbe
         basic_salary: r.basic_salary,
         statutory_allowance: r.statutory_allowance,
         non_statutory_allowance: r.non_statutory_allowance,
-        ot_hours: r.ot_hours,
-        ot_amount: r.ot_amount,
         commission_amount: r.commission_amount,
-        unpaid_leave_days: r.unpaid_leave_days,
+        ...(fromAttendance.has(r.staff_id)
+          ? {}
+          : { ot_hours: r.ot_hours, ot_amount: r.ot_amount, unpaid_leave_days: r.unpaid_leave_days }),
       })
       .eq('staff_id', r.staff_id)
       .eq('period_month', period)
