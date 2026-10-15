@@ -101,3 +101,27 @@ export function summariseRound(
 
   return { sumInput, remainingBefore, remainingAfter, overdrawRows, overCommitRows, canSubmit }
 }
+
+/**
+ * A funding pool's name (Payroll Requests' Generate PV, the desktop form's and
+ * the Finance phone app's): the five core department pools by key, and a
+ * department HR picked for HOUZS Venture's director share (IT, Revenue
+ * Department, Venture Office …) by the department the row reads.
+ */
+export function poolLabel(key: string, deptName?: string): string {
+  switch (key) {
+    case 'dept_pool_hr':
+      return 'HR Department Pool'
+    case 'dept_pool_finance':
+      return 'Finance Department Pool'
+    case 'dept_pool_director_office':
+      return 'Director Office Department Pool'
+    case 'dept_pool_marketing':
+      return 'Marketing Department Pool'
+    case 'dept_pool_director':
+      return 'Director Department Pool'
+    default:
+      if (!deptName) return key
+      return /department$/i.test(deptName) ? `${deptName} Pool` : `${deptName} Department Pool`
+  }
+}

@@ -194,7 +194,7 @@ export default function VoucherApp({
         ...(payroll ? [{ key: 'payroll', label: payroll.length > 0 ? `Payroll · ${payroll.length}` : 'Payroll', onClick: () => setMenu('payroll') } as BarButton] : []),
         { key: 'more', label: '⋯', kind: 'more', onClick: () => setMenu('more') },
       ]
-  // A queue the app draws opens on the request pressed (2026-10-16, part E4); one it does not yet, on its page.
+  // A queue opens on the request pressed (2026-10-16, part E4 — each queue is a page of the app now).
   const requestItems = (items: RequestItem[], page: string, openLabel: string): DialogMenuItem[] => {
     const inApp = page.startsWith('/fin-app/')
     const goTo = (id?: string) => {
@@ -374,7 +374,7 @@ export default function VoucherApp({
           </FinDialog>
           {payroll ? (
             <FinDialog open={menu === 'payroll'} onClose={() => setMenu(null)} title="Payroll Requests" sub={payroll.length > 0 ? `${payroll.length} waiting` : undefined}>
-              <DialogMenu items={requestItems(payroll, '/payments/payroll-requests', 'Open Payroll Requests')} />
+              <DialogMenu items={requestItems(payroll, '/fin-app/page/payroll-requests', 'Open Payroll Requests')} />
             </FinDialog>
           ) : null}
           <FinDialog open={menu === 'claims'} onClose={() => setMenu(null)} title="Claim Requests" sub={claims.length > 0 ? `${claims.length} waiting for a voucher` : undefined}>
