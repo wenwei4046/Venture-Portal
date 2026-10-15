@@ -72,6 +72,7 @@ export default function VoucherHub({
   ledger,
   actions = null,
   canSetDefault,
+  canExport = false,
   dept,
   payroll,
   claims,
@@ -81,6 +82,8 @@ export default function VoucherHub({
   /** The head's first buttons, each page's own: Create payment; Create receipt and Loan repayment. */
   actions?: ReactNode
   canSetDefault: boolean
+  /** Treasury · Export — the head's Export ▾, as its route asks (2026-10-16). */
+  canExport?: boolean
   dept: RequestItem[]
   /** null without Payroll payouts: Payroll Requests is not theirs to open. */
   payroll: RequestItem[] | null
@@ -179,7 +182,7 @@ export default function VoucherHub({
           receipts ? (
             <>
               {actions}
-              <HeadButton onClick={() => setMenu('export')}>Export ▾</HeadButton>
+              {canExport ? <HeadButton onClick={() => setMenu('export')}>Export ▾</HeadButton> : null}
             </>
           ) : (
           <>
@@ -187,7 +190,7 @@ export default function VoucherHub({
             <HeadButton onClick={() => setMenu('dept')}>{dept.length > 0 ? `Dept · ${dept.length}` : 'Dept'}</HeadButton>
             {payroll ? <HeadButton onClick={() => setMenu('payroll')}>{payroll.length > 0 ? `Payroll · ${payroll.length}` : 'Payroll'}</HeadButton> : null}
             <HeadButton onClick={() => setMenu('claims')}>{claims.length > 0 ? `Claims · ${claims.length}` : 'Claims'}</HeadButton>
-            <HeadButton onClick={() => setMenu('export')}>Export ▾</HeadButton>
+            {canExport ? <HeadButton onClick={() => setMenu('export')}>Export ▾</HeadButton> : null}
           </>
           )
         }

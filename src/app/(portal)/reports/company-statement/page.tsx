@@ -77,7 +77,7 @@ export default async function CompanyStatementPage() {
         />
       </StatCards>
 
-      <StatementView rows={rows} totals={totals} />
+      <StatementView rows={rows} totals={totals} canExport={canDo(user, 'reports', 'export')} />
     </div>
   )
 }

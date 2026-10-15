@@ -71,11 +71,12 @@ const LEDGER: HubLedger = {
   empty: false,
 }
 
-const draw = () =>
+const draw = (canExport = true) =>
   render(
     <VoucherHub
       ledger={LEDGER}
       canSetDefault={false}
+      canExport={canExport}
       dept={[]}
       payroll={null}
       claims={[]}
@@ -105,6 +106,12 @@ describe('Receipt’s hub', () => {
     expect(screen.getByRole('button', { name: 'Export ▾' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Dept/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Claims/ })).toBeNull()
+  })
+
+  it('keeps Export to whoever may export (Treasury · Export, 2026-10-16)', async () => {
+    draw(false)
+    await act(async () => undefined)
+    expect(screen.queryByRole('button', { name: 'Export ▾' })).toBeNull()
   })
 
   it('its cards: All receipts … Received … Voided, in receipts and +RM, no payroll', async () => {

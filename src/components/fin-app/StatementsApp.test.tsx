@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { StatementRead, StatementRow } from '@/app/(portal)/statements/_lib/statement-read'
 import { statementHubModel, statementRecordModel, statementsPlace } from '@/lib/fin-app/statement-model'
 
@@ -46,10 +46,10 @@ const READ: StatementRead = {
 const RECORD = statementRecordModel(READ, { created: '22 Sep 2026', issued: null }, { edit: true })
 const HUB = statementHubModel([ROW], new Map([['car', { name: 'Carres', code: 'CAR' }]]), '2026-09')
 
-const draw = (search = '', record: typeof RECORD | null = null) =>
+const draw = (search = '', record: typeof RECORD | null = null, canExport = true) =>
   render(
     <FinAppFrame platform="android" rows={['statements']}>
-      <StatementsApp place={statementsPlace('2026-09', '2026-09')} month="2026-09" hub={HUB} search={search} canGenerate record={record} refused={null} />
+      <StatementsApp place={statementsPlace('2026-09', '2026-09')} month="2026-09" hub={HUB} search={search} canGenerate canExport={canExport} record={record} refused={null} />
     </FinAppFrame>,
   )
 
@@ -123,6 +123,17 @@ describe('Statements on the phone', () => {
     const ask = await screen.findByRole('dialog', { name: 'Issue to Carres?' })
     fireEvent.click(within(ask).getByRole('button', { name: 'Cancel' }))
     expect(mocks.issue).not.toHaveBeenCalled()
+  })
+
+  it('offers the month’s files only to whoever may take them out (Treasury · Export, 2026-10-16)', async () => {
+    draw()
+    expect(await screen.findByRole('button', { name: 'Export PDF' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
+    cleanup()
+    draw('', null, false)
+    expect(await screen.findByRole('button', { name: 'Generate statements' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Export PDF' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull()
   })
 
   it('Generate statements answers how many it made, and goes to the month it made them for', async () => {

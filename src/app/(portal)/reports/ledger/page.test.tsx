@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
+import { withActions } from '@/test/with-actions'
 
 // 2026-10-09 — the General Ledger per the user's Claude Design handoff
 // (Phase 4 of the Finance revamp): the period in the eyebrow, a line of what
@@ -50,7 +51,7 @@ const LEDGERS = [
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['reports'] })
+  mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['reports'] }))
   const q: Record<string, unknown> = {}
   for (const m of ['select', 'eq', 'order']) q[m] = () => q
   q.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(res)

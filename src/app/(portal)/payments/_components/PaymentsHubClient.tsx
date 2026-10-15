@@ -18,6 +18,7 @@ export default function PaymentsHubClient({
   canCreate,
   create = null,
   canSetDefault,
+  canExport = false,
   dept,
   payroll,
   claims,
@@ -27,6 +28,8 @@ export default function PaymentsHubClient({
   /** Create payment's dialog (whoever may make a voucher): its line, today, and — arriving with ?new=1 — open with its lists. */
   create?: { prefix: string; today: string; open: boolean; initial: CreatePaymentOptions | null } | null
   canSetDefault: boolean
+  /** Treasury · Export: the head's Export ▾. */
+  canExport?: boolean
   dept: RequestItem[]
   /** null without Payroll payouts: Payroll Requests is not theirs to open. */
   payroll: RequestItem[] | null
@@ -48,6 +51,7 @@ export default function PaymentsHubClient({
     <VoucherHub
       ledger={ledger}
       canSetDefault={canSetDefault}
+      canExport={canExport}
       dept={dept}
       payroll={payroll}
       claims={claims}
