@@ -23,7 +23,7 @@ export default async function FinAppPage({ params, searchParams }: { params: Pro
   for (const sec of sections) {
     const item = sec.items.find((i) => i.key === key)
     if (!item) continue
-    if (key.startsWith('dp-')) return <DeptStatementScreen slug={key.slice(3)} sp={await searchParams} user={user} />
+    if (key.startsWith('dp-')) return <DeptStatementScreen slug={key.slice(3)} sp={await searchParams} />
     return <ComingPage roman={sec.roman ?? ''} section={sec.label ?? 'Overview'} label={item.label} />
   }
   const personal = (await loginIsPersonal()) === true

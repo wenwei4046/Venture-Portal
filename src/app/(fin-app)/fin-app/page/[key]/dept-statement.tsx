@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { requirePage } from '@/lib/auth'
+import { requireActionOn, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { officeMonth } from '@/lib/office-time'
@@ -11,7 +11,6 @@ import { fromReportModel } from '@/lib/fin-app/report-pages'
 import { deptStatementPlace, deptStatementView, type DeptStatementView } from '@/lib/fin-app/dept-statement'
 import { askedMonth, searchOf, type SearchParams } from '@/lib/fin-app/report-page'
 import type { PageModel } from '@/lib/fin-app/page-model'
-import type { User } from '@/types'
 import PageApp from '@/components/fin-app/PageApp'
 
 /**
@@ -23,9 +22,11 @@ import PageApp from '@/components/fin-app/PageApp'
  * picked (`readCashFlowStatement` / `readPnlStatement`), a month at a time
  * between the arrows, and the desktop page's files for whoever may export.
  */
-export default async function DeptStatementScreen({ slug, sp, user }: { slug: string; sp: SearchParams; user: User }) {
+export default async function DeptStatementScreen({ slug, sp }: { slug: string; sp: SearchParams }) {
+  // The desktop page's own gates, word for word.
   await requirePage('/dept-pool/statements/[seg]')
-  if (!canDo(user, 'reports', 'view') || !canDo(user, 'dept_pool', 'view')) notFound()
+  const user = await requireActionOn('/dept-pool/statements/[seg]', 'reports', 'view')
+  if (!canDo(user, 'dept_pool', 'view')) notFound()
   const dept = statementDepts(primedRegistryRows()).find((d) => d.slug === slug)
   if (!dept) notFound()
 
