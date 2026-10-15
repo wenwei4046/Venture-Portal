@@ -49,6 +49,39 @@ export async function generatePvFromRequest(
   paymentDate: string,
 ): Promise<string> {
   const user = await requirePayrollPayoutsActionOn('/payments/payroll-requests', ['treasury', 'create'])
+  const voucherId = await fundPayrollRound(user.id, requestId, sourceBankId, destBankId, sources, paymentDate)
+  redirect(`/payments/${voucherId}`)
+}
+
+/**
+ * The same round answered in words (2026-10-16, the Finance phone app's Payroll
+ * Requests): production hides a thrown message behind a digest, and the phone
+ * opens the new voucher in the app rather than the portal's page.
+ */
+export async function generatePvFromRequestInWords(
+  requestId: string,
+  sourceBankId: string,
+  destBankId: string,
+  sources: PayrollPoolSource[],
+  paymentDate: string,
+): Promise<{ ok: true; voucherId: string } | { ok: false; reason: string }> {
+  const user = await requirePayrollPayoutsActionOn('/payments/payroll-requests', ['treasury', 'create'])
+  try {
+    return { ok: true, voucherId: await fundPayrollRound(user.id, requestId, sourceBankId, destBankId, sources, paymentDate) }
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error && e.message ? e.message : 'The voucher could not be generated.' }
+  }
+}
+
+/** One funding round: every check, the voucher, its sources, the link and the approval entry — its id. */
+async function fundPayrollRound(
+  userId: string,
+  requestId: string,
+  sourceBankId: string,
+  destBankId: string,
+  sources: PayrollPoolSource[],
+  paymentDate: string,
+): Promise<string> {
   const supabase = await createClient()
 
   if (!Array.isArray(sources) || sources.length === 0) {
@@ -198,7 +231,7 @@ export async function generatePvFromRequest(
       payment_date: payDate,
       reference_type: 'payroll_payment_request',
       reference_id: requestId,
-      created_by: user.id,
+      created_by: userId,
     })
     .select('id, voucher_no')
     .single()
@@ -265,7 +298,7 @@ export async function generatePvFromRequest(
       request_type: 'payment_voucher',
       reference_id: voucher.id,
       reference_table: 'payment_vouchers',
-      submitted_by: user.id,
+      submitted_by: userId,
       description: `${voucher.voucher_no}: ${isDirector ? 'Director salary' : 'Payroll'} bank transfer — ${periodLabel}${isPartial ? ' (partial)' : ''}`,
       amount: roundAmount,
       status: 'pending',
@@ -288,7 +321,7 @@ export async function generatePvFromRequest(
   revalidatePath('/dashboard')
   revalidatePath('/approvals')
 
-  redirect(`/payments/${voucher.id}`)
+  return voucher.id as string
 }
 
 /**
@@ -395,4 +428,20 @@ export async function sendBackPayrollRun(period: string): Promise<void> {
   revalidatePath(`/hr-costing/payroll/${p}`)
   revalidatePath('/billing')
   revalidatePath('/dashboard')
+}
+
+/**
+ * Send back answered in words (2026-10-16, the Finance phone app's Payroll
+ * Requests): a batch goes back on its own, a request from before batches the
+ * month — the button's own choice; the refusal says why.
+ */
+export async function sendBackPayrollInWords(batchId: string | null, period: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  await requirePayrollPayoutsActionOn('/payments/payroll-requests', ['treasury', 'void'], ['treasury', 'approve'])
+  try {
+    if (batchId) await sendBackPayrollBatch(batchId)
+    else await sendBackPayrollRun(period)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error && e.message ? e.message : 'The payroll could not be sent back.' }
+  }
 }

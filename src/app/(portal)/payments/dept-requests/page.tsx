@@ -5,29 +5,15 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import GenerateDeptPvForm from './_components/GenerateDeptPvForm'
 import { cancelDeptRequest } from './actions'
+import { deptRequestsRead } from './_lib/dept-read'
 
 export default async function DeptRequestsPage() {
   await requirePage('/payments/dept-requests')
   await requirePermission('treasury')
   const supabase = await createClient()
 
-  const [{ data: requests }, { data: banks }] = await Promise.all([
-    supabase
-      .from('dept_payment_requests')
-      .select(
-        `id, amount, payee_name, description, status, requested_at, pv_id, department_id,
-         departments (name),
-         users:requested_by (name),
-         payment_vouchers:pv_id (voucher_no, status)`,
-      )
-      .in('status', ['pending_finance_pv', 'pending_principal_pv'])
-      .order('requested_at', { ascending: false }),
-    supabase
-      .from('bank_accounts')
-      .select('id, bank_name, current_balance')
-      .eq('status', 'active')
-      .order('is_primary', { ascending: false }),
-  ])
+  // The requests and the banks, as the Finance phone app reads them (`_lib/dept-read`).
+  const [{ data: requests }, { data: banks }] = await deptRequestsRead(supabase)
 
   const bankOptions = (banks ?? []).map((b) => ({
     id: b.id,
