@@ -97,6 +97,7 @@ export default function PrintSchedule({
                     </div>
                   ))}
                 </dl>
+                <div className="sched-print-scroll">
                 <table className="sched-print-table">
                   <thead>
                     <tr>
@@ -137,6 +138,7 @@ export default function PrintSchedule({
                     </tr>
                   </tfoot>
                 </table>
+                </div>
                 <div className="fund-print-sign">
                   <div>Prepared by · Finance</div>
                   <div>Approved by · Principal</div>

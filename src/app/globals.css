@@ -5745,6 +5745,10 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .sched-print-meta > div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid rgb(229 228 223); font-size: 12px; }
 .sched-print-meta dt { color: rgb(117 100 86); }
 .sched-print-meta dd { margin: 0; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; text-align: right; }
+/* The table scrolls inside the sheet, never the whole window (2026-10-16: on a phone its eight columns pushed the
+   page sideways); a phone's sheet keeps a narrower margin. The paper itself is A4 either way (@media print below). */
+.sched-print-scroll { overflow-x: auto; }
+@media (max-width: 640px) { .sched-print-sheet { padding: 24px 18px; } }
 .sched-print-table { width: 100%; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
 .sched-print-table th { padding: 8px; border: 1px solid rgb(207 197 183); background: rgb(235 231 224); font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; text-align: right; white-space: nowrap; }
 .sched-print-table td { padding: 6px 8px; border: 1px solid rgb(229 228 223); font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; text-align: right; white-space: nowrap; }
@@ -5758,6 +5762,7 @@ table.ledger-table.audit-saves td { vertical-align: top; }
   body.printing-schedule .sched-print { position: static; overflow: visible; padding: 0; background: #fff; }
   body.printing-schedule .sched-print-bar { display: none !important; }
   body.printing-schedule .sched-print-sheet { max-width: none; padding: 0; box-shadow: none; }
+  body.printing-schedule .sched-print-scroll { overflow: visible; }
 }
 
 /* The Repayment Schedule's calendar (2026-10-09): the month's installments on
