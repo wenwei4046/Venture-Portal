@@ -313,19 +313,25 @@ export function MediaViewer() {
         <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}
           onWheel={onWheel} onDoubleClick={zoomable ? toggleZoom : undefined} onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
           onClick={e => { if (!(e.target as HTMLElement).closest("img, video") && zoom.s === 1 && !("ontouchstart" in window)) close(); }}
-          style={{ flex: "1", minHeight: 0, display: "grid", placeItems: "center", overflow: "hidden", cursor: zoom.s > 1 ? "grab" : "default" }}>
-          <div ref={stripRef} style={{ display: "flex", width: "300vw", height: "100%", transform: "translate3d(-100vw,0,0)", willChange: "transform" }}>
+          style={{ position: "relative", flex: "1", minHeight: 0, overflow: "hidden", cursor: zoom.s > 1 ? "grab" : "default" }}>
+          {/* The strip fills the area by its own edges, so each photo has a definite height and sits at its middle (the
+              owner, 2026-10-15: "如果照片不是 full screen size 的話，就放中間而不是上面"). Every slide is drawn the same way
+              whichever place it holds — only the middle one's transform does anything — so a photo moving into the middle
+              keeps its element and its decoded picture: no reload as a slide ends ("還是有點卡"). */}
+          <div ref={stripRef} style={{ position: "absolute", top: 0, bottom: 0, left: 0, display: "flex", width: "300vw", transform: "translate3d(-100vw,0,0)", willChange: "transform" }}>
             {[s.items[s.i - 1], it, s.items[s.i + 1]].map((m, k) => (
-              <div key={m ? m.url : k === 0 ? "none-before" : "none-after"} style={{ flex: "none", width: "100vw", height: "100%", display: "grid", placeItems: "center", overflow: "hidden" }}>
-                {m && (k === 1
-                  ? <div style={{ transform: `translate(${zoom.x}px, ${drag.y + zoom.y}px) scale(${zoom.s * (drag.y ? Math.max(0.8, 1 - drag.y / 1600) : 1)})`, transition: moving ? "none" : "transform 200ms ease", display: "grid", placeItems: "center", width: "100vw", height: "100%", pointerEvents: "none" }}>
-                      {m.kind === "image"
-                        ? <img src={m.url} alt="Photo" draggable={false} style={{ maxWidth: "100vw", maxHeight: "100%", objectFit: "contain", userSelect: "none", WebkitUserSelect: "none" }} />
-                        : <video key={m.url + ":on"} src={m.url} controls autoPlay playsInline style={{ width: "100vw", maxHeight: "100%", background: "#000", pointerEvents: "auto" }} />}
-                    </div>
-                  : m.kind === "image"
-                  ? <img src={m.url} alt="" draggable={false} style={{ maxWidth: "100vw", maxHeight: "100%", objectFit: "contain", userSelect: "none", WebkitUserSelect: "none", pointerEvents: "none" }} />
-                  : <video src={`${m.url}#t=0.1`} muted playsInline preload="metadata" style={{ width: "100vw", maxHeight: "100%", background: "#000", pointerEvents: "none" }} />)}
+              <div key={m ? m.url : k === 0 ? "none-before" : "none-after"} style={{ flex: "none", position: "relative", width: "100vw", height: "100%", overflow: "hidden" }}>
+                {m && (
+                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none",
+                    transform: k === 1 ? `translate(${zoom.x}px, ${drag.y + zoom.y}px) scale(${zoom.s * (drag.y ? Math.max(0.8, 1 - drag.y / 1600) : 1)})` : "none",
+                    transition: k === 1 && !moving ? "transform 200ms ease" : "none" }}>
+                    {m.kind === "image"
+                      ? <img src={m.url} alt="Photo" draggable={false} decoding="async" style={{ display: "block", maxWidth: "100%", maxHeight: "100%", objectFit: "contain", userSelect: "none", WebkitUserSelect: "none" }} />
+                      : k === 1
+                      ? <video key={m.url + ":on"} src={m.url} controls autoPlay playsInline style={{ width: "100%", maxHeight: "100%", background: "#000", pointerEvents: "auto" }} />
+                      : <video key={m.url + ":off"} src={`${m.url}#t=0.1`} muted playsInline preload="metadata" style={{ width: "100%", maxHeight: "100%", background: "#000" }} />}
+                  </div>
+                )}
               </div>
             ))}
           </div>

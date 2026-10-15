@@ -1541,6 +1541,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.40** · 2026-10-15 · The CRM chat: the bar's icons a step bigger (Sticker 25, Attach 25, Camera 26, the main button's 24); a voice note's play 30 in a 36 button, its waveform 28 tall; the viewer's photos centred by the strip's own edges, each slide drawn alike so a photo keeps its element moving into the middle; the screen fitted to the keyboard every frame for 1.2s after a focus change.
 - **v4.39** · 2026-10-15 · The CRM chat: the mic starts at the press and a slide left cancels (*‹ Slide to cancel*); a voice note's duration sits at the end of its waveform's row, the time its one row under it; the photo editor's picture fills the screen with the strip floating over it; the phone's Back closes a chat.
 - **v4.38** · 2026-10-15 · The CRM chat: Attach is a card floating above the bar, as tall as its tiles (no blank, the chat does not move); the reply box taking the keyboard fits the screen to it at once; the photo viewer slides as a strip of the previous, this and the next photo.
 - **v4.37** · 2026-10-15 · Finance's phone app, part 4 (M15–M16): Report › P&L, Cash flow, Debtor aging, Loan aging, Balance sheet — the headline under the month, the statements' own parts as cards, a card's lines (an invoice or a deal opening in the app), *Export PDF · Export Excel* and the ⋯ (other files, Segment); the current top tab scrolls into view → Finance's view — the phone app

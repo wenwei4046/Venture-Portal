@@ -154,17 +154,24 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
     const fit = () => { place(); capPanel(); };
     refit.current = fit;
     fit();
+    // For a while after a focus change the screen is fitted every frame too (the owner, 2026-10-15, an iPhone on the new
+    // keyboard: "打字的時候看不到我已經輸入的字" — the bar stayed behind the keyboard): a phone may move its keyboard
+    // without telling visualViewport's resize, and only a later scroll or tap fitted the screen.
+    let raf = 0, until = 0;
+    const tick = () => { fit(); raf = Date.now() < until ? requestAnimationFrame(tick) : 0; };
+    const watch = () => { fit(); until = Date.now() + 1200; if (!raf) raf = requestAnimationFrame(tick); };
     vv.addEventListener("resize", fit);
     vv.addEventListener("scroll", fit);
     window.addEventListener("resize", fit);
-    document.addEventListener("focusin", fit);
-    document.addEventListener("focusout", fit);
+    document.addEventListener("focusin", watch);
+    document.addEventListener("focusout", watch);
     return () => {
+      if (raf) cancelAnimationFrame(raf);
       vv.removeEventListener("resize", fit);
       vv.removeEventListener("scroll", fit);
       window.removeEventListener("resize", fit);
-      document.removeEventListener("focusin", fit);
-      document.removeEventListener("focusout", fit);
+      document.removeEventListener("focusin", watch);
+      document.removeEventListener("focusout", watch);
       refit.current = () => {};
       clear();
     };

@@ -120,10 +120,24 @@ const PATCHES = [
     '<div data-composer-toast="" style={{ position: "absolute", left: "16px", right: "16px", bottom: "74px", zIndex: "6",',
     "the prototype's 100px counts its 26px home strip (here the chat ends above the phone's inset); marked for less motion"],
 ];
+// The bar's icons a step bigger, as WhatsApp's (the owner, 2026-10-15, WhatsApp's bar beside ours: "icon 可以放大一些，這樣
+// 氣泡看起來就比較和諧"): Sticker 21 → 25, Attach 22 → 25, Camera 23 → 26, the main button's 20 → 24 — after the patches
+// above, which give these spans their handlers.
+const ICONS = [
+  [/(title="Sticker" style=\{\{[^\n]*\n\s*<svg width=")21(" height=")21(")/, "$125$225$3", "Sticker 25"],
+  [/(title="Attach" style=\{\{[^\n]*\n\s*<svg width=")22(" height=")22(")/, "$125$225$3", "Attach 25"],
+  [/(title="Camera" style=\{\{[^\n]*\n\s*<svg width=")23(" height=")23(")/, "$126$226$3", "Camera 26"],
+  [/(title=\{p\.mainTitle\} style=\{\{[^\n]*\n\s*<svg width=")20(" height=")20(")/, "$124$224$3", "the main button 24"],
+];
 for (const [from, to, why] of PATCHES) {
   if (!why) throw new Error(`composer patch without a reason: ${from}`);
   const n = typeof from === "string" ? body.split(from).length - 1 : (body.match(new RegExp(from.source, "g")) || []).length;
   if (n !== 1) throw new Error(`SalesComposer: patch matched ${n} times: ${from}`);
+  body = body.replace(from, to);
+}
+for (const [from, to, why] of ICONS) {
+  const n = (body.match(new RegExp(from.source, "g")) || []).length;
+  if (n !== 1) throw new Error(`SalesComposer: icon size (${why}) matched ${n} times`);
   body = body.replace(from, to);
 }
 body = scaleType(body);

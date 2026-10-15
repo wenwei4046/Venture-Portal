@@ -68,11 +68,12 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="#fff" strokeWidth="1.2"><path d="M12 2.5a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0v-6a3 3 0 0 0-3-3Z" /><path d="M18 11a6 6 0 0 1-12 0M12 17v4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
             </span>
           </span>}
-      <button type="button" onClick={toggle} aria-label={playing ? "Pause" : "Play"} style={{ flex: "none", width: "30px", height: "30px", borderRadius: "15px", border: 0, background: "transparent", color: ink, display: "grid", placeItems: "center", cursor: "pointer", padding: 0 }}>
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">{playing ? <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /> : <path d="M8 5.5v13l10.5-6.5z" />}</svg>
+      <button type="button" onClick={toggle} aria-label={playing ? "Pause" : "Play"} style={{ flex: "none", width: "36px", height: "36px", borderRadius: "18px", border: 0, background: "transparent", color: ink, display: "grid", placeItems: "center", cursor: "pointer", padding: 0 }}>
+        {/* A step bigger beside the 40px picture (2026-10-15: "icon 可以放大一些，這樣氣泡看起來就比較和諧"). */}
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor">{playing ? <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /> : <path d="M8 5.5v13l10.5-6.5z" />}</svg>
       </button>
       <span style={{ flex: "1", minWidth: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-        <span onClick={seek} style={{ position: "relative", flex: "1", minWidth: 0, height: "23px", display: "flex", alignItems: "center", gap: "2px", cursor: "pointer" }}>
+        <span onClick={seek} style={{ position: "relative", flex: "1", minWidth: 0, height: "28px", display: "flex", alignItems: "center", gap: "2px", cursor: "pointer" }}>
           {shape.current.map((v, i) => (
             <span key={i} style={{ flex: "1", height: `${Math.round(v * 100)}%`, minHeight: "3px", borderRadius: "2px", background: i / BARS < done ? ink : dim }} />
           ))}
