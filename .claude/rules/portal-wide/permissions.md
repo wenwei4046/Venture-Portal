@@ -178,6 +178,18 @@ why (`undecidable` on PendingApprovals). hr_costing / director_salary / revenue
 keys' Approve rows moved to the `approvals` key (UPDATE, not DELETE — the MCP
 refuses DELETE): hr@ approves no payroll run, as before. Mig `20261009010000`.
 
+**THE QUEUE'S READS AND REFUSALS (2026-10-15, the Finance phone app's Approvals).**
+The queue's read and a request's read live in `approvals/_lib/queue-read.ts`
+and `_lib/request-read.ts` (moved word for word; `/approvals` and
+`/approvals/[id]` call them, and so does the phone's `/fin-app/page/approvals`
+behind `requirePage('/approvals')` + `requireApprovalQueue()`; a request there
+through `openApprovalRequest`, page-actions.ts, narrowed by `/approvals`'
+boxes). Refusals are answers, never throws (production masks a thrown
+message): `approveRequestsBulk` says a closed month in `failed`;
+`approveRequestGroupPartial` answers `{ ok } | { ok: false, reason }` — who
+may decide, the database's refusal — and BatchDetailsModal shows the reason.
+The finance view's phone rules: `../finance/finance-view.md` › PART 5a.
+
 **THE DATABASE ASKS FOR THE ACTION TOO (2026-10-09, PR3a).** A table's row
 policies opened it to whoever held ANY key of its domain (`has_scope(ARRAY
 ['treasury'])`), and a View cell opens a key — so through the API a template
