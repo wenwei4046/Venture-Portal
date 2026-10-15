@@ -172,7 +172,7 @@ What still binds it:
   - `gap-ds` 12;
   - `gap-ds-lg` — HR 20, Revenue 24;
   - `gap-ds-section` — HR 28, Revenue 24.
-- **HR** — the sidebar is 212px (64 folded; 248 until v4.3) and the greeting bar 60px. The sheet sits 10px in from the frame, padded 24px — 20 under 1000px, 18 × 12 on a phone; Finance's view pads it 24 / 28 / 48 (v4.3). Summary cards stand 9px apart.
+- **HR** — the sidebar is 248px (64 folded; 212 from v4.3 to v4.34, which Finance's view keeps) and the greeting bar 60px. The sheet sits 10px in from the frame, padded 24px — 20 under 1000px, 18 × 12 on a phone; Finance's view pads it 24 / 28 / 48 (v4.3). Summary cards stand 9px apart.
 - **Revenue** — a 20px side gutter, 24px between sections, hit targets of 44px or more, and a 62px bottom nav with a raised 58px Quote button. The 1440 desktop is a 240 sidebar, a 760 column and a 400 panel.
 
 **Radius — named, each with a job. Round the container, never the rows**: a table lives in a rounded well and every row inside stays square, because rounded rows break the column the eye scans.
@@ -425,7 +425,7 @@ Every sheet override in `globals.css` is written `:where(.sheet-theme) <base sel
 The source is the Claude Design handoff *Sidebar design revamp from HR* (`.design/hr-revamp/handoff`; variant A). The `.dc.html` wins over its README, and every value is the prototype's. The `.design/hr-*` handoffs are kept on the office PC outside git (`.git/info/exclude`). Measurements: `HrSidebar.module.css`, `HrTopBar.module.css`, `hrv.module.css`.
 
 **HR's shell** — `lib/hr-view.ts` decides who gets it: the hr role, and the Principal viewing as HR. Every other view keeps its own shell. `.hrv-shell`:
-- **The sidebar** (`HrSidebar` over the shared `ViewSidebar`, 212 ↔ 64px since v4.3 — the Finance revamp v2 draws both views' sidebars that wide) is square, full height and flush. Its icon tiles sit in toned sections (`components/layout/hr-nav.ts`): Overview · I. HIRING (clay) · II. HR & PAYROLL (clay) · III. REVENUE (slate) · IV. PEOPLE (olive) · V. ADMIN (walnut) · VI. DIRECTORS (gold).
+- **The sidebar** (`HrSidebar` over the shared `ViewSidebar`, 248 ↔ 64px since v4.34 — the Attendance handoff's; Finance's view keeps the 212 of v4.3) is square, full height and flush. Its brand is the walnut **H**, *HOUZS Venture* and *Internal ledger* — English only, in both views, as both prototypes draw it (v4.48). Its icon tiles sit in toned sections (`components/layout/hr-nav.ts`): Overview · I. HIRING (clay) · II. HR & PAYROLL (clay) · III. REVENUE (slate) · IV. PEOPLE (olive) · V. ADMIN (walnut) · VI. DIRECTORS (gold).
   - One peach pill with a 3px orange bar **slides** to the row clicked: `top .34s` on the curve, measured from the row's `offsetTop`.
   - The open row's tile swaps light / deep and grows to 1.06.
   - The walnut **H** folds the rail; the words fade where they stand. A cookie, `vp-hr-nav`, makes it draw folded.
@@ -1541,6 +1541,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.48** · 2026-10-15 · HR's and Finance's sidebars: the brand's second line is *Internal ledger* alone — no 内部账册, as the prototypes draw it → The HR revamp — HR's view and its kit
 - **v4.47** · 2026-10-15 · The CRM chat: Undo send removed (supersedes v4.41 / v4.43) — a message goes at once again, no Unsend in the long-press menu.
 - **v4.46** · 2026-10-15 · The CRM chat: on an iPhone the screen fits the keyboard by its bottom alone (the page's height less visualViewport), never moved by the page's pan; the screen's height is the page's, so a chat drawn with the keyboard up still fits it.
 - **v4.45** · 2026-10-15 · The CRM chat: the keyboard left to the phone when it reports none (no fitting, no assumed height); Attach and Camera stay in the pill while typing; the viewer draws photos from the phone's copy, the neighbours decoded ahead.

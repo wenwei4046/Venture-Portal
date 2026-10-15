@@ -133,7 +133,7 @@ export default function ViewSidebar({
           </button>
           <div className={s.brandText} aria-hidden={collapsed}>
             <div className={s.brandName}>HOUZS Venture</div>
-            <div className={s.brandSub}>Internal ledger · 内部账册</div>
+            <div className={s.brandSub}>Internal ledger</div>
           </div>
         </div>
         <nav ref={navRef} className={s.nav}>
