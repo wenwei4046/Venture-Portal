@@ -1541,6 +1541,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.46** · 2026-10-15 · The CRM chat: on an iPhone the screen fits the keyboard by its bottom alone (the page's height less visualViewport), never moved by the page's pan; the screen's height is the page's, so a chat drawn with the keyboard up still fits it.
 - **v4.45** · 2026-10-15 · The CRM chat: the keyboard left to the phone when it reports none (no fitting, no assumed height); Attach and Camera stay in the pill while typing; the viewer draws photos from the phone's copy, the neighbours decoded ahead.
 - **v4.44** · 2026-10-15 · The CRM chat: a voice note as WhatsApp's — play left, the waveform in the middle with its duration under it, the speaker's 52px picture on the right centred on the bubble (the speed pill in its place once played), the time on the duration's line left of the picture; the viewer's slide carries on at the finger's speed and eases out (160–340ms); Attach leaves the keyboard as it is.
 - **v4.43** · 2026-10-15 · The CRM chat: Undo send has no bar (supersedes v4.41's) — a message still held shows its clock, and its long-press menu leads with **Unsend · Ns** (red, the undo arrow).
