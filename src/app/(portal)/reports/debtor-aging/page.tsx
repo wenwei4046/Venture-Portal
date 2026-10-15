@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { canDo } from '@/lib/permission-actions'
 import { officeMonth, officeToday } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
@@ -17,6 +18,8 @@ export default async function DebtorAgingPage({ searchParams }: { searchParams: 
   await requirePage('/reports/debtor-aging')
   // dept_manager sees only their own segment's invoices (RLS on invoices).
   const user = await requirePermission('dept_reports')
+  // The files only for whoever may take them out — as the export route asks (2026-10-16).
+  const canExport = canDo(user, 'dept_reports', 'export', 'dept')
   const supabase = await createClient()
 
   // Every issued invoice still unpaid, at its remainder (`_lib/debtor-read` — the Finance phone app's read too).
@@ -65,18 +68,26 @@ export default async function DebtorAgingPage({ searchParams }: { searchParams: 
             {past ? <span className="chip alert mt-2"><span className="dot" />Unpaid as of today</span> : null}
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <a href={exportHref('xlsx', 'detail')} className="btn-quiet-sheet">
-              Excel
-            </a>
-            <a href={exportHref('pdf', 'detail')} className="btn-quiet-sheet">
-              PDF
-            </a>
-            <a href={exportHref('xlsx', 'summary')} className="btn-quiet-sheet">
-              Summary Excel
-            </a>
-            <a href={exportHref('pdf', 'summary')} className="btn-quiet-sheet">
-              Summary PDF
-            </a>
+            {canExport ? (
+              <a href={exportHref('xlsx', 'detail')} className="btn-quiet-sheet">
+                Excel
+              </a>
+            ) : null}
+            {canExport ? (
+              <a href={exportHref('pdf', 'detail')} className="btn-quiet-sheet">
+                PDF
+              </a>
+            ) : null}
+            {canExport ? (
+              <a href={exportHref('xlsx', 'summary')} className="btn-quiet-sheet">
+                Summary Excel
+              </a>
+            ) : null}
+            {canExport ? (
+              <a href={exportHref('pdf', 'summary')} className="btn-quiet-sheet">
+                Summary PDF
+              </a>
+            ) : null}
           </div>
         </div>
 
@@ -133,25 +144,27 @@ export default async function DebtorAgingPage({ searchParams }: { searchParams: 
           <p className="font-serif italic text-graphite text-base mt-2">As of {dayjs(today).format('D MMM YYYY')}</p>
         </div>
         <div className="flex flex-col gap-1.5 shrink-0 text-right">
-          {(['detail', 'summary'] as const).map((view) => (
-            <div key={view} className="flex gap-2 items-center justify-end">
-              <span className="text-[11px] font-mono uppercase tracking-wide text-muted w-14 text-right">
-                {view}
-              </span>
-              <a
-                href={`/reports/debtor-aging/export?format=xlsx&view=${view}`}
-                className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-              >
-                Excel
-              </a>
-              <a
-                href={`/reports/debtor-aging/export?format=pdf&view=${view}`}
-                className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-              >
-                PDF
-              </a>
-            </div>
-          ))}
+          {canExport ? (
+            <>{(['detail', 'summary'] as const).map((view) => (
+              <div key={view} className="flex gap-2 items-center justify-end">
+                <span className="text-[11px] font-mono uppercase tracking-wide text-muted w-14 text-right">
+                  {view}
+                </span>
+                <a
+                  href={`/reports/debtor-aging/export?format=xlsx&view=${view}`}
+                  className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+                >
+                  Excel
+                </a>
+                <a
+                  href={`/reports/debtor-aging/export?format=pdf&view=${view}`}
+                  className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+                >
+                  PDF
+                </a>
+              </div>
+            ))}</>
+          ) : null}
         </div>
       </div>
 

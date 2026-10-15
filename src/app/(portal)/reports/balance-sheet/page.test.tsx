@@ -9,7 +9,11 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 // its totals.
 
 const mocks = vi.hoisted(() => ({ buildBalanceSheet: vi.fn(), fetchTrialBalance: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: async () => ({ role: 'finance', permissions: ['reports'] }) }))
+// The keys' actions (Reports · View and Export) — the exports show only to whoever may take them out (2026-10-16).
+vi.mock('@/lib/auth', async () => {
+  const { withActions } = await import('@/test/with-actions')
+  return { requirePage: async () => undefined, requirePermission: async () => withActions({ role: 'finance', permissions: ['reports'] }) }
+})
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
     from: () => {

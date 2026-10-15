@@ -6,6 +6,7 @@
 // unset = defaults to the month after disbursement/receipt.
 
 import dayjs from 'dayjs'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
@@ -172,7 +173,9 @@ function OutstandingTables({ side }: { side: MonitorSide }) {
 
 export default async function LoanMonitorPage({ searchParams }: { searchParams: Promise<{ as_at?: string }> }) {
   await requirePage('/reports/loan-aging')
-  await requirePermission('reports')
+  const user = await requirePermission('reports')
+  // The files only for whoever may take them out — as the export route asks (2026-10-16).
+  const canExport = canDo(user, 'reports', 'export')
   const supabase = await createClient()
 
   // As at a month (2026-10-10, the handoff; the user: 要做): a past month reads
@@ -211,18 +214,26 @@ export default async function LoanMonitorPage({ searchParams }: { searchParams: 
           <h1 className="page-title">Loan Aging</h1>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <a href={exportHref('xlsx', 'aging')} className="btn-quiet-sheet">
-            Excel
-          </a>
-          <a href={exportHref('pdf', 'aging')} className="btn-quiet-sheet">
-            PDF
-          </a>
-          <a href={exportHref('xlsx', 'outstanding')} className="btn-quiet-sheet">
-            Outstanding Excel
-          </a>
-          <a href={exportHref('pdf', 'outstanding')} className="btn-quiet-sheet">
-            Outstanding PDF
-          </a>
+          {canExport ? (
+            <a href={exportHref('xlsx', 'aging')} className="btn-quiet-sheet">
+              Excel
+            </a>
+          ) : null}
+          {canExport ? (
+            <a href={exportHref('pdf', 'aging')} className="btn-quiet-sheet">
+              PDF
+            </a>
+          ) : null}
+          {canExport ? (
+            <a href={exportHref('xlsx', 'outstanding')} className="btn-quiet-sheet">
+              Outstanding Excel
+            </a>
+          ) : null}
+          {canExport ? (
+            <a href={exportHref('pdf', 'outstanding')} className="btn-quiet-sheet">
+              Outstanding PDF
+            </a>
+          ) : null}
         </div>
       </div>
 

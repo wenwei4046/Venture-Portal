@@ -9,6 +9,7 @@ import { officeTime } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { fetchCounterpartyStatement } from '@/lib/counterparty-statement-data'
 import StatementView from './_components/StatementView'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
@@ -18,7 +19,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function CompanyStatementPage() {
   await requirePage('/reports/company-statement')
-  await requirePermission('reports')
+  const user = await requirePermission('reports')
   // Untyped client — database.types.ts predates repayment_start_month (same
   // convention as lib/loan-monitor's caller).
   const supabase = (await createClient()) as unknown as SupabaseClient
@@ -39,14 +40,17 @@ export default async function CompanyStatementPage() {
           </div>
           <h1 className="page-title">Company Statement</h1>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <a href="/reports/company-statement/export?format=xlsx" className="btn-quiet-sheet">
-            Export Excel
-          </a>
-          <a href="/reports/company-statement/export?format=pdf" className="btn-quiet-sheet">
-            Export PDF
-          </a>
-        </div>
+        {/* The files only for whoever may take them out — the route asks Reports · Export (2026-10-16). */}
+        {canDo(user, 'reports', 'export') ? (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <a href="/reports/company-statement/export?format=xlsx" className="btn-quiet-sheet">
+              Export Excel
+            </a>
+            <a href="/reports/company-statement/export?format=pdf" className="btn-quiet-sheet">
+              Export PDF
+            </a>
+          </div>
+        ) : null}
       </div>
 
       <StatCards label="Company statement">

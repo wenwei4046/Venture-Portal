@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { canDo } from '@/lib/permission-actions'
 import { requirePermission, requirePage } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney } from '@/lib/utils'
@@ -8,7 +9,9 @@ import FundPieChart from './_components/FundPieChart'
 
 export default async function FundSummaryPage() {
   await requirePage('/reports/fund-summary')
-  await requirePermission('reports')
+  const user = await requirePermission('reports')
+  // The files only for whoever may take them out — as the export route asks (2026-10-16).
+  const canExport = canDo(user, 'reports', 'export')
   const supabase = await createClient()
 
   // Resolve cash account codes for the Venture Pool computation.
@@ -86,18 +89,22 @@ export default async function FundSummaryPage() {
           <h1 className="page-title">Fund Summary</h1>
         </div>
         <div className="flex gap-2">
-          <Link
-            href="/reports/fund-summary/export?format=xlsx"
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            Export Excel
-          </Link>
-          <Link
-            href="/reports/fund-summary/export?format=pdf"
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            Export PDF
-          </Link>
+          {canExport ? (
+            <Link
+              href="/reports/fund-summary/export?format=xlsx"
+              className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+            >
+              Export Excel
+            </Link>
+          ) : null}
+          {canExport ? (
+            <Link
+              href="/reports/fund-summary/export?format=pdf"
+              className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+            >
+              Export PDF
+            </Link>
+          ) : null}
         </div>
       </div>
 

@@ -44,7 +44,7 @@ function Fig({ n, kind, dash = true }: { n: number; kind?: 'in' | 'pend'; dash?:
   return <span className={kind === 'in' ? 'db-in' : undefined}>{formatMoneyBare(n)}</span>
 }
 
-export default function DailyBankView({ data, today }: { data: DailyBankData; today: string }) {
+export default function DailyBankView({ data, today, canExport = false }: { data: DailyBankData; today: string; canExport?: boolean }) {
   if (data.columns?.length) COLS = data.columns
   const router = useRouter()
   const [view, setView] = useState<'matrix' | 'banks'>('matrix')
@@ -187,9 +187,11 @@ export default function DailyBankView({ data, today }: { data: DailyBankData; to
           <button type="button" className="btn-quiet-sheet" disabled={busy} onClick={downloadPng}>
             PNG
           </button>
-          <a className="btn-quiet-sheet" href={`/daily-bank/export?date=${date}`}>
-            PDF
-          </a>
+          {canExport ? (
+            <a className="btn-quiet-sheet" href={`/daily-bank/export?date=${date}`}>
+              PDF
+            </a>
+          ) : null}
           <button type="button" className="btn-pri-sheet" disabled={busy} onClick={copyImage} title="Copy the board as an image — paste into chat apps">
             {busy ? '…' : 'Get image'}
           </button>

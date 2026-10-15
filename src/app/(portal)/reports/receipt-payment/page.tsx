@@ -9,6 +9,7 @@
 // segment — the consolidated view leaves it out instead of guessing one).
 
 import dayjs from 'dayjs'
+import { canDo } from '@/lib/permission-actions'
 import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
@@ -54,6 +55,8 @@ const r2 = (n: number) => Math.round(n * 100) / 100
 export default async function ReceiptPaymentPage({ searchParams }: Props) {
   await requirePage('/reports/receipt-payment')
   const user = await requirePermission('dept_reports')
+  // The files only for whoever may take them out — as the export route asks (2026-10-16).
+  const canExport = canDo(user, 'dept_reports', 'export', 'dept')
   const supabase = await createClient()
 
   const params = await searchParams
@@ -189,7 +192,9 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <ReportModeSwitch pair="receipt-payment" active="single" period={period} segment={segment || undefined} />
-            <ExportLinks variant="sheet" basePath="/reports/receipt-payment/export" period={period} compare={compare} segment={segment} />
+            {canExport ? (
+              <ExportLinks variant="sheet" basePath="/reports/receipt-payment/export" period={period} compare={compare} segment={segment} />
+            ) : null}
           </div>
         </div>
 
@@ -238,7 +243,9 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Receipt &amp; Payment</h1>
         </div>
-        <ExportLinks basePath="/reports/receipt-payment/export" period={period} compare={compare} segment={segment} />
+        {canExport ? (
+          <ExportLinks basePath="/reports/receipt-payment/export" period={period} compare={compare} segment={segment} />
+        ) : null}
       </div>
 
       <ReportViewToggle pair="receipt-payment" active="single" period={period} segment={segment || undefined} />

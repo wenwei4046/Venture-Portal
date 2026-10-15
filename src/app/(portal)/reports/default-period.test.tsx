@@ -80,6 +80,8 @@ const asTheServer = <T,>(fn: () => Promise<T>) => inTimeZoneAsync('UTC', fn)
 
 describe("reports open on the office's month", () => {
   it('Monthly P&L: November, not October, at half past midnight on the 1st', async () => {
+    // Its Excel shows to whoever may take it out (2026-10-16): this reader may.
+    mocks.requirePermission.mockResolvedValue({ id: 'f', role: 'finance', permissions: ['reports', 'dept_reports'], actions: { 'dept_reports.export': 'all' } })
     render(await asTheServer(() => MonthlyPnlPage({ searchParams: Promise.resolve({}) })))
     expect(mocks.buildPnlAccounts).toHaveBeenCalledWith([], [], expect.objectContaining({ year: 2026, throughMonth: 11 }))
     expect(screen.getByTestId('matrix')).toHaveTextContent('2026-11')

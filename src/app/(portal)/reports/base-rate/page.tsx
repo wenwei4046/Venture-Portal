@@ -35,14 +35,17 @@ export default async function BaseRateHistoryPage() {
           </div>
           <h1 className="page-title">Base Rate History</h1>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <a href="/reports/base-rate/export?format=xlsx" className="btn-quiet-sheet">
-            Export Excel
-          </a>
-          <a href="/reports/base-rate/export?format=pdf" className="btn-quiet-sheet">
-            Export PDF
-          </a>
-        </div>
+        {/* The files only for whoever may take them out — the route asks Reports · Export (2026-10-16). */}
+        {canDo(user, 'reports', 'export') ? (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <a href="/reports/base-rate/export?format=xlsx" className="btn-quiet-sheet">
+              Export Excel
+            </a>
+            <a href="/reports/base-rate/export?format=pdf" className="btn-quiet-sheet">
+              Export PDF
+            </a>
+          </div>
+        ) : null}
       </div>
 
       {now ? (
