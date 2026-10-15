@@ -194,10 +194,18 @@ export default function VoucherApp({
         ...(payroll ? [{ key: 'payroll', label: payroll.length > 0 ? `Payroll · ${payroll.length}` : 'Payroll', onClick: () => setMenu('payroll') } as BarButton] : []),
         { key: 'more', label: '⋯', kind: 'more', onClick: () => setMenu('more') },
       ]
-  const requestItems = (items: RequestItem[], page: string, openLabel: string): DialogMenuItem[] =>
-    items.length > 0
-      ? items.map((it) => ({ key: it.key, label: it.label, sub: it.sub, onClick: () => { setMenu(null); router.push(page) } }))
-      : [{ key: 'open', label: openLabel, sub: 'Nothing waiting', onClick: () => { setMenu(null); router.push(page) } }]
+  // A queue the app draws opens on the request pressed (2026-10-16, part E4); one it does not yet, on its page.
+  const requestItems = (items: RequestItem[], page: string, openLabel: string): DialogMenuItem[] => {
+    const inApp = page.startsWith('/fin-app/')
+    const goTo = (id?: string) => {
+      setMenu(null)
+      if (inApp) pushIntent()
+      router.push(inApp && id ? `${page}?f=waiting&id=${encodeURIComponent(id)}` : page)
+    }
+    return items.length > 0
+      ? items.map((it) => ({ key: it.key, label: it.label, sub: it.sub, onClick: () => goTo(it.key) }))
+      : [{ key: 'open', label: openLabel, sub: 'Nothing waiting', onClick: () => goTo() }]
+  }
 
   // ── A record's steps (the drawer's), with the full page's own in its ⋯ ──
   const v = step.kind === 'record' && record?.detail.id === step.id ? record.detail : null
@@ -362,7 +370,7 @@ export default function VoucherApp({
       {receipts ? null : (
         <>
           <FinDialog open={menu === 'dept'} onClose={() => setMenu(null)} title="Dept Requests" sub={dept.length > 0 ? `${dept.length} waiting for a voucher` : undefined}>
-            <DialogMenu items={requestItems(dept, '/payments/dept-requests', 'Open Dept Requests')} />
+            <DialogMenu items={requestItems(dept, '/fin-app/page/dept-requests', 'Open Dept Requests')} />
           </FinDialog>
           {payroll ? (
             <FinDialog open={menu === 'payroll'} onClose={() => setMenu(null)} title="Payroll Requests" sub={payroll.length > 0 ? `${payroll.length} waiting` : undefined}>
@@ -370,7 +378,7 @@ export default function VoucherApp({
             </FinDialog>
           ) : null}
           <FinDialog open={menu === 'claims'} onClose={() => setMenu(null)} title="Claim Requests" sub={claims.length > 0 ? `${claims.length} waiting for a voucher` : undefined}>
-            <DialogMenu items={requestItems(claims, '/payments/claim-requests', 'Open Claim Requests')} />
+            <DialogMenu items={requestItems(claims, '/fin-app/page/claim-requests', 'Open Claim Requests')} />
           </FinDialog>
           <FinDialog open={menu === 'more'} onClose={() => setMenu(null)} title="Payments">
             <DialogMenu
