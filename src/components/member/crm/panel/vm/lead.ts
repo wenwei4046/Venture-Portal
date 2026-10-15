@@ -259,7 +259,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   const info = c ? (() => {
     const rows = infoRows(c, data);
     // Owner right after Status (the shared rows gained Last chat, rev 1010 §4).
-    rows.splice(rows.findIndex(r => r.k === "Status") + 1, 0, { k: "Owner", v: c.assignedTo ? nameOf(c.assignedTo) : "No one yet", rule: "1px solid #EBDDD2", vFg: c.assignedTo ? "#3F2B22" : "#B5A398" });
+    rows.splice(rows.findIndex(r => r.k === "Status") + 1, 0, { k: "Owner", v: c.assignedTo ? nameOf(c.assignedTo) : "No one yet", rule: "1px solid #EBDDD2", vFg: c.assignedTo ? "#3F2B22" : "#B5A398", href: null });
     return rows;
   })() : [];
   return {

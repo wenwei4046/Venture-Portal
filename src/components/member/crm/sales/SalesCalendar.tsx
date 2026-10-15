@@ -6,6 +6,7 @@
 // ./vm/calendar.ts. To change the look, change the design and regenerate.
 import { Fragment } from "react";
 import H from "../crm.module.css";
+import { InfoValue } from "../shared/AdLink";
 import type { CalendarVM } from "./vm/calendar";
 
 /** Calendar: Month / Week / Day, Today with Show up / No show, upcoming, outcome and celebration; Customer info and its form. */
@@ -285,7 +286,7 @@ export default function SalesCalendar({ v }: { v: CalendarVM }) {
             {(v.ctRows).map((r, r_i) => (<Fragment key={r_i}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "12px 14px", borderTop: r.rule, fontSize: "calc(14px * var(--rv-type, 1))" }}>
                 <span style={{ flex: "none", color: "#806B60" }}>{r.k}</span>
-                <strong style={{ fontWeight: "600", textAlign: "right", minWidth: "0", color: r.vFg }}>{r.v}</strong>
+                <strong style={{ fontWeight: "600", textAlign: "right", minWidth: "0", color: r.vFg }}><InfoValue v={r.v} href={r.href} /></strong>
               </div>
             </Fragment>))}
           </div>

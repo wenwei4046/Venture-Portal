@@ -13,6 +13,7 @@ import { panelLike } from "./frame";
 import { insightRange } from "./insight";
 import { numbersOf, pct } from "../../panel/vm/common";
 import { AV, DIRECTOR_C, DIRECTOR_TEAM, ST, teamColours } from "./tokens";
+import { adHref } from "../../shared/AdLink";
 
 const chip = (key: string) => ST[key] ?? ST["Follow up"];
 
@@ -116,7 +117,7 @@ export function infoVM(ctx: DeskCtx) {
   const at = rows.findIndex(r => r[0] === "Status") + 1;
   const all: [string, string][] = c ? [...rows.slice(0, at), ...mid, ...rows.slice(at)] : [];
   return {
-    ci: { name: c?.name ?? "", ini: initials(c?.name ?? "?"), rows: all.map(([k, val], i) => ({ k, v: val || "—", bt: i ? "1px solid #F1E7DF" : "0", w: !val || val === "—" ? 400 : 650, c: !val || val === "—" ? "#A08E82" : "#3F2B22" })) },
+    ci: { name: c?.name ?? "", ini: initials(c?.name ?? "?"), rows: all.map(([k, val], i) => ({ k, v: val || "—", href: k === "Ad" ? adHref(c?.adUrl) : null, bt: i ? "1px solid #F1E7DF" : "0", w: !val || val === "—" ? 400 : 650, c: !val || val === "—" ? "#A08E82" : "#3F2B22" })) },
     infoChat: ui.kind === "info" && !!c, openInfoChat: () => { if (c) patch({ kind: "chat", chat: c.id, fromInfo: true }); },
     infoHead: { title: "Customer info", sub: c ? (visit ? `${c.name} · visit ${new Date(visit.start).toLocaleString("en-MY", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}` : c.name) : "" },
   };

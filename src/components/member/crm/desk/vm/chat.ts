@@ -157,7 +157,9 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
     send, micD: draft.trim() ? "M5 12h14M13 6l6 6-6 6" : "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0m7 7v3",
     sendTitle: draft.trim() ? "Send" : "Voice note",
     photo: () => pick("image/*,video/*", true),
-    head: c ? { avatar: initials(c.name), title: c.name, sub: c.ad, subColor: "#387557", menu: true } : null,
+    // Where the customer came from: the channel, then the ad (its headline is all Meta sends) — the owner, 2026-10-15:
+    // "沒有顯示他是從什麼平台過來".
+    head: c ? { avatar: initials(c.name), title: c.name, sub: c.adId ? `${c.channel === "whatsapp" ? "WhatsApp" : "Messenger"} · Ad · ${c.ad}` : c.ad, subColor: "#387557", menu: true } : null,
     owner: c ? (c.assignedTo ? `${ctx.nameOf(c.assignedTo)}'s customer` : "No one yet's customer") : "", reply: c ? `Reply to ${first(c.name)}…` : "",
     // v2: the pinned message's bar, the reply's quote over the box, the + menu.
     pinShown: !!pinned, pinText: pinned ? pinned.text || mediaWord(pinned) : "", unpinMsg: () => { if (c) void act.setPref(c.id, { pinnedMessageId: null }); },
