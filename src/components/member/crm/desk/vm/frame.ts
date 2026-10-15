@@ -95,7 +95,10 @@ export function frameVM(ctx: DeskCtx) {
   const isCenter = !sheetMode && pane === "wideEmpty";
   const isOverlay = pane === "overlay";
   const paneShown = !sheetMode && pane !== "closed" && pane !== "wideEmpty";
-  const paneW0 = isWide ? crmW - 380 : dockW, paneW = Math.max(300, Math.min(crmW - 320, ui.paneW ?? paneW0));
+  // A chat opened in the pane outside Inbox (the Calendar's Customer info › Open chat …) takes more room, and the page
+  // beside it shifts left (the owner, 2026-10-15: "聊天在右边打开，日历往左缩"): 42 % of the CRM, never under the dock.
+  const chatPane = !ibOn && ui.kind === "chat" && ui.pane === "docked" ? Math.max(dockW, Math.min(crmW - 560, Math.round(crmW * 0.42))) : 0;
+  const paneW0 = isWide ? crmW - 380 : chatPane || dockW, paneW = Math.max(300, Math.min(crmW - 320, ui.paneW ?? paneW0));
   const base: CSSProperties = { width: paneW, display: "flex", flexDirection: "column", background: "#FFFFFF", boxSizing: "border-box", overflow: "hidden" };
   const paneStyle: CSSProperties = isOverlay
     ? { ...base, position: "absolute", top: 0, right: 0, bottom: 0, borderLeft: "1px solid #EBDDD2", boxShadow: "-16px 0 40px rgba(40,25,18,.16)", zIndex: 4 }
