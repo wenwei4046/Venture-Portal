@@ -66,7 +66,8 @@ export function panelAppVM(ctx: PanelCtx) {
     show, hd, bl, cf,
     topBar: !!hd.showHead,
     tm: teamMineSwap("team", lead || !toMine ? undefined : () => toMine("inbox")),
-    bellIn: !!bl.showBell && show.ov, bellTop: false,
+    // On the Inbox since 2026-10-16 (the owner: "換到 Inbox 那頁"), beside Contacts; Insight's title row keeps only the avatar.
+    bellIn: !!bl.showBell && show.ib, bellTop: false,
     // The house left of the bell (switch-back.cjs, 2026-10-14); Profile's card is gone.
     exitCrm: () => ctx.exitApp(), enterNext,
     // The Insight line: "All access" for whoever sees everybody, else their team (a leader on the Team side).

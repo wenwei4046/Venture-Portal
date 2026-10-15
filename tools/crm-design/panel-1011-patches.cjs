@@ -123,7 +123,9 @@ module.exports = [
   // The three sit on the Overview alone — the first page of the bottom bar, as the Revenue app keeps its header to Today
   // (the owner, later the same day: "这三个 icon 本身只需要出现在第一个界面 … principal view … 只存在于 Insight 界面"; vm/app.ts
   // keeps the prototype's bell to it). Until then they were on Inbox, Assignment, Calendar and Profile's card too.
-  ['>Hello, {v.ov.meFirst}</h1>\n              {!!(v.bellIn) && (<>\n', '>Hello, {v.ov.meFirst}</h1>\n              {!!(v.bellIn) && (<>\n                ' + SWAP("                ") + switchBack("                ") + "\n"],
+  // 2026-10-16 (the owner, circling Team | Mine and the house on Insight: "換到 Inbox 那頁"): the three moved to the Inbox's
+  // title row, beside Contacts — where Mine keeps its own on its first page (vm/app.ts › bellIn).
+  ['</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n', '</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n              ' + SWAP("              ") + switchBack("              ") + "\n"],
   // …so Profile's card has no bell in its corner, and its name the whole row.
   ['<div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "48px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>',
     '<div style={{ display: "flex", alignItems: "center", gap: "14px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>'],
