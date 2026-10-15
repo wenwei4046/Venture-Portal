@@ -39,6 +39,7 @@ import { MessageMenu } from "./shared/msg-menu";
 import { AttachSheetHost } from "./shared/attach-sheet";
 import { ActionSheetHost } from "./shared/action-sheet";
 import { NotifSummaryHost } from "./shared/notif-summary";
+import { UndoSendBar } from "./shared/undo-send";
 import { answerOnScreen, closeNotices } from "@/components/pwa/notice-screen";
 import { crmChatTag } from "@/lib/push/notices";
 
@@ -211,6 +212,8 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     <div className={extra ? `${H.app} ${extra}` : H.app} data-revenue-app="">
       <style>{KEYFRAMES}</style>
       {body}
+      {/* Undo send (2026-10-15): inside the CRM's screen, so it rides above the composer when the keyboard fits it. */}
+      <UndoSendBar />
       <MediaViewer />
       <MessageMenu />
       <AttachSheetHost />
