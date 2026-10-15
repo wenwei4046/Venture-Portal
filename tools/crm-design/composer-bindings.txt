@@ -30,7 +30,9 @@ placeholder
 q
 qrEdit
 recCancel
+recHintC
 recOn
+recSlide
 recTime
 replyText
 replyWho

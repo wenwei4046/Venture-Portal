@@ -35,7 +35,10 @@ const RECORD = [
   '              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg>',
   '            </span>',
   '            <span style={{ flex: "1", minWidth: "0", height: "46px", boxSizing: "border-box", borderRadius: "23px", background: "#FBF1EC", display: "flex", alignItems: "center", gap: "10px", padding: "0 16px", fontSize: "15px", fontWeight: "600", color: "#3F2B22", fontVariantNumeric: "tabular-nums" }}>',
-  '              <span style={{ flex: "none", width: "10px", height: "10px", borderRadius: "50%", background: "#D93025", animation: "fadeIn 700ms ease-in-out infinite alternate" }}></span>{p.recTime} · Recording…',
+  '              <span style={{ flex: "none", width: "10px", height: "10px", borderRadius: "50%", background: "#D93025", animation: "fadeIn 700ms ease-in-out infinite alternate" }}></span>{p.recTime}',
+  // Slide left to cancel (the owner, 2026-10-15: "make it for move to left to cancel"): the hint follows the finger and
+  // turns red near the line.
+  '              <span style={{ flex: "1", minWidth: "0", textAlign: "right", transform: p.recSlide, color: p.recHintC, fontSize: "13px", fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden" }}>‹ Slide to cancel</span>',
   '            </span>',
   '          </>)}',
   '          {!(p.recOn) && (',
@@ -97,6 +100,8 @@ const PATCHES = [
   ['<textarea value={p.draft} onChange={p.onDraft} onFocus={p.focus} onClick={p.focus} placeholder="Reply to Lim…" rows={1} style={{',
     '<textarea ref={p.taRef} data-draft="1" value={p.draft} onChange={p.onDraft} onFocus={p.focus} onBlur={p.blur} onClick={p.focus} placeholder={p.placeholder} rows={1} style={{',
     "the customer's own first name; the keyboard is the phone's (focus / blur); swipe-to-reply finds the box by data-draft"],
+  ['<span onClick={p.camera} title="Camera" style={{', '<span onClick={p.camera} onMouseDown={p.keep} title="Camera" style={{',
+    "the camera keeps the reply box's focus through the press (the owner, 2026-10-15: \"the camera cant open when I press\" — the keyboard going down moved the bar under the finger and the tap was lost)"],
   ['<span onClick={p.toggleAttach} title="Attach" style={{', '<span onClick={p.toggleAttach} onMouseDown={p.keep} title="Attach" style={{',
     "as the sticker toggle: the attach panel takes the keyboard's place in one step"],
   ['<span onClick={p.mainAct} title={p.mainTitle} style={{ flex: "none", width: "46px", height: "46px", borderRadius: "50%", display: "grid", placeItems: "center", background: "#BD4A19", color: "#fff", cursor: "pointer", boxShadow: "0 3px 9px rgba(189,74,25,.18)" }}>',

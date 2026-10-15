@@ -27,6 +27,7 @@ import { useFollowNewest } from "../shared/stick";
 import { useCloseOnOutside } from "./outside";
 import { DOC_ACCEPT, PICKER_AT } from "../shared/attach-sheet";
 import { typePx } from "../shared/type";
+import { useBackCloses } from "../shared/back";
 
 export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: () => void }) {
   const { ui } = ctx;
@@ -34,6 +35,8 @@ export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: (
   useFollowNewest(ui.chat, ctx.data.customers.find(c => c.id === ui.chat)?.messages.length ?? 0);
   const { set } = ctx;
   useCloseOnOutside(!!ui.hm?.menu, useCallback(() => set(u => ({ ...u, hm: null })), [set]));
+  // The phone's Back closes the chat, back to the Inbox (2026-10-15).
+  useBackCloses(!!ui.chat, () => set(u => ({ ...u, chat: null, menu: null, book: null, tpl: false, qr: false, hm: null, reply: null, cmp: null, pick: null })), "crmChat");
   // The Inbox's title row — the first page's alone (2026-10-14): Team | Mine (whoever has a Team side), the house back to
   // the Revenue app, the bell.
   const x = { tb: titleBellVM(ctx), exitCrm: onExit, tm: teamMineVM(ctx) };
