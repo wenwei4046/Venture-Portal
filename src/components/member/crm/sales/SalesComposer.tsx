@@ -53,7 +53,8 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg>
             </span>
             <span style={{ flex: "1", minWidth: "0", height: "46px", boxSizing: "border-box", borderRadius: "23px", background: "#FBF1EC", display: "flex", alignItems: "center", gap: "10px", padding: "0 16px", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "600", color: "#3F2B22", fontVariantNumeric: "tabular-nums" }}>
-              <span style={{ flex: "none", width: "10px", height: "10px", borderRadius: "50%", background: "#D93025", animation: "fadeIn 700ms ease-in-out infinite alternate" }}></span>{p.recTime} · Recording…
+              <span style={{ flex: "none", width: "10px", height: "10px", borderRadius: "50%", background: "#D93025", animation: "fadeIn 700ms ease-in-out infinite alternate" }}></span>{p.recTime}
+              <span style={{ flex: "1", minWidth: "0", textAlign: "right", transform: p.recSlide, color: p.recHintC, fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden" }}>‹ Slide to cancel</span>
             </span>
           </>)}
           {!(p.recOn) && (<span style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "flex-end", minHeight: "46px", boxSizing: "border-box", padding: "0 4px", borderRadius: "23px", background: "#fff", boxShadow: "0 1px 2px rgba(63,43,34,.14)" }}>
@@ -72,7 +73,7 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
                   </path>
                 </svg>
               </span>
-              <span onClick={p.camera} title="Camera" style={{ flex: "none", width: "40px", height: "46px", display: "grid", placeItems: "center", cursor: "pointer", color: "rgb(128 107 96)" }}>
+              <span onClick={p.camera} onMouseDown={p.keep} title="Camera" style={{ flex: "none", width: "40px", height: "46px", display: "grid", placeItems: "center", cursor: "pointer", color: "rgb(128 107 96)" }}>
                 <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 9a2 2 0 0 1 2-2h2l1.5-2.2A1.5 1.5 0 0 1 9.75 4h4.5a1.5 1.5 0 0 1 1.25.8L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z">
                   </path>

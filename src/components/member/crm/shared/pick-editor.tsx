@@ -150,8 +150,10 @@ export function PickEditor({ pk }: { pk: PickVM }) {
           </div>
         </div>
       )}
+      {/* The items, the caption and Send float over the picture (the owner, 2026-10-15: "Photo should be at center point"):
+          the picture takes the whole screen and sits at its middle, as WhatsApp's — it sat above the middle, over this strip. */}
       {mode !== "crop" && mode !== "text" && (
-        <div style={{ flex: "none", position: "relative", zIndex: 3, padding: "8px 12px calc(var(--safe-bottom, 0px) + 10px)", display: "flex", flexDirection: "column", gap: "10px", background: "linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.6))" }}>
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 3, padding: "8px 12px calc(var(--safe-bottom, 0px) + 10px)", display: "flex", flexDirection: "column", gap: "10px", background: "linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.6))" }}>
           {(
             <div style={{ display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", touchAction: "pan-x" }}>
               {/* More photos or videos, ticked several at a time (the owner: "可以勾選多張圖片一起發送"). */}

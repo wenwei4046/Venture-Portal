@@ -105,6 +105,7 @@ export function mediaOf(m: Msg, gallery: ViewerItem[], album?: Msg[]): typeof NO
     pad: framed ? "3px 3px 5px" : k === "audio" ? "6px 9px 5px" : "10px 13px",
     inPad: framed ? "0 7px" : k === "audio" ? "0 2px" : "0",
     // 2026-10-14 ("語音氣泡還是一樣"): the time moves up beside the voice note's duration instead of a line of its own.
-    timeTop: k === "audio" ? "-16px" : "4px",
+    // 2026-10-15: the duration moved onto the waveform's row, so the time is its own row again, close under it.
+    timeTop: k === "audio" ? "2px" : "4px",
   };
 }

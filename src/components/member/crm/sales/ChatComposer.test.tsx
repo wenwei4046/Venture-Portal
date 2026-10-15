@@ -162,13 +162,29 @@ describe("the Attach panel", () => {
 });
 
 describe("the mic is held to record", () => {
-  it("a tap says so (the prototype's toast) and records nothing", async () => {
+  it("a tap says so (the prototype's toast) and sends nothing — the microphone starts at the press and its take is dropped", async () => {
     await openChat();
     fireEvent.pointerDown(byTitle("Voice note")!);
     fireEvent.pointerUp(window);
     await act(async () => {});
     expect(screen.getByText(HOLD_HINT)).toBeInTheDocument();
-    expect(voice.start).not.toHaveBeenCalled();
+    expect(voice.start).toHaveBeenCalledTimes(1);
+    expect(voice.stop).not.toHaveBeenCalled();
+  });
+
+  it("slid left past the line while held, it is thrown away there and then (2026-10-15)", async () => {
+    await openChat();
+    fireEvent.pointerDown(byTitle("Voice note")!, { clientX: 300 });
+    await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+    expect(composer().textContent).toContain("Slide to cancel");
+    fireEvent.pointerMove(window, { clientX: 250 });
+    expect(voice.cancel).not.toHaveBeenCalled();
+    fireEvent.pointerMove(window, { clientX: 150 });
+    await act(async () => {});
+    expect(voice.cancel).toHaveBeenCalledTimes(1);
+    fireEvent.pointerUp(window, { clientX: 150 });
+    await act(async () => {});
+    expect(voice.stop).not.toHaveBeenCalled();
   });
 
   it("held, it records; let go and the voice note goes", async () => {
@@ -177,7 +193,7 @@ describe("the mic is held to record", () => {
     fireEvent.pointerDown(mic);
     await act(async () => { await new Promise(r => setTimeout(r, 300)); });
     expect(voice.start).toHaveBeenCalledTimes(1);
-    expect(composer().textContent).toContain("Recording…");
+    expect(composer().textContent).toContain("Slide to cancel");
     // The main button is the same element under the finger, now Send.
     expect(byTitle("Send voice note")).toBe(mic);
     await act(async () => { await new Promise(r => setTimeout(r, 750)); });
@@ -226,7 +242,7 @@ describe("the mic is held to record", () => {
     fireEvent.pointerDown(byTitle("Voice note")!);
     await act(async () => { await new Promise(r => setTimeout(r, 300)); });
     expect(voice.start).toHaveBeenCalledTimes(2);
-    expect(composer().textContent).toContain("Recording…");
+    expect(composer().textContent).toContain("Slide to cancel");
   });
 
   it("leaving the chat while recording turns the microphone off", async () => {
