@@ -17,7 +17,8 @@ function line(l: VenturePoolRead['lines'][number]): PageLine {
 
 /** `ym`: the month on show (YYYY-MM) — the desktop page's period. */
 export function venturePoolModel(read: VenturePoolRead, ym: string): PageModel {
-  const byNewest = read.lines.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
+  // Newest day first, a day's lines in the order read — the desktop table's own (its date sort is stable).
+  const byNewest = read.lines.slice().sort((a, b) => b.date.localeCompare(a.date))
   const months = Array.from(new Set(byNewest.map((l) => l.date.slice(0, 7))))
   const monthLines = byNewest.filter((l) => l.date.slice(0, 7) === ym)
   const ledger: PageGroup[] = months.map((m) => {
