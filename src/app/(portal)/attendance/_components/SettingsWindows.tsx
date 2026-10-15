@@ -63,12 +63,14 @@ function Shell({
   const { sm, close, flash, canEdit } = props
   const isNew = !sm.id
   const [busy, start] = useTransition()
-  const run = (fn: () => Promise<{ ok: boolean; reason?: string }>, done: string) =>
+  // A new item has no title yet: its toast names what was saved (att_save_setting answers its label).
+  const run = (fn: () => Promise<{ ok: boolean; reason?: string; data?: unknown }>, done: string | ((label: string) => string)) =>
     start(async () => {
       const r = await fn()
       if (r.ok) {
         close()
-        flash(done)
+        const saved = (r.data as { label?: unknown } | undefined)?.label
+        flash(typeof done === 'function' ? done(typeof saved === 'string' && saved ? saved : title) : done)
       } else flash(r.reason ?? 'Something went wrong.')
     })
   return (
@@ -91,7 +93,7 @@ function Shell({
         <div style={{ display: 'flex', gap: 8 }}>
           <Button variant="secondary" size="sm" onClick={close}>Cancel</Button>
           {canEdit ? (
-            <Button size="sm" disabled={blocked || busy} onClick={() => run(save as () => Promise<{ ok: boolean; reason?: string }>, kind === 'ot' ? `${title} OT saved · from next close` : `${title} saved · ${isNew ? 'added' : 'updated'} · audited`)}>
+            <Button size="sm" disabled={blocked || busy} onClick={() => run(save as () => Promise<{ ok: boolean; reason?: string; data?: unknown }>, kind === 'ot' ? `${title} OT saved · from next close` : label => `${label} saved · ${isNew ? 'added' : 'updated'} · audited`)}>
               {isNew && kind !== 'ot' ? 'Add' : 'Save'}
             </Button>
           ) : null}

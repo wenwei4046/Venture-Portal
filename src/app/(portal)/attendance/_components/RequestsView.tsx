@@ -211,7 +211,8 @@ function RequestDetail({
   ]
   const changes = Array.isArray(req.detail.changes) ? (req.detail.changes as Array<{ field?: string; from?: string; to?: string }>) : []
   const diffCols: Column<{ id: number; f: string; from: string; to: string }>[] = [
-    { key: 'f', label: 'Field', width: '130px', render: r => <span style={{ fontWeight: 500 }}>{r.f}</span> },
+    // Wide enough for "Emergency relationship" (2026-10-15: a profile change's fields are People's own names).
+    { key: 'f', label: 'Field', width: '190px', render: r => <span style={{ fontWeight: 500 }}>{r.f}</span> },
     { key: 'from', label: 'On record', width: 'minmax(0,1fr)', mono: true },
     { key: 'to', label: 'Asked for', width: 'minmax(0,1fr)', mono: true, render: r => <span style={{ background: 'var(--ds-accent-soft)', padding: '1px 4px', borderRadius: 4 }}>{r.to}</span> },
   ]
