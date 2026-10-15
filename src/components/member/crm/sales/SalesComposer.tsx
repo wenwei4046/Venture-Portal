@@ -66,7 +66,7 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
             </span>
             <textarea ref={p.taRef} data-draft="1" value={p.draft} onChange={p.onDraft} onFocus={p.focus} onBlur={p.blur} onClick={p.focus} placeholder={p.placeholder} rows={1} style={{ flex: "1", minWidth: "0", height: p.taH, maxHeight: "154px", boxSizing: "border-box", margin: "0", padding: "12px 2px", border: "0", outline: "none", resize: "none", background: "transparent", font: "inherit", fontSize: "calc(16px * var(--rv-type, 1))", lineHeight: "22px", color: "#3F2B22", scrollbarWidth: "none" }}>
             </textarea>
-            {!!(p.noDraft) && (<>
+            {(<>
               <span onClick={p.toggleAttach} onMouseDown={p.keep} title="Attach" style={{ flex: "none", width: "40px", height: "46px", display: "grid", placeItems: "center", cursor: "pointer", color: p.attFg }}>
                 <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(-45deg)" }}>
                   <path d="M16.5 7.5v8.25a4.5 4.5 0 0 1-9 0V6a3 3 0 0 1 6 0v9.5a1.5 1.5 0 0 1-3 0V8">

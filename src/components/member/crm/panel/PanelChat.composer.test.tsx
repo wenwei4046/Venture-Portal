@@ -69,10 +69,10 @@ describe("the Team chat is Mine's", () => {
     expect(screen.queryByText("EMOJI")).toBeNull();
   });
 
-  it("typing folds Attach and Camera away and the mic becomes Send; Send sends and empties the box", async () => {
+  it("typing keeps Attach and Camera and the mic becomes Send; Send sends and empties the box", async () => {
     await openTeamChat();
     await type("Sunday 11am is fine");
-    expect(byTitle("Attach")).toBeNull();
+    expect(byTitle("Attach")).not.toBeNull();
     expect(iconOf(byTitle("Send"))).toBe(ICON.send);
     await tap(byTitle("Send"));
     expect(screen.getByText("Sunday 11am is fine")).toBeInTheDocument();

@@ -52,11 +52,11 @@ describe("the typing bar", () => {
     expect(byTitle("Emoji")).toBeNull();
   });
 
-  it("typing folds Attach and Camera away and the mic becomes Send; Send sends and empties the box", async () => {
+  it("typing keeps Attach and Camera and the mic becomes Send; Send sends and empties the box", async () => {
     await openChat();
     await type("See you Sunday 11am");
-    expect(byTitle("Attach")).toBeNull();
-    expect(byTitle("Camera")).toBeNull();
+    expect(byTitle("Attach")).not.toBeNull();
+    expect(byTitle("Camera")).not.toBeNull();
     expect(iconOf(byTitle("Send"))).toBe(ICON.send);
     await tap(byTitle("Send"));
     expect(screen.getByText("See you Sunday 11am")).toBeInTheDocument();

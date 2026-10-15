@@ -104,8 +104,7 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
     const app = anchorRef.current?.closest<HTMLElement>("[data-revenue-app]");
     const stack = anchorRef.current?.parentElement?.querySelector<HTMLElement>("[data-composer]");
     if (!vv || !app || !stack) return;
-    let baseH = window.innerHeight, baseW = window.innerWidth, fitted = false, safe = 0, focusAt = 0;
-    const coarse = !!window.matchMedia?.("(pointer: coarse)").matches;
+    let baseH = window.innerHeight, baseW = window.innerWidth, fitted = false, safe = 0;
     const clear = () => {
       if (!fitted) return;
       fitted = false;
@@ -130,14 +129,8 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
       if (window.innerWidth !== baseW) { baseW = window.innerWidth; baseH = window.innerHeight; }
       if (!isField(ae)) baseH = Math.max(window.innerHeight, vv.height);
       if (!fitted) safe = parseFloat(getComputedStyle(app).paddingBottom) || 0;
-      let kb = Math.max(0, Math.round(baseH - vv.height)), up = kb > KB_MIN, assumed = false;
-      const pan = vv.offsetTop;
-      // The reply box has had focus a moment and the phone still reports no keyboard (the owner, 2026-10-15, an iPhone on
-      // the new keyboard, again: "我的打字框還是看不到我輸入了什麼字" — some phones show the keyboard to an installed app
-      // without shrinking visualViewport or the window): its keyboard is taken to be there at its last height, or at
-      // 42% of the screen, and the screen fits it, so the bar sits above the keyboard rather than behind it.
-      if (!up && inBox && coarse && focusAt && Date.now() - focusAt > 450) { kb = Math.round((lastKbH ?? window.innerHeight * 0.42) + safe); up = true; assumed = true; }
-      if (up && !assumed && inBox && !shownRef.current && window.innerWidth < window.innerHeight) {
+      const kb = Math.max(0, Math.round(baseH - vv.height)), up = kb > KB_MIN, pan = vv.offsetTop;
+      if (up && inBox && !shownRef.current && window.innerWidth < window.innerHeight) {
         const h = Math.round(kb - safe);
         if (h >= 150 && Math.abs(h - (lastKbH ?? 0)) > 3) {
           lastKbH = h;
@@ -148,7 +141,11 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
       // The keyboard has come up over the panel it replaces (all the way, when its height is known): the panel goes.
       if (up && inBox && risingRef.current && kb - safe >= (lastKbH ?? 0) - 24) setRising(null);
       const swapping = Date.now() < swapUntil.current;
-      if ((!up && pan < 0.5) || !(inBox || inSearch || shownRef.current || swapping)) { clear(); return; }
+      // Typing with no keyboard reported, the phone keeps its own way (the owner, 2026-10-15: "打字看不到自己輸入的字，昨天都沒
+      // 這個問題" — since the composer took the keyboard over on 2026-10-14, an iPhone on iOS 26 that lifts the page to the
+      // keyboard without shrinking visualViewport had that lift read as a stray pan and put back, the bar behind the
+      // keyboard): only a keyboard the phone reports is fitted; a pan is kept only for a panel in the keyboard's place.
+      if ((!up && (pan < 0.5 || inBox || inSearch)) || !(inBox || inSearch || shownRef.current || swapping)) { clear(); return; }
       // Fitted to the keyboard while it is the reply box's (or the search's); a panel in its place keeps the full height.
       // By its top and bottom, never a height: the screen pads itself by the phone's insets (crm.module.css › .app,
       // content-box), so a height would add them on top.
@@ -156,7 +153,7 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
       const toKb = up && ((inBox && (!shownRef.current || shownRef.current === "attach")) || inSearch);
       fitted = true;
       app.style.top = `${pan}px`;
-      app.style.bottom = assumed && toKb ? `${kb}px` : `${Math.round(window.innerHeight - pan - (toKb ? vv.height : window.innerHeight))}px`;
+      app.style.bottom = `${Math.round(window.innerHeight - pan - (toKb ? vv.height : window.innerHeight))}px`;
       if (toKb) app.style.setProperty("--safe-bottom", "0px"); else app.style.removeProperty("--safe-bottom");
     };
     const fit = () => { place(); capPanel(); };
@@ -167,11 +164,7 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
     // without telling visualViewport's resize, and only a later scroll or tap fitted the screen.
     let raf = 0, until = 0;
     const tick = () => { fit(); raf = Date.now() < until ? requestAnimationFrame(tick) : 0; };
-    const watch = (e?: Event) => {
-      // When the reply box took focus: the clock for "no keyboard reported" starts (place, above).
-      focusAt = e?.type === "focusin" && e.target === taRef.current ? Date.now() : document.activeElement === taRef.current ? focusAt : 0;
-      fit(); until = Date.now() + 1200; if (!raf) raf = requestAnimationFrame(tick);
-    };
+    const watch = () => { fit(); until = Date.now() + 1200; if (!raf) raf = requestAnimationFrame(tick); };
     vv.addEventListener("resize", fit);
     vv.addEventListener("scroll", fit);
     window.addEventListener("resize", fit);

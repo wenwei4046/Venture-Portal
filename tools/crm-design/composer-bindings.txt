@@ -19,7 +19,6 @@ mainAct
 mainDown
 mainIcon
 mainTitle
-noDraft
 noMenu
 notSearching
 onDraft

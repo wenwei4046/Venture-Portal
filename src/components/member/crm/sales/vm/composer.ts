@@ -146,7 +146,7 @@ export const homeBg = (panel: ComposerPanel) => (panel === "sticker" ? "#fff" : 
 type Click = (e: MouseEvent<HTMLElement>) => void;
 export interface ComposerVM {
   isA: boolean; recOn: boolean; chatCold: boolean;
-  draft: string; noDraft: boolean; placeholder: string; taH: string; taRef: Ref<HTMLTextAreaElement>;
+  draft: string; placeholder: string; taH: string; taRef: Ref<HTMLTextAreaElement>;
   onDraft: (e: ChangeEvent<HTMLTextAreaElement>) => void; focus: () => void; blur: () => void;
   toggleSticker: Click; stkFg: string; stkIcon: string;
   toggleAttach: Click; attFg: string; camera: Click;
@@ -237,7 +237,7 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
   return {
     // The bar's row stays while recording — its pill gives way to the recording row and the main button is Send.
     isA: v.warm, recOn: v.warm && !!v.rec, chatCold: !v.warm,
-    draft: v.draft, noDraft: !has, placeholder: v.placeholder, taH: `${d.taH}px`, taRef: d.taRef,
+    draft: v.draft, placeholder: v.placeholder, taH: `${d.taH}px`, taRef: d.taRef,
     onDraft: e => v.setDraft(e.target.value), focus: d.focusBox, blur: d.blurBox,
     toggleSticker: () => d.swap("sticker"), stkIcon: shown === "sticker" ? ICON.kb : ICON.stk, stkFg: shown === "sticker" ? RUST : SUB,
     toggleAttach: () => d.swap("attach"), attFg: shown === "attach" ? RUST : SUB,

@@ -123,7 +123,7 @@ export function useKeptSrc(url: string, poster = false): { src: string | null; k
 /** /login forgets the kept media with every other kept read. */
 export async function forgetMedia() {
   mem.forEach(u => URL.revokeObjectURL(u));
-  mem.clear(); tried.clear(); queue = [];
+  mem.clear(); tried.clear(); queue = []; decoded.clear();
   try { if (ok()) await caches.delete(NAME); } catch { /* nothing kept */ }
 }
 
@@ -143,4 +143,30 @@ export function keepSent(messageId: string, file: File) {
   v.onseeked = () => { keepPoster(key, v); setTimeout(done, 500); };
   v.onerror = done;
   setTimeout(done, 10_000);
+}
+
+/**
+ * The viewer's photos drawn at once (the owner, 2026-10-15: "照片左右滑動還是卡，他能不能之前 loading 過的圖片就能直接看到，
+ * 不要好像慢慢出現的感覺"): the viewer drew every photo from its network address — our route and its redirect, fetched and
+ * decoded again on each open. Now it draws the phone's own copy (`keptSrc`, the same one the chat's bubble drew), and the
+ * photos around the one on show are read from the phone and DECODED before a slide reaches them (`readyPhotos`); the last
+ * few decoded pictures are held (`decoded`), so the browser keeps them drawn.
+ */
+export const keptSrc = (url: string): string | undefined => mem.get(keyOf(url));
+const decoded = new Map<string, HTMLImageElement>();
+export async function readyPhotos(urls: string[]): Promise<boolean> {
+  let fresh = false;
+  await Promise.all(urls.map(async url => {
+    const key = keyOf(url);
+    if (decoded.has(key) || !keepable(key)) return;
+    const had = mem.has(key), src = await read(key);
+    if (!src) { keepImage(url); return; }
+    if (!had) fresh = true;
+    const img = new Image();
+    img.src = src;
+    try { await img.decode(); } catch { return; }
+    decoded.delete(key); decoded.set(key, img);
+    while (decoded.size > 12) decoded.delete(decoded.keys().next().value!);
+  }));
+  return fresh;
 }
