@@ -25,6 +25,10 @@ const mocks = vi.hoisted(() => ({
   createPayment: vi.fn(),
   voidRepayment: vi.fn(),
   revert: vi.fn(),
+  amendLoan: vi.fn(),
+  amendSource: vi.fn(),
+  updateSource: vi.fn(),
+  editOptions: vi.fn(),
 }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push, refresh: mocks.refresh, replace: mocks.replace }),
@@ -46,6 +50,7 @@ vi.mock('@/app/(portal)/fund-out/actions', () => ({
   voidRepayment: mocks.voidRepayment,
   createLoanFromDialog: vi.fn(),
   openCreateLoan: vi.fn(() => new Promise(() => {})),
+  amendLoanInWords: mocks.amendLoan,
 }))
 vi.mock('@/app/(portal)/fund-in/actions', () => ({
   setFundSourceMinPayInterest: vi.fn(),
@@ -56,6 +61,9 @@ vi.mock('@/app/(portal)/fund-in/actions', () => ({
   revertTermsChange: mocks.revert,
   createFundSourceFromDialog: vi.fn(),
   openRecordFundIn: vi.fn(() => new Promise(() => {})),
+  amendFundSourceInWords: mocks.amendSource,
+  updateFundSourceInWords: mocks.updateSource,
+  openSourceEditOptions: mocks.editOptions,
 }))
 vi.mock('@/app/(portal)/payments/actions', () => ({ createPaymentFromDialog: mocks.createPayment }))
 
@@ -179,6 +187,7 @@ const LOAN = (over: Partial<LoanPageModel> = {}): LoanPageModel => ({
   trail: [],
   audit: [{ at: '20 May 2026 · 20:21', who: 'Principal', what: 'Created the loan to Carres (CAR) · RM 100,000.00' }],
   pendingCancel: null,
+  amend: { ratePct: '2', months: '12', start: '2026-03-15', compound: false, text: 'EMI · 资金来源: King', termsFrom: null, nextMonth: '2026-11' },
   can: { edit: true, void: true, amend: true, recordRepayment: true },
   ...over,
 })
@@ -231,16 +240,18 @@ const SOURCE = (over: Partial<SourcePageModel> = {}): SourcePageModel => ({
     pools: [{ value: 'venture_pool', label: 'Venture Pool' }],
     activeAccounts: ['4056', '6000', '9096'],
   },
+  amend: { ratePct: '0.5', months: '60', start: '2025-07-31', compound: false, text: 'lent to: CMI', termsFrom: '2026-09', nextMonth: '2026-11' },
+  edit: null,
   ...over,
 })
 
 const CAN: FundAppCan = { create: true, edit: true, void: true, amend: true, loanAging: true, export: true }
 
-function draw({ side = 'out', search = '', can = CAN, page = null }: { side?: 'out' | 'in'; search?: string; can?: FundAppCan; page?: DealPage | null } = {}) {
+function draw({ side = 'out', search = '', can = CAN, page = null, records }: { side?: 'out' | 'in'; search?: string; can?: FundAppCan; page?: DealPage | null; records?: FundRecord[] } = {}) {
   window.history.replaceState(null, '', `/fin-app/fund/${side}${search ? `?${search}` : ''}`)
   return render(
     <FinAppFrame platform="android" rows={['fund-out', 'fund-in', 'loan']}>
-      <FundApp side={side} records={side === 'out' ? LOANS : SOURCES} month="2026-10" today="2026-10-15" search={search} can={can} page={page} refused={null} />
+      <FundApp side={side} records={records ?? (side === 'out' ? LOANS : SOURCES)} month="2026-10" today="2026-10-15" search={search} can={can} page={page} refused={null} printedBy="Finance Manager" />
     </FinAppFrame>,
   )
 }
@@ -313,8 +324,81 @@ describe('Fund › Fund out on the phone', () => {
     expect(screen.getByRole('button', { name: 'Turn on' })).toBeInTheDocument()
     expect(screen.getByText('Created the loan to Carres (CAR) · RM 100,000.00')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Record repayment' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Amend terms' })).toHaveAttribute('href', '/fund-out/l1/edit')
-    expect(screen.getByRole('link', { name: 'Print' })).toHaveAttribute('href', '/fund-out/l1?print=1')
+    // Nothing opens the portal (part E4b): Amend terms is a sheet, Print draws the schedule over the app.
+    expect(screen.getByRole('button', { name: 'Amend terms' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Print' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Amend terms|Print/ })).not.toBeInTheDocument()
+  })
+
+  it('Amend terms from a month on sends the month and only what changed, answered in words', async () => {
+    mocks.amendLoan.mockResolvedValueOnce({ ok: false, reason: '修改失败: 生效月要晚过现行条件的生效月' }).mockResolvedValueOnce({ ok: true })
+    await act(async () => {
+      draw({ search: 'id=l1', page: { side: 'out', loan: LOAN() } })
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Amend terms' }))
+    const sheet = await screen.findByRole('dialog', { name: /Amend terms/ })
+    expect(within(sheet).getByLabelText('Effective from')).toHaveValue('2026-11')
+    expect(within(sheet).getByLabelText('Rate % /mo')).toHaveValue('2')
+    fireEvent.change(within(sheet).getByLabelText('Rate % /mo'), { target: { value: '2.5' } })
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Apply from Nov 2026' }))
+    })
+    const [mode, fd] = mocks.amendLoan.mock.calls[0] as [string, FormData]
+    expect(mode).toBe('from')
+    // The compound switch, untouched, is not sent — the RPC keeps it.
+    expect(Object.fromEntries(fd.entries())).toEqual({ loan_id: 'l1', effective_rate_percent: '2.5', effective_from: '2026-11' })
+    expect(await within(sheet).findByText('修改失败: 生效月要晚过现行条件的生效月')).toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Apply from Nov 2026' }))
+    })
+    expect(mocks.flash).toHaveBeenCalledWith('New terms from Nov 2026')
+    expect(mocks.refresh).toHaveBeenCalled()
+  })
+
+  it('Amend terms over the whole deal saves nothing until something changes, then only that', async () => {
+    mocks.amendLoan.mockResolvedValue({ ok: true })
+    await act(async () => {
+      draw({ search: 'id=l1', page: { side: 'out', loan: LOAN() } })
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Amend terms' }))
+    const sheet = await screen.findByRole('dialog', { name: /Amend terms/ })
+    fireEvent.change(within(sheet).getByLabelText('Takes effect'), { target: { value: 'whole' } })
+    expect(within(sheet).getByLabelText('Repayment terms')).toHaveValue('EMI · 资金来源: King')
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Save' }))
+    })
+    expect(mocks.amendLoan).not.toHaveBeenCalled()
+    fireEvent.change(within(sheet).getByLabelText('Term · months'), { target: { value: '24' } })
+    fireEvent.click(within(sheet).getByRole('checkbox', { name: 'Compound interest' }))
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Save' }))
+    })
+    const [mode, fd] = mocks.amendLoan.mock.calls[0] as [string, FormData]
+    expect(mode).toBe('whole')
+    expect(Object.fromEntries(fd.entries())).toEqual({ loan_id: 'l1', compound_interest: 'on', tenure_months: '24' })
+    expect(mocks.flash).toHaveBeenCalledWith('Terms saved — the whole deal recalculated')
+  })
+
+  it('Print draws the schedule over the app — the terms, every instalment, who printed it', async () => {
+    await act(async () => {
+      draw({ search: 'id=l1', page: { side: 'out', loan: LOAN() } })
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Print' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Repayment Schedule · Carres' })
+    expect(within(sheet).getByText('FUND OUT · LOAN')).toBeInTheDocument()
+    expect(within(sheet).getByText('Printed 15 Oct 2026 · Finance Manager')).toBeInTheDocument()
+    expect(within(sheet).getByText('Carres (CAR)')).toBeInTheDocument()
+    expect(within(sheet).getByText('2.000% /mo')).toBeInTheDocument()
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: 'Repayment Schedule · Carres' })).not.toBeInTheDocument()
+  })
+
+  it('without Treasury · Approve there is no Amend terms', async () => {
+    await act(async () => {
+      draw({ search: 'id=l1', page: { side: 'out', loan: LOAN({ amend: null, can: { edit: true, void: true, amend: false, recordRepayment: true } }) }, can: { ...CAN, amend: false } })
+    })
+    expect(screen.getByRole('button', { name: 'Record repayment' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Amend terms' })).not.toBeInTheDocument()
   })
 
   it('Request cancellation is shut, saying why, while repayments stand', async () => {
@@ -475,6 +559,62 @@ describe('Fund › Fund in on the phone', () => {
     })
     expect(mocks.flash).toHaveBeenCalledWith('HV-PV-202610-0600 saved as draft — send it for approval')
     expect(mocks.push).toHaveBeenCalledWith('/fin-app/daily/payments?id=pv-9')
+  })
+
+  it('Amend terms on a fund source says since when its terms stand and sends the source’s names', async () => {
+    mocks.amendSource.mockResolvedValue({ ok: true })
+    await act(async () => {
+      draw({ side: 'in', search: 'id=s1', page: { side: 'in', source: SOURCE() } })
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Amend terms' }))
+    const sheet = await screen.findByRole('dialog', { name: /Amend terms/ })
+    expect(within(sheet).getByText('Chai Meng Keat · terms since Sep 2026')).toBeInTheDocument()
+    fireEvent.click(within(sheet).getByRole('checkbox', { name: 'No fixed term from then' }))
+    expect(within(sheet).getByLabelText('Months left')).toBeDisabled()
+    fireEvent.change(within(sheet).getByLabelText('Reason'), { target: { value: 'repaid in any size' } })
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Apply from Nov 2026' }))
+    })
+    const [mode, fd] = mocks.amendSource.mock.calls[0] as [string, FormData]
+    expect(mode).toBe('from')
+    expect(Object.fromEntries(fd.entries())).toEqual({ fund_source_id: 's1', effective_from: '2026-11', no_fixed_term: 'on', reason: 'repaid in any size' })
+  })
+
+  it('a fund source still waiting: Edit is a sheet with its lists, sending only what changed', async () => {
+    mocks.editOptions.mockResolvedValue({
+      accounts: [{ code: '4056', name: 'Amount Due to - Chai Meng Keat', type: 'liability', parent_code: '4000', is_active: true }],
+      banks: [
+        { id: 'bank-hl', bank_name: 'Hong Leong Bank', account_number: '123', is_primary: true },
+        { id: 'bank-mb', bank_name: 'Maybank', account_number: '456', is_primary: false },
+      ],
+    })
+    mocks.updateSource.mockResolvedValue({ ok: true })
+    const pending = SOURCE({
+      status: 'pending_approval',
+      amend: null,
+      repay: null,
+      can: { financeEdit: true, void: true, amend: true, recordRepayment: false },
+      edit: { amount: '80000.00', ratePct: '0.500', months: '', effectiveDate: '2025-05-31', repaymentDate: '2025-06-30', notes: 'lent to: CMI', accountCode: '4056', bankId: '' },
+    })
+    mocks.openSource.mockResolvedValue({ ok: true, page: pending })
+    await act(async () => {
+      draw({ side: 'in', search: 'id=s1', page: { side: 'in', source: pending }, records: [{ ...SOURCES[0], status: 'pending_approval' }] })
+    })
+    // The bar's Edit — the settings' own Edits stand above it.
+    const edits = screen.getAllByRole('button', { name: 'Edit' })
+    fireEvent.click(edits[edits.length - 1])
+    const sheet = await screen.findByRole('dialog', { name: /Edit fund source/ })
+    expect(within(sheet).getByText('Director loan · Chai Meng Keat')).toBeInTheDocument()
+    // Unset, the bank is the primary's — the select opens on it, and it is not a change.
+    await waitFor(() => expect(within(sheet).getByLabelText('Into bank')).toHaveValue('bank-hl'))
+    expect(within(sheet).getByLabelText('Term · months')).toHaveValue('')
+    fireEvent.change(within(sheet).getByLabelText('Amount RM'), { target: { value: '85000' } })
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Save' }))
+    })
+    const fd = mocks.updateSource.mock.calls[0][0] as FormData
+    expect(Object.fromEntries(fd.entries())).toEqual({ id: 's1', amount: '85000' })
+    expect(mocks.flash).toHaveBeenCalledWith('Fund source from Chai Meng Keat saved — still waiting for approval')
   })
 
   it('the hub: Record fund in, no Loan aging', () => {

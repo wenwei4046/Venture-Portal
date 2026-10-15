@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { DialogMenu, FinDialog, type DialogMenuItem } from '@/components/finv/Dialog'
+import { flash } from '@/components/hrv/toast'
 import { drawerStyles as d } from '@/components/finv/Drawer'
 import { fd } from '@/components/finv/DrawerParts'
 import { HUB_HREF, HUB_TITLE } from '@/lib/fin-app/routes'
@@ -17,6 +18,7 @@ import { VoucherDetailBody, VoucherHero } from '@/app/(portal)/payments/_compone
 import { REFUSED } from '@/app/(portal)/payments/_lib/voucher-refusals'
 import { useVoucherSteps } from '@/app/(portal)/payments/_components/voucher-steps'
 import CreatePaymentDialog from '@/app/(portal)/payments/_components/CreatePaymentDialog'
+import VoucherEditSheet from './VoucherEditSheet'
 import AmendDateButton from '@/app/(portal)/payments/_components/AmendDateButton'
 import ReassignGlAccountButton from '@/app/(portal)/payments/[id]/_components/ReassignGlAccountButton'
 import { CopyVoucherDialog } from '@/app/(portal)/payments/[id]/_components/CopyAsDraft'
@@ -152,6 +154,8 @@ export default function VoucherApp({
   const [openBatches, setOpenBatches] = useState<Set<string>>(() => new Set(step.kind === 'batches' && step.batch ? [step.batch] : []))
   // The full page's own windows, opened from the record's ⋯ (a nonce re-opens one closed before).
   const [extra, setExtra] = useState<{ kind: 'copy' | 'date' | 'gl'; nonce: number } | null>(null)
+  // Edit is the app's sheet (part E4b), not the portal's /payments/[id]/edit.
+  const [editing, setEditing] = useState<string | null>(null)
 
   const go = (next: VoucherStep) => open(searchOfStep(next))
   const backTo = () => back(parentSearch(step))
@@ -228,13 +232,13 @@ export default function VoucherApp({
       router.refresh()
     },
     extraMore,
+    inWords: true,
   })
   const recordBar: BarButton[] = steps.map((st) => ({
     key: st.key,
     label: st.label,
     kind: st.kind,
-    href: st.href,
-    onClick: st.onClick,
+    ...(st.key === 'edit' && v ? { onClick: () => setEditing(v.id) } : { href: st.href, onClick: st.onClick }),
     disabled: busy && st.kind !== 'more',
   }))
 
@@ -400,6 +404,17 @@ export default function VoucherApp({
       </FinDialog>
 
       {create ? <CreatePaymentDialog open={making === 'payment'} onClose={() => setMaking(null)} prefix={create.prefix} today={create.today} initial={create.initial} /> : null}
+      <VoucherEditSheet
+        voucherId={editing}
+        label={v?.no ?? 'draft'}
+        today={today}
+        onClose={() => setEditing(null)}
+        onDone={() => {
+          flash('Voucher saved')
+          router.refresh()
+          if (v) load(v.id)
+        }}
+      />
       {receipts && canCreate && prefix ? (
         <>
           <CreateReceiptDialog open={making === 'receipt'} onClose={() => setMaking(null)} prefix={prefix} today={today} />
@@ -408,7 +423,20 @@ export default function VoucherApp({
       ) : null}
 
       {v && extra?.kind === 'copy' ? (
-        <CopyVoucherDialog key={extra.nonce} open onClose={() => setExtra(null)} voucherId={v.id} voucherNo={v.no} />
+        <CopyVoucherDialog
+          key={extra.nonce}
+          open
+          onClose={() => setExtra(null)}
+          voucherId={v.id}
+          voucherNo={v.no}
+          // The copy opens here, its Edit sheet up — as the desktop opens it on its edit page.
+          onCopied={(copy) => {
+            flash(`${copy.voucherNo} — a new draft`)
+            router.refresh()
+            go({ kind: 'record', id: copy.id, from: step.kind === 'record' ? step.from : null })
+            setEditing(copy.id)
+          }}
+        />
       ) : null}
       {v && extra?.kind === 'date' && v.paymentDate ? (
         <AmendDateButton key={extra.nonce} autoOpen hideTrigger kind="voucher" id={v.id} currentDate={v.paymentDate} label={v.no ?? 'Draft'} />

@@ -12,6 +12,7 @@ import VoidRepaymentButton from './_components/VoidRepaymentButton'
 import TermsTimeline from '@/components/treasury/TermsTimeline'
 import RepaymentScheduleSection, { scheduleCount } from '@/components/treasury/RepaymentScheduleSection'
 import PrintSchedule from '@/components/treasury/PrintSchedule'
+import { printedLine, scheduleMeta } from '@/lib/deal-print'
 import DealPageSteps from '@/components/treasury/DealPageSteps'
 import { FullAudit, FullCard, FullFact, FullPanelRow, FullRow, FullTrail, fullDay, fullStyles as s } from '@/components/finv/FullParts'
 import ReturnLink from '@/components/layout/ReturnLink'
@@ -96,19 +97,8 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
               kicker="FUND OUT · LOAN"
               name={loan.companyName}
               plan={plan}
-              printed={`Printed ${fullDay(today)} · ${(user as { name?: string | null }).name ?? 'Finance'}`}
-              meta={[
-                { label: 'Borrower', value: loan.borrower },
-                { label: 'Principal', value: formatMoney(loan.principal) },
-                { label: 'Rate', value: `${pct(loan.rate.effective)} /mo` },
-                { label: 'Installments', value: plan.months ? String(plan.months) : 'No fixed term' },
-                { label: 'First installment', value: plan.firstDue ? fullDay(plan.firstDue) : '—' },
-                { label: 'Installment', value: formatMoney(plan.firstInstallment) },
-                { label: 'Total interest', value: `${formatMoney(plan.totalInterest)}${plan.kind === 'open' ? ' (to date)' : ''}` },
-                { label: 'Paid', value: formatMoney(plan.principalPaid + plan.interestPaid) },
-                { label: 'Outstanding', value: formatMoney(plan.kind === 'open' ? plan.principalOwed : plan.outstandingDue) },
-                { label: 'Principal owed', value: formatMoney(plan.principalOwed) },
-              ]}
+              printed={printedLine(today, (user as { name?: string | null }).name)}
+              meta={scheduleMeta({ label: 'Borrower', value: loan.borrower }, loan.principal, `${pct(loan.rate.effective)} /mo`, plan)}
             />
           ) : null}
         </div>

@@ -14,6 +14,8 @@ import { INTEREST_EXPENSE_ACCOUNT, PENALTY_EXPENSE_ACCOUNT } from '@/lib/repayme
 import { fullDay, type FullStep } from '@/components/finv/FullParts'
 import { allTermsChanges, buildTermsSegments, currentSegment, termsChanged, type TermsChangeComparison, type TermsSegment } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isFundSourcePrincipal, paidByMonthByType, principalPaidByMonth, termsForFundSource } from '@/lib/treasury-terms-data'
+import type { AmendTerms } from '@/lib/fund-amend'
+import type { SourceEditFields } from '@/lib/fund-source-edit'
 
 // A fund source's page, read (2026-10-15 — moved out of `/fund-in/[id]/page.tsx`
 // word for word, so the Finance phone app's record reads the same): the source,
@@ -108,6 +110,10 @@ export interface SourcePageModel {
   }
   /** Record repayment's lists — only where it may be recorded. */
   repay: SourceRepaymentOptions | null
+  /** Amend terms' starting values, as its edit page reads them — an active source, Treasury · Approve. */
+  amend: AmendTerms | null
+  /** Edit's starting values, as its edit page reads them — a source still pending, Treasury · Edit. */
+  edit: SourceEditFields | null
 }
 
 /** The fund source's page, or null when the reader may not see it (or it is not there). */
@@ -329,5 +335,32 @@ export async function loadSourcePage(supabase: Client, user: User, id: string): 
           activeAccounts: (repayAccounts ?? []).map((a) => a.code as string),
         }
       : null,
+    amend:
+      isActive && canDo(user, 'treasury', 'approve')
+        ? {
+            ratePct: (Number(source.cost_rate) * 100).toString(),
+            months: (source.lock_in_months ?? '').toString(),
+            start: (source.repayment_date as string | null) ?? (source.effective_date as string),
+            compound: (source as { compound_interest?: boolean }).compound_interest === true,
+            text: source.notes ?? '',
+            termsFrom: ((source as { terms_effective_from?: string | null }).terms_effective_from ?? null)?.slice(0, 7) ?? null,
+            nextMonth: officeTime().add(1, 'month').format('YYYY-MM'),
+          }
+        : null,
+    edit:
+      status === 'pending_approval' && canDo(user, 'treasury', 'edit')
+        ? {
+            amount: amount.toFixed(2),
+            ratePct: (Number(source.cost_rate) * 100).toFixed(3),
+            // Blank — no fixed term (the desktop's form starts it at 12).
+            months: source.lock_in_months == null ? '' : String(source.lock_in_months),
+            effectiveDate: source.effective_date as string,
+            // The repayment start the schedule goes by — unset, the month after the effective date.
+            repaymentDate: start.date ?? (source.effective_date as string),
+            notes: source.notes ?? '',
+            accountCode: (source.account_code as string | null) ?? '',
+            bankId: (source.bank_account_id as string | null) ?? '',
+          }
+        : null,
   }
 }

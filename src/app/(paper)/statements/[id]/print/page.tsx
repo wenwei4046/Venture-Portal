@@ -5,15 +5,22 @@ import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import PrintButton from './PrintButton'
 import { HandoffSections, type PrintLine } from './PrintSections'
-import FinSwitch from '../../_components/FinSwitch'
+import FinSwitch from '@/app/(portal)/statements/_components/FinSwitch'
+import { FinViewProvider } from '@/components/layout/fin-view'
+import { isFinanceView } from '@/lib/finance-view'
 
 interface Props {
   params: Promise<{ id: string }>
 }
 
+// A statement on paper (2026-10-16): outside the (portal) route group on
+// purpose, as /print/director-pool is — the portal frame does not wrap a print
+// view, and the Finance phone app opens it (Print statement) though the
+// portal's pages are the computer's (lib/one-app.ts). Its address, its tabs
+// (page-tabs: STATEMENTS) and its gate are the same.
 export default async function StatementPrintPage({ params }: Props) {
   await requirePage('/statements/[id]/print')
-  await requirePermission('treasury')
+  const user = await requirePermission('treasury')
   const supabase = await createClient()
   const { id } = await params
 
@@ -63,6 +70,8 @@ export default async function StatementPrintPage({ params }: Props) {
   })
 
   return (
+    // Outside the portal, so the portal's frame does not say which view it is: the page asks as the frame would.
+    <FinViewProvider value={isFinanceView(`/statements/${id}/print`, user.role)}>
     <html lang="en-MY">
       <head>
         <title>
@@ -320,5 +329,6 @@ export default async function StatementPrintPage({ params }: Props) {
         </div>
       </body>
     </html>
+    </FinViewProvider>
   )
 }

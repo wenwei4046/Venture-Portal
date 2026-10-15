@@ -73,10 +73,16 @@ export interface InvoiceWorkSetup {
   onDoneWith?: (ids: string[], settled: boolean) => void
   /** Payroll ▾ › Payroll basis: where it is shown. */
   onBasis: () => void
+  /**
+   * A department pool's settle by netting and a paid invoice's refund — the
+   * voucher page's on the desktop (`/payments/new`, coming back to `here`); the
+   * Finance phone app opens its own sheets instead (2026-10-16, part E4b).
+   */
+  onVoucher?: (key: 'settle_netting' | 'refund', inv: HubInvoice) => void
 }
 
 export function useInvoiceWork(setup: InvoiceWorkSetup) {
-  const { hub, can, today, thisMonth, all, here, onOpen, onGone, goMonth, onRefused, ticked = [], onDoneWith, onBasis } = setup
+  const { hub, can, today, thisMonth, all, here, onOpen, onGone, goMonth, onRefused, ticked = [], onDoneWith, onBasis, onVoucher } = setup
   const router = useRouter()
   const month = hub.period.slice(0, 7)
   const [yy, mm] = month.split('-').map(Number)
@@ -149,9 +155,11 @@ export function useInvoiceWork(setup: InvoiceWorkSetup) {
       case 'settle':
         return setSettleIds([inv.id])
       case 'settle_netting':
+        if (onVoucher) return onVoucher('settle_netting', inv)
         // A department pool's invoice settles by netting on the voucher page, which brings the reader back.
         return router.push(`/payments/new?invoice_id=${inv.id}&return_to=${here}`)
       case 'refund':
+        if (onVoucher) return onVoucher('refund', inv)
         return router.push(`/payments/new?mode=refund&invoice_id=${inv.id}&return_to=${here}`)
     }
   }

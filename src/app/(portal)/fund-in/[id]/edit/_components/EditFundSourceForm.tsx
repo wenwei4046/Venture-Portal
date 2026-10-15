@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { updateFundSource } from '../../../actions'
 import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
 import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
+import { sourceEditFieldsOf, sourceEditForm, type SourceEditFields } from '@/lib/fund-source-edit'
 
 interface Props {
   id: string
@@ -45,11 +46,25 @@ export default function EditFundSourceForm({ id, typeLabel, fromLabel, initial, 
     }
   }, [error])
 
+  // The bank the select opens on — the source's own, else the primary.
+  const bankDefault = initial.bank_account_id ?? banks.find((b) => b.is_primary)?.id ?? banks[0]?.id ?? ''
+  // What the form opened with: only what is changed from it is sent (lib/fund-source-edit, 2026-10-16).
+  const was: SourceEditFields = {
+    amount: initial.amount.toFixed(2),
+    ratePct: initial.cost_rate_percent.toFixed(3),
+    months: String(initial.lock_in_months),
+    effectiveDate: initial.effective_date,
+    repaymentDate: initial.repayment_date,
+    notes: initial.notes,
+    accountCode: initial.account_code ?? '',
+    bankId: bankDefault,
+  }
+
   async function handleSubmit(formData: FormData) {
     setError(null)
     startTransition(async () => {
       try {
-        const result = await updateFundSource(formData)
+        const result = await updateFundSource(sourceEditForm(id, was, sourceEditFieldsOf(formData)))
         if (result?.error) setError(result.error)
       } catch (err) {
         if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) {
@@ -113,7 +128,7 @@ export default function EditFundSourceForm({ id, typeLabel, fromLabel, initial, 
         <select
           id="bank_account_id"
           name="bank_account_id"
-          defaultValue={initial.bank_account_id ?? banks.find((b) => b.is_primary)?.id ?? banks[0]?.id ?? ''}
+          defaultValue={bankDefault}
           disabled={isPending}
           className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border disabled:opacity-60"
         >

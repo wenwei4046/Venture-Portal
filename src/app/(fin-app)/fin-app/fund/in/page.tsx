@@ -41,6 +41,7 @@ export default async function FinAppFundIn({ searchParams }: { searchParams: Pro
       }}
       page={read && read.ok ? { side: 'in', source: read.page } : null}
       refused={read && !read.ok ? read.reason : null}
+      printedBy={(user as { name?: string | null }).name ?? null}
     />
   )
 }

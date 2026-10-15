@@ -39,7 +39,7 @@ describe('which face of the app opens on a phone', () => {
     expect(opensHrApp({ permissions: ['team'] })).toBe(false)
     expect(opensHrAppOnPhone({ role: 'hr', permissions: ['team'] })).toBe(false)
   })
-  it('the Principal’s and Finance’s views: the portal, until their phone faces are made', () => {
+  it('the Principal’s and Finance’s views: not the HR app (Finance’s opens the Finance app)', () => {
     expect(opensHrAppOnPhone({ role: 'principal', permissions: ['hiring', 'documentation'] })).toBe(false)
     expect(opensHrAppOnPhone({ role: 'finance', permissions: ['treasury'] })).toBe(false)
   })
@@ -73,7 +73,11 @@ describe('one install', () => {
   it('opens the right face from its start: `/` and every portal page send HR’s view on a phone to the HR app', () => {
     const home = readFileSync(resolve(ROOT, 'src/app/page.tsx'), 'utf8')
     const portal = readFileSync(resolve(ROOT, 'src/app/(portal)/layout.tsx'), 'utf8')
-    expect(home).toMatch(/opensHrAppOnPhone\(user\) && isPhone\(\(await headers\(\)\)\.get\('user-agent'\)\)\) redirect\('\/hr-app'\)/)
+    expect(home).toMatch(/const phone = isPhone\(\(await headers\(\)\)\.get\('user-agent'\)\)/)
+    expect(home).toMatch(/if \(opensHrAppOnPhone\(user\) && phone\) redirect\('\/hr-app'\)/)
+    // Finance's view on a phone (2026-10-16): the Finance app, from `/` and from every portal page.
+    expect(home).toMatch(/if \(opensFinApp\(user\) && phone\) redirect\('\/fin-app'\)/)
+    expect(portal).toMatch(/if \(opensFinApp\(user\) && phone\) redirect\('\/fin-app'\)/)
     // The portal reads the phone once (2026-10-14): the HR app's redirect, and Finance's shell kept off a phone.
     expect(portal).toMatch(/const phone = isPhone\(\(await headers\(\)\)\.get\('user-agent'\)\)/)
     expect(portal).toMatch(/if \(opensHrAppOnPhone\(user\) && phone\) redirect\('\/hr-app'\)/)

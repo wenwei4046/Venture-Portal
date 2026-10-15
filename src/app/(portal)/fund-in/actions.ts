@@ -14,6 +14,8 @@ import { buildTermsSegments, currentSegment, principalPaidSince, segmentRemainin
 import { fetchTermsHistory, termsForFundSource } from '@/lib/treasury-terms-data'
 import { remainingPeriods } from '@/lib/loan-monitor'
 import { loadNewSourceOptions, type NewSourceOptions } from './_lib/new-source-options'
+import { compoundSent } from '@/lib/fund-amend'
+import { sourceEditPatch } from '@/lib/fund-source-edit'
 
 // ─── Amend an ACTIVE fund source (Principal — self-service, direct apply) ─────
 // Principal is the top approval authority, so edits apply immediately via the
@@ -22,31 +24,41 @@ import { loadNewSourceOptions, type NewSourceOptions } from './_lib/new-source-o
 // path stays for pending_approval edits by Finance.
 export async function amendFundSource(formData: FormData): Promise<{ error: string } | undefined> {
   await requireActionOn('/fund-in', 'treasury', 'approve')
+  const refused = await amendFundSourceWork(formData)
+  if (refused) return refused
+  redirect(`/fund-in/${formData.get('fund_source_id') as string}`)
+}
+
+async function amendFundSourceWork(formData: FormData): Promise<{ error: string } | undefined> {
   const supabase = await createClient()
 
   const id = (formData.get('fund_source_id') as string) ?? ''
   if (!id) return { error: 'Fund source id is required' }
 
+  // Only what the form sends is changed (lib/fund-amend — the forms send what was edited, 2026-10-16).
   const ratePctRaw = (formData.get('cost_rate_percent') as string) ?? ''
-  const lockRaw = (formData.get('lock_in_months') as string) ?? ''
   const repaymentDate = (formData.get('repayment_date') as string) || null
-  const compound = formData.get('compound_interest') === 'on'
+  const compound = compoundSent(formData)
   const notes = (formData.get('notes') as string) ?? ''
 
-  const payload: Record<string, Json> = { compound_interest: compound }
+  const payload: Record<string, Json> = {}
+  if (compound !== null) payload.compound_interest = compound
 
   if (ratePctRaw.trim() !== '') {
     const ratePct = parseFloat(ratePctRaw)
     if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: '利率必须在 0–100% 之间' }
     payload.cost_rate = Math.round((ratePct / 100) * 1e6) / 1e6
   }
-  // lock_in_months: empty => 无固定期限 (null). Always sent so the RPC applies it.
-  if (lockRaw.trim() === '') {
-    payload.lock_in_months = null
-  } else {
-    const n = parseInt(lockRaw, 10)
-    if (isNaN(n) || n < 1 || n > 120) return { error: '期数必须在 1–120,或留空表示无固定期限' }
-    payload.lock_in_months = n
+  // lock_in_months: sent empty => 无固定期限 (null); not sent => as it is.
+  if (formData.has('lock_in_months')) {
+    const lockRaw = (formData.get('lock_in_months') as string) ?? ''
+    if (lockRaw.trim() === '') {
+      payload.lock_in_months = null
+    } else {
+      const n = parseInt(lockRaw, 10)
+      if (isNaN(n) || n < 1 || n > 120) return { error: '期数必须在 1–120,或留空表示无固定期限' }
+      payload.lock_in_months = n
+    }
   }
   if (repaymentDate) payload.repayment_date = repaymentDate
   if (notes.trim()) payload.notes = notes.trim()
@@ -58,7 +70,7 @@ export async function amendFundSource(formData: FormData): Promise<{ error: stri
   revalidatePath('/fund-in')
   revalidatePath('/repayment-schedule')
   revalidatePath('/dashboard')
-  redirect(`/fund-in/${id}`)
+  return undefined
 }
 
 // ─── 「从某月起生效」 (user 2026-09-21) ────────────────────────────────────────
@@ -67,6 +79,12 @@ export async function amendFundSource(formData: FormData): Promise<{ error: stri
 // and the record carries the new terms from that month (lib/treasury-terms).
 export async function amendFundSourceFrom(formData: FormData): Promise<{ error: string } | undefined> {
   await requireActionOn('/fund-in', 'treasury', 'approve')
+  const refused = await amendFundSourceFromWork(formData)
+  if (refused) return refused
+  redirect(`/fund-in/${formData.get('fund_source_id') as string}`)
+}
+
+async function amendFundSourceFromWork(formData: FormData): Promise<{ error: string } | undefined> {
   const supabase = await createClient()
 
   const id = (formData.get('fund_source_id') as string) ?? ''
@@ -88,7 +106,6 @@ export async function amendFundSourceFrom(formData: FormData): Promise<{ error: 
     if (isNaN(n) || n < 1 || n > 120) return { error: '剩余期数必须在 1–120,或留空保持原到期月' }
     remaining = n
   }
-  const compound = formData.get('compound_interest') === 'on'
   const reason = ((formData.get('reason') as string) ?? '').trim()
   const noFixedTerm = formData.get('no_fixed_term') === 'on'
 
@@ -97,7 +114,8 @@ export async function amendFundSourceFrom(formData: FormData): Promise<{ error: 
     p_effective_from: `${fromYM}-01`,
     p_cost_rate: rate,
     p_remaining_months: noFixedTerm ? null : remaining,
-    p_compound_interest: compound,
+    // Not sent = as it is (the RPC keeps a null).
+    p_compound_interest: compoundSent(formData),
     p_reason: reason || null,
     p_no_fixed_term: noFixedTerm,
   })
@@ -109,7 +127,22 @@ export async function amendFundSourceFrom(formData: FormData): Promise<{ error: 
   revalidatePath('/reports/company-statement')
   revalidatePath('/reports/loan-aging')
   revalidatePath('/dashboard')
-  redirect(`/fund-in/${id}`)
+  return undefined
+}
+
+/**
+ * Amend terms answered in words (2026-10-16, the Finance phone app's deal):
+ * the same gate and work as `amendFundSource` / `amendFundSourceFrom`, without
+ * the redirect to the portal's page — the app stays on its own screen.
+ */
+export async function amendFundSourceInWords(mode: 'from' | 'whole', formData: FormData): Promise<{ ok: true } | { ok: false; reason: string }> {
+  await requireActionOn('/fund-in', 'treasury', 'approve')
+  try {
+    const refused = mode === 'from' ? await amendFundSourceFromWork(formData) : await amendFundSourceWork(formData)
+    return refused ? { ok: false, reason: refused.error } : { ok: true }
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error && e.message ? e.message : 'The terms could not be changed.' }
+  }
 }
 
 /** Undo the latest 从某月起 change on a loan or fund source (Principal). */
@@ -172,6 +205,17 @@ export async function createFundSourceFromDialog(formData: FormData): Promise<{ 
 export async function openRecordFundIn(): Promise<NewSourceOptions> {
   await requireActionOn('/fund-in', 'treasury', 'create')
   return loadNewSourceOptions(await createClient())
+}
+
+/**
+ * A pending fund source's Edit, its lists (2026-10-16, the Finance phone app's
+ * sheet): the accounts it may be owed on and the banks it may land in — what
+ * its edit page reads.
+ */
+export async function openSourceEditOptions(): Promise<Pick<NewSourceOptions, 'accounts' | 'banks'>> {
+  await requireActionOn('/fund-in', 'treasury', 'edit')
+  const { accounts, banks } = await loadNewSourceOptions(await createClient())
+  return { accounts, banks }
 }
 
 function sourceCreated() {
@@ -402,44 +446,23 @@ export type FundSourceActionResult = { error: string } | undefined
 
 export async function updateFundSource(formData: FormData): Promise<FundSourceActionResult> {
   await requireActionOn('/fund-in', 'treasury', 'edit')
+  const refused = await updateFundSourceWork(formData)
+  if (refused) return refused
+  redirect(`/fund-in/${formData.get('id') as string}`)
+}
+
+// Only the fields sent are written (lib/fund-source-edit — the forms send what
+// was edited, 2026-10-16); the rules are checked on the row as it will stand.
+async function updateFundSourceWork(formData: FormData): Promise<FundSourceActionResult> {
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
   if (!id) return { error: 'Fund source id is required' }
 
-  const amount = parseFloat((formData.get('amount') as string) ?? '0')
-  const costRatePercent = parseFloat((formData.get('cost_rate_percent') as string) ?? '0')
-  const lockInMonths = parseInt((formData.get('lock_in_months') as string) ?? '0', 10)
-  const effectiveDate = (formData.get('effective_date') as string) ?? ''
-  const repaymentDate = (formData.get('repayment_date') as string) ?? ''
-  const notes = (formData.get('notes') as string) || null
-  // Mig 247: editable BS account. Empty string from the form means "clear",
-  // which translates to NULL (approval will fall back to 4000).
-  const rawAccountCode = (formData.get('account_code') as string) ?? ''
-  const accountCode = rawAccountCode.trim() === '' ? null : rawAccountCode.trim()
-  // Which HV bank receives the deposit. NULL = primary (approval falls back).
-  const editBankAccountId = ((formData.get('bank_account_id') as string) ?? '').trim() || null
-
-  if (isNaN(amount) || amount <= 0) return { error: 'Amount must be greater than 0' }
-  if (isNaN(costRatePercent) || costRatePercent < 0 || costRatePercent >= 100) {
-    return { error: 'Interest rate must be between 0 and 100%' }
-  }
-  if (isNaN(lockInMonths) || lockInMonths < 1) {
-    return { error: 'Repayment period must be at least 1 month' }
-  }
-  if (!effectiveDate) return { error: 'Effective date is required' }
-  if (dayjs(effectiveDate).isAfter(officeToday(), 'day')) {
-    return { error: 'Effective date cannot be in the future' }
-  }
-  if (!repaymentDate) return { error: 'Repayment date is required' }
-  if (dayjs(repaymentDate).isBefore(dayjs(effectiveDate), 'day')) {
-    return { error: 'Repayment date must be on or after effective date' }
-  }
-
   // Status guard — only pending_approval is editable.
   const { data: current } = await supabase
     .from('fund_sources')
-    .select('id, status, source_type, amount')
+    .select('id, status, source_type, amount, cost_rate, lock_in_months, effective_date, repayment_date')
     .eq('id', id)
     .single()
   if (!current) return { error: 'Fund source not found' }
@@ -449,9 +472,21 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
     }
   }
 
-  await assertPeriodOpen(supabase, effectiveDate)
+  const edit = sourceEditPatch(
+    {
+      amount: Number(current.amount),
+      cost_rate: Number(current.cost_rate),
+      lock_in_months: (current.lock_in_months as number | null) ?? null,
+      effective_date: current.effective_date as string,
+      repayment_date: (current.repayment_date as string | null) ?? null,
+    },
+    formData,
+    officeToday(),
+    new Date().toISOString(),
+  )
+  if (!edit.ok) return { error: edit.reason }
 
-  const cost_rate = costRatePercent / 100
+  await assertPeriodOpen(supabase, edit.effectiveDate)
 
   // .select() forces Supabase to return matched rows so we detect the TOCTOU
   // race where Principal approves between our SELECT and UPDATE. Without it,
@@ -459,21 +494,7 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
   // null — we'd silently corrupt an already-active fund source.
   const { data: updated, error: updErr } = await supabase
     .from('fund_sources')
-    .update({
-      amount,
-      cost_rate,
-      lock_in_months: lockInMonths || null,
-      effective_date: effectiveDate,
-      repayment_date: repaymentDate,
-      // The Expected repayment is the repayment start: its month moves with it
-      // (2026-10-12, user: 应该要一样).
-      repayment_start_month: dayjs(repaymentDate).startOf('month').format('YYYY-MM-DD'),
-      maturity_date: repaymentDate,
-      notes,
-      account_code: accountCode,
-      bank_account_id: editBankAccountId,
-      updated_at: new Date().toISOString(),
-    })
+    .update(edit.patch)
     .eq('id', id)
     .eq('status', 'pending_approval')
     .select('id')
@@ -490,6 +511,7 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
   // an RLS policy so the submitter can UPDATE their own pending approval;
   // before that, this UPDATE silently affected zero rows under finance and
   // the Principal queue kept showing the original (wrong) figure.
+  const amount = edit.amount
   if (Number(current.amount) !== amount) {
     const typeLabel =
       current.source_type === 'subsidiary' ? 'subsidiary deposit'
@@ -498,7 +520,7 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
     const { data: updatedApprovals, error: apprErr } = await supabase
       .from('approval_requests')
       .update({
-        description: `New fund source: ${typeLabel} — RM ${amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${costRatePercent}%/mo`,
+        description: `New fund source: ${typeLabel} — RM ${amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${edit.ratePct}%/mo`,
         amount,
       })
       .eq('reference_id', id)
@@ -520,7 +542,22 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
   revalidatePath(`/fund-in/${id}`)
   revalidatePath('/fund-in')
   revalidatePath('/approvals')
-  redirect(`/fund-in/${id}`)
+  return undefined
+}
+
+/**
+ * A pending fund source's Edit answered in words (2026-10-16, the Finance
+ * phone app's deal): the same gate and work as `updateFundSource`, without the
+ * redirect to the portal's page.
+ */
+export async function updateFundSourceInWords(formData: FormData): Promise<{ ok: true } | { ok: false; reason: string }> {
+  await requireActionOn('/fund-in', 'treasury', 'edit')
+  try {
+    const refused = await updateFundSourceWork(formData)
+    return refused ? { ok: false, reason: refused.error } : { ok: true }
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error && e.message ? e.message : 'The fund source could not be saved.' }
+  }
 }
 
 // ─── Withdraw a PENDING fund source (Finance self-service) ───────────────────
