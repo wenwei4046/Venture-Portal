@@ -19,6 +19,9 @@ describe('Copy as a new draft', () => {
     const onCopied = vi.fn()
     render(<CopyVoucherDialog open onClose={onClose} voucherId="pv-1" voucherNo="HV-PV-202610-0533" onCopied={onCopied} />)
     const ask = screen.getByRole('dialog', { name: 'Copy HV-PV-202610-0533?' })
+    // It opens in the app with its form — not on the portal's edit page (2026-10-16).
+    expect(ask).toHaveTextContent('It opens as a new draft, its form open to be changed before it is submitted.')
+    expect(ask).not.toHaveTextContent('edit page')
     await act(async () => {
       fireEvent.click(within(ask).getByRole('button', { name: 'Copy as a new draft' }))
     })
@@ -42,6 +45,7 @@ describe('Copy as a new draft', () => {
   it('on the desktop: the page’s own copy, which opens the edit page', async () => {
     mocks.copy.mockResolvedValue(undefined)
     render(<CopyVoucherDialog open onClose={vi.fn()} voucherId="pv-1" voucherNo="HV-PV-202610-0533" />)
+    expect(screen.getByRole('dialog')).toHaveTextContent('It opens on the edit page as a new draft, to be changed before it is submitted.')
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Copy as a new draft' }))
     })
