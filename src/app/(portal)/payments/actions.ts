@@ -1015,6 +1015,27 @@ export async function approveVoucher(formData: FormData) {
 // voucher. A deal since repaid gets a plain copy, as before.
 export async function copyPaymentVoucher(formData: FormData): Promise<void> {
   const user = await requireActionOn('/payments/[id]', 'treasury', 'create')
+  const created = await copyPaymentVoucherWork(user, formData)
+  redirect(`/payments/${created.id}/edit`)
+}
+
+/**
+ * Copy as a new draft, answered in words (2026-10-16, the Finance phone app's
+ * voucher): the same gate and work as `copyPaymentVoucher` — the app opens the
+ * copy on its own screen, its Edit sheet up, instead of the portal's edit page.
+ */
+export async function copyPaymentVoucherInWords(formData: FormData): Promise<{ ok: true; id: string; voucherNo: string } | { ok: false; reason: string }> {
+  const user = await requireActionOn('/payments/[id]', 'treasury', 'create')
+  try {
+    const created = await copyPaymentVoucherWork(user, formData)
+    return { ok: true, ...created }
+  } catch (e) {
+    if (isRedirect(e)) throw e
+    return { ok: false, reason: e instanceof Error && e.message ? e.message : 'The copy did not go through.' }
+  }
+}
+
+async function copyPaymentVoucherWork(user: Awaited<ReturnType<typeof requireActionOn>>, formData: FormData): Promise<{ id: string; voucherNo: string }> {
   const supabase = await createClient()
 
   const sourceId = (formData.get('voucher_id') as string) ?? ''
@@ -1103,7 +1124,7 @@ export async function copyPaymentVoucher(formData: FormData): Promise<void> {
   }
 
   revalidatePath('/payments')
-  redirect(`/payments/${created.id}/edit`)
+  return { id: created.id as string, voucherNo }
 }
 
 export async function updatePaymentVoucher(formData: FormData) {
@@ -1537,6 +1558,29 @@ export async function voidVoucher(formData: FormData) {
   revalidatePath('/payments')
   revalidatePath('/approvals')
   redirect('/payments')
+}
+
+/**
+ * Void a voucher, void a paid receipt, reverse a paid payment — answered in
+ * words (2026-10-16, the Finance phone app's voucher): the same gate and work
+ * as voidVoucher / voidPaidReceipt / reversePaidPayment. Their way back to the
+ * portal's Payments (the redirect at their end, reached once the work is done)
+ * is the desktop's, so here it is not followed.
+ */
+export async function voidVoucherStepInWords(
+  kind: 'void' | 'void_receipt' | 'reverse',
+  formData: FormData,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  await requireActionOn(['/payments', '/payments/[id]', '/receipts'], 'treasury', 'void')
+  try {
+    if (kind === 'void') await voidVoucher(formData)
+    else if (kind === 'void_receipt') await voidPaidReceipt(formData)
+    else await reversePaidPayment(formData)
+    return { ok: true }
+  } catch (e) {
+    if (isRedirect(e)) return { ok: true }
+    return { ok: false, reason: e instanceof Error && e.message ? e.message : 'That did not go through.' }
+  }
 }
 
 // ─── Void a PAID receipt / billing-payment (reverse all effects) ────────────

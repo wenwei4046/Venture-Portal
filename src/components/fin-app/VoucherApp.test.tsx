@@ -7,7 +7,7 @@ import type { VoucherDetail } from '@/app/(portal)/payments/_lib/voucher-detail'
 // stacked cards open a list, a row opens the voucher (the drawer's parts, read
 // by openVoucherPage), Back steps back; the windows are the desktop's.
 
-const mocks = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn(), openPage: vi.fn(), openEdit: vi.fn(), update: vi.fn(), flash: vi.fn() }))
+const mocks = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn(), openPage: vi.fn(), openEdit: vi.fn(), update: vi.fn(), flash: vi.fn(), voidWords: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push, refresh: mocks.refresh, replace: mocks.replace }),
   usePathname: () => '/fin-app/daily/payments',
@@ -26,6 +26,7 @@ vi.mock('@/app/(portal)/payments/actions', () => ({
   voidPaidReceipt: vi.fn(),
   voidVoucher: vi.fn(),
   updatePaymentVoucherInWords: mocks.update,
+  voidVoucherStepInWords: mocks.voidWords,
 }))
 vi.mock('@/app/(portal)/payments/_components/CreatePaymentDialog', () => ({
   default: ({ open }: { open: boolean }) => (open ? <div data-testid="create-payment">Create payment sheet</div> : null),
@@ -218,6 +219,26 @@ describe('Daily › Payment on the phone', () => {
     const fd = mocks.update.mock.calls[0][0] as FormData
     expect(Object.fromEntries(fd.entries())).toEqual({ id: '0001', description: 'Ads Oct — Meta' })
     expect(mocks.flash).toHaveBeenCalledWith('Voucher saved')
+    expect(mocks.push).not.toHaveBeenCalled()
+  })
+
+  it('Void is answered in words — the app stays on its screen (its action ends on the portal’s Payments)', async () => {
+    mocks.voidWords.mockResolvedValue({ ok: true })
+    window.history.replaceState(null, '', '/fin-app/daily/payments?f=all')
+    draw('f=all')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Meta Platforms Ireland/ }))
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Void voucher' }))
+    const ask = await screen.findByRole('dialog', { name: /Void HV-PV-202610-0001\?/ })
+    await act(async () => {
+      fireEvent.click(within(ask).getByRole('button', { name: 'Void voucher' }))
+    })
+    const [kind, fd] = mocks.voidWords.mock.calls[0] as [string, FormData]
+    expect(kind).toBe('void')
+    expect(fd.get('id')).toBe('0001')
+    expect(mocks.flash).toHaveBeenCalledWith('HV-PV-202610-0001 voided')
     expect(mocks.push).not.toHaveBeenCalled()
   })
 

@@ -85,7 +85,7 @@ export default function VoucherEditSheet({
   }, [voucherId, read?.id])
 
   return (
-    <FinDialog open={open} onClose={onClose} title={`Edit ${label}`} sub={read ? (read.data.voucher.direction === 'credit' ? 'Official receipt' : 'Payment voucher') : undefined} tall>
+    <FinDialog open={open} onClose={onClose} title={`Edit ${(read?.id === voucherId ? read?.data.voucher.voucher_no : null) ?? label}`} sub={read ? (read.data.voucher.direction === 'credit' ? 'Official receipt' : 'Payment voucher') : undefined} tall>
       {read ? (
         <EditForm key={read.id} data={read.data} today={today} onClose={onClose} onDone={onDone} />
       ) : (

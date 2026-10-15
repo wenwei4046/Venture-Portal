@@ -232,6 +232,7 @@ export default function VoucherApp({
       router.refresh()
     },
     extraMore,
+    inWords: true,
   })
   const recordBar: BarButton[] = steps.map((st) => ({
     key: st.key,
@@ -422,7 +423,20 @@ export default function VoucherApp({
       ) : null}
 
       {v && extra?.kind === 'copy' ? (
-        <CopyVoucherDialog key={extra.nonce} open onClose={() => setExtra(null)} voucherId={v.id} voucherNo={v.no} />
+        <CopyVoucherDialog
+          key={extra.nonce}
+          open
+          onClose={() => setExtra(null)}
+          voucherId={v.id}
+          voucherNo={v.no}
+          // The copy opens here, its Edit sheet up — as the desktop opens it on its edit page.
+          onCopied={(copy) => {
+            flash(`${copy.voucherNo} — a new draft`)
+            router.refresh()
+            go({ kind: 'record', id: copy.id, from: step.kind === 'record' ? step.from : null })
+            setEditing(copy.id)
+          }}
+        />
       ) : null}
       {v && extra?.kind === 'date' && v.paymentDate ? (
         <AmendDateButton key={extra.nonce} autoOpen hideTrigger kind="voucher" id={v.id} currentDate={v.paymentDate} label={v.no ?? 'Draft'} />
