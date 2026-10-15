@@ -132,7 +132,7 @@ describe('the faces', () => {
   // keep Georgia (the 2026-10-10 handoff). A held design proposal keeps its own.
   const PAPER = new Set([
     'src/app/(portal)/director-salary/[directorId]/print/page.tsx',
-    'src/app/(portal)/statements/[id]/print/page.tsx',
+    'src/app/(paper)/statements/[id]/print/page.tsx',
     'src/app/print/director-pool/page.tsx',
     'src/lib/commission/waiting-form.ts',
     'src/components/member/design-preview/ArenaDesignPreview.module.css',

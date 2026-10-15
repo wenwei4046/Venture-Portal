@@ -10,8 +10,11 @@ import { can, type PermissionHolder } from '@/lib/permissions'
  * - HR's view on a PHONE: the HR app (`/hr-app`). The portal's other HR pages
  *   (Payroll, People, Director Salary, the Revenue Department …) are for the
  *   computer — the user: "这些页面只在电脑用";
- * - everybody else: the portal. Finance's and the Principal's phone faces come
- *   later, into this same app.
+ * - Finance's view on a PHONE (2026-10-16): the Finance app (`/fin-app`) —
+ *   every Finance page is an app screen, the user: "我不要再用那种 portal 的
+ *   手机版了，把它全部转成 native app";
+ * - everybody else: the portal. The Principal's phone face comes later, into
+ *   this same app.
  * A view switcher moves the Principal between them all (setViewAs).
  */
 

@@ -19,7 +19,8 @@ vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireAuth: 
 vi.mock('./revenue/_lib/sub-departments', () => ({ listSubDepartments: mocks.listSubDepartments }))
 vi.mock('@/lib/dept-registry', async (orig) => ({ ...(await orig<object>()), primedRegistryRows: () => mocks.REGISTRY }))
 vi.mock('@/components/layout/PortalFrame', () => ({ default: () => null }))
-vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
+const nav = vi.hoisted(() => ({ redirect: vi.fn() }))
+vi.mock('next/navigation', () => ({ redirect: nav.redirect }))
 // The fold of HR's sidebar and the Revenue sub-department last picked are cookies (2026-10-10);
 // whether it is a phone is the browser's own words (2026-10-14: Finance's shell is the computer's).
 const jar = vi.hoisted(() => ({ values: {} as Record<string, string>, ua: '' }))
@@ -102,12 +103,24 @@ describe('the sidebar’s data', () => {
     delete jar.values['vp-hr-nav']
   })
 
-  it('tells the shell when it is a phone — Finance’s view keeps the portal’s phone shell there', async () => {
-    mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', role: 'finance', permissions: ['treasury'] }))
+  it('tells the shell when it is a phone', async () => {
+    mocks.requireAuth.mockResolvedValue(withActions({ id: 'p', role: 'principal', permissions: ['treasury'] }))
     jar.ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130 Safari/537.36'
     expect((await frameFor()).phone).toBe(false)
     jar.ua = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36'
     expect((await frameFor()).phone).toBe(true)
+    expect(nav.redirect).not.toHaveBeenCalled()
+    jar.ua = ''
+  })
+
+  it('sends Finance’s view on a phone to the Finance app (2026-10-16) — on a computer it stays', async () => {
+    mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', role: 'finance', permissions: ['treasury'] }))
+    jar.ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130 Safari/537.36'
+    await frameFor()
+    expect(nav.redirect).not.toHaveBeenCalled()
+    jar.ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
+    await frameFor()
+    expect(nav.redirect).toHaveBeenCalledWith('/fin-app')
     jar.ua = ''
   })
 })

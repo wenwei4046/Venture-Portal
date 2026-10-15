@@ -12,6 +12,8 @@ import { PROD_LOGINS } from './page-tabs.fixtures'
 import { OPEN_PAGES, PAGE_TABS, actionsOnPage, closedBoxes, hasTab, opensPage, opensPath, routeOf, userTabs, type PageRoute } from './page-tabs'
 
 const PORTAL = join(process.cwd(), 'src', 'app', '(portal)')
+// A portal page on paper stands outside the frame — (paper), 2026-10-16 — with its tabs and gate the same.
+const PAPER = join(process.cwd(), 'src', 'app', '(paper)')
 
 function pages(dir: string, out: string[] = []): string[] {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -21,8 +23,8 @@ function pages(dir: string, out: string[] = []): string[] {
   }
   return out
 }
-const routeOfFile = (file: string) => '/' + relative(PORTAL, join(file, '..')).split(sep).join('/')
-const FILES = new Map(pages(PORTAL).map(f => [routeOfFile(f), readFileSync(f, 'utf8')]))
+const routeOfFile = (group: string, file: string) => '/' + relative(group, join(file, '..')).split(sep).join('/')
+const FILES = new Map([PORTAL, PAPER].flatMap(group => pages(group).map(f => [routeOfFile(group, f), readFileSync(f, 'utf8')] as const)))
 const ROUTES = Object.keys(PAGE_TABS) as PageRoute[]
 
 describe('every portal page asks its tabs (HR revamp 8b)', () => {
