@@ -1840,7 +1840,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
             </path>
           </svg>Profile</span>
         <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "6px" }}>
-          <h1 style={{ margin: "0", fontSize: "calc(30px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.15" }}>Showrooms</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}><h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "calc(30px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.15" }}>Showrooms</h1>{!!(v.rm.rmPager) && (<span style={{ flex: "none", display: "inline-flex", alignItems: "center", height: "40px", padding: "0 2px", boxSizing: "border-box", borderRadius: "20px", border: "1px solid #EBDDD2", background: "#fff" }}><span onClick={v.rm.rmPrev} role="button" aria-label="Previous showroom" style={{ width: "34px", height: "34px", display: "grid", placeItems: "center", color: "#BD4A19", opacity: v.rm.rmPrevOp, cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6"></path></svg></span><span style={{ minWidth: "34px", textAlign: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "#806B60", fontVariantNumeric: "tabular-nums" }}>{v.rm.rmPos}</span><span onClick={v.rm.rmNext} role="button" aria-label="Next showroom" style={{ width: "34px", height: "34px", display: "grid", placeItems: "center", color: "#BD4A19", opacity: v.rm.rmNextOp, cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6"></path></svg></span></span>)}<span onClick={v.rm.rmAdd} role="button" aria-label="Add showroom" title="Add showroom" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", color: "#BD4A19", display: "grid", placeItems: "center", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"></path></svg></span></div>
         </div>
         {(v.rm.rmList).map((r, r_i) => (<Fragment key={r_i}>
           <section style={{ flex: "none", borderRadius: "18px", border: "1px solid #EBDDD2", background: "#fff", overflow: "hidden", boxShadow: "0 2px 8px rgba(63,43,34,.04)" }}>
@@ -2183,10 +2183,6 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
             </>)}
           </section>
         </Fragment>))}
-        <span onClick={v.rm.rmAdd} style={{ flex: "none", height: "48px", boxSizing: "border-box", borderRadius: "24px", border: "1px dashed #D9C7BA", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M12 5v14M5 12h14">
-            </path>
-          </svg>Add showroom</span>
       </div>
       {!!(v.rm.tpOpen) && (<>
         <div onClick={v.rm.tpClose} style={{ position: "absolute", inset: "0", zIndex: "9", background: "rgba(63,43,34,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeIn 200ms ease-out" }}>
