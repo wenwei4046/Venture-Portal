@@ -826,6 +826,27 @@ export async function createPaymentFromDialog(formData: FormData): Promise<Dialo
 }
 
 /**
+ * Settle an invoice on its official receipt, the Finance phone app's sheet
+ * (2026-10-16, part E4b — what `/payments/new?invoice_id=` makes: a
+ * department pool's or a director's invoice settled by netting): the receipt
+ * the form page makes (createPaymentVoucherInner, every rule), answered in
+ * words — no redirect back to the hub.
+ */
+export async function settleInvoiceFromSheet(formData: FormData): Promise<DialogPaymentResult> {
+  try {
+    if (formData.get('direction') !== 'credit' || formData.get('voucher_type') !== 'billing_payment' || !formData.get('invoice_id')) {
+      return { ok: false, reason: 'Settle makes the invoice’s official receipt.' }
+    }
+    if (formData.get('return_to')) formData.delete('return_to')
+    const made = await createPaymentVoucherInner(formData)
+    return { ok: true, id: made.id, voucherNo: made.voucherNo, submitted: false }
+  } catch (err) {
+    if (isRedirect(err)) throw err
+    return { ok: false, reason: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
+/**
  * Create receipt, Receipt's dialog (2026-10-14, the Finance revamp v2 — D09):
  * the receipt the form page makes (`?mode=receipt` — createPaymentVoucherInner,
  * every rule: received at once, bank and GL posted), answered in words — the

@@ -12,6 +12,9 @@ import type { InvoicePageData } from '@/app/(portal)/invoices/[id]/_lib/invoice-
 import { InvoiceDetailBody, InvoiceHero, invoiceSteps, type InvoiceBodyExtras, type InvoiceCan } from '@/app/(portal)/statements/_components/InvoiceDrawer'
 import { PayrollBasisBody } from '@/app/(portal)/statements/_components/PayrollBasisDrawer'
 import { useInvoiceWork } from '@/app/(portal)/statements/_components/invoice-work'
+import CreatePaymentDialog, { type PaymentPreset } from '@/app/(portal)/payments/_components/CreatePaymentDialog'
+import { openInvoiceRefund } from '@/app/(portal)/payments/create-actions'
+import { ContractSheet, SettleReceiptSheet } from './InvoiceSheets'
 import { INVOICE_CARD, invoiceCards, isStatusCard } from '@/app/(portal)/statements/_lib/invoice-cards'
 import {
   invoicedTotal,
@@ -204,6 +207,27 @@ export default function InvoiceApp({
   const canTick = (i: HubInvoice) => i.settleable || i.voidable
   const mayTick = (can.create || can.void || can.docExport) && (listCard === 'all' || listCard === 'issued')
 
+  // ── The voucher page's work, as sheets (part E4b): a pool's settle by netting, a paid invoice's refund,
+  // a non-billable expense — and a marketing contract, new or edited ──
+  const [settleFor, setSettleFor] = useState<HubInvoice | null>(null)
+  const [payment, setPayment] = useState<{ key: string; preset: PaymentPreset } | null>(null)
+  const [paying, setPaying] = useState(false)
+  const [contractFor, setContractFor] = useState<{ id: string | null } | null>(null)
+  const startRefund = (inv: HubInvoice) => {
+    void openInvoiceRefund(inv.id).then(
+      (res) => {
+        if (!res.ok) return flash(res.reason)
+        const r = res.preset
+        setPayment({
+          key: `refund:${inv.id}`,
+          preset: { title: 'Refund payment', payee: r.company_name, companyId: r.company_id, amount: r.amount, description: `Refund invoice ${r.invoice_no ?? ''} — ${r.company_name}` },
+        })
+        setPaying(true)
+      },
+      () => flash('The invoice could not be read. Try again.'),
+    )
+  }
+
   // Copy lands in this month's list: the record steps aside for it (see goMonth below).
   const leaving = useRef(false)
   const work = useInvoiceWork({
@@ -240,6 +264,7 @@ export default function InvoiceApp({
       })
     },
     onBasis: () => go({ kind: 'basis' }),
+    onVoucher: (key, inv) => (key === 'settle_netting' ? setSettleFor(inv) : startRefund(inv)),
   })
 
   const toggle = (i: HubInvoice) => {
@@ -369,10 +394,10 @@ export default function InvoiceApp({
               off: true,
               onClick: () => flash(`No invoice for this project in ${monthLong} yet — Create invoice ▾ › Generate Marketing invoices raises them.`),
             },
-        onOpen: can.edit ? () => router.push(`/billing/contracts/${c.id}/edit`) : undefined,
+        onOpen: can.edit ? () => setContractFor({ id: c.id }) : undefined,
       }))
       group = <ItemGroup title="Marketing projects" count={plural(hub.contracts.length, 'project', 'projects')} items={items} empty="No marketing projects yet." />
-      if (can.create) bar = [{ key: 'new', label: '+ New contract', kind: 'primary', href: '/billing/contracts/new' }]
+      if (can.create) bar = [{ key: 'new', label: '+ New contract', kind: 'primary', onClick: () => setContractFor({ id: null }) }]
     } else {
       const items: ItemLine[] = hub.nonBillable.map((t) => ({
         key: t.id,
@@ -382,7 +407,19 @@ export default function InvoiceApp({
         tone: t.out ? null : 'ledger',
       }))
       group = <ItemGroup title="Non-billable" count={plural(hub.nonBillable.length, 'transaction', 'transactions')} items={items} empty={`Nothing in ${monthLong} yet.`} />
-      if (can.voucher) bar = [{ key: 'new', label: '+ Add non-billable expense', kind: 'primary', href: '/payments/new?preset=non_billable' }]
+      if (can.voucher)
+        bar = [
+          {
+            key: 'new',
+            label: '+ Add non-billable expense',
+            kind: 'primary',
+            // The voucher page's non-billable preset: Create payment, on the Venture Pool.
+            onClick: () => {
+              setPayment({ key: 'non-billable', preset: { title: 'Non-billable expense' } })
+              setPaying(true)
+            },
+          },
+        ]
     }
     screen = (
       <AppScreen screenKey={`invoices?f=${card}`} head={{ kind: 'back', title, backLabel: 'Invoices', onBack: backTo }} bar={bar}>
@@ -487,10 +524,57 @@ export default function InvoiceApp({
     )
   }
 
+  const contractOn = contractFor?.id ? (hub.contracts.find((c) => c.id === contractFor.id) ?? null) : null
   return (
     <>
       {screen}
       {work.dialogs}
+      <SettleReceiptSheet
+        invoiceId={settleFor?.id ?? null}
+        label={settleFor?.no ?? 'the invoice'}
+        today={today}
+        onClose={() => setSettleFor(null)}
+        onDone={(no) => {
+          flash(returnedNote(no))
+          router.refresh()
+        }}
+      />
+      {payment ? (
+        <CreatePaymentDialog
+          key={payment.key}
+          open={paying}
+          onClose={() => setPaying(false)}
+          prefix={`HV-PV-${thisMonth.replace('-', '')}`}
+          today={today}
+          preset={payment.preset}
+          onSaved={() => router.refresh()}
+        />
+      ) : null}
+      {contractFor ? (
+        <ContractSheet
+          key={contractFor.id ?? 'new'}
+          open
+          onClose={() => setContractFor(null)}
+          onDone={(message) => {
+            flash(message)
+            router.refresh()
+          }}
+          contract={
+            contractOn
+              ? {
+                  id: contractOn.id,
+                  companyId: contractOn.companyId,
+                  description: contractOn.description === '—' ? '' : contractOn.description,
+                  amount: contractOn.amount == null ? '' : contractOn.amount.toFixed(2),
+                  startDate: contractOn.start ?? '',
+                  endDate: contractOn.end ?? '',
+                }
+              : null
+          }
+          companies={hub.companies}
+          today={today}
+        />
+      ) : null}
     </>
   )
 }
