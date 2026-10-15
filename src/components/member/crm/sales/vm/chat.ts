@@ -22,7 +22,6 @@ import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, INLINE_TIME, mediaOf, mediaWord, NO_MEDIA } from "../../shared/chat-media";
 import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
-import { heldLeft, isHeld, undoHeld } from "../../shared/undo-send";
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { typePx } from "../../shared/type";
 import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "./composer";
@@ -190,8 +189,6 @@ export function chatVM(ctx: SalesCtx) {
           forward: { chats: forwardChats(data.customers, c.id, nameOf), send: toId => void act.forward(key, toId) },
           info: messageInfo(m, c, nameOf),
           actions: [
-            // Still held (shared/undo-send.ts): taken back before it reaches the customer, its words back in the box.
-            ...(isHeld(key) ? [{ label: `Unsend · ${heldLeft(key)}s`, icon: MENU_ICON.unsend, danger: true, run: () => { if (!undoHeld(key)) act.toast("Already sent — it can no longer be taken back."); } }] : []),
             { label: "Reply", icon: MENU_ICON.reply, run: () => patch({ reply: { msgId: key, from: m.from, text: m.text || (m.media ? mediaWord(m) : "") }, menu: null, hover: null }) },
             { label: "Forward", icon: MENU_ICON.forward, run: () => {} },
             ...(m.text ? [{ label: "Copy", icon: MENU_ICON.copy, run: () => { void navigator.clipboard?.writeText(plain(m.text)).catch(() => {}); } }] : []),

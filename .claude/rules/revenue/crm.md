@@ -199,3 +199,5 @@ Mig `20261015100000_crm_desktop_v2` (`crm_channels`, `crm_set_channel`, `crm_not
 - **The Calendar:** the visits' analysis (vm/analysis.ts) lives in its rail; the card over the month is gone.
 - **The prototype harness** keeps the design's chart card (`ppRail` / `railOn` false), so 6h / 6hw still compare at 0 px.
 
+
+**UNDO SEND TAKEN OUT, AND KBDEBUG WITH IT (2026-10-15 — the owner: "你幫我把剛剛 delete everyone undo 10s 的取消，恢復原本的就行"; and of kbdebug's numbers: "如何取消上面綠色的字？"):** a message, photo, video, voice note or file goes the moment it is sent again, as before #447 — no 10 s hold, no *Unsend · Ns* in the long-press menu of either chat; `shared/undo-send.ts` and its test are gone (supersedes UNDO SEND and its no-bar follow-up above). `shared/kb-debug.tsx` and the `kbdebug` word are gone too: its one screenshot found the iPhone fault (#456).

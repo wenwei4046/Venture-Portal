@@ -17,7 +17,6 @@ import { rememberLocalMedia } from "../shared/pending";
 import { keepSent } from "../shared/media-cache";
 import { isPrepared, prepareImage } from "../shared/image-prep";
 import { fitVideo, fitVoice, VIDEO_PICK_MAX } from "../shared/video-fit";
-import { holdForUndo } from "../shared/undo-send";
 import { dayLabel, timeLabel, windowShut } from "./vm/common";
 
 export interface SalesActions {
@@ -148,9 +147,6 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       if (!live) { addMessage(customerId, { id: uid(), from: "me", kind: "text", text: text.trim(), at: new Date().toISOString(), status: "sent", by: me, ...(replyTo ? { replyTo } : {}) }); return true; }
       const tempId = `sending-${uid()}`;
       addMessage(customerId, { id: tempId, from: "me", kind: "text", text: text.trim(), at: new Date().toISOString(), status: "sending", by: me, ...(replyTo ? { replyTo } : {}) });
-      // Held a moment with Undo before it goes (shared/undo-send.tsx, 2026-10-15): undone, it leaves the chat and the
-      // caller puts its words back in the box.
-      if (!(await holdForUndo(tempId, `"${text.trim().slice(0, 40)}"`))) { swapMessage(customerId, tempId, null); return false; }
       const r = await inTurn(customerId, () => sendCrmMessage(customerId, text, { replyTo }));
       if (!r.ok) { swapMessage(customerId, tempId, null); toast(r.error); return false; }
       swapMessage(customerId, tempId, r.message);
@@ -355,12 +351,6 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
         ...(local ? { media: { kind: shown, url: local, ...(shown === "file" ? { name: file.name, mime: file.type } : {}) } } : {}) };
       addMessage(customerId, draft);
       if (!live) return true;
-      // Held a moment with Undo before it is prepared and sent (shared/undo-send.tsx, 2026-10-15).
-      if (!(await holdForUndo(draft.id, kind === "image" ? "Photo" : kind === "video" ? "Video" : kind === "audio" ? "Voice message" : file.name || "File"))) {
-        swapMessage(customerId, draft.id, null);
-        if (local) URL.revokeObjectURL(local);
-        return false;
-      }
       const r = await inTurn(customerId, async () => {
         // Every photo is sent as an upright JPEG — a PNG screenshot went to WhatsApp as it was and came back 131053
         // (2026-10-14, 9:57 am); one the preview already made ready is sent as it is (HD stays HD).
