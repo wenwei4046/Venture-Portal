@@ -886,6 +886,7 @@ README §1 and `prototype/Finance Mobile App.dc.html` (M01–M18): Finance's vie
 - **Reconciliation** (`ReconApp`): a card a bank against its GL, *Monthly reconciliations*; a month's page; *Match lines* — two ticked lists (statement, then book), the sums as a notice, *Match N ↔ M* pale until they agree; *Report*.
 - **Statements** (`StatementsApp`): *Net · <month>* between the arrows over *Statements · <Month>*, *Draft*, *All statements*; a statement's page with *Issue to subsidiary* / *Mark as paid* and *Print statement*; *Generate statements*.
 - **One-way steps ask first** (v4.53): a press nothing in the app undoes — *Issue to subsidiary*, *Mark as paid*, *Bill interest*, *Mark executed* — opens the kit's question (*Issue to <company>?* · *<month> · <net>*, *This cannot be undone.*, *Cancel* · the step); a step with its own way back (Mark settled, Mark done, Submit for approval, a match) stays one press.
+- **Part E3** (v4.54): *Dept Pool* (*Total balance* or *Net margin* over By department — a balance ••••• until *Show balances* — Balance by bank, HR costing), a department's page (`dp-<slug>`: its Cash Flow, the P&L a press away, a month between the arrows), *Venture Pool* (*Running balance · all-time*; This month, 12 months, Pool ledger), *Audit Log* (*Saves today*; Latest changes by day — a save's records and fields, a record's *History*; Areas you read; *Filter* · *Older* / *Newest*; ‹ Profile) and *Meeting Rooms* — the Revenue app's Book a room itself, in its own frame and theme (`data-revenue-app`, Inter Tight), ‹ Profile.
 
 
 **HR & Payroll**
@@ -1565,6 +1566,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.54** · 2026-10-15 · Finance's phone app, part E3: Department › Dept Pool, a department's own page, Venture Pool; Profile › Admin › Audit Log and Meeting Rooms (the Revenue app's Book a room, in its own frame and theme) → Finance's view — the phone app
 - **v4.53** · 2026-10-15 · Finance's phone app: one-way steps ask first — Issue to subsidiary, Mark as paid, Bill interest, Mark executed open a question sheet before they act → Finance's view — the phone app
 - **v4.52** · 2026-10-15 · Finance's phone app, part 5c: Daily › Journal Entries and Reconciliation, Fund › Invoice Financing, Repayment Schedule and Statements — each page's cards, lists and records with its steps and sheets (Match lines on its own screen, Record financing and the Calculator, Generate statements) → Finance's view — the phone app
 - **v4.51** · 2026-10-15 · HR's view — Attendance › Month close sends HQ's overtime and unpaid days to payroll: the toast says what payroll took, Outputs › Payroll where each person's payroll stands; the register's OT columns → HR's view — Attendance
