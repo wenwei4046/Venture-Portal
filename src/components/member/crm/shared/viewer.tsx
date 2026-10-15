@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { PdfPages } from "./pdf-pages";
 import { FilePreview, previewKind } from "./file-preview";
 import { typePx } from "./type";
+import { keepImage, keptSrc, readyPhotos } from "./media-cache";
 
 /**
  * A chat's photos, videos and documents open INSIDE the app (the owner, 2026-10-14: "打開圖片後，沒有返回鍵能回到聊天室
@@ -132,6 +133,7 @@ export function MediaViewer() {
   const [ready, setReady] = useState<Record<string, File | null>>({});
   const [saving, setSaving] = useState("");
   const [note, setNote] = useState("");
+  const [, setKept] = useState(0);
   const start = useRef<{ x: number; y: number; t: number; dx: number; v: number; pt: number; pdx: number; axis: "" | "x" | "y" | "pan"; zx: number; zy: number } | null>(null);
   /**
    * Left / right as a strip — the previous, this and the next photo side by side (the owner, 2026-10-15: "點入照片時，左右
@@ -171,6 +173,14 @@ export function MediaViewer() {
     const el = stripRef.current;
     if (el) { el.style.transition = "none"; el.style.transform = `translate3d(${-window.innerWidth}px,0,0)`; }
   }, [cur]);
+  // The photos two either side read from the phone and decoded before a slide reaches them (media-cache › readyPhotos).
+  useEffect(() => {
+    if (!s) return;
+    let live = true;
+    const near = s.items.slice(Math.max(0, s.i - 2), s.i + 3).filter(m => m.kind === "image").map(m => m.url);
+    void readyPhotos(near).then(fresh => { if (live && fresh) setKept(n => n + 1); });
+    return () => { live = false; };
+  }, [s]);
   // Each item: back to its whole picture, and its file fetched for Download.
   useEffect(() => {
     setDrag({ x: 0, y: 0 }); setZoom(Z0); setNote("");
@@ -336,7 +346,7 @@ export function MediaViewer() {
                     transform: k === 1 ? `translate(${zoom.x}px, ${drag.y + zoom.y}px) scale(${zoom.s * (drag.y ? Math.max(0.8, 1 - drag.y / 1600) : 1)})` : "none",
                     transition: k === 1 && !moving ? "transform 200ms ease" : "none" }}>
                     {m.kind === "image"
-                      ? <img src={m.url} alt="Photo" draggable={false} decoding="async" style={{ display: "block", maxWidth: "100%", maxHeight: "100%", objectFit: "contain", userSelect: "none", WebkitUserSelect: "none" }} />
+                      ? <img src={keptSrc(m.url) ?? m.url} onLoad={() => keepImage(m.url)} alt="Photo" draggable={false} style={{ display: "block", maxWidth: "100%", maxHeight: "100%", objectFit: "contain", userSelect: "none", WebkitUserSelect: "none" }} />
                       : k === 1
                       ? <video key={m.url + ":on"} src={m.url} controls autoPlay playsInline style={{ width: "100%", maxHeight: "100%", background: "#000", pointerEvents: "auto" }} />
                       : <video key={m.url + ":off"} src={`${m.url}#t=0.1`} muted playsInline preload="metadata" style={{ width: "100%", maxHeight: "100%", background: "#000" }} />}

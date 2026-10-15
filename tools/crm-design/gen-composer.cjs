@@ -102,6 +102,8 @@ const PATCHES = [
     "the customer's own first name; the keyboard is the phone's (focus / blur); swipe-to-reply finds the box by data-draft"],
   ['<span onClick={p.camera} title="Camera" style={{', '<span onClick={p.camera} onMouseDown={p.keep} title="Camera" style={{',
     "the camera keeps the reply box's focus through the press (the owner, 2026-10-15: \"the camera cant open when I press\" — the keyboard going down moved the bar under the finger and the tap was lost)"],
+  ['{!!(p.noDraft) && (<>', '{(<>',
+    "Attach and Camera stay while typing (the owner, 2026-10-15: \"我的聊天室，原本有的功能都不見了\" — the prototype hid both once a word was typed; the chat before it always had them)"],
   ['<span onClick={p.toggleAttach} title="Attach" style={{', '<span onClick={p.toggleAttach} onMouseDown={p.keep} title="Attach" style={{',
     "as the sticker toggle: the attach panel takes the keyboard's place in one step"],
   ['<span onClick={p.mainAct} title={p.mainTitle} style={{ flex: "none", width: "46px", height: "46px", borderRadius: "50%", display: "grid", placeItems: "center", background: "#BD4A19", color: "#fff", cursor: "pointer", boxShadow: "0 3px 9px rgba(189,74,25,.18)" }}>',
