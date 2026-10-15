@@ -78,6 +78,8 @@ export const SECTION_PICK: Record<string, number> = { assignment: 0, settings: 0
 export const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 export const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export const DIRECTOR_TEAM = "Revenue Director";
+/** The Revenue Director's key in an ad's split — the database's fixed key for the directors' "team" (mig 20261016010000). */
+export const DIRECTOR_SPLIT_KEY = "ffffffff-ffff-ffff-ffff-ffffffffffff";
 export const DIRECTOR_C: [string, string] = ["#387557", "#E8F3ED"];
 
 /**

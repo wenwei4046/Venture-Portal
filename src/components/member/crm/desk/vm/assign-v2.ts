@@ -14,7 +14,7 @@ import type { DeskCtx, HistRow } from "./ctx";
 import { crmFigures } from "./adsperf";
 import type { assignPageVM } from "./assign";
 import { MON } from "./insight";
-import { teamColours } from "./tokens";
+import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, teamColours } from "./tokens";
 
 const DAY = 86_400_000;
 const day0 = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -45,7 +45,8 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
   const adIds = [...new Set(data.customers.map(c => c.adId).filter((x): x is string => !!x))];
   const adOf = (id: string) => { const cs = data.customers.filter(c => c.adId === id); return { id, label: cs[0]?.ad ?? `Ad ${id}`, cs, wa: cs.some(c => c.channel === "whatsapp") }; };
   const ads = adIds.map(adOf).sort((a, b) => b.cs.length - a.cs.length);
-  const T3 = teams.map((t, k) => ({ id: t.id, name: t.name, color: teamColours(k)[0], people: t.people }));
+  const T3 = [...teams.map((t, k) => ({ id: t.id, name: t.name, color: teamColours(k)[0], people: t.people })),
+    ...(ctx.directors.length ? [{ id: DIRECTOR_SPLIT_KEY, name: DIRECTOR_TEAM, color: DIRECTOR_C[0], people: ctx.directors }] : [])];
   const teamOf = (pid: string | null) => (pid ? T3.find(t => t.id === pid || t.people.some(p => p.id === pid)) : undefined);
 
   // Who got the leads this month: each team's leads from the ads (by who has them now), and those held for a full team.
