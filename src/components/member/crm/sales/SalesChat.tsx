@@ -8,6 +8,7 @@ import { Fragment } from "react";
 import H from "../crm.module.css";
 import ChatComposer from "./ChatComposer";
 import { PickEditor } from "../shared/pick-editor";
+import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import type { ChatVM } from "./vm/chat";
 
@@ -229,7 +230,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
               {(v.hm.rows).map((r, r_i) => (<Fragment key={r_i}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "12px 14px", borderTop: r.rule, fontSize: "calc(14px * var(--rv-type, 1))" }}>
                   <span style={{ color: "#806B60" }}>{r.k}</span>
-                  <strong style={{ fontWeight: "600", textAlign: "right", minWidth: "0", color: r.vFg }}>{r.v}</strong>
+                  <strong style={{ fontWeight: "600", textAlign: "right", minWidth: "0", color: r.vFg }}><InfoValue v={r.v} href={r.href} /></strong>
                 </div>
               </Fragment>))}
             </div>

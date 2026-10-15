@@ -7,6 +7,7 @@ import type { ChangeEvent as InputEvent } from "react";
 import type { CrmCustomer, CrmData, CrmForm, CrmFormField } from "@/lib/member/crm-data";
 import type { CustomerForm } from "../ui";
 import { CHANNEL, STATUS_LABEL, day0, ini, lastReal, stop, timeLabel, type SalesCtx } from "./common";
+import { adHref } from "../../shared/AdLink";
 
 /** A Malaysian number as people write it: 60123456789 → 012-345 6789. */
 export function phoneLabel(raw: string): string {
@@ -56,7 +57,9 @@ export function infoRows(c: CrmCustomer, data?: Pick<CrmData, "forms">) {
     // The form's own questions, after the built-in ones (CRM Desktop rev 1, B5).
     ...(f?.extra ?? []).flatMap(s => s.fields.map(q => [q.label, c.extra?.[q.id] || "—"])),
   ] as [string, string][]).filter(([k]) => !f || !dropped[k] || f.has[dropped[k]])
-    .map(([k, v], n) => ({ k, v, rule: n ? "1px solid #EBDDD2" : "0", vFg: v === "—" ? "#B5A398" : "#3F2B22" }));
+    .map(([k, v], n) => ({ k, v, rule: n ? "1px solid #EBDDD2" : "0", vFg: v === "—" ? "#B5A398" : "#3F2B22",
+      // The Ad opens the ad itself, so the salesperson sees what the customer saw (the owner, 2026-10-15).
+      href: k === "Ad" ? adHref(c.adUrl) : null }));
 }
 
 const SIZES = ["3R 2R", "2R 1R", "2R 2R", "3R 3R", "4R 2R", "4R 3R", "4R 4R"];

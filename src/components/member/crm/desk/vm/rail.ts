@@ -8,9 +8,11 @@
 import type { DeskCtx } from "./ctx";
 import type { peopleVM } from "./people";
 import type { calendarAnalysisVM } from "./analysis";
+import type { calendarVM } from "./calendar";
 
 type People = ReturnType<typeof peopleVM>;
 type Analysis = ReturnType<typeof calendarAnalysisVM>;
+type Cal = Pick<ReturnType<typeof calendarVM>, "calStats" | "calBarBy" | "calTeamBars">;
 
 export interface RailChart {
   title: string; sum: string; empty: boolean;
@@ -19,7 +21,7 @@ export interface RailChart {
   rows: { label: string; n: number; pct: string; w: number; color: string; on: boolean; pick?: () => void }[];
 }
 
-export function railVM(ctx: DeskCtx, pp: People, calAn: Analysis) {
+export function railVM(ctx: DeskCtx, pp: People, calAn: Analysis, cal?: Cal) {
   const { ui, patch } = ctx;
   const page = ui.tab === "people" ? "people" : ui.tab === "calendar" ? "calendar" : null;
   const people = page === "people", open = !!page && ui.rail;
@@ -29,10 +31,14 @@ export function railVM(ctx: DeskCtx, pp: People, calAn: Analysis) {
     : { title: calAn.title, sum: calAn.sum, empty: calAn.empty, bys: calAn.bys, pie: calAn.pie, rows: calAn.rows.map(r => ({ ...r, on: false })) };
   return {
     railOn: !!page,
+    // The Calendar's dark figures band (Leads … Not reminded, By team / By showroom) lives in the rail too, so the month
+    // has the page to itself (the owner, 2026-10-15: "可以把標識處放到右邊（可收開式）").
+    calRail: true,
     rail: {
       open, toggle: () => patch({ rail: !ui.rail }),
       title: people ? "Contacts insights" : "Visits insights",
       chart, side: people ? pp.ppSide : null,
+      stats: page === "calendar" && cal ? { figures: cal.calStats, by: cal.calBarBy, bars: cal.calTeamBars } : null,
     },
   };
 }

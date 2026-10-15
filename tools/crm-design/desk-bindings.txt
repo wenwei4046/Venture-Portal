@@ -108,6 +108,7 @@ book
 calBarBy
 calDay
 calMonth
+calRail
 calShowroom
 calStats
 calSub
@@ -489,6 +490,8 @@ ppGrid
 ppHas
 ppHasChips
 ppHead
+ppPager
+ppPagerOn
 ppQ
 ppRail
 ppReset

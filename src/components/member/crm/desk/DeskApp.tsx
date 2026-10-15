@@ -9,7 +9,8 @@ import type React from "react";
 import DH from "./desk-hover.module.css";
 import DX from "./desk-extras.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
-import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskHistory, DeskNote, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
+import { InfoValue } from "../shared/AdLink";
+import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
 /** The whole desktop CRM: the Revenue app's frame around it (sidebar, top bar), every page, pane, menu and the toast. */
@@ -3750,6 +3751,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </Fragment>))}
                     </div>
                   </>)}
+                  {!!(v.ppPagerOn) && (<DeskPager v={v.ppPager} />)}
                   {!!(v.ppEmpty) && (<>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "48px 20px", border: "1px dashed #E2CFC1", borderRadius: "14px", textAlign: "center" }}>
                       <strong style={{ fontSize: "15px", fontWeight: "650" }}>No contacts match these filters</strong>
@@ -4138,7 +4140,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     </Fragment>))}
                   </div>
                 </div>
-                <div style={{ flex: "0 0 auto", display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr)) minmax(0, 1.8fr)", gap: "14px", alignItems: "center", padding: "18px 22px", borderRadius: "20px", background: "linear-gradient(135deg, #5A3826, #3A2218)", color: "#fff" }}>
+                {!(v.calRail) && (<><div style={{ flex: "0 0 auto", display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr)) minmax(0, 1.8fr)", gap: "14px", alignItems: "center", padding: "18px 22px", borderRadius: "20px", background: "linear-gradient(135deg, #5A3826, #3A2218)", color: "#fff" }}>
                   {(v.calStats).map((k, k_i) => (<Fragment key={k_i}>
                     <button type="button" onClick={k.open} style={{ display: "flex", flexDirection: "column", gap: "2px", margin: "-8px -10px", padding: "8px 10px", border: "0", borderRadius: "12px", background: "transparent", font: "inherit", color: "#fff", textAlign: "left", cursor: "pointer" }} className={DH.h38}>
                       <b style={{ fontSize: "26px", fontWeight: "700", color: k.color, fontVariantNumeric: "tabular-nums" }}>{k.value}</b>
@@ -4165,13 +4167,13 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </span>
                     </Fragment>))}
                   </span>
-                </div>
+                </div></>)}
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <strong style={{ fontSize: "18px", fontWeight: "700" }}>{v.calTitle}</strong>
                   <span style={{ fontSize: "13px", color: "#806B60" }}>{v.calSub}</span>
                 </div>
                 {!!(v.calMonth) && (<>
-                  <div style={{ background: "#fff", border: "1px solid #EBDDD2", borderRadius: "18px", overflow: "hidden" }}>
+                  <div style={{ flex: "0 0 auto", background: "#fff", border: "1px solid #EBDDD2", borderRadius: "18px", overflow: "hidden" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", borderBottom: "1px solid #EBDDD2" }}>
                       {(v.dow).map((d, d_i) => (<Fragment key={d_i}>
                         <span style={{ padding: "10px 12px", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "#806B60" }}>{d.l}</span>
@@ -4793,7 +4795,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       {(v.ci.rows).map((r, r_i) => (<Fragment key={r_i}>
                         <div style={{ display: "flex", alignItems: "center", gap: "12px", minHeight: "44px", padding: "0 14px", borderTop: r.bt, fontSize: "14px" }}>
                           <span style={{ flex: "0 0 auto", color: "#806B60" }}>{r.k}</span>
-                          <span style={{ flex: "1", minWidth: "0", textAlign: "right", fontWeight: r.w, color: r.c, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.v}</span>
+                          <span style={{ flex: "1", minWidth: "0", textAlign: "right", fontWeight: r.w, color: r.c, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><InfoValue v={r.v} href={r.href} /></span>
                         </div>
                       </Fragment>))}
                     </div>

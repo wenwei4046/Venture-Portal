@@ -50,6 +50,8 @@ export interface CrmCustomer {
   channel: CrmChannel;
   adId: string | null;
   ad: string;
+  /** Meta's link to the ad (its video or picture), when the customer came from one. */
+  adUrl?: string | null;
   status: CrmStatus;
   lost?: { reason: CrmLostReason; note?: string };
   previous?: "won" | "lost";
@@ -259,6 +261,7 @@ export const DEFAULT_AUTO_REPLY_SET: CrmAutoReplySet = {
 /* ── The rows, as PostgREST returns them (the new ones) ────────────────── */
 
 export interface CrmContactRowX extends CrmContactRow {
+  ad_source_url?: string | null;
   property_type?: string | null;
   unit_size?: string | null;
   unit_location?: string | null;
@@ -365,6 +368,7 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
     phone: row.phone ?? "",
     channel: row.channel,
     adId: row.ad_source_id,
+    adUrl: row.ad_source_url ?? null,
     ad: row.ad_headline?.trim() || (row.ad_source_id ? `Ad ${row.ad_source_id}` : `${CHANNEL_LABEL[row.channel]} · no ad`),
     status: row.status,
     ...(row.status === "lost" && reason ? { lost: { reason, ...(row.lost_note ? { note: row.lost_note } : {}) } } : {}),

@@ -62,7 +62,7 @@ export function deskVM(ctx: DeskCtx) {
     ...assignV2VM(ctx, op, as, { sheetW: fr.sheetW, isAdsOp: fr.isAdsOp, isFtOp: fr.isFtOp, isMwtOp: fr.isMwtOp, sheetMode: fr.sheetMode, perfW: fr.perfW }),
     ...showroomsVM(ctx, op),
     ...settingsVM(ctx, op),
-    ...pp, ...railVM(ctx, pp, cal.calAn),
+    ...pp, ...railVM(ctx, pp, cal.calAn, cal),
     ...formPageVM(ctx),
     ...auditVM(ctx),
     ...channelsVM(ctx),

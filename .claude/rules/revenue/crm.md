@@ -219,3 +219,9 @@ Mig `20261015100000_crm_desktop_v2` (`crm_channels`, `crm_set_channel`, `crm_not
   Each is sent once (`data.due`) and never for a muted, hidden or blocked chat. Dry run on production (rolled back): 4 notices at that hour.
 - **Only a login is told:** a salesperson with no login (`hr_staff_costs.user_id` empty) gets nothing. On 2026-10-15, ALVIN — who was dealt KennyTeh, a real Click-to-WhatsApp lead — had none; told the owner.
 
+
+**CONTACTS A PAGE AT A TIME; THE AD IN THE HEADER AND IN CUSTOMER INFO; THE CALENDAR'S FIGURES IN THE RAIL (2026-10-15; the owner: "Contacts List 下方我想要做一個 show 10,20,50 的選單"; "對 show channel, 最好表明是 video ads, 標題"; "在 customer info 新增一個是廣告的鏈接…業務可以看到他們影片的內容進行相應的回復"; "calander 卡住了無法往下拉，可以把標識處放到右邊（可收開式）"):**
+- **Contacts:** 10 a page to start, *Show 10 · 20 · 50* under the table with *1–10 of 26* and ‹ Page 1 of 3 › (`ppPer` / `ppPg`, `DeskPager`); a filter, a search or Clear goes back to page 1.
+- **The desktop chat's header** reads *WhatsApp · Ad · Chat with us* (channel · Ad · the headline Meta sends) for a customer from an ad, *WhatsApp · no ad* otherwise. Meta's message carries the ad's headline, link and media type, never its name. The media type (video / image) is not stored yet — *Video ad* needs a column and both ingest functions changed (a migration, waiting for the owner).
+- **Customer info's Ad opens the ad** (`ad_source_url`, Meta's fb.me link, https only — `shared/AdLink.tsx`): on the phone (every Customer info, through `tools/crm-design/ad-link.cjs` in gen-sales and gen-panel-1011), the desktop Customer info and the Contacts rail.
+- **The Calendar:** the month kept its height in the page's column (it shrank and cut off its last weeks — the "stuck" page); the dark figures band (Leads … Not reminded, By team / By showroom) moved into the right rail above the visits' pie, folded at first (`calRail`).

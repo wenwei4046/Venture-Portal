@@ -242,6 +242,7 @@ for (const [name, vm, frag, doc, vmOverride] of parts) {
   }
   // Profile's main page in the Revenue app Profile's sizes (2026-10-14 — profile-type.cjs), then the Revenue app's type scale
   // on every size (type-scale.cjs) — both after the patches, which match the prototype's px.
+  body = require("./ad-link.cjs")(body);
   if (name === "SalesProfile") body = profileType(body, "{!!(v.profMain) && (<>");
   body = scaleType(body);
   // Text with an apostrophe ("doesn't") renders as written; lint is told so on that file only.
@@ -254,7 +255,7 @@ ${apos ? "/* eslint-disable react/no-unescaped-entities -- generated from the de
 // GENERATED from docs/design_handoff_crm_roles/CRM Revenue View.dc.html (3b) by the
 // design converter — markup and styles exactly as designed. Behaviour lives in
 // ./vm/${vmFile}.ts. To change the look, change the design and regenerate.
-${usesFragment ? 'import { Fragment } from "react";\n' : ""}${usesH ? 'import H from "../crm.module.css";\n' : ""}${body.includes("<ChatComposer") ? 'import ChatComposer from "./ChatComposer";\n' : ""}${body.includes("<PickEditor") ? 'import { PickEditor } from "../shared/pick-editor";\n' : ""}${body.includes("<MediaAlbum") ? 'import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";\n' : ""}import type { ${vm} } from "./vm/${vmFile}";${extras ? '\nimport type { ShellExtras } from "./vm/header";' : ""}
+${usesFragment ? 'import { Fragment } from "react";\n' : ""}${usesH ? 'import H from "../crm.module.css";\n' : ""}${body.includes("<ChatComposer") ? 'import ChatComposer from "./ChatComposer";\n' : ""}${body.includes("<PickEditor") ? 'import { PickEditor } from "../shared/pick-editor";\n' : ""}${require("./ad-link.cjs").IMPORT(body, "../shared/AdLink")}${body.includes("<MediaAlbum") ? 'import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";\n' : ""}import type { ${vm} } from "./vm/${vmFile}";${extras ? '\nimport type { ShellExtras } from "./vm/header";' : ""}
 
 /** ${doc} */
 export default function ${name}({ v }: { v: ${vm}${extras ? " & ShellExtras" : ""} }) {

@@ -118,7 +118,7 @@ export interface DeskUi {
   // CRM alerts: Unread | Read.
   alR: "unread" | "read";
   // Contacts: the customer shown in the side panel; the chart card open (it starts folded — the owner, 2026-10-15).
-  ppSel: string | null; ppChart: boolean;
+  ppSel: string | null; ppChart: boolean; ppPer: number; ppPg: number;
   // Calendar: its analysis card open, and what it groups by (vm/analysis.ts).
   calAn: boolean; calAnBy: string;
   // Contacts' and the Calendar's right rail open (vm/rail.ts; folded at first).
@@ -176,7 +176,7 @@ export const initialDeskUi = (): DeskUi => ({
   ntfTab: "unread", ntfCat: "all", ntfSel: false, ntfPick: {},
   book: null, cform: null, history: null, histF: "all",
   ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, paneW: null, sheetW: null, menuW: null, perfW: null, mwtLogW: null, auditW: null,
-  adLog: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "unread", ppSel: null, ppChart: false, calAn: false, calAnBy: "rep", rail: false, cfPv: null,
+  adLog: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "unread", ppSel: null, ppChart: false, ppPer: 10, ppPg: 0, calAn: false, calAnBy: "rep", rail: false, cfPv: null,
   applyChk: false, ftApplyChk: false, evOpen: {}, adPer: "This month", adPerOpen: false, adCal: false, adCust: null, adCustT: null,
   calBy: "team",
   ppF: {}, ppBy: "type", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,

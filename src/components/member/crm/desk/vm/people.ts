@@ -15,6 +15,7 @@ import { CHANNEL, STATUS_LABEL, lastReal, timeLabel } from "../../sales/vm/commo
 import { mediaWord } from "../../shared/chat-media";
 import { answerOf } from "./form";
 import { phoneLabel } from "../../sales/vm/customer";
+import { adHref } from "../../shared/AdLink";
 
 const DAY = 86_400_000;
 const BUDGET: [string, number, number][] = [["Under RM 5k", 0, 5000], ["RM 5k – 10k", 5000, 10000], ["RM 10k – 20k", 10000, 20000], ["RM 20k +", 20000, 1e12]];
@@ -71,15 +72,15 @@ export function peopleVM(ctx: DeskCtx) {
   const propKey = KEYS[by][2] === "PROPERTY" || own.some(([, f]) => f.id === by);
   const mx = Math.max(1, ...counts, none);
   const bars = [...vals.map((v, i) => ({ label: v, n: counts[i], pct: pct(counts[i], tot), w: Math.round((counts[i] / mx) * 100), color: COLS[i % COLS.length], on: F[by] === v,
-    pick: () => set(u => ({ ...u, ppF: { ...u.ppF, [by]: u.ppF[by] === v ? null : v } })) })),
+    pick: () => set(u => ({ ...u, ppF: { ...u.ppF, [by]: u.ppF[by] === v ? null : v }, ppPg: 0 })) })),
   ...(propKey ? [{ label: "Not filled yet", n: none, pct: pct(none, tot), w: Math.round((none / mx) * 100), color: "#D9C9BD", on: false, pick: () => {} }] : [])]
     .map(b => ({ ...b, fw: b.on ? 700 : 600, bg: b.on ? "#FFF5EC" : "transparent" }));
   const two = typeOpts.slice(0, 2), aN = rows.filter(d => d.type === two[0]).length, bN = rows.filter(d => d.type === two[1]).length;
   const bs = rows.map(d => Number(d.budgetN)).filter(n => n > 0).sort((x, y) => x - y), med = bs.length ? bs[Math.floor(bs.length / 2)] : 0;
-  const chips = Object.entries(F).filter(([k, v]) => v && KEYS[k]).map(([k, v]) => ({ label: `${KEYS[k][0]}: ${v}`, clear: () => set(u => ({ ...u, ppF: { ...u.ppF, [k]: null } })) }));
+  const chips = Object.entries(F).filter(([k, v]) => v && KEYS[k]).map(([k, v]) => ({ label: `${KEYS[k][0]}: ${v}`, clear: () => set(u => ({ ...u, ppF: { ...u.ppF, [k]: null }, ppPg: 0 })) }));
   const sel = (k: string) => { const open = ui.ppOpen === k, cur = F[k] || null;
     const base = rows0.filter(d => Object.entries(F).every(([k2, v]) => k2 === k || !v || !KEYS[k2] || d[k2] === v));
-    const put = (val: string | null) => set(u => ({ ...u, ppF: { ...u.ppF, [k]: val }, ppOpen: null }));
+    const put = (val: string | null) => set(u => ({ ...u, ppF: { ...u.ppF, [k]: val }, ppOpen: null, ppPg: 0 }));
     return { label: KEYS[k][0], value: cur || "Any", open, bd: open || cur ? "#BD4A19" : "#E2CFC1", bg: cur ? "#FFF5EC" : "#fff",
       toggle: () => patch({ ppOpen: open ? null : k }), close: () => patch({ ppOpen: null }),
       opts: [{ v: "Any", n: base.length, on: !cur, pick: () => put(null) }, ...KEYS[k][1].map(v => ({ v, n: base.filter(d => d[k] === v).length, on: cur === v, pick: () => put(v) }))]
@@ -99,6 +100,10 @@ export function peopleVM(ctx: DeskCtx) {
   const val = (d: Row, k: string) => { const v = d[k]; if (v == null) return null; if (k === "budgetN") return Number(v); return ord[k] ? ord[k].indexOf(v) : v; };
   const sorted = !so.k ? rows : [...rows].sort((x, y) => { const a2 = val(x, so.k!), b2 = val(y, so.k!); if (a2 == null && b2 == null) return 0; if (a2 == null) return 1; if (b2 == null) return -1;
     return (typeof a2 === "string" ? a2.localeCompare(String(b2)) : (a2 as number) - (b2 as number)) * so.dir; });
+  // Shown a page at a time, 10 · 20 · 50 a page (the owner, 2026-10-15: "做一個 show 10, 20, 50 的選單", the list ran on
+  // down the page on a big screen); filtering or searching goes back to the first page.
+  const per = [10, 20, 50].includes(ui.ppPer) ? ui.ppPer : 10, pages = Math.max(1, Math.ceil(sorted.length / per)), pg = Math.min(Math.max(0, ui.ppPg), pages - 1);
+  const shown = sorted.slice(pg * per, pg * per + per);
   const toggleSort = (k: string) => set(u => { const c = u.ppSort; return { ...u, ppSort: c.k === k ? (c.dir > 0 ? { k, dir: -1 } : { k: null, dir: 1 }) : { k, dir: 1 } }; });
   return {
     ppStats: [["Contacts", String(tot), "match these filters"], [`${two[0] ?? "Condo"} · ${two[1] ?? "Landed"}`, `${aN} · ${bN}`, `${pct(aN, aN + bN)} · ${pct(bN, aN + bN)} of filled`],
@@ -107,8 +112,8 @@ export function peopleVM(ctx: DeskCtx) {
       .map(([k, [label]]) => ({ label, on: k === by, off: k !== by, pick: () => patch({ ppBy: k }) })),
     ppChartTitle: `By ${KEYS[by][0].toLowerCase()}`, ppBars: bars, ppStack: bars.filter(b => b.n).map(b => ({ color: b.color, n: b.n })),
     ppSelGroups: [["PROPERTY", "PROPERTY"], ["LEAD", "LEAD"], ["VISIT", "VISIT"], ["CONTACT", "CONTACT"]].map(([label, g]) => ({ label, sels: Object.keys(KEYS).filter(k => KEYS[k][2] === g).map(sel) })).filter(g => g.sels.length),
-    ppChips: chips, ppHasChips: chips.length > 0, ppClear: () => patch({ ppF: {}, ppQ: "" }),
-    ppQ: ui.ppQ, setPpQ: (e: { target: { value: string } }) => patch({ ppQ: e.target.value }),
+    ppChips: chips, ppHasChips: chips.length > 0, ppClear: () => patch({ ppF: {}, ppQ: "", ppPg: 0 }),
+    ppQ: ui.ppQ, setPpQ: (e: { target: { value: string } }) => patch({ ppQ: e.target.value, ppPg: 0 }),
     ppGrid: `${dw("contact")}px ${vis.map(k => `${dw(k)}px`).join(" ")} minmax(36px, 1fr)`, ppDragC: mapDrag(set, "ppCW", dw("contact"), "contact", 80, 480), ppReset: () => patch({ ppCW: {} }),
     ppHead: vis.map(k => ({ label: LBL[k].toUpperCase(), arrow: so.k === sk(k) ? (so.dir > 0 ? "↑" : "↓") : "↕", fg: so.k === sk(k) ? "#3F2B22" : "#806B60",
       drag: mapDrag(set, "ppCW", dw(k), k, 80, 480), pick: () => toggleSort(sk(k)), remove: () => set(u => ({ ...u, ppVis: (u.ppVis ?? DEF).filter(x => x !== k) })) })),
@@ -116,7 +121,7 @@ export function peopleVM(ctx: DeskCtx) {
     ppAddOpen: ui.ppAdd, ppAddToggle: () => patch({ ppAdd: !ui.ppAdd }), ppAddClose: () => patch({ ppAdd: false }),
     ppAddOpts: ALL.map(k => { const on = vis.includes(k); return { label: LBL[k], grp: GRP[k], chk: on ? "#BD4A19" : "transparent", bd: on ? "#BD4A19" : "#D9C9BD", bg: on ? "#FFF5EC" : "transparent",
       toggle: () => set(u => { const cur = (u.ppVis ?? DEF).filter(x => ALL.includes(x)); return { ...u, ppVis: cur.includes(k) ? cur.filter(x => x !== k) : ALL.filter(x => cur.includes(x) || x === k) }; }) }; }),
-    ppRows: sorted.map(d => ({ ini: d.ini, name: d.name, phone: d.phone,
+    ppRows: shown.map(d => ({ ini: d.ini, name: d.name, phone: d.phone,
       cells: vis.map(k => { const raw = k === "budget" ? (d.budgetN ? `RM ${Number(d.budgetN).toLocaleString("en-MY")}` : null) : d[k]; const v = raw || "—";
         if (k === "type") { const isB = d.type && d.type === typeOpts[1]; return { pill: true, plain: false, v, bg: isB ? "#FFF0E4" : d.type ? "#E4EDF8" : "#F5EEE8", fg: isB ? "#BD4A19" : d.type ? "#2F6FB5" : "#A08E82" }; }
         return { pill: false, plain: true, v, bg: "transparent", fg: raw ? "#3F2B22" : "#A08E82" }; }),
@@ -126,6 +131,9 @@ export function peopleVM(ctx: DeskCtx) {
       open: () => patch({ ppSel: ui.ppSel === d.id && ui.rail ? null : d.id, rail: true }),
       openChat: () => patch({ tab: "inbox", ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, pane: "docked", kind: "chat", chat: d.id, fromTeam: false, inbF: "All", whoSel: [] }) })),
     ppEmpty: !rows.length, ppHas: rows.length > 0,
+    ppPagerOn: rows.length > 0, ppPager: { range: `${pg * per + 1}–${pg * per + shown.length} of ${sorted.length}`, page: `Page ${pg + 1} of ${pages}`,
+      sizes: [10, 20, 50].map(n => ({ n, on: n === per, pick: () => patch({ ppPer: n, ppPg: 0 }) })),
+      prevOff: pg === 0, nextOff: pg >= pages - 1, prev: () => patch({ ppPg: pg - 1 }), next: () => patch({ ppPg: pg + 1 }) },
     // The chart card: folded to its title and what it says until opened; open, a pie with each value's share beside the
     // rows that filter (the owner, 2026-10-15: "分析圖表，類似截圖，默認收起").
     ppRail: true, ppFoldable: true, ppChartOpen: ui.ppChart, ppChartToggle: () => patch({ ppChart: !ui.ppChart }), ppChev: ui.ppChart ? "rotate(180deg)" : "none", ppChartBtn: ui.ppChart ? "Hide chart" : "Show chart",
@@ -162,7 +170,7 @@ function sideVM(ctx: DeskCtx, id: string | null, missing: string[]) {
     .map(x => ({ id: x.id, ini: initials(x.name), name: x.name, sub: [CHANNEL[x.channel].name, x.assignedTo ? nameOf(x.assignedTo) : "No one yet"].join(" · "),
       pick: () => patch({ ppSel: x.id }), fill: (e: { stopPropagation(): void }) => { e.stopPropagation(); edit(x.id); } }));
   const todoTitle = missing.length ? `Property info missing · ${missing.length}` : "Every contact here has property info";
-  const empty = { has: false as boolean, todo, todoTitle, hasTodo: todo.length > 0, ini: "", name: "", phone: "", ch: "", ad: "", status: "", owner: "", visit: "", lastAt: "",
+  const empty = { has: false as boolean, todo, todoTitle, hasTodo: todo.length > 0, ini: "", name: "", phone: "", ch: "", ad: "", adUrl: null as string | null, status: "", owner: "", visit: "", lastAt: "",
     groups: [] as { label: string; rows: { k: string; v: string }[] }[], msgs: [] as { who: string; text: string; at: string; mine: boolean }[], hasMsgs: false,
     openChat: () => {}, edit: () => {}, close: () => {} };
   if (!c) return empty;
@@ -171,7 +179,7 @@ function sideVM(ctx: DeskCtx, id: string | null, missing: string[]) {
     at: timeLabel(new Date(m.at)), mine: m.from === "me" }));
   const last = lastReal(c);
   return { ...empty, has: true,
-    ini: initials(c.name), name: c.name, phone: phoneLabel(c.phone) || "—", ch: CHANNEL[c.channel].name, ad: c.ad || "No ad",
+    ini: initials(c.name), name: c.name, phone: phoneLabel(c.phone) || "—", ch: CHANNEL[c.channel].name, ad: c.ad || "No ad", adUrl: adHref(c.adUrl),
     status: STATUS_LABEL[c.status], owner: c.assignedTo ? nameOf(c.assignedTo) : "No one yet",
     visit: visit ? `${new Date(visit.start).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", month: "short" })}, ${timeLabel(new Date(visit.start))} · ${data.rooms.find(r => r.id === visit.showroomId)?.name ?? ""}` : "",
     lastAt: last ? new Date(last.at).toLocaleString("en-MY", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "—",

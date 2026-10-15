@@ -4,6 +4,7 @@
 // design converter — markup and styles exactly as designed. Behaviour lives in
 // ./vm/contacts.ts. To change the look, change the design and regenerate.
 import { Fragment } from "react";
+import { InfoValue } from "../shared/AdLink";
 import type { ContactsVM } from "./vm/contacts";
 
 /** Contacts: A–Z, swipe to edit or delete, customer details and info sheets. */
@@ -109,7 +110,7 @@ export default function SalesContacts({ v }: { v: ContactsVM }) {
                 {(v.ctRows).map((r, r_i) => (<Fragment key={r_i}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "12px 14px", borderTop: r.rule, fontSize: "calc(14px * var(--rv-type, 1))" }}>
                     <span style={{ flex: "none", color: "#806B60" }}>{r.k}</span>
-                    <strong style={{ fontWeight: "600", textAlign: "right", minWidth: "0", color: r.vFg }}>{r.v}</strong>
+                    <strong style={{ fontWeight: "600", textAlign: "right", minWidth: "0", color: r.vFg }}><InfoValue v={r.v} href={r.href} /></strong>
                   </div>
                 </Fragment>))}
               </div>

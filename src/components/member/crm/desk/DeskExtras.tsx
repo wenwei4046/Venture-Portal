@@ -7,6 +7,7 @@
  */
 import { Fragment } from "react";
 import DX from "./desk-extras.module.css";
+import { InfoValue } from "../shared/AdLink";
 import SalesCustomerForm from "../sales/SalesCustomerForm";
 import type { CustomerFormVM } from "../sales/vm/customer";
 import type { bookVM, customerFormVM, historyVM, noteVM } from "./vm/extras";
@@ -283,9 +284,9 @@ export function DeskContactSide({ v }: { v: ReturnType<typeof import("./vm/peopl
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 14px", padding: "14px 18px", borderBottom: "1px solid #F1E7DF" }}>
-        {([["Status", v.status], ["Owner", v.owner], ["Ad", v.ad], ["Last chat", v.lastAt]] as const).map(([k, x]) => (
+        {([["Status", v.status, null], ["Owner", v.owner, null], ["Ad", v.ad, v.adUrl], ["Last chat", v.lastAt, null]] as const).map(([k, x, href]) => (
           <span key={k} style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: "0" }}>
-            <span style={{ fontSize: "12px", color: "#806B60" }}>{k}</span><strong style={{ fontSize: "13.5px", fontWeight: "650", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x}</strong></span>))}
+            <span style={{ fontSize: "12px", color: "#806B60" }}>{k}</span><strong style={{ fontSize: "13.5px", fontWeight: "650", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><InfoValue v={x} href={href} /></strong></span>))}
         {v.visit && <span style={{ gridColumn: "1 / -1", padding: "8px 10px", borderRadius: "10px", background: "#E4EDF8", color: "#2F5E8C", fontSize: "12.5px", fontWeight: "600" }}>Next visit · {v.visit}</span>}
       </div>
       {v.groups.map(g => (
@@ -385,6 +386,24 @@ export function DeskRail({ v }: { v: ReturnType<typeof import("./vm/rail").railV
           {ICO("m13 17 5-5-5-5M6 17l5-5-5-5")}</button>
       </div>
       <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "14px", padding: "16px" }}>
+        {v.stats && <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "14px", padding: "14px", borderRadius: "16px", background: "linear-gradient(135deg, #5A3826, #3A2218)", color: "#fff" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "6px" }}>
+            {v.stats.figures.map(k => <button key={k.label} type="button" onClick={k.open} className={DX.emo} style={{ display: "flex", flexDirection: "column", gap: "2px", padding: "8px 10px", border: "0", borderRadius: "12px", background: "transparent", font: "inherit", color: "#fff", textAlign: "left", cursor: "pointer" }}>
+              <b style={{ fontSize: "22px", fontWeight: "700", color: k.color, fontVariantNumeric: "tabular-nums" }}>{k.value}</b>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12.5px", opacity: ".85" }}>{k.label}{ICO("m9 6 6 6-6 6", 12)}</span>
+            </button>)}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ display: "flex", gap: "4px", marginBottom: "2px" }}>
+              {v.stats.by.map(o => <button key={o.l} type="button" onClick={o.pick} style={{ height: "22px", padding: "0 9px", border: "0", borderRadius: "11px", background: o.bg, opacity: o.op, font: "inherit", fontSize: "11.5px", fontWeight: "650", color: "#fff", cursor: "pointer" }}>{o.l}</button>)}
+            </span>
+            {v.stats.bars.map(t => <span key={t.name} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px" }}>
+              <span style={{ flex: "0 0 90px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+              <span style={{ flex: "1", height: "6px", borderRadius: "3px", background: "rgba(255,255,255,.15)", overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: `${t.pct}%`, background: t.color }}></span></span>
+              <span style={{ flex: "0 0 auto", opacity: ".85", fontVariantNumeric: "tabular-nums" }}>{t.label}</span>
+            </span>)}
+          </div>
+        </div>}
         {c && <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "14px", border: "1px solid #EBDDD2", borderRadius: "14px" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
             <strong style={{ fontSize: "14px", fontWeight: "650" }}>{c.title}</strong>
@@ -413,5 +432,28 @@ export function DeskRail({ v }: { v: ReturnType<typeof import("./vm/rail").railV
         {v.side && <DeskContactSide v={v.side} />}
       </div>
     </aside>
+  );
+}
+
+/**
+ * Under Contacts' table: how many a page (10 · 20 · 50, as the design's segmented chips) on the left, the range and
+ * ‹ › on the right (vm/people.ts › ppPager; the owner, 2026-10-15).
+ */
+export function DeskPager({ v }: { v: ReturnType<typeof import("./vm/people").peopleVM>["ppPager"] }) {
+  const ARROW = (off: boolean) => ({ width: "32px", height: "32px", borderRadius: "50%", border: "1px solid #E2CFC1", background: "#fff", color: off ? "#D9C9BD" : "#3F2B22", display: "grid", placeItems: "center", cursor: off ? "default" : "pointer", padding: "0" }) as const;
+  const ICO = (d: string) => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d={d}></path></svg>;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", padding: "2px 4px" }}>
+      <span style={{ fontSize: "13px", color: "#806B60" }}>Show</span>
+      <div style={{ display: "inline-flex", background: "#F5EBE3", borderRadius: "11px", padding: "3px", gap: "2px" }}>
+        {v.sizes.map(o => <button key={o.n} type="button" onClick={o.pick} style={{ height: "28px", padding: "0 12px", borderRadius: "8px", border: "0", font: "inherit", fontSize: "13px", fontWeight: "650", cursor: "pointer",
+          ...(o.on ? { background: "#fff", color: "#3F2B22", boxShadow: "0 1px 3px rgba(40,25,18,.12)" } : { background: "transparent", color: "#806B60" }) }}>{o.n}</button>)}
+      </div>
+      <span style={{ flex: "1" }}></span>
+      <span style={{ fontSize: "13px", color: "#806B60", fontVariantNumeric: "tabular-nums" }}>{v.range}</span>
+      <button type="button" onClick={v.prevOff ? undefined : v.prev} disabled={v.prevOff} title="Previous page" style={ARROW(v.prevOff)}>{ICO("m15 6-6 6 6 6")}</button>
+      <span style={{ fontSize: "13px", fontWeight: "600", color: "#3F2B22", fontVariantNumeric: "tabular-nums" }}>{v.page}</span>
+      <button type="button" onClick={v.nextOff ? undefined : v.next} disabled={v.nextOff} title="Next page" style={ARROW(v.nextOff)}>{ICO("m9 6 6 6-6 6")}</button>
+    </div>
   );
 }
