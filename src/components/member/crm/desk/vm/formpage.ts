@@ -8,7 +8,14 @@
  * offers only their own type.
  */
 import type { DeskCtx } from "./ctx";
+import type { CrmCustomer, CrmData } from "@/lib/member/crm-data";
 import { ANSWER_TYPES, SECTION_DESC, formV2, toCrmForm, type FormSectionV2 } from "./form";
+import { customerForm } from "../../sales/vm/customer";
+import type { CustomerForm } from "../../sales/ui";
+
+/** The phone preview's customer: nobody's, every answer empty. */
+const PREVIEW: CrmCustomer = { id: "preview", name: "", phone: "", channel: "whatsapp", adId: null, ad: "", status: "new", wonAmount: null, assignedTo: null, teamId: null,
+  lastCustomerAt: null, createdAt: new Date(0).toISOString(), unread: 0, details: { type: "", size: "", loc: "", req: "", budget: "" }, extra: {}, detailsSaved: false, messages: [] } as unknown as CrmCustomer;
 
 export function formPageVM(ctx: DeskCtx) {
   const { ui, set, patch, data, W, deskAct } = ctx;
@@ -23,7 +30,19 @@ export function formPageVM(ctx: DeskCtx) {
     return { label: f.label, star: f.req && !auto, span: f.type === "Long text" ? "1 / -1" : "auto", isAuto: auto, isText: !auto && (f.type === "Short text" || f.type === "Number" || f.type === "Date"),
       isLong: !auto && f.type === "Long text", isChoice: !auto && f.type === "Choice", isRange: !auto && f.type === "Range (from–to)",
       ph: f.type === "Number" ? (/budget|rm/i.test(f.label) ? "RM" : "0") : f.type === "Date" ? "dd/mm/yyyy" : "", choices: f.opts }; };
+  // The phone preview is the phone's OWN form (sales/SalesCustomerForm, the sheet every salesperson fills) drawn from this
+  // draft — the owner, 2026-10-15, asked whether the preview was 1:1 and said yes to this: the design drew its own sheet.
+  // A 375px phone, scaled into the frame; it can be typed into, and Save saves nothing.
+  const pvBase: CustomerForm = { customerId: PREVIEW.id, edit: true };
+  const cfReal = customerForm({
+    form: { ...pvBase, ...(ui.cfPv ?? {}) },
+    data: { ...data, forms: [{ id: "preview", name: "Customer info", sections: toCrmForm(secs, "preview").sections }], customers: [PREVIEW] } as CrmData,
+    saveDetails: async () => { patch({ toast: "Preview only · nothing is saved" }); return null as never; },
+    setForm: f => set(u => ({ ...u, cfPv: typeof f === "function" ? f({ ...pvBase, ...(u.cfPv ?? {}) }) : f ? f : {} })),
+    onSaved: () => {},
+  });
   return {
+    cfRealOn: true, cfReal, cfRealScale: ((W >= 1440 ? 270 : 222) - 20) / 375,
     cfOn: ui.tab === "forms", cfFields: true, cfPhoneH: W >= 1440 ? 560 : 460, cfPhoneW: W >= 1440 ? 270 : 222,
     cfDesk: !phone, cfPhone: phone,
     cfDevs: ([["phone", "Phone"], ["desktop", "Desktop"]] as const).map(([k, label]) => ({ label, on: ui.cfDev === k, off: ui.cfDev !== k, pick: () => patch({ cfDev: k }) })),

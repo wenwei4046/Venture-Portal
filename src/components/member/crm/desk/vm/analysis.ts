@@ -45,7 +45,7 @@ export function calendarAnalysisVM(ctx: DeskCtx, vs: VisitRow[]) {
   const rows = groups.map(([label, n], i) => ({ label, n, pct: pct(n, tot), w: Math.round((n / mx) * 100), color: label === "Not filled yet" ? "#D9C9BD" : COLS[i % COLS.length] }));
   const top = [...rows].filter(r => r.label !== "Not filled yet").sort((a, b) => b.n - a.n)[0];
   return {
-    open: ui.calAn, toggle: () => patch({ calAn: !ui.calAn }), chev: ui.calAn ? "rotate(180deg)" : "none",
+    open: ui.calAn, toggle: () => patch({ calAn: !ui.calAn }), chev: ui.calAn ? "rotate(180deg)" : "none", btn: ui.calAn ? "Hide chart" : "Show chart",
     title: `Visits by ${LABEL[by].toLowerCase()}`,
     sum: top ? `${tot} visits · most: ${top.label} ${top.n} (${top.pct})` : "No visits in this range",
     bys: CAL_BYS.map(k => ({ label: LABEL[k], on: k === by, pick: () => patch({ calAnBy: k }) })),
