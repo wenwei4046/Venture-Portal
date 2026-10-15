@@ -14,15 +14,34 @@ import { prepareImage } from "./image-prep";
 import { isEdited, renderEdited, type PhotoEdits } from "./edit-render";
 import { markCut, markStandard, markVideoEdits, type VideoCut } from "./video-fit";
 
-export interface PickedItem { file: File; url: string; video: boolean; edits?: PhotoEdits; cut?: VideoCut; seconds?: number; caption?: string }
+export interface PickedItem {
+  file: File; url: string; video: boolean; edits?: PhotoEdits; cut?: VideoCut; seconds?: number; caption?: string;
+  /** A portrait photo from the camera, still to be cropped to 9:16 once its size is known (2026-10-15; any edit clears it). */
+  fill916?: boolean;
+}
+
+/**
+ * The camera's photo cropped to fill a 9:16 screen (the owner, 2026-10-15: "相機能不能是 full screen 9:16", choosing a crop in
+ * the editor over a camera of our own — a page cannot ask the phone's camera for 9:16, and our own would lose its picture
+ * processing): the middle 9:16 of a portrait frame, in the frame's 0–1 coordinates. A landscape or already-9:16 photo is
+ * left whole (null). Reset in Crop gives the whole photo back.
+ */
+export function crop916(w: number, h: number): { x: number; y: number; w: number; h: number } | null {
+  if (!(w > 0 && h > 0) || w >= h) return null;
+  const r = 9 / 16, now = w / h;
+  if (Math.abs(now - r) / r < 0.03) return null;
+  if (now > r) { const cw = (h * r) / w; return { x: (1 - cw) / 2, y: 0, w: cw, h: 1 }; }
+  const ch = w / r / h;
+  return { x: 0, y: (1 - ch) / 2, w: 1, h: ch };
+}
 export interface Picked { items: PickedItem[]; hd: boolean; at?: number; caption?: string }
 
 /** Each item's own caption (the owner, 2026-10-14: "選好圖片後，下方也可編輯" — WhatsApp asks one per photo); the first
  * starts as what was typed in the reply box. */
 export const captionOf = (p: Picked, i: number) => p.items[i]?.caption ?? (i === 0 ? p.caption ?? "" : "");
 
-export function pickedOf(files: File[]): Picked {
-  return { hd: false, at: 0, caption: "", items: files.map(file => ({ file, url: typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : "", video: file.type.startsWith("video/") })) };
+export function pickedOf(files: File[], opts: { camera?: boolean } = {}): Picked {
+  return { hd: false, at: 0, caption: "", items: files.map(file => ({ file, url: typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : "", video: file.type.startsWith("video/"), ...(opts.camera && file.type.startsWith("image/") ? { fill916: true } : {}) })) };
 }
 
 const forget = (p: Picked) => p.items.forEach(it => { if (it.url) URL.revokeObjectURL(it.url); });

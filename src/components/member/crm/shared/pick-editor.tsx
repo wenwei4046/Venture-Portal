@@ -3,9 +3,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { CHAT_EMOJIS } from "./emoji";
-import { clampCrop, drawBase, FULL, noEdits, renderEdited, turnedSize, type Label, type PhotoEdits, type Rect, type Stroke } from "./edit-render";
+import { clampCrop, drawBase, FULL, isEdited, noEdits, renderEdited, turnedSize, type Label, type PhotoEdits, type Rect, type Stroke } from "./edit-render";
 import { prepareImage } from "./image-prep";
-import { captionOf, pickedOf, type PickedItem, type PickVM } from "./pick";
+import { captionOf, crop916, pickedOf, type PickedItem, type PickVM } from "./pick";
 import { STANDARD_VIDEO_MAX } from "./video-fit";
 import { saveToDevice } from "./viewer";
 import { typePx } from "./type";
@@ -94,7 +94,8 @@ export function PickEditor({ pk }: { pk: PickVM }) {
   const [saving, setSaving] = useState(false);
   const update = (patch: Partial<PickedItem>) => set({ ...p, items: p.items.map((x, i) => (i === at ? { ...x, ...patch } : x)) });
   const edits = it.edits ?? noEdits();
-  const setEdits = (e: PhotoEdits) => update({ edits: e });
+  // Any edit — the 9:16 fit among them — settles the camera photo's fit (`fill916`).
+  const setEdits = (e: PhotoEdits) => update({ edits: e, fill916: false });
   useEffect(() => { setMode(""); setTextEd(null); }, [at]);
   useEffect(() => () => { uprights.clear(); }, []);
 
@@ -197,6 +198,12 @@ function PhotoStage({ it, base, edits, setEdits, mode, setMode, color, setColor,
   const drag = useRef<{ kind: "label" | "crop"; id?: string; handle?: string; x0: number; y0: number; r0: Rect | { x: number; y: number }; moved: boolean } | null>(null);
 
   useEffect(() => { let on = true; void (base ? base() : uprightOf(it.file)).then(b => { if (on) setBmp(b); }); return () => { on = false; }; }, [it.file]); // eslint-disable-line react-hooks/exhaustive-deps -- one picture per item
+  // A camera photo, its size now known: cropped to 9:16 once, as long as nothing was edited yet.
+  useEffect(() => {
+    if (!bmp || !it.fill916) return;
+    const c = !isEdited(edits) ? crop916(bmp.width, bmp.height) : null;
+    setEdits(c ? { ...edits, crop: c } : edits);
+  }, [bmp, it.fill916]); // eslint-disable-line react-hooks/exhaustive-deps -- once, when the picture arrives
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
