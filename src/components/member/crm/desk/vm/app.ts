@@ -21,6 +21,7 @@ import { settingsVM } from "./settings";
 import { adsPerfVM } from "./adsperf";
 import { chatProgressVM } from "./chatprogress";
 import { chatVM } from "./chat";
+import { railVM } from "./rail";
 import { bookVM, customerFormVM, historyVM, noteVM } from "./extras";
 
 export function deskVM(ctx: DeskCtx) {
@@ -49,18 +50,19 @@ export function deskVM(ctx: DeskCtx) {
   };
   const as = assignPageVM(ctx, op);
   const awC = ui.awChat ? data.customers.find(c => c.id === ui.awChat) : undefined;
+  const pp = peopleVM(ctx), cal = calendarVM(ctx);
   const undoOn = !!ui.undo && ui.undo.until > ctx.now.getTime();
   return {
     ...fr,
     ...insightVM(ctx),
     ...clist, ...team, ...info,
     ...inboxVM(ctx), ...assignVM(ctx), ...alertsVM(ctx),
-    ...calendarVM(ctx),
+    ...cal,
     ...as,
     ...assignV2VM(ctx, op, as, { sheetW: fr.sheetW, isAdsOp: fr.isAdsOp, isFtOp: fr.isFtOp, isMwtOp: fr.isMwtOp, sheetMode: fr.sheetMode, perfW: fr.perfW }),
     ...showroomsVM(ctx, op),
     ...settingsVM(ctx, op),
-    ...peopleVM(ctx),
+    ...pp, ...railVM(ctx, pp, cal.calAn),
     ...formPageVM(ctx),
     ...auditVM(ctx),
     ...channelsVM(ctx),

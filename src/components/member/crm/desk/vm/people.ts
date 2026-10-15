@@ -123,19 +123,18 @@ export function peopleVM(ctx: DeskCtx) {
       // A row opens the customer in the side panel when the page is wide enough to show it (the owner, 2026-10-15: "右邊的
       // 畫面有點空" → 1); else, as before, the chat in Inbox with Customer info beside it.
       on: ui.ppSel === d.id, rowBg: ui.ppSel === d.id ? "#FFF5EC" : "#fff",
-      open: () => sideShown() ? patch({ ppSel: ui.ppSel === d.id ? null : d.id }) : patch({ tab: "inbox", ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, pane: "docked", kind: "chat", chat: d.id, fromTeam: false, inbF: "All", whoSel: [] }) })),
+      open: () => patch({ ppSel: ui.ppSel === d.id && ui.rail ? null : d.id, rail: true }),
+      openChat: () => patch({ tab: "inbox", ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, pane: "docked", kind: "chat", chat: d.id, fromTeam: false, inbF: "All", whoSel: [] }) })),
     ppEmpty: !rows.length, ppHas: rows.length > 0,
     // The chart card: folded to its title and what it says until opened; open, a pie with each value's share beside the
     // rows that filter (the owner, 2026-10-15: "分析圖表，類似截圖，默認收起").
-    ppFoldable: true, ppChartOpen: ui.ppChart, ppChartToggle: () => patch({ ppChart: !ui.ppChart }), ppChev: ui.ppChart ? "rotate(180deg)" : "none", ppChartBtn: ui.ppChart ? "Hide chart" : "Show chart",
+    ppRail: true, ppFoldable: true, ppChartOpen: ui.ppChart, ppChartToggle: () => patch({ ppChart: !ui.ppChart }), ppChev: ui.ppChart ? "rotate(180deg)" : "none", ppChartBtn: ui.ppChart ? "Hide chart" : "Show chart",
     ppChartSum: (() => { const top = bars.filter(b => b.n && b.label !== "Not filled yet").sort((a, b) => b.n - a.n)[0]; return top ? `Most: ${top.label} · ${top.n} of ${tot} (${top.pct})` : `${tot} contacts`; })(),
     ppPie: pieSlices(bars.filter(b => b.n).map(b => ({ label: b.label, n: b.n, color: b.color })), tot), ppPieHas: bars.some(b => b.n),
     ppSide: sideVM(ctx, ui.ppSel, rows.filter(d => !d.filled).map(d => d.id)),
   };
 }
 
-/** Whether Contacts' side panel is on screen (it shows only where the page has room — desk-extras.module.css). */
-const sideShown = () => typeof document !== "undefined" && !!(document.querySelector("[data-pp-side]") as HTMLElement | null)?.offsetParent;
 
 /** A pie's slices as SVG paths, each with its share written inside when it is big enough (the screenshot's look). */
 export function pieSlices(parts: { label: string; n: number; color: string }[], tot: number, r = 100) {
