@@ -108,9 +108,10 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
     // owner's iPhone, 2026-10-15 (kbdebug: inner 390, vv 390 at top 403, client 793) — a composer drawn again with the
     // keyboard up took the window's 390 as the screen, read no keyboard and left the bar behind it.
     const fullH = () => Math.max(window.innerHeight, document.documentElement.clientHeight, vv.height);
-    // On an iPhone the fixed screen is drawn from the top of what is visible, wherever the page is scrolled to (the same
-    // kbdebug: css top 0 sat right under the status bar with vv.offsetTop 403), so it is fitted by its bottom alone; moving
-    // its top by the pan, as on Android, put the bar 403px lower, behind the keyboard.
+    // An iPhone: the screen is fitted from the page's full height (the second kbdebug, #456 live: fitted by its bottom alone
+    // the screen sat 403px above what is visible, all white — the pan is needed; #425's bar behind the keyboard came from
+    // its bottom worked out from the window's 390, not the page's 793). Its getBoundingClientRect is measured from the top
+    // of what is visible (both screenshots), so a screen the phone still draws elsewhere is moved back to it.
     const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     let baseH = fullH(), baseW = window.innerWidth, fitted = false, safe = 0;
     const clear = () => {
@@ -138,7 +139,7 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
       if (!isField(ae)) baseH = fullH();
       else if (ios) baseH = Math.max(baseH, document.documentElement.clientHeight);
       if (!fitted) safe = parseFloat(getComputedStyle(app).paddingBottom) || 0;
-      const kb = Math.max(0, Math.round(baseH - vv.height)), up = kb > KB_MIN, pan = ios ? 0 : vv.offsetTop;
+      const kb = Math.max(0, Math.round(baseH - vv.height)), up = kb > KB_MIN, pan = vv.offsetTop;
       if (up && inBox && !shownRef.current && window.innerWidth < baseH) {
         const h = Math.round(kb - safe);
         if (h >= 150 && Math.abs(h - (lastKbH ?? 0)) > 3) {
@@ -164,6 +165,13 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
       app.style.top = `${pan}px`;
       const H = ios ? baseH : window.innerHeight;
       app.style.bottom = `${Math.round(H - pan - (toKb ? vv.height : H))}px`;
+      if (ios && toKb) {
+        const off = app.getBoundingClientRect().top;
+        if (Math.abs(off) > 1) {
+          app.style.top = `${Math.round(pan - off)}px`;
+          app.style.bottom = `${Math.round(H - pan + off - vv.height)}px`;
+        }
+      }
       if (toKb) app.style.setProperty("--safe-bottom", "0px"); else app.style.removeProperty("--safe-bottom");
     };
     const fit = () => { place(); capPanel(); };
