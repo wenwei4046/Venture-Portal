@@ -70,18 +70,37 @@ export function MediaAlbum({ items, more }: { items: AlbumTile[]; more: number }
  * A chat's photo and video, drawn from the phone's kept copy when there is one (shared/media-cache.ts, 2026-10-14:
  * "我看到的還是上次的畫面"), else from the network — and kept once shown. Same props as the plain elements they replace.
  */
+/**
+ * A photo or a video that could not be fetched yet tries again by itself (the owner, 2026-10-15: on the computer a photo
+ * stayed a blank "Photo" box — "先呈現在頁面上，後台的系統延遲幾秒"): our own media route fetches a customer's WhatsApp
+ * file from Meta the first time, and a first answer can fail; it is asked again after 0.8, 1.5, 3, 5, 8 and 12 s. Until it
+ * comes the box keeps its place, with no broken-picture icon.
+ */
+export const RETRY_MS = [800, 1500, 3000, 5000, 8000, 12000];
+/** The address to ask on the n-th try: our own route gets a fresh query so the browser asks again; a local copy never. */
+export const retrySrc = (src: string, n: number) => (!n || !src.startsWith("/") ? src : `${src}${src.includes("?") ? "&" : "?"}r=${n}`);
+function useRetry(src: string) {
+  const [n, setN] = useState(0), t = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => { setN(0); return () => clearTimeout(t.current); }, [src]);
+  const failed = () => { if (n < RETRY_MS.length) { clearTimeout(t.current); t.current = setTimeout(() => setN(x => x + 1), RETRY_MS[n]); } };
+  return { n, failed, waiting: n > 0 };
+}
+
 export function ChatImg({ src, onClick, onLoad, style, alt = "Photo", loading }: { src: string; onClick?: () => void; onLoad?: React.ReactEventHandler<HTMLImageElement>; style?: React.CSSProperties; alt?: string; loading?: "lazy" | "eager" }) {
-  const kept = useKeptSrc(src);
+  const kept = useKeptSrc(src), r = useRetry(src), [bad, setBad] = useState(false);
+  useEffect(() => setBad(false), [src, r.n]);
+  const shown = kept.src ? (kept.kept ? kept.src : retrySrc(kept.src, r.n)) : null;
   return (
-    <img onClick={onClick} alt={alt} loading={loading} style={style} {...(kept.src ? { src: kept.src } : {})}
-      onLoad={e => { onLoad?.(e); if (!kept.kept && kept.src === src) keepImage(src); }} />
+    <img onClick={onClick} alt={bad ? "" : alt} loading={loading} style={bad ? { ...style, visibility: "hidden" } : style} {...(shown ? { src: shown } : {})}
+      onError={() => { setBad(true); r.failed(); }}
+      onLoad={e => { setBad(false); onLoad?.(e); if (!kept.kept && kept.src === src) keepImage(src); }} />
   );
 }
 
 export function ChatVideo({ src, base, onLoadedMetadata, style }: { src: string; base: string; onLoadedMetadata?: React.ReactEventHandler<HTMLVideoElement>; style?: React.CSSProperties }) {
-  const poster = useKeptSrc(base, true);
+  const poster = useKeptSrc(base, true), r = useRetry(src);
   return (
-    <video src={src} poster={poster.src ?? undefined} muted playsInline preload="metadata" style={style}
+    <video key={r.n} src={retrySrc(src, r.n)} poster={poster.src ?? undefined} muted playsInline preload="metadata" style={style} onError={r.failed}
       onLoadedMetadata={onLoadedMetadata} onLoadedData={e => { if (!poster.kept) keepPoster(base, e.currentTarget); }} />
   );
 }

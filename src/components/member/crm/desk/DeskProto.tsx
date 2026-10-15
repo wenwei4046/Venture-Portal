@@ -85,7 +85,9 @@ function ProtoFrame({ props }: { props: ProtoProps }) {
   });
   useLayoutEffect(() => () => c.componentWillUnmount(), [c]);
   const p = { ...P, ...c.renderVals() } as Record<string, unknown>;
-  const v = { ...p, ...PROTO_FRAME, ...protoChats(p), chNote: p.chRo ? "Only Principal and Director can change these. You can look." : "" } as unknown as DeskVM;
+  const v = { ...p, ...PROTO_FRAME, ...protoChats(p), alertsP: { tab: "unread", markAll: null, empty: "", tabs: [{ label: "Unread 4", on: true, pick: noop }, { label: "Read", on: false, pick: noop }],
+    rows: ((p.alerts ?? []) as { kind: string; color: string; time: string; title: string; sub: string }[]).map((a, i) => ({ ...a, key: String(i), unread: false, bg: "#fff", dot: a.color, line: "", extra: "", quote: "", hasQuote: false, canOpen: false, open: noop, markRead: null })) },
+    chNote: p.chRo ? "Only Principal and Director can change these. You can look." : "" } as unknown as DeskVM;
   // data-revenue-app: where the desktop always sits (inside the Revenue app), so the portal's display serif stays off.
   return <div className={R.root} data-revenue-app=""><DeskApp v={v} /></div>;
 }

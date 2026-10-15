@@ -39,7 +39,7 @@ const NOOP = () => {};
 
 /** The conversation, oldest first, with the CRM's own lines between the messages. */
 export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
-  const { data, nameOf, now, patch, ui, act } = ctx;
+  const { data, nameOf, now, patch, set, ui, act } = ctx;
   type It = { at: string; m?: CrmChatMessage; sys?: string };
   const hidden = new Set(data.hiddenMessages), stars = new Set(data.starredMessages ?? []);
   const pinnedId = data.prefs[c.id]?.pinnedMessageId ?? null;
@@ -93,7 +93,10 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
       key: m.id, id: m.id, day: hide ? "" : day, sys: "", inn: !mine && !hide && !appt, out: mine && !hide && !appt,
       text: m.card || mk === "file" ? "" : m.text ?? "", time: time(m.at),
       starred: star, hasReaction: !!rx, reaction: rx, rxGap: rx ? "14px" : "0",
-      enter: () => { if (ui.msgHov !== m.id) patch({ msgHov: m.id }); }, leave: () => { if (ui.msgHov === m.id) patch({ msgHov: null }); },
+      // The ⌄ button sits 6px outside the bubble: crossing that gap leaves the message, so the button waits a moment before
+      // it goes (the owner, 2026-10-15: "mouse 過去，他會消失"); coming back — or reaching the button — keeps it.
+      enter: () => { clearTimeout(hoverOut); if (ui.msgHov !== m.id) patch({ msgHov: m.id }); },
+      leave: () => { clearTimeout(hoverOut); hoverOut = setTimeout(() => set(u => (u.msgHov === m.id ? { ...u, msgHov: null } : u)), HOVER_GRACE_MS); },
       hover: ui.msgHov === m.id || ui.msgMenu === m.id, menuToggle: () => menu(ui.msgMenu !== m.id), menuOpen: ui.msgMenu === m.id, menuClose: () => menu(false),
       reactBar: REACTIONS.map(e => ({ e, bg: rx === e ? "#F5EBE3" : "transparent", pick: () => { patch({ msgMenu: null }); void act.react(m.id, rx === e ? "" : e); } })),
       acts, tick: m.status === "read" ? "#3B8FD9" : "#A8968B", hasTick: mine && m.status !== "failed" && m.status !== "sending", failed: m.status === "failed",
@@ -101,6 +104,10 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
     };
   });
 }
+
+/** How long a message keeps its ⌄ button after the pointer leaves it. */
+export const HOVER_GRACE_MS = 400;
+let hoverOut: ReturnType<typeof setTimeout> | undefined;
 
 /** One chat's bindings: the conversation, the pinned bar, the reply quote, the + menu and the reply box. */
 export function chatVM(ctx: DeskCtx, id: string | null) {

@@ -186,3 +186,46 @@ export function DeskEmoji({ v }: { v: ReturnType<typeof import("./vm/chat").chat
     </div>
   </>);
 }
+
+/**
+ * CRM alerts' pane (frame 1d), drawn as the design draws it — its Unread | Read segment, its rows (the kind's dot, the
+ * kind and time, the title, the line under it) — with what the owner asked for on 2026-10-15: the tabs work and count,
+ * Mark all read, each row says more (what happened, the customer's channel · ad · status · owner, their last words),
+ * a tap opens the chat, and Mark as read. Behaviour: vm/inbox.ts › alertsVM.
+ */
+export function DeskAlerts({ v }: { v: ReturnType<typeof import("./vm/inbox").alertsVM>["alertsP"] }) {
+  return (<>
+    <div style={{ padding: "12px 16px", background: "#fff", borderBottom: "1px solid #F1E7DF", display: "flex", alignItems: "center", gap: "10px" }}>
+      <div style={{ display: "inline-flex", background: "#F5EBE3", borderRadius: "11px", padding: "3px", gap: "2px" }}>
+        {v.tabs.map(t => <span key={t.label} onClick={t.pick} style={{ height: "28px", lineHeight: "28px", padding: "0 12px", borderRadius: "8px", fontSize: "13px", cursor: "pointer",
+          ...(t.on ? { background: "#fff", fontWeight: "650", boxShadow: "rgba(63,43,34,.14) 0 1px 3px", color: "#3F2B22" } : { color: "#806B60", fontWeight: "550" }) }}>{t.label}</span>)}
+      </div>
+      <span style={{ flex: "1" }} />
+      {v.markAll && <button type="button" onClick={v.markAll} className={DX.emo} style={{ height: "30px", padding: "0 12px", borderRadius: "15px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#BD4A19", cursor: "pointer", whiteSpace: "nowrap" }}>Mark all read</button>}
+    </div>
+    <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column" }}>
+      {!v.rows.length && <div style={{ padding: "40px 24px", textAlign: "center", fontSize: "13.5px", color: "#806B60" }}>{v.empty}</div>}
+      {v.rows.map(a => (
+        <div key={a.key} onClick={a.open} className={DX.alert} style={{ display: "flex", gap: "12px", padding: "14px 16px", background: a.bg, borderBottom: "1px solid #F1E7DF", cursor: a.canOpen ? "pointer" : "default" }}>
+          <span style={{ flex: "0 0 auto", marginTop: "5px", width: "8px", height: "8px", borderRadius: "50%", background: a.dot }}></span>
+          <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "3px" }}>
+            <span style={{ display: "flex", gap: "8px", alignItems: "baseline" }}>
+              <b style={{ fontSize: "12px", fontWeight: "700", color: a.color }}>{a.kind}</b>
+              <span style={{ flex: "1" }}></span>
+              <small style={{ fontSize: "12px", color: "#A8968B", whiteSpace: "nowrap" }}>{a.time}</small>
+            </span>
+            <strong style={{ fontSize: "14px", fontWeight: "650" }}>{a.title}</strong>
+            {a.line && <span style={{ fontSize: "13px", color: "#3F2B22" }}>{a.line}{a.extra ? <span style={{ color: "#806B60" }}> · {a.extra}</span> : null}</span>}
+            {a.sub && <span style={{ fontSize: "12.5px", color: "#806B60" }}>{a.sub}</span>}
+            {a.hasQuote && <span style={{ marginTop: "4px", padding: "7px 10px", borderRadius: "10px", background: "#FBF6F2", borderLeft: "3px solid #E2CFC1", fontSize: "12.5px", color: "#6B574C",
+              overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{a.quote}</span>}
+            {(a.canOpen || a.markRead) && <span style={{ display: "flex", gap: "14px", marginTop: "6px" }}>
+              {a.canOpen && <span style={{ fontSize: "12.5px", fontWeight: "650", color: "#BD4A19" }}>Open chat ›</span>}
+              {a.markRead && <span onClick={a.markRead} style={{ fontSize: "12.5px", fontWeight: "650", color: "#806B60", cursor: "pointer" }}>Mark as read</span>}
+            </span>}
+          </span>
+        </div>
+      ))}
+    </div>
+  </>);
+}

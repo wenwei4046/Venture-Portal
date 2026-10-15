@@ -41,10 +41,10 @@ adSum
 adTeams
 adTot
 adTotals
-alerts
 alertsHas
 alertsLabel
 alertsN
+alertsP
 apCmpLabel
 apCmpOn
 apCmpShort

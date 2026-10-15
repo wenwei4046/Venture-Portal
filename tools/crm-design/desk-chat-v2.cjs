@@ -91,10 +91,16 @@ const EMOJI = [
   "The sticker icon opens the phone's emoji panel (its Emoji tab, Recents and search — #425) as a popover; the design drew the icon alone.",
 ];
 
+const ALERTS = [
+  /\{!!\(v\.kAlerts\) && \(<>(?:(?!\{!!\(v\.k[A-Z])[\s\S])*?<\/>\)\}(\s*\{!!\(v\.kTopMove\))/,
+  "{!!(v.kAlerts) && (<DeskAlerts v={v.alertsP} />)}$1",
+  "CRM alerts work (the owner, 2026-10-15): Unread | Read count and switch, Mark all read, each row says more and opens its chat, Mark as read — DeskAlerts keeps the design's look.",
+];
+
 const REPLY_QUOTE = [
   /(\{!!\(v\.replyOn\) && \(<>[\s\S]*?\{v\.replyWho\}<\/strong>\s*<span style=\{\{[^\n]*?\}\}>)\{v\.chatText\}/,
   "$1{v.replyText}",
   "The quote over the reply box is the message being answered (the design shows its one sample message).",
 ];
 
-module.exports = [CHAT, COMPOSER, EMOJI, REPLY_QUOTE];
+module.exports = [CHAT, COMPOSER, EMOJI, ALERTS, REPLY_QUOTE];

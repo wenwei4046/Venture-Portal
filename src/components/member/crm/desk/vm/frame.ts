@@ -11,7 +11,7 @@ import type { DeskCtx, DeskTab, PaneKind, PaneMode } from "./ctx";
 import { first, initials } from "./data";
 import { ICON, LI, MANAGE_TABS, NAV, NAV_GROUPS, PANE_MODE, PANEL_TABS, PHONE_IC, SECTION_PICK, SHEET_COPY, SOLID, TINTS } from "./tokens";
 import { edgeDrag } from "./columns";
-import { alertRows } from "./inbox";
+import { alertsUnreadN } from "./inbox";
 import { jobTitle } from "../../shared/people";
 
 const SHEET_TABS: DeskTab[] = ["assignment", "settings", "showrooms", "forms"];
@@ -153,7 +153,7 @@ export function frameVM(ctx: DeskCtx) {
     : { ini: initials(me.name), name: me.name, first: first(me.name), sub: `${jobTitle(me)} · ${ctx.app.subName.replace(/ view$/, "")}` };
   const undo = ui.undo;
   const sheetW = ui.sheetW ?? (W1440 ? 520 : 440), menuW = ui.menuW ?? (W1440 ? 340 : 310);
-  const alertsN = alertRows(ctx).length;
+  const alertsN = alertsUnreadN(ctx);
   return {
     W, H, sbW, sbOpen: !collapsed, sbClosed: collapsed, sections, appTop, appBottom, crmItems, crmGroups,
     // The profile (v2): its menu has Sign out; Back to Revenue app sits above it.
