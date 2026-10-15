@@ -76,22 +76,53 @@ describe('Statements on the phone', () => {
     expect(screen.getByRole('button', { name: 'Print statement' })).toBeInTheDocument()
   })
 
-  it('Issue goes through the page’s action; a refusal stays on the statement in words', async () => {
+  it('Issue goes one way, so it is asked first; a refusal stays in the question in words', async () => {
     mocks.issue.mockResolvedValue({ ok: false, reason: 'Period 2026-09 is closed.' })
     window.history.replaceState(null, '', '/fin-app/page/statements?id=a')
     await act(async () => {
       draw('id=a', RECORD)
     })
+    fireEvent.click(screen.getByRole('button', { name: 'Issue to subsidiary' }))
+    expect(mocks.issue).not.toHaveBeenCalled()
+    const ask = await screen.findByRole('dialog', { name: 'Issue to Carres?' })
+    expect(within(ask).getByText(/This cannot be undone/)).toBeInTheDocument()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Issue to subsidiary' }))
+      fireEvent.click(within(ask).getByRole('button', { name: 'Issue statement' }))
     })
     expect(mocks.issue).toHaveBeenCalledWith('a')
-    expect(screen.getByText('Period 2026-09 is closed.')).toBeInTheDocument()
+    expect(within(ask).getByText('Period 2026-09 is closed.')).toBeInTheDocument()
     mocks.issue.mockResolvedValue({ ok: true })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Issue to subsidiary' }))
+      fireEvent.click(within(ask).getByRole('button', { name: 'Issue statement' }))
     })
     expect(mocks.flash).toHaveBeenCalledWith('Statement issued')
+  })
+
+  it('Mark as paid is asked first too', async () => {
+    mocks.paid.mockResolvedValue({ ok: true })
+    const issued = statementRecordModel({ ...READ, statement: { ...READ.statement, status: 'issued', issued_at: '2026-10-01T01:00:00Z' } }, { created: '22 Sep 2026', issued: '1 Oct 2026 09:00' }, { edit: true })
+    window.history.replaceState(null, '', '/fin-app/page/statements?id=a')
+    await act(async () => {
+      draw('id=a', issued)
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as paid' }))
+    const ask = await screen.findByRole('dialog', { name: 'Mark Carres paid?' })
+    await act(async () => {
+      fireEvent.click(within(ask).getByRole('button', { name: 'Mark as paid' }))
+    })
+    expect(mocks.paid).toHaveBeenCalledWith('a')
+    expect(mocks.flash).toHaveBeenCalledWith('Statement marked paid')
+  })
+
+  it('Cancel leaves the statement as it was', async () => {
+    window.history.replaceState(null, '', '/fin-app/page/statements?id=a')
+    await act(async () => {
+      draw('id=a', RECORD)
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Issue to subsidiary' }))
+    const ask = await screen.findByRole('dialog', { name: 'Issue to Carres?' })
+    fireEvent.click(within(ask).getByRole('button', { name: 'Cancel' }))
+    expect(mocks.issue).not.toHaveBeenCalled()
   })
 
   it('Generate statements answers how many it made, and goes to the month it made them for', async () => {

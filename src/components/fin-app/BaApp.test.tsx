@@ -149,17 +149,20 @@ describe('Invoice Financing on the phone', () => {
     expect(window.location.search).toBe('?id=ba-9')
   })
 
-  it('a step’s refusal stays on the record in words', async () => {
+  it('Bill interest makes an invoice, so it is asked first; a refusal stays in the question in words', async () => {
     mocks.generateBaInvoice.mockResolvedValue({ error: 'Invoice INV-1 (draft) already exists for this BA — delete/void it first to regenerate' })
     window.history.replaceState(null, '', '/fin-app/page/ba?id=ba-1')
     await act(async () => {
       draw('id=ba-1', RECORD)
     })
+    fireEvent.click(screen.getByRole('button', { name: 'Bill interest' }))
+    expect(mocks.generateBaInvoice).not.toHaveBeenCalled()
+    const ask = await screen.findByRole('dialog', { name: 'Bill HS?' })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Bill interest' }))
+      fireEvent.click(within(ask).getByRole('button', { name: 'Bill interest' }))
     })
     expect(mocks.generateBaInvoice).toHaveBeenCalledWith('ba-1')
-    expect(screen.getByText(/already exists for this BA/)).toBeInTheDocument()
+    expect(within(ask).getByText(/already exists for this BA/)).toBeInTheDocument()
     expect(mocks.flash).not.toHaveBeenCalled()
   })
 

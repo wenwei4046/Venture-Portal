@@ -6,7 +6,7 @@ import { flash } from '@/components/hrv/toast'
 import { DialogConfirm, DialogMenu, FinDialog, type DialogMenuItem } from '@/components/finv/Dialog'
 import { drawerStyles as d } from '@/components/finv/Drawer'
 import { DrawerGroup as Group, DrawerLine as Line } from '@/components/finv/DrawerParts'
-import { BA_CARDS, BA_TITLE, type BaCard, type BaHubModel, type BaListRow, type BaRecordModel } from '@/lib/fin-app/ba-model'
+import { BA_CARDS, BA_TITLE, calcOf, type BaCard, type BaHubModel, type BaListRow, type BaRecordModel } from '@/lib/fin-app/ba-model'
 import { f2 } from '@/lib/fin-app/page-model'
 import type { CompanyOption, LimitRow } from '@/app/(portal)/ba/_components/BaView'
 import { deleteBa, deleteBaAttachment, generateBaInvoice, getBaAttachmentUrl, setBaStatus, uploadBaAttachment } from '@/app/(portal)/ba/actions'
@@ -115,7 +115,7 @@ export default function BaApp({
   const [limitOf, setLimitOf] = useState<{ companyId: string; label: string; limit: number } | 'new' | null>(null)
   const [menu, setMenu] = useState(false)
   const [doc, setDoc] = useState<{ id: string; name: string } | null>(null)
-  const [asking, setAsking] = useState<'delete' | 'unfile' | null>(null)
+  const [asking, setAsking] = useState<'delete' | 'unfile' | 'bill' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, startBusy] = useTransition()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -158,7 +158,7 @@ export default function BaApp({
     : [
         ...(r.can.pv ? [{ key: 'pv', label: 'Generate PV', act: () => setPv({ id: r.id, ref: r.ref, owe: r.oweToHc, maturity: r.row.maturityDate }) }] : []),
         ...(r.can.bill
-          ? [{ key: 'bill', label: 'Bill interest', act: () => run(() => generateBaInvoice(r.id), (res) => `Invoice ${(res.invoiceNo as string | null) ?? ''} created as draft — review and issue it in Invoices`) }]
+          ? [{ key: 'bill', label: 'Bill interest', act: () => { setSaid(null); setError(null); setAsking('bill') } }]
           : []),
         ...(r.can.settle ? [{ key: 'settle', label: 'Mark settled', act: () => run(() => setBaStatus(r.id, 'settled'), () => 'Marked settled — the limit is released.') }] : []),
         ...(r.can.reopen ? [{ key: 'reopen', label: 'Reopen', act: () => run(() => setBaStatus(r.id, 'active'), () => 'Reopened.') }] : []),
@@ -337,6 +337,11 @@ export default function BaApp({
           setAsking(null)
           setDoc(null)
           after('Document removed')
+        } else if (asking === 'bill') {
+          const res = await generateBaInvoice(r.id)
+          if (res?.error) return setError(res.error)
+          setAsking(null)
+          after(`Invoice ${res.invoiceNo ?? ''} created as draft — review and issue it in Invoices`)
         }
       } catch {
         setError('That did not go through. Try again.')
@@ -411,11 +416,35 @@ export default function BaApp({
           ]}
         />
       </FinDialog>
-      <FinDialog open={asking !== null} onClose={closeAsk} title={asking === 'delete' ? `Delete ${r?.ref ?? 'this financing'}?` : 'Remove this document?'} locked={busy}>
+      <FinDialog
+        open={asking !== null}
+        onClose={closeAsk}
+        title={asking === 'bill' ? `Bill ${r?.borrower ?? 'the borrower'}?` : asking === 'delete' ? `Delete ${r?.ref ?? 'this financing'}?` : 'Remove this document?'}
+        sub={asking === 'bill' && r ? `${r.ref} · RM ${f2(calcOf(r.row).chargeToBorrower)}` : undefined}
+        locked={busy}
+      >
         <DialogConfirm
-          text={asking === 'delete' ? 'Its filed documents are removed too.' : `${doc?.name ?? 'The document'} comes off the financing.`}
-          confirmLabel={busy ? (asking === 'delete' ? 'Deleting…' : 'Removing…') : asking === 'delete' ? 'Delete financing' : 'Remove document'}
-          danger
+          text={
+            asking === 'bill'
+              ? 'The interest goes out as a draft invoice (5028) to review and issue in Invoices.'
+              : asking === 'delete'
+                ? 'Its filed documents are removed too.'
+                : `${doc?.name ?? 'The document'} comes off the financing.`
+          }
+          confirmLabel={
+            busy
+              ? asking === 'bill'
+                ? 'Billing…'
+                : asking === 'delete'
+                  ? 'Deleting…'
+                  : 'Removing…'
+              : asking === 'bill'
+                ? 'Bill interest'
+                : asking === 'delete'
+                  ? 'Delete financing'
+                  : 'Remove document'
+          }
+          danger={asking !== 'bill'}
           busy={busy}
           error={error}
           onCancel={closeAsk}
