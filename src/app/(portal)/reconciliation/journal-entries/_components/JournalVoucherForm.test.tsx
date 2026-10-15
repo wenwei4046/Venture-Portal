@@ -115,6 +115,31 @@ describe('the voucher form', () => {
     expect(post).toBeDisabled()
   })
 
+  it('keeps the segment of a voucher in a department added since — it does not fall back to Unallocated (2026-10-15)', async () => {
+    mocks.updateJournalVoucher.mockResolvedValue(undefined)
+    render(
+      <JournalVoucherForm
+        accounts={ACCOUNTS}
+        entry={{
+          id: 'jv-1',
+          transaction_date: '2026-09-15',
+          description: 'Reverse the Revenue Team accrual',
+          segment: 'revenue_department',
+          lines: [
+            { account_code: '1300', debit: 100, credit: null, description: null },
+            { account_code: '5027', debit: null, credit: 100, description: null },
+          ],
+        }}
+      />,
+    )
+    const segment = screen.getByLabelText('Segment') as HTMLSelectElement
+    expect(segment.value).toBe('revenue_department')
+    expect(segment.selectedOptions[0].textContent).toBe('Revenue department')
+    fireEvent.submit(document.querySelector('form')!)
+    await waitFor(() => expect(mocks.updateJournalVoucher).toHaveBeenCalledTimes(1))
+    expect(mocks.updateJournalVoucher.mock.calls[0][1]).toMatchObject({ segment: 'revenue_department' })
+  })
+
   it('needs two filled lines, whatever else is on the form', () => {
     render(<JournalVoucherForm accounts={ACCOUNTS} />)
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'One-sided' } })
