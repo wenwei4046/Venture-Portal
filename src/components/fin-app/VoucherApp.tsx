@@ -91,6 +91,7 @@ export default function VoucherApp({
   record: initialRecord,
   refused: initialRefused,
   canCreate,
+  canExport = false,
   create,
   prefix,
   today,
@@ -106,6 +107,8 @@ export default function VoucherApp({
   record: VoucherRecord | null
   refused: string | null
   canCreate: boolean
+  /** Treasury · Export: the vouchers' Excel and PDF, as the route asks (2026-10-16). */
+  canExport?: boolean
   /** Payments: Create payment's line, today and lists. */
   create?: { prefix: string; today: string; open: boolean; initial: CreatePaymentOptions | null } | null
   /** Receive: Create receipt's line. */
@@ -190,7 +193,7 @@ export default function VoucherApp({
   const hubBar: BarButton[] = receipts
     ? [
         ...(createBtn ? [createBtn, { key: 'loan', label: 'Loan repayment', onClick: () => setMaking('loan') } as BarButton] : []),
-        { key: 'more', label: '⋯', kind: 'more', onClick: () => setMenu('export') },
+        ...(canExport ? [{ key: 'more', label: '⋯', kind: 'more', onClick: () => setMenu('export') } as BarButton] : []),
       ]
     : [
         ...(createBtn ? [createBtn] : []),
@@ -388,7 +391,7 @@ export default function VoucherApp({
             <DialogMenu
               items={[
                 { key: 'claims', label: claims.length > 0 ? `Claims · ${claims.length}` : 'Claims', sub: claims.length > 0 ? `${claims.length} waiting for a voucher` : 'Nothing waiting', onClick: () => setMenu('claims') },
-                { key: 'export', label: 'Export', sub: 'Excel or PDF of every voucher', onClick: () => setMenu('export') },
+                ...(canExport ? [{ key: 'export', label: 'Export', sub: 'Excel or PDF of every voucher', onClick: () => setMenu('export') }] : []),
               ]}
             />
           </FinDialog>
