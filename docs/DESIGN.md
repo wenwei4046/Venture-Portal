@@ -887,6 +887,7 @@ README §1 and `prototype/Finance Mobile App.dc.html` (M01–M18): Finance's vie
 - **Statements** (`StatementsApp`): *Net · <month>* between the arrows over *Statements · <Month>*, *Draft*, *All statements*; a statement's page with *Issue to subsidiary* / *Mark as paid* and *Print statement*; *Generate statements*.
 - **One-way steps ask first** (v4.53): a press nothing in the app undoes — *Issue to subsidiary*, *Mark as paid*, *Bill interest*, *Mark executed* — opens the kit's question (*Issue to <company>?* · *<month> · <net>*, *This cannot be undone.*, *Cancel* · the step); a step with its own way back (Mark settled, Mark done, Submit for approval, a match) stays one press.
 - **Part E3** (v4.54): *Dept Pool* (*Total balance* or *Net margin* over By department — a balance ••••• until *Show balances* — Balance by bank, HR costing), a department's page (`dp-<slug>`: its Cash Flow, the P&L a press away, a month between the arrows), *Venture Pool* (*Running balance · all-time*; This month, 12 months, Pool ledger), *Audit Log* (*Saves today*; Latest changes by day — a save's records and fields, a record's *History*; Areas you read; *Filter* · *Older* / *Newest*; ‹ Profile) and *Meeting Rooms* — the Revenue app's Book a room itself, in its own frame and theme (`data-revenue-app`, Inter Tight), ‹ Profile.
+- **Part E3b** (v4.55): *Departments* (*N departments · N cost centers*; Departments, Bill back salary; a department's screen with *Bill back salary*, *Switch to …* and *Provision* — the last two asked first; *+ New department*; ‹ Profile) and *Chart of Account* (*N active accounts*; a card per type with its range; the type's tree with search and *Show inactive*; an account's screen; *+ New account*, *Edit* — a new type or code asked first).
 
 
 **HR & Payroll**
@@ -1566,6 +1567,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.55** · 2026-10-16 · Finance's phone app, part E3b: Profile › Admin › Departments and Report › Chart of Account; an account's edit sends only what changed (desktop too) → Finance's view — the phone app
 - **v4.54** · 2026-10-15 · Finance's phone app, part E3: Department › Dept Pool, a department's own page, Venture Pool; Profile › Admin › Audit Log and Meeting Rooms (the Revenue app's Book a room, in its own frame and theme) → Finance's view — the phone app
 - **v4.53** · 2026-10-15 · Finance's phone app: one-way steps ask first — Issue to subsidiary, Mark as paid, Bill interest, Mark executed open a question sheet before they act → Finance's view — the phone app
 - **v4.52** · 2026-10-15 · Finance's phone app, part 5c: Daily › Journal Entries and Reconciliation, Fund › Invoice Financing, Repayment Schedule and Statements — each page's cards, lists and records with its steps and sheets (Match lines on its own screen, Record financing and the Calculator, Generate statements) → Finance's view — the phone app
