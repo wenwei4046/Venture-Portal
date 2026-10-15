@@ -47,6 +47,12 @@ describe('the printed statement’s document', () => {
     expect(await generateMetadata({ params })).toEqual({})
   })
 
+  it('on a phone, Print / Save PDF stands over the letterhead, not on it (the app’s Print statement opens this page)', () => {
+    const src = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
+    const phone = src.slice(src.indexOf('@media screen and (max-width: 640px)'))
+    expect(phone).toMatch(/^@media screen and \(max-width: 640px\) \{\s*body \{ padding: max\(16px, env\(safe-area-inset-top, 0px\)\) 16px 24px; \}\s*\.print-btn \{ position: static;/)
+  })
+
   it('leaves the document to the root layout: no <html>, <head> or <body> of its own', () => {
     const src = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
     expect(src).not.toMatch(/<(html|head|body|title)\b/)

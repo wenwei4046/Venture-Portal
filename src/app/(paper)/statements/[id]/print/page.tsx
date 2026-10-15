@@ -184,6 +184,12 @@ export default async function StatementPrintPage({ params }: Props) {
             font-family: Georgia, serif; font-style: italic; font-size: 14px;
           }
           .print-btn:hover { background: #B54A22; }
+          /* A phone (2026-10-16 — the Finance app's Print statement opens this page): the button
+             stands in the page's flow over the letterhead instead of on it, the margins narrower. */
+          @media screen and (max-width: 640px) {
+            body { padding: max(16px, env(safe-area-inset-top, 0px)) 16px 24px; }
+            .print-btn { position: static; display: block; margin: 0 0 16px auto; }
+          }
           /* The handoff's two sides and net (2026-10-10, PrintSections). */
           .bil-ps-box { margin: 18px 0; border: 1px solid rgba(21,110,78,0.3); border-left: 4px solid #156E4E; border-radius: 6px; padding: 12px 14px 4px; background: rgb(246,251,248); }
           .bil-ps-box.b { border-color: rgba(176,40,34,0.3); border-left-color: #B02822; background: rgb(253,246,245); }
