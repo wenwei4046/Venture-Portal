@@ -4,6 +4,7 @@ import type { User } from '@/types'
 import { decision } from '@/lib/approval-domains'
 import { poolLabel } from '@/lib/pools'
 import { resolveLiveApprovalAmounts } from '@/lib/approval-amounts'
+import { fetchAllRows } from '@/lib/paginate'
 import { buildQueueRows, executiveSubmitterIds, queueSummary, recentDecisionRows, type ApprovalRequestRow } from '@/lib/approval-queue'
 import type { PendingRow } from '../_components/PendingApprovals'
 
@@ -147,4 +148,36 @@ export async function readApprovalQueue(supabase: Client, user: User) {
   ) as Record<string, string>
 
   return { queue, decisions, summary, undecidable, executives: [...executives], approved30: approved30 ?? 0, rejected30: rejected30 ?? 0 }
+}
+
+/**
+ * Every request decided since `since` (2026-10-15, the Finance phone app's
+ * *Decided · 30 days* list — the desktop card's figure, so the list holds what
+ * the card counts): newest first, read in pages, each at its live amount, with
+ * who sent it.
+ */
+export async function readDecidedSince(supabase: Client, since: string) {
+  const rows = await fetchAllRows<ApprovalRequestRow>(
+    (from, to) =>
+      supabase
+        .from('approval_requests')
+        .select('id, request_type, description, amount, reference_id, reference_table, submitted_by, group_id, created_at, approved_at, status')
+        .neq('status', 'pending')
+        .gte('approved_at', since)
+        .order('approved_at', { ascending: false })
+        .order('id')
+        .range(from, to),
+    'readDecidedSince',
+  )
+  const submitterIds = uniq(rows.map((r) => r.submitted_by))
+  const [liveAmounts, { data: people }] = await Promise.all([
+    resolveLiveApprovalAmounts(supabase, rows),
+    submitterIds.length > 0 ? supabase.from('users').select('id, name').in('id', submitterIds) : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
+  ])
+  const names = new Map((people ?? []).map((u) => [u.id, u.name as string]))
+  return {
+    rows,
+    amountOf: (row: ApprovalRequestRow): number | null => (liveAmounts.has(row.id) ? liveAmounts.get(row.id)! : row.amount === null ? null : Number(row.amount)),
+    nameOf: (id: string) => names.get(id) ?? 'Unknown',
+  }
 }

@@ -24,16 +24,17 @@ export function BankHero({
   value: string
   label: string
   month?: { label: string; prev: () => void; next: () => void; canPrev?: boolean; canNext?: boolean } | null
-  /** *Unpaid as of today*, *Segment only · won't balance* — the desktop page's chip. */
-  chip?: string | null
+  /** *Unpaid as of today*, *Segment only · won't balance* — the desktop page's chip (alert, unless it says its tone). */
+  chip?: string | { text: string; tone: ChipTone } | null
 }) {
+  const said = typeof chip === 'string' ? { text: chip, tone: 'alert' as ChipTone } : (chip ?? null)
   return (
     <div className={s.bankHero}>
       <span className={s.bankValue}>{value}</span>
       <span className={s.bankLabel}>{label}</span>
-      {chip ? (
-        <span className={s.itemChip} data-tone="alert">
-          {chip}
+      {said ? (
+        <span className={s.itemChip} data-tone={said.tone}>
+          {said.text}
         </span>
       ) : null}
       {month ? (

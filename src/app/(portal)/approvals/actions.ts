@@ -435,7 +435,14 @@ export async function approveRequestsBulk(args: {
   if (ids.length === 0 && groupIds.length === 0) throw new Error('No approvals selected')
 
   // Approving moves money — block the whole batch if today's period is locked.
-  await assertPeriodOpen(supabase, new Date())
+  // Said in the answer, as every other refusal here (2026-10-15): production
+  // reduces a thrown message to a digest, so the queue and the phone read
+  // "An error occurred" for a closed month.
+  try {
+    await assertPeriodOpen(supabase, new Date())
+  } catch (e) {
+    return { approved: 0, failed: [{ id: '', description: 'Approval', error: e instanceof Error ? e.message : 'This month is closed' }] }
+  }
 
   const { data: rows } = await supabase
     .from('approval_requests')
@@ -1084,17 +1091,25 @@ export async function approveRequestGroupPartial(args: {
   rejectApprovalIds: string[]
   approveNotes: string
   rejectReason: string
-}) {
+}): Promise<{ ok: true } | { ok: false; reason: string }> {
   const user = await requireApproverOn('/approvals')
   const supabase = await createClient()
 
+  // Refusals are answered in words (2026-10-15 — the batch's details and the
+  // Finance phone app): production reduces a thrown message to a digest.
   const { data: pendingRows } = await supabase
     .from('approval_requests')
     .select('request_type, submitted_by')
     .eq('group_id', args.groupId)
     .eq('status', 'pending')
   // Nothing pending is the function's own "already processed" to say.
-  if (pendingRows && pendingRows.length > 0) assertMayDecide(user, pendingRows)
+  if (pendingRows && pendingRows.length > 0) {
+    try {
+      assertMayDecide(user, pendingRows)
+    } catch (e) {
+      return { ok: false, reason: e instanceof Error ? e.message : 'Not yours to decide' }
+    }
+  }
 
   const { error } = await supabase.rpc('approve_voucher_batch_partial', {
     p_group_id: args.groupId,
@@ -1105,7 +1120,7 @@ export async function approveRequestGroupPartial(args: {
     p_reject_reason: args.rejectReason ?? '',
   })
 
-  if (error) throw new Error(`Partial batch approval failed: ${error.message}`)
+  if (error) return { ok: false, reason: `Partial batch approval failed: ${error.message}` }
 
   notifyApprovalDecision(
     'payment_voucher',
@@ -1118,6 +1133,7 @@ export async function approveRequestGroupPartial(args: {
   revalidatePath('/payments')
   revalidatePath('/dashboard')
   revalidatePath('/hr-costing/payment')
+  return { ok: true }
 }
 
 // ─── Batch voucher details for BatchDetailsModal (Principal) ─────────────────
