@@ -121,6 +121,8 @@ export interface DeskUi {
   ppSel: string | null; ppChart: boolean;
   // Calendar: its analysis card open, and what it groups by (vm/analysis.ts).
   calAn: boolean; calAnBy: string;
+  // The Customer form's phone preview: what is typed into the real phone form there (nothing is saved).
+  cfPv: Partial<import("../../sales/ui").CustomerForm> | null;
   // Assignment
   applyChk: boolean; ftApplyChk: boolean; evOpen: Record<string, boolean>;
   adPer: "Today" | "This week" | "This month" | "Custom"; adPerOpen: boolean; adCal: boolean;
@@ -172,7 +174,7 @@ export const initialDeskUi = (): DeskUi => ({
   ntfTab: "unread", ntfCat: "all", ntfSel: false, ntfPick: {},
   book: null, cform: null, history: null, histF: "all",
   ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, paneW: null, sheetW: null, menuW: null, perfW: null, mwtLogW: null, auditW: null,
-  adLog: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "unread", ppSel: null, ppChart: false, calAn: false, calAnBy: "rep",
+  adLog: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "unread", ppSel: null, ppChart: false, calAn: false, calAnBy: "rep", cfPv: null,
   applyChk: false, ftApplyChk: false, evOpen: {}, adPer: "This month", adPerOpen: false, adCal: false, adCust: null, adCustT: null,
   calBy: "team",
   ppF: {}, ppBy: "type", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,

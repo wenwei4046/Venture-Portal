@@ -7,6 +7,8 @@
  */
 import { Fragment } from "react";
 import DX from "./desk-extras.module.css";
+import SalesCustomerForm from "../sales/SalesCustomerForm";
+import type { CustomerFormVM } from "../sales/vm/customer";
 import type { bookVM, customerFormVM, historyVM, noteVM } from "./vm/extras";
 
 const BACK = { flex: "0 0 auto", display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", border: "0", borderBottom: "1px solid #EBDDD2", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "#BD4A19", cursor: "pointer", textAlign: "left" } as const;
@@ -315,7 +317,7 @@ export function DeskAnalysis({ v }: { v: ReturnType<typeof import("./vm/analysis
       <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
         <strong onClick={v.toggle} style={{ flex: "1", minWidth: "160px", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#806B60" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "8px", verticalAlign: "-1px", transform: v.chev, transition: "transform .18s" }}><path d="m6 9 6 6 6-6"></path></svg>
-          {v.title}<span style={{ marginLeft: "10px", fontSize: "12.5px", fontWeight: "500", color: "#806B60" }}>{v.sum}</span>
+          {v.title}<span style={{ marginLeft: "10px", fontSize: "12.5px", fontWeight: "500", color: "#806B60" }}>{v.sum}</span><span style={{ marginLeft: "12px", display: "inline-flex", alignItems: "center", gap: "5px", height: "26px", padding: "0 11px", borderRadius: "13px", border: "1px solid #E2CFC1", background: "#fff", fontSize: "12px", fontWeight: "650", color: "#BD4A19", verticalAlign: "1px" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12A9 9 0 1 1 12 3v9h9Z"></path><path d="M15 3.5A9 9 0 0 1 20.5 9H15V3.5Z"></path></svg>{v.btn}</span>
         </strong>
         <div style={{ display: "flex", flexWrap: "wrap", background: "#F5EEE8", borderRadius: "10px", padding: "3px", gap: "2px" }}>
           {v.bys.map(o => <button key={o.label} type="button" onClick={o.pick} style={{ border: "0", height: "28px", padding: "0 10px", borderRadius: "8px", font: "inherit", fontSize: "12.5px", cursor: "pointer",
@@ -343,6 +345,17 @@ export function DeskAnalysis({ v }: { v: ReturnType<typeof import("./vm/analysis
             </div>
           </div>
         </div>)}
+    </div>
+  );
+}
+
+/** The Customer form's phone preview: the phone's own form (SalesCustomerForm) at a 375px phone's size, scaled to the frame. */
+export function DeskPhoneForm({ v, scale }: { v: CustomerFormVM; scale: number }) {
+  return (
+    <div style={{ position: "relative", flex: "1", minHeight: "0", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, width: "375px", height: `${100 / scale}%`, transform: `scale(${scale})`, transformOrigin: "0 0" }}>
+        <SalesCustomerForm v={v} />
+      </div>
     </div>
   );
 }

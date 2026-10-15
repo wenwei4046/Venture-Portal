@@ -134,6 +134,9 @@ cfOn
 cfPhone
 cfPhoneH
 cfPhoneW
+cfReal
+cfRealOn
+cfRealScale
 cfReset
 cfSave
 cfSaveBg
@@ -479,6 +482,7 @@ ppAddOpts
 ppAddToggle
 ppBars
 ppBys
+ppChartBtn
 ppChartOpen
 ppChartSum
 ppChartTitle

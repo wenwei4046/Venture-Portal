@@ -127,7 +127,7 @@ export function peopleVM(ctx: DeskCtx) {
     ppEmpty: !rows.length, ppHas: rows.length > 0,
     // The chart card: folded to its title and what it says until opened; open, a pie with each value's share beside the
     // rows that filter (the owner, 2026-10-15: "分析圖表，類似截圖，默認收起").
-    ppFoldable: true, ppChartOpen: ui.ppChart, ppChartToggle: () => patch({ ppChart: !ui.ppChart }), ppChev: ui.ppChart ? "rotate(180deg)" : "none",
+    ppFoldable: true, ppChartOpen: ui.ppChart, ppChartToggle: () => patch({ ppChart: !ui.ppChart }), ppChev: ui.ppChart ? "rotate(180deg)" : "none", ppChartBtn: ui.ppChart ? "Hide chart" : "Show chart",
     ppChartSum: (() => { const top = bars.filter(b => b.n && b.label !== "Not filled yet").sort((a, b) => b.n - a.n)[0]; return top ? `Most: ${top.label} · ${top.n} of ${tot} (${top.pct})` : `${tot} contacts`; })(),
     ppPie: pieSlices(bars.filter(b => b.n).map(b => ({ label: b.label, n: b.n, color: b.color })), tot), ppPieHas: bars.some(b => b.n),
     ppSide: sideVM(ctx, ui.ppSel, rows.filter(d => !d.filled).map(d => d.id)),

@@ -9,7 +9,7 @@ import type React from "react";
 import DH from "./desk-hover.module.css";
 import DX from "./desk-extras.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
-import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskHistory, DeskNote, DeskPie } from "./DeskExtras";
+import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskHistory, DeskNote, DeskPhoneForm, DeskPie } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
 /** The whole desktop CRM: the Revenue app's frame around it (sidebar, top bar), every page, pane, menu and the toast. */
@@ -729,7 +729,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                                 </span>
                                 <span style={{ fontSize: "12px" }}>5G</span>
                               </div>
-                              <div style={{ flex: "1", minHeight: "0", marginTop: "16px", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "22px 22px 0 0" }}>
+                              {!(v.cfRealOn) && (<><div style={{ flex: "1", minHeight: "0", marginTop: "16px", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "22px 22px 0 0" }}>
                                 <span style={{ alignSelf: "center", width: "40px", height: "5px", margin: "8px 0 4px", borderRadius: "3px", background: "#E2D6CC" }}>
                                 </span>
                                 <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 18px 12px", borderBottom: "1px solid #EBDDD2" }}>
@@ -781,7 +781,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                                   <span style={{ flex: "0 0 auto", height: "46px", padding: "0 20px", display: "grid", placeItems: "center", borderRadius: "23px", border: "1px solid #E2CFC1", fontSize: "15px", fontWeight: "650" }}>Cancel</span>
                                   <span style={{ flex: "1", height: "46px", display: "grid", placeItems: "center", borderRadius: "23px", background: "#BD4A19", color: "#fff", fontSize: "15px", fontWeight: "650" }}>Save</span>
                                 </div>
-                              </div>
+                              </div></>)}{!!(v.cfRealOn) && (<DeskPhoneForm v={v.cfReal} scale={v.cfRealScale} />)}
                             </div>
                           </div>
                         </>)}
@@ -3641,7 +3641,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "14px", padding: "18px 20px", border: "1px solid #EBDDD2", borderRadius: "14px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                      <strong onClick={v.ppChartToggle} style={{ flex: "1", minWidth: "160px", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}>{!!(v.ppFoldable) && (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#806B60" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "8px", verticalAlign: "-1px", transform: v.ppChev, transition: "transform .18s" }}><path d="m6 9 6 6 6-6"></path></svg>)}{v.ppChartTitle}{!!(v.ppFoldable) && (<span style={{ marginLeft: "10px", fontSize: "12.5px", fontWeight: "500", color: "#806B60" }}>{v.ppChartSum}</span>)}</strong>
+                      <strong onClick={v.ppChartToggle} style={{ flex: "1", minWidth: "160px", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}>{!!(v.ppFoldable) && (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#806B60" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "8px", verticalAlign: "-1px", transform: v.ppChev, transition: "transform .18s" }}><path d="m6 9 6 6 6-6"></path></svg>)}{v.ppChartTitle}{!!(v.ppFoldable) && (<span style={{ marginLeft: "10px", fontSize: "12.5px", fontWeight: "500", color: "#806B60" }}>{v.ppChartSum}</span>)}{!!(v.ppFoldable) && (<span style={{ marginLeft: "12px", display: "inline-flex", alignItems: "center", gap: "5px", height: "26px", padding: "0 11px", borderRadius: "13px", border: "1px solid #E2CFC1", background: "#fff", fontSize: "12px", fontWeight: "650", color: "#BD4A19", verticalAlign: "1px" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12A9 9 0 1 1 12 3v9h9Z"></path><path d="M15 3.5A9 9 0 0 1 20.5 9H15V3.5Z"></path></svg>{v.ppChartBtn}</span>)}</strong>
                       <div style={{ display: "flex", flexWrap: "wrap", background: "#F5EEE8", borderRadius: "10px", padding: "3px", gap: "2px" }}>
                         {(v.ppBys).map((o, o_i) => (<Fragment key={o_i}>
                           {!!(o.on) && (<>
