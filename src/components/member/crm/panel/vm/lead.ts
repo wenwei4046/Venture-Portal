@@ -271,7 +271,9 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     // Photos and videos (Camera, Photos) wait on the preview with its HD switch; a document goes at once.
     pickVisual: (e: ChangeEvent<HTMLInputElement>) => {
       const files = [...(e.target.files ?? [])]; e.target.value = "";
-      if (files.length) set(u => ({ ...u, pPick: { ...pickedOf(files), caption: draft } }));
+      // The camera's photo fills the 9:16 screen (2026-10-15); the photo library's stays whole.
+      const camera = e.target.id.endsWith("-camera");
+      if (files.length) set(u => ({ ...u, pPick: { ...pickedOf(files, { camera }), caption: draft } }));
     },
     pk: c ? pickVM(ui.pPick, p => set(u => ({ ...u, pPick: p })), async (files, captions) => {
       if (draft) setDraft("");

@@ -538,7 +538,9 @@ export function chatVM(ctx: SalesCtx) {
     // Photos and videos (the Attach panel's Photos, the camera) wait on the preview with its HD switch; a document goes at once.
     pickVisual: (e: ChangeEvent<HTMLInputElement>) => {
       const files = [...(e.target.files ?? [])]; e.target.value = "";
-      if (files.length) set(u => ({ ...u, pick: { ...pickedOf(files), caption: draft } }));
+      // The camera's photo fills the 9:16 screen (2026-10-15); the photo library's stays whole.
+      const camera = e.target.id.endsWith("-camera");
+      if (files.length) set(u => ({ ...u, pick: { ...pickedOf(files, { camera }), caption: draft } }));
     },
     // The editor's caption starts as what was typed in the reply box, and takes its place once sent.
     pk: pickVM(ui.pick, p => set(u => ({ ...u, pick: p })), async (files, captions) => {
