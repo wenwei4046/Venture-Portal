@@ -339,6 +339,55 @@ export async function provisionDepartment(formData: FormData) {
   return data
 }
 
+/**
+ * The department writes answered in words (2026-10-15, the Finance phone app's
+ * Departments): production hides a thrown message behind a digest, so each
+ * asks the same gate, calls the desktop's action and says what it said.
+ */
+export type DepartmentWriteResult = { ok: true } | { ok: false; reason: string }
+const refusalOf = (e: unknown, fallback: string): DepartmentWriteResult => ({
+  ok: false,
+  reason: e instanceof Error && e.message ? e.message : fallback,
+})
+
+export async function addDepartmentInWords(name: string): Promise<DepartmentWriteResult> {
+  await requireActionOn('/settings', 'categories', 'manage')
+  const fd = new FormData()
+  fd.set('name', name)
+  try {
+    await addDepartment(fd)
+    return { ok: true }
+  } catch (e) {
+    return refusalOf(e, 'The department could not be added.')
+  }
+}
+
+export async function setDepartmentBillbackInWords(id: string, billback: boolean): Promise<DepartmentWriteResult> {
+  await requireActionOn('/settings', 'categories', 'manage')
+  const fd = new FormData()
+  fd.set('id', id)
+  fd.set('own_share_billback', String(billback))
+  try {
+    await setDepartmentBillback(fd)
+    return { ok: true }
+  } catch (e) {
+    return refusalOf(e, 'The bill-back setting could not be saved.')
+  }
+}
+
+export async function provisionDepartmentInWords(id: string, segmentKey: string): Promise<DepartmentWriteResult> {
+  await requireActionOn('/settings', 'categories', 'manage')
+  const fd = new FormData()
+  fd.set('id', id)
+  fd.set('segment_key', segmentKey)
+  try {
+    await provisionDepartment(fd)
+    return { ok: true }
+  } catch (e) {
+    return refusalOf(e, 'The department could not be provisioned.')
+  }
+}
+
 export async function addCompany(formData: FormData) {
   await requireActionOn('/settings', 'settings', 'manage')
   const supabase = await createClient()

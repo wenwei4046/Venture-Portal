@@ -15,6 +15,7 @@ import BankAccountsSection from './_components/BankAccountsSection'
 import CompaniesSection from './_components/CompaniesSection'
 import DepartmentsSection from './_components/DepartmentsSection'
 import { loadDepartmentModes } from '@/lib/department-mode-server'
+import { departmentRowsRead } from './_lib/departments-read'
 import AccountsSection from './_components/AccountsSection'
 import PeriodsSection from './_components/PeriodsSection'
 import SettingsTabs, { type SettingsTab } from './_components/SettingsTabs'
@@ -91,12 +92,8 @@ export default async function SettingsPage({ searchParams }: Props) {
       .order('type')
       .order('sort_order')
       .order('code'),
-    // own_share_billback was read below but never selected (2026-09-29), so
-    // every Bill back box drew unticked whatever the registry held.
-    supabase
-      .from('departments')
-      .select('id, name, is_internal, created_at, segment_key, pool_gl_code, billing_mode_key, own_share_billback')
-      .order('created_at'),
+    // The registry's rows, as the Finance phone app reads them (`_lib/departments-read`).
+    departmentRowsRead(supabase),
   ])
   // Cost center / centralized (2026-09-30). The rest of Settings must not fail
   // because of it, so a failed read leaves the Mode column blank.
