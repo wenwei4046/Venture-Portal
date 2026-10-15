@@ -74,24 +74,35 @@ export async function readInvoicePreset(supabase: Client, invoiceId: string): Pr
 
 /**
  * Refund flow (2026-08-24): a PAID invoice prefills a debit PV paying the
- * money back — payee / amount / description from the invoice's actual
- * receipts; Finance picks pool + GL account; normal PV approval. The invoice
- * itself stays paid (money-out only). Null when nothing was received.
+ * money back — payee / amount / description from what was received; Finance
+ * picks pool + GL account; normal PV approval. The invoice itself stays paid
+ * (money-out only). Null when nothing was received.
+ *
+ * What was received (2026-10-16): an invoice settled on a consolidated
+ * receipt (one receipt for several invoices, `settlement_voucher_id`) has no
+ * receipt of its own, so counting only its own receipts read RM 0 and the
+ * page opened a blank voucher. A paid invoice received at least what it owed
+ * after its approved credit notes — the hub reads it so (invoice-model).
  */
 export async function readRefundPreset(supabase: Client, invoiceId: string): Promise<RefundPreset | null> {
   const { data: inv } = await supabase
     .from('invoices')
-    .select('id, invoice_no, company_id, billable_to_freetext_name, status, companies(name)')
+    .select('id, invoice_no, company_id, billable_to_freetext_name, status, total_amount, companies(name)')
     .eq('id', invoiceId)
     .single()
   if (!inv || (inv.status !== 'paid' && inv.status !== 'paid_via_netting')) return null
-  const { data: receiptRows } = await supabase
-    .from('payment_vouchers')
-    .select('amount')
-    .eq('invoice_id', inv.id)
-    .eq('direction', 'credit')
-    .neq('status', 'voided')
-  const received = (receiptRows ?? []).reduce((s, r) => s + Number(r.amount), 0)
+  const [{ data: receiptRows }, { data: cnRows }] = await Promise.all([
+    supabase
+      .from('payment_vouchers')
+      .select('amount')
+      .eq('invoice_id', inv.id)
+      .eq('direction', 'credit')
+      .neq('status', 'voided'),
+    supabase.from('credit_notes').select('amount').eq('invoice_id', inv.id).eq('status', 'approved'),
+  ])
+  const direct = (receiptRows ?? []).reduce((s, r) => s + Number(r.amount), 0)
+  const credited = (cnRows ?? []).reduce((s, r) => s + Number(r.amount), 0)
+  const received = inv.status === 'paid' ? Math.max(direct, Number(inv.total_amount) - credited) : direct
   if (received <= 0) return null
   const company = (inv.companies as { name: string } | null) ?? null
   return {
