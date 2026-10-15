@@ -20,7 +20,6 @@ import { albumsOf, galleryOf, INLINE_TIME, mediaOf, mediaWord } from "../../shar
 import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
-import { heldLeft, isHeld, undoHeld } from "../../shared/undo-send";
 import { actionsOnScreen, closeActions, openActions, type ActionSheet } from "../../shared/action-sheet";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
@@ -77,8 +76,6 @@ export function leadVM(ctx: PanelCtx) {
         forward: c ? { chats: forwardChats(ctx.data.customers, c.id, nameOf), send: toId => void ctx.act.forward(m.id, toId) } : undefined,
         info: c ? messageInfo(m, c, nameOf) : undefined,
         actions: [
-          // Still held (shared/undo-send.ts): taken back before it reaches the customer, its words back in the box.
-          ...(isHeld(m.id) ? [{ label: `Unsend · ${heldLeft(m.id)}s`, icon: MENU_ICON.unsend, danger: true, run: () => { if (!undoHeld(m.id)) ctx.act.toast("Already sent — it can no longer be taken back."); } }] : []),
           { label: "Reply", icon: MENU_ICON.reply, run: () => patch({ pReply: { chat: c?.id ?? "", msgId: m.id, who: mine ? "You" : c?.name ?? "", text: m.text || mediaWord(m) } }) },
           { label: "Forward", icon: MENU_ICON.forward, run: () => {} },
           ...(m.text ? [{ label: "Copy", icon: MENU_ICON.copy, run: () => { void navigator.clipboard?.writeText(m.text).catch(() => {}); } }] : []),
