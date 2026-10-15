@@ -18,6 +18,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import SalesComposer from "./SalesComposer";
+import { KB_DEBUG_WORD, KbDebug, toggleKbDebug } from "../shared/kb-debug";
 import { BOX_MAX, BOX_MIN, HOLD_HINT, PANEL_H, composerVM, dropLast, flash, focusBox, togglePanel, type ComposerIn, type ComposerPanel } from "./vm/composer";
 
 /** A press held this long records; shorter is a tap. */
@@ -66,6 +67,13 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
   const alive = useRef(true);
 
   useEffect(() => { setKbH(storedKbH()); }, []);
+
+  // `kbdebug` typed in the box turns the keyboard's numbers on or off (shared/kb-debug.tsx) and is not kept.
+  useEffect(() => {
+    if (v.draft.trim().toLowerCase() !== KB_DEBUG_WORD) return;
+    toggleKbDebug();
+    latest.current.setDraft("");
+  }, [v.draft]);
 
   // ── The reply box's height: its words, one line to six ──
   useLayoutEffect(() => {
@@ -343,5 +351,6 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
     {/* Where this composer is in the chat (the stack and the screen are found from it). */}
     <span ref={anchorRef} hidden />
     <SalesComposer p={p} />
+    <KbDebug />
   </>);
 }
