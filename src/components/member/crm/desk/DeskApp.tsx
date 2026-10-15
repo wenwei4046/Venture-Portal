@@ -8,7 +8,7 @@ import { Fragment } from "react";
 import type React from "react";
 import DH from "./desk-hover.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
-import { DeskBook, DeskCardPicker, DeskCustomerForm, DeskEmoji, DeskHistory, DeskNote } from "./DeskExtras";
+import { DeskBook, DeskCardPicker, DeskAlerts, DeskCustomerForm, DeskEmoji, DeskHistory, DeskNote } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
 /** The whole desktop CRM: the Revenue app's frame around it (sidebar, top bar), every page, pane, menu and the toast. */
@@ -4537,32 +4537,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     </span>
                   </div>
                 </>)}
-                {!!(v.kBook) && (<DeskBook v={v.book} />)}{!!(v.kNote) && (<DeskNote v={v.note} />)}{!!(v.kForm) && (<DeskCustomerForm v={v.cform} />)}{!!(v.kAlerts) && (<>
-                  <div style={{ padding: "12px 16px", background: "#fff", borderBottom: "1px solid #F1E7DF", display: "flex" }}>
-                    <div style={{ display: "inline-flex", background: "#F5EBE3", borderRadius: "11px", padding: "3px", gap: "2px" }}>
-                      <span style={{ height: "28px", lineHeight: "28px", padding: "0 12px", borderRadius: "8px", background: "#fff", fontSize: "13px", fontWeight: "650", boxShadow: "rgba(63,43,34,.14) 0 1px 3px" }}>Unread 4</span>
-                      <span style={{ height: "28px", lineHeight: "28px", padding: "0 12px", borderRadius: "8px", color: "#806B60", fontSize: "13px", fontWeight: "550" }}>Read</span>
-                    </div>
-                  </div>
-                  <div style={{ flex: "1", minHeight: "0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                    {(v.alerts).map((a, a_i) => (<Fragment key={a_i}>
-                      <div style={{ display: "flex", gap: "12px", padding: "14px 16px", background: "#fff", borderBottom: "1px solid #F1E7DF" }}>
-                        <span style={{ flex: "0 0 auto", marginTop: "5px", width: "8px", height: "8px", borderRadius: "50%", background: a.color }}>
-                        </span>
-                        <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "3px" }}>
-                          <span style={{ display: "flex", gap: "8px", alignItems: "baseline" }}>
-                            <b style={{ fontSize: "12px", fontWeight: "700", color: a.color }}>{a.kind}</b>
-                            <span style={{ flex: "1" }}>
-                            </span>
-                            <small style={{ fontSize: "12px", color: "#A8968B" }}>{a.time}</small>
-                          </span>
-                          <strong style={{ fontSize: "14px", fontWeight: "650" }}>{a.title}</strong>
-                          <span style={{ fontSize: "12.5px", color: "#806B60" }}>{a.sub}</span>
-                        </span>
-                      </div>
-                    </Fragment>))}
-                  </div>
-                </>)}
+                {!!(v.kBook) && (<DeskBook v={v.book} />)}{!!(v.kNote) && (<DeskNote v={v.note} />)}{!!(v.kForm) && (<DeskCustomerForm v={v.cform} />)}{!!(v.kAlerts) && (<DeskAlerts v={v.alertsP} />)}
                 {!!(v.kTopMove) && (<>
                   <button type="button" onClick={v.backToChat} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", border: "0", borderBottom: "1px solid #EBDDD2", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "#BD4A19", cursor: "pointer", textAlign: "left" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="m15 6-6 6 6 6">

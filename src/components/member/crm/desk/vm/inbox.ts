@@ -3,9 +3,10 @@
  * once) and the status chips; a chat opens docked beside the list. Also the team / person pane Insight opens, Customer
  * info, Assign to, and CRM alerts. The rows are the phone's (data.ts › chatRows); writes are the phone's actions.
  */
-import { notifsVM } from "../../panel/vm/notifs";
+import { panelNotifs, type PanelNotif } from "../../panel/vm/notifs";
 import { infoRows } from "../../sales/vm/customer";
-import { urgencyOf } from "../../sales/vm/common";
+import { CHANNEL, STATUS_LABEL, lastReal, urgencyOf } from "../../sales/vm/common";
+import { mediaWord } from "../../shared/chat-media";
 import type { DeskCtx } from "./ctx";
 import { chatRows, initials, teamNameOf, type ChatRow } from "./data";
 import { panelLike } from "./frame";
@@ -149,28 +150,47 @@ export async function sendTo(ctx: DeskCtx, customerId: string, staffId: string, 
   return true;
 }
 
-/** CRM alerts (the header's button, frame 1d): Move · Share · Won · Lost · Overdue 9 h+, newest first. */
+/**
+ * CRM alerts (the header's button, frame 1d): Move · Share · Won · Lost · Overdue 9 h+, newest first — the panel's own
+ * notifications (`panelNotifs`), so an alert read here is read on the phone and on Settings › Notifications too
+ * (crm_read_notifs). The owner, 2026-10-15: a tap opens its chat, each says more (who did what, the customer's channel,
+ * ad, status, owner and last words), and Mark as read — the design drew the rows alone with a fixed "Unread 4 | Read".
+ */
 export function alertsVM(ctx: DeskCtx) {
-  const n = notifsVM(panelLike(ctx));
-  const ev = ctx.data.events.slice(0, 30).map(e => {
-    const c = ctx.data.customers.find(x => x.id === e.customerId);
-    const kind = e.kind === "won" ? "Won" : e.kind === "lost" ? "Lost" : e.kind === "moved" ? "Move" : e.kind === "shared" ? "Share" : "";
-    const color = e.kind === "won" ? "#387557" : e.kind === "lost" ? "#806B60" : e.kind === "moved" ? "#8E4B6E" : "#2F6FB5";
-    const who = e.actor ? ctx.nameOf(e.actor) : "";
-    return kind ? { kind, color, at: e.at, time: new Date(e.at).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" }),
-      title: `${c?.name ?? "A customer"} · ${kind === "Move" ? "moved" : kind === "Share" ? "shared" : kind}`, sub: `${who}${c ? ` · ${c.ad}` : ""}`, id: e.customerId } : null;
-  }).filter((x): x is NonNullable<typeof x> => !!x);
-  const overdue = ctx.data.customers.filter(c => { const u = urgencyOf(c, ctx.now); return u.level === "overdue" && u.waitingMinutes >= 9 * 60; })
-    .map(c => ({ kind: "Overdue 9 h+", color: "#A3371A", at: c.lastCustomerAt ?? c.createdAt, time: "", title: `${c.name} · ${urgencyOf(c, ctx.now).label}`,
-      sub: `${c.assignedTo ? ctx.nameOf(c.assignedTo) : "No one yet"} · ${teamNameOf(ctx, c.assignedTo) ?? ""}`, id: c.id }));
-  const alerts = [...overdue, ...ev].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 40)
-    .map(a => ({ kind: a.kind, color: a.color, time: a.time || new Date(a.at).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" }), title: a.title, sub: a.sub,
-      open: () => ctx.patch({ tab: "inbox", pane: "docked", kind: "chat", chat: a.id }) }));
-  return { alerts, alertsUnread: Number(n.notifUnread) || 0 };
+  const { data, patch, now } = ctx, pc = panelLike(ctx), act = pc.act;
+  const all = panelNotifs(pc);
+  const isRead = (n: PanelNotif) => data.notifRead.includes(n.key) || (!!data.notifsSeenAt && n.at <= data.notifsSeenAt);
+  const unread = all.filter(n => !isRead(n)), read = all.filter(isRead);
+  const tab = ctx.ui.alR === "read" ? "read" : "unread", list = (tab === "read" ? read : unread).slice(0, 60);
+  const today = new Date(now).toDateString();
+  const when = (iso: string) => { const d = new Date(iso), t = d.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
+    return d.toDateString() === today ? t : `${d.toLocaleDateString("en-MY", { day: "numeric", month: "short" })}, ${t}`; };
+  const KIND: Record<PanelNotif["kind"], [string, string]> = { move: ["Move", "#8E4B6E"], share: ["Share", "#2F6FB5"], won: ["Won", "#387557"], lost: ["Lost", "#806B60"], overdue: ["Overdue 9 h+", "#A3371A"] };
+  const rows = list.map(n => {
+    const c = n.customerId ? data.customers.find(x => x.id === n.customerId) : undefined, unr = !isRead(n), [kind, color] = KIND[n.kind];
+    const last = c ? lastReal(c) : undefined;
+    const open = () => { if (unr) act.readNotifs([n.key]); if (c) patch({ tab: "inbox", pane: "docked", kind: "chat", chat: c.id, fromTeam: false, menu: false, msgMenu: null, replyTo: null, attachOpen: false, emo: null }); };
+    return { key: n.key, kind, color, time: when(n.at), unread: unr, bg: unr ? "#FFFAF6" : "#fff", dot: unr ? color : "#E2D5CB",
+      title: c?.name ?? n.lead,
+      line: n.kind === "overdue" ? `Waiting ${Math.floor(urgencyOf(c ?? ({} as never), now).waitingMinutes / 60) || 9} h for ${n.lead === "a reply" ? "a reply" : `${n.lead}'s reply`}`
+        : [n.who, n.text.replace(/ ·$/, ""), n.tail.trim()].filter(Boolean).join(" "),
+      extra: n.extra,
+      sub: c ? [CHANNEL[c.channel].name, c.ad, STATUS_LABEL[c.status], c.assignedTo ? ctx.nameOf(c.assignedTo) : "No one yet"].filter(Boolean).join(" · ") : "",
+      quote: last ? `${last.from === "me" ? "You: " : ""}${last.text || mediaWord(last)}` : "", hasQuote: !!last,
+      canOpen: !!c, open,
+      markRead: unr ? (e?: { stopPropagation(): void }) => { e?.stopPropagation(); act.readNotifs([n.key]); } : null };
+  });
+  return {
+    alerts: rows, alertsUnread: unread.length,
+    alertsP: { rows, tab,
+      tabs: ([["unread", "Unread", unread.length], ["read", "Read", read.length]] as const).map(([k, label, nn]) => ({ label: nn ? `${label} ${nn}` : label, on: tab === k, pick: () => patch({ alR: k }) })),
+      markAll: unread.length ? () => act.readNotifs(unread.map(n => n.key), true) : null,
+      empty: tab === "read" ? "Nothing read yet" : "No unread alerts · you're all caught up" },
+  };
 }
 
-/** CRM alerts' rows (the header's badge counts them). */
-export const alertRows = (ctx: DeskCtx) => alertsVM(ctx).alerts;
+/** CRM alerts' badge: the alerts not read yet (rev 1 drew the design's sample 7; v2 first counted every alert). */
+export const alertsUnreadN = (ctx: DeskCtx) => alertsVM(ctx).alertsUnread;
 
 /**
  * The chat's ⋮ menu (CRM Desktop v2, README › ⋮ menu), three groups: Assign to (CRM · Manage) · Move · Share | Customer
