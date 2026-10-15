@@ -542,8 +542,8 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     <button type="button" onClick={v.cfSave} disabled={v.cfClean} style={{ height: "36px", padding: "0 20px", borderRadius: "18px", border: "0", background: v.cfSaveBg, font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "#fff", cursor: "pointer", whiteSpace: "nowrap" }}>Save form</button>
                   </div>
                   {!!(v.cfFields) && (<>
-                    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 400px", gap: "20px", alignItems: "start" }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: "0" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "20px", alignItems: "flex-start" }}>
+                      <div style={{ flex: "1 1 640px", display: "flex", flexDirection: "column", gap: "16px", minWidth: "0" }}>
                         {(v.cfSecs).map((sec, sec_i) => (<Fragment key={sec_i}>
                           <section id={sec.anchor} style={{ display: "flex", flexDirection: "column", border: "1px solid #EBDDD2", borderRadius: "14px", background: "#fff" }}>
                             <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", padding: "16px 20px 12px" }}>
@@ -659,7 +659,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                           </section>
                         </Fragment>))}
                       </div>
-                      <aside style={{ position: "sticky", top: "0", display: "flex", flexDirection: "column", gap: "12px", minWidth: "0" }}>
+                      <aside style={{ flex: "0 1 400px", position: "sticky", top: "0", display: "flex", flexDirection: "column", gap: "12px", minWidth: "300px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                           <strong style={{ flex: "1", fontSize: "13px", fontWeight: "650" }}>Preview</strong>
                           <div style={{ display: "flex", background: "#F5EEE8", borderRadius: "10px", padding: "3px", gap: "2px" }}>
