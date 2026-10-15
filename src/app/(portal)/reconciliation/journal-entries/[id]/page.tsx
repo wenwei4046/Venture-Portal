@@ -8,6 +8,7 @@ import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import ReturnLink from '@/components/layout/ReturnLink'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import JvDeleteButton from './_components/JvDeleteButton'
+import { readJournalVoucher } from '../_lib/jv-read'
 
 // A journal voucher's own page (2026-10-09, the user's Claude Design handoff —
 // "Journal list → detail page"): its number with a chip (posted, or auto ·
@@ -26,22 +27,10 @@ export default async function JournalVoucherPage({ params }: { params: Promise<{
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data: entry }, { data: lineRows }] = await Promise.all([
-    supabase
-      .from('journal_entries')
-      .select('id, entry_no, transaction_date, description, segment, reference_type, total_amount, is_reversed')
-      .eq('id', id)
-      .maybeSingle(),
-    supabase.from('journal_lines').select('account_code, debit, credit, description').eq('entry_id', id).order('created_at'),
-  ])
-  if (!entry || !['manual_jv', 'payroll_accrual'].includes(entry.reference_type as string)) notFound()
-
-  const lines = (lineRows ?? []) as Array<{ account_code: string; debit: number | null; credit: number | null; description: string | null }>
-  const codes = Array.from(new Set(lines.map((l) => l.account_code)))
-  const { data: acctRows } = codes.length
-    ? await supabase.from('chart_of_accounts').select('code, name').in('code', codes)
-    : { data: [] as Array<{ code: string; name: string }> }
-  const nameOf = new Map(((acctRows ?? []) as Array<{ code: string; name: string }>).map((a) => [a.code, a.name]))
+  // The voucher, its lines and its accounts' names (`../_lib/jv-read` — the Finance phone app's read too).
+  const read = await readJournalVoucher(supabase, id)
+  if (!read) notFound()
+  const { entry, lines, nameOf } = read!
 
   const auto = entry!.reference_type === 'payroll_accrual'
   const dr = r2(lines.reduce((s, l) => s + Number(l.debit ?? 0), 0))

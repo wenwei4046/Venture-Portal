@@ -103,6 +103,29 @@ function internalFlipEntries(
 
 export async function uploadStatement(formData: FormData): Promise<{ error: string } | void> {
   const user = await requireActionOn('/reconciliation', 'reconciliation', 'create')
+  const made = await createReconSession(formData, user.id)
+  if ('error' in made) return made
+  redirect(`/reconciliation/${made.id}`)
+}
+
+/**
+ * Upload statement from the Finance phone app (2026-10-15, part 5c): the very
+ * session `uploadStatement` makes — parsed, saved, auto-matched — answered with
+ * its id in place of the desktop's redirect (the app opens it itself), every
+ * refusal in words.
+ */
+export async function uploadStatementInWords(formData: FormData): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+  const user = await requireActionOn('/reconciliation', 'reconciliation', 'create')
+  try {
+    const made = await createReconSession(formData, user.id)
+    return 'error' in made ? { ok: false, reason: made.error } : { ok: true, id: made.id }
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error ? e.message : 'The statement could not be saved.' }
+  }
+}
+
+/** Parse the statement, save the month's session and its lines, auto-match them — the session's id, or why not. */
+async function createReconSession(formData: FormData, userId: string): Promise<{ error: string } | { id: string }> {
   const supabase = await reconClient()
 
   const bankAccountId = (formData.get('bank_account_id') as string) || ''
@@ -181,7 +204,7 @@ export async function uploadStatement(formData: FormData): Promise<{ error: stri
       source_filename: file.name,
       statement_opening: statementOpening,
       statement_closing: statementClosing,
-      created_by: user.id,
+      created_by: userId,
     })
     .select('id')
     .single()
@@ -234,7 +257,7 @@ export async function uploadStatement(formData: FormData): Promise<{ error: stri
   }
 
   revalidatePath('/reconciliation')
-  redirect(`/reconciliation/${session.id}`)
+  return { id: session.id as string }
 }
 
 /** Match N statement lines to M journal lines whose signed totals are EQUAL

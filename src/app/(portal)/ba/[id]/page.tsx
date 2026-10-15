@@ -9,7 +9,8 @@ import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import DetailGroups from '@/components/sheet/DetailGroups'
 import ReturnLink from '@/components/layout/ReturnLink'
-import { BaStatusChip, type BaRow } from '../_components/BaView'
+import { BaStatusChip } from '../_components/BaView'
+import { baRef, readBaFacility } from '../_lib/ba-read'
 import BaDetailActions, { BaDocuments } from './_components/BaDetailActions'
 
 // A financing's own page (2026-10-09, the user's Claude Design handoff —
@@ -21,59 +22,17 @@ import BaDetailActions, { BaDocuments } from './_components/BaDetailActions'
 
 export const dynamic = 'force-dynamic'
 
-const baRef = (id: string) => `BA-${id.slice(0, 8)}`
-
 export default async function BaPage({ params }: { params: Promise<{ id: string }> }) {
   await requirePage('/ba/[id]')
   await requirePermission('treasury')
   const { id } = await params
   const supabase = (await createClient()) as unknown as SupabaseClient
 
-  const { data: b } = await supabase.from('ba_facilities').select('*').eq('id', id).maybeSingle()
-  if (!b) notFound()
-  const ba = b as Record<string, unknown>
-  const companyId = (ba.borrower_company_id as string | null) ?? null
-
-  const [{ data: company }, { data: limit }, { data: siblings }, { data: invoice }, { data: pv }, { data: attachments }, { data: bankRows }] = await Promise.all([
-    companyId ? supabase.from('companies').select('name, short_code').eq('id', companyId).maybeSingle() : Promise.resolve({ data: null }),
-    companyId ? supabase.from('ba_limits').select('limit_amount').eq('company_id', companyId).maybeSingle() : Promise.resolve({ data: null }),
-    // The borrower's active financings: what its limit has in use.
-    companyId
-      ? supabase.from('ba_facilities').select('id, face_amount').eq('borrower_company_id', companyId).eq('status', 'active')
-      : Promise.resolve({ data: [] }),
-    supabase.from('invoices').select('invoice_no, status').eq('reference_no', baRef(id)).neq('status', 'voided').maybeSingle(),
-    supabase
-      .from('payment_vouchers')
-      .select('voucher_no, status')
-      .eq('reference_type', 'ba_interest')
-      .eq('reference_id', id)
-      .in('status', ['draft', 'pending_approval', 'approved', 'paid'])
-      .maybeSingle(),
-    supabase.from('ba_attachments').select('id, ba_id, file_name').eq('ba_id', id).order('created_at'),
-    supabase.from('bank_accounts').select('id, bank_name, account_number, is_primary').eq('status', 'active').order('is_primary', { ascending: false }),
-  ])
-
-  const co = company as { name: string; short_code: string | null } | null
-  const borrower = co ? (co.short_code ? `${co.name} (${co.short_code})` : co.name) : ((ba.borrower_name as string | null) ?? '—')
-  const row: BaRow = {
-    id,
-    baNo: (ba.ba_no as string | null) ?? null,
-    bankName: (ba.bank_name as string | null) ?? null,
-    faceAmount: Number(ba.face_amount),
-    bankAnnualRate: Number(ba.bank_annual_rate),
-    startDate: ba.start_date as string,
-    tenorDays: Number(ba.tenor_days),
-    maturityDate: ba.maturity_date as string,
-    chargeRateMonthly: Number(ba.charge_rate_monthly),
-    hcRateMonthly: Number(ba.hc_rate_monthly),
-    borrower,
-    borrowerCompanyId: companyId,
-    status: ba.status as BaRow['status'],
-    notes: (ba.notes as string | null) ?? null,
-    interestInvoice: invoice ? { no: (invoice as { invoice_no: string | null }).invoice_no, status: (invoice as { status: string }).status } : null,
-    interestPv: pv ? { no: (pv as { voucher_no: string | null }).voucher_no, status: (pv as { status: string }).status } : null,
-    attachments: ((attachments ?? []) as Array<{ id: string; file_name: string }>).map((a) => ({ id: a.id, name: a.file_name })),
-  }
+  // The financing, its borrower's facility and the banks — as the Finance phone app reads them (`_lib/ba-read`).
+  const facility = await readBaFacility(supabase, id)
+  if (!facility) notFound()
+  const { row, shortCode, limit: limitAmount, used, banks } = facility
+  const borrower = row.borrower
   const c = calcBa({
     face: row.faceAmount,
     bankAnnualRate: row.bankAnnualRate,
@@ -81,17 +40,11 @@ export default async function BaPage({ params }: { params: Promise<{ id: string 
     chargeRateMonthly: row.chargeRateMonthly,
     hcRateMonthly: row.hcRateMonthly,
   })
-  const limitAmount = Number((limit as { limit_amount: number } | null)?.limit_amount ?? 0)
-  const used = ((siblings ?? []) as Array<{ face_amount: number }>).reduce((s, x) => s + Number(x.face_amount), 0)
   const active = row.status === 'active'
   const daysLeft = dayjs(row.maturityDate).diff(officeToday(), 'day')
   const pct = (r: number) => `${(r * 100).toFixed(2)}%`
   const date = (d: string) => dayjs(d).format('D MMM YYYY')
   const billed = !!row.interestInvoice
-  const banks = ((bankRows ?? []) as Array<{ id: string; bank_name: string; account_number: string | null }>).map((x) => ({
-    id: x.id,
-    label: `${x.bank_name}${x.account_number ? ` — ${x.account_number}` : ''}`,
-  }))
 
   return (
     <div>
@@ -172,7 +125,7 @@ export default async function BaPage({ params }: { params: Promise<{ id: string 
             ],
           },
           {
-            title: `Facility · ${co?.short_code ?? borrower}`,
+            title: `Facility · ${shortCode ?? borrower}`,
             items: [
               { label: 'Limit', value: limitAmount > 0 ? formatMoneyBare(limitAmount) : 'No limit set', text: limitAmount <= 0 },
               { label: 'Active (used)', value: formatMoneyBare(used) },

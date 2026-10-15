@@ -5,7 +5,7 @@ import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { officeMonth } from '@/lib/office-time'
-import { fetchAllRowsAsWritten } from '@/lib/paginate'
+import { readStatementList } from '../_lib/statement-read'
 import { statementMonths, statementsMonth, statementsSummary } from '@/lib/billing-sheet'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import GenerateStatementsButton from '../_components/GenerateStatementsButton'
@@ -49,22 +49,9 @@ export default async function MonthlyStatementsPage({ searchParams }: Props) {
   const { period: asked } = (await searchParams) ?? {}
 
   // Every month's statements (a few rows a month): the month grid's dots and
-  // the Draft / All statements cards need them all, the table its month.
-  const [statementList, { data: companies }] = await Promise.all([
-    fetchAllRowsAsWritten((page) => {
-      const q = supabase
-        .from('monthly_statements')
-        .select('id, period_month, company_id, status, total_invoice, total_contra, net_amount, created_at')
-        .order('period_month', { ascending: false })
-        .order('created_at', { ascending: false })
-      return page ? q.order('id').range(page.from, page.to) : q
-    }, 'monthly_statements'),
-    supabase.from('companies').select('id, name, short_code'),
-  ])
-
-  const companyMap = new Map(
-    (companies ?? []).map((c) => [c.id, { name: c.name, code: c.short_code }])
-  )
+  // the Draft / All statements cards need them all, the table its month — as
+  // the Finance phone app reads them (`_lib/statement-read`).
+  const { statements: statementList, companies: companyMap } = await readStatementList(supabase)
 
   const months = statementMonths(statementList)
   const month = statementsMonth(asked, months, officeMonth())

@@ -10,6 +10,7 @@ import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import DetailGroups from '@/components/sheet/DetailGroups'
 import ReturnLink from '@/components/layout/ReturnLink'
 import { issueStatement, markStatementPaid } from '../actions'
+import { readStatement, statementCategory } from '../_lib/statement-read'
 
 // A statement's page on the Finance view (2026-10-09, the user's Claude Design
 // handoff): the company as the title with its status chip, three cards — the
@@ -28,31 +29,10 @@ export default async function StatementDetailPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: statement, error } = await supabase
-    .from('monthly_statements')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error || !statement) notFound()
-
-  const [{ data: company }, { data: lines }] = await Promise.all([
-    supabase
-      .from('companies')
-      .select('name, short_code')
-      .eq('id', statement.company_id)
-      .single(),
-    supabase
-      .from('monthly_statement_lines')
-      .select('*')
-      .eq('statement_id', statement.id)
-      .order('line_type')
-      .order('created_at'),
-  ])
-
-  const lineList = lines ?? []
-  const invoiceLines = lineList.filter((l) => l.line_type === 'invoice')
-  const contraLines = lineList.filter((l) => l.line_type === 'contra')
+  // The statement and its lines — as the Finance phone app reads them (`_lib/statement-read`).
+  const read = await readStatement(supabase, id)
+  if (!read) notFound()
+  const { statement, company, invoiceLines, contraLines } = read
   const totalInvoice = Number(statement.total_invoice)
   const totalContra = Number(statement.total_contra)
   const net = Number(statement.net_amount)
@@ -110,7 +90,7 @@ export default async function StatementDetailPage({ params }: Props) {
       <LineSection
         title="Invoice items"
         count={`${items(invoiceLines.length).toUpperCase()} · ${formatMoney(totalInvoice)}`}
-        lines={invoiceLines.map((l) => ({ id: l.id, category: formatCategory(l.category_code), description: l.description, amount: Number(l.amount) }))}
+        lines={invoiceLines.map((l) => ({ id: l.id, category: statementCategory(l.category_code), description: l.description, amount: Number(l.amount) }))}
         footLabel="Subtotal invoice"
         footAmount={totalInvoice}
         empty="No invoice items for this period. Finance generates invoices on Service Billing before regenerating statements to pick them up."
@@ -120,7 +100,7 @@ export default async function StatementDetailPage({ params }: Props) {
       <LineSection
         title="Contra items"
         count={`${items(contraLines.length).toUpperCase()} · ${formatMoney(-totalContra)}`}
-        lines={contraLines.map((l) => ({ id: l.id, category: formatCategory(l.category_code), description: l.description, amount: -Number(l.amount) }))}
+        lines={contraLines.map((l) => ({ id: l.id, category: statementCategory(l.category_code), description: l.description, amount: -Number(l.amount) }))}
         footLabel="Subtotal contra"
         footAmount={-totalContra}
         empty="No contra items. Savings interest and loan repayments (via netting) would appear here."
@@ -246,19 +226,4 @@ function StatementStatus({ status }: { status: string }) {
       {status}
     </span>
   )
-}
-
-function formatCategory(code: string): string {
-  const labels: Record<string, string> = {
-    hr_pool: 'HR Pool',
-    finance_staff: 'Finance Staff',
-    marketing_project: 'Marketing Project',
-    rent: 'Rent',
-    utility: 'Utility',
-    loan_repayment: 'Loan Repayment',
-    loan_interest: 'Loan Interest',
-    loan_principal: 'Loan Principal',
-    other: 'Other',
-  }
-  return labels[code] ?? code
 }

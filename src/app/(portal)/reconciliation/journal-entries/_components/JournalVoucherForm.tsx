@@ -104,6 +104,13 @@ export default function JournalVoucherForm({ accounts, entry, prefill }: Props) 
     return [emptyLine(), emptyLine()]
   })
 
+  // A voucher of a department added since the list was written (IT, Revenue Department …) keeps its segment:
+  // a select whose value is not among its options shows — and saves — the first one, Unallocated (2026-10-15).
+  const seededSegment = seed?.segment ?? 'unallocated'
+  const segmentOptions = SEGMENT_OPTIONS.some((o) => o.value === seededSegment)
+    ? SEGMENT_OPTIONS
+    : [...SEGMENT_OPTIONS, { value: seededSegment, label: seededSegment.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) }]
+
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [isDeleting, startDeleting] = useTransition()
@@ -291,7 +298,7 @@ export default function JournalVoucherForm({ accounts, entry, prefill }: Props) 
         <label className="jv-field">
           <span>Segment</span>
           <select id="segment" name="segment" value={segment} onChange={(e) => setSegment(e.target.value)} className="jv-input">
-            {SEGMENT_OPTIONS.map((s) => (
+            {segmentOptions.map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
               </option>

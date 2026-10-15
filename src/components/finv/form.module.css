@@ -185,6 +185,10 @@ select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
 .lineRow[data-shape='pool'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 100px 28px; }
 .lineRow[data-shape='item'] { grid-template-columns: minmax(0, 1fr) 128px 28px; }
 .lineRow[data-shape='item-cat'] { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 112px 28px; }
+/* A journal voucher's line (the phone's voucher sheet, 2026-10-15): its account and ×, its debit and credit, its note. */
+.lineRow[data-shape='jv-account'] { grid-template-columns: minmax(0, 1fr) 28px; padding-bottom: 4px; }
+.lineRow[data-shape='jv-amounts'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding-top: 0; padding-bottom: 4px; }
+.lineRow[data-shape='jv-note'] { grid-template-columns: minmax(0, 1fr); padding-top: 0; }
 /* A narrow dialog (a phone): a line of four takes two rows — its two selects, then its amount and its ×. */
 @media (max-width: 560px) {
   .lineRow[data-shape='pool'],
