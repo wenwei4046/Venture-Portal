@@ -110,6 +110,17 @@ module.exports = [
   // words and its time row take the VM's colours (fg, timeC), white on your own.
   ['border: `1px solid ${m.bd}`, color: "#3F2B22" }}>', 'border: `1px solid ${m.bd}`, color: m.fg }}>'],
   ['fontSize: "11px", color: "#806B60" }}>{!!(m.hasBy)', 'fontSize: "11px", color: m.timeC }}>{!!(m.hasBy)'],
+  // 2026-10-16 (the owner: "把加 showroom（可能只需要保留 + 的符號）的功能放到右上角，同時加一個 <> 功能，切換不同 showroom，
+  // 如果都在下面太長了"): Showrooms shows one showroom at a time — ‹ 1 / 3 › and a round + at the title's right (vm/rooms.ts ›
+  // rmAt); the dashed Add showroom under the list goes.
+  ['<h1 style={{ margin: "0", fontSize: "30px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.15" }}>Showrooms</h1>',
+    '<div style={{ display: "flex", alignItems: "center", gap: "8px" }}><h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "30px", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.15" }}>Showrooms</h1>' +
+    '{!!(v.rm.rmPager) && (<span style={{ flex: "none", display: "inline-flex", alignItems: "center", height: "40px", padding: "0 2px", boxSizing: "border-box", borderRadius: "20px", border: "1px solid #EBDDD2", background: "#fff" }}>' +
+    '<span onClick={v.rm.rmPrev} role="button" aria-label="Previous showroom" style={{ width: "34px", height: "34px", display: "grid", placeItems: "center", color: "#BD4A19", opacity: v.rm.rmPrevOp, cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6"></path></svg></span>' +
+    '<span style={{ minWidth: "34px", textAlign: "center", fontSize: "13px", fontWeight: "650", color: "#806B60", fontVariantNumeric: "tabular-nums" }}>{v.rm.rmPos}</span>' +
+    '<span onClick={v.rm.rmNext} role="button" aria-label="Next showroom" style={{ width: "34px", height: "34px", display: "grid", placeItems: "center", color: "#BD4A19", opacity: v.rm.rmNextOp, cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6"></path></svg></span></span>)}' +
+    '<span onClick={v.rm.rmAdd} role="button" aria-label="Add showroom" title="Add showroom" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", color: "#BD4A19", display: "grid", placeItems: "center", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"></path></svg></span></div>'],
+  [/\n *<span onClick=\{v\.rm\.rmAdd\} style=\{\{[^\n]*\n[\s\S]*?<\/svg>Add showroom<\/span>/, ""],
   // The customer form follows the Control panel's Forms (CRM Desktop rev 1, B5) — tools/crm-design/form-patches.cjs.
   ...require("./form-patches.cjs")(),
   // 2026-10-14 (the owner: "點聊天室可以收起右上 3 個點的功能"): the chat's ⋮ menu closes on a tap anywhere outside it, as
