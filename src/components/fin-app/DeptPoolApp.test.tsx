@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import type { DeptPoolHubModel } from '@/lib/fin-app/dept-pool-model'
 
 // Department › Dept Pool in the Finance phone app (2026-10-15, part E3): a
 // department's balance stays hidden until Show balances (the desktop column's
-// toggle), a department opens its own page, Mark executed answers in words.
+// toggle), a department opens its own page, Mark executed is asked first
+// (it goes one way) and answers in words.
 
 const mocks = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn(), flash: vi.fn(), execute: vi.fn() }))
 vi.mock('next/navigation', () => ({
@@ -60,20 +61,34 @@ describe('Dept Pool on the phone', () => {
     expect(mocks.push).toHaveBeenCalledWith('/fin-app/page/dp-hr')
   })
 
-  it('Mark executed goes through the action and answers in words', async () => {
+  it('Mark executed is asked first, then goes through the action and answers in words', async () => {
     mocks.execute.mockResolvedValue({ ok: false, reason: 'Failed to execute HR costing: period closed' })
     draw()
     fireEvent.click(screen.getByRole('button', { name: /^HR costing/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Mark executed' }))
+    expect(mocks.execute).not.toHaveBeenCalled()
+    const ask = await screen.findByRole('dialog', { name: 'Mark September 2026 executed?' })
+    expect(within(ask).getByText('HR costing · RM 12,000.00')).toBeInTheDocument()
+    expect(within(ask).getByText('This cannot be undone.')).toBeInTheDocument()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Mark executed' }))
+      fireEvent.click(within(ask).getByRole('button', { name: 'Mark executed' }))
     })
     expect(mocks.execute).toHaveBeenCalledWith('sub-1')
-    expect(screen.getByText('Failed to execute HR costing: period closed')).toBeInTheDocument()
+    expect(within(ask).getByText('Failed to execute HR costing: period closed')).toBeInTheDocument()
     mocks.execute.mockResolvedValue({ ok: true })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Mark executed' }))
+      fireEvent.click(within(ask).getByRole('button', { name: 'Mark executed' }))
     })
     expect(mocks.flash).toHaveBeenCalledWith('Marked executed')
+  })
+
+  it('Cancel leaves the submission as it was', async () => {
+    draw()
+    fireEvent.click(screen.getByRole('button', { name: /^HR costing/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Mark executed' }))
+    const ask = await screen.findByRole('dialog', { name: 'Mark September 2026 executed?' })
+    fireEvent.click(within(ask).getByRole('button', { name: 'Cancel' }))
+    expect(mocks.execute).not.toHaveBeenCalled()
   })
 
   it('a submission opens onto its departments', () => {

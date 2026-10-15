@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition, type ReactNode } from 'react'
 import { flash } from '@/components/hrv/toast'
+import { DialogConfirm, FinDialog } from '@/components/finv/Dialog'
 import { DEPT_POOL_CARDS, type DeptPoolCard, type DeptPoolHubModel } from '@/lib/fin-app/dept-pool-model'
 import { f2 } from '@/lib/fin-app/page-model'
 import { executeHrCostingInWords } from '@/app/(portal)/dept-pool/hr-actions'
@@ -15,9 +16,10 @@ import s from './fin-app.module.css'
 // the design does not draw, in its style): the total balance (or the net
 // margin, on the Accrual P&L basis) over the desktop page's parts — By
 // department (a balance hidden until *Show balances*, as the desktop's column),
-// Balance by bank, the HR costing submissions (*Mark executed* on a ready one;
-// a submission's departments its own screen); a department opens its own page
-// in the app. The basis switches in the bar, the server's to read.
+// Balance by bank, the HR costing submissions (*Mark executed* on a ready one,
+// asked first — nothing in the app takes it back; a submission's departments
+// its own screen); a department opens its own page in the app. The basis
+// switches in the bar, the server's to read.
 
 type Step = { kind: 'hub' } | { kind: 'list'; card: DeptPoolCard } | { kind: 'detail'; id: string }
 
@@ -56,18 +58,29 @@ export default function DeptPoolApp({ model, search, canExecuteHr }: { model: De
   const basisBtn: BarButton = { key: 'basis', label: model.basis === 'cash' ? 'Accrual P&L' : 'Cash', disabled: moving, onClick: switchBasis }
 
   const [shown, setShown] = useState(false)
-  const [said, setSaid] = useState<string | null>(null)
+  // Mark executed goes one way (nothing here sets a submission back), so it is
+  // asked first (2026-10-15, the user: a thumb lands on the bar's first button
+  // by mistake). The refusal stays in the question.
+  const [asking, setAsking] = useState<string | null>(null)
+  const [askError, setAskError] = useState<string | null>(null)
   const [busy, startBusy] = useTransition()
-  const execute = (id: string) => {
-    setSaid(null)
+  const ask = (id: string) => {
+    setAskError(null)
+    setAsking(id)
+  }
+  const execute = () => {
+    if (!asking) return
+    const id = asking
+    setAskError(null)
     startBusy(async () => {
       try {
         const res = await executeHrCostingInWords(id)
-        if (!res.ok) return setSaid(res.reason)
+        if (!res.ok) return setAskError(res.reason)
+        setAsking(null)
         flash('Marked executed')
         router.refresh()
       } catch {
-        setSaid('That did not go through. Try again.')
+        setAskError('That did not go through. Try again.')
       }
     })
   }
@@ -85,10 +98,9 @@ export default function DeptPoolApp({ model, search, canExecuteHr }: { model: De
       <AppScreen
         screenKey={`dp?d=${step.id}`}
         head={{ kind: 'back', title: sub?.label ?? 'Submission', backLabel: 'HR costing', onBack: backTo }}
-        bar={sub && sub.ready && canExecuteHr ? [{ key: 'exec', label: 'Mark executed', kind: 'primary', disabled: busy, onClick: () => execute(sub.id) }] : []}
+        bar={sub && sub.ready && canExecuteHr ? [{ key: 'exec', label: 'Mark executed', kind: 'primary', disabled: busy, onClick: () => ask(sub.id) }] : []}
       >
         <PageHead roman="IV." eyebrow="Dept Pool · HR costing" title={sub?.label ?? 'Submission'} />
-        {said ? <Notice>{said}</Notice> : null}
         {sub ? (
           <ItemGroup
             title={`${sub.state.text} · ${sub.sub}`}
@@ -133,7 +145,7 @@ export default function DeptPoolApp({ model, search, canExecuteHr }: { model: De
             value: x.value,
             chip: x.state,
             onOpen: () => go({ kind: 'detail', id: x.id }),
-            action: x.ready && canExecuteHr ? { label: 'Mark executed', off: busy, onClick: () => execute(x.id) } : null,
+            action: x.ready && canExecuteHr ? { label: 'Mark executed', off: busy, onClick: () => ask(x.id) } : null,
           }))}
         />
       )
@@ -141,7 +153,6 @@ export default function DeptPoolApp({ model, search, canExecuteHr }: { model: De
     screen = (
       <AppScreen screenKey={`dp?f=${card}`} head={{ kind: 'back', title: TITLE[card], backLabel: 'Dept Pool', onBack: backTo }} bar={bar}>
         <PageHead roman="IV." eyebrow={`Dept Pool · ${model.basis === 'cash' ? 'Cash' : 'Accrual P&L'}`} title={TITLE[card]} />
-        {said ? <Notice>{said}</Notice> : null}
         <div className={moving ? s.pending : undefined}>{body}</div>
       </AppScreen>
     )
@@ -155,5 +166,26 @@ export default function DeptPoolApp({ model, search, canExecuteHr }: { model: De
       </AppScreen>
     )
   }
-  return screen
+  const asked = asking ? submissions.get(asking) : undefined
+  return (
+    <>
+      {screen}
+      <FinDialog
+        open={asking !== null}
+        onClose={() => !busy && setAsking(null)}
+        title={`Mark ${asked?.label ?? 'this submission'} executed?`}
+        sub={asked ? `HR costing · RM ${asked.value}` : undefined}
+        locked={busy}
+      >
+        <DialogConfirm
+          text="This cannot be undone."
+          confirmLabel={busy ? 'Marking…' : 'Mark executed'}
+          busy={busy}
+          error={askError}
+          onCancel={() => setAsking(null)}
+          onConfirm={execute}
+        />
+      </FinDialog>
+    </>
+  )
 }
