@@ -110,3 +110,14 @@ export function mediaOf(m: Msg, gallery: ViewerItem[], album?: Msg[]): typeof NO
     timeTop: k === "audio" ? "-18px" : "4px",
   };
 }
+
+/**
+ * Your own bubble (the owner, 2026-10-15: "聊天室的 bubble 可以換成橙色嗎？" — picked the brand's orange with white words,
+ * as iMessage's blue): both chats, the salesperson's and the Control panel's. Its time is white, and its ticks are white
+ * (delivered), light blue (read) or a pale red (not delivered) — the old blue and grey were lost on the orange.
+ */
+export const MINE_BG = "#BD4A19";
+export const MINE_TIME = "rgba(255,255,255,.82)";
+export function tickColor(status: string | undefined): string {
+  return status === "read" ? "#A6DBFF" : status === "failed" ? "#FFD3C7" : "rgba(255,255,255,.82)";
+}
