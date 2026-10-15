@@ -359,3 +359,59 @@ export function DeskPhoneForm({ v, scale }: { v: CustomerFormVM; scale: number }
     </div>
   );
 }
+
+/**
+ * Contacts' and the Calendar's right rail (vm/rail.ts), drawn as Inbox's Chat progress rail: folded, a 44 px column on
+ * #FBF6F2 with « at its top (60 px, a rule under it) and a pie under that; open, a 360 px column with its title and »,
+ * the chart (groupings, pie, rows) and — on Contacts — the customer picked in the table or who still lacks property info.
+ */
+export function DeskRail({ v }: { v: ReturnType<typeof import("./vm/rail").railVM>["rail"] }) {
+  const ICO = (d: string, size = 18) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}></path></svg>;
+  const PIE = "M21 12A9 9 0 1 1 12 3v9h9ZM15 3.5A9 9 0 0 1 20.5 9H15V3.5Z";
+  if (!v.open) return (
+    <aside style={{ flex: "0 0 44px", width: "44px", boxSizing: "border-box", background: "#FBF6F2", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <button type="button" onClick={v.toggle} title={`Open ${v.title.toLowerCase()}`} className={DX.emo} style={{ flex: "0 0 60px", width: "44px", height: "60px", border: "0", borderBottom: "1px solid #EBDDD2", background: "transparent", color: "#806B60", display: "grid", placeItems: "center", cursor: "pointer" }}>
+        {ICO("m11 17-5-5 5-5M18 17l-5-5 5-5")}</button>
+      <button type="button" onClick={v.toggle} title={`Open ${v.title.toLowerCase()}`} style={{ marginTop: "16px", width: "32px", height: "32px", borderRadius: "50%", border: "0", background: "#FFF0E4", color: "#BD4A19", display: "grid", placeItems: "center", cursor: "pointer" }}>
+        {ICO(PIE, 16)}</button>
+    </aside>
+  );
+  const c = v.chart;
+  return (
+    <aside style={{ flex: "0 0 360px", width: "360px", minWidth: "0", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
+      <div style={{ flex: "0 0 60px", display: "flex", alignItems: "center", gap: "10px", padding: "0 0 0 18px", borderBottom: "1px solid #EBDDD2" }}>
+        <strong style={{ flex: "1", fontSize: "15px", fontWeight: "650" }}>{v.title}</strong>
+        <button type="button" onClick={v.toggle} title="Close" className={DX.emo} style={{ width: "44px", height: "59px", border: "0", background: "transparent", color: "#806B60", display: "grid", placeItems: "center", cursor: "pointer" }}>
+          {ICO("m13 17 5-5-5-5M6 17l5-5-5-5")}</button>
+      </div>
+      <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "14px", padding: "16px" }}>
+        {c && <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "14px", border: "1px solid #EBDDD2", borderRadius: "14px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+            <strong style={{ fontSize: "14px", fontWeight: "650" }}>{c.title}</strong>
+            <span style={{ fontSize: "12px", color: "#806B60" }}>{c.sum}</span>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+            {c.bys.map(o => <button key={o.label} type="button" onClick={o.pick} style={{ height: "26px", padding: "0 9px", borderRadius: "13px", font: "inherit", fontSize: "12px", cursor: "pointer",
+              ...(o.on ? { border: "1px solid #3F2B22", background: "#3F2B22", color: "#fff", fontWeight: "650" } : { border: "1px solid #EBDDD2", background: "#fff", color: "#6B574C", fontWeight: "550" }) }}>{o.label}</button>)}
+          </div>
+          {c.empty ? <div style={{ padding: "18px 0", textAlign: "center", fontSize: "13px", color: "#806B60" }}>Nothing to chart in this range</div> : <>
+            <div style={{ display: "flex", justifyContent: "center" }}><DeskPie v={c.pie} size={180} /></div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {c.rows.map(b => (
+                <div key={b.label} onClick={b.pick} title={b.pick ? "Click to filter" : undefined} className={b.pick ? DX.alert : undefined}
+                  style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 70px 28px 40px", gap: "8px", alignItems: "center", padding: "6px 6px", margin: "0 -6px", borderRadius: "8px", background: b.on ? "#FFF5EC" : "transparent", cursor: b.pick ? "pointer" : "default" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "7px", fontSize: "12.5px", fontWeight: b.on ? "700" : "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <span style={{ flex: "0 0 8px", width: "8px", height: "8px", borderRadius: "50%", background: b.color }}></span>{b.label}</span>
+                  <span style={{ display: "block", height: "6px", borderRadius: "3px", background: "#F5EEE8" }}><span style={{ display: "block", height: "6px", width: `${b.w}%`, borderRadius: "3px", background: b.color }}></span></span>
+                  <span style={{ textAlign: "right", fontSize: "13px", fontWeight: "650", fontVariantNumeric: "tabular-nums" }}>{b.n}</span>
+                  <span style={{ textAlign: "right", fontSize: "12px", color: "#806B60", fontVariantNumeric: "tabular-nums" }}>{b.pct}</span>
+                </div>
+              ))}
+            </div>
+          </>}
+        </div>}
+        {v.side && <DeskContactSide v={v.side} />}
+      </div>
+    </aside>
+  );
+}

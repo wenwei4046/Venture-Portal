@@ -106,7 +106,7 @@ export function calendarVM(ctx: DeskCtx) {
     calTitle: view === "month" ? `${MON[mA.getMonth()]} ${mA.getFullYear()}` : view === "week" ? `${label(wkA)} – ${label(wkB)}` : view === "day" ? `Today · ${new Date(T).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", month: "short" })}` : view === "today" ? "Today's appt" : "Upcoming",
     calSub: `${vs.length} visits · ${upcoming.length} upcoming`,
     // The analysis card over the calendar (the owner, 2026-10-15), folded until opened.
-    calAnOn: true, calAn: calendarAnalysisVM(ctx, vs),
+    calAn: calendarAnalysisVM(ctx, vs),
     calStats: ([[String(leads.length), "Leads", "#fff", "Leads"], [String(upcoming.length), "Upcoming", "#F6B48A", "Upcoming"], [String(showed), "Showed up", "#fff", "Showed up"],
       [showed + noShow ? `${Math.round((showed / (showed + noShow)) * 100)}%` : "—", "Show-up", "#fff", "Show-up"],
       // v2: No show (past visits not showed up) and Not reminded (tomorrow's visits with no reminder sent).
