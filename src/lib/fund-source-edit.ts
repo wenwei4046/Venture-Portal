@@ -88,12 +88,27 @@ export interface SourceEditRow {
   repayment_date: string | null
 }
 
+/** The columns an edit writes — only those sent. */
+export interface SourceEditColumns {
+  amount?: number
+  cost_rate?: number
+  lock_in_months?: number | null
+  effective_date?: string
+  repayment_date?: string
+  repayment_start_month?: string
+  maturity_date?: string
+  notes?: string | null
+  account_code?: string | null
+  bank_account_id?: string | null
+  updated_at?: string
+}
+
 export type SourceEditPatch =
   | { ok: false; reason: string }
   | {
       ok: true
       /** Only the columns sent (and what moves with them), `updated_at` with them. */
-      patch: Record<string, string | number | null>
+      patch: SourceEditColumns
       /** The amount and rate as they will stand — the approval request's line. */
       amount: number
       ratePct: number
@@ -105,7 +120,7 @@ export type SourceEditPatch =
 export function sourceEditPatch(row: SourceEditRow, fd: FormData, today: string, now: string): SourceEditPatch {
   const sent = (k: string) => fd.has(k)
   const s = (k: string) => ((fd.get(k) as string | null) ?? '').trim()
-  const patch: Record<string, string | number | null> = {}
+  const patch: SourceEditColumns = {}
 
   let amount = Number(row.amount)
   if (sent('amount')) {

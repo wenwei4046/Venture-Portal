@@ -11,6 +11,7 @@ import RecordRepaymentForm from './_components/RecordRepaymentForm'
 import TermsTimeline from '@/components/treasury/TermsTimeline'
 import RepaymentScheduleSection, { scheduleCount } from '@/components/treasury/RepaymentScheduleSection'
 import PrintSchedule from '@/components/treasury/PrintSchedule'
+import { printedLine, scheduleMeta } from '@/lib/deal-print'
 import DealPageSteps from '@/components/treasury/DealPageSteps'
 import { FullAudit, FullCard, FullFact, FullPanelRow, FullRow, FullTrail, fullDay, fullStyles as s } from '@/components/finv/FullParts'
 import ReturnLink from '@/components/layout/ReturnLink'
@@ -92,19 +93,8 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
               kicker={`FUND IN · ${source.typeLabel.toUpperCase()}`}
               name={source.fromLabel}
               plan={plan}
-              printed={`Printed ${fullDay(today)} · ${(user as { name?: string | null }).name ?? 'Finance'}`}
-              meta={[
-                { label: 'Source', value: source.fromWithCode },
-                { label: 'Principal', value: formatMoney(source.amount) },
-                { label: 'Rate', value: source.rate },
-                { label: 'Installments', value: plan.months ? String(plan.months) : 'No fixed term' },
-                { label: 'First installment', value: plan.firstDue ? fullDay(plan.firstDue) : '—' },
-                { label: 'Installment', value: formatMoney(plan.firstInstallment) },
-                { label: 'Total interest', value: `${formatMoney(plan.totalInterest)}${plan.kind === 'open' ? ' (to date)' : ''}` },
-                { label: 'Paid', value: formatMoney(plan.principalPaid + plan.interestPaid) },
-                { label: 'Outstanding', value: formatMoney(plan.kind === 'open' ? plan.principalOwed : plan.outstandingDue) },
-                { label: 'Principal owed', value: formatMoney(plan.principalOwed) },
-              ]}
+              printed={printedLine(today, (user as { name?: string | null }).name)}
+              meta={scheduleMeta({ label: 'Source', value: source.fromWithCode }, source.amount, source.rate, plan)}
             />
           ) : null}
         </div>
