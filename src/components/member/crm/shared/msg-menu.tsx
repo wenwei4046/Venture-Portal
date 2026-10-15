@@ -28,6 +28,7 @@ export const MENU_ICON = {
   info: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM12 16v-5M12 8h.01",
   star: "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z",
   del: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
+  unsend: "M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3",
 };
 
 let state: MsgMenu | null = null;
