@@ -457,3 +457,17 @@ export function DeskPager({ v }: { v: ReturnType<typeof import("./vm/people").pe
     </div>
   );
 }
+
+/**
+ * A panel folded to its 44 px strip, as the Audit log's and the rails' (Assignment's Ad performance — the owner,
+ * 2026-10-15): « at the top under a rule, the panel's name running down, the sand of the panel open; a tap opens it.
+ */
+export function DeskFoldRail({ v }: { v: { title: string; open: () => void } }) {
+  return (
+    <aside className={DX.slideIn} style={{ flex: "0 0 44px", width: "44px", boxSizing: "border-box", background: "#FBF6F2", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <button type="button" onClick={v.open} title={`Open ${v.title}`} className={DX.emo} style={{ flex: "0 0 60px", width: "44px", height: "60px", border: "0", borderBottom: "1px solid #EBDDD2", background: "transparent", color: "#806B60", display: "grid", placeItems: "center", cursor: "pointer" }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m11 17-5-5 5-5M18 17l-5-5 5-5"></path></svg></button>
+      <button type="button" onClick={v.open} title={`Open ${v.title}`} style={{ marginTop: "16px", padding: "8px 0", border: "0", background: "transparent", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#806B60", writingMode: "vertical-rl", cursor: "pointer", whiteSpace: "nowrap" }}>{v.title}</button>
+    </aside>
+  );
+}

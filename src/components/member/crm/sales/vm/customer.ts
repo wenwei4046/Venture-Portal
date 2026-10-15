@@ -7,7 +7,7 @@ import type { ChangeEvent as InputEvent } from "react";
 import type { CrmCustomer, CrmData, CrmForm, CrmFormField } from "@/lib/member/crm-data";
 import type { CustomerForm } from "../ui";
 import { CHANNEL, STATUS_LABEL, day0, ini, lastReal, stop, timeLabel, type SalesCtx } from "./common";
-import { adHref } from "../../shared/AdLink";
+import { adHref, adKindLabel } from "../../shared/AdLink";
 
 /** A Malaysian number as people write it: 60123456789 → 012-345 6789. */
 export function phoneLabel(raw: string): string {
@@ -51,7 +51,7 @@ export function infoRows(c: CrmCustomer, data?: Pick<CrmData, "forms">) {
     ["Phone", phoneLabel(c.phone) || "—"],
     ["First contact", dmy(new Date(c.createdAt))],
     ["Last chat", last ? dmy(new Date(last.at)) : "—"],
-    ["Platform", CHANNEL[c.channel].name], ["Ad", c.ad], ["Status", STATUS_LABEL[c.status]],
+    ["Platform", CHANNEL[c.channel].name], ["Ad", c.adId ? `${adKindLabel(c)} · ${c.ad}` : c.ad], ["Status", STATUS_LABEL[c.status]],
     ["Property type", c.details.type || "—"], ["Unit size", c.details.size || "—"], ["Location", c.details.loc || "—"],
     ["Requirement", c.details.req || "—"], ["Budget", c.details.budget ? "RM " + c.details.budget : "—"],
     // The form's own questions, after the built-in ones (CRM Desktop rev 1, B5).

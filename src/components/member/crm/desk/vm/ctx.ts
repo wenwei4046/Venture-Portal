@@ -110,6 +110,8 @@ export interface DeskUi {
   paneW: number | null; sheetW: number | null; menuW: number | null; perfW: number | null; mwtLogW: number | null; auditW: number | null;
   /** The audit logs' rails (closed by default, closed again on another ad or page). */
   adLog: boolean; mwtLog: boolean;
+  /** Assignment's Ad performance folded to its strip (the owner, 2026-10-15). */
+  adPerfShut: boolean;
   meMenu: boolean;
   // The chat: + menu, the message menu (the message's id), the message under the pointer, the reply's quote.
   attachOpen: boolean; attachView: "" | "quick" | "auto"; msgMenu: string | null; msgHov: string | null; replyTo: string | null;
@@ -176,7 +178,7 @@ export const initialDeskUi = (): DeskUi => ({
   ntfTab: "unread", ntfCat: "all", ntfSel: false, ntfPick: {},
   book: null, cform: null, history: null, histF: "all",
   ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, paneW: null, sheetW: null, menuW: null, perfW: null, mwtLogW: null, auditW: null,
-  adLog: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "unread", ppSel: null, ppChart: false, ppPer: 10, ppPg: 0, calAn: false, calAnBy: "rep", rail: false, cfPv: null,
+  adLog: false, adPerfShut: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "unread", ppSel: null, ppChart: false, ppPer: 10, ppPg: 0, calAn: false, calAnBy: "rep", rail: false, cfPv: null,
   applyChk: false, ftApplyChk: false, evOpen: {}, adPer: "This month", adPerOpen: false, adCal: false, adCust: null, adCustT: null,
   calBy: "team",
   ppF: {}, ppBy: "type", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,

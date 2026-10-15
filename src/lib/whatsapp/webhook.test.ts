@@ -53,12 +53,12 @@ describe("parsing a delivery", () => {
       ...base,
       contacts: [{ wa_id: "60123456789", profile: { name: "Tan Mei Ling" } }],
       messages: [{ id: "wamid.1", from: "60123456789", timestamp: "1790000000", type: "text", text: { body: "Hi, price?" },
-        referral: { source_type: "ad", source_id: "AD9", headline: "Akemi October Fair", source_url: "https://fb.me/x" } }],
+        referral: { source_type: "ad", source_id: "AD9", headline: "Akemi October Fair", source_url: "https://fb.me/x", media_type: "video" } }],
     }));
     expect(d.messages).toEqual([{
       externalId: "wamid.1", phoneNumberId: "PN1", waId: "60123456789", name: "Tan Mei Ling", kind: "text", body: "Hi, price?",
       mediaId: null, mediaMime: null, sentAt: new Date(1790000000 * 1000).toISOString(),
-      ad: { sourceId: "AD9", headline: "Akemi October Fair", sourceUrl: "https://fb.me/x" },
+      ad: { sourceId: "AD9", headline: "Akemi October Fair", sourceUrl: "https://fb.me/x", media: "video" },
     }]);
   });
 

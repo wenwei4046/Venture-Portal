@@ -52,6 +52,8 @@ export interface CrmCustomer {
   ad: string;
   /** Meta's link to the ad (its video or picture), when the customer came from one. */
   adUrl?: string | null;
+  /** The ad's kind, "video" or "image", when Meta said (mig 20261015210000). */
+  adMedia?: "video" | "image" | null;
   status: CrmStatus;
   lost?: { reason: CrmLostReason; note?: string };
   previous?: "won" | "lost";
@@ -262,6 +264,7 @@ export const DEFAULT_AUTO_REPLY_SET: CrmAutoReplySet = {
 
 export interface CrmContactRowX extends CrmContactRow {
   ad_source_url?: string | null;
+  ad_media?: string | null;
   property_type?: string | null;
   unit_size?: string | null;
   unit_location?: string | null;
@@ -369,6 +372,7 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
     channel: row.channel,
     adId: row.ad_source_id,
     adUrl: row.ad_source_url ?? null,
+    adMedia: row.ad_media === "video" || row.ad_media === "image" ? row.ad_media : null,
     ad: row.ad_headline?.trim() || (row.ad_source_id ? `Ad ${row.ad_source_id}` : `${CHANNEL_LABEL[row.channel]} · no ad`),
     status: row.status,
     ...(row.status === "lost" && reason ? { lost: { reason, ...(row.lost_note ? { note: row.lost_note } : {}) } } : {}),

@@ -18,6 +18,7 @@ import { MENU_ICON, REACTIONS, openMsgView, openStarred } from "../../shared/msg
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { ATTACH_TILES, autoChoices, DOC_ACCEPT } from "../../shared/attach-sheet";
 import { CATS, ICON as CMP_ICON, emojiView, pushRecent } from "../../sales/vm/composer";
+import { adKindLabel } from "../../shared/AdLink";
 
 const DAY = 86_400_000;
 const day0 = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -159,7 +160,7 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
     photo: () => pick("image/*,video/*", true),
     // Where the customer came from: the channel, then the ad (its headline is all Meta sends) — the owner, 2026-10-15:
     // "沒有顯示他是從什麼平台過來".
-    head: c ? { avatar: initials(c.name), title: c.name, sub: c.adId ? `${c.channel === "whatsapp" ? "WhatsApp" : "Messenger"} · Ad · ${c.ad}` : c.ad, subColor: "#387557", menu: true } : null,
+    head: c ? { avatar: initials(c.name), title: c.name, sub: c.adId ? `${c.channel === "whatsapp" ? "WhatsApp" : "Messenger"} · ${adKindLabel(c)} · ${c.ad}` : c.ad, subColor: "#387557", menu: true } : null,
     owner: c ? (c.assignedTo ? `${ctx.nameOf(c.assignedTo)}'s customer` : "No one yet's customer") : "", reply: c ? `Reply to ${first(c.name)}…` : "",
     // v2: the pinned message's bar, the reply's quote over the box, the + menu.
     pinShown: !!pinned, pinText: pinned ? pinned.text || mediaWord(pinned) : "", unpinMsg: () => { if (c) void act.setPref(c.id, { pinnedMessageId: null }); },

@@ -13,3 +13,7 @@ export function InfoValue({ v, href }: { v: string; href?: string | null }) {
 
 /** Meta's ad link, only when it is a web address. */
 export const adHref = (url: string | null | undefined) => (url && /^https:\/\//.test(url) ? url : null);
+
+/** The ad as the screens name it: its kind, then its headline — "Video ad · Chat with us" (the owner, 2026-10-15). */
+export const adKindLabel = (c: { adId: string | null; adMedia?: "video" | "image" | null }) =>
+  !c.adId ? "" : c.adMedia === "video" ? "Video ad" : c.adMedia === "image" ? "Image ad" : "Ad";

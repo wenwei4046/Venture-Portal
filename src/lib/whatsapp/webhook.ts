@@ -59,7 +59,7 @@ interface WaMessage {
   interactive?: { button_reply?: { title?: string }; list_reply?: { title?: string } };
   location?: { latitude?: number; longitude?: number; name?: string; address?: string };
   /** A click-to-WhatsApp ad: which ad the customer came from. */
-  referral?: { source_type?: string; source_id?: string; source_url?: string; headline?: string; body?: string; ctwa_clid?: string };
+  referral?: { source_type?: string; source_id?: string; source_url?: string; headline?: string; body?: string; ctwa_clid?: string; media_type?: string };
 }
 interface WaStatus { id?: string; status?: string; timestamp?: string; recipient_id?: string; errors?: { code?: number; title?: string }[] }
 interface WaValue {
@@ -84,7 +84,8 @@ export interface WaInboundMessage {
   mediaId: string | null;       // download later with the token; never a URL from Meta
   mediaMime: string | null;
   sentAt: string;               // ISO
-  ad: { sourceId: string | null; headline: string | null; sourceUrl: string | null } | null;
+  /** media: the ad's kind as Meta names it — "video" or "image" (2026-10-15). */
+  ad: { sourceId: string | null; headline: string | null; sourceUrl: string | null; media: string | null } | null;
 }
 
 export interface WaStatusUpdate {
@@ -133,7 +134,7 @@ function readMessage(m: WaMessage, phoneNumberId: string, names: Map<string, str
     mediaId: media?.id ?? null,
     mediaMime: media?.mime_type ?? null,
     sentAt: iso(m.timestamp),
-    ad: m.referral ? { sourceId: m.referral.source_id ?? null, headline: m.referral.headline ?? null, sourceUrl: m.referral.source_url ?? null } : null,
+    ad: m.referral ? { sourceId: m.referral.source_id ?? null, headline: m.referral.headline ?? null, sourceUrl: m.referral.source_url ?? null, media: m.referral.media_type ?? null } : null,
   };
 }
 

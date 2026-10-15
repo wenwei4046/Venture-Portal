@@ -464,6 +464,9 @@ paneFull
 paneShown
 paneStyle
 people
+perfFold
+perfRail
+perfShut
 perfW
 periodNow
 periodOpts

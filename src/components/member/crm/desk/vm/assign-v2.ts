@@ -95,9 +95,11 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
   ] : [];
   const adL = logOf(adEv), logOpen = ui.adLog;
   const dock = W >= 1440, aw = ui.auditW ?? 280;
-  const adLogStyle: CSSProperties = dock
-    ? { position: "relative", flex: `0 1 ${aw}px`, width: aw, minWidth: 220, boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }
-    : { position: "absolute", top: 0, bottom: 0, right: frame.perfW, width: aw, zIndex: 5, boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", boxShadow: "-16px 0 40px rgba(40,25,18,.16)", display: "flex", flexDirection: "column" };
+  // The Audit log docks at Ad performance's right on every width (the owner, 2026-10-15: "它會在 ads performance 右邊"); where
+  // the page is narrow, opening it folds Ad performance to its strip so the two never cover each other. White, lifted
+  // off the sand of Ad performance by its shadow.
+  const perfShut = ui.adPerfShut || (logOpen && !dock);
+  const adLogStyle: CSSProperties = { position: "relative", flex: `0 1 ${aw}px`, width: aw, minWidth: 220, boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", boxShadow: "-10px 0 24px rgba(40,25,18,.08)", display: "flex", flexDirection: "column" };
 
   // ── Member work type's Audit log: full time / part time changes (crm_staff.full_time).
   const mwtEv: LogEv[] = hist.filter(h => h.table === "crm_staff" && (h.op !== "UPDATE" || h.changes.some(c => c.field === "Full time")))
@@ -130,6 +132,8 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
     adCalOpen: ui.adCal, adCalList: !ui.adCal, adCalHint: t0.step === 1 ? "Now pick the end date" : "Pick the start date", adCalLabel: calLbl(t0),
     adCalBack: () => patch({ adCal: false }), adCalApply: () => patch({ adCust: { a: t0.a, b: t0.b }, adPer: "Custom", adCal: false, adPerOpen: false }), adCalDays,
     openAdsPerf: () => patch({ tab: "adsperf", pane: "closed", ad: null, adLog: false, toast: "" }),
+    perfShut, perfFold: () => patch({ adPerfShut: true }),
+    perfRail: { title: "Ad performance", open: () => patch({ adPerfShut: false, ...(dock ? {} : { adLog: false }) }) },
     adLogOpen: logOpen, adLogClosed: !logOpen, adLogToggle: () => patch({ adLog: !logOpen }), adLog: adL.rows, adLogRail: adL.rail, adLogStyle,
     mwtLogOpen: mwtOpen, mwtLogClosed: mwtShow && !mwtOpen, mwtLogW: ui.mwtLogW ?? 280, mwtLogToggle: () => patch({ mwtLog: !ui.mwtLog }), mwtLog: mwtL.rows, mwtLogRail: mwtL.rail,
     ftSame, ftApplyDis: !ftSame, ftApplyOn, ftApplyFg: ftSame ? "#3F2B22" : "#A08E82", ftApplyCur: ftSame ? "pointer" : "not-allowed", ftApplyTip: ftSame ? "" : "Everyone in this team needs the same days",
