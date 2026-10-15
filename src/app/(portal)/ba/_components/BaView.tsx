@@ -4,7 +4,7 @@ import { useId, useMemo, useRef, useState, useTransition, type ReactNode } from 
 import { backdropDismiss } from '@/components/modal-dismiss'
 import dayjs from 'dayjs'
 import { officeToday } from '@/lib/office-time'
-import { calcBa, daysBetween } from '@/lib/ba'
+import { baLimitWarning, baMissing, baTermsOf, calcBa, type BaTermsFields } from '@/lib/ba'
 import Link from 'next/link'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import SortableTable from '@/components/SortableTable'
@@ -76,15 +76,8 @@ const calcOf = (r: BaRow) =>
   })
 
 // ── Shared calculator fields (used by the modal and the record form) ────────
-interface CalcFields {
-  face: string
-  bankRatePct: string
-  startDate: string
-  endDate: string
-  days: string
-  chargePct: string
-  hcPct: string
-}
+// The rules are lib/ba's (`baTermsOf`), the Finance phone app's sheet's too.
+type CalcFields = BaTermsFields
 
 const emptyCalc = (): CalcFields => ({
   face: '',
@@ -97,25 +90,7 @@ const emptyCalc = (): CalcFields => ({
 })
 
 function useCalc(fields: CalcFields) {
-  return useMemo(() => {
-    const days =
-      fields.endDate && fields.startDate
-        ? daysBetween(fields.startDate, fields.endDate)
-        : Number(fields.days) || 0
-    const result = calcBa({
-      face: Number(fields.face) || 0,
-      bankAnnualRate: (Number(fields.bankRatePct) || 0) / 100,
-      days,
-      chargeRateMonthly: (Number(fields.chargePct) || 0) / 100,
-      hcRateMonthly: (Number(fields.hcPct) || 0) / 100,
-    })
-    const maturity =
-      fields.endDate ||
-      (fields.startDate && days > 0
-        ? dayjs(fields.startDate).add(days, 'day').format('YYYY-MM-DD')
-        : '')
-    return { days, maturity, ...result }
-  }, [fields])
+  return useMemo(() => baTermsOf(fields), [fields])
 }
 
 // ── The form's pieces (2026-10-10, the user's Claude Design handoff — its
@@ -354,30 +329,14 @@ function RecordForm({
   const [isReading, startReading] = useTransition()
   const c = useCalc(f)
 
-  // Over-limit check — WARNS only, never blocks (user 2026-08-11: 超了警告但不挡).
-  // When editing an active BA, its own face is already inside `used`.
-  const limitWarning = useMemo(() => {
-    if (!borrowerCompanyId) return null
-    const l = limits.find(x => x.companyId === borrowerCompanyId)
-    if (!l || l.limit <= 0) return null
-    const face = Number(f.face) || 0
-    if (face <= 0) return null
-    const own =
-      editing && editing.status === 'active' && editing.borrowerCompanyId === borrowerCompanyId
-        ? editing.faceAmount
-        : 0
-    const after = l.used - own + face
-    if (after <= l.limit) return null
-    return `Over limit: ${l.label} has RM ${money(l.used - own)} active of RM ${money(l.limit)} — this BA takes it to RM ${money(after)}`
-  }, [borrowerCompanyId, f.face, limits, editing])
+  // Over-limit check — WARNS only, never blocks (user 2026-08-11: 超了警告但不挡; lib/ba).
+  const limitWarning = useMemo(
+    () => baLimitWarning({ companyId: borrowerCompanyId, face: Number(f.face) || 0, limits, editing }),
+    [borrowerCompanyId, f.face, limits, editing],
+  )
 
   // What saving still needs (2026-10-10, the handoff: a ref and a borrower too).
-  const missing = [
-    Number(f.face) > 0 ? null : 'the face amount',
-    c.days > 0 ? null : 'the days',
-    baNo.trim() ? null : 'the BA ref',
-    borrowerCompanyId || borrowerName.trim() ? null : 'the borrower',
-  ].filter((m): m is string => m !== null)
+  const missing = baMissing({ face: Number(f.face) || 0, days: c.days, baNo, borrowerCompanyId, borrowerName })
 
   const autoRead = () => {
     if (!file) return
