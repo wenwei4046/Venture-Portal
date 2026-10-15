@@ -760,6 +760,7 @@ Converted so far:
 - **Invoice** — its hub since v4.17 (`statements/_components/InvoicesHub`), its dialogs since v4.18.
 - **Statements** — one month at a time (v3.84).
 - **The Billing Allocator** — its hub since v4.23 (`billing-allocator/_components/AllocatorHub`), a record's full page in D06's hand (`/billing-allocator/[id]`).
+- **A page's files** (*Excel*, *PDF*, *Export ▾*, the ticks that pick what to export) show only to whoever may take them out — the Export its route asks, on the desktop and in the phone app alike (v4.59). The Venture Pool's stays for every reader of the page (the user, 2026-10-12). Invoice Financing's *Record financing* shows only to whoever may record it.
 - **On a phone**
   - An Approvals row is Description + Amount, with who / when as small print. Its arrow opens the rest of the row and the voucher.
   - The `.fin-queue` pages set an opened row's labels in the card-label face, and its one action (Settle) as an orange pill.
@@ -1570,6 +1571,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.59** · 2026-10-16 · Finance's pages: a page's files only for whoever may take them out — the reports, the Ledger, Daily Bank, Statements, Payments' and Receipt's *Export ▾*, Company Statement's ticks, a department's statement, and the phone app's Statements and Payment; Invoice Financing's *Record financing* only for whoever may record it; the printed statement titled *Statement — {code} — {Month YYYY}* (Save as PDF's file name), its *Print / Save PDF* over the letterhead on a phone; a schedule's print on a phone scrolls its table inside the sheet → Finance's pages on the sheet
 - **v4.58** · 2026-10-16 · Finance's phone app, part E4b: the portal's last pages as the app's sheets (Amend terms, a pending source's Edit, settle on a receipt, Refund, non-billable, contracts, a voucher's Edit; Print over the app); Finance's view on a phone opens the app; an edit sends only what changed → Finance's view — the phone app
 - **v4.57** · 2026-10-16 · Finance's phone app, part E4a: Payments' request queues — Claim, Dept and Payroll Requests (Raise voucher / Generate PV, Payroll's Fund round; Cancel request and Send back to HR asked first) → Finance's view — the phone app
 - **v4.56** · 2026-10-16 · HR's view — Attendance, the user's answers: Today's Remind all and fixed-hours people on leave; the person calendar's punch photos and Mark invalid; Requests' attachments open; Policy's by-wage line and Who clocks opening on by wage; the leave type's Balance and pay switches; Readiness' hire dates → HR's view — Attendance

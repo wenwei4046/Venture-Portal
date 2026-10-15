@@ -126,7 +126,7 @@ function hub(over: Partial<InvoiceHubData> = {}): InvoiceHubData {
     ],
     otherOpen: [toHubInvoice(row({ id: 'old1', invoice_no: 'HV-INV-202609-0040', period_month: '2026-09-01', total_amount: 300 }), ctx, true)],
     creditNotes: [CN],
-    contracts: [{ id: 'ct1', description: 'Marketing retainer — Q4', amount: 6000, status: 'active', start: '2026-10-01', end: '2026-12-31', company: 'HOUZS Century (HC)', invoice: { id: 'hc2', no: 'HV-INV-202610-0009' } }],
+    contracts: [{ id: 'ct1', description: 'Marketing retainer — Q4', amount: 6000, status: 'active', start: '2026-10-01', end: '2026-12-31', company: 'HOUZS Century (HC)', companyId: 'co-hc', invoice: { id: 'hc2', no: 'HV-INV-202610-0009' } }],
     nonBillable: [
       { id: 'vp1', at: '2026-10-06T02:00:00Z', type: 'expense_out', amount: 2899.75, description: 'AI tools Sep26 claim', source: 'Payment voucher', out: true },
       { id: 'vp2', at: '2026-10-05T02:00:00Z', type: 'profit_in', amount: 21.5, description: 'Settle HV-INV-202609-0017', source: 'Payment voucher', out: false },

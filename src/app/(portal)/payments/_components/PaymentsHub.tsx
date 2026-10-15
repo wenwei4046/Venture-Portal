@@ -1,4 +1,5 @@
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { loadPaymentsHub } from '../_lib/payments-hub'
 import type { LedgerParams } from '../_lib/hub-ledger'
 import PaymentsHubClient from './PaymentsHubClient'
@@ -17,6 +18,7 @@ export default async function PaymentsHub({ params }: { params: LedgerParams }) 
       canCreate={hub.canCreate}
       create={hub.create}
       canSetDefault={hub.canSetDefault}
+      canExport={canDo(user, 'treasury', 'export')}
       dept={hub.dept}
       payroll={hub.payroll}
       claims={hub.claims}

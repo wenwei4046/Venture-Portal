@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { HubLedger, HubRow } from '@/app/(portal)/payments/_lib/hub-ledger'
 import type { VoucherDetail } from '@/app/(portal)/payments/_lib/voucher-detail'
 
@@ -135,7 +135,7 @@ const DETAIL: VoucherDetail = {
   reference: null,
 }
 
-const draw = (search = '') =>
+const draw = (search = '', canExport = true) =>
   render(
     <FinAppFrame platform="android" rows={['payments', 'receipts', 'invoices', 'billing']}>
       <VoucherApp
@@ -145,6 +145,7 @@ const draw = (search = '') =>
         record={null}
         refused={null}
         canCreate
+        canExport={canExport}
         create={{ prefix: 'HV-PV-202610', today: '2026-10-15', open: false, initial: null }}
         today="2026-10-15"
         dept={[]}
@@ -284,6 +285,18 @@ describe('Daily › Payment on the phone', () => {
     fireEvent.click(batch)
     expect(batch).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('button', { name: /Marketing 2 vouchers 6,200\.00/ })).toBeDisabled()
+  })
+
+  it('the ⋯ keeps Export to whoever may export (Treasury · Export, 2026-10-16)', () => {
+    draw()
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    expect(screen.getByRole('menuitem', { name: /^Export/ })).toBeInTheDocument()
+    cleanup()
+    resetNav()
+    draw('', false)
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    expect(screen.getByRole('menuitem', { name: /^Claims/ })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /^Export/ })).toBeNull()
   })
 
   it('Create payment opens the desktop’s own window', () => {

@@ -895,6 +895,7 @@ export default function BaView({
   autoReadAvailable,
   openCalc,
   canSetDefault = false,
+  canRecord = true,
 }: {
   rows: BaRow[]
   companies: CompanyOption[]
@@ -904,6 +905,8 @@ export default function BaView({
   openCalc: boolean
   /** The viewer may keep the register's arrangement as everyone's default. */
   canSetDefault?: boolean
+  /** The viewer may record financing (Treasury · Create) — the button is theirs alone. */
+  canRecord?: boolean
 }) {
   const [showCalc, setShowCalc] = useState(openCalc)
   const [showForm, setShowForm] = useState(false)
@@ -1005,9 +1008,11 @@ export default function BaView({
           <button type="button" className="btn-quiet-sheet" onClick={() => setShowCalc(true)}>
             Calculator
           </button>
-          <button type="button" className="btn-pri-sheet" onClick={toggleForm}>
-            {showForm ? 'Close form' : 'Record financing'}
-          </button>
+          {canRecord ? (
+            <button type="button" className="btn-pri-sheet" onClick={toggleForm}>
+              {showForm ? 'Close form' : 'Record financing'}
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -1027,7 +1032,7 @@ export default function BaView({
         </div>
       ) : null}
 
-      {showForm ? (
+      {showForm && canRecord ? (
         <RecordForm
           key={editing?.id ?? 'new'}
           companies={companies}

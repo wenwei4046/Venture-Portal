@@ -63,7 +63,7 @@ export function CopyVoucherDialog({
   return (
     <FinDialog open={open} onClose={onClose} title={`Copy ${voucherNo ?? 'this voucher'}?`} locked={busy}>
       <DialogConfirm
-        text={error ?? 'It opens on the edit page as a new draft, to be changed before it is submitted.'}
+        text={error ?? (onCopied ? 'It opens as a new draft, its form open to be changed before it is submitted.' : 'It opens on the edit page as a new draft, to be changed before it is submitted.')}
         confirmLabel={busy ? 'Copying…' : 'Copy as a new draft'}
         busy={busy}
         onCancel={onClose}

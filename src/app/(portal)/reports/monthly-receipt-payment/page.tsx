@@ -7,6 +7,7 @@
 // 要还没收回的就好").
 
 import { officeMonth } from '@/lib/office-time'
+import { canDo } from '@/lib/permission-actions'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
@@ -46,6 +47,8 @@ interface Props {
 export default async function MonthlyReceiptPaymentPage({ searchParams }: Props) {
   await requirePage('/reports/monthly-receipt-payment')
   const user = await requirePermission('dept_reports')
+  // The files only for whoever may take them out — as the export route asks (2026-10-16).
+  const canExport = canDo(user, 'dept_reports', 'export', 'dept')
   const supabase = await createClient()
 
   const params = await searchParams
@@ -136,12 +139,16 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
             <Link href="/reports/cash-flow/layout" className="btn-quiet-sheet">
               Edit layout
             </Link>
-            <a href={exportHref('xlsx')} className="btn-quiet-sheet">
-              Excel
-            </a>
-            <a href={exportHref('pdf')} className="btn-quiet-sheet">
-              PDF
-            </a>
+            {canExport ? (
+              <a href={exportHref('xlsx')} className="btn-quiet-sheet">
+                Excel
+              </a>
+            ) : null}
+            {canExport ? (
+              <a href={exportHref('pdf')} className="btn-quiet-sheet">
+                PDF
+              </a>
+            ) : null}
           </div>
         </div>
 
@@ -203,18 +210,22 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
               Edit layout
             </Link>
           )}
-          <a
-            href={`/reports/monthly-receipt-payment/export?format=xlsx&period=${period}${segment ? `&segment=${segment}` : ''}`}
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            Excel
-          </a>
-          <a
-            href={`/reports/monthly-receipt-payment/export?format=pdf&period=${period}${segment ? `&segment=${segment}` : ''}`}
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            PDF
-          </a>
+          {canExport ? (
+            <a
+              href={`/reports/monthly-receipt-payment/export?format=xlsx&period=${period}${segment ? `&segment=${segment}` : ''}`}
+              className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+            >
+              Excel
+            </a>
+          ) : null}
+          {canExport ? (
+            <a
+              href={`/reports/monthly-receipt-payment/export?format=pdf&period=${period}${segment ? `&segment=${segment}` : ''}`}
+              className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+            >
+              PDF
+            </a>
+          ) : null}
         </div>
       </div>
 

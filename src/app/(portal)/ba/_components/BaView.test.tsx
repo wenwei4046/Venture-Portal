@@ -42,7 +42,7 @@ const COMPANIES = [
   { id: 'co-new', label: 'Newco (NEW)' },
 ]
 
-const view = (props: { canSetDefault?: boolean } = {}) =>
+const view = (props: { canSetDefault?: boolean; canRecord?: boolean } = {}) =>
   render(<BaView rows={ROWS} companies={COMPANIES} banks={[{ id: 'b1', label: 'HLB' }]} limits={LIMITS} autoReadAvailable={false} openCalc={false} {...props} />)
 const card = (name: string) => screen.getByRole('group', { name })
 const table = () => document.querySelector('table.ledger-table') as HTMLTableElement
@@ -52,6 +52,12 @@ const limits = () => screen.getByRole('heading', { name: 'Limits' }).closest('se
 beforeEach(() => vi.clearAllMocks())
 
 describe('Invoice Financing on the sheet', () => {
+  it('keeps Record financing to whoever may record it (Treasury · Create, 2026-10-16)', () => {
+    view({ canRecord: false })
+    expect(screen.queryByRole('button', { name: 'Record financing' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Calculator' })).toBeInTheDocument()
+  })
+
   it('heads as Invoice Financing with the calculator and Record financing, and sums the active book', () => {
     view()
     expect(screen.getByRole('link', { name: '← Fund In' })).toHaveAttribute('href', '/fund-in')

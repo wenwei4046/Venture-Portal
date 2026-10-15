@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { listsPayrollByPerson } from '@/lib/roles'
 import { fetchLedgers, type Ledger } from '@/lib/cfo-reports'
 import { type AccountType } from '@/lib/coa'
@@ -89,12 +90,17 @@ export default async function LedgerPage({ searchParams }: Props) {
         </div>
         <div className="flex flex-wrap items-start justify-end gap-2">
           <LedgerPicker accounts={accounts} selectedCodes={codes} from={from} to={to} showZero={showZero} />
-          <a href={ledgerExportHref('xlsx', exportArgs)} className="btn-quiet-sheet">
-            Excel
-          </a>
-          <a href={ledgerExportHref('pdf', exportArgs)} className="btn-quiet-sheet">
-            PDF
-          </a>
+          {/* The files only for whoever may take them out — the route asks Reports · Export (2026-10-16). */}
+          {canDo(user, 'reports', 'export') ? (
+            <>
+              <a href={ledgerExportHref('xlsx', exportArgs)} className="btn-quiet-sheet">
+                Excel
+              </a>
+              <a href={ledgerExportHref('pdf', exportArgs)} className="btn-quiet-sheet">
+                PDF
+              </a>
+            </>
+          ) : null}
         </div>
       </div>
 

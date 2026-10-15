@@ -5,6 +5,7 @@
 // (cfo-reports.fetchIncomeStatement) is no longer used here.
 
 import dayjs from 'dayjs'
+import { canDo } from '@/lib/permission-actions'
 import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
@@ -28,6 +29,8 @@ interface Props {
 export default async function IncomeStatementPage({ searchParams }: Props) {
   await requirePage('/reports/income-statement')
   const user = await requirePermission('dept_reports')
+  // The files only for whoever may take them out — as the export route asks (2026-10-16).
+  const canExport = canDo(user, 'reports', 'export')
   const supabase = await createClient()
 
   const params = await searchParams
@@ -65,7 +68,9 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <ReportModeSwitch pair="pnl" active="single" period={period} segment={segment || undefined} />
-            <ExportLinks variant="sheet" basePath="/reports/income-statement/export" period={period} compare={compare} segment={segment} />
+            {canExport ? (
+              <ExportLinks variant="sheet" basePath="/reports/income-statement/export" period={period} compare={compare} segment={segment} />
+            ) : null}
           </div>
         </div>
 
@@ -119,7 +124,9 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">P&amp;L Statement</h1>
         </div>
-        <ExportLinks basePath="/reports/income-statement/export" period={period} compare={compare} segment={segment} />
+        {canExport ? (
+          <ExportLinks basePath="/reports/income-statement/export" period={period} compare={compare} segment={segment} />
+        ) : null}
       </div>
 
       <ReportViewToggle pair="pnl" active="single" period={period} segment={segment || undefined} />

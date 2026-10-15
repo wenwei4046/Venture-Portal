@@ -5,6 +5,7 @@
 // equity/liabilities mostly live in the corporate segment.
 
 import dayjs from 'dayjs'
+import { canDo } from '@/lib/permission-actions'
 import { officeMonth } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
@@ -26,6 +27,8 @@ interface Props {
 export default async function BalanceSheetPage({ searchParams }: Props) {
   await requirePage('/reports/balance-sheet')
   const user = await requirePermission('reports')
+  // The files only for whoever may take them out — as the export route asks (2026-10-16).
+  const canExport = canDo(user, 'reports', 'export')
   const supabase = await createClient()
 
   const params = await searchParams
@@ -59,7 +62,9 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
           {segment ? <span className="chip alert mt-2"><span className="dot" />Segment only · won&apos;t balance</span> : null}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <ExportLinks variant="sheet" basePath="/reports/balance-sheet/export" period={period} compare={compare} segment={segment} />
+          {canExport ? (
+            <ExportLinks variant="sheet" basePath="/reports/balance-sheet/export" period={period} compare={compare} segment={segment} />
+          ) : null}
         </div>
       </div>
 

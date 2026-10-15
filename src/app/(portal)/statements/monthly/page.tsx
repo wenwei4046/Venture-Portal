@@ -64,6 +64,8 @@ export default async function MonthlyStatementsPage({ searchParams }: Props) {
   for (const m of months) marked[m] = plural(statementList.filter((s) => String(s.period_month).slice(0, 7) === m).length, 'statement', 'statements')
   // Generating raises the month's statements: Treasury · Create (2026-10-08, PR2).
   const canGenerate = canDo(user, 'treasury', 'create')
+  // The month's files for whoever may take them out — the route asks Treasury · Export (2026-10-16).
+  const canExport = canDo(user, 'treasury', 'export')
   const exportHref = (format: 'xlsx' | 'pdf') => `/statements/monthly/export?format=${format}&period=${month}`
 
   return (
@@ -84,24 +86,32 @@ export default async function MonthlyStatementsPage({ searchParams }: Props) {
           <FinSwitch
             fin={
               <>
-                <Link href={exportHref('xlsx')} className="btn-quiet-sheet">
-                  Excel
-                </Link>
-                <Link href={exportHref('pdf')} className="btn-quiet-sheet">
-                  PDF
-                </Link>
+                {canExport ? (
+                  <>
+                    <Link href={exportHref('xlsx')} className="btn-quiet-sheet">
+                      Excel
+                    </Link>
+                    <Link href={exportHref('pdf')} className="btn-quiet-sheet">
+                      PDF
+                    </Link>
+                  </>
+                ) : null}
                 {canGenerate ? <GenerateStatementsButton month={month} /> : null}
               </>
             }
             other={
               <>
                 {canGenerate ? <GenerateStatementsButton month={month} /> : null}
-                <Link href={exportHref('xlsx')} className="btn-quiet-sheet">
-                  Excel
-                </Link>
-                <Link href={exportHref('pdf')} className="btn-quiet-sheet">
-                  PDF
-                </Link>
+                {canExport ? (
+                  <>
+                    <Link href={exportHref('xlsx')} className="btn-quiet-sheet">
+                      Excel
+                    </Link>
+                    <Link href={exportHref('pdf')} className="btn-quiet-sheet">
+                      PDF
+                    </Link>
+                  </>
+                ) : null}
               </>
             }
           />

@@ -13,7 +13,24 @@ vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
 import { updatePaymentVoucher, updatePaymentVoucherInWords } from './actions'
 
-const STORED = {
+const STORED: {
+  id: string
+  status: string
+  voucher_type: string
+  fund_source_id: string | null
+  loan_id: string | null
+  repayment_breakdown: unknown
+  invoice_id: string | null
+  reference_type: string | null
+  amount: number
+  payee_name: string
+  payee_company_id: string | null
+  bank_account_id: string | null
+  description: string
+  payment_method: string
+  notes: string | null
+  target_pool: string | null
+} = {
   id: 'pv',
   status: 'draft',
   voucher_type: 'expense',

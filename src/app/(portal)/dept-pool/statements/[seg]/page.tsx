@@ -87,12 +87,17 @@ export default async function DeptStatementPage({ params, searchParams }: Props)
             </Link>
           ))}
         </div>
-        <a href={exportHref('xlsx')} className="btn-quiet-sheet">
-          Excel
-        </a>
-        <a href={exportHref('pdf')} className="btn-quiet-sheet">
-          PDF
-        </a>
+        {/* The files for whoever may take them out — the route asks Dept reports · Export (2026-10-16). */}
+        {canDo(user, 'dept_reports', 'export', 'dept') ? (
+          <>
+            <a href={exportHref('xlsx')} className="btn-quiet-sheet">
+              Excel
+            </a>
+            <a href={exportHref('pdf')} className="btn-quiet-sheet">
+              PDF
+            </a>
+          </>
+        ) : null}
       </div>
     </div>
   )
