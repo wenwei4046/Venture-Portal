@@ -1,12 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { shiftDay, type Booking } from "@/lib/rooms/model";
 import { ask, settleRead, type RevenueSource } from "../source";
 import type { RoomBookSheet, RoomViewSheet, RoomsPageProps } from "./RoomsPage";
 import { bookingOfForm, formProblem, newForm, withFromTime, type MemberRoomsData, type RoomsForm, type RoomsMode, type RoomsSheet } from "./rooms-model";
 
 const BLANK: RoomsForm = { title: "", dept: "", room: "", from: "", to: "", att: [], pax: 1, q: "" };
+
+/**
+ * What Book a room reads and writes through: the Revenue app's source (the
+ * member's own session), or the Finance phone app's Meeting Rooms — the same
+ * page under the portal's own gates (2026-10-15, the user: "Book a Room
+ * 点进去的设计是一样的").
+ */
+export type RoomsSource = Pick<RevenueSource, "rooms" | "bookRoom" | "cancelBooking" | "peek">;
 
 type BookProps = Parameters<typeof RoomBookSheet>[0];
 type ViewProps = Parameters<typeof RoomViewSheet>[0];
@@ -17,20 +25,24 @@ type ViewProps = Parameters<typeof RoomViewSheet>[0];
  * mode shown, and the two sheets. A booking or a cancel reads the schedule
  * again; the design preview books into its own fixture instead.
  */
-export function useMemberRooms({ active, source, today, fixture, readOnly, canBook }: {
+export function useMemberRooms({ active, source, today, fixture, initial, readOnly, canBook }: {
   /** The page is on screen (and the phone's kept answers are loaded). */
   active: boolean;
-  source: RevenueSource;
+  source: RoomsSource;
   today: string;
   /** The design preview's schedule (the handoff's sample): read from nowhere. */
   fixture?: MemberRoomsData;
+  /** The schedule the server read with the page (the Finance app's): shown at once, read again only after a change. */
+  initial?: MemberRoomsData | null;
   readOnly: boolean;
   canBook: boolean;
 }): { page: Omit<RoomsPageProps, "onBack">; book: BookProps; view: ViewProps } {
   const roomsToday = fixture?.range.today || today;
   const [mode, setMode] = useState<RoomsMode>("cards");
   const [day, setDay] = useState<string | null>(null);
-  const [data, setData] = useState<MemberRoomsData | null>(fixture ?? null);
+  const [data, setData] = useState<MemberRoomsData | null>(fixture ?? initial ?? null);
+  // The page's own read is the first one.
+  const served = useRef(!!initial);
   const [message, setMessage] = useState<string | null>(null);
   const [sheet, setSheet] = useState<RoomsSheet>(null);
   const [form, setForm] = useState<RoomsForm>(BLANK);
@@ -45,6 +57,7 @@ export function useMemberRooms({ active, source, today, fixture, readOnly, canBo
   const to = shiftDay(roomsToday, 6);
   useEffect(() => {
     if (!active || fixture || !source.rooms) return;
+    if (served.current) { served.current = false; return; }
     const kept = source.peek?.<MemberRoomsData>(ask.rooms(from, to));
     if (kept) setData(d => d ?? kept);
     let live = true;

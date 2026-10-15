@@ -929,3 +929,6 @@
   .content[data-anim='pop'],
   .content[data-anim='tab'] { transform: none; opacity: 1; }
 }
+
+/* Meeting Rooms (2026-10-15, part E3): the Revenue app's Book a room in its own frame. No tab bar stands under it, so its page clears the phone's own bar itself. */
+.roomsMain { padding-bottom: var(--safe-bottom, 0px); }
