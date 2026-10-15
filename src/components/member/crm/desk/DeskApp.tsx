@@ -7,8 +7,9 @@
 import { Fragment } from "react";
 import type React from "react";
 import DH from "./desk-hover.module.css";
+import DX from "./desk-extras.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
-import { DeskBook, DeskCardPicker, DeskAlerts, DeskCustomerForm, DeskEmoji, DeskHistory, DeskNote } from "./DeskExtras";
+import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskHistory, DeskNote, DeskPie } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
 /** The whole desktop CRM: the Revenue app's frame around it (sidebar, top bar), every page, pane, menu and the toast. */
@@ -3576,7 +3577,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 </div>
               </>)}
               {!!(v.kPeople) && (<>
-                <div style={{ display: "flex", flexDirection: "column", gap: "18px", maxWidth: "1180px" }}>
+                <div className={DX.ppWrap}><div style={{ display: "flex", flexDirection: "column", gap: "18px", maxWidth: "1180px" }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "14px 16px", border: "1px solid #EBDDD2", borderRadius: "14px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                       <strong style={{ flex: "1", fontSize: "13px", fontWeight: "650" }}>Filter by Customer info</strong>
@@ -3640,7 +3641,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "14px", padding: "18px 20px", border: "1px solid #EBDDD2", borderRadius: "14px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                      <strong style={{ flex: "1", minWidth: "160px", fontSize: "15px", fontWeight: "650" }}>{v.ppChartTitle}</strong>
+                      <strong onClick={v.ppChartToggle} style={{ flex: "1", minWidth: "160px", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}>{!!(v.ppFoldable) && (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#806B60" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "8px", verticalAlign: "-1px", transform: v.ppChev, transition: "transform .18s" }}><path d="m6 9 6 6 6-6"></path></svg>)}{v.ppChartTitle}{!!(v.ppFoldable) && (<span style={{ marginLeft: "10px", fontSize: "12.5px", fontWeight: "500", color: "#806B60" }}>{v.ppChartSum}</span>)}</strong>
                       <div style={{ display: "flex", flexWrap: "wrap", background: "#F5EEE8", borderRadius: "10px", padding: "3px", gap: "2px" }}>
                         {(v.ppBys).map((o, o_i) => (<Fragment key={o_i}>
                           {!!(o.on) && (<>
@@ -3652,7 +3653,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                         </Fragment>))}
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: "2px", height: "10px", borderRadius: "5px", overflow: "hidden", background: "#F5EEE8" }}>
+                    {!!(v.ppChartOpen) && (<div className={DX.ppChartBody}><DeskPie v={v.ppPie} /><div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "14px" }}><div style={{ display: "flex", gap: "2px", height: "10px", borderRadius: "5px", overflow: "hidden", background: "#F5EEE8" }}>
                       {(v.ppStack).map((g, g_i) => (<Fragment key={g_i}>
                         <span style={{ flex: `${g.n} 0 0`, background: g.color }}>
                         </span>
@@ -3671,7 +3672,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                           <span style={{ textAlign: "right", fontSize: "12.5px", color: "#806B60", fontVariantNumeric: "tabular-nums" }}>{b.pct}</span>
                         </button>
                       </Fragment>))}
-                    </div>
+                    </div></div></div>)}
                   </div>
                   {!!(v.ppHas) && (<>
                     <div style={{ display: "flex", flexDirection: "column", border: "1px solid #EBDDD2", borderRadius: "14px", overflow: "auto" }}>
@@ -3725,7 +3726,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                         </span>
                       </div>
                       {(v.ppRows).map((d, d_i) => (<Fragment key={d_i}>
-                        <button type="button" onClick={d.open} title="Open chat and Customer info" style={{ display: "grid", gridTemplateColumns: v.ppGrid, gap: "14px", alignItems: "center", padding: "10px 20px", border: "0", borderTop: "1px solid #F5EEE8", background: "#fff", font: "inherit", color: "#3F2B22", textAlign: "left", cursor: "pointer", minWidth: "max-content" }} className={DH.h12}>
+                        <button type="button" onClick={d.open} title="Open chat and Customer info" style={{ display: "grid", gridTemplateColumns: v.ppGrid, gap: "14px", alignItems: "center", padding: "10px 20px", border: "0", borderTop: "1px solid #F5EEE8", background: d.rowBg, font: "inherit", color: "#3F2B22", textAlign: "left", cursor: "pointer", minWidth: "max-content" }} className={DH.h12}>
                           <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: "0" }}>
                             <span style={{ flex: "0 0 30px", width: "30px", height: "30px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", fontSize: "11px", fontWeight: "700", display: "grid", placeItems: "center" }}>{d.ini}</span>
                             <span style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: "0" }}>
@@ -3755,7 +3756,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       <button type="button" onClick={v.ppClear} style={{ border: "0", background: "transparent", padding: "0", font: "inherit", fontSize: "13px", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }}>Clear filters</button>
                     </div>
                   </>)}
-                </div>
+                </div><aside data-pp-side="1" className={DX.ppSide}><DeskContactSide v={v.ppSide} /></aside></div>
               </>)}
               {!!(v.kAudit) && (<>
                 <div style={{ display: "flex", flexDirection: "column", gap: "20px", maxWidth: "1100px" }}>
@@ -4165,7 +4166,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     </Fragment>))}
                   </span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {!!(v.calAnOn) && (<DeskAnalysis v={v.calAn} />)}<div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <strong style={{ fontSize: "18px", fontWeight: "700" }}>{v.calTitle}</strong>
                   <span style={{ fontSize: "13px", color: "#806B60" }}>{v.calSub}</span>
                 </div>

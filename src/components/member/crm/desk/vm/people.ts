@@ -11,7 +11,9 @@ import type { DeskCtx } from "./ctx";
 import { chatRows, initials } from "./data";
 import { budgetOf, formV2, SIZES, type FormFieldV2 } from "./form";
 import { mapDrag } from "./columns";
-import { CHANNEL } from "../../sales/vm/common";
+import { CHANNEL, STATUS_LABEL, lastReal, timeLabel } from "../../sales/vm/common";
+import { mediaWord } from "../../shared/chat-media";
+import { answerOf } from "./form";
 import { phoneLabel } from "../../sales/vm/customer";
 
 const DAY = 86_400_000;
@@ -118,8 +120,63 @@ export function peopleVM(ctx: DeskCtx) {
       cells: vis.map(k => { const raw = k === "budget" ? (d.budgetN ? `RM ${Number(d.budgetN).toLocaleString("en-MY")}` : null) : d[k]; const v = raw || "—";
         if (k === "type") { const isB = d.type && d.type === typeOpts[1]; return { pill: true, plain: false, v, bg: isB ? "#FFF0E4" : d.type ? "#E4EDF8" : "#F5EEE8", fg: isB ? "#BD4A19" : d.type ? "#2F6FB5" : "#A08E82" }; }
         return { pill: false, plain: true, v, bg: "transparent", fg: raw ? "#3F2B22" : "#A08E82" }; }),
-      // A row opens the chat in Inbox with Customer info beside it.
-      open: () => patch({ tab: "inbox", ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, pane: "docked", kind: "chat", chat: d.id, fromTeam: false, inbF: "All", whoSel: [] }) })),
+      // A row opens the customer in the side panel when the page is wide enough to show it (the owner, 2026-10-15: "右邊的
+      // 畫面有點空" → 1); else, as before, the chat in Inbox with Customer info beside it.
+      on: ui.ppSel === d.id, rowBg: ui.ppSel === d.id ? "#FFF5EC" : "#fff",
+      open: () => sideShown() ? patch({ ppSel: ui.ppSel === d.id ? null : d.id }) : patch({ tab: "inbox", ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, pane: "docked", kind: "chat", chat: d.id, fromTeam: false, inbF: "All", whoSel: [] }) })),
     ppEmpty: !rows.length, ppHas: rows.length > 0,
+    // The chart card: folded to its title and what it says until opened; open, a pie with each value's share beside the
+    // rows that filter (the owner, 2026-10-15: "分析圖表，類似截圖，默認收起").
+    ppFoldable: true, ppChartOpen: ui.ppChart, ppChartToggle: () => patch({ ppChart: !ui.ppChart }), ppChev: ui.ppChart ? "rotate(180deg)" : "none",
+    ppChartSum: (() => { const top = bars.filter(b => b.n && b.label !== "Not filled yet").sort((a, b) => b.n - a.n)[0]; return top ? `Most: ${top.label} · ${top.n} of ${tot} (${top.pct})` : `${tot} contacts`; })(),
+    ppPie: pieSlices(bars.filter(b => b.n).map(b => ({ label: b.label, n: b.n, color: b.color })), tot), ppPieHas: bars.some(b => b.n),
+    ppSide: sideVM(ctx, ui.ppSel, rows.filter(d => !d.filled).map(d => d.id)),
   };
+}
+
+/** Whether Contacts' side panel is on screen (it shows only where the page has room — desk-extras.module.css). */
+const sideShown = () => typeof document !== "undefined" && !!(document.querySelector("[data-pp-side]") as HTMLElement | null)?.offsetParent;
+
+/** A pie's slices as SVG paths, each with its share written inside when it is big enough (the screenshot's look). */
+export function pieSlices(parts: { label: string; n: number; color: string }[], tot: number, r = 100) {
+  const sum = parts.reduce((a, p) => a + p.n, 0) || 1;
+  let a0 = -Math.PI / 2;
+  return parts.map(p => {
+    const a = (p.n / sum) * Math.PI * 2, a1 = a0 + a, mid = a0 + a / 2;
+    const pt = (t: number) => `${(r + r * Math.cos(t)).toFixed(2)} ${(r + r * Math.sin(t)).toFixed(2)}`;
+    const d = p.n === sum ? `M ${r} 0 A ${r} ${r} 0 1 1 ${r - 0.01} 0 Z` : `M ${r} ${r} L ${pt(a0)} A ${r} ${r} 0 ${a > Math.PI ? 1 : 0} 1 ${pt(a1)} Z`;
+    const out = { label: p.label, color: p.color, d, pct: `${((p.n / (tot || sum)) * 100).toFixed(1)}%`, showPct: p.n / sum >= 0.06,
+      x: p.n === sum ? String(r) : (r + r * 0.62 * Math.cos(mid)).toFixed(1), y: p.n === sum ? String(r) : (r + r * 0.62 * Math.sin(mid)).toFixed(1) };
+    a0 = a1;
+    return out;
+  });
+}
+
+/** Contacts' side panel: the picked customer — or, with nobody picked, those whose property info is still empty. */
+function sideVM(ctx: DeskCtx, id: string | null, missing: string[]) {
+  const { data, patch, nameOf, now } = ctx;
+  const c = id ? data.customers.find(x => x.id === id) : undefined;
+  const openChat = (cid: string) => patch({ tab: "inbox", ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, pane: "docked", kind: "chat", chat: cid, fromTeam: false, inbF: "All", whoSel: [] });
+  const edit = (cid: string) => patch({ tab: "inbox", pane: "docked", kind: "form", chat: cid, cform: null, fromTeam: false, inbF: "All", whoSel: [] });
+  const todo = missing.map(mid => data.customers.find(x => x.id === mid)).filter((x): x is CrmCustomer => !!x)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 30)
+    .map(x => ({ id: x.id, ini: initials(x.name), name: x.name, sub: [CHANNEL[x.channel].name, x.assignedTo ? nameOf(x.assignedTo) : "No one yet"].join(" · "),
+      pick: () => patch({ ppSel: x.id }), fill: (e: { stopPropagation(): void }) => { e.stopPropagation(); edit(x.id); } }));
+  const todoTitle = missing.length ? `Property info missing · ${missing.length}` : "Every contact here has property info";
+  const empty = { has: false as boolean, todo, todoTitle, hasTodo: todo.length > 0, ini: "", name: "", phone: "", ch: "", ad: "", status: "", owner: "", visit: "", lastAt: "",
+    groups: [] as { label: string; rows: { k: string; v: string }[] }[], msgs: [] as { who: string; text: string; at: string; mine: boolean }[], hasMsgs: false,
+    openChat: () => {}, edit: () => {}, close: () => {} };
+  if (!c) return empty;
+  const visit = data.visits.filter(v => v.customerId === c.id && v.state === "booked" && v.start >= now.toISOString()).sort((a, b) => a.start.localeCompare(b.start))[0];
+  const msgs = c.messages.filter(m => !m.auto).slice(-3).map(m => ({ who: m.from === "me" ? "You" : c.name.split(" ")[0], text: m.text || mediaWord(m),
+    at: timeLabel(new Date(m.at)), mine: m.from === "me" }));
+  const last = lastReal(c);
+  return { ...empty, has: true,
+    ini: initials(c.name), name: c.name, phone: phoneLabel(c.phone) || "—", ch: CHANNEL[c.channel].name, ad: c.ad || "No ad",
+    status: STATUS_LABEL[c.status], owner: c.assignedTo ? nameOf(c.assignedTo) : "No one yet",
+    visit: visit ? `${new Date(visit.start).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", month: "short" })}, ${timeLabel(new Date(visit.start))} · ${data.rooms.find(r => r.id === visit.showroomId)?.name ?? ""}` : "",
+    lastAt: last ? new Date(last.at).toLocaleString("en-MY", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "—",
+    groups: formV2(data).filter(s => s.key !== "contact" && s.key !== "lead").map(s => ({ label: s.label, rows: s.fields.map(f => ({ k: f.label.replace(/ \(RM\)$/, ""), v: answerOf(data, c, f, nameOf) })) })),
+    msgs, hasMsgs: msgs.length > 0,
+    openChat: () => openChat(c.id), edit: () => edit(c.id), close: () => patch({ ppSel: null }) };
 }
