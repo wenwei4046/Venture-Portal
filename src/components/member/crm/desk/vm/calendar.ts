@@ -5,6 +5,7 @@
  */
 import type { DeskCtx } from "./ctx";
 import { initials, visitRows, type VisitRow } from "./data";
+import { calendarAnalysisVM } from "./analysis";
 import { DIRECTOR_C, DIRECTOR_TEAM, ST, teamColours } from "./tokens";
 import { MON } from "./insight";
 
@@ -35,7 +36,7 @@ export function calendarVM(ctx: DeskCtx) {
     .filter(v => { const d = day0(v.at); return d >= r[0] && d <= r[1]; });
   const item = (v: VisitRow) => { const st = ST[v.status] ?? ST.Booked, [ink, tint] = teamColour(v.team);
     return { time: timeOf(v.at), short: short(v.at), name: v.name, who: `${v.rep} · ${v.room}`, rep: v.rep, status: v.status, stBg: st[0], stFg: st[1], color: ink, tint,
-      open: () => patch({ pane: "overlay", kind: "info", visit: v.id, infoId: null }) }; };
+      open: () => patch({ pane: "docked", kind: "info", visit: v.id, infoId: null }) }; };
 
   // The month on screen: the range's month (the prototype: October with 28–30 Sep and 1 Nov around it).
   const mA = new Date(new Date(r[0]).getFullYear(), new Date(r[0]).getMonth(), 1), lead = (mA.getDay() + 6) % 7, days = new Date(mA.getFullYear(), mA.getMonth() + 1, 0).getDate();
@@ -104,6 +105,8 @@ export function calendarVM(ctx: DeskCtx) {
     calMonth: view === "month", calWeek: view === "week", calDay: view === "day", calUp: view === "upcoming" || view === "today",
     calTitle: view === "month" ? `${MON[mA.getMonth()]} ${mA.getFullYear()}` : view === "week" ? `${label(wkA)} – ${label(wkB)}` : view === "day" ? `Today · ${new Date(T).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", month: "short" })}` : view === "today" ? "Today's appt" : "Upcoming",
     calSub: `${vs.length} visits · ${upcoming.length} upcoming`,
+    // The analysis card over the calendar (the owner, 2026-10-15), folded until opened.
+    calAnOn: true, calAn: calendarAnalysisVM(ctx, vs),
     calStats: ([[String(leads.length), "Leads", "#fff", "Leads"], [String(upcoming.length), "Upcoming", "#F6B48A", "Upcoming"], [String(showed), "Showed up", "#fff", "Showed up"],
       [showed + noShow ? `${Math.round((showed / (showed + noShow)) * 100)}%` : "—", "Show-up", "#fff", "Show-up"],
       // v2: No show (past visits not showed up) and Not reminded (tomorrow's visits with no reminder sent).

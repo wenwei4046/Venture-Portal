@@ -229,3 +229,120 @@ export function DeskAlerts({ v }: { v: ReturnType<typeof import("./vm/inbox").al
     </div>
   </>);
 }
+
+/** A pie of a chart's values, each slice's share written inside it (the owner's screenshot, 2026-10-15). */
+export function DeskPie({ v, size = 200 }: { v: ReturnType<typeof import("./vm/people").pieSlices>; size?: number }) {
+  if (!v.length) return null;
+  return (
+    <svg viewBox="0 0 200 200" width={size} height={size} style={{ flex: "0 0 auto" }} role="img" aria-label={v.map(s => `${s.label} ${s.pct}`).join(", ")}>
+      {v.map(s => <path key={s.label} d={s.d} fill={s.color} stroke="#fff" strokeWidth="1.5"><title>{`${s.label} · ${s.pct}`}</title></path>)}
+      {v.filter(s => s.showPct).map(s => <text key={s.label} x={s.x} y={s.y} textAnchor="middle" dominantBaseline="central" fill="#fff" style={{ fontSize: "13px", fontWeight: 650, fontFamily: "inherit" }}>{s.pct}</text>)}
+    </svg>
+  );
+}
+
+/**
+ * Contacts' side panel (the owner, 2026-10-15: the empty right side → option 1): the customer picked in the table — who
+ * they are, Customer info, their last messages, Open chat and Edit — or, with nobody picked, the contacts still missing
+ * property info, each with Fill in. Drawn in the Inbox's Customer info vocabulary. Behaviour: vm/people.ts › sideVM.
+ */
+export function DeskContactSide({ v }: { v: ReturnType<typeof import("./vm/people").peopleVM>["ppSide"] }) {
+  const CARD = { border: "1px solid #EBDDD2", borderRadius: "14px", background: "#fff" } as const;
+  const LAB = { fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", textTransform: "uppercase", color: "#806B60" } as const;
+  const Av = ({ ini, big }: { ini: string; big?: boolean }) => <span style={{ flex: "0 0 auto", width: big ? "44px" : "30px", height: big ? "44px" : "30px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", fontSize: big ? "14px" : "11px", fontWeight: "700", display: "grid", placeItems: "center" }}>{ini}</span>;
+  if (!v.has) return (
+    <div style={{ ...CARD, display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "16px 18px 10px" }}>
+        <div style={LAB}>To fill in</div>
+        <strong style={{ display: "block", marginTop: "4px", fontSize: "15px", fontWeight: "650" }}>{v.todoTitle}</strong>
+        <span style={{ display: "block", marginTop: "2px", fontSize: "12.5px", color: "#806B60" }}>Pick a contact in the table to see them here.</span>
+      </div>
+      {v.todo.map(t => (
+        <div key={t.id} onClick={t.pick} className={DX.alert} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 18px", borderTop: "1px solid #F5EEE8", cursor: "pointer" }}>
+          <Av ini={t.ini} />
+          <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column" }}>
+            <span style={{ fontSize: "13.5px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+            <span style={{ fontSize: "12px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.sub}</span>
+          </span>
+          <button type="button" onClick={t.fill} className={DX.emo} style={{ height: "28px", padding: "0 11px", borderRadius: "14px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "12px", fontWeight: "650", color: "#BD4A19", cursor: "pointer", whiteSpace: "nowrap" }}>Fill in</button>
+        </div>
+      ))}
+    </div>
+  );
+  return (
+    <div style={{ ...CARD, display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "16px 18px", borderBottom: "1px solid #F1E7DF" }}>
+        <Av ini={v.ini} big />
+        <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
+          <strong style={{ fontSize: "16px", fontWeight: "700" }}>{v.name}</strong>
+          <span style={{ fontSize: "12.5px", color: "#806B60" }}>{v.phone} · {v.ch}</span>
+        </span>
+        <button type="button" onClick={v.close} title="Close" style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", color: "#806B60", display: "grid", placeItems: "center", cursor: "pointer" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 14px", padding: "14px 18px", borderBottom: "1px solid #F1E7DF" }}>
+        {([["Status", v.status], ["Owner", v.owner], ["Ad", v.ad], ["Last chat", v.lastAt]] as const).map(([k, x]) => (
+          <span key={k} style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: "0" }}>
+            <span style={{ fontSize: "12px", color: "#806B60" }}>{k}</span><strong style={{ fontSize: "13.5px", fontWeight: "650", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x}</strong></span>))}
+        {v.visit && <span style={{ gridColumn: "1 / -1", padding: "8px 10px", borderRadius: "10px", background: "#E4EDF8", color: "#2F5E8C", fontSize: "12.5px", fontWeight: "600" }}>Next visit · {v.visit}</span>}
+      </div>
+      {v.groups.map(g => (
+        <div key={g.label} style={{ padding: "12px 18px", borderBottom: "1px solid #F1E7DF", display: "flex", flexDirection: "column", gap: "6px" }}>
+          <span style={LAB}>{g.label}</span>
+          {g.rows.map(r => <span key={r.k} style={{ display: "flex", gap: "10px", fontSize: "13px" }}><span style={{ flex: "0 0 110px", color: "#806B60" }}>{r.k}</span><strong style={{ flex: "1", minWidth: "0", fontWeight: "600", color: r.v === "—" ? "#A08E82" : "#3F2B22", overflowWrap: "anywhere" }}>{r.v}</strong></span>)}
+        </div>
+      ))}
+      {v.hasMsgs && <div style={{ padding: "12px 18px", borderBottom: "1px solid #F1E7DF", display: "flex", flexDirection: "column", gap: "6px" }}>
+        <span style={LAB}>Latest messages</span>
+        {v.msgs.map((m, i) => <span key={i} style={{ alignSelf: m.mine ? "flex-end" : "flex-start", maxWidth: "90%", padding: "6px 10px", borderRadius: "12px", background: m.mine ? "#F9D5B8" : "#F5EEE8", fontSize: "12.5px" }}>
+          <span style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.text}</span><small style={{ display: "block", textAlign: "right", fontSize: "11px", color: "#806B60" }}>{m.at}</small></span>)}
+      </div>}
+      <div style={{ display: "flex", gap: "10px", padding: "14px 18px" }}>
+        <button type="button" onClick={v.edit} className={DX.emo} style={{ height: "40px", padding: "0 16px", borderRadius: "20px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "#3F2B22", cursor: "pointer" }}>Edit</button>
+        <button type="button" onClick={v.openChat} style={{ flex: "1", height: "40px", borderRadius: "20px", border: "0", background: "#BD4A19", font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "#fff", cursor: "pointer" }}>Open chat</button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * An analysis card in Contacts' chart card's look (title, fold, groupings, stacked bar, pie beside its rows) — the
+ * Calendar's (vm/analysis.ts), folded until opened.
+ */
+export function DeskAnalysis({ v }: { v: ReturnType<typeof import("./vm/analysis").calendarAnalysisVM> }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "14px", padding: "18px 20px", border: "1px solid #EBDDD2", borderRadius: "14px", background: "#fff" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <strong onClick={v.toggle} style={{ flex: "1", minWidth: "160px", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#806B60" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "8px", verticalAlign: "-1px", transform: v.chev, transition: "transform .18s" }}><path d="m6 9 6 6 6-6"></path></svg>
+          {v.title}<span style={{ marginLeft: "10px", fontSize: "12.5px", fontWeight: "500", color: "#806B60" }}>{v.sum}</span>
+        </strong>
+        <div style={{ display: "flex", flexWrap: "wrap", background: "#F5EEE8", borderRadius: "10px", padding: "3px", gap: "2px" }}>
+          {v.bys.map(o => <button key={o.label} type="button" onClick={o.pick} style={{ border: "0", height: "28px", padding: "0 10px", borderRadius: "8px", font: "inherit", fontSize: "12.5px", cursor: "pointer",
+            ...(o.on ? { background: "#fff", color: "#3F2B22", fontWeight: "650", boxShadow: "0 1px 2px rgba(63,43,34,.12)" } : { background: "transparent", color: "#806B60", fontWeight: "550" }) }}>{o.label}</button>)}
+        </div>
+      </div>
+      {v.open && (v.empty
+        ? <div style={{ padding: "20px", textAlign: "center", fontSize: "13px", color: "#806B60" }}>No visits in this range</div>
+        : <div className={DX.ppChartBody}>
+          <DeskPie v={v.pie} />
+          <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "14px" }}>
+            <div style={{ display: "flex", gap: "2px", height: "10px", borderRadius: "5px", overflow: "hidden", background: "#F5EEE8" }}>
+              {v.stack.map((g, i) => <span key={i} style={{ flex: `${g.n} 0 0`, background: g.color }}></span>)}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {v.rows.map(b => (
+                <div key={b.label} style={{ display: "grid", gridTemplateColumns: "minmax(120px, 200px) minmax(0, 1fr) 36px 48px", gap: "14px", alignItems: "center", padding: "7px 0" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <span style={{ flex: "0 0 8px", width: "8px", height: "8px", borderRadius: "50%", background: b.color }}></span>{b.label}</span>
+                  <span style={{ display: "block", height: "8px", borderRadius: "4px", background: "#F5EEE8" }}><span style={{ display: "block", height: "8px", width: `${b.w}%`, borderRadius: "4px", background: b.color }}></span></span>
+                  <span style={{ textAlign: "right", fontSize: "13.5px", fontWeight: "650", fontVariantNumeric: "tabular-nums" }}>{b.n}</span>
+                  <span style={{ textAlign: "right", fontSize: "12.5px", color: "#806B60", fontVariantNumeric: "tabular-nums" }}>{b.pct}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>)}
+    </div>
+  );
+}

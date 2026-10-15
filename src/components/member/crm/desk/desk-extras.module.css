@@ -2,3 +2,11 @@
 .emo:hover { background: #FFF5EC !important; }
 /* A CRM alert row under the pointer (DeskAlerts). */
 .alert:hover { background: #FFF5EC !important; }
+/* Contacts with its side panel (DeskContactSide): the panel shows only where the page has room for the design's 1180px
+   column and itself; narrower (1440 and under) Contacts is exactly the design's. !important: desk-root resets every element (all: revert). */
+.ppWrap { display: flex !important; align-items: flex-start !important; gap: 20px !important; container-type: inline-size !important; }
+.ppWrap > div:first-child { flex: 1 1 0 !important; min-width: 0 !important; }
+.ppSide { display: none !important; flex: 0 0 340px !important; position: sticky !important; top: 0 !important; }
+@container (min-width: 1500px) { .ppSide { display: block !important; } }
+/* The chart card open: the pie beside the rows. */
+.ppChartBody { display: flex !important; align-items: center !important; gap: 28px !important; }
