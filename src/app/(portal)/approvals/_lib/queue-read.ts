@@ -146,5 +146,5 @@ export async function readApprovalQueue(supabase: Client, user: User) {
     }),
   ) as Record<string, string>
 
-  return { queue, decisions, summary, undecidable, approved30: approved30 ?? 0, rejected30: rejected30 ?? 0 }
+  return { queue, decisions, summary, undecidable, executives: [...executives], approved30: approved30 ?? 0, rejected30: rejected30 ?? 0 }
 }
