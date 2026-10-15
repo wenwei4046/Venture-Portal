@@ -16,6 +16,7 @@ import CompaniesSection from './_components/CompaniesSection'
 import DepartmentsSection from './_components/DepartmentsSection'
 import { loadDepartmentModes } from '@/lib/department-mode-server'
 import { departmentRowsRead } from './_lib/departments-read'
+import { accountRowsRead } from './_lib/accounts-read'
 import AccountsSection from './_components/AccountsSection'
 import PeriodsSection from './_components/PeriodsSection'
 import SettingsTabs, { type SettingsTab } from './_components/SettingsTabs'
@@ -86,12 +87,8 @@ export default async function SettingsPage({ searchParams }: Props) {
     supabase.from('base_rate_history').select('weighted_cost, op_margin, base_rate').order('approved_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('bank_accounts').select('*').order('is_primary', { ascending: false }),
     supabase.from('period_locks').select('period_month, is_locked, closed_at, notes').order('period_month', { ascending: false }),
-    supabase
-      .from('chart_of_accounts')
-      .select('code, name, type, cash_flow_category, parent_code, is_active, sort_order')
-      .order('type')
-      .order('sort_order')
-      .order('code'),
+    // The chart, as the Finance phone app reads it (`_lib/accounts-read`).
+    accountRowsRead(supabase),
     // The registry's rows, as the Finance phone app reads them (`_lib/departments-read`).
     departmentRowsRead(supabase),
   ])

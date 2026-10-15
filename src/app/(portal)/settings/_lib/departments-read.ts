@@ -1,4 +1,3 @@
-import 'server-only'
 import type { createClient } from '@/lib/supabase/server'
 
 // Settings › Departments' rows (2026-10-15, lifted out of the Settings page's

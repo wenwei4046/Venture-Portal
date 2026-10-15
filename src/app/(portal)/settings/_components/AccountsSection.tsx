@@ -11,6 +11,7 @@ import {
   type AccountType,
   type CashFlowCategory,
 } from '@/lib/coa'
+import { accountEdit } from '@/lib/coa-edit'
 import { createAccount, updateAccount, moveAccount } from '../actions'
 
 interface Account {
@@ -541,35 +542,29 @@ function AccountForm({
       onSubmit={(e) => {
         e.preventDefault()
         const fd = new FormData()
-        if (mode === 'edit') {
-          fd.set('code', initial?.code ?? '')
-          const typeChanged = type !== initial?.type
-          if (typeChanged) {
-            // A type change auto-allocates a new code in the new range and
-            // re-points all history — it owns the code, so skip new_code.
-            if (
-              !window.confirm(
-                `Change type of ${initial?.code} (${initial?.name}) to ${typeLabel(type)}?\n\nThe account gets a new code in the ${rangeFor(type)[0]}–${rangeFor(type)[1]} range and every past transaction is re-pointed to it. The account is detached from any parent. This cannot be undone from the UI.`,
-              )
-            ) {
-              return
-            }
-            fd.set('new_type', type)
-          } else if (newCode.trim() && newCode.trim() !== initial?.code) {
-            if (
-              !window.confirm(
-                `Change code ${initial?.code} → ${newCode.trim()}?\n\nEvery historical transaction posted to ${initial?.code} (journal lines, voucher sources, bank links, invoice categories) will be re-pointed to ${newCode.trim()}. This cannot be undone from the UI.`,
-              )
-            ) {
-              return
-            }
-            fd.set('new_code', newCode.trim())
+        if (mode === 'edit' && initial) {
+          // Only what changed is sent (lib/coa-edit — the user's rule: a save never puts back what somebody else changed).
+          const edit = accountEdit(initial, { type, code: newCode, name, cashFlow: cfc, parent: parentCode, active: isActive })
+          // A type change auto-allocates a new code in the new range and
+          // re-points all history — it owns the code, so skip new_code.
+          if (
+            edit.typeChange &&
+            !window.confirm(
+              `Change type of ${initial.code} (${initial.name}) to ${typeLabel(type)}?\n\nThe account gets a new code in the ${rangeFor(type)[0]}–${rangeFor(type)[1]} range and every past transaction is re-pointed to it. The account is detached from any parent. This cannot be undone from the UI.`,
+            )
+          ) {
+            return
           }
-          fd.set('name', name)
-          fd.set('cash_flow_category', cfc)
-          fd.set('is_active', isActive ? 'true' : 'false')
-          // Empty string = detach (clear parent_code); otherwise = new parent.
-          fd.set('parent_code', parentCode)
+          if (
+            edit.codeChange &&
+            !window.confirm(
+              `Change code ${initial.code} → ${newCode.trim()}?\n\nEvery historical transaction posted to ${initial.code} (journal lines, voucher sources, bank links, invoice categories) will be re-pointed to ${newCode.trim()}. This cannot be undone from the UI.`,
+            )
+          ) {
+            return
+          }
+          onSubmit(edit.form)
+          return
         } else {
           fd.set('type', type)
           fd.set('name', name)

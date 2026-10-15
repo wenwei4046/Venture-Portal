@@ -10,6 +10,7 @@ import {
   type AccountType,
   type CashFlowCategory,
 } from '@/lib/coa'
+import { accountRowUpdates } from '@/lib/coa-edit'
 
 // ─── Treasury Config (op_margin, saving_rate) ────────────────────────────────
 
@@ -558,19 +559,7 @@ export async function updateAccount(formData: FormData): Promise<AccountActionRe
   const supabase = await createClient()
 
   const code = ((formData.get('code') as string) ?? '').trim()
-  const name = ((formData.get('name') as string) ?? '').trim()
-  const rawCfc = ((formData.get('cash_flow_category') as string) ?? '').trim()
-  const isActive =
-    formData.get('is_active') === 'on' || formData.get('is_active') === 'true'
-  // Mig 246: editable parent. Form always sends the field (empty string = detach).
-  // Whether the form sent it is detectable via .has(); guard so legacy
-  // callers that omit it don't unintentionally null out parent_code.
-  const sentParent = formData.has('parent_code')
-  const rawParent = ((formData.get('parent_code') as string) ?? '').trim()
-  const parentCode = rawParent === '' ? null : rawParent
-
   if (!code) return { error: 'Account code is required' }
-  if (!name) return { error: 'Account name is required' }
 
   // Type change (mig 20260612080000): a new type forces the code into the new
   // range, so change_account_type allocates a fresh code there and re-points
@@ -578,6 +567,14 @@ export async function updateAccount(formData: FormData): Promise<AccountActionRe
   // applies to the resulting new code. Mutually exclusive with new_code in
   // practice (the type change picks the code).
   const rawNewType = ((formData.get('new_type') as string) ?? '').trim()
+
+  // Only what the person changed is sent and written (2026-10-15, the user's
+  // rule: an edit saves the fields that changed — a whole-record save put back
+  // what somebody else changed meanwhile); checked before anything is written
+  // (lib/coa-edit `accountRowUpdates`). Mig 246's parent: sent = moved (empty =
+  // detach), absent = kept.
+  const row = accountRowUpdates(formData, !!rawNewType)
+  if (!row.ok) return { error: row.error }
   let typedCode = code
   let typeNote = ''
   if (rawNewType) {
@@ -633,31 +630,16 @@ export async function updateAccount(formData: FormData): Promise<AccountActionRe
   // type + code are immutable post-create. name / cash_flow_category /
   // is_active / parent_code are editable. parent_code rejection (same-type,
   // no cycles) is enforced by the coa_enforce_parent_type trigger from
-  // mig 246 — we just pass the value through.
-  const updates: {
-    name: string
-    is_active: boolean
-    cash_flow_category?: CashFlowCategory
-    parent_code?: string | null
-  } = { name, is_active: isActive }
-  if (rawCfc) {
-    if (!CASH_FLOW_CATEGORIES.includes(rawCfc as CashFlowCategory)) {
-      return { error: 'Invalid cash flow category' }
-    }
-    updates.cash_flow_category = rawCfc as CashFlowCategory
+  // mig 246 — we just pass the value through. On a type change the RPC
+  // already detached the parent, so the form's is not applied.
+  const updates = row.updates
+  if (Object.keys(updates).length > 0) {
+    const { error } = await supabase
+      .from('chart_of_accounts')
+      .update(updates)
+      .eq('code', effectiveCode)
+    if (error) return { error: `Failed to update account: ${error.message}` }
   }
-  // On a type change the RPC already detached the parent (the old parent is
-  // the old type — a cross-type parent is rejected). Don't re-apply the form's
-  // stale parent; leave the account top-level for the user to re-home.
-  if (sentParent && !rawNewType) {
-    updates.parent_code = parentCode
-  }
-
-  const { error } = await supabase
-    .from('chart_of_accounts')
-    .update(updates)
-    .eq('code', effectiveCode)
-  if (error) return { error: `Failed to update account: ${error.message}` }
 
   revalidatePath('/settings')
   revalidatePath('/payments/new')
