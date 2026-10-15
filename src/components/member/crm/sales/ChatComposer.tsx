@@ -30,6 +30,8 @@ const KB_MIN = 120;
 /** How long a panel waits for the keyboard to come up over it before it goes anyway. */
 const RISE_MS = 700;
 const KB_KEY = "crm-kb-h";
+/** Slid this far left while holding the mic, the recording is thrown away. */
+const SLIDE_CANCEL = 110;
 
 /** The keyboard's last height (px, the home-indicator inset out), kept across chats; null until one is measured. */
 let lastKbH: number | null = null;
@@ -48,6 +50,7 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
   const [taH, setTaH] = useState(BOX_MIN);
   const [kbH, setKbH] = useState<number | null>(null);
   const [capH, setCapH] = useState<number | null>(null);
+  const [slide, setSlide] = useState(0);
   /** The panel kept drawn while the keyboard comes up over it. */
   const [rising, setRising] = useState<ComposerPanel>(null);
   const latest = useRef(v);
@@ -232,7 +235,7 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
   }, []);
 
   // ── Holding the mic ──
-  type Hold = { id: number; timer: ReturnType<typeof setTimeout> | null; starting: boolean; recording: boolean; done: boolean; at: number; up: (ev: PointerEvent) => void };
+  type Hold = { id: number; timer: ReturnType<typeof setTimeout> | null; starting: boolean; recording: boolean; done: boolean; hinted: boolean; at: number; x: number; up: (ev: PointerEvent) => void; move: (ev: PointerEvent) => void };
   const hold = useRef<Hold | null>(null);
   /** When the last press ended: the click a browser sends after it is not a second Send. */
   const releasedAt = useRef(0);
@@ -240,8 +243,10 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
   const finish = useCallback((h: Hold) => {
     window.removeEventListener("pointerup", h.up);
     window.removeEventListener("pointercancel", h.up);
+    window.removeEventListener("pointermove", h.move);
     if (h.timer) { clearTimeout(h.timer); h.timer = null; }
     h.done = true;
+    setSlide(0);
     if (hold.current === h) hold.current = null;
     releasedAt.current = Date.now();
   }, []);
@@ -249,26 +254,37 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     if (hold.current) return;
     e.preventDefault();
-    const h: Hold = { id: e.pointerId, timer: null, starting: false, recording: false, done: false, at: 0, up: () => {} };
+    const h: Hold = { id: e.pointerId, timer: null, starting: true, recording: false, done: false, hinted: false, at: 0, x: e.clientX, up: () => {}, move: () => {} };
     hold.current = h;
-    const hint = () => { if (alive.current) latest.current.set(s => flash(s, HOLD_HINT)); };
-    h.timer = setTimeout(async () => {
-      h.timer = null;
-      h.starting = true;
-      taRef.current?.blur();
-      const ok = await latest.current.voiceStart();
+    const hint = () => { if (alive.current && !h.hinted) { h.hinted = true; latest.current.set(s => flash(s, HOLD_HINT)); } };
+    // The microphone starts at the press, not after it (the owner, 2026-10-15: "when press the mic, it has a little bit
+    // delay when start recording"); a press shorter than HOLD_MS is still a tap, and what it recorded is dropped.
+    h.timer = setTimeout(() => { h.timer = null; }, HOLD_MS);
+    taRef.current?.blur();
+    void latest.current.voiceStart().then(ok => {
       h.starting = false;
-      if (!ok) { finish(h); return; }
-      // Let go (or the chat left) while the microphone was starting: nothing to send.
+      if (!ok) { if (!h.done) finish(h); return; }
+      // Let go (a tap, or the chat left) while the microphone was starting: nothing to send.
       if (h.done) { latest.current.voiceStop(false); hint(); return; }
       h.recording = true;
       h.at = Date.now();
-    }, HOLD_MS);
+    });
+    // Slid left past the line: thrown away there and then, as WhatsApp's.
+    h.move = (ev: PointerEvent) => {
+      if (ev.pointerId !== h.id || h.done) return;
+      const dx = Math.min(0, ev.clientX - h.x);
+      setSlide(Math.max(-SLIDE_CANCEL, dx));
+      if (dx > -SLIDE_CANCEL) return;
+      const was = h.recording;
+      finish(h);
+      try { navigator.vibrate?.(15); } catch { /* no buzz */ }
+      if (was) latest.current.voiceStop(false);
+    };
     h.up = (ev: PointerEvent) => {
       if (ev.pointerId !== h.id) return;
       const tap = !!h.timer, starting = h.starting, recording = h.recording;
       finish(h);
-      if (tap) { hint(); return; }
+      if (tap) { if (recording) latest.current.voiceStop(false); hint(); return; }
       // Still starting: the start's own answer settles it (h.done is set).
       if (starting || !recording) return;
       const bin = trashRef.current?.getBoundingClientRect();
@@ -278,6 +294,7 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
     };
     window.addEventListener("pointerup", h.up);
     window.addEventListener("pointercancel", h.up);
+    window.addEventListener("pointermove", h.move);
   }, [finish]);
   // Leaving the chat while holding (or with a recording no finger holds): the press ends and the recording goes nowhere —
   // the phone's microphone never stays on behind a closed chat. Set again on mount: React's development double mount.
@@ -307,7 +324,7 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
 
   const base = kbH ?? PANEL_H;
   const p = composerVM(v, {
-    taH, panelH: Math.round(capH != null ? Math.min(base, capH) : base), taRef, trashRef, shown,
+    taH, panelH: Math.round(capH != null ? Math.min(base, capH) : base), slide, taRef, trashRef, shown,
     focusBox: onFocusBox, blurBox: onBlurBox, swap, mainDown, recTap, recCancel, delKey,
   });
   return (<>

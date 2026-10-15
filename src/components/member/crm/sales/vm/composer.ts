@@ -158,6 +158,8 @@ export interface ComposerVM {
   slashOpen: boolean; slashQ: string; slashEmpty: boolean; slashList: { title: string; text: string; rule: string; pick: () => void }[]; qrEdit?: Click;
   openTpl: Click;
   recTime: string; recCancel: Click; trashRef: Ref<HTMLSpanElement>;
+  /** Slide to cancel: the hint follows the finger (a transform), red near the line. */
+  recSlide: string; recHintC: string;
 }
 
 /** What the chat hands the composer (vm/chat.ts › cmp): its draft and sends, its other rows, the CRM's own actions. */
@@ -197,6 +199,8 @@ export interface ComposerIn {
 export interface ComposerDom {
   taH: number;
   panelH: number;
+  /** How far left the finger holding the mic has slid (px, 0 or less). */
+  slide: number;
   taRef: Ref<HTMLTextAreaElement>;
   trashRef: Ref<HTMLSpanElement>;
   /** The panel on screen: the state's, or the one being left while the keyboard comes up over it. */
@@ -256,5 +260,6 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
     slashOpen: !!v.slash, slashQ: v.slash ? `/${v.slash.q}` : "", slashEmpty: !!v.slash?.empty, slashList: v.slash?.list ?? [], qrEdit: v.qrEdit ? () => v.qrEdit?.() : undefined,
     openTpl: () => v.openTpl(),
     recTime: v.rec?.time ?? "", recCancel: () => d.recCancel(), trashRef: d.trashRef,
+    recSlide: `translateX(${d.slide}px)`, recHintC: d.slide <= -70 ? "#A3371A" : "#806B60",
   };
 }

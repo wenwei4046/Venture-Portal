@@ -127,12 +127,14 @@ describe("the Team chat is Mine's", () => {
     fireEvent.pointerUp(window);
     await act(async () => {});
     expect(screen.getByText(HOLD_HINT)).toBeInTheDocument();
-    expect(voice.start).not.toHaveBeenCalled();
+    // The microphone starts at the press (2026-10-15); a tap's take is dropped, never sent.
+    expect(voice.start).toHaveBeenCalledTimes(1);
+    expect(voice.stop).not.toHaveBeenCalled();
     const mic = byTitle("Voice note")!;
     fireEvent.pointerDown(mic);
     await act(async () => { await new Promise(r => setTimeout(r, 300)); });
-    expect(voice.start).toHaveBeenCalledTimes(1);
-    expect(composer().textContent).toContain("Recording…");
+    expect(voice.start).toHaveBeenCalledTimes(2);
+    expect(composer().textContent).toContain("Slide to cancel");
     expect(byTitle("Send voice note")).toBe(mic);
     await act(async () => { await new Promise(r => setTimeout(r, 750)); });
     fireEvent.pointerUp(window, { clientX: 300 });

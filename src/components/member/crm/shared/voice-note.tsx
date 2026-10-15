@@ -9,7 +9,9 @@ import { typePx } from "./type";
  * there), the time under it. The waveform is a fixed pattern from the note's address — the file is not decoded only to
  * draw it. Later the same day ("語音可以加速播放 1X, 1.25X, 1.5X, 2X"; "畫面改小一點", then "語音氣泡可以稍微大一點點" — 236 px): once it has played the
  * picture becomes the speed — 1× · 1.25× · 1.5× · 2×, a tap for the next — as WhatsApp's does; the speed is kept for the
- * next note.
+ * next note. 2026-10-15 ("看起來上下的 ratio 調一下"): the duration sits at the end of the waveform's row, so every part
+ * centres on the waveform's line and the time (with "Sent by …") is the bubble's one row under it — it was three rows
+ * when somebody else sent it: the controls, the duration alone, then the time.
  */
 const BARS = 28;
 export const SPEEDS = [1, 1.25, 1.5, 2] as const;
@@ -69,14 +71,14 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
       <button type="button" onClick={toggle} aria-label={playing ? "Pause" : "Play"} style={{ flex: "none", width: "30px", height: "30px", borderRadius: "15px", border: 0, background: "transparent", color: ink, display: "grid", placeItems: "center", cursor: "pointer", padding: 0 }}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">{playing ? <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /> : <path d="M8 5.5v13l10.5-6.5z" />}</svg>
       </button>
-      <span style={{ flex: "1", minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
-        <span onClick={seek} style={{ position: "relative", height: "23px", display: "flex", alignItems: "center", gap: "2px", cursor: "pointer" }}>
+      <span style={{ flex: "1", minWidth: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+        <span onClick={seek} style={{ position: "relative", flex: "1", minWidth: 0, height: "23px", display: "flex", alignItems: "center", gap: "2px", cursor: "pointer" }}>
           {shape.current.map((v, i) => (
             <span key={i} style={{ flex: "1", height: `${Math.round(v * 100)}%`, minHeight: "3px", borderRadius: "2px", background: i / BARS < done ? ink : dim }} />
           ))}
           <span style={{ position: "absolute", left: `calc(${done * 100}% - 5px)`, top: "50%", width: "10px", height: "10px", marginTop: "-5px", borderRadius: "5px", background: ink }} />
         </span>
-        <span style={{ fontSize: typePx(11), color: ink, fontVariantNumeric: "tabular-nums" }}>{clock(playing || at ? at : dur)}</span>
+        <span style={{ flex: "none", minWidth: "28px", textAlign: "right", fontSize: typePx(11), color: ink, fontVariantNumeric: "tabular-nums" }}>{clock(playing || at ? at : dur)}</span>
       </span>
     </span>
   );
