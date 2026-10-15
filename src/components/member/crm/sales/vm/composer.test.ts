@@ -119,3 +119,13 @@ describe("the prototype's state changes", () => {
     expect(composerOf(undefined, "lead-a")).toBeNull();
   });
 });
+
+describe("Attach floats over the chat (2026-10-15)", () => {
+  it("opened while typing, it leaves the keyboard up — the bar and the chat do not move", async () => {
+    const { togglePanel: t } = await import("./composer");
+    const typing = { panel: null, kb: true, prevKb: false, searching: false, q: "", ecat: "recent", toast: "" } as Parameters<typeof t>[0];
+    const open = t(typing, "attach");
+    expect(open).toMatchObject({ panel: "attach", kb: true });
+    expect(t(open, "attach")).toMatchObject({ panel: null, kb: true });
+  });
+});

@@ -103,9 +103,10 @@ export function mediaOf(m: Msg, gallery: ViewerItem[], album?: Msg[]): typeof NO
     } : undefined,
     // A voice note sits closer to its bubble too ("語音聊天的畫面改小一點").
     pad: framed ? "3px 3px 5px" : k === "audio" ? "6px 9px 5px" : "10px 13px",
-    inPad: framed ? "0 7px" : k === "audio" ? "0 2px" : "0",
+    // A voice note's time sits left of its 52px picture (2026-10-15, WhatsApp's layout — shared/voice-note.tsx).
+    inPad: framed ? "0 7px" : k === "audio" ? "0 62px 0 2px" : "0",
     // 2026-10-14 ("語音氣泡還是一樣"): the time moves up beside the voice note's duration instead of a line of its own.
     // 2026-10-15: the duration moved onto the waveform's row, so the time is its own row again, close under it.
-    timeTop: k === "audio" ? "2px" : "4px",
+    timeTop: k === "audio" ? "-18px" : "4px",
   };
 }

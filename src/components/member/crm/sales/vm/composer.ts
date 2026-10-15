@@ -117,12 +117,17 @@ export function emojiView(s: Pick<ComposerState, "searching" | "q" | "ecat">, mi
 // ── The prototype's state changes ──
 
 /** Sticker or Attach tapped (the prototype's set): the same one closes — Sticker brings the keyboard back, Attach only if
- *  it was up before; another takes the keyboard's (or the other panel's) place. */
+ *  it was up before; another takes the keyboard's (or the other panel's) place. Attach floats over the chat since
+ *  2026-10-15, so it leaves the keyboard as it is — the bar and the chat do not move ("android 點了 attach 後 … 有點卡"). */
 export function togglePanel(s: ComposerState, p: Exclude<ComposerPanel, null>): ComposerState {
+  // From Sticker (which had taken the keyboard's place) Attach remembers the keyboard from before it.
+  if (p === "attach") return s.panel === "attach"
+    ? { ...s, panel: null, kb: s.kb || s.prevKb }
+    : { ...s, panel: "attach", prevKb: s.panel === "sticker" ? s.prevKb : s.kb, kb: s.panel === "sticker" ? false : s.kb };
   return s.panel === p ? { ...s, panel: null, kb: p === "sticker" ? true : s.prevKb } : { ...s, panel: p, prevKb: s.kb || (s.prevKb && !!s.panel), kb: false };
 }
 /** The reply box takes focus: the keyboard opens and any panel closes. */
-export const focusBox = (s: ComposerState): ComposerState => (s.kb ? s : { ...s, kb: true, panel: null });
+export const focusBox = (s: ComposerState): ComposerState => (s.kb && !s.panel ? s : { ...s, kb: true, panel: null });
 /** The message list tapped: everything closes. */
 export const dismiss = (s: ComposerState): ComposerState => ({ ...s, kb: false, panel: null, prevKb: false });
 /** A toast (the mic tapped): it shows, and everything closes (the prototype's flash). */

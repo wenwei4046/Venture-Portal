@@ -132,7 +132,7 @@ export function MediaViewer() {
   const [ready, setReady] = useState<Record<string, File | null>>({});
   const [saving, setSaving] = useState("");
   const [note, setNote] = useState("");
-  const start = useRef<{ x: number; y: number; t: number; dx: number; axis: "" | "x" | "y" | "pan"; zx: number; zy: number } | null>(null);
+  const start = useRef<{ x: number; y: number; t: number; dx: number; v: number; pt: number; pdx: number; axis: "" | "x" | "y" | "pan"; zx: number; zy: number } | null>(null);
   /**
    * Left / right as a strip — the previous, this and the next photo side by side (the owner, 2026-10-15: "點入照片時，左右
    * 滑動要很順，現在會卡頓"): the finger moves the strip itself, written straight to its style (no render a move), and let
@@ -190,22 +190,29 @@ export function MediaViewer() {
   const clamp = (z: Zoom): Zoom => (z.s <= 1.02 ? Z0 : z);
   const toggleZoom = () => setZoom(z => (z.s > 1 ? Z0 : { s: 2.5, x: 0, y: 0 }));
 
-  /** The strip at `x` px from this photo (0 = this one), sliding there when `glide`. */
-  const setStrip = (x: number, glide: boolean) => {
+  /**
+   * The strip at `x` px from this photo (0 = this one), sliding there over `ms` (0 = at once). The slide carries on at the
+   * finger's own speed and eases out (the owner, 2026-10-15: "左右滑動的速度 scrolling motion 再順一點") — a fixed 260ms
+   * ran slower than a quick flick and faster than a slow drag.
+   */
+  const setStrip = (x: number, ms: number) => {
     const el = stripRef.current;
     if (!el) return;
-    el.style.transition = glide ? "transform 260ms cubic-bezier(.2,.8,.2,1)" : "none";
+    el.style.transition = ms ? `transform ${Math.round(ms)}ms cubic-bezier(.22,.9,.32,1)` : "none";
     el.style.transform = `translate3d(${x - window.innerWidth}px,0,0)`;
   };
-  /** On to the next (1) or the previous (-1) photo: the strip slides, then the step. Back to this one at either end. */
-  const go = (d: 1 | -1) => {
+  /** How long a slide over `dist` px takes, at the finger's speed `v` (px/ms): 160–340ms. */
+  const glideMs = (dist: number, v = 0) => Math.max(160, Math.min(340, Math.abs(dist) / Math.max(1.4, Math.abs(v)) * 1.6));
+  /** On to the next (1) or the previous (-1) photo: the strip slides from `from` px, then the step. Back at either end. */
+  const go = (d: 1 | -1, from = 0, v = 0) => {
     const now = snapshot();
     if (!now || sliding.current) return;
-    if (now.i + d < 0 || now.i + d >= now.items.length) { setStrip(0, true); return; }
+    if (now.i + d < 0 || now.i + d >= now.items.length) { setStrip(0, glideMs(from)); return; }
     sliding.current = true;
     setZoom(Z0);
-    setStrip(d > 0 ? -window.innerWidth : window.innerWidth, true);
-    setTimeout(() => { sliding.current = false; stepViewer(d); }, 260);
+    const to = d > 0 ? -window.innerWidth : window.innerWidth, ms = glideMs(to - from, v);
+    setStrip(to, ms);
+    setTimeout(() => { sliding.current = false; stepViewer(d); }, ms);
   };
   goRef.current = go;
   const dist = (t: React.TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
@@ -213,7 +220,7 @@ export function MediaViewer() {
     if (e.touches.length === 2 && zoomable) { pinch.current = { d0: dist(e.touches) || 1, s0: zoomRef.current.s }; start.current = null; return; }
     if (e.touches.length !== 1) { start.current = null; return; }
     const z = zoomRef.current;
-    start.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, axis: z.s > 1 ? "pan" : "", zx: z.x, zy: z.y };
+    start.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, v: 0, pt: Date.now(), pdx: 0, axis: z.s > 1 ? "pan" : "", zx: z.x, zy: z.y };
   };
   const onTouchMove = (e: React.TouchEvent) => {
     if (pinch.current && e.touches.length === 2) {
@@ -233,7 +240,10 @@ export function MediaViewer() {
     // Sideways: the strip follows the finger; past either end it gives a quarter as much.
     const atEnd = (dx > 0 && s.i === 0) || (dx < 0 && s.i === s.items.length - 1);
     st.dx = atEnd ? dx / 4 : dx;
-    if (!sliding.current) setStrip(st.dx, false);
+    // The finger's speed over its last move (px/ms), for the slide that follows the release.
+    const t = Date.now();
+    if (t > st.pt) { st.v = 0.6 * st.v + 0.4 * ((st.dx - st.pdx) / (t - st.pt)); st.pt = t; st.pdx = st.dx; }
+    if (!sliding.current) setStrip(st.dx, 0);
   };
   const onTouchEnd = (e: React.TouchEvent) => {
     if (pinch.current) {
@@ -253,8 +263,8 @@ export function MediaViewer() {
     if (st.axis === "y" && d.y > 110) { close(); return; }
     if (st.axis === "x") {
       // A third of the screen, or a flick.
-      const fast = Math.abs(st.dx) > 24 && Math.abs(st.dx) / Math.max(1, Date.now() - st.t) > 0.45;
-      if (Math.abs(st.dx) > window.innerWidth / 3 || fast) go(st.dx < 0 ? 1 : -1); else setStrip(0, true);
+      const fast = Math.abs(st.dx) > 24 && Math.abs(st.v) > 0.35 && Math.sign(st.v) === Math.sign(st.dx);
+      if (Math.abs(st.dx) > window.innerWidth / 3 || fast) go(st.dx < 0 ? 1 : -1, st.dx, st.v); else setStrip(0, glideMs(st.dx));
       return;
     }
     setDrag({ x: 0, y: 0 });

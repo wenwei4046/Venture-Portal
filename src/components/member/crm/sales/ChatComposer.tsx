@@ -104,7 +104,8 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
     const app = anchorRef.current?.closest<HTMLElement>("[data-revenue-app]");
     const stack = anchorRef.current?.parentElement?.querySelector<HTMLElement>("[data-composer]");
     if (!vv || !app || !stack) return;
-    let baseH = window.innerHeight, baseW = window.innerWidth, fitted = false, safe = 0;
+    let baseH = window.innerHeight, baseW = window.innerWidth, fitted = false, safe = 0, focusAt = 0;
+    const coarse = !!window.matchMedia?.("(pointer: coarse)").matches;
     const clear = () => {
       if (!fitted) return;
       fitted = false;
@@ -129,8 +130,14 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
       if (window.innerWidth !== baseW) { baseW = window.innerWidth; baseH = window.innerHeight; }
       if (!isField(ae)) baseH = Math.max(window.innerHeight, vv.height);
       if (!fitted) safe = parseFloat(getComputedStyle(app).paddingBottom) || 0;
-      const kb = Math.max(0, Math.round(baseH - vv.height)), up = kb > KB_MIN, pan = vv.offsetTop;
-      if (up && inBox && !shownRef.current && window.innerWidth < window.innerHeight) {
+      let kb = Math.max(0, Math.round(baseH - vv.height)), up = kb > KB_MIN, assumed = false;
+      const pan = vv.offsetTop;
+      // The reply box has had focus a moment and the phone still reports no keyboard (the owner, 2026-10-15, an iPhone on
+      // the new keyboard, again: "我的打字框還是看不到我輸入了什麼字" — some phones show the keyboard to an installed app
+      // without shrinking visualViewport or the window): its keyboard is taken to be there at its last height, or at
+      // 42% of the screen, and the screen fits it, so the bar sits above the keyboard rather than behind it.
+      if (!up && inBox && coarse && focusAt && Date.now() - focusAt > 450) { kb = Math.round((lastKbH ?? window.innerHeight * 0.42) + safe); up = true; assumed = true; }
+      if (up && !assumed && inBox && !shownRef.current && window.innerWidth < window.innerHeight) {
         const h = Math.round(kb - safe);
         if (h >= 150 && Math.abs(h - (lastKbH ?? 0)) > 3) {
           lastKbH = h;
@@ -145,10 +152,11 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
       // Fitted to the keyboard while it is the reply box's (or the search's); a panel in its place keeps the full height.
       // By its top and bottom, never a height: the screen pads itself by the phone's insets (crm.module.css › .app,
       // content-box), so a height would add them on top.
-      const toKb = up && ((inBox && !shownRef.current) || inSearch);
+      // Attach floats over the chat, so with it open the screen still fits the keyboard.
+      const toKb = up && ((inBox && (!shownRef.current || shownRef.current === "attach")) || inSearch);
       fitted = true;
       app.style.top = `${pan}px`;
-      app.style.bottom = `${Math.round(window.innerHeight - pan - (toKb ? vv.height : window.innerHeight))}px`;
+      app.style.bottom = assumed && toKb ? `${kb}px` : `${Math.round(window.innerHeight - pan - (toKb ? vv.height : window.innerHeight))}px`;
       if (toKb) app.style.setProperty("--safe-bottom", "0px"); else app.style.removeProperty("--safe-bottom");
     };
     const fit = () => { place(); capPanel(); };
@@ -159,7 +167,11 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
     // without telling visualViewport's resize, and only a later scroll or tap fitted the screen.
     let raf = 0, until = 0;
     const tick = () => { fit(); raf = Date.now() < until ? requestAnimationFrame(tick) : 0; };
-    const watch = () => { fit(); until = Date.now() + 1200; if (!raf) raf = requestAnimationFrame(tick); };
+    const watch = (e?: Event) => {
+      // When the reply box took focus: the clock for "no keyboard reported" starts (place, above).
+      focusAt = e?.type === "focusin" && e.target === taRef.current ? Date.now() : document.activeElement === taRef.current ? focusAt : 0;
+      fit(); until = Date.now() + 1200; if (!raf) raf = requestAnimationFrame(tick);
+    };
     vv.addEventListener("resize", fit);
     vv.addEventListener("scroll", fit);
     window.addEventListener("resize", fit);

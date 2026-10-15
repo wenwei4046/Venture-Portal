@@ -66,7 +66,7 @@ export function leadVM(ctx: PanelCtx) {
     const md = m.media, mk = md?.kind, shows = mk === "image" || mk === "video" || mk === "audio";
     const star = stars.has(m.id) ? "★ " : "";
     return { sep: !k || daySep(arr[k - 1].at, now) !== sep ? sep : "", time: star + msgTime(m.at), mine, text: m.text || (md && !shows ? (md.name ?? "File") : ""), at: star + msgTime(m.at),
-      ...mediaOf(m, gallery, al.lead.get(m.id)), ...(by ? { timeTop: "4px" } : {}), ...(!md && !m.card && m.text ? INLINE_TIME : {}),
+      ...mediaOf(m, gallery, al.lead.get(m.id)), ...(by ? { timeTop: "4px", ...(md?.kind === "audio" ? { inPad: "0 2px" } : {}) } : {}), ...(!md && !m.card && m.text ? INLINE_TIME : {}),
       // flow-root: the bubble holds the floated time (INLINE_TIME).
       vis: al.hidden.has(m.id) ? "none" : "flow-root",
       // The message menu, as in Mine's chat (shared/msg-menu.tsx): a long press — reactions, Reply, Copy, Delete for me.

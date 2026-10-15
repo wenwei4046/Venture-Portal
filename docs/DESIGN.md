@@ -1541,6 +1541,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.44** · 2026-10-15 · The CRM chat: a voice note as WhatsApp's — play left, the waveform in the middle with its duration under it, the speaker's 52px picture on the right centred on the bubble (the speed pill in its place once played), the time on the duration's line left of the picture; the viewer's slide carries on at the finger's speed and eases out (160–340ms); Attach leaves the keyboard as it is.
 - **v4.43** · 2026-10-15 · The CRM chat: Undo send has no bar (supersedes v4.41's) — a message still held shows its clock, and its long-press menu leads with **Unsend · Ns** (red, the undo arrow).
 - **v4.42** · 2026-10-15 · The CRM chat: a portrait photo from the camera opens in the editor cropped to the middle 9:16 (filling the phone's screen); Crop › Reset gives the whole photo back; the photo library's photos and every video stay as they are.
 - **v4.41** · 2026-10-15 · The CRM chat: Undo send — a sent message waits 10s with a dark bar above the composer (*"words…" · sending in 8s* · a white *Undo* pill, rust lettering; *N messages* when several wait), Undo taking the newest back into the box.
