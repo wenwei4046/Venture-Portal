@@ -10,7 +10,7 @@ export type NoticeKind = 'hiring' | 'rooms' | 'review' | 'memo'
  * `crm_contact` / `crm_invite` (2026-10-14, mig 20261014030000): the CRM's own notices — a customer's message, a new
  * lead, a visit, a reminder, an invitation. They reach the phone only: the bells never list them (the CRM keeps its own).
  */
-export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo' | 'crm_contact' | 'crm_invite'
+export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo' | 'crm_contact' | 'crm_invite' | 'att_today'
 
 export interface Notice {
   id: string
@@ -65,6 +65,8 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
   // The CRM lives in the Revenue app whichever app the phone signed up in: the chat, or (an invitation) its notifications.
   if (n.refKind === 'crm_contact') return `/member?page=account&view=crm&chat=${id}`
   if (n.refKind === 'crm_invite') return '/member?page=account&view=crm&crm=notifs'
+  // Today › Remind all (2026-10-15): the app's front page, where its punch button will be. Never in a bell.
+  if (n.refKind === 'att_today') return app === 'hr' ? '/hr-app' : '/member'
   if (app === 'hr') {
     if (n.refKind === 'hiring_request') return `/hr-app?open=hire:${id}`
     if (n.refKind === 'booking') return `/hr-app?open=booking:${id}`

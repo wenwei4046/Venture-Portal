@@ -86,6 +86,9 @@ describe('a notice', () => {
     expect(noticeUrl({ refKind: 'member_request', refId: 'r9' }, 'hr')).toBe('/hr-app?open=req:r9')
     expect(noticeUrl({ refKind: 'booking', refId: 'b1' }, 'revenue')).toBe('/member?page=account&view=rooms')
     expect(noticeUrl({ refKind: 'hiring_request', refId: 'HR-301' }, 'revenue')).toBe('/member?bell=1')
+    // Today › Remind all (2026-10-15): the app's front page, either app.
+    expect(noticeUrl({ refKind: 'att_today', refId: '2026-11-02' }, 'hr')).toBe('/hr-app')
+    expect(noticeUrl({ refKind: 'att_today', refId: '2026-11-02' }, 'revenue')).toBe('/member')
     expect(openTarget('hire:HR-301')).toEqual({ k: 'hire', id: 'HR-301' })
     expect(openTarget('nope:1')).toBeNull()
   })

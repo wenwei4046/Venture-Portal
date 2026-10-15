@@ -1,3 +1,4 @@
+import { sees, shown, type SensitiveHolder } from '@/lib/sensitive'
 import { dayMon, monAbbr, shortDay, wd3 } from './engine'
 import type { AttLeaveType, AttRequest, AttStep, Route } from './types'
 
@@ -145,3 +146,16 @@ export function flowNodes(r: AttRequest): FlowNode[] {
 
 /** "Oct" for a date — the month part of a reference. */
 export const monOf = (iso: string) => monAbbr(iso)
+
+/**
+ * A profile change's account number as this viewer may see it (2026-10-15): the database already shows •••• to an
+ * account whose title does not tick bank accounts; this is the same answer for the Principal's view-as switch, which
+ * the database cannot see (lib/sensitive.ts).
+ */
+export function shownChanges(r: AttRequest, viewer: SensitiveHolder): AttRequest {
+  if (r.kind !== 'profile' || !Array.isArray(r.detail.changes) || sees(viewer, 'bank')) return r
+  const str = (v: unknown) => (typeof v === 'string' ? v : null)
+  const changes = (r.detail.changes as Array<Record<string, unknown>>).map(c =>
+    c.key === 'bank_account_no' ? { ...c, from: shown(viewer, 'bank', str(c.from)), to: shown(viewer, 'bank', str(c.to)) } : c)
+  return { ...r, detail: { ...r.detail, changes } }
+}

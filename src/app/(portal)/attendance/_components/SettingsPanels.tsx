@@ -462,7 +462,7 @@ function PolicyGroup({ title, children }: { title: string; children: React.React
   )
 }
 
-const DEFAULT_POLICY: Omit<AttPolicy, 'id' | 'from'> = { fenceMode: 'flag', photoRequired: true, earliestInMin: 120, cutover: '04:00', graceMin: 5, correctionsPerMonth: 3, otWarnH: 80, otFlagH: 104, otBase: 'basic', photoKeepDays: 90 }
+const DEFAULT_POLICY: Omit<AttPolicy, 'id' | 'from'> = { fenceMode: 'flag', photoRequired: true, earliestInMin: 120, cutover: '04:00', graceMin: 5, correctionsPerMonth: 3, otWarnH: 80, otFlagH: 104, otBase: 'basic', photoKeepDays: 90, otWageCap: 4000 }
 
 export function PolicyPanel({ config, canEdit, flash }: PanelProps) {
   const cur = policyOn(config.today, config.policies)
@@ -476,6 +476,7 @@ export function PolicyPanel({ config, canEdit, flash }: PanelProps) {
       const res = await saveSetting('policy', null, {
         from, fenceMode: p.fenceMode, photoRequired: p.photoRequired, earliestInMin: p.earliestInMin, cutover: p.cutover, graceMin: p.graceMin,
         correctionsPerMonth: p.correctionsPerMonth, otWarnH: p.otWarnH, otFlagH: p.otFlagH, otBase: p.otBase, photoKeepDays: p.photoKeepDays,
+        otWageCap: p.otWageCap,
       })
       flash(res.ok ? `Policy saved · applies from ${dmy(from)}` : res.reason)
     })
@@ -517,6 +518,9 @@ export function PolicyPanel({ config, canEdit, flash }: PanelProps) {
         </PolicyRow>
         <PolicyRow label="OT base">
           <DsSelect value={p.otBase} onChange={v => set('otBase', v as 'basic' | 'fixed')} options={[{ value: 'basic', label: 'Basic only' }, { value: 'fixed', label: 'Basic + fixed allowances' }]} ariaLabel="OT base" />
+        </PolicyRow>
+        <PolicyRow label="By wage: OT paid up to">
+          <TextField value={String(p.otWageCap)} onChange={v => set('otWageCap', int(v))} prefix="RM" suffix="a month" ariaLabel="By wage: OT paid up to" />
         </PolicyRow>
       </PolicyGroup>
       <PolicyGroup title="Privacy">
