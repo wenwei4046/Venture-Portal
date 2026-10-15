@@ -433,7 +433,8 @@ describe('Fund › Fund out on the phone', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /^CMI/ }))
     })
-    expect(screen.getByRole('link', { name: 'Open in Approvals' })).toHaveAttribute('href', '/approvals/ap1')
+    // The app's own request screen (part 5), not the portal's /approvals/ap1.
+    expect(screen.getByRole('link', { name: 'Open in Approvals' })).toHaveAttribute('href', '/fin-app/page/approvals?id=ap1')
     expect(screen.queryByRole('button', { name: 'Record repayment' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel loan' }))
     const dialog = await screen.findByRole('dialog')

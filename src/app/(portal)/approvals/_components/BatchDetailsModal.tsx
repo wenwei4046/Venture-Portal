@@ -117,13 +117,17 @@ export default function BatchDetailsModal({
     setError(null)
     startSubmitting(async () => {
       try {
-        await approveRequestGroupPartial({
+        const res = await approveRequestGroupPartial({
           groupId,
           approveApprovalIds: approveIds,
           rejectApprovalIds: rejectIds,
           approveNotes,
           rejectReason,
         })
+        if (!res.ok) {
+          setError(res.reason)
+          return
+        }
         onClose()
         router.refresh()
       } catch (e) {

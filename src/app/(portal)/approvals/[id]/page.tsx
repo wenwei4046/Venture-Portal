@@ -2,23 +2,17 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { officeTime } from '@/lib/office-time'
 import { requireAuth } from '@/lib/auth'
-import { canSeeApprovals, decision } from '@/lib/approval-domains'
-import { canSeePayrollPayouts } from '@/lib/roles'
-import { isPayrollReference } from '@/lib/payroll-vouchers'
+import { canSeeApprovals } from '@/lib/approval-domains'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
-import {
-  getVoucherDetailContext,
-  formatSourcesLabel,
-  formatPoolLabel,
-  type VoucherDetailContext,
-} from '@/lib/voucher-detail'
+import { formatSourcesLabel, formatPoolLabel } from '@/lib/voucher-detail'
 import {
   voucherUpstreamHref,
   voucherUpstreamLabel,
 } from '@/lib/voucher-upstream-href'
 import AttachmentList from '@/components/voucher/AttachmentList'
 import ApprovalActions from './_components/ApprovalActions'
+import { readApprovalRequest } from '../_lib/request-read'
 
 type ApprovalRequestTypeLocal =
   | 'new_loan'
@@ -45,73 +39,11 @@ export default async function ApprovalDetailPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: approval, error } = await supabase
-    .from('approval_requests')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error || !approval) notFound()
-  const verdict = decision(user, [approval.request_type], [approval.submitted_by])
-
-  const { data: submitter } = await supabase
-    .from('users')
-    .select('name')
-    .eq('id', approval.submitted_by)
-    .single()
-
-  // Load reference object if new_loan
-  let loanContext: {
-    company_name?: string
-    principal?: number
-    effective_rate?: number
-    base_rate?: number
-    risk_premium?: number
-    loan_id: string
-  } | null = null
-
-  if (approval.request_type === 'new_loan' && approval.reference_id) {
-    const { data: loan } = await supabase
-      .from('loans')
-      .select('*, companies(name, short_code)')
-      .eq('id', approval.reference_id)
-      .single()
-
-    if (loan) {
-      loanContext = {
-        company_name: loan.companies?.name,
-        principal: Number(loan.principal),
-        effective_rate: Number(loan.effective_rate),
-        base_rate: Number(loan.base_rate),
-        risk_premium: Number(loan.risk_premium),
-        loan_id: loan.id,
-      }
-    }
-  }
-
-  // Load voucher detail if payment_voucher
-  let voucherContext: VoucherDetailContext | null = null
-  if (approval.request_type === 'payment_voucher' && approval.reference_id) {
-    voucherContext = await getVoucherDetailContext(supabase, approval.reference_id)
-  }
-  // The request for a payroll voucher is titled with who is paid what, and
-  // shows the voucher under it: not without Payroll payouts (2026-10-02).
-  if (
-    voucherContext &&
-    isPayrollReference(voucherContext.voucher.reference_type) &&
-    !canSeePayrollPayouts(user)
-  ) {
-    notFound()
-  }
-
-  // Issue #4 pre-check: Debit voucher with insufficient bank balance should not
-  // be approvable — otherwise the approval action will throw mid-flight, and
-  // for N-voucher batches the earlier vouchers already committed.
-  const insufficientBalance =
-    voucherContext !== null &&
-    voucherContext.voucher.direction === 'debit' &&
-    voucherContext.bank !== null &&
-    voucherContext.bank.current_balance < Number(voucherContext.voucher.amount)
+  // The request, who raised it, who may decide it, its loan or voucher and the
+  // bank's balance (`_lib/request-read` — the Finance phone app's read too).
+  const read = await readApprovalRequest(supabase, user, id)
+  if (!read.found) notFound()
+  const { approval, submitterName, verdict, loanContext, voucherContext, insufficientBalance } = read
 
   const isPending = approval.status === 'pending'
 
@@ -133,7 +65,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
             {approval.description ?? 'Approval request'}
           </h1>
           <p className="font-serif italic text-graphite text-base mt-3">
-            Submitted by <em>{submitter?.name ?? 'Unknown'}</em> on {officeTime(approval.created_at).format('D MMMM YYYY HH:mm')}
+            Submitted by <em>{submitterName ?? 'Unknown'}</em> on {officeTime(approval.created_at).format('D MMMM YYYY HH:mm')}
           </p>
         </div>
         <ApprovalStatus status={approval.status} />

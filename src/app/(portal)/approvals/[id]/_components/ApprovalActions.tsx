@@ -3,54 +3,13 @@
 import { useState, useTransition } from 'react'
 import type { ApprovalRequestType } from '@/types'
 import { approveRequest, rejectRequest } from '../../actions'
+import { APPROVE_LEAD, REJECT_LEAD } from '../../_lib/decision-copy'
 
 interface Props {
   approvalId: string
   requestType: ApprovalRequestType
   disableApprove?: boolean
   disableReason?: string | null
-}
-
-// Per-request-type dialog copy. Each entry is the lead clause — the common
-// suffix ("and records your decision in the audit trail" / "A written reason
-// is required") is appended in the JSX below. Record<> enforces exhaustiveness
-// so new enum values can't sneak past the type checker.
-const APPROVE_LEAD: Record<ApprovalRequestType, string> = {
-  new_loan: 'Approving activates the loan',
-  new_contract: 'Approving stamps the service contract as approved',
-  contract_change: 'Approving applies the contract change',
-  dept_expense: 'Approving posts the expense to the department pool',
-  advance: 'Approving releases the director advance',
-  base_rate: 'Approving applies the new base rate',
-  tier_change: 'Approving applies the tier change',
-  escalation: 'Approving acknowledges the escalation',
-  invoice_pool_release: 'Approving releases the invoice pool funds',
-  profit_withdrawal: 'Approving authorises the profit withdrawal',
-  payment_voucher: 'Approving authorises the payment for execution',
-  new_fund_source: 'Approving activates the fund source and credits the Venture Pool',
-  hr_costing: 'Approving locks in the HR costing snapshot for Finance to execute',
-  payroll_run: 'Approving pays out the monthly payroll to every employee and director',
-  dept_payment_request: 'Approving debits the dept pool and routes the request to Finance to generate the PV',
-  loan_cancel: 'Approving reverses the booked loan — bank, Venture Pool and GL — and marks it cancelled',
-}
-
-const REJECT_LEAD: Record<ApprovalRequestType, string> = {
-  new_loan: 'Rejecting cancels the loan',
-  new_contract: 'Rejecting cancels the contract',
-  contract_change: 'Rejecting keeps the contract as-is',
-  dept_expense: 'Rejecting discards the expense — the pool is unchanged',
-  advance: 'Rejecting cancels the advance request',
-  base_rate: 'Rejecting keeps the current base rate',
-  tier_change: 'Rejecting keeps the current tier',
-  escalation: 'Rejecting dismisses the escalation',
-  invoice_pool_release: 'Rejecting keeps the funds in the invoice pool',
-  profit_withdrawal: 'Rejecting denies the withdrawal',
-  payment_voucher: 'Rejecting cancels the payment — no funds will be transferred',
-  new_fund_source: 'Rejecting cancels the fund source — no capital will be posted',
-  hr_costing: 'Rejecting keeps the HR snapshot as-is and blocks execution',
-  payroll_run: 'Rejecting sends the payroll back to HR as draft — no one gets paid',
-  dept_payment_request: 'Rejecting cancels the request — pool is unchanged, Finance is not notified',
-  loan_cancel: 'Rejecting keeps the loan active',
 }
 
 export default function ApprovalActions({

@@ -260,9 +260,11 @@ export default function FundApp({
     const bar: BarButton[] = []
     if (r && status === 'pending_approval') {
       for (const st of fundSteps(r, can)) {
+        // Open in Approvals is the app's own request screen (part 5), not the portal's page.
+        const href = st.key === 'decide' && r.approval ? `/fin-app/page/approvals?id=${encodeURIComponent(r.approval.id)}` : st.href
         bar.push(
-          st.href
-            ? { key: st.key, label: st.label, kind: st.kind === 'secondary' ? undefined : st.kind, href: st.href }
+          href
+            ? { key: st.key, label: st.label, kind: st.kind === 'secondary' ? undefined : st.kind, href }
             : { key: st.key, label: st.label, kind: 'danger', onClick: () => setCancelAsk('withdraw') },
         )
       }

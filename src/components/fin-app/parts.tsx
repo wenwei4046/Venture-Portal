@@ -23,26 +23,28 @@ export function BankHero({
 }: {
   value: string
   label: string
-  month?: { label: string; prev: () => void; next: () => void; canPrev?: boolean; canNext?: boolean } | null
-  /** *Unpaid as of today*, *Segment only · won't balance* — the desktop page's chip. */
-  chip?: string | null
+  /** The month under it (or a day — Daily Bank's, `unit: 'day'`). */
+  month?: { label: string; prev: () => void; next: () => void; canPrev?: boolean; canNext?: boolean; unit?: 'month' | 'day' } | null
+  /** *Unpaid as of today*, *Segment only · won't balance* — the desktop page's chip (alert, unless it says its tone). */
+  chip?: string | { text: string; tone: ChipTone } | null
 }) {
+  const said = typeof chip === 'string' ? { text: chip, tone: 'alert' as ChipTone } : (chip ?? null)
   return (
     <div className={s.bankHero}>
       <span className={s.bankValue}>{value}</span>
       <span className={s.bankLabel}>{label}</span>
-      {chip ? (
-        <span className={s.itemChip} data-tone="alert">
-          {chip}
+      {said ? (
+        <span className={s.itemChip} data-tone={said.tone}>
+          {said.text}
         </span>
       ) : null}
       {month ? (
         <div className={s.pill}>
-          <button type="button" className={s.pillBtn} onClick={month.prev} disabled={month.canPrev === false} aria-label="Previous month">
+          <button type="button" className={s.pillBtn} onClick={month.prev} disabled={month.canPrev === false} aria-label={`Previous ${month.unit ?? 'month'}`}>
             ‹
           </button>
           <span className={s.pillLabel}>{month.label}</span>
-          <button type="button" className={s.pillBtn} onClick={month.next} disabled={month.canNext === false} aria-label="Next month">
+          <button type="button" className={s.pillBtn} onClick={month.next} disabled={month.canNext === false} aria-label={`Next ${month.unit ?? 'month'}`}>
             ›
           </button>
         </div>
