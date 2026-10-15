@@ -100,6 +100,9 @@
 .app textarea[data-draft] { scrollbar-width: none; }
 /* A message bubble: an up / down drag scrolls the chat, a sideways one is ours: swipe right to reply (shared/msg-menu.tsx, 2026-10-14). */
 .app [data-msg] { touch-action: pan-y; }
+/* The message a reply quotes, inside your own orange bubble (2026-10-15): white on a lighter band, not rust on rust. */
+.app [data-mine] [style*="border-left"] { background: rgba(255, 255, 255, .18) !important; border-left-color: #fff !important; }
+.app [data-mine] [style*="border-left"] > * { color: #fff !important; }
 .app [data-chat-list] { overflow-x: hidden; }
 /* An inbox row off screen skips its layout and paint, so a long list scrolls as the chat does (2026-10-14). */
 .app [data-inbox-row] { content-visibility: auto; contain-intrinsic-size: auto 86px; }

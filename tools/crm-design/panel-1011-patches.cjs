@@ -106,6 +106,10 @@ module.exports = [
   ['<div style={{ flex: "none", display: v.ld.lx.rec ? "none" : "flex", alignItems: "center", gap: "6px" }}>', '{!!(v.ld.lx.replying) && (<div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", marginBottom: "6px", borderRadius: "12px", borderLeft: "3px solid #BD4A19", background: "#F5EBE3" }}><span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}><strong style={{ fontSize: "13px", fontWeight: "650", color: "#BD4A19" }}>{v.ld.lx.replyWho}</strong><span style={{ fontSize: "13px", color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.lx.replyText}</span></span><span onClick={v.ld.lx.cancelReply} title="Cancel reply" style={{ flex: "none", width: "28px", height: "28px", display: "grid", placeItems: "center", color: "#806B60", fontSize: "20px", cursor: "pointer" }}>×</span></div>)}<div style={{ flex: "none", display: v.ld.lx.rec ? "none" : "flex", alignItems: "center", gap: "6px" }}>'],
   // 2026-10-14: a text message's time floats beside its words, as WhatsApp's (shared/chat-media.ts › INLINE_TIME).
   ['<span style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "3px", marginTop: m.timeTop, padding: m.inPad,', '<span style={{ display: m.tDisp, float: m.tFloat, marginLeft: m.tML, marginBottom: m.tMB, alignItems: "center", justifyContent: "flex-end", gap: "3px", marginTop: m.timeTop, padding: m.inPad,'],
+  // 2026-10-15 (the owner: "聊天室的 bubble 可以換成橙色嗎？" — your own, the brand's orange with white words): the bubble's
+  // words and its time row take the VM's colours (fg, timeC), white on your own.
+  ['border: `1px solid ${m.bd}`, color: "#3F2B22" }}>', 'border: `1px solid ${m.bd}`, color: m.fg }}>'],
+  ['fontSize: "11px", color: "#806B60" }}>{!!(m.hasBy)', 'fontSize: "11px", color: m.timeC }}>{!!(m.hasBy)'],
   // The customer form follows the Control panel's Forms (CRM Desktop rev 1, B5) — tools/crm-design/form-patches.cjs.
   ...require("./form-patches.cjs")(),
   // 2026-10-14 (the owner: "點聊天室可以收起右上 3 個點的功能"): the chat's ⋮ menu closes on a tap anywhere outside it, as
