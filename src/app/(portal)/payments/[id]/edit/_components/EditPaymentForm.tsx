@@ -8,6 +8,7 @@ import { buildRepaymentSourceRows, seedRepaymentSourceRows, type RepaymentRole }
 import AccountPicker from '@/components/AccountPicker'
 import { officeDate } from '@/lib/office-clock'
 import { paymentPoolOptions, type PoolOption } from '@/lib/payment-pools'
+import { halfOverride, storedVoucherFields, voucherEditForm } from '@/lib/voucher-edit'
 
 interface GlAccount {
   code: string
@@ -160,62 +161,10 @@ export default function EditPaymentForm({
   const sourceSumMismatch =
     isDebit && totalAmount > 0 && Math.abs(sourceSum - totalAmount) > 0.005
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError(null)
-
-    if (paymentDetailsLocked) {
-      const formData = new FormData()
-      formData.set('id', voucher.id)
-      formData.set('payment_date', paymentDate)
-      formData.set('notes', notes)
-      startTransition(async () => {
-        try {
-          await updatePaymentVoucher(formData)
-        } catch (err) {
-          if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
-          setError(err instanceof Error ? err.message : 'Save failed')
-        }
-      })
-      return
-    }
-
-    const formData = new FormData(e.currentTarget)
-    formData.set('id', voucher.id)
-    formData.set('amount', amount)
-    formData.set('payee_name', payeeName)
-    formData.set('payee_company_id', payeeCompanyId)
-    formData.set('bank_account_id', bankAccountId)
-    formData.set('description', description)
-    formData.set('payment_method', paymentMethod)
-    formData.set('payment_date', paymentDate)
-    formData.set('notes', notes)
-
-    if (isDebit) {
-      if (sourceSumMismatch) {
-        setError(`Source sum RM ${sourceSum.toFixed(2)} ≠ voucher RM ${totalAmount.toFixed(2)}`)
-        return
-      }
-      formData.set('source_rows_count', String(sourceRows.length))
-      for (let i = 0; i < sourceRows.length; i++) {
-        const r = sourceRows[i]
-        formData.set(`source_rows[${i}][pool]`, r.pool)
-        formData.set(`source_rows[${i}][amount]`, r.amount)
-        formData.set(`source_rows[${i}][account_code]`, r.account_code)
-        if (r.override_account_type && r.override_gl_account_code && r.override_reason?.trim()) {
-          formData.set(`source_rows[${i}][override_account_type]`, r.override_account_type)
-          formData.set(`source_rows[${i}][override_gl_account_code]`, r.override_gl_account_code)
-          formData.set(`source_rows[${i}][override_reason]`, r.override_reason.trim())
-        } else if (r.override_account_type || r.override_gl_account_code || r.override_reason) {
-          setError(`Source row ${i + 1}: override requires account type + GL + reason — fill all or clear all`)
-          return
-        }
-      }
-    } else {
-      formData.set('target_pool', targetPool)
-      formData.set('account_code', accountCode)
-    }
-
+  // The voucher as stored: only what is changed from it is sent (lib/voucher-edit, 2026-10-16) — a date
+  // filled in for a voucher saved without one, a repayment's rows rebuilt, are changes and go.
+  const stored = storedVoucherFields(voucher, initialSources, initialCreditAccountCode)
+  const save = (formData: FormData) =>
     startTransition(async () => {
       try {
         await updatePaymentVoucher(formData)
@@ -224,6 +173,43 @@ export default function EditPaymentForm({
         setError(err instanceof Error ? err.message : 'Save failed')
       }
     })
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setError(null)
+
+    if (paymentDetailsLocked) {
+      save(voucherEditForm(voucher.id, voucher.direction, stored, { ...stored, paymentDate, notes }))
+      return
+    }
+
+    if (isDebit) {
+      if (sourceSumMismatch) {
+        setError(`Source sum RM ${sourceSum.toFixed(2)} ≠ voucher RM ${totalAmount.toFixed(2)}`)
+        return
+      }
+      const half = halfOverride(sourceRows)
+      if (half !== null) {
+        setError(`Source row ${half + 1}: override requires account type + GL + reason — fill all or clear all`)
+        return
+      }
+    }
+
+    save(
+      voucherEditForm(voucher.id, voucher.direction, stored, {
+        amount,
+        payeeName,
+        payeeCompanyId,
+        bankAccountId,
+        description,
+        paymentMethod,
+        paymentDate,
+        notes,
+        targetPool,
+        accountCode,
+        rows: sourceRows,
+      }),
+    )
   }
 
   if (paymentDetailsLocked) {

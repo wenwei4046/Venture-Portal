@@ -1108,15 +1108,38 @@ export async function copyPaymentVoucher(formData: FormData): Promise<void> {
 
 export async function updatePaymentVoucher(formData: FormData) {
   const user = await requireActionOn('/payments', 'treasury', 'edit')
+  await updatePaymentVoucherWork(user.id, formData)
+  redirect(`/payments/${formData.get('id') as string}`)
+}
+
+/**
+ * A voucher's Edit answered in words (2026-10-16, the Finance phone app's
+ * sheet): the same gate and work as `updatePaymentVoucher`, without the
+ * redirect to the portal's voucher page.
+ */
+export async function updatePaymentVoucherInWords(formData: FormData): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const user = await requireActionOn('/payments', 'treasury', 'edit')
+  try {
+    await updatePaymentVoucherWork(user.id, formData)
+    return { ok: true }
+  } catch (e) {
+    if (isRedirect(e)) throw e
+    return { ok: false, reason: e instanceof Error && e.message ? e.message : 'The voucher could not be saved.' }
+  }
+}
+
+async function updatePaymentVoucherWork(userId: string, formData: FormData): Promise<void> {
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
   if (!id) throw new Error('Voucher id is required')
 
-  // Load current voucher to validate state + lock direction/voucher_type
+  // Load current voucher to validate state + lock direction/voucher_type — and,
+  // since only what the form sends is written (lib/voucher-edit, 2026-10-16),
+  // what the rest stands at.
   const { data: current } = await supabase
     .from('payment_vouchers')
-    .select('id, status, direction, voucher_type, fund_source_id, loan_id, repayment_breakdown, invoice_id, reference_type')
+    .select('id, status, direction, voucher_type, fund_source_id, loan_id, repayment_breakdown, invoice_id, reference_type, amount, payee_name, payee_company_id, bank_account_id, description, payment_method, notes, target_pool')
     .eq('id', id)
     .single()
   if (!current) throw new Error('Voucher not found')
@@ -1155,25 +1178,38 @@ export async function updatePaymentVoucher(formData: FormData) {
       if (updateError) throw new Error(`Failed to update ${salaryPayment ? 'salary' : 'statutory'} PV: ${updateError.message}`)
       if (!updated?.length) throw new Error('Voucher status changed mid-edit (already approved or voided) — refresh and try again')
       await supabase.from('access_log').insert({
-        user_id: user.id, action: 'update_payment_voucher', resource_type: 'payment_voucher', resource_id: id,
+        user_id: userId, action: 'update_payment_voucher', resource_type: 'payment_voucher', resource_id: id,
         metadata: { status_at_edit: current.status, voucher_type: current.voucher_type, ...(salaryPayment ? { salary_details_preserved: true } : { statutory_details_preserved: true }) },
       }).then(() => { /* best-effort audit */ }, () => { /* do not block the completed edit */ })
       revalidatePath(`/payments/${id}`)
       revalidatePath('/payments')
       revalidatePath('/approvals')
       revalidatePath('/hr-costing/payment')
-      redirect(`/payments/${id}`)
+      return
     }
   }
 
-  const amount = parseFloat((formData.get('amount') as string) ?? '0')
-  let payeeName = ((formData.get('payee_name') as string) ?? '').trim()
-  const payeeCompanyId = (formData.get('payee_company_id') as string) || null
-  const bankAccountId = (formData.get('bank_account_id') as string) || null
-  const description = ((formData.get('description') as string) ?? '').trim()
-  const paymentMethod = (formData.get('payment_method') as string) || 'bank_transfer'
-  const targetPool = (formData.get('target_pool') as string) || null
-  const notes = ((formData.get('notes') as string) ?? '').trim() || null
+  // What the form sent, over what the voucher stands at (only what changed is sent).
+  const sent = (key: string) => formData.has(key)
+  const text = (key: string) => (formData.get(key) as string) ?? ''
+  const stored = current as typeof current & {
+    amount: number | string | null
+    payee_name: string | null
+    payee_company_id: string | null
+    bank_account_id: string | null
+    description: string | null
+    payment_method: string | null
+    notes: string | null
+    target_pool: string | null
+  }
+  const amount = sent('amount') ? parseFloat(text('amount') || '0') : Number(stored.amount)
+  let payeeName = sent('payee_name') ? text('payee_name').trim() : (stored.payee_name ?? '').trim()
+  const payeeCompanyId = sent('payee_company_id') ? text('payee_company_id') || null : (stored.payee_company_id ?? null)
+  const bankAccountId = sent('bank_account_id') ? text('bank_account_id') || null : (stored.bank_account_id ?? null)
+  const description = sent('description') ? text('description').trim() : (stored.description ?? '').trim()
+  const paymentMethod = sent('payment_method') ? text('payment_method') || 'bank_transfer' : (stored.payment_method ?? 'bank_transfer')
+  const targetPool = sent('target_pool') ? text('target_pool') || null : (stored.target_pool ?? null)
+  const notes = sent('notes') ? text('notes').trim() || null : (stored.notes ?? null)
   // Editable while draft/pending: drives the approval-time GL date (see create).
   const rawEditPaymentDate = (formData.get('payment_date') as string)?.trim()
   const editPaymentDate = rawEditPaymentDate && /^\d{4}-\d{2}-\d{2}$/.test(rawEditPaymentDate)
@@ -1193,9 +1229,13 @@ export async function updatePaymentVoucher(formData: FormData) {
     throw new Error('Bank account is required for debit (outgoing) vouchers')
   }
 
+  let payeeFromCompany = false
   if (!payeeName && payeeCompanyId) {
     const { data: co } = await supabase.from('companies').select('name').eq('id', payeeCompanyId).single()
-    if (co) payeeName = co.name
+    if (co) {
+      payeeName = co.name
+      payeeFromCompany = true
+    }
   }
   if (!payeeName) throw new Error('Payee name is required')
 
@@ -1212,24 +1252,109 @@ export async function updatePaymentVoucher(formData: FormData) {
     }
   }
 
+  // The source rows, checked before anything is written (mig 205: every
+  // voucher carries ≥1 PVS row; the sum must match the amount; the per-row
+  // override constraint is enforced at the DB too).
+  type SourceRowIn = {
+    pool: string
+    amount: number
+    account_code: string
+    override_account_type: AccountType | null
+    override_gl_account_code: string | null
+    override_reason: string | null
+  }
+  let debitRows: SourceRowIn[] | null = null
+  let creditRow: { pool: string; account_code: string } | null = null
+  if (current.direction === 'debit') {
+    if (sent('source_rows_count')) {
+      const rowCount = parseInt((formData.get('source_rows_count') as string) ?? '0', 10)
+      const rows: SourceRowIn[] = []
+      for (let i = 0; i < rowCount; i++) {
+        const pool = (formData.get(`source_rows[${i}][pool]`) as string)?.trim() ?? ''
+        const amt = parseFloat((formData.get(`source_rows[${i}][amount]`) as string) ?? '0')
+        const acct = (formData.get(`source_rows[${i}][account_code]`) as string)?.trim() || ''
+        const ovType = (formData.get(`source_rows[${i}][override_account_type]`) as string)?.trim() ?? ''
+        const ovGl = (formData.get(`source_rows[${i}][override_gl_account_code]`) as string)?.trim() ?? ''
+        const ovRsn = (formData.get(`source_rows[${i}][override_reason]`) as string)?.trim() ?? ''
+        const isOverride = !!ovType && !!ovGl && !!ovRsn
+        if (!isOverride && (ovType || ovGl || ovRsn)) {
+          throw new Error(`source row ${i + 1}: override requires account type, GL, AND reason`)
+        }
+        if (isOverride && !ACCOUNT_TYPES.includes(ovType as AccountType)) {
+          throw new Error(`source row ${i + 1}: invalid override account type "${ovType}"`)
+        }
+        if (pool && amt > 0) {
+          if (!acct) {
+            throw new Error(`source row ${i + 1}: account is required (every PV source row must reference a chart_of_accounts code)`)
+          }
+          rows.push({
+            pool, amount: amt, account_code: acct,
+            override_account_type: isOverride ? (ovType as AccountType) : null,
+            override_gl_account_code: isOverride ? ovGl : null,
+            override_reason: isOverride ? ovRsn : null,
+          })
+        }
+      }
+      if (rows.length === 0) throw new Error('At least one source row is required for a debit voucher')
+      const sum = rows.reduce((s, r) => s + r.amount, 0)
+      if (Math.abs(sum - amount) > 0.005) {
+        throw new Error(`source rows sum (${sum.toFixed(2)}) does not match voucher amount (${amount.toFixed(2)})`)
+      }
+      debitRows = rows
+    } else if (sent('amount')) {
+      // The amount moved and the pools were not sent: the ones standing must still add up to it.
+      const { data: standing } = await supabase.from('payment_voucher_sources').select('amount').eq('voucher_id', id)
+      const sum = (standing ?? []).reduce((s, r) => s + Number(r.amount), 0)
+      if (Math.abs(sum - amount) > 0.005) {
+        throw new Error(`source rows sum (${sum.toFixed(2)}) does not match voucher amount (${amount.toFixed(2)})`)
+      }
+    }
+  } else if (current.direction === 'credit' && (sent('amount') || sent('target_pool') || sent('account_code'))) {
+    if (!targetPool) throw new Error('Target pool is required for credit voucher')
+    let accountCode = sent('account_code') ? text('account_code').trim() || null : null
+    if (!sent('account_code')) {
+      const { data: standing } = await supabase.from('payment_voucher_sources').select('account_code').eq('voucher_id', id).limit(1)
+      accountCode = ((standing ?? [])[0] as { account_code: string | null } | undefined)?.account_code ?? null
+    }
+    // See comment on create path: credit vouchers must carry an account.
+    if (!accountCode) {
+      throw new Error('Account is required on inbound (credit) vouchers')
+    }
+    creditRow = { pool: targetPool, account_code: accountCode }
+  }
+
+  // Only the columns sent are written (and a payee filled from its company).
+  const updates: {
+    amount?: number
+    payee_name?: string
+    payee_company_id?: string | null
+    bank_account_id?: string | null
+    description?: string
+    payment_method?: string
+    notes?: string | null
+    target_pool?: string | null
+    payment_date?: string
+    updated_at: string
+  } = { updated_at: new Date().toISOString() }
+  if (sent('amount')) updates.amount = amount
+  if (sent('payee_name') || payeeFromCompany) updates.payee_name = payeeName
+  if (sent('payee_company_id')) updates.payee_company_id = payeeCompanyId
+  if (sent('bank_account_id')) updates.bank_account_id = bankAccountId
+  if (sent('description')) updates.description = description
+  if (sent('payment_method')) updates.payment_method = paymentMethod
+  if (sent('notes')) updates.notes = notes
+  if (current.direction === 'credit' ? sent('target_pool') : stored.target_pool != null) {
+    updates.target_pool = current.direction === 'credit' ? targetPool : null
+  }
+  if (editPaymentDate) updates.payment_date = editPaymentDate
+
   // .select() forces Supabase to return the matched rows so we can detect
   // the TOCTOU race where Principal approves between our SELECT and UPDATE.
   // Without this, UPDATE matches 0 rows (status no longer in our filter set)
   // and updErr stays null — we'd silently corrupt the now-paid voucher.
   const { data: updated, error: updErr } = await supabase
     .from('payment_vouchers')
-    .update({
-      amount,
-      payee_name: payeeName,
-      payee_company_id: payeeCompanyId,
-      bank_account_id: bankAccountId,
-      description,
-      payment_method: paymentMethod,
-      notes,
-      target_pool: current.direction === 'credit' ? targetPool : null,
-      ...(editPaymentDate ? { payment_date: editPaymentDate } : {}),
-      updated_at: new Date().toISOString(),
-    })
+    .update(updates)
     .eq('id', id)
     .in('status', ['pending_approval', 'draft'])
     .select('id')
@@ -1239,54 +1364,12 @@ export async function updatePaymentVoucher(formData: FormData) {
     throw new Error('Voucher status changed mid-edit (already approved or voided) — refresh and try again')
   }
 
-  // Replace source rows. Mig 205: every voucher carries ≥1 PVS row;
-  // sum must match amount; per-row override constraint enforced at DB.
-  if (current.direction === 'debit') {
-    const rowCount = parseInt((formData.get('source_rows_count') as string) ?? '0', 10)
-    const rows: {
-      pool: string
-      amount: number
-      account_code: string
-      override_account_type: AccountType | null
-      override_gl_account_code: string | null
-      override_reason: string | null
-    }[] = []
-    for (let i = 0; i < rowCount; i++) {
-      const pool = (formData.get(`source_rows[${i}][pool]`) as string)?.trim() ?? ''
-      const amt = parseFloat((formData.get(`source_rows[${i}][amount]`) as string) ?? '0')
-      const acct = (formData.get(`source_rows[${i}][account_code]`) as string)?.trim() || ''
-      const ovType = (formData.get(`source_rows[${i}][override_account_type]`) as string)?.trim() ?? ''
-      const ovGl = (formData.get(`source_rows[${i}][override_gl_account_code]`) as string)?.trim() ?? ''
-      const ovRsn = (formData.get(`source_rows[${i}][override_reason]`) as string)?.trim() ?? ''
-      const isOverride = !!ovType && !!ovGl && !!ovRsn
-      if (!isOverride && (ovType || ovGl || ovRsn)) {
-        throw new Error(`source row ${i + 1}: override requires account type, GL, AND reason`)
-      }
-      if (isOverride && !ACCOUNT_TYPES.includes(ovType as AccountType)) {
-        throw new Error(`source row ${i + 1}: invalid override account type "${ovType}"`)
-      }
-      if (pool && amt > 0) {
-        if (!acct) {
-          throw new Error(`source row ${i + 1}: account is required (every PV source row must reference a chart_of_accounts code)`)
-        }
-        rows.push({
-          pool, amount: amt, account_code: acct,
-          override_account_type: isOverride ? (ovType as AccountType) : null,
-          override_gl_account_code: isOverride ? ovGl : null,
-          override_reason: isOverride ? ovRsn : null,
-        })
-      }
-    }
-    if (rows.length === 0) throw new Error('At least one source row is required for a debit voucher')
-    const sum = rows.reduce((s, r) => s + r.amount, 0)
-    if (Math.abs(sum - amount) > 0.005) {
-      throw new Error(`source rows sum (${sum.toFixed(2)}) does not match voucher amount (${amount.toFixed(2)})`)
-    }
-
-    // Replace source rows. Mig 221 broadens RLS to allow DELETE on
-    // pending_approval vouchers (was draft-only); confirm post-delete that
-    // the voucher truly has zero PVS rows before we INSERT — catches RLS
-    // regressions and any future status restriction.
+  // Replace source rows — only when they were sent (or a receipt's pool,
+  // account or amount moved). Mig 221 broadens RLS to allow DELETE on
+  // pending_approval vouchers (was draft-only); confirm post-delete that
+  // the voucher truly has zero PVS rows before we INSERT — catches RLS
+  // regressions and any future status restriction.
+  if (debitRows || creditRow) {
     const { error: delErr } = await supabase
       .from('payment_voucher_sources')
       .delete()
@@ -1301,46 +1384,24 @@ export async function updatePaymentVoucher(formData: FormData) {
       throw new Error(`PVS RLS blocked delete (status=${current.status}) — ${leftover} stale rows remain. Apply mig 221 or contact Principal.`)
     }
 
-    const { error: insErr } = await supabase.from('payment_voucher_sources').insert(
-      rows.map(r => ({
-        voucher_id: id,
-        pool: r.pool,
-        amount: r.amount,
-        account_code: r.account_code,
-        override_account_type: r.override_account_type,
-        override_gl_account_code: r.override_gl_account_code,
-        override_reason: r.override_reason,
-      })),
-    )
-    if (insErr) throw new Error(`Failed to write new source rows: ${insErr.message}`)
-  } else if (current.direction === 'credit') {
-    if (!targetPool) throw new Error('Target pool is required for credit voucher')
-    const accountCode = (formData.get('account_code') as string)?.trim() || null
-
-    const { error: delErr } = await supabase
-      .from('payment_voucher_sources')
-      .delete()
-      .eq('voucher_id', id)
-    if (delErr) throw new Error(`Failed to clear old source rows: ${delErr.message}`)
-
-    const { count: leftover } = await supabase
-      .from('payment_voucher_sources')
-      .select('*', { count: 'exact', head: true })
-      .eq('voucher_id', id)
-    if ((leftover ?? 0) > 0) {
-      throw new Error(`PVS RLS blocked delete (status=${current.status}) — ${leftover} stale rows remain.`)
-    }
-
-    // See comment on create path: credit vouchers must carry an account.
-    if (!accountCode) {
-      throw new Error('Account is required on inbound (credit) vouchers')
-    }
-    const { error: insErr } = await supabase.from('payment_voucher_sources').insert({
-      voucher_id: id,
-      pool: targetPool,
-      amount,
-      account_code: accountCode,
-    })
+    const { error: insErr } = debitRows
+      ? await supabase.from('payment_voucher_sources').insert(
+          debitRows.map(r => ({
+            voucher_id: id,
+            pool: r.pool,
+            amount: r.amount,
+            account_code: r.account_code,
+            override_account_type: r.override_account_type,
+            override_gl_account_code: r.override_gl_account_code,
+            override_reason: r.override_reason,
+          })),
+        )
+      : await supabase.from('payment_voucher_sources').insert({
+          voucher_id: id,
+          pool: creditRow!.pool,
+          amount,
+          account_code: creditRow!.account_code,
+        })
     if (insErr) throw new Error(`Failed to write new source rows: ${insErr.message}`)
   }
 
@@ -1348,7 +1409,7 @@ export async function updatePaymentVoucher(formData: FormData) {
   await supabase
     .from('access_log')
     .insert({
-      user_id: user.id,
+      user_id: userId,
       action: 'update_payment_voucher',
       resource_type: 'payment_voucher',
       resource_id: id,
@@ -1359,7 +1420,6 @@ export async function updatePaymentVoucher(formData: FormData) {
   revalidatePath(`/payments/${id}`)
   revalidatePath('/payments')
   revalidatePath('/approvals')
-  redirect(`/payments/${id}`)
 }
 
 // ─── Amend a PAID voucher's date (Finance) ──────────────────────────────────
