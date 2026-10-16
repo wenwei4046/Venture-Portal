@@ -1,4 +1,4 @@
--- Production's permission readers as they ran on 2026-10-16, before 20261016190000 (pg_get_functiondef, verbatim).
+-- Production's permission readers as they ran on 2026-10-16, before 20261016210000 (pg_get_functiondef, verbatim).
 -- validate-personal-edits-win.mjs checks each one's md5 against production's before the migration swaps anything.
 
 CREATE OR REPLACE FUNCTION public.current_actions()

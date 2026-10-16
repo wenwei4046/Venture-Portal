@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { isSensitiveTickList, sameSensitiveTicks, sensitiveOf, sensitiveTicksFromRows, toggleSensitive } from './person-sensitive'
 
 // One person's Salary / NRIC / Bank over their template's (2026-10-16 — the owner: "Edit Permission 的优先级是高于
-// Title 和 Template 的"; mig 20261016190000).
+// Title 和 Template 的"; mig 20261016210000).
 describe('a person’s own sensitive fields', () => {
   it('lays their ticks over the template’s, in the matrix’s order', () => {
     expect(sensitiveOf(['bank'], [{ field: 'salary', granted: true }])).toEqual(['salary', 'bank'])

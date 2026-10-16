@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261016190000 (2026-10-16 — the owner: permission is two layers, the title's
+// Local PostgreSQL regression for 20261016210000 (2026-10-16 — the owner: permission is two layers, the title's
 // template first, the cells changed for one person over it, and "Edit Permission 的优先级是高于 Title 和 Template 的";
 // "如果我在 Permission 那边勾选允许她 View 和 Edit，那她 supposed to be 就可以去那个 Page 或者 App 查看"; then "2. yes
 // can"). Production's permission readers are loaded from `personal-edits-production.sql` (each md5-checked), the
@@ -144,7 +144,7 @@ const fields = async u => (await as(u, 'SELECT public.current_sensitive_fields()
 check((await keys(U.director)).includes('approvals'), false, 'before: a staff-kind template’s Approvals tick opened nothing')
 
 // ── The migration, verbatim — and again, which changes nothing ─────────────────────────────────────────────────
-const sql = await text(new URL('20261016190000_personal_edits_win.sql', migrations))
+const sql = await text(new URL('20261016210000_personal_edits_win.sql', migrations))
 await db.exec(sql)
 const once = [await md5Of('public.current_permissions()'), await md5Of('public.current_sensitive_fields()')]
 await db.exec(sql)

@@ -1,7 +1,7 @@
 /**
  * One person's Salary amounts / NRIC / Bank accounts over their title's
  * template (2026-10-16 — the owner: "Edit Permission 的优先级是高于 Title 和
- * Template 的"; mig 20261016190000). A tick raises (`granted`) or holds back a
+ * Template 的"; mig 20261016210000). A tick raises (`granted`) or holds back a
  * field for them alone; the database reads it before the template's
  * (`current_sensitive_fields()`, and the Salary tick that opens the pay keys in
  * `current_permissions()`). An account with no template keeps its kind's
