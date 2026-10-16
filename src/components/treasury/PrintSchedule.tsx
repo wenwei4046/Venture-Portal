@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import dayjs from 'dayjs'
 import { formatMoneyBare } from '@/lib/utils'
 import type { RepaymentPlan } from '@/lib/repayment-plan'
+import { COMPANY_NAME } from '@/lib/company'
 
 // Print schedule (2026-10-09, the user's Claude Design handoff): the plan on
 // a page of its own — the letterhead, the deal's terms in two columns, every
@@ -82,7 +83,7 @@ export default function PrintSchedule({
               <div className="sched-print-sheet fund-print-sheet">
                 <div className="sched-print-letterhead">
                   <div>
-                    <div className="sched-print-house fund-print-serif">HOUZS Venture Sdn Bhd</div>
+                    <div className="sched-print-house fund-print-serif">{COMPANY_NAME}</div>
                     <div className="sched-print-kicker">Internal ledger</div>
                   </div>
                   <div className="sched-print-printed">{printed}</div>

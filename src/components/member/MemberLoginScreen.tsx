@@ -6,6 +6,7 @@ import { forgetReads } from "./app/read-memory";
 import { forgetMedia } from "./crm/shared/media-cache";
 import LoginInstallCard from "@/components/pwa/LoginInstallCard";
 import s from "./MemberLogin.module.css";
+import { COMPANY_NAME } from "@/lib/company";
 
 type LoginAction = (form: FormData) => Promise<{ error: string } | void>;
 const previewAction: LoginAction = async () => ({
@@ -107,7 +108,7 @@ export default function MemberLoginScreen({
         </section>
       </main>
       <footer className={s.footer}>
-        <span>HOUZS Venture Sdn Bhd</span>
+        <span>{COMPANY_NAME}</span>
         <span>Your team. Your next chapter.</span>
       </footer>
     </div>

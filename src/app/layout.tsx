@@ -5,6 +5,7 @@ import PwaRegister from '@/components/pwa/PwaRegister'
 import SafeAreaMemory from '@/components/pwa/SafeAreaMemory'
 import UpdatePrompt from '@/components/pwa/UpdatePrompt'
 import { SAFE_BOTTOM_BOOT } from '@/lib/safe-area'
+import { COMPANY_NAME } from '@/lib/company'
 import './globals.css'
 
 // Typography — loaded via next/font for zero-CLS self-hosting.
@@ -70,7 +71,7 @@ const notoSansSc = Noto_Sans_SC({
 
 export const metadata: Metadata = {
   title: 'HOUZS Venture Portal',
-  description: 'Internal ledger for HOUZS Venture Sdn Bhd',
+  description: `Internal ledger for ${COMPANY_NAME}`,
   // Added to home screen, the portal should open chromeless so the bottom tab
   // bar is the only bar on screen.
   // It installs as an app too — public/manifest.webmanifest (linked in <head>

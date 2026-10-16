@@ -1,6 +1,7 @@
 import React from 'react'
 import { Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import { officeDay, officeTime } from '@/lib/office-time'
+import { COMPANY_NAME } from '@/lib/company'
 
 // The documents' one sheet (2026-10-15, the Finance revamp v2 — README §3 and
 // `prototype/Finance Documents v2.dc.html`, P01–P04): A4 portrait, one sans
@@ -46,11 +47,12 @@ const FOOTER_TOP = 841.89 - px(34) - 7.5 * 1.45 - px(10) - px(1)
 /**
  * The issuer's block: the company, then its line of work — the invoice says
  * both lines, the receipt, the voucher and the credit note the first (the
- * design's) — and its email last on every document. The name is *Holding*,
- * no s, and the email the one the user named (2026-10-16 — finance-view.md).
+ * design's) — and its email last on every document. The name is the
+ * company's (`lib/company.ts` — *Holding*, no s, as the user wrote it), the
+ * email the one the user named (2026-10-16 — finance-view.md).
  */
 export const ISSUER = {
-  name: 'HOUZS Venture Holding Sdn. Bhd.',
+  name: COMPANY_NAME,
   lines: ['Internal banking · Shared services', 'Director salary distribution'],
   email: 'hello@houzsventure.com',
 }

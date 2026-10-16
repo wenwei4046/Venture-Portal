@@ -11,6 +11,7 @@ import PrintButton from './_components/PrintButton'
 import EditableStatLine from './_components/EditableStatLine'
 import ResetStaffStatutoryButton from './_components/ResetStaffStatutoryButton'
 import RevenuePayoutBreakdown from '../../../_components/RevenuePayoutBreakdown'
+import { COMPANY_NAME } from '@/lib/company'
 
 interface PageProps {
   params: Promise<{ period: string; staffId: string }>
@@ -115,7 +116,7 @@ export default async function PayslipPage({ params }: PageProps) {
       <div className="border border-hairline rounded-card p-8 print:border print:border-ink print:rounded-none print:p-6 bg-surface">
         {/* Company header */}
         <div className="text-center mb-6 pb-4 border-b border-hairline">
-          <div className="text-lg font-bold tracking-[0.06em]">HOUZS VENTURE SDN BHD</div>
+          <div className="text-lg font-bold tracking-[0.06em]">{COMPANY_NAME.toUpperCase()}</div>
           <div className="text-sm mt-1">Payslip · {formatPeriodLabel(period)}</div>
         </div>
 
