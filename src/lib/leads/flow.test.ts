@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { answerStep, flowProblem, newStepId, sendFrom, starterSteps, type FlowStep } from './flow'
+import { answerStep, flowHomes, flowProblem, newStepId, removeBranch, sendFrom, starterSteps, strayStepIds, type FlowStep } from './flow'
 
 // The same cases tests/member-sql/validate-leads.mjs holds lead_flow_problem / the runner to.
 const sofa: FlowStep[] = [
@@ -45,4 +45,29 @@ describe('running a flow', () => {
     expect(answerStep(sofa, 's3', '不方便')).toBeNull()
   })
   it('names a new step', () => expect(newStepId(sofa)).toBe('s5'))
+})
+
+describe('the editor tree', () => {
+  const tree: FlowStep[] = [
+    { id: 's1', kind: 'question', text: 'q', buttons: [{ label: 'A', next: 's2' }, { label: 'B', next: 's3' }] },
+    { id: 's2', kind: 'message', text: 'a', next: 's4' },
+    { id: 's3', kind: 'question', text: 'b', buttons: [{ label: 'B1', next: 's4' }] },
+    { id: 's4', kind: 'phone', text: 'p', next: null },
+    { id: 's9', kind: 'handoff', text: 'stray' },
+  ]
+  it('places each step where it is first reached', () => {
+    const { order, home } = flowHomes(tree)
+    expect(order).toEqual(['s1', 's2', 's4', 's3'])
+    expect(home.get('s4')).toBe('s2:next')
+    expect(strayStepIds(tree)).toEqual(['s9'])
+  })
+  it('removes a branch with what only it reached, and leaves the button to be set', () => {
+    const left = removeBranch(tree, 's3')
+    expect(left.map(x => x.id)).toEqual(['s1', 's2', 's4', 's9'])
+    expect(left[0].buttons?.[1]).toEqual({ label: 'B', next: '' })
+    expect(flowProblem(left)).toMatch(/leads to a step/)
+    // s4 is still reached through s2, so it stays.
+    expect(removeBranch(tree, 's2').map(x => x.id)).toEqual(['s1', 's3', 's4', 's9'])
+    expect(removeBranch(tree, 's1')).toBe(tree)
+  })
 })

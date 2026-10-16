@@ -133,3 +133,55 @@ export function starterSteps(): FlowStep[] {
     { id: 's4', kind: 'handoff', text: '收到！同事會盡快聯絡你 🙏' },
   ]
 }
+
+// ── The editor's tree (2026-10-16, the user: "flow 更像系統要我怎麼做，但我不能編輯和編排") ─────────────────────
+// The steps are drawn as a tree from the first step: each button's reply sits under the button, each message's
+// next step under the message. A step reached from two places is drawn once, where it is first reached, and is a
+// "go to" link everywhere else.
+
+/** Where a button or a message leads: `${stepId}:b${i}` for a button, `${stepId}:next` for a message / phone. */
+export type FlowSlot = string
+
+/** Each reachable step's place, in the order a customer could meet them (depth first from the first step). */
+export function flowHomes(steps: FlowStep[]): { order: string[]; home: Map<string, FlowSlot | 'root'> } {
+  const order: string[] = []
+  const home = new Map<string, FlowSlot | 'root'>()
+  const visit = (id: string | null | undefined, slot: FlowSlot | 'root') => {
+    if (!id || home.has(id)) return
+    const st = steps.find(x => x.id === id)
+    if (!st) return
+    home.set(id, slot)
+    order.push(id)
+    if (st.kind === 'question') (st.buttons ?? []).forEach((b, i) => visit(b.next, `${id}:b${i}`))
+    else if (st.kind !== 'handoff') visit(st.next, `${id}:next`)
+  }
+  visit(steps[0]?.id, 'root')
+  return { order, home }
+}
+
+/** Steps nothing leads to (left over after an edit). */
+export function strayStepIds(steps: FlowStep[]): string[] {
+  const { home } = flowHomes(steps)
+  return steps.filter(x => !home.has(x.id)).map(x => x.id)
+}
+
+/**
+ * Take a step away with everything that only it led to. What pointed at a removed step is left unset — a
+ * button with no reply yet (`next: ''`, which flowProblem asks to fill), a message that then ends.
+ */
+export function removeBranch(steps: FlowStep[], id: string): FlowStep[] {
+  if (steps[0]?.id === id) return steps
+  const before = new Set(flowHomes(steps).home.keys())
+  const cleared = clearRefs(steps.filter(x => x.id !== id), new Set([id]))
+  const after = new Set(flowHomes(cleared).home.keys())
+  const gone = new Set([...before].filter(x => x !== id && !after.has(x)))
+  return clearRefs(cleared.filter(x => !gone.has(x.id)), gone)
+}
+
+function clearRefs(steps: FlowStep[], gone: Set<string>): FlowStep[] {
+  return steps.map(x => ({
+    ...x,
+    buttons: x.buttons?.map(b => (gone.has(b.next) ? { ...b, next: '' } : b)),
+    next: x.next && gone.has(x.next) ? null : x.next,
+  }))
+}
