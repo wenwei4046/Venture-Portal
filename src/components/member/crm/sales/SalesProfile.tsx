@@ -13,94 +13,96 @@ export default function SalesProfile({ v }: { v: ProfileVM }) {
             
     <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
       {!!(v.profMain) && (<>
-        <div style={{ borderRadius: "24px", background: "linear-gradient(180deg, #F9D9BF 0, #fff 96px)", border: "1px solid #EBDDD2", boxShadow: "0 6px 20px rgba(63,43,34,.06)", padding: "18px 16px 16px", display: "flex", flexDirection: "column", gap: "16px" }}>
+        <div data-prof-glow="1" style={{ margin: "-14px -20px 0", padding: "56px 20px 0", background: "linear-gradient(180deg, #F6B48A 0%, #FFD9BC 70%, #FFFFFF 100%) top / 100% 150px no-repeat" }}>
+        <div style={{ borderRadius: "22px", background: "#fff", boxShadow: "0 6px 24px rgba(63,43,34,.10)", padding: "18px 18px 14px", display: "flex", flexDirection: "column", gap: "14px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-            <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(18px * var(--rv-type, 1))", fontWeight: "650" }}>{v.meIniX}</span>
-            <div style={{ minWidth: "0" }}>
-              <h1 style={{ margin: "0", fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>{v.meNameX}</h1>
+            <span style={{ flex: "none", width: "56px", height: "56px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontFamily: "var(--font-display-rv)", fontSize: "calc(18px * var(--rv-type, 1))", fontWeight: "650" }}>{v.meIniX}</span>
+            <div style={{ flex: "1", minWidth: "0" }}>
+              <h1 style={{ margin: "0", fontFamily: "var(--font-display-rv)", fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>{v.meNameX}</h1>
               <p style={{ margin: "2px 0 0", fontSize: "calc(13px * var(--rv-type, 1))", color: "#806B60" }}>HOUZS Venture · CRM</p>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #EBDDD2", borderRadius: "16px", background: "#fff" }}>
-            <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: "2px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #EBDDD2", borderRadius: "14px", background: "#fff" }}>
+            <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: "2px" }}>
               <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "#806B60" }}>Title</span>
-              <strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "700", lineHeight: "1.25" }}>{v.meTitleX}</strong>
+              <strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650" }}>{v.meTitleX}</strong>
             </div>
-            <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: "2px", borderLeft: "1px solid #EBDDD2" }}>
+            <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: "2px", borderLeft: "1px solid #EBDDD2" }}>
               <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "#806B60" }}>Rank</span>
-              <strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "700" }}>{v.meRankX}</strong>
+              <strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650" }}>{v.meRankX}</strong>
             </div>
           </div>
         </div>
+        </div>
         {!!(v.hasTeam) && (<>
-          <div onClick={v.openTeam} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px", borderRadius: "22px", background: "#3F2B22", color: "#fff", cursor: "pointer" }}>
-            <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "14px", background: "rgba(255,255,255,.12)", color: "#F6B48A", display: "grid", placeItems: "center" }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <div onClick={v.openTeam} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px", borderRadius: "18px", background: "#3F2B22", color: "#fff", cursor: "pointer" }}>
+            <span style={{ flex: "none", width: "40px", height: "40px", borderRadius: "12px", background: "rgba(255,255,255,.12)", color: "#F6B48A", display: "grid", placeItems: "center" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z">
                 </path>
               </svg>
             </span>
             <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-              <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700" }}>View my team</strong>
-              <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", color: "#D9C7BA" }}>{v.teamSub}</span>
+              <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650" }}>View my team</strong>
+              <span style={{ fontSize: "calc(12.5px * var(--rv-type, 1))", color: "#F0DDCE" }}>{v.teamSub}</span>
             </span>
-            <svg style={{ flex: "none", color: "#D9C7BA" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m9 6 6 6-6 6">
+            <svg style={{ flex: "none", color: "#F0DDCE" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 5 7 7-7 7">
               </path>
             </svg>
           </div>
         </>)}
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <h2 style={{ margin: "0 0 4px", fontSize: "calc(18px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>Your workspace</h2>
+        <div style={{ display: "flex", flexDirection: "column", marginTop: "8px" }}>
+          <h2 style={{ margin: "0 0 6px", fontFamily: "var(--font-display-rv)", fontSize: "calc(18px * var(--rv-type, 1))", fontWeight: "650", letterSpacing: "-.02em" }}>Your workspace</h2>
           <div onClick={v.openNotif} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", cursor: "pointer" }}>
             <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "#E4EDF8", color: "#2F6FB5", display: "grid", placeItems: "center" }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0">
                 </path>
               </svg>
             </span>
             <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-              <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700" }}>Notifications</strong>
+              <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650" }}>Notifications</strong>
             </span>
             {!!(v.hasNotifBadge) && (<>
-              <span style={{ flex: "none", minWidth: "22px", height: "22px", padding: "0 7px", boxSizing: "border-box", borderRadius: "11px", background: "#BD4A19", color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700" }}>{v.notifBadge}</span>
+              <span style={{ flex: "none", marginRight: "-4px", padding: "1px 7px", borderRadius: "9px", background: "#BD4A19", color: "#fff", fontSize: "calc(10.9px * var(--rv-type, 1))", fontWeight: "700" }}>{v.notifBadge}</span>
             </>)}
-            <svg style={{ flex: "none", color: "#806B60" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m9 6 6 6-6 6">
+            <svg style={{ flex: "none", color: "#806B60" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 5 7 7-7 7">
               </path>
             </svg>
           </div>
-          <div style={{ height: "1px", background: "#EBDDD2", marginLeft: "66px" }}>
+          <div style={{ height: "1px", background: "#F1E7DF" }}>
           </div>
           <div onClick={v.openAuto} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", cursor: "pointer" }}>
             <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "#E6F0EA", color: "#387557", display: "grid", placeItems: "center" }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 5h16v11H9l-5 4V5Zm4 4h8M8 12h5">
                 </path>
               </svg>
             </span>
             <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-              <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700" }}>Auto-reply</strong>
+              <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650" }}>Auto-reply</strong>
             </span>
-            <svg style={{ flex: "none", color: "#806B60" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m9 6 6 6-6 6">
+            <svg style={{ flex: "none", color: "#806B60" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 5 7 7-7 7">
               </path>
             </svg>
           </div>
-          <div style={{ height: "1px", background: "#EBDDD2", marginLeft: "66px" }}>
+          <div style={{ height: "1px", background: "#F1E7DF" }}>
           </div>
           <div onClick={v.openQuick} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", cursor: "pointer" }}>
             <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", display: "grid", placeItems: "center" }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z">
                 </path>
               </svg>
             </span>
             <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-              <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700" }}>Quick replies</strong>
+              <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650" }}>Quick replies</strong>
             </span>
-            <svg style={{ flex: "none", color: "#806B60" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m9 6 6 6-6 6">
+            <svg style={{ flex: "none", color: "#806B60" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 5 7 7-7 7">
               </path>
             </svg>
           </div>

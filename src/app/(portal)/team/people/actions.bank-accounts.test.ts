@@ -20,7 +20,11 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 // Account 1 as the record holds it — read only when Account 2 is saved alone.
 const { readStaffPrivate } = vi.hoisted(() => ({ readStaffPrivate: vi.fn() }))
 vi.mock('@/lib/private-fields', () => ({ readStaffPrivate }))
+// Reports to travels by the charts' own writer (2026-10-16), which is server-only.
+const { moveReportingLine } = vi.hoisted(() => ({ moveReportingLine: vi.fn() }))
+vi.mock('@/lib/hierarchy-writes', () => ({ moveReportingLine }))
 import { addStaff, updateStaff } from './actions'
+import { LOGIN_EMAIL_LOCKED } from '@/lib/person-record'
 
 // HR's title ticks all three (2026-10-09, PR4). The Director template ticks
 // Salary amounts only — the case the masking is for; with no tick at all the
@@ -153,6 +157,42 @@ describe('a person is saved from their own page (2026-10-14, edited where it sta
     } finally {
       q.error = null
     }
+  })
+
+  // 2026-10-16, the user: "他们 email 是不能乱改的，除非他们 request to change
+  // email" — somebody with a login signs in with their Contact email.
+  it('refuses an email for somebody who signs in, writing nothing', async () => {
+    query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, user_id: 'login-1' }, error: null })
+    const form = new FormData()
+    form.set('email', 'new@example.com')
+    form.set('contact_number', '012-999 0000')
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: false, reason: LOGIN_EMAIL_LOCKED })
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  // 2026-10-16, the user: "it needs to be able to set report to an upline".
+  it('moves the reporting line by the charts’ own writer, never inside the record’s update', async () => {
+    moveReportingLine.mockResolvedValueOnce({ ok: true, mover: {}, manager: null, reportsTo: 'boss' })
+    const form = new FormData()
+    form.set('reports_to', 'boss')
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: true })
+    expect(moveReportingLine).toHaveBeenCalledWith(expect.anything(), 'staff', 'boss')
+    expect(update).not.toHaveBeenCalled()
+
+    moveReportingLine.mockResolvedValueOnce({ ok: true, mover: {}, manager: null, reportsTo: null })
+    form.set('reports_to', '')
+    await updateStaff('staff', form)
+    expect(moveReportingLine).toHaveBeenLastCalledWith(expect.anything(), 'staff', null)
+  })
+
+  it('answers the line’s refusal in its own words', async () => {
+    moveReportingLine.mockResolvedValueOnce({ ok: false, reason: 'A cannot report to B: a Revenue Specialist cannot hold downlines.' })
+    const form = new FormData()
+    form.set('reports_to', 'peer')
+    form.set('contact_number', '012-999 0000')
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: false, reason: 'A cannot report to B: a Revenue Specialist cannot hold downlines.' })
+    // No new title rode along, so the rest waits for the line.
+    expect(update).not.toHaveBeenCalled()
   })
 })
 

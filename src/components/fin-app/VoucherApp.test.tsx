@@ -172,7 +172,9 @@ describe('Daily › Payment on the phone', () => {
     expect(screen.getByText('Total paid · October 2026')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^All vouchers 3 vouchers RM 27,186\.00$/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Pending approval 1 voucher RM 25,000\.00$/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Create payment' })).toBeInTheDocument()
+    // The bar's first button is one word (2026-10-16): two filled it edge to edge on the phone.
+    expect(screen.getByRole('button', { name: 'Payment' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create payment' })).toBeNull()
   })
 
   it('a card opens its list — a step of the browser’s history — and the search narrows it', () => {
@@ -180,6 +182,7 @@ describe('Daily › Payment on the phone', () => {
     fireEvent.click(screen.getByRole('button', { name: /^All vouchers/ }))
     expect(window.location.search).toBe('?f=all')
     expect(screen.getByRole('heading', { name: 'All vouchers' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Payment' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Meta Platforms Ireland FB ads top-up RM 25,000\.00/ })).toBeInTheDocument()
     fireEvent.change(screen.getByRole('searchbox', { name: /Search voucher/ }), { target: { value: 'google' } })
     expect(screen.queryByRole('button', { name: /Meta Platforms Ireland/ })).not.toBeInTheDocument()
@@ -299,9 +302,9 @@ describe('Daily › Payment on the phone', () => {
     expect(screen.queryByRole('menuitem', { name: /^Export/ })).toBeNull()
   })
 
-  it('Create payment opens the desktop’s own window', () => {
+  it('Payment opens the desktop’s own window — Create payment, as a sheet', () => {
     draw()
-    fireEvent.click(screen.getByRole('button', { name: 'Create payment' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Payment' }))
     expect(screen.getByTestId('create-payment')).toBeInTheDocument()
   })
 })

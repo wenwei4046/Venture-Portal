@@ -15,13 +15,17 @@ import {
   type InputHTMLAttributes,
   type ReactNode,
 } from 'react'
-import { btn } from '@/components/hrv/kit'
+import { btn, Chip } from '@/components/hrv/kit'
+import { NavIcon, type HrIconName } from '@/components/hrv/icons'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
+import { initialsOf } from '@/lib/people-roster'
 import { EPF_PARTS, PCB_CATEGORIES, SOCSO_CATEGORIES, type StaffRow, type TitleRow } from '@/lib/staff-form'
+import type { UplineGroup } from '@/lib/upline-choices'
 import {
   EPF_LABELS,
   BASIC_FROM_COMMISSION,
+  LOGIN_EMAIL_LOCKED,
   PCB_LABELS,
   SOCSO_LABELS,
   asksPay,
@@ -37,17 +41,23 @@ import {
   type PayMode,
 } from '@/lib/person-record'
 import { updateStaff } from '../actions'
+import PersonWell from '../../_components/PersonWell'
 import s from './person-record.module.css'
 
 /**
- * A person's record on their full page, read — and edited where it stands
- * (2026-10-14, the user: "when i press edit, no need jump to another tab, it
- * should be can edit key in column"). Edit turns each fact into its field in
- * the same row of the same section; Department, Account and Role stay as they
- * read. The bar at the sheet's foot holds Cancel and Save, and stays in view
- * while the page scrolls. Save sends only the fields that changed, so it never
- * puts back what somebody else changed since the page was opened. The old
- * Edit page (`/team/people/[id]/edit`) sends here with `?edit=1`.
+ * A person's record on their full page — a 360 since 2026-10-16 (the user
+ * picked option C of three: "go with type c, then the wording maybe make more
+ * 明显一点"). Who they are and where they stand sit in a card on the left —
+ * their tile, name, chips, Department, Reports to, Level, Employment Type and
+ * Hire date; the rest of the record in wells on the right.
+ *
+ * Edited where it stands (2026-10-14, the user: "when i press edit, no need
+ * jump to another tab, it should be can edit key in column"): Edit turns each
+ * fact into its field in the same place. The bar at the sheet's foot holds
+ * Cancel and Save, and stays in view while the page scrolls. Save sends only
+ * the fields that changed, so it never puts back what somebody else changed
+ * since the page was opened. The old Edit page (`/team/people/[id]/edit`)
+ * sends here with `?edit=1`.
  */
 
 /** What the page reads, worded — and masked — by the server as this viewer may see it. */
@@ -56,11 +66,21 @@ export interface PersonRecordView {
   department: string
   code: string | null
   title: string | null
+  /** The rung their title stands on ("L3"); null off the ladder. */
+  level: string | null
+  active: boolean
+  /** Their login: signing in, switched off, or none. */
+  login: 'active' | 'disabled' | null
+  /** Who they report to — `href` only for a reader of the whole roster. */
+  reportsTo: { name: string; title: string | null; href: string | null; active: boolean } | null
+  /** As the page writes a date ("05 Jan 2026"). */
+  hireDate: string | null
+  /** How long they have been with the company ("9 months"). */
+  tenure: string | null
   resignationDate: string | null
-  account: { email: string; role: string } | null
   nric: string | null
   infotechCode: string | null
-  hireDate: string | null
+  /** For somebody with a login, the email they sign in with. */
   contact: { phone: string | null; email: string | null; address: string | null }
   emergency: { name: string | null; relationship: string | null; phone: string | null }
   bank: { name1: string | null; no1: string | null; name2: string | null; no2: string | null }
@@ -82,6 +102,10 @@ export interface PersonEditor {
   /** Every title, active or not — the row offers the department's. */
   titles: TitleRow[]
   canSee: { nric: boolean; bank: boolean }
+  /** Who they report to now; null = nobody. */
+  reportsTo: string | null
+  /** The uplines they may have, a group per department — null while they are not on the active roster. */
+  uplines: UplineGroup[] | null
 }
 
 /** The editor while editing; null while the page reads. */
@@ -247,127 +271,121 @@ export default function PersonRecord({
         )
       : undefined
 
-  const head = (
-    <div className="page-head">
-      <div className={ed ? 'flex-1 min-w-0' : undefined}>
-        <div className="page-eyebrow">
-          <em>I.</em> PEOPLE · {view.department.toUpperCase()}
-        </div>
+  const upline = view.reportsTo ? (
+    <>
+      {view.reportsTo.href ? (
+        <Link href={view.reportsTo.href} className={s.person}>
+          {view.reportsTo.name}
+        </Link>
+      ) : (
+        view.reportsTo.name
+      )}
+      {view.reportsTo.title || !view.reportsTo.active ? (
+        <span className={s.sub}>{[view.reportsTo.title, view.reportsTo.active ? null : 'inactive'].filter(Boolean).join(' · ')}</span>
+      ) : null}
+    </>
+  ) : null
+
+  // Their login's email reads as theirs: a word beside it, and no field.
+  const email = view.contact.email ? (
+    <>
+      {view.contact.email}
+      {view.login ? (
+        <Chip tone="plain" soft style={{ marginLeft: 8, verticalAlign: 1 }}>
+          Login
+        </Chip>
+      ) : null}
+    </>
+  ) : null
+
+  const profile = (
+    <aside className={s.profile} aria-label={view.name}>
+      <span className={s.tile} data-login={view.login === 'active' ? 'true' : undefined} aria-hidden>
+        {initialsOf(view.name)}
+      </span>
+      <div className={`page-eyebrow ${s.eyebrow}`}>
+        <em>I.</em> PEOPLE · {view.department.toUpperCase()}
+      </div>
+      <h1 className={`page-title ${s.name}`}>
         {ed ? (
-          <h1 className="page-title">
+          <>
             <label htmlFor={fieldId('name')} className="sr-only">
               Name
             </label>
             <NameField defaultValue={ed.staff.employee_name} />
-          </h1>
+          </>
         ) : (
-          <h1 className="page-title">{view.name}</h1>
+          view.name
         )}
-        <p className="text-sm mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
-          {view.code && <span className="font-mono">{view.code}</span>}
-          {view.code && view.title ? <span aria-hidden>·</span> : null}
-          {view.title && <span>{view.title}</span>}
-          {/* Resigned is a state, so it is a word on the red wash. */}
-          {view.resignationDate && (
-            <span className="chip danger">
-              <span className="dot" aria-hidden />
-              Resigned {view.resignationDate}
-            </span>
-          )}
-          {!view.code && !view.title && !view.resignationDate && <span>Active employee.</span>}
+      </h1>
+      {view.code || view.title ? (
+        // Plain text, so a long title wraps inside itself, never leaving the dot alone.
+        <p className={s.line}>
+          {view.code && <span className={s.mono}>{view.code}</span>}
+          {view.code && view.title ? ' · ' : null}
+          {view.title}
         </p>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
+      ) : null}
+      <div className={s.chips}>
+        <Chip tone={view.active ? 'ledger' : 'danger'}>
+          {view.active ? 'Active' : view.resignationDate ? `Resigned ${view.resignationDate}` : 'Inactive'}
+        </Chip>
+        <Chip tone={view.login ? (view.login === 'active' ? 'info' : 'danger') : 'plain'}>
+          {view.login ? (view.login === 'active' ? 'Has login' : 'Login disabled') : 'No login'}
+        </Chip>
         {editing ? (
           <span className="chip accent">
             <span className="dot" aria-hidden />
             Editing
           </span>
-        ) : (
-          <>
-            {/* One person, one login — so this is offered only while they
-                have none, and only to whoever may mint one. */}
-            {inviteHref ? (
-              <Link
-                href={inviteHref}
-                className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
-              >
-                Invite
-              </Link>
-            ) : null}
-            {editor ? (
-              <button
-                ref={editButton}
-                type="button"
-                onClick={enter}
-                className="bg-accent hover:bg-accent-hover text-ink text-sm px-4 py-2 rounded-control transition-colors"
-              >
-                Edit
-              </button>
-            ) : null}
-          </>
-        )}
+        ) : null}
       </div>
-    </div>
-  )
-
-  const sections = (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-2 max-w-5xl">
-      <Section title="Assignment">
-        <Row
-          label="Title"
-          field="title_id"
-          value={view.title}
-          edit={e => (
-            <SelectField
-              name="title_id"
-              defaultValue={e.staff.title_id ?? ''}
-              options={[
-                { value: '', label: '— None' },
-                ...titleChoices.map(t => ({ value: t.id, label: t.is_active ? t.name : `${t.name} (inactive)` })),
-              ]}
-            />
-          )}
+      {!editing && (editor || inviteHref) ? (
+        <div className={s.actions}>
+          {editor ? (
+            <button ref={editButton} type="button" onClick={enter} className={`${btn('primary')} ${s.action}`}>
+              Edit
+            </button>
+          ) : null}
+          {/* One person, one login — so this is offered only while they have
+              none, and only to whoever may mint one. */}
+          {inviteHref ? (
+            <Link href={inviteHref} className={`${btn('outline')} ${s.action}`}>
+              Invite
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+      <dl className={s.sideFacts}>
+        {ed ? (
+          // Read, the title is the line under the name; edited, it is a field here.
+          <SideFact
+            label="Title"
+            field="title_id"
+            value={view.title}
+            edit={e => (
+              <SelectField
+                name="title_id"
+                defaultValue={e.staff.title_id ?? ''}
+                options={[
+                  { value: '', label: '— None' },
+                  ...titleChoices.map(t => ({ value: t.id, label: t.is_active ? t.name : `${t.name} (inactive)` })),
+                ]}
+              />
+            )}
+          />
+        ) : null}
+        <SideFact label="Department" value={view.department} />
+        <SideFact
+          label="Reports to"
+          field="reports_to"
+          value={upline}
+          // Saved by the one writer both charts use (moveReportingLine); not
+          // offered while they are off the active roster, which it refuses.
+          edit={editor?.uplines ? e => <UplineField current={e.reportsTo} groups={e.uplines ?? []} /> : undefined}
         />
-        <Row label="Department" value={view.department} />
-        <Row label="Account" value={view.account?.email ?? null} mono={!!view.account} />
-        <Row label="Role" value={view.account?.role ?? null} />
-      </Section>
-
-      <Section title="Identity">
-        <Row
-          label="NRIC"
-          field="nric"
-          value={view.nric}
-          mono
-          edit={e =>
-            e.canSee.nric ? (
-              // The dash is escaped: unescaped between `9` and `\s` the
-              // browser reads a range, throws under the `v` flag and drops
-              // the constraint altogether.
-              <TextField name="nric" defaultValue={e.staff.nric} pattern="[0-9\-\s]*" mono />
-            ) : (
-              <Locked value={e.staff.nric} why="NRIC / IC is not ticked for your title" />
-            )
-          }
-        />
-        <Row
-          label="Employee Code"
-          field="employee_code"
-          value={view.code}
-          mono
-          // Numbered by the database (HV + max + 1, 2026-09-12); a code is
-          // never cleared, only corrected by typing another.
-          edit={e => <TextField name="employee_code" defaultValue={e.staff.employee_code} mono />}
-        />
-        <Row
-          label="InfoTech No"
-          field="infotech_code"
-          value={view.infotechCode}
-          mono
-          edit={e => <TextField name="infotech_code" defaultValue={e.staff.infotech_code} mono />}
-        />
-        <Row
+        <SideFact label="Level" value={view.level} />
+        <SideFact
           label="Employment Type"
           field="employment_mode"
           value={payModeLabel(shownMode, { commission_dept: view.commissionDept })}
@@ -390,64 +408,113 @@ export default function PersonRecord({
             </Select>
           )}
         />
-        <Row label="Hire Date" field="hire_date" value={view.hireDate} edit={e => <TextField name="hire_date" type="date" defaultValue={e.staff.hire_date} />} />
-        <Row
+        <SideFact
+          label="Hire Date"
+          field="hire_date"
+          value={view.hireDate ? [view.hireDate, view.tenure].filter(Boolean).join(' · ') : null}
+          edit={e => <TextField name="hire_date" type="date" defaultValue={e.staff.hire_date} />}
+        />
+      </dl>
+    </aside>
+  )
+
+  const wells = (
+    <div className={s.wells}>
+      <Well title="Identity" icon="idCard">
+        <Fact
+          label="NRIC"
+          field="nric"
+          value={view.nric}
+          mono
+          edit={e =>
+            e.canSee.nric ? (
+              // The dash is escaped: unescaped between `9` and `\s` the
+              // browser reads a range, throws under the `v` flag and drops
+              // the constraint altogether.
+              <TextField name="nric" defaultValue={e.staff.nric} pattern="[0-9\-\s]*" mono />
+            ) : (
+              <Locked value={e.staff.nric} why="NRIC / IC is not ticked for your title" />
+            )
+          }
+        />
+        <Fact
+          label="Employee Code"
+          field="employee_code"
+          value={view.code}
+          mono
+          // Numbered by the database (HV + max + 1, 2026-09-12); a code is
+          // never cleared, only corrected by typing another.
+          edit={e => <TextField name="employee_code" defaultValue={e.staff.employee_code} mono />}
+        />
+        <Fact
+          label="InfoTech No"
+          field="infotech_code"
+          value={view.infotechCode}
+          mono
+          edit={e => <TextField name="infotech_code" defaultValue={e.staff.infotech_code} mono />}
+        />
+        <Fact
           label="Resignation Date"
           field="resignation_date"
           value={view.resignationDate}
           edit={e => <TextField name="resignation_date" type="date" defaultValue={e.staff.resignation_date} />}
         />
-      </Section>
+      </Well>
 
-      <Section title="Contact">
-        <Row
+      <Well title="Contact" icon="phone">
+        <Fact
           label="Phone"
           field="contact_number"
           value={view.contact.phone}
           mono
           edit={e => <TextField name="contact_number" type="tel" defaultValue={e.staff.contact_number} mono />}
         />
-        <Row
+        <Fact
           label="Email"
-          field="email"
-          value={view.contact.email}
-          edit={e => <TextField name="email" type="email" defaultValue={e.staff.email} />}
+          field={view.login ? undefined : 'email'}
+          value={email}
+          edit={e =>
+            view.login ? (
+              <Locked value={view.contact.email} why={LOGIN_EMAIL_LOCKED} icon tag="Login" />
+            ) : (
+              <TextField name="email" type="email" defaultValue={e.staff.email} />
+            )
+          }
         />
-        <Row
+        <Fact
           label="Address"
           field="address"
           value={view.contact.address}
           multiline
+          wide
           edit={e => <AreaField name="address" defaultValue={e.staff.address} />}
         />
-      </Section>
+      </Well>
 
-      <Section title="Emergency Contact">
-        <Row
+      <Well title="Emergency contact" icon="buoy">
+        <Fact
           label="Name"
           field="emergency_contact_name"
           value={view.emergency.name}
           edit={e => <TextField name="emergency_contact_name" defaultValue={e.staff.emergency_contact_name} />}
         />
-        <Row
+        <Fact
           label="Relationship"
           field="emergency_contact_relationship"
           value={view.emergency.relationship}
-          edit={e => (
-            <TextField name="emergency_contact_relationship" defaultValue={e.staff.emergency_contact_relationship} />
-          )}
+          edit={e => <TextField name="emergency_contact_relationship" defaultValue={e.staff.emergency_contact_relationship} />}
         />
-        <Row
+        <Fact
           label="Phone"
           field="emergency_contact_phone"
           value={view.emergency.phone}
           mono
           edit={e => <TextField name="emergency_contact_phone" type="tel" defaultValue={e.staff.emergency_contact_phone} mono />}
         />
-      </Section>
+      </Well>
 
-      <Section title="Bank Accounts">
-        <Row
+      <Well title="Bank accounts" icon="bank">
+        <Fact
           label="Account 1 bank"
           field="bank_name"
           value={view.bank.name1}
@@ -459,7 +526,7 @@ export default function PersonRecord({
             )
           }
         />
-        <Row
+        <Fact
           label="Account 1 number"
           field="bank_account_no"
           value={view.bank.no1}
@@ -473,7 +540,7 @@ export default function PersonRecord({
           }
         />
         {/* Account 2 is optional: both the bank and the number, or neither. */}
-        <Row
+        <Fact
           label="Account 2 bank"
           field="bank_name_2"
           value={view.bank.name2}
@@ -485,7 +552,7 @@ export default function PersonRecord({
             )
           }
         />
-        <Row
+        <Fact
           label="Account 2 number"
           field="bank_account_no_2"
           value={view.bank.no2}
@@ -498,28 +565,28 @@ export default function PersonRecord({
             )
           }
         />
-      </Section>
+      </Well>
 
       {/* Paid 100% on commission: no basic, no allowances, statutory at 0 —
           so salary says so and statutory is neither shown nor asked. A save
           then leaves the categories as they were (payPatchForUpdate). */}
       {shownMode === 'full_commission' ? (
-        <Section title="Salary">
-          <Row label="Pay basis" value="Fully commission based" edit={basisRow(false)} />
-          <Row label="Basic" value="None — 100% of pay is commission" />
-        </Section>
+        <Well title="Salary" icon="payroll">
+          <Fact label="Pay basis" value="Fully commission based" edit={basisRow(false)} />
+          <Fact label="Basic" value="None — 100% of pay is commission" wide />
+        </Well>
       ) : (
         <>
-          <Section title="Salary">
+          <Well title="Salary" icon="payroll">
             {/* A basic in a commission department is paid out of the month's
                 commission (lib/revenue-payroll.ts); each new month's payroll
                 row starts from it (Comm Cal's close copies the basic). */}
             {view.commissionDept && shownMode === 'salaried' ? (
-              <Row label="Pay basis" value={BASIC_FROM_COMMISSION} edit={basisRow(true)} />
+              <Fact label="Pay basis" value={BASIC_FROM_COMMISSION} edit={basisRow(true)} wide />
             ) : null}
             {asksPay(shownMode) ? (
               <>
-                <Row
+                <Fact
                   label="Basic"
                   field="basic_salary"
                   value={view.pay.basic}
@@ -537,14 +604,14 @@ export default function PersonRecord({
                     />
                   )}
                 />
-                <Row
+                <Fact
                   label="Statutory Allowance"
                   field="allowances"
                   value={view.pay.allowances}
                   mono
                   edit={e => <TextField name="allowances" type="number" step="0.01" min="0" defaultValue={e.staff.allowances} mono />}
                 />
-                <Row
+                <Fact
                   label="Non-Statutory Allowance"
                   field="non_statutory_allowance"
                   value={view.pay.nonStatutory}
@@ -558,15 +625,15 @@ export default function PersonRecord({
               // Variable pay (Director department): the month's figure is
               // keyed on that month's payroll — statutory still applies to it.
               <>
-                <Row label="Pay basis" value="Variable pay — keyed monthly" />
-                <Row label="Basic" value="None — worked out each month by the Director Salary engine" />
+                <Fact label="Pay basis" value="Variable pay — keyed monthly" wide />
+                <Fact label="Basic" value="None — worked out each month by the Director Salary engine" wide />
               </>
             )}
-          </Section>
+          </Well>
 
           {asksStatutory(shownMode) ? (
-            <Section title="Statutory">
-              <Row
+            <Well title="Statutory" icon="shield">
+              <Fact
                 label="EPF"
                 field="epf_category"
                 value={view.statutory.epf}
@@ -584,7 +651,7 @@ export default function PersonRecord({
                   </span>
                 )}
               />
-              <Row
+              <Fact
                 label="SOCSO"
                 field="socso_category"
                 value={view.statutory.socso}
@@ -596,7 +663,7 @@ export default function PersonRecord({
                   />
                 )}
               />
-              <Row
+              <Fact
                 label="PCB"
                 field="pcb_category"
                 value={view.statutory.pcb}
@@ -608,121 +675,131 @@ export default function PersonRecord({
                   />
                 )}
               />
-              <Row
+              <Fact
                 label="Children"
                 field="children_count"
                 value={view.statutory.children}
                 mono
                 edit={e => <TextField name="children_count" type="number" min="0" step="1" defaultValue={e.staff.children_count ?? 0} mono />}
               />
-            </Section>
+            </Well>
           ) : null}
         </>
       )}
     </div>
   )
 
-  if (!ed) {
-    return (
-      <Editing.Provider value={null}>
-        {head}
-        {sections}
-      </Editing.Provider>
-    )
-  }
+  const layout = (
+    <div className={s.layout} data-editing={ed ? 'true' : undefined}>
+      {profile}
+      <div className={s.main}>{wells}</div>
+    </div>
+  )
 
+  // One element stands at the page's top level in both modes: the portal
+  // settles a NEWLY inserted top-level block in from nothing (globals.css ›
+  // route-fade), so a form put there by Edit made the whole record blink.
   return (
-    <Editing.Provider value={ed}>
-      <Changed.Provider value={changed}>
-        <form ref={form} onSubmit={save} onChange={edited} aria-label={`Edit ${view.name}`}>
-          {head}
-          {sections}
-          <div className={s.bar} role="region" aria-label="Save changes">
-            <span className={s.barText} aria-live="polite">
-              {error ? (
-                <span className={s.barError} role="alert">
-                  {error}
+    <div>
+      <Editing.Provider value={ed}>
+        {ed ? (
+          <Changed.Provider value={changed}>
+            <form ref={form} onSubmit={save} onChange={edited} aria-label={`Edit ${view.name}`}>
+              {layout}
+              <div className={s.bar} role="region" aria-label="Save changes">
+                <span className={s.barText} aria-live="polite">
+                  {error ? (
+                    <span className={s.barError} role="alert">
+                      {error}
+                    </span>
+                  ) : (
+                    <>
+                      <b>Editing</b> · {changesLabel(count)}
+                    </>
+                  )}
                 </span>
-              ) : (
-                <>
-                  <b>Editing</b> · {changesLabel(count)}
-                </>
-              )}
-            </span>
-            <span className={s.barActions}>
-              <button type="button" className={btn('outline')} onClick={leave} disabled={busy}>
-                Cancel
-              </button>
-              <button type="submit" className={btn('primary')} disabled={busy || count === 0}>
-                {busy ? 'Saving…' : 'Save changes'}
-              </button>
-            </span>
-          </div>
-        </form>
-      </Changed.Provider>
-    </Editing.Provider>
+                <span className={s.barActions}>
+                  <button type="button" className={btn('outline')} onClick={leave} disabled={busy}>
+                    Cancel
+                  </button>
+                  <button type="submit" className={btn('primary')} disabled={busy || count === 0}>
+                    {busy ? 'Saving…' : 'Save changes'}
+                  </button>
+                </span>
+              </div>
+            </form>
+          </Changed.Provider>
+        ) : (
+          layout
+        )}
+      </Editing.Provider>
+    </div>
   )
 }
 
-/** A section is the sheet's section head — its title over the rule — and its rows. */
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  const editing = useContext(Editing) !== null
+/** A well of the record: its icon and title in caps over its facts, two to a row. */
+function Well({ title, icon, children }: { title: string; icon: HrIconName; children: ReactNode }) {
   return (
-    <section className="mb-8">
-      <div className="sect-head">
-        <h2>{title}</h2>
-        <span className="rule" aria-hidden />
-      </div>
-      <dl className={editing ? 'space-y-2' : 'space-y-3'}>{children}</dl>
-    </section>
+    <PersonWell title={title} icon={icon}>
+      <dl className={s.facts}>{children}</dl>
+    </PersonWell>
   )
 }
 
-/** A row while editing: label | field from 640px up, the label over its field below. */
-const EDIT_ROW = 'grid grid-cols-1 gap-1.5 sm:grid-cols-[140px_1fr] sm:gap-4 sm:items-center'
-
-/**
- * One fact: its label, and its value — or, while editing, the field `edit`
- * draws in the value's place. A row with no `edit` reads the same in both.
- */
-function Row({
-  label,
-  field,
-  value,
-  mono,
-  multiline,
-  edit,
-}: {
+type FactProps = {
   label: string
   /** The field's name, which its label points at. */
   field?: string
-  value: string | null | undefined
+  value: ReactNode
   mono?: boolean
   multiline?: boolean
   edit?: (editor: PersonEditor) => ReactNode
-}) {
+}
+
+/**
+ * One fact in a well: its label over its value — or, while editing, over the
+ * field `edit` draws in the value's place. A fact with no `edit` reads the
+ * same in both. `wide` takes the well's whole row.
+ */
+function Fact({ wide, ...fact }: FactProps & { wide?: boolean }) {
+  return (
+    <div className={s.fact} data-wide={wide ? 'true' : undefined}>
+      <FactBody {...fact} />
+    </div>
+  )
+}
+
+/** One fact on the card, a hairline above it: its label over its value, or over its field while editing. */
+function SideFact(fact: FactProps) {
+  return (
+    <div className={s.sideFact}>
+      <FactBody {...fact} />
+    </div>
+  )
+}
+
+function FactBody({ label, field, value, mono, multiline, edit }: FactProps) {
   const editor = useContext(Editing)
   if (editor && edit) {
     return (
-      // On a phone the label stands over its field, so the field has the width.
-      <div className={EDIT_ROW}>
+      <>
         <dt>
-          <label htmlFor={field ? fieldId(field) : undefined} className="text-[10px] font-medium uppercase tracking-[0.06em]">
+          <label htmlFor={field ? fieldId(field) : undefined} className={s.label}>
             {label}
           </label>
         </dt>
-        <dd className="min-w-0">{edit(editor)}</dd>
-      </div>
+        <dd className={s.field}>{edit(editor)}</dd>
+      </>
     )
   }
   const isEmpty = value == null || value === ''
   return (
-    <div className={editor ? `${EDIT_ROW} sm:min-h-[32px]` : 'grid grid-cols-[140px_1fr] gap-4 items-baseline'}>
-      <dt className="text-[10px] font-medium uppercase tracking-[0.06em]">{label}</dt>
-      <dd className={[mono && !isEmpty ? 'font-mono tabular text-[12.5px]' : 'text-sm', multiline ? 'whitespace-pre-line' : ''].join(' ')}>
+    <>
+      <dt className={s.label}>{label}</dt>
+      <dd className={[s.value, mono && !isEmpty ? s.mono : '', multiline ? s.multiline : '', isEmpty ? s.empty : ''].filter(Boolean).join(' ')}>
         {isEmpty ? '—' : value}
       </dd>
-    </div>
+    </>
   )
 }
 
@@ -745,7 +822,7 @@ function TextField({
       name={name}
       defaultValue={defaultValue ?? ''}
       data-dirty={useChanged(name)}
-      className={mono ? `${s.input} ${s.mono}` : s.input}
+      className={mono ? `${s.input} ${s.inputMono}` : s.input}
       {...rest}
     />
   )
@@ -776,6 +853,28 @@ function SelectField({ name, defaultValue, options }: { name: string; defaultVal
   )
 }
 
+/**
+ * Reports to: "— None", then the uplines a department at a time, theirs
+ * first, and last everybody the line may not go to, greyed with why after
+ * their name (lib/upline-choices.ts).
+ */
+function UplineField({ current, groups }: { current: string | null; groups: UplineGroup[] }) {
+  return (
+    <Select id={fieldId('reports_to')} name="reports_to" defaultValue={current ?? ''} data-dirty={useChanged('reports_to')} className={s.select}>
+      <option value="">— None</option>
+      {groups.map(g => (
+        <optgroup key={g.name} label={g.name}>
+          {g.choices.map(c => (
+            <option key={c.value} value={c.value} disabled={c.disabled}>
+              {c.label}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </Select>
+  )
+}
+
 function CheckField({ name, defaultChecked }: { name: string; defaultChecked: boolean }) {
   return <input type="checkbox" name={name} defaultChecked={defaultChecked} data-dirty={useChanged(name)} className={s.check} />
 }
@@ -790,7 +889,7 @@ function NameField({ defaultValue }: { defaultValue: string }) {
       defaultValue={defaultValue}
       autoComplete="off"
       data-dirty={useChanged('name')}
-      className={s.name}
+      className={s.nameField}
     />
   )
 }
@@ -798,12 +897,23 @@ function NameField({ defaultValue }: { defaultValue: string }) {
 /**
  * A value this editor may not change (DESIGN.md › A hidden value): shown as
  * the reader gave it — •••• when on file — with no field behind it, so the
- * save leaves it as it was. Why, on hover.
+ * save leaves it as it was. Why, on hover. A login's email wears a padlock
+ * and its word.
  */
-function Locked({ value, why }: { value: string | null; why: string }) {
+function Locked({ value, why, icon = false, tag }: { value: string | null; why: string; icon?: boolean; tag?: string }) {
   return (
     <span className={s.locked} title={why}>
-      {value ? value : '—'}
+      {icon ? (
+        <span className={s.lockedIcon} aria-hidden>
+          <NavIcon name="lock" size={14} />
+        </span>
+      ) : null}
+      <span className={s.lockedValue}>{value ? value : '—'}</span>
+      {tag ? (
+        <Chip tone="plain" soft>
+          {tag}
+        </Chip>
+      ) : null}
     </span>
   )
 }

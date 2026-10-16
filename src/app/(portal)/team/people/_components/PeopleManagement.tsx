@@ -8,7 +8,8 @@ import { Tabs } from '@/components/hrv/tabs'
 import type { PermissionsData } from '../../_lib/permission-templates'
 import PeopleDirectory, { type AccountRow, type PersonRow } from './PeopleDirectory'
 import PermissionTemplates from './PermissionTemplates'
-import InviteDialog, { type InviteCandidate } from './InviteDialog'
+import InviteDialog, { type InviteCandidate, type InviteNotice, type PendingInvite } from './InviteDialog'
+import SecretText from './SecretText'
 import s from './people.module.css'
 
 export type PeopleTab = 'people' | 'permissions'
@@ -31,6 +32,8 @@ interface Props {
   /** Team · Create — adding somebody, by hand or from InfoTech (2026-10-08, PR2). */
   canAddPeople: boolean
   candidates: InviteCandidate[]
+  /** Sent an invite link they never used (2026-10-16): Invite user asks them again. */
+  pendingInvites: PendingInvite[]
   /** `?template=` — the template a Hierarchy › Roles link opens on. */
   initialTemplateId: string | null
   /** `?invite=` — the invite window opens on load, with that person picked if one was named. */
@@ -55,12 +58,13 @@ export default function PeopleManagement({
   canInvite,
   canAddPeople,
   candidates,
+  pendingInvites,
   initialTemplateId,
   initialInvite,
 }: Props) {
   const searchParams = useSearchParams()
   const tab = showPermissions ? peopleTab(searchParams.get('tab')) : 'people'
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<InviteNotice | null>(null)
   const [invite, setInvite] = useState<{ staffId: string | null } | null>(canInvite ? initialInvite : null)
 
   // A deep link opens the window once; it should not reopen it on every refresh.
@@ -127,7 +131,10 @@ export default function PeopleManagement({
 
       {notice ? (
         <div className={s.notice} role="status">
-          <span>{notice}</span>
+          <span>
+            {notice.text}
+            {notice.secret ? <SecretText value={notice.secret} /> : null}
+          </span>
           <button type="button" className={s.noticeDismiss} onClick={() => setNotice(null)}>
             Dismiss
           </button>
@@ -140,7 +147,7 @@ export default function PeopleManagement({
           canManage={canManagePermissions}
           canSeeHistory={canSeeHistory}
           initialTemplateId={initialTemplateId}
-          onNotice={setNotice}
+          onNotice={text => setNotice({ text })}
         />
       ) : (
         <PeopleDirectory
@@ -154,6 +161,7 @@ export default function PeopleManagement({
       {invite ? (
         <InviteDialog
           candidates={candidates}
+          pending={pendingInvites}
           templates={permissions.templates}
           initialStaffId={invite.staffId}
           onClose={() => setInvite(null)}

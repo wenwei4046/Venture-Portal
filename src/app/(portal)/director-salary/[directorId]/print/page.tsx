@@ -5,6 +5,7 @@ import { formatMoney, formatMoneyBare, getPeriodMonth } from '@/lib/utils'
 import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
 import { DIRECTOR_ROW_COLUMNS } from '@/lib/private-columns'
+import { COMPANY_NAME } from '@/lib/company'
 
 interface Props {
   params: Promise<{ directorId: string }>
@@ -93,7 +94,7 @@ export default async function PrintPayoutPage({ params, searchParams }: Props) {
         <PrintButton />
 
         <div className="header">
-          <div className="company">HOUZS VENTURE SDN BHD</div>
+          <div className="company">{COMPANY_NAME.toUpperCase()}</div>
           <div className="subtitle">Director Monthly Statement — {dayjs(period).format('MMMM YYYY')}</div>
           <div className="subtitle">Director: {director.name} ({director.code})</div>
         </div>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { payPatchForUpdate } from './staff-form'
-import { BASIC_FROM_COMMISSION, PAY_MODE_LABEL, asksPay, asksStatutory, changedFields, changedFormData, changesLabel, choosesByTick, payModeChoices, payModeFields, payModeLabel, payModeOf, type PayMode } from './person-record'
+import { BASIC_FROM_COMMISSION, PAY_MODE_LABEL, asksPay, asksStatutory, changedFields, changedFormData, changesLabel, choosesByTick, payModeChoices, payModeFields, payModeLabel, payModeOf, tenureLabel, type PayMode } from './person-record'
 
 // A person's full page, edited where it stands (2026-10-14). The Employment
 // Type row is one select now, where the old Edit page had a tick in a
@@ -190,5 +190,24 @@ describe('the save bar’s count', () => {
     expect(changedFields(form).has('address')).toBe(false)
     area.value = '24, JLN JANGGUS\n\nBUKIT MERTAJAM'
     expect(changedFields(form).has('address')).toBe(true)
+  })
+})
+
+// A person's card reads how long they have been with the company beside their
+// hire date (2026-10-16, the 360) — counted on the office's calendar days.
+describe('tenure', () => {
+  it('counts whole months, then years and months', () => {
+    expect(tenureLabel('2026-01-05', '2026-10-16')).toBe('9 months')
+    expect(tenureLabel('2026-01-17', '2026-10-16')).toBe('8 months')
+    expect(tenureLabel('2025-10-16', '2026-10-16')).toBe('1 year')
+    expect(tenureLabel('2023-07-01', '2026-10-16')).toBe('3 years 3 months')
+    expect(tenureLabel('2025-09-16', '2026-10-16')).toBe('1 year 1 month')
+  })
+
+  it('says under a month in their first weeks, and nothing before they start or without a date', () => {
+    expect(tenureLabel('2026-10-01', '2026-10-16')).toBe('Under a month')
+    expect(tenureLabel('2026-10-16', '2026-10-16')).toBe('Under a month')
+    expect(tenureLabel('2026-11-01', '2026-10-16')).toBeNull()
+    expect(tenureLabel(null, '2026-10-16')).toBeNull()
   })
 })

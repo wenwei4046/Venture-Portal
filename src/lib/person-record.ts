@@ -82,6 +82,30 @@ export function payModeFields(mode: PayMode): Record<string, string> {
   }
 }
 
+/**
+ * Somebody with a login signs in with their Contact email, so it is theirs to
+ * change — by a request from their app — and never HR's on this page
+ * (2026-10-16, the user: "他们 email 是不能乱改的，除非他们 request to change
+ * email"). The page shows it locked; `updateStaff` refuses it with this.
+ */
+export const LOGIN_EMAIL_LOCKED = 'Their email is the one they sign in with — it changes only by their own request.'
+
+/**
+ * How long somebody has been with the company — their hire date against the
+ * office's today, both `YYYY-MM-DD` ("9 months", "2 years 3 months"). Null
+ * without a hire date, or before it.
+ */
+export function tenureLabel(hireDate: string | null, today: string): string | null {
+  if (!hireDate || hireDate > today) return null
+  const [hy, hm, hd] = hireDate.split('-').map(Number)
+  const [ty, tm, td] = today.split('-').map(Number)
+  if (![hy, hm, hd, ty, tm, td].every(Number.isFinite)) return null
+  const months = (ty - hy) * 12 + (tm - hm) - (td < hd ? 1 : 0)
+  if (months < 1) return 'Under a month'
+  const part = (n: number, unit: string) => (n === 0 ? null : `${n} ${unit}${n === 1 ? '' : 's'}`)
+  return [part(Math.floor(months / 12), 'year'), part(months % 12, 'month')].filter(Boolean).join(' ')
+}
+
 /** Fully commission based carries no basic and no statutory: those rows are not shown, nor asked. */
 export const asksStatutory = (mode: PayMode) => mode !== 'full_commission'
 

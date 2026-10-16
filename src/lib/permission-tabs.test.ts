@@ -49,6 +49,23 @@ describe('the tab catalog (HR revamp 8)', () => {
     ])
   })
 
+  // 2026-10-16 — the user: Finance view › Claims deleted ("i will build another tab for it. so delete
+  // this version first"). Every department's claims keep a box: the Principal view's, where its sidebar
+  // lists Claims — so the full-access templates keep claims at All and nobody is narrowed by a save.
+  it('has no Finance view › Claims; every department’s claims are Principal view › Claims', () => {
+    expect(PERMISSION_TABS.filter(t => t.view === 'fin').map(t => t.label)).not.toContain('Claims')
+    expect(parseGrant('fin.claims.view')).toBeNull()
+    const pri = PERMISSION_TABS.find(t => t.id === 'pri.claims')!
+    expect(pri.reach).toBe('all')
+    expect(pri.opens).toEqual({ view: ['claims.view'], create: ['claims.create'], edit: ['claims.edit'], approve: ['claims.approve', 'claims.void'] })
+    for (const key of ['ultimate', 'full']) {
+      expect([...moved(key)].filter(g => g.includes('claims')).sort(), key).toEqual(['pri.claims.approve', 'pri.claims.create', 'pri.claims.edit', 'pri.claims.view'])
+    }
+    // Finance · Checker's two claims cells went with the box (mig 20261016140000): it ticks no claims box anywhere.
+    expect([...moved('fin_checker')].filter(g => g.includes('claims'))).toEqual([])
+    expect(views(moved('fin_checker'))).not.toContain('pri')
+  })
+
   it('reads a stored box back, and refuses one that does not exist', () => {
     expect(parseGrant('hr.payroll.edit')?.tab.label).toBe('Payroll')
     expect(parseGrant('hr.overview.create')).toBeNull()
@@ -57,7 +74,7 @@ describe('the tab catalog (HR revamp 8)', () => {
   })
 
   it('derives the cells underneath: the user’s merges, the widest reach', () => {
-    expect([...cellsFromTabs(['fin.payments.view', 'fin.payments.approve', 'dept.my_claims.create', 'fin.claims.create'])].sort()).toEqual([
+    expect([...cellsFromTabs(['fin.payments.view', 'fin.payments.approve', 'dept.my_claims.create', 'pri.claims.create'])].sort()).toEqual([
       ['claims.create', 'all'], ['treasury.approve', 'all'], ['treasury.export', 'all'], ['treasury.view', 'all'], ['treasury.void', 'all'],
     ])
     expect(cellsFromTabs(['dept.my_claims.view']).get('claims.view')).toBe('own')
@@ -76,7 +93,7 @@ describe('moving the eleven templates onto tabs loses nothing', () => {
     expect(gains).toEqual({
       dept_head: ['claims.void:dept', 'opex.export:dept'],
       director: ['dept_reports.export:all', 'treasury.void:all', 'venture_pool.export:all'],
-      fin_checker: ['claims.void:all', 'dept_pool.export:all', 'treasury.void:all'],
+      fin_checker: ['dept_pool.export:all', 'treasury.void:all'],
       fin_maker: ['billing.export:all', 'treasury.export:all', 'venture_pool.export:all'],
       full: [],
       hr: ['revenue.export:all', 'team.manage:all'],
@@ -216,8 +233,8 @@ describe('a person’s own boxes follow their template', () => {
     const before = moved('staff')
     const mine = personTicks(before, [{ tab: 'dept.my_claims', action: 'edit', granted: false }])
     expect(personCellRows(cellsOf(PROD.staff.cells), mine)).toEqual([{ function_key: 'claims', action: 'edit', scope: null }])
-    // Later the template edits everybody’s claims (Finance › Claims · Edit): their old ✕ would have closed it.
-    const after = new Set([...before, 'fin.overview.view', 'fin.claims.view', 'fin.claims.edit'])
+    // Later the template edits everybody’s claims (Principal › Claims · Edit): their old ✕ would have closed it.
+    const after = new Set([...before, 'pri.overview.view', 'pri.claims.view', 'pri.claims.edit'])
     expect(reapplied(before, mine, savedAs(after))).toEqual({ tabs: [{ tab: 'dept.my_claims', action: 'edit', granted: false }], cells: [] })
   })
 

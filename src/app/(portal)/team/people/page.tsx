@@ -9,8 +9,9 @@ import { onFile } from '@/lib/sensitive'
 import { readDirectory, readsStaffTable } from '@/lib/team-directory'
 import { loadPermissionsData, type PermissionsData } from '../_lib/permission-templates'
 import type { PersonRow, AccountRow } from './_components/PeopleDirectory'
-import type { InviteCandidate } from './_components/InviteDialog'
+import type { InviteCandidate, PendingInvite } from './_components/InviteDialog'
 import PeopleManagement from './_components/PeopleManagement'
+import { pendingLogins } from '@/lib/invite'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -83,8 +84,9 @@ export default async function PeopleManagementPage({
   const supabase = await createClient()
   const params = await searchParams
   if (!readsStaffTable(user)) return <DirectoryPeople supabase={supabase} user={user} />
+  const canInvite = canDo(user, 'accounts', 'create') && hasTab(user.tabs, 'hr.permissions', 'create')
 
-  const [{ data: staff }, { data: accounts }, { data: levels }, positions, permissions, privateFields] = await Promise.all([
+  const [{ data: staff }, { data: accounts }, { data: levels }, positions, permissions, privateFields, invites] = await Promise.all([
     supabase
       .from('hr_staff_costs')
       // Every status, not just 'active'. Deactivating somebody used to remove
@@ -120,7 +122,17 @@ export default async function PeopleManagementPage({
     // the table no longer hands them out (2026-10-09, PR4); the reader says
     // •••• to a viewer without the tick, which still counts as on file.
     readStaffPrivate(supabase, user, null),
+    // Whose invite link is not used yet (2026-10-16) — Supabase Auth's to say,
+    // so a function of its own, and only for whoever may invite them again.
+    // Not fatal either: without it every login reads as before.
+    canInvite
+      ? (supabase as unknown as SupabaseClient).rpc('account_invite_states').then(
+          r => r.data,
+          () => null,
+        )
+      : Promise.resolve(null),
   ])
+  const pending = pendingLogins(invites)
 
   const rungs = new Map(
     ((levels ?? []) as Array<{ id: string; rank: number; name: string }>).map(l => [l.id, l]),
@@ -154,9 +166,10 @@ export default async function PeopleManagementPage({
     p_metadata: { staff_count: staff?.length ?? 0 },
   })
 
-  const rows: PersonRow[] = untypedRows<RosterRow>(staff).map(r =>
-    personRow(r, rungs, rankByStaff.get(r.id) ?? null, privateFields.get(r.id)),
-  )
+  const rows: PersonRow[] = untypedRows<RosterRow>(staff).map(r => ({
+    ...personRow(r, rungs, rankByStaff.get(r.id) ?? null, privateFields.get(r.id)),
+    invitePending: !!r.user_id && pending.has(r.user_id),
+  }))
 
   const attached = new Set(rows.map(r => r.accountEmail).filter(Boolean))
   const unattached: AccountRow[] = (accounts ?? [])
@@ -175,7 +188,7 @@ export default async function PeopleManagementPage({
   const staffRows = (staff ?? []) as unknown as Array<{
     id: string; employee_name: string; employee_code: string | null; user_id: string | null; status: string | null
     reports_to: string | null; titles: { name: string; level_id: string | null; template_id: string | null } | null
-    departments: { name: string } | null
+    departments: { name: string } | null; users: { email: string } | null
   }>
   const byId = new Map(staffRows.map(s => [s.id, s]))
   const candidates: InviteCandidate[] = staffRows
@@ -195,6 +208,11 @@ export default async function PeopleManagementPage({
       }
     })
 
+  // …and who may be invited again: a link sent and never used (2026-10-16).
+  const pendingInvites: PendingInvite[] = staffRows
+    .filter(s => s.status !== 'inactive' && s.user_id && pending.has(s.user_id) && s.users?.email)
+    .map(s => ({ staffId: s.id, name: s.employee_name, email: s.users!.email, templateId: s.titles?.template_id ?? null }))
+
   const invite = params.invite
     ? { staffId: params.invite && UUID.test(params.invite) ? params.invite : null }
     : null
@@ -210,9 +228,10 @@ export default async function PeopleManagementPage({
       showPermissions
       canManagePermissions={canDo(user, 'accounts', 'manage') && hasTab(user.tabs, 'hr.permissions', 'edit')}
       canSeeHistory={can(user, 'permissions_manage', 'audit_log')}
-      canInvite={canDo(user, 'accounts', 'create') && hasTab(user.tabs, 'hr.permissions', 'create')}
+      canInvite={canInvite}
       canAddPeople={canDo(user, 'team', 'create')}
       candidates={candidates}
+      pendingInvites={pendingInvites}
       initialTemplateId={params.template && UUID.test(params.template) ? params.template : null}
       initialInvite={invite}
     />
@@ -257,6 +276,7 @@ async function DirectoryPeople({
       canInvite={false}
       canAddPeople={false}
       candidates={[]}
+      pendingInvites={[]}
       initialTemplateId={null}
       initialInvite={null}
     />

@@ -5,7 +5,7 @@ import s from "./MemberLogin.module.css";
 
 type LoginState = { error: string };
 
-function InputIcon({ name }: { name: "mail" | "lock" | "eye" | "eyeOff" }) {
+export function InputIcon({ name }: { name: "mail" | "lock" | "eye" | "eyeOff" }) {
   const paths = {
     mail: "M4 5h16v14H4V5Zm0 1 8 6 8-6",
     lock: "M6 10h12v11H6V10Zm3 0V6a3 3 0 0 1 6 0v4m-3 4v3",

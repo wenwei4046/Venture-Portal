@@ -5,6 +5,7 @@ import { formatMoney, formatIntlDate } from '@/lib/utils'
 import { OFFICE_TZ } from '@/lib/office-clock'
 import dayjs from 'dayjs'
 import PayslipNav from './_components/PayslipNav'
+import { COMPANY_NAME } from '@/lib/company'
 
 // Payslip for a director actual-payroll row (InfoTech import). Display-only —
 // figures are edited inline on the Director Payroll grid, this page mirrors
@@ -60,7 +61,7 @@ export default async function DirectorPayslipPage({ params }: PageProps) {
       <div className="border border-hairline rounded-card bg-surface p-8 print:rounded-none print:border-ink print:p-6">
         {/* Company header */}
         <div className="text-center mb-6 pb-4 border-b border-hairline">
-          <div className="text-xl font-semibold tracking-wide">HOUZS VENTURE SDN BHD</div>
+          <div className="text-xl font-semibold tracking-wide">{COMPANY_NAME.toUpperCase()}</div>
           <div className="text-sm mt-1">
             Director Payslip · {formatPeriodLabel(row.period_month)}
           </div>

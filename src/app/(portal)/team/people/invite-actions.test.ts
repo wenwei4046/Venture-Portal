@@ -6,18 +6,30 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   createUser: vi.fn(),
   deleteUser: vi.fn(),
+  inviteUserByEmail: vi.fn(),
+  generateLink: vi.fn(),
+  getUserById: vi.fn(),
+  updateUserById: vi.fn(),
   revalidatePath: vi.fn(),
 }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission, requireActionOn: mocks.requirePermission, requireAnyActionOn: mocks.requirePermission, requirePayrollPayoutsActionOn: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/supabase/admin', () => ({
-  adminClient: () => ({ auth: { admin: { createUser: mocks.createUser, deleteUser: mocks.deleteUser } } }),
+  adminClient: () => ({
+    auth: {
+      admin: {
+        createUser: mocks.createUser, deleteUser: mocks.deleteUser, inviteUserByEmail: mocks.inviteUserByEmail,
+        generateLink: mocks.generateLink, getUserById: mocks.getUserById, updateUserById: mocks.updateUserById,
+      },
+    },
+  }),
 }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
+vi.mock('next/headers', () => ({ headers: async () => new Map([['host', 'venture-portal-chi.vercel.app']]) }))
 // Viewing as somebody writes nothing (2026-10-11); here nobody is.
 vi.mock('@/lib/view-as-person', () => ({ viewingAsSomebody: async () => mocks.viewingAs }))
 
-import { inviteUser } from './invite-actions'
+import { inviteUser, reinviteUser } from './invite-actions'
 
 type Row = Record<string, unknown>
 
@@ -75,7 +87,11 @@ describe('inviting somebody on the roster', () => {
   })
 
   it('creates the login with the account kind their title’s template hands out, and attaches it', async () => {
-    expect(await invite()).toEqual({ ok: true, name: 'ONG SIEW LAN', email: 'siew@houzs.com' })
+    expect(await invite()).toEqual({ ok: true, mode: 'password', name: 'ONG SIEW LAN', email: 'siew@houzs.com' })
+    expect(mocks.createUser).toHaveBeenCalledWith({
+      email: 'siew@houzs.com', password: 'Hv-7k2m9q', email_confirm: true, user_metadata: { name: 'ONG SIEW LAN' },
+    })
+    expect(mocks.inviteUserByEmail).not.toHaveBeenCalled()
     expect(mocks.requirePermission).toHaveBeenCalledWith(expect.any(String), 'accounts', 'create')
     expect(db.writes).toEqual([
       { table: 'users', row: { id: 'new-user', email: 'siew@houzs.com', name: 'ONG SIEW LAN', role: 'finance', department_id: 'finance' } },
@@ -136,5 +152,114 @@ describe('inviting somebody on the roster', () => {
     mocks.requirePermission.mockRejectedValueOnce(new Error('NEXT_REDIRECT'))
     await expect(invite()).rejects.toThrow('NEXT_REDIRECT')
     expect(mocks.createClient).not.toHaveBeenCalled()
+  })
+})
+
+// The user's first choice (2026-10-16): Send Invite Link — they choose their own password from it.
+describe('inviting by link', () => {
+  let db: ReturnType<typeof database>
+  const HASH = 'a3f1c2d4e5b6a7980112233445566778899aabbccddeeff00112233'
+  beforeEach(() => {
+    vi.clearAllMocks()
+    db = database()
+    mocks.requirePermission.mockResolvedValue({
+      id: 'principal', permissions: ['team_invite'], actions: { 'accounts.view': 'all', 'accounts.create': 'all' },
+    })
+    mocks.createClient.mockResolvedValue(db)
+    mocks.inviteUserByEmail.mockResolvedValue({ data: { user: { id: 'invited-user' } }, error: null })
+    mocks.generateLink.mockResolvedValue({ data: { user: { id: 'linked-user' }, properties: { hashed_token: HASH } }, error: null })
+  })
+  const byLink = (overrides: Record<string, unknown> = {}) => invite({ mode: 'link', password: undefined, ...overrides })
+
+  it('has Supabase email it, makes no password, and attaches the login as a password invite does', async () => {
+    expect(await byLink()).toEqual({ ok: true, mode: 'link', name: 'ONG SIEW LAN', email: 'siew@houzs.com', emailed: true })
+    expect(mocks.inviteUserByEmail).toHaveBeenCalledWith('siew@houzs.com', { data: { name: 'ONG SIEW LAN' } })
+    expect(mocks.createUser).not.toHaveBeenCalled()
+    expect(mocks.generateLink).not.toHaveBeenCalled()
+    expect(db.writes).toEqual([
+      { table: 'users', row: { id: 'invited-user', email: 'siew@houzs.com', name: 'ONG SIEW LAN', role: 'finance', department_id: 'finance' } },
+      { table: 'hr_staff_costs', row: { user_id: 'invited-user', email: 'siew@houzs.com' }, id: ONG },
+    ])
+  })
+
+  it('when Supabase will not email the address, makes the same login with no email and hands back our own link', async () => {
+    mocks.inviteUserByEmail.mockResolvedValue({ data: { user: null }, error: { code: 'email_address_not_authorized', message: 'not authorized' } })
+    expect(await byLink()).toEqual({
+      ok: true, mode: 'link', name: 'ONG SIEW LAN', email: 'siew@houzs.com', emailed: false,
+      link: `https://venture-portal-chi.vercel.app/welcome?token_hash=${HASH}&type=invite`,
+      why: expect.stringContaining('until an email service is connected'),
+    })
+    expect(mocks.generateLink).toHaveBeenCalledWith({ type: 'invite', email: 'siew@houzs.com', options: { data: { name: 'ONG SIEW LAN' } } })
+    expect(db.writes.map(w => w.row.id ?? w.row.user_id)).toEqual(['linked-user', 'linked-user'])
+  })
+
+  it('refuses an address that already signs in, and makes no link for it', async () => {
+    mocks.inviteUserByEmail.mockResolvedValue({ data: { user: null }, error: { code: 'email_exists', message: 'exists' } })
+    expect(await byLink()).toEqual({ ok: false, reason: 'That email already has an account.' })
+    expect(mocks.generateLink).not.toHaveBeenCalled()
+    expect(db.writes).toEqual([])
+  })
+
+  it('deletes the invited login again when the portal user cannot be made', async () => {
+    db.state.insertError = { message: 'denied' }
+    expect(await byLink()).toEqual({ ok: false, reason: expect.stringContaining('denied') })
+    expect(mocks.deleteUser).toHaveBeenCalledWith('invited-user')
+  })
+})
+
+// An invite link never used (2026-10-16): a new one, or the password now.
+describe('inviting again', () => {
+  let db: ReturnType<typeof database>
+  const HASH = 'b4f1c2d4e5b6a7980112233445566778899aabbccddeeff00112233'
+  beforeEach(() => {
+    vi.clearAllMocks()
+    db = database()
+    db.tables.hr_staff_costs[0].user_id = 'pending-user'
+    mocks.requirePermission.mockResolvedValue({
+      id: 'principal', permissions: ['team_invite'], actions: { 'accounts.view': 'all', 'accounts.create': 'all' },
+    })
+    mocks.createClient.mockResolvedValue(db)
+    mocks.getUserById.mockResolvedValue({
+      data: { user: { id: 'pending-user', email: 'siew@houzs.com', invited_at: '2026-10-16T01:00:00Z', email_confirmed_at: null } }, error: null,
+    })
+    mocks.inviteUserByEmail.mockResolvedValue({ data: { user: { id: 'pending-user' } }, error: null })
+    mocks.generateLink.mockResolvedValue({ data: { user: { id: 'pending-user' }, properties: { hashed_token: HASH } }, error: null })
+    mocks.updateUserById.mockResolvedValue({ data: { user: { id: 'pending-user' } }, error: null })
+  })
+
+  it('sends a new link to the login’s own email, and touches no row of the portal', async () => {
+    expect(await reinviteUser({ staffId: ONG, mode: 'link' })).toEqual({ ok: true, mode: 'link', name: 'ONG SIEW LAN', email: 'siew@houzs.com', emailed: true })
+    expect(mocks.inviteUserByEmail).toHaveBeenCalledWith('siew@houzs.com', { data: { name: 'ONG SIEW LAN' } })
+    expect(db.writes).toEqual([])
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/team', 'layout')
+  })
+
+  it('hands back a new link when Supabase will not email it', async () => {
+    mocks.inviteUserByEmail.mockResolvedValue({ data: { user: null }, error: { code: 'over_email_send_rate_limit', message: 'slow down' } })
+    const result = await reinviteUser({ staffId: ONG, mode: 'link' })
+    expect(result).toMatchObject({ ok: true, emailed: false, link: `https://venture-portal-chi.vercel.app/welcome?token_hash=${HASH}&type=invite` })
+  })
+
+  it('sets the password now, which ends the invite', async () => {
+    expect(await reinviteUser({ staffId: ONG, mode: 'password', password: 'Hv-abcdefg' })).toEqual({ ok: true, mode: 'password', name: 'ONG SIEW LAN', email: 'siew@houzs.com' })
+    expect(mocks.updateUserById).toHaveBeenCalledWith('pending-user', { password: 'Hv-abcdefg', email_confirm: true })
+  })
+
+  it.each([
+    ['somebody who has chosen their password', () => mocks.getUserById.mockResolvedValue({ data: { user: { id: 'pending-user', email: 'siew@houzs.com', invited_at: '2026-10-16T01:00:00Z', email_confirmed_at: '2026-10-16T02:00:00Z' } }, error: null }), 'already set a password'],
+    ['a login made with a password', () => mocks.getUserById.mockResolvedValue({ data: { user: { id: 'pending-user', email: 'siew@houzs.com', invited_at: null, email_confirmed_at: '2026-10-16T02:00:00Z' } }, error: null }), 'already set a password'],
+    ['somebody with no login at all', () => { db.tables.hr_staff_costs[0].user_id = null }, 'invite them instead'],
+  ])('does not invite again %s', async (_label, arrange, reason) => {
+    arrange()
+    expect(await reinviteUser({ staffId: ONG, mode: 'link' })).toEqual({ ok: false, reason: expect.stringContaining(reason) })
+    expect(mocks.inviteUserByEmail).not.toHaveBeenCalled()
+    expect(mocks.updateUserById).not.toHaveBeenCalled()
+  })
+
+  it('asks a set password for six characters, and the gate before anything', async () => {
+    expect(await reinviteUser({ staffId: ONG, mode: 'password', password: '123' })).toEqual({ ok: false, reason: 'Password must be at least 6 characters' })
+    mocks.requirePermission.mockRejectedValueOnce(new Error('NEXT_REDIRECT'))
+    await expect(reinviteUser({ staffId: ONG, mode: 'link' })).rejects.toThrow('NEXT_REDIRECT')
+    expect(mocks.requirePermission).toHaveBeenCalledWith(expect.any(String), 'accounts', 'create')
   })
 })

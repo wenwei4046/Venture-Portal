@@ -1,6 +1,6 @@
 CLAUDE.md — HOUZS Venture Portal
 Project Overview
-Internal banking portal for HOUZS Venture Sdn Bhd (HV), a holding company managing 7 subsidiaries in Malaysia's home furnishing industry. HV acts as an internal bank (borrow from subsidiaries, lend to others), shared services hub (Marketing/Finance/HR), and director salary distribution center.
+Internal banking portal for HOUZS Venture Holding Sdn Bhd (HV — printed from `lib/company.ts`), a holding company managing 7 subsidiaries in Malaysia's home furnishing industry. HV acts as an internal bank (borrow from subsidiaries, lend to others), shared services hub (Marketing/Finance/HR), and director salary distribution center.
 Tech Stack — Next.js 15 (App Router) · Supabase (PostgreSQL + Auth + RLS + Edge Functions) · Vercel · TypeScript · Tailwind CSS · Recharts · React hooks (no Redux)
 Environment Variables
 ```
