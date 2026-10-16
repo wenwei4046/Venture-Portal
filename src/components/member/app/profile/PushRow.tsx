@@ -8,14 +8,14 @@ import { ICON, Svg } from "../icons";
 import s from "./profile.module.css";
 
 /**
- * Phone notifications (2026-10-11 — the user: "铃铛 + 手机推送"; not in the
- * prototype, drawn as a workspace row like *Install the app*): this phone
- * shows the bell's news — a meeting booked for them, added, changed or
- * cancelled; their manpower request's step — and, since 2026-10-14, their
- * customers' messages, new leads and visits from the CRM. The phone's
- * permission is asked only when the row is pressed. Nothing where the browser
- * cannot show them. On an Android phone, once on, *Make them pop up* says how
- * to let them pop over the screen (PopUpGuide) — only the person can.
+ * Settings › Notifications (2026-10-16 — the user, Profile's Privacy, Account and Sign out circled: "combine to one,
+ * name (settings), then add on one function is notification on, if on this, it will allow the permission setting for
+ * notification"; was Your workspace's *Phone notifications* row since 2026-10-11). This phone shows the bell's news —
+ * a meeting booked for them, added, changed or cancelled; their manpower request's step; a memo — and the CRM's
+ * messages, new leads and visits of their own chats. The phone's permission is asked only when it is switched on, inside
+ * the press (push-client.ts › turnPushOn). Said under it when the switch cannot answer: an iPhone outside the Home
+ * Screen app, a phone that blocked them, why it failed. Nothing where the browser cannot show them. On an Android phone,
+ * once on, *Make them pop up* says how to let them pop over the screen (PopUpGuide) — only the person can.
  */
 export default function PushRow() {
   const [state, setState] = useState<PushState | null>(null);
@@ -26,30 +26,28 @@ export default function PushRow() {
     void pushState().then(setState).catch(() => setState("unsupported"));
   }, []);
   if (state === null || state === "unsupported") return null;
+  const on = state === "on";
+  const usable = on || state === "off";
   const press = () =>
     start(async () => {
-      const res = state === "on" ? await turnPushOff(removePushSubscription) : await turnPushOn("revenue", savePushSubscription, reportPushTrouble);
+      const res = on ? await turnPushOff(removePushSubscription) : await turnPushOn("revenue", savePushSubscription, reportPushTrouble);
       setState(res.state);
       setReason(res.reason ?? "");
     });
+  const note = reason || (usable ? "" : PUSH_WORDS[state]);
   return (
     <>
-      <button className={s.workRow} onClick={press} disabled={busy || state === "denied" || state === "install"} aria-pressed={state === "on"}>
-        <span className={`${s.workIcon} ${s.toneMemos}`}><Svg d={ICON.bell} size={22} sw={1.8} /></span>
-        <span className={s.workText}>
-          <span className={s.workLabel}>Phone notifications</span>
-          <span className={s.workSub}>{reason || PUSH_WORDS[state]}</span>
+      <button className={s.setRow} onClick={press} disabled={busy || !usable} data-busy={busy ? "" : undefined} aria-pressed={on}>
+        <Svg d={ICON.bell} size={20} sw={1.7} />
+        <span className={s.setText}>
+          <span>Notifications</span>
+          {note ? <span className={reason ? `${s.setSub} ${s.setSubBad}` : s.setSub}>{note}</span> : null}
         </span>
-        <span className={s.pushSwitch} data-on={state === "on" ? "1" : undefined} aria-hidden="true" />
+        {usable ? <span className={s.pushSwitch} data-on={on ? "1" : undefined} aria-hidden="true" /> : null}
       </button>
-      {state === "on" && popUpNeedsTurningOn() ? (
-        <button className={s.workRow} onClick={() => setGuide(true)}>
-          <span className={`${s.workIcon} ${s.toneMemos}`}><Svg d={ICON.popUp} size={22} sw={1.8} /></span>
-          <span className={s.workText}>
-            <span className={s.workLabel}>Make them pop up</span>
-            <span className={s.workSub}>Pop on screen, once per phone</span>
-          </span>
-          <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
+      {on && popUpNeedsTurningOn() ? (
+        <button className={s.hideBtn} onClick={() => setGuide(true)}>
+          Make them pop up<Svg d={ICON.popUp} size={20} sw={1.7} />
         </button>
       ) : null}
       {guide ? <PopUpGuide onClose={() => setGuide(false)} /> : null}

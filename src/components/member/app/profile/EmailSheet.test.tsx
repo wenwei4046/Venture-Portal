@@ -17,13 +17,14 @@ const actionsOf = (mine: MyEmail | null) => ({
   withdraw: vi.fn(async () => ({ ok: true as const, mine: { email: "mei@x.my", latest: { ...waiting, status: "cancelled" as const } } })),
 });
 
-describe("Profile’s Account section", () => {
+// Account's buttons live in Settings since 2026-10-16 (the user: Privacy, Account and Sign out "combine to one, name (settings)").
+describe("Profile’s Settings: the account", () => {
   it("offers Request to change email beside Change password, when it may", () => {
     const changeEmail = vi.fn();
     render(<ProfileMain vm={vm} hidden={false} actions={{ open: vi.fn(), signOut: vi.fn(), changePassword: vi.fn(), changeEmail }} />);
-    const account = screen.getByRole("region", { name: "Account" });
-    expect(within(account).getAllByRole("button").map(b => b.textContent)).toEqual(["Change password", "Request to change email"]);
-    fireEvent.click(within(account).getByRole("button", { name: "Request to change email" }));
+    const settings = screen.getByRole("region", { name: "Settings" });
+    expect(within(settings).getAllByRole("button").map(b => b.textContent)).toEqual(["Change password", "Request to change email", "Sign out"]);
+    fireEvent.click(within(settings).getByRole("button", { name: "Request to change email" }));
     expect(changeEmail).toHaveBeenCalled();
   });
 

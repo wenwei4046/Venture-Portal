@@ -72,6 +72,25 @@ describe('pushing what is due', () => {
     expect(done.args.p_gone).toEqual(['https://fcm.googleapis.com/gone'])
   })
 
+  // 2026-10-16: the user's iPhone got nothing, and nothing said what Apple answered — the notice counted as sent
+  // because the Android took it. A push service's refusal is said in the server's log, by host and its own words.
+  it('says what a push service refused, even when another device took the notice', async () => {
+    process.env.VAPID_PRIVATE_KEY = PRIVATE
+    const db = fakeDb([
+      { id: 'n1', title: 'Principal added you to a meeting', body: '', refKind: 'booking', refId: 'b1',
+        subs: [{ endpoint: 'https://fcm.googleapis.com/a', ...DEVICE, app: 'hr' }, { endpoint: 'https://web.push.apple.com/secret-token', ...DEVICE, app: 'hr' }] },
+    ])
+    const fetcher = vi.fn(async (url: string) => url.includes('apple')
+      ? new Response('{"reason":"BadJwtToken"}', { status: 403 })
+      : new Response(null, { status: 201 }))
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await flushPush({ client: db.client as never, fetcher: fetcher as never })).toEqual({ sent: 1, gone: 0 })
+    expect(log).toHaveBeenCalledWith('[push] refused', JSON.stringify({ host: 'web.push.apple.com', status: 403, reason: '{"reason":"BadJwtToken"}' }))
+    // The host only — never the device's own address.
+    expect(JSON.stringify(log.mock.calls)).not.toContain('secret-token')
+    log.mockRestore()
+  })
+
   it('never throws into the work that called it', async () => {
     process.env.VAPID_PRIVATE_KEY = PRIVATE
     const client = { rpc: async () => { throw new Error('network') } }

@@ -27,7 +27,7 @@ export interface ProfileMainActions {
   /** Absent while their ticks close the page (2026-10-11, People › Permissions › Revenue app): no chip. */
   scheme?: () => void;
   brandWeeks?: () => void;
-  /** Absent while My income is closed (2026-10-11): the income stays hidden, so Privacy has nothing to show. */
+  /** Absent while My income is closed (2026-10-11): the income stays hidden, so Settings draws no eye. */
   toggleHide?: () => void;
   signOut: () => void;
   /** A Principal not viewing anybody yet: the way into View as. */
@@ -55,12 +55,16 @@ const VIEWS: { id: ModuleId; where: string }[] = [
 ];
 
 /**
- * Profile — the peach card, Your workspace, Privacy and Sign out (lines 1132–1187).
+ * Profile — the peach card, Your workspace, and Settings (lines 1132–1187: Privacy and Sign out, one section since
+ * 2026-10-16).
  * `closedRows`: the workspace's pages their ticks close (2026-10-11) — not listed.
  */
 export default function ProfileMain({ vm, hidden, actions, crm = true, closedRows = NO_ROWS, push = false, views = null }: {
   vm: ProfileMainVM; hidden: boolean; actions: ProfileMainActions; crm?: boolean; closedRows?: readonly WorkKey[];
-  /** This phone's notifications row (2026-10-11): their own app only — never while the Principal views a member. */
+  /**
+   * Settings › Notifications (2026-10-11; in Settings since 2026-10-16): their own app only — the Principal's too,
+   * never while the Principal views a member.
+   */
   push?: boolean;
   /**
    * Switch view (2026-10-11 — the user: "do a switch button for me to switch to hr and other view, in revenue view
@@ -147,33 +151,30 @@ export default function ProfileMain({ vm, hidden, actions, crm = true, closedRow
             </button>
           ))}
           <InstallRow />
-          {push ? <PushRow /> : null}
         </section>
-        {actions.toggleHide ? (
-          <section className={s.privacy}>
-            <h2 className={s.h2}>Privacy</h2>
+        {/* Settings (2026-10-16 — the user, Privacy, Account and Sign out circled: "combine to one, name (settings),
+            then add on one function is notification on"): this phone's notifications first, Sign out last. */}
+        <section className={s.settings} aria-label="Settings">
+          <h2 className={s.h2}>Settings</h2>
+          {push ? <PushRow /> : null}
+          {actions.toggleHide ? (
             <button className={s.hideBtn} onClick={actions.toggleHide}>
               {hidden ? "Show income amounts" : "Hide income amounts"}<Svg d={hidden ? ICON.eyeOff : ICON.eye} size={20} sw={1.7} />
             </button>
-          </section>
-        ) : null}
-        {/* Not in the prototype (2026-10-12): the login's own password, drawn as Privacy's button. */}
-        {actions.changePassword || actions.changeEmail ? (
-          <section className={s.privacy} aria-label="Account">
-            <h2 className={s.h2}>Account</h2>
-            {actions.changePassword ? (
-              <button className={s.hideBtn} onClick={actions.changePassword}>
-                Change password<Svg d={ICON.lock} size={20} sw={1.7} />
-              </button>
-            ) : null}
-            {actions.changeEmail ? (
-              <button className={s.hideBtn} onClick={actions.changeEmail}>
-                Request to change email<Svg d={ICON.mail} size={20} sw={1.7} />
-              </button>
-            ) : null}
-          </section>
-        ) : null}
-        <button className={s.signOut} onClick={actions.signOut}>Sign out</button>
+          ) : null}
+          {/* Not in the prototype (2026-10-12): the login's own password and email, drawn as the eye's button. */}
+          {actions.changePassword ? (
+            <button className={s.hideBtn} onClick={actions.changePassword}>
+              Change password<Svg d={ICON.lock} size={20} sw={1.7} />
+            </button>
+          ) : null}
+          {actions.changeEmail ? (
+            <button className={s.hideBtn} onClick={actions.changeEmail}>
+              Request to change email<Svg d={ICON.mail} size={20} sw={1.7} />
+            </button>
+          ) : null}
+          <button className={s.signOut} onClick={actions.signOut}>Sign out</button>
+        </section>
       </div>
     </div>
   );

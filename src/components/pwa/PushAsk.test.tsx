@@ -82,6 +82,17 @@ describe('the first open’s question', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('the portal’s (2026-10-16): its own words, and an open that tells the server nothing on its own', async () => {
+    const trouble = vi.fn()
+    render(<PushAsk app="hr" save={save} trouble={trouble} body="Meetings and memos reach this phone." reportOpen={false} />)
+    expect(await screen.findByText('Meetings and memos reach this phone.')).toBeInTheDocument()
+    expect(client.healPush).toHaveBeenCalledWith('hr', save, undefined)
+    client.turnPushOn.mockResolvedValue({ state: 'on' })
+    fireEvent.click(screen.getByRole('button', { name: 'Allow notifications' }))
+    // A press still tells the server what went wrong.
+    await waitFor(() => expect(client.turnPushOn).toHaveBeenCalledWith('hr', save, trouble))
+  })
+
   it('is not asked where the phone blocked them or cannot show them', async () => {
     for (const state of ['denied', 'unsupported', 'install'] as const) {
       client.healPush.mockResolvedValue(state)
