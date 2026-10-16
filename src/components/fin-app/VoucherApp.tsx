@@ -185,17 +185,19 @@ export default function VoucherApp({
   const exportHref = (format: 'xlsx' | 'pdf') => `/payments/export?${new URLSearchParams({ format, direction: receipts ? 'credit' : 'debit' }).toString()}`
   // Payment's says *Payment* (2026-10-16, the user: *Create payment* filled its
   // button edge to edge on the phone and did not sit centred); the sheet it
-  // opens is still titled Create payment.
+  // opens is still titled Create payment. Receive's follow — *Receipt* and
+  // *Repayment* (same day, the user: "CAN may do the same things"); their
+  // sheets keep Create receipt and Loan repayment received.
   const createBtn: BarButton | null = canCreate
     ? receipts
-      ? { key: 'receipt', label: 'Create receipt', kind: 'primary', onClick: () => setMaking('receipt') }
+      ? { key: 'receipt', label: 'Receipt', kind: 'primary', onClick: () => setMaking('receipt') }
       : create
         ? { key: 'payment', label: 'Payment', kind: 'primary', onClick: () => setMaking('payment') }
         : null
     : null
   const hubBar: BarButton[] = receipts
     ? [
-        ...(createBtn ? [createBtn, { key: 'loan', label: 'Loan repayment', onClick: () => setMaking('loan') } as BarButton] : []),
+        ...(createBtn ? [createBtn, { key: 'loan', label: 'Repayment', onClick: () => setMaking('loan') } as BarButton] : []),
         ...(canExport ? [{ key: 'more', label: '⋯', kind: 'more', onClick: () => setMenu('export') } as BarButton] : []),
       ]
     : [
