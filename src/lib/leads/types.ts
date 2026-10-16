@@ -62,6 +62,9 @@ export interface LeadContact {
   lastDir: 'in' | 'out'
   lastText: string
   createdAt: string
+  /** The button flow on this conversation (mig 20261016310000): running = waiting on the customer's answer. */
+  flowState?: 'none' | 'running' | 'done' | 'stopped'
+  flowName?: string | null
 }
 
 export interface LeadMessage {
@@ -73,6 +76,8 @@ export interface LeadMessage {
   phoneFound: string | null
   delivery: 'recorded' | 'sent' | 'failed'
   at: string
+  /** A flow question's buttons, as the customer saw them. */
+  buttons?: string[] | null
 }
 
 export interface LeadEvent {

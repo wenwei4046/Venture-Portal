@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import type { LeadFlow } from './flow'
 import type { LeadConfig, LeadContact, LeadThread } from './types'
 
 /**
@@ -42,4 +43,9 @@ export function loadThread(contactId: string): Promise<Read<LeadThread | null>> 
 /** Every conversation started in [from, to) — YYYY-MM-DD, the office's days. */
 export function loadLeadList(from: string, to: string): Promise<Read<LeadContact[]>> {
   return rpc<LeadContact[]>('lead_list', { p_from: from, p_to: to }, 'The leads')
+}
+
+/** Every flow, with what each started this week. */
+export function loadFlows(): Promise<Read<LeadFlow[]>> {
+  return rpc<LeadFlow[]>('lead_flows', undefined, 'The flows')
 }

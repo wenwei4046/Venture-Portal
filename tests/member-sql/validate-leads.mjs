@@ -169,4 +169,65 @@ const grants = await q(`select count(*)::int n from information_schema.role_tabl
   where table_name like 'lead\\_%' and grantee in ('anon', 'authenticated')`)
 check(grants[0].n, 0, 'no table grants')
 
+// ── Flows (mig 20261016310000) ──────────────────────────────────────────────
+await db.exec(await readFile(new URL('../../supabase/migrations/20261016310000_lead_flows.sql', import.meta.url), 'utf8'))
+const SOFA = JSON.stringify([
+  { id: 's1', kind: 'question', text: '你想看哪一種？', buttons: [{ label: '3 人座', next: 's2' }, { label: 'L 型', next: 's2' }] },
+  { id: 's2', kind: 'message', text: '照片 👇', next: 's3' },
+  { id: 's3', kind: 'phone', text: '留個電話？', next: 's4' },
+  { id: 's4', kind: 'handoff', text: '同事會聯絡你' },
+])
+await as(CS_USER, ['leads.view', 'leads.create', 'leads.edit'])
+await refuses(`select public.lead_save_flow(null, '{"name":"x","triggerKind":"first","steps":[]}')`, [], /Lead View · Manage/, 'flows need Manage')
+await as(CS_USER, ALL)
+await refuses(`select public.lead_save_flow(null, '{"name":"x","triggerKind":"first","steps":[]}')`, [], /at least one step/, 'a flow needs steps')
+await refuses(`select public.lead_save_flow(null, $1::jsonb)`, [JSON.stringify({ name: 'x', triggerKind: 'first', steps: [{ id: 's1', kind: 'question', text: 'q', buttons: [{ label: 'A', next: 's9' }] }] })], /leads to a step/, 'a button to nowhere')
+await refuses(`select public.lead_save_flow(null, '{"name":"x","triggerKind":"ad","steps":[]}')`, [], /which ad or keyword/, 'an ad flow names its ad')
+const sofaFlow = (await q(`select public.lead_save_flow(null, jsonb_build_object('name','沙發廣告','brandId',$1::text,'triggerKind','ad','triggerValue','Sofa Week','active',true,'steps',$2::jsonb)) i`, [b2990, SOFA]))[0].i
+await q(`select public.lead_save_flow(null, jsonb_build_object('name','歡迎','triggerKind','first','active',true,'steps',$1::jsonb))`,
+  [JSON.stringify([{ id: 'w1', kind: 'handoff', text: 'Hi！同事馬上回覆你' }])])
+await q(`select public.lead_save_flow(null, jsonb_build_object('name','關掉的','triggerKind','first','active',false,'steps',$1::jsonb))`,
+  [JSON.stringify([{ id: 'x1', kind: 'handoff', text: '不會出現' }])])
+
+const flowThread = async c => (await q('select public.lead_thread($1) t', [c]))[0].t
+// From the ad: the ad's flow, not the welcome.
+const ben = (await q(`select public.lead_simulate($1, 'messenger', 'Ben', 'Oct Sofa Week（影片）', '你好') c`, [b2990]))[0].c
+let ft = await flowThread(ben)
+check(ft.messages.map(m => [m.sender, m.body]), [['customer', '你好'], ['flow', '你想看哪一種？']], 'the ad starts its flow')
+check(ft.messages[1].buttons, ['3 人座', 'L 型'], 'the question carries its buttons')
+check([ft.contact.flowState, ft.contact.flowName, ft.contact.lastDir], ['running', '沙發廣告', 'out'], 'waiting on the customer')
+// A button: the photos, then the phone question.
+await q(`select public.lead_simulate($1, 'messenger', 'Ben', '', ' l 型 ')`, [b2990])
+ft = await flowThread(ben)
+check(ft.messages.slice(-2).map(m => m.body), ['照片 👇', '留個電話？'], 'a message goes straight on to the next step')
+// The phone: found, and the hand-over ends the flow and waits for Customer Service.
+await q(`select public.lead_simulate($1, 'messenger', 'Ben', '', '0123384721')`, [b2990])
+ft = await flowThread(ben)
+check([ft.messages.at(-1).body, ft.contact.flowState, ft.contact.phoneState, ft.contact.lastDir], ['同事會聯絡你', 'done', 'detected', 'in'], 'handed to Customer Service with the phone')
+check(ft.events.some(e => e.what.includes('handed the customer to Customer Service')), true, 'the timeline says so')
+
+// Typed instead of a button: the flow stops.
+const cara = (await q(`select public.lead_simulate($1, 'messenger', 'Cara', 'Sofa Week', 'hi') c`, [b2990]))[0].c
+await q(`select public.lead_simulate($1, 'messenger', 'Cara', '', '請問有分期嗎')`, [b2990])
+ft = await flowThread(cara)
+check([ft.contact.flowState, ft.messages.at(-1).sender], ['stopped', 'customer'], 'a typed answer stops the flow')
+// Customer Service replying stops a running one.
+const dan = (await q(`select public.lead_simulate($1, 'messenger', 'Dan', 'Sofa Week', 'hi') c`, [b2990]))[0].c
+await q('select public.lead_reply($1, $2)', [dan, '你好，我是 Mei Ling'])
+check((await flowThread(dan)).contact.flowState, 'stopped', 'a reply stops the flow')
+// No ad: the welcome (the inactive one never runs); a second message starts nothing more.
+const eve = (await q(`select public.lead_simulate($1, 'instagram', 'Eve', '', 'hello') c`, [bCarress]))[0].c
+await q(`select public.lead_simulate($1, 'instagram', 'Eve', '', 'still there?')`, [bCarress])
+ft = await flowThread(eve)
+check(ft.messages.map(m => m.body), ['hello', 'Hi！同事馬上回覆你', 'still there?'], 'the welcome once, never the inactive flow')
+// An old conversation (it had replies before any flow) starts none.
+await q(`select public.lead_simulate($1, 'messenger', 'Aisyah', '', 'hello again')`, [b2990])
+check((await flowThread(aisyah)).messages.at(-1).sender, 'customer', 'an answered conversation starts no flow')
+// Reading and removing.
+const flows = (await q('select public.lead_flows() f'))[0].f
+check(flows.map(f => [f.name, f.started]), [['沙發廣告', 3], ['歡迎', 1], ['關掉的', 0]], 'flows with the conversations they started')
+await q('select public.lead_remove_flow($1)', [sofaFlow])
+check((await q('select public.lead_flows() f'))[0].f.length, 2, 'removed')
+check((await q(`select count(*)::int n from information_schema.role_table_grants where table_name = 'lead_flows' and grantee in ('anon','authenticated')`))[0].n, 0, 'no grants on flows')
+
 console.log(`validate-leads: ${checks} checks passed`)

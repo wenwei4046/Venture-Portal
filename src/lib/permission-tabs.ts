@@ -236,6 +236,8 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('lead', 'inbox', 'Inbox', LEADS_KEYS, { view: ['leads.view'], create: ['leads.create'], edit: ['leads.edit'] }),
   tab('lead', 'leads', 'Leads', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.edit'] }),
   tab('lead', 'insight', 'Insight', LEADS_KEYS, { view: ['leads.view'] }),
+  // Flows (phase 2, mig 20261016310000): the button flows, set up as Settings is (Manage, with its Edit).
+  tab('lead', 'flows', 'Flows', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
   // Settings: the brands and their salespeople (Manage, with its Edit), and the test enquiry (Create).
   tab('lead', 'settings', 'Settings', LEADS_KEYS, { view: ['leads.view'], create: ['leads.create'], edit: ['leads.manage'] }),
 ]

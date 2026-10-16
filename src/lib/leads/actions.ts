@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import type { FlowStep, FlowTrigger } from './flow'
 import type { LeadThread, Appt, LeadCardFields, Shown } from './types'
 
 /**
@@ -89,4 +90,16 @@ export async function saveLeadSales(salesId: string | null, brandId: string, dat
 export async function removeLeadSales(salesId: string) {
   await requireActionOn('/leads/settings', 'leads', 'manage')
   return call<null>('lead_remove_sales', { p_id: salesId }, 'The salesperson was not removed.')
+}
+
+// ── Flows ───────────────────────────────────────────────────────────────────
+
+export async function saveLeadFlow(flowId: string | null, data: { brandId: string | null; name: string; triggerKind: FlowTrigger; triggerValue: string; active: boolean; steps: FlowStep[] }) {
+  await requireActionOn('/leads/flows', 'leads', 'manage')
+  return call<string>('lead_save_flow', { p_id: flowId, p_data: data }, 'The flow was not saved.')
+}
+
+export async function removeLeadFlow(flowId: string) {
+  await requireActionOn('/leads/flows', 'leads', 'manage')
+  return call<null>('lead_remove_flow', { p_id: flowId }, 'The flow was not removed.')
 }

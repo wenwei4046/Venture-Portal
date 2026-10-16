@@ -297,3 +297,6 @@
 .salesLine { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid rgb(var(--hv-divider)); font-size: 13px; }
 .inline { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
 .ok { padding: 8px 10px; border-radius: 8px; background: rgb(var(--hv-ledger-bg)); border: 1px solid rgb(var(--hv-ledger-border)); color: rgb(var(--hv-ledger)); font-size: 12.5px; }
+
+/* A flow question's buttons, as the customer saw them (Inbox). */
+.flowButton { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 99px; border: 1px solid rgb(var(--hv-blue)); color: rgb(var(--hv-blue)); font-size: 12px; background: rgb(255 255 255); }

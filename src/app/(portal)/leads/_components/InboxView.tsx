@@ -136,6 +136,7 @@ export default function InboxView({
                       <span className={s.rowChips}>
                         <BrandChip brand={brands.get(c.brandId)} />
                         <StateChip state={st} />
+                        {c.flowState === 'running' ? <span className={s.brand} data-tone="blue">Flow 中</span> : null}
                         {c.phone ? <span className={s.found}>{formatPhone(c.phone)}</span> : null}
                         {c.isTest ? <span className={s.brand} data-tone="plum">TEST</span> : null}
                       </span>
@@ -231,8 +232,13 @@ function Chat({ contact, thread, brandName, today, canReply, loading, onSent }: 
         ) : (
           <div key={m.id} className={s.msgOut}>
             <div className={s.bubbleOut} data-sender={m.sender}>{m.body}</div>
+            {m.buttons?.length ? (
+              <span className={s.tabs} style={{ justifyContent: 'flex-end' }}>
+                {m.buttons.map(b => <span key={b} className={s.flowButton}>{b}</span>)}
+              </span>
+            ) : null}
             <span className={s.msgMeta}>
-              {m.sender === 'cs' ? `${m.byName} · 客服` : m.sender === 'ai' ? 'AI Agent' : 'Flow'} · {whenShort(m.at, today)}
+              {m.sender === 'cs' ? `${m.byName} · 客服` : m.sender === 'ai' ? 'AI Agent' : `Flow · ${m.byName}`} · {whenShort(m.at, today)}
               {m.delivery === 'recorded' ? ' · 只記錄 recorded' : m.delivery === 'failed' ? ' · 沒發出 failed' : ''}
             </span>
           </div>
