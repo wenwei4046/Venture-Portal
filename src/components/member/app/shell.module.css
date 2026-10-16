@@ -389,11 +389,34 @@
 .capsuleCrm .capsuleBadge { right: -4px; }
 .capsuleWithCrm .capsuleBell { width: 42px; }
 .capsuleWithCrm .capsuleBell .capsuleBadge { right: 0; }
-/* A press: .6 for 120ms, every button of the capsule alike (the handoff: "same as other capsule buttons"). */
-.capsuleSd, .capsuleCrm, .capsuleBell, .capsuleAvatar { transition: opacity 120ms cubic-bezier(.2,.8,.2,1); }
-.capsuleSd:active, .capsuleCrm:active, .capsuleBell:active, .capsuleAvatar:active { opacity: .6; }
+/* A press: .6 for 120ms, every button of the capsule alike (the handoff: "same as other capsule buttons") — but the CRM
+   chat button, whose press is the switch's (2026-10-17, `pressFeedback`): a squeeze and a ripple round the icon,
+   clipped to a circle on it (the icon sits 8px in: its middle is 18.5px across, 22px down). */
+.capsuleSd, .capsuleBell, .capsuleAvatar { transition: opacity 120ms cubic-bezier(.2,.8,.2,1); }
+.capsuleSd:active, .capsuleBell:active, .capsuleAvatar:active { opacity: .6; }
 @media (prefers-reduced-motion: reduce) {
-  .capsuleSd, .capsuleCrm, .capsuleBell, .capsuleAvatar { transition: none; }
+  .capsuleSd, .capsuleBell, .capsuleAvatar { transition: none; }
+}
+.capsuleRippleClip {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 37px;
+  height: 37px;
+  border-radius: 50%;
+  overflow: hidden;
+  pointer-events: none;
+}
+.capsuleRipple {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 80px;
+  height: 80px;
+  margin: -40px 0 0 -40px;
+  border-radius: 50%;
+  background: var(--rv-accent);
+  opacity: 0;
 }
 
 /* ── the page ── */

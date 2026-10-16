@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="design_doc_mode" content="canvas">
+  <link rel="stylesheet" href="_ds/houzs-venture-design-system-1fecd655-db12-4974-abf4-3d7434e41386/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/houzs-venture-design-system-1fecd655-db12-4974-abf4-3d7434e41386/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/houzs-venture-design-system-1fecd655-db12-4974-abf4-3d7434e41386/tokens/colors-hr.css">
+  <link rel="stylesheet" href="_ds/houzs-venture-design-system-1fecd655-db12-4974-abf4-3d7434e41386/tokens/colors-revenue.css">
+  <link rel="stylesheet" href="_ds/houzs-venture-design-system-1fecd655-db12-4974-abf4-3d7434e41386/tokens/layout.css">
+  <link rel="stylesheet" href="_ds/houzs-venture-design-system-1fecd655-db12-4974-abf4-3d7434e41386/tokens/theme.css">
+  <link rel="stylesheet" href="_ds/houzs-venture-design-system-1fecd655-db12-4974-abf4-3d7434e41386/tokens/base.css">
+  <link rel="stylesheet" href="_ds/houzs-venture-design-system-1fecd655-db12-4974-abf4-3d7434e41386/styles.css">
+  <script src="_ds/houzs-venture-design-system-1fecd655-db12-4974-abf4-3d7434e41386/_ds_bundle.js"></script>
+  <style>body{margin:0;background:#F5EEE9;} a{color:#BD4A19;} a:hover{color:#3F2B22;}</style>
+</helmet>
+
+<section data-screen-label="Turn 2 · Curtain colour & wording" style="padding:56px 56px 24px;font-family:var(--font-sans);color:var(--rv-ink);">
+  <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:36px;max-width:760px;">
+    <span style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--rv-sub);">Revenue → CRM · Switch view</span>
+    <h1 style="margin:0;font-family:var(--font-display-rv);font-size:34px;font-weight:750;letter-spacing:-.03em;">Peach · Context</h1>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:48px;align-items:flex-start;">
+    <sc-for list="{{ opts2 }}" as="o" hint-placeholder-count="3">
+      <div id="{{ o.id }}" style="display:flex;flex-direction:column;gap:16px;width:360px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="display:inline-grid;place-items:center;min-width:34px;height:24px;padding:0 8px;border-radius:12px;background:var(--rv-ink);color:#fff;font-family:var(--font-mono, monospace);font-size:12px;">{{ o.id }}</span>
+          <span style="font-family:var(--font-display-rv);font-size:19px;font-weight:750;letter-spacing:-.02em;">{{ o.name }}</span>
+          <button onClick="{{ o.replay }}" style="margin-left:auto;height:30px;padding:0 12px;border-radius:15px;border:1px solid var(--rv-stepper-border);background:#fff;color:var(--rv-ink);font-family:inherit;font-size:12.5px;cursor:pointer;">Replay</button>
+        </div>
+        <div style="position:relative;width:360px;height:740px;border-radius:44px;background:#fff;overflow:hidden;box-shadow:0 0 0 8px #2A1D17, 0 24px 60px rgba(63,43,34,.25);">
+          <div style="position:absolute;inset:0;transform:{{ o.revTf }};opacity:{{ o.revOp }};transform-origin:50% 40%;background:#fff;">
+            <div style="height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;font-size:14px;font-weight:600;"><span>9:41</span><span style="font-family:var(--font-mono, monospace);font-size:11px;">5G ▮▮▮</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 20px 0;">
+              <div style="width:34px;height:34px;border-radius:10px;background:var(--rv-accent);color:#FFF0E4;display:grid;place-items:center;font-family:var(--font-display-rv);font-weight:800;font-size:17px;">H</div>
+              <span style="font-size:13px;font-weight:650;letter-spacing:.06em;">HOUZS</span>
+              <div style="position:relative;margin-left:auto;display:flex;align-items:center;gap:6px;height:34px;padding:0 12px 0 10px;border-radius:17px;background:var(--rv-pill-on);color:var(--rv-accent);font-size:13px;font-weight:650;transform:{{ o.chipTf }};">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h17v15H3V6Zm0 0V3h14v3m-3 6h7v5h-7v-5Z"></path></svg>
+                <span>Revenue</span><span style="font-size:10px;">▾</span>
+                <span style="position:absolute;left:50%;top:50%;width:80px;height:80px;margin:-40px 0 0 -40px;border-radius:50%;background:var(--rv-accent);pointer-events:none;transform:{{ o.ripTf }};opacity:{{ o.ripOp }};"></span>
+              </div>
+            </div>
+            <div style="padding:22px 20px 0;display:flex;flex-direction:column;gap:4px;">
+              <span style="font-family:var(--font-display-rv);font-size:26px;font-weight:750;letter-spacing:-.03em;">Hello, Jia Hui</span>
+              <span style="font-size:13px;color:var(--rv-sub);">Sat, 17 Oct · Akemi brand week</span>
+            </div>
+            <div style="margin:18px 20px 0;border-radius:24px;padding:18px;color:#fff;background:var(--rv-hero-gloss), var(--rv-hero-grad);box-shadow:0 12px 26px rgba(189,74,25,.3), var(--rv-hero-edge);">
+              <span style="font-size:13px;color:var(--rv-hero-sub);">October · Estimated income</span>
+              <div style="font-family:var(--font-display-rv);font-size:34px;font-weight:750;letter-spacing:-.03em;margin:6px 0 2px;font-feature-settings:var(--font-num-features);">RM 6,842.50</div>
+              <span style="font-size:12.5px;color:var(--rv-hero-sub);">RM 3,120 behind Aisyah Rahman (3rd)</span>
+            </div>
+            <div style="padding:24px 20px 10px;font-family:var(--font-display-rv);font-size:17px;font-weight:750;letter-spacing:-.02em;">Needs your action</div>
+            <div style="display:flex;flex-direction:column;gap:10px;padding:0 20px;">
+              <div style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:18px;background:var(--rv-peach);">
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;"><span style="font-size:14px;font-weight:650;">Deposit pending · Q-2041</span><span style="font-size:12.5px;color:var(--rv-sub);">Zanotti Lucca 3-seater · RM 1,200</span></div><span style="color:var(--rv-sub);">›</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:18px;background:var(--rv-peach);">
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;"><span style="font-size:14px;font-weight:650;">Delivery date to confirm</span><span style="font-size:12.5px;color:var(--rv-sub);">Akemi Comfort Queen · 2 Nov 2026</span></div><span style="color:var(--rv-sub);">›</span>
+              </div>
+            </div>
+          </div>
+          <div style="position:absolute;inset:0;background:#28190F;pointer-events:none;opacity:{{ o.scrimOp }};"></div>
+          <div style="position:absolute;inset:0;background:#fff;transform:{{ o.crmTf }};opacity:{{ o.crmOp }};box-shadow:{{ o.crmShadow }};">
+            <div style="height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;font-size:14px;font-weight:600;"><span>9:41</span><span style="font-family:var(--font-mono, monospace);font-size:11px;">5G ▮▮▮</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 20px 0;">
+              <div style="width:34px;height:34px;border-radius:10px;background:var(--rv-accent);color:#FFF0E4;display:grid;place-items:center;font-family:var(--font-display-rv);font-weight:800;font-size:17px;">H</div>
+              <span style="font-size:13px;font-weight:650;letter-spacing:.06em;">HOUZS</span>
+              <div style="margin-left:auto;display:flex;align-items:center;gap:6px;height:34px;padding:0 12px 0 10px;border-radius:17px;background:var(--rv-pill-on);color:var(--rv-accent);font-size:13px;font-weight:650;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M16 4a4 4 0 0 1 0 8m6 9v-2a4 4 0 0 0-3-3.87M12 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"></path></svg>
+                <span>CRM</span><span style="font-size:10px;">▾</span>
+              </div>
+            </div>
+            <div style="padding:22px 20px 0;display:flex;flex-direction:column;gap:4px;">
+              <span style="font-family:var(--font-display-rv);font-size:26px;font-weight:750;letter-spacing:-.03em;">Your pipeline</span>
+              <span style="font-size:13px;color:var(--rv-sub);">24 open leads · 6 to follow up today</span>
+            </div>
+            <div style="margin:18px 20px 0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:4px;border-radius:14px;background:var(--rv-chip);">
+              <span style="height:34px;display:grid;place-items:center;border-radius:10px;background:#fff;font-size:13px;font-weight:650;box-shadow:0 1px 3px rgba(63,43,34,.08);">Today</span>
+              <span style="height:34px;display:grid;place-items:center;font-size:13px;color:var(--rv-sub);">Leads</span>
+              <span style="height:34px;display:grid;place-items:center;font-size:13px;color:var(--rv-sub);">Quoted</span>
+            </div>
+            <div style="position:relative;margin-top:16px;">
+              <div style="display:flex;flex-direction:column;padding:0 20px;opacity:{{ o.rowsOp }};transform:{{ o.rowsTf }};">
+                <sc-for list="{{ leads }}" as="l" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--rv-rule-soft);">
+                    <div style="flex:none;width:40px;height:40px;border-radius:50%;background:var(--rv-peach-2);color:var(--rv-accent);display:grid;place-items:center;font-size:13px;font-weight:700;">{{ l.ini }}</div>
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;"><span style="font-size:14px;font-weight:650;">{{ l.name }}</span><span style="font-size:12.5px;color:var(--rv-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ l.sub }}</span></div>
+                    <span style="flex:none;height:24px;padding:0 10px;border-radius:12px;display:grid;place-items:center;font-size:11.5px;font-weight:650;background:{{ l.bg }};color:{{ l.fg }};">{{ l.tag }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:0 20px;background:#fff;opacity:{{ o.skelOp }};pointer-events:none;">
+                <sc-for list="{{ leads }}" as="l" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:12px;height:67px;border-bottom:1px solid var(--rv-rule-soft);">
+                    <div style="flex:none;width:40px;height:40px;border-radius:50%;background:var(--rv-bg-soft-2);opacity:{{ o.shimmer }};"></div>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:8px;"><div style="width:58%;height:11px;border-radius:6px;background:var(--rv-bg-soft-2);opacity:{{ o.shimmer }};"></div><div style="width:82%;height:9px;border-radius:5px;background:var(--rv-bg-soft-2);opacity:{{ o.shimmer }};"></div></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          
+          <sc-if value="{{ o.isB }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;pointer-events:none;transform:{{ o.panTf }};border-radius:{{ o.panR }};overflow:hidden;background:{{ o.panBg }};box-shadow:var(--rv-hero-edge);color:{{ o.panInk }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;">
+              <span style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:{{ o.capInk }};opacity:{{ o.capOp }};">{{ o.cap }}</span>
+              <div style="position:relative;height:56px;width:260px;overflow:hidden;text-align:center;font-family:var(--font-display-rv);font-size:46px;line-height:56px;font-weight:800;letter-spacing:-.04em;">
+                <span style="position:absolute;left:0;right:0;top:0;transform:{{ o.w1Tf }};">{{ o.w1 }}</span>
+                <span style="position:absolute;left:0;right:0;top:0;transform:{{ o.w2Tf }};">{{ o.w2 }}</span>
+              </div>
+              <div style="display:flex;gap:6px;opacity:{{ o.capOp }};">
+                <span style="width:6px;height:6px;border-radius:3px;background:{{ o.dotBg }};opacity:{{ o.d1 }};"></span>
+                <span style="width:6px;height:6px;border-radius:3px;background:{{ o.dotBg }};opacity:{{ o.d2 }};"></span>
+                <span style="width:6px;height:6px;border-radius:3px;background:{{ o.dotBg }};opacity:{{ o.d3 }};"></span>
+              </div>
+              <span style="position:absolute;left:0;right:0;bottom:64px;text-align:center;font-size:13px;color:{{ o.capInk }};opacity:{{ o.capOp }};">{{ o.foot }}</span>
+            </div>
+          </sc-if>
+          
+        </div>
+        <div style="height:3px;border-radius:2px;background:var(--rv-border);overflow:hidden;"><div style="height:100%;background:var(--rv-ink);width:{{ o.pct }};"></div></div>
+        <p style="margin:0;font-size:13.5px;line-height:1.6;color:var(--rv-sub);text-wrap:pretty;">{{ o.desc }}</p>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;speed&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.25,&quot;max&quot;:2,&quot;step&quot;:0.25,&quot;unit&quot;:&quot;×&quot;,&quot;tsType&quot;:&quot;number&quot;},&quot;loop&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const CYCLE = 5600;
+function bez(x) {
+  const x1 = .2, y1 = .8, x2 = .2, y2 = 1;
+  const cx = t => 3*x1*t*(1-t)*(1-t) + 3*x2*t*t*(1-t) + t*t*t;
+  const cy = t => 3*y1*t*(1-t)*(1-t) + 3*y2*t*t*(1-t) + t*t*t;
+  let lo = 0, hi = 1, t = x;
+  for (let i = 0; i < 18; i++) { t = (lo + hi) / 2; if (cx(t) < x) lo = t; else hi = t; }
+  return cy(t);
+}
+const cl = v => Math.max(0, Math.min(1, v));
+const seg = (t, a, b, lin) => { const p = cl((t - a) / (b - a)); return lin ? p : bez(p); };
+const inOut = p => p < .5 ? 2*p*p : 1 - Math.pow(-2*p + 2, 2) / 2;
+
+const META = [
+  { id: '1a', k: 'a', name: 'Tile flip', desc: 'Revenue 画面缩小淡出，中间升起品牌渐变砖。砖里的钱包图标沿 Y 轴翻成团队图标，文字从 “Leaving Revenue” 换成 “Opening CRM”，下方细进度条走完后砖放大淡出，CRM 浮现。适合作为有明确加载时间的过渡。' },
+  { id: '1b', k: 'b', name: 'Gradient curtain', desc: '收入卡的 peach→rust 渐变作为幕布从底部升起盖满屏幕，大字 “Revenue” 向上滚走、“CRM” 从下方滚入，三个点表示加载，然后幕布向上揭开露出 CRM。品牌感最强，强调“换了一个工作区”。' },
+  { id: '1c', k: 'c', name: 'Push & skeleton', desc: 'CRM 像新一页从右侧推入，Revenue 后退变暗。顶部出现深色状态胶囊 “Loading your pipeline”，列表先显示骨架屏，数据到了再逐步浮现。最接近原生 app，等待时间长短都撑得住。' },
+];
+
+const META3 = [
+  { id: '3a', f: 1, name: 'Icon tile', desc: '居中排版：渐变团队图标砖轻轻放大，大字 Revenue 滚成 CRM，下面是今日摘要和一条短进度条。层级清楚，信息最集中。' },
+  { id: '3b', f: 2, name: 'Editorial', desc: '左下对齐的大字排版，CRM 字号放到 76px，摘要拆成两行短句，底部一条通栏细线配百分比读数。更像杂志封面，品牌感强。' },
+  { id: '3c', f: 3, name: 'Summary card', desc: '幕布中间浮起一张白卡，H 砖 + CRM 标题 + 加载点，三行数字依次出现。等待时就把 CRM 首页最关键的数字先交给用户。' },
+];
+const META2 = [
+  { id: '2a', name: 'Rust · Workspace', panBg: 'var(--rv-hero-gloss), var(--rv-hero-grad)', panInk: '#FFFFFF', capInk: 'var(--rv-hero-sub)', dotBg: '#FFFFFF', cap: 'Switching workspace', w1: 'Revenue', w2: 'CRM', foot: 'Loading your leads',
+    desc: '沿用收入卡的 peach→rust 渐变，和 Revenue 首页同一种语气。文案点明“换工作区”，底部一句说明正在加载什么。' },
+  { id: '2b', name: 'Walnut · Bilingual', panBg: 'var(--rv-dark)', panInk: '#FFFFFF', capInk: 'var(--rv-dark-sub)', dotBg: 'var(--rv-accent-soft)', cap: 'Customers · 客户管理', w1: 'Sales', w2: 'Clients', foot: 'HOUZS Venture · CRM',
+    desc: '深胡桃色，和 toast、深色卡同色，更稳重，像进入另一个部门。大字用 Sales → Clients 讲“从卖货到管客户”，副标加中文。' },
+  { id: '2c', name: 'Peach · Context', panBg: 'var(--rv-peach)', panInk: 'var(--rv-accent)', capInk: 'var(--rv-sub)', dotBg: 'var(--rv-accent)', cap: 'Now opening', w1: 'Revenue', w2: 'CRM', foot: '24 open leads · 6 to follow up today',
+    desc: '浅 peach 底配 rust 大字，最轻、最不打扰。加载时直接显示 CRM 的今日摘要，等待期间就先给到有用的信息。' },
+];
+
+class Component extends DCLogic {
+  state = { now: 0, starts: [0, 0, 0, 0, 0, 0, 0, 0, 0] };
+  componentDidMount() {
+    const t0 = performance.now();
+    this.setState({ starts: [t0, t0, t0, t0, t0, t0, t0, t0, t0] });
+    const loop = () => { this.setState({ now: performance.now() }); this.raf = requestAnimationFrame(loop); };
+    this.raf = requestAnimationFrame(loop);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this.raf); }
+  replay(i) { const s = this.state.starts.slice(); s[i] = performance.now(); this.setState({ starts: s }); }
+
+  frame(k, t) {
+    const back = seg(t, 5000, 5500);
+    const tap = seg(t, 500, 950);
+    const o = {
+      ripTf: `scale(${.2 + 1.4 * tap})`, ripOp: t < 500 ? 0 : .3 * (1 - tap),
+      chipTf: `scale(${1 - .04 * Math.sin(Math.PI * seg(t, 500, 750, true))})`,
+      scrimOp: 0, crmShadow: 'none', skelOp: 0, rowsOp: 1, rowsTf: 'none', shimmer: 1,
+      isA: k === 'a', isB: k === 'b', isC: k === 'c',
+    };
+    if (k === 'a') {
+      const out = seg(t, 900, 1250), tin = seg(t, 1000, 1400), ex = seg(t, 2500, 2850);
+      const f1 = seg(t, 1400, 1600, true), f2 = seg(t, 1600, 1820);
+      o.revOp = t >= 5000 ? back : 1 - out; o.revTf = `scale(${1 - .05 * (t >= 5000 ? 0 : out)})`;
+      const ci = seg(t, 2550, 2900);
+      o.crmOp = ci * (1 - back); o.crmTf = `scale(${1.03 - .03 * ci})`;
+      o.aOp = tin * (1 - ex); o.aTf = `translateY(${(1 - tin) * 14}px) scale(${.7 + .3 * tin + .12 * ex})`;
+      o.ic1Tf = `rotateY(${90 * inOut(f1)}deg)`; o.ic1Op = f1 < 1 ? 1 : 0;
+      o.ic2Tf = `rotateY(${-90 + 90 * f2}deg)`; o.ic2Op = f1 >= 1 ? 1 : 0;
+      o.lb1Op = 1 - seg(t, 1400, 1600); o.lb2Op = seg(t, 1600, 1800);
+      o.barW = (seg(t, 1300, 2500) * 100) + '%';
+    } else if (k === 'b') {
+      const cv = seg(t, 900, 1450), un = seg(t, 2350, 2850), roll = seg(t, 1650, 2050);
+      const swapped = t >= 1450;
+      o.revOp = t >= 5000 ? back : (swapped ? 0 : 1); o.revTf = `scale(${1 - .04 * (swapped ? 0 : cv)})`;
+      const ci = seg(t, 2400, 2950);
+      o.crmOp = (swapped ? 1 : 0) * (1 - back); o.crmTf = `translateY(${(1 - ci) * 36}px)`;
+      o.panTf = `translateY(${t < 2350 ? (1 - cv) * 100 : -un * 100}%)`;
+      o.panR = t < 2350 ? `${(1 - cv) * 40}px ${(1 - cv) * 40}px 0 0` : `0 0 ${un * 40}px ${un * 40}px`;
+      o.capOp = seg(t, 1250, 1500) * (1 - seg(t, 2200, 2400));
+      o.w1Tf = `translateY(${-roll * 100}%)`; o.w2Tf = `translateY(${(1 - roll) * 100}%)`;
+      [1, 2, 3].forEach(i => { o['d' + i] = .3 + .7 * (.5 + .5 * Math.sin(t / 160 - i * 1.1)); });
+    } else {
+      const push = seg(t, 900, 1450);
+      o.revOp = t >= 5000 ? back : 1; o.revTf = `translateX(${(t >= 5000 ? 0 : -28 * push)}%)`;
+      o.scrimOp = t >= 5000 ? 0 : .2 * push;
+      o.crmOp = 1 - back; o.crmTf = `translateX(${(1 - push) * 100}%)`;
+      o.crmShadow = push > 0 && push < 1 ? '-12px 0 32px rgba(40,25,18,.18)' : 'none';
+      const pi = seg(t, 1300, 1550), po = seg(t, 2400, 2700);
+      o.pillOp = pi * (1 - po); o.pillTf = `translateY(${(1 - pi) * -10 - po * 10}px) scale(${.92 + .08 * pi})`;
+      o.spinTf = `rotate(${t * .45}deg)`;
+      o.skelOp = t < 900 ? 0 : 1 - seg(t, 2300, 2600);
+      o.shimmer = .55 + .45 * (.5 + .5 * Math.sin(t / 220));
+      const ri = seg(t, 2400, 2850);
+      o.rowsOp = t < 1300 ? 1 : ri; o.rowsTf = `translateY(${t < 1300 ? 0 : (1 - ri) * 10}px)`;
+    }
+    if (t < 900 && k !== 'c') { o.crmOp = 0; }
+    return o;
+  }
+
+  renderVals() {
+    const speed = this.props.speed ?? 1;
+    const loop = this.props.loop ?? true;
+    const opts = META.map((m, i) => {
+      const el = Math.max(0, (this.state.now - this.state.starts[i]) * speed);
+      const t = loop ? el % CYCLE : Math.min(el, 4999);
+      return { ...m, ...this.frame(m.k, t), pct: (t / CYCLE * 100) + '%', replay: () => this.replay(i) };
+    });
+    const leads = [
+      { ini: 'LW', name: 'Lim Wei Ming', sub: 'Zanotti Lucca 3-seater · Call at 3pm', tag: 'Today', bg: 'var(--rv-amber-bg)', fg: 'var(--rv-amber)' },
+      { ini: 'NI', name: 'Nurul Izzah', sub: 'Akemi Comfort Queen · RM 4,280', tag: 'Quoted', bg: 'var(--rv-pill-on)', fg: 'var(--rv-accent)' },
+      { ini: 'TM', name: 'Tan Mei Ling', sub: 'Dunlopillo Royal King · RM 6,150', tag: 'Won', bg: 'var(--rv-green-bg)', fg: 'var(--rv-green)' },
+      { ini: 'RK', name: 'Ravi Kumar', sub: 'Ergotex Firm Queen · Walk-in', tag: 'New', bg: 'var(--rv-chip)', fg: 'var(--rv-sub)' },
+    ];
+    const opts2 = META2.filter(m => m.id === '2c').map((m, i) => {
+      const el = Math.max(0, (this.state.now - this.state.starts[5]) * speed);
+      const t = loop ? el % CYCLE : Math.min(el, 4999);
+      return { ...m, ...this.frame('b', t), pct: (t / CYCLE * 100) + '%', replay: () => this.replay(5) };
+    });
+    const opts3 = META3.map((m, i) => {
+      const el = Math.max(0, (this.state.now - this.state.starts[6 + i]) * speed);
+      const t = loop ? el % CYCLE : Math.min(el, 4999);
+      const f = this.frame('b', t);
+      const bw = seg(t, 1300, 2300);
+      const x = { barW: (bw * 100) + '%', barPct: Math.round(bw * 100) + '%', tileTf: `scale(${.8 + .2 * seg(t, 1100, 1600)})`, cardTf: `translateY(${(1 - seg(t, 1100, 1600)) * 16}px)` };
+      [1, 2, 3].forEach(j => { const r = seg(t, 1400 + j * 160, 1800 + j * 160); x['r' + j + 'Op'] = r; x['r' + j + 'Tf'] = `translateY(${(1 - r) * 6}px)`; });
+      return { ...m, ...f, ...x, f1: m.f === 1, f2: m.f === 2, f3: m.f === 3, pct: (t / CYCLE * 100) + '%', replay: () => this.replay(6 + i) };
+    });
+    return { opts, opts2, opts3, leads };
+  }
+}
+</script>
+</body>
+</html>

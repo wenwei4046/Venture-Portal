@@ -19,6 +19,17 @@ export interface Me {
 export const badgeCount = (n: number) => (n > 99 ? "99+" : String(n));
 
 /**
+ * The CRM chat button's tap (2026-10-17, the switch handoff's chip press): a small squeeze, 1 → .96 → 1 in 250ms, and a
+ * ripple from the icon's middle, .2 → 1.6 while it fades from .3, in 450ms — while the curtain gets ready to rise.
+ */
+export function pressFeedback(button: HTMLElement, ripple: HTMLElement | null) {
+  if (typeof button.animate !== "function") return;
+  if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  button.animate([{ transform: "scale(1)" }, { transform: "scale(.96)" }, { transform: "scale(1)" }], { duration: 250, easing: "linear" });
+  ripple?.animate([{ transform: "scale(.2)", opacity: .3 }, { transform: "scale(1.6)", opacity: 0 }], { duration: 450, easing: "cubic-bezier(.2,.8,.2,1)" });
+}
+
+/**
  * The phone header (`header-style="d"`): wordmark, then Fair ▾ · bell · avatar in one capsule — and, on Today for an
  * account in the CRM (2026-10-14, the refresh handoff §2; the user: the header stays Today's), the CRM chat button
  * between the rule and the bell, its badge the customers' messages not read yet. Without it the capsule is as before.
@@ -37,6 +48,7 @@ export function MobileHeader({ ruled, back, subName, count, me, crm, onLogo, onB
   onBell: () => void;
   onProfile: () => void;
 }) {
+  const ripple = useRef<HTMLSpanElement>(null);
   return (
     <header className={`${s.header} ${ruled ? s.headerRuled : ""}`}>
       {back ? (
@@ -53,7 +65,8 @@ export function MobileHeader({ ruled, back, subName, count, me, crm, onLogo, onB
         </button>
         <span className={s.capsuleRule} />
         {crm && (
-          <button className={s.capsuleCrm} onClick={crm.onOpen} aria-label="Open CRM">
+          <button className={s.capsuleCrm} onClick={e => { pressFeedback(e.currentTarget, ripple.current); crm.onOpen(); }} aria-label="Open CRM">
+            <span className={s.capsuleRippleClip} aria-hidden="true"><span ref={ripple} className={s.capsuleRipple} /></span>
             <Svg d={ICON.chat} size={21} sw={1.8} />
             {crm.unread > 0 && <span className={s.capsuleBadge}>{badgeCount(crm.unread)}</span>}
           </button>

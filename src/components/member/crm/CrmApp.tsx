@@ -59,7 +59,7 @@ const demoViewer = () => (typeof window === "undefined" ? undefined : new URLSea
  * computer, the phone's on a phone). The Control panel then opens as panel/desk/PanelDesk — the same data, writes and
  * view models, laid out wide; the salesperson CRM stays the phone's until its desktop is built on the same frame.
  */
-export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null }) {
+export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void }) {
   const [data, setData] = useState<CrmData | null>(() => (live ? null : crmDemoData(salesperson)));
   // Any bottom sheet closes when pulled down (user 2026-10-13).
   useSwipeToClose();
@@ -80,6 +80,13 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   const refs = useRef<SalesRefs>({}).current;
   const dataRef = useRef<CrmData | null>(data);
   dataRef.current = data;
+  // Drawn — its kept copy, its first read, or the reason it could not read: the Revenue app's curtain may lift
+  // (2026-10-17, shell/ViewSwitchCurtain — it never lifts onto an empty screen).
+  const readyCall = useRef(onReady);
+  readyCall.current = onReady;
+  useEffect(() => {
+    if (data || problem) readyCall.current?.();
+  }, [data, problem]);
 
   // The last answer is kept on the phone (2026-10-14, the owner: "當我進入時，我看到的還是上次的畫面，那你的後台系統可以再
   // 計算"): the CRM opens on it at once and the read below replaces it when it lands — the Revenue app's own store
