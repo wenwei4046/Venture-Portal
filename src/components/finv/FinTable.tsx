@@ -111,6 +111,7 @@ export function FinTable<R>({
   countLabel,
   tools,
   select,
+  defaultShown,
   children,
 }: {
   /** Names the saved arrangement — each page arranges its own. */
@@ -139,6 +140,11 @@ export function FinTable<R>({
   /** The toolbar's last buttons, after Columns (Invoice's *Select*). */
   tools?: ReactNode
   select?: FinTableSelect<R> | null
+  /**
+   * The extras on show until the account arranges its own (2026-10-17 — Approvals: Ref #, By, Submitted); left
+   * out, every extra waits to be ticked on (the design's Name · Description · Amount). Reset comes back to them.
+   */
+  defaultShown?: readonly string[]
   /** Drawn in place of the table (the payroll batches), under the toolbar. */
   children?: ReactNode
 }) {
@@ -180,7 +186,7 @@ export function FinTable<R>({
   }, [layoutId])
 
   const layout = isCustomised(own) ? own : shared
-  const hidden = isCustomised(layout) ? layout.hidden : extras
+  const hidden = isCustomised(layout) ? layout.hidden : defaultShown ? extras.filter((k) => !defaultShown.includes(k)) : extras
   const visible = columns.filter((c) => c.fixed || !hidden.includes(c.key))
   // The person's order; a column ticked on since takes its place in the code's (Name · Description · … · Amount).
   const shown = applyOrder(visible, layout.order)
