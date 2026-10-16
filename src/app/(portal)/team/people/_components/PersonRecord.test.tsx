@@ -12,17 +12,22 @@ vi.mock('../actions', () => ({ updateStaff: mocks.updateStaff }))
 vi.mock('@/components/hrv/toast', () => ({ flash: mocks.flash }))
 
 import PersonRecord, { type PersonEditor, type PersonRecordView } from './PersonRecord'
+import type { UplineGroup } from '@/lib/upline-choices'
 
 const view = (over: Partial<PersonRecordView> = {}): PersonRecordView => ({
   name: 'TEST STAFF',
   department: 'Marketing',
   code: 'HV042',
   title: 'Executive',
+  level: 'L3',
+  active: true,
+  login: null,
+  reportsTo: { name: 'BOSS LADY', title: 'Marketing Manager', href: '/team/people/staff-boss', active: true },
+  hireDate: '05 Jan 2026',
+  tenure: '9 months',
   resignationDate: null,
-  account: null,
   nric: '850101141234',
   infotechCode: null,
-  hireDate: '2026-01-05',
   contact: { phone: '012-345 6789', email: 'test@example.com', address: null },
   emergency: { name: null, relationship: null, phone: null },
   bank: { name1: 'Maybank', no1: '0012345678', name2: 'CIMB', no2: '0098765432' },
@@ -53,10 +58,19 @@ const TITLES: TitleRow[] = [
   { id: 't-other', name: 'Accounts Executive', department_id: 'd-finance', is_active: true },
 ]
 
-const editor = (over: Partial<StaffRow> = {}, canSee = { nric: true, bank: true }): PersonEditor => ({
+const UPLINES: UplineGroup[] = [
+  { name: 'Marketing', choices: [{ value: 'staff-boss', label: 'BOSS LADY · Marketing Manager', disabled: false }] },
+  { name: 'Director', choices: [{ value: 'staff-ceo', label: 'THE CEO · Chief Executive Officer', disabled: false }] },
+  { name: 'Can’t be their upline', choices: [{ value: 'staff-junior', label: 'JUNIOR · Intern — lower level', disabled: true }] },
+]
+
+const editor = (over: Partial<StaffRow> = {}, canSee = { nric: true, bank: true }, line: Partial<Pick<PersonEditor, 'reportsTo' | 'uplines'>> = {}): PersonEditor => ({
   staff: staff(over),
   titles: TITLES,
   canSee,
+  reportsTo: 'staff-boss',
+  uplines: UPLINES,
+  ...line,
 })
 
 beforeEach(() => {
@@ -96,17 +110,128 @@ describe('reading', () => {
     expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull()
   })
 
+  // The portal settles a newly inserted top-level block in from nothing
+  // (globals.css › route-fade): a form put there by Edit made the record blink
+  // (seen 2026-10-16). One element stays on top in both modes.
+  it('Edit and Cancel keep the same element at the top — nothing fades in again', () => {
+    const { container } = render(<PersonRecord view={view()} editor={editor()} inviteHref={null} />)
+    const top = container.firstElementChild
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(container.firstElementChild).toBe(top)
+    fireEvent.click(within(bar()).getByRole('button', { name: 'Cancel' }))
+    expect(container.firstElementChild).toBe(top)
+  })
+
   it('Edit stays on the page — no link to another one', () => {
     render(<PersonRecord view={view()} editor={editor()} inviteHref={null} />)
     expect(screen.getByRole('button', { name: 'Edit' }).closest('a')).toBeNull()
     expect(document.querySelector('a[href*="/edit"]')).toBeNull()
+  })
+
+})
+
+// The 360 (2026-10-16, the user picked option C): who they are and where they
+// stand sit in the card on the left. No Account and no Role any more — the
+// user, circling them: "role is what mean ? cause is suppose to be have title
+// and department only right ?" — and Reports to, which the page had nowhere:
+// "it needs to be able to set report to an upline".
+describe('the card', () => {
+  const card = () => screen.getByRole('complementary', { name: 'TEST STAFF' })
+  const labels = () => Array.from(card().querySelectorAll('dt'), dt => dt.textContent)
+
+  it('reads Department, Reports to, Level, Employment Type and Hire Date — no Account, no Role', () => {
+    render(<PersonRecord view={view({ login: 'active', contact: { phone: null, email: 'test@example.com', address: null } })} editor={editor()} inviteHref={null} />)
+    expect(labels()).toEqual(['Department', 'Reports to', 'Level', 'Employment Type', 'Hire Date'])
+    expect(within(card()).getByRole('link', { name: 'BOSS LADY' })).toHaveAttribute('href', '/team/people/staff-boss')
+    expect(within(card()).getByText('Marketing Manager')).toBeInTheDocument()
+    expect(within(card()).getByText('05 Jan 2026 · 9 months')).toBeInTheDocument()
+    expect(within(card()).getByText('Has login')).toBeInTheDocument()
+    expect(screen.queryByText('Account')).toBeNull()
+    expect(screen.queryByText('Role')).toBeNull()
+  })
+
+  it('edited, the title and the upline are its fields', () => {
+    openEditor()
+    expect(labels()).toEqual(['Title', 'Department', 'Reports to', 'Level', 'Employment Type', 'Hire Date'])
+    expect(within(card()).getByLabelText('Title')).toHaveValue('t-exec')
+    expect(within(card()).getByLabelText('Hire Date')).toHaveValue('2026-01-05')
+  })
+
+  it('a reader without the roster sees the upline by name, no link', () => {
+    render(<PersonRecord view={view({ reportsTo: { name: 'BOSS LADY', title: null, href: null, active: true } })} editor={null} inviteHref={null} />)
+    expect(within(card()).getByText('BOSS LADY')).toBeInTheDocument()
+    expect(within(card()).queryByRole('link', { name: 'BOSS LADY' })).toBeNull()
+  })
+})
+
+describe('Reports to', () => {
+  it('offers nobody, then the uplines a department at a time, the refused last — the one they have picked', () => {
+    openEditor()
+    const select = screen.getByLabelText('Reports to') as HTMLSelectElement
+    expect(select).toHaveValue('staff-boss')
+    expect(Array.from(select.options).map(o => o.text)).toEqual([
+      '— None',
+      'BOSS LADY · Marketing Manager',
+      'THE CEO · Chief Executive Officer',
+      'JUNIOR · Intern — lower level',
+    ])
+    expect(Array.from(select.querySelectorAll('optgroup')).map(g => g.label)).toEqual(['Marketing', 'Director', 'Can’t be their upline'])
+    // Below them on the ladder: greyed, and said why.
+    expect(Array.from(select.options).find(o => o.value === 'staff-junior')).toHaveProperty('disabled', true)
+  })
+
+  it('sends the new upline, and only that', async () => {
+    openEditor()
+    fireEvent.change(screen.getByLabelText('Reports to'), { target: { value: 'staff-ceo' } })
+    expect(screen.getByLabelText('Reports to')).toHaveAttribute('data-dirty', 'true')
+    expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
+    expect(await save()).toEqual({ reports_to: 'staff-ceo' })
+  })
+
+  it('sends nobody as a blank', async () => {
+    openEditor()
+    fireEvent.change(screen.getByLabelText('Reports to'), { target: { value: '' } })
+    expect(await save()).toEqual({ reports_to: '' })
+  })
+
+  it('off the active roster it reads, and is not sent', () => {
+    openEditor(view({ active: false }), editor({}, undefined, { uplines: null }))
+    expect(screen.queryByLabelText('Reports to')).toBeNull()
+    expect(form().elements.namedItem('reports_to')).toBeNull()
+    expect(within(screen.getByRole('complementary')).getByRole('link', { name: 'BOSS LADY' })).toBeInTheDocument()
+  })
+})
+
+// 2026-10-16, the user: "他们 email 是不能乱改的，除非他们 request to change email"
+// — somebody who signs in signs in with their Contact email.
+describe('Email follows the login', () => {
+  const withLogin = view({ login: 'active', contact: { phone: '012-345 6789', email: 'staff@login.example', address: null } })
+
+  it('reads with its Login word', () => {
+    render(<PersonRecord view={withLogin} editor={editor()} inviteHref={null} />)
+    expect(screen.getByText('staff@login.example')).toBeInTheDocument()
+    expect(screen.getByText('Login')).toBeInTheDocument()
+  })
+
+  it('is locked while editing — shown, never a field, never sent', async () => {
+    openEditor(withLogin)
+    expect(screen.queryByLabelText('Email')).toBeNull()
+    expect(form().elements.namedItem('email')).toBeNull()
+    expect(screen.getByTitle(/the one they sign in with/)).toHaveTextContent('staff@login.example')
+    fireEvent.change(screen.getAllByLabelText('Phone')[0], { target: { value: '012-000 1111' } })
+    expect(await save()).toEqual({ contact_number: '012-000 1111' })
+  })
+
+  it('without a login it is HR’s to edit', () => {
+    openEditor()
+    expect(screen.getByLabelText('Email')).toHaveValue('test@example.com')
   })
 })
 
 describe('Edit — each value becomes its field where it stands', () => {
   it('keeps the sections and turns the rows into fields holding what was there', () => {
     openEditor()
-    for (const section of ['Assignment', 'Identity', 'Contact', 'Emergency Contact', 'Bank Accounts', 'Salary', 'Statutory']) {
+    for (const section of ['Identity', 'Contact', 'Emergency contact', 'Bank accounts', 'Salary', 'Statutory']) {
       expect(screen.getByRole('heading', { level: 2, name: section })).toBeInTheDocument()
     }
     expect(screen.getByLabelText('Name', { selector: '#person-name' })).toHaveValue('TEST STAFF')
@@ -118,7 +243,7 @@ describe('Edit — each value becomes its field where it stands', () => {
     expect(screen.getByLabelText('Email')).toHaveValue('test@example.com')
     expect(screen.getByLabelText('Basic')).toHaveValue(2500)
     expect(screen.getByLabelText('EPF')).toHaveValue('A')
-    // Department, Account and Role are not edited here: they read as they did.
+    // Department is not edited here: it reads as it did.
     expect(screen.queryByLabelText('Department')).toBeNull()
     expect(screen.getByText('Marketing')).toBeInTheDocument()
 
