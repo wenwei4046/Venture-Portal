@@ -194,7 +194,7 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
  * own action (PR3b). A new rpc must be put here or in INVOKER_READS.
  */
 export const DEFINER_RPCS: ReadonlySet<string> = new Set([
-  // People › Invite user (mig 20261016140000): which logins have an invite link not used yet — auth.users, Logins & invites · View.
+  // People › Invite user (mig 20261016170000): which logins have an invite link not used yet — auth.users, Logins & invites · View.
   'account_invite_states',
   'adjust_revenue_payroll_commission', 'amend_fund_source', 'amend_fund_source_from', 'amend_issued_invoice', 'amend_loan',
   'amend_loan_from', 'amend_loan_repayment', 'amend_loan_repayment_date', 'amend_voucher_date', 'approve_dept_payment_expense',

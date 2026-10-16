@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261016140000 (People › Invite user, 2026-10-16 — the user's two
+// Local PostgreSQL regression for 20261016170000 (People › Invite user, 2026-10-16 — the user's two
 // choices: Send Invite Link, or set the password now). `account_invite_states()` tells People which
 // logins were sent an invite link not used yet: Supabase Auth's own fact (auth.users — invited_at,
 // email_confirmed_at), which no signed-in reader may select. It answers whoever may invite or see the
@@ -70,7 +70,7 @@ try {
   await q(`INSERT INTO users SELECT id, email FROM auth.users`)
 
   // ── The migration, verbatim ───────────────────────────────────────────────
-  const sql = (await readFile(new URL('20261016140000_account_invite_states.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  const sql = (await readFile(new URL('20261016170000_account_invite_states.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
   await db.exec(sql)
   const fn = "proname = 'account_invite_states'"
   check(await one(`SELECT prosecdef FROM pg_proc WHERE ${fn}`), true, 'it runs as its owner — auth.users is nobody else’s to read')
