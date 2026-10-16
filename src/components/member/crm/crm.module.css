@@ -108,6 +108,12 @@
    under the floating bar: "處理一下下方的部分"): a message scrolled under the bar is hidden by it, not seen through it, and
    your orange bubble never meets the orange mic. The Attach card floats above the stack, outside this background. */
 .app [data-composer] { background: linear-gradient(rgba(239, 231, 222, 0), #EFE7DE 14px); }
+/* The chat ends above the composer by a spacer, not by the list's bottom padding (2026-10-16, the owner: "我的聊天室突然不能往
+   下滑了" — a long last message stopped under the bar): iPhone's Safari drops a scrolling flex column's end padding, so the
+   last lines could never scroll clear of the floating composer. The spacer is the list's last flex item, which every
+   browser scrolls to. */
+.app [data-chat-list][style*="absolute"] { padding-bottom: 0 !important; }
+.app [data-chat-list][style*="absolute"]::after { content: ""; flex: none; display: block; height: calc(var(--chat-foot, 64px) + 6px); }
 /* The message a reply quotes, inside your own orange bubble (2026-10-15): white on a lighter band, not rust on rust. */
 .app [data-mine] [style*="border-left"] { background: rgba(255, 255, 255, .18) !important; border-left-color: #fff !important; }
 .app [data-mine] [style*="border-left"] > * { color: #fff !important; }
