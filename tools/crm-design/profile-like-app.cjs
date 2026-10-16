@@ -8,8 +8,8 @@
 //   · the facts' box at radius 14, each fact padded 10 14, the values at 650; Your workspace 24 px under the card at 650;
 //   · the rows' icons 22 / 1.8, labels at 650, ruled edge to edge in --rv-rule (an inset #EBDDD2 line), the app's 16 px
 //     chevron, the count as the app's (10.9 px on the accent, 1 px 7 px);
-//   · View my team (a leader's) as the app's View as entry: 14 padding, radius 18, the 40 px icon tile, 650, its 12.5 line
-//     in --rv-blush.
+//   · View my team as the app's View as entry: 14 padding, radius 18, the 40 px icon tile, 650, its 12.5 line in --rv-blush
+//     (hidden today — vm/profile.ts › hasTeam is false since Team | Mine — but drawn as the app's if it comes back).
 // The CRM's own content stays (its three rows have no line under them). Applied after profile-type.cjs and before
 // type-scale.cjs, so it reads the prototype's px as profile-type left them. The status-bar strip above the glow is
 // crm.module.css's (data-prof-glow).
