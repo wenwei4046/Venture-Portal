@@ -43,7 +43,7 @@ describe('a credit note’s document', () => {
     const content = text(doc.Pages[0])
     for (const w of [
       'Credit note', 'Credit note number', 'HV-CN-202610-0002', 'Date of issue', '10 October 2026', 'Original invoice', 'HV-INV-202609-0008', 'Period', 'September 2026',
-      'HOUZS Venture Holdings Sdn. Bhd.', 'Internal banking · Shared services', 'Credit to', 'HOUZS Bedding (HB)', 'Subsidiary · HB',
+      'HOUZS Venture Holding Sdn. Bhd.', 'Internal banking · Shared services', 'hello@houzsventure.com', 'Credit to', 'HOUZS Bedding (HB)', 'Subsidiary · HB',
       'RM 220.40 credited on 10 October 2026', 'Overbilled 1 staff — left in Sep',
       'Description', 'Qty', 'Unit price', 'Amount', 'HR shared service — Sep', 'Salary Income', '–RM 220.40',
       'Original invoice RM 1,542.80', 'This credit –RM 220.40', 'Revised amount RM 1,322.40',

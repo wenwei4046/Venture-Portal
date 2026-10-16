@@ -46,11 +46,13 @@ const FOOTER_TOP = 841.89 - px(34) - 7.5 * 1.45 - px(10) - px(1)
 /**
  * The issuer's block: the company, then its line of work — the invoice says
  * both lines, the receipt, the voucher and the credit note the first (the
- * design's; its email waits until the user names it — finance-view.md).
+ * design's) — and its email last on every document. The name is *Holding*,
+ * no s, and the email the one the user named (2026-10-16 — finance-view.md).
  */
 export const ISSUER = {
-  name: 'HOUZS Venture Holdings Sdn. Bhd.',
+  name: 'HOUZS Venture Holding Sdn. Bhd.',
   lines: ['Internal banking · Shared services', 'Director salary distribution'],
+  email: 'hello@houzsventure.com',
 }
 
 /** Where to pay an invoice — the account every invoice has printed since 2026-08. */
@@ -248,13 +250,13 @@ export function DocMeta({ lines }: { lines: DocLine[] }) {
   return <DocList lines={lines} style={s.meta} />
 }
 
-/** The issuer beside the counter-party: a bold first line, the rest soft. `full` — the invoice's two lines of work. */
+/** The issuer beside the counter-party: a bold first line, the rest soft, the email last. `full` — the invoice's two lines of work. */
 export function DocParties({ counter, full = false }: { counter: { heading: string; lines: string[] }; full?: boolean }) {
   return (
     <View style={s.parties}>
       <View style={s.party}>
         <T style={s.strong}>{ISSUER.name}</T>
-        {(full ? ISSUER.lines : ISSUER.lines.slice(0, 1)).map((l) => (
+        {[...(full ? ISSUER.lines : ISSUER.lines.slice(0, 1)), ISSUER.email].map((l) => (
           <T key={l} style={s.soft}>
             {l}
           </T>

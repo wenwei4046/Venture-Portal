@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
 
 // 2026-10-09 — Department Pools per the user's Claude Design handoff (Phase 4
@@ -11,12 +11,15 @@ import { withActions } from '@/test/with-actions'
 // sidebar's choice (?basis=). Somebody who reads only their own department
 // keeps the page as it was.
 
-const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), fetchIncomeStatement: vi.fn(), redirect: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  requirePermission: vi.fn(), createClient: vi.fn(), fetchIncomeStatement: vi.fn(), redirect: vi.fn(), refresh: vi.fn(), execute: vi.fn(),
+}))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/cfo-reports', () => ({ fetchIncomeStatement: mocks.fetchIncomeStatement }))
-vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
+vi.mock('next/navigation', () => ({ redirect: mocks.redirect, useRouter: () => ({ refresh: mocks.refresh }) }))
 vi.mock('@/app/(portal)/hr-costing/actions', () => ({ executeHrCosting: vi.fn() }))
+vi.mock('./hr-actions', () => ({ executeHrCostingInWords: mocks.execute }))
 // The tables' saved column layout comes from the browser client; here there is none.
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }) }),
@@ -186,6 +189,23 @@ describe('Department Pools · the HR costing submission, for Finance', () => {
     expect(within(row('IT')).getByText('awaiting Principal').closest('.chip')).not.toHaveClass('alert')
     expect(row('Finance')).toHaveTextContent('—')
     expect(within(row('Marketing')).queryByRole('button', { name: 'Mark executed' })).toBeNull()
+  })
+
+  // 2026-10-16 — the desktop's one-way steps ask first, as the phone's do: nothing sets a submission back.
+  it('Mark executed asks first, and only its answer marks the month executed', async () => {
+    mocks.execute.mockResolvedValue({ ok: true })
+    render(await DeptPoolPage({ searchParams: Promise.resolve({}) }))
+    const row = within(section('By department')).getByText('HR').closest('tr') as HTMLElement
+    fireEvent.click(within(row).getByRole('button', { name: 'Mark executed' }))
+    const ask = screen.getByRole('dialog')
+    expect(ask).toHaveTextContent('Mark October 2026 executed?')
+    expect(ask).toHaveTextContent('This cannot be undone.')
+    expect(mocks.execute).not.toHaveBeenCalled()
+    await act(async () => {
+      fireEvent.click(within(ask).getByRole('button', { name: 'Mark executed' }))
+    })
+    expect(mocks.execute).toHaveBeenCalledWith('s2')
+    expect(mocks.refresh).toHaveBeenCalled()
   })
 })
 

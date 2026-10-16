@@ -21,10 +21,10 @@ import {
   getBaAttachmentUrl,
   deleteBaAttachment,
   extractBaFromDocument,
-  generateBaInvoice,
   generateBaPv,
   type BaInput,
 } from '../actions'
+import BillInterestDialog from './BillInterestDialog'
 
 export interface BaRow {
   id: string
@@ -912,6 +912,8 @@ export default function BaView({
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<BaRow | null>(null)
   const [pvRow, setPvRow] = useState<BaRow | null>(null)
+  // Bill borrower asks first (2026-10-16): it makes the borrower's invoice.
+  const [billRow, setBillRow] = useState<BaRow | null>(null)
   const [banner, setBanner] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -937,11 +939,6 @@ export default function BaView({
 
   // What a row can do besides being opened (2026-10-10, the handoff: the
   // register keeps only Mark settled; the rest moved to the right-click).
-  const billBorrower = (r: BaRow) =>
-    startTransition(async () => {
-      const res = await generateBaInvoice(r.id)
-      setBanner(res.error ? res.error : `Invoice ${res.invoiceNo ?? ''} created as draft — review & issue it in Statements`)
-    })
   const setStatus = (r: BaRow, status: 'active' | 'settled') =>
     startTransition(async () => {
       const res = await setBaStatus(r.id, status)
@@ -961,7 +958,7 @@ export default function BaView({
     title: r => r.baNo ?? r.id.slice(0, 8),
     more: r => {
       const items: RowMenuItem[] = []
-      if (!r.interestInvoice) items.push({ key: 'bill', label: 'Bill borrower', hint: 'invoice · 5028', onSelect: () => billBorrower(r) })
+      if (!r.interestInvoice) items.push({ key: 'bill', label: 'Bill borrower', hint: 'invoice · 5028', onSelect: () => setBillRow(r) })
       if (!r.interestPv) items.push({ key: 'pay', label: 'Pay HC', hint: 'PV · 6001', onSelect: () => setPvRow(r) })
       if (r.status === 'settled') items.push({ key: 'reopen', label: 'Reopen', onSelect: () => setStatus(r, 'active') })
       items.push({
@@ -1215,6 +1212,14 @@ export default function BaView({
           }}
         />
       ) : null}
+      <BillInterestDialog
+        row={billRow}
+        onClose={() => setBillRow(null)}
+        onDone={no => {
+          setBillRow(null)
+          setBanner(`Invoice ${no ?? ''} created as draft — review & issue it in Statements`)
+        }}
+      />
     </div>
   )
 }
