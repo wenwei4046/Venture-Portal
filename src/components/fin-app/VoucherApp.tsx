@@ -183,11 +183,14 @@ export default function VoucherApp({
 
   // ── The hub's own bar ──
   const exportHref = (format: 'xlsx' | 'pdf') => `/payments/export?${new URLSearchParams({ format, direction: receipts ? 'credit' : 'debit' }).toString()}`
+  // Payment's says *Payment* (2026-10-16, the user: *Create payment* filled its
+  // button edge to edge on the phone and did not sit centred); the sheet it
+  // opens is still titled Create payment.
   const createBtn: BarButton | null = canCreate
     ? receipts
       ? { key: 'receipt', label: 'Create receipt', kind: 'primary', onClick: () => setMaking('receipt') }
       : create
-        ? { key: 'payment', label: 'Create payment', kind: 'primary', onClick: () => setMaking('payment') }
+        ? { key: 'payment', label: 'Payment', kind: 'primary', onClick: () => setMaking('payment') }
         : null
     : null
   const hubBar: BarButton[] = receipts
