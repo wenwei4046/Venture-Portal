@@ -25,6 +25,7 @@ import {
 } from '@/lib/permission-tabs'
 import { describeHistory, type AuditRow, type HistoryEntry } from '@/lib/permission-history'
 import { isReachTickList, sortedTicks, type ReachTick } from '@/lib/sub-department-reach'
+import { isSensitiveTickList, type SensitiveTick } from '@/lib/person-sensitive'
 
 /**
  * Writing permission templates (2026-10-08, the People Management revamp;
@@ -261,7 +262,7 @@ export async function setTitleTemplate(titleId: string, templateId: string | nul
 }
 
 /** One person's boxes over their title's template — the whole set ([] = back to the title). */
-export async function setPersonTabs(input: { userId: string; templateId: string; boxes: PersonBox[]; reach?: ReachTick[] }): Promise<Result> {
+export async function setPersonTabs(input: { userId: string; templateId: string; boxes: PersonBox[]; reach?: ReachTick[]; sensitive?: SensitiveTick[] }): Promise<Result> {
   await requireActionOn('/team/people', 'accounts', 'manage')
   if (
     !input ||
@@ -270,7 +271,8 @@ export async function setPersonTabs(input: { userId: string; templateId: string;
     !Array.isArray(input.boxes) ||
     input.boxes.length > 400 ||
     !input.boxes.every(b => b && typeof b.granted === 'boolean' && parseGrant(`${b.tab}.${b.action}`) !== null) ||
-    (input.reach !== undefined && !isReachTickList(input.reach))
+    (input.reach !== undefined && !isReachTickList(input.reach)) ||
+    (input.sensitive !== undefined && !isSensitiveTickList(input.sensitive))
   ) {
     return { ok: false, reason: 'Reload the page and try again.' }
   }
@@ -288,6 +290,11 @@ export async function setPersonTabs(input: { userId: string; templateId: string;
   if (input.reach !== undefined) {
     const { error: reachError } = await supabase.rpc('permission_user_reach_set', { p_user: input.userId, p_ticks: sortedTicks(input.reach) })
     if (reachError) return { ok: false, reason: reachError.message }
+  }
+  // Their own Salary / NRIC / Bank over the template's (2026-10-16): the whole list.
+  if (input.sensitive !== undefined) {
+    const { error: sensitiveError } = await supabase.rpc('permission_user_sensitive_set', { p_user: input.userId, p_fields: input.sensitive })
+    if (sensitiveError) return { ok: false, reason: sensitiveError.message }
   }
   refresh()
   return { ok: true }
