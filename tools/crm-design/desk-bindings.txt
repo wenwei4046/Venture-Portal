@@ -345,6 +345,9 @@ ibCpStyle
 ibCpToggle
 ibHas
 ibInfo
+ibInfoFold
+ibInfoRail
+ibInfoShut
 ibInfoW
 ibNone
 infoBack

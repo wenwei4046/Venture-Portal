@@ -167,6 +167,8 @@ export function frameVM(ctx: DeskCtx) {
     alertsN: alertsN ? String(alertsN) : "", alertsHas: alertsN > 0,
     // Inbox's columns (v2).
     ibCols: ibOn, ibInfoW, ibCpW, ibHas, ibNone: !ibHas,
+    // Customer info folds to a strip and back (the owner, 2026-10-16: "右邊的 customer info 做也能收起的功能，但是 default 是開著的").
+    ibInfoShut: ui.ibInfoShut, ibInfoFold: () => patch({ ibInfoShut: true }), ibInfoRail: { title: "Customer info", open: () => patch({ ibInfoShut: false }) },
     dragList: edgeDrag(set, "ibListW", ibListW, 1, 260, ibListW + ibSpare), dragInfo: edgeDrag(set, "ibInfoW", ibInfoW, -1, 220, Math.min(440, ibInfoW + ibSpare)),
     dragCp: edgeDrag(set, "ibCpW", ibCpW, -1, 240, ibCpDock ? Math.min(440, ibCpW + ibSpare) : 440),
     resetList: () => patch({ ibListW: null }), resetInfo: () => patch({ ibInfoW: null }), resetCp: () => patch({ ibCpW: null }),

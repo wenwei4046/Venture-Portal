@@ -48,6 +48,13 @@ module.exports = [
   ['<span style={{ display: "flex", gap: "2px" }}>',
     '<span style={{ display: "flex", alignItems: "center", gap: "2px" }}>{!!(v.cfPagesOn) && (<span draggable={true} onDragStart={f.grip} onDragEnd={v.cfDragEnd} title="Drag to move — onto another section or a page tab" className={DX.grip} style={{ flex: "none", width: "16px", height: "28px", display: "grid", placeItems: "center", color: "#B5A398", cursor: "grab" }}><svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2.5" cy="3" r="1.4"></circle><circle cx="7.5" cy="3" r="1.4"></circle><circle cx="2.5" cy="8" r="1.4"></circle><circle cx="7.5" cy="8" r="1.4"></circle><circle cx="2.5" cy="13" r="1.4"></circle><circle cx="7.5" cy="13" r="1.4"></circle></svg></span>)}',
     "A field's grip before ↑ ↓ (2026-10-16)."],
+  // Inbox's Customer info folds to a 44 px strip and back, open at first (the owner, 2026-10-16) — as Ad performance.
+  [/(<aside style=\{\{ position: "relative", flex: `0 0 \$\{v\.ibInfoW\}px`[\s\S]*?<\/aside>)/,
+    m => `{!(v.ibInfoShut) && (<>${m}</>)}{!!(v.ibInfoShut) && (<DeskFoldRail v={v.ibInfoRail} />)}`,
+    "Customer info folds to a strip (the owner, 2026-10-16)."],
+  ['<strong style={{ flex: "1", minWidth: "0", fontSize: "15px", fontWeight: "650" }}>Customer info</strong>',
+    '<button type="button" onClick={v.ibInfoFold} title="Fold Customer info" className={DX.emo} style={{ flex: "0 0 30px", width: "30px", height: "30px", margin: "0 0 0 -8px", padding: "0", border: "0", borderRadius: "50%", background: "transparent", color: "#806B60", display: "grid", placeItems: "center", cursor: "pointer" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m13 17 5-5-5-5M6 17l5-5-5-5"></path></svg></button><strong style={{ flex: "1", minWidth: "0", fontSize: "15px", fontWeight: "650" }}>Customer info</strong>',
+    "Customer info's » folds it (the owner, 2026-10-16)."],
   ['fontWeight: r.w, color: r.c, overflowWrap: "anywhere", textWrap: "pretty" }}>{r.v}</span>',
     'fontWeight: r.w, color: r.c, overflowWrap: "anywhere", textWrap: "pretty" }}><InfoValue v={r.v} href={r.href} /></span>',
     "Inbox's Customer info column links the ad too (the owner, 2026-10-16: 電腦版尚未有 ad link)."],
