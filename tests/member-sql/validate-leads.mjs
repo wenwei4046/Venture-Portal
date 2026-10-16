@@ -279,4 +279,65 @@ check(flowList.find(f => f.name === '試睡廣告').template, 'ad', 'the templat
 await q('select public.lead_remove_auto_category($1)', [festive])
 check((await q('select public.lead_flows() f'))[0].f.find(f => f.name === '試睡廣告').categoryId, null, 'its automations stay, in no category')
 
+// ── AI Agent: Data Center, the soul, drafts (migs 20261016330000 / 330100) ──
+await db.exec(await readFile(new URL('../../supabase/migrations/20261016330000_lead_ai.sql', import.meta.url), 'utf8'))
+// The guards only (the registry tables are production's): each write asks its page, after its own check, once.
+const aiTabs = (await readFile(new URL('../../supabase/migrations/20261016330100_lead_ai_tabs.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+await db.exec(aiTabs.slice(aiTabs.indexOf('CREATE OR REPLACE FUNCTION pg_temp.guard_put')))
+for (const [fn, page, want] of [['lead_save_knowledge', '/leads/knowledge', 'leads.manage'], ['lead_remove_knowledge', '/leads/knowledge', 'leads.manage'],
+  ['lead_save_persona', '/leads/ai', 'leads.manage'], ['lead_ai_try_context', '/leads/ai', 'leads.manage'], ['lead_ai_context', '/leads', 'leads.create'],
+  ['lead_ai_log_draft', '/leads', 'leads.create'], ['lead_ai_draft_outcome', '/leads', 'leads.create']]) {
+  const src = (await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc
+  check(src.includes(`PERFORM public.tab_write_guard(ARRAY['${page}'], ARRAY['${want}']);`), true, `${fn} asks ${page}`)
+}
+for (const t of ['lead_knowledge', 'lead_personas', 'lead_ai_drafts'])
+  check((await q(`select count(*)::int n from information_schema.role_table_grants where table_name = $1 and grantee in ('anon','authenticated')`, [t]))[0].n, 0, `no grants on ${t}`)
+// Who may: View reads, Manage writes the Data Center and the soul, Create asks for a draft.
+await as(CS_USER, ['leads.view'])
+await refuses(`select public.lead_save_knowledge(null, '{"title":"x","body":"y"}')`, [], /Lead View · Manage/, 'cards need Manage')
+await refuses(`select public.lead_save_persona($1, '{}')`, [b2990], /Lead View · Manage/, 'the soul needs Manage')
+await as(CS_USER, ALL)
+await refuses(`select public.lead_save_knowledge(null, '{"title":"","body":"y"}')`, [], /needs a title/, 'a card needs a title')
+await refuses(`select public.lead_save_knowledge(null, '{"title":"x","body":"y","kind":"secret"}')`, [], /promo, a product/, 'a card is a known kind')
+await refuses(`select public.lead_save_knowledge(null, '{"title":"x","body":"y","startsOn":"2026-10-20","endsOn":"2026-10-01"}')`, [], /before the start/, 'dates in order')
+const klToday = (await q(`select (now() at time zone 'Asia/Kuala_Lumpur')::date::text d`))[0].d
+const card = (title, extra) => q('select public.lead_save_knowledge(null, $1::jsonb) i', [JSON.stringify({ title, body: `${title} text`, ...extra })]).then(r => r[0].i)
+const kHours = await card('Opening hours', { kind: 'showroom' })
+await card('Sofa promo', { kind: 'promo', brandId: b2990, startsOn: klToday, endsOn: klToday })
+await card('Old promo', { kind: 'promo', brandId: b2990, startsOn: '2020-01-01', endsOn: '2020-01-31' })
+await card('Carress mattress', { kind: 'product', brandId: bCarress })
+await card('Switched off', { brandId: b2990, active: false })
+check((await q('select public.lead_knowledge() k'))[0].k.length, 5, 'every card on the Data Center')
+// The soul: a brand with none yet is off, with the starting values.
+let personas = (await q('select public.lead_personas() p'))[0].p
+check(personas.slice(0, 3).map(p => [p.brandName, p.mode, p.saved]), [['2990s', 'off', false], ['2990s mini', 'off', false], ['Carress', 'off', false]], 'every brand, off until saved')
+await refuses(`select public.lead_save_persona($1, '{"mode":"auto"}')`, [b2990], /off or a copilot/, 'auto is not offered yet')
+// The try-it works whatever the mode, with the brand's cards for today and every brand's.
+const tryCtx = (await q('select public.lead_ai_try_context($1) c', [b2990]))[0].c
+check(tryCtx.knowledge.map(k => k.title).sort(), ['Opening hours', 'Sofa promo'], 'today’s cards: its own and every brand’s, in date, switched on')
+// A draft needs the agent on.
+await db.exec('update public.lead_flows set active = false')  // the automations above keep quiet
+const ivy = (await q(`select public.lead_simulate($1, 'messenger', 'Ivy', '', 'L型沙发多少钱？') c`, [b2990]))[0].c
+await refuses('select public.lead_ai_context($1)', [ivy], /off for this brand/, 'no draft while the agent is off')
+await q(`select public.lead_save_persona($1, '{"agentName":"Mia","personality":"friendly","tone":"warm","goal":"get the phone","mode":"copilot"}')`, [b2990])
+personas = (await q('select public.lead_personas() p'))[0].p
+check([personas[0].agentName, personas[0].mode, personas[0].saved, personas[0].updatedByName], ['Mia', 'copilot', true, 'Mei Ling'], 'the soul saved, by whom')
+const ctx = (await q('select public.lead_ai_context($1) c', [ivy]))[0].c
+check([ctx.persona.agentName, ctx.contact.name, ctx.messages.map(m => m.body), ctx.knowledge.length], ['Mia', 'Ivy', ['L型沙发多少钱？'], 2], 'what a draft is written from')
+await as(CS_USER, ['leads.view'])
+await refuses('select public.lead_ai_context($1)', [ivy], /Lead View · Create/, 'a draft needs Create')
+await as(CS_USER, ALL)
+// Drafts: a new one passes over the last unused; only a pending one takes an outcome.
+const d1 = (await q(`select public.lead_ai_log_draft($1, 'Hi! 你好', $2::jsonb, false, '', 'claude-opus-5-5') i`, [ivy, JSON.stringify([{ id: kHours, title: 'Opening hours' }])]))[0].i
+const d2 = (await q(`select public.lead_ai_log_draft($1, 'Hi again', '[]', true, 'asks for a discount', 'claude-opus-5-5') i`, [ivy]))[0].i
+check((await q('select outcome from public.lead_ai_drafts where id = $1', [d1]))[0].outcome, 'dismissed', 'a new draft passes over the unused one')
+await refuses(`select public.lead_ai_draft_outcome($1, 'pending')`, [d2], /sent, edited or dismissed/, 'outcomes are known')
+await q(`select public.lead_ai_draft_outcome($1, 'edited')`, [d2])
+await q(`select public.lead_ai_draft_outcome($1, 'sent')`, [d2])
+check((await q('select outcome, by_name from public.lead_ai_drafts where id = $1', [d2]))[0], { outcome: 'edited', by_name: 'Mei Ling' }, 'an outcome is kept once, with who asked')
+check((await q('select public.lead_personas() p'))[0].p[0].drafts, { total: 2, sent: 0, edited: 1, dismissed: 1 }, 'the brand’s drafts in 30 days')
+await q('select public.lead_remove_knowledge($1)', [kHours])
+check((await q('select public.lead_knowledge() k'))[0].k.length, 4, 'a card removed')
+await refuses('select public.lead_remove_knowledge($1)', [kHours], /gone/, 'removed once')
+
 console.log(`validate-leads: ${checks} checks passed`)

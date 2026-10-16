@@ -2,10 +2,10 @@
 // sidebar HR's and Finance's views draw, with Lead View's own pages —
 //
 //   Inbox · Leads · Insight
-//   I. SET UP   Automations · Settings
+//   I. SET UP   Automations · AI Agent · Data Center · Settings
 //
-// The canvas's other boards (Campaigns, AI Agent, Data Center) are later phases; their rows join here
-// with their pages. Every row asks its page's tab, as every view sidebar does (visibleHrNav → opensPath).
+// The canvas's other board (Campaigns) is a later phase; its row joins here
+// with its page. Every row asks its page's tab, as every view sidebar does (visibleHrNav → opensPath).
 
 import { canAccessLeads } from '@/lib/roles'
 import type { HrIconName } from '@/components/hrv/icons'
@@ -34,6 +34,8 @@ export function leadNavSections(): HrNavSection[] {
       tone: 'clay',
       items: [
         link('leads-flows', 'Automations', 'tree', '/leads/flows', (p) => under(p, '/leads/flows')),
+        link('leads-ai', 'AI Agent', 'idCard', '/leads/ai', (p) => under(p, '/leads/ai')),
+        link('leads-knowledge', 'Data Center', 'invoice', '/leads/knowledge', (p) => under(p, '/leads/knowledge')),
         link('leads-settings', 'Settings', 'doc', '/leads/settings', (p) => under(p, '/leads/settings')),
       ],
     },

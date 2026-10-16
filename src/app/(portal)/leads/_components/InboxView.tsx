@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { HvPage, PageHead, btn } from '@/components/hrv/kit'
-import { readThread, replyToLead } from '@/lib/leads/actions'
+import { draftLeadReply, readThread, replyToLead, setDraftOutcome, type DraftForInbox } from '@/lib/leads/actions'
+import { outcomeOf } from '@/lib/leads/ai'
 import { inboxState, type InboxState } from '@/lib/leads/handoff'
 import { formatPhone } from '@/lib/leads/phone'
 import { whenShort } from '@/lib/leads/time'
 import type { LeadConfig, LeadContact, LeadThread } from '@/lib/leads/types'
 import { Bi, BrandChip, CHANNEL_LABEL, initials } from './bits'
+import DraftBox from './DraftBox'
 import CustomerCard from './CustomerCard'
 import s from './lead.module.css'
 
@@ -17,7 +19,7 @@ import s from './lead.module.css'
  * replies here; the card keeps the phone and hands the lead to the brand's sales.
  *
  * Meta is not connected yet: a reply is recorded, not sent, and conversations arrive only through
- * Settings › Test. AI drafts, quick replies and flows are later phases of the canvas.
+ * Settings › Test. A brand whose AI agent is a copilot offers an AI draft above the reply box.
  */
 
 type Filter = InboxState | 'all'
@@ -35,6 +37,7 @@ export default function InboxView({
   canReply,
   canEdit,
   csName,
+  aiBrands,
 }: {
   config: LeadConfig
   contacts: LeadContact[]
@@ -43,6 +46,8 @@ export default function InboxView({
   canEdit: boolean
   /** Who is signed in — the hand-over's text names them. */
   csName: string
+  /** Brands whose AI agent is a copilot. */
+  aiBrands: string[]
 }) {
   const [brand, setBrand] = useState<string>('all')
   const [filter, setFilter] = useState<Filter>('all')
@@ -152,7 +157,7 @@ export default function InboxView({
         <section className={s.chat} aria-label="Chat">
           {contact ? (
             <Chat key={contact.id} contact={contact} thread={thread} brandName={brands.get(contact.brandId)?.name ?? ''} today={config.today}
-              canReply={canReply} loading={loading && !thread} onSent={() => load(contact.id)} />
+              canReply={canReply} aiOn={aiBrands.includes(contact.brandId)} loading={loading && !thread} onSent={() => load(contact.id)} />
           ) : (
             <div className={s.empty}><Bi block en="Pick a conversation." zh="选一个对话" /></div>
           )}
@@ -177,18 +182,23 @@ function StateChip({ state }: { state: InboxState }) {
   return <span className={s.brand} data-tone={tone}>{label}</span>
 }
 
-function Chat({ contact, thread, brandName, today, canReply, loading, onSent }: {
+function Chat({ contact, thread, brandName, today, canReply, aiOn, loading, onSent }: {
   contact: LeadContact
   thread: LeadThread | null
   brandName: string
   today: string
   canReply: boolean
+  aiOn: boolean
   loading: boolean
   onSent: () => void
 }) {
   const [text, setText] = useState('')
   const [sending, startSending] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  // The AI draft on offer, and the one put in the reply box (its outcome is kept when the reply goes).
+  const [draft, setDraft] = useState<DraftForInbox | null>(null)
+  const [used, setUsed] = useState<DraftForInbox | null>(null)
+  const [drafting, startDrafting] = useTransition()
   const end = useRef<HTMLDivElement>(null)
   const count = thread?.messages.length ?? 0
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }) }, [count])
@@ -200,9 +210,30 @@ function Chat({ contact, thread, brandName, today, canReply, loading, onSent }: 
     startSending(async () => {
       const r = await replyToLead(contact.id, body)
       if (!r.ok) { setError(r.reason); return }
+      if (used) void setDraftOutcome(used.id, outcomeOf(used.reply, body))
+      setUsed(null)
       setText('')
       onSent()
     })
+  }
+  const askDraft = () => {
+    setError(null)
+    startDrafting(async () => {
+      const r = await draftLeadReply(contact.id)
+      if (!r.ok) setError(r.reason)
+      else setDraft(r.data)
+    })
+  }
+  const useDraft = () => {
+    if (!draft) return
+    setText(draft.reply)
+    setUsed(draft)
+    setDraft(null)
+  }
+  const dismissDraft = () => {
+    if (!draft) return
+    void setDraftOutcome(draft.id, 'dismissed')
+    setDraft(null)
   }
 
   return (
@@ -246,6 +277,25 @@ function Chat({ contact, thread, brandName, today, canReply, loading, onSent }: 
         <div ref={end} />
       </div>
       {error ? <div className={s.error} role="alert" style={{ margin: '0 16px 8px' }}>{error}</div> : null}
+      {draft ? (
+        <div style={{ margin: '0 16px 8px' }}>
+          <DraftBox draft={draft} actions={
+            <>
+              <button type="button" className={btn('primary')} onClick={useDraft}><Bi en="Use" zh="使用" /></button>
+              <button type="button" className={btn('outline')} onClick={askDraft} disabled={drafting}><Bi en="Another" zh="换一个" /></button>
+              <button type="button" className={btn('outline')} onClick={dismissDraft}><Bi en="Dismiss" zh="不用" /></button>
+            </>
+          } />
+        </div>
+      ) : null}
+      {canReply && aiOn && !draft ? (
+        <div style={{ margin: '0 16px 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button type="button" className={btn('outline')} onClick={askDraft} disabled={drafting}>
+            {drafting ? 'Drafting…' : <>✦ <Bi en="AI draft" zh="AI 草稿" /></>}
+          </button>
+          {used ? <span className={s.hint}><Bi en="From an AI draft — check it before sending." zh="来自 AI 草稿，发送前请检查。" /></span> : null}
+        </div>
+      ) : null}
       {canReply ? (
         <div className={s.composer}>
           <label style={{ flex: 1, display: 'flex' }}>

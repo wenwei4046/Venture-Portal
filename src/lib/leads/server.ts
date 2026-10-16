@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import type { KnowledgeCard, Persona } from './ai'
 import type { LeadFlow } from './flow'
 import type { LeadConfig, LeadContact, LeadThread } from './types'
 
@@ -55,4 +56,14 @@ export interface AutoCategory { id: string; name: string; tone: 'ink' | 'clay' |
 /** The categories Customer Service made for their automations. */
 export function loadAutoCategories(): Promise<Read<AutoCategory[]>> {
   return rpc<AutoCategory[]>('lead_auto_categories', undefined, 'The categories')
+}
+
+/** The Data Center's cards, every brand's. */
+export function loadKnowledge(): Promise<Read<KnowledgeCard[]>> {
+  return rpc<KnowledgeCard[]>('lead_knowledge', undefined, 'The Data Center')
+}
+
+/** Every brand's AI agent, with its last 30 days of drafts. */
+export function loadPersonas(): Promise<Read<Persona[]>> {
+  return rpc<Persona[]>('lead_personas', undefined, 'The AI agent')
 }

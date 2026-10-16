@@ -1,7 +1,7 @@
 import { requirePage, requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { HvPage, PageHead } from '@/components/hrv/kit'
-import { loadInbox, loadLeadConfig, loadThread } from '@/lib/leads/server'
+import { loadInbox, loadLeadConfig, loadPersonas, loadThread } from '@/lib/leads/server'
 import InboxView from './_components/InboxView'
 
 export const dynamic = 'force-dynamic'
@@ -11,7 +11,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
   await requirePage('/leads')
   const user = await requirePermission('leads')
   const { c } = await searchParams
-  const [config, inbox] = await Promise.all([loadLeadConfig(), loadInbox()])
+  const [config, inbox, personas] = await Promise.all([loadLeadConfig(), loadInbox(), loadPersonas()])
   if (!config.ok || !inbox.ok) {
     return (
       <HvPage>
@@ -30,6 +30,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
       canReply={canDo(user, 'leads', 'create')}
       canEdit={canDo(user, 'leads', 'edit')}
       csName={user.name || 'Customer Service'}
+      // Brands whose AI agent is a copilot: their conversations offer an AI draft (none while its tables are not there).
+      aiBrands={personas.ok ? personas.data.filter(p => p.mode === 'copilot').map(p => p.brandId) : []}
     />
   )
 }

@@ -4,8 +4,10 @@ import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { conversationPrompt, readDraft, systemPrompt, turnsOf, type AgentDraft, type DraftOutcome, type KnowledgeCard, type KnowledgeKind, type Persona, type PersonaFields, type Turn } from './ai'
+import { askModel } from './ai-model'
 import type { FlowStep, FlowTrigger } from './flow'
-import type { LeadThread, Appt, LeadCardFields, Shown } from './types'
+import type { LeadContact, LeadThread, Appt, LeadCardFields, Shown } from './types'
 
 /**
  * Lead View's writes (2026-10-16). Each stands behind the Lead View cell it is (mig 20261016300000), named on
@@ -122,4 +124,85 @@ export async function saveAutoCategory(categoryId: string | null, name: string, 
 export async function removeAutoCategory(categoryId: string) {
   await requireActionOn('/leads/flows', 'leads', 'manage')
   return call<null>('lead_remove_auto_category', { p_id: categoryId }, 'The category was not removed.')
+}
+
+// ── AI Agent (mig 20261016330000) ───────────────────────────────────────────
+
+/** A read or a write that changes no page (a draft and its outcome): no revalidation. */
+async function quiet<T>(fn: string, args: Record<string, unknown>, fallback: string): Promise<LeadOutcome<T>> {
+  const supabase = (await createClient()) as unknown as SupabaseClient
+  const { data, error } = await supabase.rpc(fn, args)
+  if (error) return { ok: false, reason: refusal(error, fallback) }
+  return { ok: true, data: data as T }
+}
+
+export async function saveKnowledgeCard(cardId: string | null, data: {
+  brandId: string | null
+  kind: KnowledgeKind
+  title: string
+  body: string
+  startsOn: string | null
+  endsOn: string | null
+  active: boolean
+}) {
+  await requireActionOn('/leads/knowledge', 'leads', 'manage')
+  return call<string>('lead_save_knowledge', { p_id: cardId, p_data: data }, 'The card was not saved.')
+}
+
+export async function removeKnowledgeCard(cardId: string) {
+  await requireActionOn('/leads/knowledge', 'leads', 'manage')
+  return call<null>('lead_remove_knowledge', { p_id: cardId }, 'The card was not removed.')
+}
+
+export async function saveAgentPersona(brandId: string, data: PersonaFields) {
+  await requireActionOn('/leads/ai', 'leads', 'manage')
+  return call<null>('lead_save_persona', { p_brand: brandId, p_data: data }, 'The AI agent was not saved.')
+}
+
+export type DraftForInbox = AgentDraft & { id: number }
+
+/** The Inbox's "AI draft": written from the brand's soul, today's cards and the conversation; kept until used. */
+export async function draftLeadReply(contactId: string): Promise<LeadOutcome<DraftForInbox>> {
+  await requireActionOn('/leads', 'leads', 'create')
+  const ctx = await quiet<{
+    persona: Persona
+    knowledge: KnowledgeCard[]
+    contact: LeadContact
+    messages: Array<{ direction: 'in' | 'out'; sender: string; body: string }>
+    today: string
+  }>('lead_ai_context', { p_contact: contactId }, 'The conversation could not be read for a draft.')
+  if (!ctx.ok) return ctx
+  const { persona, knowledge, contact, messages, today } = ctx.data
+  const answer = await askModel(systemPrompt(persona, knowledge, today), conversationPrompt(contact, turnsOf(messages)))
+  if (!answer.ok) return answer
+  const draft = readDraft(answer.text, knowledge)
+  if (!draft) return { ok: false, reason: 'The AI agent’s answer was not usable — please try again.' }
+  const saved = await quiet<number>('lead_ai_log_draft', {
+    p_contact: contactId, p_draft: draft.reply, p_used: draft.used, p_handoff: draft.handoff, p_note: draft.note, p_model: answer.model,
+  }, 'The draft was not kept.')
+  if (!saved.ok) return saved
+  return { ok: true, data: { ...draft, id: saved.data } }
+}
+
+/** What became of a draft: sent as written, edited then sent, or dismissed. */
+export async function setDraftOutcome(draftId: number, outcome: DraftOutcome) {
+  await requireActionOn('/leads', 'leads', 'create')
+  return quiet<null>('lead_ai_draft_outcome', { p_id: draftId, p_outcome: outcome }, 'The draft’s outcome was not kept.')
+}
+
+/**
+ * AI Agent › Try it: a brand's cards for today and the soul as the form holds it (saved or not), on a pretend
+ * conversation. Nothing is kept and nothing reaches a customer.
+ */
+export async function tryAgent(brandId: string, fields: PersonaFields, turns: Turn[]): Promise<LeadOutcome<AgentDraft>> {
+  await requireActionOn('/leads/ai', 'leads', 'manage')
+  const ctx = await quiet<{ persona: Persona; knowledge: KnowledgeCard[]; today: string }>(
+    'lead_ai_try_context', { p_brand: brandId }, 'The brand could not be read.')
+  if (!ctx.ok) return ctx
+  const { persona, knowledge, today } = ctx.data
+  const clean = turns.filter(t => t.text.trim()).slice(-30).map(t => ({ who: t.who, by: t.who === 'us' ? 'customer service' : undefined, text: t.text.slice(0, 2000) }))
+  const answer = await askModel(systemPrompt({ ...persona, ...fields }, knowledge, today), conversationPrompt(null, clean))
+  if (!answer.ok) return answer
+  const draft = readDraft(answer.text, knowledge)
+  return draft ? { ok: true, data: draft } : { ok: false, reason: 'The AI agent’s answer was not usable — please try again.' }
 }

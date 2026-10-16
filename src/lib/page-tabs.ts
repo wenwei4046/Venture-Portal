@@ -108,6 +108,8 @@ export const PAGE_TABS = {
   '/leads/list': ['lead.leads'],
   '/leads/insight': ['lead.insight'],
   '/leads/flows': ['lead.flows'],
+  '/leads/ai': ['lead.ai'],
+  '/leads/knowledge': ['lead.knowledge'],
   '/leads/settings': ['lead.settings'],
   // Changes: what it shows follows the reader's other boxes (each view's Audit Log).
   '/audit-log': ['hr.audit_log', 'fin.audit_log', 'pri.audit_log'],
