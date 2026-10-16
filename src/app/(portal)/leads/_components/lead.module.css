@@ -300,3 +300,42 @@
 
 /* A flow question's buttons, as the customer saw them (Inbox). */
 .flowButton { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 99px; border: 1px solid rgb(var(--hv-blue)); color: rgb(var(--hv-blue)); font-size: 12px; background: rgb(255 255 255); }
+
+/* English first, Simplified Chinese as the smaller helper (2026-10-16). */
+.zh { margin-left: 6px; font-size: 0.8em; font-weight: 400; color: rgb(var(--hv-note)); letter-spacing: 0; text-transform: none; }
+.zhBlock { display: block; margin-top: 2px; font-size: 0.8em; font-weight: 400; color: rgb(var(--hv-note)); letter-spacing: 0; text-transform: none; }
+
+/* ── Automations (2026-10-16) ── */
+.autoIcon, .tplArt { display: grid; place-items: center; color: rgb(255 255 255); font-weight: 600; }
+.autoIcon { width: 34px; height: 34px; border-radius: 9px; flex: none; font-size: 14px; }
+.tplArt { height: 96px; font-size: 28px; }
+.autoIcon[data-tone='blue'], .tplArt[data-tone='blue'] { background: rgb(var(--hv-blue)); }
+.autoIcon[data-tone='plum'], .tplArt[data-tone='plum'] { background: rgb(var(--hv-brown)); }
+.autoIcon[data-tone='clay'], .tplArt[data-tone='clay'] { background: rgb(var(--hv-accent)); }
+.autoIcon[data-tone='olive'], .tplArt[data-tone='olive'] { background: rgb(var(--hv-ledger)); }
+.autoIcon[data-tone='rose'], .tplArt[data-tone='rose'] { background: rgb(var(--hv-danger)); }
+.autoIcon[data-tone='ink'], .tplArt[data-tone='ink'] { background: rgb(var(--hv-dark)); }
+.tplCard { display: flex; flex-direction: column; text-align: left; padding: 0; border: 1px solid rgb(var(--hv-hairline)); border-radius: 12px; overflow: hidden; background: rgb(255 255 255); font: inherit; color: inherit; cursor: pointer; }
+.tplCard:hover:not(:disabled) { border-color: rgb(var(--hv-accent)); box-shadow: 0 6px 18px rgb(var(--hv-dark) / 0.08); }
+.tplCard:disabled { opacity: 0.6; cursor: default; }
+.tplCard:focus-visible { outline: 2px solid rgb(var(--hv-accent)); outline-offset: 2px; }
+.catRow { display: flex; align-items: center; gap: 8px; flex: 1; width: 100%; min-height: 38px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 13.5px; color: rgb(var(--hv-brown)); cursor: pointer; text-align: left; }
+.catRow:hover { background: rgb(var(--hv-panel)); }
+.catRow[aria-pressed='true'] { background: rgb(255 255 255); color: rgb(var(--hv-ink)); font-weight: 600; box-shadow: 0 0 0 1px rgb(var(--hv-hairline)); }
+.catRow:focus-visible { outline: 2px solid rgb(var(--hv-accent)); outline-offset: -2px; }
+.catDot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.catDot[data-tone='ink'] { background: rgb(var(--hv-dark)); }
+.catDot[data-tone='clay'] { background: rgb(var(--hv-accent)); }
+.catDot[data-tone='blue'] { background: rgb(var(--hv-blue)); }
+.catDot[data-tone='olive'] { background: rgb(var(--hv-ledger)); }
+.catDot[data-tone='plum'] { background: rgb(var(--hv-brown)); }
+.iconBtn { width: 28px; height: 28px; flex: none; border: 0; border-radius: 6px; background: transparent; color: rgb(var(--hv-note)); cursor: pointer; font: inherit; font-size: 12px; }
+.iconBtn:hover { background: rgb(var(--hv-panel)); color: rgb(var(--hv-ink)); }
+.linkBtn { border: 0; background: none; padding: 0; font: inherit; color: rgb(var(--hv-brown)); cursor: pointer; text-decoration: underline; }
+.qaHead, .qaRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto; gap: 8px; align-items: start; }
+.qaHead { font-size: 11.5px; color: rgb(var(--hv-note)); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.check input { width: 16px; height: 16px; accent-color: rgb(var(--hv-dark)); }
+.dayGrid { display: grid; grid-template-columns: 60px minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13px; }
+.chipItem { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 4px 0 10px; border-radius: 99px; background: rgb(var(--hv-panel)); font-size: 12.5px; }
+.chipItem button { border: 0; background: none; cursor: pointer; color: rgb(var(--hv-note)); font-size: 11px; padding: 2px 6px; }

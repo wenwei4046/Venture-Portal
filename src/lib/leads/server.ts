@@ -49,3 +49,10 @@ export function loadLeadList(from: string, to: string): Promise<Read<LeadContact
 export function loadFlows(): Promise<Read<LeadFlow[]>> {
   return rpc<LeadFlow[]>('lead_flows', undefined, 'The flows')
 }
+
+export interface AutoCategory { id: string; name: string; tone: 'ink' | 'clay' | 'blue' | 'olive' | 'plum'; sortOrder: number }
+
+/** The categories Customer Service made for their automations. */
+export function loadAutoCategories(): Promise<Read<AutoCategory[]>> {
+  return rpc<AutoCategory[]>('lead_auto_categories', undefined, 'The categories')
+}

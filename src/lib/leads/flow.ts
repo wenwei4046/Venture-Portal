@@ -7,7 +7,7 @@
 import { findPhone } from './phone'
 
 export type FlowStepKind = 'question' | 'message' | 'phone' | 'handoff'
-export type FlowTrigger = 'ad' | 'keyword' | 'first'
+export type FlowTrigger = 'ad' | 'keyword' | 'first' | 'away'
 
 export interface FlowButton {
   label: string
@@ -20,6 +20,8 @@ export interface FlowStep {
   text: string
   buttons?: FlowButton[]
   next?: string | null
+  /** A question's tapped answer goes into the customer card (mig 20261016320000). */
+  saveAs?: 'interest' | 'budget' | 'showroom' | 'preferredTime' | null
 }
 
 export interface LeadFlow {
@@ -30,6 +32,10 @@ export interface LeadFlow {
   triggerValue: string
   active: boolean
   steps: FlowStep[]
+  /** Automations (mig 20261016320000): its category, the template it was made from, and that template's form. */
+  categoryId?: string | null
+  template?: 'faq' | 'welcome' | 'away' | 'keyword' | 'ad' | 'custom'
+  config?: Record<string, unknown>
   sortOrder: number
   updatedAt: string
   /** Conversations it started in the last seven days, and how many of them left a phone. */
@@ -38,16 +44,17 @@ export interface LeadFlow {
 }
 
 export const STEP_KIND_LABEL: Readonly<Record<FlowStepKind, string>> = {
-  question: '問題 + 按鈕 Question',
-  message: '發一段訊息 Message',
-  phone: '問電話 Ask phone',
-  handoff: '交給客服 Hand to CS',
+  question: 'Question + buttons · 问题',
+  message: 'Message · 发消息',
+  phone: 'Ask for phone · 问电话',
+  handoff: 'Hand to CS · 交给客服',
 }
 
 export const TRIGGER_LABEL: Readonly<Record<FlowTrigger, string>> = {
-  ad: '從廣告進來 From an ad',
-  keyword: '訊息有關鍵字 Keyword',
-  first: '任何第一則訊息 Any first message',
+  ad: 'From an ad · 从广告进来',
+  keyword: 'Keyword · 关键词',
+  first: 'Any first message · 第一则消息',
+  away: 'Outside opening hours · 下班时间',
 }
 
 /** What is wrong with these steps, or null. Twin of lead_flow_problem. */
@@ -63,6 +70,7 @@ export function flowProblem(steps: FlowStep[]): string | null {
   for (const s of steps) {
     if (!['question', 'message', 'phone', 'handoff'].includes(s.kind)) return 'A step is a question, a message, a phone question or a hand-over.'
     if (!s.text?.trim() || s.text.length > 1000) return 'Every step says something (1,000 characters at most).'
+    if (s.saveAs != null && !['interest', 'budget', 'showroom', 'preferredTime'].includes(s.saveAs)) return 'An answer is kept as interest, budget, showroom or time.'
     if (s.kind === 'question') {
       const buttons = s.buttons ?? []
       if (buttons.length === 0) return 'A question needs at least one button.'
@@ -127,10 +135,10 @@ export function newStepId(steps: FlowStep[]): string {
 /** A starter flow: a welcome question, its answer, the phone, and the hand-over. */
 export function starterSteps(): FlowStep[] {
   return [
-    { id: 's1', kind: 'question', text: 'Hi！謝謝你的訊息 🙌 你想看哪一種？', buttons: [{ label: '沙發', next: 's2' }, { label: '床褥', next: 's2' }, { label: '其他', next: 's4' }] },
-    { id: 's2', kind: 'message', text: '好的！這是我們最受歡迎的款式 👇', next: 's3' },
-    { id: 's3', kind: 'phone', text: '想親自來看看嗎？留個電話，我請門市同事幫你安排時間 😊', next: 's4' },
-    { id: 's4', kind: 'handoff', text: '收到！同事會盡快聯絡你 🙏' },
+    { id: 's1', kind: 'question', text: 'Hi! Thanks for your message 🙌 What are you looking for?', buttons: [{ label: 'Sofa', next: 's2' }, { label: 'Mattress', next: 's2' }, { label: 'Other', next: 's4' }] },
+    { id: 's2', kind: 'message', text: 'Great! Here are our most popular picks 👇', next: 's3' },
+    { id: 's3', kind: 'phone', text: "Want to see it in person? Leave your phone and we'll book you a time 😊", next: 's4' },
+    { id: 's4', kind: 'handoff', text: "Got it — we'll call you soon 🙏" },
   ]
 }
 

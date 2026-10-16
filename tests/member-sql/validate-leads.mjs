@@ -230,4 +230,53 @@ await q('select public.lead_remove_flow($1)', [sofaFlow])
 check((await q('select public.lead_flows() f'))[0].f.length, 2, 'removed')
 check((await q(`select count(*)::int n from information_schema.role_table_grants where table_name = 'lead_flows' and grantee in ('anon','authenticated')`))[0].n, 0, 'no grants on flows')
 
+// ── Automations (mig 20261016320000) ────────────────────────────────────────
+await db.exec(await readFile(new URL('../../supabase/migrations/20261016320000_lead_automations.sql', import.meta.url), 'utf8'))
+check((await q('select public.lead_auto_categories() c'))[0].c.map(c => c.name), ['General', '廣告'], 'two categories to start')
+check((await q('select category_id is not null c from public.lead_flows where deleted_at is null limit 1'))[0].c, true, 'older flows are General')
+await refuses(`select public.lead_save_auto_category(null, 'general', null)`, [], /already a category/, 'category names are unique')
+const festive = (await q(`select public.lead_save_auto_category(null, '節日活動', 'olive') i`))[0].i
+// Away hours.
+const hours = JSON.stringify({ hours: [{ day: 1, from: '10:00', to: '22:00' }] })
+const away = async at => (await q('select public.lead_is_away($1::jsonb, $2::timestamptz) a', [hours, at]))[0].a
+check(await away('2026-10-19T04:00:00Z'), false, 'Monday 12:00 in KL is open')
+check(await away('2026-10-19T15:00:00Z'), true, 'Monday 23:00 in KL is closed')
+check(await away('2026-10-18T04:00:00Z'), true, 'Sunday is not listed: closed')
+// Templates save with their form; saveAs is checked.
+await refuses(`select public.lead_save_flow(null, $1::jsonb)`, [JSON.stringify({ name: 'x', triggerKind: 'first', steps: [{ id: 's1', kind: 'question', text: 'q', saveAs: 'salary', buttons: [{ label: 'A', next: 's1' }] }] })], /kept as interest/, 'saveAs is one of the card fields')
+await refuses(`select public.lead_save_flow(null, '{"name":"x","template":"nope","triggerKind":"first","steps":[{"id":"s1","kind":"handoff","text":"a"}]}')`, [], /Unknown template/, 'templates are known')
+// Turn the earlier flows off, so these tests see only their own.
+await db.exec(`update public.lead_flows set active = false`)
+const adQ = JSON.stringify([
+  { id: 'q1', kind: 'question', text: '哪一種？', saveAs: 'interest', buttons: [{ label: '床褥', next: 'q2' }] },
+  { id: 'q2', kind: 'question', text: '預算？', saveAs: 'budget', buttons: [{ label: '3,000 以上', next: 'p' }] },
+  { id: 'p', kind: 'phone', text: '留電話？', next: 'h' },
+  { id: 'h', kind: 'handoff', text: '收到' },
+])
+await q(`select public.lead_save_flow(null, jsonb_build_object('name','試睡廣告','template','ad','categoryId',$1::text,'brandId',$2::text,'triggerKind','ad','triggerValue','Trial','active',true,'steps',$3::jsonb,'config','{"questions":2}'::jsonb))`, [festive, bCarress, adQ])
+const fay = (await q(`select public.lead_simulate($1, 'messenger', 'Fay', 'Mattress Trial', 'hi') c`, [bCarress]))[0].c
+await q(`select public.lead_simulate($1, 'messenger', 'Fay', '', '床褥')`, [bCarress])
+await q(`select public.lead_simulate($1, 'messenger', 'Fay', '', '3,000 以上')`, [bCarress])
+ft = await flowThread(fay)
+check([ft.contact.interest, ft.contact.budget, ft.messages.at(-1).body], ['床褥', '3,000 以上', '留電話？'], 'the ad answers fill the card')
+// A keyword answers a later message too — but not while Customer Service is serving the customer.
+await q(`select public.lead_save_flow(null, jsonb_build_object('name','分期','template','keyword','triggerKind','keyword','triggerValue','分期, installment','active',true,'steps','[{"id":"k1","kind":"message","text":"可以分期！"}]'::jsonb))`)
+const gus = (await q(`select public.lead_simulate($1, 'instagram', 'Gus', '', 'hello') c`, [b2990]))[0].c
+check((await flowThread(gus)).messages.length, 1, 'no automation for a plain first message now')
+await q(`select public.lead_simulate($1, 'instagram', 'Gus', '', '請問可以 installment 嗎')`, [b2990])
+check((await flowThread(gus)).messages.at(-1).body, '可以分期！', 'a keyword in a later message answers')
+await q('select public.lead_reply($1, $2)', [gus, '你好我是 Mei Ling'])
+await q(`select public.lead_simulate($1, 'instagram', 'Gus', '', '分期要幾個月？')`, [b2990])
+check((await flowThread(gus)).messages.at(-1).sender, 'customer', 'Customer Service is serving: the keyword keeps quiet')
+// Away: every day closed → always away; once in 12 hours.
+await q(`select public.lead_save_flow(null, jsonb_build_object('name','下班','template','away','triggerKind','away','active',true,'config','{"hours":[]}'::jsonb,'steps','[{"id":"a1","kind":"message","text":"我們下班了"}]'::jsonb))`)
+const hal = (await q(`select public.lead_simulate($1, 'messenger', 'Hal', '', 'hi') c`, [b2990]))[0].c
+await q(`select public.lead_simulate($1, 'messenger', 'Hal', '', 'anyone?')`, [b2990])
+ft = await flowThread(hal)
+check(ft.messages.map(m => m.body), ['hi', '我們下班了', 'anyone?'], 'away answers once, not again within 12 hours')
+const flowList = (await q('select public.lead_flows() f'))[0].f
+check(flowList.find(f => f.name === '試睡廣告').template, 'ad', 'the template comes back')
+await q('select public.lead_remove_auto_category($1)', [festive])
+check((await q('select public.lead_flows() f'))[0].f.find(f => f.name === '試睡廣告').categoryId, null, 'its automations stay, in no category')
+
 console.log(`validate-leads: ${checks} checks passed`)

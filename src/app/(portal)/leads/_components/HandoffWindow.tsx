@@ -6,7 +6,7 @@ import { handLeadOver } from '@/lib/leads/actions'
 import { handoffText, suggestedSales } from '@/lib/leads/handoff'
 import { formatPhone, whatsAppLink } from '@/lib/leads/phone'
 import type { LeadBrand, LeadContact } from '@/lib/leads/types'
-import { initials } from './bits'
+import { Bi, initials } from './bits'
 import s from './lead.module.css'
 
 /**
@@ -63,11 +63,11 @@ export default function HandoffWindow({ contact, brand, csName, onClose, onDone 
     <div className={s.scrim} onClick={e => { if (e.target === e.currentTarget && !busy) onClose() }}>
       <div className={s.window} role="dialog" aria-modal="true" aria-label="Hand over to sales">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <h2 className={s.windowTitle} style={{ flex: 1 }}>轉交給 {brand.name} 銷售</h2>
+          <h2 className={s.windowTitle} style={{ flex: 1 }}>Hand over to {brand.name} sales<span className={s.zh}>转交给销售</span></h2>
           <button type="button" className={btn('outline')} onClick={onClose} disabled={busy} aria-label="Close">✕</button>
         </div>
         {brand.sales.length === 0 ? (
-          <div className={s.error}>{brand.name} 還沒有銷售名單 — 先到 Settings 加銷售。</div>
+          <div className={s.error}><Bi block en={`${brand.name} has no salespeople yet — add them in Settings.`} zh="还没有销售名单，先到 Settings 加销售。" /></div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }} role="group" aria-label="Salesperson">
             {brand.sales.map(x => (
@@ -75,22 +75,22 @@ export default function HandoffWindow({ contact, brand, csName, onClose, onDone 
                 <span className={s.avatar} aria-hidden="true">{initials(x.name)}</span>
                 <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <span className={s.salesName}>{x.name}</span>
-                  <span className={s.salesMeta}>{formatPhone(x.phone)}{x.showroom ? ` · ${x.showroom}` : ''} · 本週 {x.week}</span>
+                  <span className={s.salesMeta}>{formatPhone(x.phone)}{x.showroom ? ` · ${x.showroom}` : ''} · {x.week} this week</span>
                 </span>
-                {next?.id === x.id ? <span className={s.brand} data-tone="clay">輪到他 Next</span> : null}
+                {next?.id === x.id ? <span className={s.brand} data-tone="clay">Next · 轮到他</span> : null}
               </button>
             ))}
           </div>
         )}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span className={s.hint}>WhatsApp 內容（可以改）</span>
+          <span className={s.hint}><Bi en="WhatsApp message (you can edit it)" zh="WhatsApp 内容（可以改）" /></span>
           <textarea className={s.preview} value={text} onChange={e => { setEdited(true); setText(e.target.value) }} disabled={!chosen} />
         </label>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
         <div className={s.actions} style={{ justifyContent: 'flex-end' }}>
-          <button type="button" className={btn('outline')} onClick={onClose} disabled={busy}>取消 Cancel</button>
+          <button type="button" className={btn('outline')} onClick={onClose} disabled={busy}><Bi en="Cancel" zh="取消" /></button>
           <button type="button" className={btn('primary')} onClick={go} disabled={!chosen || busy || !text.trim()}>
-            {busy ? '轉交中…' : '打開 WhatsApp 並標記已轉交'}
+            {busy ? 'Handing over…' : <Bi en="Open WhatsApp & mark handed" zh="打开 WhatsApp 并标记已转交" />}
           </button>
         </div>
       </div>

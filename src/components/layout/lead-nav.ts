@@ -2,7 +2,7 @@
 // sidebar HR's and Finance's views draw, with Lead View's own pages —
 //
 //   Inbox · Leads · Insight
-//   I. SET UP   Flows · Settings
+//   I. SET UP   Automations · Settings
 //
 // The canvas's other boards (Campaigns, AI Agent, Data Center) are later phases; their rows join here
 // with their pages. Every row asks its page's tab, as every view sidebar does (visibleHrNav → opensPath).
@@ -33,7 +33,7 @@ export function leadNavSections(): HrNavSection[] {
       label: 'Set up',
       tone: 'clay',
       items: [
-        link('leads-flows', 'Flows', 'tree', '/leads/flows', (p) => under(p, '/leads/flows')),
+        link('leads-flows', 'Automations', 'tree', '/leads/flows', (p) => under(p, '/leads/flows')),
         link('leads-settings', 'Settings', 'doc', '/leads/settings', (p) => under(p, '/leads/settings')),
       ],
     },

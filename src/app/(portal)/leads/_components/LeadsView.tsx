@@ -10,11 +10,11 @@ import { formatPhone } from '@/lib/leads/phone'
 import type { LeadPeriod } from '@/lib/leads/period'
 import { whenFull } from '@/lib/leads/time'
 import type { Appt, LeadConfig, LeadContact, Shown } from '@/lib/leads/types'
-import { BrandChip, CHANNEL_LABEL } from './bits'
+import { Bi, BrandChip, CHANNEL_LABEL } from './bits'
 import s from './lead.module.css'
 
-const APPT: Readonly<Record<Appt, string>> = { unknown: '未知', booked: '已預約', not_booked: '沒約到' }
-const SHOWN: Readonly<Record<Shown, string>> = { unknown: '未知', came: '到了', no_show: '沒來' }
+const APPT: Readonly<Record<Appt, string>> = { unknown: 'Not known · 未知', booked: 'Booked · 已预约', not_booked: 'Not booked · 没约到' }
+const SHOWN: Readonly<Record<Shown, string>> = { unknown: 'Not known · 未知', came: 'Came · 到了', no_show: 'No show · 没来' }
 
 /**
  * Lead View › Leads (the canvas's "Leads" board): the month's customers whose phone Customer Service got — who
@@ -47,40 +47,40 @@ export default function LeadsView({ config, contacts, period, months, canEdit }:
         </select>
       } />
       <Cards count={4} label="This month">
-        <Card label="拿到電話 Phones" value={String(t.phones)} note={`${t.conversations} 個對話 · ${rate(t.phones, t.conversations) ?? '—'}%`} />
-        <Card label="已轉交 Handed" value={String(t.handed)} note={`${t.phones - t.handed} 個還沒轉交`} />
-        <Card label="已預約 Booked" value={String(t.booked)} note="客服手動更新" />
-        <Card label="已到店 Came" value={String(t.came)} note="參考，不算客服 KPI" />
+        <Card label="Phones · 拿到电话" value={String(t.phones)} note={`of ${t.conversations} conversations · ${rate(t.phones, t.conversations) ?? '—'}%`} />
+        <Card label="Handed · 已转交" value={String(t.handed)} note={`${t.phones - t.handed} not handed yet · 还没转交`} />
+        <Card label="Booked · 已预约" value={String(t.booked)} note="Kept by Customer Service · 客服手动更新" />
+        <Card label="Came · 已到店" value={String(t.came)} note="For reference, not the CS KPI · 参考" />
       </Cards>
 
-      {onlyTests ? <div className={s.note} style={{ margin: '18px 0 0' }}>目前只有測試資料（Meta 還沒串接），所以先顯示測試對話。真的客戶進來後，測試資料不會算進數字。</div> : null}
+      {onlyTests ? <div className={s.note} style={{ margin: '18px 0 0' }}><Bi block en="Only test conversations so far (Meta is not connected), so they are shown. Once real customers arrive, tests are left out of the numbers." zh="目前只有测试资料，所以先显示测试对话。" /></div> : null}
       <div className={s.toolbar} style={{ marginTop: 18 }}>
         <div className={s.tabs} role="group" aria-label="Brand">
-          <button type="button" className={s.tab} aria-pressed={brand === 'all'} onClick={() => setBrand('all')}>全部</button>
+          <button type="button" className={s.tab} aria-pressed={brand === 'all'} onClick={() => setBrand('all')}><Bi en="All" zh="全部" /></button>
           {config.brands.map(b => (
             <button key={b.id} type="button" className={s.tab} aria-pressed={brand === b.id} onClick={() => setBrand(b.id)}>{b.name}</button>
           ))}
         </div>
         <span className={s.spacer} />
         <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          轉交 Handed
+          <Bi en="Handed" zh="转交" />
           <select className={s.select} value={handed} onChange={e => setHanded(e.target.value as 'all' | 'yes' | 'no')}>
-            <option value="all">全部 All</option><option value="no">還沒轉交 Not yet</option><option value="yes">已轉交 Handed</option>
+            <option value="all">All · 全部</option><option value="no">Not yet · 还没转交</option><option value="yes">Handed · 已转交</option>
           </select>
         </label>
         <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <input type="checkbox" checked={tests} onChange={e => setTests(e.target.checked)} /> 包含測試 Include tests
+          <input type="checkbox" checked={tests} onChange={e => setTests(e.target.checked)} /> <Bi en="Include tests" zh="包含测试" />
         </label>
       </div>
 
       <div className={s.tableBox}>
         <table className={s.table}>
           <thead>
-            <tr><th>客戶 Customer</th><th>品牌 Brand</th><th>來源 Source</th><th>電話 Phone</th><th>意向 Interest</th><th>轉交給 Handed to</th><th>轉交時間</th><th>預約 Booked</th><th>到店 Came</th></tr>
+            <tr><th>Customer<span className={s.zh}>客户</span></th><th>Brand<span className={s.zh}>品牌</span></th><th>Source<span className={s.zh}>来源</span></th><th>Phone<span className={s.zh}>电话</span></th><th>Interest<span className={s.zh}>意向</span></th><th>Handed to<span className={s.zh}>转交给</span></th><th>When<span className={s.zh}>时间</span></th><th>Booked<span className={s.zh}>预约</span></th><th>Came<span className={s.zh}>到店</span></th></tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={9} className={s.muted} style={{ textAlign: 'center', padding: 28 }}>這個月還沒有拿到電話的客戶。</td></tr>
+              <tr><td colSpan={9} className={s.muted} style={{ textAlign: 'center', padding: 28 }}><Bi block en="No phones yet this month." zh="这个月还没有拿到电话的客户。" /></td></tr>
             ) : rows.map(c => (
               <tr key={c.id}>
                 <td>
@@ -89,9 +89,9 @@ export default function LeadsView({ config, contacts, period, months, canEdit }:
                 </td>
                 <td><BrandChip brand={brands.get(c.brandId)} /></td>
                 <td className={s.muted}>{c.sourceAd || 'Organic'}</td>
-                <td className={s.mono}>{formatPhone(c.phone)}{c.phoneState === 'detected' ? <span className={s.hint}> · 待確認</span> : null}</td>
+                <td className={s.mono}>{formatPhone(c.phone)}{c.phoneState === 'detected' ? <span className={s.hint}> · to confirm</span> : null}</td>
                 <td>{c.interest || <span className={s.muted}>—</span>}</td>
-                <td>{c.handedSalesName ?? (canEdit ? <Link href={`/leads?c=${c.id}`} style={{ fontWeight: 600 }}>轉交 →</Link> : '—')}</td>
+                <td>{c.handedSalesName ?? (canEdit ? <Link href={`/leads?c=${c.id}`} style={{ fontWeight: 600 }}>Hand over →</Link> : '—')}</td>
                 <td className={`${s.mono} ${s.muted}`}>{c.handedAt ? whenFull(c.handedAt) : '—'}</td>
                 <OutcomeCells contact={c} canEdit={canEdit} />
               </tr>
@@ -99,7 +99,7 @@ export default function LeadsView({ config, contacts, period, months, canEdit }:
           </tbody>
         </table>
       </div>
-      <p className={s.hint} style={{ marginTop: 10 }}>銷售不登入這個系統：預約和到店由客服向銷售了解後更新。</p>
+      <p className={s.hint} style={{ marginTop: 10 }}><Bi en="Salespeople don't sign in here: Customer Service updates the booking and the visit." zh="销售不登入这个系统：预约和到店由客服更新。" /></p>
     </HvPage>
   )
 }

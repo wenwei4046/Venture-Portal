@@ -19,3 +19,13 @@ export function initials(name: string): string {
   if (parts.length === 0) return '?'
   return (parts.length === 1 ? parts[0].slice(0, 2) : parts[0][0] + parts[1][0]).toUpperCase()
 }
+
+/** English first, Simplified Chinese beside it, smaller (the user, 2026-10-16: 简体+英文；英文大点，中文辅助翻译). */
+export function Bi({ en, zh, block = false }: { en: string; zh: string; block?: boolean }) {
+  return (
+    <>
+      {en}
+      <span className={block ? s.zhBlock : s.zh}>{zh}</span>
+    </>
+  )
+}

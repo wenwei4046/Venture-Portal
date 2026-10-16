@@ -310,7 +310,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Lead View (mig 20261016300200): each asks has_any_action(leads.*).
   'lead_config', 'lead_inbox', 'lead_thread', 'lead_list', 'lead_reply', 'lead_simulate', 'lead_save_card',
   'lead_handoff', 'lead_set_outcome', 'lead_save_brand', 'lead_save_sales', 'lead_remove_sales',
-  'lead_flows', 'lead_save_flow', 'lead_remove_flow',
+  'lead_flows', 'lead_save_flow', 'lead_remove_flow', 'lead_auto_categories', 'lead_save_auto_category', 'lead_remove_auto_category',
   // Admin › Guest Link (mig 20261011091000): each asks has_any_action(guest_link.* / rooms.view); the guest page's
   // five (page, day, book, cancel, hire) are anon's by name and check the link's code instead.
   'guest_link_admin', 'guest_link_set', 'guest_link_new_code', 'guest_link_room', 'guest_link_save_subsidiary',

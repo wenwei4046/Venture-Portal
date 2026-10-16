@@ -7,7 +7,7 @@ import { inboxState, type InboxState } from '@/lib/leads/handoff'
 import { formatPhone } from '@/lib/leads/phone'
 import { whenShort } from '@/lib/leads/time'
 import type { LeadConfig, LeadContact, LeadThread } from '@/lib/leads/types'
-import { BrandChip, CHANNEL_LABEL, initials } from './bits'
+import { Bi, BrandChip, CHANNEL_LABEL, initials } from './bits'
 import CustomerCard from './CustomerCard'
 import s from './lead.module.css'
 
@@ -21,11 +21,11 @@ import s from './lead.module.css'
  */
 
 type Filter = InboxState | 'all'
-const FILTERS: Array<{ id: Filter; label: string }> = [
-  { id: 'waiting', label: '要回覆 Waiting' },
-  { id: 'answered', label: '已回覆 Answered' },
-  { id: 'handed', label: '已轉交 Handed' },
-  { id: 'all', label: '全部 All' },
+const FILTERS: Array<{ id: Filter; en: string; zh: string }> = [
+  { id: 'waiting', en: 'Waiting', zh: '要回复' },
+  { id: 'answered', en: 'Answered', zh: '已回复' },
+  { id: 'handed', en: 'Handed', zh: '已转交' },
+  { id: 'all', en: 'All', zh: '全部' },
 ]
 
 export default function InboxView({
@@ -97,16 +97,16 @@ export default function InboxView({
         <section className={s.list} aria-label="Conversations">
           <div className={s.listHead}>
             <div className={s.tabs} role="group" aria-label="Brand">
-              <button type="button" className={s.tab} aria-pressed={brand === 'all'} onClick={() => setBrand('all')}>全部</button>
+              <button type="button" className={s.tab} aria-pressed={brand === 'all'} onClick={() => setBrand('all')}><Bi en="All" zh="全部" /></button>
               {config.brands.map(b => (
                 <button key={b.id} type="button" className={s.tab} aria-pressed={brand === b.id} onClick={() => setBrand(b.id)}>{b.name}</button>
               ))}
             </div>
-            <input className={s.search} type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋 Search name, phone, message" aria-label="Search conversations" />
+            <input className={s.search} type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search name, phone, message · 搜索" aria-label="Search conversations" />
             <div className={s.tabs} role="group" aria-label="Where they stand">
               {FILTERS.map(f => (
                 <button key={f.id} type="button" className={s.tab} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
-                  {f.label}<span className={s.count}>{counts[f.id]}</span>
+                  <Bi en={f.en} zh={f.zh} /><span className={s.count}>{counts[f.id]}</span>
                 </button>
               ))}
             </div>
@@ -115,8 +115,8 @@ export default function InboxView({
             {shown.length === 0 ? (
               <div className={s.empty}>
                 {contacts.length === 0
-                  ? '還沒有對話。Meta 串接之前，可以在 Settings › Test 送一則測試訊息進來。'
-                  : '沒有符合的對話。'}
+                  ? <Bi block en="No conversations yet. Until Meta is connected, send a test message from Settings › Test." zh="还没有对话。Meta 串接之前，可以在 Settings › Test 发一则测试消息进来。" />
+                  : <Bi block en="No conversations match." zh="没有符合的对话。" />}
               </div>
             ) : (
               shown.map(c => {
@@ -136,7 +136,7 @@ export default function InboxView({
                       <span className={s.rowChips}>
                         <BrandChip brand={brands.get(c.brandId)} />
                         <StateChip state={st} />
-                        {c.flowState === 'running' ? <span className={s.brand} data-tone="blue">Flow 中</span> : null}
+                        {c.flowState === 'running' ? <span className={s.brand} data-tone="blue">Automation · 自动</span> : null}
                         {c.phone ? <span className={s.found}>{formatPhone(c.phone)}</span> : null}
                         {c.isTest ? <span className={s.brand} data-tone="plum">TEST</span> : null}
                       </span>
@@ -154,7 +154,7 @@ export default function InboxView({
             <Chat key={contact.id} contact={contact} thread={thread} brandName={brands.get(contact.brandId)?.name ?? ''} today={config.today}
               canReply={canReply} loading={loading && !thread} onSent={() => load(contact.id)} />
           ) : (
-            <div className={s.empty}>選一個對話 Pick a conversation.</div>
+            <div className={s.empty}><Bi block en="Pick a conversation." zh="选一个对话" /></div>
           )}
           {error ? <div className={s.error} role="alert" style={{ margin: 12 }}>{error}</div> : null}
         </section>
@@ -172,7 +172,7 @@ export default function InboxView({
 }
 
 function StateChip({ state }: { state: InboxState }) {
-  const label = state === 'waiting' ? '要回覆' : state === 'answered' ? '已回覆' : '已轉交'
+  const label = state === 'waiting' ? 'Waiting' : state === 'answered' ? 'Answered' : 'Handed'
   const tone = state === 'waiting' ? 'clay' : state === 'handed' ? 'olive' : 'plum'
   return <span className={s.brand} data-tone={tone}>{label}</span>
 }
@@ -212,21 +212,21 @@ function Chat({ contact, thread, brandName, today, canReply, loading, onSent }: 
           <span className={s.chatName}>{contact.name || '—'}</span>
           <span className={s.chatMeta}>
             <span>{brandName}</span><span>·</span><span>{CHANNEL_LABEL[contact.channel]}</span><span>·</span>
-            <span>{contact.sourceAd ? `廣告 Ad：${contact.sourceAd}` : 'Organic'}</span>
+            <span>{contact.sourceAd ? `Ad: ${contact.sourceAd}` : 'Organic'}</span>
           </span>
         </div>
       </div>
       {contact.isTest ? (
-        <div className={s.note}>測試對話 Test conversation — 從 Settings › Test 送進來，回覆只會記錄，不會發出。</div>
+        <div className={s.note}><Bi block en="Test conversation — from Settings › Test. Replies are recorded, never sent." zh="测试对话：回复只会记录，不会发出。" /></div>
       ) : (
-        <div className={s.note}>Meta 還沒串接：回覆會記錄在這裡，但還不會發給客戶。</div>
+        <div className={s.note}><Bi block en="Meta is not connected yet: replies are recorded here, not sent to the customer." zh="Meta 还没串接：回复会记录在这里，但还不会发给客户。" /></div>
       )}
       <div className={s.messages}>
         {loading ? <div className={s.empty}>Loading…</div> : null}
         {thread?.messages.map(m => m.direction === 'in' ? (
           <div key={m.id} className={s.msgIn}>
             <div className={s.bubbleIn}>{m.body}</div>
-            {m.phoneFound ? <span className={s.found}>偵測到電話 {formatPhone(m.phoneFound)} → 客戶卡</span> : null}
+            {m.phoneFound ? <span className={s.found}>Phone found {formatPhone(m.phoneFound)} → card · 侦测到电话</span> : null}
             <span className={s.msgMeta}>{whenShort(m.at, today)}</span>
           </div>
         ) : (
@@ -238,8 +238,8 @@ function Chat({ contact, thread, brandName, today, canReply, loading, onSent }: 
               </span>
             ) : null}
             <span className={s.msgMeta}>
-              {m.sender === 'cs' ? `${m.byName} · 客服` : m.sender === 'ai' ? 'AI Agent' : `Flow · ${m.byName}`} · {whenShort(m.at, today)}
-              {m.delivery === 'recorded' ? ' · 只記錄 recorded' : m.delivery === 'failed' ? ' · 沒發出 failed' : ''}
+              {m.sender === 'cs' ? `${m.byName} · CS` : m.sender === 'ai' ? 'AI Agent' : `Flow · ${m.byName}`} · {whenShort(m.at, today)}
+              {m.delivery === 'recorded' ? ' · recorded' : m.delivery === 'failed' ? ' · not sent' : ''}
             </span>
           </div>
         ))}
@@ -251,10 +251,10 @@ function Chat({ contact, thread, brandName, today, canReply, loading, onSent }: 
           <label style={{ flex: 1, display: 'flex' }}>
             <span className="sr-only">Reply</span>
             <textarea className={s.textarea} rows={2} value={text} onChange={e => setText(e.target.value)} maxLength={2000}
-              placeholder="回覆客戶… Reply (Ctrl + Enter 發送)"
+              placeholder="Reply… (Ctrl + Enter to send) · 回复客户"
               onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send() } }} />
           </label>
-          <button type="button" className={btn('primary')} onClick={send} disabled={sending || !text.trim()}>{sending ? '發送中…' : '發送 Send'}</button>
+          <button type="button" className={btn('primary')} onClick={send} disabled={sending || !text.trim()}>{sending ? 'Sending…' : <Bi en="Send" zh="发送" />}</button>
         </div>
       ) : null}
     </>

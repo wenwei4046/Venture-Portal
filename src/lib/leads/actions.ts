@@ -94,7 +94,17 @@ export async function removeLeadSales(salesId: string) {
 
 // ── Flows ───────────────────────────────────────────────────────────────────
 
-export async function saveLeadFlow(flowId: string | null, data: { brandId: string | null; name: string; triggerKind: FlowTrigger; triggerValue: string; active: boolean; steps: FlowStep[] }) {
+export async function saveLeadFlow(flowId: string | null, data: {
+  brandId: string | null
+  name: string
+  triggerKind: FlowTrigger
+  triggerValue: string
+  active: boolean
+  steps: FlowStep[]
+  categoryId?: string | null
+  template?: string
+  config?: Record<string, unknown>
+}) {
   await requireActionOn('/leads/flows', 'leads', 'manage')
   return call<string>('lead_save_flow', { p_id: flowId, p_data: data }, 'The flow was not saved.')
 }
@@ -102,4 +112,14 @@ export async function saveLeadFlow(flowId: string | null, data: { brandId: strin
 export async function removeLeadFlow(flowId: string) {
   await requireActionOn('/leads/flows', 'leads', 'manage')
   return call<null>('lead_remove_flow', { p_id: flowId }, 'The flow was not removed.')
+}
+
+export async function saveAutoCategory(categoryId: string | null, name: string, tone: string | null = null) {
+  await requireActionOn('/leads/flows', 'leads', 'manage')
+  return call<string>('lead_save_auto_category', { p_id: categoryId, p_name: name, p_tone: tone }, 'The category was not saved.')
+}
+
+export async function removeAutoCategory(categoryId: string) {
+  await requireActionOn('/leads/flows', 'leads', 'manage')
+  return call<null>('lead_remove_auto_category', { p_id: categoryId }, 'The category was not removed.')
 }

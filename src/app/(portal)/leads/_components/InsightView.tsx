@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { Card, Cards, HvPage, PageHead, SectHead } from '@/components/hrv/kit'
 import { rate, type LeadInsight, type TallyRow } from '@/lib/leads/insight'
 import type { LeadPeriod } from '@/lib/leads/period'
+import { Bi } from './bits'
 import s from './lead.module.css'
 
 /**
@@ -21,26 +22,26 @@ export default function InsightView({ insight, onlyTests = false, period, months
           {months.map(m => <option key={m.month} value={m.month}>{m.label}</option>)}
         </select>
       } />
-      {onlyTests ? <div className={s.note} style={{ margin: '0 0 14px' }}>目前只有測試資料（Meta 還沒串接），以下數字是測試資料算出來的。</div> : null}
+      {onlyTests ? <div className={s.note} style={{ margin: '0 0 14px' }}><Bi block en="Only test conversations so far (Meta is not connected): these numbers are from tests." zh="目前只有测试资料，以下数字是测试资料算出来的。" /></div> : null}
       <Cards count={4} label="This month">
-        <Card label="拿電話率 Phone rate" value={rate(t.phones, t.conversations) == null ? '—' : `${rate(t.phones, t.conversations)}%`} note={`${t.phones} / ${t.conversations} 個對話`} tone="primary" />
-        <Card label="已轉交 Handed" value={String(t.handed)} note={`${rate(t.handed, t.phones) ?? '—'}% of phones`} />
-        <Card label="轉交後預約 Booked" value={String(t.booked)} note={`${rate(t.booked, t.handed) ?? '—'}% of handed · 參考`} />
-        <Card label="到店 Came" value={String(t.came)} note="參考 reference" />
+        <Card label="Phone rate · 拿电话率" value={rate(t.phones, t.conversations) == null ? '—' : `${rate(t.phones, t.conversations)}%`} note={`${t.phones} of ${t.conversations} conversations`} tone="primary" />
+        <Card label="Handed · 已转交" value={String(t.handed)} note={`${rate(t.handed, t.phones) ?? '—'}% of phones`} />
+        <Card label="Booked · 转交后预约" value={String(t.booked)} note={`${rate(t.booked, t.handed) ?? '—'}% of handed · reference`} />
+        <Card label="Came · 到店" value={String(t.came)} note="Reference · 参考" />
       </Cards>
 
       <div style={{ marginTop: 22 }}>
-        <SectHead title="按客服 By who handed over" />
-        <Table rows={insight.byPerson} first="客服 CS" empty="這個月還沒有轉交。" />
+        <SectHead title="By who handed over · 按客服" />
+        <Table rows={insight.byPerson} first="CS · 客服" empty="Nothing handed over this month." />
       </div>
       <div className={s.twoCol} style={{ marginTop: 22 }}>
         <div>
-          <SectHead title="按品牌 By brand" />
-          <Table rows={insight.byBrand} first="品牌 Brand" empty="—" />
+          <SectHead title="By brand · 按品牌" />
+          <Table rows={insight.byBrand} first="Brand · 品牌" empty="—" />
         </div>
         <div>
-          <SectHead title="按廣告 By ad" />
-          <Table rows={insight.byAd} first="廣告 Ad" empty="這個月還沒有對話。" />
+          <SectHead title="By ad · 按广告" />
+          <Table rows={insight.byAd} first="Ad · 广告" empty="No conversations this month." />
         </div>
       </div>
     </HvPage>
@@ -52,7 +53,7 @@ function Table({ rows, first, empty }: { rows: TallyRow[]; first: string; empty:
     <div className={s.tableBox}>
       <table className={s.table}>
         <thead>
-          <tr><th>{first}</th><th className={s.num}>對話</th><th className={s.num}>電話</th><th>拿電話率</th><th className={s.num}>轉交</th><th className={s.num}>預約</th><th className={s.num}>到店</th></tr>
+          <tr><th>{first}</th><th className={s.num}>Chats<span className={s.zh}>对话</span></th><th className={s.num}>Phones<span className={s.zh}>电话</span></th><th>Phone rate<span className={s.zh}>拿电话率</span></th><th className={s.num}>Handed<span className={s.zh}>转交</span></th><th className={s.num}>Booked<span className={s.zh}>预约</span></th><th className={s.num}>Came<span className={s.zh}>到店</span></th></tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (

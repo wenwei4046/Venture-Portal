@@ -6,7 +6,7 @@ import { saveLeadCard, setLeadOutcome } from '@/lib/leads/actions'
 import { formatPhone } from '@/lib/leads/phone'
 import { whenFull } from '@/lib/leads/time'
 import type { Appt, LeadBrand, LeadCardFields, LeadContact, LeadEvent, Shown } from '@/lib/leads/types'
-import { CHANNEL_LABEL } from './bits'
+import { Bi, CHANNEL_LABEL } from './bits'
 import HandoffWindow from './HandoffWindow'
 import s from './lead.module.css'
 
@@ -51,43 +51,43 @@ export default function CustomerCard({ contact, events, brand, canEdit, csName, 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span className={s.label}>Customer</span>
         <span className={s.cardName}>{contact.name || '—'}</span>
-        <span className={s.hint}>{CHANNEL_LABEL[contact.channel]} · 首次聯絡 first contact {whenFull(contact.createdAt)}</span>
+        <span className={s.hint}>{CHANNEL_LABEL[contact.channel]} · first contact {whenFull(contact.createdAt)}</span>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span className={s.label}>電話 Phone</span>
+        <span className={s.label}><Bi en="Phone" zh="电话" /></span>
         {contact.phoneState === 'none' ? (
-          <div className={s.phoneNone}>還沒拿到。客戶在對話裡打出電話號碼，系統會自動填入。</div>
+          <div className={s.phoneNone}><Bi block en="Not yet. When the customer types a number in the chat, it fills in here." zh="还没拿到。客户在对话里打出电话号码，系统会自动填入。" /></div>
         ) : (
           <div className={s.phoneBox} data-state={contact.phoneState}>
             <span style={{ flex: 1 }}>{formatPhone(contact.phone)}</span>
             {contact.phoneState === 'detected' && canEdit ? (
-              <button type="button" className={btn('primary')} disabled={saving} onClick={() => save({ phone: contact.phone ?? '' })}>確認 Confirm</button>
+              <button type="button" className={btn('primary')} disabled={saving} onClick={() => save({ phone: contact.phone ?? '' })}><Bi en="Confirm" zh="确认" /></button>
             ) : null}
-            {contact.phoneState === 'confirmed' ? <span className={s.hint}>已確認</span> : null}
+            {contact.phoneState === 'confirmed' ? <span className={s.hint}><Bi en="Confirmed" zh="已确认" /></span> : null}
           </div>
         )}
-        {contact.phoneState === 'detected' ? <span className={s.hint}>從客戶的訊息自動偵測，請確認。</span> : null}
+        {contact.phoneState === 'detected' ? <span className={s.hint}><Bi en="Found in the customer's message — please confirm." zh="从客户的消息自动侦测，请确认。" /></span> : null}
       </div>
 
       {canEdit ? (
         <div className={s.fieldGrid}>
-          <label className={`${s.field} ${s.wide}`}>名字 Name<input value={form.name} onChange={set('name')} maxLength={80} /></label>
-          <label className={`${s.field} ${s.wide}`}>電話 Phone（手動輸入）<input value={form.phone} onChange={set('phone')} inputMode="tel" placeholder="012-345 6789" /></label>
-          <label className={s.field}>意向 Interest<input value={form.interest} onChange={set('interest')} maxLength={120} /></label>
-          <label className={s.field}>預算 Budget<input value={form.budget} onChange={set('budget')} maxLength={60} /></label>
+          <label className={`${s.field} ${s.wide}`}><Bi en="Name" zh="名字" /><input value={form.name} onChange={set('name')} maxLength={80} /></label>
+          <label className={`${s.field} ${s.wide}`}><Bi en="Phone (typed)" zh="电话（手动输入）" /><input value={form.phone} onChange={set('phone')} inputMode="tel" placeholder="012-345 6789" /></label>
+          <label className={s.field}><Bi en="Interest" zh="意向" /><input value={form.interest} onChange={set('interest')} maxLength={120} /></label>
+          <label className={s.field}><Bi en="Budget" zh="预算" /><input value={form.budget} onChange={set('budget')} maxLength={60} /></label>
           <label className={s.field}>
-            分店 Showroom
+            <Bi en="Showroom" zh="分店" />
             <input value={form.showroom} onChange={set('showroom')} maxLength={60} list={`rooms-${contact.id}`} />
             <datalist id={`rooms-${contact.id}`}>
               {[...new Set((brand?.sales ?? []).map(x => x.showroom).filter(Boolean))].map(r => <option key={r} value={r} />)}
             </datalist>
           </label>
-          <label className={s.field}>方便的時間 When<input value={form.preferredTime} onChange={set('preferredTime')} maxLength={60} /></label>
-          <label className={`${s.field} ${s.wide}`}>內部備註 Note（客戶看不到）<textarea value={form.note} onChange={set('note')} maxLength={1000} /></label>
+          <label className={s.field}><Bi en="When" zh="方便的时间" /><input value={form.preferredTime} onChange={set('preferredTime')} maxLength={60} /></label>
+          <label className={`${s.field} ${s.wide}`}><Bi en="Note (customer never sees it)" zh="内部备注" /><textarea value={form.note} onChange={set('note')} maxLength={1000} /></label>
           <div className={`${s.actions} ${s.wide}`}>
-            <button type="button" className={btn('outline')} onClick={saveChanged} disabled={saving || changed.length === 0}>{saving ? '儲存中…' : '儲存 Save'}</button>
-            {saved && changed.length === 0 ? <span className={s.hint}>已儲存</span> : null}
+            <button type="button" className={btn('outline')} onClick={saveChanged} disabled={saving || changed.length === 0}>{saving ? 'Saving…' : <Bi en="Save" zh="保存" />}</button>
+            {saved && changed.length === 0 ? <span className={s.hint}><Bi en="Saved" zh="已保存" /></span> : null}
           </div>
         </div>
       ) : null}
@@ -95,17 +95,17 @@ export default function CustomerCard({ contact, events, brand, canEdit, csName, 
 
       {contact.handedAt ? (
         <div className={s.handed}>
-          <span className={s.handedTitle}>已轉交 Handed to {contact.handedSalesName}</span>
+          <span className={s.handedTitle}>Handed to {contact.handedSalesName}<span className={s.zh}>已转交</span></span>
           <span className={s.hint}>{whenFull(contact.handedAt)} · {contact.handedByName}</span>
           {canEdit ? <Outcome contact={contact} onSaved={onSaved} /> : (
-            <span className={s.hint}>預約 {APPT[contact.appt]} · 到店 {SHOWN[contact.shown]}</span>
+            <span className={s.hint}>Booked: {APPT[contact.appt]} · Came: {SHOWN[contact.shown]}</span>
           )}
-          {canEdit && brand ? <button type="button" className={btn('outline')} onClick={() => setHanding(true)}>再轉交 Hand again</button> : null}
+          {canEdit && brand ? <button type="button" className={btn('outline')} onClick={() => setHanding(true)}><Bi en="Hand again" zh="再转交" /></button> : null}
         </div>
       ) : canEdit && brand ? (
         <button type="button" className={btn('primary')} style={{ minHeight: 44 }} onClick={() => setHanding(true)} disabled={!contact.phone}
-          title={contact.phone ? undefined : '先拿到客戶電話 Get the phone first'}>
-          轉交給 {brand.name} 銷售 Hand over
+          title={contact.phone ? undefined : 'Get the phone first · 先拿到客户电话'}>
+          Hand over to {brand.name} sales<span className={s.zh}>转交给销售</span>
         </button>
       ) : null}
 
@@ -131,8 +131,8 @@ function pickCard(form: Required<LeadCardFields>, contact: LeadContact): Partial
   return { name: form.name || contact.name, interest: form.interest, budget: form.budget, showroom: form.showroom, preferredTime: form.preferredTime, note: form.note }
 }
 
-const APPT: Readonly<Record<Appt, string>> = { unknown: '未知', booked: '已預約', not_booked: '沒約到' }
-const SHOWN: Readonly<Record<Shown, string>> = { unknown: '未知', came: '到了', no_show: '沒來' }
+const APPT: Readonly<Record<Appt, string>> = { unknown: 'Not known · 未知', booked: 'Booked · 已预约', not_booked: 'Not booked · 没约到' }
+const SHOWN: Readonly<Record<Shown, string>> = { unknown: 'Not known · 未知', came: 'Came · 到了', no_show: 'No show · 没来' }
 
 function Outcome({ contact, onSaved }: { contact: LeadContact; onSaved: () => void }) {
   const [busy, start] = useTransition()
@@ -145,12 +145,12 @@ function Outcome({ contact, onSaved }: { contact: LeadContact; onSaved: () => vo
   })
   return (
     <div className={s.fieldGrid}>
-      <label className={s.field}>預約 Appointment
+      <label className={s.field}><Bi en="Appointment" zh="预约" />
         <select value={contact.appt} disabled={busy} onChange={e => put(e.target.value as Appt, contact.shown)}>
           {(Object.keys(APPT) as Appt[]).map(k => <option key={k} value={k}>{APPT[k]}</option>)}
         </select>
       </label>
-      <label className={s.field}>到店 Came
+      <label className={s.field}><Bi en="Came" zh="到店" />
         <select value={contact.shown} disabled={busy} onChange={e => put(contact.appt, e.target.value as Shown)}>
           {(Object.keys(SHOWN) as Shown[]).map(k => <option key={k} value={k}>{SHOWN[k]}</option>)}
         </select>

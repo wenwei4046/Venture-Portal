@@ -20,15 +20,15 @@ export function suggestedSales(brand: Pick<LeadBrand, 'sales'>): LeadSales | nul
 export function handoffText(contact: LeadContact, brandName: string, sales: Pick<LeadSales, 'name'>, csName: string): string {
   const or = (v: string, missing: string) => (v.trim() ? v.trim() : missing)
   const lines = [
-    `【${brandName} 新客戶 New lead】`,
-    `姓名 Name：${or(contact.name, '[—]')}`,
-    `電話 Phone：${contact.phone ? formatPhone(contact.phone) : '[—]'}`,
-    `意向 Interest：${or(contact.interest, '[未問 not asked]')}${contact.budget.trim() ? `（預算 budget ${contact.budget.trim()}）` : ''}`,
-    `分店 Showroom：${or(contact.showroom, '[未定 not set]')} · ${or(contact.preferredTime, '[時間未定 time not set]')}`,
-    `來源 Source：${CHANNEL[contact.channel]}${contact.sourceAd.trim() ? ` · ${contact.sourceAd.trim()}` : ' · organic'}`,
+    `【${brandName} New lead 新客户】`,
+    `Name 姓名: ${or(contact.name, '[—]')}`,
+    `Phone 电话: ${contact.phone ? formatPhone(contact.phone) : '[—]'}`,
+    `Interest 意向: ${or(contact.interest, '[not asked 未问]')}${contact.budget.trim() ? ` (budget 预算 ${contact.budget.trim()})` : ''}`,
+    `Showroom 分店: ${or(contact.showroom, '[not set 未定]')} · ${or(contact.preferredTime, '[time not set 时间未定]')}`,
+    `Source 来源: ${CHANNEL[contact.channel]}${contact.sourceAd.trim() ? ` · ${contact.sourceAd.trim()}` : ' · organic'}`,
   ]
-  if (contact.note.trim()) lines.push(`備註 Note：${contact.note.trim()}`)
-  lines.push(`客服 CS：${csName}`, `→ ${sales.name}，請聯絡客戶安排到店 🙏`)
+  if (contact.note.trim()) lines.push(`Note 备注: ${contact.note.trim()}`)
+  lines.push(`CS 客服: ${csName}`, `→ ${sales.name}, please call the customer to book a visit 🙏 请联络客户安排到店`)
   return lines.join('\n')
 }
 

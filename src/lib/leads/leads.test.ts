@@ -45,9 +45,9 @@ describe('handing a lead over', () => {
     const text = handoffText(contact(), '2990s', { name: 'Daniel' }, 'Mei Ling')
     expect(text).toContain('012-338 4721')
     expect(text).toContain('Oct Sofa Week')
-    expect(text).toContain('[未定 not set]')
+    expect(text).toContain('[not set 未定]')
     expect(text).toContain('Daniel')
-    expect(text).not.toContain('備註')
+    expect(text).not.toContain('Note 备注')
   })
   it('says where a conversation stands', () => {
     expect(inboxState(contact())).toBe('waiting')
