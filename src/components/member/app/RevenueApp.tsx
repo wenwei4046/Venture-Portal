@@ -36,6 +36,7 @@ import { ask, createLiveSource, demoSource, settleRead, type RevenueSource, type
 import type { MemberWaitingForm } from "@/lib/member/server";
 import { useKeyedRead } from "./useKeyedRead";
 import { BottomNav, DeskAside, DeskHeader, MobileHeader, ViewingAsBar, type Me, type ModuleId } from "./shell/Chrome";
+import { ViewSwitchCurtain } from "./shell/ViewSwitchCurtain";
 import { useCrmUnread } from "./shell/useCrmUnread";
 import { useLiveBell } from "./shell/useLiveBell";
 import PullRefresh from "./shell/PullRefresh";
@@ -245,6 +246,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const [android, setAndroid] = useState(device === "android");
   const appRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+  // The screen itself: it steps back under the CRM's curtain, and the CRM rises in it (shell/ViewSwitchCurtain).
+  const screenRef = useRef<HTMLDivElement>(null);
   const desk = useDesk(appRef);
   const live = device === "live";
   const today = fixedToday ?? klToday();
@@ -633,11 +636,25 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // The CRM from Today's chat button (2026-10-14) opens as Profile › My leads & appointments does, and its way back
   // leads to where it was opened; any other way out of the CRM forgets that.
   const [crmFrom, setCrmFrom] = useState<Screen | null>(null);
+  // On a phone the CRM comes in behind a curtain (2026-10-17 — the user: "when revenue app, press switch to crm, i want
+  // is have a motion"; the handoff "Peach · Context", shell/ViewSwitchCurtain): from Today's chat button and from
+  // Profile's row alike. `switching` holds where its way back leads (null: Profile's own back) until the curtain has
+  // lifted — a tap meanwhile changes nothing. The curtain lifts once the CRM has drawn (`crmReady`, CrmApp's onReady).
+  const curtained = live && !desk;
+  const [switching, setSwitching] = useState<{ from: Screen | null } | null>(null);
+  const [crmReady, setCrmReady] = useState(false);
+  useEffect(() => {
+    if (!onCrm && crmReady) setCrmReady(false);
+  }, [onCrm, crmReady]);
   const openCrm = useCallback(() => {
     const from = route.screen;
+    if (curtained) {
+      setSwitching(prev => prev ?? { from });
+      return;
+    }
     goScreen("account", { pf: "crm" });
     setCrmFrom(from);
-  }, [route.screen, goScreen]);
+  }, [route.screen, goScreen, curtained]);
   useEffect(() => {
     if (!onCrm && crmFrom) setCrmFrom(null);
   }, [onCrm, crmFrom]);
@@ -1316,7 +1333,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else if (pf === "crm" && crm) {
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       // On a computer the Control panel draws the app's frame itself (CRM Desktop rev 1): its greeting, bell and links are these.
-      page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} desk={desk} open={crmOpen}
+      page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} desk={desk} open={crmOpen} onReady={() => setCrmReady(true)}
         onExit={crmFrom ? () => { const to = crmFrom; setCrmFrom(null); goScreen(to); } : back} deskApp={desk ? {
         greeting: fixture?.greeting ?? greeting(), subName: membership?.name ?? "", dateLine: `${longDayLabel(today)} · ${quarterLabel(today)}`,
         bellUnread: nfCount > 0 || nf.items.some(n => n.unread), notifCount: nfCount,
@@ -1330,7 +1347,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       // My leads & appointments carries the chats' unread messages, the same live count as Today's chat button (the owner,
       // 2026-10-14: "有任何消息，幫我出現 notification 在 revenue apps 的 my leads & appointment 中").
       page = <ProfileMain vm={docs.unseen || crmUnread ? { ...profileVM, badges: { ...profileVM.badges, ...(docs.unseen ? { docs: String(docs.unseen) } : {}), ...(crm && crmUnread ? { crm: crmUnread > 99 ? "99+" : String(crmUnread) } : {}) } } : profileVM} hidden={hidden} crm={crm} closedRows={closedRows} push={!data.demo && !viewed} actions={{
-        open: (key: WorkKey) => goScreen("account", { pf: key }),
+        open: (key: WorkKey) => (key === "crm" && curtained ? setSwitching(prev => prev ?? { from: null }) : goScreen("account", { pf: key })),
         scheme: shows(closed, "scheme") ? () => setSchemeOpen(true) : undefined,
         brandWeeks: shows(closed, "brandWeeks") ? () => goScreen("account", { pf: "brandWeeks" }) : undefined,
         toggleHide: incomeShut ? undefined : () => setHidden(!hidden),
@@ -1347,7 +1364,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const deskCrm = desk && route.screen === "account" && route.pf === "crm" && !!crm;
 
   const screen = (
-    <div className={`${s.screen} ${live ? s.screenLive : s.screenFramed} ${rail ? s.rail : ""}`} style={screenVars} data-platform={android ? "android" : "ios"}>
+    <div ref={screenRef} className={`${s.screen} ${live ? s.screenLive : s.screenFramed} ${rail ? s.rail : ""}`} style={screenVars} data-platform={android ? "android" : "ios"}>
       {!live && device !== "desktop" && <StatusBar android={android} />}
       <DeskAside active={route.screen} count={nfCount} notifOpen={nfOpen} me={me} hidden={hiddenScreens} home={home} onGo={goScreen} onQuote={() => openSheet("brand")}
         onNotif={toggleNotif} onProfile={() => goScreen("account")}
@@ -1462,6 +1479,14 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   return (
     <div ref={appRef} className={`${base.root} ${s.app}`} data-revenue-app style={!live ? { width: device === "desktop" ? 1440 : device === "android" ? 410 : 414 } : undefined}>
       {live ? screen : <div className={`${s.frame} ${frame}`}>{screen}</div>}
+      {switching && (
+        <ViewSwitchCurtain from="Revenue" to="CRM" ready={crmReady} screen={screenRef}
+          onSwap={() => {
+            goScreen("account", { pf: "crm" });
+            if (switching.from) setCrmFrom(switching.from);
+          }}
+          onDone={() => setSwitching(null)} />
+      )}
     </div>
   );
 }

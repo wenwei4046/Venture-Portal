@@ -277,6 +277,8 @@
   --rv-hero-grad: linear-gradient(140deg,#F2995E 0%,#D9622A 55%,#B8461A 100%);
   --rv-hero-sub: #FFE6D6;
   --rv-hero-good: #DDF5E7;
+  /* the inner edge of a peach panel: the switch to the CRM's curtain (2026-10-17, handoff "Peach · Context") */
+  --rv-hero-edge: inset 0 0 0 1px rgba(255,255,255,.25);
   /* Profile (2026-10-05): the peach glow, My honours' walnut card and metal
      medals, the family chart, a request's audit notes */
   --rv-profile-glow: linear-gradient(180deg,#F6B48A 0%,#FFD9BC 70%,#FFFFFF 100%);
