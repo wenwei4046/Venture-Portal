@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>Your HOUZS Venture account</title>
+</head>
+<body style="margin:0;padding:0;background:#F2EFEA;-webkit-text-size-adjust:100%;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#F2EFEA;">Choose your password to activate your HOUZS Venture account.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F2EFEA;">
+  <tr>
+    <td align="center" style="padding:36px 16px 40px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;">
+        <tr>
+          <td style="padding:0 4px 20px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding-right:12px;vertical-align:middle;"><img src="{{ .SiteURL }}/icons/icon-192.png" width="40" height="40" alt="HOUZS Venture" style="display:block;width:40px;height:40px;border:0;"></td>
+                <td style="vertical-align:middle;font-family:Inter,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;letter-spacing:.08em;color:#2B1F17;">HOUZS VENTURE</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#FCFAF7;border:1px solid #D3CBC0;border-radius:16px;padding:36px 32px 32px;font-family:Inter,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#2B1F17;">
+            <h1 style="margin:0 0 20px;font-family:Newsreader,Georgia,'Times New Roman',serif;font-size:30px;line-height:1.2;font-weight:400;letter-spacing:-.02em;color:#2B1F17;">Welcome to HOUZS Venture.</h1>
+            <p style="margin:0 0 8px;font-size:15px;line-height:1.6;">{{ if .Data.name }}Hi {{ .Data.name }},{{ else }}Hello,{{ end }}</p>
+            <p style="margin:0 0 28px;font-size:15px;line-height:1.6;">You have been invited to the HOUZS Venture portal. Choose your password to activate your account.</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="border-radius:12px;background:#5A3E2B;"><a href="{{ .SiteURL }}/welcome?token_hash={{ .TokenHash }}&type=invite" style="display:inline-block;padding:14px 28px;border-radius:12px;font-family:Inter,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;line-height:1.2;color:#FCFAF7;text-decoration:none;">Set your password</a></td>
+              </tr>
+            </table>
+            <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#5A4E44;">The link works once and expires in 24 hours. If it has expired, ask HR to send you a new one.</p>
+            <p style="margin:24px 0 0;padding-top:20px;border-top:1px solid #E5E0D8;font-size:12px;line-height:1.6;color:#5A4E44;">If the button does not open, copy this link into your browser:<br><a href="{{ .SiteURL }}/welcome?token_hash={{ .TokenHash }}&type=invite" style="color:#5A4E44;word-break:break-all;">{{ .SiteURL }}/welcome?token_hash={{ .TokenHash }}&amp;type=invite</a></p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 4px 0;font-family:Inter,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#5A4E44;">HOUZS Venture Holding Sdn Bhd · <a href="mailto:hello@houzsventure.com" style="color:#5A4E44;">hello@houzsventure.com</a></td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>
